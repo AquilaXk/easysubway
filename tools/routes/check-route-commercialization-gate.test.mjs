@@ -39,6 +39,13 @@ test("route commercialization gate passes with production-ready reports", async 
       supportedStationLinePairs: 150,
       providerFreshnessSecondsMaxObserved: 80,
       staleFallbackRequired: true,
+      freshness: { staleAsFreshCount: 0 },
+      mapping: { failureRate: 0 },
+    },
+    routeGraphCoverage: {
+      schemaVersion: 1,
+      generatedConnectorVerifiedAccessibilityCount: 0,
+      strictRouteNotFound: { total: 100, notFoundCount: 1, rate: 0.01, byReasonCode: {} },
     },
     contract: {
       schemaVersion: 1,
@@ -89,6 +96,18 @@ test("route commercialization gate fails closed for fixture-only or unsafe route
       supportedStationLinePairs: 50,
       providerFreshnessSecondsMaxObserved: 120,
       staleFallbackRequired: false,
+      freshness: { staleAsFreshCount: 1 },
+      mapping: { failureRate: 0.1 },
+    },
+    routeGraphCoverage: {
+      schemaVersion: 1,
+      generatedConnectorVerifiedAccessibilityCount: 1,
+      strictRouteNotFound: {
+        total: 100,
+        notFoundCount: 5,
+        rate: 0.05,
+        byReasonCode: { GENERATED_CONNECTOR_UNVERIFIED: 5 },
+      },
     },
     contract: {
       schemaVersion: 1,
@@ -111,6 +130,9 @@ test("route commercialization gate fails closed for fixture-only or unsafe route
       assert.ok(report.failures.includes("routeEtaAccuracy production sampleSize is below 100"));
       assert.ok(report.failures.includes("accessibility strict step-free false positive count exceeds 0"));
       assert.ok(report.failures.includes("accessibility generated connector verified count exceeds 0"));
+      assert.ok(report.failures.includes("realtimeCoverage stale-as-fresh count exceeds 0"));
+      assert.ok(report.failures.includes("route graph generated connector verified count exceeds 0"));
+      assert.ok(report.failures.includes("route graph strict route not found rate exceeds 0.02"));
       assert.ok(!report.failures.includes("routing D-3 blocker must be satisfied before out-of-station transfer release claim"));
       return true;
     },
@@ -146,6 +168,13 @@ test("route commercialization gate keeps legacy production sample fallback", asy
       supportedStationLinePairs: 150,
       providerFreshnessSecondsMaxObserved: 80,
       staleFallbackRequired: true,
+      freshness: { staleAsFreshCount: 0 },
+      mapping: { failureRate: 0 },
+    },
+    routeGraphCoverage: {
+      schemaVersion: 1,
+      generatedConnectorVerifiedAccessibilityCount: 0,
+      strictRouteNotFound: { total: 100, notFoundCount: 1, rate: 0.01, byReasonCode: {} },
     },
     contract: {
       schemaVersion: 1,
@@ -171,6 +200,129 @@ test("route commercialization gate keeps legacy production sample fallback", asy
   );
 });
 
+test("route commercialization gate derives realtime pair minimum from coverage scope", async () => {
+  const fixture = await writeFixtureSet({
+    accuracy: {
+      schemaVersion: 1,
+      sampleSize: 120,
+      sampleSourceCounts: {
+        fixture: 0,
+        staticTimetable: 0,
+        realtimeProvider: 120,
+        manualObservation: 120,
+        staleRealtime: 0,
+      },
+      productionSampleSize: 120,
+      metrics: {
+        singleRide: { sampleSize: 60, p50ErrorSeconds: 45, p90ErrorSeconds: 100 },
+        transfer: { sampleSize: 60, p50ErrorSeconds: 90, p90ErrorSeconds: 240 },
+      },
+      failures: [],
+    },
+    accessibility: {
+      schemaVersion: 1,
+      strictStepFreeKnownStairFalsePositiveCount: 0,
+      generatedConnectorVerifiedAccessibilityCount: 0,
+      unknownAccessibilityLabeled: true,
+    },
+    coverage: {
+      schemaVersion: 1,
+      scope: {
+        id: "capital_pilot_android_v1",
+        supportedStationLinePairsMin: 2,
+      },
+      supportedStationLinePairs: 2,
+      providerFreshnessSecondsMaxObserved: 80,
+      staleFallbackRequired: true,
+      freshness: { staleAsFreshCount: 0 },
+      mapping: { failureRate: 0 },
+    },
+    routeGraphCoverage: {
+      schemaVersion: 1,
+      generatedConnectorVerifiedAccessibilityCount: 0,
+      strictRouteNotFound: { total: 100, notFoundCount: 1, rate: 0.01, byReasonCode: {} },
+    },
+    contract: {
+      schemaVersion: 1,
+      multiTransferSupported: false,
+      outOfStationTransferSupported: false,
+      alternativeItinerariesMinObserved: 1,
+      wrongTransferCount: 0,
+      wrongLineSequence: 0,
+      routeNotFoundRate: 0.01,
+      releaseBlockersSatisfied: ["D-2", "D-3", "H-1"],
+    },
+  });
+
+  const { stdout } = await execChecker(fixture);
+  const report = JSON.parse(stdout);
+
+  assert.equal(report.status, "PASS");
+  assert.deepEqual(report.failures, []);
+});
+
+test("route commercialization gate fails on unclassified ETA deviations", async () => {
+  const fixture = await writeFixtureSet({
+    accuracy: {
+      schemaVersion: 1,
+      sampleSize: 120,
+      sampleSourceCounts: {
+        fixture: 0,
+        staticTimetable: 0,
+        realtimeProvider: 120,
+        manualObservation: 120,
+        staleRealtime: 0,
+      },
+      productionSampleSize: 120,
+      metrics: {
+        singleRide: { sampleSize: 60, p50ErrorSeconds: 45, p90ErrorSeconds: 100 },
+        transfer: { sampleSize: 60, p50ErrorSeconds: 90, p90ErrorSeconds: 240 },
+        unclassifiedEtaDeviationCount: 1,
+      },
+      failures: [],
+    },
+    accessibility: {
+      schemaVersion: 1,
+      strictStepFreeKnownStairFalsePositiveCount: 0,
+      generatedConnectorVerifiedAccessibilityCount: 0,
+      unknownAccessibilityLabeled: true,
+    },
+    coverage: {
+      schemaVersion: 1,
+      supportedStationLinePairs: 150,
+      providerFreshnessSecondsMaxObserved: 80,
+      staleFallbackRequired: true,
+      freshness: { staleAsFreshCount: 0 },
+      mapping: { failureRate: 0 },
+    },
+    routeGraphCoverage: {
+      schemaVersion: 1,
+      generatedConnectorVerifiedAccessibilityCount: 0,
+      strictRouteNotFound: { total: 100, notFoundCount: 1, rate: 0.01, byReasonCode: {} },
+    },
+    contract: {
+      schemaVersion: 1,
+      multiTransferSupported: false,
+      outOfStationTransferSupported: false,
+      alternativeItinerariesMinObserved: 1,
+      wrongTransferCount: 0,
+      wrongLineSequence: 0,
+      routeNotFoundRate: 0.01,
+      releaseBlockersSatisfied: ["D-2", "D-3", "H-1"],
+    },
+  });
+
+  await assert.rejects(
+    execChecker(fixture),
+    (error) => {
+      const report = JSON.parse(error.stdout);
+      assert.equal(report.status, "FAIL");
+      assert.ok(report.failures.includes("routeEtaAccuracy unclassified ETA deviation count exceeds 0"));
+      return true;
+    },
+  );
+});
+
 test("route commercialization gate sorts checked reports with an explicit comparator", async () => {
   const source = await readFile("tools/routes/check-route-commercialization-gate.mjs", "utf8");
 
@@ -184,6 +336,7 @@ async function writeFixtureSet(reports) {
     accuracy: path.join(dir, "route-accuracy-report.json"),
     accessibility: path.join(dir, "route-accessibility-regression-report.json"),
     coverage: path.join(dir, "realtime-provider-coverage-report.json"),
+    routeGraphCoverage: path.join(dir, "route-graph-coverage-report.json"),
     contract: path.join(dir, "route-v2-contract-report.json"),
   };
   await Promise.all(Object.entries(reports).map(([key, report]) => writeFile(files[key], `${JSON.stringify(report, null, 2)}\n`)));
@@ -201,6 +354,8 @@ function execChecker(files) {
     files.accessibility,
     "--coverage",
     files.coverage,
+    "--routeGraphCoverage",
+    files.routeGraphCoverage,
     "--contract",
     files.contract,
   ], { cwd: root });

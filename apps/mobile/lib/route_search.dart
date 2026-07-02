@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
+import 'ad_slot.dart';
 import 'auth_headers.dart';
 import 'core/network/api_client.dart';
 import 'features/route_draft/domain/route_draft.dart';
@@ -39,28 +40,27 @@ const _routeSearchLargeRadius = BorderRadius.all(Radius.circular(16));
 const _routeSearchPickerRadius = BorderRadius.all(Radius.circular(16));
 const _routeSearchPillRadius = BorderRadius.all(Radius.circular(999));
 const _routePointRailWidth = 30.0;
-const _routePointOriginNodeColor = Color(0xFF27A6D9);
+const _routePointOriginNodeColor = EasySubwayAccessibleColors.primary;
 const _routePointDestinationNodeColor = Color(0xFF006D77);
 const _routePointConnectorColor = Color(0xFFBFD6DA);
-const _routeTextPrimaryColor = Color(0xFF102A2C);
-const _routeTextSecondaryColor = Color(0xFF29484B);
-const _routeTextMutedColor = Color(0xFF405A5D);
-const _routeTextSubtleColor = Color(0xFF50656F);
-const _routeNextActionTextColor = Color(0xFF506B6F);
-const _routeAccentColor = Color(0xFF006D77);
+const _routeTextPrimaryColor = EasySubwayAccessibleColors.text;
+const _routeTextSecondaryColor = EasySubwayAccessibleColors.secondaryText;
+const _routeTextMutedColor = EasySubwayAccessibleColors.secondaryText;
+const _routeTextSubtleColor = EasySubwayAccessibleColors.mutedText;
+const _routeNextActionTextColor = EasySubwayAccessibleColors.mutedText;
+const _routeAccentColor = EasySubwayAccessibleColors.primary;
 const _routeCardBorderColor = Color(0xFFD5E2E4);
-const _routeDividerColor = Color(0xFFE0E7EC);
+const _routeDividerColor = EasySubwayAccessibleColors.line;
 const _routeControlBorderColor = Color(0xFF9DB6BA);
 const _routeSoftPanelColor = Color(0xFFE9F5F6);
 const _routeSoftPanelBorderColor = Color(0xFFB9D4D8);
 const _routeGuidanceDarkColor = Color(0xFF073245);
 const _routeGuidanceSecondaryColor = Color(0xFFC7D8E3);
 const _routeBlockedBorderColor = Color(0xFFEFCCCC);
-const _routeCardShadowColor = Color(0x0F071B2F);
-const _routeAccentShadowColor = Color(0x1A0D8A6D);
-const _routeResultBorderColor = Color(0xFF0D8A6D);
-const _routeStatusChipBackgroundColor = Color(0xFFDEF5E7);
-const _routeTimelineColor = Color(0xFF27A6D9);
+const _routeCardShadowColor = EasySubwayAccessibleColors.cardShadow;
+const _routeAccentShadowColor = EasySubwayAccessibleColors.cardShadow;
+const _routeResultBorderColor = EasySubwayAccessibleColors.primary;
+const _routeTimelineColor = EasySubwayAccessibleColors.primary;
 const _routeBlockedColor = Color(0xFFA93434);
 const _routeBlockedSoftColor = Color(0xFFFFE7E7);
 const _routeArrivalPanelColor = Color(0xFFE6F2F0);
@@ -734,18 +734,20 @@ class FavoriteRoute {
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
-  String get lineLabel => lineName.isEmpty ? '노선을 아직 알 수 없어요' : lineName;
+  /// 노선명(모르면 빈 문자열 — 호출부에서 줄 자체를 숨긴다).
+  String get lineLabel => lineName;
 
-  String get scoreLabel => '다시 찾으면 자세히 볼 수 있어요';
+  bool get hasLine => lineName.isNotEmpty;
 
   String get mobilityLabel => _mobilityLabelFor(mobilityType);
 
   String get etaSourceLabel => routeEtaSourceLabel(etaSource);
 
+  /// 확정 정보만: 이동 조건 · 노선(있을 때) · 최근 확인일 · 출처.
   String get scoreBasisText {
     return [
       '$mobilityLabel 조건',
-      lineLabel,
+      if (hasLine) lineLabel,
       _routeDateLabel(routeCreatedAt),
       if (etaSourceLabel.isNotEmpty) etaSourceLabel,
     ].join(' · ');
@@ -754,31 +756,19 @@ class FavoriteRoute {
   String get scoreBasisSemanticLabel {
     return [
       '$mobilityLabel 조건',
-      lineLabel,
+      if (hasLine) lineLabel,
       _routeDateLabel(routeCreatedAt),
       if (etaSourceLabel.isNotEmpty) etaSourceLabel,
     ].join(', ');
   }
 
-  String get movementMetricLabel =>
-      '예상 시간을 확인하고 있어요 · 환승 안내를 확인하고 있어요 · 걷는 거리를 확인하고 있어요';
-
-  String get accessibilityMetricLabel =>
-      '계단 여부를 아직 알 수 없어요 · 엘리베이터 연결을 아직 알 수 없어요';
-
   String get semanticLabel {
     return [
       '즐겨찾기 경로',
       summaryTitle,
-      lineLabel,
+      if (hasLine) lineLabel,
       mobilityLabel,
-      scoreLabel,
       scoreBasisSemanticLabel,
-      '예상 시간을 확인하고 있어요',
-      '환승 안내를 확인하고 있어요',
-      '걷는 거리를 확인하고 있어요',
-      '계단 여부를 아직 알 수 없어요',
-      '엘리베이터 연결을 아직 알 수 없어요',
     ].join(', ');
   }
 }
@@ -1127,6 +1117,7 @@ class RouteSearchResult {
     this.transferSlackSeconds,
     this.hasOutOfStationTransfer = false,
     this.commercialEtaEligible = false,
+    this.sourceUpdatedAt = '',
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1232,6 +1223,7 @@ class RouteSearchResult {
           _optionalRouteBool(json, 'hasOutOfStationTransfer') ?? false,
       commercialEtaEligible:
           _optionalRouteBool(json, 'commercialEtaEligible') ?? false,
+      sourceUpdatedAt: _optionalRouteString(json, 'sourceUpdatedAt'),
     );
   }
 
@@ -1291,6 +1283,7 @@ class RouteSearchResult {
         (leg) => leg.legType == 'OUT_OF_STATION_TRANSFER',
       ),
       commercialEtaEligible: itinerary.commercialEtaEligible,
+      sourceUpdatedAt: result.departureTime,
     );
   }
 
@@ -1322,6 +1315,7 @@ class RouteSearchResult {
   final int? transferSlackSeconds;
   final bool hasOutOfStationTransfer;
   final bool commercialEtaEligible;
+  final String sourceUpdatedAt;
 
   int get accessibilityScore => _accessibilityScore ?? score;
 
@@ -1412,7 +1406,16 @@ class RouteSearchResult {
 
   bool get isLocalResult => routeSearchId.startsWith('local-');
 
-  String get sourceNotice => '예상 소요시간: ${routeEtaSourceLabel(etaSource)}';
+  String get sourceNotice {
+    if (isLocalResult && etaSource == 'STATIC_LOCAL') {
+      final updatedAt = sourceUpdatedAt.trim();
+      final freshness = updatedAt.isEmpty
+          ? ''
+          : ' · ${_routeDateLabel(updatedAt)}';
+      return '예상 소요시간: 저장된 데이터 기준$freshness';
+    }
+    return '예상 소요시간: ${routeEtaSourceLabel(etaSource)}';
+  }
 
   RouteSearchResult withDisplayLabels({
     String? originStationName,
@@ -1451,6 +1454,7 @@ class RouteSearchResult {
       transferSlackSeconds: transferSlackSeconds,
       hasOutOfStationTransfer: hasOutOfStationTransfer,
       commercialEtaEligible: commercialEtaEligible,
+      sourceUpdatedAt: sourceUpdatedAt,
     );
   }
 
@@ -2684,7 +2688,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                             style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(
                                   color: _routeTextPrimaryColor,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                   height: 1.25,
                                 ),
                           ),
@@ -2831,11 +2835,12 @@ class _RoutePointPickerCard extends StatelessWidget {
         color: Colors.white,
         border: Border.all(color: _routeCardBorderColor),
         borderRadius: _routeSearchPickerRadius,
+        // 최소 그림자 원칙: 보더 중심으로 낮춘다.
         boxShadow: const [
           BoxShadow(
             color: _routeCardShadowColor,
-            blurRadius: 16,
-            offset: Offset(0, 5),
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -2992,7 +2997,7 @@ class _RouteSectionHeader extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: _routeTextPrimaryColor,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.25,
             ),
           ),
@@ -3144,6 +3149,13 @@ StationSearchLine _routeRecentLine(String name) {
 
 String _routeLineColor(String name) => fallbackLineColorHex(lineName: name);
 
+/// 기본 레벨(LEVEL_1)·미확정 품질 필러는 목록에서 감춘다(#1477과 동일 규칙).
+bool _showsRouteDataQualityLabel(String dataQualityLevel) {
+  return dataQualityLevel == 'LEVEL_2' ||
+      dataQualityLevel == 'LEVEL_3' ||
+      dataQualityLevel == 'LEVEL_4';
+}
+
 class _RouteRecentDestinationRow extends StatelessWidget {
   const _RouteRecentDestinationRow({
     required this.route,
@@ -3176,7 +3188,7 @@ class _RouteRecentDestinationRow extends StatelessWidget {
               title,
               style: const TextStyle(
                 color: _routeTextPrimaryColor,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
             subtitle: Padding(
@@ -3246,7 +3258,7 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
           option.title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
           ),
         ),
@@ -3652,7 +3664,7 @@ class _RouteStationOptionTile extends StatelessWidget {
                             result.nameKo,
                             style: textTheme.titleMedium?.copyWith(
                               color: _routeTextPrimaryColor,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w800,
                               height: 1.25,
                             ),
                           ),
@@ -3667,14 +3679,18 @@ class _RouteStationOptionTile extends StatelessWidget {
                               height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            result.dataQualityLabel,
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: _routeTextMutedColor,
-                              height: 1.3,
+                          if (_showsRouteDataQualityLabel(
+                            result.dataQualityLevel,
+                          )) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              result.dataQualityLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: _routeTextMutedColor,
+                                height: 1.3,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -3865,15 +3881,6 @@ class _RouteRefreshStatusBanner extends StatelessWidget {
   }
 }
 
-enum _RouteWorkflowView {
-  list,
-  detail,
-  guidance,
-  internalRoute,
-  blocked,
-  feedback,
-}
-
 class _RouteSearchResultCard extends StatefulWidget {
   const _RouteSearchResultCard({
     required this.result,
@@ -3896,122 +3903,134 @@ class _RouteSearchResultCard extends StatefulWidget {
 }
 
 class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
-  _RouteWorkflowView _view = _RouteWorkflowView.list;
-
-  @override
-  void didUpdateWidget(_RouteSearchResultCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.result.routeSearchId != widget.result.routeSearchId) {
-      _view = _RouteWorkflowView.list;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final result = widget.result;
-    final refreshMessage = widget.refreshMessage;
     if (result.isBlocked) {
-      final content = _RouteBlockedWorkflow(result: result);
-      final onShellBackToHome = widget.onShellBackToHome;
-      if (onShellBackToHome == null) {
-        return content;
-      }
-      return PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            onShellBackToHome();
-          }
-        },
-        child: content,
-      );
+      return _wrapShellBack(_RouteBlockedWorkflow(result: result));
     }
 
-    final canUseRouteActions = _isRecommendedRoute(result);
-    final canUseApiActions = !result.isLocalResult;
-    final canSaveRoute =
-        canUseApiActions &&
-        widget.favoriteRouteRepository != null &&
-        canUseRouteActions;
-    final canOpenFeedback =
-        canUseApiActions && widget.routeFeedbackRepository != null;
-
-    final workflowContent = switch (_view) {
-      _RouteWorkflowView.list => _RouteResultsListView(
-        result: result,
-        onOpenDetail: () => setState(() => _view = _RouteWorkflowView.detail),
+    // 결과 목록만 이 화면에 남기고, 상세·안내·역 안 이동·피드백은 표준
+    // 내비게이션 스택에 별도 화면으로 push한다(뒤로가기는 시스템 back에 위임).
+    return _wrapShellBack(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _RouteRefreshStatusBanner(
+            message: widget.refreshMessage,
+            isRefreshing: widget.isRefreshing,
+          ),
+          _RouteResultsListView(
+            result: result,
+            onOpenDetail: () => _openDetail(result),
+          ),
+        ],
       ),
-      _RouteWorkflowView.detail => _RouteDetailWorkflowView(
+    );
+  }
+
+  bool get _canUseRouteActions => _isRecommendedRoute(widget.result);
+  bool get _canUseApiActions => !widget.result.isLocalResult;
+  bool get _canSaveRoute =>
+      _canUseApiActions &&
+      widget.favoriteRouteRepository != null &&
+      _canUseRouteActions;
+  bool get _canOpenFeedback =>
+      _canUseApiActions && widget.routeFeedbackRepository != null;
+
+  // 목록 화면에서 시스템 back은 탭 셸 홈으로(탭 셸이 아닐 땐 화면 pop).
+  Widget _wrapShellBack(Widget content) {
+    final onShellBackToHome = widget.onShellBackToHome;
+    if (onShellBackToHome == null) {
+      return content;
+    }
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          onShellBackToHome();
+        }
+      },
+      child: content,
+    );
+  }
+
+  void _pushStage(Widget child) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _RouteStageScaffold(child: child),
+      ),
+    );
+  }
+
+  void _openDetail(RouteSearchResult result) {
+    _pushStage(
+      _RouteDetailWorkflowView(
         result: result,
-        onBack: () => setState(() => _view = _RouteWorkflowView.list),
-        onStartGuidance: !canUseRouteActions
+        onBack: () => Navigator.of(context).pop(),
+        onStartGuidance: !_canUseRouteActions
             ? null
-            : () => setState(() => _view = _RouteWorkflowView.guidance),
-        onOpenFeedback: !canOpenFeedback
-            ? null
-            : () => setState(() => _view = _RouteWorkflowView.feedback),
-        favoriteSaveButton: canSaveRoute
+            : () => _openGuidance(result),
+        onOpenFeedback: !_canOpenFeedback ? null : () => _openFeedback(result),
+        favoriteSaveButton: _canSaveRoute
             ? _RouteFavoriteSaveButton(
                 result: result,
                 repository: widget.favoriteRouteRepository!,
               )
             : null,
       ),
-      _RouteWorkflowView.guidance => _RouteGuidanceWorkflowView(
+    );
+  }
+
+  void _openGuidance(RouteSearchResult result) {
+    _pushStage(
+      _RouteGuidanceWorkflowView(
         result: result,
-        onBack: () => setState(() => _view = _RouteWorkflowView.detail),
-        onOpenInternalRoute: () =>
-            setState(() => _view = _RouteWorkflowView.internalRoute),
-        onOpenBlocked: !canOpenFeedback
-            ? null
-            : () => setState(() => _view = _RouteWorkflowView.feedback),
-        onOpenFeedback: !canOpenFeedback
-            ? null
-            : () => setState(() => _view = _RouteWorkflowView.feedback),
+        onBack: () => Navigator.of(context).pop(),
+        onOpenInternalRoute: () => _openInternal(result),
+        onOpenBlocked: !_canOpenFeedback ? null : () => _openFeedback(result),
+        onOpenFeedback: !_canOpenFeedback ? null : () => _openFeedback(result),
       ),
-      _RouteWorkflowView.internalRoute => _RouteInternalWorkflowView(
+    );
+  }
+
+  void _openInternal(RouteSearchResult result) {
+    _pushStage(
+      _RouteInternalWorkflowView(
         result: result,
-        onBack: () => setState(() => _view = _RouteWorkflowView.guidance),
+        onBack: () => Navigator.of(context).pop(),
       ),
-      _RouteWorkflowView.blocked => _RouteBlockedWorkflow(result: result),
-      _RouteWorkflowView.feedback => _RouteFeedbackWorkflowView(
+    );
+  }
+
+  void _openFeedback(RouteSearchResult result) {
+    _pushStage(
+      _RouteFeedbackWorkflowView(
         result: result,
         repository: widget.routeFeedbackRepository,
-        onBack: () => setState(() => _view = _RouteWorkflowView.detail),
+        onBack: () => Navigator.of(context).pop(),
       ),
-    };
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _RouteRefreshStatusBanner(
-          message: refreshMessage,
-          isRefreshing: widget.isRefreshing,
-        ),
-        workflowContent,
-      ],
     );
-    final onShellBackToHome = widget.onShellBackToHome;
-    return PopScope(
-      canPop: _view == _RouteWorkflowView.list && onShellBackToHome == null,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          return;
-        }
-        if (_view == _RouteWorkflowView.list) {
-          onShellBackToHome?.call();
-          return;
-        }
-        setState(() {
-          _view = switch (_view) {
-            _RouteWorkflowView.detail => _RouteWorkflowView.list,
-            _RouteWorkflowView.guidance => _RouteWorkflowView.detail,
-            _RouteWorkflowView.internalRoute => _RouteWorkflowView.guidance,
-            _RouteWorkflowView.feedback => _RouteWorkflowView.detail,
-            _ => _RouteWorkflowView.list,
-          };
-        });
-      },
-      child: content,
+  }
+}
+
+/// push된 길찾기 단계(상세·안내·역 안 이동·피드백) 화면 껍데기.
+/// 시스템 back과 각 뷰의 상단 back 버튼이 이 라우트를 pop한다.
+class _RouteStageScaffold extends StatelessWidget {
+  const _RouteStageScaffold({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          child: child,
+        ),
+      ),
     );
   }
 }
@@ -4048,6 +4067,9 @@ class _RouteResultsListView extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         _RouteResultListButton(result: result, onPressed: onOpenDetail),
+        // 경로 확인 휴지점(결과 목록 끝)에만 광고 슬롯. 안내 진행 화면에는 없음.
+        const SizedBox(height: 16),
+        const AdBannerSlot(slotKey: Key('routeResultListAdBanner')),
       ],
     );
   }
@@ -4121,6 +4143,9 @@ class _RouteDetailWorkflowView extends StatelessWidget {
             child: const Text('경로 피드백'),
           ),
         ],
+        // 상세 뷰 스크롤 끝에만 광고 슬롯(안내·역 안 이동·피드백에는 없음).
+        const SizedBox(height: 16),
+        const AdBannerSlot(slotKey: Key('routeDetailAdBanner')),
       ],
     );
   }
@@ -4183,7 +4208,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                 '${result.originStationName} → ${result.destinationStationName}',
                                 style: textTheme.titleMedium?.copyWith(
                                   color: EasySubwayAccessibleColors.text,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                   height: 1.25,
                                 ),
                               ),
@@ -4208,7 +4233,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                       '${result.originStationName} → ${result.destinationStationName}',
                                       style: textTheme.titleMedium?.copyWith(
                                         color: EasySubwayAccessibleColors.text,
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w800,
                                         height: 1.25,
                                       ),
                                     ),
@@ -4275,7 +4300,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                 _routeWorkflowSummaryTitle(result),
                                 style: textTheme.headlineSmall?.copyWith(
                                   color: EasySubwayAccessibleColors.text,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                   height: 1.1,
                                 ),
                               ),
@@ -4291,7 +4316,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                 result.comfortLabel,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: EasySubwayAccessibleColors.mintDark,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ],
@@ -4308,7 +4333,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                       _routeWorkflowSummaryTitle(result),
                                       style: textTheme.headlineSmall?.copyWith(
                                         color: EasySubwayAccessibleColors.text,
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w800,
                                         height: 1.1,
                                       ),
                                     ),
@@ -4332,7 +4357,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                                     style: textTheme.bodyMedium?.copyWith(
                                       color:
                                           EasySubwayAccessibleColors.mintDark,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                 ],
@@ -4380,7 +4405,7 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
         if (nextStep != null)
           _RouteNotice(
             title: '다음',
-            text: nextStep.title,
+            text: nextStep.userTitle,
             icon: Icons.near_me_outlined,
           ),
         if (onOpenBlocked case final openBlocked?)
@@ -4481,7 +4506,7 @@ class _RouteBlockedWorkflow extends StatelessWidget {
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 12),
@@ -4528,7 +4553,7 @@ class _RouteFeedbackWorkflowView extends StatelessWidget {
           '방금 안내가\n실제 이동에 도움이 됐나요?',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
           ),
         ),
@@ -4586,7 +4611,7 @@ class _RouteResultListButton extends StatelessWidget {
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(
                                   color: _routeTextPrimaryColor,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                 ),
                           ),
                         ),
@@ -4660,7 +4685,7 @@ class _RouteDarkSummaryCard extends StatelessWidget {
               title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 color: Colors.white,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 4),
@@ -4808,7 +4833,7 @@ class _RouteResultSection extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.2,
             ),
           ),
@@ -4834,10 +4859,12 @@ class _RouteStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 환승·걷기·이동조건 등 비상태 정보는 민트 틴트 대신 중립 아이콘+텍스트로.
     return Container(
       decoration: BoxDecoration(
-        color: _routeStatusChipBackgroundColor,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _routeSearchPillRadius,
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       child: Wrap(
@@ -4845,13 +4872,13 @@ class _RouteStatusChip extends StatelessWidget {
         runSpacing: 3,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Icon(icon, size: 13, color: EasySubwayAccessibleColors.mintDark),
+          Icon(icon, size: 13, color: EasySubwayAccessibleColors.secondaryText),
           Text(
             label,
             style: const TextStyle(
-              color: EasySubwayAccessibleColors.mintDark,
+              color: EasySubwayAccessibleColors.secondaryText,
               fontSize: 11,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -4979,7 +5006,7 @@ class _RouteArrivalGuidance extends StatelessWidget {
                     '도착 안내',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: _routeArrivalTextColor,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.25,
                     ),
                   ),
@@ -5041,7 +5068,7 @@ class _RouteNotice extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: _routeNoticeTextColor,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         height: 1.25,
                       ),
                     ),
@@ -5088,7 +5115,7 @@ class _RouteStepSection extends StatelessWidget {
           '이동 순서',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
           ),
         ),
@@ -5120,7 +5147,7 @@ class _RouteStepTile extends StatelessWidget {
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -5134,7 +5161,7 @@ class _RouteStepTile extends StatelessWidget {
                     step.userActionTitle,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: _routeArrivalTextColor,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
                   ),
@@ -5144,7 +5171,7 @@ class _RouteStepTile extends StatelessWidget {
                   step.userTitle,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: _routeTextPrimaryColor,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     height: 1.3,
                   ),
                 ),
@@ -5801,11 +5828,6 @@ class _FavoriteRouteTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final menuButtonKey =
-        GlobalKey<PopupMenuButtonState<_FavoriteRouteMenuAction>>();
-    final moreSemanticLabel =
-        '${favorite.summaryTitle} 더 보기${isRemoving ? ', 삭제 중' : ''}';
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -5842,35 +5864,20 @@ class _FavoriteRouteTile extends StatelessWidget {
               const SizedBox(width: 8),
             ],
             Semantics(
-              key: Key('favoriteRouteMore-${favorite.favoriteRouteId}'),
-              container: true,
-              label: moreSemanticLabel,
+              label: '${favorite.summaryTitle} 삭제',
               button: true,
               enabled: !isRemoving,
               onTap: isRemoving
                   ? null
-                  : () => menuButtonKey.currentState?.showButtonMenu(),
+                  : () => unawaited(_confirmRemove(context)),
               child: ExcludeSemantics(
-                child: PopupMenuButton<_FavoriteRouteMenuAction>(
-                  key: menuButtonKey,
-                  enabled: !isRemoving,
-                  tooltip: '경로 더 보기',
-                  onSelected: (action) {
-                    switch (action) {
-                      case _FavoriteRouteMenuAction.remove:
-                        unawaited(_confirmRemove(context));
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem<_FavoriteRouteMenuAction>(
-                      key: Key(
-                        'favoriteRouteRemove-${favorite.favoriteRouteId}',
-                      ),
-                      value: _FavoriteRouteMenuAction.remove,
-                      child: const Text('삭제'),
-                    ),
-                  ],
-                  icon: const Icon(Icons.more_vert),
+                child: IconButton(
+                  key: Key('favoriteRouteRemove-${favorite.favoriteRouteId}'),
+                  tooltip: '삭제',
+                  onPressed: isRemoving
+                      ? null
+                      : () => unawaited(_confirmRemove(context)),
+                  icon: const Icon(Icons.delete_outline),
                 ),
               ),
             ),
@@ -5910,8 +5917,6 @@ class _FavoriteRouteTile extends StatelessWidget {
   }
 }
 
-enum _FavoriteRouteMenuAction { remove }
-
 class _FavoriteRouteSummaryCard extends StatelessWidget {
   const _FavoriteRouteSummaryCard({required this.favorite});
 
@@ -5942,59 +5947,27 @@ class _FavoriteRouteSummaryCard extends StatelessWidget {
                     favorite.summaryTitle,
                     style: textTheme.titleLarge?.copyWith(
                       color: _routeTextPrimaryColor,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.25,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    favorite.lineLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: _routeTextSecondaryColor,
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
+                  if (favorite.hasLine) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      favorite.lineLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: _routeTextSecondaryColor,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    favorite.mobilityLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: _routeTextSecondaryColor,
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    favorite.scoreLabel,
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: _routeTextSecondaryColor,
-                      fontWeight: FontWeight.w800,
-                      height: 1.3,
-                    ),
-                  ),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     favorite.scoreBasisText,
                     style: textTheme.bodyMedium?.copyWith(
                       color: _routeTextMutedColor,
                       fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    favorite.movementMetricLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: _routeTextMutedColor,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    favorite.accessibilityMetricLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: _routeTextMutedColor,
                       height: 1.3,
                     ),
                   ),

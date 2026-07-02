@@ -81,6 +81,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   const readme = read("README.md");
   const prTemplate = read(".github/pull_request_template.md");
   const contractReportBuilder = "tools/routes/build-route-v2-contract-report.mjs";
+  const routeGraphCoverageBuilder = "tools/routes/build-route-graph-coverage-report.mjs";
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -117,11 +118,13 @@ test("route commercialization release gate blocks unsupported commercial route c
     accuracy: "artifacts/route-accuracy-report.json",
     accessibility: "artifacts/route-accessibility-regression-report.json",
     coverage: "artifacts/realtime-provider-coverage-report.json",
+    routeGraphCoverage: "artifacts/route-graph-coverage-report.json",
     contract: "artifacts/route-v2-contract-report.json",
   });
   assert.deepEqual(gate.outOfStationTransferReleaseBlockers, ["D-2", "D-3", "H-1"]);
 
   assert.equal(existsSync(path.join(root, contractReportBuilder)), true, "route v2 contract report builder must exist");
+  assert.equal(existsSync(path.join(root, routeGraphCoverageBuilder)), true, "route graph coverage report builder must exist");
   assert.match(readme, /Route commercialization gate/);
   assert.match(readme, /apps\/mobile\/release\/route-commercialization-gate\.json/);
   assert.match(readme, /tools\/routes\/build-route-v2-contract-report\.mjs/);
@@ -620,7 +623,12 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   const releaseGateJob = jobBlock(workflow, "release-gate-consistency", "repository-contracts");
 
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /pull_request:[\s\S]*types:[\s\S]*- edited/);
   assert.match(workflow, /name: Changes/);
+  assert.match(workflow, /name: PR Title/);
+  assert.match(workflow, /PR Title \/ Validate bracket prefix/);
+  assert.ok(workflow.includes("^\\[(Feat|Fix|Test|Chore|Docs|Build|CI|Style|Refactor|Backend|Mobile)\\]\\ .+"));
+  assert.match(workflow, /Use '\[Type\] 한국어 작업 요약' format\./);
   assert.match(workflow, /name: Repository CI/);
   assert.match(workflow, /name: Backend CI/);
   assert.match(workflow, /name: Mobile App CI/);
@@ -1314,12 +1322,9 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavSaved'\)\), findsNothing/);
   assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도만 보여준다/);
-  assert.match(main, /homeFacilityAlertLoadingState/);
-  assert.match(main, /homeFacilityAlertErrorState/);
-  assert.match(main, /homeFacilityAlertEmptyState/);
-  assert.match(main, /homeRecentRouteLoadingState/);
-  assert.match(main, /homeRecentRouteErrorState/);
-  assert.match(main, /homeRecentRouteEmptyState/);
+  assert.doesNotMatch(main, /class _HomeHero/);
+  assert.doesNotMatch(main, /class _HomeAdaptiveContent/);
+  assert.match(main, /return const SizedBox\.shrink\(\);/);
 });
 
 test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스트는 유지된다", () => {
@@ -1365,10 +1370,11 @@ test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지�
 
   assert.match(widgetTest, routeBackTestPattern);
   assert.match(routeSearch, /return PopScope\(/);
-  assert.match(routeSearch, /_RouteWorkflowView\.detail\s*=>\s*_RouteWorkflowView\.list/);
-  assert.match(routeSearch, /_RouteWorkflowView\.guidance\s*=>\s*_RouteWorkflowView\.detail/);
-  assert.match(routeSearch, /_RouteWorkflowView\.internalRoute\s*=>\s*_RouteWorkflowView\.guidance/);
-  assert.match(routeSearch, /_RouteWorkflowView\.feedback\s*=>\s*_RouteWorkflowView\.detail/);
+  assert.match(routeSearch, /Navigator\.of\(context\)\.push\(\s*MaterialPageRoute<void>/);
+  assert.match(routeSearch, /builder:\s*\(_\)\s*=>\s*_RouteStageScaffold\(child:\s*child\)/);
+  assert.match(routeSearch, /class _RouteStageScaffold extends StatelessWidget/);
+  assert.match(routeSearch, /onBack:\s*\(\)\s*=>\s*Navigator\.of\(context\)\.pop\(\)/);
+  assert.doesNotMatch(routeSearch, /enum _RouteWorkflowView/);
 });
 
 test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테스트는 유지된다", () => {
@@ -1383,9 +1389,9 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   ].join("[\\s\\S]*"));
   const facilityNoLocationPattern = new RegExp([
     "testWidgets\\('시설 신고 화면은 GPS가 꺼져 있으면 위치 없이 제보를 선택할 수 있다'",
-    "facilityReportSubmitWithoutLocationButton",
-    "위치 없이 제보합니다",
-    "현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요",
+    "requestCount, 0",
+    "facilityReportSubmitButton",
+    "onPressed, isNotNull",
     "latitude, isNull",
     "longitude, isNull",
   ].join("[\\s\\S]*"));
@@ -1394,10 +1400,11 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   assert.match(main, /_viewPreferences\s*=\s*previous/);
   assert.match(main, /설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\./);
   assert.match(widgetTest, settingsFailurePattern);
-  assert.match(facilityReport, /facilityReportSubmitWithoutLocationButton/);
+  assert.match(facilityReport, /facilityReportAttachLocationButton/);
   assert.match(facilityReport, /facilityReportOpenLocationSettingsButton/);
-  assert.match(facilityReport, /facilityReportRetryLocationButton/);
-  assert.match(facilityReport, /현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요/);
+  assert.doesNotMatch(facilityReport, /facilityReportSubmitWithoutLocationButton/);
+  assert.doesNotMatch(facilityReport, /facilityReportRetryLocationButton/);
+  assert.doesNotMatch(facilityReport, /현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요/);
   assert.match(widgetTest, facilityNoLocationPattern);
   assert.match(widgetTest, /시설 신고 화면은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다/);
 });
@@ -1412,7 +1419,7 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
     "offlineDataSettingsButton",
     "저장된 안내 상태",
     "검증 구간",
-    "상록수·사당 검증 pilot",
+    "지금은 상록수역·사당역 구간을 안내해요",
     "findsNWidgets\\(2\\)",
     "마지막 갱신",
     "앱 설치 때 함께 받은 안내",
@@ -3046,7 +3053,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
@@ -3070,7 +3077,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     },
   );
   const rcGithubEnvOutput = readFileSync(rcGithubEnv, "utf8");
-  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/datapack\.aquilaxk\.site\/datapacks\/$/m);
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/objectstorage\.ap-seoul-1\.oraclecloud\.com\/n\/axvym6vk8g7i\/b\/easysubway-datapacks\/o$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_CHANNEL=production$/m);
   assert.match(
@@ -3125,7 +3132,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
@@ -3151,7 +3158,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
@@ -9257,6 +9264,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const networkMap = read("apps/mobile/lib/network_map.dart");
   const stationLineBadges = read("apps/mobile/lib/features/stations/presentation/station_line_badges.dart");
   const stationLine = read("apps/mobile/lib/features/stations/domain/station_line.dart");
   const stationApiRepository = read(
@@ -9315,8 +9323,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_PASSWORD=$/m);
   assert.match(iosInfoPlist, /CFBundleDisplayName[\s\S]*?<string>쉬운 지하철<\/string>/);
   assert.match(main, /class EasySubwayApp extends StatelessWidget/);
-  assert.match(main, /역 검색/);
-  assert.match(main, /길찾기/);
+  assert.match(`${main}\n${networkMap}\n${stationSearch}`, /역 검색/);
+  assert.match(`${main}\n${networkMap}\n${routeSearch}\n${stationSearch}`, /길찾기/);
   assert.match(main, /이동 조건/);
   assert.match(main, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
@@ -9462,15 +9470,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(mapAdapter, /_coordinateFrom\(station\.latitude, station\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(exit\.latitude, exit\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(facility\.latitude, facility\.longitude\)/);
-  assert.match(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
-  assert.match(stationSearch, /지도 위치 목록/);
+  assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
+  assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
   assert.doesNotMatch(stationSearch, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\./);
   assert.match(mapAdapterTest, /지도 제공자는 승인된 기본 제공자만 사용한다/);
   assert.match(mapAdapterTest, /지도 어댑터는 좌표가 있는 역 출구 시설만 쉬운 이름의 마커로 만든다/);
-  assert.match(widgetTest, /지도 위치 목록/);
-  assert.match(widgetTest, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\.'\), findsNothing/);
-  assert.match(widgetTest, /상록수역 자세한 안내[\s\S]*지도 위치/);
-  assert.match(widgetTest, /1번 출구, 엘리베이터 연결, 계단 없는 이동 가능[\s\S]*지도 위치/);
+  assert.match(widgetTest, /중복 "지도 위치 목록" 섹션은 제거됐다\(#1497\)\./);
+  assert.match(widgetTest, /find\.text\('지도 위치 목록'\), findsNothing/);
+  assert.doesNotMatch(widgetTest, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다/);
   assert.match(facilityReport, /Future<FacilityReportResult> getReport\(String reportId\)/);
   assert.match(facilityReport, /\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}/);
   assert.match(facilityReport, /refreshCurrentReport/);

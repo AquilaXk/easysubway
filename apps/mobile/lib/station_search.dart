@@ -56,8 +56,8 @@ const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
-const _stationTextMutedColor = Color(0xFF405A5D);
-const _stationTextSubtleColor = Color(0xFF506B6F);
+const _stationTextMutedColor = EasySubwayAccessibleColors.secondaryText;
+const _stationTextSubtleColor = EasySubwayAccessibleColors.mutedText;
 const _stationDetailTextColor = Color(0xFF2C5558);
 const _stationDetailSoftPanelColor = Color(0xFFEAF6F4);
 const _stationDetailSoftPanelBorderColor = Color(0xFFB9D7D2);
@@ -961,6 +961,15 @@ String _dataQualityLabel(String dataQualityLevel) {
     'LEVEL_4' => '고장·공사 소식이 반영됐어요',
     _ => '정보를 준비 중이에요',
   };
+}
+
+/// 데이터 품질 라벨을 목록에 노출할지 여부.
+/// 기본 레벨(LEVEL_1)·미확정 값은 "확인 중" 같은 필러라 목록에서는 감춘다
+/// (실제 안내 역량을 뜻하는 LEVEL_2 이상만 노출). simple is best.
+bool _showsDataQualityLabel(String dataQualityLevel) {
+  return dataQualityLevel == 'LEVEL_2' ||
+      dataQualityLevel == 'LEVEL_3' ||
+      dataQualityLevel == 'LEVEL_4';
 }
 
 String _dataConfidenceLabel(String dataConfidence) {
@@ -2416,7 +2425,7 @@ class _StationRecentSearchSection extends StatelessWidget {
             '최근 검색',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.25,
             ),
           ),
@@ -3201,7 +3210,7 @@ class _NearbyStationOverview extends StatelessWidget {
     final stationName = _stationResultDisplayName(result.nameKo);
     return Card(
       margin: EdgeInsets.zero,
-      color: EasySubwayAccessibleColors.skySoft,
+      color: EasySubwayAccessibleColors.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: _stationDetailFacilityCardRadius,
@@ -3258,10 +3267,14 @@ class _NearbyStationOverview extends StatelessWidget {
                                     height: 1.3,
                                   ),
                             ),
-                            const SizedBox(height: 8),
-                            _StationDetailTextPill(
-                              text: result.dataQualityLabel,
-                            ),
+                            if (_showsDataQualityLabel(
+                              result.dataQualityLevel,
+                            )) ...[
+                              const SizedBox(height: 8),
+                              _StationDetailTextPill(
+                                text: result.dataQualityLabel,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -3471,15 +3484,19 @@ class _StationSearchResultTile extends StatelessWidget {
                                     height: 1.25,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  result.dataQualityLabel,
-                                  style: textTheme.bodyMedium?.copyWith(
-                                    color: _stationTextMutedColor,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.25,
+                                if (_showsDataQualityLabel(
+                                  result.dataQualityLevel,
+                                )) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    result.dataQualityLabel,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color: _stationTextMutedColor,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.25,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),
@@ -3916,7 +3933,7 @@ class _FavoriteStationTile extends StatelessWidget {
                             favorite.nameKo,
                             style: textTheme.titleLarge?.copyWith(
                               color: EasySubwayAccessibleColors.text,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w800,
                               height: 1.25,
                             ),
                           ),
@@ -3939,14 +3956,18 @@ class _FavoriteStationTile extends StatelessWidget {
                               height: 1.3,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            favorite.dataQualityLabel,
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: _stationTextMutedColor,
-                              height: 1.3,
+                          if (_showsDataQualityLabel(
+                            favorite.dataQualityLevel,
+                          )) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              favorite.dataQualityLabel,
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: _stationTextMutedColor,
+                                height: 1.3,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
