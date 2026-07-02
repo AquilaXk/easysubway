@@ -3844,6 +3844,30 @@ void main() {
     expect(find.text('갱신 필요'), findsOneWidget);
   });
 
+  testWidgets('설정의 오프라인 데이터 안내는 저장 manifest 만료를 갱신 필요로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppSettingsScreen(
+          currentProfile: mobilityProfileOptions.first,
+          viewPreferences: const OnboardingViewPreferences.defaults(),
+          notificationRepository: null,
+          notificationPermissionProvider: null,
+          onViewPreferencesChanged: (_) async {},
+          onOpenMobilityProfile: () async => null,
+          onOpenSupportAccess: () {},
+          onOpenMyReports: () {},
+          offlineDataExpiresAtLoader: () async => DateTime.utc(2026, 6, 25, 12),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('offlineDataSettingsButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
+    expect(find.text('갱신 필요'), findsOneWidget);
+  });
+
   testWidgets('데이터 및 지도 출처 화면은 manifest와 source inventory를 보여준다', (
     tester,
   ) async {
