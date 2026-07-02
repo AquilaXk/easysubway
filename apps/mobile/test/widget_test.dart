@@ -8890,6 +8890,8 @@ void main() {
       );
       expect(routeRepository.requests.single.mobilityType, 'SENIOR');
       expect(find.text('추천 경로'), findsOneWidget);
+      // 결과 목록 끝에 광고 슬롯(#1496).
+      expect(find.byKey(const Key('routeResultListAdBanner')), findsOneWidget);
       expect(find.text('추천 경로 목록'), findsNothing);
       expect(find.text('편한 순'), findsNothing);
       expect(find.text('빠른 순'), findsNothing);
@@ -8964,6 +8966,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('단계별 안내'), findsOneWidget);
+      // 안내 진행 화면에는 광고 슬롯이 노출되지 않는다(#1496).
+      expect(find.byKey(const Key('routeResultListAdBanner')), findsNothing);
+      expect(find.byKey(const Key('routeDetailAdBanner')), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
       expect(find.text('다음'), findsOneWidget);
       expect(
