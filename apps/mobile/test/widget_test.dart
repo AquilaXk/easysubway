@@ -11295,6 +11295,59 @@ void main() {
     expect(reportRepository.requests.single.longitude, 126.866221);
   });
 
+  testWidgets('시설 신고 화면은 위치 권한 확인 중 제출을 막는다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final permissionCheckCompleter = Completer<bool>();
+    var requestCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          needsLocationPermissionRequest: () => permissionCheckCompleter.future,
+          locationLoader: () async {
+            requestCount++;
+            return const FacilityReportLocation(
+              latitude: 37.302421,
+              longitude: 126.866221,
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pump();
+
+    final pendingSubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(pendingSubmitButton.onPressed, isNull);
+    expect(reportRepository.requests, isEmpty);
+    expect(requestCount, 0);
+
+    permissionCheckCompleter.complete(false);
+    await tester.pumpAndSettle();
+
+    final readySubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(readySubmitButton.onPressed, isNotNull);
+    expect(requestCount, 1);
+  });
+
   testWidgets('시설 신고 화면은 위치 재확인 중 중복 탭을 무시한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     var requestCount = 0;
@@ -11422,6 +11475,54 @@ void main() {
 
     expect(requestCount, 2);
     expect(find.text('현재 위치를 첨부했어요'), findsOneWidget);
+  });
+
+  testWidgets('시설 신고 화면은 위치 실패 후 위치 없이 제출하면 실패 안내를 지운다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          locationLoader: () async {
+            throw const FacilityReportLocationException(
+              '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+            );
+          },
+          needsLocationPermissionRequest: () async => false,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
+    await _showFacilityReportDescriptionInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '위치 없이 바로 제보합니다.',
+    );
+    await _showFacilityReportSubmitButton(tester);
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(reportRepository.requests.single.latitude, isNull);
+    expect(reportRepository.requests.single.longitude, isNull);
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsNothing);
   });
 
   testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 없이 제보를 선택할 수 있다', (tester) async {

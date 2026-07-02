@@ -1743,6 +1743,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   String _photoMessage = '';
   String _locationMessage = '';
   bool _isLoadingLocation = false;
+  bool _isPreparingLocationAttachment = false;
   bool _isLocationFailure = false;
   bool _isOpeningLocationSettings = false;
   bool _isPhotoFailure = false;
@@ -1782,10 +1783,10 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final isLoading = state.status == FacilityReportViewStatus.loading;
     final reportResult = state.result;
     final hasSubmittedReport = reportResult != null;
+    final isLocationBusy = _isLoadingLocation || _isPreparingLocationAttachment;
     // 위치는 선택 정보다. 위치를 첨부하지 않아도 제보를 보낼 수 있다.
-    // 위치를 불러오는 중일 때만 잠시 비활성화한다.
-    final isSubmitDisabled =
-        isLoading || hasSubmittedReport || _isLoadingLocation;
+    // 위치 권한 안내/확인 또는 로딩 중일 때만 잠시 비활성화한다.
+    final isSubmitDisabled = isLoading || hasSubmittedReport || isLocationBusy;
 
     return Scaffold(
       appBar: AppBar(title: const Text('시설 알려주기')),
@@ -1904,7 +1905,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                   onPressed:
                       isLoading ||
                           hasSubmittedReport ||
-                          _isLoadingLocation ||
+                          isLocationBusy ||
                           _isOpeningLocationSettings
                       ? null
                       : _requestCurrentLocation,
@@ -1935,9 +1936,7 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                 OutlinedButton.icon(
                   key: const Key('facilityReportOpenLocationSettingsButton'),
                   onPressed:
-                      isLoading ||
-                          _isOpeningLocationSettings ||
-                          _isLoadingLocation
+                      isLoading || _isOpeningLocationSettings || isLocationBusy
                       ? null
                       : _openLocationSettings,
                   icon: _isOpeningLocationSettings
@@ -1996,6 +1995,12 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       if (!confirmed) {
         return;
       }
+    }
+    if (_attachedLocation == null && _isLocationFailure) {
+      setState(() {
+        _locationMessage = '';
+        _isLocationFailure = false;
+      });
     }
     unawaited(
       _controller.submit(
@@ -2068,19 +2073,26 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   }
 
   Future<void> _requestCurrentLocation() async {
-    if (widget.locationLoader == null || _isLoadingLocation) {
+    if (widget.locationLoader == null ||
+        _isLoadingLocation ||
+        _isPreparingLocationAttachment) {
       return;
     }
+    setState(() => _isPreparingLocationAttachment = true);
     final shouldContinue = await _confirmLocationUseIfNeeded();
+    if (mounted) {
+      setState(() => _isPreparingLocationAttachment = false);
+    }
+    if (!mounted) {
+      return;
+    }
     if (!shouldContinue) {
       // 사용자가 위치 첨부를 취소한 것은 오류가 아니다. 조용히 첨부하지 않는다.
-      if (mounted) {
-        setState(() {
-          _attachedLocation = null;
-          _locationMessage = '';
-          _isLocationFailure = false;
-        });
-      }
+      setState(() {
+        _attachedLocation = null;
+        _locationMessage = '';
+        _isLocationFailure = false;
+      });
       return;
     }
     await _loadCurrentLocation();
