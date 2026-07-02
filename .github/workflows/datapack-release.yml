@@ -400,6 +400,16 @@ jobs:
             }
             return normalized || zeroHash;
           };
+          const topologyReport = JSON.parse(fs.readFileSync(process.env.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT, "utf8"));
+          const routeGraphTopologyViolationCount = [
+            "localRideAdjacencyViolationCount",
+            "rideSpeedViolationCount",
+            "disconnectedNodeCount",
+            "unreachableDirectedPairCount",
+          ].reduce((sum, field) => sum + Number(topologyReport.summary?.[field] ?? 0), 0);
+          const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0
+            ? "PASS"
+            : releaseLike ? "FAIL" : "BLOCKED_EXTERNAL";
 
           const bundle = {
             schemaVersion: 1,
@@ -427,7 +437,7 @@ jobs:
             validatorStatus: "PASS",
             coverageStatus: releaseLike ? "PASS" : "BLOCKED_EXTERNAL",
             routeMapPositionCoverageStatus: "PASS",
-            routeGraphTopologyStatus: "PASS",
+            routeGraphTopologyStatus,
             strictRouteRegressionStatus: externalStatus(strictEvidence),
             manifestSignatureStatus: "PASS",
             androidEvidenceStatus: externalStatus(androidEvidence),

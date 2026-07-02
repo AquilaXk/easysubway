@@ -69,8 +69,9 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
       stationLines.map((row) => [stationLineNodeId(row.station_id, row.line_id), row]),
     );
     const graphNodes = new Set(stationLineByNode.keys());
-    const adjacency = new Map([...graphNodes].map((node) => [node, new Set()]));
-    const undirected = new Map([...graphNodes].map((node) => [node, new Set()]));
+    const routeGraphNodes = connectedLineNodes(stationLines);
+    const adjacency = new Map([...routeGraphNodes].map((node) => [node, new Set()]));
+    const undirected = new Map([...routeGraphNodes].map((node) => [node, new Set()]));
     const violations = {
       localRideAdjacency: [],
       rideSpeed: [],
@@ -80,6 +81,7 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
     const edgeCountsByType = {};
     const rideCountsByServicePattern = {};
 
+    addGeneratedStationTransferEdges(stationLines, routeGraphNodes, adjacency, undirected);
     for (const edge of edges) {
       const edgeType = String(edge.edge_type ?? "").toUpperCase();
       const servicePattern = String(edge.service_pattern || "LOCAL").toUpperCase();
@@ -106,7 +108,7 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
           });
         }
       }
-      if (!isRouteGraphEdge(edgeType) || !graphNodes.has(fromNode) || !graphNodes.has(toNode)) {
+      if (!isRouteGraphEdge(edgeType) || !routeGraphNodes.has(fromNode) || !routeGraphNodes.has(toNode)) {
         continue;
       }
       addEdge(adjacency, fromNode, toNode);
@@ -117,12 +119,12 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
       }
     }
 
-    for (const node of graphNodes) {
+    for (const node of routeGraphNodes) {
       if ((undirected.get(node)?.size ?? 0) === 0) {
         violations.disconnectedNodes.push(node);
       }
       const reachable = reachableNodesFrom(node, adjacency);
-      for (const other of graphNodes) {
+      for (const other of routeGraphNodes) {
         if (other !== node && !reachable.has(other)) {
           violations.unreachableDirectedPairs.push({ fromNode: node, toNode: other });
         }
@@ -134,6 +136,7 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
       version: pack.version ?? null,
       artifactKind: pack.artifactKind ?? null,
       stationLineNodeCount: graphNodes.size,
+      routeGraphNodeCount: routeGraphNodes.size,
       networkEdgeCount: edges.length,
       edgeCountsByType,
       rideCountsByServicePattern,
@@ -141,6 +144,43 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
     };
   } finally {
     database.close();
+  }
+}
+
+function connectedLineNodes(stationLines) {
+  const lineCounts = new Map();
+  for (const row of stationLines) {
+    lineCounts.set(row.line_id, (lineCounts.get(row.line_id) ?? 0) + 1);
+  }
+  return new Set(
+    stationLines
+      .filter((row) => (lineCounts.get(row.line_id) ?? 0) > 1)
+      .map((row) => stationLineNodeId(row.station_id, row.line_id)),
+  );
+}
+
+function addGeneratedStationTransferEdges(stationLines, routeGraphNodes, adjacency, undirected) {
+  const nodesByStation = new Map();
+  for (const row of stationLines) {
+    const nodeId = stationLineNodeId(row.station_id, row.line_id);
+    if (!routeGraphNodes.has(nodeId)) {
+      continue;
+    }
+    const stationNodes = nodesByStation.get(row.station_id) ?? [];
+    stationNodes.push(nodeId);
+    nodesByStation.set(row.station_id, stationNodes);
+  }
+  for (const stationNodes of nodesByStation.values()) {
+    for (const fromNode of stationNodes) {
+      for (const toNode of stationNodes) {
+        if (fromNode === toNode) {
+          continue;
+        }
+        addEdge(adjacency, fromNode, toNode);
+        addEdge(undirected, fromNode, toNode);
+        addEdge(undirected, toNode, fromNode);
+      }
+    }
   }
 }
 

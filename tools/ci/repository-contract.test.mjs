@@ -3896,6 +3896,9 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /sourceSnapshotSetHash: releaseHash\("sourceSnapshotSetHash"\)/);
   assert.match(workflow, /approvedOverrideSetHash: releaseHash\("approvedOverrideSetHash"\)/);
   assert.match(workflow, /routeGraphTopologySha256: hashFile\(process\.env\.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT\)/);
+  assert.match(workflow, /const routeGraphTopologyViolationCount = \[/);
+  assert.match(workflow, /const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0/);
+  assert.match(workflow, /routeGraphTopologyStatus,/);
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
   assert.match(workflow, /--verify-only/);

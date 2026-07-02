@@ -49,6 +49,32 @@ test("route graph topology report exposes LOCAL adjacency and speed violations",
   assert.equal(report.violations.unreachableDirectedPairs.length, 2);
 });
 
+test("route graph topology report seeds implicit same-station transfers", () => {
+  const sqlitePath = createTopologySqlite({
+    stationLines: [
+      ["station-a", "line-2", 10],
+      ["station-a", "line-4", 20],
+      ["station-b", "line-2", 11],
+      ["station-c", "line-4", 21],
+    ],
+    edges: [
+      ["edge-a-b-line2", "station-a:line-2:LOCAL", "station-b:line-2:LOCAL", "RIDE", "LOCAL", 120, 1000],
+      ["edge-b-a-line2", "station-b:line-2:LOCAL", "station-a:line-2:LOCAL", "RIDE", "LOCAL", 120, 1000],
+      ["edge-a-c-line4", "station-a:line-4:LOCAL", "station-c:line-4:LOCAL", "RIDE", "LOCAL", 120, 1000],
+      ["edge-c-a-line4", "station-c:line-4:LOCAL", "station-a:line-4:LOCAL", "RIDE", "LOCAL", 120, 1000],
+    ],
+  });
+
+  const report = buildRouteGraphTopologyReport(sqlitePath, {
+    id: "capital",
+    version: "1",
+    artifactKind: "production",
+  });
+
+  assert.equal(report.routeGraphNodeCount, 4);
+  assert.equal(report.violations.unreachableDirectedPairs.length, 0);
+});
+
 test("route graph topology report CLI writes artifact json", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "route-graph-topology-report-"));
   await mkdir(path.join(dir, "catalog"), { recursive: true });
