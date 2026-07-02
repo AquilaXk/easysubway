@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
+import 'core/datapack/data_pack_update_state.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
 import 'favorite_facility.dart';
@@ -80,6 +81,9 @@ Future<void> main() async {
         : null,
   );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
+  final dataPackUpdateStateRepository = DataPackUpdateStateRepository(
+    userDatabase: bootstrap.userDatabase,
+  );
   runApp(
     AppBootstrapLifecycle(
       close: bootstrap.close,
@@ -90,6 +94,9 @@ Future<void> main() async {
             const SecureFacilityReportDraftTargetStore(),
         facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
         legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
+        offlineDataExpiresAtLoader: () async =>
+            (await dataPackUpdateStateRepository.readManifestCache())
+                ?.expiresAt,
       ),
     ),
   );
@@ -273,6 +280,7 @@ class EasySubwayApp extends StatelessWidget {
         const SupportAccessInfo.fromEnvironment(),
     SupportAccessLauncher supportAccessLauncher =
         const UrlLauncherSupportAccessLauncher(),
+    OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
@@ -307,6 +315,7 @@ class EasySubwayApp extends StatelessWidget {
            isReleaseMode: kReleaseMode,
          ),
          supportAccessLauncher: supportAccessLauncher,
+         offlineDataExpiresAtLoader: offlineDataExpiresAtLoader,
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
@@ -324,6 +333,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
+    required this.offlineDataExpiresAtLoader,
     required this.recentRoutesFuture,
     super.key,
   }) : repository = dependencies.repository,
@@ -367,6 +377,7 @@ class EasySubwayApp extends StatelessWidget {
   final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -447,11 +458,14 @@ class EasySubwayApp extends StatelessWidget {
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
+        offlineDataExpiresAtLoader: offlineDataExpiresAtLoader,
         recentRoutesFuture: recentRoutesFuture,
       ),
     );
   }
 }
+
+typedef OfflineDataExpiresAtLoader = Future<DateTime?> Function();
 
 class EasySubwayScrollBehavior extends MaterialScrollBehavior {
   const EasySubwayScrollBehavior();
@@ -567,6 +581,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
+    required this.offlineDataExpiresAtLoader,
     required this.recentRoutesFuture,
   });
 
@@ -593,6 +608,7 @@ class _EasySubwayHome extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -714,6 +730,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         supportAccessLauncher: widget.supportAccessLauncher,
         userDataDeletionRepository: widget.userDataDeletionRepository,
         recentRoutesFuture: widget.recentRoutesFuture,
+        offlineDataExpiresAtLoader: widget.offlineDataExpiresAtLoader,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
         onViewPreferencesChanged: _saveViewPreferences,
@@ -1219,6 +1236,7 @@ class HomeScreen extends StatefulWidget {
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
+    this.offlineDataExpiresAtLoader,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
@@ -1248,6 +1266,7 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(OnboardingViewPreferences preferences)
   onViewPreferencesChanged;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final String initialMobilityType;
   final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
@@ -1580,6 +1599,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onOpenMobilityProfile: _openMobilityProfile,
           onOpenSupportAccess: openSupportAccess,
           onOpenMyReports: openMyReports,
+          offlineDataExpiresAtLoader: widget.offlineDataExpiresAtLoader,
         ),
       );
     }
@@ -2586,6 +2606,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
     required this.onOpenMyReports,
+    this.offlineDataExpiresAtLoader,
     this.bottomNavigationBar,
     super.key,
   });
@@ -2599,6 +2620,7 @@ class AppSettingsScreen extends StatefulWidget {
   final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenMyReports;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Widget? bottomNavigationBar;
 
   @override
@@ -2697,7 +2719,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const OfflineDataScreen(),
+                          builder: (_) => OfflineDataScreen(
+                            expiresAtLoader: widget.offlineDataExpiresAtLoader,
+                          ),
                         ),
                       );
                     },
@@ -3491,18 +3515,38 @@ class _FavoriteListScreen extends StatelessWidget {
 }
 
 class OfflineDataScreen extends StatelessWidget {
-  const OfflineDataScreen({super.key, this.expiresAt, this.now});
+  const OfflineDataScreen({
+    super.key,
+    this.expiresAt,
+    this.expiresAtLoader,
+    this.now,
+  });
 
-  // ponytail: static v1 QA source; wire live catalog metadata when offline status is dynamic.
+  // ponytail: v1 stale badge only needs manifest expiry; add source freshness when surfaced here.
   static const _offlineDataSourceOfTruth = 'installed catalog metadata';
 
   final DateTime? expiresAt;
+  final OfflineDataExpiresAtLoader? expiresAtLoader;
   final DateTime Function()? now;
 
   @override
   Widget build(BuildContext context) {
     assert(_offlineDataSourceOfTruth == 'installed catalog metadata');
-    final storedDataStatus = _storedDataStatus(expiresAt: expiresAt, now: now);
+    final loader = expiresAtLoader;
+    if (loader != null && expiresAt == null) {
+      return FutureBuilder<DateTime?>(
+        future: loader(),
+        builder: (context, snapshot) => _buildScaffold(context, snapshot.data),
+      );
+    }
+    return _buildScaffold(context, expiresAt);
+  }
+
+  Widget _buildScaffold(BuildContext context, DateTime? effectiveExpiresAt) {
+    final storedDataStatus = _storedDataStatus(
+      expiresAt: effectiveExpiresAt,
+      now: now,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('인터넷 없이 이용')),
       body: SafeArea(
