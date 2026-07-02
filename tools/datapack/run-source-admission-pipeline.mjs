@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -23,7 +24,7 @@ async function main() {
 
   const raw = await readRaw(args);
   assertNoCredential(raw);
-  await writeFile(rawPath, raw.endsWith("\n") ? raw : `${raw}\n`);
+  await writeFile(rawPath, raw);
 
   const sample = await buildSampleEvidence({ candidateId, rawPath, samplePath, args });
   const snapshot = await buildSnapshot({ rawPath, canonicalRawPath, snapshotPath, args });
@@ -51,6 +52,7 @@ async function main() {
     sourceSnapshotSetHash: sha256(JSON.stringify([snapshot])),
     sourceInventorySha256: sha256(JSON.stringify(outputInventory)),
     adminReviewRecordHash,
+    licenseEvidenceHash: adminReview.licenseEvidenceHash,
     aliasLedgerHash: adminReview.aliasLedgerHash,
     operatorMappingLedgerHash: adminReview.operatorMappingLedgerHash,
     facilityEvidenceLedgerHash: adminReview.facilityEvidenceLedgerHash,
@@ -91,11 +93,20 @@ async function readRaw(args) {
     throw new Error(`${args["service-key-env"]} is required for live source fetch`);
   }
   const url = args["url-template"].replace("{serviceKey}", encodeURIComponent(key));
-  const response = await fetch(url);
+  let response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error("source live fetch failed before response");
+  }
   if (!response.ok) {
     throw new Error(`source live fetch failed: ${response.status}`);
   }
-  return response.text();
+  try {
+    return await response.text();
+  } catch {
+    throw new Error("source live fetch response read failed");
+  }
 }
 
 async function buildSampleEvidence({ candidateId, rawPath, samplePath, args }) {
@@ -199,7 +210,7 @@ async function readJson(filePath) {
 }
 
 function assertNoCredential(raw) {
-  if (/(serviceKey|apiKey|access[_-]?token|secret)[=:][^\s&"']+/i.test(raw)) {
+  if (/"?(serviceKey|apiKey|access[_-]?token|secret)"?\s*[:=]\s*"?[^\s&"'}]+/i.test(raw)) {
     throw new Error("source admission raw response contains credential-like token");
   }
 }
@@ -238,7 +249,13 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+}
+
+export { sortJson };
