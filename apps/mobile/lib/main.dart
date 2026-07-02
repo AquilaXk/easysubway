@@ -40,7 +40,7 @@ const defaultDemoHomeDataEnabled = bool.fromEnvironment(
 );
 const _mainPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
-const _homeHeroCardPadding = EdgeInsets.fromLTRB(20, 24, 20, 24);
+const _homeHeroCardPadding = EdgeInsets.fromLTRB(0, 8, 0, 8);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
 const _mainScaffoldBackgroundColor = Color(0xFFF6F8F9);
@@ -2260,7 +2260,6 @@ class _HomeHero extends StatelessWidget {
   final VoidCallback onStationSearch;
   final VoidCallback onProfileTap;
 
-  static const double _cardRadius = 18;
   static const double _buttonRadius = 12;
   static const FontWeight _heroTitleWeight = FontWeight.w800;
   static const FontWeight _primaryActionWeight = FontWeight.w800;
@@ -2272,104 +2271,96 @@ class _HomeHero extends StatelessWidget {
       container: true,
       explicitChildNodes: true,
       label: '길찾기와 역 검색, 현재 이동 조건 ${profile.title}',
-      child: Material(
+      child: Padding(
         key: const Key('homeHeroCard'),
-        color: EasySubwayAccessibleColors.brand,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(_cardRadius),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: _homeHeroCardPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ExcludeSemantics(
-                child: Text(
-                  '어디로 가시나요?',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: _heroTitleWeight,
-                    height: 1.28,
+        padding: _homeHeroCardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ExcludeSemantics(
+              child: Text(
+                '어디로 가시나요?',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: _heroTitleWeight,
+                  height: 1.28,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _HomeProfilePill(profile: profile, onTap: onProfileTap),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              ProductionScopeCopy.helpNotice,
+              style: TextStyle(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Semantics(
+              key: const Key('routeSearchButton'),
+              button: true,
+              label: '길찾기',
+              onTap: onRouteSearch,
+              child: ExcludeSemantics(
+                child: FilledButton.icon(
+                  onPressed: onRouteSearch,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: EasySubwayAccessibleColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(104),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(_buttonRadius),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: _primaryActionWeight,
+                    ),
                   ),
+                  icon: const Icon(Icons.route),
+                  label: const Text('길찾기'),
                 ),
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: _HomeProfilePill(profile: profile, onTap: onProfileTap),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                ProductionScopeCopy.helpNotice,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Semantics(
-                key: const Key('routeSearchButton'),
+            ),
+            const SizedBox(height: 10),
+            KeyedSubtree(
+              key: const Key('heroStationSearchButton'),
+              child: Semantics(
+                key: const Key('stationSearchButton'),
                 button: true,
-                label: '길찾기',
-                onTap: onRouteSearch,
+                label: '역 검색',
+                onTap: onStationSearch,
                 child: ExcludeSemantics(
-                  child: FilledButton.icon(
-                    onPressed: onRouteSearch,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: EasySubwayAccessibleColors.brandDark,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(104),
+                  child: OutlinedButton.icon(
+                    onPressed: onStationSearch,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: EasySubwayAccessibleColors.primary,
+                      side: const BorderSide(
+                        color: EasySubwayAccessibleColors.line,
+                      ),
+                      minimumSize: const Size.fromHeight(68),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(_buttonRadius),
                       ),
                       textStyle: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: _primaryActionWeight,
+                        fontSize: 20,
+                        fontWeight: _secondaryActionWeight,
                       ),
                     ),
-                    icon: const Icon(Icons.route),
-                    label: const Text('길찾기'),
+                    icon: const Icon(Icons.search),
+                    label: const Text('역 검색'),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              KeyedSubtree(
-                key: const Key('heroStationSearchButton'),
-                child: Semantics(
-                  key: const Key('stationSearchButton'),
-                  button: true,
-                  label: '역 검색',
-                  onTap: onStationSearch,
-                  child: ExcludeSemantics(
-                    child: OutlinedButton.icon(
-                      onPressed: onStationSearch,
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: EasySubwayAccessibleColors.brandDark,
-                        side: const BorderSide(
-                          color: EasySubwayAccessibleColors.line,
-                        ),
-                        minimumSize: const Size.fromHeight(68),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(_buttonRadius),
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: _secondaryActionWeight,
-                        ),
-                      ),
-                      icon: const Icon(Icons.search),
-                      label: const Text('역 검색'),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
