@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
+import 'ad_slot.dart';
 import 'auth_headers.dart';
 import 'core/network/api_client.dart';
 import 'features/route_draft/domain/route_draft.dart';
@@ -4066,6 +4067,9 @@ class _RouteResultsListView extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         _RouteResultListButton(result: result, onPressed: onOpenDetail),
+        // 경로 확인 휴지점(결과 목록 끝)에만 광고 슬롯. 안내 진행 화면에는 없음.
+        const SizedBox(height: 16),
+        const AdBannerSlot(slotKey: Key('routeResultListAdBanner')),
       ],
     );
   }
@@ -4139,6 +4143,9 @@ class _RouteDetailWorkflowView extends StatelessWidget {
             child: const Text('경로 피드백'),
           ),
         ],
+        // 상세 뷰 스크롤 끝에만 광고 슬롯(안내·역 안 이동·피드백에는 없음).
+        const SizedBox(height: 16),
+        const AdBannerSlot(slotKey: Key('routeDetailAdBanner')),
       ],
     );
   }
