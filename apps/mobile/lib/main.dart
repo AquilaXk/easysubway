@@ -5746,9 +5746,9 @@ class _DataSourceAttributionScreenState
                         subtitle: ProductionScopeCopy.supportedClaimKo,
                       ),
                     ),
-                    const _AppSectionTitle(title: '지도 표시용 파일'),
+                    const _AppSectionTitle(title: '지도 표시용 asset'),
                     for (final map in maps) _AttributionCard.map(map, manifest),
-                    const _AppSectionTitle(title: '경로·시설 판단용 데이터'),
+                    const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
                     for (final source in sources)
                       _AttributionCard.source(source),
                   ],
@@ -5777,10 +5777,10 @@ class _AttributionCard extends StatelessWidget {
       title: _text(map['name_ko']),
       subtitle: '제공·소유: ${_text(map['operator'])}',
       rows: [
-        ('출처명', _text(license['source'], _text(map['name_ko']))),
+        ('제공 기관', _text(license['source'], _text(map['name_ko']))),
         ('라이선스', '${_text(license['name'])} (${_text(license['spdx'])})'),
         ('라이선스 링크', _text(license['url'])),
-        ('출처 표기 필요', _yesNo(license['attributionRequired'])),
+        ('표기 필요', _yesNo(license['attributionRequired'])),
         ('가져온 날짜', _text(license['date'])),
         ('확인한 날짜', _text(manifest['generated_at_utc'])),
         (
@@ -5801,10 +5801,10 @@ class _AttributionCard extends StatelessWidget {
       subtitle:
           '제공·소유: ${_text(source['provider'])} / ${_text(source['owner'])}',
       rows: [
-        ('출처명', _text(source['displayName'])),
+        ('제공 기관', _text(source['displayName'])),
         ('라이선스', '${_text(license['name'])} (${_text(license['type'])})'),
         ('라이선스 링크', _text(license['evidenceUrl'])),
-        ('출처 표기 필요', _text(license['attribution'])),
+        ('표기 필요', _text(license['attribution'])),
         ('가져온 날짜', _text(source['retrievedAt'])),
         ('확인한 날짜', _text(source['observedDataUpdatedAt'])),
         (

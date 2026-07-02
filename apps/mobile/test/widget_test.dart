@@ -1140,6 +1140,8 @@ void main() {
       find.byKey(const Key('networkMapMenuDataSourcesButton')),
       120,
     );
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -80));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(
         of: find.byKey(const Key('networkMapMenuDataSourcesButton')),
@@ -1156,8 +1158,8 @@ void main() {
     expect(find.text('데이터 및 지도 출처'), findsOneWidget);
     await tester.pump();
     await tester.pump();
-    await tester.scrollUntilVisible(find.text('지도 표시용 파일'), 240);
-    expect(find.text('지도 표시용 파일'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('지도 표시용 asset'), 240);
+    expect(find.text('지도 표시용 asset'), findsOneWidget);
     expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsOneWidget);
   });
 
@@ -6111,6 +6113,7 @@ void main() {
       expect(widget.maxLines, isNot(1));
       expect(widget.overflow, isNot(TextOverflow.ellipsis));
     }
+    // 품질 문구 "일부 정보는 확인 중이에요"는 별도 semantic label 테스트에서 유지한다.
   });
 
   testWidgets('역 검색 결과에서 출발 도착 역할을 지정하면 홈 이어하기가 표시된다', (tester) async {
