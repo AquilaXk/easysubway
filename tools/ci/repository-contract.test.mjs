@@ -80,6 +80,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   const gate = readJson(gatePath);
   const readme = read("README.md");
   const prTemplate = read(".github/pull_request_template.md");
+  const contractReportBuilder = "tools/routes/build-route-v2-contract-report.mjs";
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -120,8 +121,10 @@ test("route commercialization release gate blocks unsupported commercial route c
   });
   assert.deepEqual(gate.outOfStationTransferReleaseBlockers, ["D-2", "D-3", "H-1"]);
 
+  assert.equal(existsSync(path.join(root, contractReportBuilder)), true, "route v2 contract report builder must exist");
   assert.match(readme, /Route commercialization gate/);
   assert.match(readme, /apps\/mobile\/release\/route-commercialization-gate\.json/);
+  assert.match(readme, /tools\/routes\/build-route-v2-contract-report\.mjs/);
   assert.match(prTemplate, /Route commercialization gate impact/);
   assert.match(prTemplate, /route-commercialization-gate\.json/);
 });

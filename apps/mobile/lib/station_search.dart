@@ -58,20 +58,17 @@ const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
-const _stationDetailHeroCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationTextMutedColor = Color(0xFF405A5D);
 const _stationTextSubtleColor = Color(0xFF506B6F);
 const _stationDetailTextColor = Color(0xFF2C5558);
-const _stationFacilityDividerColor = Color(0xFFC8D9E2);
 const _stationDetailSoftPanelColor = Color(0xFFEAF6F4);
 const _stationDetailSoftPanelBorderColor = Color(0xFFB9D7D2);
 const _stationDetailMintPanelColor = Color(0xFFEFF8F6);
 const _stationDetailMintPanelBorderColor = Color(0xFFB7D8D2);
 const _stationDetailNoticeColor = Color(0xFFE6F2F0);
 const _stationDetailNoticeBorderColor = Color(0xFFB8D8D3);
-const _stationLineFilterSelectedColor = Color(0xFF007A80);
-const _stationLineFilterBorderColor = Color(0xFF93C7C2);
-const _stationDetailHeroSecondaryColor = Color(0xFFAFC6D4);
+const _stationLineFilterSelectedColor = EasySubwayAccessibleColors.primary;
+const _stationLineFilterBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailCautionColor = Color(0xFF8A4B00);
 
 abstract class StationSearchRepository {
@@ -2745,6 +2742,16 @@ class _StationLineFilterSection extends StatelessWidget {
     BuildContext context,
     List<SubwayLineOption> lines,
   ) async {
+    final seenRegions = <String>{};
+    final orderedRegions = <String>[
+      for (final line in lines)
+        if (seenRegions.add(line.region)) line.region,
+    ]..sort(_compareStationLineRegions);
+    final linesByRegion = <String, List<SubwayLineOption>>{};
+    for (final line in lines) {
+      (linesByRegion[line.region] ??= <SubwayLineOption>[]).add(line);
+    }
+
     final selected = await showModalBottomSheet<Object?>(
       context: context,
       showDragHandle: true,
@@ -2758,29 +2765,39 @@ class _StationLineFilterSection extends StatelessWidget {
                 '전체 노선 보기',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
               ),
-              const SizedBox(height: 12),
-              _StationLineFilterButton(
+              const SizedBox(height: 8),
+              _StationLineSheetRow(
                 key: const Key('stationLineFilter-all'),
                 label: '전체 노선',
                 semanticLabel: '전체 노선',
                 selected: selectedLine == null,
                 onPressed: () => Navigator.of(context).pop(false),
               ),
-              const SizedBox(height: 8),
-              for (final line in lines) ...[
-                _StationLineFilterButton(
-                  key: Key('stationLineFilter-${line.id}'),
-                  label: line.name,
-                  semanticLabel: line.semanticLabel,
-                  selected: selectedLine?.id == line.id,
-                  badgeLine: line.badgeLine,
-                  onPressed: () => Navigator.of(context).pop(line),
+              for (final region in orderedRegions) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 20, bottom: 2),
+                  child: Text(
+                    region,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                for (final line in linesByRegion[region]!)
+                  _StationLineSheetRow(
+                    key: Key('stationLineFilter-${line.id}'),
+                    label: line.name,
+                    semanticLabel: line.semanticLabel,
+                    selected: selectedLine?.id == line.id,
+                    badgeLine: line.badgeLine,
+                    onPressed: () => Navigator.of(context).pop(line),
+                  ),
               ],
             ],
           ),
@@ -2869,11 +2886,9 @@ class _StationLineFilterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = selected
-        ? _stationLineFilterSelectedColor
-        : Colors.white;
+    const backgroundColor = Colors.white;
     final foregroundColor = selected
-        ? Colors.white
+        ? _stationLineFilterSelectedColor
         : EasySubwayAccessibleColors.text;
     final borderColor = selected
         ? _stationLineFilterSelectedColor
@@ -2912,6 +2927,73 @@ class _StationLineFilterButton extends StatelessWidget {
               ],
               Text(label),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StationLineSheetRow extends StatelessWidget {
+  const _StationLineSheetRow({
+    required this.label,
+    required this.semanticLabel,
+    required this.selected,
+    required this.onPressed,
+    this.badgeLine,
+    super.key,
+  });
+
+  final String label;
+  final String semanticLabel;
+  final bool selected;
+  final VoidCallback onPressed;
+  final StationSearchLine? badgeLine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
+      button: true,
+      selected: selected,
+      onTap: onPressed,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onPressed,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+              ),
+            ),
+            child: Row(
+              children: [
+                if (badgeLine != null) ...[
+                  StationLineBadge(line: badgeLine!, size: 26),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: selected
+                          ? _stationLineFilterSelectedColor
+                          : EasySubwayAccessibleColors.text,
+                      fontSize: 16,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (selected)
+                  const Icon(
+                    Icons.check,
+                    size: 22,
+                    color: _stationLineFilterSelectedColor,
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -4733,64 +4815,56 @@ class _StationDetailHeader extends StatelessWidget {
       label: detail.semanticLabel,
       header: true,
       child: ExcludeSemantics(
-        child: Card(
-          margin: EdgeInsets.zero,
-          color: EasySubwayAccessibleColors.brandDark,
-          elevation: 0,
-          shape: const RoundedRectangleBorder(
-            borderRadius: _stationDetailHeroCardRadius,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                StationLineBadges(lines: detail.lines, size: 34),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${detail.nameKo}역',
-                        style: textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              StationLineBadges(lines: detail.lines, size: 34),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${detail.nameKo}역',
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: EasySubwayAccessibleColors.text,
+                        fontWeight: FontWeight.w800,
+                        height: 1.2,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        detail.lineLabel,
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: _stationFacilityDividerColor,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      detail.lineLabel,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: EasySubwayAccessibleColors.secondaryText,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        detail.dataQualityLabel,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: _stationFacilityDividerColor,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      detail.dataQualityLabel,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontWeight: FontWeight.w500,
+                        height: 1.3,
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '마지막 확인 ${detail.lastVerifiedAt}',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: _stationFacilityDividerColor,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                        ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '마지막 확인 ${detail.lastVerifiedAt}',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontWeight: FontWeight.w500,
+                        height: 1.3,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -5381,9 +5455,6 @@ class FacilityDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusBackgroundColor = _facilityStatusNoticeBackgroundColor(
-      facility.statusPresentation.severity,
-    );
     final statusIconColor = _facilityStatusNoticeIconColor(
       facility.statusPresentation.severity,
     );
@@ -5396,108 +5467,115 @@ class FacilityDetailScreen extends StatelessWidget {
         child: ListView(
           padding: _stationSearchPagePadding,
           children: [
-            Card(
-              margin: EdgeInsets.zero,
-              color: EasySubwayAccessibleColors.brandDark,
-              elevation: 0,
-              shape: const RoundedRectangleBorder(
-                borderRadius: _stationDetailHeroCardRadius,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 27,
-                      backgroundColor: EasySubwayAccessibleColors.mintSoft,
-                      child: Icon(
-                        facility.layoutSummaryIcon,
-                        color: EasySubwayAccessibleColors.mint,
-                        size: 28,
-                      ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    facility.layoutSummaryIcon,
+                    color: EasySubwayAccessibleColors.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${station.nameKo}역',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.mutedText,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          facility.name,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.text,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                              ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${station.nameKo}역',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: _stationDetailHeroSecondaryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            facility.name,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.2,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            Card(
+            const SizedBox(height: 16),
+            Container(
               key: Key('facilityDetailStatusNotice-${facility.id}'),
-              margin: EdgeInsets.zero,
-              color: statusBackgroundColor,
-              elevation: 0,
-              shape: const RoundedRectangleBorder(
+              decoration: BoxDecoration(
+                color: EasySubwayAccessibleColors.surface,
                 borderRadius: _stationDetailFacilityCardRadius,
+                border: Border.all(color: EasySubwayAccessibleColors.line),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
+              clipBehavior: Clip.antiAlias,
+              child: IntrinsicHeight(
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(statusIcon, color: statusIconColor, size: 28),
-                    const SizedBox(width: 10),
+                    Container(width: 4, color: statusIconColor),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _facilityStatusTitle(facility),
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: statusIconColor,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.25,
-                                ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            facilityStatusDisplayLabel(
-                              statusLabel: facility.statusLabel,
-                              severityLabel: facility.severityLabel,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(statusIcon, color: statusIconColor, size: 28),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _facilityStatusTitle(facility),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: statusIconColor,
+                                          fontWeight: FontWeight.w800,
+                                          height: 1.25,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    facilityStatusDisplayLabel(
+                                      statusLabel: facility.statusLabel,
+                                      severityLabel: facility.severityLabel,
+                                    ),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.3,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    _facilityDetailStatusDescription(facility),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
+                                          fontWeight: FontWeight.w700,
+                                          height: 1.3,
+                                        ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: EasySubwayAccessibleColors.mutedText,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.3,
-                                ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            _facilityDetailStatusDescription(facility),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: EasySubwayAccessibleColors.mutedText,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.3,
-                                ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -5583,15 +5661,6 @@ String _facilityDetailStatusDescription(StationFacilityInfo facility) {
 
 String _facilityStatusTitle(StationFacilityInfo facility) {
   return facility.statusTitle;
-}
-
-Color _facilityStatusNoticeBackgroundColor(FacilityStatusSeverity severity) {
-  return switch (severity) {
-    FacilityStatusSeverity.blocked => EasySubwayAccessibleColors.redSoft,
-    FacilityStatusSeverity.caution => EasySubwayAccessibleColors.amberSoft,
-    FacilityStatusSeverity.needsInfo => EasySubwayAccessibleColors.skySoft,
-    FacilityStatusSeverity.normal => EasySubwayAccessibleColors.mintSoft,
-  };
 }
 
 Color _facilityStatusNoticeIconColor(FacilityStatusSeverity severity) {

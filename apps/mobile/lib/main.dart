@@ -1534,6 +1534,14 @@ class _HomeScreenState extends State<HomeScreen> {
       unawaited(openFavorites());
     }
 
+    void openDataSources() {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const DataSourceAttributionScreen(),
+        ),
+      );
+    }
+
     final heroSection = _HomeHero(
       profile: currentProfile,
       onRouteSearch: openRouteTab,
@@ -1595,6 +1603,7 @@ class _HomeScreenState extends State<HomeScreen> {
               unawaited(openStationSearch(StationSearchEntryMode.recent)),
           onOpenNearbyStations: () =>
               unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+          onOpenDataSources: openDataSources,
           notificationAction: notificationRepository == null
               ? null
               : FutureBuilder<bool>(
@@ -2013,23 +2022,42 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                       },
                     )
                   else if (items.isEmpty)
-                    const _AppCard(
-                      child: _AppInfoRow(
-                        icon: Icons.notifications_none,
-                        iconBackground: EasySubwayAccessibleColors.mintSoft,
-                        iconColor: EasySubwayAccessibleColors.mintDark,
-                        title: '새 알림이 없습니다',
-                        subtitle: '즐겨찾기 시설과 제보 상태가 바뀌면 여기에서 볼 수 있어요.',
+                    Padding(
+                      padding: const EdgeInsets.only(top: 80),
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.notifications_none,
+                            size: 44,
+                            color: EasySubwayAccessibleColors.mutedText,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            '새 알림이 없습니다',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: EasySubwayAccessibleColors.text,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '즐겨찾기 시설과 제보 상태가 바뀌면 여기에서 볼 수 있어요.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: EasySubwayAccessibleColors.mutedText,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   else ...[
                     _NotificationInboxChips(items: items),
-                    const SizedBox(height: 12),
-                    for (final item in items)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _NotificationInboxCard(item: item),
-                      ),
+                    for (final item in items) _NotificationInboxRow(item: item),
                   ],
                 ],
               ),
@@ -2166,20 +2194,27 @@ class _NotificationInboxChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final facilityCount = items.where((item) => item.kind == '시설').length;
     final reportCount = items.length - facilityCount;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        _HomeMiniBadge('전체 ${items.length}'),
-        if (facilityCount > 0) _HomeMiniBadge('시설 $facilityCount'),
-        if (reportCount > 0) _HomeMiniBadge('제보 $reportCount'),
-      ],
+    final parts = <String>[
+      '전체 ${items.length}',
+      if (facilityCount > 0) '시설 $facilityCount',
+      if (reportCount > 0) '제보 $reportCount',
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4, top: 4),
+      child: Text(
+        parts.join('  ·  '),
+        style: const TextStyle(
+          color: EasySubwayAccessibleColors.mutedText,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
 
-class _NotificationInboxCard extends StatelessWidget {
-  const _NotificationInboxCard({required this.item});
+class _NotificationInboxRow extends StatelessWidget {
+  const _NotificationInboxRow({required this.item});
 
   final _NotificationInboxItem item;
 
@@ -2198,50 +2233,90 @@ class _NotificationInboxCard extends StatelessWidget {
     }
 
     final accent = _facilitySeverityAccent(item.severity);
-    final card = _AppCard(
-      backgroundColor: accent.backgroundColor,
-      borderColor: accent.borderColor,
-      showBorder: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final row = Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AppInfoRow(
-            icon: item.icon,
-            iconBackground: Colors.white,
-            iconColor: accent.iconColor,
-            title: item.title,
-            subtitle: item.subtitle,
-            subtitleColor: accent.iconColor,
-            trailing: item.kind,
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(item.icon, color: accent.iconColor, size: 22),
           ),
-          if (item.actionLabel.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              item.actionLabel,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.text,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                height: 1.3,
-              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      item.kind,
+                      style: const TextStyle(
+                        color: EasySubwayAccessibleColors.mutedText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.subtitle,
+                  style: TextStyle(
+                    color: accent.iconColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+                if (item.actionLabel.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    item.actionLabel,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
     if (item.report == null) {
-      return Semantics(label: item.semanticLabel, child: card);
+      return Semantics(
+        label: item.semanticLabel,
+        child: ExcludeSemantics(child: row),
+      );
     }
     return Semantics(
       button: true,
       label: item.semanticLabel,
       onTap: open,
       child: ExcludeSemantics(
-        child: InkWell(
-          onTap: open,
-          borderRadius: BorderRadius.circular(_appCardRadius),
-          child: card,
-        ),
+        child: InkWell(onTap: open, child: row),
       ),
     );
   }
@@ -2693,7 +2768,6 @@ class _HomeFacilityAlertCard extends StatelessWidget {
           children: [
             _AppInfoRow(
               icon: _facilityIcon(facility.type),
-              iconBackground: Colors.white,
               iconColor: accent.iconColor,
               title: '${facility.stationLabel} $facilityName',
               subtitle:
@@ -3244,18 +3318,16 @@ class _AppCard extends StatelessWidget {
 class _AppInfoRow extends StatelessWidget {
   const _AppInfoRow({
     required this.icon,
-    required this.iconBackground,
     required this.iconColor,
     required this.title,
     this.subtitle,
     this.subtitleColor = EasySubwayAccessibleColors.mutedText,
-    this.iconBoxSize = 43,
+    this.iconBoxSize = 32,
     this.iconSize = 22,
     this.trailing,
   });
 
   final IconData icon;
-  final Color iconBackground;
   final Color iconColor;
   final String title;
   final String? subtitle;
@@ -3267,14 +3339,12 @@ class _AppInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final subtitle = this.subtitle;
-    final leading = Container(
+    final leading = SizedBox(
       width: iconBoxSize,
       height: iconBoxSize,
-      decoration: BoxDecoration(
-        color: iconBackground,
-        borderRadius: _mainIconControlRadius,
+      child: Center(
+        child: Icon(icon, color: iconColor, size: iconSize),
       ),
-      child: Icon(icon, color: iconColor, size: iconSize),
     );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3284,7 +3354,7 @@ class _AppInfoRow extends StatelessWidget {
           style: const TextStyle(
             color: EasySubwayAccessibleColors.text,
             fontSize: 15,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             height: 1.25,
           ),
         ),
@@ -3295,7 +3365,7 @@ class _AppInfoRow extends StatelessWidget {
             style: TextStyle(
               color: subtitleColor,
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w500,
               height: 1.4,
             ),
           ),
@@ -3322,7 +3392,7 @@ class _AppInfoRow extends StatelessWidget {
                 style: const TextStyle(
                   color: EasySubwayAccessibleColors.text,
                   fontSize: 12,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -3341,7 +3411,7 @@ class _AppInfoRow extends StatelessWidget {
             style: const TextStyle(
               color: EasySubwayAccessibleColors.text,
               fontSize: 12,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -3924,7 +3994,6 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                         child: _AppCard(
                           child: _AppInfoRow(
                             icon: Icons.bookmark_border,
-                            iconBackground: EasySubwayAccessibleColors.mintSoft,
                             iconColor: EasySubwayAccessibleColors.mintDark,
                             title: '즐겨찾기한 항목이 없습니다',
                             subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
@@ -4290,7 +4359,6 @@ class OfflineDataScreen extends StatelessWidget {
               borderColor: EasySubwayAccessibleColors.mintBorder,
               child: _AppInfoRow(
                 icon: Icons.check_circle_outline,
-                iconBackground: Colors.white,
                 iconColor: EasySubwayAccessibleColors.mintDark,
                 title: '인터넷 없이도 이용할 수 있어요',
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
@@ -4302,7 +4370,6 @@ class OfflineDataScreen extends StatelessWidget {
                 children: [
                   _AppInfoRow(
                     icon: Icons.public,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '검증 구간',
                     subtitle: ProductionScopeCopy.supportedClaimKo,
@@ -4310,7 +4377,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.update,
-                    iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '마지막 갱신',
                     subtitle: '앱 설치 때 함께 받은 안내',
@@ -4318,7 +4384,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.manage_search_outlined,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '저장 정보 다시 확인',
                     subtitle: '저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요',
@@ -4326,7 +4391,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.verified_outlined,
-                    iconBackground: EasySubwayAccessibleColors.skySoft,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '안내 범위',
                     subtitle: ProductionScopeCopy.supportedClaimKo,
@@ -4334,7 +4398,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.info_outline,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '제한 사항',
                     subtitle: '실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요',
@@ -4349,7 +4412,6 @@ class OfflineDataScreen extends StatelessWidget {
                 children: [
                   _AppInfoRow(
                     icon: Icons.map_outlined,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '노선도',
                     subtitle: '지역·노선·역 보기',
@@ -4357,7 +4419,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.train_outlined,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '역·시설 정보',
                     subtitle: '출구와 엘리베이터 보기',
@@ -4365,7 +4426,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.bookmark_border,
-                    iconBackground: EasySubwayAccessibleColors.mintSoft,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '즐겨찾기한 항목',
                     subtitle: '역·시설·경로 보기',
@@ -4380,7 +4440,6 @@ class OfflineDataScreen extends StatelessWidget {
                 children: [
                   _AppInfoRow(
                     icon: Icons.report_outlined,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '시설 제보',
                     subtitle: '사진과 제보 보내기',
@@ -4388,7 +4447,6 @@ class OfflineDataScreen extends StatelessWidget {
                   ),
                   _AppInfoRow(
                     icon: Icons.refresh,
-                    iconBackground: EasySubwayAccessibleColors.amberSoft,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '시설 상태 새로 확인',
                     subtitle: '최신 고장·복구 확인',
@@ -4430,91 +4488,90 @@ class SupportAccessScreen extends StatelessWidget {
             const _SupportSectionTitle(title: '내 정보와 개인정보'),
             _PrivacyDataUseSummary(deletionScope: deletionScope),
             const SizedBox(height: 12),
-            _SupportAccessItem(
-              key: const Key('privacyPolicyAccessItem'),
-              icon: Icons.privacy_tip_outlined,
-              title: '개인정보처리방침',
-              value: accessInfo.privacyPolicyUrl,
-              displayValue: '웹에서 확인',
-              uri: _httpsUri(accessInfo.privacyPolicyUrl),
-              launcher: launcher,
-            ),
-            const SizedBox(height: 12),
-            if (userDataDeletionRepository == null)
-              _SupportAccessItem(
-                key: const Key('dataDeletionAccessItem'),
-                icon: Icons.delete_outline,
-                title: '내 정보 삭제 요청',
-                value: accessInfo.dataDeletionEmail,
-                displayValue: '이메일 보내기',
-                helperText: '어떤 정보를 지울 수 있는지 메일로 문의해요',
-                uri: _mailtoUri(
-                  accessInfo.dataDeletionEmail,
-                  '쉬운 지하철 내 정보 삭제 요청',
+            _SupportGroupCard(
+              children: [
+                _SupportAccessItem(
+                  key: const Key('privacyPolicyAccessItem'),
+                  icon: Icons.privacy_tip_outlined,
+                  title: '개인정보처리방침',
+                  value: accessInfo.privacyPolicyUrl,
+                  displayValue: '웹에서 확인',
+                  uri: _httpsUri(accessInfo.privacyPolicyUrl),
+                  launcher: launcher,
                 ),
-                launcher: launcher,
-              )
-            else
-              _UserDataDeletionAccessItem(
-                repository: userDataDeletionRepository!,
-                deletionScope: deletionScope,
-                onDeleted: onUserDataDeleted,
-              ),
+                if (userDataDeletionRepository == null)
+                  _SupportAccessItem(
+                    key: const Key('dataDeletionAccessItem'),
+                    icon: Icons.delete_outline,
+                    title: '내 정보 삭제 요청',
+                    value: accessInfo.dataDeletionEmail,
+                    displayValue: '이메일 보내기',
+                    helperText: '어떤 정보를 지울 수 있는지 메일로 문의해요',
+                    uri: _mailtoUri(
+                      accessInfo.dataDeletionEmail,
+                      '쉬운 지하철 내 정보 삭제 요청',
+                    ),
+                    launcher: launcher,
+                  )
+                else
+                  _UserDataDeletionAccessItem(
+                    repository: userDataDeletionRepository!,
+                    deletionScope: deletionScope,
+                    onDeleted: onUserDataDeleted,
+                  ),
+              ],
+            ),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '이동 전 살펴보기'),
             const _SafetyDataNotice(),
             const SizedBox(height: 12),
-            const _AppCard(
-              child: _AppInfoRow(
-                icon: Icons.verified_outlined,
-                iconBackground: EasySubwayAccessibleColors.skySoft,
-                iconColor: EasySubwayAccessibleColors.brand,
-                title: '지원 범위',
-                subtitle: ProductionScopeCopy.helpNotice,
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              key: const Key('supportDataSourceAttributionButton'),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const DataSourceAttributionScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.source_outlined),
-              label: const Align(
-                alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('데이터 및 지도 출처'),
+            _SupportGroupCard(
+              children: [
+                const _SupportStaticRow(
+                  icon: Icons.verified_outlined,
+                  title: '지원 범위',
+                  subtitle: ProductionScopeCopy.helpNotice,
                 ),
-              ),
+                _SupportNavRow(
+                  key: const Key('supportDataSourceAttributionButton'),
+                  icon: Icons.source_outlined,
+                  title: '데이터 및 지도 출처',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const DataSourceAttributionScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             const _SupportSectionTitle(title: '문의'),
-            _SupportAccessItem(
-              key: const Key('supportAccessItem'),
-              icon: Icons.support_agent,
-              title: '고객지원',
-              value: accessInfo.supportEmail,
-              displayValue: '이메일 보내기',
-              uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
-              launcher: launcher,
+            _SupportGroupCard(
+              children: [
+                _SupportAccessItem(
+                  key: const Key('supportAccessItem'),
+                  icon: Icons.support_agent,
+                  title: '고객지원',
+                  value: accessInfo.supportEmail,
+                  displayValue: '이메일 보내기',
+                  uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
+                  launcher: launcher,
+                ),
+                _SupportAccessItem(
+                  key: const Key('securityContactAccessItem'),
+                  icon: Icons.security_outlined,
+                  title: '보안 문의',
+                  value: accessInfo.securityEmail,
+                  displayValue: '보안 문제 알리기',
+                  uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
+                  launcher: launcher,
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             const _SecurityContactNotice(),
-            const SizedBox(height: 12),
-            _SupportAccessItem(
-              key: const Key('securityContactAccessItem'),
-              icon: Icons.security_outlined,
-              title: '보안 문의',
-              value: accessInfo.securityEmail,
-              displayValue: '보안 문제 알리기',
-              uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
-              launcher: launcher,
-            ),
           ],
         ),
       ),
@@ -4535,10 +4592,156 @@ class _SupportSectionTitle extends StatelessWidget {
         header: true,
         child: Text(
           title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             height: 1.25,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportGroupCard extends StatelessWidget {
+  const _SupportGroupCard({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      rows.add(children[i]);
+      if (i != children.length - 1) {
+        rows.add(
+          const Divider(height: 1, color: EasySubwayAccessibleColors.line),
+        );
+      }
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: EasySubwayAccessibleColors.surface,
+        border: Border.all(color: EasySubwayAccessibleColors.line),
+        borderRadius: const BorderRadius.all(Radius.circular(16)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: rows,
+        ),
+      ),
+    );
+  }
+}
+
+class _SupportStaticRow extends StatelessWidget {
+  const _SupportStaticRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              icon,
+              size: 24,
+              color: EasySubwayAccessibleColors.primary,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupportNavRow extends StatelessWidget {
+  const _SupportNavRow({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: title,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: 24, color: EasySubwayAccessibleColors.primary),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  color: EasySubwayAccessibleColors.mutedText,
+                  size: 22,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -4578,59 +4781,53 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
       label: '${copy.title}, ${copy.helperText}',
       onTap: openDeletionScreen,
       child: ExcludeSemantics(
-        child: Material(
-          color: EasySubwayAccessibleColors.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: _mainThemeControlRadius,
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
-          child: InkWell(
-            borderRadius: _mainThemeControlRadius,
-            onTap: openDeletionScreen,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(
+        child: InkWell(
+          onTap: openDeletionScreen,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 1),
+                  child: Icon(
                     Icons.delete_outline,
                     color: EasySubwayAccessibleColors.red,
-                    size: 28,
+                    size: 24,
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          copy.title,
-                          style: const TextStyle(
-                            color: EasySubwayAccessibleColors.text,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            height: 1.25,
-                          ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        copy.title,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          copy.helperText,
-                          style: const TextStyle(
-                            color: EasySubwayAccessibleColors.mutedText,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            height: 1.3,
-                          ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        copy.helperText,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.mutedText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const Icon(
-                    Icons.chevron_right,
-                    color: EasySubwayAccessibleColors.mutedText,
-                  ),
-                ],
-              ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: EasySubwayAccessibleColors.mutedText,
+                ),
+              ],
             ),
           ),
         ),
@@ -5037,7 +5234,6 @@ class UserDataDeletionResultScreen extends StatelessWidget {
               borderColor: _homeInfoBorderColor,
               child: _AppInfoRow(
                 icon: Icons.map_outlined,
-                iconBackground: Colors.white,
                 iconColor: EasySubwayAccessibleColors.brand,
                 title: '노선도와 역 정보는 계속 이용할 수 있어요',
               ),
@@ -5173,13 +5369,13 @@ class _SecurityContactNotice extends StatelessWidget {
       label: '$_title, $_contactNotice $_scopeNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.skySoft,
-            border: Border.all(color: EasySubwayAccessibleColors.line),
-            borderRadius: _mainThemeControlRadius,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -5269,13 +5465,13 @@ class _SafetyDataNotice extends StatelessWidget {
       label: '$_title, $_referenceNotice $_fieldNotice $_limitationNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.amberSoft,
-            border: Border.all(color: EasySubwayAccessibleColors.amber),
-            borderRadius: _mainThemeControlRadius,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -5402,13 +5598,13 @@ class _PrivacyDataUseSummary extends StatelessWidget {
           '$_title, $_locationPurpose $_appDataPurpose $deletionScopeText $sentReportNoticeText $_retentionNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: BoxDecoration(
-            color: EasySubwayAccessibleColors.mintSoft,
-            border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
-            borderRadius: _mainThemeControlRadius,
+          decoration: const BoxDecoration(
+            border: Border(
+              top: BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -5471,12 +5667,24 @@ class _PrivacyDataUseLine extends StatelessWidget {
   }
 }
 
-class DataSourceAttributionScreen extends StatelessWidget {
+class DataSourceAttributionScreen extends StatefulWidget {
   const DataSourceAttributionScreen({super.key});
 
+  @override
+  State<DataSourceAttributionScreen> createState() =>
+      _DataSourceAttributionScreenState();
+}
+
+class _DataSourceAttributionScreenState
+    extends State<DataSourceAttributionScreen> {
   static const _mapManifestAsset =
       'assets/datapacks/metro_map_pack/manifest.json';
   static const _sourceInventoryAsset = 'assets/datapacks/source-inventory.json';
+
+  late final Future<
+    ({Map<String, Object?> manifest, Map<String, Object?> inventory})
+  >
+  _future = _load();
 
   Future<({Map<String, Object?> manifest, Map<String, Object?> inventory})>
   _load() async {
@@ -5500,7 +5708,7 @@ class DataSourceAttributionScreen extends StatelessWidget {
             FutureBuilder<
               ({Map<String, Object?> manifest, Map<String, Object?> inventory})
             >(
-              future: _load(),
+              future: _future,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return ListView(
@@ -5509,7 +5717,6 @@ class DataSourceAttributionScreen extends StatelessWidget {
                       _AppCard(
                         child: _AppInfoRow(
                           icon: Icons.error_outline,
-                          iconBackground: EasySubwayAccessibleColors.amberSoft,
                           iconColor: EasySubwayAccessibleColors.amber,
                           title: '자료 제공 정보를 불러오지 못했어요',
                           subtitle: '앱을 다시 열고, 계속 보이지 않으면 고객지원에 알려 주세요.',
@@ -5536,7 +5743,6 @@ class DataSourceAttributionScreen extends StatelessWidget {
                       borderColor: EasySubwayAccessibleColors.mintBorder,
                       child: _AppInfoRow(
                         icon: Icons.info_outline,
-                        iconBackground: Colors.white,
                         iconColor: EasySubwayAccessibleColors.mintDark,
                         title: '지원 범위',
                         subtitle: ProductionScopeCopy.supportedClaimKo,
@@ -5781,41 +5987,73 @@ class _SupportAccessItem extends StatelessWidget {
           ? null
           : () => unawaited(_openTarget(context, targetUri, targetText)),
       child: ExcludeSemantics(
-        child: OutlinedButton.icon(
-          onPressed: targetUri == null
+        child: InkWell(
+          onTap: targetUri == null
               ? null
               : () => unawaited(_openTarget(context, targetUri, targetText)),
-          icon: Icon(icon),
-          label: Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(title),
-                  const SizedBox(height: 4),
-                  Text(
-                    displayValue,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.secondaryText,
-                      height: 1.25,
-                    ),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 56),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: targetUri == null
+                        ? EasySubwayAccessibleColors.mutedText
+                        : EasySubwayAccessibleColors.primary,
                   ),
-                  if (secondaryText != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      secondaryText,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.mutedText,
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          height: 1.25,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      Text(
+                        displayValue,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: EasySubwayAccessibleColors.secondaryText,
+                          height: 1.3,
+                        ),
+                      ),
+                      if (secondaryText != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          secondaryText,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: EasySubwayAccessibleColors.mutedText,
+                                fontWeight: FontWeight.w500,
+                                height: 1.3,
+                              ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (targetUri != null) ...[
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: EasySubwayAccessibleColors.mutedText,
+                    size: 22,
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
