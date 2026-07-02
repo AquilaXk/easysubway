@@ -409,10 +409,29 @@ void main() {
     expect(capability.routeGraphConnected, isTrue);
     expect(capability.strictEvidenceSupported, isTrue);
     expect(capability.realtimeSupported, isFalse);
-    expect(capability.plannedTimetableSupported, isTrue);
+    expect(capability.plannedTimetableSupported, isFalse);
     expect(capability.outOfStationTransferAllowed, isFalse);
     expect(capability.regions, ['수도권']);
     expect(capability.operatorIds, ['seoul-metro']);
+  });
+
+  test('로컬 capability는 시간표 row가 있을 때만 planned ETA를 지원한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final capability = await repository.routeCapability(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(capability.routeGraphConnected, isTrue);
+    expect(capability.plannedTimetableSupported, isTrue);
   });
 
   test('로컬 capability는 같은 provider의 양끝 mapping이 있을 때 realtime을 지원한다', () async {
@@ -432,6 +451,63 @@ void main() {
 
     expect(capability.stationExists, isTrue);
     expect(capability.realtimeSupported, isTrue);
+  });
+
+  test('로컬 capability는 mapping이 있어도 arrivals 미지원이면 realtime을 끈다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedRealtimeMapping(database, supportsArrivals: false);
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final capability = await repository.routeCapability(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(capability.stationExists, isTrue);
+    expect(capability.realtimeSupported, isFalse);
+  });
+
+  test('로컬 capability strict 근거는 요청 경로 기준으로 판단한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES (
+        'edge-a-b-local',
+        'station-a:line-test',
+        'station-b:line-test',
+        120,
+        'RIDE',
+        'STEP_FREE',
+        'AVAILABLE',
+        95
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final capability = await repository.routeCapability(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(capability.routeGraphConnected, isTrue);
+    expect(capability.strictEvidenceSupported, isFalse);
   });
 
   test('기존 baseline catalog도 명시 access edge를 보강해 휠체어 경로를 유지한다', () async {
@@ -850,11 +926,19 @@ void main() {
         mobilityType: 'WHEELCHAIR',
       ),
     );
+    final capability = await repository.routeCapability(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
 
     final transferStep = result.steps.singleWhere(
       (step) => step.stepType == 'outOfStationTransfer',
     );
     expect(result.status, 'FOUND');
+    expect(capability.outOfStationTransferAllowed, isTrue);
     expect(result.transferCount, 1);
     expect(
       result.warnings.map((warning) => warning.code),
@@ -3906,7 +3990,67 @@ Future<void> _seedAvailableFacilityRoute(CatalogDatabase database) async {
   await _addEligibleStationFacilityEvidence(database);
 }
 
-Future<void> _seedRealtimeMapping(CatalogDatabase database) async {
+Future<void> _seedBaselineTimetable(CatalogDatabase database) async {
+  await database.customStatement('''
+      INSERT INTO service_calendars (
+        service_id, monday, tuesday, wednesday, thursday, friday,
+        saturday, sunday, start_date, end_date
+      )
+      VALUES (
+        'weekday-service', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231'
+      )
+    ''');
+  await database.customStatement('''
+      INSERT INTO transit_routes (
+        id, line_id, route_short_name, route_long_name, direction_name
+      )
+      VALUES (
+        'route-seoul-4-down', 'seoul-4', '4', '4호선 상록수-사당', '사당 방면'
+      )
+    ''');
+  await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, trip_headsign, direction_id, service_pattern
+      )
+      VALUES (
+        'trip-seoul-4-sangnoksu-sadang',
+        'route-seoul-4-down',
+        'weekday-service',
+        '사당',
+        'UP',
+        'LOCAL'
+      )
+    ''');
+  await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id, arrival_seconds,
+        departure_seconds
+      )
+      VALUES
+        (
+          'trip-seoul-4-sangnoksu-sadang',
+          1,
+          'station-sangnoksu',
+          'seoul-4',
+          28800,
+          28830
+        ),
+        (
+          'trip-seoul-4-sangnoksu-sadang',
+          2,
+          'station-sadang',
+          'seoul-4',
+          29520,
+          29550
+        )
+    ''');
+}
+
+Future<void> _seedRealtimeMapping(
+  CatalogDatabase database, {
+  bool supportsArrivals = true,
+}) async {
+  final supportsArrivalsValue = supportsArrivals ? 1 : 0;
   await database.customStatement('''
       INSERT INTO realtime_provider_line_mappings (
         provider_id, provider_line_id, line_id, source_id,
@@ -3914,7 +4058,7 @@ Future<void> _seedRealtimeMapping(CatalogDatabase database) async {
       )
       VALUES (
         'seoul-topis', '4', 'seoul-4', 'test-realtime-source',
-        1, 'OFFICIAL'
+        $supportsArrivalsValue, 'OFFICIAL'
       )
     ''');
   await database.customStatement('''
@@ -3925,11 +4069,13 @@ Future<void> _seedRealtimeMapping(CatalogDatabase database) async {
       VALUES
         (
           'seoul-topis', '4', 'topis-sangnoksu', 'station-sangnoksu',
-          'seoul-4', 'test-realtime-source', '상록수', 1, 'OFFICIAL'
+          'seoul-4', 'test-realtime-source', '상록수',
+          $supportsArrivalsValue, 'OFFICIAL'
         ),
         (
           'seoul-topis', '4', 'topis-sadang', 'station-sadang',
-          'seoul-4', 'test-realtime-source', '사당', 1, 'OFFICIAL'
+          'seoul-4', 'test-realtime-source', '사당',
+          $supportsArrivalsValue, 'OFFICIAL'
         )
     ''');
 }

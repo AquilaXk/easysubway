@@ -4,6 +4,7 @@ import '../application/network_graph.dart' as graph;
 import '../application/route_engine.dart';
 import '../domain/route_request.dart' as local;
 import '../domain/route_result.dart' as local;
+import '../domain/route_step.dart' as route_step;
 
 class LocalRouteRepository implements RouteSearchRepository {
   LocalRouteRepository({required this.catalogDatabase});
@@ -17,22 +18,40 @@ class LocalRouteRepository implements RouteSearchRepository {
     final stationExists =
         catalog.hasStation(request.originStationId) &&
         catalog.hasStation(request.destinationStationId);
-    final routeGraphConnected =
-        stationExists &&
-        catalog.routeGraphConnected(
-          request.originStationId,
-          request.destinationStationId,
-        );
+    final routeResult = stationExists
+        ? catalog.routeResult(
+            request.originStationId,
+            request.destinationStationId,
+            mobilityType: local.MobilityType.luggage,
+            constraintMode: local.ConstraintMode.allowWithWarnings,
+          )
+        : null;
+    final routeGraphConnected = routeResult?.status == local.RouteStatus.found;
     return RouteCapabilityMetadata(
       stationExists: stationExists,
       routeGraphConnected: routeGraphConnected,
-      strictEvidenceSupported: catalog.strictEvidenceSupported,
+      strictEvidenceSupported:
+          stationExists &&
+          catalog.strictEvidenceSupportedFor(
+            request.originStationId,
+            request.destinationStationId,
+          ),
       realtimeSupported: catalog.realtimeSupported(
         request.originStationId,
         request.destinationStationId,
       ),
-      plannedTimetableSupported: routeGraphConnected,
-      outOfStationTransferAllowed: false,
+      plannedTimetableSupported:
+          routeGraphConnected &&
+          catalog.plannedTimetableSupported(
+            request.originStationId,
+            request.destinationStationId,
+          ),
+      outOfStationTransferAllowed:
+          routeResult?.steps.any(
+            (step) =>
+                step.type == route_step.RouteStepType.outOfStationTransfer,
+          ) ??
+          false,
       regions: catalog.regionsFor(
         request.originStationId,
         request.destinationStationId,
@@ -541,6 +560,7 @@ class _RouteCatalogSnapshot {
     required this.strictEvidenceSupported,
     required this.sourceUpdatedAt,
     required this.realtimeStationLineKeysByProvider,
+    required this.plannedStationLineKeys,
   });
 
   final Map<String, String> stationsById;
@@ -552,6 +572,7 @@ class _RouteCatalogSnapshot {
   final bool strictEvidenceSupported;
   final String sourceUpdatedAt;
   final Map<String, Set<String>> realtimeStationLineKeysByProvider;
+  final Set<String> plannedStationLineKeys;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final sourceUpdatedAtRow = await database.customSelect('''
@@ -573,8 +594,14 @@ class _RouteCatalogSnapshot {
       database,
     );
     final realtimeRows = await database.customSelect('''
-          SELECT provider_id, station_id, line_id
-          FROM realtime_provider_station_mappings
+          SELECT station_mapping.provider_id, station_mapping.station_id,
+            station_mapping.line_id
+          FROM realtime_provider_station_mappings station_mapping
+          INNER JOIN realtime_provider_line_mappings line_mapping
+            ON line_mapping.provider_id = station_mapping.provider_id
+            AND line_mapping.line_id = station_mapping.line_id
+          WHERE station_mapping.supports_arrivals != 0
+            AND line_mapping.supports_arrivals != 0
           ''').get();
     final realtimeStationLineKeysByProvider = <String, Set<String>>{};
     for (final row in realtimeRows) {
@@ -587,6 +614,17 @@ class _RouteCatalogSnapshot {
             ),
           );
     }
+    final plannedRows = await database.customSelect('''
+          SELECT DISTINCT station_id, line_id
+          FROM transit_stop_times
+          ''').get();
+    final plannedStationLineKeys = {
+      for (final row in plannedRows)
+        _stationLineKey(
+          row.read<String>('station_id'),
+          row.read<String>('line_id'),
+        ),
+    };
     final networkEdgeColumns = await database
         .customSelect('PRAGMA table_info(network_edges)')
         .get();
@@ -881,24 +919,52 @@ class _RouteCatalogSnapshot {
         sourceUpdatedAtRow?.readNullable<int>('source_updated_at'),
       ),
       realtimeStationLineKeysByProvider: realtimeStationLineKeysByProvider,
+      plannedStationLineKeys: plannedStationLineKeys,
     );
   }
 
-  bool routeGraphConnected(
+  local.LocalRouteResult routeResult(
     String originStationId,
-    String destinationStationId,
-  ) {
-    final result = LocalRouteEngine(graph: toGraph()).search(
+    String destinationStationId, {
+    required local.MobilityType mobilityType,
+    required local.ConstraintMode constraintMode,
+  }) {
+    return LocalRouteEngine(graph: toGraph()).search(
       local.RouteRequest(
         originStationId: originStationId,
         destinationStationId: destinationStationId,
-        mobilityType: local.MobilityType.luggage,
-        constraintMode: local.ConstraintMode.allowWithWarnings,
+        mobilityType: mobilityType,
+        constraintMode: constraintMode,
         searchMode:
             local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
       ),
     );
-    return result.status == local.RouteStatus.found;
+  }
+
+  bool strictEvidenceSupportedFor(
+    String originStationId,
+    String destinationStationId,
+  ) {
+    if (!strictEvidenceSupported) {
+      return false;
+    }
+    return routeResult(
+          originStationId,
+          destinationStationId,
+          mobilityType: local.MobilityType.wheelchair,
+          constraintMode: local.ConstraintMode.strictStepFree,
+        ).status ==
+        local.RouteStatus.found;
+  }
+
+  bool plannedTimetableSupported(
+    String originStationId,
+    String destinationStationId,
+  ) {
+    final originKeys = _stationLineKeysFor(originStationId);
+    final destinationKeys = _stationLineKeysFor(destinationStationId);
+    return originKeys.any(plannedStationLineKeys.contains) &&
+        destinationKeys.any(plannedStationLineKeys.contains);
   }
 
   bool realtimeSupported(String originStationId, String destinationStationId) {
