@@ -1185,7 +1185,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			step.lineName(),
 			step.fromStationId(),
 			step.toStationId(),
-			step.estimatedMinutes(),
+			step.estimatedMinutes() + ((realtimeWaitSeconds(overlay) + 59) / 60),
 			step.distanceMeters(),
 			step.includesStairs(),
 			step.stairAccessState(),
