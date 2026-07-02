@@ -74,6 +74,7 @@
     "routeV2ContractReport": "artifacts/route-v2-contract-report.json",
     "coverageGapReport": "artifacts/datapack-coverage-gaps.json",
     "qualityMetricReport": "artifacts/datapack-quality-metrics.json",
+    "freshnessSlaPolicy": "apps/mobile/release/datapack-freshness-sla.json",
     "androidOfflineRouteEvidence": ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md"
   },
   "requiredVerificationCommands": [
