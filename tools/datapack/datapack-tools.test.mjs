@@ -620,6 +620,67 @@ test("원격 데이터팩 검증 wrapper는 manifest와 pack을 내려받아 기
   }
 });
 
+test("원격 데이터팩 검증 wrapper는 validator 실패도 summary에 기록한다", async () => {
+  const packOutputDir = path.join(tmpdir(), `easysubway-remote-datapack-source-invalid-${Date.now()}`);
+  const downloadDir = path.join(tmpdir(), `easysubway-remote-datapack-download-invalid-${Date.now()}`);
+  await rm(packOutputDir, { recursive: true, force: true });
+  await rm(downloadDir, { recursive: true, force: true });
+  await mkdir(packOutputDir, { recursive: true });
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+
+  const server = await startObjectStorageServer({ requireAuthorization: false, basePath: "/catalog" });
+  try {
+    const manifestBytes = await readFile(path.join(packOutputDir, "current.json"));
+    const corruptPackBytes = Buffer.from("not a gzip datapack");
+    server.objects.set("current.json", {
+      body: manifestBytes,
+      sha256: sha256(manifestBytes),
+      sizeBytes: manifestBytes.length,
+    });
+    server.objects.set("capital-v1.sqlite.gz", {
+      body: corruptPackBytes,
+      sha256: sha256(corruptPackBytes),
+      sizeBytes: corruptPackBytes.length,
+    });
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/validate-remote-datapack-artifact.mjs",
+          "--manifest-url",
+          `${server.origin}/catalog/current.json`,
+          "--output",
+          downloadDir,
+        ],
+        { cwd: root, env: productionEnv },
+      ),
+    );
+
+    const summary = JSON.parse(
+      await readFile(path.join(downloadDir, "remote-datapack-validation-summary.json"), "utf8"),
+    );
+    assert.notEqual(summary.validation.exitCode, 0);
+    assert.equal(summary.validation.signal, null);
+    assert.match(summary.validation.stderr, /sizeBytes mismatch/);
+  } finally {
+    await server.close();
+    await rm(packOutputDir, { recursive: true, force: true });
+    await rm(downloadDir, { recursive: true, force: true });
+  }
+});
+
 test("데이터팩 검증기는 strict step-free transfer가 계단 pathway를 가리키면 거부한다", async () => {
   const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
   const outputDir = path.join(tmpdir(), `easysubway-datapack-strict-pathway-invalid-${Date.now()}`);

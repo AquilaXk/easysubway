@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+
+const DOWNLOAD_TIMEOUT_MS = 30_000;
 
 const args = parseArgs(process.argv.slice(2));
 const manifestUrl = requireArg(args, "manifest-url");
@@ -49,6 +51,12 @@ await writeFile(
   `${JSON.stringify(summary, null, 2)}\n`,
 );
 
+if (validation.signal) {
+  process.stderr.write(validation.stderr || validation.stdout);
+  process.stderr.write(`validator terminated by signal ${validation.signal}\n`);
+  process.exit(1);
+}
+
 if (validation.exitCode !== 0) {
   process.stderr.write(validation.stderr || validation.stdout);
   process.exit(validation.exitCode);
@@ -80,7 +88,19 @@ function requireArg(parsed, name) {
 }
 
 async function download(url) {
-  const response = await fetch(url);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, { signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`download timed out after ${DOWNLOAD_TIMEOUT_MS}ms: ${url}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     throw new Error(`download failed: ${url} ${response.status}`);
   }
@@ -102,6 +122,7 @@ async function runValidator({ manifestPath, outputRoot, requireProduction }) {
   return {
     command: `${process.execPath} ${args.join(" ")}`,
     exitCode: result.exitCode,
+    signal: result.signal,
     stdout: result.stdout,
     stderr: result.stderr,
   };
@@ -115,9 +136,10 @@ function spawnResult(command, args) {
     child.stdout.on("data", (chunk) => stdout.push(chunk));
     child.stderr.on("data", (chunk) => stderr.push(chunk));
     child.on("error", reject);
-    child.on("close", (exitCode) => {
+    child.on("close", (exitCode, signal) => {
       resolve({
         exitCode,
+        signal,
         stdout: Buffer.concat(stdout).toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
       });
