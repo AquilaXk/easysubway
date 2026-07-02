@@ -11,6 +11,7 @@ import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/route_map_renderer.dart';
+import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'mobile_error_reporter.dart';
@@ -311,6 +312,7 @@ class NetworkMapScreen extends StatefulWidget {
     this.stationSearchRepository,
     this.locationProvider,
     this.viewportRepository,
+    this.realtimeRepository,
     this.onOpenSavedItems,
     this.onOpenRecentSearch,
     this.onOpenNearbyStations,
@@ -327,6 +329,7 @@ class NetworkMapScreen extends StatefulWidget {
   final StationSearchRepository? stationSearchRepository;
   final CurrentLocationProvider? locationProvider;
   final NetworkMapViewportRepository? viewportRepository;
+  final RealtimeRepository? realtimeRepository;
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenRecentSearch;
   final VoidCallback? onOpenNearbyStations;
@@ -348,7 +351,52 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _nearbyLookupMessage;
   Timer? _nearbyLookupMessageTimer;
   bool _initialNearbyFocusStarted = false;
+  RealtimeSnapshot _nearbyRealtime = const RealtimeSnapshot.loading();
+  int _nearbyRealtimeToken = 0;
   late Future<_NetworkMapLoadResult> _future = _loadMap();
+
+  Future<void> _loadNearbyRealtime(StationSearchResult station) async {
+    final repository = widget.realtimeRepository;
+    final firstLine = station.lines.isEmpty ? null : station.lines.first;
+    final token = ++_nearbyRealtimeToken;
+    if (repository == null || firstLine == null) {
+      setState(() {
+        _nearbyRealtime = const RealtimeSnapshot(
+          status: RealtimeSnapshotStatus.unsupported,
+          fallbackCode: 'LINE_MAPPING_MISSING',
+          message: '이 노선은 아직 실시간 열차 안내가 어려워요.',
+        );
+      });
+      return;
+    }
+    setState(() => _nearbyRealtime = const RealtimeSnapshot.loading());
+    RealtimeSnapshot snapshot;
+    try {
+      snapshot = await repository.arrivals(
+        RealtimeStationQuery(
+          stationId: station.id,
+          lineId: firstLine.id,
+          providerLineId: firstLine.stationCode.isEmpty
+              ? firstLine.id
+              : firstLine.stationCode,
+          stationQueryName: station.nameKo,
+        ),
+      );
+    } on RealtimeException {
+      snapshot = const RealtimeSnapshot.unavailable();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 주변역 실시간 조회 중 예외가 발생했습니다.',
+      );
+      snapshot = const RealtimeSnapshot.unavailable();
+    }
+    if (!mounted || token != _nearbyRealtimeToken) {
+      return;
+    }
+    setState(() => _nearbyRealtime = snapshot);
+  }
 
   @override
   void dispose() {
@@ -370,6 +418,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _nearbySelectedStationId = null;
       _nearbyPanelVisible = false;
       _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+      _nearbyRealtime = const RealtimeSnapshot.loading();
+      _nearbyRealtimeToken++;
       _initialNearbyFocusStarted = false;
       _future = _loadMap();
     });
@@ -398,6 +448,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               },
               nearbyPanelVisible: _nearbyPanelVisible,
               nearbyPanelData: _nearbyPanelData,
+              realtime: _nearbyRealtime,
               nearbyLookupMessage: _nearbyLookupMessage,
               adjacentStations: const _NetworkMapAdjacentStations(),
               onCurrentLocationTap: _showNearbyPanel,
@@ -421,6 +472,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               },
               nearbyPanelVisible: _nearbyPanelVisible,
               nearbyPanelData: _nearbyPanelData,
+              realtime: _nearbyRealtime,
               nearbyLookupMessage: _nearbyLookupMessage,
               adjacentStations: const _NetworkMapAdjacentStations(),
               onCurrentLocationTap: _showNearbyPanel,
@@ -453,6 +505,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             },
             nearbyPanelVisible: _nearbyPanelVisible,
             nearbyPanelData: _nearbyPanelData,
+            realtime: _nearbyRealtime,
             nearbyLookupMessage: _nearbyLookupMessage,
             adjacentStations: _adjacentStationsFor(data),
             onCurrentLocationTap: _showNearbyPanel,
@@ -525,6 +578,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         _nearbySelectedStationId = results.first.id;
         _nearbyPanelData = _NetworkMapNearbyPanelData.success(results);
       });
+      unawaited(_loadNearbyRealtime(results.first));
     } on CurrentLocationException catch (error) {
       if (!mounted) {
         return;
@@ -556,7 +610,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
       _nearbyLookupMessage = message;
     });
-    _nearbyLookupMessageTimer = Timer(const Duration(milliseconds: 1800), () {
+    _nearbyLookupMessageTimer = Timer(const Duration(seconds: 4), () {
       if (!mounted) {
         return;
       }
@@ -634,6 +688,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _nearbyPanelVisible = false;
       _nearbySelectedStationId = null;
       _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+      _nearbyRealtime = const RealtimeSnapshot.loading();
+      _nearbyRealtimeToken++;
     });
   }
 
@@ -762,6 +818,7 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.onExpressViewChanged,
     required this.nearbyPanelVisible,
     required this.nearbyPanelData,
+    required this.realtime,
     required this.nearbyLookupMessage,
     required this.adjacentStations,
     required this.onCurrentLocationTap,
@@ -781,6 +838,7 @@ class _NetworkMapChrome extends StatelessWidget {
   final ValueChanged<bool> onExpressViewChanged;
   final bool nearbyPanelVisible;
   final _NetworkMapNearbyPanelData nearbyPanelData;
+  final RealtimeSnapshot realtime;
   final String? nearbyLookupMessage;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback onCurrentLocationTap;
@@ -826,6 +884,7 @@ class _NetworkMapChrome extends StatelessWidget {
             bottom: 0,
             child: _NetworkMapNearbyStationPanel(
               data: nearbyPanelData,
+              realtime: realtime,
               adjacentStations: adjacentStations,
               onClose: onCloseNearbyPanel,
               onRetry: onCurrentLocationTap,
@@ -1277,12 +1336,14 @@ class _NetworkMapAdjacentStations {
 class _NetworkMapNearbyStationPanel extends StatelessWidget {
   const _NetworkMapNearbyStationPanel({
     required this.data,
+    required this.realtime,
     required this.adjacentStations,
     required this.onClose,
     required this.onRetry,
   });
 
   final _NetworkMapNearbyPanelData data;
+  final RealtimeSnapshot realtime;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback onClose;
   final VoidCallback onRetry;
@@ -1317,26 +1378,29 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                       child: _SubwayLinePanelTab(line: primaryLine),
                     ),
                     const Spacer(),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Container(
-                        height: 24,
-                        alignment: Alignment.center,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFFFFCACA)),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: const Text(
-                          '실시간',
-                          style: TextStyle(
-                            color: Color(0xFFFF7777),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                    if (realtime.status == RealtimeSnapshotStatus.fresh)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          height: 24,
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: EasySubwayAccessibleColors.mintBorder,
+                            ),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: const Text(
+                            '실시간',
+                            style: TextStyle(
+                              color: EasySubwayAccessibleColors.mint,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 3),
                       child: IconButton(
@@ -1379,6 +1443,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
               const Divider(height: 1, color: Color(0xFFD8D8D8)),
               _NetworkMapNearbyPanelBody(
                 data: data,
+                realtime: realtime,
                 adjacentStations: adjacentStations,
               ),
             ],
@@ -1392,10 +1457,12 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
 class _NetworkMapNearbyPanelBody extends StatelessWidget {
   const _NetworkMapNearbyPanelBody({
     required this.data,
+    required this.realtime,
     required this.adjacentStations,
   });
 
   final _NetworkMapNearbyPanelData data;
+  final RealtimeSnapshot realtime;
   final _NetworkMapAdjacentStations adjacentStations;
 
   @override
@@ -1408,6 +1475,7 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
       ),
       _NetworkMapNearbyPanelStatus.success => _NetworkMapNearbySuccessList(
         results: data.results,
+        realtime: realtime,
         adjacentStations: adjacentStations,
       ),
     };
@@ -1417,10 +1485,12 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
 class _NetworkMapNearbySuccessList extends StatelessWidget {
   const _NetworkMapNearbySuccessList({
     required this.results,
+    required this.realtime,
     required this.adjacentStations,
   });
 
   final List<StationSearchResult> results;
+  final RealtimeSnapshot realtime;
   final _NetworkMapAdjacentStations adjacentStations;
 
   @override
@@ -1497,26 +1567,8 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
         ),
         const SizedBox(height: 17),
         Padding(
-          padding: const EdgeInsets.fromLTRB(42, 0, 42, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _SubwayArrivalColumn(
-                  arrivals: const [_SubwayArrivalPlaceholder()],
-                ),
-              ),
-              const SizedBox(
-                height: 46,
-                child: VerticalDivider(color: Color(0xFFE0E0E0), width: 30),
-              ),
-              Expanded(
-                child: _SubwayArrivalColumn(
-                  arrivals: const [_SubwayArrivalPlaceholder()],
-                ),
-              ),
-            ],
-          ),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+          child: _SubwayArrivalPanel(snapshot: realtime),
         ),
       ],
     );
@@ -1563,44 +1615,219 @@ class _SubwayLinePanelTab extends StatelessWidget {
   }
 }
 
-class _SubwayArrivalPlaceholder {
-  const _SubwayArrivalPlaceholder();
+String _formatArrivalEta(RealtimeArrival arrival) {
+  final eta = arrival.etaSeconds;
+  if (eta != null && eta > 0) {
+    final minutes = (eta / 60).round();
+    return minutes <= 0 ? '곧 도착' : '약 $minutes분';
+  }
+  return arrival.message.trim();
+}
+
+String _arrivalDirectionLabel(RealtimeArrival arrival) {
+  final direction = arrival.direction.trim();
+  if (direction.isNotEmpty) {
+    return direction;
+  }
+  final destination = arrival.destination.trim();
+  return destination.isEmpty ? '' : '$destination 방면';
+}
+
+/// 주변역 패널의 도착 정보 영역. 실시간 스냅샷 상태에 따라 방향별 도착을
+/// 표시하거나, 미지원·실패 시 "-" 대신 한 줄 안내를 보여준다.
+class _SubwayArrivalPanel extends StatelessWidget {
+  const _SubwayArrivalPanel({required this.snapshot});
+
+  final RealtimeSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (snapshot.status) {
+      case RealtimeSnapshotStatus.loading:
+        return const SizedBox(
+          key: Key('networkMapNearbyArrivalLoading'),
+          height: 46,
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      case RealtimeSnapshotStatus.unsupported:
+      case RealtimeSnapshotStatus.unavailable:
+        final message = snapshot.message.trim().isEmpty
+            ? '실시간 도착 정보를 준비하고 있어요.'
+            : snapshot.message.trim();
+        return _SubwayArrivalNotice(message: message);
+      case RealtimeSnapshotStatus.fresh:
+      case RealtimeSnapshotStatus.stale:
+        if (snapshot.arrivals.isEmpty) {
+          return const _SubwayArrivalNotice(message: '표시할 도착 정보가 없어요.');
+        }
+        final groups = <String, List<RealtimeArrival>>{};
+        for (final arrival in snapshot.arrivals) {
+          groups.putIfAbsent(arrival.direction, () => []).add(arrival);
+        }
+        final directions = groups.keys.toList(growable: false);
+        final left = groups[directions.first]!;
+        final right = directions.length > 1
+            ? groups[directions[1]]!
+            : const <RealtimeArrival>[];
+        final isStale = snapshot.status == RealtimeSnapshotStatus.stale;
+        final semanticParts = <String>[
+          for (final arrival in [...left, ...right])
+            [
+              _arrivalDirectionLabel(arrival),
+              arrival.destination.trim().isEmpty
+                  ? ''
+                  : '${arrival.destination.trim()}행',
+              _formatArrivalEta(arrival),
+            ].where((part) => part.isNotEmpty).join(' '),
+        ].where((part) => part.isNotEmpty).toList(growable: false);
+        return Semantics(
+          liveRegion: true,
+          label: semanticParts.isEmpty ? '도착 정보 없음' : semanticParts.join(', '),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isStale) ...[
+                Text(
+                  snapshot.receivedAt.trim().isEmpty
+                      ? '최근 도착 정보'
+                      : '최근 도착 정보 · ${snapshot.receivedAt.trim()}',
+                  style: const TextStyle(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _SubwayArrivalColumn(arrivals: left)),
+                  if (right.isNotEmpty) ...[
+                    const SizedBox(
+                      height: 46,
+                      child: VerticalDivider(
+                        color: Color(0xFFE0E0E0),
+                        width: 30,
+                      ),
+                    ),
+                    Expanded(child: _SubwayArrivalColumn(arrivals: right)),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        );
+    }
+  }
+}
+
+class _SubwayArrivalNotice extends StatelessWidget {
+  const _SubwayArrivalNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: Center(
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: EasySubwayAccessibleColors.mutedText,
+            fontSize: 13,
+            height: 1.3,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SubwayArrivalColumn extends StatelessWidget {
   const _SubwayArrivalColumn({required this.arrivals});
 
-  final List<_SubwayArrivalPlaceholder> arrivals;
+  final List<RealtimeArrival> arrivals;
 
   @override
   Widget build(BuildContext context) {
+    final visible = arrivals.take(2).toList(growable: false);
+    final directionLabel = visible.isEmpty
+        ? ''
+        : _arrivalDirectionLabel(visible.first);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
-      children: arrivals
-          .map((arrival) => const _SubwayArrivalRow())
-          .toList(growable: false),
+      children: [
+        if (directionLabel.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              directionLabel,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        for (final arrival in visible) _SubwayArrivalRow(arrival: arrival),
+      ],
     );
   }
 }
 
 class _SubwayArrivalRow extends StatelessWidget {
-  const _SubwayArrivalRow();
+  const _SubwayArrivalRow({required this.arrival});
+
+  final RealtimeArrival arrival;
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.only(bottom: 2),
-      child: Center(
-        child: Text(
-          '-',
-          style: TextStyle(
-            color: Color(0xFF2F2F2F),
-            fontSize: 12,
-            height: 1.45,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+    final destination = arrival.destination.trim();
+    final eta = _formatArrivalEta(arrival);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        children: [
+          if (destination.isNotEmpty)
+            Text(
+              '$destination행',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF2F2F2F),
+                fontSize: 13,
+                height: 1.3,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          if (eta.isNotEmpty)
+            Text(
+              eta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.secondaryText,
+                fontSize: 12,
+                height: 1.3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+        ],
       ),
     );
   }

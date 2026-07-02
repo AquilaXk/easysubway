@@ -3092,11 +3092,13 @@ void main() {
     final requested = repository.requestedNearbyLocations.single;
     expect(requested.latitude, closeTo(37.3028, 0.0001));
     expect(requested.longitude, closeTo(126.8665, 0.0001));
-    expect(find.text('실시간'), findsOneWidget);
+    // 실시간 미연동(UnavailableRealtimeRepository) 상태에서는 "실시간" 뱃지와
+    // "-" 자리표시 대신 한 줄 안내만 보여준다.
+    expect(find.text('실시간'), findsNothing);
     expect(find.text('상록수'), findsOneWidget);
     expect(find.textContaining('반월'), findsOneWidget);
     expect(find.textContaining('한대앞'), findsOneWidget);
-    expect(find.text('-'), findsWidgets);
+    expect(find.textContaining('이용할 수 있습니다'), findsOneWidget);
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
   });
 
@@ -3183,11 +3185,59 @@ void main() {
     );
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
 
-    await tester.pump(const Duration(milliseconds: 1900));
+    await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+  });
+
+  testWidgets('노선도 주변역 패널은 실시간 도착 정보를 방향별로 보여준다', (tester) async {
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        locationProvider: locationProvider,
+        realtimeRepository: const _FreshNearbyRealtimeRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    // FRESH 상태에서만 "실시간" 뱃지가 노출되고, 도착 정보가 방향별로 표시된다.
+    expect(find.text('실시간'), findsOneWidget);
+    expect(find.text('상행'), findsOneWidget);
+    expect(find.text('하행'), findsOneWidget);
+    expect(find.text('한대앞행'), findsOneWidget);
+    expect(find.text('사당행'), findsOneWidget);
+    expect(find.text('약 3분'), findsOneWidget);
+    expect(find.text('약 5분'), findsOneWidget);
   });
 
   testWidgets('노선도는 위치 권한이 이미 있으면 가까운 역 중심 viewport를 저장한다', (tester) async {
@@ -12954,6 +13004,38 @@ CurrentLocation _freshCurrentLocation({
     provider: 'test',
     permissionPrecision: LocationPermissionPrecision.precise,
   );
+}
+
+class _FreshNearbyRealtimeRepository implements RealtimeRepository {
+  const _FreshNearbyRealtimeRepository();
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
+    return const RealtimeSnapshot(
+      status: RealtimeSnapshotStatus.fresh,
+      receivedAt: '방금',
+      arrivals: [
+        RealtimeArrival(
+          lineId: 'seoul-2',
+          stationName: '상록수',
+          destination: '한대앞',
+          direction: '상행',
+          trainNo: '2001',
+          message: '',
+          etaSeconds: 180,
+        ),
+        RealtimeArrival(
+          lineId: 'seoul-2',
+          stationName: '상록수',
+          destination: '사당',
+          direction: '하행',
+          trainNo: '2002',
+          message: '',
+          etaSeconds: 300,
+        ),
+      ],
+    );
+  }
 }
 
 class FakeCurrentLocationProvider implements CurrentLocationProvider {
