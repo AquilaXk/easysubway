@@ -74,6 +74,7 @@
     "routeV2ContractReport": "artifacts/route-v2-contract-report.json",
     "coverageGapReport": "artifacts/datapack-coverage-gaps.json",
     "qualityMetricReport": "artifacts/datapack-quality-metrics.json",
+    "routeGraphTopologyReport": "artifacts/route-graph-topology-report.json",
     "freshnessSlaPolicy": "apps/mobile/release/datapack-freshness-sla.json",
     "androidOfflineRouteEvidence": ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md"
   },
@@ -82,6 +83,7 @@
     "node --test tools/datapack/*.test.mjs tools/routes/*.test.mjs",
     "node tools/routes/evaluate-eta-accuracy.mjs ...",
     "node tools/routes/check-route-commercialization-gate.mjs --gate apps/mobile/release/route-commercialization-gate.json --accuracy artifacts/route-accuracy-report.json --accessibility artifacts/route-accessibility-regression-report.json --coverage artifacts/realtime-provider-coverage-report.json --contract artifacts/route-v2-contract-report.json",
+    "node tools/datapack/build-route-graph-topology-report.mjs --manifest ... --root ... --output artifacts/route-graph-topology-report.json",
     "node tools/datapack/report-coverage-gaps.mjs ..."
   ],
   "evidencePolicy": {
