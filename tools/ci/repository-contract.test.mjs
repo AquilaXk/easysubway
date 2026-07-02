@@ -3046,7 +3046,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
@@ -3070,7 +3070,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     },
   );
   const rcGithubEnvOutput = readFileSync(rcGithubEnv, "utf8");
-  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/datapack\.aquilaxk\.site\/datapacks\/$/m);
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/objectstorage\.ap-seoul-1\.oraclecloud\.com\/n\/axvym6vk8g7i\/b\/easysubway-datapacks\/o$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1$/m);
   assert.match(rcGithubEnvOutput, /^EASYSUBWAY_DATAPACK_CHANNEL=production$/m);
   assert.match(
@@ -3125,7 +3125,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
@@ -3151,7 +3151,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
-    "EASYSUBWAY_DATA_PACK_BASE_URL=https://datapack.aquilaxk.site/datapacks/",
+    "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
