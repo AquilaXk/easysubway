@@ -17,6 +17,7 @@ import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
+const _routeOnlineSearchErrorMessage = '실시간/서버 경로를 확인하지 못했어요.';
 const _routeRefreshErrorMessage = '도착 시간을 새로 확인하지 못했어요.';
 const _routeFeedbackErrorMessage = '의견을 보내지 못했어요.';
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 바꾸지 못했어요.';
@@ -387,7 +388,7 @@ class RouteSearchOnlineException extends RouteSearchException {
   const RouteSearchOnlineException.unavailable({
     this.statusCode,
     this.failureReason = 'online-unavailable',
-  }) : super(_routeSearchErrorMessage);
+  }) : super(_routeOnlineSearchErrorMessage);
 
   factory RouteSearchOnlineException.http(int statusCode) {
     final backend4xxFailure = statusCode >= 400 && statusCode < 500;
@@ -405,7 +406,7 @@ class RouteSearchOnlineException extends RouteSearchException {
   const RouteSearchOnlineException._({
     required this.statusCode,
     required this.failureReason,
-  }) : super(_routeSearchErrorMessage);
+  }) : super(_routeOnlineSearchErrorMessage);
 
   final int? statusCode;
   final String failureReason;

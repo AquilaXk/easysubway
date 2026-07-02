@@ -9768,6 +9768,42 @@ void main() {
     );
   });
 
+  testWidgets('로컬 경로 결과는 저장된 데이터 source를 실시간이나 시간표로 표시하지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              routeSearchId: 'local-station-sangnoksu-station-sadang',
+              etaSource: 'STATIC_LOCAL',
+              sourceUpdatedAt: '2026-06-19T00:00:00Z',
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 23),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('예상 소요시간: 저장된 데이터 기준 · 최근 확인 2026-06-19'), findsOneWidget);
+    expect(find.textContaining('실시간'), findsNothing);
+    expect(find.textContaining('시간표'), findsNothing);
+  });
+
   testWidgets('추천 경로 항목은 스크린리더에서 상세 진입 버튼으로 남는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
@@ -13333,6 +13369,8 @@ RouteSearchResult _sampleRouteSearchResult({
   String routeSearchId = 'route-1',
   String status = 'FOUND',
   String mobilityType = 'SENIOR',
+  String etaSource = '',
+  String sourceUpdatedAt = '',
   List<RouteSearchStep>? steps,
   List<String> recommendationReasons = const [
     '엘리베이터 동선을 우선했어요',
@@ -13403,6 +13441,8 @@ RouteSearchResult _sampleRouteSearchResult({
     recommendationReasons: recommendationReasons,
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',
+    etaSource: etaSource,
+    sourceUpdatedAt: sourceUpdatedAt,
   );
 }
 
