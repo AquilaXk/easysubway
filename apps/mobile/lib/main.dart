@@ -43,7 +43,7 @@ const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
 const _homeHeroCardPadding = EdgeInsets.fromLTRB(0, 8, 0, 8);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
-const _mainScaffoldBackgroundColor = Color(0xFFF6F8F9);
+const _mainScaffoldBackgroundColor = EasySubwayAccessibleColors.scaffoldSurface;
 const _appCardRadius = 20.0;
 const _homeActionButtonRadius = 12.0;
 const _homeRouteDraftRadius = 18.0;
@@ -52,15 +52,18 @@ const _homeRecentRouteRadius = 26.0;
 const _dataDeletionResultIconRadius = 16.0;
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(12));
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
-const _appCardShadowColor = Color(0x0A071B2F);
-const _highContrastTextColor = Color(0xFF000000);
-const _highContrastPrimaryColor = Color(0xFF003D40);
-const _highContrastSecondaryColor = Color(0xFF005E68);
+const _appCardShadowColor = EasySubwayAccessibleColors.cardShadow;
+const _highContrastTextColor = EasySubwayAccessibleColors.highContrastText;
+const _highContrastPrimaryColor =
+    EasySubwayAccessibleColors.highContrastPrimary;
+const _highContrastSecondaryColor =
+    EasySubwayAccessibleColors.highContrastSecondary;
 const _homeInfoBorderColor = Color(0xFFB7DDF4);
 const _homeFacilityCautionBorderColor = Color(0xFFF1D49A);
-const _homeFacilityInfoBorderColor = Color(0xFFC8E6F8);
-const _settingsSwitchActiveTrackColor = Color(0xFF0D8A6D);
-const _settingsSwitchInactiveTrackColor = Color(0xFFC8D3DC);
+const _settingsSwitchActiveTrackColor =
+    EasySubwayAccessibleColors.switchActiveTrack;
+const _settingsSwitchInactiveTrackColor =
+    EasySubwayAccessibleColors.switchInactiveTrack;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -393,9 +396,10 @@ class EasySubwayApp extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+        // 주 행동(채움)만 강하게: 높이 60, 진한 채움.
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(60),
+            minimumSize: const Size.fromHeight(EasySubwayTouchTarget.primary),
             shape: const RoundedRectangleBorder(
               borderRadius: _mainThemeControlRadius,
             ),
@@ -405,18 +409,21 @@ class EasySubwayApp extends StatelessWidget {
             ),
           ),
         ),
+        // 보조 행동은 조용하게: 중립 얇은 보더(line 토큰) + primary 텍스트,
+        // 높이는 접근성 최소(56). 고대비 대비는 _themeForPreferences에서 보정.
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(60),
+            minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
+            foregroundColor: EasySubwayAccessibleColors.primary,
             side: const BorderSide(
-              color: EasySubwayAccessibleColors.primary,
-              width: 2,
+              color: EasySubwayAccessibleColors.line,
+              width: 1.5,
             ),
             shape: const RoundedRectangleBorder(
               borderRadius: _mainThemeControlRadius,
             ),
             textStyle: const TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -1110,6 +1117,17 @@ ThemeData _themeForPreferences(
         color: _highContrastTextColor,
       ),
     ),
+    // 보조 버튼이 중립 보더로 바뀌었으므로 고대비에서 보더·텍스트 대비를 보정.
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: baseTheme.outlinedButtonTheme.style?.copyWith(
+        foregroundColor: const WidgetStatePropertyAll(
+          _highContrastPrimaryColor,
+        ),
+        side: const WidgetStatePropertyAll(
+          BorderSide(color: _highContrastTextColor, width: 1.5),
+        ),
+      ),
+    ),
   );
 }
 
@@ -1598,11 +1616,13 @@ class _HomeScreenState extends State<HomeScreen> {
           stationSearchRepository: repository,
           locationProvider: locationProvider,
           viewportRepository: widget.networkMapViewportRepository,
+          realtimeRepository: widget.realtimeRepository,
           onOpenSavedItems: openSavedTab,
           onOpenRecentSearch: () =>
               unawaited(openStationSearch(StationSearchEntryMode.recent)),
           onOpenNearbyStations: () =>
               unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+          onOpenSettings: openMoreTab,
           onOpenDataSources: openDataSources,
           notificationAction: notificationRepository == null
               ? null
@@ -1857,7 +1877,7 @@ class _HomeNotificationButton extends StatelessWidget {
               style: IconButton.styleFrom(
                 minimumSize: const Size.square(48),
                 backgroundColor: Colors.white,
-                foregroundColor: EasySubwayAccessibleColors.mintDark,
+                foregroundColor: EasySubwayAccessibleColors.secondaryText,
                 side: const BorderSide(
                   color: EasySubwayAccessibleColors.line,
                   width: 1.5,
@@ -2651,7 +2671,7 @@ class _AppSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           height: 1.2,
         ),
       ),
@@ -2815,9 +2835,9 @@ _FacilitySeverityAccent _facilitySeverityAccent(
       iconColor: EasySubwayAccessibleColors.amber,
     ),
     FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
-      backgroundColor: EasySubwayAccessibleColors.skySoft,
-      borderColor: _homeFacilityInfoBorderColor,
-      iconColor: EasySubwayAccessibleColors.brand,
+      backgroundColor: Colors.white,
+      borderColor: EasySubwayAccessibleColors.needsInfo,
+      iconColor: EasySubwayAccessibleColors.needsInfo,
     ),
     FacilityStatusSeverity.normal => const _FacilitySeverityAccent(
       backgroundColor: Colors.white,
@@ -3167,13 +3187,10 @@ class _HomeSavedRouteCard extends StatelessWidget {
             showBorder: true,
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 21,
-                  backgroundColor: EasySubwayAccessibleColors.mintSoft,
-                  child: const Icon(
-                    Icons.route_outlined,
-                    color: EasySubwayAccessibleColors.mintDark,
-                  ),
+                const Icon(
+                  Icons.route_outlined,
+                  color: EasySubwayAccessibleColors.primary,
+                  size: 30,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -3185,7 +3202,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
                         style: const TextStyle(
                           color: EasySubwayAccessibleColors.text,
                           fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                           height: 1.25,
                         ),
                       ),
@@ -3236,21 +3253,7 @@ class _HomeLineSymbol extends StatelessWidget {
 }
 
 String _lineColorForRoute(FavoriteRoute route) {
-  final lineId = route.lineId.toLowerCase();
-  final lineName = route.lineName;
-  if (lineId.contains('4') || lineName.contains('4호선')) {
-    return '#00A5DE';
-  }
-  if (lineId.contains('1') || lineName.contains('1호선')) {
-    return '#0052A4';
-  }
-  if (lineId.contains('2') || lineName.contains('2호선')) {
-    return '#00A84D';
-  }
-  if (lineId.contains('3') || lineName.contains('3호선')) {
-    return '#EF7C1C';
-  }
-  return '#006D77';
+  return fallbackLineColorHex(lineId: route.lineId, lineName: route.lineName);
 }
 
 String _stationNameWithSuffix(String name) {
@@ -3267,13 +3270,13 @@ class _HomeMiniBadge extends StatelessWidget {
     return Chip(
       label: Text(label),
       visualDensity: VisualDensity.compact,
-      backgroundColor: EasySubwayAccessibleColors.mintSoft,
-      side: BorderSide.none,
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      side: const BorderSide(color: EasySubwayAccessibleColors.line),
       shape: const StadiumBorder(),
       labelStyle: const TextStyle(
-        color: EasySubwayAccessibleColors.mintDark,
+        color: EasySubwayAccessibleColors.secondaryText,
         fontSize: 11,
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w700,
         height: 1.2,
       ),
       padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -3288,7 +3291,7 @@ class _AppCard extends StatelessWidget {
     this.borderColor = EasySubwayAccessibleColors.line,
     this.borderRadius = 20,
     this.padding = const EdgeInsets.all(16),
-    this.showBorder = false,
+    this.showBorder = true,
   });
 
   final Widget child;
@@ -3300,10 +3303,11 @@ class _AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 최소 그림자 원칙: 그림자 대신 얇은 보더로 카드를 구분한다.
     return Card(
       margin: EdgeInsets.zero,
       color: backgroundColor,
-      elevation: 2,
+      elevation: 0,
       shadowColor: _appCardShadowColor,
       shape: RoundedRectangleBorder(
         side: showBorder ? BorderSide(color: borderColor) : BorderSide.none,
@@ -3678,7 +3682,7 @@ class _AppSettingsSection extends StatelessWidget {
               title,
               style: textTheme.titleMedium?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
                 height: 1.25,
               ),
             ),
@@ -3994,7 +3998,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
                         child: _AppCard(
                           child: _AppInfoRow(
                             icon: Icons.bookmark_border,
-                            iconColor: EasySubwayAccessibleColors.mintDark,
+                            iconColor: EasySubwayAccessibleColors.mutedText,
                             title: '즐겨찾기한 항목이 없습니다',
                             subtitle: '역, 시설, 경로에서 즐겨찾기를 추가해 주세요.',
                           ),
@@ -4267,18 +4271,13 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: EasySubwayAccessibleColors.mintSoft,
-                    borderRadius: _mainThemeControlRadius,
-                  ),
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(
-                      icon,
-                      color: EasySubwayAccessibleColors.mintDark,
-                    ),
+                SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    icon,
+                    color: EasySubwayAccessibleColors.primary,
+                    size: 28,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -4291,7 +4290,7 @@ class _FavoriteHomeQuickCard extends StatelessWidget {
                         style: const TextStyle(
                           color: EasySubwayAccessibleColors.text,
                           fontSize: 18,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                           height: 1.25,
                         ),
                       ),
@@ -4355,11 +4354,10 @@ class OfflineDataScreen extends StatelessWidget {
           padding: _mainPagePadding,
           children: const [
             _AppCard(
-              backgroundColor: EasySubwayAccessibleColors.mintSoft,
-              borderColor: EasySubwayAccessibleColors.mintBorder,
+              showBorder: true,
               child: _AppInfoRow(
                 icon: Icons.check_circle_outline,
-                iconColor: EasySubwayAccessibleColors.mintDark,
+                iconColor: EasySubwayAccessibleColors.primary,
                 title: '인터넷 없이도 이용할 수 있어요',
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
               ),
@@ -5230,11 +5228,10 @@ class UserDataDeletionResultScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             const _AppCard(
-              backgroundColor: EasySubwayAccessibleColors.skySoft,
-              borderColor: _homeInfoBorderColor,
+              showBorder: true,
               child: _AppInfoRow(
                 icon: Icons.map_outlined,
-                iconColor: EasySubwayAccessibleColors.brand,
+                iconColor: EasySubwayAccessibleColors.primary,
                 title: '노선도와 역 정보는 계속 이용할 수 있어요',
               ),
             ),
@@ -5269,7 +5266,7 @@ class _DataDeletionResultRow extends StatelessWidget {
           title,
           style: textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 4),
@@ -5282,6 +5279,7 @@ class _DataDeletionResultRow extends StatelessWidget {
         ),
       ],
     );
+    // 삭제 완료는 복구/완료 상태 의미가 있어 민트 뱃지를 유지한다.
     final statusBadge = Container(
       key: Key('dataDeletionResultStatus-$id'),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -5293,8 +5291,8 @@ class _DataDeletionResultRow extends StatelessWidget {
       child: const Text(
         '완료',
         style: TextStyle(
-          color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w900,
+          color: EasySubwayAccessibleColors.mintDark,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -5777,24 +5775,21 @@ class _AttributionCard extends StatelessWidget {
     final offline = (map['offline'] as Map<String, Object?>?) ?? const {};
     return _AttributionCard._(
       title: _text(map['name_ko']),
-      subtitle: 'provider/owner: ${_text(map['operator'])}',
+      subtitle: '제공·소유: ${_text(map['operator'])}',
       rows: [
-        ('source name', _text(license['source'], _text(map['name_ko']))),
+        ('제공 기관', _text(license['source'], _text(map['name_ko']))),
+        ('라이선스', '${_text(license['name'])} (${_text(license['spdx'])})'),
+        ('라이선스 링크', _text(license['url'])),
+        ('표기 필요', _yesNo(license['attributionRequired'])),
+        ('가져온 날짜', _text(license['date'])),
+        ('확인한 날짜', _text(manifest['generated_at_utc'])),
         (
-          'license type',
-          '${_text(license['name'])} (${_text(license['spdx'])})',
-        ),
-        ('license URL', _text(license['url'])),
-        ('attribution required', _yesNo(license['attributionRequired'])),
-        ('last retrieved', _text(license['date'])),
-        ('last verified', _text(manifest['generated_at_utc'])),
-        (
-          'commercial use / redistribution',
+          '상업적 이용 / 재배포',
           '${_allowed(license['commercialUseAllowed'])} / ${_allowed(license['redistributionAllowed'])}',
         ),
-        ('review status', _text(license['reviewStatus'])),
-        ('changes', _text(license['changes'])),
-        ('asset path', _text(offline['path'])),
+        ('검토 상태', _text(license['reviewStatus'])),
+        ('변경 사항', _text(license['changes'])),
+        ('파일 경로', _text(offline['path'])),
       ],
     );
   }
@@ -5804,26 +5799,23 @@ class _AttributionCard extends StatelessWidget {
     return _AttributionCard._(
       title: _text(source['displayName']),
       subtitle:
-          'provider/owner: ${_text(source['provider'])} / ${_text(source['owner'])}',
+          '제공·소유: ${_text(source['provider'])} / ${_text(source['owner'])}',
       rows: [
-        ('source name', _text(source['displayName'])),
+        ('제공 기관', _text(source['displayName'])),
+        ('라이선스', '${_text(license['name'])} (${_text(license['type'])})'),
+        ('라이선스 링크', _text(license['evidenceUrl'])),
+        ('표기 필요', _text(license['attribution'])),
+        ('가져온 날짜', _text(source['retrievedAt'])),
+        ('확인한 날짜', _text(source['observedDataUpdatedAt'])),
         (
-          'license type',
-          '${_text(license['name'])} (${_text(license['type'])})',
-        ),
-        ('license URL', _text(license['evidenceUrl'])),
-        ('attribution required', _text(license['attribution'])),
-        ('last retrieved', _text(source['retrievedAt'])),
-        ('last verified', _text(source['observedDataUpdatedAt'])),
-        (
-          'commercial use / redistribution',
+          '상업적 이용 / 재배포',
           '${_allowed(license['commercialUseAllowed'])} / ${_allowed(license['redistributionAllowed'])}',
         ),
         (
-          'changes',
+          '변경 사항',
           source.containsKey('changes')
               ? _text(source['changes'])
-              : 'inventory에 별도 변경 고지 없음',
+              : '자료 목록에 별도 변경 고지 없음',
         ),
       ],
     );
@@ -5852,7 +5844,7 @@ class _AttributionCard extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   height: 1.25,
                 ),
               ),
@@ -5925,7 +5917,7 @@ class _AttributionRow extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.25,
             ),
           ),

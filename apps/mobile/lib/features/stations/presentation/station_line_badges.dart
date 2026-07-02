@@ -114,7 +114,7 @@ class _StationLineOverflowBadge extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.skySoft,
+        color: EasySubwayAccessibleColors.scaffoldSurface,
         shape: BoxShape.circle,
         border: Border.all(color: EasySubwayAccessibleColors.line),
       ),

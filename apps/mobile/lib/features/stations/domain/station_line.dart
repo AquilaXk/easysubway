@@ -189,6 +189,47 @@ Color stationLineColor(String color) {
   return const Color(0xFF006D77);
 }
 
+/// 카탈로그 색이 없을 때 노선 이름·식별자로 추정하는 노선색 단일 소스.
+///
+/// 화면별로 흩어져 있던 노선색 매핑을 이 한 곳으로 모은다. 실제 노선색은
+/// 카탈로그 데이터([StationSearchLine.color])를 우선 사용하고, 값이 없을 때만
+/// 이 폴백을 쓴다.
+const _lineColorFallbacks = <String, String>{
+  '1호선': '#0052A4',
+  '2호선': '#00A84D',
+  '3호선': '#EF7C1C',
+  '4호선': '#00A5DE',
+  '5호선': '#996CAC',
+  '6호선': '#CD7C2F',
+  '7호선': '#747F00',
+  '8호선': '#E6186C',
+  '9호선': '#BDB092',
+  '경의중앙선': '#77C4A3',
+  '수인분당선': '#F5A200',
+  '신분당선': '#D4003B',
+  '공항철도': '#0090D2',
+};
+
+/// 브랜드 액센트 폴백(노선 추정 실패 시).
+const String stationLineFallbackBrandHex = '#006D77';
+
+/// 노선 이름/식별자로 표준 노선색 hex를 찾는다. 매칭 실패 시 브랜드 액센트.
+String fallbackLineColorHex({String? lineId, String? lineName}) {
+  final name = lineName ?? '';
+  final id = (lineId ?? '').toLowerCase();
+  for (final entry in _lineColorFallbacks.entries) {
+    final key = entry.key;
+    if (name.contains(key)) {
+      return entry.value;
+    }
+    final numeric = key.replaceAll('호선', '');
+    if (numeric != key && numeric.isNotEmpty && id.contains(numeric)) {
+      return entry.value;
+    }
+  }
+  return stationLineFallbackBrandHex;
+}
+
 Color stationLineTextColor(Color backgroundColor) {
   const darkText = Color(0xFF102A2C);
   final darkContrast = _contrastRatio(backgroundColor, darkText);
