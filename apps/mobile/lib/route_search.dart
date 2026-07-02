@@ -1419,6 +1419,43 @@ class RouteSearchResult {
     return '예상 소요시간: ${routeEtaSourceLabel(etaSource)}';
   }
 
+  String get etaBadgeLabel => routeEtaSourceLabel(etaSource);
+
+  String get accessibilityBadgeLabel {
+    if (isBlocked) {
+      return '엘리베이터 상태를 살펴봐 주세요';
+    }
+    final risk = accessibilityRiskLevel.trim().toUpperCase();
+    if (risk == 'HIGH' ||
+        risk == 'UNKNOWN' ||
+        steps.any((step) => step.requiresAccessibilityCheck)) {
+      return '엘리베이터 상태를 살펴봐 주세요';
+    }
+    if (stairAccessLabel == '계단 없는 길이에요') {
+      return '계단 없는 경로 확인';
+    }
+    return '일부 이동 정보를 살펴봐 주세요';
+  }
+
+  String get transferBadgeLabel {
+    if (hasOutOfStationTransfer) {
+      return '역 밖 환승';
+    }
+    final slackSeconds = transferSlackSeconds;
+    if (slackSeconds == null) {
+      return '';
+    }
+    return slackSeconds <= 90 ? '환승 빠듯함' : '환승 여유 충분';
+  }
+
+  List<String> get badgeLabels {
+    return [
+      etaBadgeLabel,
+      accessibilityBadgeLabel,
+      transferBadgeLabel,
+    ].where((label) => label.trim().isNotEmpty).toList(growable: false);
+  }
+
   RouteSearchResult withDisplayLabels({
     String? originStationName,
     String? destinationStationName,
@@ -1527,6 +1564,7 @@ class RouteSearchResult {
       lineLabel,
       comfortLabel,
       stairAccessLabel,
+      ...badgeLabels,
     ];
     if (!isBlocked && warnings.isNotEmpty) {
       parts.add(attentionLabel);
@@ -4584,8 +4622,13 @@ class _RouteResultListButton extends StatelessWidget {
     final totalMinutes = _routeTotalMinutes(result);
     return Semantics(
       button: true,
-      label:
-          '${result.summaryTitle}, ${_routeMetaLabel(result)}, ${result.comfortLabel}, ${result.stairAccessLabel}',
+      label: [
+        result.summaryTitle,
+        _routeMetaLabel(result),
+        result.comfortLabel,
+        result.stairAccessLabel,
+        ...result.badgeLabels,
+      ].join(', '),
       onTap: onPressed,
       child: ExcludeSemantics(
         child: Material(
@@ -4647,6 +4690,12 @@ class _RouteResultListButton extends StatelessWidget {
                           label: result.stairAccessLabel,
                           icon: _routeStairAccessIcon(result),
                         ),
+                        for (final label in result.badgeLabels)
+                          _RouteStatusChip(
+                            key: Key('routeResultBadge-$label'),
+                            label: label,
+                            icon: _routeBadgeIcon(label),
+                          ),
                       ],
                     ),
                   ],
@@ -4658,6 +4707,19 @@ class _RouteResultListButton extends StatelessWidget {
       ),
     );
   }
+}
+
+IconData _routeBadgeIcon(String label) {
+  if (routeEtaSourceLabels.containsValue(label) ||
+      label == routeEtaSourceLabel('')) {
+    return Icons.schedule;
+  }
+  return switch (label) {
+    '계단 없는 경로 확인' => Icons.check_circle_outline,
+    '엘리베이터 상태를 살펴봐 주세요' || '일부 이동 정보를 살펴봐 주세요' => Icons.accessible_forward,
+    '환승 여유 충분' || '환승 빠듯함' || '역 밖 환승' => Icons.compare_arrows,
+    _ => Icons.info_outline,
+  };
 }
 
 class _RouteDarkSummaryCard extends StatelessWidget {
