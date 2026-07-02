@@ -1133,18 +1133,19 @@ public class RouteSearchService implements RouteSearchUseCase {
 			return plannedSteps;
 		}
 		List<RouteStep> realtimeSteps = new ArrayList<>(plannedSteps);
-		int elapsedMinutes = 0;
+		int elapsedSeconds = 0;
 		for (int index = 0; index < realtimeSteps.size(); index++) {
 			RouteStep step = realtimeSteps.get(index);
 			if (!"ride".equals(step.stepType())) {
-				elapsedMinutes += Math.max(0, step.estimatedMinutes());
+				elapsedSeconds += durationSeconds(step);
 				continue;
 			}
-			Instant readyAt = command.departureTime().toInstant().plusSeconds(elapsedMinutes * 60L);
+			int boardingSlackSeconds = boardingSlackSeconds(command.mobilityType());
+			Instant readyAt = command.departureTime().toInstant().plusSeconds(elapsedSeconds + boardingSlackSeconds);
 			RealtimeArrivalResolver.Resolution resolution = realtimeArrivalResolver.resolve(realtimeQuery(step, readyAt));
 			RealtimeEtaOverlay.Result overlay = realtimeEtaOverlay.overlay(
 				readyAt,
-				Math.max(0, step.estimatedMinutes()) * 60,
+				durationSeconds(step),
 				directionFor(step),
 				resolution.status(),
 				resolution.fallbackCode(),
@@ -1155,7 +1156,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			);
 			RouteStep realtimeStep = withEtaOverlay(step, overlay);
 			realtimeSteps.set(index, realtimeStep);
-			elapsedMinutes += realtimeWaitMinutes(overlay) + Math.max(0, step.estimatedMinutes());
+			elapsedSeconds += boardingSlackSeconds + realtimeWaitSeconds(overlay) + durationSeconds(step);
 		}
 		return List.copyOf(realtimeSteps);
 	}
@@ -1195,11 +1196,24 @@ public class RouteSearchService implements RouteSearchUseCase {
 		);
 	}
 
-	private int realtimeWaitMinutes(RealtimeEtaOverlay.Result overlay) {
+	private int durationSeconds(RouteStep step) {
+		return Math.max(0, step.estimatedMinutes()) * 60;
+	}
+
+	private int realtimeWaitSeconds(RealtimeEtaOverlay.Result overlay) {
 		if (overlay.etaSource() != EtaSource.REALTIME) {
 			return 0;
 		}
-		return Math.max(0, (overlay.waitSeconds() + 59) / 60);
+		return Math.max(0, overlay.waitSeconds());
+	}
+
+	private int boardingSlackSeconds(MobilityType mobilityType) {
+		return switch (mobilityType) {
+			case LUGGAGE -> 60;
+			case SENIOR, PREGNANT -> 90;
+			case STROLLER, TEMPORARY_INJURY -> 120;
+			case WHEELCHAIR -> 180;
+		};
 	}
 
 	private String directionFor(RouteStep step) {
