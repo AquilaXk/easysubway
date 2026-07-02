@@ -260,7 +260,7 @@ start_observability_services() {
 	if [[ "${recreate_config_services}" -eq 1 ]]; then
 		compose "${backend_env}" "${compose_env}" "${image_tag}" --profile observability up -d --no-build --force-recreate "${OBSERVABILITY_CONFIG_SERVICES[@]}" || return 1
 	elif [[ "${recreate_alertmanager}" -eq 1 ]]; then
-		compose "${backend_env}" "${compose_env}" "${image_tag}" --profile observability up -d --no-build --force-recreate alertmanager
+		compose "${backend_env}" "${compose_env}" "${image_tag}" --profile observability up -d --no-build --force-recreate alertmanager || return 1
 	fi
 }
 
@@ -425,7 +425,7 @@ fi
 recreate_observability_config=0
 if [[ -z "${current_sha}" ]]; then
 	recreate_observability_config=1
-elif git diff --name-only "${current_sha}" "${DEPLOY_SHA}" -- infra/prometheus infra/alertmanager/templates infra/loki infra/grafana/provisioning | grep -q .; then
+elif ! git diff --quiet "${current_sha}" "${DEPLOY_SHA}" -- infra/prometheus infra/alertmanager/templates infra/loki infra/grafana/provisioning; then
 	recreate_observability_config=1
 fi
 
