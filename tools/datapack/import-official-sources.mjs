@@ -962,7 +962,11 @@ function routeMapPositionRows(rows, allowedSourceIds, mappingBySourceKey) {
       region: requiredString(row.region, "routeMapPositions.region"),
       x: requiredNonNegativeInteger(row.x, "routeMapPositions.x"),
       y: requiredNonNegativeInteger(row.y, "routeMapPositions.y"),
+      labelDx: row.labelDx ?? 0,
+      labelDy: row.labelDy ?? 0,
       labelPolygon: row.labelPolygon ?? undefined,
+      upPath: row.upPath ?? "",
+      downPath: row.downPath ?? "",
       sourceId,
       sourceName: requiredString(row.sourceName, "routeMapPositions.sourceName"),
       sourceUrl: requiredString(row.sourceUrl, "routeMapPositions.sourceUrl"),
@@ -974,6 +978,7 @@ function routeMapPositionRows(rows, allowedSourceIds, mappingBySourceKey) {
       derivationKind: "OFFICIAL",
       sourceLabel: row.sourceLabel ?? "",
       reviewedAt: requiredString(row.reviewedAt, "routeMapPositions.reviewedAt"),
+      updatedAt: requiredString(row.updatedAt, "routeMapPositions.updatedAt"),
     };
   });
 }
