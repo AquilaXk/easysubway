@@ -33,7 +33,7 @@
   "routing": {
     "multiTransferSupported": false,
     "outOfStationTransferSupported": false,
-    "alternativeItinerariesMin": 1
+    "alternativeItinerariesMin": 2
   },
   "etaSourceIntegrity": {
     "realtimeEtaWithoutFreshProviderAllowed": false,
