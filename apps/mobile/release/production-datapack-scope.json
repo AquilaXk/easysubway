@@ -112,7 +112,7 @@
     "Android RC installer install and rollback evidence is missing",
     "app or Play listing claims a wider support scope than approved"
   ],
-  "linkedReleaseBlockers": [547, 571, 1016, 1020, 1021, 1022],
+  "linkedReleaseBlockers": [547, 571, 1016, 1020, 1021, 1022, 1419],
   "evidencePolicy": {
     "githubSummaryOnly": true,
     "localOnlyEvidenceRoot": ".codex/evidence/datapack/production-scope/<rc-or-run>/",
