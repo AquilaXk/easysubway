@@ -106,6 +106,10 @@ function validateSample({ candidate, candidateId, sample }) {
     throw new Error(`sample evidence must not contain serviceKey credentials: ${leakPath}`);
   }
 
+  validateEvidenceMetadata(sample);
+}
+
+function validateEvidenceMetadata(sample) {
   assertSha256(sample.rawSha256, "rawSha256");
   assertSha256(sample.schemaFingerprint, "schemaFingerprint");
   assertSha256(sample.evidenceHash, "evidenceHash");
@@ -122,7 +126,9 @@ function validateSample({ candidate, candidateId, sample }) {
     throw new Error("rowCount must match providerRecordHashes length");
   }
 
-  const expectedSchemaFingerprint = sha256(JSON.stringify([...sample.fields].sort()));
+  const expectedSchemaFingerprint = sha256(JSON.stringify(
+    [...sample.fields].sort((left, right) => left.localeCompare(right)),
+  ));
   if (sample.schemaFingerprint !== expectedSchemaFingerprint) {
     throw new Error("schemaFingerprint does not match fields");
   }
