@@ -97,6 +97,7 @@ const routeEtaSourceLabels = <String, String>{
   'REALTIME': '실시간 도착정보 준비 중',
   'MIXED': '일부 도착정보를 확인하고 있어요',
   'PLANNED': '시간표 기준',
+  'STATIC_BACKEND_ESTIMATE': '시간표 기준',
   'STATIC_BACKEND_V1': '시간표 기준',
   'STATIC_LOCAL': '저장된 데이터 기준',
   'STATIC_ESTIMATE': '정적 추정',
