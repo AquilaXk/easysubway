@@ -104,6 +104,25 @@ function validateSample({ candidate, candidateId, sample }) {
   if (leakPath) {
     throw new Error(`sample evidence must not contain serviceKey credentials: ${leakPath}`);
   }
+
+  assertSha256(sample.rawSha256, "rawSha256");
+  assertSha256(sample.schemaFingerprint, "schemaFingerprint");
+  assertSha256(sample.evidenceHash, "evidenceHash");
+  if (sample.credentialRedacted !== true) {
+    throw new Error("credentialRedacted must be true");
+  }
+  if (!Array.isArray(sample.providerRecordHashes) || sample.providerRecordHashes.length === 0) {
+    throw new Error("providerRecordHashes must be a non-empty array");
+  }
+  for (const [index, hash] of sample.providerRecordHashes.entries()) {
+    assertSha256(hash, `providerRecordHashes.${index}`);
+  }
+}
+
+function assertSha256(value, label) {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
+    throw new Error(`${label} must be a sha256 hex string`);
+  }
 }
 
 async function main() {
