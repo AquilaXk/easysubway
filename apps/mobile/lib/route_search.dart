@@ -1423,18 +1423,18 @@ class RouteSearchResult {
 
   String get accessibilityBadgeLabel {
     if (isBlocked) {
-      return '엘리베이터 상태 확인 필요';
+      return '엘리베이터 상태를 살펴봐 주세요';
     }
     final risk = accessibilityRiskLevel.trim().toUpperCase();
     if (risk == 'HIGH' ||
         risk == 'UNKNOWN' ||
         steps.any((step) => step.requiresAccessibilityCheck)) {
-      return '엘리베이터 상태 확인 필요';
+      return '엘리베이터 상태를 살펴봐 주세요';
     }
     if (stairAccessLabel == '계단 없는 길이에요') {
       return '계단 없는 경로 확인';
     }
-    return '일부 확인 필요';
+    return '일부 이동 정보를 살펴봐 주세요';
   }
 
   String get transferBadgeLabel {
@@ -4710,17 +4710,13 @@ class _RouteResultListButton extends StatelessWidget {
 }
 
 IconData _routeBadgeIcon(String label) {
+  if (routeEtaSourceLabels.containsValue(label) ||
+      label == routeEtaSourceLabel('')) {
+    return Icons.schedule;
+  }
   return switch (label) {
-    '실시간 도착정보 준비 중' ||
-    '일부 도착정보를 확인하고 있어요' ||
-    '시간표 기준' ||
-    '저장된 데이터 기준' ||
-    '정적 추정' ||
-    '실시간 미지원' ||
-    '저장된 데이터 기준 · 갱신 필요' ||
-    '도착 정보를 확인하고 있어요' => Icons.schedule,
     '계단 없는 경로 확인' => Icons.check_circle_outline,
-    '엘리베이터 상태 확인 필요' || '일부 확인 필요' => Icons.accessible_forward,
+    '엘리베이터 상태를 살펴봐 주세요' || '일부 이동 정보를 살펴봐 주세요' => Icons.accessible_forward,
     '환승 여유 충분' || '환승 빠듯함' || '역 밖 환승' => Icons.compare_arrows,
     _ => Icons.info_outline,
   };

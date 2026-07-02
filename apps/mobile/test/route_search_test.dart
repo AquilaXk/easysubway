@@ -1027,9 +1027,9 @@ void main() {
       ],
     );
 
-    expect(tightTransfer.badgeLabels, ['정적 추정', '엘리베이터 상태 확인 필요', '역 밖 환승']);
+    expect(tightTransfer.badgeLabels, ['정적 추정', '엘리베이터 상태를 살펴봐 주세요', '역 밖 환승']);
     expect(tightTransfer.semanticLabel, contains('정적 추정'));
-    expect(tightTransfer.semanticLabel, contains('엘리베이터 상태 확인 필요'));
+    expect(tightTransfer.semanticLabel, contains('엘리베이터 상태를 살펴봐 주세요'));
     expect(tightTransfer.semanticLabel, contains('역 밖 환승'));
 
     final clearTransfer = _sampleRouteSearchResult(
