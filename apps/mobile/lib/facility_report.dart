@@ -1743,8 +1743,8 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   String _photoMessage = '';
   String _locationMessage = '';
   bool _isLoadingLocation = false;
+  bool _isPreparingLocationAttachment = false;
   bool _isLocationFailure = false;
-  bool _submitWithoutLocation = false;
   bool _isOpeningLocationSettings = false;
   bool _isPhotoFailure = false;
   bool _isConfirmingPhotoUse = false;
@@ -1760,10 +1760,11 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     if (_photoAttachment != null) {
       _photoMessage = '사진 1장 추가됨';
     }
+    // 위치는 선택 정보이므로 진입 즉시 요청하지 않는다. 사용자가 "현재 위치
+    // 첨부"를 켤 때 1회 요청한다(진입 마찰 축소).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         unawaited(_restoreLostPhoto());
-        unawaited(_requestCurrentLocation());
       }
     });
   }
@@ -1782,15 +1783,10 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
     final isLoading = state.status == FacilityReportViewStatus.loading;
     final reportResult = state.result;
     final hasSubmittedReport = reportResult != null;
-    final needsLocationChoice =
-        widget.locationLoader != null &&
-        _attachedLocation == null &&
-        !_submitWithoutLocation;
-    final isSubmitDisabled =
-        isLoading ||
-        hasSubmittedReport ||
-        _isLoadingLocation ||
-        needsLocationChoice;
+    final isLocationBusy = _isLoadingLocation || _isPreparingLocationAttachment;
+    // 위치는 선택 정보다. 위치를 첨부하지 않아도 제보를 보낼 수 있다.
+    // 위치 권한 안내/확인 또는 로딩 중일 때만 잠시 비활성화한다.
+    final isSubmitDisabled = isLoading || hasSubmittedReport || isLocationBusy;
 
     return Scaffold(
       appBar: AppBar(title: const Text('시설 알려주기')),
@@ -1868,59 +1864,49 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                 isFailure: _isPhotoFailure,
               ),
             ],
-            if (_locationMessage.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              _FacilityReportLocationMessage(
-                message: _locationMessage,
-                isFailure: _isLocationFailure,
-              ),
-              if (_isLocationFailure && !hasSubmittedReport) ...[
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  key: const Key('facilityReportSubmitWithoutLocationButton'),
-                  onPressed:
-                      isLoading ||
-                          _isOpeningLocationSettings ||
-                          _isLoadingLocation
-                      ? null
-                      : () {
-                          setState(() {
-                            _submitWithoutLocation = true;
-                            _isLocationFailure = false;
-                            _locationMessage =
-                                '위치 없이 제보합니다. 정확한 위치를 찾는 데 시간이 걸릴 수 있어요.';
-                          });
-                        },
-                  icon: const Icon(Icons.location_off_outlined),
-                  label: const Text('위치 없이 제보'),
-                ),
-                const SizedBox(height: 10),
-                if (_canOpenLocationSettings) ...[
-                  OutlinedButton.icon(
-                    key: const Key('facilityReportOpenLocationSettingsButton'),
-                    onPressed:
-                        isLoading ||
-                            _isOpeningLocationSettings ||
-                            _isLoadingLocation
-                        ? null
-                        : _openLocationSettings,
-                    icon: _isOpeningLocationSettings
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          )
-                        : const Icon(Icons.settings),
-                    label: const Text('위치 설정 열기'),
-                  ),
-                  const SizedBox(height: 10),
-                ],
+            if (widget.locationLoader != null) ...[
+              const SizedBox(height: 16),
+              if (_attachedLocation != null)
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      color: EasySubwayAccessibleColors.primary,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        '현재 위치를 첨부했어요',
+                        style: TextStyle(
+                          color: EasySubwayAccessibleColors.text,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      key: const Key('facilityReportRemoveLocationButton'),
+                      onPressed: isLoading || hasSubmittedReport
+                          ? null
+                          : () {
+                              setState(() {
+                                _attachedLocation = null;
+                                _locationMessage = '';
+                                _isLocationFailure = false;
+                              });
+                            },
+                      child: const Text('지우기'),
+                    ),
+                  ],
+                )
+              else
                 OutlinedButton.icon(
-                  key: const Key('facilityReportRetryLocationButton'),
+                  key: const Key('facilityReportAttachLocationButton'),
                   onPressed:
                       isLoading ||
-                          _isOpeningLocationSettings ||
-                          _isLoadingLocation
+                          hasSubmittedReport ||
+                          isLocationBusy ||
+                          _isOpeningLocationSettings
                       ? null
                       : _requestCurrentLocation,
                   icon: _isLoadingLocation
@@ -1930,7 +1916,37 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2.5),
                         )
                       : const Icon(Icons.my_location),
-                  label: const Text('위치 다시 찾기'),
+                  label: Text(
+                    _isLocationFailure ? '위치 다시 찾기' : '현재 위치 첨부 (선택)',
+                  ),
+                ),
+              if (_locationMessage.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _FacilityReportLocationMessage(
+                  message: _locationMessage,
+                  isFailure: _isLocationFailure,
+                ),
+              ],
+              // 실패 시 행동은 1개만: GPS가 꺼져 있으면 설정 열기, 아니면 위 버튼으로
+              // 다시 시도. 위치 없이도 제보를 보낼 수 있어 "위치 없이 제보" 버튼은 없앤다.
+              if (_isLocationFailure &&
+                  !hasSubmittedReport &&
+                  _canOpenLocationSettings) ...[
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  key: const Key('facilityReportOpenLocationSettingsButton'),
+                  onPressed:
+                      isLoading || _isOpeningLocationSettings || isLocationBusy
+                      ? null
+                      : _openLocationSettings,
+                  icon: _isOpeningLocationSettings
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        )
+                      : const Icon(Icons.settings),
+                  label: const Text('위치 설정 열기'),
                 ),
               ],
             ],
@@ -1974,13 +1990,17 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _locationMessage == _facilityReportLocationDisabledMessage;
 
   Future<void> _submit() async {
-    if (_photoAttachment != null ||
-        _attachedLocation != null ||
-        _submitWithoutLocation) {
+    if (_photoAttachment != null || _attachedLocation != null) {
       final confirmed = await _confirmReportUpload();
       if (!confirmed) {
         return;
       }
+    }
+    if (_attachedLocation == null && _isLocationFailure) {
+      setState(() {
+        _locationMessage = '';
+        _isLocationFailure = false;
+      });
     }
     unawaited(
       _controller.submit(
@@ -2004,10 +2024,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(_facilityReportUploadDisclosurePurpose),
-            if (_submitWithoutLocation) ...[
-              const SizedBox(height: 8),
-              const Text('현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요.'),
-            ],
             const SizedBox(height: 8),
             const Text(_facilityReportUploadDisclosureScope),
           ],
@@ -2057,19 +2073,26 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
   }
 
   Future<void> _requestCurrentLocation() async {
-    if (widget.locationLoader == null || _isLoadingLocation) {
+    if (widget.locationLoader == null ||
+        _isLoadingLocation ||
+        _isPreparingLocationAttachment) {
       return;
     }
+    setState(() => _isPreparingLocationAttachment = true);
     final shouldContinue = await _confirmLocationUseIfNeeded();
+    if (mounted) {
+      setState(() => _isPreparingLocationAttachment = false);
+    }
+    if (!mounted) {
+      return;
+    }
     if (!shouldContinue) {
-      if (mounted) {
-        setState(() {
-          _attachedLocation = null;
-          _submitWithoutLocation = false;
-          _locationMessage = '위치 안내를 확인한 뒤 제보 위치를 첨부해 주세요.';
-          _isLocationFailure = true;
-        });
-      }
+      // 사용자가 위치 첨부를 취소한 것은 오류가 아니다. 조용히 첨부하지 않는다.
+      setState(() {
+        _attachedLocation = null;
+        _locationMessage = '';
+        _isLocationFailure = false;
+      });
       return;
     }
     await _loadCurrentLocation();
@@ -2300,7 +2323,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
       _isLoadingLocation = true;
       _locationMessage = '';
       _isLocationFailure = false;
-      _submitWithoutLocation = false;
     });
 
     try {
@@ -2312,7 +2334,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = location;
         _locationMessage = '';
         _isLocationFailure = false;
-        _submitWithoutLocation = false;
       });
     } on FacilityReportLocationException catch (error) {
       if (!mounted) {
@@ -2324,7 +2345,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
           error.message,
         );
         _isLocationFailure = true;
-        _submitWithoutLocation = false;
       });
     } catch (error, stackTrace) {
       reportMobileError(
@@ -2339,7 +2359,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
         _attachedLocation = null;
         _locationMessage = '현재 위치를 확인하지 못했어요.';
         _isLocationFailure = true;
-        _submitWithoutLocation = false;
       });
     } finally {
       if (mounted) {
