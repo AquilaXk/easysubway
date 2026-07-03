@@ -4878,7 +4878,17 @@ class _PrivacyDataUseLine extends StatelessWidget {
 }
 
 class DataSourceAttributionScreen extends StatefulWidget {
-  const DataSourceAttributionScreen({super.key});
+  const DataSourceAttributionScreen({
+    super.key,
+    this.initialManifest,
+    this.initialInventory,
+  }) : assert(
+         (initialManifest == null) == (initialInventory == null),
+         'initialManifest and initialInventory must be provided together.',
+       );
+
+  final Map<String, Object?>? initialManifest;
+  final Map<String, Object?>? initialInventory;
 
   @override
   State<DataSourceAttributionScreen> createState() =>
@@ -4898,6 +4908,11 @@ class _DataSourceAttributionScreenState
 
   Future<({Map<String, Object?> manifest, Map<String, Object?> inventory})>
   _load() async {
+    final initialManifest = widget.initialManifest;
+    final initialInventory = widget.initialInventory;
+    if (initialManifest != null && initialInventory != null) {
+      return (manifest: initialManifest, inventory: initialInventory);
+    }
     final [manifestText, inventoryText] = await Future.wait([
       rootBundle.loadString(_mapManifestAsset),
       rootBundle.loadString(_sourceInventoryAsset),
@@ -4960,6 +4975,25 @@ class _DataSourceAttributionScreenState
                     ),
                     const _AppSectionTitle(title: '지도 표시용 asset'),
                     for (final map in maps) _AttributionCard.map(map, manifest),
+                    const _AppSectionTitle(title: '데이터 품질 Level'),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.verified_outlined,
+                        iconColor: EasySubwayAccessibleColors.mintDark,
+                        title: 'Level 1-4 품질 기준',
+                        subtitle:
+                            'Level 1은 역·노선 수, Level 2는 필수 시설 근거, Level 3은 운행상태와 최신 여부, Level 4는 현장 또는 운영기관이 확인한 쉬운 길을 봐요.',
+                      ),
+                    ),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.analytics_outlined,
+                        iconColor: EasySubwayAccessibleColors.amber,
+                        title: '품질 지표',
+                        subtitle:
+                            '필수 시설 근거 비율, 운행상태 확인 비율, 최신 정보 비율, 검증된 쉬운 길 비율, 현장 확인 경로 비율을 함께 확인해요.',
+                      ),
+                    ),
                     const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
                     for (final source in sources)
                       _AttributionCard.source(source),
