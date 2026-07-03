@@ -203,8 +203,8 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
-	@DisplayName("provider call rate limit은 cache miss 남용을 외부 provider 호출 전에 차단한다")
-	void providerRateLimitBlocksRepeatedCacheMissesBeforeProviderCall() {
+	@DisplayName("provider call rate limit은 stale cache가 있으면 stale 응답을 유지한다")
+	void providerRateLimitServesStaleCacheWhenAvailable() {
 		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
 		CountingProvider provider = new CountingProvider();
 		RealtimeGatewayService service = service(
@@ -222,8 +222,8 @@ class RealtimeGatewayServiceTest {
 		RealtimeArrivalResult limited = service.arrivals(query);
 
 		assertThat(first.status()).hasToString("FRESH");
-		assertThat(limited.status()).hasToString("UNAVAILABLE");
-		assertThat(limited.fallbackCode()).isEqualTo("PROVIDER_RATE_LIMITED");
+		assertThat(limited.status()).hasToString("STALE");
+		assertThat(limited.fallbackCode()).isEqualTo("STALE_CACHE");
 		assertThat(provider.arrivalCalls).hasValue(1);
 	}
 
@@ -356,8 +356,8 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
-	@DisplayName("열차 위치 provider call rate limit도 cache miss 남용을 외부 provider 호출 전에 차단한다")
-	void trainPositionProviderRateLimitBlocksRepeatedCacheMissesBeforeProviderCall() {
+	@DisplayName("열차 위치 provider call rate limit도 stale cache가 있으면 stale 응답을 유지한다")
+	void trainPositionProviderRateLimitServesStaleCacheWhenAvailable() {
 		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
 		CountingProvider provider = new CountingProvider();
 		RealtimeGatewayService service = service(
@@ -375,8 +375,8 @@ class RealtimeGatewayServiceTest {
 		RealtimeTrainPositionResult limited = service.trainPositions(query);
 
 		assertThat(first.status()).hasToString("FRESH");
-		assertThat(limited.status()).hasToString("UNAVAILABLE");
-		assertThat(limited.fallbackCode()).isEqualTo("PROVIDER_RATE_LIMITED");
+		assertThat(limited.status()).hasToString("STALE");
+		assertThat(limited.fallbackCode()).isEqualTo("STALE_CACHE");
 		assertThat(provider.trainPositionCalls).hasValue(1);
 	}
 

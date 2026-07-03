@@ -146,7 +146,9 @@ public class RealtimeGatewayService {
 		}
 		try {
 			if (!providerCallRateLimiter.tryAcquire(clock.instant())) {
-				RealtimeArrivalResult result = RealtimeArrivalResult.unavailable("PROVIDER_RATE_LIMITED");
+				RealtimeArrivalResult result = cached != null && isStaleUsable(cached.cachedAt())
+					? cached.result().stale()
+					: RealtimeArrivalResult.unavailable("PROVIDER_RATE_LIMITED");
 				request.complete(result);
 				return recordArrivalResult(result);
 			}
@@ -225,7 +227,9 @@ public class RealtimeGatewayService {
 		}
 		try {
 			if (!providerCallRateLimiter.tryAcquire(clock.instant())) {
-				RealtimeTrainPositionResult result = RealtimeTrainPositionResult.unavailable("PROVIDER_RATE_LIMITED");
+				RealtimeTrainPositionResult result = cached != null && isStaleUsable(cached.cachedAt())
+					? cached.result().stale()
+					: RealtimeTrainPositionResult.unavailable("PROVIDER_RATE_LIMITED");
 				request.complete(result);
 				return recordTrainPositionResult(result);
 			}
