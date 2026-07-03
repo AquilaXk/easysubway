@@ -187,6 +187,8 @@ jobs:
           if [[ -n "${EASYSUBWAY_ENV_SECRET}" ]]; then
             printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
             printf '\nEASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=%s\n' "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" >> "${env_file}"
+            printf 'EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1\n' >> "${env_file}"
+            printf 'EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800\n' >> "${env_file}"
             echo "source=secret" >> "${GITHUB_OUTPUT}"
           else
             cp .env.example "${env_file}"

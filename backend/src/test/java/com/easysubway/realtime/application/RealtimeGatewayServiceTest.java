@@ -122,7 +122,7 @@ class RealtimeGatewayServiceTest {
 		RealtimeQuery query = sangnoksuQuery();
 
 		service.arrivals(query);
-		clock.instant = Instant.parse("2026-06-26T08:00:30Z");
+		clock.instant = Instant.parse("2026-06-26T08:01:31Z");
 		provider.failureCode = "PROVIDER_TIMEOUT";
 		RealtimeArrivalResult stale = service.arrivals(query);
 
@@ -250,6 +250,93 @@ class RealtimeGatewayServiceTest {
 			.doesNotContain("raw-secret")
 			.doesNotContain("상록수")
 			.doesNotContain("4123");
+	}
+
+	@Test
+	@DisplayName("provider call rate limit 설정은 안전 상한을 넘지 않는다")
+	void providerRateLimitIsCappedAtSafeDefault() {
+		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
+		CountingProvider provider = new CountingProvider();
+		StubMappingPort mappingPort = new StubMappingPort();
+		for (int index = 0; index < 2; index += 1) {
+			mappingPort.add(mapping(
+				"station-%02d".formatted(index),
+				"seoul-4",
+				"1004",
+				"10040004%02d".formatted(index),
+				"상록수%02d".formatted(index),
+				true,
+				false,
+				"OFFICIAL"
+			));
+		}
+		RealtimeGatewayService service = service(
+			provider,
+			clock,
+			mappingPort,
+			new RealtimeProviderControl(),
+			999
+		);
+
+		RealtimeArrivalResult result = null;
+		for (int index = 0; index < 2; index += 1) {
+			result = service.arrivals(new RealtimeQuery(
+				"station-%02d".formatted(index),
+				"seoul-4",
+				"1004",
+				"상록수%02d".formatted(index),
+				null
+			));
+		}
+
+		assertThat(result.status()).hasToString("UNAVAILABLE");
+		assertThat(result.fallbackCode()).isEqualTo("PROVIDER_RATE_LIMITED");
+		assertThat(provider.arrivalCalls).hasValue(1);
+	}
+
+	@Test
+	@DisplayName("provider call rate limit은 KST 일일 안전 한도도 넘지 않는다")
+	void providerRateLimitBlocksDailyOverflow() {
+		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
+		CountingProvider provider = new CountingProvider();
+		StubMappingPort mappingPort = new StubMappingPort();
+		for (int index = 0; index < 3; index += 1) {
+			mappingPort.add(mapping(
+				"station-day-%02d".formatted(index),
+				"seoul-4",
+				"1004",
+				"10040005%02d".formatted(index),
+				"상록수일일%02d".formatted(index),
+				true,
+				false,
+				"OFFICIAL"
+			));
+		}
+		RealtimeGatewayService service = service(
+			provider,
+			clock,
+			mappingPort,
+			new RealtimeProviderControl(),
+			1,
+			2
+		);
+
+		RealtimeArrivalResult result = null;
+		for (int index = 0; index < 3; index += 1) {
+			clock.instant = Instant.parse("2026-06-26T08:0%d:00Z".formatted(index));
+			provider.providerReceivedAt = "2026-06-26T08:0%d:00Z".formatted(index);
+			result = service.arrivals(new RealtimeQuery(
+				"station-day-%02d".formatted(index),
+				"seoul-4",
+				"1004",
+				"상록수일일%02d".formatted(index),
+				null
+			));
+		}
+
+		assertThat(result.status()).hasToString("UNAVAILABLE");
+		assertThat(result.fallbackCode()).isEqualTo("PROVIDER_RATE_LIMITED");
+		assertThat(provider.arrivalCalls).hasValue(2);
 	}
 
 	@Test
@@ -573,14 +660,14 @@ class RealtimeGatewayServiceTest {
 	@Test
 	@DisplayName("provider empty 결과는 quota circuit을 열지 않는다")
 	void emptyProviderResultDoesNotOpenQuotaCircuit() {
+		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
 		CountingProvider provider = new CountingProvider();
-		RealtimeGatewayService service = service(
-			provider,
-			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC)
-		);
+		RealtimeGatewayService service = service(provider, clock);
 		provider.emptyArrivals = true;
 
 		RealtimeArrivalResult empty = service.arrivals(sangnoksuQuery());
+		clock.instant = Instant.parse("2026-06-26T08:01:00Z");
+		provider.providerReceivedAt = "2026-06-26T08:01:00Z";
 		provider.emptyArrivals = false;
 		RealtimeArrivalResult fresh = service.arrivals(sangnoksuQuery());
 
@@ -621,10 +708,11 @@ class RealtimeGatewayServiceTest {
 		RealtimeGatewayService service = service(provider, clock);
 
 		service.arrivals(sangnoksuQuery());
-		clock.instant = Instant.parse("2026-06-26T08:00:30Z");
+		clock.instant = Instant.parse("2026-06-26T08:01:31Z");
 		provider.failureCode = "PROVIDER_TIMEOUT";
 		service.arrivals(sangnoksuQuery());
 		service.arrivals(new RealtimeQuery("station-outside", "other", null, "외부역", null));
+		clock.instant = Instant.parse("2026-06-26T08:02:00Z");
 		provider.failureCode = "PROVIDER_QUOTA_EXCEEDED";
 		service.trainPositions(line4Query());
 
@@ -856,6 +944,24 @@ class RealtimeGatewayServiceTest {
 		int providerCallLimitPerMinute
 	) {
 		return new RealtimeGatewayService(provider, clock, mappingPort, control, providerCallLimitPerMinute);
+	}
+
+	private RealtimeGatewayService service(
+		RealtimeProvider provider,
+		Clock clock,
+		RealtimeMappingPort mappingPort,
+		RealtimeProviderControl control,
+		int providerCallLimitPerMinute,
+		int providerCallLimitPerDay
+	) {
+		return new RealtimeGatewayService(
+			provider,
+			clock,
+			mappingPort,
+			control,
+			providerCallLimitPerMinute,
+			providerCallLimitPerDay
+		);
 	}
 
 	private RealtimeMapping mapping(

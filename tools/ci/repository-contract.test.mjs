@@ -953,12 +953,19 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
   assert.match(readme, /provider key overlay를 append/);
+  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
+  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
+  assert.match(readme, /실시간 지하철 한도 1,000\/day 아래/);
+  assert.match(readme, /개발계정 10,000\/day 안에서/);
+  assert.match(readme, /1회 실행당 live fetch 1회/);
   assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
   assert.match(readme, /GitHub `production` environment approval을 기다리지 않습니다/);
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
   assert.match(script, /\.env\.example is a template/);
+  assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
+  assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
 
   for (const file of workflowFiles()) {
@@ -1029,6 +1036,8 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
+    "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1",
+    "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800",
     "EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=legacy-pepper-with-enough-entropy",
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
