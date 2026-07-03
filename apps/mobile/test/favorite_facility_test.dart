@@ -87,6 +87,7 @@ void main() {
     final unavailable = _favoriteFacility(status: 'OUT_OF_SERVICE');
     final reported = _favoriteFacility(status: 'USER_REPORTED');
     final unknown = _favoriteFacility(status: 'NEEDS_CHECK');
+    final operationalUnknown = _favoriteFacility(status: 'UNKNOWN');
     final available = _favoriteFacility(status: 'AVAILABLE');
     final verified = _favoriteFacility(fieldValidationStatus: 'VERIFIED');
     final metadataOnlyDescription = _favoriteFacility(description: '현장 검증 전');
@@ -100,6 +101,9 @@ void main() {
     expect(reported.nextActionLabel, '역무원 도움 요청');
     expect(unknown.severityLabel, '확인 중');
     expect(unknown.nextActionLabel, '자세히 보기');
+    expect(operationalUnknown.statusLabel, '설치 확인 · 운행상태 미확인');
+    expect(operationalUnknown.statusTitle, '설치 확인 · 운행상태 미확인');
+    expect(operationalUnknown.needsAttention, isTrue);
     expect(available.severityLabel, '정상');
     expect(available.needsAttention, isFalse);
     expect(available.verificationStatusLabel, '최신 상태를 준비 중이에요');
