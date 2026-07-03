@@ -5707,6 +5707,7 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     productionCanonicalStopTimesStatus: "blocked_requires_trip_stop_sequence",
     plannedEtaUseAllowed: false,
   });
+  // source-candidates keeps a public summary, not the local full admin-review input with productionSource.
   assert.deepEqual(candidate.evidence.adminReview, {
     artifactKind: "source-admission-admin-review-summary",
     decision: "APPROVED",
