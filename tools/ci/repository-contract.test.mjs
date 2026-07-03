@@ -177,6 +177,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     routeAccuracyReport: "artifacts/route-accuracy-report.json",
     realtimeProviderCoverageReport: "artifacts/realtime-provider-coverage-report.json",
     routeAccessibilityRegressionReport: "artifacts/route-accessibility-regression-report.json",
+    routeGraphCoverageReport: "artifacts/route-graph-coverage-report.json",
     routeV2ContractReport: "artifacts/route-v2-contract-report.json",
     coverageGapReport: "artifacts/datapack-coverage-gaps.json",
     qualityMetricReport: "artifacts/datapack-quality-metrics.json",
@@ -190,6 +191,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     ),
   );
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("validate-datapack.mjs --require-production")));
+  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-coverage-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-topology-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
   assert.equal(gate.evidencePolicy.githubSummaryOnly, true);
