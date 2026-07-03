@@ -3900,6 +3900,11 @@ void main() {
     );
     expect(find.text('데이터 및 지도 출처'), findsOneWidget);
     expect(find.byType(Scrollable), findsOneWidget);
+    expect(find.text('현재 앱 표시'), findsOneWidget);
+    expect(
+      find.textContaining('전국 쉬운 길이나 실시간 도착을 보장한다고 말하지 않아요'),
+      findsOneWidget,
+    );
     await tester.scrollUntilVisible(find.text('데이터 품질 Level'), 160);
     await tester.pumpAndSettle();
     expect(find.text('데이터 품질 Level'), findsOneWidget);
