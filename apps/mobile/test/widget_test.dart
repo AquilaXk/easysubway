@@ -3888,15 +3888,12 @@ void main() {
     expect(find.text('데이터 품질 Level'), findsOneWidget);
     expect(find.text('Level 1-4 품질 기준'), findsOneWidget);
     expect(
-      find.textContaining('Level 4는 현장 또는 운영기관 검증 pathway'),
+      find.textContaining('Level 4는 현장 또는 운영기관이 확인한 쉬운 길'),
       findsOneWidget,
     );
     expect(find.text('품질 지표'), findsOneWidget);
-    expect(
-      find.textContaining('requiredFacilityEvidenceCoverageRatio'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('fieldVerifiedPathwayRatio'), findsOneWidget);
+    expect(find.textContaining('필수 시설 근거 비율'), findsOneWidget);
+    expect(find.textContaining('현장 확인 경로 비율'), findsOneWidget);
 
     final manifest =
         jsonDecode(
