@@ -7413,18 +7413,7 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   const inlineStyleFiles = adminTemplateFiles
     .filter((file) => /<style\b/.test(read(file)))
     .sort();
-  assert.deepEqual(inlineStyleFiles, [
-    "backend/src/main/resources/templates/admin/collections/list.html",
-    "backend/src/main/resources/templates/admin/facilities/list.html",
-    "backend/src/main/resources/templates/admin/notifications/push.html",
-    "backend/src/main/resources/templates/admin/quality/dashboard.html",
-    "backend/src/main/resources/templates/admin/reports/detail.html",
-    "backend/src/main/resources/templates/admin/reports/list.html",
-    "backend/src/main/resources/templates/admin/routes/feedback.html",
-    "backend/src/main/resources/templates/admin/routes/searches.html",
-    "backend/src/main/resources/templates/admin/stations/layouts.html",
-    "backend/src/main/resources/templates/admin/usage/activity.html",
-  ]);
+  assert.deepEqual(inlineStyleFiles, []);
 });
 
 test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다", () => {
