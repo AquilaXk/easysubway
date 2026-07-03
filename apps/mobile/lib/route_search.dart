@@ -4132,19 +4132,14 @@ class _RouteDetailWorkflowView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalMinutes = _routeTotalMinutes(result);
-    final meta = _routeMetaLabel(result);
-    final recommended = _isRecommendedRoute(result);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _RouteWorkflowBackButton(label: '경로 목록', onPressed: onBack),
         const SizedBox(height: 8),
         _RouteDarkSummaryCard(
-          title: recommended && totalMinutes > 0
-              ? '$totalMinutes분'
-              : result.statusLabel,
-          subtitle: recommended ? meta : result.guidanceLabel,
+          title: _routeWorkflowSummaryTitle(result),
+          subtitle: _routeWorkflowSummarySubtitle(result),
           chips: [
             _RouteSummaryChip(label: result.comfortLabel),
             _RouteSummaryChip(
@@ -4846,7 +4841,7 @@ String _routeWorkflowSummaryTitle(RouteSearchResult result) {
 String _routeWorkflowSummarySubtitle(RouteSearchResult result) {
   return _isRecommendedRoute(result)
       ? _routeMetaLabel(result)
-      : result.statusLabel;
+      : result.guidanceLabel;
 }
 
 IconData _routeStairAccessIcon(RouteSearchResult result) {
