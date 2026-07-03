@@ -103,7 +103,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.equal(gate.accessibility.unknownAccessibilityMustBeLabeled, true);
   assert.equal(gate.routing.multiTransferSupported, false);
   assert.equal(gate.routing.outOfStationTransferSupported, false);
-  assert.equal(gate.routing.alternativeItinerariesMin, 1);
+  assert.equal(gate.routing.alternativeItinerariesMin, 2);
   assert.equal(gate.etaSourceIntegrity.realtimeEtaWithoutFreshProviderAllowed, false);
   assert.equal(gate.etaSourceIntegrity.staleRealtimeUsedAsFreshAllowed, false);
   assert.equal(gate.etaSourceIntegrity.staticLocalMustBeLabeled, true);
@@ -114,6 +114,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.equal(gate.evidence.routeAccuracyReportRequired, true);
   assert.equal(gate.evidence.providerCoverageReportRequired, true);
   assert.equal(gate.evidence.accessibilityRegressionReportRequired, true);
+  assert.equal(gate.evidence.runtimeTraceabilityRequired, true);
   assert.deepEqual(gate.requiredReports, {
     accuracy: "artifacts/route-accuracy-report.json",
     accessibility: "artifacts/route-accessibility-regression-report.json",
@@ -178,6 +179,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     routeV2ContractReport: "artifacts/route-v2-contract-report.json",
     coverageGapReport: "artifacts/datapack-coverage-gaps.json",
     qualityMetricReport: "artifacts/datapack-quality-metrics.json",
+    routeGraphTopologyReport: "artifacts/route-graph-topology-report.json",
     freshnessSlaPolicy: "apps/mobile/release/datapack-freshness-sla.json",
     androidOfflineRouteEvidence: ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md",
   });
@@ -187,6 +189,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     ),
   );
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("validate-datapack.mjs --require-production")));
+  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-topology-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
   assert.equal(gate.evidencePolicy.githubSummaryOnly, true);
   assert.ok(gate.evidencePolicy.forbiddenInGithubSummary.includes("backend-only provider key"));
@@ -208,6 +211,50 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.ok(scope.linkedReleaseBlockers.includes(1419));
   assert.match(readme, /datapack-release-readiness-gate\.json/);
   assert.match(readme, /오프라인 데이터팩과 온라인 실시간 overlay를 분리/);
+});
+
+test("README maps data quality levels to production datapack metrics", () => {
+  const readme = read("README.md");
+
+  for (const text of [
+    "## Data Quality Levels",
+    "Level 1",
+    "Level 2",
+    "Level 3",
+    "Level 4",
+    "stationCount",
+    "edgeCount",
+    "requiredFacilityEvidenceCoverageRatio",
+    "operationalKnownRatio",
+    "freshnessValidRatio",
+    "strictRouteEligibleFacilityRatio",
+    "fieldVerifiedPathwayRatio",
+    "unknownEdgeRatioByProfile",
+  ]) {
+    assert.ok(readme.includes(text), `README must include ${text}`);
+  }
+});
+
+test("README fixes production routing graph admission policy", () => {
+  const readme = read("README.md");
+
+  for (const text of [
+    "## Production Routing Graph",
+    "Production LOCAL `RIDE` edge",
+    "인접 `lineSequence`",
+    "regression fixture",
+    "`EXPRESS`",
+    "station-line(`stationId:lineId`)",
+    "`platformInfo`",
+    "canonical route map position",
+    "`routeMapPositions`",
+    "sourceSha256",
+    "데이터 및 지도 출처",
+    "#1397 source admission",
+    "#1400 인접역 graph/position 확장 증거",
+  ]) {
+    assert.ok(readme.includes(text), `README must include ${text}`);
+  }
 });
 
 test("route release readiness tracker keeps issue 1414 as a release blocker", () => {
@@ -337,14 +384,22 @@ function workflowFiles() {
 function assertActionsEnvSecretPolicy(file, source) {
   const secretAccess = /secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
   const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
-  const allowedExtraSecrets = file === ".github/workflows/release-artifacts.yml"
-    ? new Set([
-        "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
-        "EASYSUBWAY_ANDROID_STORE_PASSWORD",
-        "EASYSUBWAY_ANDROID_KEY_ALIAS",
-        "EASYSUBWAY_ANDROID_KEY_PASSWORD",
-      ])
-    : new Set();
+  const allowedExtraSecretsByFile = {
+    ".github/workflows/cd.yml": new Set([
+      "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+    ]),
+    ".github/workflows/datapack-release.yml": new Set([
+      "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+      "DATA_GO_KR_SERVICE_KEY",
+    ]),
+    ".github/workflows/release-artifacts.yml": new Set([
+      "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
+      "EASYSUBWAY_ANDROID_STORE_PASSWORD",
+      "EASYSUBWAY_ANDROID_KEY_ALIAS",
+      "EASYSUBWAY_ANDROID_KEY_PASSWORD",
+    ]),
+  };
+  const allowedExtraSecrets = allowedExtraSecretsByFile[file] ?? new Set();
 
   for (const match of source.matchAll(secretAccess)) {
     const secretName = match[1] ?? match[2];
@@ -353,7 +408,7 @@ function assertActionsEnvSecretPolicy(file, source) {
       secretName !== "EASYSUBWAY_ENV" &&
       !allowedExtraSecrets.has(secretName)
     ) {
-      assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved Android upload key secrets`);
+      assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved scoped secrets`);
     }
   }
   assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
@@ -737,21 +792,31 @@ test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함�
   assert.match(template, /## Version impact/);
   assert.match(template, /mobile patch/);
   assert.match(template, /backend identity/);
+  assert.match(template, /PR 본문은 이 템플릿 섹션을 삭제하지 않고 모두 채웠다/);
   assert.match(template, /CodeRabbit 리뷰를 확인했다/);
-  assert.match(template, /Codex CLI code review 결과를 확인했다/);
+  assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
+  assert.match(template, /CodeRabbit status check만으로는 리뷰 완료로 보지 않는다/);
+  assert.match(template, /CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다/);
   assert.match(template, /CD 상태를 확인했다/);
 });
 
 test("이슈 템플릿은 에이전트 서술 없이 개발자 판단 정보를 수집한다", () => {
   const templates = [
     read(".github/ISSUE_TEMPLATE/bug_report.yml"),
+    read(".github/ISSUE_TEMPLATE/docs_request.yml"),
     read(".github/ISSUE_TEMPLATE/feature_request.yml"),
+    read(".github/ISSUE_TEMPLATE/refactor_request.yml"),
+    read(".github/ISSUE_TEMPLATE/style_request.yml"),
     read(".github/ISSUE_TEMPLATE/task_request.yml"),
+    read(".github/ISSUE_TEMPLATE/test_request.yml"),
   ].join("\n");
 
   assert.match(templates, /실제 개발자가 바로 판단할 수 있게/);
   assert.match(templates, /사용자 또는 운영 영향/);
   assert.match(templates, /실행할 검증/);
+  assert.match(templates, /상위 이슈는 하위 이슈와 완료 조건을 함께 적고/);
+  assert.match(templates, /하위 이슈 완료 전에는 닫지 않습니다/);
+  assert.match(templates, /PR 본문 양식과 GitHub PR Review 증거 확인/);
   assert.doesNotMatch(templates, /AI 에이전트|자동 생성|제가 작업/);
 });
 
@@ -878,21 +943,37 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
   assert.doesNotMatch(tfvarsExample, /ocid1\.(?:tenancy|user|compartment)\.oc1\.[a-z0-9]{20,}/);
 });
 
-test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
+test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관리한다", () => {
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
+  const datapackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
 
-  assert.match(readme, /애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나/);
-  assert.match(readme, /애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
+  assert.match(readme, /로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다/);
+  assert.match(readme, /provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
+  assert.match(readme, /provider key overlay를 append/);
+  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
+  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
+  assert.match(readme, /실시간 지하철 한도 1,000\/day 아래/);
+  assert.match(readme, /개발계정 10,000\/day 안에서/);
+  assert.match(readme, /1회 실행당 live fetch 1회/);
   assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
   assert.match(readme, /GitHub `production` environment approval을 기다리지 않습니다/);
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
   assert.match(script, /\.env\.example is a template/);
+  assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
+  assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
+  assert.match(cdWorkflow, /drop_topis_key/);
+  assert.match(cdWorkflow, /!\(\$1 in drop\)/);
+  assert.match(cdWorkflow, /tail -c 1 "\$\{env_file\}"/);
+  assert.match(datapackReleaseWorkflow, /drop_topis_key/);
+  assert.match(datapackReleaseWorkflow, /drop_data_go_key/);
+  assert.match(datapackReleaseWorkflow, /!\(\$1 in drop\)/);
+  assert.match(datapackReleaseWorkflow, /tail -c 1 "\$\{env_file\}"/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
 
   for (const file of workflowFiles()) {
@@ -963,6 +1044,8 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
+    "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1",
+    "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800",
     "EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=legacy-pepper-with-enough-entropy",
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
@@ -1370,10 +1453,11 @@ test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지�
 
   assert.match(widgetTest, routeBackTestPattern);
   assert.match(routeSearch, /return PopScope\(/);
-  assert.match(routeSearch, /_RouteWorkflowView\.detail\s*=>\s*_RouteWorkflowView\.list/);
-  assert.match(routeSearch, /_RouteWorkflowView\.guidance\s*=>\s*_RouteWorkflowView\.detail/);
-  assert.match(routeSearch, /_RouteWorkflowView\.internalRoute\s*=>\s*_RouteWorkflowView\.guidance/);
-  assert.match(routeSearch, /_RouteWorkflowView\.feedback\s*=>\s*_RouteWorkflowView\.detail/);
+  assert.match(routeSearch, /Navigator\.of\(context\)\.push\(\s*MaterialPageRoute<void>/);
+  assert.match(routeSearch, /builder:\s*\(_\)\s*=>\s*_RouteStageScaffold\(child:\s*child\)/);
+  assert.match(routeSearch, /class _RouteStageScaffold extends StatelessWidget/);
+  assert.match(routeSearch, /onBack:\s*\(\)\s*=>\s*Navigator\.of\(context\)\.pop\(\)/);
+  assert.doesNotMatch(routeSearch, /enum _RouteWorkflowView/);
 });
 
 test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테스트는 유지된다", () => {
@@ -1388,9 +1472,9 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   ].join("[\\s\\S]*"));
   const facilityNoLocationPattern = new RegExp([
     "testWidgets\\('시설 신고 화면은 GPS가 꺼져 있으면 위치 없이 제보를 선택할 수 있다'",
-    "facilityReportSubmitWithoutLocationButton",
-    "위치 없이 제보합니다",
-    "현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요",
+    "requestCount, 0",
+    "facilityReportSubmitButton",
+    "onPressed, isNotNull",
     "latitude, isNull",
     "longitude, isNull",
   ].join("[\\s\\S]*"));
@@ -1399,10 +1483,11 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   assert.match(main, /_viewPreferences\s*=\s*previous/);
   assert.match(main, /설정을 저장하지 못했어요\. 이전 값으로 되돌렸어요\./);
   assert.match(widgetTest, settingsFailurePattern);
-  assert.match(facilityReport, /facilityReportSubmitWithoutLocationButton/);
+  assert.match(facilityReport, /facilityReportAttachLocationButton/);
   assert.match(facilityReport, /facilityReportOpenLocationSettingsButton/);
-  assert.match(facilityReport, /facilityReportRetryLocationButton/);
-  assert.match(facilityReport, /현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요/);
+  assert.doesNotMatch(facilityReport, /facilityReportSubmitWithoutLocationButton/);
+  assert.doesNotMatch(facilityReport, /facilityReportRetryLocationButton/);
+  assert.doesNotMatch(facilityReport, /현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요/);
   assert.match(widgetTest, facilityNoLocationPattern);
   assert.match(widgetTest, /시설 신고 화면은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다/);
 });
@@ -3872,12 +3957,28 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /release mode cannot use fixture input/);
   assert.match(workflow, /release request approver must differ from requester/);
   assert.match(workflow, /manifest channel must match targetChannel/);
+  assert.match(workflow, /Data Pack Release \/ Write route graph topology evidence/);
+  assert.match(workflow, /EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT/);
+  assert.match(workflow, /tools\/datapack\/build-route-graph-topology-report\.mjs/);
+  assert.match(workflow, /Data Pack Release \/ Write headway evidence/);
+  assert.match(workflow, /EASYSUBWAY_HEADWAY_REPORT/);
+  assert.match(workflow, /tools\/datapack\/build-headway-report\.mjs/);
+  assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_BUILD_FIXTURE\}"/);
   assert.match(workflow, /Data Pack Release \/ Validate release evidence bundle/);
   assert.match(workflow, /tools\/datapack\/validate-release-evidence-bundle\.mjs/);
   assert.match(workflow, /--build-spec "\$\{EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH\}"/);
   assert.match(workflow, /const buildSpec = JSON\.parse\(fs\.readFileSync\(buildSpecPath, "utf8"\)\)/);
   assert.match(workflow, /sourceSnapshotSetHash: releaseHash\("sourceSnapshotSetHash"\)/);
   assert.match(workflow, /approvedOverrideSetHash: releaseHash\("approvedOverrideSetHash"\)/);
+  assert.match(workflow, /routeGraphTopologySha256: hashFile\(process\.env\.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT\)/);
+  assert.match(workflow, /headwayReportSha256: hashFile\(process\.env\.EASYSUBWAY_HEADWAY_REPORT\)/);
+  assert.match(workflow, /const routeGraphTopologyViolationCount = \[/);
+  assert.match(workflow, /const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0/);
+  assert.match(workflow, /const headwayEvidenceCount =/);
+  assert.match(workflow, /const headwayReportStatus = headwayEvidenceCount > 0/);
+  assert.match(workflow, /"DEFERRED"/);
+  assert.match(workflow, /routeGraphTopologyStatus,/);
+  assert.match(workflow, /headwayReportStatus,/);
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
   assert.match(workflow, /--verify-only/);
@@ -3897,12 +3998,19 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     "coverageStatus",
     "routeMapPositionCoverageSha256",
     "routeMapPositionCoverageStatus",
+    "routeGraphTopologySha256",
+    "routeGraphTopologyStatus",
+    "headwayReportSha256",
+    "headwayReportStatus",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
     "strictRouteRegressionStatus",
   ]) {
     assert.ok(releaseEvidenceBundleSchema.required.includes(field), `${field} must be required`);
   }
+  assert.equal(releaseEvidenceBundleSchema.properties.headwayReportStatus.$ref, "#/$defs/headwayGateStatus");
+  assert.equal(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"), false);
+  assert.equal(releaseEvidenceBundleSchema.$defs.headwayGateStatus.enum.includes("DEFERRED"), true);
 });
 
 test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 credential preflight를 사용한다", () => {
@@ -4245,11 +4353,15 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "manifestSha256",
     "coverageSummarySha256",
     "routeMapPositionCoverageSha256",
+    "routeGraphTopologySha256",
+    "headwayReportSha256",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
     "validatorStatus",
     "coverageStatus",
     "routeMapPositionCoverageStatus",
+    "routeGraphTopologyStatus",
+    "headwayReportStatus",
     "strictRouteRegressionStatus",
     "manifestSignatureStatus",
     "androidEvidenceStatus",
@@ -5507,7 +5619,7 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
   for (const candidate of topisCandidates) {
     assert.equal(candidate.priority, "P0");
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-    assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+    assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
     assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
     assert.equal(candidate.serviceKeyHandling, "backend_secret_only");
     assert.equal(candidate.mobileEmbeddingAllowed, false);
@@ -5530,9 +5642,15 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.equal(candidate.evidence.usePermissionRange, "공공누리 1유형");
     assert.deepEqual(candidate.evidence.formats, ["JSON"]);
     assert.match(candidate.evidence.sampleUrl, /\[서비스키값\]/);
+    assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    assert.equal(candidate.evidence.liveSampleRowCount, 5);
+    assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
+    assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
+    assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
     assert.ok(candidate.evidence.coverageLimitations.length >= 2);
     assert.ok(candidate.evidence.outputFields.includes("recptnDt"));
-    assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+    assert.deepEqual(candidate.evidence.missingEvidence, ["providerTermsOrQuotaApproval", "adminReview"]);
+    assert.equal(candidate.capabilities.realtime.coverageStatus, "PROVIDER_TERMS_OR_QUOTA_REQUIRED");
     assert.ok(candidate.nextAction);
 
     const productionSource = productionSourceByDatasetUrl.get(candidate.detailUrl);
@@ -5553,15 +5671,31 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(candidate.priority, "P0");
   assert.equal(candidate.domain, "schedule_timetable");
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
   assert.equal(candidate.productionInventoryReferenceId, "molit-tago-subway-info");
+  assert.equal(candidate.productionInventoryRelationship, "same_dataset_inventory_entry_remains_schedule_candidate_until_importer_validation");
   assert.equal(candidate.requestUrl, "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList");
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
-  assert.match(candidate.evidence.sampleUrl, /subwayStationId=448/);
+  assert.match(candidate.evidence.sampleUrl, /subwayStationId=MTRKR4448/);
+  assert.match(candidate.evidence.stationDiscoveryUrl, /GetKwrdFndSubwaySttnList/);
+  assert.match(candidate.evidence.stationDiscoveryUrl, /subwayStationName=상록수/);
+  assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  assert.equal(candidate.evidence.liveSampleRowCount, 10);
+  assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
+  assert.deepEqual(candidate.evidence.scheduleImporterValidation, {
+    status: "validated_station_timetable_projection",
+    tool: "tools/datapack/validate-tago-schedule-sample.mjs",
+    validatedAt: "2026-07-03",
+    validatedRawSha256: candidate.evidence.liveSampleRawSha256,
+    productionCanonicalStopTimesStatus: "blocked_requires_trip_stop_sequence",
+    plannedEtaUseAllowed: false,
+  });
   assert.equal(productionSourceIds.has(candidate.id), true, "TAGO inventory entry exists but must remain non-production");
 
   const inventorySource = inventory.sources.find(({ id }) => id === "molit-tago-subway-info");
@@ -5572,8 +5706,8 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
 
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
   assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
-  assert.equal(candidate.capabilities.schedule.coverageStatus, "SAMPLE_EVIDENCE_REQUIRED");
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse", "scheduleImporterValidation"]);
+  assert.equal(candidate.capabilities.schedule.coverageStatus, "TRIP_STOP_SEQUENCE_REQUIRED");
+  assert.deepEqual(candidate.evidence.missingEvidence, ["tripStopSequenceSource", "adminReview"]);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
   assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
@@ -7279,18 +7413,7 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   const inlineStyleFiles = adminTemplateFiles
     .filter((file) => /<style\b/.test(read(file)))
     .sort();
-  assert.deepEqual(inlineStyleFiles, [
-    "backend/src/main/resources/templates/admin/collections/list.html",
-    "backend/src/main/resources/templates/admin/facilities/list.html",
-    "backend/src/main/resources/templates/admin/notifications/push.html",
-    "backend/src/main/resources/templates/admin/quality/dashboard.html",
-    "backend/src/main/resources/templates/admin/reports/detail.html",
-    "backend/src/main/resources/templates/admin/reports/list.html",
-    "backend/src/main/resources/templates/admin/routes/feedback.html",
-    "backend/src/main/resources/templates/admin/routes/searches.html",
-    "backend/src/main/resources/templates/admin/stations/layouts.html",
-    "backend/src/main/resources/templates/admin/usage/activity.html",
-  ]);
+  assert.deepEqual(inlineStyleFiles, []);
 });
 
 test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다", () => {
@@ -9199,29 +9322,37 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
 
 test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 전달한다", () => {
   const controller = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const useCasePath = "backend/src/main/java/com/easysubway/route/application/port/in/RouteV2SearchUseCase.java";
   const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
 
+  assert.equal(existsSync(path.join(root, useCasePath)), true, "RouteV2SearchUseCase must expose the V2 planning port");
   assert.equal(existsSync(path.join(root, plannerPath)), true, "RouteV2Planner must own V2 production search planning");
 
+  const useCase = read(useCasePath);
   const planner = read(plannerPath);
   const v2Endpoint = controller.match(
     /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
 
-  assert.match(v2Endpoint, /routeV2Planner\.search/);
+  assert.match(v2Endpoint, /routeV2SearchUseCase\.search/);
   assert.doesNotMatch(v2Endpoint, /routeSearchUseCase\.searchRoute/);
   assert.match(controller, /toV2Command\(departureTime\)/);
   assert.match(controller, /RouteSearchV2Response\.from\(plan, request, departureTime\)/);
   assert.match(controller, /plan\.statuses\(\)/);
   assert.doesNotMatch(controller, /List\.of\(\s*"FOUND"[\s\S]*"ROUTE_GRAPH_UNKNOWN"/);
-  assert.match(planner, /class RouteV2Planner/);
+  assert.match(planner, /class RouteV2Planner implements RouteV2SearchUseCase/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
-  assert.match(planner, /record SearchRouteV2Command/);
-  assert.match(planner, /OffsetDateTime departureTime/);
-  assert.match(planner, /boolean useRealtime/);
-  assert.match(planner, /int maxTransfers/);
-  assert.match(planner, /int alternativeCount/);
+  assert.match(useCase, /record SearchRouteV2Command/);
+  assert.match(useCase, /OffsetDateTime departureTime/);
+  assert.match(useCase, /boolean useRealtime/);
+  assert.match(useCase, /int maxTransfers/);
+  assert.match(useCase, /int alternativeCount/);
+  assert.match(useCase, /SearchRouteV2Command \{/);
+  assert.match(useCase, /maxTransfers < 0/);
+  assert.match(useCase, /alternativeCount < 1/);
+  assert.match(useCase, /enum RouteV2Status/);
+  assert.match(useCase, /List<RouteV2Status> statuses/);
   assert.match(planner, /route-algorithm-v2-adr\.json|Range RAPTOR/);
 });
 
@@ -9468,15 +9599,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(mapAdapter, /_coordinateFrom\(station\.latitude, station\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(exit\.latitude, exit\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(facility\.latitude, facility\.longitude\)/);
-  assert.match(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
-  assert.match(stationSearch, /지도 위치 목록/);
+  assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
+  assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
   assert.doesNotMatch(stationSearch, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\./);
   assert.match(mapAdapterTest, /지도 제공자는 승인된 기본 제공자만 사용한다/);
   assert.match(mapAdapterTest, /지도 어댑터는 좌표가 있는 역 출구 시설만 쉬운 이름의 마커로 만든다/);
-  assert.match(widgetTest, /지도 위치 목록/);
-  assert.match(widgetTest, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\.'\), findsNothing/);
-  assert.match(widgetTest, /상록수역 자세한 안내[\s\S]*지도 위치/);
-  assert.match(widgetTest, /1번 출구, 엘리베이터 연결, 계단 없는 이동 가능[\s\S]*지도 위치/);
+  assert.match(widgetTest, /중복 "지도 위치 목록" 섹션은 제거됐다\(#1497\)\./);
+  assert.match(widgetTest, /find\.text\('지도 위치 목록'\), findsNothing/);
+  assert.doesNotMatch(widgetTest, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다/);
   assert.match(facilityReport, /Future<FacilityReportResult> getReport\(String reportId\)/);
   assert.match(facilityReport, /\/api\/v1\/reports\/\$\{Uri\.encodeComponent\(trimmedReportId\)\}/);
   assert.match(facilityReport, /refreshCurrentReport/);
