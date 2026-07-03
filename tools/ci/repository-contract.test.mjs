@@ -5670,6 +5670,7 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
   assert.equal(candidate.productionInventoryReferenceId, "molit-tago-subway-info");
+  assert.equal(candidate.productionInventoryRelationship, "same_dataset_inventory_entry_remains_schedule_candidate_until_importer_validation");
   assert.equal(candidate.requestUrl, "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList");
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
