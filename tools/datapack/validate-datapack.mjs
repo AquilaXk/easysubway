@@ -29,6 +29,10 @@ const facilityEvidenceProvenanceColumns = [
   "retrieved_at",
 ];
 const productionFacilityProvenanceKinds = ["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_SURVEY"];
+const allowedRealtimeDatapackTables = new Set([
+  "realtime_provider_line_mappings",
+  "realtime_provider_station_mappings",
+]);
 const allowedNetworkEdgeTypes = new Set([
   "RIDE",
   "IN_STATION_TRANSFER",
@@ -55,14 +59,14 @@ async function main() {
   const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-validate-"));
   try {
     for (const pack of manifest.packs) {
-      await validatePack(root, temporaryDir, pack, manifest.manifestVersion ?? 1);
+      await validatePack(root, temporaryDir, pack, manifest.manifestVersion ?? 1, requireProduction);
     }
   } finally {
     await rm(temporaryDir, { recursive: true, force: true });
   }
 }
 
-async function validatePack(root, temporaryDir, pack, manifestVersion) {
+async function validatePack(root, temporaryDir, pack, manifestVersion, requireProduction = false) {
   const compressedPath = localPackPathForUrl(root, pack);
   const compressedBytes = await readFile(compressedPath);
   if (compressedBytes.length !== pack.sizeBytes) {
@@ -95,7 +99,7 @@ async function validatePack(root, temporaryDir, pack, manifestVersion) {
 
   const sqlitePath = path.join(temporaryDir, `${pack.id}-v${pack.version}.sqlite`);
   await writeFile(sqlitePath, sqliteBytes);
-  validateSqlite(sqlitePath, pack);
+  validateSqlite(sqlitePath, pack, requireProduction);
 }
 
 function localPackPathForUrl(root, pack) {
@@ -105,7 +109,7 @@ function localPackPathForUrl(root, pack) {
   return path.join(root, pack.url);
 }
 
-function validateSqlite(sqlitePath, pack) {
+function validateSqlite(sqlitePath, pack, requireProduction) {
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
     const quickCheck = database.prepare("PRAGMA quick_check").all();
@@ -138,6 +142,7 @@ function validateSqlite(sqlitePath, pack) {
       }
     }
 
+    validateNoRealtimePayloadTables(database, pack);
     validateNetworkEdgeReferences(database, pack);
     validateTransitSchedule(database, pack);
     validateStationPathways(database, pack);
@@ -149,6 +154,7 @@ function validateSqlite(sqlitePath, pack) {
     validateRegionalQualityMetricsMatchDatabase(database, pack);
     validateRepresentativeRouteRegressions(database, pack);
     validateProductionRideEdgeSpeed(database, pack);
+    validateProductionRideEdgeAdjacency(database, pack, requireProduction);
 
     for (const [tableName, minimumRows] of Object.entries(pack.minimumTableRows ?? {})) {
       const row = database.prepare(`SELECT COUNT(*) AS count FROM ${tableName}`).get();
@@ -161,6 +167,20 @@ function validateSqlite(sqlitePath, pack) {
     }
   } finally {
     database.close();
+  }
+}
+
+function validateNoRealtimePayloadTables(database, pack) {
+  if (pack.artifactKind !== "production") {
+    return;
+  }
+  const rows = database
+    .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name LIKE 'realtime_%' ORDER BY name")
+    .all();
+  for (const row of rows) {
+    if (!allowedRealtimeDatapackTables.has(row.name)) {
+      throw new Error(`${pack.id}@${pack.version} realtime payload table is not allowed in production datapack: ${row.name}`);
+    }
   }
 }
 
@@ -543,6 +563,45 @@ function validateProductionRideEdgeSpeed(database, pack) {
     const speedKmh = (row.distance_meters / row.duration_seconds) * 3.6;
     if (speedKmh < 15 || speedKmh > 110) {
       throw new Error(`${pack.id}@${pack.version} network_edges ride speed is outside production bounds: ${row.id}`);
+    }
+  }
+}
+
+function validateProductionRideEdgeAdjacency(database, pack, requireProduction) {
+  if (!requireProduction || pack.artifactKind !== "production" || !hasTable(database, "station_lines") || !hasTable(database, "network_edges")) {
+    return;
+  }
+  const stationLineByNode = new Map(
+    database
+      .prepare("SELECT station_id, line_id, line_sequence FROM station_lines")
+      .all()
+      .map((row) => [
+        stationLineNodeId(row.station_id, row.line_id),
+        { lineId: row.line_id, lineSequence: row.line_sequence },
+      ]),
+  );
+  const edges = database
+    .prepare(`
+      SELECT id, from_node_id, to_node_id, service_pattern
+      FROM network_edges
+      WHERE edge_type = 'RIDE'
+      ORDER BY id
+    `)
+    .all();
+  for (const edge of edges) {
+    if (String(edge.service_pattern || "LOCAL").toUpperCase() === "EXPRESS") {
+      continue;
+    }
+    const from = stationLineByNode.get(stationLineNodeFromRouteNodeId(edge.from_node_id));
+    const to = stationLineByNode.get(stationLineNodeFromRouteNodeId(edge.to_node_id));
+    if (!from || !to) {
+      continue;
+    }
+    if (from.lineId !== to.lineId) {
+      throw new Error(`${pack.id}@${pack.version} network_edges RIDE edge must stay on one line: ${edge.id}`);
+    }
+    if (Math.abs(from.lineSequence - to.lineSequence) !== 1) {
+      throw new Error(`${pack.id}@${pack.version} network_edges LOCAL RIDE edge must connect adjacent station-line sequences: ${edge.id}`);
     }
   }
 }
@@ -1302,8 +1361,8 @@ function validateProductionFacilityPositiveStatus(row, statusMeaning, pack) {
   const positiveStatus = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(
     String(row.status ?? "").toUpperCase(),
   );
-  if (positiveStatus && statusMeaning !== "REALTIME_OPERATION") {
-    throw new Error(`${pack.id}@${pack.version} facilities positive status requires REALTIME_OPERATION evidence: ${row.id}`);
+  if (positiveStatus && !["REALTIME_OPERATION", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(statusMeaning)) {
+    throw new Error(`${pack.id}@${pack.version} facilities positive status requires verified operation evidence: ${row.id}`);
   }
 }
 
@@ -1361,6 +1420,18 @@ function validateProductionStationFacilityEvidenceRow(row, sourceIds, pack) {
   }
   if (row.strict_route_eligible === 1) {
     requiredString(row.strict_route_eligible_reason, `station_facility_evidence.${id}.strict_route_eligible_reason`);
+    validateStrictRouteEligibleFacilityEvidence(row, pack, id);
+  }
+}
+
+function validateStrictRouteEligibleFacilityEvidence(row, pack, id) {
+  const operationalStatus = String(row.operational_status ?? "").toUpperCase();
+  const statusMeaning = String(row.status_meaning ?? "").toUpperCase();
+  if (!["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(operationalStatus)) {
+    throw new Error(`${pack.id}@${pack.version} station_facility_evidence strict route eligibility requires available operation status: ${id}`);
+  }
+  if (!["REALTIME_OPERATION", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(statusMeaning)) {
+    throw new Error(`${pack.id}@${pack.version} station_facility_evidence strict route eligibility requires verified operation evidence: ${id}`);
   }
 }
 
