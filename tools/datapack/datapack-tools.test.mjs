@@ -7950,6 +7950,90 @@ test("공식 source ingest adapter는 admission 전 schedule provenance도 produ
   );
 });
 
+test("TAGO 시간표 sample validator는 station-level row shape만 검증하고 production 승격은 막는다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-sample-${Date.now()}.json`);
+  await writeFile(samplePath, JSON.stringify({
+    response: {
+      body: {
+        items: {
+          item: [
+            {
+              endSubwayStationNm: "당고개",
+              subwayRouteId: "MTRKR4",
+              subwayStationId: "MTRKR4448",
+              subwayStationNm: "상록수",
+              dailyTypeCode: "01",
+              upDownTypeCode: "U",
+              depTime: "080500",
+              arrTime: "080500",
+              endSubwayStationId: "MTRKR4409",
+            },
+            {
+              endSubwayStationNm: "당고개",
+              subwayRouteId: "MTRKR4",
+              subwayStationId: "MTRKR4448",
+              subwayStationNm: "상록수",
+              dailyTypeCode: "01",
+              upDownTypeCode: "U",
+              depTime: "081200",
+              arrTime: "081200",
+              endSubwayStationId: "MTRKR4409",
+            },
+          ],
+        },
+      },
+    },
+  }));
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+    { cwd: root, env: productionEnv },
+  );
+  const report = JSON.parse(stdout);
+  assert.equal(report.candidateId, "molit-tago-subway-info");
+  assert.equal(report.rowCount, 2);
+  assert.equal(report.stationLevelOnly, true);
+  assert.equal(report.productionUseAllowed, false);
+  assert.equal(report.remainingAdmissionBlocker, "line_wide_trip_stop_sequence_validation_required");
+  assert.deepEqual(
+    report.departures.map((departure) => departure.departureSeconds),
+    [29100, 29520],
+  );
+});
+
+test("TAGO 시간표 sample validator는 잘못된 시간 row를 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-invalid-${Date.now()}.json`);
+  await writeFile(samplePath, JSON.stringify({
+    response: {
+      body: {
+        items: {
+          item: {
+            endSubwayStationNm: "당고개",
+            subwayRouteId: "MTRKR4",
+            subwayStationId: "MTRKR4448",
+            subwayStationNm: "상록수",
+            dailyTypeCode: "01",
+            upDownTypeCode: "U",
+            depTime: "080500",
+            arrTime: "080700",
+            endSubwayStationId: "MTRKR4409",
+          },
+        },
+      },
+    },
+  }));
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /arrival must be <= departure/,
+  );
+});
+
 test("공식 source ingest adapter는 station-line 단위 facility evidence coverage를 요구한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-facility-line-coverage-${Date.now()}`);
   const input = productionSourceIngestInput();
