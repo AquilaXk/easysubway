@@ -4898,13 +4898,17 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
 test("4호선 상록수-사당 topology 후보는 production scope와 분리한다", () => {
   const candidate = readJson("tools/datapack/line4-topology-source-admission-candidate.json");
   const productionInput = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const nationwideTargets = readJson("tools/datapack/nationwide-coverage-targets.json");
   const inventory = readJson("tools/datapack/source-inventory.json");
   const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
+  const nationwideClaim = nationwideTargets.claimLedger.find((claim) => claim.claimId === "nationwide_subway_support");
 
   assert.equal(candidate.schemaVersion, 1);
   assert.equal(candidate.artifactKind, "line4-topology-source-admission-candidate");
   assert.equal(candidate.status, "SOURCE_BACKED_CANDIDATE_NOT_PRODUCTION_SUPPORTED");
   assert.equal(candidate.productionUseAllowed, false);
+  assert.equal(nationwideClaim.status, "NO_GO");
+  assert.match(nationwideClaim.unblockConditionKo, /coverage ratio 1/);
   assert.equal(candidate.candidateGraph.automaticProductionRouteEdgeAllowed, false);
   assert.deepEqual(candidate.supportBoundary.productionSupportedStationIds, ["station-sangnoksu", "station-sadang"]);
   assert.deepEqual(productionInput.supportedV1Scope.includedStationIds, ["station-sangnoksu", "station-sadang"]);
