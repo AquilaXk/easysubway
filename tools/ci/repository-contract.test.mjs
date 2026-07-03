@@ -5728,6 +5728,12 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.match(inventorySource.admissionEvidence.adminReviewRecordHash, /^[0-9a-f]{64}$/);
   assert.match(inventorySource.admissionEvidence.sourceSnapshotSetHash, /^[0-9a-f]{64}$/);
   assert.match(inventorySource.admissionEvidence.sourceInventorySha256, /^[0-9a-f]{64}$/);
+  const admittedInventorySnapshot = JSON.parse(JSON.stringify(inventory));
+  delete admittedInventorySnapshot.sources.find(({ id }) => id === "molit-tago-subway-info").admissionEvidence;
+  assert.equal(
+    inventorySource.admissionEvidence.sourceInventorySha256,
+    createHash("sha256").update(JSON.stringify(admittedInventorySnapshot)).digest("hex"),
+  );
 
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
   assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
