@@ -334,6 +334,7 @@ void main() {
       expect(result.status, RouteStatus.unknown);
       expect(result.edgeIds, isEmpty);
       expect(result.blockedReasonCodes, ['ACCESSIBILITY_STATE_UNKNOWN']);
+      expect(result.warningCodes, isEmpty);
     });
 
     test('휠체어 조건은 계단 여부 미확인 edge를 안전한 경로로 사용하지 않는다', () {
