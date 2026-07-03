@@ -320,6 +320,23 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
+    test('휠체어 조건은 strict eligible이 아닌 edge를 안전한 경로로 사용하지 않는다', () {
+      final engine = LocalRouteEngine(graph: _strictIneligibleFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-a',
+          destinationStationId: 'station-b',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.unknown);
+      expect(result.edgeIds, isEmpty);
+      expect(result.blockedReasonCodes, ['ACCESSIBILITY_STATE_UNKNOWN']);
+      expect(result.warningCodes, isEmpty);
+    });
+
     test('휠체어 조건은 계단 여부 미확인 edge를 안전한 경로로 사용하지 않는다', () {
       final engine = LocalRouteEngine(graph: _unknownStairAccessFixtureGraph());
 
@@ -1273,6 +1290,40 @@ NetworkGraph _unknownStairAccessFixtureGraph() {
         type: RouteEdgeType.exit,
         baseCost: 60,
         stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _strictIneligibleFixtureGraph() {
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(id: 'station-a', stationId: 'station-a', lineId: 'line-1'),
+      RouteNode(id: 'station-b', stationId: 'station-b', lineId: 'line-1'),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'facility-a-b-status-unknown',
+        fromNodeId: 'station-a',
+        toNodeId: 'station-b',
+        type: RouteEdgeType.facilityConnector,
+        baseCost: 90,
+        stairAccessState: RouteStairAccessState.stepFree,
+        safetyEvidence: RouteEdgeSafetyEvidence(
+          sourceId: 'operator-facility-status',
+          sourceSnapshotId: 'snapshot-unknown',
+          providerRecordHash: 'provider-hash',
+          provenanceKind: 'OFFICIAL_SOURCE',
+          verificationStatus: 'CHECK_REQUIRED',
+          evidenceHash: 'evidence-hash',
+          evidenceHashValid: true,
+          isPlaceholderEvidence: false,
+          lastVerifiedAt: null,
+          isStale: false,
+          isGeneratedConnector: false,
+          strictRouteEligible: false,
+          blockerReasons: ['ACCESSIBILITY_STATE_UNKNOWN'],
+        ),
       ),
     ],
   );
