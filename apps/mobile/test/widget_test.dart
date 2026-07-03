@@ -9496,6 +9496,42 @@ void main() {
     expect(favoriteRouteRepository.savedRouteSearchIds, isEmpty);
   });
 
+  testWidgets('경로 검색 UNKNOWN 결과는 이동 가능 화면 문구로 보이지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(status: 'UNKNOWN'),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 26),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await _openFirstRouteResultDetail(tester);
+
+    expect(find.text('경로 상태를 아직 알 수 없어요'), findsWidgets);
+    expect(find.text('확인 후 이동'), findsOneWidget);
+    expect(find.text('추천 경로'), findsNothing);
+    expect(find.textContaining('이동할 수 있는 경로'), findsNothing);
+    expect(find.byKey(const Key('routeFavoriteSaveButton')), findsNothing);
+    expect(find.byKey(const Key('routeStartGuidanceButton')), findsNothing);
+  });
+
   testWidgets('즐겨찾기 경로 저장 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
