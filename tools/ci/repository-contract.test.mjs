@@ -5732,6 +5732,10 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
   assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
   assert.equal(candidate.capabilities.schedule.coverageStatus, "TRIP_STOP_SEQUENCE_REQUIRED");
+  assert.equal(
+    candidate.capabilities.schedule.unsupportedNotes,
+    "commercial schedule import remains blocked until a provider trip/stop-sequence source is identified and validated",
+  );
   assert.deepEqual(candidate.evidence.missingEvidence, ["tripStopSequenceSource"]);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
