@@ -4878,7 +4878,17 @@ class _PrivacyDataUseLine extends StatelessWidget {
 }
 
 class DataSourceAttributionScreen extends StatefulWidget {
-  const DataSourceAttributionScreen({super.key});
+  const DataSourceAttributionScreen({
+    super.key,
+    this.initialManifest,
+    this.initialInventory,
+  }) : assert(
+         (initialManifest == null) == (initialInventory == null),
+         'initialManifest and initialInventory must be provided together.',
+       );
+
+  final Map<String, Object?>? initialManifest;
+  final Map<String, Object?>? initialInventory;
 
   @override
   State<DataSourceAttributionScreen> createState() =>
@@ -4898,6 +4908,11 @@ class _DataSourceAttributionScreenState
 
   Future<({Map<String, Object?> manifest, Map<String, Object?> inventory})>
   _load() async {
+    final initialManifest = widget.initialManifest;
+    final initialInventory = widget.initialInventory;
+    if (initialManifest != null && initialInventory != null) {
+      return (manifest: initialManifest, inventory: initialInventory);
+    }
     final [manifestText, inventoryText] = await Future.wait([
       rootBundle.loadString(_mapManifestAsset),
       rootBundle.loadString(_sourceInventoryAsset),
