@@ -8852,6 +8852,27 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
   const adjacencySafeInputPath = path.join(outputDir, "capital-pilot-production-adjacency-safe.json");
   await writeFile(adjacencySafeInputPath, `${JSON.stringify(adjacencySafeInput, null, 2)}\n`);
 
+  const missingSummaryRidePolicyInput = JSON.parse(JSON.stringify(adjacencySafeInput));
+  delete missingSummaryRidePolicyInput.routeGraphTopologyPolicy;
+  const missingSummaryRidePolicyInputPath = path.join(outputDir, "missing-summary-ride-policy.json");
+  await writeFile(missingSummaryRidePolicyInputPath, `${JSON.stringify(missingSummaryRidePolicyInput, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        missingSummaryRidePolicyInputPath,
+        "--output",
+        path.join(outputDir, "missing-summary-ride-policy-fixture.json"),
+      ],
+      { cwd: root },
+    ),
+    /routeGraphTopologyPolicy\.summaryRideEdges must mark non-adjacent EXPRESS RIDE edges as release-blocking-regression-only/,
+  );
+
   await execFileAsync(
     process.execPath,
     [
@@ -10864,6 +10885,15 @@ function productionSourceIngestInput() {
   const input = sourceIngestInput();
   input.pack.artifactKind = "production";
   input.pack.url = "https://datapack.example.com/easysubway/catalog/capital-v1.sqlite.gz";
+  input.routeGraphTopologyPolicy = {
+    summaryRideEdges: "release-blocking-regression-only",
+    productionReadinessRequirement:
+      "replace summary RIDE edges with adjacent-station LOCAL RIDE edges before ETA or release-readiness claim",
+    nonAdjacentExpressRideEdgeIds: [
+      "edge-sangnoksu-sadang-seoul-4",
+      "edge-sadang-sangnoksu-seoul-4",
+    ],
+  };
   input.sourceIds = [
     "molit-urban-rail-full-route",
     "seoulmetro-station-line-info",
