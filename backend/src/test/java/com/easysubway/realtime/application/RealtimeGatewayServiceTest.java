@@ -300,7 +300,7 @@ class RealtimeGatewayServiceTest {
 		MutableClock clock = new MutableClock(Instant.parse("2026-06-26T08:00:00Z"));
 		CountingProvider provider = new CountingProvider();
 		StubMappingPort mappingPort = new StubMappingPort();
-		for (int index = 0; index < 3; index += 1) {
+		for (int index = 0; index < 4; index += 1) {
 			mappingPort.add(mapping(
 				"station-day-%02d".formatted(index),
 				"seoul-4",
@@ -322,9 +322,14 @@ class RealtimeGatewayServiceTest {
 		);
 
 		RealtimeArrivalResult result = null;
-		for (int index = 0; index < 3; index += 1) {
-			clock.instant = Instant.parse("2026-06-26T08:0%d:00Z".formatted(index));
-			provider.providerReceivedAt = "2026-06-26T08:0%d:00Z".formatted(index);
+		List<Instant> sameKstDayInstants = List.of(
+			Instant.parse("2026-06-26T08:00:00Z"),
+			Instant.parse("2026-06-26T08:01:00Z"),
+			Instant.parse("2026-06-26T08:02:00Z")
+		);
+		for (int index = 0; index < sameKstDayInstants.size(); index += 1) {
+			clock.instant = sameKstDayInstants.get(index);
+			provider.providerReceivedAt = clock.instant.toString();
 			result = service.arrivals(new RealtimeQuery(
 				"station-day-%02d".formatted(index),
 				"seoul-4",
@@ -336,7 +341,18 @@ class RealtimeGatewayServiceTest {
 
 		assertThat(result.status()).hasToString("UNAVAILABLE");
 		assertThat(result.fallbackCode()).isEqualTo("PROVIDER_RATE_LIMITED");
-		assertThat(provider.arrivalCalls).hasValue(2);
+		clock.instant = Instant.parse("2026-06-26T15:00:00Z");
+		provider.providerReceivedAt = clock.instant.toString();
+		RealtimeArrivalResult nextKstDay = service.arrivals(new RealtimeQuery(
+			"station-day-03",
+			"seoul-4",
+			"1004",
+			"상록수일일03",
+			null
+		));
+
+		assertThat(nextKstDay.status()).hasToString("FRESH");
+		assertThat(provider.arrivalCalls).hasValue(3);
 	}
 
 	@Test

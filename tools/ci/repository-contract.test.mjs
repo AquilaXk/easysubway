@@ -969,6 +969,7 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
   assert.match(cdWorkflow, /drop_topis_key/);
   assert.match(cdWorkflow, /!\(\$1 in drop\)/);
+  assert.match(datapackReleaseWorkflow, /drop_topis_key/);
   assert.match(datapackReleaseWorkflow, /drop_data_go_key/);
   assert.match(datapackReleaseWorkflow, /!\(\$1 in drop\)/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);

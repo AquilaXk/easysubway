@@ -206,6 +206,7 @@ jobs:
           DATA_GO_KR_SERVICE_KEY_SECRET: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: |
           set -euo pipefail
+          umask 077
           if [[ -z "${EASYSUBWAY_ENV_SECRET}" ]]; then
             echo "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH=disabled" >> "${GITHUB_ENV}"
             exit 0
@@ -231,9 +232,17 @@ jobs:
           mv "${filtered_env_file}" "${env_file}"
           {
             if [[ -n "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" ]]; then
+              if [[ "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" == *$'\n'* || "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" == *$'\r'* ]]; then
+                echo "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY secret must be a single line" >&2
+                exit 1
+              fi
               printf '\nEASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=%s\n' "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}"
             fi
             if [[ -n "${DATA_GO_KR_SERVICE_KEY_SECRET}" ]]; then
+              if [[ "${DATA_GO_KR_SERVICE_KEY_SECRET}" == *$'\n'* || "${DATA_GO_KR_SERVICE_KEY_SECRET}" == *$'\r'* ]]; then
+                echo "DATA_GO_KR_SERVICE_KEY secret must be a single line" >&2
+                exit 1
+              fi
               printf 'DATA_GO_KR_SERVICE_KEY=%s\n' "${DATA_GO_KR_SERVICE_KEY_SECRET}"
             fi
           } >> "${env_file}"
