@@ -6814,6 +6814,48 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
     ),
     /adminReview\.productionSource\.admissionEvidence\.quotaEvidence must match adminReview\.quotaEvidence/,
   );
+
+  const unsanitizedAdminReview = JSON.parse(JSON.stringify(adminReview));
+  unsanitizedAdminReview.quotaEvidence.providerAccountMemo = "local-only quota account detail";
+  await writeFile(adminReviewPath, `${JSON.stringify(unsanitizedAdminReview, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/run-source-admission-pipeline.mjs",
+        "--candidate",
+        "kric-train-operation-organ",
+        "--raw-input",
+        rawPath,
+        "--evidence-dir",
+        outputDir,
+        "--snapshot-id",
+        "kric-train-operation-organ-snapshot-20260702",
+        "--source-id",
+        "kric-train-operation-organ",
+        "--provider",
+        "국가철도공단",
+        "--retrieved-at",
+        "2026-07-02T00:00:00Z",
+        "--source-updated-at",
+        "2026-07-02T00:00:00Z",
+        "--raw-object-uri",
+        "s3://easysubway-datapack-sources/kric-train-operation-organ/20260702.json",
+        "--freshness-expires-at",
+        "2026-08-01T00:00:00Z",
+        "--raw-retention-expires-at",
+        "2026-10-01T00:00:00Z",
+        "--admin-review",
+        adminReviewPath,
+        "--output-inventory",
+        path.join(outputDir, "source-inventory.unsanitized-quota.json"),
+        "--output",
+        path.join(outputDir, "admission-summary-unsanitized-quota.json"),
+      ],
+      { cwd: root },
+    ),
+    /adminReview\.quotaEvidence must only include defaultDailyLimit, portal, productionUseAllowed, unlockStatus/,
+  );
 });
 
 test("source admission pipeline은 custom candidates를 최종 inventory 검증에 전달한다", async () => {

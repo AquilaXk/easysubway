@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+const quotaEvidenceKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
 
 async function main() {
   const startedAt = Date.now();
@@ -220,6 +221,10 @@ function validateAdminReview({ adminReview, candidateId, sample, snapshot, args 
 function validateQuotaEvidence(quotaEvidence, label) {
   if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
     throw new Error(`${label} must be an object`);
+  }
+  const keys = Object.keys(quotaEvidence).sort((left, right) => left.localeCompare(right));
+  if (JSON.stringify(keys) !== JSON.stringify(quotaEvidenceKeys)) {
+    throw new Error(`${label} must only include ${quotaEvidenceKeys.join(", ")}`);
   }
   requiredText(quotaEvidence.portal, `${label}.portal`);
   if (

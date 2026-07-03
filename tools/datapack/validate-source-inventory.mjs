@@ -6,6 +6,7 @@ const inventoryPath = optionValue("--inventory") ?? "tools/datapack/source-inven
 const candidatesPath = optionValue("--candidates") ?? "tools/datapack/source-candidates.json";
 const scopePath = optionValue("--scope");
 const compareStrings = (left, right) => left.localeCompare(right);
+const quotaEvidenceKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
 
 try {
   const inventory = JSON.parse(await readFile(inventoryPath, "utf8"));
@@ -264,6 +265,10 @@ function validateAdmissionEvidence(evidence, candidate, sourceId) {
 function validateQuotaEvidence(quotaEvidence, label) {
   if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
     throw new Error(`${label} must be an object`);
+  }
+  const keys = Object.keys(quotaEvidence).sort(compareStrings);
+  if (JSON.stringify(keys) !== JSON.stringify(quotaEvidenceKeys)) {
+    throw new Error(`${label} must only include ${quotaEvidenceKeys.join(", ")}`);
   }
   assertString(quotaEvidence.portal, `${label}.portal`);
   if (
