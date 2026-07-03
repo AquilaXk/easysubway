@@ -384,14 +384,22 @@ function workflowFiles() {
 function assertActionsEnvSecretPolicy(file, source) {
   const secretAccess = /secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
   const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
-  const allowedExtraSecrets = file === ".github/workflows/release-artifacts.yml"
-    ? new Set([
-        "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
-        "EASYSUBWAY_ANDROID_STORE_PASSWORD",
-        "EASYSUBWAY_ANDROID_KEY_ALIAS",
-        "EASYSUBWAY_ANDROID_KEY_PASSWORD",
-      ])
-    : new Set();
+  const allowedExtraSecretsByFile = {
+    ".github/workflows/cd.yml": new Set([
+      "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+    ]),
+    ".github/workflows/datapack-release.yml": new Set([
+      "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+      "DATA_GO_KR_SERVICE_KEY",
+    ]),
+    ".github/workflows/release-artifacts.yml": new Set([
+      "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
+      "EASYSUBWAY_ANDROID_STORE_PASSWORD",
+      "EASYSUBWAY_ANDROID_KEY_ALIAS",
+      "EASYSUBWAY_ANDROID_KEY_PASSWORD",
+    ]),
+  };
+  const allowedExtraSecrets = allowedExtraSecretsByFile[file] ?? new Set();
 
   for (const match of source.matchAll(secretAccess)) {
     const secretName = match[1] ?? match[2];
@@ -400,7 +408,7 @@ function assertActionsEnvSecretPolicy(file, source) {
       secretName !== "EASYSUBWAY_ENV" &&
       !allowedExtraSecrets.has(secretName)
     ) {
-      assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved Android upload key secrets`);
+      assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved scoped secrets`);
     }
   }
   assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
@@ -935,21 +943,37 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
   assert.doesNotMatch(tfvarsExample, /ocid1\.(?:tenancy|user|compartment)\.oc1\.[a-z0-9]{20,}/);
 });
 
-test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
+test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관리한다", () => {
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
+  const datapackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
 
-  assert.match(readme, /애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나/);
-  assert.match(readme, /애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
+  assert.match(readme, /로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다/);
+  assert.match(readme, /provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
+  assert.match(readme, /provider key overlay를 append/);
+  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
+  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
+  assert.match(readme, /실시간 지하철 한도 1,000\/day 아래/);
+  assert.match(readme, /개발계정 10,000\/day 안에서/);
+  assert.match(readme, /1회 실행당 live fetch 1회/);
   assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
   assert.match(readme, /GitHub `production` environment approval을 기다리지 않습니다/);
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
   assert.match(script, /\.env\.example is a template/);
+  assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
+  assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
+  assert.match(cdWorkflow, /drop_topis_key/);
+  assert.match(cdWorkflow, /!\(\$1 in drop\)/);
+  assert.match(cdWorkflow, /tail -c 1 "\$\{env_file\}"/);
+  assert.match(datapackReleaseWorkflow, /drop_topis_key/);
+  assert.match(datapackReleaseWorkflow, /drop_data_go_key/);
+  assert.match(datapackReleaseWorkflow, /!\(\$1 in drop\)/);
+  assert.match(datapackReleaseWorkflow, /tail -c 1 "\$\{env_file\}"/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
 
   for (const file of workflowFiles()) {
@@ -1020,6 +1044,8 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
+    "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1",
+    "EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800",
     "EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER=legacy-pepper-with-enough-entropy",
     "EASYSUBWAY_REPORT_UPLOAD_BUCKET=easysubway-report-uploads",
     "EASYSUBWAY_REPORT_UPLOAD_MAX_BYTES=921600",
