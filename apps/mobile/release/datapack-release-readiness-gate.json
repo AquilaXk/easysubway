@@ -3,7 +3,8 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "datapack-release-readiness",
-  "issue": 1419,
+  "issue": 1414,
+  "absorbedFromIssue": 1419,
   "status": "IN_PROGRESS",
   "releaseBlockerPolicy": true,
   "currentDecision": "NO_GO",
@@ -51,8 +52,8 @@
     "operationalEvidenceRequiredForAvailableClaim": true
   },
   "childIssueLinks": {
-    "sourceAdmission": [1397, 1416, 1399],
-    "offlineDatapackCompleteness": [1400, 1394, 1415],
+    "sourceAdmission": [1397, 1416, 1621, 1399],
+    "offlineDatapackCompleteness": [1400, 1394, 1415, 1620],
     "artifactVerificationAccuracy": [1393, 1395, 1417, 1418],
     "userClaimUi": [1392, 1396, 1398]
   },
@@ -71,6 +72,7 @@
     "routeAccuracyReport": "artifacts/route-accuracy-report.json",
     "realtimeProviderCoverageReport": "artifacts/realtime-provider-coverage-report.json",
     "routeAccessibilityRegressionReport": "artifacts/route-accessibility-regression-report.json",
+    "routeGraphCoverageReport": "artifacts/route-graph-coverage-report.json",
     "routeV2ContractReport": "artifacts/route-v2-contract-report.json",
     "coverageGapReport": "artifacts/datapack-coverage-gaps.json",
     "qualityMetricReport": "artifacts/datapack-quality-metrics.json",
@@ -82,7 +84,8 @@
     "node tools/datapack/validate-datapack.mjs --require-production ...",
     "node --test tools/datapack/*.test.mjs tools/routes/*.test.mjs",
     "node tools/routes/evaluate-eta-accuracy.mjs ...",
-    "node tools/routes/check-route-commercialization-gate.mjs --gate apps/mobile/release/route-commercialization-gate.json --accuracy artifacts/route-accuracy-report.json --accessibility artifacts/route-accessibility-regression-report.json --coverage artifacts/realtime-provider-coverage-report.json --contract artifacts/route-v2-contract-report.json",
+    "node tools/routes/build-route-graph-coverage-report.mjs --input artifacts/route-graph-coverage-input.json --output artifacts/route-graph-coverage-report.json",
+    "node tools/routes/check-route-commercialization-gate.mjs --gate apps/mobile/release/route-commercialization-gate.json --accuracy artifacts/route-accuracy-report.json --accessibility artifacts/route-accessibility-regression-report.json --coverage artifacts/realtime-provider-coverage-report.json --routeGraphCoverage artifacts/route-graph-coverage-report.json --contract artifacts/route-v2-contract-report.json",
     "node tools/datapack/build-route-graph-topology-report.mjs --manifest ... --root ... --output artifacts/route-graph-topology-report.json",
     "node tools/datapack/report-coverage-gaps.mjs ..."
   ],
