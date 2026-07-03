@@ -64,7 +64,9 @@ UI, 접근성, 수동 QA, 배포 확인이 필요한 항목은 증거 첨부, �
 
 ## 체크리스트
 
+- [ ] PR 본문은 이 템플릿 섹션을 삭제하지 않고 모두 채웠다.
 - [ ] CI 결과를 확인했다.
 - [ ] CodeRabbit 리뷰를 확인했다.
-- [ ] CodeRabbit 실행이 불가능한 경우 Codex CLI code review 결과를 확인했다.
+- [ ] GitHub PR Review 객체가 있는지 확인했다. CodeRabbit status check만으로는 리뷰 완료로 보지 않는다.
+- [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다.
 - [ ] 배포 영향이 있는 경우 CD 상태를 확인했다.

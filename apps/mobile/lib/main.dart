@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
+import 'core/datapack/data_pack_update_state.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
 import 'favorite_facility.dart';
@@ -80,6 +81,9 @@ Future<void> main() async {
         : null,
   );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
+  final dataPackUpdateStateRepository = DataPackUpdateStateRepository(
+    userDatabase: bootstrap.userDatabase,
+  );
   runApp(
     AppBootstrapLifecycle(
       close: bootstrap.close,
@@ -90,6 +94,9 @@ Future<void> main() async {
             const SecureFacilityReportDraftTargetStore(),
         facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
         legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
+        offlineDataExpiresAtLoader: () async =>
+            (await dataPackUpdateStateRepository.readManifestCache())
+                ?.expiresAt,
       ),
     ),
   );
@@ -273,6 +280,7 @@ class EasySubwayApp extends StatelessWidget {
         const SupportAccessInfo.fromEnvironment(),
     SupportAccessLauncher supportAccessLauncher =
         const UrlLauncherSupportAccessLauncher(),
+    OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
@@ -307,6 +315,7 @@ class EasySubwayApp extends StatelessWidget {
            isReleaseMode: kReleaseMode,
          ),
          supportAccessLauncher: supportAccessLauncher,
+         offlineDataExpiresAtLoader: offlineDataExpiresAtLoader,
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
@@ -324,6 +333,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
+    required this.offlineDataExpiresAtLoader,
     required this.recentRoutesFuture,
     super.key,
   }) : repository = dependencies.repository,
@@ -367,6 +377,7 @@ class EasySubwayApp extends StatelessWidget {
   final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -447,11 +458,14 @@ class EasySubwayApp extends StatelessWidget {
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
+        offlineDataExpiresAtLoader: offlineDataExpiresAtLoader,
         recentRoutesFuture: recentRoutesFuture,
       ),
     );
   }
 }
+
+typedef OfflineDataExpiresAtLoader = Future<DateTime?> Function();
 
 class EasySubwayScrollBehavior extends MaterialScrollBehavior {
   const EasySubwayScrollBehavior();
@@ -567,6 +581,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
+    required this.offlineDataExpiresAtLoader,
     required this.recentRoutesFuture,
   });
 
@@ -593,6 +608,7 @@ class _EasySubwayHome extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -714,6 +730,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         supportAccessLauncher: widget.supportAccessLauncher,
         userDataDeletionRepository: widget.userDataDeletionRepository,
         recentRoutesFuture: widget.recentRoutesFuture,
+        offlineDataExpiresAtLoader: widget.offlineDataExpiresAtLoader,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
         onViewPreferencesChanged: _saveViewPreferences,
@@ -1219,6 +1236,7 @@ class HomeScreen extends StatefulWidget {
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
+    this.offlineDataExpiresAtLoader,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
@@ -1248,6 +1266,7 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(OnboardingViewPreferences preferences)
   onViewPreferencesChanged;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final String initialMobilityType;
   final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
@@ -1580,6 +1599,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onOpenMobilityProfile: _openMobilityProfile,
           onOpenSupportAccess: openSupportAccess,
           onOpenMyReports: openMyReports,
+          offlineDataExpiresAtLoader: widget.offlineDataExpiresAtLoader,
         ),
       );
     }
@@ -2586,6 +2606,7 @@ class AppSettingsScreen extends StatefulWidget {
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
     required this.onOpenMyReports,
+    this.offlineDataExpiresAtLoader,
     this.bottomNavigationBar,
     super.key,
   });
@@ -2599,6 +2620,7 @@ class AppSettingsScreen extends StatefulWidget {
   final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenMyReports;
+  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Widget? bottomNavigationBar;
 
   @override
@@ -2697,7 +2719,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => const OfflineDataScreen(),
+                          builder: (_) => OfflineDataScreen(
+                            expiresAtLoader: widget.offlineDataExpiresAtLoader,
+                          ),
                         ),
                       );
                     },
@@ -3491,21 +3515,45 @@ class _FavoriteListScreen extends StatelessWidget {
 }
 
 class OfflineDataScreen extends StatelessWidget {
-  const OfflineDataScreen({super.key});
+  const OfflineDataScreen({
+    super.key,
+    this.expiresAt,
+    this.expiresAtLoader,
+    this.now,
+  });
 
-  // ponytail: static v1 QA source; wire live catalog metadata when offline status is dynamic.
+  // ponytail: v1 stale badge only needs manifest expiry; add source freshness when surfaced here.
   static const _offlineDataSourceOfTruth = 'installed catalog metadata';
+
+  final DateTime? expiresAt;
+  final OfflineDataExpiresAtLoader? expiresAtLoader;
+  final DateTime Function()? now;
 
   @override
   Widget build(BuildContext context) {
     assert(_offlineDataSourceOfTruth == 'installed catalog metadata');
+    final loader = expiresAtLoader;
+    if (loader != null && expiresAt == null) {
+      return FutureBuilder<DateTime?>(
+        future: loader(),
+        builder: (context, snapshot) => _buildScaffold(context, snapshot.data),
+      );
+    }
+    return _buildScaffold(context, expiresAt);
+  }
+
+  Widget _buildScaffold(BuildContext context, DateTime? effectiveExpiresAt) {
+    final storedDataStatus = _storedDataStatus(
+      expiresAt: effectiveExpiresAt,
+      now: now,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text('인터넷 없이 이용')),
       body: SafeArea(
         child: ListView(
           padding: _mainPagePadding,
-          children: const [
-            _AppCard(
+          children: [
+            const _AppCard(
               showBorder: true,
               child: _AppInfoRow(
                 icon: Icons.check_circle_outline,
@@ -3514,11 +3562,11 @@ class OfflineDataScreen extends StatelessWidget {
                 subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
               ),
             ),
-            _AppSectionTitle(title: '저장된 안내 상태'),
+            const _AppSectionTitle(title: '저장된 안내 상태'),
             _AppCard(
               child: Column(
                 children: [
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.public,
                     iconColor: EasySubwayAccessibleColors.mintDark,
                     title: '검증 구간',
@@ -3529,24 +3577,24 @@ class OfflineDataScreen extends StatelessWidget {
                     icon: Icons.update,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '마지막 갱신',
-                    subtitle: '앱 설치 때 함께 받은 안내',
-                    trailing: '저장됨',
+                    subtitle: storedDataStatus.subtitle,
+                    trailing: storedDataStatus.trailing,
                   ),
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.manage_search_outlined,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '저장 정보 다시 확인',
                     subtitle: '저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요',
                     trailing: '확인',
                   ),
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.verified_outlined,
                     iconColor: EasySubwayAccessibleColors.brand,
                     title: '안내 범위',
                     subtitle: ProductionScopeCopy.supportedClaimKo,
                     trailing: '일부',
                   ),
-                  _AppInfoRow(
+                  const _AppInfoRow(
                     icon: Icons.info_outline,
                     iconColor: EasySubwayAccessibleColors.amber,
                     title: '제한 사항',
@@ -3556,8 +3604,8 @@ class OfflineDataScreen extends StatelessWidget {
                 ],
               ),
             ),
-            _AppSectionTitle(title: '이용 가능'),
-            _AppCard(
+            const _AppSectionTitle(title: '이용 가능'),
+            const _AppCard(
               child: Column(
                 children: [
                   _AppInfoRow(
@@ -3584,8 +3632,8 @@ class OfflineDataScreen extends StatelessWidget {
                 ],
               ),
             ),
-            _AppSectionTitle(title: '인터넷 연결 필요'),
-            _AppCard(
+            const _AppSectionTitle(title: '인터넷 연결 필요'),
+            const _AppCard(
               child: Column(
                 children: [
                   _AppInfoRow(
@@ -3610,6 +3658,18 @@ class OfflineDataScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+({String subtitle, String trailing}) _storedDataStatus({
+  DateTime? expiresAt,
+  DateTime Function()? now,
+}) {
+  final expiry = expiresAt;
+  final current = (now ?? DateTime.now)().toUtc();
+  if (expiry != null && !current.isBefore(expiry.toUtc())) {
+    return (subtitle: '저장된 데이터 기준 · 갱신 필요', trailing: '갱신 필요');
+  }
+  return (subtitle: '앱 설치 때 함께 받은 안내', trailing: '저장됨');
 }
 
 class SupportAccessScreen extends StatelessWidget {
@@ -4818,7 +4878,17 @@ class _PrivacyDataUseLine extends StatelessWidget {
 }
 
 class DataSourceAttributionScreen extends StatefulWidget {
-  const DataSourceAttributionScreen({super.key});
+  const DataSourceAttributionScreen({
+    super.key,
+    this.initialManifest,
+    this.initialInventory,
+  }) : assert(
+         (initialManifest == null) == (initialInventory == null),
+         'initialManifest and initialInventory must be provided together.',
+       );
+
+  final Map<String, Object?>? initialManifest;
+  final Map<String, Object?>? initialInventory;
 
   @override
   State<DataSourceAttributionScreen> createState() =>
@@ -4838,6 +4908,11 @@ class _DataSourceAttributionScreenState
 
   Future<({Map<String, Object?> manifest, Map<String, Object?> inventory})>
   _load() async {
+    final initialManifest = widget.initialManifest;
+    final initialInventory = widget.initialInventory;
+    if (initialManifest != null && initialInventory != null) {
+      return (manifest: initialManifest, inventory: initialInventory);
+    }
     final [manifestText, inventoryText] = await Future.wait([
       rootBundle.loadString(_mapManifestAsset),
       rootBundle.loadString(_sourceInventoryAsset),
@@ -4898,8 +4973,36 @@ class _DataSourceAttributionScreenState
                         subtitle: ProductionScopeCopy.supportedClaimKo,
                       ),
                     ),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.fact_check_outlined,
+                        iconColor: EasySubwayAccessibleColors.amber,
+                        title: '현재 앱 표시',
+                        subtitle:
+                            '상록수·사당 pilot만 확인해요. 현장 또는 운영기관 확인 전에는 전국 쉬운 길이나 실시간 도착을 보장한다고 말하지 않아요.',
+                      ),
+                    ),
                     const _AppSectionTitle(title: '지도 표시용 asset'),
                     for (final map in maps) _AttributionCard.map(map, manifest),
+                    const _AppSectionTitle(title: '데이터 품질 Level'),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.verified_outlined,
+                        iconColor: EasySubwayAccessibleColors.mintDark,
+                        title: 'Level 1-4 품질 기준',
+                        subtitle:
+                            'Level 1은 역·노선 수, Level 2는 필수 시설 근거, Level 3은 운행상태와 최신 여부, Level 4는 현장 또는 운영기관이 확인한 쉬운 길을 봐요.',
+                      ),
+                    ),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.analytics_outlined,
+                        iconColor: EasySubwayAccessibleColors.amber,
+                        title: '품질 지표',
+                        subtitle:
+                            '필수 시설 근거 비율, 운행상태 확인 비율, 최신 정보 비율, 검증된 쉬운 길 비율, 현장 확인 경로 비율을 함께 확인해요.',
+                      ),
+                    ),
                     const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
                     for (final source in sources)
                       _AttributionCard.source(source),
