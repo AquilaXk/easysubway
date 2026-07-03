@@ -276,7 +276,7 @@ class FavoriteFacility {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '상태를 확인하고 있어요',
+      'UNKNOWN' => '설치 확인 · 운행상태 미확인',
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',

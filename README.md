@@ -11,6 +11,21 @@
 - 지역별 데이터 품질은 Level 1-4로 구분하고, 신뢰도와 마지막 갱신일을 숨기지 않습니다.
 - 초기 현장 검증 지역은 상록수역입니다.
 
+## Data Quality Levels
+
+- Level 1: 역·노선 기본 식별 정보와 출처가 있고, `stationCount`/`edgeCount`로 분모를 공개합니다.
+- Level 2: 역-노선 × 필수 시설 유형 근거가 채워지며, `requiredFacilityEvidenceCoverageRatio`로 측정합니다.
+- Level 3: 운행상태와 freshness가 확인된 시설만 경로 근거로 쓰며, `operationalKnownRatio`와 `freshnessValidRatio`로 측정합니다.
+- Level 4: 현장 또는 운영기관 검증 pathway만 교통약자 경로 claim에 쓰며, `strictRouteEligibleFacilityRatio`와 `fieldVerifiedPathwayRatio`로 측정합니다.
+- `unknownEdgeRatioByProfile`은 휠체어·유모차·저이동성 profile에서 UNKNOWN edge가 strict 경로를 만들지 않는지 확인하는 보조 차단 지표입니다.
+
+## Production Routing Graph
+
+- Production LOCAL `RIDE` edge는 같은 노선의 인접 `lineSequence`만 연결합니다. 비인접 요약 edge는 regression fixture 또는 공식 정차 패턴이 있는 `EXPRESS` 근거로만 둡니다.
+- 기본 route node는 station-line(`stationId:lineId`)입니다. platform node는 공식 platform/source가 admission되기 전까지 만들지 않고, 방향 문구는 `platformInfo`에만 둡니다.
+- 표시용 SVG asset은 앱 지도 표시용입니다. canonical route map position은 `routeMapPositions`의 source, license, `sourceSha256`, `reviewedAt`, `updatedAt`, label polygon으로만 판정합니다.
+- 앱의 `데이터 및 지도 출처` 화면은 source inventory와 manifest를 보여주는 사용자 연결점입니다. Level 4 또는 전국 claim은 #1397 source admission과 #1400 인접역 graph/position 확장 증거가 닫힐 때까지 NO-GO입니다.
+
 ## Stack
 
 - Mobile: Flutter, Dart, Riverpod, go_router, Dio, Drift
@@ -23,13 +38,15 @@
 
 `.env.example`은 로컬 실행과 배포에 필요한 dotenv 양식입니다. 실제 값은 git에 올리지 않는 로컬 `.env`에만 둡니다.
 
-GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다.
+GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 단, provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다.
 
 ```bash
 scripts/github/sync-actions-env-secret.sh .env
 ```
 
-워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
+워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 provider key overlay를 append하고, 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
+
+Provider 호출 안전 범위는 공식 한도보다 낮게 둡니다. TOPIS backend 실시간 호출은 서울 Open API 실시간 지하철 한도 1,000/day 아래로 `EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1`, `EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800`까지 clamp합니다. TAGO/Data.go.kr admission은 개발계정 10,000/day 안에서 자동 반복 수집 없이 `run-source-admission-pipeline.mjs` 1회 실행당 live fetch 1회만 수행합니다.
 
 Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다. GitHub Actions 알림은 `.env.example`에 빈 양식으로 남긴 `SLACK_CI_WEBHOOK_URL`, `SLACK_RELEASE_WEBHOOK_URL`, `SLACK_SECURITY_WEBHOOK_URL`을 채널별 incoming webhook repository secret으로 등록해 사용합니다. Slack 알림은 별도 `workflow_run` workflow가 아니라 원본 workflow 내부 notify job에서 전송합니다. CI와 SonarCloud는 `main` push 실패, 취소 결과만 보내고, CD/Data Pack Release/Release Artifacts/Store Distribution Evidence는 release 채널로 성공, 실패, 취소 결과를 보냅니다.
 
