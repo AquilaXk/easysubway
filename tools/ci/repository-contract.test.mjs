@@ -31,11 +31,15 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-function sourceInventorySha256WithoutAdmissionEvidence(inventory) {
+function sourceInventorySha256ForAdmissionEvidence(inventory, { sourceId, omitSourceIds = [] }) {
   const snapshot = JSON.parse(JSON.stringify(inventory));
-  for (const source of snapshot.sources) {
-    delete source.admissionEvidence;
+  const omitted = new Set(omitSourceIds);
+  snapshot.sources = snapshot.sources.filter((source) => !omitted.has(source.id));
+  const source = snapshot.sources.find((entry) => entry.id === sourceId);
+  if (!source) {
+    throw new Error(`source missing from inventory snapshot: ${sourceId}`);
   }
+  delete source.admissionEvidence;
   return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
 }
 
@@ -4530,6 +4534,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "demand_reference",
     ],
   );
+  assert.deepEqual(targets.knownSourceDomains, ["realtime_train_positions"]);
   assert.ok(targets.regions.some((region) => region.id === "capital"));
   assert.ok(targets.regions.some((region) => region.id !== "capital"));
   const capitalTarget = targets.regions.find((region) => region.id === "capital");
@@ -5631,7 +5636,6 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
 test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분리를 고정한다", () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
-  const expectedInventorySha256 = sourceInventorySha256WithoutAdmissionEvidence(inventory);
   const topisCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("seoul-topis-realtime-"));
 
   assert.deepEqual(
@@ -5694,6 +5698,10 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
 
     const productionSource = inventory.sources.find(({ id }) => id === candidate.productionInventoryReferenceId);
     assert.ok(productionSource, `${candidate.productionInventoryReferenceId} must exist in source inventory`);
+    assert.deepEqual(
+      productionSource.coverageScope.sourceDomains,
+      candidate.id === "seoul-topis-realtime-train-position" ? ["realtime_train_positions"] : ["realtime_arrivals"],
+    );
     for (const field of candidate.evidence.outputFields) {
       assert.ok(
         productionSource.fieldsProvided.includes(field),
@@ -5710,7 +5718,15 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.equal(productionSource.admissionEvidence.sampleEvidenceHash, candidate.evidence.liveSampleEvidenceHash);
     assert.equal(productionSource.admissionEvidence.quotaEvidence.defaultDailyLimit, 1000);
     assert.equal(productionSource.admissionEvidence.quotaEvidence.productionUseAllowed, false);
-    assert.equal(productionSource.admissionEvidence.sourceInventorySha256, expectedInventorySha256);
+    assert.equal(
+      productionSource.admissionEvidence.sourceInventorySha256,
+      sourceInventorySha256ForAdmissionEvidence(inventory, {
+        sourceId: productionSource.id,
+        omitSourceIds: candidate.id === "seoul-topis-realtime-station-arrival"
+          ? ["seoul-topis-realtime-train-position"]
+          : [],
+      }),
+    );
   }
 });
 
@@ -5773,7 +5789,7 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.match(inventorySource.admissionEvidence.sourceInventorySha256, /^[0-9a-f]{64}$/);
   assert.equal(
     inventorySource.admissionEvidence.sourceInventorySha256,
-    sourceInventorySha256WithoutAdmissionEvidence(inventory),
+    "85a88db7f1c9f389adda7a8c1b9bc7c682ec1fe3762a4cb647ce332d52a916f1",
   );
 
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
