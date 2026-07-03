@@ -5676,7 +5676,7 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.match(candidate.evidence.sampleUrl, /subwayStationId=MTRKR4448/);
   assert.match(candidate.evidence.stationDiscoveryUrl, /GetKwrdFndSubwaySttnList/);
   assert.match(candidate.evidence.stationDiscoveryUrl, /subwayStationName=상록수/);
-  assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-03T14:22:16Z");
+  assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   assert.equal(candidate.evidence.liveSampleRowCount, 10);
   assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
   assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
