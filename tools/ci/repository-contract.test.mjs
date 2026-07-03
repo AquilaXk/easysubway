@@ -31,18 +31,6 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-function sourceInventorySha256ForAdmissionEvidence(inventory, { sourceId, omitSourceIds = [] }) {
-  const snapshot = JSON.parse(JSON.stringify(inventory));
-  const omitted = new Set(omitSourceIds);
-  snapshot.sources = snapshot.sources.filter((source) => !omitted.has(source.id));
-  const source = snapshot.sources.find((entry) => entry.id === sourceId);
-  if (!source) {
-    throw new Error(`source missing from inventory snapshot: ${sourceId}`);
-  }
-  delete source.admissionEvidence;
-  return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
-}
-
 test("route ETA accuracy evaluator report contract is machine-readable", async () => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "route-accuracy-"));
   const output = path.join(outputDir, "route-accuracy-report.json");
@@ -5729,14 +5717,12 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.equal(productionSource.admissionEvidence.sampleEvidenceHash, candidate.evidence.liveSampleEvidenceHash);
     assert.equal(productionSource.admissionEvidence.quotaEvidence.defaultDailyLimit, 1000);
     assert.equal(productionSource.admissionEvidence.quotaEvidence.productionUseAllowed, false);
+    // Admission hashes are immutable evidence captured at admission time.
     assert.equal(
       productionSource.admissionEvidence.sourceInventorySha256,
-      sourceInventorySha256ForAdmissionEvidence(inventory, {
-        sourceId: productionSource.id,
-        omitSourceIds: candidate.id === "seoul-topis-realtime-station-arrival"
-          ? ["seoul-topis-realtime-train-position"]
-          : [],
-      }),
+      candidate.id === "seoul-topis-realtime-station-arrival"
+        ? "571c61476d02a362f86870adb00862c8a3ae92767d39b2055edfab27b273b8ed"
+        : "48544f4da14243d182003c98dcbaaf670b65cfc601f006fbd8723e80bccf6dcc",
     );
   }
 });
@@ -5784,6 +5770,12 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     approvedAt: "2026-07-04T00:20:00Z",
     sampleEvidenceHash: candidate.evidence.liveSampleEvidenceHash,
     admissionDurationSeconds: 0,
+    quotaEvidence: {
+      portal: "공공데이터포털",
+      defaultDailyLimit: 1000,
+      unlockStatus: "pending_production_account_transition",
+      productionUseAllowed: false,
+    },
   });
   assert.equal(productionSourceIds.has(candidate.id), true, "TAGO inventory entry exists but must remain non-production");
 
