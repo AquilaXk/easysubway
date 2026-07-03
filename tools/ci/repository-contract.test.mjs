@@ -5665,7 +5665,7 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(candidate.priority, "P0");
   assert.equal(candidate.domain, "schedule_timetable");
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
@@ -5673,7 +5673,14 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(candidate.requestUrl, "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList");
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
-  assert.match(candidate.evidence.sampleUrl, /subwayStationId=448/);
+  assert.match(candidate.evidence.sampleUrl, /subwayStationId=MTRKR4448/);
+  assert.match(candidate.evidence.stationDiscoveryUrl, /GetKwrdFndSubwaySttnList/);
+  assert.match(candidate.evidence.stationDiscoveryUrl, /subwayStationName=상록수/);
+  assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-03T14:22:16Z");
+  assert.equal(candidate.evidence.liveSampleRowCount, 10);
+  assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
   assert.equal(productionSourceIds.has(candidate.id), true, "TAGO inventory entry exists but must remain non-production");
 
   const inventorySource = inventory.sources.find(({ id }) => id === "molit-tago-subway-info");
@@ -5684,8 +5691,8 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
 
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
   assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
-  assert.equal(candidate.capabilities.schedule.coverageStatus, "SAMPLE_EVIDENCE_REQUIRED");
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse", "scheduleImporterValidation"]);
+  assert.equal(candidate.capabilities.schedule.coverageStatus, "IMPORTER_VALIDATION_REQUIRED");
+  assert.deepEqual(candidate.evidence.missingEvidence, ["scheduleImporterValidation"]);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
   assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
