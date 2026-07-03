@@ -213,6 +213,28 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.match(readme, /오프라인 데이터팩과 온라인 실시간 overlay를 분리/);
 });
 
+test("README maps data quality levels to production datapack metrics", () => {
+  const readme = read("README.md");
+
+  for (const text of [
+    "## Data Quality Levels",
+    "Level 1",
+    "Level 2",
+    "Level 3",
+    "Level 4",
+    "stationCount",
+    "edgeCount",
+    "requiredFacilityEvidenceCoverageRatio",
+    "operationalKnownRatio",
+    "freshnessValidRatio",
+    "strictRouteEligibleFacilityRatio",
+    "fieldVerifiedPathwayRatio",
+    "unknownEdgeRatioByProfile",
+  ]) {
+    assert.match(readme, new RegExp(text));
+  }
+});
+
 test("route release readiness tracker keeps issue 1414 as a release blocker", () => {
   const trackerPath = "apps/mobile/release/route-release-readiness-tracker.json";
   assert.equal(existsSync(path.join(root, trackerPath)), true, "route release readiness tracker must exist");
