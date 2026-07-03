@@ -3871,19 +3871,6 @@ void main() {
   testWidgets('데이터 및 지도 출처 화면은 manifest와 source inventory를 보여준다', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: DataSourceAttributionScreen()),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump();
-
-    expect(
-      find.byKey(const Key('dataSourceAttributionScreen')),
-      findsOneWidget,
-    );
-    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
-
     final manifest =
         jsonDecode(
               File(
@@ -3896,6 +3883,35 @@ void main() {
               File('assets/datapacks/source-inventory.json').readAsStringSync(),
             )
             as Map<String, Object?>;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DataSourceAttributionScreen(
+          initialManifest: manifest,
+          initialInventory: inventory,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('dataSourceAttributionScreen')),
+      findsOneWidget,
+    );
+    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
+    expect(find.byType(Scrollable), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('데이터 품질 Level'), 160);
+    await tester.pumpAndSettle();
+    expect(find.text('데이터 품질 Level'), findsOneWidget);
+    expect(find.text('Level 1-4 품질 기준'), findsOneWidget);
+    expect(
+      find.textContaining('Level 4는 현장 또는 운영기관이 확인한 쉬운 길'),
+      findsOneWidget,
+    );
+    expect(find.text('품질 지표'), findsOneWidget);
+    expect(find.textContaining('필수 시설 근거 비율'), findsOneWidget);
+    expect(find.textContaining('현장 확인 경로 비율'), findsOneWidget);
+
     final maps = (manifest['maps'] as List).cast<Map<String, Object?>>();
     final sources = (inventory['sources'] as List).cast<Map<String, Object?>>();
 
