@@ -37,9 +37,8 @@ function parseArgs(argv) {
 }
 
 function validateTagoScheduleSample(rawText) {
-  const canonicalRawText = rawText.trimEnd();
-  const payload = JSON.parse(canonicalRawText);
-  rejectCredentialLeak(canonicalRawText, payload);
+  const payload = JSON.parse(rawText);
+  rejectCredentialLeak(rawText, payload);
   if (payload.response?.header && payload.response.header.resultCode !== "00") {
     throw new Error(`TAGO response is not normal service: ${payload.response?.header?.resultCode ?? "missing"}`);
   }
@@ -90,7 +89,7 @@ function validateTagoScheduleSample(rawText) {
     endpoint: "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList",
     rowCount: rows.length,
     providerRecordHashes,
-    rawSha256: sha256(canonicalRawText),
+    rawSha256: sha256(rawText),
     departures,
     stationLevelOnly: true,
     productionUseAllowed: false,

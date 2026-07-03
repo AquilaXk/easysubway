@@ -7952,7 +7952,7 @@ test("공식 source ingest adapter는 admission 전 schedule provenance도 produ
 
 test("TAGO 시간표 sample validator는 station-level row shape만 검증하고 production 승격은 막는다", async () => {
   const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-sample-${Date.now()}.json`);
-  await writeFile(samplePath, JSON.stringify({
+  const rawSample = `${JSON.stringify({
     response: {
       body: {
         items: {
@@ -7983,7 +7983,8 @@ test("TAGO 시간표 sample validator는 station-level row shape만 검증하고
         },
       },
     },
-  }));
+  })}\n`;
+  await writeFile(samplePath, rawSample);
 
   const { stdout } = await execFileAsync(
     process.execPath,
@@ -7995,6 +7996,7 @@ test("TAGO 시간표 sample validator는 station-level row shape만 검증하고
   assert.equal(report.rowCount, 2);
   assert.equal(report.stationLevelOnly, true);
   assert.equal(report.productionUseAllowed, false);
+  assert.equal(report.rawSha256, sha256(rawSample));
   assert.equal(report.remainingAdmissionBlocker, "line_wide_trip_stop_sequence_validation_required");
   assert.deepEqual(
     report.departures.map((departure) => departure.departureSeconds),
