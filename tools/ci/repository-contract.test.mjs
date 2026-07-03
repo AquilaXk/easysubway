@@ -3938,7 +3938,9 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   ]) {
     assert.ok(releaseEvidenceBundleSchema.required.includes(field), `${field} must be required`);
   }
-  assert.ok(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"));
+  assert.equal(releaseEvidenceBundleSchema.properties.headwayReportStatus.$ref, "#/$defs/headwayGateStatus");
+  assert.equal(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"), false);
+  assert.equal(releaseEvidenceBundleSchema.$defs.headwayGateStatus.enum.includes("DEFERRED"), true);
 });
 
 test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 credential preflight를 사용한다", () => {

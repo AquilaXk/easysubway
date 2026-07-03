@@ -67,7 +67,7 @@
     "coverageStatus": { "$ref": "#/$defs/gateStatus" },
     "routeMapPositionCoverageStatus": { "$ref": "#/$defs/gateStatus" },
     "routeGraphTopologyStatus": { "$ref": "#/$defs/gateStatus" },
-    "headwayReportStatus": { "$ref": "#/$defs/gateStatus" },
+    "headwayReportStatus": { "$ref": "#/$defs/headwayGateStatus" },
     "strictRouteRegressionStatus": { "$ref": "#/$defs/gateStatus" },
     "manifestSignatureStatus": { "$ref": "#/$defs/gateStatus" },
     "androidEvidenceStatus": { "$ref": "#/$defs/gateStatus" },
@@ -80,6 +80,9 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "gateStatus": {
+      "enum": ["PASS", "FAIL", "BLOCKED_EXTERNAL"]
+    },
+    "headwayGateStatus": {
       "enum": ["PASS", "FAIL", "BLOCKED_EXTERNAL", "DEFERRED"]
     }
   }

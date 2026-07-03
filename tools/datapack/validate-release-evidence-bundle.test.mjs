@@ -77,4 +77,14 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
     { cwd: root },
   );
+
+  bundle.headwayReportStatus = "PASS";
+  bundle.validatorStatus = "DEFERRED";
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath], {
+      cwd: root,
+    }),
+    /validatorStatus must be a release gate status/,
+  );
 });
