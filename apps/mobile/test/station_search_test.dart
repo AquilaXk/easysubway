@@ -1488,6 +1488,7 @@ void main() {
     expect(customerCenter.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(customerCenter.semanticLabel, isNot(contains('현장 검증')));
     expect(customerCenter.semanticLabel, isNot(contains('출처')));
+    expect(_stationFacility(status: 'UNKNOWN').statusLabel, '설치 확인 · 운행상태 미확인');
     expect(uncheckedDescription.locationLabel, '이동 보조 시설');
     expect(uncheckedDescription.semanticLabel, isNot(contains('현장 검증')));
     expect(metadataOnlyDescription.locationLabel, 'B1-1F');
