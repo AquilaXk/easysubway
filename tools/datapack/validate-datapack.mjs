@@ -1358,10 +1358,9 @@ function validateProductionFacilityEvidenceConfidence(confidence, pack, tableNam
 }
 
 function validateProductionFacilityPositiveStatus(row, statusMeaning, pack) {
-  const positiveStatus = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(
-    String(row.status ?? "").toUpperCase(),
-  ) || ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(
-    String(row.operational_status ?? "").toUpperCase(),
+  const positiveFacilityStatuses = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"];
+  const positiveStatus = [row.status, row.operational_status].some((status) =>
+    positiveFacilityStatuses.includes(String(status ?? "").toUpperCase()),
   );
   if (positiveStatus && !["REALTIME_OPERATION", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(statusMeaning)) {
     throw new Error(`${pack.id}@${pack.version} facilities positive status requires verified operation evidence: ${row.id}`);
