@@ -656,24 +656,38 @@
       "detailUrl": "https://www.data.go.kr/data/15098554/openapi.do",
       "requestUrl": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList",
       "licenseEvidenceStatus": "confirmed_attribution",
-      "sampleEvidenceStatus": "sample_url_documented_key_required",
+      "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "evidence_recorded_admin_review_required",
       "productionInventoryReferenceId": "molit-tago-subway-info",
-      "productionInventoryRelationship": "same_dataset_inventory_entry_remains_schedule_candidate_until_sample_and_importer_validation",
+      "productionInventoryRelationship": "same_dataset_inventory_entry_remains_schedule_candidate_until_importer_validation",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15098554/openapi.do",
         "retrievedAt": "2026-06-22",
         "endpoint": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList",
-        "sampleUrl": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList?serviceKey=[서비스키값]&pageNo=1&numOfRows=10&_type=json&subwayStationId=448&dailyTypeCode=01&upDownTypeCode=U",
+        "sampleUrl": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList?serviceKey=[서비스키값]&pageNo=1&numOfRows=10&_type=json&subwayStationId=MTRKR4448&dailyTypeCode=01&upDownTypeCode=U",
+        "stationDiscoveryUrl": "https://apis.data.go.kr/1613000/SubwayInfo/GetKwrdFndSubwaySttnList?serviceKey=[서비스키값]&pageNo=1&numOfRows=10&_type=json&subwayStationName=상록수",
+        "liveSampleRetrievedAt": "2026-07-03T14:22:16Z",
+        "liveSampleRowCount": 10,
+        "liveSampleRawSha256": "34af0c0e6750012070282b0b59f0226075bfbc8ee533f0bd934c78b130d297d4",
+        "liveSampleSchemaFingerprint": "6e5d572290d2d5a8ea2d243a615b6f310417995944c140353a5606228016bd48",
+        "liveSampleEvidenceHash": "d5a60bcc1907d346a24fbf720a5d362268720e8fab68e35c42eace270e5fe9ae",
+        "scheduleImporterValidation": {
+          "status": "validated_station_timetable_projection",
+          "tool": "tools/datapack/validate-tago-schedule-sample.mjs",
+          "validatedAt": "2026-07-03",
+          "validatedRawSha256": "34af0c0e6750012070282b0b59f0226075bfbc8ee533f0bd934c78b130d297d4",
+          "productionCanonicalStopTimesStatus": "blocked_requires_trip_stop_sequence",
+          "plannedEtaUseAllowed": false
+        },
         "usePermissionRange": "공공데이터포털 이용허락범위 제한 없음",
         "formats": [
           "XML",
           "JSON"
         ],
         "coverageLimitations": [
-          "시간표 import adapter와 provider sample validation 전까지 production PLANNED ETA 근거로 쓰지 않음",
+          "provider station timetable sample projection은 검증했지만 trip id와 전체 stop sequence가 없어 production PLANNED ETA 근거로 쓰지 않음",
           "route graph RIDE edge duration과 stop_times 정합 검증 필요"
         ],
         "outputFields": [
@@ -688,18 +702,18 @@
           "endSubwayStationId"
         ],
         "missingEvidence": [
-          "sampleResponse",
-          "scheduleImporterValidation"
+          "tripStopSequenceSource",
+          "adminReview"
         ]
       },
-      "nextAction": "capture sanitized TAGO live sample and validate schedule importer before production timetable admission",
+      "nextAction": "identify provider trip/stop-sequence source and complete admin review before production timetable admission",
       "capabilities": {
         "schedule": {
           "status": "CANDIDATE",
           "productionUseAllowed": false,
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "TRIP_STOP_SEQUENCE_REQUIRED",
           "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "commercial schedule import remains blocked until production schedule importer and provider sample validation are complete"
+          "unsupportedNotes": "commercial schedule import remains blocked until trip id/stop sequence source and admin review are complete"
         },
         "realtime": {
           "status": "UNSUPPORTED",
@@ -727,7 +741,7 @@
       "detailUrl": "https://data.seoul.go.kr/dataList/OA-12764/F/1/datasetView.do",
       "requestUrl": "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
       "licenseEvidenceStatus": "confirmed_attribution",
-      "sampleEvidenceStatus": "sample_url_documented_key_required",
+      "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "evidence_recorded_admin_review_required",
       "productionInventoryReferenceId": "seoul-realtime-arrival-station-info",
       "productionInventoryRelationship": "same_dataset_station_reference_is_production_live_provider_contract_remains_candidate",
@@ -763,10 +777,16 @@
           "updnLine"
         ],
         "missingEvidence": [
-          "sampleResponse"
-        ]
+          "providerTermsOrQuotaApproval",
+          "adminReview"
+        ],
+        "liveSampleRetrievedAt": "2026-07-03T15:37:21Z",
+        "liveSampleRowCount": 5,
+        "liveSampleRawSha256": "d07597c4936e4a5af61f465abf25851a6e4881c09781b034bed2696d4fd396a8",
+        "liveSampleSchemaFingerprint": "868d78c39e620f62a464cd547760de538e71cb7e863bf962cd14a25b30b3ff47",
+        "liveSampleEvidenceHash": "86c6fede4ddef9e5038142ef1ae1ceb700fe15d1f2d2eca2aa6e57bc6a27862b"
       },
-      "nextAction": "capture sanitized live sample with backend-only Seoul API key and confirm quota before production provider adapter",
+      "nextAction": "complete TOPIS provider terms/quota approval and admin review before production realtime ETA admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -780,9 +800,9 @@
           "productionUseAllowed": false,
           "liveEtaEligible": false,
           "rateLimitStatus": "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA",
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "PROVIDER_TERMS_OR_QUOTA_REQUIRED",
           "updateFrequency": "provider realtime API; production quota not admitted",
-          "unsupportedNotes": "backend-only service key, provider terms, rate limits, and live sample evidence must be approved before live ETA"
+          "unsupportedNotes": "live sample evidence is validated, but backend-only key terms, provider quota, and admin review are still required before live ETA"
         },
         "facility": {
           "status": "UNSUPPORTED",
@@ -801,7 +821,7 @@
       "detailUrl": "https://data.seoul.go.kr/dataList/OA-12601/A/1/datasetView.do",
       "requestUrl": "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimePosition",
       "licenseEvidenceStatus": "confirmed_attribution",
-      "sampleEvidenceStatus": "sample_url_documented_key_required",
+      "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "evidence_recorded_admin_review_required",
       "serviceKeyHandling": "backend_secret_only",
       "mobileEmbeddingAllowed": false,
@@ -835,10 +855,16 @@
           "updnLine"
         ],
         "missingEvidence": [
-          "sampleResponse"
-        ]
+          "providerTermsOrQuotaApproval",
+          "adminReview"
+        ],
+        "liveSampleRetrievedAt": "2026-07-03T15:37:21Z",
+        "liveSampleRowCount": 5,
+        "liveSampleRawSha256": "c48be5d948394ff8af18617feee43c902a09e4a6237da76e6003b442aa6445b3",
+        "liveSampleSchemaFingerprint": "94d22dd5b64ad968f1347d94c3cce657e0f539c5a0e6bf2c2570245715479209",
+        "liveSampleEvidenceHash": "33734c425b0896ca26cf1f5eae718b9516f43fd4caa92fa14fbbb6b8bf58f6f6"
       },
-      "nextAction": "capture sanitized live sample with backend-only Seoul API key and keep train position separate from precise GPS claims",
+      "nextAction": "complete TOPIS provider terms/quota approval and admin review before using train position as realtime overlay evidence",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -852,9 +878,9 @@
           "productionUseAllowed": false,
           "liveEtaEligible": false,
           "rateLimitStatus": "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA",
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "PROVIDER_TERMS_OR_QUOTA_REQUIRED",
           "updateFrequency": "provider realtime API; production quota not admitted",
-          "unsupportedNotes": "backend-only service key, provider terms, rate limits, and live sample evidence must be approved before live ETA"
+          "unsupportedNotes": "live sample evidence is validated, but backend-only key terms, provider quota, and admin review are still required before live ETA"
         },
         "facility": {
           "status": "UNSUPPORTED",

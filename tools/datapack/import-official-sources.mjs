@@ -33,6 +33,7 @@ function buildFixture(inventory, input) {
   const stations = normalizedStations(stationRows);
   const stationLines = normalizedStationLines(stationRows);
   const networkEdges = routeEdges(input.routeEdges ?? [], allowedSourceIds, mappingBySourceKey, isProductionPack);
+  validateProductionRideEdgeAdmission(stationLines, networkEdges, isProductionPack);
   const facilities = facilityRows(input.facilityRows ?? [], allowedSourceIds, mappingBySourceKey, isProductionPack);
   const stationFacilityEvidence = stationFacilityEvidenceRows(input, stationRows, facilities, isProductionPack);
   const movementCandidates = movementPathCandidates(
@@ -733,6 +734,39 @@ function routeEdges(rows, allowedSourceIds, mappingBySourceKey, isProductionPack
   });
 }
 
+function validateProductionRideEdgeAdmission(stationLines, networkEdges, isProductionPack) {
+  if (!isProductionPack) {
+    return;
+  }
+  const stationLineByNode = new Map(
+    stationLines.map((row) => [
+      `${row.stationId}:${row.lineId}`,
+      { lineId: row.lineId, lineSequence: row.lineSequence },
+    ]),
+  );
+  for (const edge of networkEdges) {
+    if (edge.edgeType !== "RIDE" || String(edge.servicePattern || "LOCAL").toUpperCase() === "EXPRESS") {
+      continue;
+    }
+    const from = stationLineByNode.get(stationLineNodeFromRouteNode(edge.fromNodeId));
+    const to = stationLineByNode.get(stationLineNodeFromRouteNode(edge.toNodeId));
+    if (!from || !to) {
+      continue;
+    }
+    if (from.lineId !== to.lineId) {
+      throw new Error(`production routeEdges RIDE edge must stay on one line: ${edge.id}`);
+    }
+    if (Math.abs(from.lineSequence - to.lineSequence) !== 1) {
+      throw new Error(`production routeEdges LOCAL RIDE edge must connect adjacent station-line sequences: ${edge.id}`);
+    }
+  }
+}
+
+function stationLineNodeFromRouteNode(nodeId) {
+  const parts = nodeId.split(":");
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : "";
+}
+
 function facilityRows(rows, allowedSourceIds, mappingBySourceKey, isProductionPack) {
   return rows.map((row) => {
     const sourceId = row.sourceId ?? row.station?.sourceId;
@@ -811,6 +845,7 @@ function stationFacilityEvidenceRows(input, stationRows, facilities, isProductio
       for (const facility of [...facilitiesByCoverageKey.values()]
         .filter((entry) => entry.stationId === stationId && entry.type === facilityType)
         .sort((left, right) => left.lineId.localeCompare(right.lineId))) {
+        const strictEligibility = facilityStrictRouteEligibility(facility);
         rows.push({
           stationId,
           lineId: facility.lineId,
@@ -827,13 +862,28 @@ function stationFacilityEvidenceRows(input, stationRows, facilities, isProductio
           confidence: facility.confidence,
           verifiedAt: facility.verifiedAt,
           retrievedAt: facility.retrievedAt,
-          strictRouteEligible: true,
-          strictRouteEligibleReason: "FACILITY_EXISTS_AND_PROVENANCE_VERIFIED",
+          strictRouteEligible: strictEligibility.eligible,
+          strictRouteEligibleReason: strictEligibility.reason,
         });
       }
     }
   }
   return rows;
+}
+
+function facilityStrictRouteEligibility(facility) {
+  const operationalStatus = String(facility.operationalStatus ?? "").toUpperCase();
+  const statusMeaning = String(facility.statusMeaning ?? "").toUpperCase();
+  if (["UNKNOWN", "CHECK_REQUIRED", ""].includes(operationalStatus)) {
+    return { eligible: false, reason: "OPERATION_STATUS_UNKNOWN" };
+  }
+  if (!["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"].includes(operationalStatus)) {
+    return { eligible: false, reason: "OPERATION_STATUS_NOT_AVAILABLE" };
+  }
+  if (!["REALTIME_OPERATION", "OPERATOR_CONFIRMED", "FIELD_SURVEY"].includes(statusMeaning)) {
+    return { eligible: false, reason: "OPERATION_EVIDENCE_MISSING" };
+  }
+  return { eligible: true, reason: "FACILITY_OPERATION_VERIFIED" };
 }
 
 function productionString(value, isProductionPack, label) {
@@ -912,7 +962,11 @@ function routeMapPositionRows(rows, allowedSourceIds, mappingBySourceKey) {
       region: requiredString(row.region, "routeMapPositions.region"),
       x: requiredNonNegativeInteger(row.x, "routeMapPositions.x"),
       y: requiredNonNegativeInteger(row.y, "routeMapPositions.y"),
+      labelDx: optionalInteger(row.labelDx, "routeMapPositions.labelDx"),
+      labelDy: optionalInteger(row.labelDy, "routeMapPositions.labelDy"),
       labelPolygon: row.labelPolygon ?? undefined,
+      upPath: optionalString(row.upPath, "routeMapPositions.upPath"),
+      downPath: optionalString(row.downPath, "routeMapPositions.downPath"),
       sourceId,
       sourceName: requiredString(row.sourceName, "routeMapPositions.sourceName"),
       sourceUrl: requiredString(row.sourceUrl, "routeMapPositions.sourceUrl"),
@@ -924,6 +978,7 @@ function routeMapPositionRows(rows, allowedSourceIds, mappingBySourceKey) {
       derivationKind: "OFFICIAL",
       sourceLabel: row.sourceLabel ?? "",
       reviewedAt: requiredString(row.reviewedAt, "routeMapPositions.reviewedAt"),
+      updatedAt: requiredString(row.updatedAt, "routeMapPositions.updatedAt"),
     };
   });
 }
@@ -1038,6 +1093,23 @@ function requiredString(value, label) {
 function requiredInteger(value, label) {
   if (!Number.isInteger(value)) {
     throw new Error(`${label} must be an integer`);
+  }
+  return value;
+}
+
+function optionalInteger(value, label) {
+  if (value === undefined || value === null) {
+    return 0;
+  }
+  return requiredInteger(value, label);
+}
+
+function optionalString(value, label) {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
   }
   return value;
 }
