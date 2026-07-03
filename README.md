@@ -19,6 +19,13 @@
 - Level 4: 현장 또는 운영기관 검증 pathway만 교통약자 경로 claim에 쓰며, `strictRouteEligibleFacilityRatio`와 `fieldVerifiedPathwayRatio`로 측정합니다.
 - `unknownEdgeRatioByProfile`은 휠체어·유모차·저이동성 profile에서 UNKNOWN edge가 strict 경로를 만들지 않는지 확인하는 보조 차단 지표입니다.
 
+## Production Routing Graph
+
+- Production LOCAL `RIDE` edge는 같은 노선의 인접 `lineSequence`만 연결합니다. 비인접 요약 edge는 regression fixture 또는 공식 정차 패턴이 있는 `EXPRESS` 근거로만 둡니다.
+- 기본 route node는 station-line(`stationId:lineId`)입니다. platform node는 공식 platform/source가 admission되기 전까지 만들지 않고, 방향 문구는 `platformInfo`에만 둡니다.
+- 표시용 SVG asset은 앱 지도 표시용입니다. canonical route map position은 `routeMapPositions`의 source, license, `sourceSha256`, `reviewedAt`, `updatedAt`, label polygon으로만 판정합니다.
+- 앱의 `데이터 및 지도 출처` 화면은 source inventory와 manifest를 보여주는 사용자 연결점입니다. Level 4 또는 전국 claim은 #1397 source admission과 #1400 인접역 graph/position 확장 증거가 닫힐 때까지 NO-GO입니다.
+
 ## Stack
 
 - Mobile: Flutter, Dart, Riverpod, go_router, Dio, Drift

@@ -231,7 +231,29 @@ test("README maps data quality levels to production datapack metrics", () => {
     "fieldVerifiedPathwayRatio",
     "unknownEdgeRatioByProfile",
   ]) {
-    assert.match(readme, new RegExp(text));
+    assert.ok(readme.includes(text), `README must include ${text}`);
+  }
+});
+
+test("README fixes production routing graph admission policy", () => {
+  const readme = read("README.md");
+
+  for (const text of [
+    "## Production Routing Graph",
+    "Production LOCAL `RIDE` edge",
+    "인접 `lineSequence`",
+    "regression fixture",
+    "`EXPRESS`",
+    "station-line(`stationId:lineId`)",
+    "`platformInfo`",
+    "canonical route map position",
+    "`routeMapPositions`",
+    "sourceSha256",
+    "데이터 및 지도 출처",
+    "#1397 source admission",
+    "#1400 인접역 graph/position 확장 증거",
+  ]) {
+    assert.ok(readme.includes(text), `README must include ${text}`);
   }
 });
 
