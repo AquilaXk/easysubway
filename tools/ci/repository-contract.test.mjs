@@ -5619,7 +5619,7 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
   for (const candidate of topisCandidates) {
     assert.equal(candidate.priority, "P0");
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-    assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+    assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
     assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
     assert.equal(candidate.serviceKeyHandling, "backend_secret_only");
     assert.equal(candidate.mobileEmbeddingAllowed, false);
@@ -5642,9 +5642,15 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.equal(candidate.evidence.usePermissionRange, "공공누리 1유형");
     assert.deepEqual(candidate.evidence.formats, ["JSON"]);
     assert.match(candidate.evidence.sampleUrl, /\[서비스키값\]/);
+    assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    assert.equal(candidate.evidence.liveSampleRowCount, 5);
+    assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
+    assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
+    assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
     assert.ok(candidate.evidence.coverageLimitations.length >= 2);
     assert.ok(candidate.evidence.outputFields.includes("recptnDt"));
-    assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+    assert.deepEqual(candidate.evidence.missingEvidence, ["providerTermsOrQuotaApproval", "adminReview"]);
+    assert.equal(candidate.capabilities.realtime.coverageStatus, "PROVIDER_TERMS_OR_QUOTA_REQUIRED");
     assert.ok(candidate.nextAction);
 
     const productionSource = productionSourceByDatasetUrl.get(candidate.detailUrl);
