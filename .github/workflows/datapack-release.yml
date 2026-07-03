@@ -202,6 +202,8 @@ jobs:
       - name: Data Pack Release / Restore GitHub Actions dotenv secret
         env:
           EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
+          EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET: ${{ secrets.EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY }}
+          DATA_GO_KR_SERVICE_KEY_SECRET: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: |
           set -euo pipefail
           if [[ -z "${EASYSUBWAY_ENV_SECRET}" ]]; then
@@ -210,6 +212,10 @@ jobs:
           fi
           env_file="${RUNNER_TEMP}/easysubway-deploy.env"
           printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
+          {
+            printf '\nEASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=%s\n' "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}"
+            printf 'DATA_GO_KR_SERVICE_KEY=%s\n' "${DATA_GO_KR_SERVICE_KEY_SECRET}"
+          } >> "${env_file}"
           chmod 600 "${env_file}"
           echo "EASYSUBWAY_ENV_FILE=${env_file}" >> "${GITHUB_ENV}"
 

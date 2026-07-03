@@ -384,14 +384,22 @@ function workflowFiles() {
 function assertActionsEnvSecretPolicy(file, source) {
   const secretAccess = /secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
   const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
-  const allowedExtraSecrets = file === ".github/workflows/release-artifacts.yml"
-    ? new Set([
-        "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
-        "EASYSUBWAY_ANDROID_STORE_PASSWORD",
-        "EASYSUBWAY_ANDROID_KEY_ALIAS",
-        "EASYSUBWAY_ANDROID_KEY_PASSWORD",
-      ])
-    : new Set();
+  const allowedExtraSecretsByFile = {
+    ".github/workflows/cd.yml": new Set([
+      "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+    ]),
+    ".github/workflows/datapack-release.yml": new Set([
+      "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+      "DATA_GO_KR_SERVICE_KEY",
+    ]),
+    ".github/workflows/release-artifacts.yml": new Set([
+      "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
+      "EASYSUBWAY_ANDROID_STORE_PASSWORD",
+      "EASYSUBWAY_ANDROID_KEY_ALIAS",
+      "EASYSUBWAY_ANDROID_KEY_PASSWORD",
+    ]),
+  };
+  const allowedExtraSecrets = allowedExtraSecretsByFile[file] ?? new Set();
 
   for (const match of source.matchAll(secretAccess)) {
     const secretName = match[1] ?? match[2];
@@ -400,7 +408,7 @@ function assertActionsEnvSecretPolicy(file, source) {
       secretName !== "EASYSUBWAY_ENV" &&
       !allowedExtraSecrets.has(secretName)
     ) {
-      assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved Android upload key secrets`);
+      assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved scoped secrets`);
     }
   }
   assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
@@ -935,15 +943,16 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
   assert.doesNotMatch(tfvarsExample, /ocid1\.(?:tenancy|user|compartment)\.oc1\.[a-z0-9]{20,}/);
 });
 
-test("GitHub Actions 환경값은 dotenv secret 하나로 관리한다", () => {
+test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관리한다", () => {
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
 
-  assert.match(readme, /애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나/);
-  assert.match(readme, /애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다/);
+  assert.match(readme, /로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다/);
+  assert.match(readme, /provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
+  assert.match(readme, /provider key overlay를 append/);
   assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
   assert.match(readme, /GitHub `production` environment approval을 기다리지 않습니다/);
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
