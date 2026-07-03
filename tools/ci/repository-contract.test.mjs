@@ -947,6 +947,7 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
+  const datapackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
 
   assert.match(readme, /로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다/);
   assert.match(readme, /provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다/);
@@ -966,6 +967,10 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   assert.match(script, /\.env\.example is a template/);
   assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
   assert.match(cdWorkflow, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
+  assert.match(cdWorkflow, /drop_topis_key/);
+  assert.match(cdWorkflow, /!\(\$1 in drop\)/);
+  assert.match(datapackReleaseWorkflow, /drop_data_go_key/);
+  assert.match(datapackReleaseWorkflow, /!\(\$1 in drop\)/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
 
   for (const file of workflowFiles()) {

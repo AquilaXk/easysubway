@@ -212,9 +212,30 @@ jobs:
           fi
           env_file="${RUNNER_TEMP}/easysubway-deploy.env"
           printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
+          filtered_env_file="${RUNNER_TEMP}/easysubway-deploy.filtered.env"
+          drop_topis_key=false
+          drop_data_go_key=false
+          [[ -n "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" ]] && drop_topis_key=true
+          [[ -n "${DATA_GO_KR_SERVICE_KEY_SECRET}" ]] && drop_data_go_key=true
+          awk -F= -v drop_topis_key="${drop_topis_key}" -v drop_data_go_key="${drop_data_go_key}" '
+            BEGIN {
+              if (drop_topis_key == "true") {
+                drop["EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY"] = 1
+              }
+              if (drop_data_go_key == "true") {
+                drop["DATA_GO_KR_SERVICE_KEY"] = 1
+              }
+            }
+            !($1 in drop)
+          ' "${env_file}" > "${filtered_env_file}"
+          mv "${filtered_env_file}" "${env_file}"
           {
-            printf '\nEASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=%s\n' "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}"
-            printf 'DATA_GO_KR_SERVICE_KEY=%s\n' "${DATA_GO_KR_SERVICE_KEY_SECRET}"
+            if [[ -n "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" ]]; then
+              printf '\nEASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=%s\n' "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}"
+            fi
+            if [[ -n "${DATA_GO_KR_SERVICE_KEY_SECRET}" ]]; then
+              printf 'DATA_GO_KR_SERVICE_KEY=%s\n' "${DATA_GO_KR_SERVICE_KEY_SECRET}"
+            fi
           } >> "${env_file}"
           chmod 600 "${env_file}"
           echo "EASYSUBWAY_ENV_FILE=${env_file}" >> "${GITHUB_ENV}"

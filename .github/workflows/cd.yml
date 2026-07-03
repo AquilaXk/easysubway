@@ -186,7 +186,23 @@ jobs:
           env_file="${RUNNER_TEMP}/easysubway.env"
           if [[ -n "${EASYSUBWAY_ENV_SECRET}" ]]; then
             printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
-            printf '\nEASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=%s\n' "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" >> "${env_file}"
+            filtered_env_file="${RUNNER_TEMP}/easysubway.filtered.env"
+            drop_topis_key=false
+            [[ -n "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" ]] && drop_topis_key=true
+            awk -F= -v drop_topis_key="${drop_topis_key}" '
+              BEGIN {
+                drop["EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE"] = 1
+                drop["EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY"] = 1
+                if (drop_topis_key == "true") {
+                  drop["EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY"] = 1
+                }
+              }
+              !($1 in drop)
+            ' "${env_file}" > "${filtered_env_file}"
+            mv "${filtered_env_file}" "${env_file}"
+            if [[ -n "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" ]]; then
+              printf '\nEASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY=%s\n' "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" >> "${env_file}"
+            fi
             printf 'EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1\n' >> "${env_file}"
             printf 'EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800\n' >> "${env_file}"
             echo "source=secret" >> "${GITHUB_OUTPUT}"
