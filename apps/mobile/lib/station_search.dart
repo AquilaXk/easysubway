@@ -15,7 +15,6 @@ import 'features/realtime/realtime_repository.dart';
 import 'features/stations/domain/station_line.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
-import 'map_adapter.dart';
 import 'mobile_error_reporter.dart';
 import 'production_scope.dart';
 
@@ -41,7 +40,6 @@ const _locationPermissionRationaleDenialNotice =
     '위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.';
 const _stationSearchFailureNextAction =
     '역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.';
-const _stationSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했어요.';
 const _favoriteStationStatusErrorMessage = '즐겨찾기를 확인하지 못했어요.';
 const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했어요.';
@@ -60,13 +58,11 @@ const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationTextMutedColor = EasySubwayAccessibleColors.secondaryText;
 const _stationTextSubtleColor = EasySubwayAccessibleColors.mutedText;
-const _stationDetailTextColor = Color(0xFF2C5558);
-const _stationDetailSoftPanelColor = Color(0xFFEAF6F4);
-const _stationDetailSoftPanelBorderColor = Color(0xFFB9D7D2);
-const _stationDetailMintPanelColor = Color(0xFFEFF8F6);
-const _stationDetailMintPanelBorderColor = Color(0xFFB7D8D2);
-const _stationDetailNoticeColor = Color(0xFFE6F2F0);
-const _stationDetailNoticeBorderColor = Color(0xFFB8D8D3);
+const _stationDetailTextColor = EasySubwayAccessibleColors.secondaryText;
+const _stationDetailSoftPanelColor = EasySubwayAccessibleColors.surface;
+const _stationDetailSoftPanelBorderColor = EasySubwayAccessibleColors.line;
+const _stationDetailMintPanelColor = EasySubwayAccessibleColors.surface;
+const _stationDetailMintPanelBorderColor = EasySubwayAccessibleColors.line;
 const _stationLineFilterSelectedColor = EasySubwayAccessibleColors.primary;
 const _stationLineFilterBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailCautionColor = Color(0xFF8A4B00);
@@ -770,7 +766,7 @@ class StationFacilityInfo {
       'UNDER_CONSTRUCTION' => '공사 중',
       'CONSTRUCTION' => '공사 중',
       'CLOSED' => '폐쇄',
-      'UNKNOWN' => '상태를 확인하고 있어요',
+      'UNKNOWN' => '설치 확인 · 운행상태 미확인',
       'USER_REPORTED' => '제보됨',
       'ADMIN_VERIFIED' => '확인 완료',
       'NEEDS_REPORT' => '알려 주세요',
@@ -4237,34 +4233,29 @@ class _StationDetailContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mapMarkers = const EasySubwayMapAdapter().markersForStationDetail(
-      station: detail,
-      exits: exits,
-      facilities: facilities,
-    );
-
+    // 정보구조 다이어트(#1497): 첫 화면에서 역 이름·고장 여부·실시간 도착·주요
+    // 행동이 보이도록 실시간을 위로, 메타는 맨 아래로, 중복 "지도 위치 목록"과
+    // 상시 안전 안내는 제거, "역 안 이동 안내"+"순서"는 한 섹션으로 통합한다.
     final primaryChildren = <Widget>[
       _StationDetailHeader(detail: detail),
-      const SizedBox(height: 12),
-      _InfoBasisDisclosure(
-        labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
-      ),
       const SizedBox(height: 12),
       if (facilityAttentionSummary.isNotEmpty) ...[
         _StationFacilityStatusSummary(
           text: facilityAttentionSummary,
           semanticLabel: facilityAttentionSemanticLabel,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
       ],
+      const _StationDetailSectionTitle(title: '실시간 열차'),
+      const SizedBox(height: 12),
+      _StationRealtimeSummary(snapshot: realtimeSnapshot),
+      const SizedBox(height: 20),
       _StationDetailRouteActions(
         detail: detail,
         routeDraftController: routeDraftController,
       ),
-      const SizedBox(height: 12),
-      const _StationSafetyGuidanceNotice(),
       if (favoriteController != null) ...[
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _StationFavoriteControl(
           detail: detail,
           controller: favoriteController!,
@@ -4272,25 +4263,18 @@ class _StationDetailContent extends StatelessWidget {
       ],
     ];
     final detailChildren = <Widget>[
-      if (layoutSummaryItems.isNotEmpty) ...[
-        const _StationDetailSectionTitle(title: '역 안 이동 안내'),
+      if (layoutSummaryItems.isNotEmpty || internalRouteState != null) ...[
+        const _StationDetailSectionTitle(title: '역 안 이동'),
         const SizedBox(height: 12),
-        _StationLayoutSummary(
-          items: layoutSummaryItems,
-          semanticLabel: layoutSummarySemanticLabel,
-        ),
-        const SizedBox(height: 24),
-      ],
-      if (internalRouteState != null) ...[
-        const _StationDetailSectionTitle(title: '역 안 이동 순서'),
-        const SizedBox(height: 12),
-        _StationInternalRouteGuidance(state: internalRouteState!),
-        const SizedBox(height: 24),
-      ],
-      if (mapMarkers.isNotEmpty) ...[
-        const _StationDetailSectionTitle(title: '지도 위치 목록'),
-        const SizedBox(height: 12),
-        _StationMapTextList(markers: mapMarkers),
+        if (layoutSummaryItems.isNotEmpty) ...[
+          _StationLayoutSummary(
+            items: layoutSummaryItems,
+            semanticLabel: layoutSummarySemanticLabel,
+          ),
+          if (internalRouteState != null) const SizedBox(height: 16),
+        ],
+        if (internalRouteState != null)
+          _StationInternalRouteGuidance(state: internalRouteState!),
         const SizedBox(height: 24),
       ],
       const _StationDetailSectionTitle(title: '출구'),
@@ -4312,9 +4296,10 @@ class _StationDetailContent extends StatelessWidget {
             onReportTap: () => _openFacilityReport(context, facility),
           ),
       const SizedBox(height: 24),
-      const _StationDetailSectionTitle(title: '실시간 열차'),
-      const SizedBox(height: 12),
-      _StationRealtimeSummary(snapshot: realtimeSnapshot),
+      // 메타 정보(안내 출처·마지막 확인)는 맨 아래로.
+      _InfoBasisDisclosure(
+        labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
+      ),
     ];
 
     return LayoutBuilder(
@@ -4450,27 +4435,6 @@ class _StationDetailAdaptiveContent extends StatelessWidget {
   }
 }
 
-class _StationMapTextList extends StatelessWidget {
-  const _StationMapTextList({required this.markers});
-
-  final List<MapMarker> markers;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Semantics(
-          container: true,
-          label: '지도 위치 목록',
-          child: const SizedBox.shrink(),
-        ),
-        for (final marker in markers) _StationMapTextListItem(marker: marker),
-      ],
-    );
-  }
-}
-
 class _StationRealtimeSummary extends StatelessWidget {
   const _StationRealtimeSummary({required this.snapshot});
 
@@ -4587,9 +4551,8 @@ class _StationDetailRouteActions extends StatelessWidget {
         Expanded(
           child: _StationPointButton(
             key: const Key('stationDetailSetOriginButton'),
-            symbol: '출',
+            icon: Icons.trip_origin,
             label: '출발로 설정',
-            selectedColor: EasySubwayAccessibleColors.mint,
             onPressed: () {
               controller.setOrigin(station);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -4602,9 +4565,8 @@ class _StationDetailRouteActions extends StatelessWidget {
         Expanded(
           child: _StationPointButton(
             key: const Key('stationDetailSetDestinationButton'),
-            symbol: '도',
+            icon: Icons.flag_outlined,
             label: '도착으로 설정',
-            selectedColor: EasySubwayAccessibleColors.brand,
             onPressed: () {
               controller.setDestination(station);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -4620,96 +4582,36 @@ class _StationDetailRouteActions extends StatelessWidget {
 
 class _StationPointButton extends StatelessWidget {
   const _StationPointButton({
-    required this.symbol,
+    required this.icon,
     required this.label,
-    required this.selectedColor,
     required this.onPressed,
     super.key,
   });
 
-  final String symbol;
+  final IconData icon;
   final String label;
-  final Color selectedColor;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    // 같은 성격 행동은 화면이 달라도 같은 패턴: 검색 결과의 _StationRoleButton과
+    // 동일하게 아웃라인 아이콘 + 라벨, 단일 primary 계열.
     return OutlinedButton.icon(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(62),
+        minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
         backgroundColor: Colors.white,
-        foregroundColor: EasySubwayAccessibleColors.text,
+        foregroundColor: EasySubwayAccessibleColors.primary,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
         shape: const RoundedRectangleBorder(
           borderRadius: _stationDetailActionButtonRadius,
         ),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
-      icon: CircleAvatar(
-        radius: 16,
-        backgroundColor: selectedColor,
-        child: Text(
-          symbol,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+      icon: Icon(icon, size: 22),
       label: Text(label),
     );
   }
-}
-
-class _StationMapTextListItem extends StatelessWidget {
-  const _StationMapTextListItem({required this.marker});
-
-  final MapMarker marker;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: marker.semanticLabel,
-      child: ExcludeSemantics(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                _mapMarkerIcon(marker.type),
-                size: 22,
-                color: EasySubwayAccessibleColors.primary,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  marker.title,
-                  key: Key('stationMapTextListItem-${marker.id}'),
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: EasySubwayAccessibleColors.text,
-                    fontWeight: FontWeight.w800,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-IconData _mapMarkerIcon(MapMarkerType type) {
-  return switch (type) {
-    MapMarkerType.station => Icons.train_outlined,
-    MapMarkerType.exit => Icons.exit_to_app,
-    MapMarkerType.facility => Icons.accessible_forward,
-  };
 }
 
 class _StationLayoutSummary extends StatelessWidget {
@@ -4781,7 +4683,7 @@ class _StationLayoutStep extends StatelessWidget {
             textAlign: TextAlign.center,
             style: textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               height: 1.2,
             ),
           ),
@@ -4912,23 +4814,6 @@ class _StationDetailHeader extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StationSafetyGuidanceNotice extends StatelessWidget {
-  const _StationSafetyGuidanceNotice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '안전 안내, $_stationSafetyGuidanceNotice',
-      child: const ExcludeSemantics(
-        child: _StationDetailInfoRow(
-          icon: Icons.info_outline,
-          text: _stationSafetyGuidanceNotice,
         ),
       ),
     );
@@ -5235,7 +5120,7 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
                     '안내 확인 방법',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -5273,7 +5158,7 @@ class _StationDetailSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           height: 1.25,
         ),
       ),
@@ -5329,7 +5214,7 @@ class _StationExitCard extends StatelessWidget {
                     exit.name,
                     style: textTheme.titleMedium?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                       height: 1.25,
                     ),
                   ),
@@ -5773,19 +5658,20 @@ class _StationDetailTextPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 유형·품질 라벨은 상태 의미가 없으므로 틴트 필 대신 중립 아웃라인으로.
     return Container(
       decoration: BoxDecoration(
-        color: _stationDetailNoticeColor,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: _stationDetailNoticeBorderColor),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Text(
           text,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
+            color: EasySubwayAccessibleColors.secondaryText,
+            fontWeight: FontWeight.w700,
             height: 1.2,
           ),
         ),
