@@ -4596,14 +4596,18 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   ]);
   const p0SourceCandidates = sourceCandidates.candidates.filter((candidate) => candidate.priority === "P0");
   assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.p0CandidateCount, p0SourceCandidates.length);
-  assert.ok(
-    p0SourceCandidates.every(
-      (candidate) =>
-        candidate.admissionStatus === targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentSharedAdmissionStatus,
-    ),
+  assert.deepEqual(
+    p0SourceCandidates
+      .filter(
+        (candidate) =>
+          candidate.admissionStatus === targets.roadmapEvidenceLedger.sourceCandidateAdmission.requiredAdmissionStatusBeforeProductionClaim,
+      )
+      .map((candidate) => candidate.id),
+    ["molit-tago-subway-info"],
   );
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 1);
   assert.equal(
-    targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentSharedAdmissionStatus,
+    targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentOpenAdmissionStatus,
     "evidence_recorded_admin_review_required",
   );
   assert.match(targets.roadmapEvidenceLedger.gapEscalationRuleKo, /P0 release blocker/);
@@ -5679,7 +5683,7 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(candidate.domain, "schedule_timetable");
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
   assert.equal(candidate.productionInventoryReferenceId, "molit-tago-subway-info");
@@ -5703,6 +5707,14 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     productionCanonicalStopTimesStatus: "blocked_requires_trip_stop_sequence",
     plannedEtaUseAllowed: false,
   });
+  assert.deepEqual(candidate.evidence.adminReview, {
+    artifactKind: "source-admission-admin-review-summary",
+    decision: "APPROVED",
+    approvedBy: "qa-admin",
+    approvedAt: "2026-07-04T00:20:00Z",
+    sampleEvidenceHash: candidate.evidence.liveSampleEvidenceHash,
+    admissionDurationSeconds: 0,
+  });
   assert.equal(productionSourceIds.has(candidate.id), true, "TAGO inventory entry exists but must remain non-production");
 
   const inventorySource = inventory.sources.find(({ id }) => id === "molit-tago-subway-info");
@@ -5710,11 +5722,17 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.equal(inventorySource.capabilities.schedule.status, "CANDIDATE");
   assert.equal(inventorySource.capabilities.schedule.productionUseAllowed, false);
   assert.equal(inventorySource.coverageScope.sourceDomains.includes("schedule_timetable"), false);
+  assert.equal(inventorySource.admissionEvidence.candidateId, "molit-tago-subway-info");
+  assert.equal(inventorySource.admissionEvidence.decision, "APPROVED");
+  assert.equal(inventorySource.admissionEvidence.sampleEvidenceHash, candidate.evidence.liveSampleEvidenceHash);
+  assert.match(inventorySource.admissionEvidence.adminReviewRecordHash, /^[0-9a-f]{64}$/);
+  assert.match(inventorySource.admissionEvidence.sourceSnapshotSetHash, /^[0-9a-f]{64}$/);
+  assert.match(inventorySource.admissionEvidence.sourceInventorySha256, /^[0-9a-f]{64}$/);
 
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
   assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
   assert.equal(candidate.capabilities.schedule.coverageStatus, "TRIP_STOP_SEQUENCE_REQUIRED");
-  assert.deepEqual(candidate.evidence.missingEvidence, ["tripStopSequenceSource", "adminReview"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, ["tripStopSequenceSource"]);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
   assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
