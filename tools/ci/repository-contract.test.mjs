@@ -146,7 +146,8 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.equal(gate.applicationId, "easysubway");
   assert.equal(gate.androidApplicationId, "com.easysubway.app");
   assert.equal(gate.releaseGate, "datapack-release-readiness");
-  assert.equal(gate.issue, 1419);
+  assert.equal(gate.issue, 1414);
+  assert.equal(gate.absorbedFromIssue, 1419);
   assert.equal(gate.status, "IN_PROGRESS");
   assert.equal(gate.releaseBlockerPolicy, true);
   assert.equal(gate.currentDecision, "NO_GO");
@@ -168,8 +169,8 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.equal(gate.realtimePayloadPolicy.silentFallbackAllowed, false);
   assert.equal(gate.strictAccessibilityPolicy.unknownCanProduceStrictFound, false);
   assert.equal(gate.strictAccessibilityPolicy.generatedConnectorCanBeVerifiedEvidence, false);
-  assert.deepEqual(gate.childIssueLinks.sourceAdmission, [1397, 1416, 1399]);
-  assert.deepEqual(gate.childIssueLinks.offlineDatapackCompleteness, [1400, 1394, 1415]);
+  assert.deepEqual(gate.childIssueLinks.sourceAdmission, [1397, 1416, 1621, 1399]);
+  assert.deepEqual(gate.childIssueLinks.offlineDatapackCompleteness, [1400, 1394, 1415, 1620]);
   assert.deepEqual(gate.childIssueLinks.artifactVerificationAccuracy, [1393, 1395, 1417, 1418]);
   assert.deepEqual(gate.childIssueLinks.userClaimUi, [1392, 1396, 1398]);
   assert.deepEqual(gate.requiredArtifacts, {
@@ -193,13 +194,14 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
   assert.equal(gate.evidencePolicy.githubSummaryOnly, true);
   assert.ok(gate.evidencePolicy.forbiddenInGithubSummary.includes("backend-only provider key"));
-  assert.ok(governance.latestGoNoGoStatus.blockingOpenIssues.includes(1419));
+  assert.ok(governance.latestGoNoGoStatus.blockingOpenIssues.includes(1414));
+  assert.equal(governance.latestGoNoGoStatus.blockingOpenIssues.includes(1419), false);
   assert.ok(governance.latestGoNoGoStatus.remainingP0Blockers.includes("datapack-release-readiness-tracker-evidence"));
   assert.deepEqual(
-    governance.gates.find((item) => item.issue === 1419),
+    governance.gates.find((item) => item.id === "G13_DATAPACK_RELEASE_READINESS"),
     {
       id: "G13_DATAPACK_RELEASE_READINESS",
-      issue: 1419,
+      issue: 1414,
       priority: "P0",
       status: "IN_PROGRESS",
       owner: "datapack-release",
@@ -207,8 +209,9 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
       evidenceReference: gatePath,
     },
   );
-  assert.ok(governance.childIssueLinks.includes(1419));
-  assert.ok(scope.linkedReleaseBlockers.includes(1419));
+  assert.equal(governance.childIssueLinks.includes(1419), false);
+  assert.ok(scope.linkedReleaseBlockers.includes(1414));
+  assert.equal(scope.linkedReleaseBlockers.includes(1419), false);
   assert.match(readme, /datapack-release-readiness-gate\.json/);
   assert.match(readme, /오프라인 데이터팩과 온라인 실시간 overlay를 분리/);
 });
@@ -286,6 +289,7 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
   assert.deepEqual(issueNumbers.toSorted((left, right) => left - right), [
     1210, 1230, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401,
     1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413,
+    1415, 1416, 1417, 1418, 1620, 1621,
   ]);
   assert.ok(tracker.requiredChildIssues.every((issue) => issue.releaseBlocker === true));
   assert.equal(tracker.completionCriteria.allRequiredChildIssuesClosed, true);
@@ -295,6 +299,7 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
     "artifacts/route-accuracy-report.json",
     "artifacts/route-accessibility-regression-report.json",
     "artifacts/realtime-provider-coverage-report.json",
+    "artifacts/route-graph-coverage-report.json",
     "artifacts/route-v2-contract-report.json",
   ]);
   assert.equal(tracker.completionCriteria.androidRouteResultUiEvidenceRequired, true);
@@ -2858,7 +2863,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "da34e5215daf64ae4c1c31a7682d4fa774588074");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
-  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414, 1419]);
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414]);
   assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
@@ -2949,7 +2954,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     },
   );
   assert.deepEqual(
-    gate.gates.find((item) => item.issue === 1414),
+    gate.gates.find((item) => item.id === "G14_ROUTE_RELEASE_READINESS"),
     {
       id: "G14_ROUTE_RELEASE_READINESS",
       issue: 1414,
@@ -2966,7 +2971,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.deepEqual(
     gate.childIssueLinks,
-    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414, 1419],
+    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414],
   );
   for (const item of gate.gates.filter((gateItem) => gateItem.priority.startsWith("P0"))) {
     assert.ok(item.owner, `${item.id} must define owner`);
