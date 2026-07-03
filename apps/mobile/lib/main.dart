@@ -4973,6 +4973,15 @@ class _DataSourceAttributionScreenState
                         subtitle: ProductionScopeCopy.supportedClaimKo,
                       ),
                     ),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.fact_check_outlined,
+                        iconColor: EasySubwayAccessibleColors.amber,
+                        title: '현재 앱 표시',
+                        subtitle:
+                            '상록수·사당 pilot만 확인해요. 현장 또는 운영기관 확인 전에는 전국 쉬운 길이나 실시간 도착을 보장한다고 말하지 않아요.',
+                      ),
+                    ),
                     const _AppSectionTitle(title: '지도 표시용 asset'),
                     for (final map in maps) _AttributionCard.map(map, manifest),
                     const _AppSectionTitle(title: '데이터 품질 Level'),
