@@ -8069,6 +8069,43 @@ test("TAGO 시간표 sample validator는 JSON serviceKey credential을 거부한
   );
 });
 
+test("TAGO 시간표 sample validator는 duplicate serviceKey credential을 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-duplicate-secret-${Date.now()}.json`);
+  await writeFile(
+    samplePath,
+    `{
+      "serviceKey": "actual-secret",
+      "serviceKey": "[서비스키값]",
+      "response": {
+        "body": {
+          "items": {
+            "item": {
+              "endSubwayStationNm": "당고개",
+              "subwayRouteId": "MTRKR4",
+              "subwayStationId": "MTRKR4448",
+              "subwayStationNm": "상록수",
+              "dailyTypeCode": "01",
+              "upDownTypeCode": "U",
+              "depTime": "080500",
+              "arrTime": "080500",
+              "endSubwayStationId": "MTRKR4409"
+            }
+          }
+        }
+      }
+    }`,
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /serviceKey credentials/,
+  );
+});
+
 test("공식 source ingest adapter는 station-line 단위 facility evidence coverage를 요구한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-facility-line-coverage-${Date.now()}`);
   const input = productionSourceIngestInput();

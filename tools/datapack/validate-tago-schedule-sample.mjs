@@ -124,7 +124,10 @@ function parseHhmmss(value, label) {
 }
 
 function rejectCredentialLeak(rawText, parsed, pathParts = []) {
-  if (/serviceKey=(?!\[서비스키값\])[^&\s"]+/i.test(rawText)) {
+  if (
+    /serviceKey=(?!\[서비스키값\])[^&\s"]+/i.test(rawText) ||
+    /"serviceKey"\s*:\s*"(?!\[서비스키값\]")[^"]+"/i.test(rawText)
+  ) {
     throw new Error("TAGO schedule sample must not contain serviceKey credentials");
   }
   if (Array.isArray(parsed)) {
