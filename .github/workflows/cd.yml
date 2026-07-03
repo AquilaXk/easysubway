@@ -201,6 +201,7 @@ jobs:
               !($1 in drop)
             ' "${env_file}" > "${filtered_env_file}"
             mv "${filtered_env_file}" "${env_file}"
+            [[ -s "${env_file}" && "$(tail -c 1 "${env_file}")" != "" ]] && printf '\n' >> "${env_file}"
             if [[ -n "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" ]]; then
               if [[ "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" == *$'\n'* || "${EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET}" == *$'\r'* ]]; then
                 echo "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY secret must be a single line" >&2
