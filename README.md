@@ -38,13 +38,15 @@
 
 `.env.example`은 로컬 실행과 배포에 필요한 dotenv 양식입니다. 실제 값은 git에 올리지 않는 로컬 `.env`에만 둡니다.
 
-GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 애플리케이션 환경값용 GitHub Actions secret 이름은 반드시 `EASYSUBWAY_ENV`만 사용합니다.
+GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 단, provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다.
 
 ```bash
 scripts/github/sync-actions-env-secret.sh .env
 ```
 
-워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
+워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 provider key overlay를 append하고, 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
+
+Provider 호출 안전 범위는 공식 한도보다 낮게 둡니다. TOPIS backend 실시간 호출은 서울 Open API 실시간 지하철 한도 1,000/day 아래로 `EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1`, `EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800`까지 clamp합니다. TAGO/Data.go.kr admission은 개발계정 10,000/day 안에서 자동 반복 수집 없이 `run-source-admission-pipeline.mjs` 1회 실행당 live fetch 1회만 수행합니다.
 
 Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다. GitHub Actions 알림은 `.env.example`에 빈 양식으로 남긴 `SLACK_CI_WEBHOOK_URL`, `SLACK_RELEASE_WEBHOOK_URL`, `SLACK_SECURITY_WEBHOOK_URL`을 채널별 incoming webhook repository secret으로 등록해 사용합니다. Slack 알림은 별도 `workflow_run` workflow가 아니라 원본 workflow 내부 notify job에서 전송합니다. CI와 SonarCloud는 `main` push 실패, 취소 결과만 보내고, CD/Data Pack Release/Release Artifacts/Store Distribution Evidence는 release 채널로 성공, 실패, 취소 결과를 보냅니다.
 
