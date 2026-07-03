@@ -7742,7 +7742,7 @@ void main() {
           fieldValidationStatus: 'VERIFIED',
         ),
         StationFacilityInfo(
-          id: 'facility-sangnoksu-info-needed',
+          id: 'facility-sangnoksu-operation-unknown',
           stationId: 'station-sangnoksu',
           exitId: 'exit-sangnoksu-3',
           type: 'ESCALATOR',
@@ -7750,7 +7750,7 @@ void main() {
           floorFrom: 'B1',
           floorTo: '1F',
           description: '3번 출구 앞',
-          status: 'NEEDS_CHECK',
+          status: 'UNKNOWN',
           dataConfidence: 'LOW',
           dataSourceType: 'OFFICIAL_FILE',
           lastUpdatedAt: '2026-06-10',
@@ -7863,7 +7863,7 @@ void main() {
       expect(find.text('이용할 수 없어요'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.byKey(
-          const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
+          const Key('stationFacilityCard-facility-sangnoksu-operation-unknown'),
         ),
         120,
         scrollable: find.byType(Scrollable).last,
@@ -7873,9 +7873,28 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(
-            const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
+            const Key(
+              'stationFacilityCard-facility-sangnoksu-operation-unknown',
+            ),
           ),
-          matching: find.text('상태를 확인하고 있어요'),
+          matching: find.text('설치 확인 · 운행상태 미확인'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key(
+              'stationFacilityCard-facility-sangnoksu-operation-unknown',
+            ),
+          ),
+          matching: find.text('이용 가능'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsLabel(
+          '3번 출구 에스컬레이터, 에스컬레이터, 설치 확인 · 운행상태 미확인, 3번 출구 앞, 최근 확인 2026-06-10, 최신 상태를 준비 중이에요, 자세히 보기',
         ),
         findsOneWidget,
       );
