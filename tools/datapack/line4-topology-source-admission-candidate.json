@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "line4-topology-source-admission-candidate",
+  "candidateId": "capital-line4-sadang-sangnoksu-topology-20260703",
+  "issue": 1400,
+  "createdAt": "2026-07-03T00:00:00.000Z",
+  "status": "SOURCE_BACKED_CANDIDATE_NOT_PRODUCTION_SUPPORTED",
+  "productionUseAllowed": false,
+  "supportBoundary": {
+    "productionSupportedScopeId": "capital_pilot_android_v1",
+    "productionSupportedStationIds": ["station-sangnoksu", "station-sadang"],
+    "candidateOnlyStationIds": [
+      "station-cd50dac04268",
+      "station-b06936dabc76",
+      "station-d8aba0e84e54",
+      "station-f870f37ac6e5",
+      "station-e9aed16d6ab8",
+      "station-c1a4e2fc5dc5",
+      "station-56684b0f1770",
+      "station-740e11495c3c",
+      "station-4f3d7288135e",
+      "station-5565cfc07e93",
+      "station-493478141d7f",
+      "station-a5ca3701535e",
+      "station-9b12e97fd55b",
+      "station-b495e35152ea"
+    ],
+    "productionClaimBoundaryKo": "상록수·사당 pilot만 production supported scope이며, 중간역은 source-backed topology 후보로만 기록한다."
+  },
+  "sourceEvidence": {
+    "stationLineMembershipSourceIds": [
+      "molit-urban-rail-full-route",
+      "seoulmetro-station-line-info"
+    ],
+    "routeMapPositionSourceId": "seoulmetro-cyberstation-route-map",
+    "routeMapSourceSha256": "7370b4db2d2f398f46c55314b71d7335c77ec6745fd388793804874447cd25e0",
+    "routeMapSourceUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
+    "membershipRetrievedAt": "2026-06-21",
+    "routeMapReviewedAt": "2026-06-28T00:00:00.000Z"
+  },
+  "candidateGraph": {
+    "lineId": "seoul-4",
+    "operatorId": "seoul-metro",
+    "region": "수도권",
+    "sequenceStart": 28,
+    "sequenceEnd": 43,
+    "stationCount": 16,
+    "undirectedSegmentCount": 15,
+    "directedRideEdgeCandidateCount": 30,
+    "confirmedFields": [
+      "station_line_membership",
+      "line_sequence_adjacency",
+      "route_map_position"
+    ],
+    "missingConfirmedFields": [
+      "duration_seconds",
+      "distance_meters",
+      "accessibility_facilities",
+      "field_or_operator_pathway_review"
+    ],
+    "automaticProductionRouteEdgeAllowed": false,
+    "admissionNoteKo": "연속 lineSequence로 인접 topology 후보는 만들 수 있지만, 이동 비용과 접근성 시설/동선 증거가 없어 production RIDE edge 또는 쉬운 길 보장으로 승격하지 않는다."
+  },
+  "stations": [
+    { "sequence": 28, "stationId": "station-sadang", "stationNameKo": "사당", "stationLineCode": "433", "molitSourceStationCode": "MOLIT-SEOUL-4-433", "routeMapX": 705, "routeMapY": 680, "routeMapSourceLabel": "사당" },
+    { "sequence": 29, "stationId": "station-cd50dac04268", "stationNameKo": "남태령", "stationLineCode": "29", "molitSourceStationCode": "MOLIT-SEOUL-4-29", "routeMapX": 705, "routeMapY": 705, "routeMapSourceLabel": "남태령" },
+    { "sequence": 30, "stationId": "station-b06936dabc76", "stationNameKo": "선바위", "stationLineCode": "30", "molitSourceStationCode": "MOLIT-SEOUL-4-30", "routeMapX": 705, "routeMapY": 725, "routeMapSourceLabel": "선바위" },
+    { "sequence": 31, "stationId": "station-d8aba0e84e54", "stationNameKo": "경마공원", "stationLineCode": "31", "molitSourceStationCode": "MOLIT-SEOUL-4-31", "routeMapX": 695, "routeMapY": 745, "routeMapSourceLabel": "경마공원" },
+    { "sequence": 32, "stationId": "station-f870f37ac6e5", "stationNameKo": "대공원", "stationLineCode": "32", "molitSourceStationCode": "MOLIT-SEOUL-4-32", "routeMapX": 675, "routeMapY": 765, "routeMapSourceLabel": "대공원" },
+    { "sequence": 33, "stationId": "station-e9aed16d6ab8", "stationNameKo": "과천", "stationLineCode": "33", "molitSourceStationCode": "MOLIT-SEOUL-4-33", "routeMapX": 655, "routeMapY": 780, "routeMapSourceLabel": "과천" },
+    { "sequence": 34, "stationId": "station-c1a4e2fc5dc5", "stationNameKo": "정부과천청사", "stationLineCode": "34", "molitSourceStationCode": "MOLIT-SEOUL-4-34", "routeMapX": 620, "routeMapY": 780, "routeMapSourceLabel": "정부과천청사" },
+    { "sequence": 35, "stationId": "station-56684b0f1770", "stationNameKo": "인덕원", "stationLineCode": "35", "molitSourceStationCode": "MOLIT-SEOUL-4-35", "routeMapX": 575, "routeMapY": 800, "routeMapSourceLabel": "인덕원" },
+    { "sequence": 36, "stationId": "station-740e11495c3c", "stationNameKo": "평촌", "stationLineCode": "36", "molitSourceStationCode": "MOLIT-SEOUL-4-36", "routeMapX": 555, "routeMapY": 820, "routeMapSourceLabel": "평촌" },
+    { "sequence": 37, "stationId": "station-4f3d7288135e", "stationNameKo": "범계", "stationLineCode": "37", "molitSourceStationCode": "MOLIT-SEOUL-4-37", "routeMapX": 535, "routeMapY": 840, "routeMapSourceLabel": "범계" },
+    { "sequence": 38, "stationId": "station-5565cfc07e93", "stationNameKo": "금정", "stationLineCode": "38", "molitSourceStationCode": "MOLIT-SEOUL-4-38", "routeMapX": 515, "routeMapY": 860, "routeMapSourceLabel": "금정" },
+    { "sequence": 39, "stationId": "station-493478141d7f", "stationNameKo": "산본", "stationLineCode": "39", "molitSourceStationCode": "MOLIT-SEOUL-4-39", "routeMapX": 495, "routeMapY": 880, "routeMapSourceLabel": "산본" },
+    { "sequence": 40, "stationId": "station-a5ca3701535e", "stationNameKo": "수리산", "stationLineCode": "40", "molitSourceStationCode": "MOLIT-SEOUL-4-40", "routeMapX": 475, "routeMapY": 900, "routeMapSourceLabel": "수리산" },
+    { "sequence": 41, "stationId": "station-9b12e97fd55b", "stationNameKo": "대야미", "stationLineCode": "41", "molitSourceStationCode": "MOLIT-SEOUL-4-41", "routeMapX": 455, "routeMapY": 920, "routeMapSourceLabel": "대야미" },
+    { "sequence": 42, "stationId": "station-b495e35152ea", "stationNameKo": "반월", "stationLineCode": "42", "molitSourceStationCode": "MOLIT-SEOUL-4-42", "routeMapX": 410, "routeMapY": 945, "routeMapSourceLabel": "반월" },
+    { "sequence": 43, "stationId": "station-sangnoksu", "stationNameKo": "상록수", "stationLineCode": "448", "molitSourceStationCode": "MOLIT-SEOUL-4-448", "routeMapX": 380, "routeMapY": 945, "routeMapSourceLabel": "상록수" }
+  ]
+}
