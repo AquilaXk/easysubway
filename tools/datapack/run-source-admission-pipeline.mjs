@@ -65,6 +65,7 @@ async function main() {
     routeEvidenceLedgerHash: adminReview.routeEvidenceLedgerHash,
     overrideHash: adminReview.overrideHash,
     admissionDurationSeconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
+    quotaEvidence: adminReview.quotaEvidence,
   };
 
   await writeFile(path.resolve(root, requireArg(args, "output")), `${JSON.stringify(summary, null, 2)}\n`);
@@ -188,6 +189,7 @@ function validateAdminReview({ adminReview, candidateId, sample, snapshot, args 
   ]) {
     assertSha256(adminReview[field], `adminReview.${field}`);
   }
+  validateQuotaEvidence(adminReview.quotaEvidence, "adminReview.quotaEvidence");
   if (!adminReview.productionSource || adminReview.productionSource.id !== adminReview.sourceId) {
     throw new Error("adminReview.productionSource.id must match adminReview.sourceId");
   }
@@ -198,6 +200,23 @@ function validateAdminReview({ adminReview, candidateId, sample, snapshot, args 
     }
   }
   return sha256(JSON.stringify(sortJson(adminReview)));
+}
+
+function validateQuotaEvidence(quotaEvidence, label) {
+  if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
+    throw new Error(`${label} must be an object`);
+  }
+  requiredText(quotaEvidence.portal, `${label}.portal`);
+  if (
+    quotaEvidence.defaultDailyLimit !== "unlimited" &&
+    (!Number.isInteger(quotaEvidence.defaultDailyLimit) || quotaEvidence.defaultDailyLimit < 0)
+  ) {
+    throw new Error(`${label}.defaultDailyLimit must be a non-negative integer or unlimited`);
+  }
+  requiredText(quotaEvidence.unlockStatus, `${label}.unlockStatus`);
+  if (typeof quotaEvidence.productionUseAllowed !== "boolean") {
+    throw new Error(`${label}.productionUseAllowed must be a boolean`);
+  }
 }
 
 function admitSource({ inventory, productionSource }) {

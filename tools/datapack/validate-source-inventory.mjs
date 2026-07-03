@@ -258,6 +258,24 @@ function validateAdmissionEvidence(evidence, candidate, sourceId) {
   if (!Number.isInteger(evidence.admissionDurationSeconds) || evidence.admissionDurationSeconds < 0) {
     throw new Error(`${sourceId}.admissionEvidence.admissionDurationSeconds must be a non-negative integer`);
   }
+  validateQuotaEvidence(evidence.quotaEvidence, `${sourceId}.admissionEvidence.quotaEvidence`);
+}
+
+function validateQuotaEvidence(quotaEvidence, label) {
+  if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
+    throw new Error(`${label} must be an object`);
+  }
+  assertString(quotaEvidence.portal, `${label}.portal`);
+  if (
+    quotaEvidence.defaultDailyLimit !== "unlimited" &&
+    (!Number.isInteger(quotaEvidence.defaultDailyLimit) || quotaEvidence.defaultDailyLimit < 0)
+  ) {
+    throw new Error(`${label}.defaultDailyLimit must be a non-negative integer or unlimited`);
+  }
+  assertString(quotaEvidence.unlockStatus, `${label}.unlockStatus`);
+  if (typeof quotaEvidence.productionUseAllowed !== "boolean") {
+    throw new Error(`${label}.productionUseAllowed must be a boolean`);
+  }
 }
 
 function requireInventorySource(sources, sourceId) {

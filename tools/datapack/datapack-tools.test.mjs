@@ -6710,6 +6710,12 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
     facilityEvidenceLedgerHash: sha256("facility-evidence-ledger"),
     routeEvidenceLedgerHash: sha256("route-evidence-ledger"),
     overrideHash: sha256("override-ledger"),
+    quotaEvidence: {
+      portal: "KRIC 레일포털",
+      defaultDailyLimit: "unlimited",
+      unlockStatus: "not_required",
+      productionUseAllowed: true,
+    },
     productionSource,
   };
   await writeFile(adminReviewPath, `${JSON.stringify(adminReview, null, 2)}\n`);
@@ -6858,6 +6864,12 @@ test("source admission pipeline은 custom candidates를 최종 inventory 검증�
     facilityEvidenceLedgerHash: sha256("facility-evidence-ledger"),
     routeEvidenceLedgerHash: sha256("route-evidence-ledger"),
     overrideHash: sha256("override-ledger"),
+    quotaEvidence: {
+      portal: "KRIC 레일포털",
+      defaultDailyLimit: "unlimited",
+      unlockStatus: "not_required",
+      productionUseAllowed: true,
+    },
     productionSource,
   };
   await writeFile(adminReviewPath, `${JSON.stringify(adminReview, null, 2)}\n`);
@@ -6901,6 +6913,31 @@ test("source admission pipeline은 custom candidates를 최종 inventory 검증�
       { cwd: root },
     ),
     /molit-tago-subway-info\.admissionEvidence\.sampleEvidenceHash must be/,
+  );
+});
+
+test("source inventory 검증기는 admitted candidate의 quota evidence 누락을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-admission-quota-${Date.now()}`);
+  const inventoryPath = path.join(outputDir, "source-inventory.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const inventory = JSON.parse(await readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8"));
+  const source = inventory.sources.find((entry) => entry.id === "seoul-realtime-arrival-station-info");
+  delete source.admissionEvidence.quotaEvidence;
+  await writeFile(inventoryPath, `${JSON.stringify(inventory, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-inventory.mjs",
+        "--inventory",
+        inventoryPath,
+      ],
+      { cwd: root },
+    ),
+    /seoul-realtime-arrival-station-info\.admissionEvidence\.quotaEvidence must be an object/,
   );
 });
 
