@@ -9,7 +9,7 @@ import test from "node:test";
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 
-test("release evidence bundle validator는 publish gate status를 모두 PASS로 요구한다", async () => {
+test("release evidence bundle validator는 publish gate status와 deferred headway 예외를 검증한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-release-evidence-${Date.now()}`);
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
@@ -67,5 +67,14 @@ test("release evidence bundle validator는 publish gate status를 모두 PASS로
       { cwd: root },
     ),
     /androidEvidenceStatus must be PASS for publish/,
+  );
+
+  bundle.androidEvidenceStatus = "PASS";
+  bundle.headwayReportStatus = "DEFERRED";
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+    { cwd: root },
   );
 });

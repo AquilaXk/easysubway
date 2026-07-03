@@ -3906,6 +3906,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0/);
   assert.match(workflow, /const headwayEvidenceCount =/);
   assert.match(workflow, /const headwayReportStatus = headwayEvidenceCount > 0/);
+  assert.match(workflow, /"DEFERRED"/);
   assert.match(workflow, /routeGraphTopologyStatus,/);
   assert.match(workflow, /headwayReportStatus,/);
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
@@ -3937,6 +3938,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   ]) {
     assert.ok(releaseEvidenceBundleSchema.required.includes(field), `${field} must be required`);
   }
+  assert.ok(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"));
 });
 
 test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 credential preflight를 사용한다", () => {

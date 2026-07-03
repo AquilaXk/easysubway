@@ -80,7 +80,7 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "gateStatus": {
-      "enum": ["PASS", "FAIL", "BLOCKED_EXTERNAL"]
+      "enum": ["PASS", "FAIL", "BLOCKED_EXTERNAL", "DEFERRED"]
     }
   }
 }

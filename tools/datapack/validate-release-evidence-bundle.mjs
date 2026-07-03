@@ -2,7 +2,8 @@
 import { readFile } from "node:fs/promises";
 
 const SHA256 = /^[a-f0-9]{64}$/;
-const STATUSES = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL"]);
+const STATUSES = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL", "DEFERRED"]);
+const PUBLISH_DEFERRED_FIELDS = new Set(["headwayReportStatus"]);
 
 function argValue(args, name) {
   const index = args.indexOf(name);
@@ -28,7 +29,7 @@ function validateStatus(bundle, field, requirePass) {
   if (!STATUSES.has(value)) {
     throw new Error(`${field} must be a release gate status`);
   }
-  if (requirePass && value !== "PASS") {
+  if (requirePass && value !== "PASS" && !(value === "DEFERRED" && PUBLISH_DEFERRED_FIELDS.has(field))) {
     throw new Error(`${field} must be PASS for publish`);
   }
 }

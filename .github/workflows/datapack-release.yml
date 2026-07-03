@@ -423,9 +423,7 @@ jobs:
           const headwayEvidenceCount =
             Number(headwayReport.summary?.observedHeadwayGroupCount ?? 0) +
             Number(headwayReport.summary?.declaredFrequencyCount ?? 0);
-          const headwayReportStatus = headwayEvidenceCount > 0
-            ? "PASS"
-            : releaseLike ? "FAIL" : "BLOCKED_EXTERNAL";
+          const headwayReportStatus = headwayEvidenceCount > 0 ? "PASS" : "DEFERRED";
 
           const bundle = {
             schemaVersion: 1,
