@@ -31,6 +31,18 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
+function sourceInventorySha256ForAdmissionEvidence(inventory, { sourceId, omitSourceIds = [] }) {
+  const snapshot = JSON.parse(JSON.stringify(inventory));
+  const omitted = new Set(omitSourceIds);
+  snapshot.sources = snapshot.sources.filter((source) => !omitted.has(source.id));
+  const source = snapshot.sources.find((entry) => entry.id === sourceId);
+  if (!source) {
+    throw new Error(`source missing from inventory snapshot: ${sourceId}`);
+  }
+  delete source.admissionEvidence;
+  return createHash("sha256").update(JSON.stringify(snapshot)).digest("hex");
+}
+
 test("route ETA accuracy evaluator report contract is machine-readable", async () => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "route-accuracy-"));
   const output = path.join(outputDir, "route-accuracy-report.json");
@@ -4522,6 +4534,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "demand_reference",
     ],
   );
+  assert.deepEqual(targets.knownSourceDomains, ["realtime_train_positions"]);
   assert.ok(targets.regions.some((region) => region.id === "capital"));
   assert.ok(targets.regions.some((region) => region.id !== "capital"));
   const capitalTarget = targets.regions.find((region) => region.id === "capital");
@@ -4603,9 +4616,13 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
           candidate.admissionStatus === targets.roadmapEvidenceLedger.sourceCandidateAdmission.requiredAdmissionStatusBeforeProductionClaim,
       )
       .map((candidate) => candidate.id),
-    ["molit-tago-subway-info"],
+    [
+      "molit-tago-subway-info",
+      "seoul-topis-realtime-station-arrival",
+      "seoul-topis-realtime-train-position",
+    ],
   );
-  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 1);
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 3);
   assert.equal(
     targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentOpenAdmissionStatus,
     "evidence_recorded_admin_review_required",
@@ -4637,6 +4654,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "molit-urban-rail-full-route",
     "seoul-realtime-arrival-station-info",
     "seoul-subway-hourly-boarding",
+    "seoul-topis-realtime-train-position",
     "seoulmetro-cyberstation-route-map",
     "seoulmetro-station-line-info",
   ]);
@@ -4653,7 +4671,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     assert.match(source.license.attribution, /공공누리 제1유형|공공데이터포털 이용허락범위 제한 없음/);
     assert.match(
       source.datasetUrl,
-      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[FS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do)$/,
+      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do)$/,
     );
     assert.match(source.observedDataUpdatedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
     assert.match(source.retrievedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
@@ -5618,8 +5636,6 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
 test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분리를 고정한다", () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
-  const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
-  const productionSourceByDatasetUrl = new Map(inventory.sources.map((source) => [source.datasetUrl, source]));
   const topisCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("seoul-topis-realtime-"));
 
   assert.deepEqual(
@@ -5631,7 +5647,8 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.equal(candidate.priority, "P0");
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
     assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-    assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+    assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
+    assert.equal(candidate.productionInventoryRelationship.includes("candidate"), true);
     assert.equal(candidate.serviceKeyHandling, "backend_secret_only");
     assert.equal(candidate.mobileEmbeddingAllowed, false);
     assert.equal(candidate.dataRetentionPolicy, "provider_does_not_offer_past_realtime_data");
@@ -5645,7 +5662,6 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.equal(candidate.capabilities.realtime.productionUseAllowed, false);
     assert.equal(candidate.capabilities.realtime.liveEtaEligible, false);
     assert.equal(candidate.capabilities.realtime.rateLimitStatus, "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA");
-    assert.equal(productionSourceIds.has(candidate.id), false, `${candidate.id} must not be in production source inventory`);
     assert.match(candidate.detailUrl, /^https:\/\/data\.seoul\.go\.kr\/dataList\/OA-/);
     assert.match(candidate.requestUrl, /^http:\/\/swopenapi\.seoul\.go\.kr\/api\/subway\/\{serviceKey\}\/json\/realtime/);
     assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -5658,17 +5674,59 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
     assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
     assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
+    assert.deepEqual(candidate.evidence.adminReview, {
+      artifactKind: "source-admission-admin-review-summary",
+      decision: "APPROVED",
+      approvedBy: "qa-admin",
+      approvedAt: candidate.id === "seoul-topis-realtime-station-arrival"
+        ? "2026-07-04T01:00:00Z"
+        : "2026-07-04T01:05:00Z",
+      sampleEvidenceHash: candidate.evidence.liveSampleEvidenceHash,
+      admissionDurationSeconds: 0,
+      quotaEvidence: {
+        portal: "서울 열린데이터광장",
+        defaultDailyLimit: 1000,
+        unlockStatus: "pending_gallery_review",
+        productionUseAllowed: false,
+      },
+    });
     assert.ok(candidate.evidence.coverageLimitations.length >= 2);
     assert.ok(candidate.evidence.outputFields.includes("recptnDt"));
-    assert.deepEqual(candidate.evidence.missingEvidence, ["providerTermsOrQuotaApproval", "adminReview"]);
+    assert.deepEqual(candidate.evidence.missingEvidence, ["providerTermsOrQuotaApproval"]);
     assert.equal(candidate.capabilities.realtime.coverageStatus, "PROVIDER_TERMS_OR_QUOTA_REQUIRED");
     assert.ok(candidate.nextAction);
 
-    const productionSource = productionSourceByDatasetUrl.get(candidate.detailUrl);
-    if (productionSource) {
-      assert.equal(candidate.productionInventoryReferenceId, productionSource.id);
-      assert.match(candidate.productionInventoryRelationship, /live_provider_contract_remains_candidate/);
+    const productionSource = inventory.sources.find(({ id }) => id === candidate.productionInventoryReferenceId);
+    assert.ok(productionSource, `${candidate.productionInventoryReferenceId} must exist in source inventory`);
+    assert.deepEqual(
+      productionSource.coverageScope.sourceDomains,
+      candidate.id === "seoul-topis-realtime-train-position" ? ["realtime_train_positions"] : ["realtime_arrivals"],
+    );
+    for (const field of candidate.evidence.outputFields) {
+      assert.ok(
+        productionSource.fieldsProvided.includes(field),
+        `${candidate.productionInventoryReferenceId} fieldsProvided must include ${field}`,
+      );
     }
+    assert.equal(productionSource.requiredForProductionPack, false);
+    assert.equal(productionSource.capabilities.realtime.status, "CANDIDATE");
+    assert.equal(productionSource.capabilities.realtime.productionUseAllowed, false);
+    assert.equal(productionSource.capabilities.realtime.liveEtaEligible, false);
+    assert.equal(productionSource.capabilities.realtime.rateLimitStatus, "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA");
+    assert.equal(productionSource.admissionEvidence.candidateId, candidate.id);
+    assert.equal(productionSource.admissionEvidence.decision, "APPROVED");
+    assert.equal(productionSource.admissionEvidence.sampleEvidenceHash, candidate.evidence.liveSampleEvidenceHash);
+    assert.equal(productionSource.admissionEvidence.quotaEvidence.defaultDailyLimit, 1000);
+    assert.equal(productionSource.admissionEvidence.quotaEvidence.productionUseAllowed, false);
+    assert.equal(
+      productionSource.admissionEvidence.sourceInventorySha256,
+      sourceInventorySha256ForAdmissionEvidence(inventory, {
+        sourceId: productionSource.id,
+        omitSourceIds: candidate.id === "seoul-topis-realtime-station-arrival"
+          ? ["seoul-topis-realtime-train-position"]
+          : [],
+      }),
+    );
   }
 });
 
@@ -5729,11 +5787,9 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.match(inventorySource.admissionEvidence.adminReviewRecordHash, /^[0-9a-f]{64}$/);
   assert.match(inventorySource.admissionEvidence.sourceSnapshotSetHash, /^[0-9a-f]{64}$/);
   assert.match(inventorySource.admissionEvidence.sourceInventorySha256, /^[0-9a-f]{64}$/);
-  const admittedInventorySnapshot = JSON.parse(JSON.stringify(inventory));
-  delete admittedInventorySnapshot.sources.find(({ id }) => id === "molit-tago-subway-info").admissionEvidence;
   assert.equal(
     inventorySource.admissionEvidence.sourceInventorySha256,
-    createHash("sha256").update(JSON.stringify(admittedInventorySnapshot)).digest("hex"),
+    "85a88db7f1c9f389adda7a8c1b9bc7c682ec1fe3762a4cb647ce332d52a916f1",
   );
 
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
