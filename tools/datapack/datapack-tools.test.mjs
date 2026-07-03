@@ -1,5 +1,5 @@
-import { gunzipSync } from "node:zlib";
-import { createHash } from "node:crypto";
+import { gzipSync, gunzipSync } from "node:zlib";
+import { createHash, createSign } from "node:crypto";
 import { copyFile, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "node:http";
@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
+import { sortJson } from "./run-source-admission-pipeline.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -560,6 +561,134 @@ test("데이터팩 검증기는 trip별 stop_time 시간이 역행하면 거부�
   );
 });
 
+test("원격 데이터팩 검증 wrapper는 manifest와 pack을 내려받아 기존 validator를 실행한다", async () => {
+  const packOutputDir = path.join(tmpdir(), `easysubway-remote-datapack-source-${Date.now()}`);
+  const downloadDir = path.join(tmpdir(), `easysubway-remote-datapack-download-${Date.now()}`);
+  await rm(packOutputDir, { recursive: true, force: true });
+  await rm(downloadDir, { recursive: true, force: true });
+  await mkdir(packOutputDir, { recursive: true });
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+
+  const server = await startObjectStorageServer({ requireAuthorization: false, basePath: "/catalog" });
+  try {
+    const manifestBytes = await readFile(path.join(packOutputDir, "current.json"));
+    const packBytes = await readFile(path.join(packOutputDir, "catalog", "capital-v1.sqlite.gz"));
+    server.objects.set("current.json", {
+      body: manifestBytes,
+      sha256: sha256(manifestBytes),
+      sizeBytes: manifestBytes.length,
+    });
+    server.objects.set("capital-v1.sqlite.gz", {
+      body: packBytes,
+      sha256: sha256(packBytes),
+      sizeBytes: packBytes.length,
+    });
+
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-remote-datapack-artifact.mjs",
+        "--manifest-url",
+        `${server.origin}/catalog/current.json`,
+        "--output",
+        downloadDir,
+      ],
+      { cwd: root, env: productionEnv },
+    );
+
+    const summary = JSON.parse(
+      await readFile(path.join(downloadDir, "remote-datapack-validation-summary.json"), "utf8"),
+    );
+    assert.equal(summary.manifestVersion, 1);
+    assert.equal(summary.validation.exitCode, 0);
+    assert.equal(summary.packs[0].id, "capital");
+    assert.equal(summary.packs[0].download.sizeBytesMatchesManifest, true);
+    assert.equal(summary.packs[0].download.sha256MatchesManifest, true);
+    assert.equal(summary.packs[0].download.sqliteSha256MatchesManifest, true);
+    assert.match(summary.manifestSha256, /^[0-9a-f]{64}$/);
+  } finally {
+    await server.close();
+    await rm(packOutputDir, { recursive: true, force: true });
+    await rm(downloadDir, { recursive: true, force: true });
+  }
+});
+
+test("원격 데이터팩 검증 wrapper는 validator 실패도 summary에 기록한다", async () => {
+  const packOutputDir = path.join(tmpdir(), `easysubway-remote-datapack-source-invalid-${Date.now()}`);
+  const downloadDir = path.join(tmpdir(), `easysubway-remote-datapack-download-invalid-${Date.now()}`);
+  await rm(packOutputDir, { recursive: true, force: true });
+  await rm(downloadDir, { recursive: true, force: true });
+  await mkdir(packOutputDir, { recursive: true });
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+
+  const server = await startObjectStorageServer({ requireAuthorization: false, basePath: "/catalog" });
+  try {
+    const manifestBytes = await readFile(path.join(packOutputDir, "current.json"));
+    const corruptPackBytes = Buffer.from("not a gzip datapack");
+    server.objects.set("current.json", {
+      body: manifestBytes,
+      sha256: sha256(manifestBytes),
+      sizeBytes: manifestBytes.length,
+    });
+    server.objects.set("capital-v1.sqlite.gz", {
+      body: corruptPackBytes,
+      sha256: sha256(corruptPackBytes),
+      sizeBytes: corruptPackBytes.length,
+    });
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/validate-remote-datapack-artifact.mjs",
+          "--manifest-url",
+          `${server.origin}/catalog/current.json`,
+          "--output",
+          downloadDir,
+        ],
+        { cwd: root, env: productionEnv },
+      ),
+    );
+
+    const summary = JSON.parse(
+      await readFile(path.join(downloadDir, "remote-datapack-validation-summary.json"), "utf8"),
+    );
+    assert.notEqual(summary.validation.exitCode, 0);
+    assert.equal(summary.validation.signal, null);
+    assert.equal(summary.packs[0].download.sizeBytesMatchesManifest, false);
+    assert.equal(summary.packs[0].download.sha256MatchesManifest, false);
+    assert.equal(summary.packs[0].download.sqliteSha256MatchesManifest, false);
+    assert.match(summary.packs[0].download.sqliteDecompressionError, /incorrect header check|not in gzip format/);
+    assert.match(summary.validation.stderr, /sizeBytes mismatch/);
+  } finally {
+    await server.close();
+    await rm(packOutputDir, { recursive: true, force: true });
+    await rm(downloadDir, { recursive: true, force: true });
+  }
+});
+
 test("데이터팩 검증기는 strict step-free transfer가 계단 pathway를 가리키면 거부한다", async () => {
   const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
   const outputDir = path.join(tmpdir(), `easysubway-datapack-strict-pathway-invalid-${Date.now()}`);
@@ -925,6 +1054,38 @@ test("데이터팩 생성기는 만료된 source snapshot buildSpec을 거부한
         },
       ),
       /buildSpec\.sourceSnapshots\[0\]\.freshnessExpiresAt must be in the future/,
+    );
+  } finally {
+    await rm(buildSpecDir, { recursive: true, force: true });
+  }
+});
+
+test("데이터팩 생성기는 admin review 없는 source snapshot buildSpec을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-build-spec-admin-output-${Date.now()}`);
+  const buildSpecDir = path.join(root, "tmp", `easysubway-datapack-build-spec-admin-${process.pid}-${Date.now()}`);
+  const buildSpecPath = path.join(buildSpecDir, "candidate-build-spec.missing-admin.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await rm(buildSpecDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await mkdir(buildSpecDir, { recursive: true });
+  const buildSpec = JSON.parse(await readFile("tools/datapack/fixtures/candidate-build-spec.json", "utf8"));
+  delete buildSpec.sourceSnapshots[0].adminReviewRecordHash;
+  await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
+
+  try {
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/build-datapack.mjs",
+          "--build-spec",
+          buildSpecPath,
+          "--output",
+          outputDir,
+        ],
+        { cwd: root, env: productionEnv },
+      ),
+      /buildSpec\.sourceSnapshots\[0\]\.adminReviewRecordHash must be a non-empty string/,
     );
   } finally {
     await rm(buildSpecDir, { recursive: true, force: true });
@@ -3010,6 +3171,85 @@ test("데이터팩 생성기는 production 시설 status 의미와 검증 근거
   );
 });
 
+test("데이터팩 검증기는 현장·운영기관 확인 시설 AVAILABLE 근거를 허용한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-production-facility-positive-evidence-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "catalog-fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  for (const [index, statusMeaning] of ["FIELD_SURVEY", "OPERATOR_CONFIRMED"].entries()) {
+    fixture.packs[0].facilities[index].status = "NORMAL";
+    fixture.packs[0].facilities[index].operationalStatus = "AVAILABLE";
+    fixture.packs[0].facilities[index].statusMeaning = statusMeaning;
+    fixture.packs[0].facilities[index].provenanceKind = statusMeaning;
+  }
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/validate-datapack.mjs",
+      "--manifest",
+      path.join(packOutputDir, "current.json"),
+      "--root",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+});
+
+test("데이터팩 검증기는 UNKNOWN 운행상태 시설의 strict route eligibility를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-production-facility-strict-unknown-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "catalog-fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  fixture.packs[0].stationFacilityEvidence[0].strictRouteEligible = true;
+  fixture.packs[0].stationFacilityEvidence[0].strictRouteEligibleReason = "FACILITY_EXISTS_AND_PROVENANCE_VERIFIED";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      packOutputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(packOutputDir, "current.json"),
+        "--root",
+        packOutputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /station_facility_evidence strict route eligibility requires available operation status/,
+  );
+});
+
 test("데이터팩 검증기는 production verified edge coverage report를 출력한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-production-edge-report-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");
@@ -3505,6 +3745,71 @@ test("데이터팩 검증기는 production sourceInventory coverageScope 누락�
       { cwd: root, env: productionEnv },
     ),
     /capital@1 production sourceInventory.coverageScope must be an object/,
+  );
+});
+
+test("데이터팩 검증기는 production pack의 realtime payload table을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-realtime-payload-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  markFixturePackProduction(fixture);
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      outputDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+
+  const manifestPath = path.join(outputDir, "current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const pack = manifest.packs[0];
+  const sqlitePath = path.join(outputDir, "catalog", "capital-v1.sqlite");
+  const database = new DatabaseSync(sqlitePath);
+  try {
+    database.exec(`
+      CREATE TABLE realtime_station_arrivals (
+        provider_id TEXT NOT NULL,
+        station_id TEXT NOT NULL,
+        payload_json TEXT NOT NULL
+      )
+    `);
+    database.exec("INSERT INTO realtime_station_arrivals VALUES ('topis', 'station-sadang', '{}')");
+  } finally {
+    database.close();
+  }
+
+  const sqliteBytes = await readFile(sqlitePath);
+  const compressedBytes = gzipSync(sqliteBytes);
+  await writeFile(path.join(outputDir, "catalog", "capital-v1.sqlite.gz"), compressedBytes);
+  pack.sizeBytes = compressedBytes.length;
+  pack.sha256 = sha256(compressedBytes);
+  pack.sqliteSha256 = sha256(sqliteBytes);
+  resignProductionManifest(manifest);
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        manifestPath,
+        "--root",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /capital@1 realtime payload table is not allowed in production datapack: realtime_station_arrivals/,
   );
 });
 
@@ -4100,6 +4405,140 @@ test("데이터팩 quality metric report는 denominator 기반 metric과 freshne
   assert.equal(report.packs[0].metrics.freshnessValidRatio, 0);
 });
 
+test("데이터팩 headway report는 stop_times와 frequencies에서 대기시간 근거를 산출한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-headway-report-${Date.now()}`);
+  const reportPath = path.join(outputDir, "artifacts/datapack-headways.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      "tools/datapack/fixtures/catalog-fixture.json",
+      "--output",
+      reportPath,
+    ],
+    { cwd: root },
+  );
+
+  const report = JSON.parse(await readFile(reportPath, "utf8"));
+  assert.equal(report.artifactKind, "datapack-headway-report");
+  assert.equal(report.summary.packCount, 1);
+  assert.equal(report.summary.declaredFrequencyCount, 1);
+  assert.equal(report.packs[0].declaredFrequencies[0].headwaySeconds, 600);
+  const sangnoksu = report.packs[0].observedHeadways.find(
+    (row) =>
+      row.stationId === "station-sangnoksu" &&
+      row.stationLineId === "seoul-4" &&
+      row.servicePattern === "LOCAL",
+  );
+  assert.deepEqual(sangnoksu.departures, [29100, 90300]);
+  assert.equal(sangnoksu.minHeadwaySeconds, 61200);
+
+  const defaultLocalFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  delete defaultLocalFixture.packs[0].transitTrips.find(
+    (row) => row.id === "trip-seoul-4-local-2505",
+  ).servicePattern;
+  const defaultLocalFixturePath = path.join(outputDir, "default-local-fixture.json");
+  const defaultLocalReportPath = path.join(outputDir, "artifacts/datapack-headways-default-local.json");
+  await writeFile(defaultLocalFixturePath, `${JSON.stringify(defaultLocalFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      defaultLocalFixturePath,
+      "--output",
+      defaultLocalReportPath,
+    ],
+    { cwd: root },
+  );
+  const defaultLocalReport = JSON.parse(await readFile(defaultLocalReportPath, "utf8"));
+  const defaultLocalSangnoksu = defaultLocalReport.packs[0].observedHeadways.find(
+    (row) =>
+      row.stationId === "station-sangnoksu" &&
+      row.stationLineId === "seoul-4" &&
+      row.servicePattern === "LOCAL",
+  );
+  assert.deepEqual(defaultLocalSangnoksu.departures, [29100, 90300]);
+
+  const frequencyTemplateFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  frequencyTemplateFixture.packs[0].transitTrips.push({
+    id: "trip-seoul-2-local-0830",
+    routeId: "route-seoul-2-inner",
+    serviceId: "weekday-2026",
+    tripHeadsign: "내선순환",
+    directionId: "inner",
+    servicePattern: "LOCAL",
+    serviceDayStartSeconds: 0,
+  });
+  frequencyTemplateFixture.packs[0].transitStopTimes.push({
+    tripId: "trip-seoul-2-local-0830",
+    stopSequence: 1,
+    stationId: "station-sadang",
+    lineId: "seoul-2",
+    arrivalSeconds: 30600,
+    departureSeconds: 30600,
+  });
+  frequencyTemplateFixture.packs[0].transitFrequencies.push({
+    tripId: "trip-seoul-2-local-0830",
+    startTimeSeconds: 30600,
+    endTimeSeconds: 33600,
+    headwaySeconds: 600,
+    exactTimes: false,
+  });
+  const frequencyTemplateFixturePath = path.join(outputDir, "frequency-template-fixture.json");
+  const frequencyTemplateReportPath = path.join(outputDir, "artifacts/datapack-headways-frequency-template.json");
+  await writeFile(frequencyTemplateFixturePath, `${JSON.stringify(frequencyTemplateFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      frequencyTemplateFixturePath,
+      "--output",
+      frequencyTemplateReportPath,
+    ],
+    { cwd: root },
+  );
+  const frequencyTemplateReport = JSON.parse(await readFile(frequencyTemplateReportPath, "utf8"));
+  assert.equal(
+    frequencyTemplateReport.packs[0].observedHeadways.some((row) => row.lineId === "seoul-2"),
+    false,
+  );
+
+  const noPickupFixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  noPickupFixture.packs[0].transitStopTimes.find(
+    (row) => row.tripId === "trip-seoul-4-local-2505" && row.stationId === "station-sangnoksu",
+  ).pickupType = 1;
+  const noPickupFixturePath = path.join(outputDir, "no-pickup-fixture.json");
+  const noPickupReportPath = path.join(outputDir, "artifacts/datapack-headways-no-pickup.json");
+  await writeFile(noPickupFixturePath, `${JSON.stringify(noPickupFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-headway-report.mjs",
+      "--fixture",
+      noPickupFixturePath,
+      "--output",
+      noPickupReportPath,
+    ],
+    { cwd: root },
+  );
+  const noPickupReport = JSON.parse(await readFile(noPickupReportPath, "utf8"));
+  assert.equal(
+    noPickupReport.packs[0].observedHeadways.some(
+      (row) =>
+        row.stationId === "station-sangnoksu" &&
+        row.stationLineId === "seoul-4" &&
+        row.servicePattern === "LOCAL",
+    ),
+    false,
+  );
+});
+
 test("데이터팩 quality metric report는 freshness metric 누락 manifest를 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-quality-report-invalid-${Date.now()}`);
   await rm(outputDir, { recursive: true, force: true });
@@ -4468,7 +4907,7 @@ test("데이터팩 검증기는 분리된 route graph component를 거부한다"
     durationSeconds: 180,
     distanceMeters: 700,
     edgeType: "RIDE",
-    servicePattern: "LOCAL",
+    servicePattern: "EXPRESS",
     includesStairs: false,
     stairAccessState: "STEP_FREE",
     accessibilityStatus: "AVAILABLE",
@@ -6061,6 +6500,333 @@ test("source candidate sample evidence builder는 raw response의 TOPIS path ser
   );
 });
 
+test("source admission pipeline은 admin 승인 record로 inventory admission evidence를 만든다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-admission-${Date.now()}`);
+  const rawPath = path.join(outputDir, "kric-train-operation-organ.raw.json");
+  const seedSamplePath = path.join(outputDir, "seed-sample.json");
+  const adminReviewPath = path.join(outputDir, "admin-review.json");
+  const outputInventoryPath = path.join(outputDir, "source-inventory.admitted.json");
+  const summaryPath = path.join(outputDir, "admission-summary.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(rawPath, `${JSON.stringify([{ railOprIsttCd: "S1", railOprIsttNm: "서울교통공사" }])}\n`);
+
+  const { stdout: sampleStdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-source-candidate-sample-evidence.mjs",
+      "--candidate",
+      "kric-train-operation-organ",
+      "--response",
+      rawPath,
+    ],
+    { cwd: root },
+  );
+  await writeFile(seedSamplePath, sampleStdout);
+  const sample = JSON.parse(sampleStdout);
+  const productionSource = {
+    id: "kric-train-operation-organ",
+    displayName: "열차운영기관정보",
+    owner: "국가철도공단",
+    provider: "국가철도공단",
+    sourceSystem: "KRIC OpenAPI",
+    datasetUrl: "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266&service=convenientInfo&operation=trainOperationOrgan&page=3",
+    requiredForProductionPack: false,
+    updateFrequency: "provider-documented",
+    observedDataUpdatedAt: "2026-07-02",
+    retrievedAt: "2026-07-02",
+    license: {
+      type: "KOGL-1",
+      name: "공공누리 1유형",
+      attribution: "공공누리 제1유형: 출처표시",
+      commercialUseAllowed: true,
+      derivativeWorkAllowed: true,
+      redistributionAllowed: true,
+      evidenceUrl: "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266&service=convenientInfo&operation=trainOperationOrgan&page=3",
+    },
+    coverageScope: {
+      regionIds: ["capital"],
+      operatorIds: ["seoul-metro"],
+      sourceDomains: ["station_line_membership"],
+    },
+    fieldsProvided: ["railOprIsttCd", "railOprIsttNm"],
+    capabilities: {
+      schedule: {
+        status: "UNSUPPORTED",
+        productionUseAllowed: false,
+        coverageStatus: "NOT_PROVIDED_BY_SOURCE",
+        updateFrequency: "provider-documented",
+        unsupportedNotes: "candidate does not provide scheduled timetable data",
+      },
+      realtime: {
+        status: "UNSUPPORTED",
+        productionUseAllowed: false,
+        liveEtaEligible: false,
+        rateLimitStatus: "NOT_APPLICABLE",
+        coverageStatus: "NOT_PROVIDED_BY_SOURCE",
+        updateFrequency: "provider-documented",
+        unsupportedNotes: "candidate does not provide realtime arrival data",
+      },
+      facility: {
+        status: "UNSUPPORTED",
+        productionUseAllowed: false,
+        coverageStatus: "NOT_PROVIDED_BY_SOURCE",
+        updateFrequency: "provider-documented",
+        unsupportedNotes: "candidate does not provide accessibility facility records",
+      },
+    },
+  };
+  const adminReview = {
+    schemaVersion: 1,
+    artifactKind: "source-admission-admin-review",
+    candidateId: "kric-train-operation-organ",
+    sourceId: "kric-train-operation-organ",
+    snapshotId: "kric-train-operation-organ-snapshot-20260702",
+    sampleEvidenceHash: sample.evidenceHash,
+    decision: "APPROVED",
+    approvedBy: "qa-admin",
+    approvedAt: "2026-07-02T00:10:00Z",
+    licenseEvidenceHash: sha256("license-evidence"),
+    aliasLedgerHash: sha256("alias-ledger"),
+    operatorMappingLedgerHash: sha256("operator-mapping-ledger"),
+    facilityEvidenceLedgerHash: sha256("facility-evidence-ledger"),
+    routeEvidenceLedgerHash: sha256("route-evidence-ledger"),
+    overrideHash: sha256("override-ledger"),
+    productionSource,
+  };
+  await writeFile(adminReviewPath, `${JSON.stringify(adminReview, null, 2)}\n`);
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/run-source-admission-pipeline.mjs",
+      "--candidate",
+      "kric-train-operation-organ",
+      "--raw-input",
+      rawPath,
+      "--evidence-dir",
+      outputDir,
+      "--snapshot-id",
+      "kric-train-operation-organ-snapshot-20260702",
+      "--source-id",
+      "kric-train-operation-organ",
+      "--provider",
+      "국가철도공단",
+      "--retrieved-at",
+      "2026-07-02T00:00:00Z",
+      "--source-updated-at",
+      "2026-07-02T00:00:00Z",
+      "--raw-object-uri",
+      "s3://easysubway-datapack-sources/kric-train-operation-organ/20260702.json",
+      "--freshness-expires-at",
+      "2026-08-01T00:00:00Z",
+      "--raw-retention-expires-at",
+      "2026-10-01T00:00:00Z",
+      "--admin-review",
+      adminReviewPath,
+      "--output-inventory",
+      outputInventoryPath,
+      "--output",
+      summaryPath,
+    ],
+    { cwd: root },
+  );
+
+  assert.match(stdout, /source admission pipeline evidence written/);
+  const summary = JSON.parse(await readFile(summaryPath, "utf8"));
+  assert.equal(summary.artifactKind, "source-admission-pipeline-evidence");
+  assert.equal(summary.candidateId, "kric-train-operation-organ");
+  assert.match(summary.sourceSnapshotSetHash, /^[0-9a-f]{64}$/);
+  assert.equal(summary.adminReviewRecordHash, sha256(JSON.stringify(sortJson(adminReview))));
+  assert.equal(summary.licenseEvidenceHash, adminReview.licenseEvidenceHash);
+  const outputInventory = JSON.parse(await readFile(outputInventoryPath, "utf8"));
+  assert.ok(outputInventory.sources.some((source) => source.id === "kric-train-operation-organ"));
+});
+
+test("source admission pipeline은 JSON credential raw response를 저장 전에 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-admission-secret-${Date.now()}`);
+  const rawPath = path.join(outputDir, "kric-train-operation-organ.raw.json");
+  const adminReviewPath = path.join(outputDir, "admin-review.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(rawPath, JSON.stringify({ response: { body: { serviceKey: "actual-secret" } } }));
+  await writeFile(
+    adminReviewPath,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        artifactKind: "source-admission-admin-review",
+        decision: "APPROVED",
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/run-source-admission-pipeline.mjs",
+        "--candidate",
+        "kric-train-operation-organ",
+        "--raw-input",
+        rawPath,
+        "--evidence-dir",
+        outputDir,
+        "--snapshot-id",
+        "kric-train-operation-organ-snapshot-20260702",
+        "--source-id",
+        "kric-train-operation-organ",
+        "--provider",
+        "국가철도공단",
+        "--retrieved-at",
+        "2026-07-02T00:00:00Z",
+        "--raw-object-uri",
+        "s3://easysubway-datapack-sources/kric-train-operation-organ/20260702.json",
+        "--freshness-expires-at",
+        "2026-08-01T00:00:00Z",
+        "--raw-retention-expires-at",
+        "2026-10-01T00:00:00Z",
+        "--admin-review",
+        adminReviewPath,
+        "--output-inventory",
+        path.join(outputDir, "source-inventory.admitted.json"),
+        "--output",
+        path.join(outputDir, "admission-summary.json"),
+      ],
+      { cwd: root },
+    ),
+    /source admission raw response contains credential-like token/,
+  );
+});
+
+test("source admission pipeline은 live fetch 실패 메시지에서 service key를 숨긴다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-admission-fetch-secret-${Date.now()}`);
+  const adminReviewPath = path.join(outputDir, "admin-review.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(
+    adminReviewPath,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        artifactKind: "source-admission-admin-review",
+        decision: "APPROVED",
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/run-source-admission-pipeline.mjs",
+        "--candidate",
+        "kric-train-operation-organ",
+        "--url-template",
+        "http://127.0.0.1:1/source?serviceKey={serviceKey}",
+        "--service-key-env",
+        "EASYSUBWAY_TEST_SERVICE_KEY",
+        "--evidence-dir",
+        outputDir,
+        "--snapshot-id",
+        "kric-train-operation-organ-snapshot-20260702",
+        "--source-id",
+        "kric-train-operation-organ",
+        "--provider",
+        "국가철도공단",
+        "--retrieved-at",
+        "2026-07-02T00:00:00Z",
+        "--raw-object-uri",
+        "s3://easysubway-datapack-sources/kric-train-operation-organ/20260702.json",
+        "--freshness-expires-at",
+        "2026-08-01T00:00:00Z",
+        "--raw-retention-expires-at",
+        "2026-10-01T00:00:00Z",
+        "--admin-review",
+        adminReviewPath,
+        "--output-inventory",
+        path.join(outputDir, "source-inventory.admitted.json"),
+        "--output",
+        path.join(outputDir, "admission-summary.json"),
+      ],
+      { cwd: root, env: { ...process.env, EASYSUBWAY_TEST_SERVICE_KEY: "actual-secret-value" } },
+    ),
+    (error) => {
+      assert.match(error.stderr, /source live fetch failed before response/);
+      assert.doesNotMatch(error.stderr, /actual-secret-value/);
+      return true;
+    },
+  );
+});
+
+test("source admission pipeline은 admin 승인 없는 inventory admission을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-admission-negative-${Date.now()}`);
+  const rawPath = path.join(outputDir, "kric-train-operation-organ.raw.json");
+  const adminReviewPath = path.join(outputDir, "admin-review.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(rawPath, `${JSON.stringify([{ railOprIsttCd: "S1", railOprIsttNm: "서울교통공사" }])}\n`);
+  await writeFile(
+    adminReviewPath,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        artifactKind: "source-admission-admin-review",
+        candidateId: "kric-train-operation-organ",
+        sourceId: "kric-train-operation-organ",
+        snapshotId: "kric-train-operation-organ-snapshot-20260702",
+        sampleEvidenceHash: sha256("not-used"),
+        decision: "PENDING",
+        approvedBy: "qa-admin",
+        approvedAt: "2026-07-02T00:10:00Z",
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/run-source-admission-pipeline.mjs",
+        "--candidate",
+        "kric-train-operation-organ",
+        "--raw-input",
+        rawPath,
+        "--evidence-dir",
+        outputDir,
+        "--snapshot-id",
+        "kric-train-operation-organ-snapshot-20260702",
+        "--source-id",
+        "kric-train-operation-organ",
+        "--provider",
+        "국가철도공단",
+        "--retrieved-at",
+        "2026-07-02T00:00:00Z",
+        "--raw-object-uri",
+        "s3://easysubway-datapack-sources/kric-train-operation-organ/20260702.json",
+        "--freshness-expires-at",
+        "2026-08-01T00:00:00Z",
+        "--raw-retention-expires-at",
+        "2026-10-01T00:00:00Z",
+        "--admin-review",
+        adminReviewPath,
+        "--output-inventory",
+        path.join(outputDir, "source-inventory.admitted.json"),
+        "--output",
+        path.join(outputDir, "admission-summary.json"),
+      ],
+      { cwd: root },
+    ),
+    /adminReview\.decision must be APPROVED/,
+  );
+});
+
 test("전국 coverage gap report는 현재 source inventory의 누락 coverage를 실패로 노출한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-coverage-gap-fail-${Date.now()}`);
   const reportPath = path.join(outputDir, "coverage-gap-report.json");
@@ -6565,7 +7331,7 @@ test("공식 source ingest adapter는 stable id mapping으로 catalog fixture pa
     durationSeconds: 1860,
     distanceMeters: 18600,
     edgeType: "RIDE",
-    servicePattern: "LOCAL",
+    servicePattern: "EXPRESS",
     includesStairs: false,
     stairAccessState: "STEP_FREE",
     accessibilityStatus: "AVAILABLE",
@@ -6700,7 +7466,7 @@ test("공식 source ingest adapter는 전국 마스터 source를 canonical 역·
         stationId: "station-sangnoksu",
         lineId: "seoul-4",
         stationCode: "448",
-        lineSequence: 48,
+        lineSequence: 43,
       },
       {
         stationId: "station-busan-station",
@@ -7184,6 +7950,205 @@ test("공식 source ingest adapter는 admission 전 schedule provenance도 produ
   );
 });
 
+test("TAGO 시간표 sample validator는 station-level row shape만 검증하고 production 승격은 막는다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-sample-${Date.now()}.json`);
+  const rawSample = `${JSON.stringify({
+    response: {
+      body: {
+        items: {
+          item: [
+            {
+              endSubwayStationNm: "당고개",
+              subwayRouteId: "MTRKR4",
+              subwayStationId: "MTRKR4448",
+              subwayStationNm: "상록수",
+              dailyTypeCode: "01",
+              upDownTypeCode: "U",
+              depTime: "080500",
+              arrTime: "080500",
+              endSubwayStationId: "MTRKR4409",
+            },
+            {
+              endSubwayStationNm: "당고개",
+              subwayRouteId: "MTRKR4",
+              subwayStationId: "MTRKR4448",
+              subwayStationNm: "상록수",
+              dailyTypeCode: "01",
+              upDownTypeCode: "U",
+              depTime: "081200",
+              arrTime: "081200",
+              endSubwayStationId: "MTRKR4409",
+            },
+          ],
+        },
+      },
+    },
+  })}\n`;
+  await writeFile(samplePath, rawSample);
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+    { cwd: root, env: productionEnv },
+  );
+  const report = JSON.parse(stdout);
+  assert.equal(report.candidateId, "molit-tago-subway-info");
+  assert.equal(report.rowCount, 2);
+  assert.equal(report.stationLevelOnly, true);
+  assert.equal(report.productionUseAllowed, false);
+  assert.equal(report.rawSha256, sha256(rawSample));
+  assert.equal(report.remainingAdmissionBlocker, "line_wide_trip_stop_sequence_validation_required");
+  assert.deepEqual(
+    report.departures.map((departure) => departure.departureSeconds),
+    [29100, 29520],
+  );
+});
+
+test("TAGO 시간표 sample validator는 잘못된 시간 row를 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-invalid-${Date.now()}.json`);
+  await writeFile(samplePath, JSON.stringify({
+    response: {
+      body: {
+        items: {
+          item: {
+            endSubwayStationNm: "당고개",
+            subwayRouteId: "MTRKR4",
+            subwayStationId: "MTRKR4448",
+            subwayStationNm: "상록수",
+            dailyTypeCode: "01",
+            upDownTypeCode: "U",
+            depTime: "080500",
+            arrTime: "080700",
+            endSubwayStationId: "MTRKR4409",
+          },
+        },
+      },
+    },
+  }));
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /arrival must be <= departure/,
+  );
+});
+
+test("TAGO 시간표 sample validator는 JSON serviceKey credential을 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-secret-${Date.now()}.json`);
+  await writeFile(samplePath, JSON.stringify({
+    serviceKey: "secret",
+    response: {
+      body: {
+        items: {
+          item: {
+            endSubwayStationNm: "당고개",
+            subwayRouteId: "MTRKR4",
+            subwayStationId: "MTRKR4448",
+            subwayStationNm: "상록수",
+            dailyTypeCode: "01",
+            upDownTypeCode: "U",
+            depTime: "080500",
+            arrTime: "080500",
+            endSubwayStationId: "MTRKR4409",
+          },
+        },
+      },
+    },
+  }));
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /serviceKey credentials/,
+  );
+});
+
+test("TAGO 시간표 sample validator는 destination field가 sample 전체에서 사라지면 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-missing-destination-${Date.now()}.json`);
+  await writeFile(samplePath, JSON.stringify({
+    response: {
+      body: {
+        items: {
+          item: {
+            subwayRouteId: "MTRKR4",
+            subwayStationId: "MTRKR4448",
+            subwayStationNm: "상록수",
+            dailyTypeCode: "01",
+            upDownTypeCode: "U",
+            depTime: "080500",
+            arrTime: "080500",
+          },
+        },
+      },
+    },
+  }));
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /missing observed field: endSubwayStationNm/,
+  );
+});
+
+test("TAGO 시간표 sample validator는 함수 import만으로 CLI를 실행하지 않는다", async () => {
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      "import { validateTagoScheduleSample } from './tools/datapack/validate-tago-schedule-sample.mjs'; console.log(typeof validateTagoScheduleSample);",
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  assert.equal(stdout.trim(), "function");
+});
+
+test("TAGO 시간표 sample validator는 duplicate serviceKey credential을 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-duplicate-secret-${Date.now()}.json`);
+  await writeFile(
+    samplePath,
+    `{
+      "serviceKey": "actual-secret",
+      "serviceKey": "[서비스키값]",
+      "response": {
+        "body": {
+          "items": {
+            "item": {
+              "endSubwayStationNm": "당고개",
+              "subwayRouteId": "MTRKR4",
+              "subwayStationId": "MTRKR4448",
+              "subwayStationNm": "상록수",
+              "dailyTypeCode": "01",
+              "upDownTypeCode": "U",
+              "depTime": "080500",
+              "arrTime": "080500",
+              "endSubwayStationId": "MTRKR4409"
+            }
+          }
+        }
+      }
+    }`,
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /serviceKey credentials/,
+  );
+});
+
 test("공식 source ingest adapter는 station-line 단위 facility evidence coverage를 요구한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-facility-line-coverage-${Date.now()}`);
   const input = productionSourceIngestInput();
@@ -7229,12 +8194,13 @@ test("공식 source ingest adapter는 동일 station-line-type 시설을 evidenc
           row.lineId === "seoul-4" &&
           row.facilityType === "ELEVATOR",
       )
-      .map(({ stationId, lineId, facilityType, sourceId, strictRouteEligible }) => ({
+      .map(({ stationId, lineId, facilityType, sourceId, strictRouteEligible, strictRouteEligibleReason }) => ({
         stationId,
         lineId,
         facilityType,
         sourceId,
         strictRouteEligible,
+        strictRouteEligibleReason,
       })),
     [
       {
@@ -7242,7 +8208,8 @@ test("공식 source ingest adapter는 동일 station-line-type 시설을 evidenc
         lineId: "seoul-4",
         facilityType: "ELEVATOR",
         sourceId: "kric-station-elevator",
-        strictRouteEligible: true,
+        strictRouteEligible: false,
+        strictRouteEligibleReason: "OPERATION_STATUS_UNKNOWN",
       },
     ],
   );
@@ -7301,6 +8268,14 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
   assert.equal(input.manifest.releaseSequence, undefined);
   assert.equal(input.manifest.publishedAt, undefined);
   assert.equal(input.manifest.expiresAt, undefined);
+  const adjacencySafeInput = {
+    ...input,
+    routeEdges: input.routeEdges.map((edge) =>
+      edge.edgeType === "RIDE" ? { ...edge, servicePattern: "EXPRESS" } : edge,
+    ),
+  };
+  const adjacencySafeInputPath = path.join(outputDir, "capital-pilot-production-adjacency-safe.json");
+  await writeFile(adjacencySafeInputPath, `${JSON.stringify(adjacencySafeInput, null, 2)}\n`);
 
   await execFileAsync(
     process.execPath,
@@ -7309,22 +8284,149 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
       "--inventory",
       "tools/datapack/source-inventory.json",
       "--input",
-      inputPath,
+      adjacencySafeInputPath,
       "--output",
       importedFixturePath,
     ],
     { cwd: root },
   );
   const importedFixture = JSON.parse(await readFile(importedFixturePath, "utf8"));
-  assert.equal(importedFixture.packs[0].requiredTables.includes("route_map_positions"), false);
-  assert.equal(importedFixture.packs[0].minimumTableRows.route_map_positions, undefined);
+  assert.equal(importedFixture.packs[0].requiredTables.includes("route_map_positions"), true);
+  assert.equal(importedFixture.packs[0].minimumTableRows.route_map_positions, 2);
+  assert.equal(importedFixture.packs[0].routeMapPositions.length, 2);
+  assert.deepEqual(
+    importedFixture.packs[0].routeMapPositions.map((position) => ({
+      stationId: position.stationId,
+      lineId: position.lineId,
+      sourceId: position.sourceId,
+      sourceSha256: position.sourceSha256,
+      labelPolygonCount: position.labelPolygon.length,
+      updatedAt: position.updatedAt,
+    })),
+    [
+      {
+        stationId: "station-sangnoksu",
+        lineId: "seoul-4",
+        sourceId: "seoulmetro-cyberstation-route-map",
+        sourceSha256: "7370b4db2d2f398f46c55314b71d7335c77ec6745fd388793804874447cd25e0",
+        labelPolygonCount: 4,
+        updatedAt: "2026-06-28T00:00:00.000Z",
+      },
+      {
+        stationId: "station-sadang",
+        lineId: "seoul-4",
+        sourceId: "seoulmetro-cyberstation-route-map",
+        sourceSha256: "7370b4db2d2f398f46c55314b71d7335c77ec6745fd388793804874447cd25e0",
+        labelPolygonCount: 4,
+        updatedAt: "2026-06-28T00:00:00.000Z",
+      },
+    ],
+  );
+  for (const testCase of [
+    {
+      name: "string-label-dx",
+      mutate(position) {
+        position.labelDx = "0";
+      },
+      expected: /routeMapPositions\.labelDx must be an integer/,
+    },
+    {
+      name: "number-up-path",
+      mutate(position) {
+        position.upPath = 1;
+      },
+      expected: /routeMapPositions\.upPath must be a string/,
+    },
+  ]) {
+    const invalidRouteMapPositionInput = JSON.parse(JSON.stringify(adjacencySafeInput));
+    testCase.mutate(invalidRouteMapPositionInput.routeMapPositions[0]);
+    const invalidRouteMapPositionInputPath = path.join(outputDir, `${testCase.name}-input.json`);
+    const invalidRouteMapPositionOutputPath = path.join(outputDir, `${testCase.name}-fixture.json`);
+    await writeFile(invalidRouteMapPositionInputPath, `${JSON.stringify(invalidRouteMapPositionInput, null, 2)}\n`);
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/import-official-sources.mjs",
+          "--inventory",
+          "tools/datapack/source-inventory.json",
+          "--input",
+          invalidRouteMapPositionInputPath,
+          "--output",
+          invalidRouteMapPositionOutputPath,
+        ],
+        { cwd: root },
+      ),
+      testCase.expected,
+    );
+  }
+
+  const validatorBypassFixture = JSON.parse(JSON.stringify(importedFixture));
+  validatorBypassFixture.packs[0].networkEdges = validatorBypassFixture.packs[0].networkEdges.map((edge) =>
+    edge.edgeType === "RIDE" ? { ...edge, servicePattern: "LOCAL" } : edge,
+  );
+  const validatorBypassFixturePath = path.join(outputDir, "validator-bypass-local-ride.json");
+  const validatorBypassPackDir = path.join(outputDir, "validator-bypass-local-ride-pack");
+  await writeFile(validatorBypassFixturePath, `${JSON.stringify(validatorBypassFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      validatorBypassFixturePath,
+      "--output",
+      validatorBypassPackDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(validatorBypassPackDir, "current.json"),
+        "--root",
+        validatorBypassPackDir,
+        "--require-production",
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /network_edges LOCAL RIDE edge must connect adjacent station-line sequences/,
+  );
+
+  const nonAdjacentInput = {
+    ...input,
+    routeEdges: input.routeEdges.map((edge) =>
+      edge.edgeType === "RIDE" ? { ...edge, servicePattern: "LOCAL" } : edge,
+    ),
+  };
+  const nonAdjacentInputPath = path.join(outputDir, "non-adjacent-local-ride-input.json");
+  const nonAdjacentFixturePath = path.join(outputDir, "non-adjacent-local-ride.json");
+  await writeFile(nonAdjacentInputPath, `${JSON.stringify(nonAdjacentInput, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        nonAdjacentInputPath,
+        "--output",
+        nonAdjacentFixturePath,
+      ],
+      { cwd: root },
+    ),
+    /production routeEdges LOCAL RIDE edge must connect adjacent station-line sequences/,
+  );
 
   const missingFacilityInputPath = path.join(outputDir, "capital-pilot-production-missing-facility.json");
   await writeFile(
     missingFacilityInputPath,
     `${JSON.stringify(
       {
-        ...input,
+        ...adjacencySafeInput,
         facilityRows: [],
       },
       null,
@@ -7356,8 +8458,8 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
     missingWheelchairLiftEvidenceInputPath,
     `${JSON.stringify(
       {
-        ...input,
-        facilityRows: input.facilityRows.filter((row) => row.id !== "facility-sadang-wheelchair-lift-kric-1"),
+        ...adjacencySafeInput,
+        facilityRows: adjacencySafeInput.facilityRows.filter((row) => row.id !== "facility-sadang-wheelchair-lift-kric-1"),
       },
       null,
       2,
@@ -7385,8 +8487,8 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
     unrealisticRideSpeedInputPath,
     `${JSON.stringify(
       {
-        ...input,
-        routeEdges: input.routeEdges.map((edge) =>
+        ...adjacencySafeInput,
+        routeEdges: adjacencySafeInput.routeEdges.map((edge) =>
           edge.edgeType === "RIDE"
             ? { ...edge, durationSeconds: 420 }
             : edge,
@@ -7490,13 +8592,18 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
       path.join(packOutputDir, "current.provenance.json"),
       "--output",
       coverageReportPath,
+      "--allow-gaps",
     ],
     { cwd: root },
   );
   const coverageReport = JSON.parse(await readFile(coverageReportPath, "utf8"));
-  assert.equal(coverageReport.summary.coverageComplete, true);
-  assert.equal(coverageReport.summary.missingRequirements, 0);
-  assert.equal(coverageReport.summary.coverageRatio, 1);
+  assert.equal(coverageReport.summary.coverageComplete, false);
+  assert.equal(coverageReport.summary.missingRequirements, 1);
+  assert.equal(coverageReport.summary.coverageRatio, 0.6667);
+  assert.deepEqual(
+    coverageReport.requirements.find((requirement) => requirement.sourceDomain === "schedule_timetable").missingFields,
+    ["service_calendar", "trip", "stop_time"],
+  );
 
   const manifest = JSON.parse(await readFile(path.join(packOutputDir, "current.json"), "utf8"));
   assert.equal(manifest.manifestVersion, 2);
@@ -7553,7 +8660,7 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
   const routeMapRecords = provenance.packs[0].records.filter(
     (record) => record.sourceId === "seoulmetro-cyberstation-route-map",
   );
-  assert.equal(routeMapRecords.length, 0);
+  assert.equal(routeMapRecords.length, 4);
   assert.equal(
     provenance.packs[0].records.filter(
       (record) => record.entityType === "facility" && record.field === "status",
@@ -7585,7 +8692,8 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
       entry.operatorId === "seoul-metro" &&
       entry.sourceDomain === "route_map_positions",
   );
-  assert.notEqual(capitalRouteMapCoverage.status, "covered");
+  assert.equal(capitalRouteMapCoverage.status, "covered");
+  assert.deepEqual(capitalRouteMapCoverage.missingFields, []);
 });
 
 test("관리자 검수 NORMAL override는 production 시설 provenance와 validator를 통과한다", async () => {
@@ -8551,6 +9659,54 @@ test("emergency datapack drill은 rollback, patch, route regression 증거를 �
   assert.equal(evidence.verification.commandOutputSha256, sha256('{"failures":[],"sampleSize":100}'));
 });
 
+test("데이터팩 만료 알림 evidence는 SLA 임박 manifest를 FIRING으로 기록한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-expiry-alert-${Date.now()}`);
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const manifestPath = path.join(outputDir, "current.json");
+  const outputPath = path.join(outputDir, "expiry-alert-evidence.json");
+
+  await writeFile(
+    manifestPath,
+    `${JSON.stringify(
+      {
+        manifestVersion: 2,
+        channel: "production",
+        releaseSequence: 42,
+        publishedAt: "2026-07-01T18:00:00.000Z",
+        expiresAt: "2026-07-02T05:30:00.000Z",
+        activePack: { id: "capital", version: "1" },
+        packs: [],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/check-datapack-expiry-alert.mjs",
+      "--manifest",
+      manifestPath,
+      "--output",
+      outputPath,
+      "--now",
+      "2026-07-02T00:00:00.000Z",
+    ],
+    { cwd: root },
+  );
+
+  const evidence = JSON.parse(await readFile(outputPath, "utf8"));
+  assert.equal(evidence.artifactKind, "datapack-expiry-alert-evidence");
+  assert.equal(evidence.policy.alertBeforePackExpiry, "PT6H");
+  assert.equal(evidence.manifest.channel, "production");
+  assert.equal(evidence.manifest.releaseSequence, 42);
+  assert.equal(evidence.alert.status, "FIRING");
+  assert.equal(evidence.alert.severity, "warning");
+  assert.equal(evidence.alert.secondsUntilExpiry, 19800);
+});
+
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -8735,7 +9891,7 @@ function sourceIngestInput() {
         latitude: 37.3028,
         longitude: 126.8666,
         stationCode: "448",
-        lineSequence: 48,
+        lineSequence: 43,
         platformInfo: "당고개 방면 / 오이도 방면",
         lastVerifiedAt: "2026-06-21T00:00:00.000Z",
       },
@@ -8750,7 +9906,7 @@ function sourceIngestInput() {
         latitude: 37.3028,
         longitude: 126.8666,
         stationCode: "448",
-        lineSequence: 48,
+        lineSequence: 43,
         platformInfo: "당고개 방면 / 오이도 방면",
         lastVerifiedAt: "2026-06-21T00:00:00.000Z",
       },
@@ -8765,7 +9921,7 @@ function sourceIngestInput() {
         latitude: 37.4766,
         longitude: 126.9816,
         stationCode: "433",
-        lineSequence: 33,
+        lineSequence: 28,
         platformInfo: "당고개 방면 / 오이도 방면",
         lastVerifiedAt: "2026-06-21T00:00:00.000Z",
       },
@@ -8787,7 +9943,7 @@ function sourceIngestInput() {
         durationSeconds: 1860,
         distanceMeters: 18600,
         edgeType: "RIDE",
-        servicePattern: "LOCAL",
+        servicePattern: "EXPRESS",
         includesStairs: false,
         stairAccessState: "STEP_FREE",
         accessibilityStatus: "AVAILABLE",
@@ -8810,7 +9966,7 @@ function sourceIngestInput() {
         durationSeconds: 1860,
         distanceMeters: 18600,
         edgeType: "RIDE",
-        servicePattern: "LOCAL",
+        servicePattern: "EXPRESS",
         includesStairs: false,
         stairAccessState: "STEP_FREE",
         accessibilityStatus: "AVAILABLE",
@@ -8853,9 +10009,9 @@ function sourceIngestInput() {
 
 function nationwideMasterSourceIngestInput() {
   const stationSources = [
-    ["molit-urban-rail-full-route", "MOLIT-SEOUL-4-448", "seoul-4", "station-sangnoksu", "448", 48, "상록수", "Sangnoksu", "수도권", 37.3028, 126.8666],
-    ["molit-tago-subway-info", "448", "seoul-4", "station-sangnoksu", "448", 48, "상록수", "Sangnoksu", "수도권", 37.3028, 126.8666],
-    ["kric-metropolitan-rail-station-info", "KRIC-SEOUL-4-448", "seoul-4", "station-sangnoksu", "448", 48, "상록수", "Sangnoksu", "수도권", 37.3028, 126.8666],
+    ["molit-urban-rail-full-route", "MOLIT-SEOUL-4-448", "seoul-4", "station-sangnoksu", "448", 43, "상록수", "Sangnoksu", "수도권", 37.3028, 126.8666],
+    ["molit-tago-subway-info", "448", "seoul-4", "station-sangnoksu", "448", 43, "상록수", "Sangnoksu", "수도권", 37.3028, 126.8666],
+    ["kric-metropolitan-rail-station-info", "KRIC-SEOUL-4-448", "seoul-4", "station-sangnoksu", "448", 43, "상록수", "Sangnoksu", "수도권", 37.3028, 126.8666],
     ["molit-urban-rail-full-route", "MOLIT-BUSAN-1-113", "busan-1", "station-busan-station", "113", 13, "부산역", "Busan Station", "부산권", 35.1152, 129.0422],
     ["kric-metropolitan-rail-station-info", "KRIC-BUSAN-1-113", "busan-1", "station-busan-station", "113", 13, "부산역", "Busan Station", "부산권", 35.1152, 129.0422],
   ];
@@ -9706,6 +10862,43 @@ function productionSourceCoverageScope() {
 
 function packSignaturePayload(pack) {
   return `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}:${representativeRouteRegressionPayload(pack.representativeRouteRegressions)}`;
+}
+
+function resignProductionManifest(manifest) {
+  const pack = manifest.packs[0];
+  const packUrl = new URL(pack.url).toString();
+  const fixturePayload = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+  pack.signature.value = rsaSha256Signature(`${fixturePayload}:${packUrl}`);
+  pack.representativeRouteRegressionSignature.value = rsaSha256Signature(
+    `${fixturePayload}:${representativeRouteRegressionPayload(pack.representativeRouteRegressions)}:${packUrl}`,
+  );
+  if (manifest.signature) {
+    manifest.signature.value = rsaSha256Signature(canonicalJson(withoutSignature(manifest)));
+  }
+}
+
+function rsaSha256Signature(value) {
+  return createSign("RSA-SHA256").update(value).sign(testPrivateKeyPem).toString("base64url");
+}
+
+function withoutSignature(value) {
+  const copy = { ...value };
+  delete copy.signature;
+  return copy;
+}
+
+function canonicalJson(value) {
+  return JSON.stringify(canonicalValue(value));
+}
+
+function canonicalValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(canonicalValue);
+  }
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
 }
 
 function representativeRouteRegressionPayload(routes) {
