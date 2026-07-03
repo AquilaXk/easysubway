@@ -3829,22 +3829,48 @@ void main() {
     expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
   });
 
+  testWidgets('오프라인 데이터 안내는 만료된 저장 정보를 갱신 필요로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OfflineDataScreen(
+          expiresAt: DateTime.utc(2026, 6, 25, 12),
+          now: () => DateTime.utc(2026, 6, 25, 12, 1),
+        ),
+      ),
+    );
+
+    expect(find.text('마지막 갱신'), findsOneWidget);
+    expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
+    expect(find.text('갱신 필요'), findsOneWidget);
+  });
+
+  testWidgets('설정의 오프라인 데이터 안내는 저장 manifest 만료를 갱신 필요로 보여준다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppSettingsScreen(
+          currentProfile: mobilityProfileOptions.first,
+          viewPreferences: const OnboardingViewPreferences.defaults(),
+          notificationRepository: null,
+          notificationPermissionProvider: null,
+          onViewPreferencesChanged: (_) async {},
+          onOpenMobilityProfile: () async => null,
+          onOpenSupportAccess: () {},
+          onOpenMyReports: () {},
+          offlineDataExpiresAtLoader: () async => DateTime.utc(2026, 6, 25, 12),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('offlineDataSettingsButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
+    expect(find.text('갱신 필요'), findsOneWidget);
+  });
+
   testWidgets('데이터 및 지도 출처 화면은 manifest와 source inventory를 보여준다', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: DataSourceAttributionScreen()),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.pump();
-
-    expect(
-      find.byKey(const Key('dataSourceAttributionScreen')),
-      findsOneWidget,
-    );
-    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
-
     final manifest =
         jsonDecode(
               File(
@@ -3857,6 +3883,40 @@ void main() {
               File('assets/datapacks/source-inventory.json').readAsStringSync(),
             )
             as Map<String, Object?>;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DataSourceAttributionScreen(
+          initialManifest: manifest,
+          initialInventory: inventory,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('dataSourceAttributionScreen')),
+      findsOneWidget,
+    );
+    expect(find.text('데이터 및 지도 출처'), findsOneWidget);
+    expect(find.byType(Scrollable), findsOneWidget);
+    expect(find.text('현재 앱 표시'), findsOneWidget);
+    expect(
+      find.textContaining('전국 쉬운 길이나 실시간 도착을 보장한다고 말하지 않아요'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(find.text('데이터 품질 Level'), 160);
+    await tester.pumpAndSettle();
+    expect(find.text('데이터 품질 Level'), findsOneWidget);
+    expect(find.text('Level 1-4 품질 기준'), findsOneWidget);
+    expect(
+      find.textContaining('Level 4는 현장 또는 운영기관이 확인한 쉬운 길'),
+      findsOneWidget,
+    );
+    expect(find.text('품질 지표'), findsOneWidget);
+    expect(find.textContaining('필수 시설 근거 비율'), findsOneWidget);
+    expect(find.textContaining('현장 확인 경로 비율'), findsOneWidget);
+
     final maps = (manifest['maps'] as List).cast<Map<String, Object?>>();
     final sources = (inventory['sources'] as List).cast<Map<String, Object?>>();
 
@@ -5669,6 +5729,17 @@ void main() {
       tabKey: const Key('favoriteFacilitiesTabButton'),
     );
     await tester.tap(find.widgetWithText(OutlinedButton, '시설 알려주기'));
+    await tester.pumpAndSettle();
+
+    // 진입 시에는 위치 권한 확인·요청을 하지 않는다.
+    expect(locationProvider.permissionCheckCount, 0);
+    expect(locationProvider.requestCount, 0);
+
+    // 위치 첨부를 켤 때 권한 사용 안내(사용 목적)를 유지한다.
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
     await tester.pumpAndSettle();
 
     expect(locationProvider.permissionCheckCount, 1);
@@ -7692,7 +7763,7 @@ void main() {
           fieldValidationStatus: 'VERIFIED',
         ),
         StationFacilityInfo(
-          id: 'facility-sangnoksu-info-needed',
+          id: 'facility-sangnoksu-operation-unknown',
           stationId: 'station-sangnoksu',
           exitId: 'exit-sangnoksu-3',
           type: 'ESCALATOR',
@@ -7700,7 +7771,7 @@ void main() {
           floorFrom: 'B1',
           floorTo: '1F',
           description: '3번 출구 앞',
-          status: 'NEEDS_CHECK',
+          status: 'UNKNOWN',
           dataConfidence: 'LOW',
           dataSourceType: 'OFFICIAL_FILE',
           lastUpdatedAt: '2026-06-10',
@@ -7751,30 +7822,22 @@ void main() {
       expect(find.text('마지막 확인'), findsOneWidget);
       expect(find.text('2026-06-13'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('안전 안내, 이동 전 현장 안내와 역무원 안내를 확인해 주세요.'),
-        findsOneWidget,
-      );
+      // 상시 안전 안내는 제거됐다(#1497).
+      expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsNothing);
       expect(
         find.bySemanticsLabel(
           '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13',
         ),
         findsOneWidget,
       );
-      expect(
-        find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'),
-        findsOneWidget,
+      // 역 안 이동 안내·순서는 "역 안 이동" 한 섹션으로 통합됐다(#1497).
+      await tester.scrollUntilVisible(
+        find.text('역 안 이동'),
+        120,
+        scrollable: find.byType(Scrollable).last,
       );
-      await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'));
       await tester.pumpAndSettle();
-      expect(find.text('안내 확인 방법'), findsOneWidget);
-      expect(find.text('공식 안내'), findsOneWidget);
-      expectNoForbiddenUserCopy(tester);
-      await tester.tap(find.widgetWithText(OutlinedButton, '안내 확인 방법 접기'));
-      await tester.pumpAndSettle();
-      expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.text('역 안 이동 안내'), findsOneWidget);
+      expect(find.text('역 안 이동'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('승강장'),
         120,
@@ -7789,56 +7852,11 @@ void main() {
         find.bySemanticsLabel('역 안 이동 안내, 1번 출구, 엘리베이터, 승강장'),
         findsOneWidget,
       );
-      await tester.scrollUntilVisible(
-        find.text('지도 위치 목록'),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('지도 위치 목록'), findsOneWidget);
-      expect(find.text('지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다.'), findsNothing);
-      expect(find.text('상록수역'), findsWidgets);
-      expect(find.text('1번 출구'), findsWidgets);
-      expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
-      expect(find.text('2번 출구'), findsNothing);
-      expect(find.bySemanticsLabel('지도 위치 목록'), findsWidgets);
-      await tester.scrollUntilVisible(
+      // 중복 "지도 위치 목록" 섹션은 제거됐다(#1497).
+      expect(find.text('지도 위치 목록'), findsNothing);
+      expect(
         find.byKey(const Key('stationMapTextListItem-station-sangnoksu')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.bySemanticsLabel(
-          '상록수역 자세한 안내, 수도권 2호선, 일부 정보는 확인 중이에요, 마지막 확인 2026-06-13, 지도 위치',
-        ),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('stationMapTextListItem-exit-sangnoksu-1')),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.bySemanticsLabel(
-          '1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 시설 상태가 확인됐어요, 지도 위치',
-        ),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.byKey(
-          const Key('stationMapTextListItem-facility-sangnoksu-elevator-1'),
-        ),
-        120,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.pumpAndSettle();
-      expect(
-        find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 상태가 확인됐어요, 시설 알려주기, 지도 위치',
-        ),
-        findsOneWidget,
+        findsNothing,
       );
       await tester.scrollUntilVisible(
         find.text('출구'),
@@ -7866,7 +7884,7 @@ void main() {
       expect(find.text('이용할 수 없어요'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.byKey(
-          const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
+          const Key('stationFacilityCard-facility-sangnoksu-operation-unknown'),
         ),
         120,
         scrollable: find.byType(Scrollable).last,
@@ -7876,9 +7894,28 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(
-            const Key('stationFacilityCard-facility-sangnoksu-info-needed'),
+            const Key(
+              'stationFacilityCard-facility-sangnoksu-operation-unknown',
+            ),
           ),
-          matching: find.text('상태를 확인하고 있어요'),
+          matching: find.text('설치 확인 · 운행상태 미확인'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const Key(
+              'stationFacilityCard-facility-sangnoksu-operation-unknown',
+            ),
+          ),
+          matching: find.text('이용 가능'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsLabel(
+          '3번 출구 에스컬레이터, 에스컬레이터, 설치 확인 · 운행상태 미확인, 3번 출구 앞, 최근 확인 2026-06-10, 최신 상태를 준비 중이에요, 자세히 보기',
         ),
         findsOneWidget,
       );
@@ -8402,7 +8439,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.requests, hasLength(1));
-    expect(find.text('역 안 이동 순서'), findsOneWidget);
+    expect(find.text('역 안 이동'), findsOneWidget);
     expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('1번 출구 엘리베이터에서 개찰구까지'), findsWidgets);
     expect(find.text('약 1분 15초 · 28m'), findsOneWidget);
@@ -8467,9 +8504,9 @@ void main() {
       'node-sangnoksu-faregate',
     );
     expect(internalRouteRepository.requests.single.mobilityType, 'WHEELCHAIR');
-    await tester.scrollUntilVisible(find.text('역 안 이동 순서'), 500);
+    await tester.scrollUntilVisible(find.text('역 안 이동'), 500);
     await tester.pumpAndSettle();
-    expect(find.text('역 안 이동 순서'), findsOneWidget);
+    expect(find.text('역 안 이동'), findsOneWidget);
     expect(find.text('역 안 이동 경로를 찾았어요'), findsOneWidget);
     expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
   });
@@ -8497,7 +8534,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.nodeStationIds, ['station-sangnoksu']);
-    expect(find.text('역 안 이동 순서'), findsOneWidget);
+    expect(find.text('역 안 이동'), findsOneWidget);
     expect(find.text('역 안 길 안내에 필요한 정보를 찾지 못했어요.'), findsOneWidget);
     expect(find.textContaining('기준점'), findsNothing);
   });
@@ -8991,6 +9028,8 @@ void main() {
       );
       expect(routeRepository.requests.single.mobilityType, 'SENIOR');
       expect(find.text('추천 경로'), findsOneWidget);
+      // 결과 목록 끝에 광고 슬롯(#1496).
+      expect(find.byKey(const Key('routeResultListAdBanner')), findsOneWidget);
       expect(find.text('추천 경로 목록'), findsNothing);
       expect(find.text('편한 순'), findsNothing);
       expect(find.text('빠른 순'), findsNothing);
@@ -9017,7 +9056,11 @@ void main() {
       await tester.pumpAndSettle();
       await _tapFirstRouteResultListItem(tester);
       await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, 600));
+      // 상세는 이제 별도 화면(SingleChildScrollView)으로 push된다.
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, 600),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('경로 목록'), findsOneWidget);
@@ -9061,6 +9104,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('단계별 안내'), findsOneWidget);
+      // 안내 진행 화면에는 광고 슬롯이 노출되지 않는다(#1496).
+      expect(find.byKey(const Key('routeResultListAdBanner')), findsNothing);
+      expect(find.byKey(const Key('routeDetailAdBanner')), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
       expect(find.text('다음'), findsOneWidget);
       expect(
@@ -9471,6 +9517,42 @@ void main() {
     expect(favoriteRouteRepository.savedRouteSearchIds, isEmpty);
   });
 
+  testWidgets('경로 검색 UNKNOWN 결과는 이동 가능 화면 문구로 보이지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(status: 'UNKNOWN'),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 26),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await _openFirstRouteResultDetail(tester);
+
+    expect(find.text('경로 상태를 아직 알 수 없어요'), findsWidgets);
+    expect(find.text('확인 후 이동'), findsOneWidget);
+    expect(find.text('추천 경로'), findsNothing);
+    expect(find.textContaining('이동할 수 있는 경로'), findsNothing);
+    expect(find.byKey(const Key('routeFavoriteSaveButton')), findsNothing);
+    expect(find.byKey(const Key('routeStartGuidanceButton')), findsNothing);
+  });
+
   testWidgets('즐겨찾기 경로 저장 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final stationRepository = FakeStationSearchRepository(
@@ -9760,6 +9842,42 @@ void main() {
       find.byKey(const Key('routeOpenInternalRouteButton')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('로컬 경로 결과는 저장된 데이터 source를 실시간이나 시간표로 표시하지 않는다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              routeSearchId: 'local-station-sangnoksu-station-sadang',
+              etaSource: 'STATIC_LOCAL',
+              sourceUpdatedAt: '2026-06-19T00:00:00Z',
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 23),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('예상 소요시간: 저장된 데이터 기준 · 최근 확인 2026-06-19'), findsOneWidget);
+    expect(find.textContaining('실시간'), findsNothing);
+    expect(find.textContaining('시간표'), findsNothing);
   });
 
   testWidgets('추천 경로 항목은 스크린리더에서 상세 진입 버튼으로 남는다', (tester) async {
@@ -10480,10 +10598,7 @@ void main() {
       await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('사진·위치 확인'), findsOneWidget);
-      await tester.tap(find.text('보내기'));
-      await tester.pumpAndSettle();
-
+      // 사진·위치를 첨부하지 않았으므로 별도 공개 범위 확인 없이 바로 접수된다.
       expect(reportRepository.requests, hasLength(1));
       expect(reportRepository.requests.single.stationId, 'station-sangnoksu');
       expect(
@@ -11126,6 +11241,13 @@ void main() {
     await tester.pumpAndSettle();
     await _continuePhotoUse(tester);
 
+    // 위치 첨부(선택)를 켜서 사진과 위치를 함께 보낸다.
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+
     await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
@@ -11161,7 +11283,7 @@ void main() {
     expect(reportRepository.requests.single.longitude, 126.866221);
   });
 
-  testWidgets('시설 신고 화면은 진입하면 현재 위치를 자동으로 확인한다', (tester) async {
+  testWidgets('시설 신고 화면은 진입 시 위치를 자동 요청하지 않고 버튼을 눌러야 첨부한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     var requestCount = 0;
 
@@ -11190,13 +11312,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(requestCount, 1);
+    // 진입 즉시 위치 요청·다이얼로그가 뜨지 않는다.
+    expect(requestCount, 0);
     expect(find.text('현재 위치 사용'), findsNothing);
-    expect(find.text('현재 위치로 가까운 역을 찾습니다.'), findsNothing);
-    expect(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
-      findsNothing,
+
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
     );
+    await tester.pumpAndSettle();
+
+    expect(requestCount, 1);
+    expect(find.text('현재 위치를 첨부했어요'), findsOneWidget);
   });
 
   testWidgets('시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다', (tester) async {
@@ -11232,6 +11359,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 진입 시에는 권한 확인·요청을 하지 않는다.
+    expect(permissionCheckCount, 0);
+    expect(requestCount, 0);
+    expect(find.text('현재 위치 사용'), findsNothing);
+
+    // 위치 첨부를 켤 때 사용 목적을 먼저 안내한다.
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+
     expect(permissionCheckCount, 1);
     expect(requestCount, 0);
     expect(find.text('현재 위치 사용'), findsOneWidget);
@@ -11240,7 +11379,6 @@ void main() {
       find.text('위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.'),
       findsOneWidget,
     );
-    expect(find.text('현재 위치 첨부됨'), findsNothing);
 
     await tester.tap(find.text('계속'));
     await tester.pumpAndSettle();
@@ -11262,6 +11400,59 @@ void main() {
     expect(reportRepository.requests, hasLength(1));
     expect(reportRepository.requests.single.latitude, 37.302421);
     expect(reportRepository.requests.single.longitude, 126.866221);
+  });
+
+  testWidgets('시설 신고 화면은 위치 권한 확인 중 제출을 막는다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+    final permissionCheckCompleter = Completer<bool>();
+    var requestCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          needsLocationPermissionRequest: () => permissionCheckCompleter.future,
+          locationLoader: () async {
+            requestCount++;
+            return const FacilityReportLocation(
+              latitude: 37.302421,
+              longitude: 126.866221,
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pump();
+
+    final pendingSubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(pendingSubmitButton.onPressed, isNull);
+    expect(reportRepository.requests, isEmpty);
+    expect(requestCount, 0);
+
+    permissionCheckCompleter.complete(false);
+    await tester.pumpAndSettle();
+
+    final readySubmitButton = tester.widget<FilledButton>(
+      find.byKey(const Key('facilityReportSubmitButton')),
+    );
+    expect(readySubmitButton.onPressed, isNotNull);
+    expect(requestCount, 1);
   });
 
   testWidgets('시설 신고 화면은 위치 재확인 중 중복 탭을 무시한다', (tester) async {
@@ -11301,19 +11492,22 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(requestCount, 1);
+    expect(requestCount, 0);
 
-    await tester.dragUntilVisible(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
-      find.byType(Scrollable).first,
-      const Offset(0, -300),
+    // 첫 첨부 시도 → 실패, 버튼이 "위치 다시 찾기"로 바뀐다(같은 키).
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
     );
     await tester.pumpAndSettle();
+    expect(requestCount, 1);
+
+    await _showFacilityReportAttachLocationButton(tester);
     await tester.tap(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
+      find.byKey(const Key('facilityReportAttachLocationButton')),
     );
     await tester.tap(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
+      find.byKey(const Key('facilityReportAttachLocationButton')),
     );
     await tester.pump();
 
@@ -11362,29 +11556,80 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _showFacilityReportSubmitButton(tester);
 
+    // 첫 첨부 시도 → 실패.
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(requestCount, 1);
     expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
+    // 위치는 선택이므로 실패해도 제보 버튼은 활성 상태다.
+    await _showFacilityReportSubmitButton(tester);
     final failedLocationSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
-    expect(failedLocationSubmitButton.onPressed, isNull);
-    expect(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
-      findsOneWidget,
-    );
+    expect(failedLocationSubmitButton.onPressed, isNotNull);
 
+    // 같은 버튼(라벨 "위치 다시 찾기")으로 다시 시도 → 성공.
+    await _showFacilityReportAttachLocationButton(tester);
     await tester.tap(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
+      find.byKey(const Key('facilityReportAttachLocationButton')),
     );
     await tester.pumpAndSettle();
 
     expect(requestCount, 2);
-    expect(find.text('위치 확인됨'), findsNothing);
-    final readySubmitButton = tester.widget<FilledButton>(
-      find.byKey(const Key('facilityReportSubmitButton')),
+    expect(find.text('현재 위치를 첨부했어요'), findsOneWidget);
+  });
+
+  testWidgets('시설 신고 화면은 위치 실패 후 위치 없이 제출하면 실패 안내를 지운다', (tester) async {
+    final reportRepository = FakeFacilityReportRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: reportRepository,
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-elevator-1',
+            facilityName: '1번 출구 엘리베이터',
+            facilityTypeLabel: '엘리베이터',
+            facilityStatusLabel: '정상',
+          ),
+          locationLoader: () async {
+            throw const FacilityReportLocationException(
+              '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.',
+            );
+          },
+          needsLocationPermissionRequest: () async => false,
+        ),
+      ),
     );
-    expect(readySubmitButton.onPressed, isNotNull);
+    await tester.pumpAndSettle();
+
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
+    await _showFacilityReportDescriptionInput(tester);
+    await tester.enterText(
+      find.byKey(const Key('facilityReportDescriptionInput')),
+      '위치 없이 바로 제보합니다.',
+    );
+    await _showFacilityReportSubmitButton(tester);
+    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(reportRepository.requests, hasLength(1));
+    expect(reportRepository.requests.single.latitude, isNull);
+    expect(reportRepository.requests.single.longitude, isNull);
+    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsNothing);
   });
 
   testWidgets('시설 신고 화면은 GPS가 꺼져 있으면 위치 없이 제보를 선택할 수 있다', (tester) async {
@@ -11451,54 +11696,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(locationProvider.requestCount, 1);
-    await tester.dragUntilVisible(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
-      find.byType(Scrollable).first,
-      const Offset(0, -300),
-    );
-    await tester.pumpAndSettle();
+    // 진입 시 위치를 자동 요청하지 않는다.
+    expect(locationProvider.requestCount, 0);
 
-    expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
-    expect(find.text('현재 위치 첨부됨'), findsNothing);
-    expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
-    expect(find.text('위치 확인됨'), findsNothing);
-
+    // 위치를 첨부하지 않아도 제보를 보낼 수 있다(위치는 선택).
     await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
-      '위치가 다르게 표시됩니다.',
+      '위치 없이 빠르게 알립니다.',
     );
-    final failedLocationSubmitButton = tester.widget<FilledButton>(
+    await _showFacilityReportSubmitButton(tester);
+    final submitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
-    expect(failedLocationSubmitButton.onPressed, isNull);
-    expect(
-      find.byKey(const Key('facilityReportSubmitWithoutLocationButton')),
-      findsOneWidget,
-    );
-
-    await tester.tap(
-      find.byKey(const Key('facilityReportSubmitWithoutLocationButton')),
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.text('위치 없이 제보합니다. 정확한 위치를 찾는 데 시간이 걸릴 수 있어요.'),
-      findsOneWidget,
-    );
-
-    final noLocationSubmitButton = tester.widget<FilledButton>(
-      find.byKey(const Key('facilityReportSubmitButton')),
-    );
-    expect(noLocationSubmitButton.onPressed, isNotNull);
+    expect(submitButton.onPressed, isNotNull);
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
-    await tester.pumpAndSettle();
-    expect(find.text('사진·위치 확인'), findsOneWidget);
-    expect(
-      find.text('현재 위치 없이 제보하면 담당자가 위치를 따로 파악해야 할 수 있어요.'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('보내기'));
     await tester.pumpAndSettle();
 
     expect(reportRepository.requests, hasLength(1));
@@ -11569,6 +11781,14 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // 진입 시 자동 요청하지 않고, 첨부 시도 시 GPS 꺼짐 실패 → 설정 열기 버튼 노출.
+    expect(locationProvider.requestCount, 0);
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
     await tester.dragUntilVisible(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
       find.byType(Scrollable).first,
@@ -11620,6 +11840,15 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    // 첨부 시도 → GPS 꺼짐 실패.
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pumpAndSettle();
+    expect(requestCount, 1);
+
     await tester.dragUntilVisible(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
       find.byType(Scrollable).first,
@@ -11627,15 +11856,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 설정을 여는 중에는 위치 재확인(다시 찾기) 버튼이 눌리지 않는다.
     await tester.tap(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
     );
     await tester.pump();
     await tester.ensureVisible(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
+      find.byKey(const Key('facilityReportAttachLocationButton')),
     );
     await tester.tap(
-      find.byKey(const Key('facilityReportRetryLocationButton')),
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+      warnIfMissed: false,
     );
     await tester.pump();
 
@@ -11711,17 +11942,22 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('시설 알려주기'), findsOneWidget);
-    await _showFacilityReportDescriptionInput(tester);
+    // 위치는 자동 요청되지 않는다. 첨부 버튼으로 켠 뒤 첨부된다.
+    expect(locationProvider.requestCount, 0);
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
     await tester.pumpAndSettle();
-    expect(find.text('현재 위치 첨부됨'), findsNothing);
-    expect(find.text('현재 위치가 첨부되었습니다.'), findsNothing);
-    expect(find.text('위치 확인됨'), findsNothing);
     expect(locationProvider.requestCount, 1);
+    expect(find.text('현재 위치를 첨부했어요'), findsOneWidget);
 
+    await _showFacilityReportDescriptionInput(tester);
     await tester.enterText(
       find.byKey(const Key('facilityReportDescriptionInput')),
       '승강기 앞에서 확인했습니다.',
     );
+    await _showFacilityReportSubmitButton(tester);
     await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
     await tester.pumpAndSettle();
 
@@ -11764,14 +12000,17 @@ void main() {
     );
     await tester.pump();
 
-    await _showFacilityReportDescriptionInput(tester);
+    // 위치 첨부를 켜면 확인 중(로딩 스피너)에는 제출이 잠시 막힌다.
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
+    await tester.pump();
 
     final loadingSubmitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
     expect(loadingSubmitButton.onPressed, isNull);
-    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
-    await tester.pump();
     expect(reportRepository.requests, isEmpty);
 
     locationCompleter.complete(
@@ -11845,27 +12084,42 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await _showFacilityReportDescriptionInput(tester);
+
+    // 첨부 시도 → 권한 거부 실패 안내를 쉬운 문구로 보여준다.
+    await _showFacilityReportAttachLocationButton(tester);
+    await tester.tap(
+      find.byKey(const Key('facilityReportAttachLocationButton')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치를 사용할 수 없어요.'), findsOneWidget);
-    expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
+    // GPS off가 아닌 권한 거부라 설정 버튼은 없고, 위치 없이도 제출할 수 있다.
     expect(
       find.byKey(const Key('facilityReportOpenLocationSettingsButton')),
       findsNothing,
     );
-    final failedLocationSubmitButton = tester.widget<FilledButton>(
+    await _showFacilityReportSubmitButton(tester);
+    final submitButton = tester.widget<FilledButton>(
       find.byKey(const Key('facilityReportSubmitButton')),
     );
-    expect(failedLocationSubmitButton.onPressed, isNull);
-    expect(
-      find.byKey(const Key('facilityReportSubmitWithoutLocationButton')),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('facilityReportSubmitButton')));
-    await tester.pump();
-    expect(reportRepository.requests, isEmpty);
+    expect(submitButton.onPressed, isNotNull);
   });
+}
+
+Future<void> _showFacilityReportAttachLocationButton(
+  WidgetTester tester,
+) async {
+  final finder = find.byKey(const Key('facilityReportAttachLocationButton'));
+  if (finder.evaluate().isNotEmpty) {
+    await tester.ensureVisible(finder);
+  } else {
+    await tester.dragUntilVisible(
+      finder,
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+  }
+  await tester.pumpAndSettle();
 }
 
 Future<void> _showFacilityReportDescriptionInput(WidgetTester tester) async {
@@ -13191,6 +13445,8 @@ RouteSearchResult _sampleRouteSearchResult({
   String routeSearchId = 'route-1',
   String status = 'FOUND',
   String mobilityType = 'SENIOR',
+  String etaSource = '',
+  String sourceUpdatedAt = '',
   List<RouteSearchStep>? steps,
   List<String> recommendationReasons = const [
     '엘리베이터 동선을 우선했어요',
@@ -13261,6 +13517,8 @@ RouteSearchResult _sampleRouteSearchResult({
     recommendationReasons: recommendationReasons,
     blockedReasons: [],
     createdAt: '2026-06-13T04:20:00',
+    etaSource: etaSource,
+    sourceUpdatedAt: sourceUpdatedAt,
   );
 }
 
