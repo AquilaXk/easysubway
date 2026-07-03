@@ -3973,6 +3973,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /routeGraphTopologySha256: hashFile\(process\.env\.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT\)/);
   assert.match(workflow, /headwayReportSha256: hashFile\(process\.env\.EASYSUBWAY_HEADWAY_REPORT\)/);
   assert.match(workflow, /const routeGraphTopologyViolationCount = \[/);
+  assert.match(workflow, /"nonAdjacentExpressRideViolationCount"/);
   assert.match(workflow, /const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0/);
   assert.match(workflow, /const headwayEvidenceCount =/);
   assert.match(workflow, /const headwayReportStatus = headwayEvidenceCount > 0/);
