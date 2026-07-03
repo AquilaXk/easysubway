@@ -5694,6 +5694,12 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
 
     const productionSource = inventory.sources.find(({ id }) => id === candidate.productionInventoryReferenceId);
     assert.ok(productionSource, `${candidate.productionInventoryReferenceId} must exist in source inventory`);
+    for (const field of candidate.evidence.outputFields) {
+      assert.ok(
+        productionSource.fieldsProvided.includes(field),
+        `${candidate.productionInventoryReferenceId} fieldsProvided must include ${field}`,
+      );
+    }
     assert.equal(productionSource.requiredForProductionPack, false);
     assert.equal(productionSource.capabilities.realtime.status, "CANDIDATE");
     assert.equal(productionSource.capabilities.realtime.productionUseAllowed, false);
