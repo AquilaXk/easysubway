@@ -193,6 +193,21 @@ function validateAdminReview({ adminReview, candidateId, sample, snapshot, args 
   if (!adminReview.productionSource || adminReview.productionSource.id !== adminReview.sourceId) {
     throw new Error("adminReview.productionSource.id must match adminReview.sourceId");
   }
+  const productionAdmissionEvidence = adminReview.productionSource.admissionEvidence;
+  if (productionAdmissionEvidence != null) {
+    if (typeof productionAdmissionEvidence !== "object" || Array.isArray(productionAdmissionEvidence)) {
+      throw new Error("adminReview.productionSource.admissionEvidence must be an object");
+    }
+    validateQuotaEvidence(
+      productionAdmissionEvidence.quotaEvidence,
+      "adminReview.productionSource.admissionEvidence.quotaEvidence",
+    );
+    const productionQuota = JSON.stringify(sortJson(productionAdmissionEvidence.quotaEvidence));
+    const adminQuota = JSON.stringify(sortJson(adminReview.quotaEvidence));
+    if (productionQuota !== adminQuota) {
+      throw new Error("adminReview.productionSource.admissionEvidence.quotaEvidence must match adminReview.quotaEvidence");
+    }
+  }
   const fieldsProvided = new Set(adminReview.productionSource.fieldsProvided ?? []);
   for (const field of sample.fields) {
     if (!fieldsProvided.has(field)) {
