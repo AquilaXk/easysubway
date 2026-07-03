@@ -4967,7 +4967,7 @@ class _DataSourceAttributionScreenState
                         iconColor: EasySubwayAccessibleColors.mintDark,
                         title: 'Level 1-4 품질 기준',
                         subtitle:
-                            'Level 1은 역·노선 분모, Level 2는 시설 근거, Level 3은 운행상태와 freshness, Level 4는 현장 또는 운영기관 검증 pathway를 확인해요.',
+                            'Level 1은 역·노선 수, Level 2는 필수 시설 근거, Level 3은 운행상태와 최신 여부, Level 4는 현장 또는 운영기관이 확인한 쉬운 길을 봐요.',
                       ),
                     ),
                     const _AppCard(
@@ -4976,7 +4976,7 @@ class _DataSourceAttributionScreenState
                         iconColor: EasySubwayAccessibleColors.amber,
                         title: '품질 지표',
                         subtitle:
-                            'requiredFacilityEvidenceCoverageRatio, operationalKnownRatio, freshnessValidRatio, strictRouteEligibleFacilityRatio, fieldVerifiedPathwayRatio로 확인해요.',
+                            '필수 시설 근거 비율, 운행상태 확인 비율, 최신 정보 비율, 검증된 쉬운 길 비율, 현장 확인 경로 비율을 함께 확인해요.',
                       ),
                     ),
                     const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
