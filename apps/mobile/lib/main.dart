@@ -4960,6 +4960,25 @@ class _DataSourceAttributionScreenState
                     ),
                     const _AppSectionTitle(title: '지도 표시용 asset'),
                     for (final map in maps) _AttributionCard.map(map, manifest),
+                    const _AppSectionTitle(title: '데이터 품질 Level'),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.verified_outlined,
+                        iconColor: EasySubwayAccessibleColors.mintDark,
+                        title: 'Level 1-4 품질 기준',
+                        subtitle:
+                            'Level 1은 역·노선 분모, Level 2는 시설 근거, Level 3은 운행상태와 freshness, Level 4는 현장 또는 운영기관 검증 pathway를 확인해요.',
+                      ),
+                    ),
+                    const _AppCard(
+                      child: _AppInfoRow(
+                        icon: Icons.analytics_outlined,
+                        iconColor: EasySubwayAccessibleColors.amber,
+                        title: '품질 지표',
+                        subtitle:
+                            'requiredFacilityEvidenceCoverageRatio, operationalKnownRatio, freshnessValidRatio, strictRouteEligibleFacilityRatio, fieldVerifiedPathwayRatio로 확인해요.',
+                      ),
+                    ),
                     const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
                     for (final source in sources)
                       _AttributionCard.source(source),

@@ -3883,6 +3883,20 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('데이터 및 지도 출처'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('데이터 품질 Level'), 160);
+    await tester.pumpAndSettle();
+    expect(find.text('데이터 품질 Level'), findsOneWidget);
+    expect(find.text('Level 1-4 품질 기준'), findsOneWidget);
+    expect(
+      find.textContaining('Level 4는 현장 또는 운영기관 검증 pathway'),
+      findsOneWidget,
+    );
+    expect(find.text('품질 지표'), findsOneWidget);
+    expect(
+      find.textContaining('requiredFacilityEvidenceCoverageRatio'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('fieldVerifiedPathwayRatio'), findsOneWidget);
 
     final manifest =
         jsonDecode(
