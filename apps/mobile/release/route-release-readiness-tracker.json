@@ -43,7 +43,13 @@
     { "number": 1410, "area": "mobile-user-claim", "releaseBlocker": true },
     { "number": 1411, "area": "data-accessibility-coverage", "releaseBlocker": true },
     { "number": 1412, "area": "backend-planner", "releaseBlocker": true },
-    { "number": 1413, "area": "backend-planner", "releaseBlocker": true }
+    { "number": 1413, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1415, "area": "offline-datapack", "releaseBlocker": true },
+    { "number": 1416, "area": "realtime-overlay", "releaseBlocker": true },
+    { "number": 1417, "area": "contract-tests-gate", "releaseBlocker": true },
+    { "number": 1418, "area": "datapack-release", "releaseBlocker": true },
+    { "number": 1620, "area": "backend-planner", "releaseBlocker": true },
+    { "number": 1621, "area": "realtime-overlay", "releaseBlocker": true }
   ],
   "completionCriteria": {
     "allRequiredChildIssuesClosed": true,
@@ -53,6 +59,7 @@
       "artifacts/route-accuracy-report.json",
       "artifacts/route-accessibility-regression-report.json",
       "artifacts/realtime-provider-coverage-report.json",
+      "artifacts/route-graph-coverage-report.json",
       "artifacts/route-v2-contract-report.json"
     ],
     "androidRouteResultUiEvidenceRequired": true,
