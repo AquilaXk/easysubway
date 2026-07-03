@@ -29,6 +29,7 @@ const facilityEvidenceProvenanceColumns = [
   "retrieved_at",
 ];
 const productionFacilityProvenanceKinds = ["OFFICIAL_SOURCE", "OPERATOR_CONFIRMED", "FIELD_SURVEY"];
+const positiveFacilityStatuses = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"];
 const allowedRealtimeDatapackTables = new Set([
   "realtime_provider_line_mappings",
   "realtime_provider_station_mappings",
@@ -1358,7 +1359,6 @@ function validateProductionFacilityEvidenceConfidence(confidence, pack, tableNam
 }
 
 function validateProductionFacilityPositiveStatus(row, statusMeaning, pack) {
-  const positiveFacilityStatuses = ["NORMAL", "AVAILABLE", "IN_SERVICE", "OPERATING", "OPEN", "ADMIN_VERIFIED"];
   const positiveStatus = [row.status, row.operational_status].some((status) =>
     positiveFacilityStatuses.includes(String(status ?? "").toUpperCase()),
   );
