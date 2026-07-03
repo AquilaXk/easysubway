@@ -1148,8 +1148,15 @@ void main() {
         matching: find.byType(InkWell),
       ),
     );
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 300));
+    for (var attempt = 0; attempt < 30; attempt += 1) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text('지도 표시용 asset').evaluate().isNotEmpty) {
+        break;
+      }
+    }
 
     expect(
       find.byKey(const Key('dataSourceAttributionScreen')),
