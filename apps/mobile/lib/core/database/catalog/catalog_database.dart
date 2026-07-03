@@ -220,7 +220,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             stationId: 'station-sangnoksu',
             lineId: 'seoul-4',
             stationCode: const Value('448'),
-            lineSequence: 48,
+            lineSequence: 43,
             platformInfo: const Value('당고개 방면 / 오이도 방면'),
           ),
           StationLinesCompanion.insert(
@@ -234,7 +234,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             stationId: 'station-sadang',
             lineId: 'seoul-4',
             stationCode: const Value('433'),
-            lineSequence: 33,
+            lineSequence: 28,
             platformInfo: const Value('당고개 방면 / 오이도 방면'),
           ),
         ]);
