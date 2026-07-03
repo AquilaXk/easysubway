@@ -7010,6 +7010,7 @@ test("source admission pipeline은 custom candidates를 최종 inventory 검증�
 test("source inventory 검증기는 admitted candidate의 quota evidence 누락을 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-admission-quota-${Date.now()}`);
   const inventoryPath = path.join(outputDir, "source-inventory.json");
+  const promotedInventoryPath = path.join(outputDir, "source-inventory.quota-blocked-production.json");
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
 
@@ -7029,6 +7030,25 @@ test("source inventory 검증기는 admitted candidate의 quota evidence 누락�
       { cwd: root },
     ),
     /seoul-realtime-arrival-station-info\.admissionEvidence\.quotaEvidence must be an object/,
+  );
+
+  const promotedInventory = JSON.parse(await readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8"));
+  const promotedSource = promotedInventory.sources.find((entry) => entry.id === "molit-tago-subway-info");
+  promotedSource.capabilities.schedule.status = "SUPPORTED";
+  promotedSource.capabilities.schedule.productionUseAllowed = true;
+  await writeFile(promotedInventoryPath, `${JSON.stringify(promotedInventory, null, 2)}\n`);
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-inventory.mjs",
+        "--inventory",
+        promotedInventoryPath,
+      ],
+      { cwd: root },
+    ),
+    /molit-tago-subway-info\.admissionEvidence\.quotaEvidence\.productionUseAllowed must be true when source has production capability/,
   );
 });
 

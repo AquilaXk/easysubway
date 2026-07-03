@@ -214,11 +214,11 @@ function validateAdmittedCandidateEvidence(inventory, candidates) {
     if (!source) {
       throw new Error(`${candidate.id} admitted candidate missing production inventory source: ${sourceId}`);
     }
-    validateAdmissionEvidence(source.admissionEvidence, candidate, sourceId);
+    validateAdmissionEvidence(source.admissionEvidence, candidate, source, sourceId);
   }
 }
 
-function validateAdmissionEvidence(evidence, candidate, sourceId) {
+function validateAdmissionEvidence(evidence, candidate, source, sourceId) {
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
     throw new Error(`${sourceId}.admissionEvidence must be an object for admitted candidate ${candidate.id}`);
   }
@@ -260,6 +260,17 @@ function validateAdmissionEvidence(evidence, candidate, sourceId) {
     throw new Error(`${sourceId}.admissionEvidence.admissionDurationSeconds must be a non-negative integer`);
   }
   validateQuotaEvidence(evidence.quotaEvidence, `${sourceId}.admissionEvidence.quotaEvidence`);
+  if (sourceHasProductionCapability(source) && evidence.quotaEvidence.productionUseAllowed !== true) {
+    throw new Error(
+      `${sourceId}.admissionEvidence.quotaEvidence.productionUseAllowed must be true when source has production capability`,
+    );
+  }
+}
+
+function sourceHasProductionCapability(source) {
+  return ["schedule", "realtime", "facility"].some(
+    (capabilityName) => source.capabilities?.[capabilityName]?.productionUseAllowed === true,
+  );
 }
 
 function validateQuotaEvidence(quotaEvidence, label) {
