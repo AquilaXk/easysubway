@@ -8069,6 +8069,49 @@ test("TAGO 시간표 sample validator는 JSON serviceKey credential을 거부한
   );
 });
 
+test("TAGO 시간표 sample validator는 destination field가 sample 전체에서 사라지면 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-missing-destination-${Date.now()}.json`);
+  await writeFile(samplePath, JSON.stringify({
+    response: {
+      body: {
+        items: {
+          item: {
+            subwayRouteId: "MTRKR4",
+            subwayStationId: "MTRKR4448",
+            subwayStationNm: "상록수",
+            dailyTypeCode: "01",
+            upDownTypeCode: "U",
+            depTime: "080500",
+            arrTime: "080500",
+          },
+        },
+      },
+    },
+  }));
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /missing observed field: endSubwayStationNm/,
+  );
+});
+
+test("TAGO 시간표 sample validator는 함수 import만으로 CLI를 실행하지 않는다", async () => {
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      "import { validateTagoScheduleSample } from './tools/datapack/validate-tago-schedule-sample.mjs'; console.log(typeof validateTagoScheduleSample);",
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  assert.equal(stdout.trim(), "function");
+});
+
 test("TAGO 시간표 sample validator는 duplicate serviceKey credential을 거부한다", async () => {
   const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-duplicate-secret-${Date.now()}.json`);
   await writeFile(

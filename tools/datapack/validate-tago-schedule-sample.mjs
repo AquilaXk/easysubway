@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const REQUIRED_FIELDS = [
   "subwayRouteId",
@@ -11,6 +12,11 @@ const REQUIRED_FIELDS = [
   "upDownTypeCode",
   "depTime",
   "arrTime",
+];
+const OBSERVED_FIELDS = [
+  ...REQUIRED_FIELDS,
+  "endSubwayStationNm",
+  "endSubwayStationId",
 ];
 const DAILY_TYPE_CODES = new Set(["01", "02", "03"]);
 const UP_DOWN_CODES = new Set(["U", "D"]);
@@ -46,6 +52,12 @@ function validateTagoScheduleSample(rawText) {
   const rows = normalizeRows(payload.response?.body?.items?.item);
   if (rows.length === 0) {
     throw new Error("TAGO schedule sample has no rows");
+  }
+  const observedFields = new Set(rows.flatMap((row) => Object.keys(row)));
+  for (const field of OBSERVED_FIELDS) {
+    if (!observedFields.has(field)) {
+      throw new Error(`TAGO schedule sample missing observed field: ${field}`);
+    }
   }
 
   let previousDeparture = -1;
@@ -167,7 +179,9 @@ async function main() {
 
 export { validateTagoScheduleSample };
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}
