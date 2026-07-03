@@ -5682,6 +5682,14 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
   assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
   assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
   assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
+  assert.deepEqual(candidate.evidence.scheduleImporterValidation, {
+    status: "validated_station_timetable_projection",
+    tool: "tools/datapack/validate-tago-schedule-sample.mjs",
+    validatedAt: "2026-07-03",
+    validatedRawSha256: candidate.evidence.liveSampleRawSha256,
+    productionCanonicalStopTimesStatus: "blocked_requires_trip_stop_sequence",
+    plannedEtaUseAllowed: false,
+  });
   assert.equal(productionSourceIds.has(candidate.id), true, "TAGO inventory entry exists but must remain non-production");
 
   const inventorySource = inventory.sources.find(({ id }) => id === "molit-tago-subway-info");
@@ -5692,8 +5700,8 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
 
   assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
   assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
-  assert.equal(candidate.capabilities.schedule.coverageStatus, "IMPORTER_VALIDATION_REQUIRED");
-  assert.deepEqual(candidate.evidence.missingEvidence, ["scheduleImporterValidation"]);
+  assert.equal(candidate.capabilities.schedule.coverageStatus, "TRIP_STOP_SEQUENCE_REQUIRED");
+  assert.deepEqual(candidate.evidence.missingEvidence, ["tripStopSequenceSource", "adminReview"]);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
   assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
