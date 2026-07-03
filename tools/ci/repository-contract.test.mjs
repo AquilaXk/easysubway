@@ -261,6 +261,8 @@ test("README fixes production routing graph admission policy", () => {
     "인접 `lineSequence`",
     "regression fixture",
     "`EXPRESS`",
+    "release-blocking",
+    "nonAdjacentExpressRide",
     "station-line(`stationId:lineId`)",
     "`platformInfo`",
     "canonical route map position",
@@ -3992,6 +3994,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /routeGraphTopologySha256: hashFile\(process\.env\.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT\)/);
   assert.match(workflow, /headwayReportSha256: hashFile\(process\.env\.EASYSUBWAY_HEADWAY_REPORT\)/);
   assert.match(workflow, /const routeGraphTopologyViolationCount = \[/);
+  assert.match(workflow, /"nonAdjacentExpressRideViolationCount"/);
   assert.match(workflow, /const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0/);
   assert.match(workflow, /const headwayEvidenceCount =/);
   assert.match(workflow, /const headwayReportStatus = headwayEvidenceCount > 0/);
@@ -4777,7 +4780,15 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     excludedPatterns: ["TRANSFER", "MULTI_TRANSFER", "LOOP_BRANCH", "EXPRESS_LOCAL"],
     claim: productionInput.routeRegressionScope.claim,
   });
-  assert.match(productionInput.routeRegressionScope.claim, /direct ride only/);
+  assert.match(productionInput.routeRegressionScope.claim, /direct regression only/);
+  assert.deepEqual(productionInput.routeGraphTopologyPolicy, {
+    summaryRideEdges: "release-blocking-regression-only",
+    productionReadinessRequirement: "replace summary RIDE edges with adjacent-station LOCAL RIDE edges before ETA or release-readiness claim",
+    nonAdjacentExpressRideEdgeIds: [
+      "edge-sangnoksu-sadang-seoul-4",
+      "edge-sadang-sangnoksu-seoul-4",
+    ],
+  });
   assert.deepEqual(productionInput.representativeRouteRegressions.map((route) => route.pattern), ["DIRECT"]);
   for (const edge of productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE")) {
     const speedKmh = (edge.distanceMeters / edge.durationSeconds) * 3.6;
