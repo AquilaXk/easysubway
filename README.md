@@ -11,6 +11,14 @@
 - 지역별 데이터 품질은 Level 1-4로 구분하고, 신뢰도와 마지막 갱신일을 숨기지 않습니다.
 - 초기 현장 검증 지역은 상록수역입니다.
 
+## Data Quality Levels
+
+- Level 1: 역·노선 기본 식별 정보와 출처가 있고, `stationCount`/`edgeCount`로 분모를 공개합니다.
+- Level 2: 역-노선 × 필수 시설 유형 근거가 채워지며, `requiredFacilityEvidenceCoverageRatio`로 측정합니다.
+- Level 3: 운행상태와 freshness가 확인된 시설만 경로 근거로 쓰며, `operationalKnownRatio`와 `freshnessValidRatio`로 측정합니다.
+- Level 4: 현장 또는 운영기관 검증 pathway만 교통약자 경로 claim에 쓰며, `strictRouteEligibleFacilityRatio`와 `fieldVerifiedPathwayRatio`로 측정합니다.
+- `unknownEdgeRatioByProfile`은 휠체어·유모차·저이동성 profile에서 UNKNOWN edge가 strict 경로를 만들지 않는지 확인하는 보조 차단 지표입니다.
+
 ## Stack
 
 - Mobile: Flutter, Dart, Riverpod, go_router, Dio, Drift
