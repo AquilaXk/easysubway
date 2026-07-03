@@ -38,8 +38,8 @@ function parseArgs(argv) {
 
 function validateTagoScheduleSample(rawText) {
   const canonicalRawText = rawText.trimEnd();
-  rejectCredentialLeak(rawText);
   const payload = JSON.parse(canonicalRawText);
+  rejectCredentialLeak(canonicalRawText, payload);
   if (payload.response?.header && payload.response.header.resultCode !== "00") {
     throw new Error(`TAGO response is not normal service: ${payload.response?.header?.resultCode ?? "missing"}`);
   }
@@ -124,9 +124,24 @@ function parseHhmmss(value, label) {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
-function rejectCredentialLeak(rawText) {
+function rejectCredentialLeak(rawText, parsed, pathParts = []) {
   if (/serviceKey=(?!\[서비스키값\])[^&\s"]+/i.test(rawText)) {
     throw new Error("TAGO schedule sample must not contain serviceKey credentials");
+  }
+  if (Array.isArray(parsed)) {
+    for (const [index, item] of parsed.entries()) {
+      rejectCredentialLeak("", item, [...pathParts, String(index)]);
+    }
+    return;
+  }
+  if (!parsed || typeof parsed !== "object") {
+    return;
+  }
+  for (const [key, value] of Object.entries(parsed)) {
+    if (/serviceKey/i.test(key) && value !== "[서비스키값]") {
+      throw new Error(`TAGO schedule sample must not contain serviceKey credentials: ${[...pathParts, key].join(".")}`);
+    }
+    rejectCredentialLeak("", value, [...pathParts, key]);
   }
 }
 

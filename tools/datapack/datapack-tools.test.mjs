@@ -8034,6 +8034,39 @@ test("TAGO 시간표 sample validator는 잘못된 시간 row를 거부한다", 
   );
 });
 
+test("TAGO 시간표 sample validator는 JSON serviceKey credential을 거부한다", async () => {
+  const samplePath = path.join(tmpdir(), `easysubway-tago-schedule-secret-${Date.now()}.json`);
+  await writeFile(samplePath, JSON.stringify({
+    serviceKey: "secret",
+    response: {
+      body: {
+        items: {
+          item: {
+            endSubwayStationNm: "당고개",
+            subwayRouteId: "MTRKR4",
+            subwayStationId: "MTRKR4448",
+            subwayStationNm: "상록수",
+            dailyTypeCode: "01",
+            upDownTypeCode: "U",
+            depTime: "080500",
+            arrTime: "080500",
+            endSubwayStationId: "MTRKR4409",
+          },
+        },
+      },
+    },
+  }));
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-tago-schedule-sample.mjs", "--sample", samplePath],
+      { cwd: root, env: productionEnv },
+    ),
+    /serviceKey credentials/,
+  );
+});
+
 test("공식 source ingest adapter는 station-line 단위 facility evidence coverage를 요구한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-facility-line-coverage-${Date.now()}`);
   const input = productionSourceIngestInput();
