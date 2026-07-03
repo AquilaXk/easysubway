@@ -3890,6 +3890,10 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /Data Pack Release \/ Write route graph topology evidence/);
   assert.match(workflow, /EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT/);
   assert.match(workflow, /tools\/datapack\/build-route-graph-topology-report\.mjs/);
+  assert.match(workflow, /Data Pack Release \/ Write headway evidence/);
+  assert.match(workflow, /EASYSUBWAY_HEADWAY_REPORT/);
+  assert.match(workflow, /tools\/datapack\/build-headway-report\.mjs/);
+  assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_BUILD_FIXTURE\}"/);
   assert.match(workflow, /Data Pack Release \/ Validate release evidence bundle/);
   assert.match(workflow, /tools\/datapack\/validate-release-evidence-bundle\.mjs/);
   assert.match(workflow, /--build-spec "\$\{EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH\}"/);
@@ -3897,9 +3901,14 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /sourceSnapshotSetHash: releaseHash\("sourceSnapshotSetHash"\)/);
   assert.match(workflow, /approvedOverrideSetHash: releaseHash\("approvedOverrideSetHash"\)/);
   assert.match(workflow, /routeGraphTopologySha256: hashFile\(process\.env\.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT\)/);
+  assert.match(workflow, /headwayReportSha256: hashFile\(process\.env\.EASYSUBWAY_HEADWAY_REPORT\)/);
   assert.match(workflow, /const routeGraphTopologyViolationCount = \[/);
   assert.match(workflow, /const routeGraphTopologyStatus = routeGraphTopologyViolationCount === 0/);
+  assert.match(workflow, /const headwayEvidenceCount =/);
+  assert.match(workflow, /const headwayReportStatus = headwayEvidenceCount > 0/);
+  assert.match(workflow, /"DEFERRED"/);
   assert.match(workflow, /routeGraphTopologyStatus,/);
+  assert.match(workflow, /headwayReportStatus,/);
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
   assert.match(workflow, /--verify-only/);
@@ -3921,12 +3930,17 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     "routeMapPositionCoverageStatus",
     "routeGraphTopologySha256",
     "routeGraphTopologyStatus",
+    "headwayReportSha256",
+    "headwayReportStatus",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
     "strictRouteRegressionStatus",
   ]) {
     assert.ok(releaseEvidenceBundleSchema.required.includes(field), `${field} must be required`);
   }
+  assert.equal(releaseEvidenceBundleSchema.properties.headwayReportStatus.$ref, "#/$defs/headwayGateStatus");
+  assert.equal(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"), false);
+  assert.equal(releaseEvidenceBundleSchema.$defs.headwayGateStatus.enum.includes("DEFERRED"), true);
 });
 
 test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 credential preflight를 사용한다", () => {
@@ -4270,12 +4284,14 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "coverageSummarySha256",
     "routeMapPositionCoverageSha256",
     "routeGraphTopologySha256",
+    "headwayReportSha256",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
     "validatorStatus",
     "coverageStatus",
     "routeMapPositionCoverageStatus",
     "routeGraphTopologyStatus",
+    "headwayReportStatus",
     "strictRouteRegressionStatus",
     "manifestSignatureStatus",
     "androidEvidenceStatus",
