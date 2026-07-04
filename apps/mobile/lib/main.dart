@@ -2586,51 +2586,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   ),
                 ],
               ),
-              _AppSettingsSection(
-                key: const Key('settingsSection-region-data'),
-                title: '저장된 안내',
-                children: [
-                  _AppSettingsActionTile(
-                    key: const Key('offlineDataSettingsButton'),
-                    icon: Icons.offline_pin_outlined,
-                    title: '인터넷 없이 이용',
-                    subtitle: '노선도와 역 정보 사용 범위를 확인해요',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => OfflineDataScreen(
-                            expiresAtLoader: widget.offlineDataExpiresAtLoader,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  _AppSettingsActionTile(
-                    key: const Key('dataSourceAttributionSettingsButton'),
-                    icon: Icons.source_outlined,
-                    title: '데이터 및 지도 출처',
-                    subtitle: '지도와 경로 판단 자료의 출처와 이용 조건을 확인해요',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const DataSourceAttributionScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-              _AppSettingsSection(
-                key: const Key('settingsSection-notification'),
-                title: '알림',
-                children: [
-                  if (widget.notificationRepository == null)
-                    const _AppSettingsInfoTile(
-                      icon: Icons.notifications_off_outlined,
-                      title: '알림은 아직 사용할 수 없어요',
-                      subtitle: '시설 상태와 제보 진행 상황은 앱 안에서 확인할 수 있어요',
-                    )
-                  else
+              // '저장된 안내'(인터넷 없이 이용·데이터 출처) 섹션 제거(#1570):
+              // 오프라인 동작은 설명 없이 그냥 되는 것이고, 데이터·지도 출처는
+              // 도움말·문의 하위에 이미 있어 중복 진입을 없앤다.
+              if (widget.notificationRepository != null)
+                _AppSettingsSection(
+                  key: const Key('settingsSection-notification'),
+                  title: '알림',
+                  children: [
                     _AppSettingsActionTile(
                       key: const Key('notificationSettingsButton'),
                       icon: Icons.notifications_active_outlined,
@@ -2648,8 +2611,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         );
                       },
                     ),
-                ],
-              ),
+                  ],
+                ),
               _AppSettingsSection(
                 key: const Key('settingsSection-activity'),
                 title: '내 활동',
@@ -2658,7 +2621,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     key: const Key('myReportsSettingsButton'),
                     icon: Icons.receipt_long_outlined,
                     title: '내 제보',
-                    subtitle: '접수한 시설 제보와 진행 상황을 확인해요',
                     onTap: widget.onOpenMyReports,
                   ),
                 ],
@@ -2671,7 +2633,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     key: const Key('settingsSupportPrivacyButton'),
                     icon: Icons.help_outline,
                     title: '도움말·문의',
-                    subtitle: '사용법, 개인정보, 문의 경로를 확인해요',
                     onTap: widget.onOpenSupportAccess,
                   ),
                 ],
@@ -2754,21 +2715,23 @@ class _AppSettingsActionTile extends StatelessWidget {
   const _AppSettingsActionTile({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     required this.onTap,
     super.key,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
+  // 제목만으로 자명한 행은 회색 부가설명을 생략한다(#1570).
+  final String? subtitle;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final subtitle = this.subtitle;
     return Semantics(
       button: true,
-      label: '$title, $subtitle',
+      label: subtitle == null ? title : '$title, $subtitle',
       onTap: onTap,
       child: ExcludeSemantics(
         child: ListTile(
@@ -2784,61 +2747,20 @@ class _AppSettingsActionTile extends StatelessWidget {
               height: 1.25,
             ),
           ),
-          subtitle: Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: EasySubwayAccessibleColors.mutedText,
-              height: 1.3,
-            ),
-          ),
+          subtitle: subtitle == null
+              ? null
+              : Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    height: 1.3,
+                  ),
+                ),
           trailing: const Icon(Icons.chevron_right),
           shape: Border(
             bottom: BorderSide(
               color: Theme.of(context).colorScheme.outlineVariant,
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AppSettingsInfoTile extends StatelessWidget {
-  const _AppSettingsInfoTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return MergeSemantics(
-      child: ListTile(
-        minVerticalPadding: 12,
-        minLeadingWidth: 32,
-        leading: Icon(icon, color: EasySubwayAccessibleColors.mutedText),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
-            height: 1.25,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: EasySubwayAccessibleColors.mutedText,
-            height: 1.3,
-          ),
-        ),
-        shape: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
       ),

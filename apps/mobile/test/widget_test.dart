@@ -3678,7 +3678,8 @@ void main() {
       expect(find.text('이동 조건'), findsOneWidget);
       expect(find.text('화면 및 접근성'), findsOneWidget);
       expect(find.text('경로 찾기'), findsNothing);
-      expect(find.text('저장된 안내'), findsOneWidget);
+      // '저장된 안내'(인터넷 없이 이용·데이터 출처) 섹션은 제거됐다(#1570).
+      expect(find.text('저장된 안내'), findsNothing);
       expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
       expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
       expect(find.text('큰 글자'), findsNothing);
@@ -3734,13 +3735,11 @@ void main() {
         find.byKey(const Key('notificationSettingsButton')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const Key('offlineDataSettingsButton')),
-        findsOneWidget,
-      );
+      // 오프라인·데이터 출처 진입점은 더보기에서 제거됐다(#1570).
+      expect(find.byKey(const Key('offlineDataSettingsButton')), findsNothing);
       expect(
         find.byKey(const Key('dataSourceAttributionSettingsButton')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('settingsSupportPrivacyButton')),
@@ -3752,15 +3751,10 @@ void main() {
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
+      // 자명한 행은 부가설명 없이 제목만 시맨틱에 담는다(#1570).
       expect(
         settingsActionSemantics(
-          '데이터 및 지도 출처, 지도와 경로 판단 자료의 출처와 이용 조건을 확인해요',
-        ).getSemanticsData().hasAction(SemanticsAction.tap),
-        isTrue,
-      );
-      expect(
-        settingsActionSemantics(
-          '도움말·문의, 사용법, 개인정보, 문의 경로를 확인해요',
+          '도움말·문의',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -3775,30 +3769,8 @@ void main() {
   });
 
   testWidgets('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다', (tester) async {
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await _openSettingsScreen(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('offlineDataSettingsButton')),
-      160,
-    );
-    await tester.ensureVisible(
-      find.byKey(const Key('offlineDataSettingsButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('offlineDataSettingsButton')));
+    // 더보기 진입점은 제거됐지만(#1570) 화면 자체는 유지되므로 직접 띄워 검증한다.
+    await tester.pumpWidget(const MaterialApp(home: OfflineDataScreen()));
     await tester.pumpAndSettle();
 
     expect(find.text('저장된 안내 상태'), findsOneWidget);
@@ -3824,30 +3796,6 @@ void main() {
     );
 
     expect(find.text('마지막 갱신'), findsOneWidget);
-    expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
-    expect(find.text('갱신 필요'), findsOneWidget);
-  });
-
-  testWidgets('설정의 오프라인 데이터 안내는 저장 manifest 만료를 갱신 필요로 보여준다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: AppSettingsScreen(
-          currentProfile: mobilityProfileOptions.first,
-          viewPreferences: const OnboardingViewPreferences.defaults(),
-          notificationRepository: null,
-          notificationPermissionProvider: null,
-          onViewPreferencesChanged: (_) async {},
-          onOpenMobilityProfile: () async => null,
-          onOpenSupportAccess: () {},
-          onOpenMyReports: () {},
-          offlineDataExpiresAtLoader: () async => DateTime.utc(2026, 6, 25, 12),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('offlineDataSettingsButton')));
-    await tester.pumpAndSettle();
-
     expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
     expect(find.text('갱신 필요'), findsOneWidget);
   });
@@ -4413,13 +4361,9 @@ void main() {
     expect(find.text('큰 글자'), findsNothing);
     expect(find.byKey(const Key('highContrastSettingsButton')), findsOneWidget);
     expect(find.byKey(const Key('simpleViewSettingsButton')), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('settingsSection-notification')),
-      160,
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('알림은 아직 사용할 수 없어요'), findsOneWidget);
+    // 알림 미구현 고지 섹션은 제거됐다(#1570). 알림 저장소가 없으면 섹션 자체가 없다.
+    expect(find.byKey(const Key('settingsSection-notification')), findsNothing);
+    expect(find.text('알림은 아직 사용할 수 없어요'), findsNothing);
     expect(find.textContaining('실기기 QA'), findsNothing);
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
