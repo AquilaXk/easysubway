@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../../stations/domain/station_line.dart' show stationLineColor;
 import '../domain/map_camera.dart';
 import '../domain/structured_route_map.dart';
+import 'route_map_label_placement.dart';
 
 // 구조화 노선도 native canvas 렌더러 코어 (#1641 Stage 2).
 //
@@ -75,9 +76,13 @@ class StructuredRouteMapPainter extends CustomPainter {
     required this.map,
     required this.camera,
     required this.lineColors,
+    this.labelTextByStationId = const {},
+    this.attributionText,
     this.lineWidth = 4.0,
     this.stationRadius = 3.0,
     this.transferStationRadius = 5.0,
+    this.labelStyle = _defaultLabelStyle,
+    this.attributionStyle = _defaultAttributionStyle,
   });
 
   final StructuredRouteMap map;
@@ -85,14 +90,35 @@ class StructuredRouteMapPainter extends CustomPainter {
 
   /// line_id → 색. 없으면 노선 색 fallback을 쓴다.
   final Map<String, Color> lineColors;
+
+  /// station_id → 역명. 비어 있으면 라벨을 그리지 않는다.
+  final Map<String, String> labelTextByStationId;
+
+  /// 출처 표기(#1637 attribution 필요 지역). null/빈 문자열이면 그리지 않는다.
+  final String? attributionText;
   final double lineWidth;
   final double stationRadius;
   final double transferStationRadius;
+  final TextStyle labelStyle;
+  final TextStyle attributionStyle;
 
   static const Color _transferFill = Color(0xFFFFFFFF);
   static const Color _transferBorder = Color(0xFF102A2C);
   static const Color _fallbackLineColor = Color(0xFF8D8D8D);
   static const double _transferBorderWidth = 2.0;
+  static const double _labelGap = 4.0;
+  static const TextStyle _defaultLabelStyle = TextStyle(
+    color: Color(0xFF102A2C),
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+  );
+  static const TextStyle _defaultAttributionStyle = TextStyle(
+    color: Color(0xFF466467),
+    fontSize: 10,
+  );
+
+  // 텍스트 실측은 비싸므로 인스턴스 수명 동안 TextPainter를 캐시한다.
+  final Map<String, TextPainter> _labelPainters = {};
 
   // 프레임마다 재할당하지 않도록 Paint를 인스턴스/정적 필드로 hoist한다.
   final Paint _linePaint = Paint()
@@ -125,6 +151,8 @@ class StructuredRouteMapPainter extends CustomPainter {
     final visible = camera.visibleSourceRect.inflate(margin);
     _paintLines(canvas, visible);
     _paintStations(canvas, visible);
+    _paintLabels(canvas, size, visible);
+    _paintAttribution(canvas, size);
   }
 
   void _paintLines(Canvas canvas, Rect visible) {
@@ -190,11 +218,127 @@ class StructuredRouteMapPainter extends CustomPainter {
     }
   }
 
+  void _paintLabels(Canvas canvas, Size size, Rect visible) {
+    if (labelTextByStationId.isEmpty) {
+      return;
+    }
+    final bucket = routeMapZoomBucket(camera);
+    // bucket 0은 lines only — 라벨 없음.
+    if (bucket < minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
+      return;
+    }
+    final candidates = <RouteMapLabelCandidate>[];
+    final painterById = <String, TextPainter>{};
+
+    // 환승 라벨(우선순위 0): transferGroups 중심, bucket >= 1.
+    for (final group in map.transferGroups) {
+      if (!visible.contains(group.centroid)) {
+        continue;
+      }
+      final text = labelTextByStationId[group.stationId];
+      if (text == null || text.isEmpty) {
+        continue;
+      }
+      final id = 'transfer:${group.stationId}';
+      final painter = _labelPainter(text);
+      painterById[id] = painter;
+      candidates.add(
+        RouteMapLabelCandidate(
+          id: id,
+          anchor: camera.sourceToViewportPoint(group.centroid),
+          size: painter.size,
+          priority: 0,
+        ),
+      );
+    }
+
+    // 일반 역 라벨(우선순위 2): bucket >= 2.
+    if (bucket >= minLabelZoomBucketFor(RouteMapLabelClass.regular)) {
+      for (final station in map.stations) {
+        if (station.labelClass == RouteMapLabelClass.transfer) {
+          continue;
+        }
+        if (!visible.contains(station.position)) {
+          continue;
+        }
+        final text = labelTextByStationId[station.stationId];
+        if (text == null || text.isEmpty) {
+          continue;
+        }
+        final id = '${station.stationId}:${station.lineId}';
+        final painter = _labelPainter(text);
+        painterById[id] = painter;
+        candidates.add(
+          RouteMapLabelCandidate(
+            id: id,
+            anchor: camera.sourceToViewportPoint(station.position),
+            size: painter.size,
+            priority: 2,
+          ),
+        );
+      }
+    }
+
+    final placed = placeRouteMapLabels(
+      candidates,
+      gap: _labelGap,
+      viewportBounds: Offset.zero & size,
+    );
+    for (final label in placed) {
+      painterById[label.candidate.id]?.paint(canvas, label.rect.topLeft);
+    }
+  }
+
+  void _paintAttribution(Canvas canvas, Size size) {
+    final text = attributionText;
+    if (text == null || text.isEmpty) {
+      return;
+    }
+    final painter = _labelPainters.putIfAbsent(
+      'attribution:$text',
+      () => TextPainter(
+        text: TextSpan(text: text, style: attributionStyle),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
+    const padding = 4.0;
+    final origin = Offset(
+      padding + 2,
+      size.height - painter.height - padding - 2,
+    );
+    final background = Rect.fromLTWH(
+      origin.dx - 3,
+      origin.dy - 2,
+      painter.width + 6,
+      painter.height + 4,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(background, const Radius.circular(3)),
+      Paint()..color = const Color(0xCCFFFFFF),
+    );
+    painter.paint(canvas, origin);
+  }
+
+  TextPainter _labelPainter(String text) {
+    return _labelPainters.putIfAbsent(
+      text,
+      () => TextPainter(
+        text: TextSpan(text: text, style: labelStyle),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout(),
+    );
+  }
+
   @override
   bool shouldRepaint(StructuredRouteMapPainter oldDelegate) {
     return oldDelegate.camera.revision != camera.revision ||
         !identical(oldDelegate.map, map) ||
         !mapEquals(oldDelegate.lineColors, lineColors) ||
+        !mapEquals(oldDelegate.labelTextByStationId, labelTextByStationId) ||
+        oldDelegate.attributionText != attributionText ||
+        oldDelegate.labelStyle != labelStyle ||
+        oldDelegate.attributionStyle != attributionStyle ||
         oldDelegate.lineWidth != lineWidth ||
         oldDelegate.stationRadius != stationRadius ||
         oldDelegate.transferStationRadius != transferStationRadius;
@@ -208,12 +352,16 @@ class StructuredRouteMapView extends StatelessWidget {
     required this.map,
     required this.camera,
     required this.lineColors,
+    this.labelTextByStationId = const {},
+    this.attributionText,
     super.key,
   });
 
   final StructuredRouteMap map;
   final MapCameraState camera;
   final Map<String, Color> lineColors;
+  final Map<String, String> labelTextByStationId;
+  final String? attributionText;
 
   @override
   Widget build(BuildContext context) {
@@ -223,6 +371,8 @@ class StructuredRouteMapView extends StatelessWidget {
         map: map,
         camera: camera,
         lineColors: lineColors,
+        labelTextByStationId: labelTextByStationId,
+        attributionText: attributionText,
       ),
     );
   }
