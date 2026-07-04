@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import {
   buildTagoScheduleCollectionPlan,
   buildTagoScheduleCollectionSummary,
+  collectTagoSchedules,
 } from "./validate-tago-schedule-sample.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -174,6 +175,71 @@ test("TAGO 시간표 수집 summary CLI는 rawPath 목록에서 checkpoint summa
   const summary = JSON.parse(await readFile(outputPath, "utf8"));
   assert.deepEqual(summary.checkpoint, { completedRequestKeys: ["MTRKR4448|01|U"] });
   assert.equal(summary.rowCount, 2);
+});
+
+test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret을 출력하지 않는다", async () => {
+  const fetchUrls = [];
+  const collection = await collectTagoSchedules(
+    {
+      stationLineRows: [
+        { stationCode: "448", lineId: "seoul-4" },
+        { stationCode: "433", lineId: "seoul-4" },
+      ],
+    },
+    {
+      checkpoint: { completedRequestKeys: ["MTRKR4448|01|U"] },
+      dailyLimit: 2,
+      serviceKey: "actual-secret-key",
+      serviceKeyEnv: "DATA_GO_KR_SERVICE_KEY",
+      collectedAt: "2026-07-05T00:00:00.000Z",
+      fetchImpl: async (url) => {
+        fetchUrls.push(url);
+        const params = new URL(url).searchParams;
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return tagoResponse(
+              params.get("subwayStationId"),
+              params.get("dailyTypeCode"),
+              params.get("upDownTypeCode"),
+            );
+          },
+        };
+      },
+    },
+  );
+
+  assert.equal(collection.artifactKind, "tago-schedule-collection");
+  assert.equal(collection.requestedCount, 2);
+  assert.equal(collection.pendingRequestCount, 9);
+  assert.deepEqual(
+    collection.responses.map((response) => response.requestKey),
+    ["MTRKR4448|01|D", "MTRKR4448|02|U"],
+  );
+  assert.deepEqual(collection.checkpoint.completedRequestKeys, [
+    "MTRKR4448|01|D",
+    "MTRKR4448|01|U",
+    "MTRKR4448|02|U",
+  ]);
+  assert.equal(new URL(fetchUrls[0]).searchParams.get("serviceKey"), "actual-secret-key");
+  assert.doesNotMatch(JSON.stringify(collection), /actual-secret-key/);
+});
+
+test("TAGO 시간표 수집기는 service key가 없으면 provider 호출 전에 실패한다", async () => {
+  await assert.rejects(
+    () =>
+      collectTagoSchedules(
+        { stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }] },
+        {
+          serviceKey: undefined,
+          fetchImpl: async () => {
+            throw new Error("must not fetch");
+          },
+        },
+      ),
+    /serviceKey is required/,
+  );
 });
 
 function tagoResponse(stationId, dailyTypeCode, upDownTypeCode) {

@@ -5754,6 +5754,7 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     status: "planned_pilot_collection",
     tool: "tools/datapack/validate-tago-schedule-sample.mjs",
     command: "node tools/datapack/validate-tago-schedule-sample.mjs --plan --input tools/datapack/inputs/capital-pilot-production-source-input.json --daily-limit 1000 --checkpoint <checkpoint.json> --output <plan.json>",
+    collectCommand: "node tools/datapack/validate-tago-schedule-sample.mjs --collect --input tools/datapack/inputs/capital-pilot-production-source-input.json --daily-limit 1000 --checkpoint <checkpoint.json> --service-key-env DATA_GO_KR_SERVICE_KEY --output <collection.json>",
     summaryCommand: "node tools/datapack/validate-tago-schedule-sample.mjs --summary --input <collection.json> --output <summary.json>",
     summaryArtifactKind: "tago-schedule-collection-summary",
     input: "tools/datapack/inputs/capital-pilot-production-source-input.json",

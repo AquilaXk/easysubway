@@ -30,7 +30,7 @@ function parseArgs(argv) {
     if (!flag.startsWith("--")) {
       throw new Error(`unexpected argument: ${flag}`);
     }
-    if (flag === "--plan" || flag === "--summary") {
+    if (flag === "--plan" || flag === "--summary" || flag === "--collect") {
       args[flag.slice(2)] = true;
       continue;
     }
@@ -201,6 +201,67 @@ function buildTagoScheduleCollectionSummary(collection) {
   };
 }
 
+async function collectTagoSchedules(input, options = {}) {
+  const serviceKey = requiredString(options.serviceKey, "serviceKey");
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  if (typeof fetchImpl !== "function") {
+    throw new Error("fetch is required for TAGO schedule collection");
+  }
+  const checkpoint = options.checkpoint ?? {};
+  const dailyLimit = options.dailyLimit ?? 1000;
+  const plan = buildTagoScheduleCollectionPlan(input, checkpoint, dailyLimit);
+  const requests = plan.batches[0]?.requests ?? [];
+  const collectedAt = options.collectedAt ?? new Date().toISOString();
+  const responses = [];
+
+  for (const request of requests) {
+    let response;
+    try {
+      response = await fetchImpl(buildTagoScheduleRequestUrl(request, serviceKey));
+    } catch {
+      throw new Error(`TAGO schedule fetch failed before response: ${request.requestKey}`);
+    }
+    if (!response.ok) {
+      throw new Error(`TAGO schedule fetch failed: ${request.requestKey} status ${response.status}`);
+    }
+    const rawText = await response.text();
+    const validation = validateTagoScheduleSample(rawText);
+    assertResponseMatchesRequestKey(validation, request.requestKey);
+    responses.push({ requestKey: request.requestKey, rawText });
+  }
+
+  const completedRequestKeys = [
+    ...new Set([...(checkpoint.completedRequestKeys ?? []), ...responses.map((response) => response.requestKey)]),
+  ].sort();
+  return {
+    artifactKind: "tago-schedule-collection",
+    sourceId: plan.sourceId,
+    endpoint: plan.endpoint,
+    serviceKeyEnv: options.serviceKeyEnv ?? "DATA_GO_KR_SERVICE_KEY",
+    collectedAt,
+    dailyLimit: plan.dailyLimit,
+    totalRequestCount: plan.totalRequestCount,
+    requestedCount: responses.length,
+    completedRequestCount: completedRequestKeys.length,
+    pendingRequestCount: Math.max(0, plan.pendingRequestCount - responses.length),
+    checkpoint: { completedRequestKeys },
+    responses,
+  };
+}
+
+function buildTagoScheduleRequestUrl(request, serviceKey) {
+  const [stationId, dailyTypeCode, upDownTypeCode] = requestKeyParts(request.requestKey);
+  const url = new URL(TAGO_SCHEDULE_ENDPOINT);
+  url.searchParams.set("serviceKey", serviceKey);
+  url.searchParams.set("pageNo", "1");
+  url.searchParams.set("numOfRows", "1000");
+  url.searchParams.set("_type", "json");
+  url.searchParams.set("subwayStationId", stationId);
+  url.searchParams.set("dailyTypeCode", dailyTypeCode);
+  url.searchParams.set("upDownTypeCode", upDownTypeCode);
+  return url.toString();
+}
+
 function assertResponseMatchesRequestKey(validation, requestKey) {
   const [stationId, dailyTypeCode, upDownTypeCode] = requestKeyParts(requestKey);
   if (
@@ -317,6 +378,16 @@ async function main() {
     const checkpoint = args.checkpoint ? JSON.parse(await readFile(path.resolve(args.checkpoint), "utf8")) : {};
     const dailyLimit = args["daily-limit"] === undefined ? undefined : Number(args["daily-limit"]);
     result = buildTagoScheduleCollectionPlan(JSON.parse(await readFile(inputPath, "utf8")), checkpoint, dailyLimit);
+  } else if (args.collect) {
+    const checkpoint = args.checkpoint ? JSON.parse(await readFile(path.resolve(args.checkpoint), "utf8")) : {};
+    const dailyLimit = args["daily-limit"] === undefined ? undefined : Number(args["daily-limit"]);
+    const serviceKeyEnv = args["service-key-env"] ?? "DATA_GO_KR_SERVICE_KEY";
+    result = await collectTagoSchedules(JSON.parse(await readFile(inputPath, "utf8")), {
+      checkpoint,
+      dailyLimit,
+      serviceKey: process.env[serviceKeyEnv],
+      serviceKeyEnv,
+    });
   } else if (args.summary) {
     const input = JSON.parse(await readFile(inputPath, "utf8"));
     const inputDir = path.dirname(inputPath);
@@ -347,7 +418,12 @@ function requiredString(value, label) {
   return value;
 }
 
-export { buildTagoScheduleCollectionPlan, buildTagoScheduleCollectionSummary, validateTagoScheduleSample };
+export {
+  buildTagoScheduleCollectionPlan,
+  buildTagoScheduleCollectionSummary,
+  collectTagoSchedules,
+  validateTagoScheduleSample,
+};
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
