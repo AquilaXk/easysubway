@@ -1,5 +1,6 @@
 package com.easysubway.route.application.service;
 
+import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
@@ -8,6 +9,7 @@ import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Plan
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Status;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
+import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.RouteNotFoundException;
 import com.easysubway.route.domain.RouteSearchResult;
@@ -60,7 +62,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 			if (timetableRequired && !routeTimetablePort.hasRouteTimetable()) {
 				return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
 			}
-			if (timetableRequired && !command.useRealtime()) {
+			if (timetableRequired && canUseTimetableRaptor(command)) {
 				List<RouteSearchResult> timetableItineraries = timetableRaptorPlanner.search(
 					command,
 					routeTimetablePort.loadRouteTimetable()
@@ -83,6 +85,12 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		} catch (RouteNotFoundException exception) {
 			return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
 		}
+	}
+
+	private boolean canUseTimetableRaptor(SearchRouteV2Command command) {
+		return !command.useRealtime()
+			&& command.constraintMode() != ConstraintMode.STRICT_STEP_FREE
+			&& command.mobilityType() != MobilityType.WHEELCHAIR;
 	}
 
 	private List<RouteV2Status> statusesOf(List<RouteSearchResult> itineraries, boolean useRealtime) {

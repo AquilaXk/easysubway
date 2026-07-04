@@ -1,9 +1,11 @@
 package com.easysubway.route.application.service;
 
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.SearchRouteV2Command;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.ServiceCalendar;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.ServiceCalendarDate;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitFrequency;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitRoute;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitStopTime;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.TransitTrip;
@@ -40,10 +42,13 @@ class RouteTimetableRaptorPlanner {
 
 		Map<String, TransitRoute> routesById = routesById(timetable);
 		Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(timetable);
-		List<TransitTrip> trips = timetable.transitTrips().stream()
+		Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(timetable);
+		List<ScheduledTrip> trips = timetable.transitTrips().stream()
 			.filter(trip -> activeServiceIds.contains(trip.serviceId()))
 			.filter(trip -> stopTimesByTrip.getOrDefault(trip.id(), List.of()).size() > 1)
-			.sorted(Comparator.comparing(TransitTrip::id))
+			.flatMap(trip -> scheduledTrips(trip, routesById.get(trip.routeId()), stopTimesByTrip.get(trip.id()), frequenciesByTrip.getOrDefault(trip.id(), List.of())).stream())
+			.sorted(Comparator.comparing((ScheduledTrip scheduledTrip) -> scheduledTrip.trip().id())
+				.thenComparingInt(scheduledTrip -> scheduledTrip.stopTimes().getFirst().departureSeconds()))
 			.toList();
 		if (trips.isEmpty()) {
 			return List.of();
@@ -59,8 +64,8 @@ class RouteTimetableRaptorPlanner {
 		)));
 
 		for (int round = 0; round <= command.maxTransfers(); round += 1) {
-			for (TransitTrip trip : trips) {
-				scanTrip(command, labels, trip, routesById.get(trip.routeId()), stopTimesByTrip.get(trip.id()), round);
+			for (ScheduledTrip trip : trips) {
+				scanTrip(command, labels, trip, round);
 			}
 		}
 
@@ -75,19 +80,17 @@ class RouteTimetableRaptorPlanner {
 	private void scanTrip(
 		SearchRouteV2Command command,
 		Map<String, List<Label>> labels,
-		TransitTrip trip,
-		TransitRoute route,
-		List<TransitStopTime> stopTimes,
+		ScheduledTrip trip,
 		int round
 	) {
 		Boarding boarding = null;
-		for (TransitStopTime stopTime : stopTimes) {
+		for (TransitStopTime stopTime : trip.stopTimes()) {
 			for (Label label : List.copyOf(labels.getOrDefault(stopTime.stationId(), List.of()))) {
-				if (canBoard(command, label, stopTime, round)) {
+				if (canBoard(command, label, stopTime, round) && allowsPickup(stopTime)) {
 					boarding = betterBoarding(boarding, label, stopTime);
 				}
 			}
-			if (boarding == null || stopTime.stopSequence() <= boarding.stopTime().stopSequence()) {
+			if (boarding == null || stopTime.stopSequence() <= boarding.stopTime().stopSequence() || !allowsDropOff(stopTime)) {
 				continue;
 			}
 			addLabel(labels, new Label(
@@ -95,7 +98,7 @@ class RouteTimetableRaptorPlanner {
 				stopTime.arrivalSeconds(),
 				boarding.label().startSeconds(),
 				boarding.label().boardings() + 1,
-				withLeg(boarding.label().path(), new RideLeg(trip, route, boarding.stopTime(), stopTime))
+				withLeg(boarding.label().path(), new RideLeg(trip.trip(), trip.route(), boarding.stopTime(), stopTime))
 			));
 		}
 	}
@@ -110,6 +113,14 @@ class RouteTimetableRaptorPlanner {
 			return new Boarding(label, stopTime);
 		}
 		return current;
+	}
+
+	private boolean allowsPickup(TransitStopTime stopTime) {
+		return stopTime.pickupType() != 1;
+	}
+
+	private boolean allowsDropOff(TransitStopTime stopTime) {
+		return stopTime.dropOffType() != 1;
 	}
 
 	private void addLabel(Map<String, List<Label>> labels, Label candidate) {
@@ -218,6 +229,61 @@ class RouteTimetableRaptorPlanner {
 		return stopTimes;
 	}
 
+	private static Map<String, List<TransitFrequency>> frequenciesByTrip(RouteTimetable timetable) {
+		Map<String, List<TransitFrequency>> frequencies = new HashMap<>();
+		for (TransitFrequency frequency : timetable.transitFrequencies()) {
+			frequencies.computeIfAbsent(frequency.tripId(), ignored -> new ArrayList<>()).add(frequency);
+		}
+		return frequencies;
+	}
+
+	private static List<ScheduledTrip> scheduledTrips(
+		TransitTrip trip,
+		TransitRoute route,
+		List<TransitStopTime> stopTimes,
+		List<TransitFrequency> frequencies
+	) {
+		if (frequencies.isEmpty()) {
+			return List.of(new ScheduledTrip(trip, route, stopTimes));
+		}
+		int firstDepartureSeconds = stopTimes.getFirst().departureSeconds();
+		List<ScheduledTrip> scheduledTrips = new ArrayList<>();
+		for (TransitFrequency frequency : frequencies) {
+			for (int departureSeconds = frequency.startTimeSeconds();
+				 departureSeconds < frequency.endTimeSeconds();
+				 departureSeconds += frequency.headwaySeconds()) {
+				shiftedStopTimes(stopTimes, departureSeconds - firstDepartureSeconds)
+					.ifPresent(shifted -> scheduledTrips.add(new ScheduledTrip(trip, route, shifted)));
+			}
+		}
+		return List.copyOf(scheduledTrips);
+	}
+
+	private static java.util.Optional<List<TransitStopTime>> shiftedStopTimes(List<TransitStopTime> stopTimes, int offsetSeconds) {
+		List<TransitStopTime> shifted = new ArrayList<>();
+		for (TransitStopTime stopTime : stopTimes) {
+			int arrivalSeconds = stopTime.arrivalSeconds() + offsetSeconds;
+			int departureSeconds = stopTime.departureSeconds() + offsetSeconds;
+			if (arrivalSeconds < 0
+				|| departureSeconds < 0
+				|| arrivalSeconds >= LoadRouteTimetablePort.SERVICE_DAY_SECONDS_LIMIT_EXCLUSIVE
+				|| departureSeconds >= LoadRouteTimetablePort.SERVICE_DAY_SECONDS_LIMIT_EXCLUSIVE) {
+				return java.util.Optional.empty();
+			}
+			shifted.add(new TransitStopTime(
+				stopTime.tripId(),
+				stopTime.stopSequence(),
+				stopTime.stationId(),
+				stopTime.lineId(),
+				arrivalSeconds,
+				departureSeconds,
+				stopTime.pickupType(),
+				stopTime.dropOffType()
+			));
+		}
+		return java.util.Optional.of(List.copyOf(shifted));
+	}
+
 	private static Set<String> activeServiceIds(RouteTimetable timetable, LocalDate serviceDate) {
 		Set<String> active = new HashSet<>();
 		for (ServiceCalendar calendar : timetable.serviceCalendars()) {
@@ -272,6 +338,9 @@ class RouteTimetableRaptorPlanner {
 	}
 
 	private record Boarding(Label label, TransitStopTime stopTime) {
+	}
+
+	private record ScheduledTrip(TransitTrip trip, TransitRoute route, List<TransitStopTime> stopTimes) {
 	}
 
 	private record RideLeg(TransitTrip trip, TransitRoute route, TransitStopTime from, TransitStopTime to) {

@@ -816,6 +816,52 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 planner는 strict step-free 요청에서 시간표 scan으로 접근성 차단을 우회하지 않는다")
+	void routeV2PlannerKeepsAccessibilityBlockingForStrictStepFreeWithTimetable() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new StairOnlyTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.STRICT_STEP_FREE, MobilityType.WHEELCHAIR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.BLOCKED_ACCESSIBILITY);
+		assertThat(plan.itineraries()).hasSize(1);
+		assertThat(plan.itineraries().getFirst().status()).isEqualTo(RouteSearchStatus.BLOCKED);
+	}
+
+	@Test
+	@DisplayName("V2 planner는 frequency 기반 배차를 시간표 scan 후보로 확장한다")
+	void routeV2PlannerExpandsFrequencyBasedDepartures() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), frequencyRouteTimetablePort());
+
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T09:05:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			false,
+			1,
+			3
+		));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(900);
+	}
+
+	@Test
+	@DisplayName("V2 planner는 pickup/drop-off 제한 stop_times를 승하차 후보에서 제외한다")
+	void routeV2PlannerHonorsPickupAndDropOffRestrictions() {
+		var noPickupPlanner = new RouteV2Planner(legacySearchMustNotBeCalled(), restrictedStopRouteTimetablePort(1, 0));
+		var noDropOffPlanner = new RouteV2Planner(legacySearchMustNotBeCalled(), restrictedStopRouteTimetablePort(0, 1));
+
+		assertThat(noPickupPlanner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3)).statuses())
+			.containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+		assertThat(noDropOffPlanner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3)).statuses())
+			.containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+	}
+
+	@Test
 	@DisplayName("V2 realtime overlay fallback 경로는 availability 확인에 전체 snapshot을 읽지 않는다")
 	void routeV2PlannerDoesNotLoadFullTimetableForRealtimeAvailabilityGuard() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -1835,6 +1881,67 @@ class RouteSearchServiceTest {
 				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33120, 33120, 0, 0)
 			),
 			List.of()
+		);
+	}
+
+	private static LoadRouteTimetablePort frequencyRouteTimetablePort() {
+		return () -> routeTimetable(
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-frequency", 1, "station-a", "seoul-4", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-frequency", 2, "station-b", "seoul-4", 33300, 33300, 0, 0)
+			),
+			List.of(new LoadRouteTimetablePort.TransitFrequency("trip-seoul-4-frequency", 32400, 36000, 600, false))
+		);
+	}
+
+	private static LoadRouteTimetablePort restrictedStopRouteTimetablePort(int pickupType, int dropOffType) {
+		return () -> routeTimetable(
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32520, 32520, pickupType, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33120, 33120, 0, dropOffType)
+			),
+			List.of()
+		);
+	}
+
+	private static LoadRouteTimetablePort.RouteTimetable routeTimetable(
+		List<LoadRouteTimetablePort.TransitStopTime> stopTimes,
+		List<LoadRouteTimetablePort.TransitFrequency> frequencies
+	) {
+		return new LoadRouteTimetablePort.RouteTimetable(
+			List.of(new LoadRouteTimetablePort.ServiceCalendar(
+				"weekday-2026",
+				true,
+				true,
+				true,
+				true,
+				true,
+				false,
+				false,
+				LocalDate.parse("2026-07-01"),
+				LocalDate.parse("2026-12-31"),
+				"Asia/Seoul"
+			)),
+			List.of(),
+			List.of(new LoadRouteTimetablePort.TransitRoute(
+				"route-seoul-4",
+				"seoul-4",
+				"4",
+				"수도권 4호선",
+				"사당 방면",
+				"Asia/Seoul"
+			)),
+			List.of(new LoadRouteTimetablePort.TransitTrip(
+				stopTimes.getFirst().tripId(),
+				"route-seoul-4",
+				"weekday-2026",
+				"사당",
+				"0",
+				"LOCAL",
+				0
+			)),
+			stopTimes,
+			frequencies
 		);
 	}
 
