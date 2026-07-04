@@ -274,6 +274,11 @@ Future<void> _tapFirstRouteResultListItem(WidgetTester tester) async {
 }
 
 void main() {
+  // 상대 확인 시점을 쓰는 테스트가 기준 시각을 고정한 뒤 항상 원래대로 되돌린다.
+  tearDown(() {
+    debugStationVerifiedClock = DateTime.now;
+  });
+
   testWidgets('홈에서 내 신고 화면으로 이동한다', (tester) async {
     final reportRepository = FakeFacilityReportRepository(
       reports: [
@@ -7144,6 +7149,7 @@ void main() {
   });
 
   testWidgets('역 검색 결과를 누르면 출구와 시설 상태를 쉬운 문구로 보여준다', (tester) async {
+    debugStationVerifiedClock = () => DateTime(2026, 6, 15);
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -7254,14 +7260,14 @@ void main() {
       expect(find.text('수도권 2호선'), findsOneWidget);
       // 상세 헤더는 데이터 품질 문구를 노출하지 않는다(간결화, 시맨틱 라벨에는 유지).
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
-      // '마지막 확인'은 역명 우측에 라벨/날짜 두 줄로 표시된다.
+      // '마지막 확인'은 역명 우측에 라벨/상대시간 두 줄로 표시된다(#1567 후속).
       expect(find.text('마지막 확인'), findsOneWidget);
-      expect(find.text('2026-06-13'), findsOneWidget);
+      expect(find.text('2일 전'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
       // 상시 안전 안내는 제거됐다(#1497).
       expect(find.text('이동 전 현장 안내와 역무원 안내를 확인해 주세요.'), findsNothing);
       expect(
-        find.bySemanticsLabel('상록수역 자세한 안내, 수도권 2호선, 마지막 확인 2026-06-13'),
+        find.bySemanticsLabel('상록수역 자세한 안내, 수도권 2호선, 마지막 확인 2일 전'),
         findsOneWidget,
       );
       // 역 안 이동 안내·순서는 "역 안 이동" 한 섹션으로 통합됐다(#1497).
@@ -7350,7 +7356,7 @@ void main() {
       );
       expect(
         find.bySemanticsLabel(
-          '3번 출구 에스컬레이터, 에스컬레이터, 설치 확인 · 운행상태 미확인, 3번 출구 앞, 최근 확인 2026-06-10, 자세히 보기',
+          '3번 출구 에스컬레이터, 에스컬레이터, 설치 확인 · 운행상태 미확인, 3번 출구 앞, 최근 확인 5일 전, 자세히 보기',
         ),
         findsOneWidget,
       );
@@ -7366,10 +7372,10 @@ void main() {
       // 정상 시설은 상태 필 없이 이름+위치+확인 시점만 조용히 표시.
       expect(find.text('이용 가능'), findsNothing);
       expect(find.text('1번 출구 앞'), findsOneWidget);
-      expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
+      expect(find.text('최근 확인 3일 전'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
-          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 알려주기',
+          '1번 출구 엘리베이터, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 3일 전, 시설 알려주기',
         ),
         findsOneWidget,
       );
@@ -7615,6 +7621,7 @@ void main() {
   });
 
   testWidgets('시설 상세는 실제 시설 데이터로 시설 알려주기 진입을 보여준다', (tester) async {
+    debugStationVerifiedClock = () => DateTime(2026, 6, 15);
     final reportRepository = FakeFacilityReportRepository();
     final repository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -7688,7 +7695,7 @@ void main() {
     expect(find.text('현장 안내와 다르면 시설 알려주기로 알려 주세요.'), findsOneWidget);
     expect(find.text('연결 위치 B1 ↔ 1F'), findsOneWidget);
     expect(find.text('2번 출구 앞'), findsOneWidget);
-    expect(find.text('최근 확인 2026-06-14'), findsOneWidget);
+    expect(find.text('최근 확인 어제'), findsOneWidget);
     expect(find.text('정보 신뢰도 높음'), findsNothing);
     expect(find.text('출처 공식 파일'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '안내 확인 방법 보기'), findsOneWidget);
@@ -8071,6 +8078,7 @@ void main() {
   });
 
   testWidgets('역 상세는 즐겨찾기 확인을 기다리지 않고 열린다', (tester) async {
+    debugStationVerifiedClock = () => DateTime(2026, 6, 15);
     final favoriteRepository = ControlledFavoriteStationRepository();
     final stationRepository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -8102,7 +8110,7 @@ void main() {
     await tester.pump();
 
     expect(
-      find.bySemanticsLabel('상록수역 자세한 안내, 수도권 2호선, 마지막 확인 2026-06-13'),
+      find.bySemanticsLabel('상록수역 자세한 안내, 수도권 2호선, 마지막 확인 2일 전'),
       findsOneWidget,
     );
     expect(find.widgetWithText(OutlinedButton, '확인 중'), findsOneWidget);
@@ -8113,6 +8121,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(OutlinedButton, '즐겨찾기 해제'), findsOneWidget);
+  });
+
+  testWidgets('역 상세 실시간 확인 불가는 다시 시도로 도착 정보를 불러온다', (tester) async {
+    final realtimeRepository = _RetryRealtimeRepository();
+    final stationRepository = FakeStationSearchRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationDetailScreen(
+          repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
+          stationId: 'station-sangnoksu',
+          realtimeRepository: realtimeRepository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 첫 조회는 실패해 '실시간 정보 확인 불가'와 다시 시도 버튼을 보여준다.
+    expect(find.text('실시간 정보 확인 불가'), findsOneWidget);
+    final retryButton = find.byKey(const Key('stationRealtimeRetryButton'));
+    expect(retryButton, findsOneWidget);
+    expect(realtimeRepository.callCount, 1);
+
+    await tester.tap(retryButton);
+    await tester.pumpAndSettle();
+
+    // 재시도가 성공하면 도착 정보로 바뀌고 버튼은 사라진다.
+    expect(realtimeRepository.callCount, 2);
+    expect(find.text('도착 정보'), findsOneWidget);
+    expect(find.text('실시간 정보 확인 불가'), findsNothing);
+    expect(retryButton, findsNothing);
   });
 
   testWidgets('즐겨찾기 목록은 상세에서 해제하고 돌아오면 다시 불러온다', (tester) async {
@@ -12795,6 +12837,33 @@ CurrentLocation _freshCurrentLocation({
     provider: 'test',
     permissionPrecision: LocationPermissionPrecision.precise,
   );
+}
+
+class _RetryRealtimeRepository implements RealtimeRepository {
+  int callCount = 0;
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
+    callCount++;
+    if (callCount == 1) {
+      throw const RealtimeException('실시간 정보를 불러오지 못했어요.');
+    }
+    return const RealtimeSnapshot(
+      status: RealtimeSnapshotStatus.fresh,
+      receivedAt: '방금',
+      arrivals: [
+        RealtimeArrival(
+          lineId: 'seoul-2',
+          stationName: '상록수',
+          destination: '사당',
+          direction: '하행',
+          trainNo: '2002',
+          message: '곧 도착',
+          etaSeconds: 120,
+        ),
+      ],
+    );
+  }
 }
 
 class _FreshNearbyRealtimeRepository implements RealtimeRepository {
