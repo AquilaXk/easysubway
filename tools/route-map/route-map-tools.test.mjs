@@ -13,6 +13,37 @@ const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const buildLineTracksScript = path.resolve(import.meta.dirname, "build-route-map-line-tracks.mjs");
 const applyLineTracksScript = path.resolve(import.meta.dirname, "apply-route-map-line-tracks.mjs");
+const auditRouteMapScript = path.resolve(import.meta.dirname, "audit-route-map.mjs");
+
+// audit-route-map을 temp fixture + line-tracks 문서로 실행하고 report JSON을 돌려준다.
+// --fail-on으로 exit 1이 나도 stdout에 report가 있으므로 그대로 파싱한다.
+async function runAuditRouteMap({ fixture, lineTracks = [], failOn = [] }) {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-audit-tracks-"));
+  try {
+    const fixturePath = path.join(dir, "fixture.json");
+    await writeFile(fixturePath, JSON.stringify(fixture));
+    const trackArgs = [];
+    for (let i = 0; i < lineTracks.length; i += 1) {
+      const trackPath = path.join(dir, `line-tracks-${i}.json`);
+      await writeFile(trackPath, JSON.stringify(lineTracks[i]));
+      trackArgs.push("--line-tracks", trackPath);
+    }
+    const failArgs = failOn.length > 0 ? ["--fail-on", failOn.join(",")] : [];
+    let stdout;
+    try {
+      ({ stdout } = await execFileAsync(
+        "node",
+        [auditRouteMapScript, "--fixture", fixturePath, ...trackArgs, ...failArgs],
+        { cwd: root, maxBuffer: 4 * 1024 * 1024 },
+      ));
+    } catch (error) {
+      stdout = error.stdout; // --fail-on exit 1이어도 report는 stdout에 있다.
+    }
+    return JSON.parse(stdout);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
 
 // temp .gz pack(route_map_positions 라이선스 메타 포함) + index.json + tracks.json을
 // 만들어 apply-route-map-line-tracks를 실행하고, 기록된 route_map_line_tracks 행을
@@ -2150,6 +2181,48 @@ test("apply-route-map-line-tracks writes tracks with inherited license metadata"
   // 재실행(같은 region)은 기존 행 DELETE 후 INSERT — 중복 없음.
   const rerun = await runApplyLineTracks({ region: "테스트권", positions, tracksDocs });
   assert.equal(rerun.rows.length, 2);
+});
+
+test("audit-route-map flags line-track gaps as blockers", async () => {
+  const fixture = {
+    packs: [{
+      id: "test",
+      routeMapPositions: [
+        { stationId: "s1", lineId: "line-a", region: "테스트권", x: 0, y: 0 },
+        { stationId: "s2", lineId: "line-b", region: "테스트권", x: 10, y: 10 },
+      ],
+    }],
+  };
+  // tracks에 line-a만(line-b 누락) + 색≠노선.
+  const lineTracks = [{
+    region: "테스트권", source: "svg-strokes", colorCount: 1, lineCount: 2,
+    lines: [{ lineId: "line-a", svgColor: "#ff0000", matchVotes: 5, paths: ["M 0 0 L 1 0"] }],
+  }];
+  const report = await runAuditRouteMap({ fixture, lineTracks });
+  const codes = report.findings.map((finding) => finding.code);
+  assert.ok(codes.includes("LINE_TRACKS_MISSING_LINE"), "누락 노선 blocker");
+  assert.ok(codes.includes("LINE_TRACKS_COLOR_LINE_MISMATCH"), "색≠노선 blocker");
+  const missing = report.findings.find((finding) => finding.code === "LINE_TRACKS_MISSING_LINE");
+  assert.equal(missing.severity, "BLOCKER");
+  assert.equal(missing.lineId, "line-b");
+});
+
+test("audit-route-map flags zero-vote tracks as HIGH for manual review", async () => {
+  const fixture = {
+    packs: [{
+      id: "test",
+      routeMapPositions: [{ stationId: "s1", lineId: "line-a", region: "테스트권", x: 0, y: 0 }],
+    }],
+  };
+  const lineTracks = [{
+    region: "테스트권", source: "svg-strokes", colorCount: 1, lineCount: 1,
+    lines: [{ lineId: "line-a", svgColor: "#ff0000", matchVotes: 0, paths: ["M 0 0 L 1 0"] }],
+  }];
+  const report = await runAuditRouteMap({ fixture, lineTracks });
+  const zeroVote = report.findings.find((finding) => finding.code === "LINE_TRACKS_ZERO_VOTE");
+  assert.ok(zeroVote, "0표 노선 finding");
+  assert.equal(zeroVote.severity, "HIGH");
+  assert.equal(zeroVote.lineId, "line-a");
 });
 
 test("apply-route-map-line-tracks --check does not write and flags missing line license", async () => {
