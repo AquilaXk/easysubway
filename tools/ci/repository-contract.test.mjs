@@ -9439,14 +9439,17 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const useCasePath = "backend/src/main/java/com/easysubway/route/application/port/in/RouteV2SearchUseCase.java";
   const timetablePortPath = "backend/src/main/java/com/easysubway/route/application/port/out/LoadRouteTimetablePort.java";
   const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
+  const raptorPlannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteTimetableRaptorPlanner.java";
 
   assert.equal(existsSync(path.join(root, useCasePath)), true, "RouteV2SearchUseCase must expose the V2 planning port");
   assert.equal(existsSync(path.join(root, timetablePortPath)), true, "RouteV2Planner must get timetable data through a port");
   assert.equal(existsSync(path.join(root, plannerPath)), true, "RouteV2Planner must own V2 production search planning");
+  assert.equal(existsSync(path.join(root, raptorPlannerPath)), true, "RouteV2Planner must have a timetable RAPTOR scanner");
 
   const useCase = read(useCasePath);
   const timetablePort = read(timetablePortPath);
   const planner = read(plannerPath);
+  const raptorPlanner = read(raptorPlannerPath);
   const v2Endpoint = controller.match(
     /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
@@ -9464,8 +9467,21 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
   assert.match(planner, /timetableRequired && !routeTimetablePort\.hasRouteTimetable\(\)/);
   assert.match(planner, /hasRouteTimetable\(\)/);
+  assert.match(planner, /!command\.useRealtime\(\)/);
+  assert.match(planner, /canUseTimetableRaptor/);
+  assert.match(planner, /loadRouteTimetable\(\)/);
+  assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
+  assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);
+  assert.match(raptorPlanner, /BoardingSlackPolicy\.secondsFor/);
+  assert.match(raptorPlanner, /SERVICE_DAY_CUTOFF_HOUR\s*=\s*3/);
+  assert.match(raptorPlanner, /activeServiceIds/);
+  assert.match(raptorPlanner, /EtaSource\s*\.\s*PLANNED\s*\.\s*name\(\)/);
+  assert.match(raptorPlanner, /transitFrequencies\(\)/);
+  assert.match(raptorPlanner, /pickupType\(\)/);
+  assert.match(raptorPlanner, /dropOffType\(\)/);
+  assert.match(raptorPlanner, /dominates/);
   assert.match(useCase, /record SearchRouteV2Command/);
   assert.match(useCase, /OffsetDateTime departureTime/);
   assert.match(useCase, /boolean useRealtime/);
@@ -9794,7 +9810,6 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(facilityReport, /사진과 제보 위치는 시설 제보 확인에만 사용됩니다/);
   assert.match(facilityReport, /제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다/);
   assert.match(widgetTest, /시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
-  assert.match(widgetTest, /시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 사진과 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 현재 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
@@ -9805,7 +9820,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(easySubwayAppDefaultsTest, /인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다/);
   assert.match(widgetTest, /노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
-  assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
   assert.match(main, /보안 문의 안내/);
@@ -9864,13 +9879,19 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     routeSearch,
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
-  assert.match(main, /개인정보 사용 안내/);
+  // 개인정보 안내는 화면 불릿 대신 개인정보처리방침 링크로 위임한다(#1571).
+  assert.match(main, /개인정보처리방침/);
+  assert.doesNotMatch(main, /개인정보 사용 안내/);
   assert.match(main, /이동 전 살펴보기/);
-  assert.match(main, /현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다/);
   assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
-  assert.match(main, /내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꿉니다/);
+  // 삭제 확인 화면은 지워지는 것 1줄 + 되돌릴 수 없음 강조 + 예외 1줄로 압축한다(#1571).
+  assert.match(main, /삭제 후에는 되돌릴 수 없어요/);
+  assert.match(
+    main,
+    /이 기기의 즐겨찾기·최근 검색·설정과 보낸 제보·사진이 삭제되거나 익명 처리돼요/,
+  );
   assert.match(apiClient, /class ApiClient/);
   assert.match(apiClient, /const defaultApiTimeout = Duration\(seconds: 8\)/);
   assert.match(apiClient, /Future<ApiResponse> getJson/);

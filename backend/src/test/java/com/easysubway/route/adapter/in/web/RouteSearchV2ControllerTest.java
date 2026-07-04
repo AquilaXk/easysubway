@@ -26,6 +26,7 @@ import com.easysubway.route.domain.RouteWarningCode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,11 @@ class RouteSearchV2ControllerTest {
 
 	@MockitoBean
 	private RouteSearchUseCase routeSearchUseCase;
+
+	@BeforeEach
+	void setUpRealtimeOverlayCapability() {
+		when(routeSearchUseCase.supportsRealtimeOverlay()).thenReturn(true);
+	}
 
 	@TestConfiguration
 	static class RouteTimetableTestConfiguration {
@@ -484,6 +490,31 @@ class RouteSearchV2ControllerTest {
 					  "constraintMode": "STRICT_STEP_FREE",
 					  "useRealtime": true,
 					  "alternativeCount": 3
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.message").exists());
+
+		verifyNoInteractions(routeSearchUseCase);
+	}
+
+	@Test
+	@DisplayName("V2 대안 경로 수는 3개를 초과하면 search 저장 전에 JSON 400으로 거부한다")
+	void routeSearchV2AlternativeCountAboveThreeReturnsBadRequestBeforeSearch() throws Exception {
+		mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "originStationId": "station-sangnoksu",
+					  "destinationStationId": "station-sadang",
+					  "departureTime": "2026-06-30T09:15:00+09:00",
+					  "mobilityType": "STROLLER",
+					  "constraintMode": "STRICT_STEP_FREE",
+					  "useRealtime": true,
+					  "maxTransfers": 3,
+					  "alternativeCount": 4
 					}
 					"""))
 			.andExpect(status().isBadRequest())

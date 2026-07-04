@@ -1,5 +1,6 @@
 package com.easysubway.route.application.service;
 
+import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
@@ -8,11 +9,14 @@ import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Plan
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Status;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort.RouteTimetable;
+import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.RouteNotFoundException;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchStatus;
+import com.easysubway.route.domain.RouteStep;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -22,10 +26,13 @@ import org.springframework.stereotype.Service;
 public class RouteV2Planner implements RouteV2SearchUseCase {
 
 	private static final String PLANNER_ADR = "tools/routes/route-algorithm-v2-adr.json";
+	private static final int RANKING_CANDIDATE_LIMIT = 3;
 
 	private final RouteSearchUseCase routeSearchUseCase;
 	private final LoadRouteTimetablePort routeTimetablePort;
+	private final RouteTimetableRaptorPlanner timetableRaptorPlanner = new RouteTimetableRaptorPlanner();
 	private final boolean timetableRequired;
+	private volatile RouteTimetable cachedRouteTimetable;
 
 	public RouteV2Planner(RouteSearchUseCase routeSearchUseCase) {
 		this(routeSearchUseCase, RouteTimetable::empty, false);
@@ -59,6 +66,25 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 			if (timetableRequired && !routeTimetablePort.hasRouteTimetable()) {
 				return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
 			}
+			if (timetableRequired && canUseTimetableRaptor(command)) {
+				SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
+				routeSearchUseCase.validateRouteSearch(searchRouteCommand);
+				List<RouteSearchResult> timetableItineraries = timetableRaptorPlanner.search(
+					rankingCommand(command),
+					routeTimetable()
+				);
+				if (timetableItineraries.isEmpty()) {
+					return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
+				}
+				timetableItineraries = routeSearchUseCase.stabilizeTimetableRouteCandidates(
+					searchRouteCommand,
+					RANKING_CANDIDATE_LIMIT,
+					command.alternativeCount(),
+					timetableItineraries,
+					candidates -> rankTimetableItineraries(candidates, command.alternativeCount())
+				);
+				return new RouteV2Plan(timetableItineraries, statusesOf(timetableItineraries, command.useRealtime()), PLANNER_ADR);
+			}
 			SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
 			List<RouteSearchResult> itineraries = routeSearchUseCase.searchRouteAlternatives(
 				searchRouteCommand,
@@ -72,6 +98,63 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		} catch (RouteNotFoundException exception) {
 			return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
 		}
+	}
+
+	private boolean canUseTimetableRaptor(SearchRouteV2Command command) {
+		return command.constraintMode() != ConstraintMode.STRICT_STEP_FREE
+			&& command.mobilityType() != MobilityType.WHEELCHAIR
+			&& (!command.useRealtime() || !routeSearchUseCase.supportsRealtimeOverlay());
+	}
+
+	private RouteTimetable routeTimetable() {
+		RouteTimetable snapshot = cachedRouteTimetable;
+		if (snapshot != null) {
+			return snapshot;
+		}
+		synchronized (this) {
+			if (cachedRouteTimetable == null) {
+				cachedRouteTimetable = routeTimetablePort.loadRouteTimetable();
+			}
+			return cachedRouteTimetable;
+		}
+	}
+
+	private SearchRouteV2Command rankingCommand(SearchRouteV2Command command) {
+		return new SearchRouteV2Command(
+			command.originStationId(),
+			command.destinationStationId(),
+			command.departureTime(),
+			command.mobilityType(),
+			command.constraintMode(),
+			command.useRealtime(),
+			command.maxTransfers(),
+			RANKING_CANDIDATE_LIMIT
+		);
+	}
+
+	private List<RouteSearchResult> rankTimetableItineraries(List<RouteSearchResult> itineraries, int alternativeCount) {
+		return itineraries.stream()
+			.sorted(Comparator.comparingInt(RouteSearchResult::estimatedDurationSeconds)
+				.thenComparingInt(RouteSearchResult::transferCount)
+				.thenComparingInt(this::accessibilityRiskScore))
+			.limit(alternativeCount)
+			.toList();
+	}
+
+	private int accessibilityRiskScore(RouteSearchResult itinerary) {
+		int score = itinerary.warnings().size() * 1_000 + itinerary.blockedReasons().size() * 1_000;
+		for (RouteStep step : itinerary.steps()) {
+			if (step.includesStairs()) {
+				score += 100;
+			}
+			if ("UNKNOWN".equals(step.stairAccessState())) {
+				score += 10;
+			}
+			if (step.requiresAccessibilityCheck()) {
+				score += 1;
+			}
+		}
+		return score;
 	}
 
 	private List<RouteV2Status> statusesOf(List<RouteSearchResult> itineraries, boolean useRealtime) {
