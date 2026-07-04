@@ -23,7 +23,6 @@ import 'mobility_profile.dart';
 import 'network_map.dart';
 import 'notification_settings.dart';
 import 'onboarding.dart';
-import 'production_scope.dart';
 import 'route_search.dart';
 import 'station_search.dart';
 import 'mobile_error_reporter.dart';
@@ -2706,11 +2705,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 key: const Key('settingsSection-region-data'),
                 title: '저장된 안내',
                 children: [
-                  const _AppSettingsInfoTile(
-                    icon: Icons.public,
-                    title: '지원 범위',
-                    subtitle: ProductionScopeCopy.supportedClaimKo,
-                  ),
                   _AppSettingsActionTile(
                     key: const Key('offlineDataSettingsButton'),
                     icon: Icons.offline_pin_outlined,
@@ -3566,13 +3560,6 @@ class OfflineDataScreen extends StatelessWidget {
             _AppCard(
               child: Column(
                 children: [
-                  const _AppInfoRow(
-                    icon: Icons.public,
-                    iconColor: EasySubwayAccessibleColors.mintDark,
-                    title: '검증 구간',
-                    subtitle: ProductionScopeCopy.supportedClaimKo,
-                    trailing: '저장됨',
-                  ),
                   _AppInfoRow(
                     icon: Icons.update,
                     iconColor: EasySubwayAccessibleColors.brand,
@@ -3586,13 +3573,6 @@ class OfflineDataScreen extends StatelessWidget {
                     title: '저장 정보 다시 확인',
                     subtitle: '저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요',
                     trailing: '확인',
-                  ),
-                  const _AppInfoRow(
-                    icon: Icons.verified_outlined,
-                    iconColor: EasySubwayAccessibleColors.brand,
-                    title: '안내 범위',
-                    subtitle: ProductionScopeCopy.supportedClaimKo,
-                    trailing: '일부',
                   ),
                   const _AppInfoRow(
                     icon: Icons.info_outline,
@@ -3737,11 +3717,6 @@ class SupportAccessScreen extends StatelessWidget {
             const SizedBox(height: 12),
             _SupportGroupCard(
               children: [
-                const _SupportStaticRow(
-                  icon: Icons.verified_outlined,
-                  title: '지원 범위',
-                  subtitle: ProductionScopeCopy.helpNotice,
-                ),
                 _SupportNavRow(
                   key: const Key('supportDataSourceAttributionButton'),
                   icon: Icons.source_outlined,
@@ -3841,65 +3816,6 @@ class _SupportGroupCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: rows,
         ),
-      ),
-    );
-  }
-}
-
-class _SupportStaticRow extends StatelessWidget {
-  const _SupportStaticRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Icon(
-              icon,
-              size: 24,
-              color: EasySubwayAccessibleColors.primary,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.mutedText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -4963,16 +4879,6 @@ class _DataSourceAttributionScreenState
                 return ListView(
                   padding: _mainPagePadding,
                   children: [
-                    const _AppCard(
-                      backgroundColor: EasySubwayAccessibleColors.mintSoft,
-                      borderColor: EasySubwayAccessibleColors.mintBorder,
-                      child: _AppInfoRow(
-                        icon: Icons.info_outline,
-                        iconColor: EasySubwayAccessibleColors.mintDark,
-                        title: '지원 범위',
-                        subtitle: ProductionScopeCopy.supportedClaimKo,
-                      ),
-                    ),
                     const _AppCard(
                       child: _AppInfoRow(
                         icon: Icons.fact_check_outlined,

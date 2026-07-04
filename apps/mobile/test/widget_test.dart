@@ -1167,7 +1167,7 @@ void main() {
     await tester.pump();
     await tester.scrollUntilVisible(find.text('지도 표시용 asset'), 240);
     expect(find.text('지도 표시용 asset'), findsOneWidget);
-    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsOneWidget);
+    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNothing);
   });
 
   testWidgets('노선도 지역 메뉴는 선택한 지역으로 지도를 다시 불러온다', (tester) async {
@@ -3314,44 +3314,6 @@ void main() {
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
-  testWidgets('가까운 역 화면은 위치 권한 안내 취소 후 재시도 버튼을 유지한다', (tester) async {
-    final locationProvider = FakeCurrentLocationProvider(
-      location: _freshCurrentLocation(),
-      needsPermissionRequest: true,
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        locationProvider: locationProvider,
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, '취소'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.descendant(of: find.byType(AppBar), matching: find.text('가까운 역')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
-    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
-    expect(find.text('내 주변 역 다시 찾기'), findsOneWidget);
-    expect(locationProvider.requestCount, 0);
-  });
-
   testWidgets('노선도 좌측 메뉴에서 설정 화면으로 들어갈 수 있다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -3825,13 +3787,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('저장된 안내 상태'), findsOneWidget);
-    expect(find.text('검증 구간'), findsOneWidget);
-    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNWidgets(2));
+    expect(find.text('검증 구간'), findsNothing);
+    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNothing);
     expect(find.text('마지막 갱신'), findsOneWidget);
     expect(find.text('앱 설치 때 함께 받은 안내'), findsOneWidget);
     expect(find.text('저장 정보 다시 확인'), findsOneWidget);
     expect(find.text('저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요'), findsOneWidget);
-    expect(find.text('안내 범위'), findsOneWidget);
+    expect(find.text('안내 범위'), findsNothing);
     expect(find.text('제한 사항'), findsOneWidget);
     expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
   });
@@ -6031,7 +5993,7 @@ void main() {
           of: find.byType(AppBar),
           matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       final searchInput = tester.widget<TextField>(
         find.byKey(const Key('stationSearchInput')),
@@ -6320,7 +6282,7 @@ void main() {
           of: find.byType(AppBar),
           matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(find.text('출발·도착 입력'), findsNothing);
       expect(find.text('출'), findsNothing);
@@ -7458,7 +7420,7 @@ void main() {
     );
   });
 
-  testWidgets('역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다', (tester) async {
+  testWidgets('역 검색은 사전 안내 다이얼로그 없이 바로 위치를 요청한다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
     );
@@ -7488,18 +7450,10 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
-    expect(locationProvider.permissionCheckCount, 1);
-    expect(locationProvider.requestCount, 0);
-    expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
-    expect(
-      find.text('위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('계속'));
-    await tester.pumpAndSettle();
-
+    // 사전 rationale 다이얼로그(제목·본문·계속/취소) 없이 곧바로 위치를 요청한다.
+    expect(find.text('현재 위치 사용'), findsNothing);
+    expect(find.text('계속'), findsNothing);
+    expect(find.text('취소'), findsNothing);
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
     expect(find.text('상록수역'), findsOneWidget);
@@ -7538,7 +7492,6 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pump();
 
-    expect(locationProvider.permissionCheckCount, 1);
     expect(locationProvider.requestCount, 1);
 
     locationCompleter.complete(_freshCurrentLocation());
@@ -8034,7 +7987,7 @@ void main() {
         of: find.byType(AppBar),
         matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(
