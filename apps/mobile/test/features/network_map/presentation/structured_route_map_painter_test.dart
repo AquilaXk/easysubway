@@ -46,7 +46,13 @@ StructuredRouteMap sampleMap() {
         labelClass: RouteMapLabelClass.regular,
       ),
     ],
-    transferGroups: const [],
+    transferGroups: const [
+      RouteMapTransferGroup(
+        stationId: 'transfer',
+        lineIds: ['L1', 'L2'],
+        centroid: Offset(500, 500),
+      ),
+    ],
   );
 }
 
@@ -144,12 +150,30 @@ void main() {
       expect(b.shouldRepaint(a), isTrue);
     });
 
-    test('동일 map·revision이면 repaint 안 함', () {
+    test('동일 map·revision·내용 동일 lineColors면 repaint 안 함', () {
+      // painterWith가 매번 새 lineColors 맵 리터럴을 만들지만 내용이 같으면
+      // mapEquals로 repaint하지 않는다(참조 비교로 매 프레임 repaint 방지).
       final map = sampleMap();
       final cam = camera();
       final a = painterWith(map: map, cam: cam);
       final b = painterWith(map: map, cam: cam);
       expect(b.shouldRepaint(a), isFalse);
+    });
+
+    test('lineColors 내용이 바뀌면 repaint', () {
+      final map = sampleMap();
+      final cam = camera();
+      final a = StructuredRouteMapPainter(
+        map: map,
+        camera: cam,
+        lineColors: const {'L1': Color(0xFF0052A4)},
+      );
+      final b = StructuredRouteMapPainter(
+        map: map,
+        camera: cam,
+        lineColors: const {'L1': Color(0xFFEE0000)},
+      );
+      expect(b.shouldRepaint(a), isTrue);
     });
   });
 
@@ -176,6 +200,20 @@ void main() {
     final painter = StructuredRouteMapPainter(
       map: sampleMap(),
       camera: camera(scale: 0.5), // bucket 0 → 환승역 점만
+      lineColors: routeMapLineColors(const {'L1': '#0052A4'}),
+    );
+    painter.paint(canvas, const Size(400, 400));
+    final picture = recorder.endRecording();
+    expect(picture, isNotNull);
+    picture.dispose();
+  });
+
+  test('최대 확대에서 선·일반역·환승마커 경로를 예외 없이 그린다', () {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final painter = StructuredRouteMapPainter(
+      map: sampleMap(),
+      camera: camera(scale: 3.5), // bucket 2 → 전체 역 + 환승 그룹 마커
       lineColors: routeMapLineColors(const {'L1': '#0052A4'}),
     );
     painter.paint(canvas, const Size(400, 400));

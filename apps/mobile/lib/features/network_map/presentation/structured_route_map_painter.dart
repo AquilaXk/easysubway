@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/widgets.dart';
 
 import '../../stations/domain/station_line.dart' show stationLineColor;
@@ -89,23 +92,45 @@ class StructuredRouteMapPainter extends CustomPainter {
   static const Color _transferFill = Color(0xFFFFFFFF);
   static const Color _transferBorder = Color(0xFF102A2C);
   static const Color _fallbackLineColor = Color(0xFF8D8D8D);
+  static const double _transferBorderWidth = 2.0;
+
+  // 프레임마다 재할당하지 않도록 Paint를 인스턴스/정적 필드로 hoist한다.
+  final Paint _linePaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeJoin = StrokeJoin.round
+    ..strokeCap = StrokeCap.round
+    ..isAntiAlias = true;
+  final Paint _regularStationPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..isAntiAlias = true;
+  static final Paint _transferFillPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = _transferFill
+    ..isAntiAlias = true;
+  static final Paint _transferBorderPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = _transferBorderWidth
+    ..color = _transferBorder
+    ..isAntiAlias = true;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final visible = camera.visibleSourceRect;
+    // stroke 폭·점 반지름은 viewport px이므로 source 단위로 환산해 culling
+    // rect를 넓힌다. 경계에서 선 끝·반원이 튀는(pop) 현상 방지.
+    final maxViewportExtent = math.max(
+      lineWidth / 2,
+      math.max(stationRadius, transferStationRadius),
+    );
+    final margin = maxViewportExtent / camera.scale;
+    final visible = camera.visibleSourceRect.inflate(margin);
     _paintLines(canvas, visible);
     _paintStations(canvas, visible);
   }
 
   void _paintLines(Canvas canvas, Rect visible) {
+    _linePaint.strokeWidth = lineWidth;
     for (final line in map.lines) {
-      final paint = Paint()
-        ..color = lineColors[line.lineId] ?? _fallbackLineColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = lineWidth
-        ..strokeJoin = StrokeJoin.round
-        ..strokeCap = StrokeCap.round
-        ..isAntiAlias = true;
+      _linePaint.color = lineColors[line.lineId] ?? _fallbackLineColor;
       for (final polyline in line.polylines) {
         // viewport 밖 sub-polyline은 그리지 않는다 (culling).
         if (!routeMapPolylineIntersectsRect(polyline, visible)) {
@@ -122,40 +147,46 @@ class StructuredRouteMapPainter extends CustomPainter {
             path.lineTo(viewportPoint.dx, viewportPoint.dy);
           }
         }
-        canvas.drawPath(path, paint);
+        canvas.drawPath(path, _linePaint);
       }
     }
   }
 
   void _paintStations(Canvas canvas, Rect visible) {
     final bucket = routeMapZoomBucket(camera);
-    final fillPaint = Paint()..style = PaintingStyle.fill;
-    final transferFillPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = _transferFill;
-    final transferBorderPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..color = _transferBorder
-      ..isAntiAlias = true;
+
+    // 일반(비환승) 역 점: LOD는 도메인 helper 단일 소스를 재사용한다.
+    // 환승 노드는 transferGroups에서 한 번만 그리므로 여기서 건너뛴다.
     for (final station in map.stations) {
-      final isTransfer = station.labelClass == RouteMapLabelClass.transfer;
-      // LOD: 최소 확대(bucket 0)에서는 환승역 점만 그린다.
-      if (bucket == 0 && !isTransfer) {
+      if (station.labelClass == RouteMapLabelClass.transfer) {
         continue;
       }
-      // viewport 밖 역은 그리지 않는다 (culling).
+      if (bucket < minLabelZoomBucketFor(station.labelClass)) {
+        continue;
+      }
       if (!visible.contains(station.position)) {
         continue;
       }
-      final center = camera.sourceToViewportPoint(station.position);
-      if (isTransfer) {
-        canvas.drawCircle(center, transferStationRadius, transferFillPaint);
-        canvas.drawCircle(center, transferStationRadius, transferBorderPaint);
-      } else {
-        fillPaint.color = lineColors[station.lineId] ?? _fallbackLineColor;
-        canvas.drawCircle(center, stationRadius, fillPaint);
+      _regularStationPaint.color =
+          lineColors[station.lineId] ?? _fallbackLineColor;
+      canvas.drawCircle(
+        camera.sourceToViewportPoint(station.position),
+        stationRadius,
+        _regularStationPaint,
+      );
+    }
+
+    // 환승 마커: 물리 역당 한 번, transferGroups 중심 좌표에 그린다.
+    if (bucket < minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
+      return;
+    }
+    for (final group in map.transferGroups) {
+      if (!visible.contains(group.centroid)) {
+        continue;
       }
+      final center = camera.sourceToViewportPoint(group.centroid);
+      canvas.drawCircle(center, transferStationRadius, _transferFillPaint);
+      canvas.drawCircle(center, transferStationRadius, _transferBorderPaint);
     }
   }
 
@@ -163,7 +194,7 @@ class StructuredRouteMapPainter extends CustomPainter {
   bool shouldRepaint(StructuredRouteMapPainter oldDelegate) {
     return oldDelegate.camera.revision != camera.revision ||
         !identical(oldDelegate.map, map) ||
-        oldDelegate.lineColors != lineColors ||
+        !mapEquals(oldDelegate.lineColors, lineColors) ||
         oldDelegate.lineWidth != lineWidth ||
         oldDelegate.stationRadius != stationRadius ||
         oldDelegate.transferStationRadius != transferStationRadius;
