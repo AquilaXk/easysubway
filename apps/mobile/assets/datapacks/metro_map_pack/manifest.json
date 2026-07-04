@@ -23,7 +23,7 @@
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
-        "included": true,
+        "included": false,
         "type": "svg",
         "path": "assets/datapacks/maps/seoul-official-route-map.svg",
         "official_asset_url": "https://upload.wikimedia.org/wikipedia/commons/8/85/Seoul_subway_linemap_ko.svg",
@@ -36,7 +36,9 @@
         "source": "Seoul subway linemap ko.svg",
         "source_page": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
         "date": "2007-12-26",
-        "authors": ["IRTC1015"],
+        "authors": [
+          "IRTC1015"
+        ],
         "attributionRequired": false,
         "commercialUseAllowed": true,
         "derivativeWorkAllowed": true,
@@ -58,7 +60,7 @@
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
-        "included": true,
+        "included": false,
         "type": "svg",
         "path": "assets/datapacks/maps/busan-official-route-map.svg",
         "official_asset_url": "https://www2.humetro.busan.kr/upload/default/integrate.zip",
@@ -71,7 +73,9 @@
         "source": "부산교통공사 사이버스테이션 노선도",
         "source_page": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
         "date": "2026-06-23",
-        "authors": ["부산교통공사"],
+        "authors": [
+          "부산교통공사"
+        ],
         "attributionRequired": true,
         "commercialUseAllowed": false,
         "derivativeWorkAllowed": false,
@@ -93,7 +97,7 @@
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
-        "included": true,
+        "included": false,
         "type": "svg",
         "path": "assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg",
         "mime_type": "image/svg+xml"
@@ -106,7 +110,10 @@
         "source_page": "https://namu.wiki/w/%ED%8C%8C%EC%9D%BC:%EA%B4%91%EC%A3%BC%20%EB%8F%84%EC%8B%9C%EC%B2%A0%EB%8F%84%201%ED%98%B8%EC%84%A0%20%EB%85%B8%EC%84%A0%EB%8F%84.svg",
         "based_on": "파일:서울 지하철 7호선 노선도(2021_05).svg",
         "date": "210712",
-        "authors": ["kiwitree", "grafiker"],
+        "authors": [
+          "kiwitree",
+          "grafiker"
+        ],
         "attributionRequired": true,
         "commercialUseAllowed": false,
         "derivativeWorkAllowed": false,
@@ -128,7 +135,7 @@
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
-        "included": true,
+        "included": false,
         "type": "svg",
         "path": "assets/datapacks/maps/daegu-official-route-map.svg",
         "official_asset_url": "https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.zip",
@@ -141,7 +148,9 @@
         "source": "대구교통공사 사이버스테이션 노선도",
         "source_page": "https://www.dtro.or.kr/front/dtro/cyberstation/station/cyberstation.do",
         "date": "2026-06-23",
-        "authors": ["대구교통공사"],
+        "authors": [
+          "대구교통공사"
+        ],
         "attributionRequired": true,
         "commercialUseAllowed": false,
         "derivativeWorkAllowed": false,
@@ -163,7 +172,7 @@
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
-        "included": true,
+        "included": false,
         "type": "svg",
         "path": "assets/datapacks/maps/daejeon-official-route-map.svg",
         "official_asset_url": "https://www.djtc.kr/kor/resources/routemap/korean.zip",
@@ -176,7 +185,9 @@
         "source": "대전교통공사 사이버스테이션 노선도",
         "source_page": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
         "date": "2026-06-23",
-        "authors": ["대전교통공사"],
+        "authors": [
+          "대전교통공사"
+        ],
         "attributionRequired": true,
         "commercialUseAllowed": false,
         "derivativeWorkAllowed": false,
