@@ -2084,13 +2084,35 @@ class RouteSearchServiceTest {
 	}
 
 	private static LoadRouteTimetablePort lateNightRouteTimetablePort() {
-		return () -> routeTimetable(
-			List.of(
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-late", 1, "station-a", "seoul-4", 87000, 87000, 0, 0),
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-late", 2, "station-b", "seoul-4", 87900, 87900, 0, 0)
-			),
-			List.of()
-		);
+		return () -> {
+			var timetable = routeTimetable(
+				List.of(
+					new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-late", 1, "station-a", "seoul-4", 87000, 87000, 0, 0),
+					new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-late", 2, "station-b", "seoul-4", 87900, 87900, 0, 0)
+				),
+				List.of()
+			);
+			return new LoadRouteTimetablePort.RouteTimetable(
+				List.of(new LoadRouteTimetablePort.ServiceCalendar(
+					"weekday-2026",
+					true,
+					true,
+					true,
+					true,
+					true,
+					false,
+					false,
+					LocalDate.parse("2026-07-01"),
+					LocalDate.parse("2026-07-01"),
+					"Asia/Seoul"
+				)),
+				timetable.serviceCalendarDates(),
+				timetable.transitRoutes(),
+				timetable.transitTrips(),
+				timetable.transitStopTimes(),
+				timetable.transitFrequencies()
+			);
+		};
 	}
 
 	private static LoadRouteTimetablePort removedCalendarDateRouteTimetablePort() {
