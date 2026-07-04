@@ -97,9 +97,8 @@ class StructuredRouteMap {
       lines.isEmpty && stations.isEmpty && transferGroups.isEmpty;
 }
 
-/// 빌더 입력: route_map_positions 한 행에 대응하는 값.
+/// 빌더 입력: route_map_positions 한 행(역-노선)의 표시 값.
 /// [labelPolygon]은 호출부에서 기존 _parseLabelPolygon으로 미리 파싱해 전달한다.
-/// [downPath]는 이 역으로 들어오는 track 세그먼트("M prev L this")의 원본 문자열.
 class StructuredRouteMapStationInput {
   const StructuredRouteMapStationInput({
     required this.stationId,
@@ -107,7 +106,6 @@ class StructuredRouteMapStationInput {
     required this.sequence,
     required this.position,
     required this.labelPolygon,
-    required this.downPath,
   });
 
   final String stationId;
@@ -115,75 +113,91 @@ class StructuredRouteMapStationInput {
   final int sequence;
   final Offset position;
   final List<Offset> labelPolygon;
-  final String downPath;
+
+  String get key => '$stationId:$lineId';
 }
 
-/// "M x y L x y ..." 형태의 절대 좌표 path를 정점 목록으로 파싱한다.
-/// 데이터팩(enrich-capital-route-map-layer.mjs)은 절대 M/L 세그먼트만 방출하므로
-/// 명령 문자는 무시하고 숫자 쌍만 읽는다. (H/V/상대 명령은 대상 아님.)
-List<Offset> parseRouteMapPolyline(String path) {
-  if (path.trim().isEmpty) {
-    return const [];
-  }
-  final numbers = RegExp(r'-?\d+(?:\.\d+)?')
-      .allMatches(path)
-      .map((match) => double.parse(match.group(0)!))
-      .toList();
-  final points = <Offset>[];
-  for (var index = 0; index + 1 < numbers.length; index += 2) {
-    points.add(Offset(numbers[index], numbers[index + 1]));
-  }
-  return points;
+/// 빌더 입력: 노선 topology 엣지(실제 인접 두 역). RIDE 엣지에서 온다.
+/// [fromKey]/[toKey]는 'stationId:lineId' 형식의 역-노선 키.
+class StructuredRouteMapEdgeInput {
+  const StructuredRouteMapEdgeInput({
+    required this.lineId,
+    required this.fromKey,
+    required this.toKey,
+  });
+
+  final String lineId;
+  final String fromKey;
+  final String toKey;
 }
 
-/// 원시 route_map_positions 입력에서 구조화 노선도를 파생한다.
-StructuredRouteMap buildStructuredRouteMap(
-  Iterable<StructuredRouteMapStationInput> inputs,
-) {
-  final inputList = inputs.toList(growable: false);
+/// 노선 topology(실제 인접 RIDE 엣지)와 역 좌표에서 구조화 노선도를 파생한다.
+///
+/// line geometry는 각 RIDE 엣지를 인접 두 역 사이 세그먼트로 둔다. line_sequence가
+/// 아니라 실제 인접을 쓰므로 지선/분기/순환에서 먼 역끼리 잇는 phantom edge(부채꼴)가
+/// 생기지 않는다.
+StructuredRouteMap buildStructuredRouteMap({
+  required Iterable<StructuredRouteMapStationInput> stations,
+  required Iterable<StructuredRouteMapEdgeInput> edges,
+}) {
+  final stationList = stations.toList(growable: false);
 
-  // 물리 역(station_id)이 속한 line 집합 → 환승 판정.
+  final positionByKey = <String, Offset>{};
   final lineIdsByStation = <String, Set<String>>{};
-  // 환승 중심 계산용: 환승역 후보만 좌표를 모은다.
   final positionsByStation = <String, List<Offset>>{};
-  for (final input in inputList) {
+  for (final station in stationList) {
+    positionByKey[station.key] = station.position;
     lineIdsByStation
-        .putIfAbsent(input.stationId, () => <String>{})
-        .add(input.lineId);
+        .putIfAbsent(station.stationId, () => <String>{})
+        .add(station.lineId);
     positionsByStation
-        .putIfAbsent(input.stationId, () => <Offset>[])
-        .add(input.position);
+        .putIfAbsent(station.stationId, () => <Offset>[])
+        .add(station.position);
   }
 
-  // 노선별 track polyline: sequence(동률 시 station_id) 순서로 세그먼트를 잇되
-  // 이어지지 않는 지점에서 끊는다.
-  final byLine = <String, List<StructuredRouteMapStationInput>>{};
-  for (final input in inputList) {
-    byLine.putIfAbsent(input.lineId, () => []).add(input);
+  // line geometry: RIDE 엣지 = 인접 두 역 세그먼트. 무방향이라 중복 제거하고
+  // 노선별로 모은다. 각 세그먼트가 독립 sub-polyline(2점)이라 렌더러가 이어 그린다.
+  final segmentsByLine = <String, List<List<Offset>>>{};
+  final seenEdges = <String>{};
+  for (final edge in edges) {
+    final from = positionByKey[edge.fromKey];
+    final to = positionByKey[edge.toKey];
+    if (from == null || to == null || from == to) {
+      continue;
+    }
+    final undirected = edge.fromKey.compareTo(edge.toKey) <= 0
+        ? '${edge.lineId}|${edge.fromKey}|${edge.toKey}'
+        : '${edge.lineId}|${edge.toKey}|${edge.fromKey}';
+    if (!seenEdges.add(undirected)) {
+      continue;
+    }
+    segmentsByLine
+        .putIfAbsent(edge.lineId, () => <List<Offset>>[])
+        .add(<Offset>[from, to]);
   }
   final lines = <RouteMapLineGeometry>[];
-  final orderedLineIds = byLine.keys.toList()..sort();
+  final orderedLineIds = segmentsByLine.keys.toList()..sort();
   for (final lineId in orderedLineIds) {
-    final stations = byLine[lineId]!..sort(_bySequenceThenStation);
     lines.add(
       RouteMapLineGeometry(
         lineId: lineId,
-        polylines: _assemblePolylines(stations),
+        polylines: _filterPhantomSegments(segmentsByLine[lineId]!),
       ),
     );
   }
 
   // 구조화 역 노드 + 라벨 class.
-  final stations = <RouteMapStructuredStation>[];
-  for (final input in inputList) {
-    final isTransfer = (lineIdsByStation[input.stationId]?.length ?? 0) > 1;
-    stations.add(
+  final structuredStations = <RouteMapStructuredStation>[];
+  for (final station in stationList) {
+    final isTransfer =
+        (lineIdsByStation[station.stationId]?.length ?? 0) > 1;
+    structuredStations.add(
       RouteMapStructuredStation(
-        stationId: input.stationId,
-        lineId: input.lineId,
-        sequence: input.sequence,
-        position: input.position,
-        labelPolygon: input.labelPolygon,
+        stationId: station.stationId,
+        lineId: station.lineId,
+        sequence: station.sequence,
+        position: station.position,
+        labelPolygon: station.labelPolygon,
         labelClass: isTransfer
             ? RouteMapLabelClass.transfer
             : RouteMapLabelClass.regular,
@@ -210,40 +224,31 @@ StructuredRouteMap buildStructuredRouteMap(
 
   return StructuredRouteMap(
     lines: lines,
-    stations: stations,
+    stations: structuredStations,
     transferGroups: transferGroups,
   );
 }
 
-int _bySequenceThenStation(
-  StructuredRouteMapStationInput a,
-  StructuredRouteMapStationInput b,
-) {
-  final bySequence = a.sequence.compareTo(b.sequence);
-  return bySequence != 0 ? bySequence : a.stationId.compareTo(b.stationId);
-}
-
-/// down_path 세그먼트("M prev L this", 전방 정점 순서)들을 sequence 순서로 이어
-/// track polyline을 만든다. 인접 세그먼트가 끝점=시작점으로 이어지면 붙이고,
-/// 이어지지 않으면(데이터 hole) 새 polyline을 시작한다.
-List<List<Offset>> _assemblePolylines(
-  List<StructuredRouteMapStationInput> orderedStations,
-) {
-  final polylines = <List<Offset>>[];
-  List<Offset>? current;
-  for (final station in orderedStations) {
-    final segment = parseRouteMapPolyline(station.downPath);
-    if (segment.isEmpty) {
-      continue;
-    }
-    if (current != null && current.last == segment.first) {
-      current.addAll(segment.skip(1));
-    } else {
-      current = <Offset>[...segment];
-      polylines.add(current);
-    }
+/// 데이터에 실제 인접 topology가 없어 RIDE 엣지가 line_sequence 기반이면,
+/// 지선/분기에서 먼 두 역을 잇는 phantom 세그먼트(부채꼴)가 섞인다. 노선별
+/// 세그먼트 길이의 median 대비 [thresholdFactor]배를 넘는 세그먼트를 제외한다.
+/// GTX-A처럼 역간격이 균일하게 넓은 노선은 median 자체가 커서 보존된다.
+List<List<Offset>> _filterPhantomSegments(
+  List<List<Offset>> segments, {
+  double thresholdFactor = 4.0,
+}) {
+  if (segments.length < 5) {
+    return segments;
   }
-  return polylines;
+  final lengths = segments.map((s) => (s[1] - s[0]).distance).toList()..sort();
+  final median = lengths[lengths.length ~/ 2];
+  if (median <= 0) {
+    return segments;
+  }
+  final threshold = median * thresholdFactor;
+  return segments
+      .where((s) => (s[1] - s[0]).distance <= threshold)
+      .toList(growable: false);
 }
 
 Offset _centroid(List<Offset> points) {

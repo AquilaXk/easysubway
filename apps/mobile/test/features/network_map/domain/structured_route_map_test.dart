@@ -1,13 +1,14 @@
+import 'dart:ui' show Offset;
+
 import 'package:easysubway_mobile/features/network_map/domain/structured_route_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-StructuredRouteMapStationInput input({
+StructuredRouteMapStationInput station({
   required String stationId,
   required String lineId,
-  required int sequence,
+  int sequence = 0,
   Offset position = Offset.zero,
   List<Offset> labelPolygon = const [],
-  String downPath = '',
 }) {
   return StructuredRouteMapStationInput(
     stationId: stationId,
@@ -15,137 +16,150 @@ StructuredRouteMapStationInput input({
     sequence: sequence,
     position: position,
     labelPolygon: labelPolygon,
-    downPath: downPath,
   );
 }
 
+StructuredRouteMapEdgeInput edge(String lineId, String from, String to) {
+  return StructuredRouteMapEdgeInput(lineId: lineId, fromKey: from, toKey: to);
+}
+
 void main() {
-  group('parseRouteMapPolyline', () {
-    test('절대 M/L 명령을 정점 목록으로 파싱한다', () {
-      expect(parseRouteMapPolyline('M 1623 1238 L 1744 1359'), <Offset>[
-        const Offset(1623, 1238),
-        const Offset(1744, 1359),
+  group('buildStructuredRouteMap line geometry (topology)', () {
+    test('각 RIDE 엣지를 인접 두 역 세그먼트로 만든다', () {
+      final map = buildStructuredRouteMap(
+        stations: [
+          station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
+          station(
+            stationId: 's2',
+            lineId: 'L1',
+            position: const Offset(10, 0),
+          ),
+          station(
+            stationId: 's3',
+            lineId: 'L1',
+            position: const Offset(20, 0),
+          ),
+        ],
+        edges: [edge('L1', 's1:L1', 's2:L1'), edge('L1', 's2:L1', 's3:L1')],
+      );
+      expect(map.lines, hasLength(1));
+      final segments = map.lines.single.polylines;
+      expect(segments, <List<Offset>>[
+        [const Offset(0, 0), const Offset(10, 0)],
+        [const Offset(10, 0), const Offset(20, 0)],
       ]);
     });
 
-    test('빈 문자열은 빈 목록', () {
-      expect(parseRouteMapPolyline(''), isEmpty);
-      expect(parseRouteMapPolyline('   '), isEmpty);
+    test('무방향 중복 엣지(A-B, B-A)는 한 번만 그린다', () {
+      final map = buildStructuredRouteMap(
+        stations: [
+          station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
+          station(
+            stationId: 's2',
+            lineId: 'L1',
+            position: const Offset(10, 0),
+          ),
+        ],
+        edges: [edge('L1', 's1:L1', 's2:L1'), edge('L1', 's2:L1', 's1:L1')],
+      );
+      expect(map.lines.single.polylines, hasLength(1));
     });
 
-    test('명령 문자에 붙어 있어도 숫자만 추출한다', () {
-      expect(parseRouteMapPolyline('M1,2 L3,4'), <Offset>[
-        const Offset(1, 2),
-        const Offset(3, 4),
-      ]);
+    test('분기(한 역에서 여러 인접)는 여러 세그먼트로 자연 표현된다', () {
+      // s2에서 s1, s3, s4로 분기 → 세그먼트 3개(부채꼴 아님, 각자 짧은 인접).
+      final map = buildStructuredRouteMap(
+        stations: [
+          station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
+          station(
+            stationId: 's2',
+            lineId: 'L1',
+            position: const Offset(10, 0),
+          ),
+          station(
+            stationId: 's3',
+            lineId: 'L1',
+            position: const Offset(20, 5),
+          ),
+          station(
+            stationId: 's4',
+            lineId: 'L1',
+            position: const Offset(20, -5),
+          ),
+        ],
+        edges: [
+          edge('L1', 's1:L1', 's2:L1'),
+          edge('L1', 's2:L1', 's3:L1'),
+          edge('L1', 's2:L1', 's4:L1'),
+        ],
+      );
+      expect(map.lines.single.polylines, hasLength(3));
     });
 
-    test('짝이 맞지 않는 마지막 숫자는 버린다', () {
-      expect(parseRouteMapPolyline('M 1 2 L 3'), <Offset>[const Offset(1, 2)]);
+    test('phantom(노선 median 대비 매우 긴) 세그먼트를 제외한다', () {
+      // 길이 10짜리 인접 6개 + 먼 역으로 튀는 phantom 1개.
+      final stations = [
+        for (var i = 0; i <= 6; i++)
+          station(
+            stationId: 's$i',
+            lineId: 'L1',
+            position: Offset(i * 10, 0),
+          ),
+        station(stationId: 'far', lineId: 'L1', position: const Offset(1000, 0)),
+      ];
+      final edges = [
+        for (var i = 0; i < 6; i++) edge('L1', 's$i:L1', 's${i + 1}:L1'),
+        edge('L1', 's6:L1', 'far:L1'),
+      ];
+      final map = buildStructuredRouteMap(stations: stations, edges: edges);
+      expect(map.lines.single.polylines, hasLength(6));
+    });
+
+    test('세그먼트가 균일하게 길면(GTX-A류) 보존한다', () {
+      // 모두 길이 300 → median 300, threshold 1200, 아무것도 안 잘림.
+      final stations = [
+        for (var i = 0; i <= 5; i++)
+          station(
+            stationId: 'g$i',
+            lineId: 'GTX',
+            position: Offset(i * 300, 0),
+          ),
+      ];
+      final edges = [
+        for (var i = 0; i < 5; i++) edge('GTX', 'g$i:GTX', 'g${i + 1}:GTX'),
+      ];
+      final map = buildStructuredRouteMap(stations: stations, edges: edges);
+      expect(map.lines.single.polylines, hasLength(5));
+    });
+
+    test('좌표를 못 찾는 엣지는 건너뛴다', () {
+      final map = buildStructuredRouteMap(
+        stations: [
+          station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
+        ],
+        edges: [edge('L1', 's1:L1', 'missing:L1')],
+      );
+      expect(map.lines, isEmpty);
     });
   });
 
-  group('buildStructuredRouteMap', () {
-    test('track polyline을 sequence 순서로 잇고 공유 정점을 중복 제거한다', () {
-      final map = buildStructuredRouteMap([
-        input(
-          stationId: 's2',
-          lineId: 'L1',
-          sequence: 2,
-          downPath: 'M 10 10 L 20 20',
-        ),
-        input(
-          stationId: 's1',
-          lineId: 'L1',
-          sequence: 1,
-          downPath: '', // 시점 역은 들어오는 세그먼트 없음
-        ),
-        input(
-          stationId: 's3',
-          lineId: 'L1',
-          sequence: 3,
-          downPath: 'M 20 20 L 30 30',
-        ),
-      ]);
-
-      expect(map.lines, hasLength(1));
-      expect(map.lines.single.polylines, hasLength(1));
-      expect(map.lines.single.polylines.single, <Offset>[
-        const Offset(10, 10),
-        const Offset(20, 20),
-        const Offset(30, 30),
-      ]);
-    });
-
-    test('이어지지 않는 세그먼트(데이터 hole)에서 polyline을 끊는다', () {
-      final map = buildStructuredRouteMap([
-        input(stationId: 's1', lineId: 'L1', sequence: 1, downPath: ''),
-        input(
-          stationId: 's2',
-          lineId: 'L1',
-          sequence: 2,
-          downPath: 'M 0 0 L 10 10',
-        ),
-        // s3 세그먼트가 (10,10)에서 이어지지 않고 (30,30)에서 시작 → 끊는다.
-        input(
-          stationId: 's3',
-          lineId: 'L1',
-          sequence: 3,
-          downPath: 'M 30 30 L 40 40',
-        ),
-      ]);
-
-      expect(map.lines.single.polylines, <List<Offset>>[
-        [const Offset(0, 0), const Offset(10, 10)],
-        [const Offset(30, 30), const Offset(40, 40)],
-      ]);
-    });
-
-    test('sequence 동률이면 station_id로 결정적으로 정렬한다', () {
-      final ordered = buildStructuredRouteMap([
-        input(
-          stationId: 'sb',
-          lineId: 'L1',
-          sequence: 1,
-          downPath: 'M 5 5 L 6 6',
-        ),
-        input(
-          stationId: 'sa',
-          lineId: 'L1',
-          sequence: 1,
-          downPath: 'M 0 0 L 5 5',
-        ),
-      ]);
-      // sa(먼저) → sb: (0,0)-(5,5)-(6,6) 하나로 이어진다.
-      expect(ordered.lines.single.polylines.single, <Offset>[
-        const Offset(0, 0),
-        const Offset(5, 5),
-        const Offset(6, 6),
-      ]);
-    });
-
+  group('buildStructuredRouteMap nodes/transfers/labels', () {
     test('여러 노선에 속한 역을 환승 그룹으로 묶고 중심 좌표를 구한다', () {
-      final map = buildStructuredRouteMap([
-        input(
-          stationId: 's1',
-          lineId: 'L1',
-          sequence: 1,
-          position: Offset.zero,
-        ),
-        input(
-          stationId: 's1',
-          lineId: 'L2',
-          sequence: 5,
-          position: const Offset(10, 20),
-        ),
-        input(
-          stationId: 's2',
-          lineId: 'L1',
-          sequence: 2,
-          position: const Offset(100, 100),
-        ),
-      ]);
-
+      final map = buildStructuredRouteMap(
+        stations: [
+          station(stationId: 's1', lineId: 'L1', position: Offset.zero),
+          station(
+            stationId: 's1',
+            lineId: 'L2',
+            position: const Offset(10, 20),
+          ),
+          station(
+            stationId: 's2',
+            lineId: 'L1',
+            position: const Offset(100, 100),
+          ),
+        ],
+        edges: const [],
+      );
       expect(map.transferGroups, hasLength(1));
       final group = map.transferGroups.single;
       expect(group.stationId, 's1');
@@ -153,13 +167,15 @@ void main() {
       expect(group.centroid, const Offset(5, 10));
     });
 
-    test('환승역은 transfer, 단일 노선역은 regular class', () {
-      final map = buildStructuredRouteMap([
-        input(stationId: 's1', lineId: 'L1', sequence: 1),
-        input(stationId: 's1', lineId: 'L2', sequence: 1),
-        input(stationId: 's2', lineId: 'L1', sequence: 2),
-      ]);
-
+    test('환승역은 transfer, 단일 노선역은 regular class + LOD', () {
+      final map = buildStructuredRouteMap(
+        stations: [
+          station(stationId: 's1', lineId: 'L1'),
+          station(stationId: 's1', lineId: 'L2'),
+          station(stationId: 's2', lineId: 'L1'),
+        ],
+        edges: const [],
+      );
       final transfer = map.stations.firstWhere((s) => s.stationId == 's1');
       final regular = map.stations.firstWhere((s) => s.stationId == 's2');
       expect(transfer.labelClass, RouteMapLabelClass.transfer);
@@ -175,7 +191,10 @@ void main() {
     });
 
     test('빈 입력은 빈 구조', () {
-      expect(buildStructuredRouteMap(const []).isEmpty, isTrue);
+      expect(
+        buildStructuredRouteMap(stations: const [], edges: const []).isEmpty,
+        isTrue,
+      );
     });
   });
 }

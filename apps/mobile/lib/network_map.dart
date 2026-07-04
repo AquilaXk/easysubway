@@ -108,7 +108,7 @@ class NetworkMapData {
   /// route_map_positions 필드에서 계산한다.
   StructuredRouteMap toStructuredRouteMap() {
     return buildStructuredRouteMap(
-      stations.map(
+      stations: stations.map(
         (station) => StructuredRouteMapStationInput(
           stationId: station.id,
           lineId: station.lineId,
@@ -119,7 +119,14 @@ class NetworkMapData {
           ),
           labelPolygon:
               _parseLabelPolygon(station.position.labelPolygon) ?? const [],
-          downPath: station.position.downPath,
+        ),
+      ),
+      // line geometry는 sequence가 아니라 실제 인접(RIDE 엣지) topology로 잇는다.
+      edges: edges.map(
+        (edge) => StructuredRouteMapEdgeInput(
+          lineId: edge.lineId,
+          fromKey: edge.fromStationId,
+          toKey: edge.toStationId,
         ),
       ),
     );
