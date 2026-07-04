@@ -2780,8 +2780,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   void _ensureStructuredRouteMap() {
     final data = widget.data;
+    // geometry 캐시와 동일하게 identityHashCode를 포함해, 같은 region·같은 개수라도
+    // data 인스턴스가 바뀌면(좌표 수정/노선 교체) 재계산되게 한다(overlay와 정합).
     final key =
-        '${data.selectedRegion}:${data.stations.length}:${data.lines.length}';
+        '${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}:${data.lines.length}';
     if (_structuredCacheKey == key && _structuredRouteMapCache != null) {
       return;
     }
