@@ -311,7 +311,8 @@ private final class RouteMapViewportWebViewFactory: NSObject, FlutterPlatformVie
       sourceWidth: params["sourceWidth"].asDouble(),
       sourceHeight: params["sourceHeight"].asDouble(),
       viewBox: params["viewBox"].asDoubleList(),
-      revision: params["revision"].asInt()
+      revision: params["revision"].asInt(),
+      labelCollisionScript: params["labelCollisionScript"] as? String ?? ""
     )
   }
 }
@@ -325,6 +326,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   private let sourceHeight: Double
   private var viewBox: [Double]
   private var revision: Int
+  private let labelCollisionScript: String
   private var webView: WKWebView?
 
   init(
@@ -336,7 +338,8 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     sourceWidth: Double,
     sourceHeight: Double,
     viewBox: [Double],
-    revision: Int
+    revision: Int,
+    labelCollisionScript: String
   ) {
     container = UIView(frame: frame)
     channel = FlutterMethodChannel(
@@ -349,6 +352,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     self.sourceHeight = sourceHeight
     self.viewBox = viewBox
     self.revision = revision
+    self.labelCollisionScript = labelCollisionScript
     super.init()
 
     container.backgroundColor = .white
@@ -430,6 +434,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
           html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
           svg { display: block; width: 100%; height: 100%; }
         </style>
+        <script>\(labelCollisionScript)</script>
       </head>
       <body>\(svg)</body>
       </html>
@@ -448,7 +453,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     let frameRevision = revision
     let script = String(
       format:
-        "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');return true;})();",
+        "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');try{if(window.easysubwayApplyRouteMapLabelPolicy){window.easysubwayApplyRouteMapLabelPolicy();}}catch(e){}return true;})();",
       locale: Locale(identifier: "en_US_POSIX"),
       values[0],
       values[1],
