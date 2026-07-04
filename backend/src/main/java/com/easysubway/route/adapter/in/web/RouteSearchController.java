@@ -159,6 +159,7 @@ class RouteSearchController {
 		@Max(value = 3, message = "최대 환승 수는 3 이하여야 합니다.")
 		Integer maxTransfers,
 		@Min(value = 1, message = "대안 경로 수는 1 이상이어야 합니다.")
+		@Max(value = 3, message = "대안 경로 수는 3 이하여야 합니다.")
 		int alternativeCount
 	) {
 

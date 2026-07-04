@@ -810,7 +810,7 @@ class RouteSearchServiceTest {
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 		assertThat(plan.itineraries()).hasSize(1);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
-		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(720);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(1140);
 		assertThat(plan.itineraries().getFirst().steps())
 			.extracting("stepType", "fromStationId", "toStationId", "timeSource")
 			.containsExactly(
@@ -821,9 +821,9 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().steps())
 			.extracting("stepType", "estimatedMinutes")
 			.containsExactly(
-				tuple("entry", 2),
+				tuple("entry", 6),
 				tuple("ride", 10),
-				tuple("exit", 0)
+				tuple("exit", 3)
 			);
 	}
 
@@ -984,7 +984,7 @@ class RouteSearchServiceTest {
 		));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
-		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(1200);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(1980);
 	}
 
 	@Test
@@ -1254,6 +1254,9 @@ class RouteSearchServiceTest {
 		assertThatThrownBy(() -> routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 0))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("alternativeCount must be at least 1");
+		assertThatThrownBy(() -> routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 4))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("alternativeCount must be 3 or less");
 	}
 
 	@Test
@@ -2015,8 +2018,8 @@ class RouteSearchServiceTest {
 				0
 			)),
 			List.of(
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32520, 32520, 0, 0),
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33120, 33120, 0, 0)
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32760, 32760, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33360, 33360, 0, 0)
 			),
 			List.of()
 		);
@@ -2035,15 +2038,15 @@ class RouteSearchServiceTest {
 	private static LoadRouteTimetablePort restrictedStopRouteTimetablePort(int pickupType, int dropOffType) {
 		return () -> routeTimetable(
 			List.of(
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32520, 32520, pickupType, 0),
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33120, 33120, 0, dropOffType)
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32760, 32760, pickupType, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33360, 33360, 0, dropOffType)
 			),
 			List.of()
 		);
 	}
 
 	private static LoadRouteTimetablePort transferRouteTimetablePort() {
-		return transferRouteTimetablePort(33420);
+		return transferRouteTimetablePort(33720);
 	}
 
 	private static LoadRouteTimetablePort transferRouteTimetablePort(int secondDepartureSeconds) {
@@ -2101,8 +2104,8 @@ class RouteSearchServiceTest {
 				)
 			),
 			List.of(
-				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 1, "station-a", "line-a", 32520, 32520, 0, 0),
-				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 2, "station-transfer", "line-a", 32940, 32940, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 1, "station-a", "line-a", 32760, 32760, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 2, "station-transfer", "line-a", 33180, 33180, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 1, "station-transfer", "line-b", secondDepartureSeconds, secondDepartureSeconds, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 2, "station-b", "line-b", secondDepartureSeconds + 420, secondDepartureSeconds + 420, 0, 0)
 			),

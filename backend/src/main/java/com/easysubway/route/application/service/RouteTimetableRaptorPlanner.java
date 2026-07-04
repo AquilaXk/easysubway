@@ -32,9 +32,11 @@ class RouteTimetableRaptorPlanner {
 	private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 	private static final int SERVICE_DAY_CUTOFF_HOUR = 3;
 	private static final int PARETO_LIMIT = 3;
+	private static final int ENTRY_DURATION_SECONDS = 240;
 	private static final int ENTRY_DISTANCE_METERS = 180;
 	private static final int TRANSFER_DURATION_SECONDS = 360;
 	private static final int TRANSFER_DISTANCE_METERS = 260;
+	private static final int EXIT_DURATION_SECONDS = 180;
 	private static final int EXIT_DISTANCE_METERS = 120;
 
 	List<RouteSearchResult> search(SearchRouteV2Command command, RouteTimetable timetable) {
@@ -109,8 +111,8 @@ class RouteTimetableRaptorPlanner {
 
 	private boolean canBoard(SearchRouteV2Command command, Label label, TransitStopTime stopTime, int round) {
 		int slackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
-		int transferSeconds = label.boardings() > 0 ? TRANSFER_DURATION_SECONDS : 0;
-		return label.boardings() == round && stopTime.departureSeconds() >= label.timeSeconds() + transferSeconds + slackSeconds;
+		int accessSeconds = label.boardings() > 0 ? TRANSFER_DURATION_SECONDS : ENTRY_DURATION_SECONDS;
+		return label.boardings() == round && stopTime.departureSeconds() >= label.timeSeconds() + accessSeconds + slackSeconds;
 	}
 
 	private Boarding betterBoarding(Boarding current, Label label, TransitStopTime stopTime) {
@@ -183,7 +185,7 @@ class RouteTimetableRaptorPlanner {
 			firstLeg.from().stationId(),
 			firstLeg.lineId(),
 			firstLeg.lineName(),
-			waitMinutesBeforeBoarding(label.startSeconds(), firstLeg.from().departureSeconds(), 0, boardingSlackSeconds),
+			waitMinutesBeforeBoarding(label.startSeconds(), firstLeg.from().departureSeconds(), ENTRY_DURATION_SECONDS, boardingSlackSeconds),
 			ENTRY_DISTANCE_METERS
 		));
 		sequence += 1;
@@ -231,7 +233,7 @@ class RouteTimetableRaptorPlanner {
 			command.destinationStationId(),
 			lastLeg.lineId(),
 			lastLeg.lineName(),
-			0,
+			EXIT_DURATION_SECONDS / 60,
 			EXIT_DISTANCE_METERS
 		));
 		return new RouteSearchResult(
