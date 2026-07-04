@@ -3568,6 +3568,10 @@ class _SupportGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 연결 가능한 항목이 없으면(전 항목 숨김) 빈 테두리 카드를 그리지 않는다.
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final rows = <Widget>[];
     for (var i = 0; i < children.length; i++) {
       rows.add(children[i]);
