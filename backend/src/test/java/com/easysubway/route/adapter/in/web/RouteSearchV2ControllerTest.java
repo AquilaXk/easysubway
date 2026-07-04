@@ -636,7 +636,7 @@ class RouteSearchV2ControllerTest {
 	}
 
 	@Test
-	@DisplayName("V2 TIMETABLE egress leg는 순수 보행 시간을 walkSeconds로 노출한다")
+	@DisplayName("V2 TIMETABLE egress leg는 반올림된 분이 아니라 순수 보행 초를 노출한다")
 	void routeSearchV2ExposesTimetableEgressWalkSeconds() throws Exception {
 		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
 			command.mobilityType() == MobilityType.STROLLER
@@ -659,7 +659,7 @@ class RouteSearchV2ControllerTest {
 					}
 					"""))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.itineraries[0].legs[0].walkSeconds").value(180))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].walkSeconds").value(160))
 			.andExpect(jsonPath("$.data.itineraries[0].legs[0].appliedPreset").value("STEP_FREE"));
 	}
 
@@ -919,7 +919,13 @@ class RouteSearchV2ControllerTest {
 				true,
 				"PLANNED",
 				"TIMETABLE",
-				"시간표"
+				"시간표",
+				List.of(),
+				null,
+				null,
+				null,
+				null,
+				160
 			)),
 			List.of(),
 			List.of(),
