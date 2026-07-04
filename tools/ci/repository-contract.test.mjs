@@ -9618,13 +9618,16 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
   assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
-  assert.match(main, /label: '역'/);
-  assert.match(main, /label: '시설'/);
-  assert.match(main, /label: '경로'/);
+  // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
+  assert.match(main, /_AppSectionTitle\(title: '역'\)/);
+  assert.match(main, /_AppSectionTitle\(title: '시설'\)/);
+  assert.match(main, /_AppSectionTitle\(title: '경로'\)/);
   assert.match(main, /FavoriteHomeScreen/);
-  assert.match(main, /FavoriteRouteListContent/);
-  assert.match(main, /FavoriteStationListContent/);
-  assert.match(main, /FavoriteFacilityListContent/);
+  // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
+  // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
+  assert.match(main, /class _FavoriteHomeStationRow/);
+  assert.match(main, /class _FavoriteHomeFacilityRow/);
+  assert.match(main, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);
