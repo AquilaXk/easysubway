@@ -167,6 +167,8 @@ class RouteTimetableRaptorPlanner {
 	private static RouteSearchResult toRouteSearchResult(SearchRouteV2Command command, Label label, ServiceDay serviceDay) {
 		List<RouteStep> steps = new ArrayList<>();
 		int sequence = 1;
+		int cursorSeconds = label.startSeconds();
+		int boardingSlackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
 		for (RideLeg leg : label.path()) {
 			String lineName = leg.lineName();
 			steps.add(new RouteStep(
@@ -178,7 +180,7 @@ class RouteTimetableRaptorPlanner {
 				lineName,
 				leg.from().stationId(),
 				leg.to().stationId(),
-				Math.max(1, (int) Math.ceil((leg.to().arrivalSeconds() - leg.from().departureSeconds()) / 60.0)),
+				Math.max(1, (int) Math.ceil((leg.to().arrivalSeconds() - cursorSeconds - boardingSlackSeconds) / 60.0)),
 				0,
 				false,
 				"UNKNOWN",
@@ -187,11 +189,12 @@ class RouteTimetableRaptorPlanner {
 				"TIMETABLE",
 				"시간표"
 			));
+			cursorSeconds = leg.to().arrivalSeconds();
 			sequence += 1;
 		}
 		return new RouteSearchResult(
 			"route-v2-raptor-" + serviceDay.date() + "-" + command.originStationId() + "-" + command.destinationStationId()
-				+ "-" + label.timeSeconds(),
+				+ "-" + label.timeSeconds() + "-" + pathDiscriminator(label.path()),
 			command.originStationId(),
 			command.originStationId(),
 			command.destinationStationId(),
@@ -206,6 +209,21 @@ class RouteTimetableRaptorPlanner {
 			List.of(),
 			LocalDateTime.of(serviceDay.date(), java.time.LocalTime.MIDNIGHT).plusSeconds(label.startSeconds())
 		);
+	}
+
+	private static String pathDiscriminator(List<RideLeg> path) {
+		StringBuilder key = new StringBuilder();
+		for (RideLeg leg : path) {
+			if (!key.isEmpty()) {
+				key.append('>');
+			}
+			key.append(leg.tripId())
+				.append('@')
+				.append(leg.from().departureSeconds())
+				.append('-')
+				.append(leg.to().arrivalSeconds());
+		}
+		return Integer.toUnsignedString(key.toString().hashCode(), 36);
 	}
 
 	private static Map<String, TransitRoute> routesById(RouteTimetable timetable) {

@@ -176,6 +176,29 @@ public class RouteSearchService implements RouteSearchUseCase {
 	}
 
 	public List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount) {
+		return buildRouteSearchAlternatives(command, alternativeCount).stream()
+			.map(saveRouteSearchPort::saveRouteSearch)
+			.toList();
+	}
+
+	@Override
+	public List<RouteSearchResult> stabilizeTimetableRouteResults(
+		SearchRouteCommand command,
+		int alternativeCount,
+		List<RouteSearchResult> timetableResults
+	) {
+		List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, alternativeCount);
+		if (accessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
+			return accessibilityCheckedResults.stream()
+				.map(saveRouteSearchPort::saveRouteSearch)
+				.toList();
+		}
+		return timetableResults.stream()
+			.map(saveRouteSearchPort::saveRouteSearch)
+			.toList();
+	}
+
+	private List<RouteSearchResult> buildRouteSearchAlternatives(SearchRouteCommand command, int alternativeCount) {
 		requireCommand(command);
 		Station origin = loadActiveStation(command.originStationId());
 		Station destination = loadActiveStation(command.destinationStationId());
@@ -195,11 +218,16 @@ public class RouteSearchService implements RouteSearchUseCase {
 			throw new RouteNotFoundException();
 		}
 		return routePlans.stream()
-			.map(routePlan -> saveRouteSearch(command, origin, destination, profileWeight, routePlan))
+			.map(routePlan -> routeSearchResult(command, origin, destination, profileWeight, routePlan))
 			.toList();
 	}
 
-	private RouteSearchResult saveRouteSearch(
+	private boolean hasAccessibilitySignal(RouteSearchResult routeSearchResult) {
+		return routeSearchResult.status() != RouteSearchStatus.FOUND
+			|| !routeSearchResult.warnings().isEmpty();
+	}
+
+	private RouteSearchResult routeSearchResult(
 		SearchRouteCommand command,
 		Station origin,
 		Station destination,
@@ -211,7 +239,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 		List<RouteWarning> warnings = routeWarnings(accessibilityStationIds, stairOnlyAccess);
 
 		if (profileWeight.blocksStairOnlyAccess() && stairOnlyAccess) {
-			return saveRouteSearchPort.saveRouteSearch(new RouteSearchResult(
+			return new RouteSearchResult(
 				newRouteSearchId(),
 				origin.id(),
 				origin.nameKo(),
@@ -226,14 +254,14 @@ public class RouteSearchService implements RouteSearchUseCase {
 				warnings,
 				List.of("계단 없는 역 접근 경로를 확인할 수 없습니다."),
 				LocalDateTime.now(clock)
-			));
+			);
 		}
 
 		List<RouteStep> routeSteps = realtimeAwareRouteSteps(
 			command,
 			routeSteps(origin, destination, routePlan, profileWeight)
 		);
-		return saveRouteSearchPort.saveRouteSearch(new RouteSearchResult(
+		return new RouteSearchResult(
 			newRouteSearchId(),
 			origin.id(),
 			origin.nameKo(),
@@ -248,7 +276,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			warnings,
 			List.of(),
 			LocalDateTime.now(clock)
-		));
+		);
 	}
 
 	@Override

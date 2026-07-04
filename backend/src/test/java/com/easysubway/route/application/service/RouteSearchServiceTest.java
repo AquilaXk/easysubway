@@ -809,10 +809,40 @@ class RouteSearchServiceTest {
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 		assertThat(plan.itineraries()).hasSize(1);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
-		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(600);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(660);
 		assertThat(plan.itineraries().getFirst().steps())
 			.extracting("stepType", "fromStationId", "toStationId", "timeSource")
 			.containsExactly(tuple("ride", "station-a", "station-b", EtaSource.PLANNED.name()));
+	}
+
+	@Test
+	@DisplayName("V2 planner는 시간표 scan 결과를 refresh와 feedback 조회 경로에 저장한다")
+	void routeV2PlannerPersistsTimetableScanResultsForRefreshAndFeedback() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
+		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isPresent();
+	}
+
+	@Test
+	@DisplayName("V2 planner는 stair-only 위험이 있으면 시간표 scan보다 접근성 warning을 보존한다")
+	void routeV2PlannerPreservesAccessibilityWarningsBeforeTimetableScan() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new StairOnlyTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.STATIC_BACKEND_ESTIMATE);
+		assertThat(plan.itineraries().getFirst().warnings())
+			.extracting("code")
+			.containsExactly(RouteWarningCode.STAIR_ONLY_ACCESS);
 	}
 
 	@Test
@@ -846,7 +876,7 @@ class RouteSearchServiceTest {
 		));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
-		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(900);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(1140);
 	}
 
 	@Test
