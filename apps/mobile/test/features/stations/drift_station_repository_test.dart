@@ -217,4 +217,30 @@ void main() {
 
     expect(dependencies.repository, isA<DriftStationRepository>());
   });
+
+  test('노선도 데이터는 노선별 line track을 track index 순으로 로드한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    // track_index를 일부러 뒤집어 삽입 — ORDER BY track_index 검증.
+    await database.customStatement(
+      '''
+      INSERT INTO route_map_line_tracks
+        (region, line_id, track_index, path, svg_color, source_id, source_name,
+         source_url, license, license_status, commercial_use_allowed, attribution_required)
+      VALUES
+        (?, ?, 1, 'M 20 0 L 30 0', '', 's', 'n', 'u', 'l', 'reviewed', 0, 1),
+        (?, ?, 0, 'M 0 0 L 10 0', '', 's', 'n', 'u', 'l', 'reviewed', 0, 1)
+      ''',
+      ['수도권', 'seoul-4', '수도권', 'seoul-4'],
+    );
+    final repository = DriftStationRepository(database: database);
+
+    final map = await repository.getNetworkMap(region: '수도권', lineId: 'seoul-4');
+    final track = map.lineTracks.singleWhere(
+      (track) => track.lineId == 'seoul-4',
+    );
+
+    expect(track.paths, ['M 0 0 L 10 0', 'M 20 0 L 30 0']);
+  });
 }
