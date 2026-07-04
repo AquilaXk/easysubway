@@ -3644,8 +3644,14 @@ class _StationDetailContent extends StatelessWidget {
         ),
       ],
     ];
+    // 데이터 부재(unavailable) 상태는 화면에 아무것도 그리지 않으므로
+    // 역 안 이동 섹션 노출 여부·간격 계산에서도 빈 안내로 취급한다(#1577).
+    final internalRouteStateValue = internalRouteState;
+    final hasInternalRouteGuidance =
+        internalRouteStateValue != null &&
+        internalRouteStateValue.status != InternalRouteViewStatus.unavailable;
     final detailChildren = <Widget>[
-      if (layoutSummaryItems.isNotEmpty || internalRouteState != null) ...[
+      if (layoutSummaryItems.isNotEmpty || hasInternalRouteGuidance) ...[
         const _StationDetailSectionTitle(title: '역 안 이동'),
         const SizedBox(height: 12),
         if (layoutSummaryItems.isNotEmpty) ...[
@@ -3653,9 +3659,9 @@ class _StationDetailContent extends StatelessWidget {
             items: layoutSummaryItems,
             semanticLabel: layoutSummarySemanticLabel,
           ),
-          if (internalRouteState != null) const SizedBox(height: 16),
+          if (hasInternalRouteGuidance) const SizedBox(height: 16),
         ],
-        if (internalRouteState != null)
+        if (hasInternalRouteGuidance)
           _StationInternalRouteGuidance(state: internalRouteState!),
         const SizedBox(height: 24),
       ],
@@ -4298,6 +4304,8 @@ class _StationInternalRouteGuidance extends StatelessWidget {
       InternalRouteViewStatus.success => _StationInternalRouteResultCard(
         result: state.result!,
       ),
+      // 데이터 부재는 사과 문구 없이 숨긴다(#1577).
+      InternalRouteViewStatus.unavailable => const SizedBox.shrink(),
     };
   }
 }
