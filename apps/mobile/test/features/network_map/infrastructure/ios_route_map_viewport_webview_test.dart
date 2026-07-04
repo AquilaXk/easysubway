@@ -35,7 +35,25 @@ void main() {
         'sourceHeight': 500.0,
         'viewBox': <double>[250.0, 125.0, 500.0, 250.0],
         'revision': 3,
+        'labelCollisionScript': routeMapViewportLabelCollisionScript,
       },
+    );
+  });
+
+  test('creation params include label collision policy script', () {
+    final params = iosRouteMapViewportCreationParams(
+      assetPath: 'assets/datapacks/maps/seoul-official-route-map.svg',
+      mimeType: 'image/svg+xml',
+      camera: camera,
+    );
+
+    expect(params['labelCollisionScript'], isA<String>());
+    expect(params['labelCollisionScript'], contains('getBBox'));
+    expect(params['labelCollisionScript'], contains('getScreenCTM'));
+    expect(params['labelCollisionScript'], contains('setTimeout'));
+    expect(
+      params['labelCollisionScript'],
+      contains('data-easysubway-hidden-label'),
     );
   });
 
