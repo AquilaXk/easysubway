@@ -1153,7 +1153,7 @@ List<FacilityReportTypeOption> facilityReportTypeOptionsFor({
       _defaultFacilityReportTypeOptions;
   final isNormal = _normalFacilityStatusLabels.contains(facilityStatusLabel);
   final isBroken = facilityStatusLabel == '고장';
-  return [
+  final options = [
     for (final option in base)
       if (switch (option) {
         // 정상 시설에는 '다시 정상'을 숨긴다.
@@ -1164,6 +1164,9 @@ List<FacilityReportTypeOption> facilityReportTypeOptionsFor({
       })
         option,
   ];
+  // 현재 매핑상 필터로 목록이 비는 조합은 없지만, 향후 매핑을 확장하더라도
+  // initState의 `.first`가 죽지 않도록 기본 세트로 방어한다.
+  return options.isEmpty ? _defaultFacilityReportTypeOptions : options;
 }
 
 /// 기본(대부분의 시설) 노출 세트. 경로/역 수준 유형은 제외한다.
