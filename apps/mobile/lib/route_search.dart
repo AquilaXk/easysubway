@@ -23,7 +23,6 @@ const _favoriteRouteErrorMessage = '즐겨찾기 경로를 바꾸지 못했어�
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했어요.';
 const _routeSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.';
-const _routeBlockedConfirmationNotice = '역무원이나 현장 안내를 확인한 뒤 이동해 주세요.';
 const _routeFeedbackFailureNextAction = '잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.';
 const _favoriteRouteSaveFailureNextAction =
     '네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.';
@@ -52,7 +51,6 @@ const _routeAccentColor = EasySubwayAccessibleColors.primary;
 const _routeCardBorderColor = Color(0xFFD5E2E4);
 const _routeDividerColor = EasySubwayAccessibleColors.line;
 const _routeControlBorderColor = Color(0xFF9DB6BA);
-const _routeSoftPanelColor = Color(0xFFE9F5F6);
 const _routeSoftPanelBorderColor = Color(0xFFB9D4D8);
 const _routeGuidanceDarkColor = Color(0xFF073245);
 const _routeGuidanceSecondaryColor = Color(0xFFC7D8E3);
@@ -103,7 +101,7 @@ const routeEtaSourceLabels = <String, String>{
   'STATIC_ESTIMATE': '정적 추정',
   'FALLBACK': '실시간 미지원',
   'UNSUPPORTED': '실시간 미지원',
-  'STALE': '저장된 데이터 기준 · 갱신 필요',
+  'STALE': '저장된 데이터 기준',
 };
 
 String routeEtaSourceLabel(String value) {
@@ -1269,7 +1267,7 @@ class RouteSearchResult {
           .toList(growable: false),
       recommendationReasons: itinerary.commercialEtaEligible
           ? const ['실시간 도착 정보를 반영했어요.']
-          : const ['상용 ETA 품질 확인 전 경로입니다.'],
+          : const [],
       blockedReasons: itinerary.status == 'FOUND'
           ? const []
           : itinerary.accessibilityRisk.reasonCodes.isEmpty
@@ -1553,6 +1551,24 @@ class RouteSearchResult {
     return warnings.isEmpty ? '주의 안내가 없어요' : '주의 안내 보기';
   }
 
+  // 여러 주의 코드를 케이스별 카드로 누적하지 않고 각주 한 줄로 합친다(#1577).
+  // 같은 문구는 한 번만 남긴다.
+  String get warningNoticeText {
+    if (warnings.isEmpty) {
+      return '';
+    }
+    final seen = <String>{};
+    final messages = <String>[];
+    for (final warning in warnings) {
+      final message = warning.userMessage;
+      if (message.isEmpty || !seen.add(message)) {
+        continue;
+      }
+      messages.add(message);
+    }
+    return messages.join(' · ');
+  }
+
   String get semanticLabel {
     // 결과 첫 문장은 사용자가 이동 가능 여부를 바로 판단할 수 있게 구성한다.
     final parts = <String>[
@@ -1584,9 +1600,7 @@ class RouteSearchResult {
       parts.add('다른 방법 $_routeSearchFailureNextAction');
     }
     if (warnings.isNotEmpty) {
-      parts.add(
-        '주의 ${warnings.map((warning) => warning.userMessage).join(', ')}',
-      );
+      parts.add('주의 $warningNoticeText');
     }
     if (sourceNotice.isNotEmpty) {
       parts.add(sourceNotice);
@@ -1597,10 +1611,9 @@ class RouteSearchResult {
         '이동 안내 ${stepsForGuidance.map((step) => step.semanticGuidanceLabel).join(', ')}',
       );
     }
+    // 면책·주의 안내는 '안전 안내' 한 곳으로 통합한다. '이동 전 살펴보기'는
+    // 같은 의미의 이중 고지라 시맨틱에서 제거한다(#1577).
     parts.add('안전 안내 $_routeSafetyGuidanceNotice');
-    if (isBlocked) {
-      parts.add('이동 전 살펴보기 $_routeBlockedConfirmationNotice');
-    }
     return parts.join(', ');
   }
 
@@ -2006,7 +2019,8 @@ class RouteSearchStep {
     }
     if (timeSource == 'ESTIMATED_CONSTANT' ||
         distanceSource == 'ESTIMATED_CONSTANT') {
-      return '예상 시간·거리예요. 현장 안내를 먼저 확인해 주세요';
+      // 값만 남긴다. 예상치임의 면책은 결과 하단 안전 안내 각주 1줄이 담당(#1577).
+      return '예상 시간·거리예요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
       return '시간 또는 거리를 확인하고 있어요';
@@ -2049,8 +2063,9 @@ String _routeWarningLabel(String code) {
     'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
-    'GENERATED_CONNECTOR_UNVERIFIED' =>
-      '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
+    // 두 번째 문장('현장 안내를 먼저 봐 주세요')은 결과 하단 '안전 안내' 각주와
+    // 중복이라 제거한다. 헤지는 한 곳에서만 담당한다(#1577).
+    'GENERATED_CONNECTOR_UNVERIFIED' => '연결 위치를 아직 확인하지 못했어요.',
     'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
     'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
@@ -2551,8 +2566,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                 SwitchListTile(
                   key: const Key('routeStrictStepFreeSwitch'),
                   contentPadding: EdgeInsets.zero,
+                  // 켜기 전에 부정적 결과를 먼저 경고하지 않는다. 경로가 없을 때는
+                  // 결과 화면에서 안내한다(#1568).
                   title: const Text('계단 없는 길만'),
-                  subtitle: const Text('켜면 경로가 줄거나 없을 수 있어요.'),
                   value: _selectedConstraintMode == 'STRICT_STEP_FREE',
                   onChanged: (value) {
                     setState(() {
@@ -3277,73 +3293,47 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final option = _mobilityOptionFor(mobilityType);
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          option.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w800,
-            height: 1.25,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          _routeMobilityConditionLabel(option),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: _routeTextSubtleColor,
-            fontWeight: FontWeight.w700,
-            height: 1.3,
-          ),
-        ),
-      ],
-    );
+    // 장식 틴트 카드 대신 얇은 구분선 위의 플랫 행으로 둔다. 조건 요약 부제는
+    // 이동 조건 화면과 중복이라 제거하고 현재 조건명 + '변경'만 남긴다(#1568).
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label:
-          '현재 이동 조건 ${option.title}, ${_routeMobilityConditionLabel(option)}',
+      label: '현재 이동 조건 ${option.title}',
       liveRegion: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: _routeSoftPanelColor,
-          border: Border.all(color: _routeSoftPanelBorderColor),
-          borderRadius: _routeSearchSmallRadius,
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: _routeSoftPanelBorderColor)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: ExcludeSemantics(
-                  child: Row(
-                    children: [
-                      Icon(option.icon, color: _routeAccentColor, size: 26),
-                      const SizedBox(width: 10),
-                      Expanded(child: content),
-                    ],
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: ExcludeSemantics(
+                child: Text(
+                  option.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: _routeTextPrimaryColor,
+                    fontWeight: FontWeight.w800,
+                    height: 1.25,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Semantics(
-                button: true,
-                label: '이동 조건 바꾸기, 현재 ${option.title}',
-                onTap: onChangeRequested,
-                child: ExcludeSemantics(
-                  child: OutlinedButton(
-                    key: const Key('routeSimpleMobilityTypeButton'),
-                    onPressed: onChangeRequested,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(64, 48),
-                    ),
-                    child: const Text('변경'),
-                  ),
+            ),
+            const SizedBox(width: 10),
+            Semantics(
+              button: true,
+              label: '이동 조건 바꾸기, 현재 ${option.title}',
+              onTap: onChangeRequested,
+              child: ExcludeSemantics(
+                child: TextButton(
+                  key: const Key('routeSimpleMobilityTypeButton'),
+                  onPressed: onChangeRequested,
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                  child: const Text('변경'),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -4142,12 +4132,11 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         ],
         if (result.warnings.isNotEmpty) ...[
           const SizedBox(height: 8),
-          for (final warning in result.warnings)
-            _RouteNotice(
-              title: '주의 확인',
-              text: warning.userMessage,
-              icon: Icons.warning_amber,
-            ),
+          _RouteNotice(
+            title: '주의 확인',
+            text: result.warningNoticeText,
+            icon: Icons.warning_amber,
+          ),
         ],
         const SizedBox(height: 12),
         ?favoriteSaveButton,
@@ -4406,12 +4395,11 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                         ],
                         if (result.warnings.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          for (final warning in result.warnings)
-                            _RouteNotice(
-                              title: '주의 확인',
-                              text: warning.userMessage,
-                              icon: Icons.warning_amber,
-                            ),
+                          _RouteNotice(
+                            title: '주의 확인',
+                            text: result.warningNoticeText,
+                            icon: Icons.warning_amber,
+                          ),
                         ],
                         if (result.movementSteps.isNotEmpty) ...[
                           const SizedBox(height: 18),

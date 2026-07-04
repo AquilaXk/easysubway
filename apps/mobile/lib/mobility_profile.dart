@@ -170,8 +170,8 @@ class _MobilityProfileScreenState extends State<MobilityProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _SelectionStatus(option: _selectedOption),
-              if (_selectedOption != null) const SizedBox(height: 12),
+              // 선택 상태는 각 카드의 '선택됨' 시맨틱과 체크 표시가 이미 알리므로
+              // 문장형 헤더('…조건을 선택했습니다')는 제거한다(#1568).
               for (final option in mobilityProfileOptions)
                 _MobilityProfileCard(
                   option: option,
@@ -272,32 +272,6 @@ class _MobilityProfileCard extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SelectionStatus extends StatelessWidget {
-  const _SelectionStatus({required this.option});
-
-  final MobilityProfileOption? option;
-
-  @override
-  Widget build(BuildContext context) {
-    final selectedOption = option;
-    if (selectedOption == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Semantics(
-      liveRegion: true,
-      child: Text(
-        '${selectedOption.title} 조건을 선택했습니다',
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w800,
-          height: 1.35,
         ),
       ),
     );

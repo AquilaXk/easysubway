@@ -40,12 +40,9 @@ const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했어�
 const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어요.';
 const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
-const _stationLineSheetPadding = EdgeInsets.fromLTRB(20, 8, 20, 24);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
 const _stationSearchInputRadius = BorderRadius.all(Radius.circular(12));
 const _stationCompactCardRadius = BorderRadius.all(Radius.circular(12));
-const _stationLineRegionChipRadius = BorderRadius.all(Radius.circular(12));
-const _stationLineFilterButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
@@ -57,8 +54,6 @@ const _stationDetailSoftPanelColor = EasySubwayAccessibleColors.surface;
 const _stationDetailSoftPanelBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailMintPanelColor = EasySubwayAccessibleColors.surface;
 const _stationDetailMintPanelBorderColor = EasySubwayAccessibleColors.line;
-const _stationLineFilterSelectedColor = EasySubwayAccessibleColors.primary;
-const _stationLineFilterBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailCautionColor = Color(0xFF8A4B00);
 
 abstract class StationSearchRepository {
@@ -416,7 +411,7 @@ class FavoriteStation {
   }
 
   String get semanticLabel {
-    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
+    return '즐겨찾기 역, $nameKo, $lineLabel, $region';
   }
 }
 
@@ -496,9 +491,9 @@ class StationSearchResult {
   String get semanticLabel {
     final distance = distanceLabel;
     if (distance.isEmpty) {
-      return '$nameKo, $lineLabel, $region, $dataQualityLabel';
+      return '$nameKo, $lineLabel, $region';
     }
-    return '$nameKo, $distance, $lineLabel, $region, $dataQualityLabel';
+    return '$nameKo, $distance, $lineLabel, $region';
   }
 }
 
@@ -568,7 +563,8 @@ class StationDetail {
   }
 
   String get semanticLabel {
-    return '$nameKo역 자세한 안내, $lineLabel, $dataQualityLabel, 마지막 확인 $lastVerifiedAt';
+    return '$nameKo역 자세한 안내, $lineLabel, '
+        '마지막 확인 ${stationVerifiedRelativeLabel(lastVerifiedAt)}';
   }
 }
 
@@ -638,7 +634,7 @@ class StationExitInfo {
       _fieldVerificationStatusLabel(fieldValidationStatus);
 
   String get semanticLabel {
-    return '$name, $elevatorConnectionLabel, $stairPathLabel, $verificationStatusLabel';
+    return '$name, $elevatorConnectionLabel, $stairPathLabel';
   }
 }
 
@@ -807,10 +803,11 @@ class StationFacilityInfo {
     return '위치 안내를 준비 중이에요';
   }
 
-  String get updatedLabel => '최근 확인 $lastUpdatedAt';
+  String get updatedLabel =>
+      '최근 확인 ${stationVerifiedRelativeLabel(lastUpdatedAt)}';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
+    return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $nextActionLabel';
   }
 }
 
@@ -945,52 +942,20 @@ int? _optionalInt(Map<String, Object?> json, String key) {
   return null;
 }
 
-String _dataQualityLabel(String dataQualityLevel) {
-  return switch (dataQualityLevel) {
-    'LEVEL_1' => '일부 정보는 확인 중이에요',
-    'LEVEL_2' => '시설 정보를 함께 볼 수 있어요',
-    'LEVEL_3' => '쉬운 길 안내를 볼 수 있어요',
-    'LEVEL_4' => '고장·공사 소식이 반영됐어요',
-    _ => '정보를 준비 중이에요',
-  };
-}
+// #1578 전역 원칙: 내부 데이터 품질·검증 상태 라벨은 사용자에게 노출하지 않는다.
+// 소스(라벨 함수)를 중립화해 모든 화면이 이를 상속한다. 화면 구조 정리(빈
+// 위젯·조건 제거)는 #1566/#1567/#1569에서 다룬다. 정상·확인됨·준비 중은 무표시,
+// 시점 정보는 별도의 "최근 확인 …" 표현으로만 제공한다.
+String _dataQualityLabel(String dataQualityLevel) => '';
 
-/// 데이터 품질 라벨을 목록에 노출할지 여부.
-/// 기본 레벨(LEVEL_1)·미확정 값은 "확인 중" 같은 필러라 목록에서는 감춘다
-/// (실제 안내 역량을 뜻하는 LEVEL_2 이상만 노출). simple is best.
-bool _showsDataQualityLabel(String dataQualityLevel) {
-  return dataQualityLevel == 'LEVEL_2' ||
-      dataQualityLevel == 'LEVEL_3' ||
-      dataQualityLevel == 'LEVEL_4';
-}
+/// 데이터 품질 라벨은 더 이상 목록에 노출하지 않는다(#1578).
+bool _showsDataQualityLabel(String dataQualityLevel) => false;
 
-String _dataConfidenceLabel(String dataConfidence) {
-  return switch (dataConfidence) {
-    'HIGH' => '최근 확인된 정보예요',
-    'MEDIUM' => '일부 확인된 정보예요',
-    'LOW' => '안내를 준비 중이에요',
-    _ => '안내를 준비 중이에요',
-  };
-}
+String _dataConfidenceLabel(String dataConfidence) => '';
 
-String _fieldValidationLabel(String fieldValidationStatus) {
-  final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
-  return switch (normalizedStatus) {
-    'VERIFIED' => '최근 확인했어요',
-    'STALE' => '최근 확인한 내용은 다시 봐 주세요',
-    'UNKNOWN' => '최근 확인한 기록이 없어요',
-    _ => '최근 확인한 기록이 없어요',
-  };
-}
+String _fieldValidationLabel(String fieldValidationStatus) => '';
 
-String _fieldVerificationStatusLabel(String fieldValidationStatus) {
-  final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
-  return switch (normalizedStatus) {
-    'VERIFIED' => '시설 상태가 확인됐어요',
-    'STALE' => '최신 상태를 준비 중이에요',
-    _ => '최신 상태를 준비 중이에요',
-  };
-}
+String _fieldVerificationStatusLabel(String fieldValidationStatus) => '';
 
 String _facilityUserLocationLabel(String description) {
   var label = description.trim();
@@ -1010,6 +975,44 @@ String _dataSourceLabel(String dataSourceType) {
     'PARTNER_FEED' => '연계 안내',
     _ => '안내를 준비 중이에요',
   };
+}
+
+/// 확인 시점 상대 표현의 기준 시각. 테스트에서 고정할 수 있게 주입 지점을 둔다.
+@visibleForTesting
+DateTime Function() debugStationVerifiedClock = DateTime.now;
+
+/// 확인 시점('YYYY-MM-DD' 또는 ISO datetime)을 오늘 기준 상대 표현으로 바꾼다.
+/// '오늘 / 어제 / n일 전 / n주 전'으로 최신성을 한눈에 보여주고, 파싱 불가·미래·
+/// 4주 이상 과거는 원문 날짜를 그대로 둬 오래된 안내는 정확한 날짜로 드러낸다.
+String stationVerifiedRelativeLabel(String rawVerifiedAt) {
+  final raw = rawVerifiedAt.trim();
+  if (raw.isEmpty) {
+    return raw;
+  }
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) {
+    return raw;
+  }
+  final now = debugStationVerifiedClock();
+  final today = DateTime(now.year, now.month, now.day);
+  final verifiedDay = DateTime(parsed.year, parsed.month, parsed.day);
+  final days = today.difference(verifiedDay).inDays;
+  if (days < 0) {
+    return raw;
+  }
+  if (days == 0) {
+    return '오늘';
+  }
+  if (days == 1) {
+    return '어제';
+  }
+  if (days < 7) {
+    return '$days일 전';
+  }
+  if (days < 28) {
+    return '${days ~/ 7}주 전';
+  }
+  return raw;
 }
 
 enum StationSearchStatus { idle, loading, success, empty, failure }
@@ -1051,7 +1054,11 @@ class StationSearchController extends ChangeNotifier {
 
   StationSearchState get state => _state;
 
-  Future<void> search(String query, {String? lineId}) async {
+  Future<void> search(
+    String query, {
+    String? lineId,
+    bool recordHistory = true,
+  }) async {
     final requestId = ++_searchRequestId;
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
@@ -1078,7 +1085,11 @@ class StationSearchController extends ChangeNotifier {
       if (!_isActiveRequest(requestId)) {
         return;
       }
-      await _recordSearch(trimmedQuery);
+      // 디바운스 타이핑 검색은 최근 검색에 기록하지 않는다(부분 입력 기록 방지).
+      // 키보드 검색·최근 검색 선택 등 명시적 검색만 기록한다.
+      if (recordHistory) {
+        await _recordSearch(trimmedQuery);
+      }
       if (results.isEmpty) {
         _state = const StationSearchState(
           status: StationSearchStatus.empty,
@@ -1415,6 +1426,25 @@ class StationDetailController extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  // 실시간 조회가 실패로 끝났을 때 사용자가 직접 다시 시도할 수 있게 한다.
+  // 현재 역 상세를 유지한 채 실시간만 로딩 상태로 되돌린 뒤 재조회한다.
+  Future<void> retryRealtime() async {
+    final detail = _state.detail;
+    if (_isDisposed || detail == null) {
+      return;
+    }
+    _state = StationDetailState(
+      status: _state.status,
+      detail: detail,
+      exits: _state.exits,
+      facilities: _state.facilities,
+      realtimeSnapshot: const RealtimeSnapshot.loading(),
+      message: _state.message,
+    );
+    notifyListeners();
+    await _refreshRealtimeSnapshot(detail);
   }
 
   Future<void> _refreshRealtimeSnapshot(StationDetail detail) async {
@@ -1842,11 +1872,8 @@ enum StationSearchEntryMode { search, recent, nearby }
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
-  Future<List<SubwayLineOption>>? _lineOptionsFuture;
   List<String> _recentQueries = const [];
-  SubwayLineOption? _selectedLine;
-  String? _selectedLineRegion;
-  bool _isLineFilterExpanded = true;
+  Timer? _searchDebounce;
   bool _isNearbySearchRunning = false;
   bool _isOpeningLocationSettings = false;
 
@@ -1859,10 +1886,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     );
     _controller.addListener(_handleControllerChanged);
     _queryController.addListener(_handleQueryChanged);
-    final lineRepository = _lineFilterRepository;
-    if (lineRepository != null) {
-      _lineOptionsFuture = lineRepository.listLines();
-    }
     unawaited(_loadRecentQueries());
     if (widget.entryMode == StationSearchEntryMode.nearby) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1880,6 +1903,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       ..dispose();
     _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -1893,10 +1917,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     if (!mounted) {
       return;
     }
-    if (!_hasSearchQuery &&
-        !_isNearbySearchRunning &&
-        _controller.state.status != StationSearchStatus.idle) {
-      _controller.search('');
+    _searchDebounce?.cancel();
+    if (!_hasSearchQuery) {
+      if (!_isNearbySearchRunning &&
+          _controller.state.status != StationSearchStatus.idle) {
+        _controller.search('');
+      }
+    } else {
+      // 타이핑 즉시(디바운스) 검색으로 통일한다. 부분 입력은 최근 검색에 기록하지 않는다.
+      final query = _queryController.text;
+      _searchDebounce = Timer(
+        const Duration(milliseconds: 300),
+        () => unawaited(_runSearch(query, recordHistory: false)),
+      );
     }
     setState(() {});
   }
@@ -2007,14 +2040,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               );
             }
             if (_hasSearchQuery) {
-              return FilledButton.icon(
-                key: const Key('stationSearchSubmitButton'),
-                onPressed: isSearching
-                    ? null
-                    : () => _submit(_queryController.text),
-                icon: const Icon(Icons.search),
-                label: const Text('검색'),
-              );
+              // 즉시(디바운스) 검색으로 통일했으므로 별도 검색 버튼을 두지 않는다.
+              return const SizedBox.shrink();
             }
             return OutlinedButton.icon(
               key: const Key('nearbyStationSearchButton'),
@@ -2043,39 +2070,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           onOpenLocationSettings: _openLocationSettings,
         );
       },
-    );
-    final lineFilterSection = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (showSearchInput && _lineOptionsFuture != null)
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              final isSearching =
-                  _controller.state.status == StationSearchStatus.loading;
-              final hasSearchResults =
-                  _controller.state.status == StationSearchStatus.success &&
-                  _controller.state.source == StationSearchResultSource.search;
-              return _StationLineFilterPanel(
-                expanded: !hasSearchResults || _isLineFilterExpanded,
-                collapsible: hasSearchResults,
-                onToggleExpanded: () {
-                  setState(() {
-                    _isLineFilterExpanded = !_isLineFilterExpanded;
-                  });
-                },
-                child: _StationLineFilterSection(
-                  linesFuture: _lineOptionsFuture!,
-                  selectedLine: _selectedLine,
-                  selectedRegion: _selectedLineRegion,
-                  enabled: !isSearching && !_isNearbySearchRunning,
-                  onRegionSelected: _selectLineRegion,
-                  onLineSelected: _selectLine,
-                ),
-              );
-            },
-          ),
-      ],
     );
     return Scaffold(
       appBar: AppBar(
@@ -2115,7 +2109,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                     recentSearchSection: recentSearchSection,
                     actionButtonSection: actionButtonSection,
                     resultSection: resultSection,
-                    lineFilterSection: lineFilterSection,
                   ),
                 ],
               );
@@ -2127,19 +2120,20 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _submit(String query) {
+    // 키보드 검색 액션 등 명시적 검색: 디바운스를 취소하고 최근 검색에 기록한다.
+    _searchDebounce?.cancel();
     if (_controller.state.status == StationSearchStatus.loading) {
       return;
     }
     unawaited(_runSearch(query));
   }
 
-  Future<void> _runSearch(String query) async {
-    await _controller.search(query, lineId: _selectedLine?.id);
-    await _loadRecentQueries();
-    if (mounted &&
-        _controller.state.status == StationSearchStatus.success &&
-        _controller.state.source == StationSearchResultSource.search) {
-      setState(() => _isLineFilterExpanded = false);
+  Future<void> _runSearch(String query, {bool recordHistory = true}) async {
+    await _controller.search(query, recordHistory: recordHistory);
+    // 최근 검색 목록은 기록한 경우에만 바뀌므로, 디바운스 타이핑 검색에서는
+    // 불필요한 재조회를 하지 않는다.
+    if (recordHistory) {
+      await _loadRecentQueries();
     }
   }
 
@@ -2225,32 +2219,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
     }
-  }
-
-  StationLineFilterRepository? get _lineFilterRepository {
-    final Object repository = widget.repository;
-    if (repository is StationLineFilterRepository) {
-      return repository;
-    }
-    return null;
-  }
-
-  void _selectLine(SubwayLineOption? line) {
-    setState(() {
-      _selectedLine = line;
-      if (line != null) {
-        _selectedLineRegion = line.region;
-      }
-    });
-  }
-
-  void _selectLineRegion(String region) {
-    setState(() {
-      _selectedLineRegion = region;
-      if (_selectedLine?.region != region) {
-        _selectedLine = null;
-      }
-    });
   }
 
   void _setRouteOrigin(StationSearchResult result) {
@@ -2535,430 +2503,6 @@ class _StationRecentSearchEmptyState extends StatelessWidget {
   }
 }
 
-class _StationLineFilterPanel extends StatelessWidget {
-  const _StationLineFilterPanel({
-    required this.expanded,
-    required this.collapsible,
-    required this.onToggleExpanded,
-    required this.child,
-  });
-
-  final bool expanded;
-  final bool collapsible;
-  final VoidCallback onToggleExpanded;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('stationLineFilterPanel'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (collapsible) ...[
-          OutlinedButton.icon(
-            key: const Key('stationLineFilterToggle'),
-            onPressed: onToggleExpanded,
-            icon: Icon(expanded ? Icons.expand_less : Icons.tune),
-            label: Text(expanded ? '노선 필터 접기' : '노선 필터 펼치기'),
-          ),
-          if (expanded) const SizedBox(height: 12),
-        ],
-        if (expanded) child,
-      ],
-    );
-  }
-}
-
-class _StationLineFilterSection extends StatelessWidget {
-  const _StationLineFilterSection({
-    required this.linesFuture,
-    required this.selectedLine,
-    required this.selectedRegion,
-    required this.enabled,
-    required this.onRegionSelected,
-    required this.onLineSelected,
-  });
-
-  final Future<List<SubwayLineOption>> linesFuture;
-  final SubwayLineOption? selectedLine;
-  final String? selectedRegion;
-  final bool enabled;
-  final ValueChanged<String> onRegionSelected;
-  final ValueChanged<SubwayLineOption?> onLineSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<SubwayLineOption>>(
-      future: linesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const SizedBox(
-            height: 56,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: CircularProgressIndicator(strokeWidth: 2.5),
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Text(
-            '노선을 불러오지 못했어요.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
-            ),
-          );
-        }
-
-        final lines = (snapshot.data ?? const <SubwayLineOption>[])
-            .where((line) => line.active)
-            .toList(growable: false);
-        if (lines.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final seenRegions = <String>{};
-        final regions = <String>[
-          for (final line in lines)
-            if (seenRegions.add(line.region)) line.region,
-        ]..sort(_compareStationLineRegions);
-        final currentRegion =
-            selectedRegion ?? selectedLine?.region ?? regions.first;
-        final visibleLines = lines
-            .where((line) => line.region == currentRegion)
-            .toList(growable: false);
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final region in regions) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _StationLineRegionButton(
-                        key: Key('stationLineRegion-$region'),
-                        label: region,
-                        selected: region == currentRegion,
-                        onPressed: enabled
-                            ? () => onRegionSelected(region)
-                            : null,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _StationLineFilterButton(
-                  key: const Key('stationLineFilter-all'),
-                  label: '전체 노선',
-                  semanticLabel: '전체 노선',
-                  selected: selectedLine == null,
-                  onPressed: enabled ? () => onLineSelected(null) : null,
-                ),
-                for (final line in visibleLines)
-                  _StationLineFilterButton(
-                    key: Key('stationLineFilter-${line.id}'),
-                    label: line.shortName,
-                    semanticLabel: line.semanticLabel,
-                    selected: selectedLine?.id == line.id,
-                    badgeLine: line.badgeLine,
-                    onPressed: enabled ? () => onLineSelected(line) : null,
-                  ),
-                OutlinedButton.icon(
-                  key: const Key('stationLineFilterMoreButton'),
-                  onPressed: enabled
-                      ? () => _showAllLineSheet(context, lines)
-                      : null,
-                  icon: const Icon(Icons.list_alt),
-                  label: const Text('전체 노선 보기'),
-                ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _showAllLineSheet(
-    BuildContext context,
-    List<SubwayLineOption> lines,
-  ) async {
-    final seenRegions = <String>{};
-    final orderedRegions = <String>[
-      for (final line in lines)
-        if (seenRegions.add(line.region)) line.region,
-    ]..sort(_compareStationLineRegions);
-    final linesByRegion = <String, List<SubwayLineOption>>{};
-    for (final line in lines) {
-      (linesByRegion[line.region] ??= <SubwayLineOption>[]).add(line);
-    }
-
-    final selected = await showModalBottomSheet<Object?>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: ListView(
-            key: const Key('stationLineAllSheet'),
-            padding: _stationLineSheetPadding,
-            children: [
-              Text(
-                '전체 노선 보기',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
-                  height: 1.25,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _StationLineSheetRow(
-                key: const Key('stationLineFilter-all'),
-                label: '전체 노선',
-                semanticLabel: '전체 노선',
-                selected: selectedLine == null,
-                onPressed: () => Navigator.of(context).pop(false),
-              ),
-              for (final region in orderedRegions) ...[
-                Padding(
-                  padding: const EdgeInsets.only(top: 20, bottom: 2),
-                  child: Text(
-                    region,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.mutedText,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                for (final line in linesByRegion[region]!)
-                  _StationLineSheetRow(
-                    key: Key('stationLineFilter-${line.id}'),
-                    label: line.shortName,
-                    semanticLabel: line.semanticLabel,
-                    selected: selectedLine?.id == line.id,
-                    badgeLine: line.badgeLine,
-                    onPressed: () => Navigator.of(context).pop(line),
-                  ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-    if (selected is SubwayLineOption) {
-      onLineSelected(selected);
-    } else if (selected == false) {
-      onLineSelected(null);
-    }
-  }
-}
-
-class _StationLineRegionButton extends StatelessWidget {
-  const _StationLineRegionButton({
-    required this.label,
-    required this.selected,
-    required this.onPressed,
-    super.key,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '$label 지역 ${selected ? '선택됨' : '선택 안 됨'}',
-      button: true,
-      selected: selected,
-      enabled: onPressed != null,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: ChoiceChip(
-          label: Text(label),
-          selected: selected,
-          onSelected: onPressed == null ? null : (_) => onPressed?.call(),
-          showCheckmark: true,
-          checkmarkColor: Colors.white,
-          labelStyle: TextStyle(
-            color: selected ? Colors.white : EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
-          ),
-          selectedColor: _stationLineFilterSelectedColor,
-          backgroundColor: Colors.white,
-          side: BorderSide(
-            color: selected
-                ? _stationLineFilterSelectedColor
-                : _stationLineFilterBorderColor,
-          ),
-          shape: const RoundedRectangleBorder(
-            borderRadius: _stationLineRegionChipRadius,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-int _compareStationLineRegions(String left, String right) {
-  final leftRank = _stationLineRegionRank(left);
-  final rightRank = _stationLineRegionRank(right);
-  if (leftRank != rightRank) {
-    return leftRank.compareTo(rightRank);
-  }
-  return left.compareTo(right);
-}
-
-int _stationLineRegionRank(String region) {
-  const preferredRegions = ['수도권', '부산', '대구', '광주', '대전'];
-  final index = preferredRegions.indexOf(region);
-  return index == -1 ? preferredRegions.length : index;
-}
-
-class _StationLineFilterButton extends StatelessWidget {
-  const _StationLineFilterButton({
-    required this.label,
-    required this.semanticLabel,
-    required this.selected,
-    required this.onPressed,
-    this.badgeLine,
-    super.key,
-  });
-
-  final String label;
-  final String semanticLabel;
-  final bool selected;
-  final VoidCallback? onPressed;
-  final StationSearchLine? badgeLine;
-
-  @override
-  Widget build(BuildContext context) {
-    const backgroundColor = Colors.white;
-    final foregroundColor = selected
-        ? _stationLineFilterSelectedColor
-        : EasySubwayAccessibleColors.text;
-    final borderColor = selected
-        ? _stationLineFilterSelectedColor
-        : _stationLineFilterBorderColor;
-
-    return Semantics(
-      label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
-      button: true,
-      selected: selected,
-      enabled: onPressed != null,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: OutlinedButton(
-          onPressed: onPressed,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(74, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            backgroundColor: backgroundColor,
-            foregroundColor: foregroundColor,
-            side: BorderSide(color: borderColor, width: selected ? 2 : 1.5),
-            shape: const RoundedRectangleBorder(
-              borderRadius: _stationLineFilterButtonRadius,
-            ),
-            textStyle: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (badgeLine != null) ...[
-                StationLineBadge(line: badgeLine!, size: 26),
-                const SizedBox(width: 8),
-              ],
-              Text(label),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StationLineSheetRow extends StatelessWidget {
-  const _StationLineSheetRow({
-    required this.label,
-    required this.semanticLabel,
-    required this.selected,
-    required this.onPressed,
-    this.badgeLine,
-    super.key,
-  });
-
-  final String label;
-  final String semanticLabel;
-  final bool selected;
-  final VoidCallback onPressed;
-  final StationSearchLine? badgeLine;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
-      button: true,
-      selected: selected,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onPressed,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: EasySubwayAccessibleColors.line),
-              ),
-            ),
-            child: Row(
-              children: [
-                if (badgeLine != null) ...[
-                  StationLineBadge(line: badgeLine!, size: 26),
-                  const SizedBox(width: 12),
-                ],
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected
-                          ? _stationLineFilterSelectedColor
-                          : EasySubwayAccessibleColors.text,
-                      fontSize: 16,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (selected)
-                  const Icon(
-                    Icons.check,
-                    size: 22,
-                    color: _stationLineFilterSelectedColor,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _StationSearchAdaptiveContent extends StatelessWidget {
   const _StationSearchAdaptiveContent({
     required this.isLargeScreen,
@@ -2966,7 +2510,6 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
     required this.recentSearchSection,
     required this.actionButtonSection,
     required this.resultSection,
-    required this.lineFilterSection,
   });
 
   final bool isLargeScreen;
@@ -2974,7 +2517,6 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
   final Widget recentSearchSection;
   final Widget actionButtonSection;
   final Widget resultSection;
-  final Widget lineFilterSection;
 
   @override
   Widget build(BuildContext context) {
@@ -2986,8 +2528,6 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
           recentSearchSection,
           actionButtonSection,
           resultSection,
-          const SizedBox(height: 16),
-          lineFilterSection,
         ],
       );
     }
@@ -3019,7 +2559,7 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
               flex: 4,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [recentSearchSection, lineFilterSection],
+                children: [recentSearchSection],
               ),
             ),
           ],
@@ -3200,14 +2740,6 @@ class _NearbyStationOverview extends StatelessWidget {
                                     height: 1.3,
                                   ),
                             ),
-                            if (_showsDataQualityLabel(
-                              result.dataQualityLevel,
-                            )) ...[
-                              const SizedBox(height: 8),
-                              _StationDetailTextPill(
-                                text: result.dataQualityLabel,
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -3417,19 +2949,6 @@ class _StationSearchResultTile extends StatelessWidget {
                                     height: 1.25,
                                   ),
                                 ),
-                                if (_showsDataQualityLabel(
-                                  result.dataQualityLevel,
-                                )) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    result.dataQualityLabel,
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      color: _stationTextMutedColor,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                ],
                               ],
                             ),
                           ),
@@ -3554,9 +3073,9 @@ String _stationResultSemanticLabel(StationSearchResult result) {
   final stationName = _stationResultDisplayName(result.nameKo);
   final distance = result.distanceLabel;
   if (distance.isEmpty) {
-    return '$stationName, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
+    return '$stationName, ${result.lineLabel}, ${result.region}';
   }
-  return '$stationName, $distance, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
+  return '$stationName, $distance, ${result.lineLabel}, ${result.region}';
 }
 
 class FavoriteStationListScreen extends StatefulWidget {
@@ -4053,6 +3572,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
             builder: (context, _) {
               return _StationDetailBody(
                 state: _controller.state,
+                onRetryRealtime: _controller.retryRealtime,
                 internalRouteState: _internalRouteController?.state,
                 reportRepository: widget.reportRepository,
                 favoriteController: _favoriteController,
@@ -4072,6 +3592,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
 class _StationDetailBody extends StatelessWidget {
   const _StationDetailBody({
     required this.state,
+    required this.onRetryRealtime,
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
@@ -4081,6 +3602,7 @@ class _StationDetailBody extends StatelessWidget {
   });
 
   final StationDetailState state;
+  final VoidCallback onRetryRealtime;
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
@@ -4109,6 +3631,7 @@ class _StationDetailBody extends StatelessWidget {
         layoutSummaryItems: state.layoutSummaryItems,
         layoutSummarySemanticLabel: state.layoutSummarySemanticLabel,
         realtimeSnapshot: state.realtimeSnapshot,
+        onRetryRealtime: onRetryRealtime,
         internalRouteState: internalRouteState,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
@@ -4130,6 +3653,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.layoutSummaryItems,
     required this.layoutSummarySemanticLabel,
     required this.realtimeSnapshot,
+    required this.onRetryRealtime,
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
@@ -4146,6 +3670,7 @@ class _StationDetailContent extends StatelessWidget {
   final List<StationLayoutSummaryItem> layoutSummaryItems;
   final String layoutSummarySemanticLabel;
   final RealtimeSnapshot realtimeSnapshot;
+  final VoidCallback onRetryRealtime;
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
@@ -4170,7 +3695,10 @@ class _StationDetailContent extends StatelessWidget {
       ],
       const _StationDetailSectionTitle(title: '실시간 열차'),
       const SizedBox(height: 12),
-      _StationRealtimeSummary(snapshot: realtimeSnapshot),
+      _StationRealtimeSummary(
+        snapshot: realtimeSnapshot,
+        onRetry: onRetryRealtime,
+      ),
       const SizedBox(height: 20),
       _StationDetailRouteActions(
         detail: detail,
@@ -4184,8 +3712,14 @@ class _StationDetailContent extends StatelessWidget {
         ),
       ],
     ];
+    // 데이터 부재(unavailable) 상태는 화면에 아무것도 그리지 않으므로
+    // 역 안 이동 섹션 노출 여부·간격 계산에서도 빈 안내로 취급한다(#1577).
+    final internalRouteStateValue = internalRouteState;
+    final hasInternalRouteGuidance =
+        internalRouteStateValue != null &&
+        internalRouteStateValue.status != InternalRouteViewStatus.unavailable;
     final detailChildren = <Widget>[
-      if (layoutSummaryItems.isNotEmpty || internalRouteState != null) ...[
+      if (layoutSummaryItems.isNotEmpty || hasInternalRouteGuidance) ...[
         const _StationDetailSectionTitle(title: '역 안 이동'),
         const SizedBox(height: 12),
         if (layoutSummaryItems.isNotEmpty) ...[
@@ -4193,9 +3727,9 @@ class _StationDetailContent extends StatelessWidget {
             items: layoutSummaryItems,
             semanticLabel: layoutSummarySemanticLabel,
           ),
-          if (internalRouteState != null) const SizedBox(height: 16),
+          if (hasInternalRouteGuidance) const SizedBox(height: 16),
         ],
-        if (internalRouteState != null)
+        if (hasInternalRouteGuidance)
           _StationInternalRouteGuidance(state: internalRouteState!),
         const SizedBox(height: 24),
       ],
@@ -4220,7 +3754,10 @@ class _StationDetailContent extends StatelessWidget {
       const SizedBox(height: 24),
       // 메타 정보(안내 출처·마지막 확인)는 맨 아래로.
       _InfoBasisDisclosure(
-        labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
+        labels: [
+          detail.dataSourceLabel,
+          '마지막 확인 ${stationVerifiedRelativeLabel(detail.lastVerifiedAt)}',
+        ],
       ),
     ];
 
@@ -4358,9 +3895,13 @@ class _StationDetailAdaptiveContent extends StatelessWidget {
 }
 
 class _StationRealtimeSummary extends StatelessWidget {
-  const _StationRealtimeSummary({required this.snapshot});
+  const _StationRealtimeSummary({
+    required this.snapshot,
+    required this.onRetry,
+  });
 
   final RealtimeSnapshot snapshot;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -4371,6 +3912,9 @@ class _StationRealtimeSummary extends StatelessWidget {
       RealtimeSnapshotStatus.unavailable => '실시간 정보 확인 불가',
       RealtimeSnapshotStatus.loading => '실시간 정보 확인 중',
     };
+    // 실시간 조회가 실패로 끝난 경우에만 다시 시도를 권한다. 미지원 노선은
+    // 재시도해도 결과가 같으므로 버튼을 노출하지 않는다.
+    final canRetry = snapshot.status == RealtimeSnapshotStatus.unavailable;
     final summary = snapshot.summaryText.trim().isEmpty
         ? '역 정보와 경로 검색은 계속 이용할 수 있습니다.'
         : snapshot.summaryText.trim();
@@ -4382,7 +3926,7 @@ class _StationRealtimeSummary extends StatelessWidget {
       title,
       summary,
       if (updatedLabel.isNotEmpty) updatedLabel,
-      '열차 위치는 GPS가 아니라 열차 운행 안내를 바탕으로 보여줘요.',
+      if (canRetry) '다시 시도할 수 있어요',
     ];
     return Semantics(
       label: semanticParts.join(', '),
@@ -4437,14 +3981,18 @@ class _StationRealtimeSummary extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Text(
-              '열차 위치는 GPS가 아니라 열차 운행 안내를 바탕으로 보여줘요.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                height: 1.3,
+            if (canRetry) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const Key('stationRealtimeRetryButton'),
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh, size: 20),
+                  label: const Text('다시 시도'),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -4724,7 +4272,7 @@ class _StationDetailHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    detail.lastVerifiedAt,
+                    stationVerifiedRelativeLabel(detail.lastVerifiedAt),
                     style: const TextStyle(
                       color: EasySubwayAccessibleColors.mutedText,
                       fontSize: 12,
@@ -4847,6 +4395,8 @@ class _StationInternalRouteGuidance extends StatelessWidget {
       InternalRouteViewStatus.success => _StationInternalRouteResultCard(
         result: state.result!,
       ),
+      // 데이터 부재는 사과 문구 없이 숨긴다(#1577).
+      InternalRouteViewStatus.unavailable => const SizedBox.shrink(),
     };
   }
 }
@@ -5152,15 +4702,6 @@ class _StationExitCard extends StatelessWidget {
                     text: exit.stairPathLabel,
                     positive: !exit.hasStairOnlyPath,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    exit.verificationStatusLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: _stationTextMutedColor,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -5217,17 +4758,13 @@ class _StationFacilityCard extends StatelessWidget {
                     height: 1.25,
                   ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _StationDetailTextPill(text: facility.typeLabel),
-                    _StationDetailTextPill(text: facility.statusTitle),
-                    if (facility.severityLabel != facility.statusTitle)
-                      _StationDetailTextPill(text: facility.severityLabel),
-                  ],
-                ),
+                // 정상 시설은 필 없이 조용히 표시하고, 문제(고장·공사)일 때만
+                // 상태 필 하나만 노출한다. 시설 종류는 이름에 이미 포함되고,
+                // '이용 가능'='정상' 중복과 종류 필은 제거한다.
+                if (facility.needsAttention) ...[
+                  const SizedBox(height: 10),
+                  _StationDetailTextPill(text: facility.statusTitle),
+                ],
                 const SizedBox(height: 12),
                 _StationDetailInfoRow(
                   icon: Icons.place_outlined,
@@ -5237,15 +4774,6 @@ class _StationFacilityCard extends StatelessWidget {
                 _StationDetailInfoRow(
                   icon: Icons.event_available,
                   text: facility.updatedLabel,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  facility.verificationStatusLabel,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: _stationTextMutedColor,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                  ),
                 ),
                 const SizedBox(height: 14),
                 Row(

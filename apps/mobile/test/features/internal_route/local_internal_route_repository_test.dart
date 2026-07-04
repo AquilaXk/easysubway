@@ -225,18 +225,28 @@ void main() {
       return result.steps.single.burdenLabel;
     }
 
-    expect(
-      await burdenLabelFor('node-verified-from', 'node-verified-to'),
-      contains('최근 확인했어요'),
+    // 검증 상태 라벨은 중립화(제거)됐지만, burdenLabel은 여전히 소요시간·거리를
+    // 담은 실제 문구여야 한다(빈 문자열/오값 회귀 방지, CodeRabbit 반영).
+    final verifiedLabel = await burdenLabelFor(
+      'node-verified-from',
+      'node-verified-to',
     );
-    expect(
-      await burdenLabelFor('node-unknown-from', 'node-unknown-to'),
-      contains('최근 확인한 기록이 없어요'),
+    expect(verifiedLabel, '약 1분 · 0m');
+    expect(verifiedLabel, isNot(contains('최근 확인했어요')));
+
+    final unknownLabel = await burdenLabelFor(
+      'node-unknown-from',
+      'node-unknown-to',
     );
-    expect(
-      await burdenLabelFor('node-stale-from', 'node-stale-to'),
-      contains('최신 상태를 준비 중이에요'),
+    expect(unknownLabel, '약 1분 · 0m');
+    expect(unknownLabel, isNot(contains('최근 확인한 기록이 없어요')));
+
+    final staleLabel = await burdenLabelFor(
+      'node-stale-from',
+      'node-stale-to',
     );
+    expect(staleLabel, '약 1분 · 0m');
+    expect(staleLabel, isNot(contains('최신 상태를 준비 중이에요')));
   });
 
   test('로컬 내부 이동 repository는 구스키마 catalog edge를 기본값으로 읽는다', () async {
