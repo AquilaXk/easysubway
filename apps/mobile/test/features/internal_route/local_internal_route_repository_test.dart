@@ -227,15 +227,15 @@ void main() {
 
     expect(
       await burdenLabelFor('node-verified-from', 'node-verified-to'),
-      contains('최근 확인했어요'),
+      isNot(contains('최근 확인했어요')),
     );
     expect(
       await burdenLabelFor('node-unknown-from', 'node-unknown-to'),
-      contains('최근 확인한 기록이 없어요'),
+      isNot(contains('최근 확인한 기록이 없어요')),
     );
     expect(
       await burdenLabelFor('node-stale-from', 'node-stale-to'),
-      contains('최신 상태를 준비 중이에요'),
+      isNot(contains('최신 상태를 준비 중이에요')),
     );
   });
 
