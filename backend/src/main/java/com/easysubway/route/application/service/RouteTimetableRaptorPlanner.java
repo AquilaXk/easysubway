@@ -33,6 +33,7 @@ class RouteTimetableRaptorPlanner {
 	private static final int SERVICE_DAY_CUTOFF_HOUR = 3;
 	private static final int PARETO_LIMIT = 3;
 	private static final int ENTRY_DISTANCE_METERS = 180;
+	private static final int TRANSFER_DURATION_SECONDS = 360;
 	private static final int TRANSFER_DISTANCE_METERS = 260;
 	private static final int EXIT_DISTANCE_METERS = 120;
 
@@ -108,7 +109,8 @@ class RouteTimetableRaptorPlanner {
 
 	private boolean canBoard(SearchRouteV2Command command, Label label, TransitStopTime stopTime, int round) {
 		int slackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
-		return label.boardings() == round && stopTime.departureSeconds() >= label.timeSeconds() + slackSeconds;
+		int transferSeconds = label.boardings() > 0 ? TRANSFER_DURATION_SECONDS : 0;
+		return label.boardings() == round && stopTime.departureSeconds() >= label.timeSeconds() + transferSeconds + slackSeconds;
 	}
 
 	private Boarding betterBoarding(Boarding current, Label label, TransitStopTime stopTime) {
@@ -170,7 +172,6 @@ class RouteTimetableRaptorPlanner {
 	private static RouteSearchResult toRouteSearchResult(SearchRouteV2Command command, Label label, ServiceDay serviceDay) {
 		List<RouteStep> steps = new ArrayList<>();
 		int sequence = 1;
-		int cursorSeconds = label.startSeconds();
 		int boardingSlackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
 		List<RideLeg> path = label.path();
 		RideLeg firstLeg = path.getFirst();
@@ -182,6 +183,7 @@ class RouteTimetableRaptorPlanner {
 			firstLeg.from().stationId(),
 			firstLeg.lineId(),
 			firstLeg.lineName(),
+			waitMinutesBeforeBoarding(label.startSeconds(), firstLeg.from().departureSeconds(), 0, boardingSlackSeconds),
 			ENTRY_DISTANCE_METERS
 		));
 		sequence += 1;
@@ -196,6 +198,7 @@ class RouteTimetableRaptorPlanner {
 					leg.from().stationId(),
 					leg.lineId(),
 					leg.lineName(),
+					waitMinutesBeforeBoarding(previousLeg.to().arrivalSeconds(), leg.from().departureSeconds(), TRANSFER_DURATION_SECONDS, boardingSlackSeconds),
 					TRANSFER_DISTANCE_METERS
 				));
 				sequence += 1;
@@ -210,7 +213,7 @@ class RouteTimetableRaptorPlanner {
 				lineName,
 				leg.from().stationId(),
 				leg.to().stationId(),
-				Math.max(1, (int) Math.ceil((leg.to().arrivalSeconds() - cursorSeconds - boardingSlackSeconds) / 60.0)),
+				Math.max(1, (int) Math.ceil((leg.to().arrivalSeconds() - leg.from().departureSeconds()) / 60.0)),
 				0,
 				false,
 				"UNKNOWN",
@@ -219,7 +222,6 @@ class RouteTimetableRaptorPlanner {
 				"TIMETABLE",
 				"시간표"
 			));
-			cursorSeconds = leg.to().arrivalSeconds();
 			sequence += 1;
 		}
 		steps.add(timetableAccessStep(
@@ -229,6 +231,7 @@ class RouteTimetableRaptorPlanner {
 			command.destinationStationId(),
 			lastLeg.lineId(),
 			lastLeg.lineName(),
+			0,
 			EXIT_DISTANCE_METERS
 		));
 		return new RouteSearchResult(
@@ -257,6 +260,7 @@ class RouteTimetableRaptorPlanner {
 		String toStationId,
 		String lineId,
 		String lineName,
+		int estimatedMinutes,
 		int distanceMeters
 	) {
 		return new RouteStep(
@@ -268,7 +272,7 @@ class RouteTimetableRaptorPlanner {
 			lineName,
 			fromStationId,
 			toStationId,
-			0,
+			estimatedMinutes,
 			distanceMeters,
 			false,
 			"UNKNOWN",
@@ -277,6 +281,16 @@ class RouteTimetableRaptorPlanner {
 			"TIMETABLE",
 			"시간표"
 		);
+	}
+
+	private static int waitMinutesBeforeBoarding(
+		int readySeconds,
+		int departureSeconds,
+		int movementSeconds,
+		int slackSeconds
+	) {
+		int waitSeconds = Math.max(movementSeconds, departureSeconds - readySeconds - slackSeconds);
+		return (int) Math.ceil(waitSeconds / 60.0);
 	}
 
 	private static String pathDiscriminator(List<RideLeg> path) {

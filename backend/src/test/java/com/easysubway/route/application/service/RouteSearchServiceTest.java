@@ -818,6 +818,13 @@ class RouteSearchServiceTest {
 				tuple("ride", "station-a", "station-b", EtaSource.PLANNED.name()),
 				tuple("exit", "station-b", "station-b", EtaSource.PLANNED.name())
 			);
+		assertThat(plan.itineraries().getFirst().steps())
+			.extracting("stepType", "estimatedMinutes")
+			.containsExactly(
+				tuple("entry", 1),
+				tuple("ride", 10),
+				tuple("exit", 0)
+			);
 	}
 
 	@Test
@@ -839,6 +846,17 @@ class RouteSearchServiceTest {
 				tuple("ride", "station-transfer", "station-b", false),
 				tuple("exit", "station-b", "station-b", true)
 			);
+	}
+
+	@Test
+	@DisplayName("V2 planner는 환승 이동 시간 전에 출발하는 시간표 후보를 제외한다")
+	void routeV2PlannerRejectsTransferBeforeTransferTime() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), transferRouteTimetablePort(33300));
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+		assertThat(plan.itineraries()).isEmpty();
 	}
 
 	@Test
@@ -2025,6 +2043,10 @@ class RouteSearchServiceTest {
 	}
 
 	private static LoadRouteTimetablePort transferRouteTimetablePort() {
+		return transferRouteTimetablePort(33420);
+	}
+
+	private static LoadRouteTimetablePort transferRouteTimetablePort(int secondDepartureSeconds) {
 		return () -> new LoadRouteTimetablePort.RouteTimetable(
 			List.of(new LoadRouteTimetablePort.ServiceCalendar(
 				"weekday-2026",
@@ -2081,8 +2103,8 @@ class RouteSearchServiceTest {
 			List.of(
 				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 1, "station-a", "line-a", 32520, 32520, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 2, "station-transfer", "line-a", 32940, 32940, 0, 0),
-				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 1, "station-transfer", "line-b", 33300, 33300, 0, 0),
-				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 2, "station-b", "line-b", 33720, 33720, 0, 0)
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 1, "station-transfer", "line-b", secondDepartureSeconds, secondDepartureSeconds, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 2, "station-b", "line-b", secondDepartureSeconds + 420, secondDepartureSeconds + 420, 0, 0)
 			),
 			List.of()
 		);
