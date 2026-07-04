@@ -1510,14 +1510,12 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
     "testWidgets\\('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다'",
     "offlineDataSettingsButton",
     "저장된 안내 상태",
-    "검증 구간",
-    "지금은 상록수역·사당역 구간을 안내해요",
-    "findsNWidgets\\(2\\)",
+    "find\\.text\\('검증 구간'\\), findsNothing",
     "마지막 갱신",
     "앱 설치 때 함께 받은 안내",
     "저장 정보 다시 확인",
     "저장 정보 기록을 확인할 수 없으면",
-    "안내 범위",
+    "find\\.text\\('안내 범위'\\), findsNothing",
     "실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요",
   ].join("[\\s\\S]*"));
 
@@ -1528,10 +1526,10 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
   assert.match(main, /_offlineDataSourceOfTruth\s*=\s*'installed catalog metadata'/);
   assert.match(offlineScreen, /저장된 안내 상태/);
   assert.doesNotMatch(offlineScreen, /저장된 데이터 상태/);
-  assert.match(offlineScreen, /검증 구간[\s\S]*ProductionScopeCopy\.supportedClaimKo/);
+  assert.doesNotMatch(offlineScreen, /검증 구간/);
   assert.match(offlineScreen, /저장 정보 다시 확인[\s\S]*저장 정보 기록을 확인할 수 없으면/);
   assert.match(offlineScreen, /마지막 갱신[\s\S]*앱 설치 때 함께 받은 안내/);
-  assert.match(offlineScreen, /안내 범위[\s\S]*ProductionScopeCopy\.supportedClaimKo/);
+  assert.doesNotMatch(offlineScreen, /안내 범위/);
   assert.match(offlineScreen, /인터넷 연결 필요[\s\S]*시설 제보[\s\S]*연결 필요/);
   assert.match(widgetTest, offlineWidgetTestPattern);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
@@ -4797,31 +4795,9 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     "실시간 보장",
     "항상 정확",
   ].toSorted());
-  assert.match(
-    read("apps/mobile/lib/main.dart"),
-    /ProductionScopeCopy\.supportedClaimKo/,
-    "home/help/settings/offline copy must use the production scope constant",
-  );
-  assert.match(
-    read("apps/mobile/lib/station_search.dart"),
-    /ProductionScopeCopy\.stationSearchNotice/,
-    "station search and detail copy must use the production scope constant",
-  );
-  assert.match(
-    read("apps/mobile/lib/station_search.dart"),
-    /AppBar[\s\S]*ProductionScopeCopy\.supportedClaimKo[\s\S]*ProductionScopeCopy\.stationSearchNotice/,
-    "station search and detail must render visible production scope claims",
-  );
-  assert.match(
-    read("apps/mobile/lib/route_search.dart"),
-    /ProductionScopeCopy\.routeSearchNotice/,
-    "route result copy must use the production scope constant",
-  );
-  assert.match(
-    read("apps/mobile/lib/route_search.dart"),
-    /AppBar[\s\S]*ProductionScopeCopy\.supportedClaimKo[\s\S]*ProductionScopeCopy\.routeSearchNotice/,
-    "route search must render a visible production scope claim",
-  );
+  assert.doesNotMatch(read("apps/mobile/lib/main.dart"), /ProductionScopeCopy/);
+  assert.doesNotMatch(read("apps/mobile/lib/station_search.dart"), /ProductionScopeCopy/);
+  assert.doesNotMatch(read("apps/mobile/lib/route_search.dart"), /ProductionScopeCopy/);
 
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
     "kric-station-elevator",
@@ -9798,12 +9774,12 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(read("apps/mobile/test/onboarding_test.dart"), /온보딩은 알림 권한 요청 실패 도움말을 안내한다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
   assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
-  assert.match(stationSearch, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
-  assert.match(stationSearch, /위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다/);
+  assert.doesNotMatch(stationSearch, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
+  assert.doesNotMatch(stationSearch, /위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다/);
   assert.doesNotMatch(stationSearch, /상태 신고/);
   assert.match(facilityReport, /사진과 제보 위치는 시설 제보 확인에만 사용됩니다/);
   assert.match(facilityReport, /제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다/);
-  assert.match(widgetTest, /역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
+  assert.match(widgetTest, /역 검색은 사전 안내 다이얼로그 없이 바로 위치를 요청한다/);
   assert.match(widgetTest, /시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 사진과 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 현재 위치를 보내기 전에 공개 범위를 안내한다/);
