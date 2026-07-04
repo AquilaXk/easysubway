@@ -395,7 +395,6 @@ class InternalRouteStep {
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터를 이용해요',
       if (requiresEscalator) '에스컬레이터 안내를 확인하고 있어요',
-      if (reliabilityScore < 80) '이동 전 역무원에게 확인해 주세요',
     ];
     return labels.join(' · ');
   }
