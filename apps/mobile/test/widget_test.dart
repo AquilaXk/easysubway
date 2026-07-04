@@ -12,7 +12,6 @@ import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
-import 'package:easysubway_mobile/features/stations/presentation/station_line_badges.dart';
 import 'package:easysubway_mobile/internal_route.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
@@ -3409,7 +3408,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
     expect(repository.requestedQueries, contains('상록수'));
@@ -5974,6 +5973,39 @@ void main() {
     }
   });
 
+  testWidgets('역 검색은 검색 버튼 없이 타이핑(디바운스)만으로 결과를 보여준다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    // 버튼 탭·키보드 액션 없이 디바운스 시간만 지나면 검색된다.
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedQueries, ['상록수']);
+    expect(find.text('상록수역'), findsOneWidget);
+    // 검색창 아래 검색 버튼·노선 필터·전체 노선 진입이 없다.
+    expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
+    expect(find.text('노선 필터 펼치기'), findsNothing);
+    expect(find.text('전체 노선'), findsNothing);
+  });
+
   testWidgets('역 검색은 접근성 표시가 포함된 백엔드 결과를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
@@ -6046,13 +6078,11 @@ void main() {
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('stationSearchSubmitButton')),
-        findsOneWidget,
-      );
+      await tester.pump();
+      // 검색 버튼은 제거됐고, 입력이 있으면 주변 역 버튼도 감춘다.
+      expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
       expect(find.byKey(const Key('nearbyStationSearchButton')), findsNothing);
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
 
       expect(repository.requestedQueries, ['상록수']);
@@ -6169,7 +6199,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '김포');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
     for (final text in [
@@ -6207,7 +6237,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
     expect(
@@ -6233,7 +6263,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationRoleDestination-station-sadang')),
@@ -6733,7 +6763,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '환승');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
@@ -6746,582 +6776,6 @@ void main() {
     expect(resultTileSize.height, lessThanOrEqualTo(112));
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
-  });
-
-  testWidgets('역 검색 노선 필터는 지역을 먼저 고르고 전체 노선은 바텀시트로 연다', (tester) async {
-    final semanticsHandle = tester.ensureSemantics();
-    final repository = FakeStationSearchRepository(
-      lineOptions: const [
-        SubwayLineOption(
-          id: 'busan-1',
-          name: '부산 1호선',
-          color: '#F06A00',
-          region: '부산',
-          lineCode: '1',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'seoul-4',
-          name: '수도권 4호선',
-          color: '#00A5DE',
-          region: '수도권',
-          lineCode: '4',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'inactive-line',
-          name: '운행 중지 노선',
-          color: '#777777',
-          region: '수도권',
-          lineCode: '중지',
-          active: false,
-        ),
-      ],
-    );
-
-    try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingState(),
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('stationLineFilterPanel')), findsOneWidget);
-      expect(find.byKey(const Key('stationLineRegion-수도권')), findsOneWidget);
-      expect(find.byKey(const Key('stationLineRegion-부산')), findsOneWidget);
-      expect(
-        find.byKey(const Key('stationLineFilter-seoul-4')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('stationLineFilter-busan-1')), findsNothing);
-      expect(find.text('운행 중지 노선'), findsNothing);
-
-      await tester.tap(find.byKey(const Key('stationLineRegion-부산')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('stationLineFilter-busan-1')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('stationLineFilter-seoul-4')), findsNothing);
-      expect(find.bySemanticsLabel('부산 1호선 선택 안 됨'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('stationLineFilterMoreButton')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('stationLineAllSheet')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('stationLineAllSheet')),
-          matching: find.text('전체 노선 보기'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('stationLineFilter-seoul-4')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('stationLineFilter-busan-1')), findsWidgets);
-      expect(find.text('운행 중지 노선'), findsNothing);
-    } finally {
-      semanticsHandle.dispose();
-    }
-  });
-
-  testWidgets('역 검색 결과는 입력창 바로 아래에 먼저 보이고 필터는 접을 수 있다', (tester) async {
-    final repository = FakeStationSearchRepository(
-      lineOptions: const [
-        SubwayLineOption(
-          id: 'seoul-4',
-          name: '수도권 4호선',
-          color: '#00A5DE',
-          region: '수도권',
-          lineCode: '4',
-          active: true,
-        ),
-      ],
-      nextResults: [
-        const StationSearchResult(
-          id: 'station-sangnoksu',
-          nameKo: '상록수',
-          nameEn: 'Sangnoksu',
-          region: '수도권',
-          dataQualityLevel: 'LEVEL_1',
-          lastVerifiedAt: '2026-06-12',
-          lines: [
-            StationSearchLine(
-              id: 'seoul-4',
-              name: '수도권 4호선',
-              color: '#00A5DE',
-              stationCode: '448',
-            ),
-          ],
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
-    await tester.pumpAndSettle();
-
-    final resultTop = tester
-        .getTopLeft(
-          find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-        )
-        .dy;
-    final filterTop = tester
-        .getTopLeft(find.byKey(const Key('stationLineFilterPanel')))
-        .dy;
-    expect(resultTop, lessThan(filterTop));
-    expect(find.text('노선 필터 펼치기'), findsOneWidget);
-    expect(find.byKey(const Key('stationLineFilter-seoul-4')), findsNothing);
-
-    await tester.tap(find.byKey(const Key('stationLineFilterToggle')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('노선 필터 접기'), findsOneWidget);
-    expect(find.byKey(const Key('stationLineFilter-seoul-4')), findsOneWidget);
-  });
-
-  testWidgets('역 검색은 태블릿 landscape에서 결과와 필터를 나란히 보여준다', (tester) async {
-    tester.view.physicalSize = const Size(1280, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-
-    final repository = FakeStationSearchRepository(
-      lineOptions: const [
-        SubwayLineOption(
-          id: 'seoul-4',
-          name: '수도권 4호선',
-          color: '#00A5DE',
-          region: '수도권',
-          lineCode: '4',
-          active: true,
-        ),
-      ],
-      nextResults: [
-        const StationSearchResult(
-          id: 'station-sangnoksu',
-          nameKo: '상록수',
-          nameEn: 'Sangnoksu',
-          region: '수도권',
-          dataQualityLevel: 'LEVEL_1',
-          lastVerifiedAt: '2026-06-12',
-          lines: [
-            StationSearchLine(
-              id: 'seoul-4',
-              name: '수도권 4호선',
-              color: '#00A5DE',
-              stationCode: '448',
-            ),
-          ],
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const Key('stationSearchLargeScreenLayout')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('stationLineFilterPanel')), findsOneWidget);
-    expect(find.text('노선 필터 펼치기'), findsOneWidget);
-
-    final resultRect = tester.getRect(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    final filterRect = tester.getRect(
-      find.byKey(const Key('stationLineFilterPanel')),
-    );
-    final inputRect = tester.getRect(
-      find.byKey(const Key('stationSearchInput')),
-    );
-
-    expect(inputRect.right, lessThan(filterRect.left));
-    expect(resultRect.right, lessThan(filterRect.left));
-    expect(filterRect.top, lessThan(resultRect.bottom));
-  });
-
-  testWidgets('역 검색 대화면은 경계 폭 시스템 글자 크기와 긴 노선명에서 렌더링된다', (tester) async {
-    tester.view.physicalSize = const Size(900, 800);
-    tester.view.devicePixelRatio = 1;
-    tester.platformDispatcher.textScaleFactorTestValue = 2;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-
-    final repository = FakeStationSearchRepository(
-      lineOptions: const [
-        SubwayLineOption(
-          id: 'gyeongui-jungang',
-          name: '경의중앙선',
-          color: '#77C4A3',
-          region: '수도권',
-          lineCode: '경의중앙',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'ui-sinseol',
-          name: '우이신설선',
-          color: '#B7C452',
-          region: '수도권',
-          lineCode: '우이신설',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'gimpo-gold',
-          name: '김포골드라인',
-          color: '#AD8605',
-          region: '수도권',
-          lineCode: '김포골드',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'airport-railroad',
-          name: '공항철도',
-          color: '#0090D2',
-          region: '수도권',
-          lineCode: '공항',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'shinbundang',
-          name: '신분당선',
-          color: '#D31145',
-          region: '수도권',
-          lineCode: '신분당',
-          active: true,
-        ),
-      ],
-      nextResults: [
-        const StationSearchResult(
-          id: 'station-transfer',
-          nameKo: '디지털미디어시티',
-          nameEn: 'Digital Media City',
-          region: '수도권',
-          dataQualityLevel: 'LEVEL_1',
-          lastVerifiedAt: '2026-06-12',
-          lines: [
-            StationSearchLine(
-              id: 'gyeongui-jungang',
-              name: '경의중앙선',
-              color: '#77C4A3',
-              stationCode: 'K316',
-            ),
-            StationSearchLine(
-              id: 'airport-railroad',
-              name: '공항철도',
-              color: '#0090D2',
-              stationCode: 'A04',
-            ),
-          ],
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingStateWithPreferences(
-          preferences: const OnboardingViewPreferences(
-            largeTextEnabled: false,
-            highContrastEnabled: true,
-            simpleViewEnabled: false,
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '디지털');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
-    await tester.pumpAndSettle();
-
-    expect(tester.takeException(), isNull);
-    expect(
-      find.byKey(const Key('stationSearchLargeScreenLayout')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const Key('stationSearchResult-station-transfer')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('stationLineFilterPanel')), findsOneWidget);
-    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
-  });
-
-  testWidgets('역 검색은 노선을 선택해 결과를 좁힌다', (tester) async {
-    final semanticsHandle = tester.ensureSemantics();
-    final repository = FakeStationSearchRepository(
-      lineOptions: const [
-        SubwayLineOption(
-          id: 'seoul-4',
-          name: '수도권 4호선',
-          color: '#00A5DE',
-          region: '수도권',
-          lineCode: '4',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'korail-gyeongui-jungang',
-          name: '경의중앙선',
-          color: '#75C5A1',
-          region: '수도권',
-          lineCode: '경의중앙',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'inactive-line',
-          name: '운행 중지 노선',
-          color: '#777777',
-          region: '수도권',
-          lineCode: '중지',
-          active: false,
-        ),
-      ],
-      nextResults: [
-        const StationSearchResult(
-          id: 'station-sangnoksu',
-          nameKo: '상록수',
-          nameEn: 'Sangnoksu',
-          region: '수도권',
-          dataQualityLevel: 'LEVEL_1',
-          lastVerifiedAt: '2026-06-12',
-          lines: [
-            StationSearchLine(
-              id: 'seoul-4',
-              name: '수도권 4호선',
-              color: '#00A5DE',
-              stationCode: '448',
-            ),
-          ],
-        ),
-      ],
-    );
-
-    try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingState(),
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('stationLineFilter-all')), findsOneWidget);
-      expect(
-        find.byKey(const Key('stationLineFilter-seoul-4')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('stationLineFilter-inactive-line')),
-        findsNothing,
-      );
-      expect(find.text('운행 중지 노선'), findsNothing);
-      final lineFilterImage = tester.widget<Image>(
-        find.descendant(
-          of: find.byKey(const Key('stationLineFilter-seoul-4')),
-          matching: find.byType(Image),
-        ),
-      );
-      expect(
-        (lineFilterImage.image as AssetImage).assetName,
-        'assets/metro_symbols/line_badges/seoul_4_compact_256.png',
-      );
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('stationLineFilter-seoul-4')),
-          matching: find.byType(StationLineBadge),
-        ),
-        findsOneWidget,
-      );
-      expect(find.bySemanticsLabel('수도권 4호선 선택 안 됨'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('stationLineFilter-seoul-4')));
-      await tester.pumpAndSettle();
-
-      expect(find.bySemanticsLabel('수도권 4호선 선택됨'), findsOneWidget);
-
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
-      await tester.pumpAndSettle();
-
-      expect(repository.requestedQueries, ['상록수']);
-      expect(repository.requestedLineIds, ['seoul-4']);
-      expect(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const Key('stationLineFilterToggle')));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const Key('stationLineFilter-all')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationLineFilter-all')));
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const Key('stationSearchSubmitButton')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
-      await tester.pumpAndSettle();
-
-      expect(repository.requestedQueries, ['상록수', '상록수']);
-      expect(repository.requestedLineIds, ['seoul-4', null]);
-    } finally {
-      semanticsHandle.dispose();
-    }
-  });
-
-  testWidgets('역 검색은 검색 중 노선 선택을 바꾸지 않는다', (tester) async {
-    final semanticsHandle = tester.ensureSemantics();
-    final searchCompleter = Completer<List<StationSearchResult>>();
-    final repository = FakeStationSearchRepository(
-      lineOptions: const [
-        SubwayLineOption(
-          id: 'seoul-4',
-          name: '수도권 4호선',
-          color: '#00A5DE',
-          region: '수도권',
-          lineCode: '4',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'korail-gyeongui-jungang',
-          name: '경의중앙선',
-          color: '#75C5A1',
-          region: '수도권',
-          lineCode: '경의중앙',
-          active: true,
-        ),
-        SubwayLineOption(
-          id: 'inactive-line',
-          name: '운행 중지 노선',
-          color: '#777777',
-          region: '수도권',
-          lineCode: '중지',
-          active: false,
-        ),
-      ],
-      searchCompleter: searchCompleter,
-    );
-
-    try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingState(),
-        ),
-      );
-
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('stationLineFilter-inactive-line')),
-        findsNothing,
-      );
-      expect(find.text('운행 중지 노선'), findsNothing);
-
-      await tester.tap(find.byKey(const Key('stationLineFilter-seoul-4')));
-      await tester.pumpAndSettle();
-
-      expect(
-        tester.getSemantics(find.bySemanticsLabel('수도권 4호선 선택됨')),
-        isSemantics(
-          label: '수도권 4호선 선택됨',
-          isButton: true,
-          isSelected: true,
-          hasTapAction: true,
-        ),
-      );
-
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
-      await tester.pump();
-
-      await tester.tap(
-        find.byKey(const Key('stationLineFilter-korail-gyeongui-jungang')),
-      );
-      await tester.pump();
-
-      expect(find.bySemanticsLabel('수도권 4호선 선택됨'), findsOneWidget);
-      expect(find.bySemanticsLabel('경의중앙선 선택 안 됨'), findsOneWidget);
-
-      searchCompleter.complete([
-        _stationResult(id: 'station-sangnoksu', name: '상록수'),
-      ]);
-      await tester.pumpAndSettle();
-
-      expect(repository.requestedLineIds, ['seoul-4']);
-    } finally {
-      semanticsHandle.dispose();
-    }
   });
 
   testWidgets('역 검색은 현재 위치 주변 역을 큰 버튼으로 찾고 거리를 보여준다', (tester) async {
@@ -7637,7 +7091,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '없는역');
     await tester.pump();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
     expect(repository.requestedQueries, ['없는역']);
@@ -7782,7 +7236,7 @@ void main() {
         '상록수',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
@@ -7988,7 +7442,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8112,7 +7566,7 @@ void main() {
         '상록수',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8197,7 +7651,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8298,7 +7752,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8373,7 +7827,7 @@ void main() {
         '상록수',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8463,7 +7917,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8542,7 +7996,7 @@ void main() {
         '상록수',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8599,7 +8053,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8632,7 +8086,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -8695,42 +8149,6 @@ void main() {
       find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
       findsNothing,
     );
-  });
-
-  testWidgets('검색 요청 중에는 검색 버튼을 비활성화한다', (tester) async {
-    final repository = ControlledStationSearchRepository();
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
-    await tester.pump();
-
-    expect(repository.requestedQueries, ['상록수']);
-    final loadingButton = tester.widget<FilledButton>(
-      find.byKey(const Key('stationSearchSubmitButton')),
-    );
-    expect(loadingButton.onPressed, isNull);
-
-    repository.complete(const []);
-    await tester.pumpAndSettle();
-
-    final completedButton = tester.widget<FilledButton>(
-      find.byKey(const Key('stationSearchSubmitButton')),
-    );
-    expect(completedButton.onPressed, isNotNull);
   });
 
   testWidgets('이동 조건 화면은 큰 선택 카드로 사용자 상황을 고를 수 있다', (tester) async {
@@ -10530,7 +9948,7 @@ void main() {
         '상록수',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -11733,7 +11151,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -11819,7 +11237,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -11978,7 +11396,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -12122,7 +11540,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('stationSearchSubmitButton')));
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
