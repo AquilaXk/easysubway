@@ -525,6 +525,24 @@ void main() {
     expect(pack.representativeRouteRegressionSignature.value, '0' * 64);
   });
 
+  test('manifest는 route regression claim이 없으면 빈 회귀 목록을 허용한다', () {
+    final packJson = _fixturePack();
+    packJson['representativeRouteRegressions'] = <Object?>[];
+    packJson['representativeRouteRegressionSignature'] = {
+      'algorithm': 'sha256-route-regression-v1',
+      'value': '0' * 64,
+    };
+
+    final manifest = DataPackManifest.fromJson({
+      'ttlSeconds': 3600,
+      'packs': [packJson],
+    });
+
+    final pack = manifest.packs.single;
+    expect(pack.artifactKind, DataPackArtifactKind.fixture);
+    expect(pack.representativeRouteRegressions, isEmpty);
+  });
+
   test('production key가 설정되면 fixture manifest를 거부한다', () {
     expect(
       () => DataPackManifest.fromJson({
