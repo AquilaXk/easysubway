@@ -2,6 +2,82 @@ import 'dart:async';
 
 import '../domain/map_camera.dart';
 
+const routeMapViewportLabelCollisionScript = r'''
+window.easysubwayApplyRouteMapLabelPolicy = function () {
+  const svg = document.querySelector('svg');
+  if (!svg || !svg.viewBox || !svg.viewBox.baseVal) {
+    return false;
+  }
+  const viewBox = svg.viewBox.baseVal;
+  const viewport = {
+    left: viewBox.x,
+    top: viewBox.y,
+    right: viewBox.x + viewBox.width,
+    bottom: viewBox.y + viewBox.height
+  };
+  const accepted = [];
+  const labels = Array.from(svg.querySelectorAll('text'));
+  for (const label of labels) {
+    label.style.display = '';
+    label.removeAttribute('data-easysubway-hidden-label');
+    let box;
+    if (
+      label.dataset.easysubwayLabelLeft &&
+      label.dataset.easysubwayLabelTop &&
+      label.dataset.easysubwayLabelRight &&
+      label.dataset.easysubwayLabelBottom
+    ) {
+      box = {
+        left: Number(label.dataset.easysubwayLabelLeft),
+        top: Number(label.dataset.easysubwayLabelTop),
+        right: Number(label.dataset.easysubwayLabelRight),
+        bottom: Number(label.dataset.easysubwayLabelBottom)
+      };
+    } else {
+      let bounds;
+      try {
+        bounds = label.getBBox();
+      } catch (_) {
+        continue;
+      }
+      box = {
+        left: bounds.x,
+        top: bounds.y,
+        right: bounds.x + bounds.width,
+        bottom: bounds.y + bounds.height
+      };
+      label.dataset.easysubwayLabelLeft = String(box.left);
+      label.dataset.easysubwayLabelTop = String(box.top);
+      label.dataset.easysubwayLabelRight = String(box.right);
+      label.dataset.easysubwayLabelBottom = String(box.bottom);
+    }
+    if (
+      box.right < viewport.left ||
+      box.left > viewport.right ||
+      box.bottom < viewport.top ||
+      box.top > viewport.bottom
+    ) {
+      label.style.display = 'none';
+      label.setAttribute('data-easysubway-hidden-label', 'offscreen');
+      continue;
+    }
+    const overlaps = accepted.some((other) =>
+      box.left < other.right &&
+      box.right > other.left &&
+      box.top < other.bottom &&
+      box.bottom > other.top
+    );
+    if (overlaps) {
+      label.style.display = 'none';
+      label.setAttribute('data-easysubway-hidden-label', 'collision');
+    } else {
+      accepted.push(box);
+    }
+  }
+  return true;
+};
+''';
+
 abstract interface class RouteMapRendererController {
   Stream<RouteMapRendererEvent> get events;
 
