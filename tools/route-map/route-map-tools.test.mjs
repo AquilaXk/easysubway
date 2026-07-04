@@ -17,7 +17,7 @@ const auditRouteMapScript = path.resolve(import.meta.dirname, "audit-route-map.m
 
 // audit-route-map을 temp fixture + line-tracks 문서로 실행하고 report JSON을 돌려준다.
 // --fail-on으로 exit 1이 나도 stdout에 report가 있으므로 그대로 파싱한다.
-async function runAuditRouteMap({ fixture, lineTracks = [], failOn = [] }) {
+async function runAuditRouteMap({ fixture, lineTracks = [], reviewedLineTracks = null, failOn = [] }) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-audit-tracks-"));
   try {
     const fixturePath = path.join(dir, "fixture.json");
@@ -27,6 +27,11 @@ async function runAuditRouteMap({ fixture, lineTracks = [], failOn = [] }) {
       const trackPath = path.join(dir, `line-tracks-${i}.json`);
       await writeFile(trackPath, JSON.stringify(lineTracks[i]));
       trackArgs.push("--line-tracks", trackPath);
+    }
+    if (reviewedLineTracks != null) {
+      const reviewedPath = path.join(dir, "reviewed-line-tracks.json");
+      await writeFile(reviewedPath, JSON.stringify(reviewedLineTracks));
+      trackArgs.push("--reviewed-line-tracks", reviewedPath);
     }
     const failArgs = failOn.length > 0 ? ["--fail-on", failOn.join(",")] : [];
     let stdout;
@@ -2238,6 +2243,74 @@ test("audit-route-map flags zero-vote tracks as HIGH for manual review", async (
   assert.ok(zeroVote, "0표 노선 finding");
   assert.equal(zeroVote.severity, "HIGH");
   assert.equal(zeroVote.lineId, "line-a");
+});
+
+test("audit-route-map downgrades reviewed zero-vote tracks to INFO", async () => {
+  const fixture = {
+    packs: [{
+      id: "test",
+      routeMapPositions: [{ stationId: "s1", lineId: "line-a", region: "테스트권", x: 0, y: 0 }],
+    }],
+  };
+  const lineTracks = [{
+    region: "테스트권", source: "svg-strokes", colorCount: 1, lineCount: 1,
+    lines: [{ lineId: "line-a", svgColor: "#f58921", matchVotes: 0, paths: ["M 0 0 L 1 0"] }],
+  }];
+  const reviewedLineTracks = {
+    reviewedLineTracks: [{
+      region: "테스트권",
+      lineId: "line-a",
+      reason: "공용 색 노선이라 근접 역 0표지만 SVG 육안 대조로 track 정합 확인",
+      reviewedAt: "2026-07-05T00:00:00.000Z",
+      reviewedBy: "QA",
+      reviewSource: "https://github.com/AquilaXk/easysubway/issues/1638",
+    }],
+  };
+  const report = await runAuditRouteMap({ fixture, lineTracks, reviewedLineTracks });
+  assert.equal(
+    report.findings.find((finding) => finding.code === "LINE_TRACKS_ZERO_VOTE"),
+    undefined,
+    "검수된 0표는 HIGH finding으로 남지 않는다",
+  );
+  const reviewed = report.findings.find(
+    (finding) => finding.code === "REVIEWED_LINE_TRACK_ZERO_VOTE",
+  );
+  assert.ok(reviewed, "검수 기록 finding");
+  assert.equal(reviewed.severity, "INFO");
+  assert.equal(reviewed.lineId, "line-a");
+  assert.match(reviewed.message, /육안 대조/);
+});
+
+test("audit-route-map keeps unreviewed zero-vote as HIGH when reviewed list covers a different line", async () => {
+  const fixture = {
+    packs: [{
+      id: "test",
+      routeMapPositions: [{ stationId: "s1", lineId: "line-a", region: "테스트권", x: 0, y: 0 }],
+    }],
+  };
+  const lineTracks = [{
+    region: "테스트권", source: "svg-strokes", colorCount: 1, lineCount: 1,
+    lines: [{ lineId: "line-a", svgColor: "#f58921", matchVotes: 0, paths: ["M 0 0 L 1 0"] }],
+  }];
+  const reviewedLineTracks = {
+    reviewedLineTracks: [{
+      region: "테스트권",
+      lineId: "line-other",
+      reason: "다른 노선 검수 — line-a는 미검수",
+      reviewedAt: "2026-07-05T00:00:00.000Z",
+      reviewedBy: "QA",
+      reviewSource: "https://github.com/AquilaXk/easysubway/issues/1638",
+    }],
+  };
+  const report = await runAuditRouteMap({ fixture, lineTracks, reviewedLineTracks });
+  const zeroVote = report.findings.find((finding) => finding.code === "LINE_TRACKS_ZERO_VOTE");
+  assert.ok(zeroVote, "미검수 0표는 HIGH로 남는다");
+  assert.equal(zeroVote.severity, "HIGH");
+  assert.equal(
+    report.findings.find((finding) => finding.code === "REVIEWED_LINE_TRACK_ZERO_VOTE"),
+    undefined,
+    "다른 노선 검수는 line-a에 적용되지 않는다",
+  );
 });
 
 test("apply-route-map-line-tracks --check does not write and flags missing line license", async () => {
