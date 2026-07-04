@@ -23,6 +23,7 @@ Map<String, Object?> iosRouteMapViewportCreationParams({
     'sourceHeight': camera.sourceBounds.height,
     'viewBox': _viewBoxFor(camera),
     'revision': camera.revision,
+    'labelCollisionScript': routeMapViewportLabelCollisionScript,
   };
 }
 

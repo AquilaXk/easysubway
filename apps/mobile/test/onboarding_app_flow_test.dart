@@ -56,9 +56,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
-    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
-    await tester.pumpAndSettle();
+    // 조건 확인 단계 없이 프로필 다음은 바로 권한 단계(#1563).
+    expect(find.text('적용할 조건을 확인하세요'), findsNothing);
     expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
     expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
     await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
@@ -184,9 +183,8 @@ Future<void> _tapIntroConfigure(WidgetTester tester) async {
 }
 
 Future<void> _continueFromProfileToPermission(WidgetTester tester) async {
+  // 2단계 흐름(#1563): 프로필 → '다음' 한 번이면 권한 단계.
   await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('onboardingDoneButton')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('onboardingDoneButton')));
   await tester.pumpAndSettle();
