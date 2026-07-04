@@ -44,11 +44,28 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
       return null;
     }
   };
+  const isFiniteBox = (box) =>
+    box &&
+    Number.isFinite(box.left) &&
+    Number.isFinite(box.top) &&
+    Number.isFinite(box.right) &&
+    Number.isFinite(box.bottom);
   const accepted = [];
+  // svg 좌표 변환은 한 패스 내내 불변이므로 루프 밖에서 한 번만 계산한다.
+  const svgMatrix = svg.getScreenCTM();
+  const toSvg = svgMatrix ? invertMatrix(svgMatrix) : null;
+  const point = svg.createSVGPoint ? svg.createSVGPoint() : null;
   const labels = Array.from(svg.querySelectorAll('text'));
   for (const label of labels) {
-    label.style.display = '';
-    label.removeAttribute('data-easysubway-hidden-label');
+    const hiddenByUs = label.hasAttribute('data-easysubway-hidden-label');
+    if (!hiddenByUs && label.style.display === 'none') {
+      // 원본 SVG가 숨긴 라벨: 그대로 숨겨 두고 라벨 공간도 차지하지 않게 한다.
+      continue;
+    }
+    if (hiddenByUs) {
+      label.style.display = '';
+      label.removeAttribute('data-easysubway-hidden-label');
+    }
     let box;
     if (
       label.dataset.easysubwayLabelLeft &&
@@ -62,21 +79,19 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
         right: Number(label.dataset.easysubwayLabelRight),
         bottom: Number(label.dataset.easysubwayLabelBottom)
       };
-    } else {
+    }
+    if (!isFiniteBox(box)) {
+      if (!toSvg || !point) {
+        continue;
+      }
       const bounds = readBounds(label);
       if (!bounds) {
         continue;
       }
       const labelMatrix = label.getScreenCTM();
-      const svgMatrix = svg.getScreenCTM();
-      if (!labelMatrix || !svgMatrix) {
+      if (!labelMatrix) {
         continue;
       }
-      const toSvg = invertMatrix(svgMatrix);
-      if (!toSvg) {
-        continue;
-      }
-      const point = svg.createSVGPoint();
       const transformPoint = (x, y) => {
         point.x = x;
         point.y = y;
@@ -95,6 +110,11 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
         right: Math.max(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x),
         bottom: Math.max(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)
       };
+      if (!isFiniteBox(box)) {
+        // 비정상 측정값(뷰가 아직 레이아웃되지 않은 상태): 잘못된 박스를 영구
+        // 캐시하지 않도록 캐시를 건너뛰어 다음 실행에서 다시 측정하게 한다.
+        continue;
+      }
       label.dataset.easysubwayLabelLeft = String(box.left);
       label.dataset.easysubwayLabelTop = String(box.top);
       label.dataset.easysubwayLabelRight = String(box.right);

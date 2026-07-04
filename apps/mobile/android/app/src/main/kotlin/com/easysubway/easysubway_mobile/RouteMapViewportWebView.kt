@@ -190,7 +190,7 @@ private class RouteMapViewportPlatformView(
         val frameRevision = revision
         val script = String.format(
             Locale.US,
-            "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');if(window.easysubwayApplyRouteMapLabelPolicy){window.easysubwayApplyRouteMapLabelPolicy();}return true;})();",
+            "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');try{if(window.easysubwayApplyRouteMapLabelPolicy){window.easysubwayApplyRouteMapLabelPolicy();}}catch(e){}return true;})();",
             values[0],
             values[1],
             values[2],
