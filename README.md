@@ -21,7 +21,7 @@
 
 ## Production Routing Graph
 
-- Production LOCAL `RIDE` edge는 같은 노선의 인접 `lineSequence`만 연결합니다. 비인접 요약 edge는 regression fixture 또는 공식 정차 패턴이 있는 `EXPRESS` 근거로만 둡니다. pilot summary edge가 임시 pack에 남아 있으면 `route-graph-topology-report`의 release-blocking `nonAdjacentExpressRide` violation으로 기록하고 ETA 근거로 쓰지 않습니다. Production ingest는 이런 edge가 있을 때 `routeGraphTopologyPolicy.summaryRideEdges=release-blocking-regression-only`와 edge id 목록을 요구합니다.
+- Production LOCAL `RIDE` edge는 같은 노선의 인접 `lineSequence`만 연결합니다. 비인접 요약 edge는 regression fixture 전용이며 production pack에서 제외합니다. 공식 정차 패턴이 검증된 `EXPRESS` edge를 추가하기 전까지 pilot summary edge를 `route-graph-topology-report`의 release-blocking `nonAdjacentExpressRide` violation 또는 ETA 근거로 쓰지 않습니다.
 - 기본 route node는 station-line(`stationId:lineId`)입니다. platform node는 공식 platform/source가 admission되기 전까지 만들지 않고, 방향 문구는 `platformInfo`에만 둡니다.
 - 표시용 SVG asset은 앱 지도 표시용입니다. canonical route map position은 `routeMapPositions`의 source, license, `sourceSha256`, `reviewedAt`, `updatedAt`, label polygon으로만 판정합니다.
 - 앱의 `데이터 및 지도 출처` 화면은 source inventory와 manifest를 보여주는 사용자 연결점입니다. Level 4 또는 전국 claim은 #1397 source admission과 #1400 인접역 graph/position 확장 증거가 닫힐 때까지 NO-GO입니다.
