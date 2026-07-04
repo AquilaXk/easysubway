@@ -70,13 +70,13 @@ void main() {
     expect(favorites.single.severityLabel, '정상');
     expect(favorites.single.nextActionLabel, '시설 알려주기');
     expect(favorites.single.statusTitle, '이용 가능');
-    expect(favorites.single.confidenceLabel, '최근 확인된 정보예요');
+    expect(favorites.single.confidenceLabel, '');
     expect(favorites.single.dataSourceLabel, '공식 안내');
     expect(favorites.single.locationLabel, '1번 출구 앞');
-    expect(favorites.single.verificationStatusLabel, '최신 상태를 준비 중이에요');
+    expect(favorites.single.verificationStatusLabel, '');
     expect(
       favorites.single.semanticLabel,
-      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 최신 상태를 준비 중이에요, 시설 알려주기',
+      '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 알려주기',
     );
     expect(favorites.single.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(favorites.single.semanticLabel, isNot(contains('출처')));
@@ -106,8 +106,8 @@ void main() {
     expect(operationalUnknown.needsAttention, isTrue);
     expect(available.severityLabel, '정상');
     expect(available.needsAttention, isFalse);
-    expect(available.verificationStatusLabel, '최신 상태를 준비 중이에요');
-    expect(verified.verificationStatusLabel, '시설 상태가 확인됐어요');
+    expect(available.verificationStatusLabel, '');
+    expect(verified.verificationStatusLabel, '');
     expect(metadataOnlyDescription.locationLabel, '1F-B1');
   });
 
