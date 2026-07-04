@@ -955,6 +955,31 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("시간표 후보 stabilization은 탈락 후보의 접근성 signal로 응답 source를 바꾸지 않는다")
+	void stabilizeTimetableRouteCandidatesIgnoresDroppedAccessibilitySignals() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(
+			repository,
+			repository,
+			new MixedTransferAccessibilityTransitMasterPort(),
+			CLOCK
+		);
+
+		var results = routeSearchService.stabilizeTimetableRouteCandidates(
+			new SearchRouteCommand("station-a", "station-b", MobilityType.WHEELCHAIR, ConstraintMode.STRICT_STEP_FREE, 1),
+			2,
+			1,
+			List.of(routeSearchResultWithAccessState("route-timetable", "AVAILABLE", false)),
+			candidates -> candidates.stream()
+				.limit(1)
+				.toList()
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
+	}
+
+	@Test
 	@DisplayName("V2 planner는 legacy graph가 놓친 시간표 경로를 NO_TIMETABLE_SERVICE로 버리지 않는다")
 	void routeV2PlannerKeepsTimetableRouteWhenLegacyGraphMisses() {
 		var repository = new InMemoryRouteSearchRepository();
