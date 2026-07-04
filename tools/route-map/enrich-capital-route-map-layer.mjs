@@ -12,6 +12,9 @@ import { DatabaseSync } from "node:sqlite";
 const expectedCountsByRegion = {
   "수도권": { positions: 796, lines: 24 },
   "부산권": { positions: 158, lines: 6 },
+  "대구권": { positions: 101, lines: 4 },
+  "광주권": { positions: 20, lines: 1 },
+  "대전권": { positions: 22, lines: 1 },
 };
 
 function usage() {
@@ -379,7 +382,9 @@ function assertCapitalRouteMap(summary, region) {
       `${region} label polygons must cover every station-line row, got ${summary.labelPolygons}/${summary.positions}`,
     );
   }
-  if (summary.transferGroups <= 0) {
+  // 단일 노선 지역(예: 광주·대전 1호선)은 환승역이 없어 transfer 0이 정상.
+  // 다노선 지역은 환승 그룹이 도출되어야 한다.
+  if (expected.lines > 1 && summary.transferGroups <= 0) {
     throw new Error(`${region} transfer groups must be derivable`);
   }
   if (summary.lod.zoom1MajorLabels !== summary.transferGroups) {

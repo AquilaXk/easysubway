@@ -35,6 +35,9 @@ async function regionCoverage(region) {
 const regionExpectations = {
   "수도권": { minPositions: 796, lines: 24 },
   "부산권": { minPositions: 158, lines: 6 },
+  "대구권": { minPositions: 101, lines: 4 },
+  "광주권": { minPositions: 20, lines: 1 },
+  "대전권": { minPositions: 22, lines: 1 },
 };
 
 for (const [region, expected] of Object.entries(regionExpectations)) {
@@ -63,8 +66,10 @@ for (const [region, expected] of Object.entries(regionExpectations)) {
       `${region} 모든 역에 label_polygon`,
     );
 
-    // 환승 그룹과 LOD 정합.
-    assert.ok(after.transferGroups > 0, `${region} 환승 그룹 도출`);
+    // 환승 그룹과 LOD 정합. 단일 노선 지역(광주·대전)은 환승 0이 정상.
+    if (expected.lines > 1) {
+      assert.ok(after.transferGroups > 0, `${region} 환승 그룹 도출`);
+    }
     assert.equal(after.lod.zoom0, "lines_only");
     assert.equal(
       after.lod.zoom1MajorLabels,
