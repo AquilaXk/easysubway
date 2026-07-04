@@ -16,6 +16,12 @@
       "app_region": "수도권",
       "operator": "Wikimedia Commons",
       "source_url": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
+      "route_map_strategy": {
+        "rendering_strategy": "official-svg",
+        "bundled_svg_role": "app-render-source",
+        "commercial_production_ready": true,
+        "decision_ref": "tools/route-map/route-map-license-decision.json"
+      },
       "offline": {
         "included": true,
         "type": "svg",
@@ -45,6 +51,12 @@
       "app_region": "부산",
       "operator": "부산교통공사",
       "source_url": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
+      "route_map_strategy": {
+        "rendering_strategy": "self-drawn-schematic",
+        "bundled_svg_role": "review-reference-only",
+        "commercial_production_ready": false,
+        "decision_ref": "tools/route-map/route-map-license-decision.json"
+      },
       "offline": {
         "included": true,
         "type": "svg",
@@ -74,6 +86,12 @@
       "app_region": "광주",
       "operator": "광주교통공사",
       "source_url": "https://www.grtc.co.kr/cyber/simple",
+      "route_map_strategy": {
+        "rendering_strategy": "self-drawn-schematic",
+        "bundled_svg_role": "review-reference-only",
+        "commercial_production_ready": false,
+        "decision_ref": "tools/route-map/route-map-license-decision.json"
+      },
       "offline": {
         "included": true,
         "type": "svg",
@@ -103,6 +121,12 @@
       "app_region": "대구",
       "operator": "대구교통공사",
       "source_url": "https://www.dtro.or.kr/front/dtro/cyberstation/station/cyberstation.do",
+      "route_map_strategy": {
+        "rendering_strategy": "self-drawn-schematic",
+        "bundled_svg_role": "review-reference-only",
+        "commercial_production_ready": false,
+        "decision_ref": "tools/route-map/route-map-license-decision.json"
+      },
       "offline": {
         "included": true,
         "type": "svg",
@@ -132,6 +156,12 @@
       "app_region": "대전",
       "operator": "대전교통공사",
       "source_url": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
+      "route_map_strategy": {
+        "rendering_strategy": "self-drawn-schematic",
+        "bundled_svg_role": "review-reference-only",
+        "commercial_production_ready": false,
+        "decision_ref": "tools/route-map/route-map-license-decision.json"
+      },
       "offline": {
         "included": true,
         "type": "svg",
