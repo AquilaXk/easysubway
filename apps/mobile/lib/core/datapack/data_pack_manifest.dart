@@ -884,9 +884,10 @@ _parseRepresentativeRouteRegressions(
   if (rawRoutes == null && artifactKind == DataPackArtifactKind.fixture) {
     return const [];
   }
-  if (rawRoutes is! List<Object?> || rawRoutes.isEmpty) {
+  if (rawRoutes is! List<Object?>) {
     throw const FormatException('Invalid representative route regressions.');
   }
+  if (rawRoutes.isEmpty) return const [];
   final routes = rawRoutes
       .map((route) {
         if (route is! Map<String, Object?>) {
