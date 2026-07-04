@@ -154,7 +154,11 @@ function buildTagoScheduleCollectionSummary(collection) {
   if (!Array.isArray(responses) || responses.length === 0) {
     throw new Error("responses must be a non-empty array");
   }
-  const completedRequestKeys = [];
+  const checkpointRequestKeys = collection?.checkpoint?.completedRequestKeys ?? [];
+  for (const requestKey of checkpointRequestKeys) {
+    requestKeyParts(requestKey);
+  }
+  const responseRequestKeys = [];
   const rawSha256ByRequest = {};
   const providerRecordHashes = [];
   let rowCount = 0;
@@ -163,7 +167,7 @@ function buildTagoScheduleCollectionSummary(collection) {
     requestKeyParts(response.requestKey);
   }
   for (const response of [...responses].sort((left, right) => left.requestKey.localeCompare(right.requestKey))) {
-    if (completedRequestKeys.includes(response.requestKey)) {
+    if (responseRequestKeys.includes(response.requestKey)) {
       throw new Error(`duplicate requestKey: ${response.requestKey}`);
     }
     if (typeof response.rawText !== "string" || response.rawText.length === 0) {
@@ -171,11 +175,14 @@ function buildTagoScheduleCollectionSummary(collection) {
     }
     const validation = validateTagoScheduleSample(response.rawText);
     assertResponseMatchesRequestKey(validation, response.requestKey);
-    completedRequestKeys.push(response.requestKey);
+    responseRequestKeys.push(response.requestKey);
     rawSha256ByRequest[response.requestKey] = validation.rawSha256;
     providerRecordHashes.push(...validation.providerRecordHashes);
     rowCount += validation.rowCount;
   }
+  const completedRequestKeys = [...new Set([...checkpointRequestKeys, ...responseRequestKeys])].sort((left, right) =>
+    left.localeCompare(right),
+  );
 
   const evidencePayload = {
     sourceId: "molit-tago-subway-info",

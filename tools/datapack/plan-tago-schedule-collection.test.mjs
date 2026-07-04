@@ -224,6 +224,9 @@ test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret
   ]);
   assert.equal(new URL(fetchUrls[0]).searchParams.get("serviceKey"), "actual-secret-key");
   assert.doesNotMatch(JSON.stringify(collection), /actual-secret-key/);
+
+  const summary = buildTagoScheduleCollectionSummary(collection);
+  assert.deepEqual(summary.checkpoint.completedRequestKeys, collection.checkpoint.completedRequestKeys);
 });
 
 test("TAGO 시간표 수집기는 service key가 없으면 provider 호출 전에 실패한다", async () => {
