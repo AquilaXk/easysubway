@@ -636,6 +636,34 @@ class RouteSearchV2ControllerTest {
 	}
 
 	@Test
+	@DisplayName("V2 TIMETABLE egress leg는 순수 보행 시간을 walkSeconds로 노출한다")
+	void routeSearchV2ExposesTimetableEgressWalkSeconds() throws Exception {
+		when(routeSearchUseCase.searchRouteAlternatives(argThat(command ->
+			command.mobilityType() == MobilityType.STROLLER
+				&& command.constraintMode() == ConstraintMode.STRICT_STEP_FREE
+		), eq(1))).thenReturn(List.of(foundTimetableEgressRouteSearch()));
+
+		mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "originStationId": "station-sangnoksu",
+					  "destinationStationId": "station-sadang",
+					  "departureTime": "2026-06-30T09:15:00+09:00",
+					  "mobilityType": "STROLLER",
+					  "mobilityPreset": "STEP_FREE",
+					  "constraintMode": "STRICT_STEP_FREE",
+					  "useRealtime": true,
+					  "maxTransfers": 1,
+					  "alternativeCount": 1
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].walkSeconds").value(180))
+			.andExpect(jsonPath("$.data.itineraries[0].legs[0].appliedPreset").value("STEP_FREE"));
+	}
+
+	@Test
 	@DisplayName("legacy 경로로 강등되는 V2 요청은 기본값과 다른 mobilityPreset을 거부한다")
 	void nonDefaultRouteSearchV2MobilityPresetOnLegacyPathReturnsBadRequestBeforeSearch() throws Exception {
 		mockMvc.perform(post("/api/v2/routes/search")
@@ -850,6 +878,42 @@ class RouteSearchV2ControllerTest {
 				"station-sangnoksu",
 				9,
 				180,
+				false,
+				"UNKNOWN",
+				true,
+				"PLANNED",
+				"TIMETABLE",
+				"시간표"
+			)),
+			List.of(),
+			List.of(),
+			LocalDateTime.of(2026, 6, 30, 9, 0)
+		);
+	}
+
+	private RouteSearchResult foundTimetableEgressRouteSearch() {
+		return new RouteSearchResult(
+			"route-search-1",
+			"station-sangnoksu",
+			"상록수",
+			"station-sadang",
+			"사당",
+			MobilityType.STROLLER,
+			RouteSearchStatus.FOUND,
+			"line-4",
+			"수도권 4호선",
+			18,
+			List.of(new RouteStep(
+				1,
+				"exit",
+				"사당역 출구 이동",
+				"시간표 경로의 승하차 접근성과 환승 동선을 확인합니다.",
+				"line-4",
+				"수도권 4호선",
+				"station-sadang",
+				"station-sadang",
+				3,
+				120,
 				false,
 				"UNKNOWN",
 				true,

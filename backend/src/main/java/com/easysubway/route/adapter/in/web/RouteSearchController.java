@@ -526,7 +526,8 @@ class RouteSearchController {
 			int slackSeconds,
 			String mobilityPreset
 		) {
-			int walkSeconds = "RIDE".equals(legType) || "TIMETABLE".equals(step.distanceSource()) ? 0 : durationSeconds;
+			boolean hasTimetableWait = "TIMETABLE".equals(step.distanceSource()) && !"exit".equals(step.stepType());
+			int walkSeconds = "RIDE".equals(legType) || hasTimetableWait ? 0 : durationSeconds;
 			return new LegDto(
 				legType,
 				step.fromStationId(),
