@@ -25,6 +25,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 
 	private final RouteSearchUseCase routeSearchUseCase;
 	private final LoadRouteTimetablePort routeTimetablePort;
+	private final RouteTimetableRaptorPlanner timetableRaptorPlanner = new RouteTimetableRaptorPlanner();
 	private final boolean timetableRequired;
 
 	public RouteV2Planner(RouteSearchUseCase routeSearchUseCase) {
@@ -58,6 +59,16 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		try {
 			if (timetableRequired && !routeTimetablePort.hasRouteTimetable()) {
 				return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
+			}
+			if (timetableRequired && !command.useRealtime()) {
+				List<RouteSearchResult> timetableItineraries = timetableRaptorPlanner.search(
+					command,
+					routeTimetablePort.loadRouteTimetable()
+				);
+				if (timetableItineraries.isEmpty()) {
+					return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
+				}
+				return new RouteV2Plan(timetableItineraries, statusesOf(timetableItineraries, false), PLANNER_ADR);
 			}
 			SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
 			List<RouteSearchResult> itineraries = routeSearchUseCase.searchRouteAlternatives(

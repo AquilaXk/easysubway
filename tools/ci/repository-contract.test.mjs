@@ -9443,14 +9443,17 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const useCasePath = "backend/src/main/java/com/easysubway/route/application/port/in/RouteV2SearchUseCase.java";
   const timetablePortPath = "backend/src/main/java/com/easysubway/route/application/port/out/LoadRouteTimetablePort.java";
   const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
+  const raptorPlannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteTimetableRaptorPlanner.java";
 
   assert.equal(existsSync(path.join(root, useCasePath)), true, "RouteV2SearchUseCase must expose the V2 planning port");
   assert.equal(existsSync(path.join(root, timetablePortPath)), true, "RouteV2Planner must get timetable data through a port");
   assert.equal(existsSync(path.join(root, plannerPath)), true, "RouteV2Planner must own V2 production search planning");
+  assert.equal(existsSync(path.join(root, raptorPlannerPath)), true, "RouteV2Planner must have a timetable RAPTOR scanner");
 
   const useCase = read(useCasePath);
   const timetablePort = read(timetablePortPath);
   const planner = read(plannerPath);
+  const raptorPlanner = read(raptorPlannerPath);
   const v2Endpoint = controller.match(
     /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
@@ -9468,8 +9471,17 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
   assert.match(planner, /timetableRequired && !routeTimetablePort\.hasRouteTimetable\(\)/);
   assert.match(planner, /hasRouteTimetable\(\)/);
+  assert.match(planner, /!command\.useRealtime\(\)/);
+  assert.match(planner, /loadRouteTimetable\(\)/);
+  assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
+  assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);
+  assert.match(raptorPlanner, /BoardingSlackPolicy\.secondsFor/);
+  assert.match(raptorPlanner, /SERVICE_DAY_CUTOFF_HOUR = 3/);
+  assert.match(raptorPlanner, /activeServiceIds/);
+  assert.match(raptorPlanner, /EtaSource\.PLANNED\.name\(\)/);
+  assert.match(raptorPlanner, /dominates/);
   assert.match(useCase, /record SearchRouteV2Command/);
   assert.match(useCase, /OffsetDateTime departureTime/);
   assert.match(useCase, /boolean useRealtime/);

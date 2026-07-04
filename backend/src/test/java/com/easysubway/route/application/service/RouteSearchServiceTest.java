@@ -2,10 +2,12 @@ package com.easysubway.route.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.adapter.out.persistence.InMemoryRouteSearchRepository;
+import com.easysubway.route.application.port.in.RouteSearchUseCase;
 import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
@@ -19,10 +21,13 @@ import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.EtaConfidence;
 import com.easysubway.route.domain.InvalidRouteFeedbackException;
 import com.easysubway.route.domain.EtaSource;
+import com.easysubway.route.domain.InternalRouteResult;
+import com.easysubway.route.domain.RouteFeedback;
 import com.easysubway.route.domain.RouteNotFoundException;
 import com.easysubway.route.domain.RouteEtaOffsetBucket;
 import com.easysubway.route.domain.RouteFeedbackRating;
 import com.easysubway.route.domain.RouteProfileWeight;
+import com.easysubway.route.domain.RouteRefreshResult;
 import com.easysubway.route.domain.RouteRefreshStatus;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchNotFoundException;
@@ -795,8 +800,24 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
-	@DisplayName("V2 planner는 시간표 availability 확인에 전체 snapshot을 읽지 않는다")
-	void routeV2PlannerDoesNotLoadFullTimetableForAvailabilityGuard() {
+	@DisplayName("V2 planner는 시간표 기반 탐색 시 legacy graph search에 위임하지 않는다")
+	void routeV2PlannerUsesTimetableScanWithoutLegacyGraphSearch() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), routeTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.itineraries()).hasSize(1);
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(600);
+		assertThat(plan.itineraries().getFirst().steps())
+			.extracting("stepType", "fromStationId", "toStationId", "timeSource")
+			.containsExactly(tuple("ride", "station-a", "station-b", EtaSource.PLANNED.name()));
+	}
+
+	@Test
+	@DisplayName("V2 realtime overlay fallback 경로는 availability 확인에 전체 snapshot을 읽지 않는다")
+	void routeV2PlannerDoesNotLoadFullTimetableForRealtimeAvailabilityGuard() {
 		var repository = new InMemoryRouteSearchRepository();
 		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
 		var planner = new RouteV2Planner(routeSearchService, new LoadRouteTimetablePort() {
@@ -811,9 +832,18 @@ class RouteSearchServiceTest {
 			}
 		});
 
-		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			true,
+			1,
+			3
+		));
 
-		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.statuses()).contains(RouteV2Status.FOUND);
 	}
 
 	@Test
@@ -984,7 +1014,7 @@ class RouteSearchServiceTest {
 		));
 
 		assertThat(resolver.callCount()).isZero();
-		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.STATIC_BACKEND_ESTIMATE);
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 	}
 
@@ -1730,7 +1760,41 @@ class RouteSearchServiceTest {
 
 	private static RouteV2Planner routeV2Planner(LoadTransitMasterPort transitMasterPort) {
 		var repository = new InMemoryRouteSearchRepository();
-		return new RouteV2Planner(new RouteSearchService(repository, repository, transitMasterPort, CLOCK), routeTimetablePort());
+		return new RouteV2Planner(new RouteSearchService(repository, repository, transitMasterPort, CLOCK));
+	}
+
+	private static RouteSearchUseCase legacySearchMustNotBeCalled() {
+		return new RouteSearchUseCase() {
+			@Override
+			public RouteSearchResult searchRoute(SearchRouteCommand command) {
+				throw new AssertionError("RouteV2Planner must not delegate timetable-backed search to legacy graph search");
+			}
+
+			@Override
+			public List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount) {
+				throw new AssertionError("RouteV2Planner must not delegate timetable-backed search to legacy graph search");
+			}
+
+			@Override
+			public InternalRouteResult searchInternalRoute(SearchInternalRouteCommand command) {
+				throw new AssertionError("RouteV2Planner must not call internal route search");
+			}
+
+			@Override
+			public RouteSearchResult getRouteSearch(String routeSearchId) {
+				throw new AssertionError("RouteV2Planner must not load legacy route search results");
+			}
+
+			@Override
+			public RouteRefreshResult refreshRoute(String routeSearchId) {
+				throw new AssertionError("RouteV2Planner must not refresh legacy route search results");
+			}
+
+			@Override
+			public RouteFeedback submitRouteFeedback(SubmitRouteFeedbackCommand command) {
+				throw new AssertionError("RouteV2Planner must not submit feedback during search");
+			}
+		};
 	}
 
 	private static LoadRouteTimetablePort routeTimetablePort() {
@@ -1767,8 +1831,8 @@ class RouteSearchServiceTest {
 				0
 			)),
 			List.of(
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32400, 32400, 0, 0),
-				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33000, 33000, 0, 0)
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32520, 32520, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33120, 33120, 0, 0)
 			),
 			List.of()
 		);
