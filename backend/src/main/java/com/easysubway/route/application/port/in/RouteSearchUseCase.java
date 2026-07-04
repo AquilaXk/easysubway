@@ -12,6 +12,21 @@ public interface RouteSearchUseCase {
 
 	List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount);
 
+	default void validateRouteSearch(SearchRouteCommand command) {
+	}
+
+	default List<RouteSearchResult> stabilizeTimetableRouteResults(
+		SearchRouteCommand command,
+		int alternativeCount,
+		List<RouteSearchResult> timetableResults
+	) {
+		return List.copyOf(timetableResults);
+	}
+
+	default boolean supportsRealtimeOverlay() {
+		return true;
+	}
+
 	InternalRouteResult searchInternalRoute(SearchInternalRouteCommand command);
 
 	RouteSearchResult getRouteSearch(String routeSearchId);
