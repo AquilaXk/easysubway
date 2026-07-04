@@ -2189,6 +2189,7 @@ class RouteSearchServiceTest {
 		boolean requiresAccessibilityCheck,
 		int estimatedMinutes
 	) {
+		boolean includesStairs = "STAIR_ONLY".equals(stairAccessState);
 		return new RouteStep(
 			sequence,
 			stepType,
@@ -2200,7 +2201,7 @@ class RouteSearchServiceTest {
 			"station-b",
 			estimatedMinutes,
 			100,
-			false,
+			includesStairs,
 			stairAccessState,
 			requiresAccessibilityCheck,
 			EtaSource.PLANNED.name(),
