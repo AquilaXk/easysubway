@@ -53,7 +53,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
@@ -61,6 +61,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       onCreate: (migrator) async {
         await migrator.createAll();
         await _createRouteMapPositionsTable();
+        await _createRouteMapLineTracksTable();
         await _createIndexes();
       },
       onUpgrade: (migrator, from, to) async {
@@ -106,6 +107,9 @@ class CatalogDatabase extends _$CatalogDatabase {
         if (from < 11) {
           await migrator.createTable(facilityStatusSnapshots);
           await _createFacilityStatusSnapshotIndexes();
+        }
+        if (from < 12) {
+          await _createRouteMapLineTracksTable();
         }
       },
       beforeOpen: (_) async {
@@ -778,6 +782,29 @@ class CatalogDatabase extends _$CatalogDatabase {
         reviewed_at INTEGER,
         updated_at INTEGER,
         PRIMARY KEY (station_id, line_id, region)
+      )
+      ''');
+  }
+
+  /// 노선별 실제 track polyline(#1638). apply-route-map-line-tracks 스키마와 동일.
+  /// 구팩(테이블 없음)에서도 열리도록 IF NOT EXISTS로 만든다.
+  Future<void> _createRouteMapLineTracksTable() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS route_map_line_tracks (
+        region TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        track_index INTEGER NOT NULL,
+        path TEXT NOT NULL,
+        svg_color TEXT NOT NULL DEFAULT '',
+        source_id TEXT NOT NULL,
+        source_name TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        license TEXT NOT NULL,
+        license_status TEXT NOT NULL,
+        commercial_use_allowed INTEGER NOT NULL DEFAULT 0 CHECK (commercial_use_allowed IN (0, 1)),
+        attribution_required INTEGER NOT NULL DEFAULT 1 CHECK (attribution_required IN (0, 1)),
+        updated_at INTEGER,
+        PRIMARY KEY (region, line_id, track_index)
       )
       ''');
   }

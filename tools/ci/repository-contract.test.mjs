@@ -5250,10 +5250,11 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationPathwayEdges extends Table/);
   assert.match(mobileTables, /class TransferRules extends Table/);
   assert.match(mobileTables, /class FacilityStatusSnapshots extends Table/);
-  assert.match(mobileDatabase, /int get schemaVersion => 11/);
+  assert.match(mobileDatabase, /int get schemaVersion => 12/);
   assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
   assert.match(mobileDatabase, /_createStationPathwayIndexes/);
   assert.match(mobileDatabase, /_createFacilityStatusSnapshotIndexes/);
+  assert.match(mobileDatabase, /_createRouteMapLineTracksTable/);
   assert.match(schedulePostgresMigration, /CREATE TABLE IF NOT EXISTS transit_stop_times/);
   assert.match(scheduleH2Migration, /CREATE TABLE IF NOT EXISTS transit_stop_times/);
   assert.match(pathwayPostgresMigration, /CREATE TABLE IF NOT EXISTS station_pathway_edges/);
@@ -5264,7 +5265,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /int get schemaVersion => 11/);
+  assert.match(mobileDatabase, /int get schemaVersion => 12/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /FacilityStatusSnapshots/);
   assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);
