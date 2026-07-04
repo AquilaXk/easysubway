@@ -4909,7 +4909,7 @@ class _DataSourceAttributionScreenState
                             '필수 시설 근거 비율, 운행상태 확인 비율, 최신 정보 비율, 검증된 쉬운 길 비율, 현장 확인 경로 비율을 함께 확인해요.',
                       ),
                     ),
-                    const _AppSectionTitle(title: '경로·시설 판단용 data pack'),
+                    const _AppSectionTitle(title: '경로·시설 안내용 데이터'),
                     for (final source in sources)
                       _AttributionCard.source(source),
                   ],

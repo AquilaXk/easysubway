@@ -416,7 +416,7 @@ class FavoriteStation {
   }
 
   String get semanticLabel {
-    return '즐겨찾기 역, $nameKo, $lineLabel, $region, $dataQualityLabel';
+    return '즐겨찾기 역, $nameKo, $lineLabel, $region';
   }
 }
 
@@ -496,9 +496,9 @@ class StationSearchResult {
   String get semanticLabel {
     final distance = distanceLabel;
     if (distance.isEmpty) {
-      return '$nameKo, $lineLabel, $region, $dataQualityLabel';
+      return '$nameKo, $lineLabel, $region';
     }
-    return '$nameKo, $distance, $lineLabel, $region, $dataQualityLabel';
+    return '$nameKo, $distance, $lineLabel, $region';
   }
 }
 
@@ -568,7 +568,7 @@ class StationDetail {
   }
 
   String get semanticLabel {
-    return '$nameKo역 자세한 안내, $lineLabel, $dataQualityLabel, 마지막 확인 $lastVerifiedAt';
+    return '$nameKo역 자세한 안내, $lineLabel, 마지막 확인 $lastVerifiedAt';
   }
 }
 
@@ -638,7 +638,7 @@ class StationExitInfo {
       _fieldVerificationStatusLabel(fieldValidationStatus);
 
   String get semanticLabel {
-    return '$name, $elevatorConnectionLabel, $stairPathLabel, $verificationStatusLabel';
+    return '$name, $elevatorConnectionLabel, $stairPathLabel';
   }
 }
 
@@ -810,7 +810,7 @@ class StationFacilityInfo {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel {
-    return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
+    return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $nextActionLabel';
   }
 }
 
@@ -945,52 +945,20 @@ int? _optionalInt(Map<String, Object?> json, String key) {
   return null;
 }
 
-String _dataQualityLabel(String dataQualityLevel) {
-  return switch (dataQualityLevel) {
-    'LEVEL_1' => '일부 정보는 확인 중이에요',
-    'LEVEL_2' => '시설 정보를 함께 볼 수 있어요',
-    'LEVEL_3' => '쉬운 길 안내를 볼 수 있어요',
-    'LEVEL_4' => '고장·공사 소식이 반영됐어요',
-    _ => '정보를 준비 중이에요',
-  };
-}
+// #1578 전역 원칙: 내부 데이터 품질·검증 상태 라벨은 사용자에게 노출하지 않는다.
+// 소스(라벨 함수)를 중립화해 모든 화면이 이를 상속한다. 화면 구조 정리(빈
+// 위젯·조건 제거)는 #1566/#1567/#1569에서 다룬다. 정상·확인됨·준비 중은 무표시,
+// 시점 정보는 별도의 "최근 확인 …" 표현으로만 제공한다.
+String _dataQualityLabel(String dataQualityLevel) => '';
 
-/// 데이터 품질 라벨을 목록에 노출할지 여부.
-/// 기본 레벨(LEVEL_1)·미확정 값은 "확인 중" 같은 필러라 목록에서는 감춘다
-/// (실제 안내 역량을 뜻하는 LEVEL_2 이상만 노출). simple is best.
-bool _showsDataQualityLabel(String dataQualityLevel) {
-  return dataQualityLevel == 'LEVEL_2' ||
-      dataQualityLevel == 'LEVEL_3' ||
-      dataQualityLevel == 'LEVEL_4';
-}
+/// 데이터 품질 라벨은 더 이상 목록에 노출하지 않는다(#1578).
+bool _showsDataQualityLabel(String dataQualityLevel) => false;
 
-String _dataConfidenceLabel(String dataConfidence) {
-  return switch (dataConfidence) {
-    'HIGH' => '최근 확인된 정보예요',
-    'MEDIUM' => '일부 확인된 정보예요',
-    'LOW' => '안내를 준비 중이에요',
-    _ => '안내를 준비 중이에요',
-  };
-}
+String _dataConfidenceLabel(String dataConfidence) => '';
 
-String _fieldValidationLabel(String fieldValidationStatus) {
-  final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
-  return switch (normalizedStatus) {
-    'VERIFIED' => '최근 확인했어요',
-    'STALE' => '최근 확인한 내용은 다시 봐 주세요',
-    'UNKNOWN' => '최근 확인한 기록이 없어요',
-    _ => '최근 확인한 기록이 없어요',
-  };
-}
+String _fieldValidationLabel(String fieldValidationStatus) => '';
 
-String _fieldVerificationStatusLabel(String fieldValidationStatus) {
-  final normalizedStatus = fieldValidationStatus.trim().toUpperCase();
-  return switch (normalizedStatus) {
-    'VERIFIED' => '시설 상태가 확인됐어요',
-    'STALE' => '최신 상태를 준비 중이에요',
-    _ => '최신 상태를 준비 중이에요',
-  };
-}
+String _fieldVerificationStatusLabel(String fieldValidationStatus) => '';
 
 String _facilityUserLocationLabel(String description) {
   var label = description.trim();
@@ -3554,9 +3522,9 @@ String _stationResultSemanticLabel(StationSearchResult result) {
   final stationName = _stationResultDisplayName(result.nameKo);
   final distance = result.distanceLabel;
   if (distance.isEmpty) {
-    return '$stationName, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
+    return '$stationName, ${result.lineLabel}, ${result.region}';
   }
-  return '$stationName, $distance, ${result.lineLabel}, ${result.region}, ${result.dataQualityLabel}';
+  return '$stationName, $distance, ${result.lineLabel}, ${result.region}';
 }
 
 class FavoriteStationListScreen extends StatefulWidget {
