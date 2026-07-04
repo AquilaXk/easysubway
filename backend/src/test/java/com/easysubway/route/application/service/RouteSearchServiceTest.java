@@ -1031,6 +1031,20 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 planner는 RAPTOR 시간표 snapshot을 planner 인스턴스에서 재사용한다")
+	void routeV2PlannerReusesLoadedTimetableSnapshot() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
+		var timetablePort = new CountingRouteTimetablePort();
+		var planner = new RouteV2Planner(routeSearchService, timetablePort);
+
+		planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+		planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(timetablePort.loadCount()).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("V2 planner는 접근성 차단 경로를 BLOCKED_ACCESSIBILITY status로 반환한다")
 	void routeV2PlannerReturnsBlockedAccessibilityStatus() {
 		var planner = routeV2Planner(new StairOnlyTransitMasterPort());
@@ -2043,6 +2057,25 @@ class RouteSearchServiceTest {
 			),
 			List.of()
 		);
+	}
+
+	private static class CountingRouteTimetablePort implements LoadRouteTimetablePort {
+		private int loadCount;
+
+		@Override
+		public boolean hasRouteTimetable() {
+			return true;
+		}
+
+		@Override
+		public LoadRouteTimetablePort.RouteTimetable loadRouteTimetable() {
+			loadCount += 1;
+			return routeTimetablePort().loadRouteTimetable();
+		}
+
+		int loadCount() {
+			return loadCount;
+		}
 	}
 
 	private static LoadRouteTimetablePort transferRouteTimetablePort() {

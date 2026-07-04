@@ -29,6 +29,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 	private final LoadRouteTimetablePort routeTimetablePort;
 	private final RouteTimetableRaptorPlanner timetableRaptorPlanner = new RouteTimetableRaptorPlanner();
 	private final boolean timetableRequired;
+	private volatile RouteTimetable cachedRouteTimetable;
 
 	public RouteV2Planner(RouteSearchUseCase routeSearchUseCase) {
 		this(routeSearchUseCase, RouteTimetable::empty, false);
@@ -67,7 +68,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				routeSearchUseCase.validateRouteSearch(searchRouteCommand);
 				List<RouteSearchResult> timetableItineraries = timetableRaptorPlanner.search(
 					command,
-					routeTimetablePort.loadRouteTimetable()
+					routeTimetable()
 				);
 				if (timetableItineraries.isEmpty()) {
 					return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
@@ -98,6 +99,19 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		return !command.useRealtime()
 			&& command.constraintMode() != ConstraintMode.STRICT_STEP_FREE
 			&& command.mobilityType() != MobilityType.WHEELCHAIR;
+	}
+
+	private RouteTimetable routeTimetable() {
+		RouteTimetable snapshot = cachedRouteTimetable;
+		if (snapshot != null) {
+			return snapshot;
+		}
+		synchronized (this) {
+			if (cachedRouteTimetable == null) {
+				cachedRouteTimetable = routeTimetablePort.loadRouteTimetable();
+			}
+			return cachedRouteTimetable;
+		}
 	}
 
 	private List<RouteV2Status> statusesOf(List<RouteSearchResult> itineraries, boolean useRealtime) {
