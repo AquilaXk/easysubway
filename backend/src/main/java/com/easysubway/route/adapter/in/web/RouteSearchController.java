@@ -560,10 +560,13 @@ class RouteSearchController {
 		}
 
 		private static int walkSeconds(RouteStep step, String legType, int durationSeconds, boolean hasTimetableWait) {
-			if ("RIDE".equals(legType) || hasTimetableWait) {
+			if ("RIDE".equals(legType)) {
 				return 0;
 			}
-			return step.walkSeconds() == null ? durationSeconds : step.walkSeconds();
+			if (step.walkSeconds() != null) {
+				return step.walkSeconds();
+			}
+			return hasTimetableWait ? 0 : durationSeconds;
 		}
 
 		private static int slackSeconds(String legType, MobilityType mobilityType) {
