@@ -826,6 +826,27 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 planner는 환승 전용 경로의 다음 운행 시각도 RAPTOR scan으로 계산한다")
+	void routeV2PlannerReturnsNextServiceTimeForTransferOnlyRoute() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), transferRouteTimetablePort());
+
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T23:55:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			false,
+			1,
+			3
+		));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+		assertThat(plan.itineraries()).isEmpty();
+		assertThat(plan.nextServiceTime()).isEqualTo(OffsetDateTime.parse("2026-07-02T09:07:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("V2 planner는 시간표 adapter 미연결 fallback에서는 기존 경로 검색을 유지한다")
 	void routeV2PlannerKeepsLegacySearchWhenTimetableAdapterMissing() {
 		var repository = new InMemoryRouteSearchRepository();

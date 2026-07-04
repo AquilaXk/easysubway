@@ -45,11 +45,46 @@ class RouteTimetableRaptorPlanner {
 
 	List<RouteSearchResult> search(SearchRouteV2Command command, RouteTimetable timetable) {
 		ServiceDay serviceDay = serviceDay(command);
+		return scanDestinationLabels(command, timetable, serviceDay, serviceDay.departureSeconds()).labels().stream()
+			.sorted(RouteTimetableRaptorPlanner::compareLabels)
+			.limit(Math.min(command.alternativeCount(), PARETO_LIMIT))
+			.map(label -> toRouteSearchResult(command, label, serviceDay))
+			.toList();
+	}
+
+	Optional<OffsetDateTime> nextServiceTime(SearchRouteV2Command command, RouteTimetable timetable) {
+		ServiceDay serviceDay = serviceDay(command);
+		for (int dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+			LocalDate candidateServiceDate = serviceDay.date().plusDays(dayOffset);
+			ServiceDay candidateServiceDay = new ServiceDay(candidateServiceDate, 0);
+			int startSeconds = dayOffset == 0 ? serviceDay.departureSeconds() : 0;
+			Optional<Integer> departureSeconds = scanDestinationLabels(
+				command,
+				timetable,
+				candidateServiceDay,
+				startSeconds
+			).labels().stream()
+				.map(label -> label.path().getFirst().from().departureSeconds())
+				.min(Integer::compareTo);
+			if (departureSeconds.isPresent()) {
+				return Optional.of(candidateServiceDate.atStartOfDay(SERVICE_ZONE)
+					.plusSeconds(departureSeconds.get())
+					.toOffsetDateTime());
+			}
+		}
+		return Optional.empty();
+	}
+
+	private ScanResult scanDestinationLabels(
+		SearchRouteV2Command command,
+		RouteTimetable timetable,
+		ServiceDay serviceDay,
+		int startSeconds
+	) {
 		Set<String> activeServiceIds = activeServiceIds(timetable, serviceDay.date());
 		if (activeServiceIds.isEmpty()) {
-			return List.of();
+			return new ScanResult(serviceDay, List.of());
 		}
-
 		Map<String, TransitRoute> routesById = routesById(timetable);
 		Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(timetable);
 		Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(timetable);
@@ -61,14 +96,14 @@ class RouteTimetableRaptorPlanner {
 				.thenComparingInt(scheduledTrip -> scheduledTrip.stopTimes().getFirst().departureSeconds()))
 			.toList();
 		if (trips.isEmpty()) {
-			return List.of();
+			return new ScanResult(serviceDay, List.of());
 		}
 
 		Map<String, List<Label>> labels = new HashMap<>();
 		labels.put(command.originStationId(), List.of(new Label(
 			command.originStationId(),
-			serviceDay.departureSeconds(),
-			serviceDay.departureSeconds(),
+			startSeconds,
+			startSeconds,
 			0,
 			List.of()
 		)));
@@ -79,81 +114,12 @@ class RouteTimetableRaptorPlanner {
 			}
 		}
 
-		return labels.getOrDefault(command.destinationStationId(), List.of()).stream()
+		List<Label> destinationLabels = labels.getOrDefault(command.destinationStationId(), List.of()).stream()
 			.filter(label -> !label.path().isEmpty())
 			.sorted(RouteTimetableRaptorPlanner::compareLabels)
-			.limit(Math.min(command.alternativeCount(), PARETO_LIMIT))
-			.map(label -> toRouteSearchResult(command, label, serviceDay))
+			.limit(PARETO_LIMIT)
 			.toList();
-	}
-
-	Optional<OffsetDateTime> nextServiceTime(SearchRouteV2Command command, RouteTimetable timetable) {
-		ServiceDay serviceDay = serviceDay(command);
-		int sameServiceDayReadySeconds = serviceDay.departureSeconds()
-			+ profiledWalkSeconds(command, ENTRY_DURATION_SECONDS)
-			+ BoardingSlackPolicy.secondsFor(command.mobilityType());
-		for (int dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
-			LocalDate candidateServiceDate = serviceDay.date().plusDays(dayOffset);
-			int minimumDepartureSeconds = dayOffset == 0 ? sameServiceDayReadySeconds : 0;
-			Optional<Integer> departureSeconds = earliestDirectDepartureSeconds(
-				command,
-				timetable,
-				candidateServiceDate,
-				minimumDepartureSeconds
-			);
-			if (departureSeconds.isPresent()) {
-				return Optional.of(candidateServiceDate.atStartOfDay(SERVICE_ZONE)
-					.plusSeconds(departureSeconds.get())
-					.toOffsetDateTime());
-			}
-		}
-		return Optional.empty();
-	}
-
-	private Optional<Integer> earliestDirectDepartureSeconds(
-		SearchRouteV2Command command,
-		RouteTimetable timetable,
-		LocalDate serviceDate,
-		int minimumDepartureSeconds
-	) {
-		Set<String> activeServiceIds = activeServiceIds(timetable, serviceDate);
-		if (activeServiceIds.isEmpty()) {
-			return Optional.empty();
-		}
-		Map<String, TransitRoute> routesById = routesById(timetable);
-		Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(timetable);
-		Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(timetable);
-		return timetable.transitTrips().stream()
-			.filter(trip -> activeServiceIds.contains(trip.serviceId()))
-			.filter(trip -> stopTimesByTrip.getOrDefault(trip.id(), List.of()).size() > 1)
-			.flatMap(trip -> scheduledTrips(trip, routesById.get(trip.routeId()), stopTimesByTrip.get(trip.id()), frequenciesByTrip.getOrDefault(trip.id(), List.of())).stream())
-			.map(scheduledTrip -> directDepartureSeconds(command, scheduledTrip, minimumDepartureSeconds))
-			.flatMap(Optional::stream)
-			.min(Integer::compareTo);
-	}
-
-	private Optional<Integer> directDepartureSeconds(
-		SearchRouteV2Command command,
-		ScheduledTrip trip,
-		int minimumDepartureSeconds
-	) {
-		TransitStopTime boardingStop = null;
-		for (TransitStopTime stopTime : trip.stopTimes()) {
-			if (boardingStop == null
-				&& command.originStationId().equals(stopTime.stationId())
-				&& allowsPickup(stopTime)
-				&& stopTime.departureSeconds() >= minimumDepartureSeconds) {
-				boardingStop = stopTime;
-				continue;
-			}
-			if (boardingStop != null
-				&& stopTime.stopSequence() > boardingStop.stopSequence()
-				&& command.destinationStationId().equals(stopTime.stationId())
-				&& allowsDropOff(stopTime)) {
-				return Optional.of(boardingStop.departureSeconds());
-			}
-		}
-		return Optional.empty();
+		return new ScanResult(serviceDay, destinationLabels);
 	}
 
 	private void scanTrip(
@@ -535,6 +501,9 @@ class RouteTimetableRaptorPlanner {
 	}
 
 	private record ServiceDay(LocalDate date, int departureSeconds) {
+	}
+
+	private record ScanResult(ServiceDay serviceDay, List<Label> labels) {
 	}
 
 	private record Label(String stationId, int timeSeconds, int startSeconds, int boardings, List<RideLeg> path) {
