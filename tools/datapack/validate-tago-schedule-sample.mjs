@@ -305,15 +305,18 @@ class TagoScheduleCollectionError extends Error {
 
 function buildTagoScheduleRequestUrl(request, serviceKey) {
   const [stationId, dailyTypeCode, upDownTypeCode] = requestKeyParts(request.requestKey);
-  const url = new URL(TAGO_SCHEDULE_ENDPOINT);
-  url.searchParams.set("serviceKey", serviceKey);
-  url.searchParams.set("pageNo", "1");
-  url.searchParams.set("numOfRows", "1000");
-  url.searchParams.set("_type", "json");
-  url.searchParams.set("subwayStationId", stationId);
-  url.searchParams.set("dailyTypeCode", dailyTypeCode);
-  url.searchParams.set("upDownTypeCode", upDownTypeCode);
-  return url.toString();
+  const params = new URLSearchParams();
+  params.set("pageNo", "1");
+  params.set("numOfRows", "1000");
+  params.set("_type", "json");
+  params.set("subwayStationId", stationId);
+  params.set("dailyTypeCode", dailyTypeCode);
+  params.set("upDownTypeCode", upDownTypeCode);
+  return `${TAGO_SCHEDULE_ENDPOINT}?serviceKey=${encodeDataGoKrServiceKey(serviceKey)}&${params.toString()}`;
+}
+
+function encodeDataGoKrServiceKey(serviceKey) {
+  return /%[0-9a-f]{2}/i.test(serviceKey) ? serviceKey : encodeURIComponent(serviceKey);
 }
 
 function assertResponseMatchesRequestKey(validation, requestKey) {

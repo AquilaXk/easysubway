@@ -268,6 +268,67 @@ test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret
   assert.deepEqual(summary.checkpoint.completedRequestKeys, collection.checkpoint.completedRequestKeys);
 });
 
+test("TAGO 시간표 수집기는 encoded service key를 이중 인코딩하지 않는다", async () => {
+  const fetchUrls = [];
+  await collectTagoSchedules(
+    {
+      stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }],
+    },
+    {
+      dailyLimit: 1,
+      serviceKey: "encoded%2Bkey%3D",
+      fetchImpl: async (url) => {
+        fetchUrls.push(url);
+        const params = new URL(url).searchParams;
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return tagoResponse(
+              params.get("subwayStationId"),
+              params.get("dailyTypeCode"),
+              params.get("upDownTypeCode"),
+            );
+          },
+        };
+      },
+    },
+  );
+
+  assert.match(fetchUrls[0], /serviceKey=encoded%2Bkey%3D/);
+  assert.doesNotMatch(fetchUrls[0], /%252B|%253D/);
+});
+
+test("TAGO 시간표 수집기는 decoded service key를 URL 인코딩한다", async () => {
+  const fetchUrls = [];
+  await collectTagoSchedules(
+    {
+      stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }],
+    },
+    {
+      dailyLimit: 1,
+      serviceKey: "decoded+key=",
+      fetchImpl: async (url) => {
+        fetchUrls.push(url);
+        const params = new URL(url).searchParams;
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            return tagoResponse(
+              params.get("subwayStationId"),
+              params.get("dailyTypeCode"),
+              params.get("upDownTypeCode"),
+            );
+          },
+        };
+      },
+    },
+  );
+
+  assert.match(fetchUrls[0], /serviceKey=decoded%2Bkey%3D/);
+});
+
 test("TAGO 시간표 수집기는 batch 중간 실패 시 성공분 checkpoint를 보존한다", async () => {
   await assert.rejects(
     () =>
