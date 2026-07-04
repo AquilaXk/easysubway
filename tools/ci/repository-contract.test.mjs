@@ -5756,6 +5756,16 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     productionCanonicalStopTimesStatus: "blocked_requires_trip_stop_sequence",
     plannedEtaUseAllowed: false,
   });
+  assert.deepEqual(candidate.evidence.scheduleCollectionPlan, {
+    status: "planned_pilot_collection",
+    tool: "tools/datapack/validate-tago-schedule-sample.mjs",
+    command: "node tools/datapack/validate-tago-schedule-sample.mjs --plan --input tools/datapack/inputs/capital-pilot-production-source-input.json --daily-limit 1000 --checkpoint <checkpoint.json> --output <plan.json>",
+    input: "tools/datapack/inputs/capital-pilot-production-source-input.json",
+    defaultDailyLimit: 1000,
+    pilotRequestCount: 12,
+    checkpointField: "completedRequestKeys",
+    productionUseAllowed: false,
+  });
   // source-candidates keeps a public summary, not the local full admin-review input with productionSource.
   assert.deepEqual(candidate.evidence.adminReview, {
     artifactKind: "source-admission-admin-review-summary",
