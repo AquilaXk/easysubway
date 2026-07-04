@@ -31,19 +31,17 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
     bottom: viewBox.y + viewBox.height
   };
   const readBounds = (label) => {
-    let bounds = null;
     try {
-      bounds = label.getBBox();
-    } finally {
-      return bounds;
+      return label.getBBox();
+    } catch (error) {
+      return null;
     }
   };
   const invertMatrix = (matrix) => {
-    let inverted = null;
     try {
-      inverted = matrix.inverse();
-    } finally {
-      return inverted;
+      return matrix.inverse();
+    } catch (error) {
+      return null;
     }
   };
   const accepted = [];
