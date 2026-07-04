@@ -13,6 +13,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // 상대 확인 시점 기준 시각을 고정한 테스트는 항상 원래대로 되돌린다.
+  tearDown(() {
+    debugStationVerifiedClock = DateTime.now;
+  });
+
   test('릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다', () {
     expect(
       () => stationApiBaseUriForEnvironment(
@@ -1411,6 +1416,7 @@ void main() {
   });
 
   test('시설 정보는 백엔드 enum 값을 쉬운 라벨과 스크린리더 문구로 바꾼다', () {
+    debugStationVerifiedClock = () => DateTime(2026, 6, 15);
     const ramp = StationFacilityInfo(
       id: 'facility-ramp-1',
       stationId: 'station-sangnoksu',
@@ -1473,7 +1479,7 @@ void main() {
     expect(ramp.statusTitle, '가기 전에 확인해 주세요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2026-06-13, 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2일 전, 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '확인 완료');
@@ -1487,6 +1493,29 @@ void main() {
     expect(uncheckedDescription.locationLabel, '이동 보조 시설');
     expect(uncheckedDescription.semanticLabel, isNot(contains('현장 검증')));
     expect(metadataOnlyDescription.locationLabel, 'B1-1F');
+  });
+
+  test('확인 시점 상대 표현은 오늘/어제/n일 전/n주 전 버킷을 만든다', () {
+    debugStationVerifiedClock = () => DateTime(2026, 6, 15);
+    expect(stationVerifiedRelativeLabel('2026-06-15'), '오늘');
+    expect(stationVerifiedRelativeLabel('2026-06-14'), '어제');
+    expect(stationVerifiedRelativeLabel('2026-06-13'), '2일 전');
+    expect(stationVerifiedRelativeLabel('2026-06-09'), '6일 전');
+    expect(stationVerifiedRelativeLabel('2026-06-08'), '1주 전');
+    expect(stationVerifiedRelativeLabel('2026-05-19'), '3주 전');
+    // 시각 성분이 있어도 날짜 단위로 비교한다.
+    expect(stationVerifiedRelativeLabel('2026-06-14T23:59:00'), '어제');
+  });
+
+  test('확인 시점 상대 표현은 4주 이상·미래·파싱 불가를 원문으로 둔다', () {
+    debugStationVerifiedClock = () => DateTime(2026, 6, 15);
+    // 28일 이상은 정확한 날짜로 최신성 저하를 드러낸다.
+    expect(stationVerifiedRelativeLabel('2026-05-18'), '2026-05-18');
+    // 시계 오차 등 미래 값은 원문 유지.
+    expect(stationVerifiedRelativeLabel('2026-06-20'), '2026-06-20');
+    // 파싱 불가·빈 값은 그대로.
+    expect(stationVerifiedRelativeLabel('준비 중'), '준비 중');
+    expect(stationVerifiedRelativeLabel('  '), '');
   });
 }
 

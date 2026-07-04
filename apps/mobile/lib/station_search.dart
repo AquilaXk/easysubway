@@ -563,7 +563,8 @@ class StationDetail {
   }
 
   String get semanticLabel {
-    return '$nameKo역 자세한 안내, $lineLabel, 마지막 확인 $lastVerifiedAt';
+    return '$nameKo역 자세한 안내, $lineLabel, '
+        '마지막 확인 ${stationVerifiedRelativeLabel(lastVerifiedAt)}';
   }
 }
 
@@ -802,7 +803,8 @@ class StationFacilityInfo {
     return '위치 안내를 준비 중이에요';
   }
 
-  String get updatedLabel => '최근 확인 $lastUpdatedAt';
+  String get updatedLabel =>
+      '최근 확인 ${stationVerifiedRelativeLabel(lastUpdatedAt)}';
 
   String get semanticLabel {
     return '$name, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $nextActionLabel';
@@ -973,6 +975,44 @@ String _dataSourceLabel(String dataSourceType) {
     'PARTNER_FEED' => '연계 안내',
     _ => '안내를 준비 중이에요',
   };
+}
+
+/// 확인 시점 상대 표현의 기준 시각. 테스트에서 고정할 수 있게 주입 지점을 둔다.
+@visibleForTesting
+DateTime Function() debugStationVerifiedClock = DateTime.now;
+
+/// 확인 시점('YYYY-MM-DD' 또는 ISO datetime)을 오늘 기준 상대 표현으로 바꾼다.
+/// '오늘 / 어제 / n일 전 / n주 전'으로 최신성을 한눈에 보여주고, 파싱 불가·미래·
+/// 4주 이상 과거는 원문 날짜를 그대로 둬 오래된 안내는 정확한 날짜로 드러낸다.
+String stationVerifiedRelativeLabel(String rawVerifiedAt) {
+  final raw = rawVerifiedAt.trim();
+  if (raw.isEmpty) {
+    return raw;
+  }
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) {
+    return raw;
+  }
+  final now = debugStationVerifiedClock();
+  final today = DateTime(now.year, now.month, now.day);
+  final verifiedDay = DateTime(parsed.year, parsed.month, parsed.day);
+  final days = today.difference(verifiedDay).inDays;
+  if (days < 0) {
+    return raw;
+  }
+  if (days == 0) {
+    return '오늘';
+  }
+  if (days == 1) {
+    return '어제';
+  }
+  if (days < 7) {
+    return '$days일 전';
+  }
+  if (days < 28) {
+    return '${days ~/ 7}주 전';
+  }
+  return raw;
 }
 
 enum StationSearchStatus { idle, loading, success, empty, failure }
@@ -1386,6 +1426,25 @@ class StationDetailController extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  // 실시간 조회가 실패로 끝났을 때 사용자가 직접 다시 시도할 수 있게 한다.
+  // 현재 역 상세를 유지한 채 실시간만 로딩 상태로 되돌린 뒤 재조회한다.
+  Future<void> retryRealtime() async {
+    final detail = _state.detail;
+    if (_isDisposed || detail == null) {
+      return;
+    }
+    _state = StationDetailState(
+      status: _state.status,
+      detail: detail,
+      exits: _state.exits,
+      facilities: _state.facilities,
+      realtimeSnapshot: const RealtimeSnapshot.loading(),
+      message: _state.message,
+    );
+    notifyListeners();
+    await _refreshRealtimeSnapshot(detail);
   }
 
   Future<void> _refreshRealtimeSnapshot(StationDetail detail) async {
@@ -3513,6 +3572,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
             builder: (context, _) {
               return _StationDetailBody(
                 state: _controller.state,
+                onRetryRealtime: _controller.retryRealtime,
                 internalRouteState: _internalRouteController?.state,
                 reportRepository: widget.reportRepository,
                 favoriteController: _favoriteController,
@@ -3532,6 +3592,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
 class _StationDetailBody extends StatelessWidget {
   const _StationDetailBody({
     required this.state,
+    required this.onRetryRealtime,
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
@@ -3541,6 +3602,7 @@ class _StationDetailBody extends StatelessWidget {
   });
 
   final StationDetailState state;
+  final VoidCallback onRetryRealtime;
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
@@ -3569,6 +3631,7 @@ class _StationDetailBody extends StatelessWidget {
         layoutSummaryItems: state.layoutSummaryItems,
         layoutSummarySemanticLabel: state.layoutSummarySemanticLabel,
         realtimeSnapshot: state.realtimeSnapshot,
+        onRetryRealtime: onRetryRealtime,
         internalRouteState: internalRouteState,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
@@ -3590,6 +3653,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.layoutSummaryItems,
     required this.layoutSummarySemanticLabel,
     required this.realtimeSnapshot,
+    required this.onRetryRealtime,
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
@@ -3606,6 +3670,7 @@ class _StationDetailContent extends StatelessWidget {
   final List<StationLayoutSummaryItem> layoutSummaryItems;
   final String layoutSummarySemanticLabel;
   final RealtimeSnapshot realtimeSnapshot;
+  final VoidCallback onRetryRealtime;
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
@@ -3630,7 +3695,10 @@ class _StationDetailContent extends StatelessWidget {
       ],
       const _StationDetailSectionTitle(title: '실시간 열차'),
       const SizedBox(height: 12),
-      _StationRealtimeSummary(snapshot: realtimeSnapshot),
+      _StationRealtimeSummary(
+        snapshot: realtimeSnapshot,
+        onRetry: onRetryRealtime,
+      ),
       const SizedBox(height: 20),
       _StationDetailRouteActions(
         detail: detail,
@@ -3644,8 +3712,14 @@ class _StationDetailContent extends StatelessWidget {
         ),
       ],
     ];
+    // 데이터 부재(unavailable) 상태는 화면에 아무것도 그리지 않으므로
+    // 역 안 이동 섹션 노출 여부·간격 계산에서도 빈 안내로 취급한다(#1577).
+    final internalRouteStateValue = internalRouteState;
+    final hasInternalRouteGuidance =
+        internalRouteStateValue != null &&
+        internalRouteStateValue.status != InternalRouteViewStatus.unavailable;
     final detailChildren = <Widget>[
-      if (layoutSummaryItems.isNotEmpty || internalRouteState != null) ...[
+      if (layoutSummaryItems.isNotEmpty || hasInternalRouteGuidance) ...[
         const _StationDetailSectionTitle(title: '역 안 이동'),
         const SizedBox(height: 12),
         if (layoutSummaryItems.isNotEmpty) ...[
@@ -3653,9 +3727,9 @@ class _StationDetailContent extends StatelessWidget {
             items: layoutSummaryItems,
             semanticLabel: layoutSummarySemanticLabel,
           ),
-          if (internalRouteState != null) const SizedBox(height: 16),
+          if (hasInternalRouteGuidance) const SizedBox(height: 16),
         ],
-        if (internalRouteState != null)
+        if (hasInternalRouteGuidance)
           _StationInternalRouteGuidance(state: internalRouteState!),
         const SizedBox(height: 24),
       ],
@@ -3680,7 +3754,10 @@ class _StationDetailContent extends StatelessWidget {
       const SizedBox(height: 24),
       // 메타 정보(안내 출처·마지막 확인)는 맨 아래로.
       _InfoBasisDisclosure(
-        labels: [detail.dataSourceLabel, '마지막 확인 ${detail.lastVerifiedAt}'],
+        labels: [
+          detail.dataSourceLabel,
+          '마지막 확인 ${stationVerifiedRelativeLabel(detail.lastVerifiedAt)}',
+        ],
       ),
     ];
 
@@ -3818,9 +3895,13 @@ class _StationDetailAdaptiveContent extends StatelessWidget {
 }
 
 class _StationRealtimeSummary extends StatelessWidget {
-  const _StationRealtimeSummary({required this.snapshot});
+  const _StationRealtimeSummary({
+    required this.snapshot,
+    required this.onRetry,
+  });
 
   final RealtimeSnapshot snapshot;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -3831,6 +3912,9 @@ class _StationRealtimeSummary extends StatelessWidget {
       RealtimeSnapshotStatus.unavailable => '실시간 정보 확인 불가',
       RealtimeSnapshotStatus.loading => '실시간 정보 확인 중',
     };
+    // 실시간 조회가 실패로 끝난 경우에만 다시 시도를 권한다. 미지원 노선은
+    // 재시도해도 결과가 같으므로 버튼을 노출하지 않는다.
+    final canRetry = snapshot.status == RealtimeSnapshotStatus.unavailable;
     final summary = snapshot.summaryText.trim().isEmpty
         ? '역 정보와 경로 검색은 계속 이용할 수 있습니다.'
         : snapshot.summaryText.trim();
@@ -3842,6 +3926,7 @@ class _StationRealtimeSummary extends StatelessWidget {
       title,
       summary,
       if (updatedLabel.isNotEmpty) updatedLabel,
+      if (canRetry) '다시 시도할 수 있어요',
     ];
     return Semantics(
       label: semanticParts.join(', '),
@@ -3893,6 +3978,18 @@ class _StationRealtimeSummary extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: EasySubwayAccessibleColors.mutedText,
                   height: 1.3,
+                ),
+              ),
+            ],
+            if (canRetry) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const Key('stationRealtimeRetryButton'),
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh, size: 20),
+                  label: const Text('다시 시도'),
                 ),
               ),
             ],
@@ -4175,7 +4272,7 @@ class _StationDetailHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    detail.lastVerifiedAt,
+                    stationVerifiedRelativeLabel(detail.lastVerifiedAt),
                     style: const TextStyle(
                       color: EasySubwayAccessibleColors.mutedText,
                       fontSize: 12,
@@ -4298,6 +4395,8 @@ class _StationInternalRouteGuidance extends StatelessWidget {
       InternalRouteViewStatus.success => _StationInternalRouteResultCard(
         result: state.result!,
       ),
+      // 데이터 부재는 사과 문구 없이 숨긴다(#1577).
+      InternalRouteViewStatus.unavailable => const SizedBox.shrink(),
     };
   }
 }

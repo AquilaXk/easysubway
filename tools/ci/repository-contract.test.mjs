@@ -1513,7 +1513,9 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
   // 노출되는 저장 상태 안내 순서만 검증한다.
   const offlineWidgetTestPattern = new RegExp([
     "testWidgets\\('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다'",
-    "offlineDataSettingsButton",
+    // 더보기 진입점(offlineDataSettingsButton)은 #1570에서 제거해, 테스트는
+    // OfflineDataScreen을 직접 띄워 검증한다.
+    "OfflineDataScreen\\(\\)",
     "저장된 안내 상태",
     "검증 구간'\\), findsNothing",
     "마지막 갱신",
@@ -1526,8 +1528,11 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
 
   assert.ok(offlineScreenMatch, "OfflineDataScreen block not found");
   const offlineScreen = offlineScreenMatch[0];
-  assert.match(main, /offlineDataSettingsButton/);
-  assert.match(main, /title:\s*'인터넷 없이 이용'/);
+  // '저장된 안내' 섹션(인터넷 없이 이용 진입점)은 #1570에서 더보기에서 제거했다.
+  // OfflineDataScreen 화면 자체는 유지된다(직접 진입만 가능).
+  assert.match(main, /class OfflineDataScreen/);
+  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  assert.doesNotMatch(main, /title:\s*'인터넷 없이 이용'/);
   assert.match(main, /_offlineDataSourceOfTruth\s*=\s*'installed catalog metadata'/);
   assert.match(offlineScreen, /저장된 안내 상태/);
   assert.doesNotMatch(offlineScreen, /저장된 데이터 상태/);
@@ -9618,13 +9623,16 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /simpleViewEnabled: preferences\.simpleViewEnabled/);
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
   assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
-  assert.match(main, /label: '역'/);
-  assert.match(main, /label: '시설'/);
-  assert.match(main, /label: '경로'/);
+  // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
+  assert.match(main, /_AppSectionTitle\(title: '역'\)/);
+  assert.match(main, /_AppSectionTitle\(title: '시설'\)/);
+  assert.match(main, /_AppSectionTitle\(title: '경로'\)/);
   assert.match(main, /FavoriteHomeScreen/);
-  assert.match(main, /FavoriteRouteListContent/);
-  assert.match(main, /FavoriteStationListContent/);
-  assert.match(main, /FavoriteFacilityListContent/);
+  // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
+  // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
+  assert.match(main, /class _FavoriteHomeStationRow/);
+  assert.match(main, /class _FavoriteHomeFacilityRow/);
+  assert.match(main, /_HomeSavedRouteCard\([\s\S]*onRemove:/);
   assert.match(onboarding, /class OnboardingViewPreferences/);
   assert.match(onboarding, /const OnboardingViewPreferences\.defaults/);
   assert.match(onboarding, /class OnboardingResult/);

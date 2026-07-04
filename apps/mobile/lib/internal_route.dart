@@ -395,7 +395,6 @@ class InternalRouteStep {
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터를 이용해요',
       if (requiresEscalator) '에스컬레이터 안내를 확인하고 있어요',
-      if (reliabilityScore < 80) '이동 전 역무원에게 확인해 주세요',
     ];
     return labels.join(' · ');
   }
@@ -431,7 +430,7 @@ class InternalRouteWarning {
   }
 }
 
-enum InternalRouteViewStatus { loading, success, failure }
+enum InternalRouteViewStatus { loading, success, failure, unavailable }
 
 class InternalRouteState {
   const InternalRouteState({
@@ -442,6 +441,13 @@ class InternalRouteState {
 
   const InternalRouteState.loading()
     : status = InternalRouteViewStatus.loading,
+      result = null,
+      message = '';
+
+  // 역 안 길 안내 데이터 자체가 없을 때. 오류가 아니라 '보여줄 것이 없음'이라
+  // 사과 문구 없이 관련 안내를 숨긴다(#1577).
+  const InternalRouteState.unavailable()
+    : status = InternalRouteViewStatus.unavailable,
       result = null,
       message = '';
 
@@ -478,10 +484,7 @@ class InternalRouteController extends ChangeNotifier {
         if (_disposed) {
           return;
         }
-        _state = const InternalRouteState(
-          status: InternalRouteViewStatus.failure,
-          message: '역 안 길 안내에 필요한 정보를 찾지 못했어요.',
-        );
+        _state = const InternalRouteState.unavailable();
         notifyListeners();
         return;
       }
