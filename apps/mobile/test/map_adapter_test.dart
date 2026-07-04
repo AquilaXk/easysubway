@@ -3,6 +3,11 @@ import 'package:easysubway_mobile/station_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  // 마커 시맨틱의 '마지막 확인'은 상대 시점을 쓰므로(#1567b) 기준 시각을 고정한다.
+  tearDown(() {
+    debugStationVerifiedClock = DateTime.now;
+  });
+
   test('지도 기능 계약은 노선도와 주변 지도를 분리하고 목록 대체를 필수로 둔다', () {
     expect(mapCapabilityContracts.map((contract) => contract.type), [
       MapCapabilityType.offlineLineMap,
@@ -34,6 +39,7 @@ void main() {
   });
 
   test('지도 어댑터는 좌표가 있는 역 출구 시설만 쉬운 이름의 마커로 만든다', () {
+    debugStationVerifiedClock = () => DateTime(2026, 6, 15);
     const adapter = EasySubwayMapAdapter();
     final markers = adapter.markersForStationDetail(
       station: const StationDetail(
@@ -102,13 +108,13 @@ void main() {
     ]);
     expect(markers[0].title, '상록수역');
     expect(markers[0].semanticLabel, contains('상록수역 자세한 안내'));
-    expect(markers[0].semanticLabel, contains('마지막 확인 2026-06-12'));
+    expect(markers[0].semanticLabel, contains('마지막 확인 3일 전'));
     expect(markers[1].semanticLabel, contains('1번 출구'));
     expect(markers[1].semanticLabel, contains('계단 없는 이동 가능'));
-    expect(markers[1].semanticLabel, contains('최신 상태를 준비 중이에요'));
+    expect(markers[1].semanticLabel, isNot(contains('최신 상태를 준비 중이에요')));
     expect(markers[2].semanticLabel, contains('엘리베이터'));
     expect(markers[2].semanticLabel, contains('이용 가능'));
-    expect(markers[2].semanticLabel, contains('최근 확인 2026-06-12'));
-    expect(markers[2].semanticLabel, contains('최신 상태를 준비 중이에요'));
+    expect(markers[2].semanticLabel, contains('최근 확인 3일 전'));
+    expect(markers[2].semanticLabel, isNot(contains('최신 상태를 준비 중이에요')));
   });
 }

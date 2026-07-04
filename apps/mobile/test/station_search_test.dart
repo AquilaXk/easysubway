@@ -102,13 +102,8 @@ void main() {
         )
         .toList(growable: false);
 
-    expect(labels, [
-      '일부 정보는 확인 중이에요',
-      '시설 정보를 함께 볼 수 있어요',
-      '쉬운 길 안내를 볼 수 있어요',
-      '고장·공사 소식이 반영됐어요',
-      '정보를 준비 중이에요',
-    ]);
+    // 내부 데이터 품질 라벨은 사용자에게 노출하지 않으므로 전부 빈 문자열이다(#1578).
+    expect(labels, ['', '', '', '', '']);
   });
 
   test('역 API 저장소는 백엔드 역 목록을 요청하고 결과를 파싱한다', () async {
@@ -163,7 +158,7 @@ void main() {
     expect(results.single.id, 'station-sangnoksu');
     expect(results.single.nameKo, '상록수');
     expect(results.single.region, '수도권');
-    expect(results.single.dataQualityLabel, '일부 정보는 확인 중이에요');
+    expect(results.single.dataQualityLabel, '');
     expect(results.single.dataSourceLabel, '공식 안내');
     expect(results.single.lines.single.name, '수도권 4호선');
   });
@@ -583,7 +578,7 @@ void main() {
     expect(detail.nameKo, '상록수');
     expect(detail.latitude, 37.302795);
     expect(detail.longitude, 126.866489);
-    expect(detail.dataQualityLabel, '일부 정보는 확인 중이에요');
+    expect(detail.dataQualityLabel, '');
     expect(detail.dataSourceLabel, '공식 안내');
     expect(detail.lines.single.stationCode, '448');
     expect(exits.single.name, '1번 출구');
@@ -597,7 +592,7 @@ void main() {
     expect(facilities.single.longitude, 126.866489);
     expect(facilities.single.statusLabel, '정상');
     expect(facilities.single.statusTitle, '이용 가능');
-    expect(facilities.single.confidenceLabel, '최근 확인된 정보예요');
+    expect(facilities.single.confidenceLabel, '');
     expect(facilities.single.dataSourceLabel, '공식 안내');
   });
 
@@ -663,7 +658,7 @@ void main() {
     expect(favorites.single.stationId, 'station-sangnoksu');
     expect(favorites.single.nameKo, '상록수');
     expect(favorites.single.lineLabel, '수도권 4호선');
-    expect(favorites.single.dataQualityLabel, '일부 정보는 확인 중이에요');
+    expect(favorites.single.dataQualityLabel, '');
     expect(favorites.single.dataSourceLabel, '공식 안내');
   });
 
@@ -1480,16 +1475,16 @@ void main() {
     expect(ramp.statusLabel, '공사 중');
     expect(ramp.severityLabel, '가기 전 살펴보기');
     expect(ramp.nextActionLabel, '역무원 도움 요청');
-    expect(ramp.confidenceLabel, '안내를 준비 중이에요');
+    expect(ramp.confidenceLabel, '');
     expect(ramp.statusTitle, '가기 전에 확인해 주세요');
     expect(
       ramp.semanticLabel,
-      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2일 전, 최신 상태를 준비 중이에요, 역무원 도움 요청',
+      '1번 출구 경사로, 경사로, 가기 전에 확인해 주세요, 1F-B1, 최근 확인 2일 전, 역무원 도움 요청',
     );
     expect(customerCenter.typeLabel, '고객센터');
     expect(customerCenter.statusLabel, '확인 완료');
     expect(customerCenter.severityLabel, '정상');
-    expect(customerCenter.fieldValidationLabel, '최근 확인했어요');
+    expect(customerCenter.fieldValidationLabel, '');
     expect(customerCenter.statusTitle, '이용 가능');
     expect(customerCenter.semanticLabel, isNot(contains('정보 신뢰도')));
     expect(customerCenter.semanticLabel, isNot(contains('현장 검증')));

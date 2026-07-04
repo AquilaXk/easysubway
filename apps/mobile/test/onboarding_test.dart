@@ -112,42 +112,8 @@ void main() {
       await tester.tap(find.byKey(const Key('onboardingDoneButton')));
       await tester.pumpAndSettle();
 
-      expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
-      expect(find.text('계단 피하기'), findsOneWidget);
-      expect(find.text('엘리베이터 이용'), findsOneWidget);
-      expect(find.text('켜짐'), findsWidgets);
-      expect(find.text('큰 글씨'), findsNothing);
-      expect(find.text('큰 글자'), findsNothing);
-      expect(find.text('단순 보기'), findsNothing);
-      expect(find.text('간편 보기'), findsOneWidget);
-      expect(
-        tester.getSemantics(find.bySemanticsLabel('계단 피하기 켜짐, 계단 없는 길')),
-        isSemantics(label: '계단 피하기 켜짐, 계단 없는 길'),
-      );
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('onboardingPreference-highContrast')),
-        150,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.drag(find.byType(Scrollable).last, const Offset(0, -140));
-      await tester.pumpAndSettle();
-      expect(
-        tester.getSemantics(
-          find.byKey(const Key('onboardingPreference-highContrast')),
-        ),
-        isSemantics(hasTapAction: true),
-      );
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const Key('onboardingPreference-highContrast')),
-          matching: find.byType(Switch),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('onboardingDoneButton')));
-      await tester.pumpAndSettle();
-
+      // 조건 확인·보기 설정 단계는 제거됐다(#1563). 프로필 다음은 바로 권한 단계.
+      expect(find.text('적용할 조건을 확인하세요'), findsNothing);
       expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
       expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
       expect(find.text('현재 위치'), findsOneWidget);
@@ -159,8 +125,9 @@ void main() {
 
       expect(completedResult?.profile.id, 'wheelchair');
       expect(completedResult?.profile.mobilityType, 'WHEELCHAIR');
+      // 보기 설정은 온보딩에서 더는 고르지 않으므로 기본값이 반환된다(#1563).
       expect(completedResult?.preferences.largeTextEnabled, isFalse);
-      expect(completedResult?.preferences.highContrastEnabled, isTrue);
+      expect(completedResult?.preferences.highContrastEnabled, isFalse);
       expect(completedResult?.preferences.simpleViewEnabled, isTrue);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -188,8 +155,6 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -222,8 +187,6 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -342,44 +305,16 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
-    expect(find.text('켜짐'), findsWidgets);
-    expect(find.text('꺼짐'), findsWidgets);
+    // 2단계 흐름: 프로필 → 권한. 권한에서 이전으로 돌아가면 프로필 단계로 온다(#1563).
+    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
     await tester.tap(find.byTooltip('이전 단계'));
     await tester.pumpAndSettle();
     expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
-    await tester.pumpAndSettle();
-
     expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
     expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
-    await tester.tap(find.byTooltip('이전 단계'));
-    await tester.pumpAndSettle();
-    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
-  });
-
-  testWidgets('온보딩 조건 배지는 시스템 글자 크기에서도 잘리지 않는다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: MediaQuery(
-          data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
-          child: OnboardingScreen(onCompleted: (_) {}),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('적용할 조건을 확인하세요'), findsOneWidget);
-    expect(find.text('켜짐'), findsWidgets);
-    expect(find.text('꺼짐'), findsWidgets);
-    expect(tester.takeException(), isNull);
   });
 
   testWidgets('온보딩 고정 CTA 단계는 하단 스크롤 여백을 확보한다', (tester) async {
@@ -398,8 +333,9 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
+    // 권한 단계는 하단 고정 버튼이 없어 여백이 32로 줄어든다(#1563).
     final secondStepList = tester.widget<ListView>(find.byType(ListView));
-    expect(secondStepList.padding?.resolve(TextDirection.ltr).bottom, 104);
+    expect(secondStepList.padding?.resolve(TextDirection.ltr).bottom, 32);
   });
 
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
@@ -466,9 +402,8 @@ void main() {
 }
 
 Future<void> _moveToPermissionStep(WidgetTester tester) async {
+  // 2단계 흐름(#1563): 프로필 → '다음' 한 번이면 바로 권한 단계.
   await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
-  await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('onboardingDoneButton')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('onboardingDoneButton')));
   await tester.pumpAndSettle();
