@@ -3842,7 +3842,6 @@ class _StationRealtimeSummary extends StatelessWidget {
       title,
       summary,
       if (updatedLabel.isNotEmpty) updatedLabel,
-      '열차 위치는 GPS가 아니라 열차 운행 안내를 바탕으로 보여줘요.',
     ];
     return Semantics(
       label: semanticParts.join(', '),
@@ -3897,14 +3896,6 @@ class _StationRealtimeSummary extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Text(
-              '열차 위치는 GPS가 아니라 열차 운행 안내를 바탕으로 보여줘요.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                height: 1.3,
-              ),
-            ),
           ],
         ),
       ),
@@ -4612,15 +4603,6 @@ class _StationExitCard extends StatelessWidget {
                     text: exit.stairPathLabel,
                     positive: !exit.hasStairOnlyPath,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    exit.verificationStatusLabel,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: _stationTextMutedColor,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -4677,17 +4659,13 @@ class _StationFacilityCard extends StatelessWidget {
                     height: 1.25,
                   ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _StationDetailTextPill(text: facility.typeLabel),
-                    _StationDetailTextPill(text: facility.statusTitle),
-                    if (facility.severityLabel != facility.statusTitle)
-                      _StationDetailTextPill(text: facility.severityLabel),
-                  ],
-                ),
+                // 정상 시설은 필 없이 조용히 표시하고, 문제(고장·공사)일 때만
+                // 상태 필 하나만 노출한다. 시설 종류는 이름에 이미 포함되고,
+                // '이용 가능'='정상' 중복과 종류 필은 제거한다.
+                if (facility.needsAttention) ...[
+                  const SizedBox(height: 10),
+                  _StationDetailTextPill(text: facility.statusTitle),
+                ],
                 const SizedBox(height: 12),
                 _StationDetailInfoRow(
                   icon: Icons.place_outlined,
@@ -4697,15 +4675,6 @@ class _StationFacilityCard extends StatelessWidget {
                 _StationDetailInfoRow(
                   icon: Icons.event_available,
                   text: facility.updatedLabel,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  facility.verificationStatusLabel,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: _stationTextMutedColor,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                  ),
                 ),
                 const SizedBox(height: 14),
                 Row(
