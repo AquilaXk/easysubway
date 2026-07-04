@@ -33,14 +33,14 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
   const readBounds = (label) => {
     try {
       return label.getBBox();
-    } catch (error) {
+    } catch {
       return null;
     }
   };
   const invertMatrix = (matrix) => {
     try {
       return matrix.inverse();
-    } catch (error) {
+    } catch {
       return null;
     }
   };
