@@ -7314,7 +7314,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('시설'), findsOneWidget);
       expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
-      expect(find.text('엘리베이터'), findsWidgets);
+      // 시설 종류 필은 제거(이름에 포함). 문제 상태만 상태 필로 노출.
+      expect(find.text('엘리베이터'), findsNothing);
       expect(find.text('이용할 수 없어요'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.byKey(
@@ -7362,7 +7363,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
-      expect(find.text('이용 가능'), findsOneWidget);
+      // 정상 시설은 상태 필 없이 이름+위치+확인 시점만 조용히 표시.
+      expect(find.text('이용 가능'), findsNothing);
       expect(find.text('1번 출구 앞'), findsOneWidget);
       expect(find.text('최근 확인 2026-06-12'), findsOneWidget);
       expect(
@@ -7487,7 +7489,7 @@ void main() {
     expect(detailRect.top, lessThan(primaryRect.bottom));
   });
 
-  testWidgets('역 상세 대화면은 시스템 글자 크기에서 시설 상태 3종을 렌더링한다', (tester) async {
+  testWidgets('역 상세 대화면은 정상은 조용히·문제 시설만 상태 필로 렌더링한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     tester.view.physicalSize = const Size(900, 800);
     tester.view.devicePixelRatio = 1;
@@ -7583,14 +7585,15 @@ void main() {
         find.byKey(const Key('stationDetailLargeScreenLayout')),
         findsNothing,
       );
-      var sawNormal = false;
+      // 정상 시설은 상태 필 없이 이름으로 조용히, 문제(고장·확인 중)만 상태 필로 렌더링.
+      var sawNormalQuiet = false;
       var sawBroken = false;
       var sawNeedsCheck = false;
       for (var index = 0; index < 8; index += 1) {
-        sawNormal |= find.text('이용 가능').evaluate().isNotEmpty;
+        sawNormalQuiet |= find.text('1번 출구 엘리베이터').evaluate().isNotEmpty;
         sawBroken |= find.text('이용할 수 없어요').evaluate().isNotEmpty;
         sawNeedsCheck |= find.text('상태를 확인하고 있어요').evaluate().isNotEmpty;
-        if (sawNormal && sawBroken && sawNeedsCheck) {
+        if (sawNormalQuiet && sawBroken && sawNeedsCheck) {
           break;
         }
         await tester.drag(
@@ -7599,9 +7602,11 @@ void main() {
         );
         await tester.pumpAndSettle();
       }
-      expect(sawNormal, isTrue);
+      expect(sawNormalQuiet, isTrue);
       expect(sawBroken, isTrue);
       expect(sawNeedsCheck, isTrue);
+      // 정상 시설의 '이용 가능' 상태 필은 노출하지 않는다.
+      expect(find.text('이용 가능'), findsNothing);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     } finally {
