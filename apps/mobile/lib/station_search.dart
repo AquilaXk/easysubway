@@ -2071,7 +2071,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   Future<void> _runSearch(String query, {bool recordHistory = true}) async {
     await _controller.search(query, recordHistory: recordHistory);
-    await _loadRecentQueries();
+    // 최근 검색 목록은 기록한 경우에만 바뀌므로, 디바운스 타이핑 검색에서는
+    // 불필요한 재조회를 하지 않는다.
+    if (recordHistory) {
+      await _loadRecentQueries();
+    }
   }
 
   void _searchRecentQuery(String query) {
