@@ -371,7 +371,7 @@ class DriftStationRepository
       selectedRegion: selectedRegion,
       lines: lines,
       stations: stations,
-      edges: await _networkMapEdges(selectedLineIds),
+      edges: _networkMapEdges(stations),
       positionSources: await _networkMapPositionSources(selectedRegion),
       stationLineMemberships: stationLineMemberships,
     );
@@ -433,48 +433,31 @@ class DriftStationRepository
         .toList(growable: false);
   }
 
-  // 노선 topology를 network_edges의 RIDE 엣지(실제 인접 두 역)로 로드한다.
-  // line_sequence 기반 인접이 아니라 실제 인접이라, 지선/분기/순환 노선에서
-  // 먼 역끼리 잇는 선(부채꼴)이 생기지 않는다. node_id는 'stationId:lineId' 키.
-  Future<List<NetworkMapEdge>> _networkMapEdges(
-    Set<String> selectedLineIds,
-  ) async {
-    final rows = await database
-        .customSelect(
-          "SELECT from_node_id, to_node_id FROM network_edges "
-          "WHERE edge_type = 'RIDE'",
-        )
-        .get();
+  List<NetworkMapEdge> _networkMapEdges(List<NetworkMapStation> stations) {
+    final byLine = <String, List<NetworkMapStation>>{};
+    for (final station in stations) {
+      byLine.putIfAbsent(station.lineId, () => []).add(station);
+    }
     final edges = <NetworkMapEdge>[];
-    final seen = <String>{};
-    for (final row in rows) {
-      final from = row.read<String>('from_node_id');
-      final to = row.read<String>('to_node_id');
-      final lineId = _lineIdFromNodeKey(from);
-      if (lineId == null || !selectedLineIds.contains(lineId)) {
-        continue;
+    for (final entry in byLine.entries) {
+      final sortedStations = [...entry.value]
+        ..sort((a, b) => a.sequence.compareTo(b.sequence));
+      for (var index = 0; index < sortedStations.length - 1; index += 1) {
+        final from = sortedStations[index];
+        final to = sortedStations[index + 1];
+        edges.add(
+          NetworkMapEdge(
+            id: 'map-edge-${entry.key}-${from.id}-${to.id}',
+            lineId: entry.key,
+            fromStationId: _mapStationKey(from),
+            toStationId: _mapStationKey(to),
+            accessibilityStatus: 'AVAILABLE',
+            reliabilityScore: 100,
+          ),
+        );
       }
-      final undirected = from.compareTo(to) <= 0 ? '$from|$to' : '$to|$from';
-      if (!seen.add(undirected)) {
-        continue;
-      }
-      edges.add(
-        NetworkMapEdge(
-          id: 'ride-$from-$to',
-          lineId: lineId,
-          fromStationId: from,
-          toStationId: to,
-          accessibilityStatus: 'AVAILABLE',
-          reliabilityScore: 100,
-        ),
-      );
     }
     return edges;
-  }
-
-  String? _lineIdFromNodeKey(String nodeKey) {
-    final separator = nodeKey.indexOf(':');
-    return separator < 0 ? null : nodeKey.substring(separator + 1);
   }
 
   Future<_LocalStationSummary?> _getStationSummary(String stationId) async {
@@ -584,6 +567,9 @@ class DriftStationRepository
     return summaries.values.toList(growable: false);
   }
 }
+
+String _mapStationKey(NetworkMapStation station) =>
+    '${station.id}:${station.lineId}';
 
 class _LocalStationSummary {
   _LocalStationSummary({
