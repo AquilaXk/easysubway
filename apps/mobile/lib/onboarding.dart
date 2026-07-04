@@ -286,22 +286,28 @@ class OnboardingIntroScreen extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
           children: [
-            const _IntroVisual(),
-            const SizedBox(height: 25),
+            const SizedBox(height: 12),
             Semantics(
               header: true,
               child: Text(
                 '계단 없는 길을\n먼저 찾습니다',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w900,
-                  height: 1.25,
+                  height: 1.2,
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const _IntroInfoCard(),
-            const SizedBox(height: 20),
+            Text(
+              '엘리베이터와 출구까지 함께 살펴, 실제로 갈 수 있는 길을 안내해요.',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 28),
             FilledButton(
               key: const Key('onboardingIntroConfigureButton'),
               onPressed: onConfigure,
@@ -332,127 +338,6 @@ class OnboardingIntroScreen extends StatelessWidget {
   }
 }
 
-class _IntroVisual extends StatelessWidget {
-  const _IntroVisual();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 230,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: EasySubwayAccessibleColors.surface,
-          border: Border.all(color: EasySubwayAccessibleColors.line),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Stack(
-          children: [
-            Positioned(
-              left: 28,
-              top: 38,
-              child: _IntroIcon(
-                icon: Icons.accessible_forward,
-                color: EasySubwayAccessibleColors.primary,
-              ),
-            ),
-            Positioned(
-              right: 30,
-              top: 80,
-              child: _IntroIcon(
-                icon: Icons.elevator_outlined,
-                color: EasySubwayAccessibleColors.primary,
-              ),
-            ),
-            Positioned(
-              left: 117,
-              bottom: 26,
-              child: _IntroIcon(
-                icon: Icons.route,
-                color: Colors.white,
-                backgroundColor: EasySubwayAccessibleColors.primary,
-                size: 94,
-                iconSize: 44,
-                radius: 29,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _IntroIcon extends StatelessWidget {
-  const _IntroIcon({
-    required this.icon,
-    required this.color,
-    this.backgroundColor = Colors.white,
-    this.size = 86,
-    this.iconSize = 43,
-    this.radius = 27,
-  });
-
-  final IconData icon;
-  final Color color;
-  final Color backgroundColor;
-  final double size;
-  final double iconSize;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: const [
-          BoxShadow(
-            color: EasySubwayAccessibleColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: Icon(icon, color: color, size: iconSize),
-      ),
-    );
-  }
-}
-
-class _IntroInfoCard extends StatelessWidget {
-  const _IntroInfoCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return const _IntroCard(
-      child: Column(
-        children: [
-          _IntroInfoRow(
-            icon: Icons.elevator_outlined,
-            title: '엘리베이터 확인',
-            subtitle: '고장 시설을 피해 안내',
-          ),
-          _IntroDivider(),
-          _IntroInfoRow(
-            icon: Icons.route_outlined,
-            title: '걷기와 환승 줄이기',
-            subtitle: '내 이동 조건에 맞춰 안내',
-          ),
-          _IntroDivider(),
-          _IntroInfoRow(
-            icon: Icons.map_outlined,
-            title: '인터넷 없이 이용',
-            subtitle: '노선도와 역 정보 확인',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _IntroCard extends StatelessWidget {
   const _IntroCard({required this.child});
 
@@ -467,59 +352,6 @@ class _IntroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
       ),
       child: Padding(padding: const EdgeInsets.all(16), child: child),
-    );
-  }
-}
-
-class _IntroInfoRow extends StatelessWidget {
-  const _IntroInfoRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 43,
-          height: 43,
-          child: Icon(
-            icon,
-            color: EasySubwayAccessibleColors.primary,
-            size: 26,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
-                  fontWeight: FontWeight.w700,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

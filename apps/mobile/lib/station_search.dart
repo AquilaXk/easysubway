@@ -33,11 +33,6 @@ const _locationQualityCoarseMessage =
     '현재 위치 정확도가 낮아 가까운 역을 정확히 찾기 어려워요. 출발역을 직접 선택해 주세요.';
 const _locationQualityMockedMessage =
     '모의 위치는 가까운 역 찾기에 사용할 수 없어요. 출발역을 직접 선택해 주세요.';
-const _locationPermissionRationaleTitle = '현재 위치 사용';
-const _locationPermissionRationalePurpose =
-    '가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.';
-const _locationPermissionRationaleDenialNotice =
-    '위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.';
 const _stationSearchFailureNextAction =
     '역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다.';
 const _favoriteStationLoadErrorMessage = '즐겨찾기를 불러오지 못했어요.';
@@ -2303,62 +2298,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     }
     setState(() => _isNearbySearchRunning = true);
     try {
-      final shouldContinue = await _confirmLocationUseIfNeeded();
-      if (!shouldContinue) {
-        return;
-      }
+      // 사전 안내 다이얼로그 없이 바로 위치를 요청한다. 거부 시에는 결과 영역의
+      // 실패 안내와 '위치 설정 열기'로 재안내하므로 별도 사전 고지가 필요 없다.
       await _controller.searchNearby(widget.locationProvider);
     } finally {
       if (mounted) {
         setState(() => _isNearbySearchRunning = false);
       }
     }
-  }
-
-  Future<bool> _confirmLocationUseIfNeeded() async {
-    var needsPermissionRequest = true;
-    try {
-      needsPermissionRequest = await widget.locationProvider
-          .needsLocationPermissionRequest();
-    } catch (error, stackTrace) {
-      reportMobileError(
-        error,
-        stackTrace,
-        context: '주변 역 위치 권한 사전 확인 중 예외가 발생했습니다.',
-      );
-    }
-    if (!needsPermissionRequest) {
-      return true;
-    }
-    if (!mounted) {
-      return false;
-    }
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text(_locationPermissionRationaleTitle),
-            content: const Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(_locationPermissionRationalePurpose),
-                SizedBox(height: 8),
-                Text(_locationPermissionRationaleDenialNotice),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('계속'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
   }
 
   Future<void> _openLocationSettings() async {

@@ -3314,44 +3314,6 @@ void main() {
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
-  testWidgets('가까운 역 화면은 위치 권한 안내 취소 후 재시도 버튼을 유지한다', (tester) async {
-    final locationProvider = FakeCurrentLocationProvider(
-      location: _freshCurrentLocation(),
-      needsPermissionRequest: true,
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        locationProvider: locationProvider,
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, '취소'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.descendant(of: find.byType(AppBar), matching: find.text('가까운 역')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
-    expect(find.byKey(const Key('nearbyStationSearchButton')), findsOneWidget);
-    expect(find.text('내 주변 역 다시 찾기'), findsOneWidget);
-    expect(locationProvider.requestCount, 0);
-  });
-
   testWidgets('노선도 좌측 메뉴에서 설정 화면으로 들어갈 수 있다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -7458,7 +7420,7 @@ void main() {
     );
   });
 
-  testWidgets('역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다', (tester) async {
+  testWidgets('역 검색은 사전 안내 다이얼로그 없이 바로 위치를 요청한다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
     );
@@ -7488,18 +7450,10 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pumpAndSettle();
 
-    expect(locationProvider.permissionCheckCount, 1);
-    expect(locationProvider.requestCount, 0);
-    expect(find.text('현재 위치 사용'), findsOneWidget);
-    expect(find.text('가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다.'), findsOneWidget);
-    expect(
-      find.text('위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다.'),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text('계속'));
-    await tester.pumpAndSettle();
-
+    // 사전 rationale 다이얼로그(제목·본문·계속/취소) 없이 곧바로 위치를 요청한다.
+    expect(find.text('현재 위치 사용'), findsNothing);
+    expect(find.text('계속'), findsNothing);
+    expect(find.text('취소'), findsNothing);
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
     expect(find.text('상록수역'), findsOneWidget);
@@ -7538,7 +7492,6 @@ void main() {
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pump();
 
-    expect(locationProvider.permissionCheckCount, 1);
     expect(locationProvider.requestCount, 1);
 
     locationCompleter.complete(_freshCurrentLocation());
@@ -10706,6 +10659,91 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('시설 제보 화면은 에스컬레이터 정상 상태에 유효한 유형만 노출한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: FakeFacilityReportRepository(),
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-escalator-1',
+            facilityName: '1번 출구 에스컬레이터',
+            facilityTypeLabel: '에스컬레이터',
+            facilityStatusLabel: '정상',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 유효 유형만 노출한다.
+    expect(find.text('고장'), findsOneWidget);
+    expect(find.text('공사 중'), findsOneWidget);
+    expect(find.text('폐쇄'), findsOneWidget);
+    expect(find.text('위치가 달라요'), findsOneWidget);
+    expect(find.text('정보가 달라요'), findsOneWidget);
+    // 경로/역 수준·엘리베이터 전용 유형과, 정상 시설의 '다시 정상'은 숨긴다.
+    expect(find.text('계단이 있어요'), findsNothing);
+    expect(find.text('환승이 어려워요'), findsNothing);
+    expect(find.text('도착 시간이 달라요'), findsNothing);
+    expect(find.text('경로가 막혔어요'), findsNothing);
+    expect(find.text('엘리베이터 이용 불가'), findsNothing);
+    expect(find.text('다시 정상'), findsNothing);
+  });
+
+  group('facilityReportTypeOptionsFor', () {
+    test('에스컬레이터 정상은 경로/역 수준·다시 정상을 제외한다', () {
+      expect(
+        facilityReportTypeOptionsFor(
+          facilityTypeLabel: '에스컬레이터',
+          facilityStatusLabel: '정상',
+        ),
+        const [
+          FacilityReportTypeOption.broken,
+          FacilityReportTypeOption.underConstruction,
+          FacilityReportTypeOption.closed,
+          FacilityReportTypeOption.locationWrong,
+          FacilityReportTypeOption.informationWrong,
+        ],
+      );
+    });
+
+    test('엘리베이터에는 엘리베이터 이용 불가를 노출한다', () {
+      final options = facilityReportTypeOptionsFor(
+        facilityTypeLabel: '엘리베이터',
+        facilityStatusLabel: '정상',
+      );
+      expect(options, contains(FacilityReportTypeOption.elevatorUnavailable));
+      expect(options, isNot(contains(FacilityReportTypeOption.recovered)));
+    });
+
+    test('고장 상태는 고장을 숨기고 다시 정상을 노출한다', () {
+      final options = facilityReportTypeOptionsFor(
+        facilityTypeLabel: '에스컬레이터',
+        facilityStatusLabel: '고장',
+      );
+      expect(options, isNot(contains(FacilityReportTypeOption.broken)));
+      expect(options, contains(FacilityReportTypeOption.recovered));
+    });
+
+    test('알 수 없는 타입도 경로/역 수준 유형은 제외한다', () {
+      final options = facilityReportTypeOptionsFor(
+        facilityTypeLabel: '고객센터',
+        facilityStatusLabel: '상태를 확인하고 있어요',
+      );
+      expect(options, isNot(contains(FacilityReportTypeOption.routeBlocked)));
+      expect(options, isNot(contains(FacilityReportTypeOption.stairsPresent)));
+      expect(
+        options,
+        isNot(contains(FacilityReportTypeOption.transferImpossible)),
+      );
+      expect(options, isNot(contains(FacilityReportTypeOption.etaInaccurate)));
+      // 정상이 아니므로 '다시 정상'은 노출한다.
+      expect(options, contains(FacilityReportTypeOption.recovered));
+    });
   });
 
   testWidgets('시설 신고 화면은 사진 선택 전에 짧은 개인정보 안내를 보여준다', (tester) async {
