@@ -4464,6 +4464,10 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
   assert.match(manifestSchema.$id, /^https:\/\/easysubway\.local\/schema\//);
   assert.deepEqual(manifestSchema.properties.packs.items.properties.payloadKind.enum, ["sqlite_catalog"]);
   assert.equal(
+    manifestSchema.properties.packs.items.properties.representativeRouteRegressions.minItems,
+    0,
+  );
+  assert.equal(
     manifestSchema.properties.packs.items.properties.dependencies.items.$ref,
     "#/$defs/packIdentity",
   );
@@ -4763,21 +4767,10 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     productionInput.supportedV1Scope.facilityCoverageDenominator,
     scope.supportScope.facilityCoverageDenominator,
   );
-  assert.deepEqual(productionInput.routeRegressionScope, {
-    mode: "DIRECT_ONLY",
-    excludedPatterns: ["TRANSFER", "MULTI_TRANSFER", "LOOP_BRANCH", "EXPRESS_LOCAL"],
-    claim: productionInput.routeRegressionScope.claim,
-  });
-  assert.match(productionInput.routeRegressionScope.claim, /direct regression only/);
-  assert.deepEqual(productionInput.routeGraphTopologyPolicy, {
-    summaryRideEdges: "release-blocking-regression-only",
-    productionReadinessRequirement: "replace summary RIDE edges with adjacent-station LOCAL RIDE edges before ETA or release-readiness claim",
-    nonAdjacentExpressRideEdgeIds: [
-      "edge-sangnoksu-sadang-seoul-4",
-      "edge-sadang-sangnoksu-seoul-4",
-    ],
-  });
-  assert.deepEqual(productionInput.representativeRouteRegressions.map((route) => route.pattern), ["DIRECT"]);
+  assert.equal(productionInput.routeRegressionScope, undefined);
+  assert.equal(productionInput.routeGraphTopologyPolicy, undefined);
+  assert.deepEqual(productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE"), []);
+  assert.deepEqual(productionInput.representativeRouteRegressions, []);
   for (const edge of productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE")) {
     const speedKmh = (edge.distanceMeters / edge.durationSeconds) * 3.6;
     assert.ok(speedKmh >= 15 && speedKmh <= 110, `${edge.id} must stay within production ride speed bounds`);
@@ -4899,6 +4892,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.productionPromotionCriteria.p0CoverageGapPolicy, "fail-release");
   assert.equal(scope.productionPromotionCriteria.minimumProductionCoverageValuesMustBePositive, true);
   assert.equal(scope.productionPromotionCriteria.coverageEvidenceRequired, true);
+  assert.equal(scope.productionPromotionCriteria.representativeRouteRegressionsRequired, false);
   assert.equal(scope.productionPromotionCriteria.manifest.manifestVersion, 2);
   assert.equal(scope.productionPromotionCriteria.manifest.channel, "production");
   assert.equal(scope.productionPromotionCriteria.manifest.releaseSequenceMustIncrease, true);
@@ -5727,7 +5721,7 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
   }
 });
 
-test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되지 않는다", () => {
+test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되지 않는다", async () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
@@ -5762,6 +5756,35 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     productionCanonicalStopTimesStatus: "blocked_requires_trip_stop_sequence",
     plannedEtaUseAllowed: false,
   });
+  assert.deepStrictEqual(candidate.evidence.scheduleCollectionPlan, {
+    status: "planned_pilot_collection",
+    tool: "tools/datapack/validate-tago-schedule-sample.mjs",
+    command: "node tools/datapack/validate-tago-schedule-sample.mjs --plan --input tools/datapack/inputs/capital-pilot-production-source-input.json --daily-limit 1000 --checkpoint <checkpoint.json> --output <plan.json>",
+    summaryCommand: "node tools/datapack/validate-tago-schedule-sample.mjs --summary --input <collection.json> --output <summary.json>",
+    summaryArtifactKind: "tago-schedule-collection-summary",
+    input: "tools/datapack/inputs/capital-pilot-production-source-input.json",
+    defaultDailyLimit: 1000,
+    pilotRequestCount: 12,
+    checkpointField: "completedRequestKeys",
+    productionUseAllowed: false,
+  });
+  const { stdout: collectionPlanStdout } = await execFileAsync(
+    process.execPath,
+    [
+      candidate.evidence.scheduleCollectionPlan.tool,
+      "--plan",
+      "--input",
+      candidate.evidence.scheduleCollectionPlan.input,
+      "--daily-limit",
+      String(candidate.evidence.scheduleCollectionPlan.defaultDailyLimit),
+    ],
+    { cwd: root },
+  );
+  const collectionPlan = JSON.parse(collectionPlanStdout);
+  assert.equal(collectionPlan.sourceId, candidate.id);
+  assert.equal(collectionPlan.dailyLimit, candidate.evidence.scheduleCollectionPlan.defaultDailyLimit);
+  assert.equal(collectionPlan.totalRequestCount, candidate.evidence.scheduleCollectionPlan.pilotRequestCount);
+  assert.equal(collectionPlan.pendingRequestCount, candidate.evidence.scheduleCollectionPlan.pilotRequestCount);
   // source-candidates keeps a public summary, not the local full admin-review input with productionSource.
   assert.deepEqual(candidate.evidence.adminReview, {
     artifactKind: "source-admission-admin-review-summary",
@@ -9441,8 +9464,10 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /class RouteV2Planner implements RouteV2SearchUseCase/);
   assert.match(planner, /LoadRouteTimetablePort/);
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
-  assert.match(planner, /getIfAvailable\(\(\) -> RouteTimetable::empty\)/);
-  assert.match(planner, /loadRouteTimetable\(\)/);
+  assert.match(planner, /getIfAvailable\(\)/);
+  assert.match(planner, /timetableRequired && routeTimetablePort != null/);
+  assert.match(planner, /timetableRequired && !routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /hasRouteTimetable\(\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(useCase, /record SearchRouteV2Command/);
@@ -9457,6 +9482,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(useCase, /List<RouteV2Status> statuses/);
   assert.match(timetablePort, /interface LoadRouteTimetablePort/);
   assert.match(timetablePort, /loadRouteTimetable/);
+  assert.match(timetablePort, /hasRouteTimetable/);
   assert.match(timetablePort, /record RouteTimetable/);
   for (const schemaRecord of [
     "ServiceCalendar",
