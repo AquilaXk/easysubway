@@ -9804,7 +9804,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(easySubwayAppDefaultsTest, /인증 저장소가 없으면 홈 즐겨찾기를 노출하지 않는다/);
   assert.match(widgetTest, /노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다/);
   assert.match(widgetTest, /홈 즐겨찾기는 하나의 진입점에서 탭 목록을 바로 보여준다/);
-  assert.match(widgetTest, /도움말은 개인정보 사용 목적과 삭제 요청 대상을 쉬운 문구로 안내한다/);
+  assert.match(widgetTest, /도움말은 개인정보 안내를 불릿 대신 처리방침 링크로 위임한다/);
   assert.match(widgetTest, /도움말은 이동 전 살펴보기 안내를 함께 보여준다/);
   assert.match(widgetTest, /도움말은 보안과 개인정보 문의 경로를 안내한다/);
   assert.match(main, /보안 문의 안내/);
@@ -9863,13 +9863,19 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     routeSearch,
     /class FavoriteRouteApiRepository[\s\S]*?_httpClient[\s\S]*?class FavoriteRouteException/,
   );
-  assert.match(main, /개인정보 사용 안내/);
+  // 개인정보 안내는 화면 불릿 대신 개인정보처리방침 링크로 위임한다(#1571).
+  assert.match(main, /개인정보처리방침/);
+  assert.doesNotMatch(main, /개인정보 사용 안내/);
   assert.match(main, /이동 전 살펴보기/);
-  assert.match(main, /현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다/);
   assert.match(main, /경로와 시설 정보는 이동을 돕는 참고 정보입니다/);
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
-  assert.match(main, /내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꿉니다/);
+  // 삭제 확인 화면은 지워지는 것 1줄 + 되돌릴 수 없음 강조 + 예외 1줄로 압축한다(#1571).
+  assert.match(main, /삭제 후에는 되돌릴 수 없어요/);
+  assert.match(
+    main,
+    /이 기기의 즐겨찾기·최근 검색·설정과 보낸 제보·사진이 삭제되거나 익명 처리돼요/,
+  );
   assert.match(apiClient, /class ApiClient/);
   assert.match(apiClient, /const defaultApiTimeout = Duration\(seconds: 8\)/);
   assert.match(apiClient, /Future<ApiResponse> getJson/);
