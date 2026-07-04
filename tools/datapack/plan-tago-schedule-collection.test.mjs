@@ -222,8 +222,23 @@ test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret
     "MTRKR4448|01|U",
     "MTRKR4448|02|U",
   ]);
+  assert.deepEqual(collection.completedRequestKeys, collection.checkpoint.completedRequestKeys);
   assert.equal(new URL(fetchUrls[0]).searchParams.get("serviceKey"), "actual-secret-key");
   assert.doesNotMatch(JSON.stringify(collection), /actual-secret-key/);
+
+  const resumedPlan = buildTagoScheduleCollectionPlan(
+    {
+      stationLineRows: [
+        { stationCode: "448", lineId: "seoul-4" },
+        { stationCode: "433", lineId: "seoul-4" },
+      ],
+    },
+    collection,
+    2,
+  );
+  assert.equal(resumedPlan.completedRequestCount, 3);
+  assert.equal(resumedPlan.pendingRequestCount, 9);
+  assert.equal(resumedPlan.batches[0].requests[0].requestKey, "MTRKR4448|02|D");
 
   const summary = buildTagoScheduleCollectionSummary(collection);
   assert.deepEqual(summary.completedRequestKeys, collection.checkpoint.completedRequestKeys);

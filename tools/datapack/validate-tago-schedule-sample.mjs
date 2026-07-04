@@ -252,6 +252,7 @@ async function collectTagoSchedules(input, options = {}) {
     requestedCount: responses.length,
     completedRequestCount: completedRequestKeys.length,
     pendingRequestCount: Math.max(0, plan.pendingRequestCount - responses.length),
+    completedRequestKeys,
     checkpoint: { completedRequestKeys },
     responses,
   };
