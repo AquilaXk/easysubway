@@ -2602,7 +2602,7 @@ class RouteSearchServiceTest {
 			),
 			List.of(
 				new LoadRouteTimetablePort.TransitTrip(
-					"express-0901",
+					"express-0904",
 					"route-express",
 					"weekday-2026",
 					"도착",
@@ -2621,8 +2621,8 @@ class RouteSearchServiceTest {
 				)
 			),
 			List.of(
-				new LoadRouteTimetablePort.TransitStopTime("express-0901", 1, "station-a", "line-express", 32460, 32460, 0, 0),
-				new LoadRouteTimetablePort.TransitStopTime("express-0901", 2, "station-b", "line-express", 33000, 33000, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("express-0904", 1, "station-a", "line-express", 32640, 32640, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("express-0904", 2, "station-b", "line-express", 33180, 33180, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("local-0905", 1, "station-a", "line-local", 32700, 32700, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("local-0905", 2, "station-b", "line-local", 33900, 33900, 0, 0)
 			),
