@@ -3,22 +3,33 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 
-const region = "수도권";
+// region별 기대 역 point/노선 수 — QA 회귀 방지용 고정값. 새 region을 enrich할 때
+// 여기에 등록해야 exact-count 검증이 동작한다. (segment path 수는 positions-lines로
+// region 무관하게 파생된다.)
+export const expectedCountsByRegion = {
+  "수도권": { positions: 796, lines: 24 },
+  "부산권": { positions: 158, lines: 6 },
+  "대구권": { positions: 101, lines: 4 },
+  "광주권": { positions: 20, lines: 1 },
+  "대전권": { positions: 22, lines: 1 },
+};
 
 function usage() {
-  return `Usage: node tools/route-map/enrich-capital-route-map-layer.mjs --pack apps/mobile/assets/datapacks/capital.sqlite.gz --index apps/mobile/assets/datapacks/index.json [--check] [--qa-report report.json] [--max-label-overlaps N]
+  return `Usage: node tools/route-map/enrich-capital-route-map-layer.mjs --pack apps/mobile/assets/datapacks/capital.sqlite.gz --index apps/mobile/assets/datapacks/index.json [--region 수도권] [--check] [--qa-report report.json] [--max-label-overlaps N]
 
-Adds derived route-map line paths and label polygons for the capital route-map
-positions. --check validates the enriched capital layer without rewriting files.`;
+Adds derived route-map line paths and label polygons for a region's route-map
+positions inside the capital pack. --check validates without rewriting files.`;
 }
 
 function parseArgs(argv) {
   const options = {
     pack: null,
     index: null,
+    region: "수도권",
     check: false,
     qaReport: null,
     maxLabelOverlaps: null,
@@ -31,6 +42,9 @@ function parseArgs(argv) {
         break;
       case "--index":
         options.index = argv[++index];
+        break;
+      case "--region":
+        options.region = argv[++index];
         break;
       case "--check":
         options.check = true;
@@ -60,6 +74,7 @@ function parseArgs(argv) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  const region = options.region;
   const root = path.resolve(import.meta.dirname, "../..");
   const packPath = path.resolve(root, options.pack);
   const indexPath = path.resolve(root, options.index);
@@ -70,16 +85,16 @@ async function main() {
     const database = new DatabaseSync(sqlitePath);
     let output;
     try {
-      const before = capitalRouteMapSummary(database);
+      const before = capitalRouteMapSummary(database, region);
       if (!options.check) {
-        enrichCapitalRouteMap(database);
+        enrichCapitalRouteMap(database, region);
       }
-      const after = capitalRouteMapSummary(database);
-      assertCapitalRouteMap(after);
+      const after = capitalRouteMapSummary(database, region);
+      assertCapitalRouteMap(after, region);
       output = {
         before,
         after,
-        labelCollisionQa: labelCollisionQa(database),
+        labelCollisionQa: labelCollisionQa(database, region),
       };
       assertLabelCollisionBudget(output.labelCollisionQa, options.maxLabelOverlaps);
       console.log(JSON.stringify(output, null, 2));
@@ -100,7 +115,7 @@ async function main() {
   }
 }
 
-function enrichCapitalRouteMap(database) {
+function enrichCapitalRouteMap(database, region) {
   const rows = database.prepare(`
     SELECT
       rmp.station_id,
@@ -198,7 +213,7 @@ function segmentPath(from, to) {
   return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
 }
 
-function capitalRouteMapSummary(database) {
+function capitalRouteMapSummary(database, region) {
   const base = database.prepare(`
     SELECT
       COUNT(*) AS positions,
@@ -245,7 +260,7 @@ function capitalRouteMapSummary(database) {
   };
 }
 
-function labelCollisionQa(database) {
+function labelCollisionQa(database, region) {
   const rows = database.prepare(`
     SELECT
       rmp.station_id,
@@ -340,25 +355,41 @@ function labelKey(label) {
   return `${label.stationName}(${label.stationId}:${label.lineId})`;
 }
 
-function assertCapitalRouteMap(summary) {
-  if (summary.positions !== 796) {
-    throw new Error(`capital route map positions must be 796, got ${summary.positions}`);
+function assertCapitalRouteMap(summary, region) {
+  const expected = expectedCountsByRegion[region];
+  if (!expected) {
+    throw new Error(
+      `no expected route map counts configured for region ${region}; add it to expectedCountsByRegion`,
+    );
   }
-  if (summary.lines !== 24) {
-    throw new Error(`capital route map lines must be 24, got ${summary.lines}`);
+  if (summary.positions !== expected.positions) {
+    throw new Error(
+      `${region} route map positions must be ${expected.positions}, got ${summary.positions}`,
+    );
+  }
+  if (summary.lines !== expected.lines) {
+    throw new Error(
+      `${region} route map lines must be ${expected.lines}, got ${summary.lines}`,
+    );
   }
   const expectedSegmentPaths = summary.positions - summary.lines;
   if (summary.upPaths !== expectedSegmentPaths || summary.downPaths !== expectedSegmentPaths) {
-    throw new Error(`capital line paths must be ${expectedSegmentPaths} up/down segments, got ${summary.upPaths}/${summary.downPaths}`);
+    throw new Error(
+      `${region} line paths must be ${expectedSegmentPaths} up/down segments, got ${summary.upPaths}/${summary.downPaths}`,
+    );
   }
   if (summary.labelPolygons !== summary.positions) {
-    throw new Error(`capital label polygons must cover every station-line row, got ${summary.labelPolygons}/${summary.positions}`);
+    throw new Error(
+      `${region} label polygons must cover every station-line row, got ${summary.labelPolygons}/${summary.positions}`,
+    );
   }
-  if (summary.transferGroups <= 0) {
-    throw new Error("capital transfer groups must be derivable");
+  // 단일 노선 지역(예: 광주·대전 1호선)은 환승역이 없어 transfer 0이 정상.
+  // 다노선 지역은 환승 그룹이 도출되어야 한다.
+  if (expected.lines > 1 && summary.transferGroups <= 0) {
+    throw new Error(`${region} transfer groups must be derivable`);
   }
   if (summary.lod.zoom1MajorLabels !== summary.transferGroups) {
-    throw new Error("capital LOD major labels must match transfer groups");
+    throw new Error(`${region} LOD major labels must match transfer groups`);
   }
 }
 
@@ -396,7 +427,11 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+// CLI로 직접 실행할 때만 main을 돌린다. import(테스트에서 expectedCountsByRegion
+// 재사용)로 로드하면 실행하지 않는다.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
+}
