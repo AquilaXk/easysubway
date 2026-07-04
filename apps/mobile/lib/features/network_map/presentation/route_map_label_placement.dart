@@ -28,6 +28,7 @@ class RouteMapLabelCandidate {
     required this.anchor,
     required this.size,
     required this.priority,
+    this.anchorPadding = 0,
   });
 
   /// 안정 정렬용 식별자 (보통 stationId:lineId).
@@ -41,6 +42,10 @@ class RouteMapLabelCandidate {
 
   /// 낮을수록 우선(0=환승, 1=주요, 2=일반). 우선순위 높은 라벨이 자리를 먼저 차지.
   final int priority;
+
+  /// 역 마커 반지름 등, 라벨을 anchor에서 추가로 띄울 여백 px. gap에 더해진다.
+  /// (환승 마커처럼 큰 글리프 위에 라벨이 겹치지 않게 한다.)
+  final double anchorPadding;
 }
 
 /// 배치된 라벨과 최종 사각형.
@@ -119,7 +124,7 @@ List<PlacedRouteMapLabel> placeRouteMapLabels(
         candidate.anchor,
         candidate.size,
         anchor,
-        gap,
+        gap + candidate.anchorPadding,
       );
       if (viewportBounds != null && !viewportBounds.overlaps(rect)) {
         continue;

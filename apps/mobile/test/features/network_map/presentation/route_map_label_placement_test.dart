@@ -99,6 +99,30 @@ void main() {
       expect(placed, isEmpty);
     });
 
+    test('anchorPadding은 라벨을 anchor에서 gap보다 더 띄운다', () {
+      final noPad = placeRouteMapLabels(
+        [candidate(id: 'a', anchor: const Offset(100, 100), priority: 0)],
+        anchors: const [RouteMapLabelAnchor.right],
+        gap: 4,
+      );
+      final withPad = placeRouteMapLabels(
+        const [
+          RouteMapLabelCandidate(
+            id: 'a',
+            anchor: Offset(100, 100),
+            size: Size(40, 12),
+            priority: 0,
+            anchorPadding: 20,
+          ),
+        ],
+        anchors: const [RouteMapLabelAnchor.right],
+        gap: 4,
+      );
+      expect(withPad.single.rect.left, greaterThan(noPad.single.rect.left));
+      // right anchor: left = anchor.dx + gap + anchorPadding = 100+4+20.
+      expect(withPad.single.rect.left, 124);
+    });
+
     test('같은 우선순위는 id로 안정 정렬된다', () {
       final placed = placeRouteMapLabels(
         [

@@ -242,6 +242,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('major 역 라벨은 bucket 1(중간 확대)에서 예외 없이 그려진다', (tester) async {
+    final map = StructuredRouteMap(
+      lines: const [],
+      stations: const [
+        RouteMapStructuredStation(
+          stationId: 'major',
+          lineId: 'L1',
+          sequence: 1,
+          position: Offset(500, 500),
+          labelPolygon: [],
+          labelClass: RouteMapLabelClass.major,
+        ),
+      ],
+      transferGroups: const [],
+    );
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: map,
+          camera: camera(scale: 2.0), // bucket 1
+          lineColors: const {},
+          labelTextByStationId: const {'major': '주요역'},
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   test('shouldRepaint은 라벨 텍스트·attribution 변화를 감지한다', () {
     final map = sampleMap();
     final cam = camera(scale: 3.5);
