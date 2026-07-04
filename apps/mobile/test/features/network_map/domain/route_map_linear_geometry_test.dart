@@ -43,6 +43,16 @@ void main() {
         const Offset(3, 4),
       );
     });
+
+    test('NaN/Infinity 좌표는 마지막이 아니라 첫 정점으로 강등한다', () {
+      final nan = RouteMapLinearGeometry(const [
+        Offset(0, 0),
+        Offset(double.nan, 0),
+        Offset(10, 0),
+      ]);
+      expect(nan.pointAtT(0.5), const Offset(0, 0));
+      expect(nan.tAtVertex(1), 0);
+    });
   });
 
   group('tAtVertex / pointBetweenVertices', () {

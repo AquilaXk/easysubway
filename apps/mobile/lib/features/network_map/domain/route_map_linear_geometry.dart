@@ -29,28 +29,34 @@ class RouteMapLinearGeometry {
     if (_polyline.isEmpty) {
       return Offset.zero;
     }
-    if (_polyline.length == 1 || length == 0) {
+    // 단일 정점·길이 0·비유한(NaN/Infinity geometry)은 첫 정점으로 안전 강등.
+    if (_polyline.length == 1 || length == 0 || !length.isFinite) {
       return _polyline.first;
     }
     final clamped = t.isNaN ? 0.0 : t.clamp(0.0, 1.0);
     final target = clamped * length;
-    // target 이상이 되는 첫 정점을 찾아 그 이전 구간에서 보간한다.
-    for (var index = 1; index < _cumulative.length; index += 1) {
-      if (_cumulative[index] >= target) {
-        final segmentStart = _cumulative[index - 1];
-        final segmentLength = _cumulative[index] - segmentStart;
-        final fraction =
-            segmentLength == 0 ? 0.0 : (target - segmentStart) / segmentLength;
-        return Offset.lerp(_polyline[index - 1], _polyline[index], fraction)!;
+    // _cumulative는 단조 비감소 → 이진 탐색으로 target 이상 첫 정점을 찾는다.
+    var lo = 1;
+    var hi = _cumulative.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (_cumulative[mid] >= target) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
       }
     }
-    return _polyline.last;
+    final segmentStart = _cumulative[lo - 1];
+    final segmentLength = _cumulative[lo] - segmentStart;
+    final fraction =
+        segmentLength == 0 ? 0.0 : (target - segmentStart) / segmentLength;
+    return Offset.lerp(_polyline[lo - 1], _polyline[lo], fraction)!;
   }
 
   /// 정점 index의 t값(누적 거리 / 전체). 역이 polyline 정점에 해당하므로,
   /// 역별 t는 이 값으로 얻는다.
   double tAtVertex(int index) {
-    if (_cumulative.isEmpty || length == 0) {
+    if (_cumulative.isEmpty || length == 0 || !length.isFinite) {
       return 0;
     }
     final clampedIndex = index.clamp(0, _cumulative.length - 1);
