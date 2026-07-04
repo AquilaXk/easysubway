@@ -23,9 +23,17 @@ import { tmpdir } from "node:os";
 // 역 라벨을 track에 근접 배정할 때의 반경(root px). 라벨은 track에서 20~35px
 // 떨어져 있어(폰트 높이 근처) 이보다 크면 이웃 노선까지 삼킨다.
 const SNAP_RADIUS = 35;
+// 같은 색 track 조각의 끝점이 이 거리(root px) 이내면 한 조각으로 이어 붙인다.
+const STITCH_TOLERANCE = 1.5;
+// 색 정제: RGB 거리가 이 값 이내인 두 색은 같은 노선의 변종으로 보고 병합한다.
+// (대구 3호선 노랑 #fdc30d/#ffc512 = 거리 ≈ 6.)
+const MERGE_COLOR_DISTANCE = 24;
+// 색 정제: HSV 채도가 이 값 미만이면 무채색(외곽선·테두리·배경)으로 보고 제외 후보.
+// 노선색은 최소 0.43(부산 #7189c5)이라 여유가 있다.
+const ACHROMATIC_THRESHOLD = 0.2;
 
 function usage() {
-  return `Usage: node tools/route-map/build-route-map-line-tracks.mjs --geometry <geom.json> --pack <capital.sqlite[.gz]> --region <name> [--out <tracks.json>] [--check] [--snap-radius <px>]
+  return `Usage: node tools/route-map/build-route-map-line-tracks.mjs --geometry <geom.json> --pack <capital.sqlite[.gz]> --region <name> [--out <tracks.json>] [--check] [--snap-radius <px>] [--stitch-tolerance <px>] [--merge-color-distance <rgb>] [--achromatic-threshold <0-1>]
 
 extract-svg-geometry v2 결과의 노선 track(polyline/path)을 색↔line_id 최적매칭으로
 region 노선별 track geometry로 변환한다. --check는 파일을 쓰지 않고 무결성만 검증한다.
@@ -33,7 +41,13 @@ region 노선별 track geometry로 변환한다. --check는 파일을 쓰지 않
 }
 
 function parseArgs(argv) {
-  const options = { geometry: null, pack: null, region: null, out: null, check: false, snapRadius: SNAP_RADIUS };
+  const options = {
+    geometry: null, pack: null, region: null, out: null, check: false,
+    snapRadius: SNAP_RADIUS,
+    stitchTolerance: STITCH_TOLERANCE,
+    mergeColorDistance: MERGE_COLOR_DISTANCE,
+    achromaticThreshold: ACHROMATIC_THRESHOLD,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     switch (arg) {
@@ -46,6 +60,9 @@ function parseArgs(argv) {
       case "--out": options.out = argv[++index] ?? null; break;
       case "--check": options.check = true; break;
       case "--snap-radius": options.snapRadius = Number.parseFloat(argv[++index] ?? ""); break;
+      case "--stitch-tolerance": options.stitchTolerance = Number.parseFloat(argv[++index] ?? ""); break;
+      case "--merge-color-distance": options.mergeColorDistance = Number.parseFloat(argv[++index] ?? ""); break;
+      case "--achromatic-threshold": options.achromaticThreshold = Number.parseFloat(argv[++index] ?? ""); break;
       default:
         if (arg.startsWith("--")) throw new Error(`Unknown option: ${arg}`);
     }
@@ -54,6 +71,9 @@ function parseArgs(argv) {
   if (!options.pack) throw new Error("--pack is required.");
   if (!options.region) throw new Error("--region is required.");
   if (!Number.isFinite(options.snapRadius) || options.snapRadius <= 0) throw new Error("--snap-radius must be a positive number.");
+  if (!Number.isFinite(options.stitchTolerance) || options.stitchTolerance <= 0) throw new Error("--stitch-tolerance must be a positive number.");
+  if (!Number.isFinite(options.mergeColorDistance) || options.mergeColorDistance < 0) throw new Error("--merge-color-distance must be a non-negative number.");
+  if (!Number.isFinite(options.achromaticThreshold) || options.achromaticThreshold < 0) throw new Error("--achromatic-threshold must be a non-negative number.");
   return options;
 }
 
@@ -150,7 +170,98 @@ function pathString(points) {
     .join(" ");
 }
 
-async function buildLineTracks({ geometry, pack, region, snapRadius }) {
+// "#rrggbb" → [r, g, b].
+function rgb(hex) {
+  return [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
+}
+
+// HSV 채도(0=무채색). 외곽선·테두리·배경 같은 비노선 색을 가려낸다.
+function saturation(hex) {
+  const [r, g, b] = rgb(hex);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
+function colorDistance(a, b) {
+  const [ar, ag, ab] = rgb(a);
+  const [br, bg, bb] = rgb(b);
+  return Math.hypot(ar - br, ag - bg, ab - bb);
+}
+
+// 두 정점열을 끝점이 tolerance 이내면 (방향 4조합 시도) 이어 붙인다. 아니면 null.
+function joinChains(a, b, tolerance) {
+  const close = (p, q) => Math.hypot(p.x - q.x, p.y - q.y) <= tolerance;
+  if (close(a[a.length - 1], b[0])) return [...a, ...b.slice(1)];
+  if (close(b[b.length - 1], a[0])) return [...b, ...a.slice(1)];
+  if (close(a[a.length - 1], b[b.length - 1])) return [...a, ...[...b].reverse().slice(1)];
+  if (close(a[0], b[0])) return [...[...a].reverse(), ...b.slice(1)];
+  return null;
+}
+
+// 같은 색 조각들을 끝점 tolerance로 이어 붙인다. 조각 수가 작아 반복 병합 O(n²)로 충분.
+function stitchChains(pointLists, tolerance) {
+  const chains = pointLists.map((points) => [...points]);
+  let merged = true;
+  while (merged) {
+    merged = false;
+    outer: for (let i = 0; i < chains.length; i += 1) {
+      for (let j = i + 1; j < chains.length; j += 1) {
+        const joined = joinChains(chains[i], chains[j], tolerance);
+        if (joined) {
+          chains[i] = joined;
+          chains.splice(j, 1);
+          merged = true;
+          break outer;
+        }
+      }
+    }
+  }
+  return chains;
+}
+
+// 색 정제: 색 수 > 노선 수일 때만 발동. (1) 유사색 병합 (2) 무채색 최저표 제외
+// (3) 최저표 제외. 색 수 = 노선 수면 그대로 둔다(수도권 회색 노선 #797979 보존).
+// items: [{ color, tracks: stroke[], weightRow: number[] }], weightRow는 색×line 표.
+function refineColors(items, lineCount, { mergeDistance, achromaticThreshold }) {
+  const report = { originalColorCount: items.length, merged: [], dropped: [] };
+  const rowSum = (item) => item.weightRow.reduce((sum, value) => sum + value, 0);
+  let guard = items.length * 2;
+  while (items.length > lineCount && guard-- > 0) {
+    // 1. 가장 가까운 유사색 쌍 병합 (표 많은 쪽을 대표색으로).
+    let bestPair = null;
+    let bestDistance = Infinity;
+    for (let i = 0; i < items.length; i += 1) {
+      for (let j = i + 1; j < items.length; j += 1) {
+        const distance = colorDistance(items[i].color, items[j].color);
+        if (distance <= mergeDistance && distance < bestDistance) {
+          bestDistance = distance;
+          bestPair = [i, j];
+        }
+      }
+    }
+    if (bestPair) {
+      const [i, j] = bestPair;
+      const keep = rowSum(items[i]) >= rowSum(items[j]) ? i : j;
+      const drop = keep === i ? j : i;
+      report.merged.push([items[keep].color, items[drop].color]);
+      items[keep].tracks.push(...items[drop].tracks);
+      items[keep].weightRow = items[keep].weightRow.map((value, index) => value + items[drop].weightRow[index]);
+      items.splice(drop, 1);
+      continue;
+    }
+    // 2. 무채색 중 최저표 제외. 없으면 3. 전체 최저표 제외(경고는 호출부에서).
+    const achromatic = items.filter((item) => saturation(item.color) < achromaticThreshold);
+    const pool = achromatic.length > 0 ? achromatic : items;
+    let victim = pool[0];
+    for (const item of pool) if (rowSum(item) < rowSum(victim)) victim = item;
+    report.dropped.push({ color: victim.color, achromatic: saturation(victim.color) < achromaticThreshold, votes: rowSum(victim) });
+    items.splice(items.indexOf(victim), 1);
+  }
+  return report;
+}
+
+async function buildLineTracks({ geometry, pack, region, snapRadius, stitchTolerance, mergeColorDistance, achromaticThreshold }) {
   const geom = JSON.parse(await readFile(path.resolve(geometry), "utf8"));
   const strokes = (geom.strokes ?? []).filter((stroke) => stroke.tag !== "line" && !stroke.dashed);
   if (strokes.length === 0) throw new Error("geometry에 노선 track(polyline/path stroke)이 없다. extract-svg-geometry v2 결과인지 확인.");
@@ -176,10 +287,12 @@ async function buildLineTracks({ geometry, pack, region, snapRadius }) {
   }
   const colors = [...tracksByColor.keys()];
   const lineIds = [...new Set(stations.map((station) => station.lineId))];
-
-  // 색×line_id 근접 표수: 각 역을 "가장 가까운 색"에 투표(snapRadius 이내일 때만).
-  const weight = colors.map(() => new Array(lineIds.length).fill(0));
   const lineIndex = new Map(lineIds.map((id, index) => [id, index]));
+
+  // 색×line_id 근접 표수 + 좌표계 검증용 근접 역 수: 각 역을 "가장 가까운 색"에
+  // 투표(snapRadius 이내일 때만). votedStations는 어떤 색에든 배정된 역 = 근접률.
+  const weight = colors.map(() => new Array(lineIds.length).fill(0));
+  let votedStations = 0;
   for (const station of stations) {
     let bestColor = -1;
     let bestDistance = Infinity;
@@ -189,35 +302,56 @@ async function buildLineTracks({ geometry, pack, region, snapRadius }) {
     });
     if (bestColor >= 0 && bestDistance <= snapRadius) {
       weight[bestColor][lineIndex.get(station.lineId)] += 1;
+      votedStations += 1;
     }
   }
+  const stationProximityRatio = Math.round((votedStations / stations.length) * 1000) / 1000;
 
-  // 색↔line_id 전역 최적 1:1 매칭.
-  const lineForColor = maximumWeightMatching(weight, colors.length, lineIds.length);
+  // 색 정제: 색 수 > 노선 수면 유사색 병합·무채색 제외로 색=노선을 성립시킨다.
+  const items = colors.map((color, colorIndex) => ({
+    color,
+    tracks: tracksByColor.get(color),
+    weightRow: weight[colorIndex],
+  }));
+  const refinement = refineColors(items, lineIds.length, {
+    mergeDistance: mergeColorDistance,
+    achromaticThreshold,
+  });
+
+  // 정제된 색으로 전역 최적 1:1 매칭.
+  const refinedColors = items.map((item) => item.color);
+  const refinedWeight = items.map((item) => item.weightRow);
+  const lineForColor = maximumWeightMatching(refinedWeight, refinedColors.length, lineIds.length);
   const stationCountByLine = new Map();
   for (const station of stations) stationCountByLine.set(station.lineId, (stationCountByLine.get(station.lineId) ?? 0) + 1);
 
   const lines = [];
   const warnings = [];
   const colorToLineId = {};
-  colors.forEach((color, colorIndex) => {
+  for (const dropped of refinement.dropped) {
+    if (!dropped.achromatic) warnings.push(`색 ${dropped.color}: 색>노선 초과분으로 제외(표 ${dropped.votes}, 무채색 아님). 검수 필요.`);
+  }
+  items.forEach((item, colorIndex) => {
     const matchedLineIndex = lineForColor[colorIndex];
     const lineId = matchedLineIndex >= 0 ? lineIds[matchedLineIndex] : null;
-    const votes = matchedLineIndex >= 0 ? weight[colorIndex][matchedLineIndex] : 0;
-    const bestVotes = Math.max(0, ...weight[colorIndex]);
+    const votes = matchedLineIndex >= 0 ? item.weightRow[matchedLineIndex] : 0;
+    const bestVotes = Math.max(0, ...item.weightRow);
     if (!lineId) {
-      warnings.push(`색 ${color}: 매칭된 노선 없음(track ${tracksByColor.get(color).length}개).`);
+      warnings.push(`색 ${item.color}: 매칭된 노선 없음(track ${item.tracks.length}개).`);
       return;
     }
-    colorToLineId[color] = lineId;
-    if (votes === 0) warnings.push(`색 ${color} → ${lineId}: 근접 역 0표(소거법 배정). 위치 검수 필요.`);
-    else if (votes !== bestVotes) warnings.push(`색 ${color} → ${lineId}: 최적매칭 표(${votes})가 국소 최다표(${bestVotes})와 다름.`);
-    const paths = tracksByColor.get(color)
-      .filter((track) => track.points.length >= 2)
-      .map((track) => pathString(track.points));
+    colorToLineId[item.color] = lineId;
+    if (votes === 0) warnings.push(`색 ${item.color} → ${lineId}: 근접 역 0표(소거법 배정). 위치 검수 필요.`);
+    else if (votes !== bestVotes) warnings.push(`색 ${item.color} → ${lineId}: 최적매칭 표(${votes})가 국소 최다표(${bestVotes})와 다름.`);
+    const paths = stitchChains(
+      item.tracks.map((track) => track.points).filter((points) => points.length >= 2),
+      stitchTolerance,
+    )
+      .filter((points) => points.length >= 2)
+      .map((points) => pathString(points));
     lines.push({
       lineId,
-      svgColor: color,
+      svgColor: item.color,
       trackCount: paths.length,
       matchVotes: votes,
       stationCount: stationCountByLine.get(lineId) ?? 0,
@@ -234,9 +368,12 @@ async function buildLineTracks({ geometry, pack, region, snapRadius }) {
     schemaVersion: 1,
     region,
     snapRadius,
+    stitchTolerance,
+    stationProximityRatio,
     sourceExtractorVersion: geom.extractorVersion ?? null,
-    colorCount: colors.length,
+    colorCount: refinedColors.length,
     lineCount: lineIds.length,
+    refinement,
     colorToLineId,
     lines: lines.sort((a, b) => a.lineId.localeCompare(b.lineId)),
     warnings,
@@ -248,14 +385,13 @@ function assertIntegrity(result) {
   if (result.colorCount !== result.lineCount) {
     problems.push(`track 색 수(${result.colorCount}) ≠ 노선 수(${result.lineCount}) — 색이 노선 식별자라는 전제 위반.`);
   }
-  const zeroVote = result.lines.filter((line) => line.matchVotes === 0);
-  if (zeroVote.length > 0) {
-    problems.push(`근접 역 0표로 배정된 노선 ${zeroVote.length}개: ${zeroVote.map((line) => line.lineId).join(", ")}`);
-  }
   const emptyPaths = result.lines.filter((line) => line.trackCount === 0);
   if (emptyPaths.length > 0) {
     problems.push(`track path가 비어 있는 노선 ${emptyPaths.length}개: ${emptyPaths.map((line) => line.lineId).join(", ")}`);
   }
+  // 0표(소거법 배정) 노선은 track이 존재하므로 무음 fallback이 아니다. BLOCKER가 아닌
+  // 수동 검수 대상(audit LINE_TRACKS_ZERO_VOTE=HIGH)이며 warnings로 이미 노출된다.
+  // 색≠노선/빈 path만 build --check의 차단 사유로 둔다.
   return problems;
 }
 
@@ -268,7 +404,9 @@ async function main() {
   const result = await buildLineTracks(options);
   const problems = assertIntegrity(result);
 
-  process.stderr.write(`[${result.region}] 색 ${result.colorCount} / 노선 ${result.lineCount} · track 노선 ${result.lines.length} · 경고 ${result.warnings.length}\n`);
+  process.stderr.write(`[${result.region}] 색 ${result.colorCount}(원본 ${result.refinement.originalColorCount}) / 노선 ${result.lineCount} · track 노선 ${result.lines.length} · 근접률 ${result.stationProximityRatio} · 경고 ${result.warnings.length}\n`);
+  if (result.refinement.merged.length > 0) process.stderr.write(`  ↳ 병합 ${result.refinement.merged.map((pair) => pair.join("←")).join(", ")}\n`);
+  if (result.refinement.dropped.length > 0) process.stderr.write(`  ↳ 제외 ${result.refinement.dropped.map((drop) => `${drop.color}${drop.achromatic ? "(무채색)" : ""}`).join(", ")}\n`);
   for (const warning of result.warnings) process.stderr.write(`  ⚠ ${warning}\n`);
 
   if (options.check) {

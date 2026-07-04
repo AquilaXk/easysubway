@@ -5,10 +5,48 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+const buildLineTracksScript = path.resolve(import.meta.dirname, "build-route-map-line-tracks.mjs");
+
+// build-route-map-line-tracks를 temp pack + geometry로 실행하고 stdout JSON을 돌려준다.
+// route_map_positions는 build가 SELECT하는 컬럼(station_id/line_id/region/x/y)만 만든다.
+async function runBuildLineTracks({ geometry, region, stations, args = [] }) {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-line-tracks-test-"));
+  try {
+    const packPath = path.join(dir, "pack.sqlite");
+    const db = new DatabaseSync(packPath);
+    db.exec(
+      `CREATE TABLE route_map_positions (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        region TEXT NOT NULL,
+        x INTEGER NOT NULL,
+        y INTEGER NOT NULL
+      )`,
+    );
+    const insert = db.prepare(
+      "INSERT INTO route_map_positions (station_id, line_id, region, x, y) VALUES (?, ?, ?, ?, ?)",
+    );
+    for (const station of stations) {
+      insert.run(station.station_id, station.line_id, region, station.x, station.y);
+    }
+    db.close();
+    const geometryPath = path.join(dir, "geometry.json");
+    await writeFile(geometryPath, JSON.stringify(geometry));
+    const { stdout } = await execFileAsync(
+      "node",
+      [buildLineTracksScript, "--geometry", geometryPath, "--pack", packPath, "--region", region, ...args],
+      { cwd: root, maxBuffer: 4 * 1024 * 1024 },
+    );
+    return JSON.parse(stdout);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
 
 test("structured route map contract pins nationwide vector-rendered layers", async () => {
   const contract = JSON.parse(
@@ -132,7 +170,7 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
 
   assert.equal(output.schemaVersion, 1);
   assert.equal(output.region, "fixture");
-  assert.equal(output.extractorVersion, "route-map-svg-geometry-v1");
+  assert.equal(output.extractorVersion, "route-map-svg-geometry-v2");
   assert.equal(output.sourceSvgSha256, createHash("sha256").update(source).digest("hex"));
   assert.deepEqual(output.sourceViewBox, [0, 0, 200, 120]);
   assert.match(output.browser.version, /Chrome|Chromium/i);
@@ -1901,4 +1939,59 @@ test("MOLIT nationwide fixture builder emits route map source hashes", async () 
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }
+});
+
+test("build-route-map-line-tracks stitches touching fragments and reports proximity", async () => {
+  // 같은 색 두 조각: (0,0)-(10,0) 와 (10.5,0)-(20,0) → tolerance 1.5로 한 조각.
+  const geometry = {
+    extractorVersion: 2,
+    strokes: [
+      { tag: "polyline", stroke: "#ff0000", dashed: false, points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+      { tag: "polyline", stroke: "#ff0000", dashed: false, points: [{ x: 10.5, y: 0 }, { x: 20, y: 0 }] },
+    ],
+  };
+  const result = await runBuildLineTracks({
+    geometry,
+    region: "테스트권",
+    stations: [
+      { station_id: "s1", line_id: "line-a", x: 2, y: 5 },
+      { station_id: "s2", line_id: "line-a", x: 18, y: 5 },
+    ],
+  });
+  assert.equal(result.lines.length, 1);
+  assert.equal(result.lines[0].trackCount, 1); // 2 조각 → 1 (stitched)
+  assert.equal(result.lines[0].paths[0], "M 0 0 L 10 0 L 20 0");
+  assert.equal(result.stationProximityRatio, 1); // 2/2 역이 반경 내
+});
+
+test("build-route-map-line-tracks refines surplus colors (achromatic drop + similar merge)", async () => {
+  // 노선 2개(line-a, line-b). 색 4개 = 빨강·빨강변종(line-a)·파랑(line-b)·검정(무채색 외곽선).
+  // 정제: 빨강 변종 병합 + 무채색 검정 제외 → 색2 = 노선2.
+  const geometry = {
+    extractorVersion: 2,
+    strokes: [
+      { tag: "polyline", stroke: "#ff0000", dashed: false, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+      { tag: "polyline", stroke: "#fe0202", dashed: false, points: [{ x: 100, y: 0 }, { x: 200, y: 0 }] },
+      { tag: "polyline", stroke: "#0000ff", dashed: false, points: [{ x: 0, y: 100 }, { x: 100, y: 100 }] },
+      { tag: "polyline", stroke: "#1a1a1a", dashed: false, points: [{ x: 0, y: 400 }, { x: 200, y: 400 }] },
+    ],
+  };
+  const result = await runBuildLineTracks({
+    geometry,
+    region: "테스트권",
+    stations: [
+      { station_id: "a1", line_id: "line-a", x: 5, y: 5 },
+      { station_id: "a2", line_id: "line-a", x: 195, y: 5 },
+      { station_id: "b1", line_id: "line-b", x: 5, y: 105 },
+      { station_id: "b2", line_id: "line-b", x: 95, y: 105 },
+    ],
+  });
+  assert.equal(result.lines.length, 2);
+  assert.equal(result.colorCount, 2); // 정제 후 색 수 = 노선 수
+  assert.equal(result.refinement.originalColorCount, 4);
+  assert.ok(result.refinement.dropped.some((drop) => drop.color === "#1a1a1a" && drop.achromatic)); // 무채색 제외
+  assert.ok(result.refinement.merged.some((pair) => pair.includes("#fe0202"))); // 유사색 병합
+  // 빨강 노선은 병합으로 한 조각(0→200), 파랑은 별도.
+  const redLine = result.lines.find((line) => line.svgColor === "#ff0000");
+  assert.ok(redLine, "대표색 #ff0000 노선이 있어야 한다");
 });
