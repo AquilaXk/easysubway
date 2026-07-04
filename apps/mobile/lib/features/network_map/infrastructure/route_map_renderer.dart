@@ -15,6 +15,22 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
     right: viewBox.x + viewBox.width,
     bottom: viewBox.y + viewBox.height
   };
+  const readBounds = (label) => {
+    let bounds = null;
+    try {
+      bounds = label.getBBox();
+    } finally {
+      return bounds;
+    }
+  };
+  const invertMatrix = (matrix) => {
+    let inverted = null;
+    try {
+      inverted = matrix.inverse();
+    } finally {
+      return inverted;
+    }
+  };
   const accepted = [];
   const labels = Array.from(svg.querySelectorAll('text'));
   for (const label of labels) {
@@ -34,10 +50,8 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
         bottom: Number(label.dataset.easysubwayLabelBottom)
       };
     } else {
-      let bounds;
-      try {
-        bounds = label.getBBox();
-      } catch (_) {
+      const bounds = readBounds(label);
+      if (!bounds) {
         continue;
       }
       const labelMatrix = label.getScreenCTM();
@@ -45,10 +59,8 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
       if (!labelMatrix || !svgMatrix) {
         continue;
       }
-      let toSvg;
-      try {
-        toSvg = svgMatrix.inverse();
-      } catch (_) {
+      const toSvg = invertMatrix(svgMatrix);
+      if (!toSvg) {
         continue;
       }
       const point = svg.createSVGPoint();
