@@ -8,6 +8,21 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
   if (!svg || !svg.viewBox || !svg.viewBox.baseVal) {
     return false;
   }
+  const minIntervalMs = 120;
+  const now = Date.now();
+  const lastRun = Number(svg.dataset.easysubwayLabelPolicyAt || 0);
+  const remainingMs = minIntervalMs - (now - lastRun);
+  if (remainingMs > 0) {
+    if (!svg.dataset.easysubwayLabelPolicyPending) {
+      svg.dataset.easysubwayLabelPolicyPending = 'true';
+      setTimeout(() => {
+        delete svg.dataset.easysubwayLabelPolicyPending;
+        window.easysubwayApplyRouteMapLabelPolicy();
+      }, remainingMs);
+    }
+    return true;
+  }
+  svg.dataset.easysubwayLabelPolicyAt = String(now);
   const viewBox = svg.viewBox.baseVal;
   const viewport = {
     left: viewBox.x,
