@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../../stations/domain/station_line.dart' show stationLineColor;
 import '../domain/map_camera.dart';
 import '../domain/structured_route_map.dart';
+import 'route_map_label_placement.dart';
 
 // 구조화 노선도 native canvas 렌더러 코어 (#1641 Stage 2).
 //
@@ -75,24 +76,63 @@ class StructuredRouteMapPainter extends CustomPainter {
     required this.map,
     required this.camera,
     required this.lineColors,
+    this.labelTextByStationId = const {},
+    this.attributionText,
     this.lineWidth = 4.0,
     this.stationRadius = 3.0,
     this.transferStationRadius = 5.0,
-  });
+    this.labelStyle = _defaultLabelStyle,
+    this.attributionStyle = _defaultAttributionStyle,
+    Map<String, TextPainter>? labelPainterCache,
+  }) : _labelPainters = labelPainterCache ?? {};
 
   final StructuredRouteMap map;
   final MapCameraState camera;
 
   /// line_id → 색. 없으면 노선 색 fallback을 쓴다.
   final Map<String, Color> lineColors;
+
+  /// station_id → 역명. 비어 있으면 라벨을 그리지 않는다.
+  final Map<String, String> labelTextByStationId;
+
+  /// 출처 표기(#1637 attribution 필요 지역). null/빈 문자열이면 그리지 않는다.
+  final String? attributionText;
   final double lineWidth;
   final double stationRadius;
   final double transferStationRadius;
+  final TextStyle labelStyle;
+  final TextStyle attributionStyle;
 
   static const Color _transferFill = Color(0xFFFFFFFF);
   static const Color _transferBorder = Color(0xFF102A2C);
   static const Color _fallbackLineColor = Color(0xFF8D8D8D);
   static const double _transferBorderWidth = 2.0;
+  static const double _labelGap = 4.0;
+  static const TextStyle _defaultLabelStyle = TextStyle(
+    color: Color(0xFF102A2C),
+    fontSize: 11,
+    fontWeight: FontWeight.w600,
+  );
+  static const TextStyle _defaultAttributionStyle = TextStyle(
+    color: Color(0xFF466467),
+    fontSize: 10,
+  );
+
+  // 텍스트 실측은 비싸므로 TextPainter를 캐시한다. 외부(StatefulWidget)가 캐시를
+  // 주입하면 rebuild 간에도 유지되고 소유자가 dispose한다. 없으면 인스턴스 수명용.
+  final Map<String, TextPainter> _labelPainters;
+
+  /// 라벨 class → 배치 우선순위(낮을수록 우선). #1636 station_labels.priority.
+  static int _labelPriorityFor(RouteMapLabelClass labelClass) {
+    switch (labelClass) {
+      case RouteMapLabelClass.transfer:
+        return 0;
+      case RouteMapLabelClass.major:
+        return 1;
+      case RouteMapLabelClass.regular:
+        return 2;
+    }
+  }
 
   // 프레임마다 재할당하지 않도록 Paint를 인스턴스/정적 필드로 hoist한다.
   final Paint _linePaint = Paint()
@@ -125,6 +165,8 @@ class StructuredRouteMapPainter extends CustomPainter {
     final visible = camera.visibleSourceRect.inflate(margin);
     _paintLines(canvas, visible);
     _paintStations(canvas, visible);
+    _paintLabels(canvas, size, visible);
+    _paintAttribution(canvas, size);
   }
 
   void _paintLines(Canvas canvas, Rect visible) {
@@ -190,11 +232,133 @@ class StructuredRouteMapPainter extends CustomPainter {
     }
   }
 
+  void _paintLabels(Canvas canvas, Size size, Rect visible) {
+    if (labelTextByStationId.isEmpty) {
+      return;
+    }
+    final bucket = routeMapZoomBucket(camera);
+    // 어떤 class든 라벨 최소 bucket은 1 — bucket 0은 lines only.
+    if (bucket < 1) {
+      return;
+    }
+    final candidates = <RouteMapLabelCandidate>[];
+    final painterById = <String, TextPainter>{};
+
+    // 환승 라벨: transferGroups 중심, 마커 반지름만큼 여백을 둔다.
+    if (bucket >= minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
+      for (final group in map.transferGroups) {
+        if (!visible.contains(group.centroid)) {
+          continue;
+        }
+        final text = labelTextByStationId[group.stationId];
+        if (text == null || text.isEmpty) {
+          continue;
+        }
+        final id = 'transfer:${group.stationId}';
+        final painter = _labelPainter(text);
+        painterById[id] = painter;
+        candidates.add(
+          RouteMapLabelCandidate(
+            id: id,
+            anchor: camera.sourceToViewportPoint(group.centroid),
+            size: painter.size,
+            priority: _labelPriorityFor(RouteMapLabelClass.transfer),
+            anchorPadding: transferStationRadius + _transferBorderWidth,
+          ),
+        );
+      }
+    }
+
+    // 비환승 역 라벨(주요/일반): class별 LOD·우선순위를 적용한다.
+    for (final station in map.stations) {
+      if (station.labelClass == RouteMapLabelClass.transfer) {
+        continue;
+      }
+      if (bucket < minLabelZoomBucketFor(station.labelClass)) {
+        continue;
+      }
+      if (!visible.contains(station.position)) {
+        continue;
+      }
+      final text = labelTextByStationId[station.stationId];
+      if (text == null || text.isEmpty) {
+        continue;
+      }
+      final id = '${station.stationId}:${station.lineId}';
+      final painter = _labelPainter(text);
+      painterById[id] = painter;
+      candidates.add(
+        RouteMapLabelCandidate(
+          id: id,
+          anchor: camera.sourceToViewportPoint(station.position),
+          size: painter.size,
+          priority: _labelPriorityFor(station.labelClass),
+          anchorPadding: stationRadius,
+        ),
+      );
+    }
+
+    final placed = placeRouteMapLabels(
+      candidates,
+      gap: _labelGap,
+      viewportBounds: Offset.zero & size,
+    );
+    for (final label in placed) {
+      painterById[label.candidate.id]?.paint(canvas, label.rect.topLeft);
+    }
+  }
+
+  void _paintAttribution(Canvas canvas, Size size) {
+    final text = attributionText;
+    if (text == null || text.isEmpty) {
+      return;
+    }
+    final painter = _labelPainters.putIfAbsent(
+      'attribution:$text',
+      () => TextPainter(
+        text: TextSpan(text: text, style: attributionStyle),
+        textDirection: TextDirection.ltr,
+      )..layout(),
+    );
+    const padding = 4.0;
+    final origin = Offset(
+      padding + 2,
+      // 아주 작은 뷰포트에서 위로 넘어가지 않도록 하한을 둔다.
+      math.max(padding, size.height - painter.height - padding - 2),
+    );
+    final background = Rect.fromLTWH(
+      origin.dx - 3,
+      origin.dy - 2,
+      painter.width + 6,
+      painter.height + 4,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(background, const Radius.circular(3)),
+      Paint()..color = const Color(0xCCFFFFFF),
+    );
+    painter.paint(canvas, origin);
+  }
+
+  TextPainter _labelPainter(String text) {
+    return _labelPainters.putIfAbsent(
+      text,
+      () => TextPainter(
+        text: TextSpan(text: text, style: labelStyle),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout(),
+    );
+  }
+
   @override
   bool shouldRepaint(StructuredRouteMapPainter oldDelegate) {
     return oldDelegate.camera.revision != camera.revision ||
         !identical(oldDelegate.map, map) ||
         !mapEquals(oldDelegate.lineColors, lineColors) ||
+        !mapEquals(oldDelegate.labelTextByStationId, labelTextByStationId) ||
+        oldDelegate.attributionText != attributionText ||
+        oldDelegate.labelStyle != labelStyle ||
+        oldDelegate.attributionStyle != attributionStyle ||
         oldDelegate.lineWidth != lineWidth ||
         oldDelegate.stationRadius != stationRadius ||
         oldDelegate.transferStationRadius != transferStationRadius;
@@ -203,26 +367,53 @@ class StructuredRouteMapPainter extends CustomPainter {
 
 /// 구조화 노선도 canvas 뷰. [camera]/[map]을 받아 [StructuredRouteMapPainter]로
 /// 그린다. WebView 없이 native로 렌더링한다.
-class StructuredRouteMapView extends StatelessWidget {
+///
+/// TextPainter 캐시를 State가 소유해 rebuild 간에 유지하고 dispose 시 정리한다
+/// (painter는 프레임마다 새로 만들어지므로 캐시를 인스턴스에 두면 유지되지 않고
+/// native paragraph 핸들이 누수된다).
+class StructuredRouteMapView extends StatefulWidget {
   const StructuredRouteMapView({
     required this.map,
     required this.camera,
     required this.lineColors,
+    this.labelTextByStationId = const {},
+    this.attributionText,
     super.key,
   });
 
   final StructuredRouteMap map;
   final MapCameraState camera;
   final Map<String, Color> lineColors;
+  final Map<String, String> labelTextByStationId;
+  final String? attributionText;
+
+  @override
+  State<StructuredRouteMapView> createState() => _StructuredRouteMapViewState();
+}
+
+class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
+  final Map<String, TextPainter> _labelPainters = {};
+
+  @override
+  void dispose() {
+    for (final painter in _labelPainters.values) {
+      painter.dispose();
+    }
+    _labelPainters.clear();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      size: camera.viewportSize,
+      size: widget.camera.viewportSize,
       painter: StructuredRouteMapPainter(
-        map: map,
-        camera: camera,
-        lineColors: lineColors,
+        map: widget.map,
+        camera: widget.camera,
+        lineColors: widget.lineColors,
+        labelTextByStationId: widget.labelTextByStationId,
+        attributionText: widget.attributionText,
+        labelPainterCache: _labelPainters,
       ),
     );
   }

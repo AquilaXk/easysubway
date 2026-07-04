@@ -221,4 +221,81 @@ void main() {
     expect(picture, isNotNull);
     picture.dispose();
   });
+
+  testWidgets('라벨·attribution을 예외 없이 그린다 (bucket 2)', (tester) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: sampleMap(),
+          camera: camera(scale: 3.5),
+          lineColors: routeMapLineColors(const {'L1': '#0052A4'}),
+          labelTextByStationId: const {
+            'transfer': '환승역',
+            'regular': '일반역',
+          },
+          attributionText: '© 광주교통공사',
+        ),
+      ),
+    );
+    expect(find.byType(CustomPaint), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('major 역 라벨은 bucket 1(중간 확대)에서 예외 없이 그려진다', (tester) async {
+    final map = StructuredRouteMap(
+      lines: const [],
+      stations: const [
+        RouteMapStructuredStation(
+          stationId: 'major',
+          lineId: 'L1',
+          sequence: 1,
+          position: Offset(500, 500),
+          labelPolygon: [],
+          labelClass: RouteMapLabelClass.major,
+        ),
+      ],
+      transferGroups: const [],
+    );
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: StructuredRouteMapView(
+          map: map,
+          camera: camera(scale: 2.0), // bucket 1
+          lineColors: const {},
+          labelTextByStationId: const {'major': '주요역'},
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  test('shouldRepaint은 라벨 텍스트·attribution 변화를 감지한다', () {
+    final map = sampleMap();
+    final cam = camera(scale: 3.5);
+    final base = StructuredRouteMapPainter(
+      map: map,
+      camera: cam,
+      lineColors: const {'L1': Color(0xFF0052A4)},
+      labelTextByStationId: const {'transfer': '환승역'},
+      attributionText: '© A',
+    );
+    final differentLabel = StructuredRouteMapPainter(
+      map: map,
+      camera: cam,
+      lineColors: const {'L1': Color(0xFF0052A4)},
+      labelTextByStationId: const {'transfer': '다른역'},
+      attributionText: '© A',
+    );
+    final differentAttribution = StructuredRouteMapPainter(
+      map: map,
+      camera: cam,
+      lineColors: const {'L1': Color(0xFF0052A4)},
+      labelTextByStationId: const {'transfer': '환승역'},
+      attributionText: '© B',
+    );
+    expect(differentLabel.shouldRepaint(base), isTrue);
+    expect(differentAttribution.shouldRepaint(base), isTrue);
+  });
 }
