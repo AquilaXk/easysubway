@@ -13,21 +13,6 @@ import 'route_map_label_placement.dart';
 // WebView SVG 렌더러를 대체하는 CustomPainter. 이 파일은 선(line path)과
 // 역 점(station point) 레이어를 viewport culling + LOD로 그린다. 라벨/환승
 // 노드/경로 강조는 Stage 3, controller 이벤트·접근성은 Stage 4에서 얹는다.
-//
-// 전환은 [RouteMapRendererKind] flag로 제어하며 기본값은 WebView다(병행 유지).
-// QA(#1642/#1643) 통과 후 WebView 경로와 assets/datapacks/maps/*.svg를 제거한다.
-
-/// 노선도 렌더러 선택 flag. 기본값 WebView 유지(#1641 전환 전략).
-enum RouteMapRendererKind { webView, structuredCanvas }
-
-/// 기본 렌더러. QA 전까지 WebView이며, dart-define으로 canvas를 켜 실기기
-/// 검증한다: `--dart-define=EASYSUBWAY_STRUCTURED_ROUTE_MAP=true`.
-/// QA(#1642/#1643) 통과 후 canvas를 기본으로 승격하고 WebView·SVG를 제거한다.
-const RouteMapRendererKind kDefaultRouteMapRenderer =
-    bool.fromEnvironment('EASYSUBWAY_STRUCTURED_ROUTE_MAP')
-    ? RouteMapRendererKind.structuredCanvas
-    : RouteMapRendererKind.webView;
-
 /// line_id → hex 색 문자열 맵을 렌더러용 [Color] 맵으로 변환한다.
 /// 기존 [stationLineColor] 파서를 재사용한다(hex 파싱·fallback 일원화).
 Map<String, Color> routeMapLineColors(Map<String, String> hexColorByLineId) {

@@ -10,9 +10,6 @@ import 'accessible_design.dart';
 import 'ad_slot.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/structured_route_map.dart';
-import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
-import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
-import 'features/network_map/infrastructure/route_map_renderer.dart';
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -543,10 +540,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           final loadResult = snapshot.data!;
           final data = loadResult.data;
           final hasExpressLines = _expressLineIds(data).isNotEmpty;
-          final hasAssetRenderer =
-              _routeMapAssetForRegion(data.selectedRegion) != null;
-          final visibleData =
-              hasExpressLines && !hasAssetRenderer && _expressView
+          // #1641: 모든 지역이 구조화 canvas로 렌더되므로 express 필터·서비스 패턴
+          // 토글이 전 지역에 균일 적용된다(과거 SVG 지역 예외 제거).
+          final visibleData = hasExpressLines && _expressView
               ? _expressOnlyMapData(data)
               : data;
           _startInitialNearbyFocus();
@@ -554,7 +550,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             regions: data.regions,
             selectedRegion: data.selectedRegion,
             expressView: _expressView,
-            showServicePatternToggle: !hasAssetRenderer,
+            showServicePatternToggle: true,
             notificationAction: widget.notificationAction,
             onMenuTap: _openMapMenu,
             onSearchTap: widget.onOpenStationSearch,
@@ -2238,70 +2234,6 @@ class _NetworkMapLoadFailure extends StatelessWidget {
   }
 }
 
-class _RouteMapAsset {
-  const _RouteMapAsset({
-    required this.path,
-    required this.mimeType,
-    required this.width,
-    required this.height,
-    required this.coordinateWidth,
-    required this.coordinateHeight,
-  });
-
-  final String path;
-  final String mimeType;
-  final double width;
-  final double height;
-  final double coordinateWidth;
-  final double coordinateHeight;
-}
-
-_RouteMapAsset? _routeMapAssetForRegion(String region) {
-  return switch (_displayRegionName(region)) {
-    '수도권' => const _RouteMapAsset(
-      path: 'assets/datapacks/maps/seoul-official-route-map.svg',
-      mimeType: 'image/svg+xml',
-      width: 5724,
-      height: 6516,
-      coordinateWidth: 5724,
-      coordinateHeight: 6516,
-    ),
-    '부산' => const _RouteMapAsset(
-      path: 'assets/datapacks/maps/busan-official-route-map.svg',
-      mimeType: 'image/svg+xml',
-      width: 3704,
-      height: 1134,
-      coordinateWidth: 3703.9,
-      coordinateHeight: 1133.9,
-    ),
-    '광주' => const _RouteMapAsset(
-      path: 'assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg',
-      mimeType: 'image/svg+xml',
-      width: 720,
-      height: 600,
-      coordinateWidth: 190.50001,
-      coordinateHeight: 158.75,
-    ),
-    '대구' => const _RouteMapAsset(
-      path: 'assets/datapacks/maps/daegu-official-route-map.svg',
-      mimeType: 'image/svg+xml',
-      width: 5348,
-      height: 862,
-      coordinateWidth: 5348,
-      coordinateHeight: 861.73,
-    ),
-    '대전' => const _RouteMapAsset(
-      path: 'assets/datapacks/maps/daejeon-official-route-map.svg',
-      mimeType: 'image/svg+xml',
-      width: 853,
-      height: 813,
-      coordinateWidth: 853.33,
-      coordinateHeight: 813.33,
-    ),
-    _ => null,
-  };
-}
-
 class _NetworkMapCanvas extends StatefulWidget {
   const _NetworkMapCanvas({
     required this.data,
@@ -2350,8 +2282,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   String? _cameraFocusedStationId;
   MapCameraState? _gestureStartCamera;
   Offset? _gestureStartFocalPoint;
-  RouteMapRendererHealthMonitor? _rendererMonitor;
-  RouteMapRendererController? _rendererController;
   String? _geometryCacheKey;
   _MapGeometry? _geometryCache;
   // 구조화 canvas 렌더러(#1641) 파생 데이터 캐시 — region 단위로 재계산.
@@ -2371,65 +2301,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _pendingCamera = null;
-    _requestedRendererCamera = null;
-    _presentedRendererCamera = null;
-    _requestedRendererCamerasByRevision.clear();
-    _releaseRenderer(disposeRenderer: true);
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    switch (state) {
-      case AppLifecycleState.inactive || AppLifecycleState.paused:
-        _ignoreRendererLifecycleFailure(_rendererMonitor?.trimMemory());
-      case AppLifecycleState.detached:
-        _releaseRenderer(disposeRenderer: true);
-      case AppLifecycleState.resumed || AppLifecycleState.hidden:
-        break;
-    }
-  }
-
-  @override
-  void didHaveMemoryPressure() {
-    _ignoreRendererLifecycleFailure(_rendererMonitor?.trimMemory());
-  }
-
-  void _ignoreRendererLifecycleFailure(Future<void>? future) {
-    if (future == null) {
-      return;
-    }
-    unawaited(future.catchError((Object _) {}));
-  }
-
-  void _releaseRenderer({required bool disposeRenderer}) {
-    final monitor = _rendererMonitor;
-    _rendererController = null;
-    if (monitor == null) {
-      return;
-    }
-    if (!disposeRenderer) {
-      _rendererMonitor = null;
-    }
-    _ignoreRendererLifecycleFailure(
-      monitor.close(disposeRenderer: disposeRenderer).whenComplete(() {
-        if (identical(_rendererMonitor, monitor)) {
-          _rendererMonitor = null;
-        }
-      }),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final stationLinesById = _stationLinesById(widget.data);
-    final mapAsset = _routeMapAssetForRegion(widget.data.selectedRegion);
     return Container(
       key: const Key('networkMapSurface'),
       decoration: const BoxDecoration(color: Colors.white),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final geometry = _geometryFor(mapAsset, widget.data);
+          final geometry = _geometryFor(widget.data);
           final fullBounds = Rect.fromLTWH(
             0,
             0,
@@ -2442,11 +2325,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           if (_layoutKey != layoutKey) {
             _layoutKey = layoutKey;
             _pendingCamera = null;
-            _requestedRendererCamera = null;
-            _presentedRendererCamera = null;
-            _requestedRendererCamerasByRevision.clear();
-            _routeMapRendererActive = mapAsset != null;
-            _lastRendererCameraRequestAt = null;
+            _routeMapRendererActive = widget.data.stations.isNotEmpty;
             _gestureActive = false;
             _cameraFocusedStationId = null;
             final initialCamera = _cameraForBounds(
@@ -2456,14 +2335,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               contain: true,
               minScale: minScale,
             );
-            final initialRendererCamera = networkMapOverscannedRendererCamera(
-              initialCamera,
-            );
             _camera = initialCamera;
-            if (_routeMapRendererActive) {
-              _requestedRendererCamera = initialRendererCamera;
-              _presentedRendererCamera = initialRendererCamera;
-            }
           }
           var camera =
               _camera ??
@@ -2495,37 +2367,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             _camera = focusedCamera;
             camera = focusedCamera;
             widget.onViewportChanged(focusedCamera.visibleSourceRect);
-            if (_routeMapRendererActive) {
-              final rendererCamera = networkMapOverscannedRendererCamera(
-                focusedCamera,
-              );
-              _requestedRendererCamera = rendererCamera;
-              _presentedRendererCamera = rendererCamera;
-            }
           } else if (focusedStation == null) {
             _cameraFocusedStationId = null;
           }
           return Stack(
             children: [
               Positioned.fill(
-                child: mapAsset == null || !_routeMapRendererActive
+                child: !_routeMapRendererActive
                     ? const _OriginalRouteMapUnavailable()
-                    : kDefaultRouteMapRenderer ==
-                          RouteMapRendererKind.structuredCanvas
-                    ? _buildStructuredRouteMapCanvas(camera)
-                    : _RouteMapViewportRenderer(
-                        asset: mapAsset,
-                        camera:
-                            _requestedRendererCamera ??
-                            networkMapOverscannedRendererCamera(camera),
-                        presentedCamera:
-                            _presentedRendererCamera ??
-                            _requestedRendererCamera ??
-                            networkMapOverscannedRendererCamera(camera),
-                        gestureActive: _gestureActive,
-                        visualCamera: camera,
-                        onControllerCreated: _attachRendererController,
-                      ),
+                    : _buildStructuredRouteMapCanvas(camera),
               ),
               Positioned.fill(
                 child: Semantics(
@@ -2609,19 +2459,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     );
   }
 
-  _MapGeometry _geometryFor(_RouteMapAsset? mapAsset, NetworkMapData data) {
-    final assetKey = mapAsset == null
-        ? 'generated'
-        : '${mapAsset.path}:${mapAsset.coordinateWidth}:${mapAsset.coordinateHeight}';
+  _MapGeometry _geometryFor(NetworkMapData data) {
     final cacheKey =
-        '$assetKey:${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}';
+        'generated:${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}';
     final cached = _geometryCache;
     if (_geometryCacheKey == cacheKey && cached != null) {
       return cached;
     }
-    final geometry = mapAsset == null
-        ? _MapGeometry.fromStations(data.stations)
-        : _MapGeometry.fromOriginalAsset(mapAsset, data.stations);
+    final geometry = _MapGeometry.fromStations(data.stations);
     _geometryCacheKey = cacheKey;
     _geometryCache = geometry;
     return geometry;
@@ -2829,100 +2674,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     };
   }
 
-  void _attachRendererController(RouteMapRendererController controller) {
-    if (identical(_rendererController, controller)) {
-      return;
-    }
-    _releaseRenderer(disposeRenderer: true);
-    _rendererController = controller;
-    late final RouteMapRendererHealthMonitor monitor;
-    monitor = RouteMapRendererHealthMonitor(
-      controller,
-      onEvent: (event) => _handleRendererEvent(monitor, event),
-    );
-    _rendererMonitor = monitor;
-    monitor.start();
-  }
-
-  void _handleRendererEvent(
-    RouteMapRendererHealthMonitor monitor,
-    RouteMapRendererEvent event,
-  ) {
-    final isCurrentMonitor = identical(_rendererMonitor, monitor);
-    if (event is RouteMapRendererDisposed && isCurrentMonitor) {
-      _rendererMonitor = null;
-      _rendererController = null;
-    }
-    if (!isCurrentMonitor) {
-      return;
-    }
-    if (event is RouteMapRendererFramePresented) {
-      _markRendererFramePresented(event.revision);
-    }
-    if (event is RouteMapRendererFailed) {
-      _releaseRenderer(disposeRenderer: true);
-      if (mounted) {
-        setState(() {
-          _routeMapRendererActive = false;
-          _requestedRendererCamera = null;
-          _presentedRendererCamera = null;
-          _requestedRendererCamerasByRevision.clear();
-        });
-      }
-    }
-    if (!kDebugMode && !kProfileMode) {
-      return;
-    }
-    switch (event) {
-      case RouteMapRendererCameraLatency(:final revision, :final elapsed):
-        debugPrint(
-          'routeMapRenderer cameraLatency revision=$revision elapsedMs=${elapsed.inMilliseconds}',
-        );
-      case RouteMapRendererFrameTimeout(:final revision):
-        debugPrint('routeMapRenderer frameTimeout revision=$revision');
-      case RouteMapRendererRecovering(:final attempt):
-        debugPrint('routeMapRenderer recovering attempt=$attempt');
-      case RouteMapRendererProcessGone(:final didCrash):
-        debugPrint('routeMapRenderer processGone didCrash=$didCrash');
-      case RouteMapRendererMemoryTrimmed():
-        debugPrint('routeMapRenderer memoryTrimmed');
-      case RouteMapRendererDisposed():
-        debugPrint('routeMapRenderer disposed');
-      case RouteMapRendererCreated() ||
-          RouteMapRendererAssetLoading() ||
-          RouteMapRendererAssetReady() ||
-          RouteMapRendererCameraRequested() ||
-          RouteMapRendererFramePresented() ||
-          RouteMapRendererFailed():
-        break;
-    }
-  }
-
-  void _markRendererFramePresented(int revision) {
-    if (!networkMapShouldAcceptPresentedRendererRevision(
-      revision: revision,
-      presentedCamera: _presentedRendererCamera,
-      requestedCamera: _requestedRendererCamera,
-    )) {
-      _requestedRendererCamerasByRevision.remove(revision);
-      return;
-    }
-    final camera =
-        _requestedRendererCamerasByRevision.remove(revision) ??
-        (_requestedRendererCamera?.revision == revision
-            ? _requestedRendererCamera
-            : null);
-    if (camera == null || identical(_presentedRendererCamera, camera)) {
-      return;
-    }
-    if (!mounted) {
-      _presentedRendererCamera = camera;
-      return;
-    }
-    setState(() {
-      _presentedRendererCamera = camera;
-    });
-  }
 }
 
 String _networkMapStationLineKey(String stationId, String lineId) =>
@@ -2980,56 +2731,6 @@ _CachedRouteMapPath _cachedRouteMapPath(String pathData, Offset origin) {
   });
 }
 
-class _RouteMapViewportRenderer extends StatelessWidget {
-  const _RouteMapViewportRenderer({
-    required this.asset,
-    required this.camera,
-    required this.presentedCamera,
-    required this.gestureActive,
-    required this.visualCamera,
-    required this.onControllerCreated,
-  });
-
-  final _RouteMapAsset asset;
-  final MapCameraState camera;
-  final MapCameraState presentedCamera;
-  final bool gestureActive;
-  final MapCameraState visualCamera;
-  final ValueChanged<RouteMapRendererController> onControllerCreated;
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isWidgetTest) {
-      return const ColoredBox(
-        key: Key('routeMapViewportRenderer'),
-        color: Colors.white,
-      );
-    }
-    final rendererCamera = gestureActive ? camera : visualCamera;
-    final renderer = switch (defaultTargetPlatform) {
-      TargetPlatform.android => AndroidRouteMapViewportWebView(
-        assetPath: asset.path,
-        mimeType: asset.mimeType,
-        camera: rendererCamera,
-        onControllerCreated: onControllerCreated,
-      ),
-      TargetPlatform.iOS => IosRouteMapViewportWebView(
-        assetPath: asset.path,
-        mimeType: asset.mimeType,
-        camera: rendererCamera,
-        onControllerCreated: onControllerCreated,
-      ),
-      _ => const ColoredBox(color: Colors.white),
-    };
-    return ClipRect(
-      child: KeyedSubtree(
-        key: const Key('routeMapViewportRenderer'),
-        child: renderer,
-      ),
-    );
-  }
-}
-
 class _OriginalRouteMapUnavailable extends StatelessWidget {
   const _OriginalRouteMapUnavailable();
 
@@ -3045,17 +2746,6 @@ class _OriginalRouteMapUnavailable extends StatelessWidget {
       ),
     );
   }
-}
-
-bool get _isWidgetTest {
-  var isTest = false;
-  assert(() {
-    isTest = WidgetsBinding.instance.runtimeType.toString().contains(
-      'AutomatedTest',
-    );
-    return true;
-  }());
-  return isTest;
 }
 
 String _displayRegionName(String region) {
@@ -3359,34 +3049,6 @@ class _MapGeometry {
   final Rect initialBounds;
   final double overlayStyleScale;
   final _StationSpatialIndex stationIndex;
-
-  factory _MapGeometry.fromOriginalAsset(
-    _RouteMapAsset asset,
-    List<NetworkMapStation> stations,
-  ) {
-    final sourceWidth = asset.coordinateWidth;
-    final sourceHeight = asset.coordinateHeight;
-    final overlayStyleScale = math.min(
-      sourceWidth / asset.width,
-      sourceHeight / asset.height,
-    );
-    final geometry = _MapGeometry(
-      origin: Offset.zero,
-      focus: Offset(sourceWidth / 2, sourceHeight / 2),
-      width: sourceWidth,
-      height: sourceHeight,
-      initialBounds: networkMapInitialOriginalAssetBounds(
-        sourceWidth: sourceWidth,
-        sourceHeight: sourceHeight,
-      ),
-      overlayStyleScale: overlayStyleScale.isFinite && overlayStyleScale > 0
-          ? overlayStyleScale
-          : 1.0,
-    );
-    return geometry.copyWith(
-      stationIndex: _StationSpatialIndex.fromStations(stations, geometry),
-    );
-  }
 
   factory _MapGeometry.fromStations(List<NetworkMapStation> stations) {
     var minX = double.infinity;
