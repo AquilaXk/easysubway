@@ -120,7 +120,7 @@ void main() {
     expect(result.totalBurdenLabel, '약 1분 15초 · 28m');
     expect(
       result.steps.single.burdenLabel,
-      '약 1분 15초 · 28m · 최근 확인한 기록이 없어요 · 엘리베이터를 이용해요',
+      '약 1분 15초 · 28m · 엘리베이터를 이용해요',
     );
     expect(result.semanticLabel, contains('1번 역 안 이동, 1번 출구 엘리베이터에서 개찰구까지'));
     expect(result.semanticLabel, contains('엘리베이터에서 개찰구까지 이동합니다.'));
@@ -652,7 +652,7 @@ void main() {
     expect(routeEtaSourceLabel('STATIC_BACKEND_ESTIMATE'), '시간표 기준');
     expect(routeEtaSourceLabel('STATIC_ESTIMATE'), '정적 추정');
     expect(routeEtaSourceLabel('UNSUPPORTED'), '실시간 미지원');
-    expect(routeEtaSourceLabel('STALE'), '저장된 데이터 기준 · 갱신 필요');
+    expect(routeEtaSourceLabel('STALE'), '저장된 데이터 기준');
     expect(routeEtaSourceLabel(''), '도착 정보를 확인하고 있어요');
     expect(routeEtaSourceLabel('SERVER_NEW_VALUE'), '도착 정보를 확인하고 있어요');
     expect(routeEtaSourceLabels.values, isNot(contains('실시간 반영')));
