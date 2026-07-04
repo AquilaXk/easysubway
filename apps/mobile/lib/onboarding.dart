@@ -545,7 +545,9 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   MobilityProfileOption? _selectedProfile;
-  OnboardingViewPreferences _preferences =
+  // 온보딩에서는 보기 설정(고대비·간편 보기)을 다루지 않는다. 기본값으로 완료하고,
+  // 상세 설정은 더보기·설정 화면에서 바꾼다(#1563).
+  final OnboardingViewPreferences _preferences =
       const OnboardingViewPreferences.defaults();
   int _currentStep = 0;
   bool _locationPermissionSelected = false;
@@ -556,7 +558,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final selectedProfile = _selectedProfile;
     final textTheme = Theme.of(context).textTheme;
-    final listBottomPadding = _currentStep == 2 ? 32.0 : 104.0;
+    final listBottomPadding = _currentStep == 1 ? 32.0 : 104.0;
     final profileOptions = [
       mobilityProfileOptions.firstWhere((profile) => profile.id == 'elderly'),
       mobilityProfileOptions.firstWhere(
@@ -575,10 +577,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               setState(() => _currentStep = 1);
               return;
             }
-            if (_currentStep == 1) {
-              setState(() => _currentStep = 2);
-              return;
-            }
             _completeOnboarding();
           };
 
@@ -593,7 +591,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 icon: const Icon(Icons.arrow_back),
               ),
       ),
-      bottomNavigationBar: _currentStep == 2
+      bottomNavigationBar: _currentStep == 1
           ? null
           : Padding(
               padding: easySubwayBottomActionInsets(context, top: 8),
@@ -614,7 +612,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           padding: EdgeInsets.fromLTRB(20, 20, 20, listBottomPadding),
           children: _currentStep == 0
               ? [
-                  const _OnboardingStepIndicator(currentStep: 1, totalSteps: 3),
+                  const _OnboardingStepIndicator(currentStep: 1, totalSteps: 2),
                   const SizedBox(height: 15),
                   Semantics(
                     header: true,
@@ -639,93 +637,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       },
                     ),
                 ]
-              : _currentStep == 1
-              ? [
-                  const _OnboardingStepIndicator(currentStep: 2, totalSteps: 3),
-                  const SizedBox(height: 15),
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      '적용할 조건을 확인하세요',
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w900,
-                        height: 1.25,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  _OnboardingPreferenceCard(
-                    children: [
-                      _OnboardingConditionRow(
-                        key: const Key('onboardingRoutePreference-avoidStairs'),
-                        title: '계단 피하기',
-                        subtitle: '계단 없는 길',
-                        enabled: selectedProfile?.avoidStairs ?? true,
-                      ),
-                      const _OnboardingPreferenceDivider(),
-                      _OnboardingConditionRow(
-                        key: const Key(
-                          'onboardingRoutePreference-requireElevator',
-                        ),
-                        title: '엘리베이터 이용',
-                        subtitle: '엘리베이터 연결',
-                        enabled: selectedProfile?.requireElevator ?? true,
-                      ),
-                      const _OnboardingPreferenceDivider(),
-                      _OnboardingConditionRow(
-                        key: const Key(
-                          'onboardingRoutePreference-minimizeTransfers',
-                        ),
-                        title: '환승 줄이기',
-                        subtitle: '갈아타는 횟수 줄이기',
-                        enabled: selectedProfile?.minimizeTransfers ?? true,
-                      ),
-                      const _OnboardingPreferenceDivider(),
-                      _OnboardingConditionRow(
-                        key: const Key(
-                          'onboardingRoutePreference-avoidLongWalks',
-                        ),
-                        title: '걷는 거리 줄이기',
-                        subtitle: '오래 걷는 길 피하기',
-                        enabled: selectedProfile?.avoidLongWalks ?? true,
-                      ),
-                    ],
-                  ),
-                  _OnboardingPreferenceCard(
-                    children: [
-                      _OnboardingViewPreferenceSwitch(
-                        key: const Key('onboardingPreference-highContrast'),
-                        title: '고대비',
-                        subtitle: '글자와 배경 대비 강화',
-                        value: _preferences.highContrastEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _preferences = _preferences.copyWith(
-                              highContrastEnabled: value,
-                            );
-                          });
-                        },
-                      ),
-                      const _OnboardingPreferenceDivider(),
-                      _OnboardingViewPreferenceSwitch(
-                        key: const Key('onboardingPreference-simpleView'),
-                        title: '간편 보기',
-                        subtitle: '꼭 필요한 안내부터 보여요',
-                        value: _preferences.simpleViewEnabled,
-                        onChanged: (value) {
-                          setState(() {
-                            _preferences = _preferences.copyWith(
-                              simpleViewEnabled: value,
-                            );
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ]
               : [
-                  const _OnboardingStepIndicator(currentStep: 3, totalSteps: 3),
+                  const _OnboardingStepIndicator(currentStep: 2, totalSteps: 2),
                   const SizedBox(height: 15),
                   Semantics(
                     header: true,
@@ -779,7 +692,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('선택한 기능 설정하고 시작'),
+                    child: const Text('시작하기'),
                   ),
                   const SizedBox(height: 9),
                   OutlinedButton(
@@ -1039,189 +952,5 @@ class _ProfileRadio extends StatelessWidget {
             : null,
       ),
     );
-  }
-}
-
-class _OnboardingPreferenceCard extends StatelessWidget {
-  const _OnboardingPreferenceCard({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: EasySubwayAccessibleColors.line),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(children: children),
-      ),
-    );
-  }
-}
-
-class _OnboardingConditionRow extends StatelessWidget {
-  const _OnboardingConditionRow({
-    required super.key,
-    required this.title,
-    required this.subtitle,
-    required this.enabled,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final state = enabled ? '켜짐' : '꺼짐';
-
-    return Semantics(
-      container: true,
-      label: '$title $state, $subtitle',
-      child: ExcludeSemantics(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 68),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.mutedText,
-                        fontWeight: FontWeight.w700,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 12),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: enabled
-                            ? EasySubwayAccessibleColors.primary
-                            : EasySubwayAccessibleColors.line,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      state,
-                      style: TextStyle(
-                        color: enabled
-                            ? EasySubwayAccessibleColors.primary
-                            : EasySubwayAccessibleColors.mutedText,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        height: 1.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OnboardingViewPreferenceSwitch extends StatelessWidget {
-  const _OnboardingViewPreferenceSwitch({
-    required super.key,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      label: '$title ${value ? '켜짐' : '꺼짐'}, $subtitle',
-      toggled: value,
-      onTap: () => onChanged(!value),
-      child: ExcludeSemantics(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 68),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.mutedText,
-                        fontWeight: FontWeight.w700,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: value,
-                onChanged: onChanged,
-                activeThumbColor: Colors.white,
-                activeTrackColor: EasySubwayAccessibleColors.switchActiveTrack,
-                inactiveThumbColor: Colors.white,
-                inactiveTrackColor:
-                    EasySubwayAccessibleColors.switchInactiveTrack,
-                materialTapTargetSize: MaterialTapTargetSize.padded,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OnboardingPreferenceDivider extends StatelessWidget {
-  const _OnboardingPreferenceDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Divider(height: 1, color: EasySubwayAccessibleColors.line);
   }
 }
