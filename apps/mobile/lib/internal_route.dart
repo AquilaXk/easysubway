@@ -392,7 +392,6 @@ class InternalRouteStep {
     final labels = <String>[
       _internalRouteSecondsLabel(estimatedSeconds),
       _internalRouteDistanceLabel(distanceMeters),
-      _internalRouteFieldValidationLabel(fieldValidationStatus),
       if (includesStairs) '계단 포함',
       if (requiresElevator) '엘리베이터를 이용해요',
       if (requiresEscalator) '에스컬레이터 안내를 확인하고 있어요',
@@ -620,15 +619,6 @@ String _internalRouteDistanceLabel(int distanceMeters) {
     return '${kilometers.toStringAsFixed(0)}km';
   }
   return '${kilometers.toStringAsFixed(1)}km';
-}
-
-String _internalRouteFieldValidationLabel(String fieldValidationStatus) {
-  return switch (fieldValidationStatus) {
-    'VERIFIED' => '최근 확인했어요',
-    'STALE' => '최신 상태를 준비 중이에요',
-    'UNKNOWN' => '최근 확인한 기록이 없어요',
-    _ => '최근 확인한 기록이 없어요',
-  };
 }
 
 String _internalRouteSecondsLabel(int seconds) {
