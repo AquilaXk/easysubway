@@ -91,22 +91,7 @@ Future<void> _openFavoriteList(
     ),
   );
   await tester.pumpAndSettle();
-  if (tabKey != null) {
-    final targetKey = switch (tabKey) {
-      const Key('favoriteStationsTabButton') => const Key(
-        'favoriteHomeStationsButton',
-      ),
-      const Key('favoriteFacilitiesTabButton') => const Key(
-        'favoriteHomeFacilitiesButton',
-      ),
-      _ => const Key('favoriteHomeRoutesButton'),
-    };
-    await tester.tap(find.byKey(targetKey));
-    await tester.pumpAndSettle();
-    return;
-  }
-  await tester.tap(find.byKey(const Key('favoriteHomeRoutesButton')));
-  await tester.pumpAndSettle();
+  // 즐겨찾기 홈은 단일 리스트라 카테고리 진입 탭이 없다. 항목이 바로 보인다(#1569).
 }
 
 Future<void> _openRouteSearchScreen(WidgetTester tester) async {
@@ -473,13 +458,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSavedItemsScreen(tester);
-    await tester.tap(find.byKey(const Key('favoriteHomeRoutesButton')));
-    await tester.pumpAndSettle();
 
-    expect(find.text('즐겨찾기한 경로'), findsOneWidget);
-    expect(find.text('상록수에서 사당까지'), findsOneWidget);
+    // 카테고리 진입 없이 경로가 인라인 카드로 바로 보인다(#1569).
+    expect(find.text('경로'), findsOneWidget);
+    expect(find.text('상록수역 → 사당역'), findsOneWidget);
     expect(
-      find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+      find.byKey(const Key('favoriteRouteRemoveButton-route-1')),
       findsOneWidget,
     );
     expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
@@ -1118,9 +1102,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openSavedItemsScreen(tester);
-    await tester.tap(find.byKey(const Key('favoriteHomeRoutesButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('favoriteRouteSearchAgain-route-1')));
+    // 경로 행을 탭하면 저장된 이동 조건으로 길찾기 화면이 열린다(#1569).
+    await tester.tap(find.text('상록수역 → 사당역'));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('routeSearchScreen')), findsOneWidget);
@@ -3007,7 +2990,7 @@ void main() {
     expect(find.byKey(const Key('homeSavedItemsCard')), findsNothing);
   });
 
-  testWidgets('홈 시설 알림은 더 급한 시설과 할 일을 먼저 보여준다', (tester) async {
+  testWidgets('홈 즐겨찾기는 여러 시설을 인라인 행으로 나열한다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -3039,9 +3022,9 @@ void main() {
 
     expect(find.text('시설 알림'), findsNothing);
     await _openSavedItemsScreen(tester);
-    await tester.tap(find.byKey(const Key('favoriteHomeFacilitiesButton')));
-    await tester.pumpAndSettle();
-
+    // 카테고리 진입·알림 카드 없이 시설이 인라인 행으로 바로 보인다(#1569).
+    expect(find.text('시설'), findsOneWidget);
+    expect(find.text('3번 출구 엘리베이터'), findsOneWidget);
     expect(find.text('2번 출구 엘리베이터'), findsOneWidget);
     expectNoForbiddenUserCopy(tester);
   });
@@ -3597,7 +3580,7 @@ void main() {
     expect(image.height, 844);
   });
 
-  testWidgets('홈은 저장한 경로를 최근 경로로 보여주되 즐겨찾기 카드처럼 보여주지 않는다', (tester) async {
+  testWidgets('홈 즐겨찾기는 저장한 경로를 인라인 카드로 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
@@ -3617,11 +3600,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await _openSavedItemsScreen(tester);
-      await tester.tap(find.byKey(const Key('favoriteHomeRoutesButton')));
-      await tester.pumpAndSettle();
 
-      expect(find.text('상록수에서 사당까지'), findsOneWidget);
-      expect(find.text('상록수에서 사당까지'), findsOneWidget);
+      // 카테고리 진입 없이 경로가 인라인 카드로 바로 보인다(#1569).
+      expect(find.text('경로'), findsOneWidget);
+      expect(find.text('상록수역 → 사당역'), findsOneWidget);
       expect(find.text('저장한 경로가 없습니다'), findsNothing);
     } finally {
       semanticsHandle.dispose();
@@ -4506,12 +4488,14 @@ void main() {
     await _openSavedItemsScreen(tester);
 
     expect(find.byKey(const Key('favoriteHomeScreen')), findsOneWidget);
-    expect(find.byKey(const Key('favoriteHomeStationsButton')), findsOneWidget);
-    expect(
-      find.byKey(const Key('favoriteHomeFacilitiesButton')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('favoriteHomeRoutesButton')), findsOneWidget);
+    // 카테고리 카드·개수 없이 저장 항목이 섹션별로 바로 나열된다(#1569).
+    expect(find.byKey(const Key('favoriteHomeStationsButton')), findsNothing);
+    expect(find.byKey(const Key('favoriteHomeFacilitiesButton')), findsNothing);
+    expect(find.byKey(const Key('favoriteHomeRoutesButton')), findsNothing);
+    expect(find.text('역'), findsOneWidget);
+    expect(find.text('경로'), findsOneWidget);
+    expect(find.text('시설'), findsOneWidget);
+    expect(find.text('상록수역'), findsWidgets);
     expect(favoriteRepository.listCount, greaterThanOrEqualTo(1));
     expect(favoriteFacilityRepository.listCount, greaterThanOrEqualTo(1));
     expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
@@ -4595,7 +4579,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('favoriteHomeStationsButton')));
+    // 역 행 → 상세 화면(하위)로 진입 후 복귀 시 새로고침이 실패하면 오류 상태(#1569).
+    await tester.tap(
+      find.byKey(const Key('favoriteHomeStationRow-station-sangnoksu')),
+    );
     await tester.pumpAndSettle();
     favoriteRepository.error = StateError('favorite failed');
     await tester.pageBack();
@@ -5584,30 +5571,26 @@ void main() {
         tabKey: const Key('favoriteStationsTabButton'),
       );
 
-      expect(find.text('즐겨찾기한 역'), findsOneWidget);
-      expect(find.text('상록수'), findsOneWidget);
+      // 카테고리 진입 없이 역이 인라인 행으로 바로 보인다(#1569).
+      expect(find.text('즐겨찾기한 역'), findsNothing);
+      expect(find.text('역'), findsOneWidget);
+      expect(find.text('상록수역'), findsOneWidget);
       expect(find.text('수도권 4호선'), findsOneWidget);
-      // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
-      expect(find.widgetWithText(OutlinedButton, '출발지로 설정'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '도착지로 설정'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '역 상세 보기'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '시설 상태 확인'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '즐겨찾기 해제'), findsOneWidget);
+      // 목록 행의 상세·출발/도착 액션은 상세 화면(즐겨찾기 토글 포함)으로 옮겨졌다.
+      expect(find.widgetWithText(OutlinedButton, '출발지로 설정'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '역 상세 보기'), findsNothing);
       expect(
-        find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
+        find.byKey(const Key('favoriteHomeStationRow-station-sangnoksu')),
         findsOneWidget,
       );
-      expect(
-        find.bySemanticsLabel('즐겨찾기 역, 상록수, 수도권 4호선, 수도권'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('즐겨찾기 역, 상록수역, 수도권 4호선'), findsOneWidget);
       expect(find.text('출처 공식 파일'), findsNothing);
 
       final tileSize = tester.getSize(
-        find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
+        find.byKey(const Key('favoriteHomeStationRow-station-sangnoksu')),
       );
-      expect(tileSize.height, greaterThanOrEqualTo(72));
+      expect(tileSize.height, greaterThanOrEqualTo(44));
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -5668,38 +5651,23 @@ void main() {
         tabKey: const Key('favoriteFacilitiesTabButton'),
       );
 
-      expect(find.text('즐겨찾기한 시설'), findsOneWidget);
+      // 시설도 카테고리 진입 없이 인라인 행으로 흡수됐다(#1569).
+      expect(find.text('즐겨찾기한 시설'), findsNothing);
+      expect(find.text('시설'), findsOneWidget);
       expect(find.text('1번 출구 엘리베이터'), findsOneWidget);
       expect(find.text('상록수역'), findsOneWidget);
-      expect(find.text('이용 가능'), findsOneWidget);
-      expect(find.text('최신 상태를 준비 중이에요'), findsNothing);
       expect(find.text('정보 신뢰도 높음'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.widgetWithText(OutlinedButton, '시설 알려주기'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '시설 알려주기'), findsOneWidget);
       expect(
         find.byKey(
-          const Key('favoriteFacilityTile-facility-sangnoksu-elevator-1'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.bySemanticsLabel(
-          '즐겨찾기 시설, 1번 출구 엘리베이터, 상록수역, 엘리베이터, 이용 가능, 1번 출구 앞, 최근 확인 2026-06-12, 시설 알려주기',
+          const Key(
+            'favoriteFacilityReportButton-facility-sangnoksu-elevator-1',
+          ),
         ),
         findsOneWidget,
       );
       expectNoForbiddenUserCopy(tester);
-
-      final tileSize = tester.getSize(
-        find.byKey(
-          const Key('favoriteFacilityTile-facility-sangnoksu-elevator-1'),
-        ),
-      );
-      expect(tileSize.height, greaterThanOrEqualTo(72));
-
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     } finally {
       semanticsHandle.dispose();
     }
@@ -5730,7 +5698,7 @@ void main() {
       tester,
       tabKey: const Key('favoriteFacilitiesTabButton'),
     );
-    await tester.tap(find.widgetWithText(OutlinedButton, '시설 알려주기'));
+    await tester.tap(find.widgetWithText(TextButton, '시설 알려주기'));
     await tester.pumpAndSettle();
 
     // 진입 시에는 위치 권한 확인·요청을 하지 않는다.
@@ -5782,37 +5750,18 @@ void main() {
         },
       );
 
-      expect(find.text('즐겨찾기한 경로'), findsOneWidget);
-      expect(find.text('상록수에서 사당까지'), findsOneWidget);
-      expect(find.text('수도권 4호선'), findsOneWidget);
-      expect(find.text('이동 편의도 92점'), findsNothing);
-      // 고정 플레이스홀더 문구는 카드에서 제거됐다(#1488).
+      // 경로가 인라인 카드로 바로 보인다(#1569). 카테고리·하위 목록 화면 없음.
+      expect(find.text('즐겨찾기한 경로'), findsNothing);
+      expect(find.text('경로'), findsOneWidget);
+      expect(find.text('상록수역 → 사당역'), findsOneWidget);
       expect(find.text('다시 찾으면 자세히 볼 수 있어요'), findsNothing);
       expect(
-        find.text('천천히 이동 조건 · 수도권 4호선 · 최근 확인 2026-06-13 · 도착 정보를 확인하고 있어요'),
-        findsOneWidget,
-      );
-      expect(
-        find.text('예상 시간을 확인하고 있어요 · 환승 안내를 확인하고 있어요 · 걷는 거리를 확인하고 있어요'),
-        findsNothing,
-      );
-      expect(
-        find.text('계단 여부를 아직 알 수 없어요 · 엘리베이터 연결을 아직 알 수 없어요'),
-        findsNothing,
-      );
-      // 항목 1개짜리 더 보기 메뉴 → 삭제 아이콘 버튼으로 단순화(#1488).
-      expect(
-        find.byKey(const Key('favoriteRouteRemove-route-1')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
+        find.byKey(const Key('favoriteRouteRemoveButton-route-1')),
         findsOneWidget,
       );
 
-      await tester.tap(
-        find.byKey(const Key('favoriteRouteSearchAgain-route-1')),
-      );
+      // 행 탭 → 저장된 출발/도착·이동 조건으로 다시 길찾기.
+      await tester.tap(find.text('상록수역 → 사당역'));
       await tester.pumpAndSettle();
 
       expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
@@ -5830,75 +5779,17 @@ void main() {
         },
       );
 
-      await tester.tap(find.byKey(const Key('favoriteRouteRemove-route-1')));
-      await tester.pumpAndSettle();
-      expect(find.text('즐겨찾기 경로 삭제'), findsOneWidget);
+      // 오른쪽 삭제 아이콘 → 확인 다이얼로그 없이 바로 삭제하고 리스트를 갱신한다.
       await tester.tap(
-        find.byKey(const Key('favoriteRouteRemoveConfirm-route-1')),
+        find.byKey(const Key('favoriteRouteRemoveButton-route-1')),
       );
       await tester.pumpAndSettle();
 
       expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
-      expect(find.text('즐겨찾기한 경로가 없습니다.'), findsOneWidget);
-
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-
-      expect(find.text('최근 경로'), findsNothing);
-
-      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
-      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      expect(find.text('즐겨찾기한 항목이 없습니다'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
-  });
-
-  testWidgets('홈 즐겨찾기 경로 삭제 중에는 같은 항목을 다시 누를 수 없다', (tester) async {
-    final removeCompleter = Completer<void>();
-    final favoriteRouteRepository = FakeFavoriteRouteRepository(
-      favorites: [_favoriteRoute()],
-      removeCompleter: removeCompleter,
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: favoriteRouteRepository,
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await _openFavoriteList(tester);
-
-    await tester.tap(find.byKey(const Key('favoriteRouteRemove-route-1')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('favoriteRouteRemoveConfirm-route-1')),
-    );
-    await tester.pump();
-
-    expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
-    expect(find.text('삭제 중'), findsOneWidget);
-
-    // 삭제 중에는 삭제 버튼이 비활성화되어 다시 눌러도 재요청되지 않는다.
-    await tester.tap(
-      find.byKey(const Key('favoriteRouteRemove-route-1')),
-      warnIfMissed: false,
-    );
-    await tester.pump();
-
-    expect(favoriteRouteRepository.removedFavoriteRouteIds, ['route-1']);
-
-    removeCompleter.complete();
-    await tester.pumpAndSettle();
-
-    expect(find.text('즐겨찾기한 경로가 없습니다.'), findsOneWidget);
   });
 
   testWidgets('즐겨찾기 경로 다시 찾기는 저장된 이동 조건으로 연다', (tester) async {
@@ -5931,7 +5822,7 @@ void main() {
       },
     );
 
-    await tester.tap(find.byKey(const Key('favoriteRouteSearchAgain-route-1')));
+    await tester.tap(find.text('상록수역 → 사당역'));
     await tester.pumpAndSettle();
 
     expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
@@ -8182,8 +8073,9 @@ void main() {
       tester,
       tabKey: const Key('favoriteStationsTabButton'),
     );
+    // 역 행 → 상세 → 즐겨찾기 해제 → 복귀 시 리스트가 갱신돼 빈 상태가 된다(#1569).
     await tester.tap(
-      find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
+      find.byKey(const Key('favoriteHomeStationRow-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('stationFavoriteToggleButton')));
@@ -8194,9 +8086,9 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    expect(find.text('즐겨찾기한 역이 없습니다.'), findsOneWidget);
+    expect(find.text('즐겨찾기한 항목이 없습니다'), findsOneWidget);
     expect(
-      find.byKey(const Key('favoriteStationTile-station-sangnoksu')),
+      find.byKey(const Key('favoriteHomeStationRow-station-sangnoksu')),
       findsNothing,
     );
   });
