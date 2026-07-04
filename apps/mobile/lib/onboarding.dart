@@ -420,12 +420,15 @@ class _PermissionInfoCard extends StatelessWidget {
     required this.notificationSelected,
     required this.onLocationChanged,
     required this.onNotificationChanged,
+    required this.notificationAvailable,
   });
 
   final bool locationSelected;
   final bool notificationSelected;
   final ValueChanged<bool> onLocationChanged;
   final ValueChanged<bool> onNotificationChanged;
+  // 알림 기능이 이 빌드에서 제공되지 않으면 켜라고 요청하지 않는다(#1579).
+  final bool notificationAvailable;
 
   @override
   Widget build(BuildContext context) {
@@ -439,14 +442,16 @@ class _PermissionInfoCard extends StatelessWidget {
             value: locationSelected,
             onChanged: onLocationChanged,
           ),
-          const _IntroDivider(),
-          _PermissionInfoRow(
-            icon: Icons.notifications_none,
-            title: '알림',
-            subtitle: '시설 고장·복구 알림',
-            value: notificationSelected,
-            onChanged: onNotificationChanged,
-          ),
+          if (notificationAvailable) ...[
+            const _IntroDivider(),
+            _PermissionInfoRow(
+              icon: Icons.notifications_none,
+              title: '알림',
+              subtitle: '시설 고장·복구 알림',
+              value: notificationSelected,
+              onChanged: onNotificationChanged,
+            ),
+          ],
         ],
       ),
     );
@@ -558,6 +563,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final selectedProfile = _selectedProfile;
     final textTheme = Theme.of(context).textTheme;
+    // 알림 기능 가용 여부의 단일 소스: 알림 권한 provider가 주입됐는지(#1579).
+    // 더보기 알림 섹션(notificationRepository)과 함께 켜지고 꺼진다.
+    final notificationAvailable = widget.notificationPermissionProvider != null;
     final listBottomPadding = _currentStep == 1 ? 32.0 : 104.0;
     final profileOptions = [
       mobilityProfileOptions.firstWhere((profile) => profile.id == 'elderly'),
@@ -643,7 +651,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   Semantics(
                     header: true,
                     child: Text(
-                      '위치와 알림은 나중에도 켤 수 있어요',
+                      notificationAvailable
+                          ? '위치와 알림은 나중에도 켤 수 있어요'
+                          : '위치는 나중에도 켤 수 있어요',
                       style: textTheme.headlineSmall?.copyWith(
                         color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w900,
@@ -659,6 +669,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         setState(() => _locationPermissionSelected = value),
                     onNotificationChanged: (value) =>
                         setState(() => _notificationPermissionSelected = value),
+                    notificationAvailable: notificationAvailable,
                   ),
                   if (_showNotificationPermissionFailureNextAction) ...[
                     const SizedBox(height: 12),
