@@ -593,7 +593,7 @@ class RouteSearchV2ControllerTest {
 					  "destinationStationId": "station-sadang",
 					  "departureTime": "2026-06-30T09:15:00+09:00",
 					  "mobilityType": "STROLLER",
-					  "mobilityPreset": "STANDARD",
+					  "mobilityPreset": "STEP_FREE",
 					  "constraintMode": "STRICT_STEP_FREE",
 					  "useRealtime": true,
 					  "maxTransfers": 1,
@@ -601,7 +601,33 @@ class RouteSearchV2ControllerTest {
 					}
 					"""))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.data.mobilityPreset").value("STANDARD"));
+			.andExpect(jsonPath("$.data.mobilityPreset").value("STEP_FREE"));
+	}
+
+	@Test
+	@DisplayName("legacy 경로로 강등되는 V2 요청은 기본값과 다른 mobilityPreset을 거부한다")
+	void nonDefaultRouteSearchV2MobilityPresetOnLegacyPathReturnsBadRequestBeforeSearch() throws Exception {
+		mockMvc.perform(post("/api/v2/routes/search")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "originStationId": "station-sangnoksu",
+					  "destinationStationId": "station-sadang",
+					  "departureTime": "2026-06-30T09:15:00+09:00",
+					  "mobilityType": "STROLLER",
+					  "mobilityPreset": "STANDARD",
+					  "constraintMode": "STRICT_STEP_FREE",
+					  "useRealtime": true,
+					  "maxTransfers": 1,
+					  "alternativeCount": 1
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.message").value("보행 프리셋은 RAPTOR 시간표 경로에서만 변경할 수 있습니다."));
+
+		verifyNoInteractions(routeSearchUseCase);
 	}
 
 	@Test
