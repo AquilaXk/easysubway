@@ -17,6 +17,7 @@ import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -1019,10 +1020,10 @@ void main() {
     expect(find.bySemanticsLabel('노선: 전체 노선'), findsNothing);
     expect(find.text('전체 노선'), findsNothing);
     expect(find.byKey(const Key('networkMapInteractiveViewer')), findsNothing);
-    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
+    expect(find.byType(StructuredRouteMapView), findsOneWidget);
 
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
-    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
+    expect(find.byType(StructuredRouteMapView), findsOneWidget);
   });
 
   testWidgets('홈 shell 경로 상세 뒤로가기는 결과 목록으로 돌아간다', (tester) async {
@@ -1203,8 +1204,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
-    expect(find.text('노선도를 불러오지 못했어요'), findsOneWidget);
-    expect(find.text('원본 노선도를 불러올 수 없습니다.'), findsNothing);
+    expect(find.byType(StructuredRouteMapView), findsOneWidget);
     expect(find.byKey(const Key('networkMapLineFilter')), findsNothing);
 
     await tester.tap(find.text('테스트권'));
@@ -1577,8 +1577,9 @@ void main() {
       final path = offline['path'] as String;
       expect(map['source_url'], isA<String>());
       expect(map['source_url'] as String, startsWith('https://'));
-      expect(offline['included'], isTrue);
-      expect(File(path).existsSync(), isTrue, reason: path);
+      // #1641: SVG 이미지는 더 이상 번들하지 않는다(canvas 렌더). 소스 경로와
+      // 라이선스 속성표기만 유지된다(광주 CC-BY-SA 등).
+      expect(offline['included'], isFalse);
       expect(path, startsWith('assets/datapacks/maps/'));
       final extension = path.split('.').last.toLowerCase();
       expect(extension, anyOf('pdf', 'svg'));
@@ -1629,11 +1630,11 @@ void main() {
     expect(decoration.color, Colors.white);
     expect(decoration.border, isNull);
     expect(decoration.borderRadius, isNull);
-    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
+    expect(find.byType(StructuredRouteMapView), findsOneWidget);
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
   });
 
-  testWidgets('수도권 노선도는 Android에서도 viewport renderer를 사용한다', (tester) async {
+  testWidgets('수도권 노선도는 Android에서 구조화 canvas 렌더러로 전체 크기를 채운다', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     tester.view.devicePixelRatio = 3;
     try {
@@ -1657,7 +1658,7 @@ void main() {
         findsNothing,
       );
       final renderer = tester.getSize(
-        find.byKey(const Key('routeMapViewportRenderer')),
+        find.byType(StructuredRouteMapView),
       );
       final surface = tester.getSize(
         find.byKey(const Key('networkMapSurface')),
@@ -1665,8 +1666,8 @@ void main() {
       expect(renderer.width, surface.width);
       expect(renderer.height, surface.height);
       expect(
-        tester.widget(find.byKey(const Key('routeMapViewportRenderer'))),
-        isA<ColoredBox>(),
+        tester.widget(find.byType(StructuredRouteMapView)),
+        isA<StructuredRouteMapView>(),
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -1778,24 +1779,6 @@ void main() {
       find.byKey(const Key('networkMapStation-express-a-line-express')),
       findsOneWidget,
     );
-  });
-
-  testWidgets('공식 노선도 asset 지역은 급행 전환을 숨긴다', (tester) async {
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(
-          networkMapData: _assetBackedExpressMapData(),
-        ),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('routeMapViewportRenderer')), findsOneWidget);
-    expect(find.text('급행'), findsNothing);
   });
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
@@ -11599,19 +11582,6 @@ NetworkMapData _expressFilterMapData() {
       ),
     ],
     stationLineMemberships: [],
-  );
-}
-
-NetworkMapData _assetBackedExpressMapData() {
-  final data = _expressFilterMapData();
-  return NetworkMapData(
-    regions: const [NetworkMapRegion(name: '수도권')],
-    selectedRegion: '수도권',
-    lines: data.lines,
-    stations: data.stations,
-    edges: data.edges,
-    positionSources: data.positionSources,
-    stationLineMemberships: data.stationLineMemberships,
   );
 }
 

@@ -80,11 +80,6 @@ flutter:
     - assets/datapacks/metro_map_pack/manifest.json
     - assets/datapacks/metro_map_pack/SOURCE_URLS.txt
     - assets/datapacks/metro_map_pack/SHA256SUMS.txt
-    - assets/datapacks/maps/seoul-official-route-map.svg
-    - assets/datapacks/maps/busan-official-route-map.svg
-    - assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg
-    - assets/datapacks/maps/daegu-official-route-map.svg
-    - assets/datapacks/maps/daejeon-official-route-map.svg
     - assets/metro_symbols/line_badges/
 
   # An image asset can refer to one or more resolution-specific "variants", see
