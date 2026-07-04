@@ -400,6 +400,7 @@ function assertActionsEnvSecretPolicy(file, source) {
     ".github/workflows/datapack-release.yml": new Set([
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
       "DATA_GO_KR_SERVICE_KEY",
+      "KRIC_SERVICE_KEY",
     ]),
     ".github/workflows/release-artifacts.yml": new Set([
       "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
@@ -959,7 +960,7 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   const datapackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
 
   assert.match(readme, /로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다/);
-  assert.match(readme, /provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다/);
+  assert.match(readme, /provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY`, `KRIC_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다/);
   assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
   assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
   assert.match(readme, /provider key overlay를 append/);
@@ -981,6 +982,8 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   assert.match(cdWorkflow, /tail -c 1 "\$\{env_file\}"/);
   assert.match(datapackReleaseWorkflow, /drop_topis_key/);
   assert.match(datapackReleaseWorkflow, /drop_data_go_key/);
+  assert.match(datapackReleaseWorkflow, /drop_kric_key/);
+  assert.match(datapackReleaseWorkflow, /KRIC_SERVICE_KEY_SECRET: \$\{\{ secrets\.KRIC_SERVICE_KEY \}\}/);
   assert.match(datapackReleaseWorkflow, /!\(\$1 in drop\)/);
   assert.match(datapackReleaseWorkflow, /tail -c 1 "\$\{env_file\}"/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
