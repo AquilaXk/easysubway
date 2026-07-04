@@ -103,7 +103,7 @@ const routeEtaSourceLabels = <String, String>{
   'STATIC_ESTIMATE': '정적 추정',
   'FALLBACK': '실시간 미지원',
   'UNSUPPORTED': '실시간 미지원',
-  'STALE': '저장된 데이터 기준 · 갱신 필요',
+  'STALE': '저장된 데이터 기준',
 };
 
 String routeEtaSourceLabel(String value) {
@@ -1269,7 +1269,7 @@ class RouteSearchResult {
           .toList(growable: false),
       recommendationReasons: itinerary.commercialEtaEligible
           ? const ['실시간 도착 정보를 반영했어요.']
-          : const ['상용 ETA 품질 확인 전 경로입니다.'],
+          : const [],
       blockedReasons: itinerary.status == 'FOUND'
           ? const []
           : itinerary.accessibilityRisk.reasonCodes.isEmpty
