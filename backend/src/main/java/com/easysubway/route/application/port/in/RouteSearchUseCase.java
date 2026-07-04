@@ -23,6 +23,15 @@ public interface RouteSearchUseCase {
 		return List.copyOf(timetableResults);
 	}
 
+	default List<RouteSearchResult> stabilizeTimetableRouteCandidates(
+		SearchRouteCommand command,
+		int candidateCount,
+		int alternativeCount,
+		List<RouteSearchResult> timetableResults
+	) {
+		return stabilizeTimetableRouteResults(command, alternativeCount, timetableResults);
+	}
+
 	default boolean supportsRealtimeOverlay() {
 		return true;
 	}

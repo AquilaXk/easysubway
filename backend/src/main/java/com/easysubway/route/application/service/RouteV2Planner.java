@@ -76,9 +76,10 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				if (timetableItineraries.isEmpty()) {
 					return new RouteV2Plan(List.of(), List.of(RouteV2Status.NO_TIMETABLE_SERVICE), PLANNER_ADR);
 				}
-				timetableItineraries = routeSearchUseCase.stabilizeTimetableRouteResults(
+				timetableItineraries = routeSearchUseCase.stabilizeTimetableRouteCandidates(
 					searchRouteCommand,
 					RANKING_CANDIDATE_LIMIT,
+					command.alternativeCount(),
 					timetableItineraries
 				);
 				timetableItineraries = rankTimetableItineraries(timetableItineraries, command.alternativeCount());

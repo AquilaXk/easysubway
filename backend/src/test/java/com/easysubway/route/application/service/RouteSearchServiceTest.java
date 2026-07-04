@@ -2084,13 +2084,14 @@ class RouteSearchServiceTest {
 			}
 
 			@Override
-			public List<RouteSearchResult> stabilizeTimetableRouteResults(
+			public List<RouteSearchResult> stabilizeTimetableRouteCandidates(
 				SearchRouteCommand command,
+				int candidateCount,
 				int alternativeCount,
 				List<RouteSearchResult> timetableResults
 			) {
 				return stabilizedResults.stream()
-					.limit(alternativeCount)
+					.limit(candidateCount)
 					.toList();
 			}
 

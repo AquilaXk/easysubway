@@ -200,10 +200,23 @@ public class RouteSearchService implements RouteSearchUseCase {
 		int alternativeCount,
 		List<RouteSearchResult> timetableResults
 	) {
+		return stabilizeTimetableRouteCandidates(command, alternativeCount, alternativeCount, timetableResults);
+	}
+
+	@Override
+	public List<RouteSearchResult> stabilizeTimetableRouteCandidates(
+		SearchRouteCommand command,
+		int candidateCount,
+		int alternativeCount,
+		List<RouteSearchResult> timetableResults
+	) {
 		try {
-			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, alternativeCount);
-			if (accessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
-				return accessibilityCheckedResults.stream()
+			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, candidateCount);
+			List<RouteSearchResult> returnableAccessibilityResults = accessibilityCheckedResults.stream()
+				.limit(alternativeCount)
+				.toList();
+			if (returnableAccessibilityResults.stream().anyMatch(this::hasAccessibilitySignal)) {
+				return returnableAccessibilityResults.stream()
 					.map(saveRouteSearchPort::saveRouteSearch)
 					.toList();
 			}
