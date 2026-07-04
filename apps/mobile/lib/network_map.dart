@@ -9,6 +9,7 @@ import 'package:flutter/scheduler.dart';
 import 'accessible_design.dart';
 import 'ad_slot.dart';
 import 'features/network_map/domain/map_camera.dart';
+import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/route_map_renderer.dart';
@@ -98,6 +99,26 @@ class NetworkMapData {
       stationLineMemberships: _objectList(
         json['stationLineMemberships'],
       ).map(NetworkMapStationLineMembership.fromJson).toList(growable: false),
+    );
+  }
+
+  /// 구조화 노선도 레이어(#1636 스키마 기준)를 파생한다. native canvas
+  /// 렌더러(#1641)가 소비하는 line geometry / transfer group / label·LOD를
+  /// route_map_positions 필드에서 계산한다.
+  StructuredRouteMap toStructuredRouteMap() {
+    return buildStructuredRouteMap(
+      stations.map(
+        (station) => StructuredRouteMapStationInput(
+          stationId: station.id,
+          lineId: station.lineId,
+          sequence: station.sequence,
+          x: station.position.x.toDouble(),
+          y: station.position.y.toDouble(),
+          upPath: station.position.upPath,
+          downPath: station.position.downPath,
+          labelPolygon: station.position.labelPolygon,
+        ),
+      ),
     );
   }
 }
