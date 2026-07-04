@@ -9,9 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Profile("prod | staging | release | prod-like")
+@Transactional(readOnly = true)
 public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 
 	private final JdbcTemplate jdbcTemplate;
@@ -23,6 +25,20 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 
 	JdbcRouteTimetableRepository(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
+	}
+
+	@Override
+	public boolean hasRouteTimetable() {
+		return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+			"""
+				SELECT CASE
+					WHEN EXISTS (SELECT 1 FROM transit_trips)
+						AND EXISTS (SELECT 1 FROM transit_stop_times)
+					THEN TRUE ELSE FALSE
+				END
+				""",
+			Boolean.class
+		));
 	}
 
 	@Override

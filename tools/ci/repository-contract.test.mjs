@@ -9466,8 +9466,8 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
   assert.match(planner, /getIfAvailable\(\)/);
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
-  assert.match(planner, /timetableRequired && \(timetable\.transitTrips\(\)\.isEmpty\(\) \|\| timetable\.transitStopTimes\(\)\.isEmpty\(\)\)/);
-  assert.match(planner, /loadRouteTimetable\(\)/);
+  assert.match(planner, /timetableRequired && !routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /hasRouteTimetable\(\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(useCase, /record SearchRouteV2Command/);
@@ -9482,6 +9482,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(useCase, /List<RouteV2Status> statuses/);
   assert.match(timetablePort, /interface LoadRouteTimetablePort/);
   assert.match(timetablePort, /loadRouteTimetable/);
+  assert.match(timetablePort, /hasRouteTimetable/);
   assert.match(timetablePort, /record RouteTimetable/);
   for (const schemaRecord of [
     "ServiceCalendar",

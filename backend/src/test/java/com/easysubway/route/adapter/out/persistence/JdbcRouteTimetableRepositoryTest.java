@@ -22,6 +22,7 @@ class JdbcRouteTimetableRepositoryTest {
 			""
 		);
 		jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate.execute("DROP ALL OBJECTS");
 		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V29__canonical_transit_schedule.sql'");
 		repository = new JdbcRouteTimetableRepository(jdbcTemplate);
 	}
@@ -42,6 +43,16 @@ class JdbcRouteTimetableRepositoryTest {
 		assertThat(timetable.transitTrips().getFirst().servicePattern()).isEqualTo("LOCAL");
 		assertThat(timetable.transitStopTimes().getFirst().stationId()).isEqualTo("station-sangnoksu");
 		assertThat(timetable.transitFrequencies().getFirst().headwaySeconds()).isEqualTo(600);
+	}
+
+	@Test
+	@DisplayName("시간표 availability는 stop_times 전체를 읽지 않고 판정한다")
+	void hasRouteTimetableChecksOnlyTripAndStopTimePresence() {
+		assertThat(repository.hasRouteTimetable()).isFalse();
+
+		insertTimetableRows();
+
+		assertThat(repository.hasRouteTimetable()).isTrue();
 	}
 
 	private void insertTimetableRows() {
