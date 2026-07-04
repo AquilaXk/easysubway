@@ -1010,16 +1010,27 @@ class _NetworkMapTopBar extends StatelessWidget {
                   key: const Key('mapRegionTabs'),
                   container: true,
                   button: true,
-                  label: '지역: $currentRegion',
+                  label: '지역: $currentRegion, 지역 변경',
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 148),
-                    child: SizedBox(
-                      height: EasySubwayTouchTarget.general,
-                      child: ExcludeSemantics(
-                        child: InkWell(
-                          key: const Key('networkMapRegionDropdown'),
-                          onTap: () =>
-                              _showRegionSheet(context, availableRegions),
+                    child: ExcludeSemantics(
+                      // 트리거의 ▾ 캐럿과 반응 위치를 맞춘다: 트리거 바로 아래
+                      // 앵커된 드롭다운 메뉴로 5개 지역을 표시한다(하단 시트 대신).
+                      child: PopupMenuButton<String>(
+                        key: const Key('networkMapRegionDropdown'),
+                        tooltip: '지역 선택',
+                        position: PopupMenuPosition.under,
+                        onSelected: onRegionSelected,
+                        itemBuilder: (context) => [
+                          for (final region in availableRegions)
+                            CheckedPopupMenuItem<String>(
+                              value: region.name,
+                              checked: region.name == selectedRegion,
+                              child: Text(region.displayName),
+                            ),
+                        ],
+                        child: SizedBox(
+                          height: EasySubwayTouchTarget.general,
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -1052,103 +1063,6 @@ class _NetworkMapTopBar extends StatelessWidget {
                   const SizedBox(width: 8),
                   notificationAction!,
                 ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showRegionSheet(
-    BuildContext context,
-    List<NetworkMapRegion> availableRegions,
-  ) async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: ListView(
-            key: const Key('networkMapRegionSheet'),
-            shrinkWrap: true,
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            children: [
-              const Text(
-                '지역 선택',
-                style: TextStyle(
-                  color: _networkMapMenuLabelColor,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (final region in availableRegions)
-                _NetworkMapRegionRow(
-                  label: region.displayName,
-                  selected: region.name == selectedRegion,
-                  onTap: () => Navigator.of(context).pop(region.name),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-    if (selected != null) {
-      onRegionSelected(selected);
-    }
-  }
-}
-
-class _NetworkMapRegionRow extends StatelessWidget {
-  const _NetworkMapRegionRow({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '$label 지역 ${selected ? '선택됨' : '선택 안 됨'}',
-      button: true,
-      selected: selected,
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: EasySubwayAccessibleColors.line),
-              ),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected
-                          ? EasySubwayAccessibleColors.primary
-                          : _networkMapMenuLabelColor,
-                      fontSize: 16,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (selected)
-                  const Icon(
-                    Icons.check,
-                    size: 22,
-                    color: EasySubwayAccessibleColors.primary,
-                  ),
               ],
             ),
           ),
