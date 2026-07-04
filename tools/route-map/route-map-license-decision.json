@@ -32,9 +32,10 @@
       "originalCommercialUseAllowed": false,
       "renderingStrategy": "self-drawn-schematic",
       "bundledSvgRole": "review-reference-only",
-      "attributionRequired": false,
+      "attributionRequired": true,
+      "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": false,
-      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 사실 데이터 기반 자체 schematic으로 전환하고, 원본 SVG는 좌표 검수 참조로만 쓴다. 상용 준비 완료는 좌표 provenance 확정(#1639)과 렌더러(#1641)에서 판정한다."
+      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 사실 데이터 기반 자체 schematic으로 전환하고, 원본 SVG는 좌표 검수 참조로만 쓴다. 원본 SVG가 아직 번들되어 있는 동안에는 attribution을 유지하며(=true), 자체 도식 전환 + SVG 제거 + 좌표 provenance 확정(#1639/#1641) 후 attribution 해제 가능(attributionDropTargetAfterSelfDrawn)."
     },
     {
       "id": "daegu",
@@ -46,9 +47,10 @@
       "originalCommercialUseAllowed": false,
       "renderingStrategy": "self-drawn-schematic",
       "bundledSvgRole": "review-reference-only",
-      "attributionRequired": false,
+      "attributionRequired": true,
+      "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": false,
-      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다."
+      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. SVG 번들 유지 중에는 attribution 유지, 자체 도식 전환 후 해제 가능. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다."
     },
     {
       "id": "daejeon",
@@ -60,9 +62,10 @@
       "originalCommercialUseAllowed": false,
       "renderingStrategy": "self-drawn-schematic",
       "bundledSvgRole": "review-reference-only",
-      "attributionRequired": false,
+      "attributionRequired": true,
+      "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": false,
-      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다."
+      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. SVG 번들 유지 중에는 attribution 유지, 자체 도식 전환 후 해제 가능. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다."
     },
     {
       "id": "gwangju",
@@ -74,9 +77,10 @@
       "originalCommercialUseAllowed": true,
       "renderingStrategy": "self-drawn-schematic",
       "bundledSvgRole": "review-reference-only",
-      "attributionRequired": false,
+      "attributionRequired": true,
+      "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": false,
-      "notes": "원본 SVG는 CC BY-SA 2.0 KR(상용 가능하나 attribution·ShareAlike). ShareAlike 전파 리스크를 없애기 위해 앱 렌더링을 CC-BY-SA SVG 파생이 아닌 사실 데이터 기반 자체 schematic으로 전환한다. 원본 SVG는 좌표 검수 참조로만 쓴다."
+      "notes": "원본 SVG는 CC BY-SA 2.0 KR(상용 가능하나 attribution·ShareAlike). ShareAlike 전파 리스크를 없애기 위해 앱 렌더링을 CC-BY-SA SVG 파생이 아닌 사실 데이터 기반 자체 schematic으로 전환한다. 원본 SVG가 아직 번들되어 있으므로 CC-BY-SA attribution을 유지하며(=true), SVG 제거 + 사실 출처 provenance 확정(#1640) 후 해제 가능. 원본 SVG는 좌표 검수 참조로만 쓴다."
     }
   ],
   "gwangjuShareAlikeConclusion": {
@@ -86,9 +90,10 @@
     "conservativeGuard": "확정 전까지 광주는 attribution-pending으로 두고, CC-BY-SA SVG 자체는 앱에 배포하지 않으며 좌표 검수 참조로만 쓴다."
   },
   "attributionHandoffTo1641": {
-    "attributionRequiredRegions": [],
-    "attributionPendingRegions": ["부산", "대구", "대전", "광주"],
-    "rule": "대안 A(자체 schematic) 하에서는 배포 렌더링이 원본 저작물 파생이 아니므로 화면 attribution이 법적으로 필수는 아니다. 다만 좌표 provenance가 사실 출처로 확정(#1639/#1640)되기 전까지 부산·대구·대전·광주는 attribution-pending으로 두고, 확정 시 attributionRequiredRegions를 갱신해 #1641 렌더러 요구사항으로 전달한다. 수도권은 public domain으로 attribution 불필요."
+    "attributionRequiredRegions": ["부산", "대구", "대전", "광주"],
+    "attributionDropTargetRegions": ["부산", "대구", "대전", "광주"],
+    "rule": "현재 원본 SVG(permission-required / CC-BY-SA)가 여전히 번들되어 있으므로, #1641 렌더러는 부산·대구·대전·광주에 대해 화면 attribution(출처표시)을 표시해야 한다. 수도권은 public domain으로 attribution 불필요. 대안 A 완료(자체 schematic 전환 + 원본 SVG 제거 + 좌표 provenance 사실 출처 확정, #1639/#1640/#1641) 후에는 배포 렌더링이 원본 저작물 파생이 아니게 되어 해당 지역 attribution을 해제할 수 있다(attributionDropTargetRegions). 그 시점에 attributionRequiredRegions를 갱신한다.",
+    "consistencyRule": "각 지역의 attributionRequiredRegions 포함 여부는 regions[].attributionRequired와 일치한다(attributionRequired=true인 지역은 목록에 포함, 수도권은 false로 제외)."
   },
   "productionPromotionRule": "renderingStrategy=self-drawn-schematic 지역은 원본 SVG 라이선스로 production source 승격하지 않는다. 상용 가능성이 불명확한 원본(permission-required, ShareAlike)은 앱 렌더링 source of truth가 아니며, PDF/SVG 원본은 좌표 검수 기준으로만 쓴다.",
   "svgAdmissionRule": "qa-provided-route-map-svg 등 비공식 경로로 입수했거나 재배포 권한이 확인되지 않은 원본은 production route_map source로 승격하지 않는다. import-official-sources의 source admission gate가 미승인 source를 거부한다.",

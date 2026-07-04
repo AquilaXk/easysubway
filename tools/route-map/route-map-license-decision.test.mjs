@@ -23,15 +23,39 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
   const decisionById = new Map(decision.regions.map((r) => [r.id, r]));
   const manifestById = new Map(manifest.maps.map((m) => [m.id, m]));
 
-  // 모든 지역 결정이 실제 번들 manifest map과 1:1로 대응한다.
+  // 모든 지역 결정이 실제 번들 manifest map과 1:1로 정합한다(수도권 포함).
   for (const region of decision.regions) {
-    assert.ok(
-      manifestById.has(region.id),
-      `${region.id} 결정이 manifest map과 대응해야 함`,
-    );
+    const map = manifestById.get(region.id);
+    assert.ok(map, `${region.id} 결정이 manifest map과 대응해야 함`);
     assert.ok(
       decision.strategyValues.includes(region.renderingStrategy),
       `${region.id} renderingStrategy 값이 허용 목록에 있어야 함`,
+    );
+    assert.ok(
+      decision.bundledSvgRoleValues.includes(region.bundledSvgRole),
+      `${region.id} bundledSvgRole 값이 허용 목록에 있어야 함`,
+    );
+    // 결정 ↔ manifest route_map_strategy 정합 (drift 방지, 모든 지역).
+    assert.equal(
+      map.route_map_strategy.rendering_strategy,
+      region.renderingStrategy,
+      `${region.id} rendering_strategy가 결정과 일치해야 함`,
+    );
+    assert.equal(
+      map.route_map_strategy.bundled_svg_role,
+      region.bundledSvgRole,
+      `${region.id} bundled_svg_role가 결정과 일치해야 함`,
+    );
+    assert.equal(
+      map.route_map_strategy.commercial_production_ready,
+      region.commercialProductionReady,
+      `${region.id} commercial_production_ready가 결정과 일치해야 함`,
+    );
+    // attribution 정합: 결정과 shipped manifest license가 어긋나면 안 된다.
+    assert.equal(
+      map.license.attributionRequired,
+      region.attributionRequired,
+      `${region.id} attributionRequired가 manifest license와 일치해야 함`,
     );
   }
 
@@ -41,7 +65,7 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
   assert.equal(seoul.commercialProductionReady, true);
   assert.equal(seoul.attributionRequired, false);
 
-  // 부산·대구·대전·광주는 self-drawn 전환 + 상용 미승격 + manifest 정합.
+  // 부산·대구·대전·광주는 self-drawn 전환 + 상용 미승격 + 번들 중 attribution 유지.
   for (const id of ["busan", "daegu", "daejeon", "gwangju"]) {
     const region = decisionById.get(id);
     assert.equal(
@@ -55,18 +79,19 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
       false,
       `${id}는 원본 라이선스로 상용 승격되지 않아야 함`,
     );
+    // 원본 SVG 번들 유지 중에는 attribution을 유지한다(license 위반 방지).
+    assert.equal(
+      region.attributionRequired,
+      true,
+      `${id}는 SVG 번들 유지 중 attributionRequired=true여야 함`,
+    );
 
-    const map = manifestById.get(id);
     // 상용 불명확 원본은 production으로 승격하지 않는다: manifest도 상용 불가.
     assert.equal(
-      map.license.commercialUseAllowed,
+      manifestById.get(id).license.commercialUseAllowed,
       false,
       `${id} manifest license.commercialUseAllowed는 false여야 함`,
     );
-    // manifest route_map_strategy가 결정과 일치한다.
-    assert.equal(map.route_map_strategy.rendering_strategy, "self-drawn-schematic");
-    assert.equal(map.route_map_strategy.bundled_svg_role, "review-reference-only");
-    assert.equal(map.route_map_strategy.commercial_production_ready, false);
   }
 
   // 광주 ShareAlike 결론이 사실≠저작물 근거와 함께 기록된다.
@@ -78,13 +103,24 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
 
   // attribution 필요 지역 목록이 #1641로 전달 가능한 형태로 확정된다.
   const handoff = decision.attributionHandoffTo1641;
-  assert.ok(Array.isArray(handoff.attributionRequiredRegions));
-  assert.deepEqual(handoff.attributionPendingRegions, [
+  assert.deepEqual(handoff.attributionRequiredRegions, [
     "부산",
     "대구",
     "대전",
     "광주",
   ]);
+  // handoff 목록이 per-region attributionRequired 플래그와 정합한다.
+  const requiredKoreanNames = decision.regions
+    .filter((region) => region.attributionRequired)
+    .map((region) => region.region);
+  assert.deepEqual(
+    [...handoff.attributionRequiredRegions].sort(),
+    [...requiredKoreanNames].sort(),
+  );
+  assert.ok(
+    !handoff.attributionRequiredRegions.includes("수도권"),
+    "수도권은 public domain으로 attribution 목록에서 제외되어야 함",
+  );
 
   // 상용 앱 벤치마크가 URL과 함께 기록된다(카카오·네이버·Transit 등).
   const services = decision.similarServiceBenchmarks.map((b) => b.service);
