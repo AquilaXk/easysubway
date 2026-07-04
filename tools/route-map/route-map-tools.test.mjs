@@ -196,6 +196,46 @@ async function runBuildLineTracksFromPack({ region, rows, args = [] }) {
   }
 }
 
+// svg-strokes 모드 + 0표 노선 down_path 완충 검증용: route_map_positions(down_path)+
+// station_lines(line_sequence)를 실제 팩 스키마대로 만들고 geometry로 실행한다.
+async function runBuildLineTracksWithDownPath({ geometry, region, rows, args = [] }) {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-line-tracks-fill-"));
+  try {
+    const packPath = path.join(dir, "pack.sqlite");
+    const db = new DatabaseSync(packPath);
+    db.exec(
+      `CREATE TABLE route_map_positions (
+        station_id TEXT NOT NULL, line_id TEXT NOT NULL, region TEXT NOT NULL,
+        x INTEGER NOT NULL, y INTEGER NOT NULL, down_path TEXT NOT NULL DEFAULT ''
+      );
+      CREATE TABLE station_lines (
+        station_id TEXT NOT NULL, line_id TEXT NOT NULL, line_sequence INTEGER NOT NULL
+      )`,
+    );
+    const insertPosition = db.prepare(
+      "INSERT INTO route_map_positions (station_id, line_id, region, x, y, down_path) VALUES (?, ?, ?, ?, ?, ?)",
+    );
+    const insertLine = db.prepare(
+      "INSERT INTO station_lines (station_id, line_id, line_sequence) VALUES (?, ?, ?)",
+    );
+    for (const row of rows) {
+      insertPosition.run(row.station_id, row.line_id, region, row.x, row.y, row.down_path ?? "");
+      insertLine.run(row.station_id, row.line_id, row.sequence);
+    }
+    db.close();
+    const geometryPath = path.join(dir, "geometry.json");
+    await writeFile(geometryPath, JSON.stringify(geometry));
+    const { stdout } = await execFileAsync(
+      "node",
+      [buildLineTracksScript, "--geometry", geometryPath, "--pack", packPath, "--region", region, ...args],
+      { cwd: root, maxBuffer: 4 * 1024 * 1024 },
+    );
+    return JSON.parse(stdout);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 test("structured route map contract pins nationwide vector-rendered layers", async () => {
   const contract = JSON.parse(
     await readFile(
@@ -2174,6 +2214,43 @@ test("build-route-map-line-tracks --source pack-down-path chains existing segmen
   assert.equal(result.lines[0].lineId, "line-a");
   assert.equal(result.lines[0].trackCount, 1);
   assert.equal(result.lines[0].paths[0], "M 0 0 L 10 0 L 20 0");
+});
+
+test("build-route-map-line-tracks completes zero-vote svg lines from pack down_path", async () => {
+  // line-a: 빨강 track 근처 역 → 득표. line-b: 어느 track과도 멀어 0표지만
+  // down_path 보유 → SVG 고아 색 대신 down_path 완충(Route B 로직 재사용).
+  const geometry = {
+    extractorVersion: 2,
+    strokes: [
+      { tag: "polyline", stroke: "#ff0000", dashed: false,
+        points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] },
+      // 고아 주황 track — 어느 역과도 멀어 0표. 소거법으로 line-b에 배정될 후보.
+      { tag: "polyline", stroke: "#f58921", dashed: false,
+        points: [{ x: 0, y: 500 }, { x: 100, y: 500 }] },
+    ],
+  };
+  const result = await runBuildLineTracksWithDownPath({
+    geometry,
+    region: "테스트권",
+    rows: [
+      { station_id: "a1", line_id: "line-a", sequence: 1, x: 10, y: 5, down_path: "" },
+      { station_id: "a2", line_id: "line-a", sequence: 2, x: 90, y: 5, down_path: "M 10 5 L 90 5" },
+      { station_id: "b1", line_id: "line-b", sequence: 1, x: 10, y: 1000, down_path: "" },
+      { station_id: "b2", line_id: "line-b", sequence: 2, x: 90, y: 1000, down_path: "M 10 1000 L 90 1000" },
+    ],
+  });
+  assert.equal(result.source, "svg-strokes");
+  assert.equal(result.colorCount, result.lineCount, "완충 후에도 색=노선 전제 유지");
+  const lineB = result.lines.find((line) => line.lineId === "line-b");
+  assert.ok(lineB, "line-b 존재");
+  assert.equal(lineB.matchVotes, null, "완충 노선은 SVG 득표가 아니므로 matchVotes=null");
+  assert.equal(lineB.svgColor, "", "완충 노선은 SVG 색을 버린다(고아 색 미방출)");
+  assert.equal(lineB.source, "pack-down-path", "노선 단위 down_path 완충 표시");
+  assert.equal(lineB.trackCount, 1);
+  assert.equal(lineB.paths[0], "M 10 1000 L 90 1000", "down_path 실측 track");
+  const lineA = result.lines.find((line) => line.lineId === "line-a");
+  assert.ok(lineA.matchVotes > 0, "정상 매칭 노선은 SVG track 유지");
+  assert.equal(lineA.svgColor, "#ff0000");
 });
 
 test("apply-route-map-line-tracks writes tracks with inherited license metadata", async () => {
