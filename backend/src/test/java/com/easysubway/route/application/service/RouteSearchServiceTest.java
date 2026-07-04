@@ -11,6 +11,7 @@ import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Status;
 import com.easysubway.route.application.port.in.SubmitRouteFeedbackCommand;
+import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.RealtimeArrivalResolver;
 import com.easysubway.route.domain.ArrivalCandidate;
 import com.easysubway.route.domain.ArrivalFreshness;
@@ -770,12 +771,49 @@ class RouteSearchServiceTest {
 	@Test
 	@DisplayName("V2 planner는 시간표 서비스가 없으면 NO_TIMETABLE_SERVICE status를 반환한다")
 	void routeV2PlannerReturnsNoTimetableServiceStatus() {
-		var planner = routeV2Planner(new TwoTransferTransitMasterPort());
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, LoadRouteTimetablePort.RouteTimetable::empty);
 
 		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
 		assertThat(plan.itineraries()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("V2 planner는 시간표 adapter 미연결 fallback에서는 기존 경로 검색을 유지한다")
+	void routeV2PlannerKeepsLegacySearchWhenTimetableAdapterMissing() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService);
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.itineraries()).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("V2 planner는 시간표 availability 확인에 전체 snapshot을 읽지 않는다")
+	void routeV2PlannerDoesNotLoadFullTimetableForAvailabilityGuard() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, new LoadRouteTimetablePort() {
+			@Override
+			public boolean hasRouteTimetable() {
+				return true;
+			}
+
+			@Override
+			public LoadRouteTimetablePort.RouteTimetable loadRouteTimetable() {
+				throw new AssertionError("RouteV2Planner must not materialize the full timetable before RAPTOR uses it");
+			}
+		});
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 	}
 
 	@Test
@@ -802,7 +840,7 @@ class RouteSearchServiceTest {
 			CLOCK,
 			resolver
 		);
-		var planner = new RouteV2Planner(routeSearchService);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
 
 		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
@@ -848,7 +886,7 @@ class RouteSearchServiceTest {
 			CLOCK,
 			resolver
 		);
-		var planner = new RouteV2Planner(routeSearchService);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
 
 		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
 			"station-a",
@@ -890,7 +928,7 @@ class RouteSearchServiceTest {
 			CLOCK,
 			resolver
 		);
-		var planner = new RouteV2Planner(routeSearchService);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
 
 		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
 			"station-a",
@@ -932,7 +970,7 @@ class RouteSearchServiceTest {
 			CLOCK,
 			resolver
 		);
-		var planner = new RouteV2Planner(routeSearchService);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
 
 		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
@@ -967,7 +1005,7 @@ class RouteSearchServiceTest {
 				List.of()
 			)
 		);
-		var planner = new RouteV2Planner(routeSearchService);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
 
 		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
 			"station-a",
@@ -1692,7 +1730,48 @@ class RouteSearchServiceTest {
 
 	private static RouteV2Planner routeV2Planner(LoadTransitMasterPort transitMasterPort) {
 		var repository = new InMemoryRouteSearchRepository();
-		return new RouteV2Planner(new RouteSearchService(repository, repository, transitMasterPort, CLOCK));
+		return new RouteV2Planner(new RouteSearchService(repository, repository, transitMasterPort, CLOCK), routeTimetablePort());
+	}
+
+	private static LoadRouteTimetablePort routeTimetablePort() {
+		return () -> new LoadRouteTimetablePort.RouteTimetable(
+			List.of(new LoadRouteTimetablePort.ServiceCalendar(
+				"weekday-2026",
+				true,
+				true,
+				true,
+				true,
+				true,
+				false,
+				false,
+				LocalDate.parse("2026-07-01"),
+				LocalDate.parse("2026-12-31"),
+				"Asia/Seoul"
+			)),
+			List.of(),
+			List.of(new LoadRouteTimetablePort.TransitRoute(
+				"route-seoul-4",
+				"seoul-4",
+				"4",
+				"수도권 4호선",
+				"사당 방면",
+				"Asia/Seoul"
+			)),
+			List.of(new LoadRouteTimetablePort.TransitTrip(
+				"trip-seoul-4-0900",
+				"route-seoul-4",
+				"weekday-2026",
+				"사당",
+				"0",
+				"LOCAL",
+				0
+			)),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32400, 32400, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33000, 33000, 0, 0)
+			),
+			List.of()
+		);
 	}
 
 	private static RouteV2SearchUseCase.SearchRouteV2Command routeV2Command(
