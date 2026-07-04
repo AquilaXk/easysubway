@@ -51,7 +51,6 @@ const _routeAccentColor = EasySubwayAccessibleColors.primary;
 const _routeCardBorderColor = Color(0xFFD5E2E4);
 const _routeDividerColor = EasySubwayAccessibleColors.line;
 const _routeControlBorderColor = Color(0xFF9DB6BA);
-const _routeSoftPanelColor = Color(0xFFE9F5F6);
 const _routeSoftPanelBorderColor = Color(0xFFB9D4D8);
 const _routeGuidanceDarkColor = Color(0xFF073245);
 const _routeGuidanceSecondaryColor = Color(0xFFC7D8E3);
@@ -2567,8 +2566,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                 SwitchListTile(
                   key: const Key('routeStrictStepFreeSwitch'),
                   contentPadding: EdgeInsets.zero,
+                  // 켜기 전에 부정적 결과를 먼저 경고하지 않는다. 경로가 없을 때는
+                  // 결과 화면에서 안내한다(#1568).
                   title: const Text('계단 없는 길만'),
-                  subtitle: const Text('켜면 경로가 줄거나 없을 수 있어요.'),
                   value: _selectedConstraintMode == 'STRICT_STEP_FREE',
                   onChanged: (value) {
                     setState(() {
@@ -3293,73 +3293,47 @@ class _RouteMobilityTypeSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final option = _mobilityOptionFor(mobilityType);
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          option.title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: _routeTextPrimaryColor,
-            fontWeight: FontWeight.w800,
-            height: 1.25,
-          ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          _routeMobilityConditionLabel(option),
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: _routeTextSubtleColor,
-            fontWeight: FontWeight.w700,
-            height: 1.3,
-          ),
-        ),
-      ],
-    );
+    // 장식 틴트 카드 대신 얇은 구분선 위의 플랫 행으로 둔다. 조건 요약 부제는
+    // 이동 조건 화면과 중복이라 제거하고 현재 조건명 + '변경'만 남긴다(#1568).
     return Semantics(
       container: true,
       explicitChildNodes: true,
-      label:
-          '현재 이동 조건 ${option.title}, ${_routeMobilityConditionLabel(option)}',
+      label: '현재 이동 조건 ${option.title}',
       liveRegion: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: _routeSoftPanelColor,
-          border: Border.all(color: _routeSoftPanelBorderColor),
-          borderRadius: _routeSearchSmallRadius,
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: _routeSoftPanelBorderColor)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: ExcludeSemantics(
-                  child: Row(
-                    children: [
-                      Icon(option.icon, color: _routeAccentColor, size: 26),
-                      const SizedBox(width: 10),
-                      Expanded(child: content),
-                    ],
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: ExcludeSemantics(
+                child: Text(
+                  option.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: _routeTextPrimaryColor,
+                    fontWeight: FontWeight.w800,
+                    height: 1.25,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Semantics(
-                button: true,
-                label: '이동 조건 바꾸기, 현재 ${option.title}',
-                onTap: onChangeRequested,
-                child: ExcludeSemantics(
-                  child: OutlinedButton(
-                    key: const Key('routeSimpleMobilityTypeButton'),
-                    onPressed: onChangeRequested,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(64, 48),
-                    ),
-                    child: const Text('변경'),
-                  ),
+            ),
+            const SizedBox(width: 10),
+            Semantics(
+              button: true,
+              label: '이동 조건 바꾸기, 현재 ${option.title}',
+              onTap: onChangeRequested,
+              child: ExcludeSemantics(
+                child: TextButton(
+                  key: const Key('routeSimpleMobilityTypeButton'),
+                  onPressed: onChangeRequested,
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                  child: const Text('변경'),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
