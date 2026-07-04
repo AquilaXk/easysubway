@@ -23,7 +23,6 @@ const _favoriteRouteErrorMessage = '즐겨찾기 경로를 바꾸지 못했어�
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했어요.';
 const _routeSafetyGuidanceNotice = '이동 전 현장 안내와 역무원 안내를 확인해 주세요.';
 const _routeSearchFailureNextAction = '역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.';
-const _routeBlockedConfirmationNotice = '역무원이나 현장 안내를 확인한 뒤 이동해 주세요.';
 const _routeFeedbackFailureNextAction = '잠시 후 다시 보내거나 경로 조건을 바꿔 다시 찾아보세요.';
 const _favoriteRouteSaveFailureNextAction =
     '네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요.';
@@ -1597,10 +1596,9 @@ class RouteSearchResult {
         '이동 안내 ${stepsForGuidance.map((step) => step.semanticGuidanceLabel).join(', ')}',
       );
     }
+    // 면책·주의 안내는 '안전 안내' 한 곳으로 통합한다. '이동 전 살펴보기'는
+    // 같은 의미의 이중 고지라 시맨틱에서 제거한다(#1577).
     parts.add('안전 안내 $_routeSafetyGuidanceNotice');
-    if (isBlocked) {
-      parts.add('이동 전 살펴보기 $_routeBlockedConfirmationNotice');
-    }
     return parts.join(', ');
   }
 
@@ -2006,7 +2004,8 @@ class RouteSearchStep {
     }
     if (timeSource == 'ESTIMATED_CONSTANT' ||
         distanceSource == 'ESTIMATED_CONSTANT') {
-      return '예상 시간·거리예요. 현장 안내를 먼저 확인해 주세요';
+      // 값만 남긴다. 예상치임의 면책은 결과 하단 안전 안내 각주 1줄이 담당(#1577).
+      return '예상 시간·거리예요';
     }
     if (timeSource == 'UNKNOWN' || distanceSource == 'UNKNOWN') {
       return '시간 또는 거리를 확인하고 있어요';
