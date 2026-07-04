@@ -226,6 +226,11 @@ test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret
   assert.doesNotMatch(JSON.stringify(collection), /actual-secret-key/);
 
   const summary = buildTagoScheduleCollectionSummary(collection);
+  assert.deepEqual(
+    summary.completedRequestKeys,
+    collection.responses.map((response) => response.requestKey),
+  );
+  assert.equal(summary.responseCount, collection.responses.length);
   assert.deepEqual(summary.checkpoint.completedRequestKeys, collection.checkpoint.completedRequestKeys);
 });
 

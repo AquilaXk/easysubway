@@ -180,8 +180,9 @@ function buildTagoScheduleCollectionSummary(collection) {
     providerRecordHashes.push(...validation.providerRecordHashes);
     rowCount += validation.rowCount;
   }
-  const completedRequestKeys = [...new Set([...checkpointRequestKeys, ...responseRequestKeys])].sort((left, right) =>
-    left.localeCompare(right),
+  const completedRequestKeys = responseRequestKeys;
+  const checkpointCompletedRequestKeys = [...new Set([...checkpointRequestKeys, ...responseRequestKeys])].sort(
+    (left, right) => left.localeCompare(right),
   );
 
   const evidencePayload = {
@@ -196,7 +197,7 @@ function buildTagoScheduleCollectionSummary(collection) {
     sourceId: evidencePayload.sourceId,
     endpoint: evidencePayload.endpoint,
     completedRequestKeys,
-    checkpoint: { completedRequestKeys },
+    checkpoint: { completedRequestKeys: checkpointCompletedRequestKeys },
     responseCount: completedRequestKeys.length,
     rowCount,
     rawSha256ByRequest,
