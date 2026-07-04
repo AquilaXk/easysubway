@@ -187,15 +187,39 @@ public class RouteSearchService implements RouteSearchUseCase {
 		int alternativeCount,
 		List<RouteSearchResult> timetableResults
 	) {
-		List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, alternativeCount);
-		if (accessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
-			return accessibilityCheckedResults.stream()
-				.map(saveRouteSearchPort::saveRouteSearch)
-				.toList();
+		try {
+			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, alternativeCount);
+			if (accessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
+				return accessibilityCheckedResults.stream()
+					.map(saveRouteSearchPort::saveRouteSearch)
+					.toList();
+			}
+		} catch (RouteNotFoundException | StationNotFoundException exception) {
+			// Timetable coverage can lead legacy graph coverage while #1400 closes the production graph gap.
 		}
 		return timetableResults.stream()
+			.map(this::storedTimetableRouteResult)
 			.map(saveRouteSearchPort::saveRouteSearch)
 			.toList();
+	}
+
+	private RouteSearchResult storedTimetableRouteResult(RouteSearchResult routeSearchResult) {
+		return new RouteSearchResult(
+			newRouteSearchId(),
+			routeSearchResult.originStationId(),
+			routeSearchResult.originStationName(),
+			routeSearchResult.destinationStationId(),
+			routeSearchResult.destinationStationName(),
+			routeSearchResult.mobilityType(),
+			routeSearchResult.status(),
+			routeSearchResult.lineId(),
+			routeSearchResult.lineName(),
+			routeSearchResult.score(),
+			routeSearchResult.steps(),
+			routeSearchResult.warnings(),
+			routeSearchResult.blockedReasons(),
+			LocalDateTime.now(clock)
+		);
 	}
 
 	private List<RouteSearchResult> buildRouteSearchAlternatives(SearchRouteCommand command, int alternativeCount) {

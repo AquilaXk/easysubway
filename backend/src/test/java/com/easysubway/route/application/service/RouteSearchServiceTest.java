@@ -830,6 +830,37 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 planner는 시간표 scan 결과 저장 시 검색별 ID와 생성 시각을 부여한다")
+	void routeV2PlannerStoresTimetableScanResultsWithSearchIdentityAndCreationTime() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+
+		var firstPlan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+		var secondPlan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		var first = firstPlan.itineraries().getFirst();
+		var second = secondPlan.itineraries().getFirst();
+		assertThat(first.routeSearchId()).isNotEqualTo(second.routeSearchId());
+		assertThat(first.createdAt()).isEqualTo(LocalDate.of(2026, 6, 13).atTime(18, 0));
+		assertThat(second.createdAt()).isEqualTo(LocalDate.of(2026, 6, 13).atTime(18, 0));
+	}
+
+	@Test
+	@DisplayName("V2 planner는 legacy graph가 놓친 시간표 경로를 NO_TIMETABLE_SERVICE로 버리지 않는다")
+	void routeV2PlannerKeepsTimetableRouteWhenLegacyGraphMisses() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new DisconnectedTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
+		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isPresent();
+	}
+
+	@Test
 	@DisplayName("V2 planner는 stair-only 위험이 있으면 시간표 scan보다 접근성 warning을 보존한다")
 	void routeV2PlannerPreservesAccessibilityWarningsBeforeTimetableScan() {
 		var repository = new InMemoryRouteSearchRepository();
