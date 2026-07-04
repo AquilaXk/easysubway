@@ -1026,7 +1026,7 @@ void main() {
       tester.getSize(find.byKey(const Key('mapRegionTabs'))).height,
       greaterThanOrEqualTo(40),
     );
-    expect(find.bySemanticsLabel('지역: 수도권'), findsOneWidget);
+    expect(find.bySemanticsLabel('지역: 수도권, 지역 변경'), findsOneWidget);
     expect(find.bySemanticsLabel('노선: 전체 노선'), findsNothing);
     expect(find.text('전체 노선'), findsNothing);
     expect(find.byKey(const Key('networkMapInteractiveViewer')), findsNothing);
