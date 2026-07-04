@@ -23,6 +23,7 @@ Map<String, Object?> androidRouteMapViewportCreationParams({
     'sourceHeight': camera.sourceBounds.height,
     'viewBox': _viewBoxFor(camera),
     'revision': camera.revision,
+    'labelCollisionScript': routeMapViewportLabelCollisionScript,
   };
 }
 
