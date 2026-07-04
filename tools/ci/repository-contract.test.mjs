@@ -4888,6 +4888,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.productionPromotionCriteria.p0CoverageGapPolicy, "fail-release");
   assert.equal(scope.productionPromotionCriteria.minimumProductionCoverageValuesMustBePositive, true);
   assert.equal(scope.productionPromotionCriteria.coverageEvidenceRequired, true);
+  assert.equal(scope.productionPromotionCriteria.representativeRouteRegressionsRequired, false);
   assert.equal(scope.productionPromotionCriteria.manifest.manifestVersion, 2);
   assert.equal(scope.productionPromotionCriteria.manifest.channel, "production");
   assert.equal(scope.productionPromotionCriteria.manifest.releaseSequenceMustIncrease, true);
