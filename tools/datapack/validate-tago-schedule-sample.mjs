@@ -205,7 +205,7 @@ async function collectTagoSchedules(input, options = {}) {
   const serviceKey = requiredString(options.serviceKey, "serviceKey");
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   if (typeof fetchImpl !== "function") {
-    throw new Error("fetch is required for TAGO schedule collection");
+    throw new TypeError("fetch is required for TAGO schedule collection");
   }
   const checkpoint = options.checkpoint ?? {};
   const dailyLimit = options.dailyLimit ?? 1000;
@@ -232,7 +232,7 @@ async function collectTagoSchedules(input, options = {}) {
 
   const completedRequestKeys = [
     ...new Set([...(checkpoint.completedRequestKeys ?? []), ...responses.map((response) => response.requestKey)]),
-  ].sort();
+  ].sort((left, right) => left.localeCompare(right));
   return {
     artifactKind: "tago-schedule-collection",
     sourceId: plan.sourceId,
