@@ -637,6 +637,35 @@ void main() {
     expect(find.text('신고'), findsNothing);
   });
 
+  testWidgets('온보딩은 조건 확인 단계 없이 도움 선택 → 권한 2단계로 끝난다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+    );
+    await tester.pumpAndSettle();
+
+    // 1단계: 도움 선택
+    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+    expect(find.text('1 / 2'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    // 2단계: 권한 — 조건 확인 화면과 옛 CTA는 없다.
+    expect(find.text('적용할 조건을 확인하세요'), findsNothing);
+    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('2 / 2'), findsOneWidget);
+    expect(find.text('시작하기'), findsOneWidget);
+    expect(find.text('선택한 기능 설정하고 시작'), findsNothing);
+    expect(find.text('나중에 설정'), findsOneWidget);
+
+    // 뒤로가기 → 도움 선택으로 복귀.
+    await tester.tap(find.byTooltip('이전 단계'));
+    await tester.pumpAndSettle();
+    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+    expect(find.text('1 / 2'), findsOneWidget);
+  });
+
   testWidgets('노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
