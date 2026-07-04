@@ -182,6 +182,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 	}
 
 	@Override
+	public void validateRouteSearch(SearchRouteCommand command) {
+		validatedRouteStations(command);
+	}
+
+	@Override
 	public List<RouteSearchResult> stabilizeTimetableRouteResults(
 		SearchRouteCommand command,
 		int alternativeCount,
@@ -204,12 +209,14 @@ public class RouteSearchService implements RouteSearchUseCase {
 	}
 
 	private RouteSearchResult storedTimetableRouteResult(RouteSearchResult routeSearchResult) {
+		Station origin = loadActiveStation(routeSearchResult.originStationId());
+		Station destination = loadActiveStation(routeSearchResult.destinationStationId());
 		return new RouteSearchResult(
 			newRouteSearchId(),
 			routeSearchResult.originStationId(),
-			routeSearchResult.originStationName(),
+			origin.nameKo(),
 			routeSearchResult.destinationStationId(),
-			routeSearchResult.destinationStationName(),
+			destination.nameKo(),
 			routeSearchResult.mobilityType(),
 			routeSearchResult.status(),
 			routeSearchResult.lineId(),
@@ -223,12 +230,9 @@ public class RouteSearchService implements RouteSearchUseCase {
 	}
 
 	private List<RouteSearchResult> buildRouteSearchAlternatives(SearchRouteCommand command, int alternativeCount) {
-		requireCommand(command);
-		Station origin = loadActiveStation(command.originStationId());
-		Station destination = loadActiveStation(command.destinationStationId());
-		if (origin.id().equals(destination.id())) {
-			throw new InvalidRouteSearchException("출발역과 도착역이 달라야 합니다.");
-		}
+		RouteStations routeStations = validatedRouteStations(command);
+		Station origin = routeStations.origin();
+		Station destination = routeStations.destination();
 
 		RouteProfileWeight profileWeight = RouteProfileWeight.from(command.mobilityType(), command.constraintMode());
 		List<RoutePlan> routePlans = findRoutePlans(
@@ -244,6 +248,19 @@ public class RouteSearchService implements RouteSearchUseCase {
 		return routePlans.stream()
 			.map(routePlan -> routeSearchResult(command, origin, destination, profileWeight, routePlan))
 			.toList();
+	}
+
+	private RouteStations validatedRouteStations(SearchRouteCommand command) {
+		requireCommand(command);
+		Station origin = loadActiveStation(command.originStationId());
+		Station destination = loadActiveStation(command.destinationStationId());
+		if (origin.id().equals(destination.id())) {
+			throw new InvalidRouteSearchException("출발역과 도착역이 달라야 합니다.");
+		}
+		return new RouteStations(origin, destination);
+	}
+
+	private record RouteStations(Station origin, Station destination) {
 	}
 
 	private boolean hasAccessibilitySignal(RouteSearchResult routeSearchResult) {

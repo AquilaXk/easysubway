@@ -12,6 +12,9 @@ public interface RouteSearchUseCase {
 
 	List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount);
 
+	default void validateRouteSearch(SearchRouteCommand command) {
+	}
+
 	default List<RouteSearchResult> stabilizeTimetableRouteResults(
 		SearchRouteCommand command,
 		int alternativeCount,

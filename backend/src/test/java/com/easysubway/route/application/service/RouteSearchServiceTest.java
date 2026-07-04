@@ -20,6 +20,7 @@ import com.easysubway.route.domain.ArrivalFreshness;
 import com.easysubway.route.domain.ConstraintMode;
 import com.easysubway.route.domain.EtaConfidence;
 import com.easysubway.route.domain.InvalidRouteFeedbackException;
+import com.easysubway.route.domain.InvalidRouteSearchException;
 import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.InternalRouteResult;
 import com.easysubway.route.domain.RouteFeedback;
@@ -842,6 +843,8 @@ class RouteSearchServiceTest {
 		var first = firstPlan.itineraries().getFirst();
 		var second = secondPlan.itineraries().getFirst();
 		assertThat(first.routeSearchId()).isNotEqualTo(second.routeSearchId());
+		assertThat(first.originStationName()).isEqualTo("출발역");
+		assertThat(first.destinationStationName()).isEqualTo("도착역");
 		assertThat(first.createdAt()).isEqualTo(LocalDate.of(2026, 6, 13).atTime(18, 0));
 		assertThat(second.createdAt()).isEqualTo(LocalDate.of(2026, 6, 13).atTime(18, 0));
 	}
@@ -858,6 +861,37 @@ class RouteSearchServiceTest {
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
 		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isPresent();
+	}
+
+	@Test
+	@DisplayName("V2 planner는 시간표 scan 전에 출발역과 도착역을 검증한다")
+	void routeV2PlannerValidatesStationsBeforeTimetableScan() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
+		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+
+		assertThatThrownBy(() -> planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
+			"station-a",
+			"station-a",
+			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			false,
+			1,
+			3
+		))).isInstanceOf(InvalidRouteSearchException.class)
+			.hasMessage("출발역과 도착역이 달라야 합니다.");
+
+		assertThatThrownBy(() -> planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
+			"station-unknown",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T09:00:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			false,
+			1,
+			3
+		))).isInstanceOf(StationNotFoundException.class);
 	}
 
 	@Test
