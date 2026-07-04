@@ -7,7 +7,7 @@
     {
       "id": "line_geometry",
       "source": ["network_edges", "route_map_positions.up_path", "route_map_positions.down_path"],
-      "requiredFields": ["station_id", "line_id", "region", "x", "y"],
+      "requiredFields": ["station_id", "line_id", "region", "x", "y", "up_path", "down_path"],
       "lod": [
         { "minZoom": 0, "visible": true, "labelPolicy": "hide_station_labels" },
         { "minZoom": 1, "visible": true, "labelPolicy": "major_transfer_labels" },
@@ -32,6 +32,7 @@
       "source": ["stations", "route_map_positions.label_dx", "route_map_positions.label_dy", "route_map_positions.label_polygon"],
       "requiredFields": ["station_id", "line_id", "region", "label_dx", "label_dy"],
       "priority": ["transfer", "major", "regular"],
+      "majorRule": "환승역이 아니어도 지역별 공식 노선도에서 주요 거점으로 별도 검수된 역을 major로 둔다. 별도 검수값이 없으면 regular다.",
       "collisionField": "label_polygon",
       "renderRule": "데이터에는 역명을 보관하되 화면에는 zoom과 collision 결과로 필요한 라벨만 그린다."
     }

@@ -36,6 +36,10 @@ test("structured route map contract pins nationwide vector-rendered layers", asy
     contract.layers.map((layer) => layer.id),
     ["line_geometry", "station_nodes", "transfer_groups", "station_labels"],
   );
+  assert.deepEqual(
+    contract.layers.find((layer) => layer.id === "line_geometry").requiredFields,
+    ["station_id", "line_id", "region", "x", "y", "up_path", "down_path"],
+  );
   assert.equal(
     contract.layers.find((layer) => layer.id === "station_nodes").featureId,
     "{region}:{station_id}:{line_id}",
@@ -43,6 +47,10 @@ test("structured route map contract pins nationwide vector-rendered layers", asy
   assert.deepEqual(
     contract.layers.find((layer) => layer.id === "station_labels").priority,
     ["transfer", "major", "regular"],
+  );
+  assert.equal(
+    contract.layers.find((layer) => layer.id === "station_labels").majorRule,
+    "환승역이 아니어도 지역별 공식 노선도에서 주요 거점으로 별도 검수된 역을 major로 둔다. 별도 검수값이 없으면 regular다.",
   );
   assert.equal(
     contract.layers.find((layer) => layer.id === "station_labels").renderRule,
@@ -53,8 +61,13 @@ test("structured route map contract pins nationwide vector-rendered layers", asy
     "지역별 datapack의 route_map_positions를 우선한다.",
   );
 
+  const routeMapPositionsTable = schema.match(
+    /CREATE TABLE route_map_positions \(([\s\S]*?)\);/,
+  );
+  assert.ok(routeMapPositionsTable, "route_map_positions table definition not found");
+  const routeMapPositionsDdl = routeMapPositionsTable[1];
   for (const column of contract.routeMapPositionsColumns) {
-    assert.match(schema, new RegExp(`\\b${column}\\b`));
+    assert.match(routeMapPositionsDdl, new RegExp(`\\b${column}\\b`));
   }
   assert.ok(fixture.packs[0].requiredTables.includes("route_map_positions"));
   assert.ok(fixture.packs[0].minimumTableRows.route_map_positions > 0);
