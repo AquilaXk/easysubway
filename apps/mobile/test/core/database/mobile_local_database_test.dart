@@ -274,7 +274,7 @@ void main() {
     );
     expect(
       routeMapPosition.read<String>('label_polygon'),
-      '[{"x":2318.642,"y":4961.953},{"x":2355.324,"y":4925.272},{"x":2372.294,"y":4942.242},{"x":2335.613,"y":4978.923}]',
+      '[{"x":2306,"y":4980},{"x":2357,"y":4980},{"x":2357,"y":5002},{"x":2306,"y":5002}]',
     );
     final displayedSourceValues = [
       routeMapPosition.read<String>('source_id'),
