@@ -5721,7 +5721,7 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
   }
 });
 
-test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되지 않는다", () => {
+test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되지 않는다", async () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
@@ -5756,6 +5756,33 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     productionCanonicalStopTimesStatus: "blocked_requires_trip_stop_sequence",
     plannedEtaUseAllowed: false,
   });
+  assert.deepStrictEqual(candidate.evidence.scheduleCollectionPlan, {
+    status: "planned_pilot_collection",
+    tool: "tools/datapack/validate-tago-schedule-sample.mjs",
+    command: "node tools/datapack/validate-tago-schedule-sample.mjs --plan --input tools/datapack/inputs/capital-pilot-production-source-input.json --daily-limit 1000 --checkpoint <checkpoint.json> --output <plan.json>",
+    input: "tools/datapack/inputs/capital-pilot-production-source-input.json",
+    defaultDailyLimit: 1000,
+    pilotRequestCount: 12,
+    checkpointField: "completedRequestKeys",
+    productionUseAllowed: false,
+  });
+  const { stdout: collectionPlanStdout } = await execFileAsync(
+    process.execPath,
+    [
+      candidate.evidence.scheduleCollectionPlan.tool,
+      "--plan",
+      "--input",
+      candidate.evidence.scheduleCollectionPlan.input,
+      "--daily-limit",
+      String(candidate.evidence.scheduleCollectionPlan.defaultDailyLimit),
+    ],
+    { cwd: root },
+  );
+  const collectionPlan = JSON.parse(collectionPlanStdout);
+  assert.equal(collectionPlan.sourceId, candidate.id);
+  assert.equal(collectionPlan.dailyLimit, candidate.evidence.scheduleCollectionPlan.defaultDailyLimit);
+  assert.equal(collectionPlan.totalRequestCount, candidate.evidence.scheduleCollectionPlan.pilotRequestCount);
+  assert.equal(collectionPlan.pendingRequestCount, candidate.evidence.scheduleCollectionPlan.pilotRequestCount);
   // source-candidates keeps a public summary, not the local full admin-review input with productionSource.
   assert.deepEqual(candidate.evidence.adminReview, {
     artifactKind: "source-admission-admin-review-summary",
