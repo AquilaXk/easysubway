@@ -9418,12 +9418,15 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
 test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 전달한다", () => {
   const controller = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
   const useCasePath = "backend/src/main/java/com/easysubway/route/application/port/in/RouteV2SearchUseCase.java";
+  const timetablePortPath = "backend/src/main/java/com/easysubway/route/application/port/out/LoadRouteTimetablePort.java";
   const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
 
   assert.equal(existsSync(path.join(root, useCasePath)), true, "RouteV2SearchUseCase must expose the V2 planning port");
+  assert.equal(existsSync(path.join(root, timetablePortPath)), true, "RouteV2Planner must get timetable data through a port");
   assert.equal(existsSync(path.join(root, plannerPath)), true, "RouteV2Planner must own V2 production search planning");
 
   const useCase = read(useCasePath);
+  const timetablePort = read(timetablePortPath);
   const planner = read(plannerPath);
   const v2Endpoint = controller.match(
     /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
@@ -9436,6 +9439,10 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(controller, /plan\.statuses\(\)/);
   assert.doesNotMatch(controller, /List\.of\(\s*"FOUND"[\s\S]*"ROUTE_GRAPH_UNKNOWN"/);
   assert.match(planner, /class RouteV2Planner implements RouteV2SearchUseCase/);
+  assert.match(planner, /LoadRouteTimetablePort/);
+  assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
+  assert.match(planner, /getIfAvailable\(\(\) -> RouteTimetable::empty\)/);
+  assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(useCase, /record SearchRouteV2Command/);
@@ -9448,6 +9455,19 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(useCase, /alternativeCount < 1/);
   assert.match(useCase, /enum RouteV2Status/);
   assert.match(useCase, /List<RouteV2Status> statuses/);
+  assert.match(timetablePort, /interface LoadRouteTimetablePort/);
+  assert.match(timetablePort, /loadRouteTimetable/);
+  assert.match(timetablePort, /record RouteTimetable/);
+  for (const schemaRecord of [
+    "ServiceCalendar",
+    "ServiceCalendarDate",
+    "TransitRoute",
+    "TransitTrip",
+    "TransitStopTime",
+    "TransitFrequency",
+  ]) {
+    assert.match(timetablePort, new RegExp(`record ${schemaRecord}`));
+  }
   assert.match(planner, /route-algorithm-v2-adr\.json|Range RAPTOR/);
 });
 
