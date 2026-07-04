@@ -2029,20 +2029,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 10),
-                      const Divider(height: 1, color: Color(0xFFEDEDED)),
-                      const _NetworkMapMenuInfoBanner(),
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(24, 6, 24, 8),
-                        child: Text(
-                          '교통약자 이동을 더 쉽게',
-                          style: TextStyle(
-                            color: Color(0xFF9A9A9A),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -2082,17 +2068,6 @@ class _NetworkMapMenuHeader extends StatelessWidget {
               fontSize: 21,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
-            ),
-          ),
-          SizedBox(height: 3),
-          Text(
-            '교통약자 지하철 길찾기',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: _networkMapMenuSectionColor,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -2178,39 +2153,6 @@ class _NetworkMapMenuTile extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _NetworkMapMenuInfoBanner extends StatelessWidget {
-  const _NetworkMapMenuInfoBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.elevator_outlined,
-            size: 18,
-            color: _networkMapMenuSectionColor,
-          ),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '엘리베이터·출구 정보를 한 화면에서 확인할 수 있어요',
-              style: TextStyle(
-                color: _networkMapMenuSectionColor,
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
