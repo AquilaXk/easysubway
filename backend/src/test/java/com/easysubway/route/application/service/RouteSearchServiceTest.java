@@ -855,7 +855,7 @@ class RouteSearchServiceTest {
 	@DisplayName("V2 planner는 동일 ETA 후보에서 접근성 미확인 위험이 낮은 경로를 우선한다")
 	void routeV2PlannerRanksLowerAccessibilityRiskForSameEtaCandidates() {
 		var risky = routeSearchResultWithAccessState("route-risky", "UNKNOWN", true);
-		var verified = routeSearchResultWithAccessState("route-verified", "AVAILABLE", false);
+		var verified = transferRouteSearchResultWithAccessState("route-verified", "AVAILABLE", false);
 		var planner = new RouteV2Planner(stabilizingRouteSearchUseCase(List.of(risky, verified)), routeTimetablePort());
 
 		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 1));
@@ -2144,11 +2144,50 @@ class RouteSearchServiceTest {
 		);
 	}
 
+	private static RouteSearchResult transferRouteSearchResultWithAccessState(
+		String routeSearchId,
+		String stairAccessState,
+		boolean requiresAccessibilityCheck
+	) {
+		return new RouteSearchResult(
+			routeSearchId,
+			"station-a",
+			"출발역",
+			"station-b",
+			"도착역",
+			MobilityType.SENIOR,
+			RouteSearchStatus.FOUND,
+			"seoul-4",
+			"4호선",
+			0,
+			List.of(
+				timetableStep(1, "entry", stairAccessState, requiresAccessibilityCheck, 3),
+				timetableStep(2, "ride", "AVAILABLE", false, 3),
+				timetableStep(3, "transfer", stairAccessState, requiresAccessibilityCheck, 3),
+				timetableStep(4, "ride", "AVAILABLE", false, 3),
+				timetableStep(5, "exit", stairAccessState, requiresAccessibilityCheck, 3)
+			),
+			List.of(),
+			List.of(),
+			LocalDate.of(2026, 7, 1).atStartOfDay()
+		);
+	}
+
 	private static RouteStep timetableStep(
 		int sequence,
 		String stepType,
 		String stairAccessState,
 		boolean requiresAccessibilityCheck
+	) {
+		return timetableStep(sequence, stepType, stairAccessState, requiresAccessibilityCheck, 5);
+	}
+
+	private static RouteStep timetableStep(
+		int sequence,
+		String stepType,
+		String stairAccessState,
+		boolean requiresAccessibilityCheck,
+		int estimatedMinutes
 	) {
 		return new RouteStep(
 			sequence,
@@ -2159,7 +2198,7 @@ class RouteSearchServiceTest {
 			"4호선",
 			"station-a",
 			"station-b",
-			5,
+			estimatedMinutes,
 			100,
 			false,
 			stairAccessState,
