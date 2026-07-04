@@ -8916,6 +8916,30 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
     /routeGraphTopologyPolicy\.summaryRideEdges must mark non-adjacent EXPRESS RIDE edges as release-blocking-regression-only/,
   );
 
+  const lowercaseRideEdgeInput = JSON.parse(JSON.stringify(adjacencySafeInput));
+  lowercaseRideEdgeInput.routeEdges = lowercaseRideEdgeInput.routeEdges.map((edge) =>
+    edge.edgeType === "RIDE" ? { ...edge, edgeType: "ride" } : edge,
+  );
+  delete lowercaseRideEdgeInput.routeGraphTopologyPolicy;
+  const lowercaseRideEdgeInputPath = path.join(outputDir, "lowercase-ride-summary-policy.json");
+  await writeFile(lowercaseRideEdgeInputPath, `${JSON.stringify(lowercaseRideEdgeInput, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/import-official-sources.mjs",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--input",
+        lowercaseRideEdgeInputPath,
+        "--output",
+        path.join(outputDir, "lowercase-ride-summary-policy-fixture.json"),
+      ],
+      { cwd: root },
+    ),
+    /routeGraphTopologyPolicy\.summaryRideEdges must mark non-adjacent EXPRESS RIDE edges as release-blocking-regression-only/,
+  );
+
   await execFileAsync(
     process.execPath,
     [

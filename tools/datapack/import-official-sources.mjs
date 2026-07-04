@@ -775,7 +775,10 @@ function validateProductionSummaryRideEdgePolicy(stationLines, networkEdges, pol
     ]),
   );
   const nonAdjacentExpressRideEdgeIds = networkEdges
-    .filter((edge) => edge.edgeType === "RIDE" && String(edge.servicePattern || "LOCAL").toUpperCase() === "EXPRESS")
+    .filter((edge) =>
+      String(edge.edgeType ?? "").toUpperCase() === "RIDE" &&
+      String(edge.servicePattern || "LOCAL").toUpperCase() === "EXPRESS"
+    )
     .filter((edge) => {
       const from = stationLineByNode.get(stationLineNodeFromRouteNode(edge.fromNodeId));
       const to = stationLineByNode.get(stationLineNodeFromRouteNode(edge.toNodeId));
