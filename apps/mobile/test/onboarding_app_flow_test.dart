@@ -95,10 +95,12 @@ void main() {
     expect(find.byType(HomeScreen), findsOneWidget);
   });
 
-  testWidgets('첫 실행 앱은 알림 설정 저장소가 없어도 권한 선택 화면을 유지한다', (tester) async {
+  testWidgets('첫 실행 앱은 알림이 비활성이면 온보딩 알림 요청을 숨기고 위치만 남긴다', (tester) async {
     await tester.pumpWidget(
       _testApp(
+        // 알림 가용성 단일 소스: 저장소·권한 provider를 함께 비활성으로 둔다(#1579).
         notificationRepository: null,
+        notificationPermissionProvider: null,
         onboardingStore: MemoryOnboardingResultStore(),
       ),
     );
@@ -106,10 +108,12 @@ void main() {
     await _openOnboarding(tester);
     await _continueFromProfileToPermission(tester);
 
-    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+    // 켜라고 요청하지 않는다(더보기 '사용할 수 없어요' 고지와의 모순 제거, #1579).
+    expect(find.text('위치는 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsNothing);
     expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
     expect(find.text('현재 위치'), findsOneWidget);
-    expect(find.text('알림'), findsOneWidget);
+    expect(find.text('알림'), findsNothing);
     expect(
       find.byKey(const Key('onboardingPermissionSkipButton')),
       findsOneWidget,
@@ -196,7 +200,9 @@ EasySubwayApp _testApp({
       const NoLegacyCredentialCleaner(),
   NotificationSettingsRepository? notificationRepository =
       const _DefaultNotificationSettingsRepository(),
-  NotificationPermissionProvider? notificationPermissionProvider,
+  // 알림 가용성은 단일 소스라(#1579) 기본은 저장소·권한 provider를 함께 제공한다.
+  NotificationPermissionProvider? notificationPermissionProvider =
+      const _DefaultNotificationPermissionProvider(),
   CurrentLocationProvider? locationProvider,
 }) {
   return EasySubwayApp(
@@ -306,6 +312,16 @@ class FakeFavoriteStationRepository implements FavoriteStationRepository {
 
   @override
   Future<void> removeFavoriteStation(String stationId) async {}
+}
+
+class _DefaultNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  const _DefaultNotificationPermissionProvider();
+
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() async {
+    return NotificationPermissionStatus.granted;
+  }
 }
 
 class _DefaultNotificationSettingsRepository
