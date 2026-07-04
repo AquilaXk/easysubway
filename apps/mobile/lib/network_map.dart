@@ -13,6 +13,7 @@ import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/infrastructure/android_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/ios_route_map_viewport_webview.dart';
 import 'features/network_map/infrastructure/route_map_renderer.dart';
+import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
@@ -2321,6 +2322,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   RouteMapRendererController? _rendererController;
   String? _geometryCacheKey;
   _MapGeometry? _geometryCache;
+  // 구조화 canvas 렌더러(#1641) 파생 데이터 캐시 — region 단위로 재계산.
+  String? _structuredCacheKey;
+  StructuredRouteMap? _structuredRouteMapCache;
+  Map<String, Color>? _structuredLineColorsCache;
+  Map<String, String>? _structuredLabelTextCache;
   NetworkMapStation? _selectedStation;
 
   @override
@@ -2472,6 +2478,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               Positioned.fill(
                 child: mapAsset == null || !_routeMapRendererActive
                     ? const _OriginalRouteMapUnavailable()
+                    : kDefaultRouteMapRenderer ==
+                          RouteMapRendererKind.structuredCanvas
+                    ? _buildStructuredRouteMapCanvas(camera)
                     : _RouteMapViewportRenderer(
                         asset: mapAsset,
                         camera:
@@ -2755,6 +2764,35 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   void _selectStation(NetworkMapStation station) {
     setState(() => _selectedStation = station);
+  }
+
+  // 구조화 canvas 렌더러(#1641)를 visual camera로 마운트한다. WebView와 달리
+  // 명령형 controller 없이 camera prop 변경(setState)으로 갱신된다.
+  Widget _buildStructuredRouteMapCanvas(MapCameraState camera) {
+    _ensureStructuredRouteMap();
+    return StructuredRouteMapView(
+      map: _structuredRouteMapCache!,
+      camera: camera,
+      lineColors: _structuredLineColorsCache!,
+      labelTextByStationId: _structuredLabelTextCache!,
+    );
+  }
+
+  void _ensureStructuredRouteMap() {
+    final data = widget.data;
+    final key =
+        '${data.selectedRegion}:${data.stations.length}:${data.lines.length}';
+    if (_structuredCacheKey == key && _structuredRouteMapCache != null) {
+      return;
+    }
+    _structuredCacheKey = key;
+    _structuredRouteMapCache = data.toStructuredRouteMap();
+    _structuredLineColorsCache = routeMapLineColors({
+      for (final line in data.lines) line.id: line.color,
+    });
+    _structuredLabelTextCache = {
+      for (final station in data.stations) station.id: station.nameKo,
+    };
   }
 
   void _attachRendererController(RouteMapRendererController controller) {
