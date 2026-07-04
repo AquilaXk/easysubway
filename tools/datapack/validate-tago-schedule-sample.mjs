@@ -180,15 +180,14 @@ function buildTagoScheduleCollectionSummary(collection) {
     providerRecordHashes.push(...validation.providerRecordHashes);
     rowCount += validation.rowCount;
   }
-  const completedRequestKeys = responseRequestKeys;
-  const checkpointCompletedRequestKeys = [...new Set([...checkpointRequestKeys, ...responseRequestKeys])].sort(
+  const completedRequestKeys = [...new Set([...checkpointRequestKeys, ...responseRequestKeys])].sort(
     (left, right) => left.localeCompare(right),
   );
 
   const evidencePayload = {
     sourceId: "molit-tago-subway-info",
     endpoint: TAGO_SCHEDULE_ENDPOINT,
-    completedRequestKeys,
+    responseRequestKeys,
     rawSha256ByRequest,
     providerRecordHashes,
   };
@@ -197,8 +196,9 @@ function buildTagoScheduleCollectionSummary(collection) {
     sourceId: evidencePayload.sourceId,
     endpoint: evidencePayload.endpoint,
     completedRequestKeys,
-    checkpoint: { completedRequestKeys: checkpointCompletedRequestKeys },
-    responseCount: completedRequestKeys.length,
+    responseRequestKeys,
+    checkpoint: { completedRequestKeys },
+    responseCount: responseRequestKeys.length,
     rowCount,
     rawSha256ByRequest,
     providerRecordHashes,
