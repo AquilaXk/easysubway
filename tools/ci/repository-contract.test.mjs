@@ -9463,6 +9463,8 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(controller, /toV2Command\(departureTime\)/);
   assert.match(controller, /RouteSearchV2Response\.from\(plan, request, departureTime\)/);
   assert.match(controller, /plan\.statuses\(\)/);
+  assert.match(controller, /String nextServiceTime/);
+  assert.match(controller, /plan\.nextServiceTime\(\)/);
   assert.doesNotMatch(controller, /List\.of\(\s*"FOUND"[\s\S]*"ROUTE_GRAPH_UNKNOWN"/);
   assert.match(planner, /class RouteV2Planner implements RouteV2SearchUseCase/);
   assert.match(planner, /LoadRouteTimetablePort/);
@@ -9475,9 +9477,13 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /canUseTimetableRaptor/);
   assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
+  assert.match(planner, /noTimetableServicePlan/);
+  assert.match(planner, /nextServiceTime\(command, routeTimetable\(\)\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);
+  assert.match(raptorPlanner, /Optional<OffsetDateTime> nextServiceTime/);
+  assert.match(raptorPlanner, /earliestDirectDepartureSeconds/);
   assert.match(raptorPlanner, /BoardingSlackPolicy\.secondsFor/);
   assert.match(raptorPlanner, /SERVICE_DAY_CUTOFF_HOUR\s*=\s*3/);
   assert.match(raptorPlanner, /activeServiceIds/);
@@ -9496,6 +9502,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(useCase, /alternativeCount < 1/);
   assert.match(useCase, /enum RouteV2Status/);
   assert.match(useCase, /List<RouteV2Status> statuses/);
+  assert.match(useCase, /OffsetDateTime nextServiceTime/);
   assert.match(timetablePort, /interface LoadRouteTimetablePort/);
   assert.match(timetablePort, /loadRouteTimetable/);
   assert.match(timetablePort, /hasRouteTimetable/);

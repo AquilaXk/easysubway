@@ -19,6 +19,7 @@ import com.easysubway.route.domain.RouteStep;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 class RouteTimetableRaptorPlanner {
@@ -83,6 +85,75 @@ class RouteTimetableRaptorPlanner {
 			.limit(Math.min(command.alternativeCount(), PARETO_LIMIT))
 			.map(label -> toRouteSearchResult(command, label, serviceDay))
 			.toList();
+	}
+
+	Optional<OffsetDateTime> nextServiceTime(SearchRouteV2Command command, RouteTimetable timetable) {
+		ServiceDay serviceDay = serviceDay(command);
+		int sameServiceDayReadySeconds = serviceDay.departureSeconds()
+			+ profiledWalkSeconds(command, ENTRY_DURATION_SECONDS)
+			+ BoardingSlackPolicy.secondsFor(command.mobilityType());
+		for (int dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+			LocalDate candidateServiceDate = serviceDay.date().plusDays(dayOffset);
+			int minimumDepartureSeconds = dayOffset == 0 ? sameServiceDayReadySeconds : 0;
+			Optional<Integer> departureSeconds = earliestDirectDepartureSeconds(
+				command,
+				timetable,
+				candidateServiceDate,
+				minimumDepartureSeconds
+			);
+			if (departureSeconds.isPresent()) {
+				return Optional.of(candidateServiceDate.atStartOfDay(SERVICE_ZONE)
+					.plusSeconds(departureSeconds.get())
+					.toOffsetDateTime());
+			}
+		}
+		return Optional.empty();
+	}
+
+	private Optional<Integer> earliestDirectDepartureSeconds(
+		SearchRouteV2Command command,
+		RouteTimetable timetable,
+		LocalDate serviceDate,
+		int minimumDepartureSeconds
+	) {
+		Set<String> activeServiceIds = activeServiceIds(timetable, serviceDate);
+		if (activeServiceIds.isEmpty()) {
+			return Optional.empty();
+		}
+		Map<String, TransitRoute> routesById = routesById(timetable);
+		Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(timetable);
+		Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(timetable);
+		return timetable.transitTrips().stream()
+			.filter(trip -> activeServiceIds.contains(trip.serviceId()))
+			.filter(trip -> stopTimesByTrip.getOrDefault(trip.id(), List.of()).size() > 1)
+			.flatMap(trip -> scheduledTrips(trip, routesById.get(trip.routeId()), stopTimesByTrip.get(trip.id()), frequenciesByTrip.getOrDefault(trip.id(), List.of())).stream())
+			.map(scheduledTrip -> directDepartureSeconds(command, scheduledTrip, minimumDepartureSeconds))
+			.flatMap(Optional::stream)
+			.min(Integer::compareTo);
+	}
+
+	private Optional<Integer> directDepartureSeconds(
+		SearchRouteV2Command command,
+		ScheduledTrip trip,
+		int minimumDepartureSeconds
+	) {
+		TransitStopTime boardingStop = null;
+		for (TransitStopTime stopTime : trip.stopTimes()) {
+			if (boardingStop == null
+				&& command.originStationId().equals(stopTime.stationId())
+				&& allowsPickup(stopTime)
+				&& stopTime.departureSeconds() >= minimumDepartureSeconds) {
+				boardingStop = stopTime;
+				continue;
+			}
+			if (boardingStop != null
+				&& stopTime.stopSequence() > boardingStop.stopSequence()
+				&& command.destinationStationId().equals(stopTime.stationId())
+				&& allowsDropOff(stopTime)) {
+				return Optional.of(boardingStop.departureSeconds());
+			}
+		}
+		return Optional.empty();
 	}
 
 	private void scanTrip(
