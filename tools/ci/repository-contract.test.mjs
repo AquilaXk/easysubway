@@ -1513,7 +1513,9 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
   // 노출되는 저장 상태 안내 순서만 검증한다.
   const offlineWidgetTestPattern = new RegExp([
     "testWidgets\\('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다'",
-    "offlineDataSettingsButton",
+    // 더보기 진입점(offlineDataSettingsButton)은 #1570에서 제거해, 테스트는
+    // OfflineDataScreen을 직접 띄워 검증한다.
+    "OfflineDataScreen\\(\\)",
     "저장된 안내 상태",
     "검증 구간'\\), findsNothing",
     "마지막 갱신",
@@ -1526,8 +1528,11 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
 
   assert.ok(offlineScreenMatch, "OfflineDataScreen block not found");
   const offlineScreen = offlineScreenMatch[0];
-  assert.match(main, /offlineDataSettingsButton/);
-  assert.match(main, /title:\s*'인터넷 없이 이용'/);
+  // '저장된 안내' 섹션(인터넷 없이 이용 진입점)은 #1570에서 더보기에서 제거했다.
+  // OfflineDataScreen 화면 자체는 유지된다(직접 진입만 가능).
+  assert.match(main, /class OfflineDataScreen/);
+  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  assert.doesNotMatch(main, /title:\s*'인터넷 없이 이용'/);
   assert.match(main, /_offlineDataSourceOfTruth\s*=\s*'installed catalog metadata'/);
   assert.match(offlineScreen, /저장된 안내 상태/);
   assert.doesNotMatch(offlineScreen, /저장된 데이터 상태/);
