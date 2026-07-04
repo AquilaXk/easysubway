@@ -4464,6 +4464,10 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
   assert.match(manifestSchema.$id, /^https:\/\/easysubway\.local\/schema\//);
   assert.deepEqual(manifestSchema.properties.packs.items.properties.payloadKind.enum, ["sqlite_catalog"]);
   assert.equal(
+    manifestSchema.properties.packs.items.properties.representativeRouteRegressions.minItems,
+    0,
+  );
+  assert.equal(
     manifestSchema.properties.packs.items.properties.dependencies.items.$ref,
     "#/$defs/packIdentity",
   );
@@ -4763,21 +4767,10 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     productionInput.supportedV1Scope.facilityCoverageDenominator,
     scope.supportScope.facilityCoverageDenominator,
   );
-  assert.deepEqual(productionInput.routeRegressionScope, {
-    mode: "DIRECT_ONLY",
-    excludedPatterns: ["TRANSFER", "MULTI_TRANSFER", "LOOP_BRANCH", "EXPRESS_LOCAL"],
-    claim: productionInput.routeRegressionScope.claim,
-  });
-  assert.match(productionInput.routeRegressionScope.claim, /direct regression only/);
-  assert.deepEqual(productionInput.routeGraphTopologyPolicy, {
-    summaryRideEdges: "release-blocking-regression-only",
-    productionReadinessRequirement: "replace summary RIDE edges with adjacent-station LOCAL RIDE edges before ETA or release-readiness claim",
-    nonAdjacentExpressRideEdgeIds: [
-      "edge-sangnoksu-sadang-seoul-4",
-      "edge-sadang-sangnoksu-seoul-4",
-    ],
-  });
-  assert.deepEqual(productionInput.representativeRouteRegressions.map((route) => route.pattern), ["DIRECT"]);
+  assert.equal(productionInput.routeRegressionScope, undefined);
+  assert.equal(productionInput.routeGraphTopologyPolicy, undefined);
+  assert.deepEqual(productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE"), []);
+  assert.deepEqual(productionInput.representativeRouteRegressions, []);
   for (const edge of productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE")) {
     const speedKmh = (edge.distanceMeters / edge.durationSeconds) * 3.6;
     assert.ok(speedKmh >= 15 && speedKmh <= 110, `${edge.id} must stay within production ride speed bounds`);
@@ -4899,6 +4892,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.productionPromotionCriteria.p0CoverageGapPolicy, "fail-release");
   assert.equal(scope.productionPromotionCriteria.minimumProductionCoverageValuesMustBePositive, true);
   assert.equal(scope.productionPromotionCriteria.coverageEvidenceRequired, true);
+  assert.equal(scope.productionPromotionCriteria.representativeRouteRegressionsRequired, false);
   assert.equal(scope.productionPromotionCriteria.manifest.manifestVersion, 2);
   assert.equal(scope.productionPromotionCriteria.manifest.channel, "production");
   assert.equal(scope.productionPromotionCriteria.manifest.releaseSequenceMustIncrease, true);
