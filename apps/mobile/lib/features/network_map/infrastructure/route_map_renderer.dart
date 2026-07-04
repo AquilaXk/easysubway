@@ -40,11 +40,35 @@ window.easysubwayApplyRouteMapLabelPolicy = function () {
       } catch (_) {
         continue;
       }
+      const labelMatrix = label.getScreenCTM();
+      const svgMatrix = svg.getScreenCTM();
+      if (!labelMatrix || !svgMatrix) {
+        continue;
+      }
+      let toSvg;
+      try {
+        toSvg = svgMatrix.inverse();
+      } catch (_) {
+        continue;
+      }
+      const point = svg.createSVGPoint();
+      const transformPoint = (x, y) => {
+        point.x = x;
+        point.y = y;
+        return point.matrixTransform(labelMatrix).matrixTransform(toSvg);
+      };
+      const topLeft = transformPoint(bounds.x, bounds.y);
+      const topRight = transformPoint(bounds.x + bounds.width, bounds.y);
+      const bottomLeft = transformPoint(bounds.x, bounds.y + bounds.height);
+      const bottomRight = transformPoint(
+        bounds.x + bounds.width,
+        bounds.y + bounds.height
+      );
       box = {
-        left: bounds.x,
-        top: bounds.y,
-        right: bounds.x + bounds.width,
-        bottom: bounds.y + bounds.height
+        left: Math.min(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x),
+        top: Math.min(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y),
+        right: Math.max(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x),
+        bottom: Math.max(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)
       };
       label.dataset.easysubwayLabelLeft = String(box.left);
       label.dataset.easysubwayLabelTop = String(box.top);

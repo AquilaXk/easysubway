@@ -49,6 +49,7 @@ void main() {
 
     expect(params['labelCollisionScript'], isA<String>());
     expect(params['labelCollisionScript'], contains('getBBox'));
+    expect(params['labelCollisionScript'], contains('getScreenCTM'));
     expect(
       params['labelCollisionScript'],
       contains('data-easysubway-hidden-label'),
