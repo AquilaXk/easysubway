@@ -20,9 +20,10 @@ MapCameraState cameraAt(int revision) {
 Future<void> flush() => Future<void>.delayed(Duration.zero);
 
 void main() {
-  test('생성 시 Created/AssetLoading/AssetReady를 방출한다', () async {
+  test('첫 구독 시 Created/AssetLoading/AssetReady를 방출한다', () async {
     final controller = StructuredRouteMapRendererController(
       scheduleFrame: (_) {},
+      requestFrame: () {},
     );
     final events = <RouteMapRendererEvent>[];
     controller.events.listen(events.add);
@@ -36,10 +37,12 @@ void main() {
     await controller.dispose();
   });
 
-  test('setCamera는 CameraRequested 후 post-frame에 CameraLatency·FramePresented', () async {
+  test('setCamera는 프레임을 요청하고 post-frame에 CameraLatency·FramePresented', () async {
     final frames = <void Function(Duration)>[];
+    var frameRequests = 0;
     final controller = StructuredRouteMapRendererController(
       scheduleFrame: frames.add,
+      requestFrame: () => frameRequests++,
     );
     final events = <RouteMapRendererEvent>[];
     controller.events.listen(events.add);
@@ -53,12 +56,11 @@ void main() {
       events.whereType<RouteMapRendererCameraRequested>().single.revision,
       7,
     );
-    // 아직 프레임이 안 왔으므로 FramePresented 없음.
+    expect(frameRequests, greaterThanOrEqualTo(1)); // 프레임을 실제로 요청함
     expect(events.whereType<RouteMapRendererFramePresented>(), isEmpty);
     expect(frames, hasLength(1));
 
-    // 프레임 도착 시뮬레이션.
-    frames.single(Duration.zero);
+    frames.single(Duration.zero); // 프레임 도착 시뮬레이션
     await flush();
 
     expect(
@@ -71,28 +73,58 @@ void main() {
     await controller.dispose();
   });
 
-  test('retry는 AssetReady, trimMemory는 MemoryTrimmed를 방출한다', () async {
+  test('retry는 마지막 revision의 FramePresented를 다시 통지한다(복구 완료)', () async {
+    final frames = <void Function(Duration)>[];
+    final controller = StructuredRouteMapRendererController(
+      scheduleFrame: frames.add,
+      requestFrame: () {},
+    );
+    final events = <RouteMapRendererEvent>[];
+    controller.events.listen(events.add);
+    await flush();
+
+    await controller.setCamera(cameraAt(5));
+    await flush();
+    frames.removeLast()(Duration.zero); // 최초 프레임 소비
+    await flush();
+    events.clear();
+
+    // 복구 시나리오: monitor가 retry 호출 → AssetReady + revision 재통지.
+    await controller.retry();
+    await flush();
+    expect(events.whereType<RouteMapRendererAssetReady>(), hasLength(1));
+    expect(frames, hasLength(1));
+
+    frames.single(Duration.zero);
+    await flush();
+    expect(
+      events.whereType<RouteMapRendererFramePresented>().single.revision,
+      5,
+    );
+    await controller.dispose();
+  });
+
+  test('trimMemory는 MemoryTrimmed를 방출한다', () async {
     final controller = StructuredRouteMapRendererController(
       scheduleFrame: (_) {},
+      requestFrame: () {},
     );
     final events = <RouteMapRendererEvent>[];
     controller.events.listen(events.add);
     await flush();
     events.clear();
 
-    await controller.retry();
     await controller.trimMemory();
     await flush();
-
-    expect(events.whereType<RouteMapRendererAssetReady>(), hasLength(1));
     expect(events.whereType<RouteMapRendererMemoryTrimmed>(), hasLength(1));
     await controller.dispose();
   });
 
-  test('dispose는 Disposed 방출 후 스트림을 닫고, 이후 호출은 무시된다', () async {
+  test('dispose는 Disposed 방출 후 스트림을 닫고 이후 호출을 무시한다', () async {
     final frames = <void Function(Duration)>[];
     final controller = StructuredRouteMapRendererController(
       scheduleFrame: frames.add,
+      requestFrame: () {},
     );
     final events = <RouteMapRendererEvent>[];
     controller.events.listen(events.add);
@@ -102,7 +134,6 @@ void main() {
     await flush();
     expect(events.whereType<RouteMapRendererDisposed>(), hasLength(1));
 
-    // dispose 이후 setCamera는 아무 이벤트도 만들지 않고 프레임도 예약 안 함.
     await controller.setCamera(cameraAt(9));
     await flush();
     expect(frames, isEmpty);
@@ -112,6 +143,7 @@ void main() {
     final frames = <void Function(Duration)>[];
     final controller = StructuredRouteMapRendererController(
       scheduleFrame: frames.add,
+      requestFrame: () {},
     );
     controller.events.listen((_) {});
     await flush();
@@ -121,7 +153,6 @@ void main() {
     expect(frames, hasLength(1));
 
     await controller.dispose();
-    // 늦게 도착한 프레임 콜백이 예외를 던지지 않아야 한다.
     expect(() => frames.single(Duration.zero), returnsNormally);
   });
 }
