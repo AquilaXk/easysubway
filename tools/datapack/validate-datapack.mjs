@@ -798,6 +798,7 @@ function validateNetworkEdgeStationLineEndpoints(database, pack) {
   const edges = database
     .prepare("SELECT id, from_node_id, to_node_id, edge_type FROM network_edges ORDER BY id")
     .all();
+  let hasExplicitRouteGraphEdge = false;
   addGeneratedStationTransferEdges(
     stationLineRows,
     routeGraphRequiredNodes,
@@ -832,6 +833,7 @@ function validateNetworkEdgeStationLineEndpoints(database, pack) {
       routeGraphRequiredNodes.has(fromNode) &&
       routeGraphRequiredNodes.has(toNode)
     ) {
+      hasExplicitRouteGraphEdge = true;
       addRouteGraphEdge(
         fromNode,
         toNode,
@@ -851,7 +853,11 @@ function validateNetworkEdgeStationLineEndpoints(database, pack) {
     }
   }
 
-  if (!pack.routeRegressionScope && (!Array.isArray(pack.representativeRouteRegressions) || pack.representativeRouteRegressions.length === 0)) {
+  if (
+    !hasExplicitRouteGraphEdge &&
+    !pack.routeRegressionScope &&
+    (!Array.isArray(pack.representativeRouteRegressions) || pack.representativeRouteRegressions.length === 0)
+  ) {
     return;
   }
   for (const nodeId of routeGraphRequiredNodes) {

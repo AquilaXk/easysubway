@@ -4464,6 +4464,10 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
   assert.match(manifestSchema.$id, /^https:\/\/easysubway\.local\/schema\//);
   assert.deepEqual(manifestSchema.properties.packs.items.properties.payloadKind.enum, ["sqlite_catalog"]);
   assert.equal(
+    manifestSchema.properties.packs.items.properties.representativeRouteRegressions.minItems,
+    0,
+  );
+  assert.equal(
     manifestSchema.properties.packs.items.properties.dependencies.items.$ref,
     "#/$defs/packIdentity",
   );

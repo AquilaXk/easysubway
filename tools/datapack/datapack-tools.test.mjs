@@ -4884,6 +4884,64 @@ test("데이터팩 검증기는 route graph에서 고립된 station-line node를
   );
 });
 
+test("데이터팩 검증기는 빈 route regression pack도 명시 route edge가 있으면 route graph를 검증한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-empty-regression-route-graph-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  fixture.packs[0].representativeRouteRegressions = [];
+  fixture.packs[0].stations.push({
+    id: "station-isolated",
+    nameKo: "고립역",
+    nameEn: "Isolated",
+    normalizedName: "isolated",
+    region: "capital",
+    latitude: 37.1,
+    longitude: 127.1,
+    dataQualityLevel: "LEVEL_2",
+    dataSourceType: "OFFICIAL_FILE",
+    lastVerifiedAt: "2026-06-19T00:00:00.000Z",
+  });
+  fixture.packs[0].stationLines.push({
+    stationId: "station-isolated",
+    lineId: "seoul-4",
+    stationCode: "499",
+    lineSequence: 999,
+    platformInfo: "테스트 고립 노드",
+  });
+  fixture.packs[0].minimumTableRows.stations = 3;
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      outputDir,
+    ],
+    { cwd: root },
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(outputDir, "current.json"),
+        "--root",
+        outputDir,
+      ],
+      { cwd: root },
+    ),
+    /station-line node is isolated from route graph/,
+  );
+});
+
 test("데이터팩 검증기는 분리된 route graph component를 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-disconnected-graph-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");
