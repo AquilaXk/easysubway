@@ -639,9 +639,10 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    // 2단계: 권한 — 조건 확인 화면과 옛 CTA는 없다.
+    // 2단계: 권한 — 조건 확인 화면과 옛 CTA는 없다. 알림 provider 미주입이라
+    // 알림 요청은 숨고 위치만 남는다(#1579).
     expect(find.text('적용할 조건을 확인하세요'), findsNothing);
-    expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
+    expect(find.text('위치는 나중에도 켤 수 있어요'), findsOneWidget);
     expect(find.text('2 / 2'), findsOneWidget);
     expect(find.text('시작하기'), findsOneWidget);
     expect(find.text('선택한 기능 설정하고 시작'), findsNothing);
