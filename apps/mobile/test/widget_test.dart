@@ -6373,9 +6373,11 @@ void main() {
       );
       expect(find.bySemanticsLabel('출발 도착 바꾸기'), findsOneWidget);
       expect(find.text('이동 조건'), findsOneWidget);
-      expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
+      // 폼 요약은 조건명만 남기고 중복 조건 요약 부제·협박형 캡션을 제거했다(#1568).
+      expect(find.text('천천히 이동'), findsWidgets);
+      expect(find.text('계단 피하기 · 환승 줄이기'), findsNothing);
       expect(find.text('계단 없는 길만'), findsOneWidget);
-      expect(find.text('켜면 경로가 줄거나 없을 수 있어요.'), findsOneWidget);
+      expect(find.text('켜면 경로가 줄거나 없을 수 있어요.'), findsNothing);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
 
       await tester.drag(find.byType(ListView), const Offset(0, -260));
@@ -8254,7 +8256,8 @@ void main() {
         find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
         findsOneWidget,
       );
-      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsOneWidget);
+      // 선택 상태는 카드 '선택됨' 시맨틱이 알리므로 문장형 헤더는 제거됐다(#1568).
+      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsNothing);
       expect(find.bySemanticsLabel('선택 완료'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
@@ -8283,7 +8286,7 @@ void main() {
         find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
         findsOneWidget,
       );
-      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsOneWidget);
+      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
@@ -8474,7 +8477,9 @@ void main() {
       expect(find.text('빠른 순'), findsNothing);
       expect(find.text('환승 적은 순'), findsNothing);
       expect(find.text('상록수 → 사당'), findsNothing);
-      expect(find.text('계단 피하기 · 환승 줄이기'), findsWidgets);
+      // 폼 요약의 조건 요약 부제는 제거됐다(#1568). 조건명만 노출.
+      expect(find.text('계단 피하기 · 환승 줄이기'), findsNothing);
+      expect(find.text('천천히 이동'), findsWidgets);
       expect(find.text('계단 여부를 아직 알 수 없어요'), findsWidgets);
       expect(find.text('계단 없음'), findsNothing);
       expect(find.text('엘리베이터 이용'), findsNothing);
@@ -8790,8 +8795,9 @@ void main() {
     await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
     await tester.pumpAndSettle();
 
+    // 폼 요약은 조건명만 남기고 조건 요약 부제는 제거했다(#1568).
     expect(find.text('휠체어 이용'), findsOneWidget);
-    expect(find.text('계단 피하기 · 엘리베이터 이동'), findsOneWidget);
+    expect(find.text('계단 피하기 · 엘리베이터 이동'), findsNothing);
     await _openRouteOriginStationInput(tester);
     await tester.enterText(
       find.byKey(const Key('routeOriginStationInput')),
@@ -8841,10 +8847,7 @@ void main() {
 
       await _openRouteSearchScreen(tester);
 
-      expect(
-        find.bySemanticsLabel('현재 이동 조건 천천히 이동, 계단 피하기 · 환승 줄이기'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('현재 이동 조건 천천히 이동'), findsOneWidget);
       expect(
         tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 천천히 이동')),
         isSemantics(
