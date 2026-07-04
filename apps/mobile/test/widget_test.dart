@@ -10661,6 +10661,91 @@ void main() {
     }
   });
 
+  testWidgets('시설 제보 화면은 에스컬레이터 정상 상태에 유효한 유형만 노출한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: FacilityReportScreen(
+          repository: FakeFacilityReportRepository(),
+          target: const FacilityReportTarget(
+            stationId: 'station-sangnoksu',
+            stationName: '상록수',
+            facilityId: 'facility-sangnoksu-escalator-1',
+            facilityName: '1번 출구 에스컬레이터',
+            facilityTypeLabel: '에스컬레이터',
+            facilityStatusLabel: '정상',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 유효 유형만 노출한다.
+    expect(find.text('고장'), findsOneWidget);
+    expect(find.text('공사 중'), findsOneWidget);
+    expect(find.text('폐쇄'), findsOneWidget);
+    expect(find.text('위치가 달라요'), findsOneWidget);
+    expect(find.text('정보가 달라요'), findsOneWidget);
+    // 경로/역 수준·엘리베이터 전용 유형과, 정상 시설의 '다시 정상'은 숨긴다.
+    expect(find.text('계단이 있어요'), findsNothing);
+    expect(find.text('환승이 어려워요'), findsNothing);
+    expect(find.text('도착 시간이 달라요'), findsNothing);
+    expect(find.text('경로가 막혔어요'), findsNothing);
+    expect(find.text('엘리베이터 이용 불가'), findsNothing);
+    expect(find.text('다시 정상'), findsNothing);
+  });
+
+  group('facilityReportTypeOptionsFor', () {
+    test('에스컬레이터 정상은 경로/역 수준·다시 정상을 제외한다', () {
+      expect(
+        facilityReportTypeOptionsFor(
+          facilityTypeLabel: '에스컬레이터',
+          facilityStatusLabel: '정상',
+        ),
+        const [
+          FacilityReportTypeOption.broken,
+          FacilityReportTypeOption.underConstruction,
+          FacilityReportTypeOption.closed,
+          FacilityReportTypeOption.locationWrong,
+          FacilityReportTypeOption.informationWrong,
+        ],
+      );
+    });
+
+    test('엘리베이터에는 엘리베이터 이용 불가를 노출한다', () {
+      final options = facilityReportTypeOptionsFor(
+        facilityTypeLabel: '엘리베이터',
+        facilityStatusLabel: '정상',
+      );
+      expect(options, contains(FacilityReportTypeOption.elevatorUnavailable));
+      expect(options, isNot(contains(FacilityReportTypeOption.recovered)));
+    });
+
+    test('고장 상태는 고장을 숨기고 다시 정상을 노출한다', () {
+      final options = facilityReportTypeOptionsFor(
+        facilityTypeLabel: '에스컬레이터',
+        facilityStatusLabel: '고장',
+      );
+      expect(options, isNot(contains(FacilityReportTypeOption.broken)));
+      expect(options, contains(FacilityReportTypeOption.recovered));
+    });
+
+    test('알 수 없는 타입도 경로/역 수준 유형은 제외한다', () {
+      final options = facilityReportTypeOptionsFor(
+        facilityTypeLabel: '고객센터',
+        facilityStatusLabel: '상태를 확인하고 있어요',
+      );
+      expect(options, isNot(contains(FacilityReportTypeOption.routeBlocked)));
+      expect(options, isNot(contains(FacilityReportTypeOption.stairsPresent)));
+      expect(
+        options,
+        isNot(contains(FacilityReportTypeOption.transferImpossible)),
+      );
+      expect(options, isNot(contains(FacilityReportTypeOption.etaInaccurate)));
+      // 정상이 아니므로 '다시 정상'은 노출한다.
+      expect(options, contains(FacilityReportTypeOption.recovered));
+    });
+  });
+
   testWidgets('시설 신고 화면은 사진 선택 전에 짧은 개인정보 안내를 보여준다', (tester) async {
     final reportRepository = FakeFacilityReportRepository();
     var pickerCallCount = 0;
