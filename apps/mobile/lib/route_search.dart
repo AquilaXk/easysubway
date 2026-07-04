@@ -12,6 +12,7 @@ import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
+import 'production_scope.dart';
 import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
@@ -2461,7 +2462,19 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
     final scaffold = Scaffold(
       key: const Key('routeSearchScreen'),
-      appBar: AppBar(title: const Text('길찾기')),
+      appBar: AppBar(
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('길찾기'),
+            Text(
+              ProductionScopeCopy.supportedClaimKo,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: widget.shellNavigationBar == null
           ? submitButton
           : Column(
@@ -2470,6 +2483,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
             ),
       body: Semantics(
         container: true,
+        label: ProductionScopeCopy.routeSearchNotice,
         child: SafeArea(
           child: RefreshIndicator(
             key: const Key('routeResultRefreshIndicator'),

@@ -59,6 +59,8 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -66,6 +68,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class RouteSearchService implements RouteSearchUseCase {
 
+	private static final Logger log = LoggerFactory.getLogger(RouteSearchService.class);
 	private static final int ENTRY_ESTIMATED_MINUTES = 4;
 	private static final int ENTRY_DISTANCE_METERS = 180;
 	private static final int EXIT_ESTIMATED_MINUTES = 3;
@@ -201,6 +204,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			}
 		} catch (RouteNotFoundException | StationNotFoundException exception) {
 			// Timetable coverage can lead legacy graph coverage while #1400 closes the production graph gap.
+			log.debug("Legacy graph could not stabilize timetable route {} -> {}", command.originStationId(), command.destinationStationId(), exception);
 		}
 		return timetableResults.stream()
 			.map(this::storedTimetableRouteResult)

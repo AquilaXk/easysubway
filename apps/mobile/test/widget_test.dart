@@ -3825,13 +3825,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('저장된 안내 상태'), findsOneWidget);
-    expect(find.text('검증 구간'), findsNothing);
-    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNothing);
+    expect(find.text('검증 구간'), findsOneWidget);
+    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNWidgets(2));
     expect(find.text('마지막 갱신'), findsOneWidget);
     expect(find.text('앱 설치 때 함께 받은 안내'), findsOneWidget);
     expect(find.text('저장 정보 다시 확인'), findsOneWidget);
     expect(find.text('저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요'), findsOneWidget);
-    expect(find.text('안내 범위'), findsNothing);
+    expect(find.text('안내 범위'), findsOneWidget);
     expect(find.text('제한 사항'), findsOneWidget);
     expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
   });
@@ -6031,7 +6031,7 @@ void main() {
           of: find.byType(AppBar),
           matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
         ),
-        findsNothing,
+        findsOneWidget,
       );
       final searchInput = tester.widget<TextField>(
         find.byKey(const Key('stationSearchInput')),
@@ -6320,7 +6320,7 @@ void main() {
           of: find.byType(AppBar),
           matching: find.text('지금은 상록수역·사당역 구간을 안내해요'),
         ),
-        findsNothing,
+        findsOneWidget,
       );
       expect(find.text('출발·도착 입력'), findsNothing);
       expect(find.text('출'), findsNothing);

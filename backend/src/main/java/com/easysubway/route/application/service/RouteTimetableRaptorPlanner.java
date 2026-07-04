@@ -351,6 +351,9 @@ class RouteTimetableRaptorPlanner {
 		int firstDepartureSeconds = stopTimes.getFirst().departureSeconds();
 		List<ScheduledTrip> scheduledTrips = new ArrayList<>();
 		for (TransitFrequency frequency : frequencies) {
+			if (frequency.headwaySeconds() <= 0) {
+				continue;
+			}
 			for (int departureSeconds = frequency.startTimeSeconds();
 				 departureSeconds < frequency.endTimeSeconds();
 				 departureSeconds += frequency.headwaySeconds()) {
@@ -458,11 +461,13 @@ class RouteTimetableRaptorPlanner {
 			if (route == null) {
 				return from.lineId();
 			}
-			if (!route.routeLongName().isBlank()) {
-				return route.routeLongName();
+			String routeLongName = route.routeLongName();
+			if (routeLongName != null && !routeLongName.isBlank()) {
+				return routeLongName;
 			}
-			if (!route.routeShortName().isBlank()) {
-				return route.routeShortName();
+			String routeShortName = route.routeShortName();
+			if (routeShortName != null && !routeShortName.isBlank()) {
+				return routeShortName;
 			}
 			return route.lineId();
 		}

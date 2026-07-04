@@ -16,6 +16,7 @@ import 'features/stations/domain/station_line.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
+import 'production_scope.dart';
 
 export 'features/stations/domain/station_line.dart';
 
@@ -2084,11 +2085,21 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     );
     return Scaffold(
       appBar: AppBar(
-        title: Text(switch (widget.entryMode) {
-          StationSearchEntryMode.recent => '최근 검색',
-          StationSearchEntryMode.nearby => '가까운 역',
-          StationSearchEntryMode.search => '역 검색',
-        }),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(switch (widget.entryMode) {
+              StationSearchEntryMode.recent => '최근 검색',
+              StationSearchEntryMode.nearby => '가까운 역',
+              StationSearchEntryMode.search => '역 검색',
+            }),
+            const Text(
+              ProductionScopeCopy.supportedClaimKo,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
         actions: [
           if (!isRecentEntry && !isNearbyEntry)
             TextButton.icon(
@@ -2102,6 +2113,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       bottomNavigationBar: widget.bottomNavigationBar,
       body: Semantics(
         container: true,
+        label: ProductionScopeCopy.stationSearchNotice,
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
