@@ -8381,6 +8381,49 @@ test("공식 source ingest adapter는 명시한 lineSequence 경계 wrap만 허�
   assert.equal(generated.packs[0].minimumTableRows.transit_stop_times, 3);
 });
 
+test("공식 source ingest adapter는 cross-line EXPRESS summary edge도 격리 정책을 요구한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-cross-line-express-policy-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  addSeoul2ProductionScope(input);
+  addMolitStationMapping(input, {
+    sourceStationCode: "MOLIT-SEOUL-2-226",
+    stationId: "station-sadang",
+  });
+  addStationLineRow(input, {
+    baseSourceStationCode: "MOLIT-SEOUL-4-433",
+    sourceStationCode: "MOLIT-SEOUL-2-226",
+    stationCode: "226",
+    lineSequence: 29,
+  });
+  input.routeEdges = [
+    {
+      ...input.routeEdges[0],
+      id: "edge-cross-line-express-summary",
+      sourceId: "molit-urban-rail-full-route",
+      from: {
+        sourceId: "molit-urban-rail-full-route",
+        sourceStationCode: "MOLIT-SEOUL-4-448",
+        lineId: "seoul-4",
+      },
+      to: {
+        sourceId: "molit-urban-rail-full-route",
+        sourceStationCode: "MOLIT-SEOUL-2-226",
+        lineId: "seoul-2",
+      },
+      servicePattern: "EXPRESS",
+      sourceSnapshotId: "molit-urban-rail-full-route-snapshot-20260621",
+      providerRecordHash: sha256("provider:edge-cross-line-express-summary:molit-urban-rail-full-route"),
+      evidenceHash: sha256("evidence:edge-cross-line-express-summary:molit-urban-rail-full-route:2026-06-21T00:00:00.000Z"),
+    },
+  ];
+  delete input.routeGraphTopologyPolicy;
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /routeGraphTopologyPolicy\.summaryRideEdges must mark non-adjacent EXPRESS RIDE edges as release-blocking-regression-only/,
+  );
+});
+
 test("공식 source ingest adapter는 stop_times 순서가 lineSequence와 뒤섞이면 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-stop-times-sequence-${Date.now()}`);
   const input = sourceIngestInput();

@@ -779,7 +779,7 @@ function validateProductionSummaryRideEdgePolicy(stationLines, networkEdges, pol
     .filter((edge) => {
       const from = stationLineByNode.get(stationLineNodeFromRouteNode(edge.fromNodeId));
       const to = stationLineByNode.get(stationLineNodeFromRouteNode(edge.toNodeId));
-      return from && to && from.lineId === to.lineId && Math.abs(from.lineSequence - to.lineSequence) !== 1;
+      return from && to && (from.lineId !== to.lineId || Math.abs(from.lineSequence - to.lineSequence) !== 1);
     })
     .map((edge) => edge.id)
     .sort((left, right) => left.localeCompare(right));
