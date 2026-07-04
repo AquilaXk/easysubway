@@ -7947,7 +7947,7 @@ void main() {
     expect(find.text('내부 이동 경로를 찾았습니다'), findsNothing);
   });
 
-  testWidgets('역 상세는 역 안 이동 정보가 부족하면 쉬운 안내를 보여준다', (tester) async {
+  testWidgets('역 상세는 역 안 이동 정보가 없으면 관련 안내를 숨긴다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
     );
@@ -7970,8 +7970,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(internalRouteRepository.nodeStationIds, ['station-sangnoksu']);
-    expect(find.text('역 안 이동'), findsOneWidget);
-    expect(find.text('역 안 길 안내에 필요한 정보를 찾지 못했어요.'), findsOneWidget);
+    // 데이터가 없으면 사과 문구 대신 역 안 이동 안내를 통째로 숨긴다(#1577).
+    expect(find.text('역 안 길 안내에 필요한 정보를 찾지 못했어요.'), findsNothing);
+    expect(find.text('역 안 이동'), findsNothing);
     expect(find.textContaining('기준점'), findsNothing);
   });
 
@@ -8475,8 +8476,12 @@ void main() {
       expect(find.textContaining('MEASURED'), findsNothing);
       expect(find.text('계단 없는 승강장 접근 동선을 확인해 이동합니다.'), findsOneWidget);
       expect(find.text('약 4분 · 180m · 엘리베이터 안내 준비 중'), findsOneWidget);
-      expect(find.text('일부 시설 안내를 준비 중이에요.'), findsOneWidget);
-      expect(find.text('시설 상태 안내가 오래됐을 수 있어요.'), findsOneWidget);
+      // 여러 주의는 각주 한 줄로 합쳐 하나의 '주의 확인'만 노출한다(#1577).
+      expect(find.text('주의 확인'), findsOneWidget);
+      expect(
+        find.text('일부 시설 안내를 준비 중이에요. · 시설 상태 안내가 오래됐을 수 있어요.'),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
           of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 아직 알 수 없어요')),

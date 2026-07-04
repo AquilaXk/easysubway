@@ -1552,6 +1552,24 @@ class RouteSearchResult {
     return warnings.isEmpty ? '주의 안내가 없어요' : '주의 안내 보기';
   }
 
+  // 여러 주의 코드를 케이스별 카드로 누적하지 않고 각주 한 줄로 합친다(#1577).
+  // 같은 문구는 한 번만 남긴다.
+  String get warningNoticeText {
+    if (warnings.isEmpty) {
+      return '';
+    }
+    final seen = <String>{};
+    final messages = <String>[];
+    for (final warning in warnings) {
+      final message = warning.userMessage;
+      if (message.isEmpty || !seen.add(message)) {
+        continue;
+      }
+      messages.add(message);
+    }
+    return messages.join(' · ');
+  }
+
   String get semanticLabel {
     // 결과 첫 문장은 사용자가 이동 가능 여부를 바로 판단할 수 있게 구성한다.
     final parts = <String>[
@@ -1583,9 +1601,7 @@ class RouteSearchResult {
       parts.add('다른 방법 $_routeSearchFailureNextAction');
     }
     if (warnings.isNotEmpty) {
-      parts.add(
-        '주의 ${warnings.map((warning) => warning.userMessage).join(', ')}',
-      );
+      parts.add('주의 $warningNoticeText');
     }
     if (sourceNotice.isNotEmpty) {
       parts.add(sourceNotice);
@@ -2048,8 +2064,9 @@ String _routeWarningLabel(String code) {
     'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
     'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
     'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
-    'GENERATED_CONNECTOR_UNVERIFIED' =>
-      '연결 위치를 아직 정확히 확인하지 못했어요. 현장 안내를 먼저 봐 주세요.',
+    // 두 번째 문장('현장 안내를 먼저 봐 주세요')은 결과 하단 '안전 안내' 각주와
+    // 중복이라 제거한다. 헤지는 한 곳에서만 담당한다(#1577).
+    'GENERATED_CONNECTOR_UNVERIFIED' => '연결 위치를 아직 확인하지 못했어요.',
     'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
     'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
     'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
@@ -4141,12 +4158,11 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         ],
         if (result.warnings.isNotEmpty) ...[
           const SizedBox(height: 8),
-          for (final warning in result.warnings)
-            _RouteNotice(
-              title: '주의 확인',
-              text: warning.userMessage,
-              icon: Icons.warning_amber,
-            ),
+          _RouteNotice(
+            title: '주의 확인',
+            text: result.warningNoticeText,
+            icon: Icons.warning_amber,
+          ),
         ],
         const SizedBox(height: 12),
         ?favoriteSaveButton,
@@ -4405,12 +4421,11 @@ class _RouteGuidanceWorkflowView extends StatelessWidget {
                         ],
                         if (result.warnings.isNotEmpty) ...[
                           const SizedBox(height: 16),
-                          for (final warning in result.warnings)
-                            _RouteNotice(
-                              title: '주의 확인',
-                              text: warning.userMessage,
-                              icon: Icons.warning_amber,
-                            ),
+                          _RouteNotice(
+                            title: '주의 확인',
+                            text: result.warningNoticeText,
+                            icon: Icons.warning_amber,
+                          ),
                         ],
                         if (result.movementSteps.isNotEmpty) ...[
                           const SizedBox(height: 18),
