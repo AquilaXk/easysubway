@@ -813,7 +813,32 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(660);
 		assertThat(plan.itineraries().getFirst().steps())
 			.extracting("stepType", "fromStationId", "toStationId", "timeSource")
-			.containsExactly(tuple("ride", "station-a", "station-b", EtaSource.PLANNED.name()));
+			.containsExactly(
+				tuple("entry", "station-a", "station-a", EtaSource.PLANNED.name()),
+				tuple("ride", "station-a", "station-b", EtaSource.PLANNED.name()),
+				tuple("exit", "station-b", "station-b", EtaSource.PLANNED.name())
+			);
+	}
+
+	@Test
+	@DisplayName("V2 planner는 시간표 환승 경로에 접근과 환승 step을 보강한다")
+	void routeV2PlannerAddsAccessAndTransferStepsToTimetableTransferRoute() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), transferRouteTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.itineraries().getFirst().transferCount()).isEqualTo(1);
+		assertThat(plan.itineraries().getFirst().walkingDistanceMeters()).isEqualTo(560);
+		assertThat(plan.itineraries().getFirst().steps())
+			.extracting("stepType", "fromStationId", "toStationId", "requiresAccessibilityCheck")
+			.containsExactly(
+				tuple("entry", "station-a", "station-a", true),
+				tuple("ride", "station-a", "station-transfer", false),
+				tuple("transfer", "station-transfer", "station-transfer", true),
+				tuple("ride", "station-transfer", "station-b", false),
+				tuple("exit", "station-b", "station-b", true)
+			);
 	}
 
 	@Test
@@ -1994,6 +2019,70 @@ class RouteSearchServiceTest {
 			List.of(
 				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 1, "station-a", "seoul-4", 32520, 32520, pickupType, 0),
 				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0900", 2, "station-b", "seoul-4", 33120, 33120, 0, dropOffType)
+			),
+			List.of()
+		);
+	}
+
+	private static LoadRouteTimetablePort transferRouteTimetablePort() {
+		return () -> new LoadRouteTimetablePort.RouteTimetable(
+			List.of(new LoadRouteTimetablePort.ServiceCalendar(
+				"weekday-2026",
+				true,
+				true,
+				true,
+				true,
+				true,
+				false,
+				false,
+				LocalDate.parse("2026-07-01"),
+				LocalDate.parse("2026-12-31"),
+				"Asia/Seoul"
+			)),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-line-a",
+					"line-a",
+					"A",
+					"A 노선",
+					"환승 방면",
+					"Asia/Seoul"
+				),
+				new LoadRouteTimetablePort.TransitRoute(
+					"route-line-b",
+					"line-b",
+					"B",
+					"B 노선",
+					"도착 방면",
+					"Asia/Seoul"
+				)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-line-a-0900",
+					"route-line-a",
+					"weekday-2026",
+					"환승",
+					"0",
+					"LOCAL",
+					0
+				),
+				new LoadRouteTimetablePort.TransitTrip(
+					"trip-line-b-0915",
+					"route-line-b",
+					"weekday-2026",
+					"도착",
+					"0",
+					"LOCAL",
+					0
+				)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 1, "station-a", "line-a", 32520, 32520, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-a-0900", 2, "station-transfer", "line-a", 32940, 32940, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 1, "station-transfer", "line-b", 33300, 33300, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-line-b-0915", 2, "station-b", "line-b", 33720, 33720, 0, 0)
 			),
 			List.of()
 		);

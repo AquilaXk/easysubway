@@ -32,6 +32,9 @@ class RouteTimetableRaptorPlanner {
 	private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 	private static final int SERVICE_DAY_CUTOFF_HOUR = 3;
 	private static final int PARETO_LIMIT = 3;
+	private static final int ENTRY_DISTANCE_METERS = 180;
+	private static final int TRANSFER_DISTANCE_METERS = 260;
+	private static final int EXIT_DISTANCE_METERS = 120;
 
 	List<RouteSearchResult> search(SearchRouteV2Command command, RouteTimetable timetable) {
 		ServiceDay serviceDay = serviceDay(command);
@@ -169,7 +172,34 @@ class RouteTimetableRaptorPlanner {
 		int sequence = 1;
 		int cursorSeconds = label.startSeconds();
 		int boardingSlackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
-		for (RideLeg leg : label.path()) {
+		List<RideLeg> path = label.path();
+		RideLeg firstLeg = path.getFirst();
+		RideLeg lastLeg = path.getLast();
+		steps.add(timetableAccessStep(
+			sequence,
+			"entry",
+			command.originStationId(),
+			firstLeg.from().stationId(),
+			firstLeg.lineId(),
+			firstLeg.lineName(),
+			ENTRY_DISTANCE_METERS
+		));
+		sequence += 1;
+		for (int index = 0; index < path.size(); index += 1) {
+			RideLeg leg = path.get(index);
+			if (index > 0) {
+				RideLeg previousLeg = path.get(index - 1);
+				steps.add(timetableAccessStep(
+					sequence,
+					"transfer",
+					previousLeg.to().stationId(),
+					leg.from().stationId(),
+					leg.lineId(),
+					leg.lineName(),
+					TRANSFER_DISTANCE_METERS
+				));
+				sequence += 1;
+			}
 			String lineName = leg.lineName();
 			steps.add(new RouteStep(
 				sequence,
@@ -192,6 +222,15 @@ class RouteTimetableRaptorPlanner {
 			cursorSeconds = leg.to().arrivalSeconds();
 			sequence += 1;
 		}
+		steps.add(timetableAccessStep(
+			sequence,
+			"exit",
+			lastLeg.to().stationId(),
+			command.destinationStationId(),
+			lastLeg.lineId(),
+			lastLeg.lineName(),
+			EXIT_DISTANCE_METERS
+		));
 		return new RouteSearchResult(
 			"route-v2-raptor-" + serviceDay.date() + "-" + command.originStationId() + "-" + command.destinationStationId()
 				+ "-" + label.timeSeconds() + "-" + pathDiscriminator(label.path()),
@@ -208,6 +247,35 @@ class RouteTimetableRaptorPlanner {
 			List.of(),
 			List.of(),
 			LocalDateTime.of(serviceDay.date(), java.time.LocalTime.MIDNIGHT).plusSeconds(label.startSeconds())
+		);
+	}
+
+	private static RouteStep timetableAccessStep(
+		int sequence,
+		String stepType,
+		String fromStationId,
+		String toStationId,
+		String lineId,
+		String lineName,
+		int distanceMeters
+	) {
+		return new RouteStep(
+			sequence,
+			stepType,
+			lineName + " 접근 동선 확인",
+			"시간표 경로의 승하차 접근성과 환승 동선을 확인합니다.",
+			lineId,
+			lineName,
+			fromStationId,
+			toStationId,
+			0,
+			distanceMeters,
+			false,
+			"UNKNOWN",
+			true,
+			EtaSource.PLANNED.name(),
+			"TIMETABLE",
+			"시간표"
 		);
 	}
 
