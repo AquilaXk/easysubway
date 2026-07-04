@@ -80,9 +80,9 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 					searchRouteCommand,
 					RANKING_CANDIDATE_LIMIT,
 					command.alternativeCount(),
-					timetableItineraries
+					timetableItineraries,
+					candidates -> rankTimetableItineraries(candidates, command.alternativeCount())
 				);
-				timetableItineraries = rankTimetableItineraries(timetableItineraries, command.alternativeCount());
 				return new RouteV2Plan(timetableItineraries, statusesOf(timetableItineraries, command.useRealtime()), PLANNER_ADR);
 			}
 			SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);

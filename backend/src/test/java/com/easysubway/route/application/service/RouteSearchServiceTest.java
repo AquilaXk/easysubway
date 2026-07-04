@@ -931,6 +931,30 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("시간표 후보 stabilization은 응답에서 제외된 후보를 저장하지 않는다")
+	void stabilizeTimetableRouteCandidatesDoesNotPersistDroppedCandidates() {
+		var repository = new InMemoryRouteSearchRepository();
+		var routeSearchService = new RouteSearchService(repository, repository, new DisconnectedTransitMasterPort(), CLOCK);
+
+		var results = routeSearchService.stabilizeTimetableRouteCandidates(
+			new SearchRouteCommand("station-a", "station-b", MobilityType.SENIOR, ConstraintMode.PREFER_STEP_FREE, 1),
+			3,
+			1,
+			List.of(
+				routeSearchResultWithAccessState("route-dropped", "UNKNOWN", true),
+				routeSearchResultWithAccessState("route-selected", "AVAILABLE", false)
+			),
+			candidates -> candidates.stream()
+				.filter(candidate -> "route-selected".equals(candidate.routeSearchId()))
+				.toList()
+		);
+
+		assertThat(results).hasSize(1);
+		assertThat(repository.summarizeRouteSearches().totalCount()).isEqualTo(1);
+		assertThat(repository.loadRouteSearch(results.getFirst().routeSearchId())).isPresent();
+	}
+
+	@Test
 	@DisplayName("V2 planner는 legacy graph가 놓친 시간표 경로를 NO_TIMETABLE_SERVICE로 버리지 않는다")
 	void routeV2PlannerKeepsTimetableRouteWhenLegacyGraphMisses() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -2088,11 +2112,12 @@ class RouteSearchServiceTest {
 				SearchRouteCommand command,
 				int candidateCount,
 				int alternativeCount,
-				List<RouteSearchResult> timetableResults
+				List<RouteSearchResult> timetableResults,
+				java.util.function.UnaryOperator<List<RouteSearchResult>> selectCandidates
 			) {
-				return stabilizedResults.stream()
+				return selectCandidates.apply(stabilizedResults.stream()
 					.limit(candidateCount)
-					.toList();
+					.toList());
 			}
 
 			@Override
