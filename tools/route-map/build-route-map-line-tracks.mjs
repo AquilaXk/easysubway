@@ -176,6 +176,19 @@ function pathString(points) {
     .join(" ");
 }
 
+// 정점열 묶음 → stitching 후 유효 조각만 path 문자열로. svg-strokes/pack-down-path
+// 두 소스가 같은 규칙으로 path를 만들도록 공유한다(스키마 드리프트 방지).
+function toPaths(pointLists, tolerance) {
+  return stitchChains(pointLists.filter((points) => points.length >= 2), tolerance)
+    .filter((points) => points.length >= 2)
+    .map((points) => pathString(points));
+}
+
+// tracks.json의 노선 레코드. 두 소스가 동일 shape를 내도록 공유한다.
+function makeLine({ lineId, svgColor, matchVotes, stationCount, paths }) {
+  return { lineId, svgColor, trackCount: paths.length, matchVotes, stationCount, paths };
+}
+
 // "#rrggbb" → [r, g, b].
 function rgb(hex) {
   return [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
@@ -349,20 +362,14 @@ async function buildLineTracks({ geometry, pack, region, snapRadius, stitchToler
     colorToLineId[item.color] = lineId;
     if (votes === 0) warnings.push(`색 ${item.color} → ${lineId}: 근접 역 0표(소거법 배정). 위치 검수 필요.`);
     else if (votes !== bestVotes) warnings.push(`색 ${item.color} → ${lineId}: 최적매칭 표(${votes})가 국소 최다표(${bestVotes})와 다름.`);
-    const paths = stitchChains(
-      item.tracks.map((track) => track.points).filter((points) => points.length >= 2),
-      stitchTolerance,
-    )
-      .filter((points) => points.length >= 2)
-      .map((points) => pathString(points));
-    lines.push({
+    const paths = toPaths(item.tracks.map((track) => track.points), stitchTolerance);
+    lines.push(makeLine({
       lineId,
       svgColor: item.color,
-      trackCount: paths.length,
       matchVotes: votes,
       stationCount: stationCountByLine.get(lineId) ?? 0,
       paths,
-    });
+    }));
   });
 
   // 미매칭 노선(track 색이 배정되지 않은 line_id).
@@ -447,18 +454,15 @@ async function buildLineTracksFromDownPath({ pack, region, stitchTolerance }) {
       }
     }
     // 미세 hole은 stitching으로 추가 통합.
-    const paths = stitchChains(polylines.filter((points) => points.length >= 2), stitchTolerance)
-      .filter((points) => points.length >= 2)
-      .map((points) => pathString(points));
+    const paths = toPaths(polylines, stitchTolerance);
     if (paths.length === 0) warnings.push(`노선 ${lineId}: down_path 세그먼트가 없어 빈 track.`);
-    lines.push({
+    lines.push(makeLine({
       lineId,
       svgColor: "",
-      trackCount: paths.length,
       matchVotes: null,
       stationCount: stationCountByLine.get(lineId) ?? 0,
       paths,
-    });
+    }));
   }
 
   return {
