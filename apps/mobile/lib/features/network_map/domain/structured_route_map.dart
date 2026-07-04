@@ -1,35 +1,22 @@
 // 구조화 노선도 도메인 모델과 파생 로직 (#1641 Stage 1: data layer).
 //
-// route_map_positions에서 앱으로 올라온 원시 필드(x/y, up_path/down_path,
-// label_polygon)를 native canvas 렌더러(#1641 Stage 2)가 바로 소비할 수 있는
-// 구조로 파생한다. 렌더링은 이 모듈에 없다 — 순수 파싱·파생만 한다.
+// route_map_positions에서 앱으로 올라온 필드를 native canvas 렌더러(#1641
+// Stage 2)가 바로 소비할 구조로 파생한다. 렌더링은 이 모듈에 없다 — 순수
+// 파생만 한다. label_polygon 파싱은 network_map.dart의 기존 _parseLabelPolygon
+// 을 재사용하므로(호출부에서 List<Offset>로 전달) 여기서 다시 파싱하지 않는다.
 //
 // #1636 structured-route-map-contract의 layer/LOD 규칙을 따른다:
-// - line_geometry: up_path/down_path polyline
+// - line_geometry: 노선 track polyline (gap에서 끊는다)
 // - transfer_groups: 같은 station_id에 여러 line_id → 중심 좌표
 // - station_labels priority: 환승 > 주요 > 일반 (별도 검수값 없으면 일반)
 // - LOD: zoom0 lines only, zoom1 환승/주요 라벨, zoom2 전체 역 라벨
-import 'dart:convert';
-
-/// 노선도 원본 좌표계의 2D 점.
-class RouteMapPoint {
-  const RouteMapPoint(this.x, this.y);
-
-  final double x;
-  final double y;
-
-  @override
-  bool operator ==(Object other) =>
-      other is RouteMapPoint && other.x == x && other.y == y;
-
-  @override
-  int get hashCode => Object.hash(x, y);
-
-  @override
-  String toString() => 'RouteMapPoint($x, $y)';
-}
+import 'dart:ui' show Offset;
 
 /// 라벨 우선순위 class (#1636 station_labels.priority).
+///
+/// [major]는 #1636 majorRule("별도 검수된 주요 거점")을 위한 예약 값이다.
+/// 현재 데이터팩에는 검수 컬럼이 없어 빌더는 transfer/regular만 산출하지만,
+/// 계약과 LOD 매핑을 위해 값과 zoom bucket을 유지한다.
 enum RouteMapLabelClass { transfer, major, regular }
 
 /// 라벨 class → 최초 표시 zoom bucket (#1636 LOD).
@@ -44,21 +31,16 @@ int minLabelZoomBucketFor(RouteMapLabelClass labelClass) {
   }
 }
 
-/// 한 노선의 방향별 polyline geometry.
+/// 한 노선의 track geometry. 데이터 hole(인접 세그먼트가 이어지지 않는 지점)에서
+/// 끊어 여러 sub-polyline으로 둔다 — 끊긴 두 역을 직선으로 잇는 phantom edge를
+/// 만들지 않기 위함이다.
 class RouteMapLineGeometry {
-  const RouteMapLineGeometry({
-    required this.lineId,
-    required this.upPolyline,
-    required this.downPolyline,
-  });
+  const RouteMapLineGeometry({required this.lineId, required this.polylines});
 
   final String lineId;
 
-  /// 상행(up) 방향 정점 목록, station sequence 순서.
-  final List<RouteMapPoint> upPolyline;
-
-  /// 하행(down) 방향 정점 목록, station sequence 순서.
-  final List<RouteMapPoint> downPolyline;
+  /// sequence 순서의 정점 목록들. 각 원소가 연속된 sub-polyline.
+  final List<List<Offset>> polylines;
 }
 
 /// 구조화된 역 노드 (렌더러가 point/label layer로 소비).
@@ -75,8 +57,8 @@ class RouteMapStructuredStation {
   final String stationId;
   final String lineId;
   final int sequence;
-  final RouteMapPoint position;
-  final List<RouteMapPoint> labelPolygon;
+  final Offset position;
+  final List<Offset> labelPolygon;
   final RouteMapLabelClass labelClass;
 
   int get minLabelZoomBucket => minLabelZoomBucketFor(labelClass);
@@ -96,7 +78,7 @@ class RouteMapTransferGroup {
   final List<String> lineIds;
 
   /// 표시 좌표: 해당 station_id route_map_positions의 중심값.
-  final RouteMapPoint centroid;
+  final Offset centroid;
 }
 
 /// 구조화 노선도 집합 (렌더러 입력).
@@ -115,70 +97,41 @@ class StructuredRouteMap {
       lines.isEmpty && stations.isEmpty && transferGroups.isEmpty;
 }
 
-/// 빌더 입력: route_map_positions 한 행에 대응하는 원시 값.
+/// 빌더 입력: route_map_positions 한 행에 대응하는 값.
+/// [labelPolygon]은 호출부에서 기존 _parseLabelPolygon으로 미리 파싱해 전달한다.
+/// [downPath]는 이 역으로 들어오는 track 세그먼트("M prev L this")의 원본 문자열.
 class StructuredRouteMapStationInput {
   const StructuredRouteMapStationInput({
     required this.stationId,
     required this.lineId,
     required this.sequence,
-    required this.x,
-    required this.y,
-    required this.upPath,
-    required this.downPath,
+    required this.position,
     required this.labelPolygon,
+    required this.downPath,
   });
 
   final String stationId;
   final String lineId;
   final int sequence;
-  final double x;
-  final double y;
-  final String upPath;
+  final Offset position;
+  final List<Offset> labelPolygon;
   final String downPath;
-  final String labelPolygon;
 }
 
-/// "M x y L x y ..." 형태의 절대 좌표 path 문자열을 점 목록으로 파싱한다.
-/// 명령 문자(M/L 등)는 건너뛰고 숫자 쌍만 읽는다. 잘못된 입력은 건너뛴다.
-List<RouteMapPoint> parseRouteMapPath(String path) {
+/// "M x y L x y ..." 형태의 절대 좌표 path를 정점 목록으로 파싱한다.
+/// 데이터팩(enrich-capital-route-map-layer.mjs)은 절대 M/L 세그먼트만 방출하므로
+/// 명령 문자는 무시하고 숫자 쌍만 읽는다. (H/V/상대 명령은 대상 아님.)
+List<Offset> parseRouteMapPolyline(String path) {
   if (path.trim().isEmpty) {
     return const [];
   }
-  // 명령 문자(M/L 등)나 쉼표에 붙어 있어도 숫자만 추출한다.
   final numbers = RegExp(r'-?\d+(?:\.\d+)?')
       .allMatches(path)
       .map((match) => double.parse(match.group(0)!))
       .toList();
-  final points = <RouteMapPoint>[];
+  final points = <Offset>[];
   for (var index = 0; index + 1 < numbers.length; index += 2) {
-    points.add(RouteMapPoint(numbers[index], numbers[index + 1]));
-  }
-  return points;
-}
-
-/// label_polygon JSON('[{"x":..,"y":..}]')을 점 목록으로 파싱한다.
-List<RouteMapPoint> parseRouteMapLabelPolygon(String source) {
-  if (source.trim().isEmpty) {
-    return const [];
-  }
-  Object? decoded;
-  try {
-    decoded = jsonDecode(source);
-  } on FormatException {
-    return const [];
-  }
-  if (decoded is! List) {
-    return const [];
-  }
-  final points = <RouteMapPoint>[];
-  for (final entry in decoded) {
-    if (entry is Map) {
-      final x = (entry['x'] as num?)?.toDouble();
-      final y = (entry['y'] as num?)?.toDouble();
-      if (x != null && y != null) {
-        points.add(RouteMapPoint(x, y));
-      }
-    }
+    points.add(Offset(numbers[index], numbers[index + 1]));
   }
   return points;
 }
@@ -191,17 +144,19 @@ StructuredRouteMap buildStructuredRouteMap(
 
   // 물리 역(station_id)이 속한 line 집합 → 환승 판정.
   final lineIdsByStation = <String, Set<String>>{};
-  final positionsByStation = <String, List<RouteMapPoint>>{};
+  // 환승 중심 계산용: 환승역 후보만 좌표를 모은다.
+  final positionsByStation = <String, List<Offset>>{};
   for (final input in inputList) {
     lineIdsByStation
         .putIfAbsent(input.stationId, () => <String>{})
         .add(input.lineId);
     positionsByStation
-        .putIfAbsent(input.stationId, () => <RouteMapPoint>[])
-        .add(RouteMapPoint(input.x, input.y));
+        .putIfAbsent(input.stationId, () => <Offset>[])
+        .add(input.position);
   }
 
-  // 노선별 방향 polyline: sequence 순서로 세그먼트를 이어 붙인다.
+  // 노선별 track polyline: sequence(동률 시 station_id) 순서로 세그먼트를 잇되
+  // 이어지지 않는 지점에서 끊는다.
   final byLine = <String, List<StructuredRouteMapStationInput>>{};
   for (final input in inputList) {
     byLine.putIfAbsent(input.lineId, () => []).add(input);
@@ -209,13 +164,11 @@ StructuredRouteMap buildStructuredRouteMap(
   final lines = <RouteMapLineGeometry>[];
   final orderedLineIds = byLine.keys.toList()..sort();
   for (final lineId in orderedLineIds) {
-    final stations = byLine[lineId]!
-      ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    final stations = byLine[lineId]!..sort(_bySequenceThenStation);
     lines.add(
       RouteMapLineGeometry(
         lineId: lineId,
-        upPolyline: _joinSegments(stations.map((s) => s.upPath)),
-        downPolyline: _joinSegments(stations.map((s) => s.downPath)),
+        polylines: _assemblePolylines(stations),
       ),
     );
   }
@@ -229,10 +182,11 @@ StructuredRouteMap buildStructuredRouteMap(
         stationId: input.stationId,
         lineId: input.lineId,
         sequence: input.sequence,
-        position: RouteMapPoint(input.x, input.y),
-        labelPolygon: parseRouteMapLabelPolygon(input.labelPolygon),
-        labelClass:
-            isTransfer ? RouteMapLabelClass.transfer : RouteMapLabelClass.regular,
+        position: input.position,
+        labelPolygon: input.labelPolygon,
+        labelClass: isTransfer
+            ? RouteMapLabelClass.transfer
+            : RouteMapLabelClass.regular,
       ),
     );
   }
@@ -261,29 +215,46 @@ StructuredRouteMap buildStructuredRouteMap(
   );
 }
 
-/// 세그먼트 path 목록을 하나의 polyline으로 잇는다. 인접 세그먼트의 공유 정점은
-/// 중복 제거한다(세그먼트 i의 끝점 == 세그먼트 i+1의 시작점).
-List<RouteMapPoint> _joinSegments(Iterable<String> paths) {
-  final polyline = <RouteMapPoint>[];
-  for (final path in paths) {
-    for (final point in parseRouteMapPath(path)) {
-      if (polyline.isEmpty || polyline.last != point) {
-        polyline.add(point);
-      }
-    }
-  }
-  return polyline;
+int _bySequenceThenStation(
+  StructuredRouteMapStationInput a,
+  StructuredRouteMapStationInput b,
+) {
+  final bySequence = a.sequence.compareTo(b.sequence);
+  return bySequence != 0 ? bySequence : a.stationId.compareTo(b.stationId);
 }
 
-RouteMapPoint _centroid(List<RouteMapPoint> points) {
+/// down_path 세그먼트("M prev L this", 전방 정점 순서)들을 sequence 순서로 이어
+/// track polyline을 만든다. 인접 세그먼트가 끝점=시작점으로 이어지면 붙이고,
+/// 이어지지 않으면(데이터 hole) 새 polyline을 시작한다.
+List<List<Offset>> _assemblePolylines(
+  List<StructuredRouteMapStationInput> orderedStations,
+) {
+  final polylines = <List<Offset>>[];
+  List<Offset>? current;
+  for (final station in orderedStations) {
+    final segment = parseRouteMapPolyline(station.downPath);
+    if (segment.isEmpty) {
+      continue;
+    }
+    if (current != null && current.last == segment.first) {
+      current.addAll(segment.skip(1));
+    } else {
+      current = <Offset>[...segment];
+      polylines.add(current);
+    }
+  }
+  return polylines;
+}
+
+Offset _centroid(List<Offset> points) {
   if (points.isEmpty) {
-    return const RouteMapPoint(0, 0);
+    return Offset.zero;
   }
   var sumX = 0.0;
   var sumY = 0.0;
   for (final point in points) {
-    sumX += point.x;
-    sumY += point.y;
+    sumX += point.dx;
+    sumY += point.dy;
   }
-  return RouteMapPoint(sumX / points.length, sumY / points.length);
+  return Offset(sumX / points.length, sumY / points.length);
 }

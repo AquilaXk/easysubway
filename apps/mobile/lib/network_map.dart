@@ -112,11 +112,13 @@ class NetworkMapData {
           stationId: station.id,
           lineId: station.lineId,
           sequence: station.sequence,
-          x: station.position.x.toDouble(),
-          y: station.position.y.toDouble(),
-          upPath: station.position.upPath,
+          position: Offset(
+            station.position.x.toDouble(),
+            station.position.y.toDouble(),
+          ),
+          labelPolygon:
+              _parseLabelPolygon(station.position.labelPolygon) ?? const [],
           downPath: station.position.downPath,
-          labelPolygon: station.position.labelPolygon,
         ),
       ),
     );
