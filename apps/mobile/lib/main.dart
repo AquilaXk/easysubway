@@ -3443,38 +3443,40 @@ class SupportAccessScreen extends StatelessWidget {
           padding: _mainPagePadding,
           children: [
             const _SupportSectionTitle(title: '내 정보와 개인정보'),
-            _PrivacyDataUseSummary(deletionScope: deletionScope),
-            const SizedBox(height: 12),
             _SupportGroupCard(
               children: [
-                _SupportAccessItem(
-                  key: const Key('privacyPolicyAccessItem'),
-                  icon: Icons.privacy_tip_outlined,
-                  title: '개인정보처리방침',
-                  value: accessInfo.privacyPolicyUrl,
-                  displayValue: '웹에서 확인',
-                  uri: _httpsUri(accessInfo.privacyPolicyUrl),
-                  launcher: launcher,
-                ),
-                if (userDataDeletionRepository == null)
+                if (_httpsUri(accessInfo.privacyPolicyUrl) != null)
+                  _SupportAccessItem(
+                    key: const Key('privacyPolicyAccessItem'),
+                    icon: Icons.privacy_tip_outlined,
+                    title: '개인정보처리방침',
+                    value: accessInfo.privacyPolicyUrl,
+                    displayValue: '웹에서 확인',
+                    uri: _httpsUri(accessInfo.privacyPolicyUrl),
+                    launcher: launcher,
+                  ),
+                if (userDataDeletionRepository != null)
+                  _UserDataDeletionAccessItem(
+                    repository: userDataDeletionRepository!,
+                    deletionScope: deletionScope,
+                    onDeleted: onUserDataDeleted,
+                  )
+                else if (_mailtoUri(
+                      accessInfo.dataDeletionEmail,
+                      '쉬운 지하철 내 정보 삭제 요청',
+                    ) !=
+                    null)
                   _SupportAccessItem(
                     key: const Key('dataDeletionAccessItem'),
                     icon: Icons.delete_outline,
                     title: '내 정보 삭제 요청',
                     value: accessInfo.dataDeletionEmail,
                     displayValue: '이메일 보내기',
-                    helperText: '어떤 정보를 지울 수 있는지 메일로 문의해요',
                     uri: _mailtoUri(
                       accessInfo.dataDeletionEmail,
                       '쉬운 지하철 내 정보 삭제 요청',
                     ),
                     launcher: launcher,
-                  )
-                else
-                  _UserDataDeletionAccessItem(
-                    repository: userDataDeletionRepository!,
-                    deletionScope: deletionScope,
-                    onDeleted: onUserDataDeleted,
                   ),
               ],
             ),
@@ -3502,24 +3504,28 @@ class SupportAccessScreen extends StatelessWidget {
             const _SupportSectionTitle(title: '문의'),
             _SupportGroupCard(
               children: [
-                _SupportAccessItem(
-                  key: const Key('supportAccessItem'),
-                  icon: Icons.support_agent,
-                  title: '고객지원',
-                  value: accessInfo.supportEmail,
-                  displayValue: '이메일 보내기',
-                  uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
-                  launcher: launcher,
-                ),
-                _SupportAccessItem(
-                  key: const Key('securityContactAccessItem'),
-                  icon: Icons.security_outlined,
-                  title: '보안 문의',
-                  value: accessInfo.securityEmail,
-                  displayValue: '보안 문제 알리기',
-                  uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
-                  launcher: launcher,
-                ),
+                if (_mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의') !=
+                    null)
+                  _SupportAccessItem(
+                    key: const Key('supportAccessItem'),
+                    icon: Icons.support_agent,
+                    title: '고객지원',
+                    value: accessInfo.supportEmail,
+                    displayValue: '이메일 보내기',
+                    uri: _mailtoUri(accessInfo.supportEmail, '쉬운 지하철 고객지원 문의'),
+                    launcher: launcher,
+                  ),
+                if (_mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의') !=
+                    null)
+                  _SupportAccessItem(
+                    key: const Key('securityContactAccessItem'),
+                    icon: Icons.security_outlined,
+                    title: '보안 문의',
+                    value: accessInfo.securityEmail,
+                    displayValue: '보안 문제 알리기',
+                    uri: _mailtoUri(accessInfo.securityEmail, '쉬운 지하철 보안 문의'),
+                    launcher: launcher,
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -3562,6 +3568,10 @@ class _SupportGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 연결 가능한 항목이 없으면(전 항목 숨김) 빈 테두리 카드를 그리지 않는다.
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final rows = <Widget>[];
     for (var i = 0; i < children.length; i++) {
       rows.add(children[i]);
@@ -3691,29 +3701,14 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        copy.title,
-                        style: const TextStyle(
-                          color: EasySubwayAccessibleColors.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        copy.helperText,
-                        style: const TextStyle(
-                          color: EasySubwayAccessibleColors.mutedText,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    copy.title,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      height: 1.25,
+                    ),
                   ),
                 ),
                 const Icon(
@@ -3755,74 +3750,48 @@ class _UserDataDeletionCopy {
   const _UserDataDeletionCopy({
     required this.title,
     required this.helperText,
-    required this.body,
-    required this.notices,
+    required this.deletedSummary,
     required this.confirmText,
+    this.exceptionNote,
   });
 
   factory _UserDataDeletionCopy.forScope(UserDataDeletionScope scope) {
     return switch (scope) {
       UserDataDeletionScope.requestOnly => const _UserDataDeletionCopy(
         title: '내 정보 삭제 요청',
-        helperText: '어떤 정보를 지울 수 있는지 메일로 문의합니다.',
-        body: '삭제가 필요한 정보와 방법을 지원 메일로 문의합니다.',
-        notices: [
-          '앱 안에서 바로 삭제할 수 없는 정보는 답변으로 안내해 드립니다.',
-          '요청 전 개인정보처리방침에서 보관 범위와 기간을 확인할 수 있습니다.',
-        ],
+        helperText: '메일로 삭제를 문의합니다.',
+        deletedSummary: '삭제가 필요한 정보와 방법을 지원 메일로 문의합니다.',
         confirmText: '내 정보 삭제 요청 메일을 보낼까요?',
       ),
       UserDataDeletionScope.deviceOnly => const _UserDataDeletionCopy(
         title: '이 기기의 앱 정보 삭제',
-        helperText: '이 기기에서 지울 범위와 되돌릴 수 없는 항목을 확인하고 진행합니다.',
-        body:
-            '즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 이 기기에 저장된 제보 접수 확인 정보와 작성 중인 제보를 삭제합니다.',
-        notices: [
-          '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.',
-          '삭제가 끝나면 이동 조건과 화면 설정이 초기화되고 처음 설정 화면으로 돌아갑니다.',
-          '삭제한 정보는 앱에서 복구할 수 없습니다.',
-          '삭제를 완료하지 못하면 오류 안내를 보고 다시 시도할 수 있습니다.',
-          '법으로 꼭 필요한 기록은 정해진 기간 동안만 보관될 수 있습니다.',
-        ],
-        confirmText: '삭제 후에는 이 기기에 저장된 앱 정보와 설정이 지워지고 되돌릴 수 없습니다.',
+        helperText: '이 기기에서 지울 정보를 확인합니다.',
+        deletedSummary: '즐겨찾기, 최근 검색, 이동 조건, 화면 설정이 이 기기에서 지워져요.',
+        exceptionNote: '이미 보낸 시설 제보와 사진은 그대로 남아요.',
+        confirmText: '이 기기의 즐겨찾기·최근 검색·설정이 지워지고 되돌릴 수 없어요.',
       ),
       UserDataDeletionScope.remoteOnly => const _UserDataDeletionCopy(
         title: '보낸 정보 삭제',
-        helperText: '보낸 정보 중 지울 범위와 앱 초기화 여부를 확인하고 진행합니다.',
-        body:
-            '내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꿉니다.',
-        notices: [
-          '삭제가 끝나면 보낸 정보가 정리되고 앱 설정이 초기화됩니다.',
-          '앱은 처음 설정 화면으로 돌아갑니다.',
-          '삭제한 정보는 앱에서 복구할 수 없습니다.',
-          '네트워크 오류가 나면 기존 정보는 지우지 않고 다시 시도할 수 있습니다.',
-          '법으로 꼭 필요한 기록은 정해진 기간 동안만 보관될 수 있습니다.',
-        ],
-        confirmText:
-            '삭제 후에는 보낸 정보와 설정이 삭제되거나 누구의 정보인지 알 수 없게 바뀌고 앱 설정이 초기화됩니다. 되돌릴 수 없습니다.',
+        helperText: '보낸 정보 삭제 범위를 확인합니다.',
+        deletedSummary: '보낸 제보와 사진·위치, 즐겨찾기, 이동 조건이 삭제되거나 익명 처리돼요.',
+        confirmText: '보낸 정보와 설정이 삭제·익명 처리되고 되돌릴 수 없어요.',
       ),
       UserDataDeletionScope.remoteAndDevice => const _UserDataDeletionCopy(
         title: '내 정보 삭제',
-        helperText: '삭제 범위와 복구 불가 여부를 확인하고 진행합니다.',
-        body:
-            '내 정보 삭제 요청 시 즐겨찾기, 이동 조건, 제보 접수 기록, 제보 내용·사진·위치와 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꿉니다.',
-        notices: [
-          '삭제가 끝나면 이 기기와 보낸 정보가 함께 정리됩니다.',
-          '삭제한 정보는 앱에서 복구할 수 없습니다.',
-          '네트워크 오류가 나면 기존 정보는 지우지 않고 다시 시도할 수 있습니다.',
-          '법으로 꼭 필요한 기록은 정해진 기간 동안만 보관될 수 있습니다.',
-        ],
-        confirmText:
-            '삭제 후에는 이 기기와 보낸 정보, 설정이 삭제되거나 누구의 정보인지 알 수 없게 바뀌고 되돌릴 수 없습니다.',
+        helperText: '삭제 범위를 확인합니다.',
+        deletedSummary: '이 기기의 즐겨찾기·최근 검색·설정과 보낸 제보·사진이 삭제되거나 익명 처리돼요.',
+        confirmText: '이 기기와 보낸 정보가 삭제·익명 처리되고 되돌릴 수 없어요.',
       ),
     };
   }
 
   final String title;
   final String helperText;
-  final String body;
-  final List<String> notices;
+  final String deletedSummary;
+  final String? exceptionNote;
   final String confirmText;
+
+  static const irreversibleLine = '삭제 후에는 되돌릴 수 없어요.';
 }
 
 class UserDataDeletionScreen extends StatefulWidget {
@@ -3886,15 +3855,31 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              copy.body,
+              copy.deletedSummary,
               style: textTheme.bodyLarge?.copyWith(
                 color: EasySubwayAccessibleColors.text,
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 16),
-            for (final notice in copy.notices)
-              _DataDeletionNoticeLine(text: notice),
+            const SizedBox(height: 10),
+            Text(
+              _UserDataDeletionCopy.irreversibleLine,
+              style: textTheme.bodyLarge?.copyWith(
+                color: EasySubwayAccessibleColors.red,
+                fontWeight: FontWeight.w800,
+                height: 1.4,
+              ),
+            ),
+            if (copy.exceptionNote != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                copy.exceptionNote!,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.mutedText,
+                  height: 1.4,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -3966,42 +3951,6 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
         });
       }
     }
-  }
-}
-
-class _DataDeletionNoticeLine extends StatelessWidget {
-  const _DataDeletionNoticeLine({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 7),
-            child: Icon(
-              Icons.circle,
-              size: 7,
-              color: EasySubwayAccessibleColors.red,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -4438,128 +4387,6 @@ class _SafetyDataNoticeLine extends StatelessWidget {
   }
 }
 
-class _PrivacyDataUseSummary extends StatelessWidget {
-  const _PrivacyDataUseSummary({required this.deletionScope});
-
-  final UserDataDeletionScope deletionScope;
-
-  static const _title = '개인정보 사용 안내';
-  static const _locationPurpose = '현재 위치는 가까운 역 찾기와 시설 제보 위치 확인에만 사용됩니다.';
-  static const _appDataPurpose = '즐겨찾기, 이동 조건, 제보 내용과 사진은 앱 기능 제공에 사용됩니다.';
-  static const _requestDeletionScope =
-      '내 정보 삭제 요청은 지원 메일로 지울 수 있는 정보와 방법을 문의할 수 있습니다.';
-  static const _deviceDeletionScope =
-      '이 기기의 앱 정보 삭제는 즐겨찾기, 최근 검색, 이동 조건, 화면 설정, 제보 접수 확인 정보와 작성 중인 제보만 지웁니다.';
-  static const _remoteDeletionScope =
-      '보낸 정보 삭제는 즐겨찾기, 제보 접수 기록, 제보 내용과 사진, 위치, 경로 피드백을 삭제하거나 누구의 정보인지 알 수 없게 바꾸고 앱 설정을 초기화합니다.';
-  static const _combinedDeletionScope =
-      '내 정보 삭제는 이 기기의 즐겨찾기, 최근 검색, 이동 조건, 화면 설정과 보낸 제보 내용·사진·위치, 경로 피드백 정보를 삭제하거나 누구의 정보인지 알 수 없게 바꿉니다.';
-  static const _requestNotice = '앱 안에서 바로 삭제할 수 없는 정보는 답변으로 안내해 드립니다.';
-  static const _deviceSentReportNotice =
-      '이미 보낸 시설 제보, 사진, 위치 정보는 이 작업으로 삭제되지 않습니다.';
-  static const _remoteSentReportNotice =
-      '이미 보낸 시설 제보, 사진, 위치 정보, 경로 피드백은 삭제되거나 누구의 정보인지 알 수 없게 바뀝니다.';
-  static const _retentionNotice = '법으로 꼭 필요한 기록은 정해진 기간 동안만 보관합니다.';
-
-  String get _deletionScopeText {
-    return switch (deletionScope) {
-      UserDataDeletionScope.requestOnly => _requestDeletionScope,
-      UserDataDeletionScope.deviceOnly => _deviceDeletionScope,
-      UserDataDeletionScope.remoteOnly => _remoteDeletionScope,
-      UserDataDeletionScope.remoteAndDevice => _combinedDeletionScope,
-    };
-  }
-
-  String get _sentReportNoticeText {
-    return switch (deletionScope) {
-      UserDataDeletionScope.requestOnly => _requestNotice,
-      UserDataDeletionScope.deviceOnly => _deviceSentReportNotice,
-      UserDataDeletionScope.remoteOnly ||
-      UserDataDeletionScope.remoteAndDevice => _remoteSentReportNotice,
-    };
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final deletionScopeText = _deletionScopeText;
-    final sentReportNoticeText = _sentReportNoticeText;
-    return Semantics(
-      key: const Key('privacyDataUseSummary'),
-      container: true,
-      label:
-          '$_title, $_locationPurpose $_appDataPurpose $deletionScopeText $sentReportNoticeText $_retentionNotice',
-      child: ExcludeSemantics(
-        child: Container(
-          decoration: const BoxDecoration(
-            border: Border(
-              top: BorderSide(color: EasySubwayAccessibleColors.line),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _title,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.text,
-                    fontWeight: FontWeight.w800,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const _PrivacyDataUseLine(text: _locationPurpose),
-                const _PrivacyDataUseLine(text: _appDataPurpose),
-                _PrivacyDataUseLine(text: deletionScopeText),
-                _PrivacyDataUseLine(text: sentReportNoticeText),
-                const _PrivacyDataUseLine(text: _retentionNotice),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrivacyDataUseLine extends StatelessWidget {
-  const _PrivacyDataUseLine({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 7),
-            child: Icon(
-              Icons.circle,
-              size: 7,
-              color: EasySubwayAccessibleColors.primary,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.secondaryText,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class DataSourceAttributionScreen extends StatefulWidget {
   const DataSourceAttributionScreen({
     super.key,
@@ -4872,7 +4699,6 @@ class _SupportAccessItem extends StatelessWidget {
     required this.uri,
     required this.launcher,
     this.displayValue,
-    this.helperText,
     super.key,
   });
 
@@ -4882,22 +4708,15 @@ class _SupportAccessItem extends StatelessWidget {
   final Uri? uri;
   final SupportAccessLauncher launcher;
   final String? displayValue;
-  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
     final targetUri = uri;
     final targetText = value.trim();
-    final displayValue = targetUri == null
-        ? '아직 준비 중이에요'
-        : this.displayValue ?? targetText;
-    final secondaryText = helperText;
+    final displayValue = this.displayValue ?? targetText;
     final semanticLabelParts = [title, displayValue];
     if (targetUri != null && displayValue != targetText) {
       semanticLabelParts.add(targetText);
-    }
-    if (secondaryText != null) {
-      semanticLabelParts.add(secondaryText);
     }
     return Semantics(
       button: true,
@@ -4950,18 +4769,6 @@ class _SupportAccessItem extends StatelessWidget {
                           height: 1.3,
                         ),
                       ),
-                      if (secondaryText != null) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          secondaryText,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: EasySubwayAccessibleColors.mutedText,
-                                fontWeight: FontWeight.w500,
-                                height: 1.3,
-                              ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
