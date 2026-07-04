@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildTagoScheduleCollectionPlan } from "./validate-tago-schedule-sample.mjs";
 
-test("TAGO 시간표 수집 plan은 daily limit과 checkpoint resume을 적용한다", async () => {
+test("TAGO 시간표 수집 plan은 daily limit과 checkpoint resume을 적용한다", () => {
   const plan = buildTagoScheduleCollectionPlan(
     {
       stationLineRows: [
@@ -23,4 +23,14 @@ test("TAGO 시간표 수집 plan은 daily limit과 checkpoint resume을 적용�
   );
   assert.equal(plan.batches[0].requests[0].requestKey, "MTRKR4448|01|D");
   assert.ok(plan.batches.every((batch) => batch.requests.length <= 3));
+});
+
+test("TAGO 시간표 수집 plan은 파일럿 매핑 대상이 아닌 lineId를 거부한다", () => {
+  assert.throws(
+    () =>
+      buildTagoScheduleCollectionPlan({
+        stationLineRows: [{ stationCode: "113", lineId: "busan-1" }],
+      }),
+    /Unsupported lineId for pilot mapping: busan-1/,
+  );
 });

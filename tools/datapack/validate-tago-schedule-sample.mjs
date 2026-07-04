@@ -149,8 +149,15 @@ function tagoStationIds(input) {
   const stationIds = new Set();
   for (const row of input.stationLineRows ?? []) {
     if (!row.stationCode) continue;
-    // ponytail: pilot line 4 mapping; use explicit provider station ids before nationwide collection.
-    stationIds.add(row.stationCode.startsWith("MTRKR") ? row.stationCode : `MTRKR4${row.stationCode}`);
+    // TODO: pilot line 4 mapping only; replace with explicit provider station ids before nationwide collection.
+    if (row.stationCode.startsWith("MTRKR")) {
+      stationIds.add(row.stationCode);
+      continue;
+    }
+    if (row.lineId !== "seoul-4") {
+      throw new Error(`Unsupported lineId for pilot mapping: ${row.lineId}`);
+    }
+    stationIds.add(`MTRKR4${row.stationCode}`);
   }
   if (stationIds.size === 0) {
     throw new Error("stationLineRows must contain at least one stationCode");
