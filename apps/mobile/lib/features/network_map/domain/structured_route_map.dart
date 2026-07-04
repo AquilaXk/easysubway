@@ -117,71 +117,38 @@ class StructuredRouteMapStationInput {
   String get key => '$stationId:$lineId';
 }
 
-/// 빌더 입력: 노선 topology 엣지(실제 인접 두 역). RIDE 엣지에서 온다.
-/// [fromKey]/[toKey]는 'stationId:lineId' 형식의 역-노선 키.
-class StructuredRouteMapEdgeInput {
-  const StructuredRouteMapEdgeInput({
-    required this.lineId,
-    required this.fromKey,
-    required this.toKey,
-  });
-
-  final String lineId;
-  final String fromKey;
-  final String toKey;
-}
-
-/// 노선 topology(실제 인접 RIDE 엣지)와 역 좌표에서 구조화 노선도를 파생한다.
+/// 역 좌표에서 구조화 노선도를 파생한다.
 ///
-/// line geometry는 각 RIDE 엣지를 인접 두 역 사이 세그먼트로 둔다. line_sequence가
-/// 아니라 실제 인접을 쓰므로 지선/분기/순환에서 먼 역끼리 잇는 phantom edge(부채꼴)가
-/// 생기지 않는다.
+/// line geometry는 각 노선의 역을 좌표 거리 기반 최근접 인접으로 잇는다.
+/// line_sequence/RIDE의 번호 기반 인접(지선/분기에서 먼 역을 잇는 부채꼴)을
+/// 신뢰하지 않고, 정확한 좌표만으로 실제 인접을 재구성한다.
 StructuredRouteMap buildStructuredRouteMap({
   required Iterable<StructuredRouteMapStationInput> stations,
-  required Iterable<StructuredRouteMapEdgeInput> edges,
 }) {
   final stationList = stations.toList(growable: false);
 
-  final positionByKey = <String, Offset>{};
   final lineIdsByStation = <String, Set<String>>{};
   final positionsByStation = <String, List<Offset>>{};
+  final stationsByLine = <String, List<StructuredRouteMapStationInput>>{};
   for (final station in stationList) {
-    positionByKey[station.key] = station.position;
     lineIdsByStation
         .putIfAbsent(station.stationId, () => <String>{})
         .add(station.lineId);
     positionsByStation
         .putIfAbsent(station.stationId, () => <Offset>[])
         .add(station.position);
+    stationsByLine.putIfAbsent(station.lineId, () => []).add(station);
   }
 
-  // line geometry: RIDE 엣지 = 인접 두 역 세그먼트. 무방향이라 중복 제거하고
-  // 노선별로 모은다. 각 세그먼트가 독립 sub-polyline(2점)이라 렌더러가 이어 그린다.
-  final segmentsByLine = <String, List<List<Offset>>>{};
-  final seenEdges = <String>{};
-  for (final edge in edges) {
-    final from = positionByKey[edge.fromKey];
-    final to = positionByKey[edge.toKey];
-    if (from == null || to == null || from == to) {
-      continue;
-    }
-    final undirected = edge.fromKey.compareTo(edge.toKey) <= 0
-        ? '${edge.lineId}|${edge.fromKey}|${edge.toKey}'
-        : '${edge.lineId}|${edge.toKey}|${edge.fromKey}';
-    if (!seenEdges.add(undirected)) {
-      continue;
-    }
-    segmentsByLine
-        .putIfAbsent(edge.lineId, () => <List<Offset>>[])
-        .add(<Offset>[from, to]);
-  }
   final lines = <RouteMapLineGeometry>[];
-  final orderedLineIds = segmentsByLine.keys.toList()..sort();
+  final orderedLineIds = stationsByLine.keys.toList()..sort();
   for (final lineId in orderedLineIds) {
     lines.add(
       RouteMapLineGeometry(
         lineId: lineId,
-        polylines: _filterPhantomSegments(segmentsByLine[lineId]!),
+        polylines: _filterPhantomSegments(
+          _minimumSpanningTreeSegments(stationsByLine[lineId]!),
+        ),
       ),
     );
   }
@@ -227,6 +194,55 @@ StructuredRouteMap buildStructuredRouteMap({
     stations: structuredStations,
     transferGroups: transferGroups,
   );
+}
+
+/// 노선의 역들을 좌표 기반 최소 신장 트리(MST, euclidean)로 잇는다. 번호
+/// (line_sequence)의 잘못된 인접을 신뢰하지 않고 정확한 좌표만으로 topology를
+/// 재구성한다. 트리라 각 역이 필요한 만큼만 연결돼 skip/부채꼴이 없으며, 선형
+/// 노선은 체인, 분기 노선은 트리로 자연스럽게 표현된다. (Prim O(n^2).)
+/// 순환선은 트리라 한 구간이 열리지만 시각적 영향은 미미하다. octilinear 등
+/// 상용 도식화의 입력 topology를 만드는 정석 단계이기도 하다.
+List<List<Offset>> _minimumSpanningTreeSegments(
+  List<StructuredRouteMapStationInput> stations,
+) {
+  final positions = stations.map((s) => s.position).toList(growable: false);
+  final count = positions.length;
+  if (count < 2) {
+    return const [];
+  }
+  final inTree = List<bool>.filled(count, false);
+  final bestDistance = List<double>.filled(count, double.infinity);
+  final bestFrom = List<int>.filled(count, -1);
+  bestDistance[0] = 0;
+  final segments = <List<Offset>>[];
+  for (var added = 0; added < count; added += 1) {
+    var u = -1;
+    var best = double.infinity;
+    for (var v = 0; v < count; v += 1) {
+      if (!inTree[v] && bestDistance[v] < best) {
+        best = bestDistance[v];
+        u = v;
+      }
+    }
+    if (u < 0) {
+      break;
+    }
+    inTree[u] = true;
+    if (bestFrom[u] >= 0) {
+      segments.add(<Offset>[positions[bestFrom[u]], positions[u]]);
+    }
+    for (var v = 0; v < count; v += 1) {
+      if (inTree[v]) {
+        continue;
+      }
+      final distance = (positions[v] - positions[u]).distanceSquared;
+      if (distance < bestDistance[v]) {
+        bestDistance[v] = distance;
+        bestFrom[v] = u;
+      }
+    }
+  }
+  return segments;
 }
 
 /// 데이터에 실제 인접 topology가 없어 RIDE 엣지가 line_sequence 기반이면,

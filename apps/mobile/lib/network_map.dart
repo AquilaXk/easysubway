@@ -107,6 +107,8 @@ class NetworkMapData {
   /// 렌더러(#1641)가 소비하는 line geometry / transfer group / label·LOD를
   /// route_map_positions 필드에서 계산한다.
   StructuredRouteMap toStructuredRouteMap() {
+    // line geometry는 역 좌표 기반 최근접 인접으로 재구성한다(sequence/RIDE의
+    // 번호 기반 인접을 쓰지 않는다).
     return buildStructuredRouteMap(
       stations: stations.map(
         (station) => StructuredRouteMapStationInput(
@@ -119,14 +121,6 @@ class NetworkMapData {
           ),
           labelPolygon:
               _parseLabelPolygon(station.position.labelPolygon) ?? const [],
-        ),
-      ),
-      // line geometry는 sequence가 아니라 실제 인접(RIDE 엣지) topology로 잇는다.
-      edges: edges.map(
-        (edge) => StructuredRouteMapEdgeInput(
-          lineId: edge.lineId,
-          fromKey: edge.fromStationId,
-          toKey: edge.toStationId,
         ),
       ),
     );

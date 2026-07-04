@@ -19,54 +19,28 @@ StructuredRouteMapStationInput station({
   );
 }
 
-StructuredRouteMapEdgeInput edge(String lineId, String from, String to) {
-  return StructuredRouteMapEdgeInput(lineId: lineId, fromKey: from, toKey: to);
-}
-
 void main() {
-  group('buildStructuredRouteMap line geometry (topology)', () {
-    test('각 RIDE 엣지를 인접 두 역 세그먼트로 만든다', () {
+  group('buildStructuredRouteMap line geometry (좌표 MST)', () {
+    test('선형 노선은 MST 체인으로 인접 세그먼트를 만든다', () {
       final map = buildStructuredRouteMap(
         stations: [
-          station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
-          station(
-            stationId: 's2',
-            lineId: 'L1',
-            position: const Offset(10, 0),
-          ),
-          station(
-            stationId: 's3',
-            lineId: 'L1',
-            position: const Offset(20, 0),
-          ),
+          for (var i = 0; i < 4; i += 1)
+            station(
+              stationId: 's$i',
+              lineId: 'L1',
+              position: Offset(i * 10.0, 0),
+            ),
         ],
-        edges: [edge('L1', 's1:L1', 's2:L1'), edge('L1', 's2:L1', 's3:L1')],
       );
-      expect(map.lines, hasLength(1));
+      // 4역 체인 → 세그먼트 3개, 각 인접(길이 10).
       final segments = map.lines.single.polylines;
-      expect(segments, <List<Offset>>[
-        [const Offset(0, 0), const Offset(10, 0)],
-        [const Offset(10, 0), const Offset(20, 0)],
-      ]);
+      expect(segments, hasLength(3));
+      for (final segment in segments) {
+        expect((segment[1] - segment[0]).distance, closeTo(10, 1e-9));
+      }
     });
 
-    test('무방향 중복 엣지(A-B, B-A)는 한 번만 그린다', () {
-      final map = buildStructuredRouteMap(
-        stations: [
-          station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
-          station(
-            stationId: 's2',
-            lineId: 'L1',
-            position: const Offset(10, 0),
-          ),
-        ],
-        edges: [edge('L1', 's1:L1', 's2:L1'), edge('L1', 's2:L1', 's1:L1')],
-      );
-      expect(map.lines.single.polylines, hasLength(1));
-    });
-
-    test('분기(한 역에서 여러 인접)는 여러 세그먼트로 자연 표현된다', () {
-      // s2에서 s1, s3, s4로 분기 → 세그먼트 3개(부채꼴 아님, 각자 짧은 인접).
+    test('분기 노선은 MST 트리로 표현된다(먼 역 직접 연결 없음)', () {
       final map = buildStructuredRouteMap(
         stations: [
           station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
@@ -86,59 +60,78 @@ void main() {
             position: const Offset(20, -5),
           ),
         ],
-        edges: [
-          edge('L1', 's1:L1', 's2:L1'),
-          edge('L1', 's2:L1', 's3:L1'),
-          edge('L1', 's2:L1', 's4:L1'),
+      );
+      // 4역 트리 = 세그먼트 3개. 모든 세그먼트가 짧은 인접(부채꼴 없음).
+      expect(map.lines.single.polylines, hasLength(3));
+      for (final segment in map.lines.single.polylines) {
+        expect((segment[1] - segment[0]).distance, lessThan(30));
+      }
+    });
+
+    test('번호 순서가 물리 위치와 어긋나도 좌표로 올바르게 잇는다', () {
+      // sequence는 뒤죽박죽이지만 좌표는 일렬 → MST가 좌표대로 체인.
+      final map = buildStructuredRouteMap(
+        stations: [
+          station(
+            stationId: 'a',
+            lineId: 'L1',
+            sequence: 99,
+            position: const Offset(0, 0),
+          ),
+          station(
+            stationId: 'b',
+            lineId: 'L1',
+            sequence: 1,
+            position: const Offset(10, 0),
+          ),
+          station(
+            stationId: 'c',
+            lineId: 'L1',
+            sequence: 50,
+            position: const Offset(20, 0),
+          ),
         ],
       );
-      expect(map.lines.single.polylines, hasLength(3));
+      expect(map.lines.single.polylines, hasLength(2));
+      for (final segment in map.lines.single.polylines) {
+        expect((segment[1] - segment[0]).distance, closeTo(10, 1e-9));
+      }
     });
 
     test('phantom(노선 median 대비 매우 긴) 세그먼트를 제외한다', () {
-      // 길이 10짜리 인접 6개 + 먼 역으로 튀는 phantom 1개.
-      final stations = [
-        for (var i = 0; i <= 6; i++)
+      // 촘촘한 역들 + 멀리 떨어진 outlier 1개. MST는 outlier를 마지막에 긴
+      // 엣지로 붙이는데, phantom 필터가 그 긴 엣지를 제거한다.
+      final map = buildStructuredRouteMap(
+        stations: [
+          for (var i = 0; i <= 6; i += 1)
+            station(
+              stationId: 's$i',
+              lineId: 'L1',
+              position: Offset(i * 10.0, 0),
+            ),
           station(
-            stationId: 's$i',
+            stationId: 'far',
             lineId: 'L1',
-            position: Offset(i * 10, 0),
+            position: const Offset(2000, 0),
           ),
-        station(stationId: 'far', lineId: 'L1', position: const Offset(1000, 0)),
-      ];
-      final edges = [
-        for (var i = 0; i < 6; i++) edge('L1', 's$i:L1', 's${i + 1}:L1'),
-        edge('L1', 's6:L1', 'far:L1'),
-      ];
-      final map = buildStructuredRouteMap(stations: stations, edges: edges);
+        ],
+      );
+      // 촘촘한 7역 체인(6 세그먼트)은 남고 far로 가는 긴 엣지는 제외.
       expect(map.lines.single.polylines, hasLength(6));
     });
 
     test('세그먼트가 균일하게 길면(GTX-A류) 보존한다', () {
-      // 모두 길이 300 → median 300, threshold 1200, 아무것도 안 잘림.
-      final stations = [
-        for (var i = 0; i <= 5; i++)
-          station(
-            stationId: 'g$i',
-            lineId: 'GTX',
-            position: Offset(i * 300, 0),
-          ),
-      ];
-      final edges = [
-        for (var i = 0; i < 5; i++) edge('GTX', 'g$i:GTX', 'g${i + 1}:GTX'),
-      ];
-      final map = buildStructuredRouteMap(stations: stations, edges: edges);
-      expect(map.lines.single.polylines, hasLength(5));
-    });
-
-    test('좌표를 못 찾는 엣지는 건너뛴다', () {
       final map = buildStructuredRouteMap(
         stations: [
-          station(stationId: 's1', lineId: 'L1', position: const Offset(0, 0)),
+          for (var i = 0; i <= 5; i += 1)
+            station(
+              stationId: 'g$i',
+              lineId: 'GTX',
+              position: Offset(i * 300.0, 0),
+            ),
         ],
-        edges: [edge('L1', 's1:L1', 'missing:L1')],
       );
-      expect(map.lines, isEmpty);
+      expect(map.lines.single.polylines, hasLength(5));
     });
   });
 
@@ -158,7 +151,6 @@ void main() {
             position: const Offset(100, 100),
           ),
         ],
-        edges: const [],
       );
       expect(map.transferGroups, hasLength(1));
       final group = map.transferGroups.single;
@@ -174,7 +166,6 @@ void main() {
           station(stationId: 's1', lineId: 'L2'),
           station(stationId: 's2', lineId: 'L1'),
         ],
-        edges: const [],
       );
       final transfer = map.stations.firstWhere((s) => s.stationId == 's1');
       final regular = map.stations.firstWhere((s) => s.stationId == 's2');
@@ -191,10 +182,7 @@ void main() {
     });
 
     test('빈 입력은 빈 구조', () {
-      expect(
-        buildStructuredRouteMap(stations: const [], edges: const []).isEmpty,
-        isTrue,
-      );
+      expect(buildStructuredRouteMap(stations: const []).isEmpty, isTrue);
     });
   });
 }
