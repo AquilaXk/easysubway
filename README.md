@@ -38,7 +38,7 @@
 
 `.env.example`은 로컬 실행과 배포에 필요한 dotenv 양식입니다. 실제 값은 git에 올리지 않는 로컬 `.env`에만 둡니다.
 
-GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 단, provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다.
+GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 단, provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY`, `KRIC_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다.
 
 ```bash
 scripts/github/sync-actions-env-secret.sh .env
