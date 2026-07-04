@@ -323,7 +323,7 @@ class FavoriteFacility {
   String get updatedLabel => '최근 확인 $lastUpdatedAt';
 
   String get semanticLabel =>
-      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $verificationStatusLabel, $nextActionLabel';
+      '즐겨찾기 시설, $name, $stationLabel, $typeLabel, $statusTitle, $locationLabel, $updatedLabel, $nextActionLabel';
 }
 
 enum FavoriteFacilityListStatus { loading, success, empty, failure }
@@ -785,22 +785,10 @@ String _stringOrDefault(
   return defaultValue;
 }
 
-String _dataConfidenceLabel(String dataConfidence) {
-  return switch (dataConfidence) {
-    'HIGH' => '최근 확인된 정보예요',
-    'MEDIUM' => '일부 확인된 정보예요',
-    'LOW' => '안내를 준비 중이에요',
-    _ => '안내를 준비 중이에요',
-  };
-}
+// #1578: 내부 데이터 품질·검증 상태 라벨은 사용자에게 노출하지 않는다(소스 중립화).
+String _dataConfidenceLabel(String dataConfidence) => '';
 
-String _facilityVerificationStatusLabel(String fieldValidationStatus) {
-  return switch (fieldValidationStatus.trim().toUpperCase()) {
-    'VERIFIED' => '시설 상태가 확인됐어요',
-    'STALE' => '최신 상태를 준비 중이에요',
-    _ => '최신 상태를 준비 중이에요',
-  };
-}
+String _facilityVerificationStatusLabel(String fieldValidationStatus) => '';
 
 String _facilityUserLocationLabel(String description) {
   var label = description.trim();

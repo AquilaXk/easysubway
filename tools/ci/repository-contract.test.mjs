@@ -1506,18 +1506,19 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const finalQaEvidence = readJson("apps/mobile/release/issue-1075-final-qa-evidence.json");
   const offlineScreenMatch = main.match(/class OfflineDataScreen[\s\S]*?class _SupportSectionTitle/);
+  // 지원 범위 주장(검증 구간·안내 범위·상록수역·사당역 구간)은 #1559에서 화면에서
+  // 제거해, 오프라인 테스트는 이제 이들이 없음(findsNothing)을 확인한다. 패턴은 실제로
+  // 노출되는 저장 상태 안내 순서만 검증한다.
   const offlineWidgetTestPattern = new RegExp([
     "testWidgets\\('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다'",
     "offlineDataSettingsButton",
     "저장된 안내 상태",
-    "검증 구간",
-    "지금은 상록수역·사당역 구간을 안내해요",
-    "findsNWidgets\\(2\\)",
+    "검증 구간'\\), findsNothing",
     "마지막 갱신",
     "앱 설치 때 함께 받은 안내",
     "저장 정보 다시 확인",
     "저장 정보 기록을 확인할 수 없으면",
-    "안내 범위",
+    "안내 범위'\\), findsNothing",
     "실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요",
   ].join("[\\s\\S]*"));
 
@@ -1528,10 +1529,11 @@ test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구�
   assert.match(main, /_offlineDataSourceOfTruth\s*=\s*'installed catalog metadata'/);
   assert.match(offlineScreen, /저장된 안내 상태/);
   assert.doesNotMatch(offlineScreen, /저장된 데이터 상태/);
-  assert.match(offlineScreen, /검증 구간[\s\S]*ProductionScopeCopy\.supportedClaimKo/);
+  // 지원 범위 주장(검증 구간·안내 범위 + ProductionScopeCopy)은 #1559에서 화면에서
+  // 제거했다. 오프라인 화면이 더는 범위 주장을 노출하지 않는지 가드한다.
+  assert.doesNotMatch(offlineScreen, /ProductionScopeCopy/);
   assert.match(offlineScreen, /저장 정보 다시 확인[\s\S]*저장 정보 기록을 확인할 수 없으면/);
   assert.match(offlineScreen, /마지막 갱신[\s\S]*앱 설치 때 함께 받은 안내/);
-  assert.match(offlineScreen, /안내 범위[\s\S]*ProductionScopeCopy\.supportedClaimKo/);
   assert.match(offlineScreen, /인터넷 연결 필요[\s\S]*시설 제보[\s\S]*연결 필요/);
   assert.match(widgetTest, offlineWidgetTestPattern);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
@@ -4508,7 +4510,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.match(mobileMain, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
   assert.match(mobileMain, /assets\/datapacks\/source-inventory\.json/);
   assert.match(mobileMain, /지도 표시용 asset/);
-  assert.match(mobileMain, /경로·시설 판단용 data pack/);
+  assert.match(mobileMain, /경로·시설 안내용 데이터/);
 
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.region, "nationwide");
@@ -4797,30 +4799,14 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     "실시간 보장",
     "항상 정확",
   ].toSorted());
-  assert.match(
-    read("apps/mobile/lib/main.dart"),
-    /ProductionScopeCopy\.supportedClaimKo/,
-    "home/help/settings/offline copy must use the production scope constant",
-  );
-  assert.match(
-    read("apps/mobile/lib/station_search.dart"),
-    /ProductionScopeCopy\.stationSearchNotice/,
-    "station search and detail copy must use the production scope constant",
-  );
-  assert.match(
-    read("apps/mobile/lib/station_search.dart"),
-    /AppBar[\s\S]*ProductionScopeCopy\.supportedClaimKo[\s\S]*ProductionScopeCopy\.stationSearchNotice/,
-    "station search and detail must render visible production scope claims",
-  );
-  assert.match(
-    read("apps/mobile/lib/route_search.dart"),
-    /ProductionScopeCopy\.routeSearchNotice/,
-    "route result copy must use the production scope constant",
-  );
-  assert.match(
-    read("apps/mobile/lib/route_search.dart"),
-    /AppBar[\s\S]*ProductionScopeCopy\.supportedClaimKo[\s\S]*ProductionScopeCopy\.routeSearchNotice/,
-    "route search must render a visible production scope claim",
+  // 화면 내 상시 지원범위 주장(ProductionScopeCopy)은 #1559에서 제거하기로 결정했다.
+  // 사용자에게 상시 노출되던 "지원 범위" 배너가 TMI라 걷어냈고, 상용 범위 주장은
+  // 아래(4782-4791)에서 검증하는 Play Store 리스팅으로 유지한다. 따라서 앱 소스에
+  // ProductionScopeCopy 상수 렌더를 요구하던 가드는 의도적으로 완화한다.
+  assert.equal(
+    existsSync("apps/mobile/lib/production_scope.dart"),
+    false,
+    "production scope in-app copy was intentionally removed (#1559)",
   );
 
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
@@ -9068,10 +9054,12 @@ test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계�
   assert.match(adminTemplate, /고장 신고 수/);
 	assert.match(adminTemplate, /정보 확인 중/);
 	assert.match(adminTemplate, /고장·공사 반영/);
-  assert.match(mobileStationSearch, /'LEVEL_1' => '일부 정보는 확인 중이에요'/);
-  assert.match(mobileStationSearch, /'LEVEL_2' => '시설 정보를 함께 볼 수 있어요'/);
-  assert.match(mobileStationSearch, /'LEVEL_3' => '쉬운 길 안내를 볼 수 있어요'/);
-  assert.match(mobileStationSearch, /'LEVEL_4' => '고장·공사 소식이 반영됐어요'/);
+  // 내부 데이터 품질 라벨은 #1578에서 사용자 노출을 중립화했다(빈 문자열/false).
+  // 등급→사용자 문구 매핑을 다시 노출하지 않는지 가드한다.
+  assert.match(mobileStationSearch, /_dataQualityLabel\(String dataQualityLevel\) => '';/);
+  assert.match(mobileStationSearch, /_showsDataQualityLabel\(String dataQualityLevel\) => false;/);
+  assert.doesNotMatch(mobileStationSearch, /'LEVEL_1' => '일부 정보는 확인 중이에요'/);
+  // 경로 점수 가중치(등급→점수)는 사용자 라벨이 아니므로 유지한다.
   assert.match(mobileRouteRepository, /'LEVEL_1' => 40/);
   assert.match(mobileRouteRepository, /'LEVEL_2' => 60/);
   assert.match(mobileRouteRepository, /'LEVEL_3' => 80/);
@@ -9666,7 +9654,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(accessibilityBaselineTest, /labeledTapTargetGuideline/);
   assert.match(accessibilityBaselineTest, /textContrastGuideline/);
   assert.match(onboardingTest, /온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다/);
-  assert.match(onboardingTest, /hasTapAction: true/);
+  // 조건 확인 스텝의 hasTapAction 단언은 #1563에서 스텝을 제거하며 사라졌다.
+  // 온보딩 tap 접근성은 tap target 가이드라인 검증으로 계속 커버한다.
+  assert.match(onboardingTest, /labeledTapTargetGuideline/);
   assert.match(authHeaders, /abstract class AuthorizationHeaderProvider/);
   assert.match(authHeaders, /class BasicAuthorizationHeaderProvider implements AuthorizationHeaderProvider/);
   assert.match(authHeaders, /authorizationHeader/);
@@ -9723,7 +9713,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /Release API base URL must include a host\./);
   assert.match(stationSearch, /Text\(\s*result\.dataQualityLabel,/);
   assert.match(widgetTest, /expect\(find\.text\('출처 확인 필요'\), findsNothing\);/);
-  assert.match(widgetTest, /상록수역, 수도권 4호선, 경의중앙선, 수도권, 일부 정보는 확인 중이에요/);
+  // 내부 품질 라벨(일부 정보는 확인 중이에요)은 #1578에서 시맨틱에서도 중립화됐다.
+  assert.match(widgetTest, /상록수역, 수도권 4호선, 경의중앙선, 수도권/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);
@@ -9782,12 +9773,15 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(read("apps/mobile/test/onboarding_test.dart"), /온보딩은 알림 권한 요청 실패 도움말을 안내한다/);
   assert.match(onboardingAppFlowTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
   assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩 알림 권한 실패 도움말을 안내한다/);
-  assert.match(stationSearch, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
-  assert.match(stationSearch, /위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다/);
+  // 위치 사용 안내 카피는 #1560에서 공용 위치 권한 다이얼로그(facility_report.dart)로
+  // 옮겼다. station_search가 아니라 그 파일에서 노출을 검증한다.
+  const locationPermissionCopySource = read("apps/mobile/lib/facility_report.dart");
+  assert.match(locationPermissionCopySource, /가까운 역 찾기와 시설 제보 위치 확인에만 현재 위치를 사용합니다/);
+  assert.match(locationPermissionCopySource, /위치 사용을 허용하지 않아도 역명 검색, 즐겨찾기, 엘리베이터와 시설 안내는 계속 사용할 수 있습니다/);
   assert.doesNotMatch(stationSearch, /상태 신고/);
   assert.match(facilityReport, /사진과 제보 위치는 시설 제보 확인에만 사용됩니다/);
   assert.match(facilityReport, /제보 내용은 접수 담당자에게 전달되며 앱 사용자에게 공개되지 않습니다/);
-  assert.match(widgetTest, /역 검색은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
+  assert.match(widgetTest, /시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 첫 위치 권한 요청 전에 사용 목적을 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 사진과 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 현재 위치를 보내기 전에 공개 범위를 안내한다/);
