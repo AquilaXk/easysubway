@@ -83,6 +83,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: OnboardingScreen(
+            notificationPermissionProvider:
+                _FakeNotificationPermissionProvider(),
             onCompleted: (result) {
               completedResult = result;
             },
@@ -297,7 +299,12 @@ void main() {
 
   testWidgets('온보딩 2·3단계는 이전 단계로 돌아갈 수 있다', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+      MaterialApp(
+        home: OnboardingScreen(
+          notificationPermissionProvider: _FakeNotificationPermissionProvider(),
+          onCompleted: (_) {},
+        ),
+      ),
     );
 
     await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
