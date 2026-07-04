@@ -216,7 +216,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 				.limit(alternativeCount)
 				.toList();
 			if (returnableAccessibilityResults.stream().anyMatch(this::hasAccessibilitySignal)) {
-				return returnableAccessibilityResults.stream()
+				return accessibilityCheckedResults.stream()
 					.map(saveRouteSearchPort::saveRouteSearch)
 					.toList();
 			}
