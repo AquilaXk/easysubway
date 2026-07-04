@@ -97,9 +97,9 @@ class StructuredRouteMap {
       lines.isEmpty && stations.isEmpty && transferGroups.isEmpty;
 }
 
-/// 빌더 입력: route_map_positions 한 행에 대응하는 값.
+/// 빌더 입력: route_map_positions 한 행에 대응하는 값(역 노드·라벨·환승용).
 /// [labelPolygon]은 호출부에서 기존 _parseLabelPolygon으로 미리 파싱해 전달한다.
-/// [downPath]는 이 역으로 들어오는 track 세그먼트("M prev L this")의 원본 문자열.
+/// line geometry는 이 입력이 아니라 [RouteMapLineTrackInput]에서 온다(#1638).
 class StructuredRouteMapStationInput {
   const StructuredRouteMapStationInput({
     required this.stationId,
@@ -107,7 +107,6 @@ class StructuredRouteMapStationInput {
     required this.sequence,
     required this.position,
     required this.labelPolygon,
-    required this.downPath,
   });
 
   final String stationId;
@@ -115,7 +114,15 @@ class StructuredRouteMapStationInput {
   final int sequence;
   final Offset position;
   final List<Offset> labelPolygon;
-  final String downPath;
+}
+
+/// 한 노선의 track 입력: pack route_map_line_tracks의 path 문자열들(#1638).
+/// line geometry의 source — 역별 down_path 조립을 대체한다.
+class RouteMapLineTrackInput {
+  const RouteMapLineTrackInput({required this.lineId, required this.paths});
+
+  final String lineId;
+  final List<String> paths;
 }
 
 /// "M x y L x y ..." 형태의 절대 좌표 path를 정점 목록으로 파싱한다.
@@ -136,16 +143,19 @@ List<Offset> parseRouteMapPolyline(String path) {
   return points;
 }
 
-/// 원시 route_map_positions 입력에서 구조화 노선도를 파생한다.
+/// route_map 입력에서 구조화 노선도를 파생한다. line geometry는 [lineTracks]의
+/// track path에서, 역 노드·환승·라벨은 [inputs]에서 온다(#1638 track 직접 렌더).
 StructuredRouteMap buildStructuredRouteMap(
-  Iterable<StructuredRouteMapStationInput> inputs,
-) {
+  Iterable<StructuredRouteMapStationInput> inputs, {
+  required List<RouteMapLineTrackInput> lineTracks,
+}) {
   final inputList = inputs.toList(growable: false);
 
   // 물리 역(station_id)이 속한 line 집합 → 환승 판정.
   final lineIdsByStation = <String, Set<String>>{};
   // 환승 중심 계산용: 환승역 후보만 좌표를 모은다.
   final positionsByStation = <String, List<Offset>>{};
+  final lineIdsWithStations = <String>{};
   for (final input in inputList) {
     lineIdsByStation
         .putIfAbsent(input.stationId, () => <String>{})
@@ -153,25 +163,26 @@ StructuredRouteMap buildStructuredRouteMap(
     positionsByStation
         .putIfAbsent(input.stationId, () => <Offset>[])
         .add(input.position);
+    lineIdsWithStations.add(input.lineId);
   }
 
-  // 노선별 track polyline: sequence(동률 시 station_id) 순서로 세그먼트를 잇되
-  // 이어지지 않는 지점에서 끊는다.
-  final byLine = <String, List<StructuredRouteMapStationInput>>{};
-  for (final input in inputList) {
-    byLine.putIfAbsent(input.lineId, () => []).add(input);
-  }
-  final lines = <RouteMapLineGeometry>[];
-  final orderedLineIds = byLine.keys.toList()..sort();
-  for (final lineId in orderedLineIds) {
-    final stations = byLine[lineId]!..sort(_bySequenceThenStation);
-    lines.add(
+  // line geometry: 노선별 실제 track polyline을 저장된 path 그대로 파싱한다.
+  // 조각(끊긴 track)은 phantom 직선 없이 분리 유지, 정점 2개 미만은 버린다.
+  final pathsByLine = <String, List<String>>{
+    for (final track in lineTracks) track.lineId: track.paths,
+  };
+  final lineIds = <String>{...lineIdsWithStations, ...pathsByLine.keys}.toList()
+    ..sort();
+  final lines = <RouteMapLineGeometry>[
+    for (final lineId in lineIds)
       RouteMapLineGeometry(
         lineId: lineId,
-        polylines: _assemblePolylines(stations),
+        polylines: [
+          for (final path in pathsByLine[lineId] ?? const <String>[])
+            parseRouteMapPolyline(path),
+        ].where((points) => points.length >= 2).toList(growable: false),
       ),
-    );
-  }
+  ];
 
   // 구조화 역 노드 + 라벨 class.
   final stations = <RouteMapStructuredStation>[];
@@ -213,37 +224,6 @@ StructuredRouteMap buildStructuredRouteMap(
     stations: stations,
     transferGroups: transferGroups,
   );
-}
-
-int _bySequenceThenStation(
-  StructuredRouteMapStationInput a,
-  StructuredRouteMapStationInput b,
-) {
-  final bySequence = a.sequence.compareTo(b.sequence);
-  return bySequence != 0 ? bySequence : a.stationId.compareTo(b.stationId);
-}
-
-/// down_path 세그먼트("M prev L this", 전방 정점 순서)들을 sequence 순서로 이어
-/// track polyline을 만든다. 인접 세그먼트가 끝점=시작점으로 이어지면 붙이고,
-/// 이어지지 않으면(데이터 hole) 새 polyline을 시작한다.
-List<List<Offset>> _assemblePolylines(
-  List<StructuredRouteMapStationInput> orderedStations,
-) {
-  final polylines = <List<Offset>>[];
-  List<Offset>? current;
-  for (final station in orderedStations) {
-    final segment = parseRouteMapPolyline(station.downPath);
-    if (segment.isEmpty) {
-      continue;
-    }
-    if (current != null && current.last == segment.first) {
-      current.addAll(segment.skip(1));
-    } else {
-      current = <Offset>[...segment];
-      polylines.add(current);
-    }
-  }
-  return polylines;
 }
 
 Offset _centroid(List<Offset> points) {

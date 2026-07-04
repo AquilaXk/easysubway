@@ -127,9 +127,12 @@ class NetworkMapData {
           ),
           labelPolygon:
               _parseLabelPolygon(station.position.labelPolygon) ?? const [],
-          downPath: station.position.downPath,
         ),
       ),
+      lineTracks: [
+        for (final track in lineTracks)
+          RouteMapLineTrackInput(lineId: track.lineId, paths: track.paths),
+      ],
     );
   }
 }
