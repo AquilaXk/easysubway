@@ -1432,9 +1432,11 @@ test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스�
   assert.ok(resultTileMatch, "_StationSearchResultTile block not found");
   const resultTile = resultTileMatch[0];
   assert.match(resultTile, /StationLineBadges\([\s\S]*maxBadgeCount:\s*2/);
+  // 품질 라벨(result.dataQualityLabel) 렌더는 #1566에서 제거했다(역 검색 다이어트).
+  // 역명·거리만 노출한다.
   assert.match(
     resultTile,
-    /Text\(\s*stationName[\s\S]*Text\(\s*result\.distanceLabel\.isEmpty[\s\S]*Text\(\s*result\.dataQualityLabel/,
+    /Text\(\s*stationName[\s\S]*Text\(\s*result\.distanceLabel\.isEmpty/,
   );
   assert.doesNotMatch(resultTile, /maxLines:\s*1/);
   assert.doesNotMatch(resultTile, /overflow:\s*TextOverflow\.ellipsis/);
@@ -9711,7 +9713,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /Release API base URL must use HTTPS\./);
   assert.match(stationSearch, /baseUri\.host\.isEmpty/);
   assert.match(stationSearch, /Release API base URL must include a host\./);
-  assert.match(stationSearch, /Text\(\s*result\.dataQualityLabel,/);
+  // 품질 라벨 렌더는 #1566에서 제거됐다(역 검색 다이어트).
+  assert.doesNotMatch(stationSearch, /Text\(\s*result\.dataQualityLabel,/);
   assert.match(widgetTest, /expect\(find\.text\('출처 확인 필요'\), findsNothing\);/);
   // 내부 품질 라벨(일부 정보는 확인 중이에요)은 #1578에서 시맨틱에서도 중립화됐다.
   assert.match(widgetTest, /상록수역, 수도권 4호선, 경의중앙선, 수도권/);
