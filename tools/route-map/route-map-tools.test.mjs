@@ -48,6 +48,50 @@ async function runBuildLineTracks({ geometry, region, stations, args = [] }) {
   }
 }
 
+// --source pack-down-path 모드용: route_map_positions(down_path)+station_lines(line_sequence)를
+// 만들고 실행한다(앱 drift_station_repository의 조회 구조와 동일).
+async function runBuildLineTracksFromPack({ region, rows, args = [] }) {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-line-tracks-pack-"));
+  try {
+    const packPath = path.join(dir, "pack.sqlite");
+    const db = new DatabaseSync(packPath);
+    db.exec(
+      `CREATE TABLE route_map_positions (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        region TEXT NOT NULL,
+        x INTEGER NOT NULL,
+        y INTEGER NOT NULL,
+        down_path TEXT NOT NULL DEFAULT ''
+      );
+      CREATE TABLE station_lines (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        line_sequence INTEGER NOT NULL
+      )`,
+    );
+    const insertPosition = db.prepare(
+      "INSERT INTO route_map_positions (station_id, line_id, region, x, y, down_path) VALUES (?, ?, ?, ?, ?, ?)",
+    );
+    const insertLine = db.prepare(
+      "INSERT INTO station_lines (station_id, line_id, line_sequence) VALUES (?, ?, ?)",
+    );
+    for (const row of rows) {
+      insertPosition.run(row.station_id, row.line_id, region, row.x, row.y, row.down_path ?? "");
+      insertLine.run(row.station_id, row.line_id, row.sequence);
+    }
+    db.close();
+    const { stdout } = await execFileAsync(
+      "node",
+      [buildLineTracksScript, "--source", "pack-down-path", "--pack", packPath, "--region", region, ...args],
+      { cwd: root, maxBuffer: 4 * 1024 * 1024 },
+    );
+    return JSON.parse(stdout);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 test("structured route map contract pins nationwide vector-rendered layers", async () => {
   const contract = JSON.parse(
     await readFile(
@@ -1994,4 +2038,21 @@ test("build-route-map-line-tracks refines surplus colors (achromatic drop + simi
   // 빨강 노선은 병합으로 한 조각(0→200), 파랑은 별도.
   const redLine = result.lines.find((line) => line.svgColor === "#ff0000");
   assert.ok(redLine, "대표색 #ff0000 노선이 있어야 한다");
+});
+
+test("build-route-map-line-tracks --source pack-down-path chains existing segments", async () => {
+  // down_path "M 0 0 L 10 0" → "M 10 0 L 20 0": 끝점=시작점이라 한 조각으로 이어진다.
+  const result = await runBuildLineTracksFromPack({
+    region: "테스트권",
+    rows: [
+      { station_id: "s1", line_id: "line-a", sequence: 1, x: 0, y: 0, down_path: "" },
+      { station_id: "s2", line_id: "line-a", sequence: 2, x: 10, y: 0, down_path: "M 0 0 L 10 0" },
+      { station_id: "s3", line_id: "line-a", sequence: 3, x: 20, y: 0, down_path: "M 10 0 L 20 0" },
+    ],
+  });
+  assert.equal(result.source, "pack-down-path");
+  assert.equal(result.lines.length, 1);
+  assert.equal(result.lines[0].lineId, "line-a");
+  assert.equal(result.lines[0].trackCount, 1);
+  assert.equal(result.lines[0].paths[0], "M 0 0 L 10 0 L 20 0");
 });

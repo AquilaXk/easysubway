@@ -43,6 +43,7 @@ region 노선별 track geometry로 변환한다. --check는 파일을 쓰지 않
 function parseArgs(argv) {
   const options = {
     geometry: null, pack: null, region: null, out: null, check: false,
+    source: "svg-strokes",
     snapRadius: SNAP_RADIUS,
     stitchTolerance: STITCH_TOLERANCE,
     mergeColorDistance: MERGE_COLOR_DISTANCE,
@@ -59,6 +60,7 @@ function parseArgs(argv) {
       case "--region": options.region = argv[++index] ?? null; break;
       case "--out": options.out = argv[++index] ?? null; break;
       case "--check": options.check = true; break;
+      case "--source": options.source = argv[++index] ?? ""; break;
       case "--snap-radius": options.snapRadius = Number.parseFloat(argv[++index] ?? ""); break;
       case "--stitch-tolerance": options.stitchTolerance = Number.parseFloat(argv[++index] ?? ""); break;
       case "--merge-color-distance": options.mergeColorDistance = Number.parseFloat(argv[++index] ?? ""); break;
@@ -67,7 +69,11 @@ function parseArgs(argv) {
         if (arg.startsWith("--")) throw new Error(`Unknown option: ${arg}`);
     }
   }
-  if (!options.geometry) throw new Error("--geometry is required.");
+  if (!["svg-strokes", "pack-down-path"].includes(options.source)) {
+    throw new Error(`--source must be svg-strokes or pack-down-path, got: ${options.source}`);
+  }
+  // pack-down-path(Route B)는 SVG 없이 pack 실측 down_path만 변환하므로 geometry 불요.
+  if (options.source === "svg-strokes" && !options.geometry) throw new Error("--geometry is required (source=svg-strokes).");
   if (!options.pack) throw new Error("--pack is required.");
   if (!options.region) throw new Error("--region is required.");
   if (!Number.isFinite(options.snapRadius) || options.snapRadius <= 0) throw new Error("--snap-radius must be a positive number.");
@@ -367,6 +373,7 @@ async function buildLineTracks({ geometry, pack, region, snapRadius, stitchToler
   return {
     schemaVersion: 1,
     region,
+    source: "svg-strokes",
     snapRadius,
     stitchTolerance,
     stationProximityRatio,
@@ -380,9 +387,98 @@ async function buildLineTracks({ geometry, pack, region, snapRadius, stitchToler
   };
 }
 
+// "M x y L x y ..." 절대좌표 path를 정점 목록으로 파싱(parseRouteMapPolyline과 동일 규칙).
+function parseAbsolutePolyline(pathText) {
+  const numbers = (pathText.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  const points = [];
+  for (let index = 0; index + 1 < numbers.length; index += 2) {
+    points.push({ x: numbers[index], y: numbers[index + 1] });
+  }
+  return points;
+}
+
+// Route B: pack 실측 down_path를 sequence 순으로 체이닝해 동일 tracks.json 스키마로
+// 변환한다. 렌더러는 SVG track과 구분하지 않고 소비한다(무음 fallback 아님 —
+// track 원천이 명시적으로 pack-down-path일 뿐). 체이닝 규칙은 앱
+// _assemblePolylines(structured_route_map.dart)와 동일: 끝점=시작점이면 잇고 아니면 끊는다.
+async function buildLineTracksFromDownPath({ pack, region, stitchTolerance }) {
+  const { db, tempDir } = await openPack(pack);
+  let rows;
+  try {
+    rows = db
+      .prepare(
+        `SELECT rmp.line_id AS lineId, rmp.down_path AS downPath
+         FROM route_map_positions rmp
+         JOIN station_lines sl ON sl.station_id = rmp.station_id AND sl.line_id = rmp.line_id
+         WHERE rmp.region = ?
+         ORDER BY rmp.line_id, sl.line_sequence, rmp.station_id`,
+      )
+      .all(region);
+  } finally {
+    db.close();
+    if (tempDir) await rm(tempDir, { recursive: true, force: true });
+  }
+  if (rows.length === 0) throw new Error(`region '${region}'의 route_map_positions가 비어 있다.`);
+
+  const segmentsByLine = new Map();
+  const stationCountByLine = new Map();
+  for (const row of rows) {
+    if (!segmentsByLine.has(row.lineId)) segmentsByLine.set(row.lineId, []);
+    segmentsByLine.get(row.lineId).push(row.downPath ?? "");
+    stationCountByLine.set(row.lineId, (stationCountByLine.get(row.lineId) ?? 0) + 1);
+  }
+
+  const lines = [];
+  const warnings = [];
+  const orderedLineIds = [...segmentsByLine.keys()].sort((a, b) => a.localeCompare(b));
+  for (const lineId of orderedLineIds) {
+    // sequence 순 down_path 세그먼트를 끝점 연속이면 이어 붙인다.
+    const polylines = [];
+    let current = null;
+    for (const segment of segmentsByLine.get(lineId)) {
+      const points = parseAbsolutePolyline(segment);
+      if (points.length === 0) continue;
+      const tail = current?.[current.length - 1];
+      if (current && tail.x === points[0].x && tail.y === points[0].y) {
+        current.push(...points.slice(1));
+      } else {
+        current = [...points];
+        polylines.push(current);
+      }
+    }
+    // 미세 hole은 stitching으로 추가 통합.
+    const paths = stitchChains(polylines.filter((points) => points.length >= 2), stitchTolerance)
+      .filter((points) => points.length >= 2)
+      .map((points) => pathString(points));
+    if (paths.length === 0) warnings.push(`노선 ${lineId}: down_path 세그먼트가 없어 빈 track.`);
+    lines.push({
+      lineId,
+      svgColor: "",
+      trackCount: paths.length,
+      matchVotes: null,
+      stationCount: stationCountByLine.get(lineId) ?? 0,
+      paths,
+    });
+  }
+
+  return {
+    schemaVersion: 1,
+    region,
+    source: "pack-down-path",
+    stitchTolerance,
+    stationProximityRatio: null,
+    colorCount: null,
+    lineCount: segmentsByLine.size,
+    refinement: null,
+    lines,
+    warnings,
+  };
+}
+
 function assertIntegrity(result) {
   const problems = [];
-  if (result.colorCount !== result.lineCount) {
+  // 색↔노선 전제는 SVG stroke 원천에만 적용(Route B는 색이 없다).
+  if (result.source === "svg-strokes" && result.colorCount !== result.lineCount) {
     problems.push(`track 색 수(${result.colorCount}) ≠ 노선 수(${result.lineCount}) — 색이 노선 식별자라는 전제 위반.`);
   }
   const emptyPaths = result.lines.filter((line) => line.trackCount === 0);
@@ -401,12 +497,18 @@ async function main() {
     process.stdout.write(usage());
     return;
   }
-  const result = await buildLineTracks(options);
+  const result = options.source === "pack-down-path"
+    ? await buildLineTracksFromDownPath(options)
+    : await buildLineTracks(options);
   const problems = assertIntegrity(result);
 
-  process.stderr.write(`[${result.region}] 색 ${result.colorCount}(원본 ${result.refinement.originalColorCount}) / 노선 ${result.lineCount} · track 노선 ${result.lines.length} · 근접률 ${result.stationProximityRatio} · 경고 ${result.warnings.length}\n`);
-  if (result.refinement.merged.length > 0) process.stderr.write(`  ↳ 병합 ${result.refinement.merged.map((pair) => pair.join("←")).join(", ")}\n`);
-  if (result.refinement.dropped.length > 0) process.stderr.write(`  ↳ 제외 ${result.refinement.dropped.map((drop) => `${drop.color}${drop.achromatic ? "(무채색)" : ""}`).join(", ")}\n`);
+  if (result.source === "pack-down-path") {
+    process.stderr.write(`[${result.region}] (down_path 변환) 노선 ${result.lineCount} · track 노선 ${result.lines.length} · 경고 ${result.warnings.length}\n`);
+  } else {
+    process.stderr.write(`[${result.region}] 색 ${result.colorCount}(원본 ${result.refinement.originalColorCount}) / 노선 ${result.lineCount} · track 노선 ${result.lines.length} · 근접률 ${result.stationProximityRatio} · 경고 ${result.warnings.length}\n`);
+    if (result.refinement.merged.length > 0) process.stderr.write(`  ↳ 병합 ${result.refinement.merged.map((pair) => pair.join("←")).join(", ")}\n`);
+    if (result.refinement.dropped.length > 0) process.stderr.write(`  ↳ 제외 ${result.refinement.dropped.map((drop) => `${drop.color}${drop.achromatic ? "(무채색)" : ""}`).join(", ")}\n`);
+  }
   for (const warning of result.warnings) process.stderr.write(`  ⚠ ${warning}\n`);
 
   if (options.check) {
