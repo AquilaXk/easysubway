@@ -69,6 +69,7 @@ class NetworkMapData {
     required this.edges,
     required this.positionSources,
     this.stationLineMemberships = const [],
+    this.lineTracks = const [],
   });
 
   final List<NetworkMapRegion> regions;
@@ -78,6 +79,10 @@ class NetworkMapData {
   final List<NetworkMapEdge> edges;
   final List<NetworkMapPositionSource> positionSources;
   final List<NetworkMapStationLineMembership> stationLineMemberships;
+
+  /// 노선별 실제 track polyline (#1638). route_map_line_tracks에서 온다 —
+  /// 렌더러 line geometry의 source(역별 down_path 조립을 대체).
+  final List<NetworkMapLineTrack> lineTracks;
 
   factory NetworkMapData.fromJson(Map<String, Object?> json) {
     return NetworkMapData(
@@ -100,6 +105,9 @@ class NetworkMapData {
       stationLineMemberships: _objectList(
         json['stationLineMemberships'],
       ).map(NetworkMapStationLineMembership.fromJson).toList(growable: false),
+      lineTracks: _objectList(
+        json['lineTracks'],
+      ).map(NetworkMapLineTrack.fromJson).toList(growable: false),
     );
   }
 
@@ -119,9 +127,33 @@ class NetworkMapData {
           ),
           labelPolygon:
               _parseLabelPolygon(station.position.labelPolygon) ?? const [],
-          downPath: station.position.downPath,
         ),
       ),
+      lineTracks: [
+        for (final track in lineTracks)
+          RouteMapLineTrackInput(lineId: track.lineId, paths: track.paths),
+      ],
+    );
+  }
+}
+
+/// 한 노선의 track 조각들 (#1638). route_map_line_tracks의 path 문자열 목록.
+class NetworkMapLineTrack {
+  const NetworkMapLineTrack({required this.lineId, required this.paths});
+
+  final String lineId;
+
+  /// track_index 순서의 "M x y L x y ..." path 문자열들.
+  final List<String> paths;
+
+  factory NetworkMapLineTrack.fromJson(Map<String, Object?> json) {
+    return NetworkMapLineTrack(
+      lineId: json['lineId'] as String? ?? '',
+      paths:
+          (json['paths'] as List<Object?>?)
+              ?.map((value) => value as String)
+              .toList(growable: false) ??
+          const [],
     );
   }
 }

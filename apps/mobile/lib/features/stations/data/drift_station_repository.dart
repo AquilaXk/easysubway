@@ -374,7 +374,41 @@ class DriftStationRepository
       edges: _networkMapEdges(stations),
       positionSources: await _networkMapPositionSources(selectedRegion),
       stationLineMemberships: stationLineMemberships,
+      lineTracks: await _networkMapLineTracks(selectedRegion, selectedLineIds),
     );
+  }
+
+  /// route_map_line_tracks에서 노선별 track path를 track_index 순으로 로드한다(#1638).
+  /// 선택 노선 필터를 반영하고, 구팩(테이블 없음)은 빈 목록을 반환한다.
+  Future<List<NetworkMapLineTrack>> _networkMapLineTracks(
+    String region,
+    Set<String> selectedLineIds,
+  ) async {
+    final rows = await database
+        .customSelect(
+          '''
+          SELECT line_id, path
+          FROM route_map_line_tracks
+          WHERE region = ?
+          ORDER BY line_id, track_index
+          ''',
+          variables: [Variable.withString(region)],
+        )
+        .get();
+    final pathsByLine = <String, List<String>>{};
+    for (final row in rows) {
+      final lineId = row.read<String>('line_id');
+      if (!selectedLineIds.contains(lineId)) {
+        continue;
+      }
+      pathsByLine
+          .putIfAbsent(lineId, () => <String>[])
+          .add(row.read<String>('path'));
+    }
+    return [
+      for (final entry in pathsByLine.entries)
+        NetworkMapLineTrack(lineId: entry.key, paths: entry.value),
+    ];
   }
 
   Future<String> _selectedNetworkMapRegion(String? requestedRegion) async {
