@@ -159,10 +159,10 @@ function buildTagoScheduleCollectionSummary(collection) {
   const providerRecordHashes = [];
   let rowCount = 0;
 
+  for (const response of responses) {
+    requestKeyParts(response.requestKey);
+  }
   for (const response of [...responses].sort((left, right) => left.requestKey.localeCompare(right.requestKey))) {
-    if (typeof response.requestKey !== "string" || response.requestKey.length === 0) {
-      throw new Error("responses.requestKey is required");
-    }
     if (completedRequestKeys.includes(response.requestKey)) {
       throw new Error(`duplicate requestKey: ${response.requestKey}`);
     }
@@ -202,11 +202,8 @@ function buildTagoScheduleCollectionSummary(collection) {
 }
 
 function assertResponseMatchesRequestKey(validation, requestKey) {
-  const [stationId, dailyTypeCode, upDownTypeCode] = requestKey.split("|");
+  const [stationId, dailyTypeCode, upDownTypeCode] = requestKeyParts(requestKey);
   if (
-    !stationId ||
-    !dailyTypeCode ||
-    !upDownTypeCode ||
     validation.departures.some(
       (row) =>
         row.subwayStationId !== stationId ||
@@ -216,6 +213,17 @@ function assertResponseMatchesRequestKey(validation, requestKey) {
   ) {
     throw new Error(`response does not match requestKey: ${requestKey}`);
   }
+}
+
+function requestKeyParts(requestKey) {
+  if (typeof requestKey !== "string" || requestKey.length === 0) {
+    throw new Error("responses.requestKey is required");
+  }
+  const parts = requestKey.split("|");
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) {
+    throw new Error(`response does not match requestKey: ${requestKey}`);
+  }
+  return parts;
 }
 
 function tagoStationIds(input) {

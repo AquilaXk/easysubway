@@ -124,6 +124,31 @@ test("TAGO 시간표 수집 summary는 requestKey와 raw 응답 불일치를 거
   );
 });
 
+test("TAGO 시간표 수집 summary는 중복 또는 malformed requestKey를 거부한다", () => {
+  assert.throws(
+    () =>
+      buildTagoScheduleCollectionSummary({
+        responses: [
+          { requestKey: "MTRKR4448|01|U", rawText: tagoResponse("MTRKR4448", "01", "U") },
+          { requestKey: "MTRKR4448|01|U", rawText: tagoResponse("MTRKR4448", "01", "U") },
+        ],
+      }),
+    /duplicate requestKey: MTRKR4448\|01\|U/,
+  );
+  assert.throws(
+    () =>
+      buildTagoScheduleCollectionSummary({
+        responses: [
+          {
+            requestKey: "MTRKR4448|01|U|retry",
+            rawText: tagoResponse("MTRKR4448", "01", "U"),
+          },
+        ],
+      }),
+    /response does not match requestKey: MTRKR4448\|01\|U\|retry/,
+  );
+});
+
 test("TAGO 시간표 수집 summary CLI는 rawPath 목록에서 checkpoint summary를 생성한다", async (t) => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "tago-summary-"));
   t.after(async () => {
@@ -136,7 +161,7 @@ test("TAGO 시간표 수집 summary CLI는 rawPath 목록에서 checkpoint summa
   await writeFile(
     inputPath,
     `${JSON.stringify({
-      responses: [{ requestKey: "MTRKR4448|01|U", rawPath }],
+      responses: [{ requestKey: "MTRKR4448|01|U", rawPath: path.basename(rawPath) }],
     })}\n`,
   );
 
