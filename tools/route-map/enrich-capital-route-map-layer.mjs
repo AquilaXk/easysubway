@@ -6,9 +6,6 @@ import path from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 
-// capital.sqlite.gz(다지역 팩) 안에서 enrich 대상 region. --region으로 바꾼다.
-let region = "수도권";
-
 // region별 기대 역 point/노선 수 — QA 회귀 방지용 고정값. 새 region을 enrich할 때
 // 여기에 등록해야 exact-count 검증이 동작한다. (segment path 수는 positions-lines로
 // region 무관하게 파생된다.)
@@ -73,7 +70,7 @@ function parseArgs(argv) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  region = options.region;
+  const region = options.region;
   const root = path.resolve(import.meta.dirname, "../..");
   const packPath = path.resolve(root, options.pack);
   const indexPath = path.resolve(root, options.index);
@@ -84,16 +81,16 @@ async function main() {
     const database = new DatabaseSync(sqlitePath);
     let output;
     try {
-      const before = capitalRouteMapSummary(database);
+      const before = capitalRouteMapSummary(database, region);
       if (!options.check) {
-        enrichCapitalRouteMap(database);
+        enrichCapitalRouteMap(database, region);
       }
-      const after = capitalRouteMapSummary(database);
-      assertCapitalRouteMap(after);
+      const after = capitalRouteMapSummary(database, region);
+      assertCapitalRouteMap(after, region);
       output = {
         before,
         after,
-        labelCollisionQa: labelCollisionQa(database),
+        labelCollisionQa: labelCollisionQa(database, region),
       };
       assertLabelCollisionBudget(output.labelCollisionQa, options.maxLabelOverlaps);
       console.log(JSON.stringify(output, null, 2));
@@ -114,7 +111,7 @@ async function main() {
   }
 }
 
-function enrichCapitalRouteMap(database) {
+function enrichCapitalRouteMap(database, region) {
   const rows = database.prepare(`
     SELECT
       rmp.station_id,
@@ -212,7 +209,7 @@ function segmentPath(from, to) {
   return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
 }
 
-function capitalRouteMapSummary(database) {
+function capitalRouteMapSummary(database, region) {
   const base = database.prepare(`
     SELECT
       COUNT(*) AS positions,
@@ -259,7 +256,7 @@ function capitalRouteMapSummary(database) {
   };
 }
 
-function labelCollisionQa(database) {
+function labelCollisionQa(database, region) {
   const rows = database.prepare(`
     SELECT
       rmp.station_id,
@@ -354,7 +351,7 @@ function labelKey(label) {
   return `${label.stationName}(${label.stationId}:${label.lineId})`;
 }
 
-function assertCapitalRouteMap(summary) {
+function assertCapitalRouteMap(summary, region) {
   const expected = expectedCountsByRegion[region];
   if (!expected) {
     throw new Error(
