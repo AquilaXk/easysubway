@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 public class RouteV2Planner implements RouteV2SearchUseCase {
 
 	private static final String PLANNER_ADR = "tools/routes/route-algorithm-v2-adr.json";
+	private static final int RANKING_CANDIDATE_LIMIT = 3;
 
 	private final RouteSearchUseCase routeSearchUseCase;
 	private final LoadRouteTimetablePort routeTimetablePort;
@@ -69,7 +70,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
 				routeSearchUseCase.validateRouteSearch(searchRouteCommand);
 				List<RouteSearchResult> timetableItineraries = timetableRaptorPlanner.search(
-					command,
+					rankingCommand(command),
 					routeTimetable()
 				);
 				if (timetableItineraries.isEmpty()) {
@@ -77,10 +78,10 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				}
 				timetableItineraries = routeSearchUseCase.stabilizeTimetableRouteResults(
 					searchRouteCommand,
-					command.alternativeCount(),
+					RANKING_CANDIDATE_LIMIT,
 					timetableItineraries
 				);
-				timetableItineraries = rankTimetableItineraries(timetableItineraries);
+				timetableItineraries = rankTimetableItineraries(timetableItineraries, command.alternativeCount());
 				return new RouteV2Plan(timetableItineraries, statusesOf(timetableItineraries, command.useRealtime()), PLANNER_ADR);
 			}
 			SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
@@ -117,11 +118,25 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 		}
 	}
 
-	private List<RouteSearchResult> rankTimetableItineraries(List<RouteSearchResult> itineraries) {
+	private SearchRouteV2Command rankingCommand(SearchRouteV2Command command) {
+		return new SearchRouteV2Command(
+			command.originStationId(),
+			command.destinationStationId(),
+			command.departureTime(),
+			command.mobilityType(),
+			command.constraintMode(),
+			command.useRealtime(),
+			command.maxTransfers(),
+			RANKING_CANDIDATE_LIMIT
+		);
+	}
+
+	private List<RouteSearchResult> rankTimetableItineraries(List<RouteSearchResult> itineraries, int alternativeCount) {
 		return itineraries.stream()
 			.sorted(Comparator.comparingInt(RouteSearchResult::estimatedDurationSeconds)
 				.thenComparingInt(RouteSearchResult::transferCount)
 				.thenComparingInt(this::accessibilityRiskScore))
+			.limit(alternativeCount)
 			.toList();
 	}
 

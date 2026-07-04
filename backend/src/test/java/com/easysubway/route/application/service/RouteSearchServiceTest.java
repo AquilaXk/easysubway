@@ -858,11 +858,11 @@ class RouteSearchServiceTest {
 		var verified = routeSearchResultWithAccessState("route-verified", "AVAILABLE", false);
 		var planner = new RouteV2Planner(stabilizingRouteSearchUseCase(List.of(risky, verified)), routeTimetablePort());
 
-		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 1));
 
 		assertThat(plan.itineraries())
 			.extracting(RouteSearchResult::routeSearchId)
-			.containsExactly("route-verified", "route-risky");
+			.containsExactly("route-verified");
 	}
 
 	@Test
@@ -2089,7 +2089,9 @@ class RouteSearchServiceTest {
 				int alternativeCount,
 				List<RouteSearchResult> timetableResults
 			) {
-				return stabilizedResults;
+				return stabilizedResults.stream()
+					.limit(alternativeCount)
+					.toList();
 			}
 
 			@Override
