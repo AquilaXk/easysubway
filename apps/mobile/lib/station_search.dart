@@ -40,12 +40,9 @@ const _favoriteStationChangeErrorMessage = '즐겨찾기를 바꾸지 못했어�
 const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어요.';
 const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
-const _stationLineSheetPadding = EdgeInsets.fromLTRB(20, 8, 20, 24);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
 const _stationSearchInputRadius = BorderRadius.all(Radius.circular(12));
 const _stationCompactCardRadius = BorderRadius.all(Radius.circular(12));
-const _stationLineRegionChipRadius = BorderRadius.all(Radius.circular(12));
-const _stationLineFilterButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
@@ -57,8 +54,6 @@ const _stationDetailSoftPanelColor = EasySubwayAccessibleColors.surface;
 const _stationDetailSoftPanelBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailMintPanelColor = EasySubwayAccessibleColors.surface;
 const _stationDetailMintPanelBorderColor = EasySubwayAccessibleColors.line;
-const _stationLineFilterSelectedColor = EasySubwayAccessibleColors.primary;
-const _stationLineFilterBorderColor = EasySubwayAccessibleColors.line;
 const _stationDetailCautionColor = Color(0xFF8A4B00);
 
 abstract class StationSearchRepository {
@@ -1019,7 +1014,11 @@ class StationSearchController extends ChangeNotifier {
 
   StationSearchState get state => _state;
 
-  Future<void> search(String query, {String? lineId}) async {
+  Future<void> search(
+    String query, {
+    String? lineId,
+    bool recordHistory = true,
+  }) async {
     final requestId = ++_searchRequestId;
     final trimmedQuery = query.trim();
     if (trimmedQuery.isEmpty) {
@@ -1046,7 +1045,11 @@ class StationSearchController extends ChangeNotifier {
       if (!_isActiveRequest(requestId)) {
         return;
       }
-      await _recordSearch(trimmedQuery);
+      // 디바운스 타이핑 검색은 최근 검색에 기록하지 않는다(부분 입력 기록 방지).
+      // 키보드 검색·최근 검색 선택 등 명시적 검색만 기록한다.
+      if (recordHistory) {
+        await _recordSearch(trimmedQuery);
+      }
       if (results.isEmpty) {
         _state = const StationSearchState(
           status: StationSearchStatus.empty,
@@ -1810,11 +1813,8 @@ enum StationSearchEntryMode { search, recent, nearby }
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
-  Future<List<SubwayLineOption>>? _lineOptionsFuture;
   List<String> _recentQueries = const [];
-  SubwayLineOption? _selectedLine;
-  String? _selectedLineRegion;
-  bool _isLineFilterExpanded = true;
+  Timer? _searchDebounce;
   bool _isNearbySearchRunning = false;
   bool _isOpeningLocationSettings = false;
 
@@ -1827,10 +1827,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     );
     _controller.addListener(_handleControllerChanged);
     _queryController.addListener(_handleQueryChanged);
-    final lineRepository = _lineFilterRepository;
-    if (lineRepository != null) {
-      _lineOptionsFuture = lineRepository.listLines();
-    }
     unawaited(_loadRecentQueries());
     if (widget.entryMode == StationSearchEntryMode.nearby) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1848,6 +1844,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       ..dispose();
     _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -1861,10 +1858,19 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     if (!mounted) {
       return;
     }
-    if (!_hasSearchQuery &&
-        !_isNearbySearchRunning &&
-        _controller.state.status != StationSearchStatus.idle) {
-      _controller.search('');
+    _searchDebounce?.cancel();
+    if (!_hasSearchQuery) {
+      if (!_isNearbySearchRunning &&
+          _controller.state.status != StationSearchStatus.idle) {
+        _controller.search('');
+      }
+    } else {
+      // 타이핑 즉시(디바운스) 검색으로 통일한다. 부분 입력은 최근 검색에 기록하지 않는다.
+      final query = _queryController.text;
+      _searchDebounce = Timer(
+        const Duration(milliseconds: 300),
+        () => unawaited(_runSearch(query, recordHistory: false)),
+      );
     }
     setState(() {});
   }
@@ -1975,14 +1981,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               );
             }
             if (_hasSearchQuery) {
-              return FilledButton.icon(
-                key: const Key('stationSearchSubmitButton'),
-                onPressed: isSearching
-                    ? null
-                    : () => _submit(_queryController.text),
-                icon: const Icon(Icons.search),
-                label: const Text('검색'),
-              );
+              // 즉시(디바운스) 검색으로 통일했으므로 별도 검색 버튼을 두지 않는다.
+              return const SizedBox.shrink();
             }
             return OutlinedButton.icon(
               key: const Key('nearbyStationSearchButton'),
@@ -2011,39 +2011,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           onOpenLocationSettings: _openLocationSettings,
         );
       },
-    );
-    final lineFilterSection = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (showSearchInput && _lineOptionsFuture != null)
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              final isSearching =
-                  _controller.state.status == StationSearchStatus.loading;
-              final hasSearchResults =
-                  _controller.state.status == StationSearchStatus.success &&
-                  _controller.state.source == StationSearchResultSource.search;
-              return _StationLineFilterPanel(
-                expanded: !hasSearchResults || _isLineFilterExpanded,
-                collapsible: hasSearchResults,
-                onToggleExpanded: () {
-                  setState(() {
-                    _isLineFilterExpanded = !_isLineFilterExpanded;
-                  });
-                },
-                child: _StationLineFilterSection(
-                  linesFuture: _lineOptionsFuture!,
-                  selectedLine: _selectedLine,
-                  selectedRegion: _selectedLineRegion,
-                  enabled: !isSearching && !_isNearbySearchRunning,
-                  onRegionSelected: _selectLineRegion,
-                  onLineSelected: _selectLine,
-                ),
-              );
-            },
-          ),
-      ],
     );
     return Scaffold(
       appBar: AppBar(
@@ -2083,7 +2050,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                     recentSearchSection: recentSearchSection,
                     actionButtonSection: actionButtonSection,
                     resultSection: resultSection,
-                    lineFilterSection: lineFilterSection,
                   ),
                 ],
               );
@@ -2095,19 +2061,20 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _submit(String query) {
+    // 키보드 검색 액션 등 명시적 검색: 디바운스를 취소하고 최근 검색에 기록한다.
+    _searchDebounce?.cancel();
     if (_controller.state.status == StationSearchStatus.loading) {
       return;
     }
     unawaited(_runSearch(query));
   }
 
-  Future<void> _runSearch(String query) async {
-    await _controller.search(query, lineId: _selectedLine?.id);
-    await _loadRecentQueries();
-    if (mounted &&
-        _controller.state.status == StationSearchStatus.success &&
-        _controller.state.source == StationSearchResultSource.search) {
-      setState(() => _isLineFilterExpanded = false);
+  Future<void> _runSearch(String query, {bool recordHistory = true}) async {
+    await _controller.search(query, recordHistory: recordHistory);
+    // 최근 검색 목록은 기록한 경우에만 바뀌므로, 디바운스 타이핑 검색에서는
+    // 불필요한 재조회를 하지 않는다.
+    if (recordHistory) {
+      await _loadRecentQueries();
     }
   }
 
@@ -2193,32 +2160,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
     }
-  }
-
-  StationLineFilterRepository? get _lineFilterRepository {
-    final Object repository = widget.repository;
-    if (repository is StationLineFilterRepository) {
-      return repository;
-    }
-    return null;
-  }
-
-  void _selectLine(SubwayLineOption? line) {
-    setState(() {
-      _selectedLine = line;
-      if (line != null) {
-        _selectedLineRegion = line.region;
-      }
-    });
-  }
-
-  void _selectLineRegion(String region) {
-    setState(() {
-      _selectedLineRegion = region;
-      if (_selectedLine?.region != region) {
-        _selectedLine = null;
-      }
-    });
   }
 
   void _setRouteOrigin(StationSearchResult result) {
@@ -2503,430 +2444,6 @@ class _StationRecentSearchEmptyState extends StatelessWidget {
   }
 }
 
-class _StationLineFilterPanel extends StatelessWidget {
-  const _StationLineFilterPanel({
-    required this.expanded,
-    required this.collapsible,
-    required this.onToggleExpanded,
-    required this.child,
-  });
-
-  final bool expanded;
-  final bool collapsible;
-  final VoidCallback onToggleExpanded;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('stationLineFilterPanel'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (collapsible) ...[
-          OutlinedButton.icon(
-            key: const Key('stationLineFilterToggle'),
-            onPressed: onToggleExpanded,
-            icon: Icon(expanded ? Icons.expand_less : Icons.tune),
-            label: Text(expanded ? '노선 필터 접기' : '노선 필터 펼치기'),
-          ),
-          if (expanded) const SizedBox(height: 12),
-        ],
-        if (expanded) child,
-      ],
-    );
-  }
-}
-
-class _StationLineFilterSection extends StatelessWidget {
-  const _StationLineFilterSection({
-    required this.linesFuture,
-    required this.selectedLine,
-    required this.selectedRegion,
-    required this.enabled,
-    required this.onRegionSelected,
-    required this.onLineSelected,
-  });
-
-  final Future<List<SubwayLineOption>> linesFuture;
-  final SubwayLineOption? selectedLine;
-  final String? selectedRegion;
-  final bool enabled;
-  final ValueChanged<String> onRegionSelected;
-  final ValueChanged<SubwayLineOption?> onLineSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<SubwayLineOption>>(
-      future: linesFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const SizedBox(
-            height: 56,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: CircularProgressIndicator(strokeWidth: 2.5),
-            ),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Text(
-            '노선을 불러오지 못했어요.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
-            ),
-          );
-        }
-
-        final lines = (snapshot.data ?? const <SubwayLineOption>[])
-            .where((line) => line.active)
-            .toList(growable: false);
-        if (lines.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final seenRegions = <String>{};
-        final regions = <String>[
-          for (final line in lines)
-            if (seenRegions.add(line.region)) line.region,
-        ]..sort(_compareStationLineRegions);
-        final currentRegion =
-            selectedRegion ?? selectedLine?.region ?? regions.first;
-        final visibleLines = lines
-            .where((line) => line.region == currentRegion)
-            .toList(growable: false);
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final region in regions) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _StationLineRegionButton(
-                        key: Key('stationLineRegion-$region'),
-                        label: region,
-                        selected: region == currentRegion,
-                        onPressed: enabled
-                            ? () => onRegionSelected(region)
-                            : null,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _StationLineFilterButton(
-                  key: const Key('stationLineFilter-all'),
-                  label: '전체 노선',
-                  semanticLabel: '전체 노선',
-                  selected: selectedLine == null,
-                  onPressed: enabled ? () => onLineSelected(null) : null,
-                ),
-                for (final line in visibleLines)
-                  _StationLineFilterButton(
-                    key: Key('stationLineFilter-${line.id}'),
-                    label: line.shortName,
-                    semanticLabel: line.semanticLabel,
-                    selected: selectedLine?.id == line.id,
-                    badgeLine: line.badgeLine,
-                    onPressed: enabled ? () => onLineSelected(line) : null,
-                  ),
-                OutlinedButton.icon(
-                  key: const Key('stationLineFilterMoreButton'),
-                  onPressed: enabled
-                      ? () => _showAllLineSheet(context, lines)
-                      : null,
-                  icon: const Icon(Icons.list_alt),
-                  label: const Text('전체 노선 보기'),
-                ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _showAllLineSheet(
-    BuildContext context,
-    List<SubwayLineOption> lines,
-  ) async {
-    final seenRegions = <String>{};
-    final orderedRegions = <String>[
-      for (final line in lines)
-        if (seenRegions.add(line.region)) line.region,
-    ]..sort(_compareStationLineRegions);
-    final linesByRegion = <String, List<SubwayLineOption>>{};
-    for (final line in lines) {
-      (linesByRegion[line.region] ??= <SubwayLineOption>[]).add(line);
-    }
-
-    final selected = await showModalBottomSheet<Object?>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: ListView(
-            key: const Key('stationLineAllSheet'),
-            padding: _stationLineSheetPadding,
-            children: [
-              Text(
-                '전체 노선 보기',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
-                  height: 1.25,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _StationLineSheetRow(
-                key: const Key('stationLineFilter-all'),
-                label: '전체 노선',
-                semanticLabel: '전체 노선',
-                selected: selectedLine == null,
-                onPressed: () => Navigator.of(context).pop(false),
-              ),
-              for (final region in orderedRegions) ...[
-                Padding(
-                  padding: const EdgeInsets.only(top: 20, bottom: 2),
-                  child: Text(
-                    region,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.mutedText,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                for (final line in linesByRegion[region]!)
-                  _StationLineSheetRow(
-                    key: Key('stationLineFilter-${line.id}'),
-                    label: line.shortName,
-                    semanticLabel: line.semanticLabel,
-                    selected: selectedLine?.id == line.id,
-                    badgeLine: line.badgeLine,
-                    onPressed: () => Navigator.of(context).pop(line),
-                  ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-    if (selected is SubwayLineOption) {
-      onLineSelected(selected);
-    } else if (selected == false) {
-      onLineSelected(null);
-    }
-  }
-}
-
-class _StationLineRegionButton extends StatelessWidget {
-  const _StationLineRegionButton({
-    required this.label,
-    required this.selected,
-    required this.onPressed,
-    super.key,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '$label 지역 ${selected ? '선택됨' : '선택 안 됨'}',
-      button: true,
-      selected: selected,
-      enabled: onPressed != null,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: ChoiceChip(
-          label: Text(label),
-          selected: selected,
-          onSelected: onPressed == null ? null : (_) => onPressed?.call(),
-          showCheckmark: true,
-          checkmarkColor: Colors.white,
-          labelStyle: TextStyle(
-            color: selected ? Colors.white : EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
-          ),
-          selectedColor: _stationLineFilterSelectedColor,
-          backgroundColor: Colors.white,
-          side: BorderSide(
-            color: selected
-                ? _stationLineFilterSelectedColor
-                : _stationLineFilterBorderColor,
-          ),
-          shape: const RoundedRectangleBorder(
-            borderRadius: _stationLineRegionChipRadius,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-int _compareStationLineRegions(String left, String right) {
-  final leftRank = _stationLineRegionRank(left);
-  final rightRank = _stationLineRegionRank(right);
-  if (leftRank != rightRank) {
-    return leftRank.compareTo(rightRank);
-  }
-  return left.compareTo(right);
-}
-
-int _stationLineRegionRank(String region) {
-  const preferredRegions = ['수도권', '부산', '대구', '광주', '대전'];
-  final index = preferredRegions.indexOf(region);
-  return index == -1 ? preferredRegions.length : index;
-}
-
-class _StationLineFilterButton extends StatelessWidget {
-  const _StationLineFilterButton({
-    required this.label,
-    required this.semanticLabel,
-    required this.selected,
-    required this.onPressed,
-    this.badgeLine,
-    super.key,
-  });
-
-  final String label;
-  final String semanticLabel;
-  final bool selected;
-  final VoidCallback? onPressed;
-  final StationSearchLine? badgeLine;
-
-  @override
-  Widget build(BuildContext context) {
-    const backgroundColor = Colors.white;
-    final foregroundColor = selected
-        ? _stationLineFilterSelectedColor
-        : EasySubwayAccessibleColors.text;
-    final borderColor = selected
-        ? _stationLineFilterSelectedColor
-        : _stationLineFilterBorderColor;
-
-    return Semantics(
-      label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
-      button: true,
-      selected: selected,
-      enabled: onPressed != null,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: OutlinedButton(
-          onPressed: onPressed,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(74, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            backgroundColor: backgroundColor,
-            foregroundColor: foregroundColor,
-            side: BorderSide(color: borderColor, width: selected ? 2 : 1.5),
-            shape: const RoundedRectangleBorder(
-              borderRadius: _stationLineFilterButtonRadius,
-            ),
-            textStyle: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (badgeLine != null) ...[
-                StationLineBadge(line: badgeLine!, size: 26),
-                const SizedBox(width: 8),
-              ],
-              Text(label),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StationLineSheetRow extends StatelessWidget {
-  const _StationLineSheetRow({
-    required this.label,
-    required this.semanticLabel,
-    required this.selected,
-    required this.onPressed,
-    this.badgeLine,
-    super.key,
-  });
-
-  final String label;
-  final String semanticLabel;
-  final bool selected;
-  final VoidCallback onPressed;
-  final StationSearchLine? badgeLine;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '$semanticLabel ${selected ? '선택됨' : '선택 안 됨'}',
-      button: true,
-      selected: selected,
-      onTap: onPressed,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onPressed,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 56),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: EasySubwayAccessibleColors.line),
-              ),
-            ),
-            child: Row(
-              children: [
-                if (badgeLine != null) ...[
-                  StationLineBadge(line: badgeLine!, size: 26),
-                  const SizedBox(width: 12),
-                ],
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: selected
-                          ? _stationLineFilterSelectedColor
-                          : EasySubwayAccessibleColors.text,
-                      fontSize: 16,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (selected)
-                  const Icon(
-                    Icons.check,
-                    size: 22,
-                    color: _stationLineFilterSelectedColor,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _StationSearchAdaptiveContent extends StatelessWidget {
   const _StationSearchAdaptiveContent({
     required this.isLargeScreen,
@@ -2934,7 +2451,6 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
     required this.recentSearchSection,
     required this.actionButtonSection,
     required this.resultSection,
-    required this.lineFilterSection,
   });
 
   final bool isLargeScreen;
@@ -2942,7 +2458,6 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
   final Widget recentSearchSection;
   final Widget actionButtonSection;
   final Widget resultSection;
-  final Widget lineFilterSection;
 
   @override
   Widget build(BuildContext context) {
@@ -2954,8 +2469,6 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
           recentSearchSection,
           actionButtonSection,
           resultSection,
-          const SizedBox(height: 16),
-          lineFilterSection,
         ],
       );
     }
@@ -2987,7 +2500,7 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
               flex: 4,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [recentSearchSection, lineFilterSection],
+                children: [recentSearchSection],
               ),
             ),
           ],
@@ -3168,14 +2681,6 @@ class _NearbyStationOverview extends StatelessWidget {
                                     height: 1.3,
                                   ),
                             ),
-                            if (_showsDataQualityLabel(
-                              result.dataQualityLevel,
-                            )) ...[
-                              const SizedBox(height: 8),
-                              _StationDetailTextPill(
-                                text: result.dataQualityLabel,
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -3385,19 +2890,6 @@ class _StationSearchResultTile extends StatelessWidget {
                                     height: 1.25,
                                   ),
                                 ),
-                                if (_showsDataQualityLabel(
-                                  result.dataQualityLevel,
-                                )) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    result.dataQualityLabel,
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      color: _stationTextMutedColor,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                ],
                               ],
                             ),
                           ),
