@@ -9439,6 +9439,8 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(controller, /plan\.statuses\(\)/);
   assert.doesNotMatch(controller, /List\.of\(\s*"FOUND"[\s\S]*"ROUTE_GRAPH_UNKNOWN"/);
   assert.match(planner, /class RouteV2Planner implements RouteV2SearchUseCase/);
+  assert.match(planner, /LoadRouteTimetablePort/);
+  assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
   assert.match(useCase, /record SearchRouteV2Command/);

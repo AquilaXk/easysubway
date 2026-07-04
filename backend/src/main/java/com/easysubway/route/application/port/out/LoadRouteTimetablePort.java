@@ -14,6 +14,9 @@ public interface LoadRouteTimetablePort {
 		List<TransitStopTime> transitStopTimes,
 		List<TransitFrequency> transitFrequencies
 	) {
+		public static RouteTimetable empty() {
+			return new RouteTimetable(List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+		}
 	}
 
 	record ServiceCalendar(
