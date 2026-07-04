@@ -110,6 +110,23 @@ test("TAGO 시간표 수집 summary는 완료 checkpoint와 evidence hash를 남
   assert.equal(summary.productionUseAllowed, false);
 });
 
+test("TAGO 시간표 수집 summary evidence hash는 checkpoint 상태를 포함한다", () => {
+  const response = {
+    requestKey: "MTRKR4448|02|U",
+    rawText: tagoResponse("MTRKR4448", "02", "U"),
+  };
+  const baseSummary = buildTagoScheduleCollectionSummary({
+    checkpoint: { completedRequestKeys: ["MTRKR4448|01|U"] },
+    responses: [response],
+  });
+  const editedCheckpointSummary = buildTagoScheduleCollectionSummary({
+    checkpoint: { completedRequestKeys: ["MTRKR4448|01|D"] },
+    responses: [response],
+  });
+
+  assert.notEqual(baseSummary.evidenceHash, editedCheckpointSummary.evidenceHash);
+});
+
 test("TAGO 시간표 수집 summary는 requestKey와 raw 응답 불일치를 거부한다", () => {
   assert.throws(
     () =>
@@ -295,6 +312,53 @@ test("TAGO 시간표 수집기는 batch 중간 실패 시 성공분 checkpoint�
         ["MTRKR4448|01|D"],
       );
       assert.doesNotMatch(JSON.stringify(error.collection), /actual-secret-key/);
+      return true;
+    },
+  );
+});
+
+test("TAGO 시간표 수집기는 body read 실패 시 성공분 checkpoint를 보존한다", async () => {
+  await assert.rejects(
+    () =>
+      collectTagoSchedules(
+        {
+          stationLineRows: [
+            { stationCode: "448", lineId: "seoul-4" },
+            { stationCode: "433", lineId: "seoul-4" },
+          ],
+        },
+        {
+          checkpoint: { completedRequestKeys: ["MTRKR4448|01|U"] },
+          dailyLimit: 3,
+          serviceKey: "actual-secret-key",
+          fetchImpl: async (url) => {
+            const params = new URL(url).searchParams;
+            return {
+              ok: true,
+              status: 200,
+              async text() {
+                if (params.get("upDownTypeCode") === "U" && params.get("dailyTypeCode") === "02") {
+                  throw new Error("connection dropped");
+                }
+                return tagoResponse(
+                  params.get("subwayStationId"),
+                  params.get("dailyTypeCode"),
+                  params.get("upDownTypeCode"),
+                );
+              },
+            };
+          },
+        },
+      ),
+    (error) => {
+      assert.equal(error.name, "TagoScheduleCollectionError");
+      assert.equal(error.message, "TAGO schedule response read failed: MTRKR4448|02|U");
+      assert.equal(error.collection.collectionStatus, "partial_failed");
+      assert.deepEqual(error.collection.completedRequestKeys, ["MTRKR4448|01|D", "MTRKR4448|01|U"]);
+      assert.deepEqual(
+        error.collection.responses.map((response) => response.requestKey),
+        ["MTRKR4448|01|D"],
+      );
       return true;
     },
   );

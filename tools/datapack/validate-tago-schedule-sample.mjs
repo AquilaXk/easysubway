@@ -187,6 +187,7 @@ function buildTagoScheduleCollectionSummary(collection) {
   const evidencePayload = {
     sourceId: "molit-tago-subway-info",
     endpoint: TAGO_SCHEDULE_ENDPOINT,
+    completedRequestKeys,
     responseRequestKeys,
     rawSha256ByRequest,
     providerRecordHashes,
@@ -242,7 +243,17 @@ async function collectTagoSchedules(input, options = {}) {
         }),
       );
     }
-    const rawText = await response.text();
+    let rawText;
+    try {
+      rawText = await response.text();
+    } catch {
+      throw new TagoScheduleCollectionError(
+        `TAGO schedule response read failed: ${request.requestKey}`,
+        buildTagoScheduleCollectionArtifact(plan, options, collectedAt, responses, {
+          failedRequestKey: request.requestKey,
+        }),
+      );
+    }
     try {
       const validation = validateTagoScheduleSample(rawText);
       assertResponseMatchesRequestKey(validation, request.requestKey);
