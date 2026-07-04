@@ -9441,7 +9441,9 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /class RouteV2Planner implements RouteV2SearchUseCase/);
   assert.match(planner, /LoadRouteTimetablePort/);
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
-  assert.match(planner, /getIfAvailable\(\(\) -> RouteTimetable::empty\)/);
+  assert.match(planner, /getIfAvailable\(\)/);
+  assert.match(planner, /timetableRequired && routeTimetablePort != null/);
+  assert.match(planner, /timetableRequired && \(timetable\.transitTrips\(\)\.isEmpty\(\) \|\| timetable\.transitStopTimes\(\)\.isEmpty\(\)\)/);
   assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /searchRouteAlternatives/);
   assert.match(planner, /statusesOf/);
