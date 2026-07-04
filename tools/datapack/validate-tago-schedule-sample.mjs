@@ -227,17 +227,41 @@ async function collectTagoSchedules(input, options = {}) {
     try {
       response = await fetchImpl(buildTagoScheduleRequestUrl(request, serviceKey));
     } catch {
-      throw new Error(`TAGO schedule fetch failed before response: ${request.requestKey}`);
+      throw new TagoScheduleCollectionError(
+        `TAGO schedule fetch failed before response: ${request.requestKey}`,
+        buildTagoScheduleCollectionArtifact(plan, options, collectedAt, responses, {
+          failedRequestKey: request.requestKey,
+        }),
+      );
     }
     if (!response.ok) {
-      throw new Error(`TAGO schedule fetch failed: ${request.requestKey} status ${response.status}`);
+      throw new TagoScheduleCollectionError(
+        `TAGO schedule fetch failed: ${request.requestKey} status ${response.status}`,
+        buildTagoScheduleCollectionArtifact(plan, options, collectedAt, responses, {
+          failedRequestKey: request.requestKey,
+        }),
+      );
     }
     const rawText = await response.text();
-    const validation = validateTagoScheduleSample(rawText);
-    assertResponseMatchesRequestKey(validation, request.requestKey);
+    try {
+      const validation = validateTagoScheduleSample(rawText);
+      assertResponseMatchesRequestKey(validation, request.requestKey);
+    } catch (error) {
+      throw new TagoScheduleCollectionError(
+        error instanceof Error ? error.message : `TAGO schedule validation failed: ${request.requestKey}`,
+        buildTagoScheduleCollectionArtifact(plan, options, collectedAt, responses, {
+          failedRequestKey: request.requestKey,
+        }),
+      );
+    }
     responses.push({ requestKey: request.requestKey, rawText });
   }
 
+  return buildTagoScheduleCollectionArtifact(plan, options, collectedAt, responses);
+}
+
+function buildTagoScheduleCollectionArtifact(plan, options, collectedAt, responses, failure = {}) {
+  const checkpoint = options.checkpoint ?? {};
   const completedRequestKeys = [
     ...new Set([...(checkpoint.completedRequestKeys ?? []), ...responses.map((response) => response.requestKey)]),
   ].sort((left, right) => left.localeCompare(right));
@@ -254,8 +278,18 @@ async function collectTagoSchedules(input, options = {}) {
     pendingRequestCount: Math.max(0, plan.pendingRequestCount - responses.length),
     completedRequestKeys,
     checkpoint: { completedRequestKeys },
+    collectionStatus: failure.failedRequestKey ? "partial_failed" : "completed_batch",
+    ...(failure.failedRequestKey ? { failedRequestKey: failure.failedRequestKey } : {}),
     responses,
   };
+}
+
+class TagoScheduleCollectionError extends Error {
+  constructor(message, collection) {
+    super(message);
+    this.name = "TagoScheduleCollectionError";
+    this.collection = collection;
+  }
 }
 
 function buildTagoScheduleRequestUrl(request, serviceKey) {
@@ -391,12 +425,19 @@ async function main() {
     const checkpoint = args.checkpoint ? JSON.parse(await readFile(path.resolve(args.checkpoint), "utf8")) : {};
     const dailyLimit = args["daily-limit"] === undefined ? undefined : Number(args["daily-limit"]);
     const serviceKeyEnv = args["service-key-env"] ?? "DATA_GO_KR_SERVICE_KEY";
-    result = await collectTagoSchedules(JSON.parse(await readFile(inputPath, "utf8")), {
-      checkpoint,
-      dailyLimit,
-      serviceKey: process.env[serviceKeyEnv],
-      serviceKeyEnv,
-    });
+    try {
+      result = await collectTagoSchedules(JSON.parse(await readFile(inputPath, "utf8")), {
+        checkpoint,
+        dailyLimit,
+        serviceKey: process.env[serviceKeyEnv],
+        serviceKeyEnv,
+      });
+    } catch (error) {
+      if (error instanceof TagoScheduleCollectionError && args.output) {
+        await writeJsonOutput(args.output, error.collection);
+      }
+      throw error;
+    }
   } else if (args.summary) {
     const input = JSON.parse(await readFile(inputPath, "utf8"));
     const inputDir = path.dirname(inputPath);
@@ -415,9 +456,13 @@ async function main() {
     result = validateTagoScheduleSample(await readFile(inputPath, "utf8"));
   }
   if (args.output) {
-    await writeFile(path.resolve(args.output), `${JSON.stringify(result, null, 2)}\n`);
+    await writeJsonOutput(args.output, result);
   }
   console.log(JSON.stringify(result, null, 2));
+}
+
+async function writeJsonOutput(outputPath, value) {
+  await writeFile(path.resolve(outputPath), `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function requiredString(value, label) {

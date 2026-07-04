@@ -213,6 +213,7 @@ test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret
   assert.equal(collection.artifactKind, "tago-schedule-collection");
   assert.equal(collection.requestedCount, 2);
   assert.equal(collection.pendingRequestCount, 9);
+  assert.equal(collection.collectionStatus, "completed_batch");
   assert.deepEqual(
     collection.responses.map((response) => response.requestKey),
     ["MTRKR4448|01|D", "MTRKR4448|02|U"],
@@ -248,6 +249,55 @@ test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret
   );
   assert.equal(summary.responseCount, collection.responses.length);
   assert.deepEqual(summary.checkpoint.completedRequestKeys, collection.checkpoint.completedRequestKeys);
+});
+
+test("TAGO 시간표 수집기는 batch 중간 실패 시 성공분 checkpoint를 보존한다", async () => {
+  await assert.rejects(
+    () =>
+      collectTagoSchedules(
+        {
+          stationLineRows: [
+            { stationCode: "448", lineId: "seoul-4" },
+            { stationCode: "433", lineId: "seoul-4" },
+          ],
+        },
+        {
+          checkpoint: { completedRequestKeys: ["MTRKR4448|01|U"] },
+          dailyLimit: 3,
+          serviceKey: "actual-secret-key",
+          fetchImpl: async (url) => {
+            const params = new URL(url).searchParams;
+            if (params.get("upDownTypeCode") === "U" && params.get("dailyTypeCode") === "02") {
+              throw new Error("provider timeout");
+            }
+            return {
+              ok: true,
+              status: 200,
+              async text() {
+                return tagoResponse(
+                  params.get("subwayStationId"),
+                  params.get("dailyTypeCode"),
+                  params.get("upDownTypeCode"),
+                );
+              },
+            };
+          },
+        },
+      ),
+    (error) => {
+      assert.equal(error.name, "TagoScheduleCollectionError");
+      assert.equal(error.message, "TAGO schedule fetch failed before response: MTRKR4448|02|U");
+      assert.equal(error.collection.collectionStatus, "partial_failed");
+      assert.equal(error.collection.failedRequestKey, "MTRKR4448|02|U");
+      assert.deepEqual(error.collection.completedRequestKeys, ["MTRKR4448|01|D", "MTRKR4448|01|U"]);
+      assert.deepEqual(
+        error.collection.responses.map((response) => response.requestKey),
+        ["MTRKR4448|01|D"],
+      );
+      assert.doesNotMatch(JSON.stringify(error.collection), /actual-secret-key/);
+      return true;
+    },
+  );
 });
 
 test("TAGO 시간표 수집기는 service key가 없으면 provider 호출 전에 실패한다", async () => {
