@@ -125,6 +125,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 			command.destinationStationId(),
 			command.departureTime(),
 			command.mobilityType(),
+			command.mobilityPreset(),
 			command.constraintMode(),
 			command.useRealtime(),
 			command.maxTransfers(),
