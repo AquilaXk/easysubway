@@ -810,7 +810,7 @@ class RouteSearchServiceTest {
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 		assertThat(plan.itineraries()).hasSize(1);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
-		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(660);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(720);
 		assertThat(plan.itineraries().getFirst().steps())
 			.extracting("stepType", "fromStationId", "toStationId", "timeSource")
 			.containsExactly(
@@ -821,7 +821,7 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().steps())
 			.extracting("stepType", "estimatedMinutes")
 			.containsExactly(
-				tuple("entry", 1),
+				tuple("entry", 2),
 				tuple("ride", 10),
 				tuple("exit", 0)
 			);
@@ -984,7 +984,7 @@ class RouteSearchServiceTest {
 		));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
-		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(1140);
+		assertThat(plan.itineraries().getFirst().estimatedDurationSeconds()).isEqualTo(1200);
 	}
 
 	@Test

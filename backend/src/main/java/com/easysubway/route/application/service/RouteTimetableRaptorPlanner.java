@@ -289,7 +289,7 @@ class RouteTimetableRaptorPlanner {
 		int movementSeconds,
 		int slackSeconds
 	) {
-		int waitSeconds = Math.max(movementSeconds, departureSeconds - readySeconds - slackSeconds);
+		int waitSeconds = Math.max(movementSeconds + slackSeconds, departureSeconds - readySeconds);
 		return (int) Math.ceil(waitSeconds / 60.0);
 	}
 

@@ -490,7 +490,7 @@ class RouteSearchController {
 			for (RouteStep step : steps) {
 				String legType = legTypeOf(step);
 				int durationSeconds = Math.max(0, step.estimatedMinutes()) * 60;
-				int slackSeconds = slackSeconds(legType, mobilityType);
+				int slackSeconds = slackSeconds(step, legType, mobilityType);
 				OffsetDateTime plannedDepartureTime = cursor.plusSeconds(slackSeconds);
 				OffsetDateTime plannedArrivalTime = plannedDepartureTime.plusSeconds(durationSeconds);
 				legs.add(from(step, legType, plannedDepartureTime, plannedArrivalTime, durationSeconds, slackSeconds));
@@ -539,23 +539,32 @@ class RouteSearchController {
 			if (!"RIDE".equals(legType)) {
 				return 0;
 			}
-			// ponytail: schedule candidate selection belongs with timetable schema; expose only mobility buffer for now.
 			return BoardingSlackPolicy.secondsFor(mobilityType);
 		}
 
-			private static EtaSource etaSourceOf(RouteStep step) {
-				if (step.timeSource() == null || step.timeSource().isBlank()) {
-					return EtaSource.STATIC_BACKEND_ESTIMATE;
-				}
-				if ("ESTIMATED_CONSTANT".equals(step.timeSource()) || "STATIC_BACKEND_V1".equals(step.timeSource())) {
-					return EtaSource.STATIC_BACKEND_ESTIMATE;
-				}
-				try {
-					return EtaSource.valueOf(step.timeSource());
-				} catch (IllegalArgumentException exception) {
-					return EtaSource.STATIC_BACKEND_ESTIMATE;
-				}
+		private static int slackSeconds(RouteStep step, String legType, MobilityType mobilityType) {
+			boolean alreadyIncludesSlack = "RIDE".equals(legType)
+				&& EtaSource.PLANNED.name().equals(step.timeSource())
+				&& "TIMETABLE".equals(step.distanceSource());
+			if (alreadyIncludesSlack) {
+				return 0;
 			}
+			return slackSeconds(legType, mobilityType);
+		}
+
+		private static EtaSource etaSourceOf(RouteStep step) {
+			if (step.timeSource() == null || step.timeSource().isBlank()) {
+				return EtaSource.STATIC_BACKEND_ESTIMATE;
+			}
+			if ("ESTIMATED_CONSTANT".equals(step.timeSource()) || "STATIC_BACKEND_V1".equals(step.timeSource())) {
+				return EtaSource.STATIC_BACKEND_ESTIMATE;
+			}
+			try {
+				return EtaSource.valueOf(step.timeSource());
+			} catch (IllegalArgumentException exception) {
+				return EtaSource.STATIC_BACKEND_ESTIMATE;
+			}
+		}
 
 		private static String etaConfidenceOf(RouteStep step) {
 			if ("HIGH".equals(step.confidenceLabel())
