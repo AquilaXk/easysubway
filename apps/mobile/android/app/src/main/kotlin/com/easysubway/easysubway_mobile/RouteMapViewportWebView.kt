@@ -34,6 +34,7 @@ class RouteMapViewportWebViewFactory(
             sourceHeight = params["sourceHeight"].asDouble(),
             viewBox = params["viewBox"].asDoubleList(),
             revision = params["revision"].asInt(),
+            labelCollisionScript = params["labelCollisionScript"] as? String ?: "",
         )
     }
 }
@@ -48,6 +49,7 @@ private class RouteMapViewportPlatformView(
     private val sourceHeight: Double,
     private var viewBox: List<Double>,
     private var revision: Int,
+    private val labelCollisionScript: String,
 ) : PlatformView {
     private val container = FrameLayout(context).apply {
         setBackgroundColor(Color.WHITE)
@@ -174,6 +176,7 @@ private class RouteMapViewportPlatformView(
                     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
                     svg { display: block; width: 100%; height: 100%; }
                 </style>
+                <script>$labelCollisionScript</script>
             </head>
             <body>$svg</body>
             </html>
@@ -187,7 +190,7 @@ private class RouteMapViewportPlatformView(
         val frameRevision = revision
         val script = String.format(
             Locale.US,
-            "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');return true;})();",
+            "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');try{if(window.easysubwayApplyRouteMapLabelPolicy){window.easysubwayApplyRouteMapLabelPolicy();}}catch(e){}return true;})();",
             values[0],
             values[1],
             values[2],
