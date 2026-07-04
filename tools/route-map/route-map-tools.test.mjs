@@ -219,7 +219,22 @@ test("structured route map contract pins nationwide vector-rendered layers", asy
   );
   assert.deepEqual(
     contract.layers.find((layer) => layer.id === "line_geometry").requiredFields,
-    ["station_id", "line_id", "region", "x", "y", "up_path", "down_path"],
+    ["region", "line_id", "track_index", "path"],
+  );
+  assert.deepEqual(
+    contract.layers.find((layer) => layer.id === "line_geometry").source,
+    ["route_map_line_tracks"],
+  );
+  assert.ok(
+    /track 직접 렌더/.test(
+      contract.layers.find((layer) => layer.id === "line_geometry").deriveRule,
+    ),
+    "line_geometry deriveRule은 track 직접 렌더를 명시해야 한다",
+  );
+  assert.ok(
+    Array.isArray(contract.routeMapLineTracksColumns) &&
+      contract.routeMapLineTracksColumns.includes("path"),
+    "routeMapLineTracksColumns에 path가 있어야 한다",
   );
   assert.equal(
     contract.layers.find((layer) => layer.id === "station_nodes").featureId,
