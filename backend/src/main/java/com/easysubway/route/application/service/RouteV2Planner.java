@@ -14,7 +14,9 @@ import com.easysubway.route.domain.EtaSource;
 import com.easysubway.route.domain.RouteNotFoundException;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchStatus;
+import com.easysubway.route.domain.RouteStep;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -78,6 +80,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 					command.alternativeCount(),
 					timetableItineraries
 				);
+				timetableItineraries = rankTimetableItineraries(timetableItineraries);
 				return new RouteV2Plan(timetableItineraries, statusesOf(timetableItineraries, command.useRealtime()), PLANNER_ADR);
 			}
 			SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
@@ -112,6 +115,30 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 			}
 			return cachedRouteTimetable;
 		}
+	}
+
+	private List<RouteSearchResult> rankTimetableItineraries(List<RouteSearchResult> itineraries) {
+		return itineraries.stream()
+			.sorted(Comparator.comparingInt(RouteSearchResult::estimatedDurationSeconds)
+				.thenComparingInt(RouteSearchResult::transferCount)
+				.thenComparingInt(this::accessibilityRiskScore))
+			.toList();
+	}
+
+	private int accessibilityRiskScore(RouteSearchResult itinerary) {
+		int score = itinerary.warnings().size() * 1_000 + itinerary.blockedReasons().size() * 1_000;
+		for (RouteStep step : itinerary.steps()) {
+			if (step.includesStairs()) {
+				score += 100;
+			}
+			if ("UNKNOWN".equals(step.stairAccessState())) {
+				score += 10;
+			}
+			if (step.requiresAccessibilityCheck()) {
+				score += 1;
+			}
+		}
+		return score;
 	}
 
 	private List<RouteV2Status> statusesOf(List<RouteSearchResult> itineraries, boolean useRealtime) {

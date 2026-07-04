@@ -33,6 +33,7 @@ import com.easysubway.route.domain.RouteRefreshStatus;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchNotFoundException;
 import com.easysubway.route.domain.RouteSearchStatus;
+import com.easysubway.route.domain.RouteStep;
 import com.easysubway.route.domain.RouteWarningCode;
 import com.easysubway.transit.adapter.out.persistence.InMemoryTransitMasterRepository;
 import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
@@ -848,6 +849,20 @@ class RouteSearchServiceTest {
 		assertThat(plan.statuses())
 			.containsExactly(RouteV2Status.FOUND, RouteV2Status.REALTIME_UNAVAILABLE_PLANNED_USED);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
+	}
+
+	@Test
+	@DisplayName("V2 planner는 동일 ETA 후보에서 접근성 미확인 위험이 낮은 경로를 우선한다")
+	void routeV2PlannerRanksLowerAccessibilityRiskForSameEtaCandidates() {
+		var risky = routeSearchResultWithAccessState("route-risky", "UNKNOWN", true);
+		var verified = routeSearchResultWithAccessState("route-verified", "AVAILABLE", false);
+		var planner = new RouteV2Planner(stabilizingRouteSearchUseCase(List.of(risky, verified)), routeTimetablePort());
+
+		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
+
+		assertThat(plan.itineraries())
+			.extracting(RouteSearchResult::routeSearchId)
+			.containsExactly("route-verified", "route-risky");
 	}
 
 	@Test
@@ -2054,6 +2069,102 @@ class RouteSearchServiceTest {
 				throw new AssertionError("RouteV2Planner must not submit feedback during search");
 			}
 		};
+	}
+
+	private static RouteSearchUseCase stabilizingRouteSearchUseCase(List<RouteSearchResult> stabilizedResults) {
+		return new RouteSearchUseCase() {
+			@Override
+			public RouteSearchResult searchRoute(SearchRouteCommand command) {
+				throw new AssertionError("RouteV2Planner must use timetable scan for this test");
+			}
+
+			@Override
+			public List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount) {
+				throw new AssertionError("RouteV2Planner must use timetable scan for this test");
+			}
+
+			@Override
+			public List<RouteSearchResult> stabilizeTimetableRouteResults(
+				SearchRouteCommand command,
+				int alternativeCount,
+				List<RouteSearchResult> timetableResults
+			) {
+				return stabilizedResults;
+			}
+
+			@Override
+			public InternalRouteResult searchInternalRoute(SearchInternalRouteCommand command) {
+				throw new AssertionError("RouteV2Planner must not call internal route search");
+			}
+
+			@Override
+			public RouteSearchResult getRouteSearch(String routeSearchId) {
+				throw new AssertionError("RouteV2Planner must not load legacy route search results");
+			}
+
+			@Override
+			public RouteRefreshResult refreshRoute(String routeSearchId) {
+				throw new AssertionError("RouteV2Planner must not refresh legacy route search results");
+			}
+
+			@Override
+			public RouteFeedback submitRouteFeedback(SubmitRouteFeedbackCommand command) {
+				throw new AssertionError("RouteV2Planner must not submit feedback during search");
+			}
+		};
+	}
+
+	private static RouteSearchResult routeSearchResultWithAccessState(
+		String routeSearchId,
+		String stairAccessState,
+		boolean requiresAccessibilityCheck
+	) {
+		return new RouteSearchResult(
+			routeSearchId,
+			"station-a",
+			"출발역",
+			"station-b",
+			"도착역",
+			MobilityType.SENIOR,
+			RouteSearchStatus.FOUND,
+			"seoul-4",
+			"4호선",
+			0,
+			List.of(
+				timetableStep(1, "entry", stairAccessState, requiresAccessibilityCheck),
+				timetableStep(2, "ride", "AVAILABLE", false),
+				timetableStep(3, "exit", stairAccessState, requiresAccessibilityCheck)
+			),
+			List.of(),
+			List.of(),
+			LocalDate.of(2026, 7, 1).atStartOfDay()
+		);
+	}
+
+	private static RouteStep timetableStep(
+		int sequence,
+		String stepType,
+		String stairAccessState,
+		boolean requiresAccessibilityCheck
+	) {
+		return new RouteStep(
+			sequence,
+			stepType,
+			stepType,
+			"시간표 경로",
+			"seoul-4",
+			"4호선",
+			"station-a",
+			"station-b",
+			5,
+			100,
+			false,
+			stairAccessState,
+			requiresAccessibilityCheck,
+			EtaSource.PLANNED.name(),
+			"TIMETABLE",
+			"시간표"
+		);
 	}
 
 	private static LoadRouteTimetablePort routeTimetablePort() {
