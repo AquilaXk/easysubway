@@ -6,7 +6,7 @@ import 'package:easysubway_mobile/features/network_map/presentation/structured_r
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-MapCameraState camera({double scale = 1.0}) {
+MapCameraState camera({double scale = 1.0, double? initialScale}) {
   return MapCameraState(
     sourceBounds: const Rect.fromLTWH(0, 0, 1000, 1000),
     viewportSize: const Size(400, 400),
@@ -15,6 +15,7 @@ MapCameraState camera({double scale = 1.0}) {
     minScale: 0.5,
     maxScale: 3.5,
     revision: 1,
+    initialScale: initialScale,
   );
 }
 
@@ -58,23 +59,27 @@ StructuredRouteMap sampleMap() {
 
 void main() {
   group('routeMapZoomBucket', () {
-    test('최소 확대는 bucket 0, 중간은 1, 최대는 2', () {
-      expect(routeMapZoomBucket(camera(scale: 0.5)), 0);
-      expect(routeMapZoomBucket(camera(scale: 2.0)), 1);
-      expect(routeMapZoomBucket(camera(scale: 3.5)), 2);
+    // #1764 A: 절대 scale이 아니라 지역 초기 화면(initialScale) 대비 배율로 판정.
+    test('초기 화면 배율 1.0은 bucket 1', () {
+      expect(routeMapZoomBucket(camera(scale: 1.0, initialScale: 1.0)), 1);
+      // 지역 크기가 달라도(초기 scale 0.3) 배율 1.0이면 초기 화면은 bucket 1.
+      expect(routeMapZoomBucket(camera(scale: 0.3, initialScale: 0.3)), 1);
     });
 
-    test('scale 범위가 0이면 2', () {
-      final flat = MapCameraState(
-        sourceBounds: const Rect.fromLTWH(0, 0, 10, 10),
-        viewportSize: const Size(10, 10),
-        center: const Offset(5, 5),
-        scale: 1.0,
-        minScale: 1.0,
-        maxScale: 1.0,
-        revision: 0,
-      );
-      expect(routeMapZoomBucket(flat), 2);
+    test('초기보다 더 축소(r<0.75)하면 bucket 0', () {
+      expect(routeMapZoomBucket(camera(scale: 0.7, initialScale: 1.0)), 0);
+      expect(routeMapZoomBucket(camera(scale: 0.74, initialScale: 1.0)), 0);
+    });
+
+    test('초기 대비 1.8배 이상 확대해야 bucket 2', () {
+      expect(routeMapZoomBucket(camera(scale: 1.79, initialScale: 1.0)), 1);
+      expect(routeMapZoomBucket(camera(scale: 1.8, initialScale: 1.0)), 2);
+      expect(routeMapZoomBucket(camera(scale: 3.6, initialScale: 1.0)), 2);
+    });
+
+    test('initialScale 미지정이면 현재 scale 기준(배율 1.0) → bucket 1', () {
+      expect(routeMapZoomBucket(camera(scale: 2.0)), 1);
+      expect(routeMapZoomBucket(camera(scale: 0.5)), 1);
     });
   });
 
@@ -199,7 +204,7 @@ void main() {
     final canvas = Canvas(recorder);
     final painter = StructuredRouteMapPainter(
       map: sampleMap(),
-      camera: camera(scale: 0.5), // bucket 0 → 환승역 점만
+      camera: camera(scale: 0.5), // initialScale 미지정 → 배율 1.0 → bucket 1
       lineColors: routeMapLineColors(const {'L1': '#0052A4'}),
     );
     painter.paint(canvas, const Size(400, 400));

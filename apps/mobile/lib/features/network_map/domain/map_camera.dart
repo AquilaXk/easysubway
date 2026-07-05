@@ -12,10 +12,12 @@ class MapCameraState {
     required this.minScale,
     required this.maxScale,
     required this.revision,
+    this.initialScale,
   }) : assert(scale > 0),
        assert(minScale > 0),
        assert(maxScale >= minScale),
-       assert(revision >= 0);
+       assert(revision >= 0),
+       assert(initialScale == null || initialScale > 0);
 
   final Rect sourceBounds;
   final Size viewportSize;
@@ -24,6 +26,12 @@ class MapCameraState {
   final double minScale;
   final double maxScale;
   final int revision;
+
+  /// 해당 지역 초기 화면(initialBounds contain-fit)의 scale. LOD zoom bucket을
+  /// 절대 scale이 아니라 "초기 화면 대비 배율"로 판정하기 위한 안정적 기준값이며,
+  /// zoom/focus/pan으로 카메라가 변해도 지역 baseline으로 보존한다(#1764 A).
+  /// 테스트 등에서 미지정 시 bucket 계산은 현재 scale을 기준(배율 1.0)으로 본다.
+  final double? initialScale;
 
   Rect get visibleSourceRect {
     final sourceWidth = viewportSize.width / scale;
@@ -91,6 +99,7 @@ class MapCameraState {
     double? minScale,
     double? maxScale,
     int? revision,
+    double? initialScale,
   }) {
     return MapCameraState(
       sourceBounds: sourceBounds ?? this.sourceBounds,
@@ -100,6 +109,8 @@ class MapCameraState {
       minScale: minScale ?? this.minScale,
       maxScale: maxScale ?? this.maxScale,
       revision: revision ?? this.revision,
+      // zoom/pan/clamp가 지역 baseline을 잃지 않도록 보존한다(#1764 A).
+      initialScale: initialScale ?? this.initialScale,
     );
   }
 }

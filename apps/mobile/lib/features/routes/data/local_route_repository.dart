@@ -1,4 +1,5 @@
 import '../../../core/database/catalog/catalog_database.dart';
+import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
 import '../application/network_graph.dart' as graph;
 import '../application/route_engine.dart';
@@ -368,17 +369,19 @@ class LocalRouteRepository implements RouteSearchRepository {
   String _blockedReasonMessage(String code) {
     return switch (code) {
       'STAIR_ONLY_ACCESS' => '계단 없는 경로를 아직 찾지 못했어요.',
-      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
-      'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 길인지 아직 알 수 없어요.',
+      // 불확실성 헤지는 앱 공통 사전 한 벌로(#1577). 연결 미확인은 계단이 아니라
+      // 경로 연결 문구로 바로잡는다(이전 매핑 불일치 수정).
+      'STAIR_ONLY_ACCESS_UNKNOWN' => routeHedgeStepFreeUnknown,
+      'GENERATED_CONNECTOR_UNVERIFIED' => routeHedgeConnectivityUnknown,
       'FACILITY_UNAVAILABLE' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
-      'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
+      'ACCESSIBILITY_STATE_UNKNOWN' => routeHedgeAccessibilityUnknown,
       'STALE_ACCESSIBILITY_DATA' => '오래된 안내라 계단 없는 경로로 안내하지 않아요.',
       'BLOCKED_UNVERIFIED_EDGE' => '검증되지 않은 경로는 안내하지 않아요.',
       'BLOCKED_MISSING_EVIDENCE_HASH' => '검증 근거가 없는 경로는 안내하지 않아요.',
       'BLOCKED_PLACEHOLDER_EVIDENCE_HASH' => '임시 근거만 있는 경로는 안내하지 않아요.',
       'BLOCKED_UNSUPPORTED_SCOPE' => '지원 범위 밖 경로는 안내하지 않아요.',
       'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.',
-      'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
+      'ROUTE_GRAPH_UNKNOWN' => routeHedgeConnectivityUnknown,
       _ => '안내할 수 있는 경로를 아직 찾지 못했어요.',
     };
   }
