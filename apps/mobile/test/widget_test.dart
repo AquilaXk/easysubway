@@ -3783,10 +3783,11 @@ void main() {
     expect(find.text('데이터 및 지도 출처'), findsOneWidget);
     expect(find.byType(Scrollable), findsOneWidget);
     expect(find.text('현재 앱 표시'), findsOneWidget);
-    expect(
-      find.textContaining('전국 쉬운 길이나 실시간 도착을 보장한다고 말하지 않아요'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('공식·공개 자료를 바탕으로'), findsOneWidget);
+    // 내부 거버넌스 언어(pilot·"~보장한다고 말하지 않아요")는 사용자 화면에
+    // 노출하지 않는다(#1765).
+    expect(find.textContaining('pilot'), findsNothing);
+    expect(find.textContaining('보장한다고 말하지 않아요'), findsNothing);
     await tester.scrollUntilVisible(find.text('데이터 품질 Level'), 160);
     await tester.pumpAndSettle();
     expect(find.text('데이터 품질 Level'), findsOneWidget);
