@@ -1230,3 +1230,35 @@ body.admin-v3 {
 	color: var(--admin-ink-2);
 	font-size: 12px;
 }
+
+/* breadcrumb(#1738) */
+.admin-v3 .admin-breadcrumb ol {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	align-items: center;
+	list-style: none;
+	margin: 0 0 12px;
+	padding: 0;
+	color: var(--admin-ink-2);
+	font-size: 13px;
+}
+
+.admin-v3 .admin-breadcrumb li:not(:first-child)::before {
+	content: "\203A";
+	margin-right: 6px;
+	color: var(--admin-ink-3);
+}
+
+.admin-v3 .admin-breadcrumb a {
+	color: var(--admin-ink-2);
+	text-decoration: none;
+}
+
+.admin-v3 .admin-breadcrumb a:hover {
+	text-decoration: underline;
+}
+
+.admin-v3 .admin-breadcrumb [aria-current="page"] {
+	color: var(--admin-ink);
+}

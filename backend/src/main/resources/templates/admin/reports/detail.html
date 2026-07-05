@@ -13,6 +13,8 @@
 <main class="admin-main">
 	<div th:replace="~{admin/fragments/shell :: topbar}"></div>
 	<div th:replace="~{admin/fragments/shell :: contentStart}"></div>
+	<!-- breadcrumb은 풀페이지 전용(드로어 fragment 밖) -->
+	<div th:replace="~{admin/fragments/shell :: breadcrumb('제보·품질·확인', '제보 확인 대기열', '/admin/reports/page', '상세')}"></div>
 	<!-- 드로어(사이드 패널) htmx 로드 대상(#1737): 이 fragment만 부분 응답으로 반환된다. -->
 	<div th:fragment="detailBody">
 	<header class="admin-page-head">

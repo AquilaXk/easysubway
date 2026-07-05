@@ -40,6 +40,19 @@
 	</div>
 </div>
 <div th:fragment="contentStart" id="admin-content" class="admin-content-anchor" tabindex="-1"></div>
+<!--
+  breadcrumb(#1738): 그룹 > 프로그램(링크) > 상세. 상세 화면(reports/detail 등)에서 위치를 보여준다.
+  detailLabel이 null이면 2단만 렌더. 화면군 이슈가 재사용한다.
+-->
+<nav th:fragment="breadcrumb(groupLabel, programLabel, programHref, detailLabel)"
+     class="admin-breadcrumb" aria-label="위치">
+	<ol>
+		<li th:text="${groupLabel}">그룹</li>
+		<li><a th:href="@{${programHref}}" th:text="${programLabel}">프로그램</a></li>
+		<li th:if="${detailLabel != null and !detailLabel.isEmpty()}"
+		    aria-current="page" th:text="${detailLabel}">상세</li>
+	</ol>
+</nav>
 <output th:fragment="flash" class="alert alert-dismissible"
         th:if="${flashMessage != null && !flashMessage.isBlank()}"
         th:classappend="${flashTone == 'failure'} ? ' failure' : (${flashTone == 'warning'} ? ' warning' : ' good')"
