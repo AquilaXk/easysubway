@@ -19,12 +19,13 @@ Options:
                             renderer latency focus on gestures instead of initial map entry.
   -h, --help                Show this help.
 
-The script installs nothing. Install a debug or profile APK first, then run this
-against the same device. Release APKs are not supported because the renderer
-dispose signal is intentionally emitted only in debug/profile builds. It fails
-when the device is unavailable, the route map flow cannot be driven, evidence
-files are empty, or the renderer dispose log is not observed after leaving the
-route map.
+The script installs nothing. Install a debug or profile APK first (framestats
+are most useful there) and complete onboarding so the app opens directly to the
+route map home. The route map uses the structured native canvas renderer
+(#1641); there is no WebView dispose signal, so the gate is renderer crash
+signatures during pan/zoom instead. It fails when the device is unavailable,
+the route map cannot be driven, evidence files are empty, or a renderer crash
+signature is observed during the gesture window.
 USAGE
 }
 
@@ -153,9 +154,8 @@ fi
 
 WIDTH="${BASH_REMATCH[1]}"
 HEIGHT="${BASH_REMATCH[2]}"
-ROUTE_TAB_X=$((WIDTH * 3 / 10))
-HOME_TAB_X=$((WIDTH / 10))
-BOTTOM_NAV_Y=$((HEIGHT * 9 / 10))
+# 노선도는 홈 화면이다(#1641 구조화 canvas 전환 이후 하단 탭 없음). 앱은 온보딩을
+# 마친 상태여야 하며, 실행 즉시 노선도가 표시된다.
 PAN_Y=$((HEIGHT / 2))
 PAN_LEFT_X=$((WIDTH * 3 / 10))
 PAN_RIGHT_X=$((WIDTH * 7 / 10))
@@ -179,22 +179,16 @@ require_non_empty "$ARTIFACT_DIR/package.txt"
 
 adb_device logcat -c
 adb_device shell am force-stop "$PACKAGE"
+adb_device shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null 2>&1 || true
 adb_device shell monkey -p "$PACKAGE" 1 > "$ARTIFACT_DIR/launch.txt"
 sleep "$SETTLE_SECONDS"
 
-capture_screen "home"
-capture_ui_tree "home"
-
-if [[ "$MEASURE_AFTER_ROUTE_MAP_SETTLE" != "true" ]]; then
-  adb_device shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null
-fi
-adb_device shell input tap "$ROUTE_TAB_X" "$BOTTOM_NAV_Y"
-sleep "$SETTLE_SECONDS"
-
+# 노선도는 홈 화면이라 실행 즉시 표시된다(별도 진입 탭 없음).
 capture_screen "route-map"
 capture_ui_tree "route-map"
 
 if [[ "$MEASURE_AFTER_ROUTE_MAP_SETTLE" == "true" ]]; then
+  # 제스처 구간만 분리 측정: 노선도 안착 후 프레임/로그 증거를 리셋한다.
   adb_device shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null
   adb_device logcat -c
 fi
@@ -212,19 +206,28 @@ require_non_empty "$ARTIFACT_DIR/gfxinfo.txt"
 require_non_empty "$ARTIFACT_DIR/gfxinfo-framestats.txt"
 require_non_empty "$ARTIFACT_DIR/meminfo.txt"
 
-adb_device shell input tap "$HOME_TAB_X" "$BOTTOM_NAV_Y"
-sleep "$SETTLE_SECONDS"
-
-capture_screen "after-route-map-exit"
-capture_ui_tree "after-route-map-exit"
+capture_screen "after-pan"
+capture_ui_tree "after-pan"
 adb_device logcat -d -v time > "$ARTIFACT_DIR/logcat.txt"
 require_non_empty "$ARTIFACT_DIR/logcat.txt"
 
-grep "routeMapRenderer" "$ARTIFACT_DIR/logcat.txt" > "$ARTIFACT_DIR/route-map-renderer.log" || true
-require_non_empty "$ARTIFACT_DIR/route-map-renderer.log"
+# 구조화 canvas 렌더러는 pure Flutter CustomPaint라 WebView dispose 신호가 없다
+# (#1641에서 WebView 렌더러·health monitor 제거). 대신 pan/zoom 구간에서 렌더러
+# 크래시(FATAL EXCEPTION / Flutter 엔진 abort)가 없었는지를 차단 조건으로 둔다.
+grep -E "FATAL EXCEPTION|E AndroidRuntime|Lost connection to device|## Flutter engine|libflutter.*abort" \
+  "$ARTIFACT_DIR/logcat.txt" > "$ARTIFACT_DIR/renderer-crashes.log" || true
+if [[ -s "$ARTIFACT_DIR/renderer-crashes.log" ]]; then
+  echo "Route map renderer crash signatures observed during pan/zoom:" >&2
+  cat "$ARTIFACT_DIR/renderer-crashes.log" >&2
+  exit 1
+fi
 
-if ! grep -q "routeMapRenderer disposed" "$ARTIFACT_DIR/route-map-renderer.log"; then
-  echo "routeMapRenderer disposed log was not observed after route map exit." >&2
+# #1643: FrameTiming 계측 로그(routeMapFrame buildMs/rasterMs/totalMs). 구조화
+# canvas는 dumpsys gfxinfo로 프레임이 안 잡혀 이 로그가 프레임 성능의 정본이다.
+grep "routeMapFrame" "$ARTIFACT_DIR/logcat.txt" > "$ARTIFACT_DIR/route-map-frames.log" || true
+if [[ ! -s "$ARTIFACT_DIR/route-map-frames.log" ]]; then
+  echo "No routeMapFrame timing logs captured. Use a debug/profile build and" >&2
+  echo "ensure the route map was on screen during the gesture window." >&2
   exit 1
 fi
 
@@ -238,10 +241,17 @@ fi
   echo "- pan_count: $PAN_COUNT"
   echo "- measurement_scope: $MEASUREMENT_SCOPE"
   echo
-  echo "## Renderer logs"
-  grep "routeMapRenderer" "$ARTIFACT_DIR/route-map-renderer.log" || true
+  echo "## Renderer stability"
+  echo "- renderer: structured-canvas (#1641)"
+  echo "- crash_signatures_during_pan: $(wc -l < "$ARTIFACT_DIR/renderer-crashes.log" | tr -d ' ')"
   echo
-  echo "## gfxinfo headline"
+  echo "## Frame timing (FrameTiming, primary)"
+  echo "- routeMapFrame_samples: $(wc -l < "$ARTIFACT_DIR/route-map-frames.log" | tr -d ' ')"
+  echo "- analyze with: node tools/mobile/analyze-route-map-android-evidence.mjs --artifact-dir <dir>"
+  echo
+  echo "## gfxinfo headline (HWUI only — NOT Flutter canvas frames)"
+  echo "- note: Flutter는 자체 렌더 파이프라인이라 dumpsys gfxinfo가 노선도 프레임을"
+  echo "  잡지 못한다. 프레임 성능은 위 FrameTiming(route-map-frames.log)이 정본이다."
   grep -E "Total frames rendered|Janky frames|50th percentile|90th percentile|95th percentile|99th percentile" "$ARTIFACT_DIR/gfxinfo.txt" || true
   echo
   echo "## meminfo headline"

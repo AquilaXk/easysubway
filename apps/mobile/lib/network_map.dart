@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -2265,6 +2266,26 @@ const _routeMapGestureMaxTranslationDriftFraction = 1.35;
 const _routeMapGestureMaxScaleRatio = 3.4;
 const _routeMapGestureRendererOverscanFactor = 3.25;
 
+/// #1643 성능 QA: 노선도 프레임의 build/raster/total 시간을 logcat에 기록한다.
+/// run-route-map-android-evidence.sh가 'routeMapFrame' 라인을 grep해 jank·P90를
+/// 산출한다(Flutter는 dumpsys gfxinfo로 프레임이 안 잡혀 FrameTiming으로 계측).
+void _logRouteMapFrameTimings(List<FrameTiming> timings) {
+  for (final timing in timings) {
+    final buildMs = timing.buildDuration.inMicroseconds / 1000.0;
+    final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
+    final totalMs = timing.totalSpan.inMicroseconds / 1000.0;
+    // debugPrint는 throttle(debugPrintThrottled)이라 pan 중 다량의 프레임 로그를
+    // 큐잉·드롭해 janky burst 구간을 undercount할 수 있다(jank% 하향 편향). 측정
+    // 정확도를 위해 unthrottled synchronous 출력으로 모든 프레임을 남긴다.
+    debugPrintSynchronously(
+      'routeMapFrame '
+      'buildMs=${buildMs.toStringAsFixed(2)} '
+      'rasterMs=${rasterMs.toStringAsFixed(2)} '
+      'totalMs=${totalMs.toStringAsFixed(2)}',
+    );
+  }
+}
+
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     with WidgetsBindingObserver {
   String? _layoutKey;
@@ -2294,10 +2315,19 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // #1643 성능 QA: 노선도가 떠 있는 동안 프레임 build/raster 시간을 logcat에
+    // 기록한다. 구조화 canvas는 Flutter 자체 렌더 파이프라인이라 dumpsys gfxinfo로
+    // 프레임이 잡히지 않으므로 FrameTiming으로 계측한다. release에는 넣지 않는다.
+    if (!kReleaseMode) {
+      SchedulerBinding.instance.addTimingsCallback(_logRouteMapFrameTimings);
+    }
   }
 
   @override
   void dispose() {
+    if (!kReleaseMode) {
+      SchedulerBinding.instance.removeTimingsCallback(_logRouteMapFrameTimings);
+    }
     WidgetsBinding.instance.removeObserver(this);
     _pendingCamera = null;
     super.dispose();

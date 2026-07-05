@@ -11509,14 +11509,17 @@ test("노선도 Android 실기기 evidence runner는 frame, memory, renderer rec
   assert.match(script, /logcat -d -v time > "\$ARTIFACT_DIR\/logcat\.txt"/);
   assert.match(script, /uiautomator dump/);
   assert.match(script, /screencap -p/);
-  assert.match(script, /routeMapRenderer disposed/);
-  assert.match(script, /input tap "\$ROUTE_TAB_X" "\$BOTTOM_NAV_Y"/);
-  assert.match(script, /input tap "\$HOME_TAB_X" "\$BOTTOM_NAV_Y"/);
+  // #1641 native canvas 렌더러: WebView dispose 로그 대신 pan/zoom 크래시
+  // 시그니처가 차단 조건이다. 노선도가 홈이라 하단 탭 진입/이탈이 없다.
+  assert.match(script, /renderer-crashes\.log/);
+  assert.match(script, /FATAL EXCEPTION/);
+  assert.doesNotMatch(script, /routeMapRenderer disposed/);
+  assert.doesNotMatch(script, /BOTTOM_NAV_Y/);
   assert.match(script, /input swipe "\$PAN_RIGHT_X" "\$PAN_Y" "\$PAN_LEFT_X" "\$PAN_Y"/);
   assert.match(script, /summary\.md/);
 });
 
-test("노선도 Android evidence analyzer는 profile frame, memory, camera latency를 요약한다", async () => {
+test("노선도 Android evidence analyzer는 profile frame, memory, 렌더러 안정성을 요약한다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-route-map-evidence-"));
   const artifactDir = path.join(dir, "run-1");
   await mkdir(artifactDir, { recursive: true });
@@ -11554,12 +11557,16 @@ test("노선도 Android evidence analyzer는 profile frame, memory, camera laten
       "TOTAL PSS:   591090            TOTAL RSS:   723053       TOTAL SWAP PSS:      272",
     ].join("\n"),
   );
+  // native canvas 렌더러는 pan/zoom 구간에서 크래시 시그니처가 없어야 한다(빈 로그).
+  await writeFile(path.join(artifactDir, "renderer-crashes.log"), "");
+  // #1643 FrameTiming 정본: 앱이 로깅한 노선도 프레임 build/raster/total(ms).
   await writeFile(
-    path.join(artifactDir, "route-map-renderer.log"),
+    path.join(artifactDir, "route-map-frames.log"),
     [
-      "06-26 10:25:37.509 I/flutter: routeMapRenderer cameraLatency revision=0 elapsedMs=12",
-      "06-26 10:25:42.432 I/flutter: routeMapRenderer cameraLatency revision=1 elapsedMs=48",
-      "06-26 10:25:46.185 I/flutter: routeMapRenderer disposed",
+      "routeMapFrame buildMs=4.20 rasterMs=6.10 totalMs=12.50",
+      "routeMapFrame buildMs=5.00 rasterMs=8.00 totalMs=14.00",
+      "routeMapFrame buildMs=18.30 rasterMs=9.00 totalMs=22.10",
+      "routeMapFrame buildMs=6.00 rasterMs=7.50 totalMs=13.00",
     ].join("\n"),
   );
 
@@ -11583,10 +11590,16 @@ test("노선도 Android evidence analyzer는 profile frame, memory, camera laten
   assert.equal(output.runs[0].gfxinfo.jankyPercent, 5.36);
   assert.equal(output.runs[0].gfxinfo.p99Ms, 33);
   assert.equal(output.runs[0].meminfo.totalPssKb, 591090);
-  assert.equal(output.runs[0].renderer.cameraLatencyP95Ms, 48);
+  assert.equal(output.runs[0].renderer.crashSignatureCount, 0);
+  // FrameTiming(정본): 4 프레임 중 1개(build 18.3ms)가 1 vsync 초과 = 25% janky.
+  assert.equal(output.runs[0].frameTiming.frameSampleCount, 4);
+  assert.equal(output.runs[0].frameTiming.jankyFrames, 1);
+  assert.equal(output.runs[0].frameTiming.jankyPercent, 25);
+  assert.equal(output.runs[0].frameTiming.buildP90Ms, 18.3);
   assert.deepEqual(output.aggregate.measurementScopes, ["gesture_after_route_map_settle"]);
   assert.equal(output.aggregate.maxP95FrameMs, 25);
-  assert.equal(output.aggregate.disposeObservedInAllRuns, true);
+  assert.equal(output.aggregate.maxFrameJankyPercent, 25);
+  assert.equal(output.aggregate.noCrashesInAllRuns, true);
 });
 
 async function classifyChangedFiles(files) {
