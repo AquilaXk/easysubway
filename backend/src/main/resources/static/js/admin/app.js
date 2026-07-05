@@ -262,19 +262,24 @@ document.addEventListener('alpine:init', function () {
 			rowLinks: function () {
 				return Array.prototype.slice.call(this.$root.querySelectorAll('.report-row .detail-link'));
 			},
-			// 현재 포커스가 향한 행의 상세 링크. 포커스가 표 밖이면 첫 행으로 대체한다.
+			// 현재 포커스가 향한 행의 상세 링크. 포커스가 표 밖이면 첫 행으로 대체한다(비파괴 동작 전용).
 			currentLink: function () {
 				var links = this.rowLinks();
 				if (!links.length) {
 					return null;
 				}
+				return this.focusedRowLink() || links[0];
+			},
+			// 포커스가 실제로 어느 행 안에 있을 때만 그 행의 상세 링크를 준다(없으면 null, 첫 행 폴백 없음).
+			// 승인·반려처럼 파괴적인 단축키가 포커스가 표 밖일 때 첫 행을 잘못 처리하지 않게 한다.
+			focusedRowLink: function () {
 				var active = document.activeElement;
+				var links = this.rowLinks();
 				if (links.indexOf(active) !== -1) {
 					return active;
 				}
 				var row = active && active.closest ? active.closest('.report-row') : null;
-				var link = row ? row.querySelector('.detail-link') : null;
-				return link || links[0];
+				return row ? row.querySelector('.detail-link') : null;
 			},
 			isFormField: function (element) {
 				if (!element) {
@@ -306,8 +311,9 @@ document.addEventListener('alpine:init', function () {
 				}
 			},
 			// 활성 행 하나만 선택 상태로 만들고 일괄 검수 폼을 해당 결정으로 제출한다(단일 처리 시맨틱).
+			// 포커스가 표 밖이면 아무 것도 하지 않는다(첫 행 오처리 방지) — focusedRowLink는 폴백이 없다.
 			processActive: function (decision) {
-				var link = this.currentLink();
+				var link = this.focusedRowLink();
 				if (!link) {
 					return;
 				}
