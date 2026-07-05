@@ -62,7 +62,9 @@ function forceJsonFormat(sampleUrl) {
 }
 
 function assertRedactedServiceKey(sampleUrl, candidateId) {
-  const serviceKeys = new URL(sampleUrl).searchParams.getAll("serviceKey");
+  const serviceKeys = [...new URL(sampleUrl).searchParams.entries()]
+    .filter(([name]) => name.toLowerCase() === "servicekey")
+    .map(([, value]) => value);
   if (serviceKeys.length !== 1 || serviceKeys[0] !== "[서비스키값]") {
     throw new Error(`${candidateId} sampleUrl must keep exactly one redacted serviceKey`);
   }

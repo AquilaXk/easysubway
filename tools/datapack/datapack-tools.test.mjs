@@ -6303,6 +6303,23 @@ test("KRIC route graph 수집 계획은 실제 serviceKey가 섞인 후보를 �
     ),
     /sampleUrl must keep exactly one redacted serviceKey/,
   );
+
+  candidate.evidence.sampleUrl = `${originalSampleUrl}&ServiceKey=real-secret-key`;
+  await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/plan-kric-route-graph-collection.mjs",
+        "--candidates",
+        candidatesPath,
+        "--candidate",
+        "kric-subway-route-info",
+      ],
+      { cwd: root },
+    ),
+    /sampleUrl must keep exactly one redacted serviceKey/,
+  );
 });
 
 test("source candidate sample 검증기는 evidence hash metadata 누락을 거부한다", async () => {
