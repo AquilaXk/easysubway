@@ -56,7 +56,7 @@ class RouteTimetableRaptorPlanner {
 		ServiceDay serviceDay = serviceDay(command);
 		for (int dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
 			LocalDate candidateServiceDate = serviceDay.date().plusDays(dayOffset);
-			int startSeconds = dayOffset == 0 ? serviceDay.departureSeconds() : 0;
+			int startSeconds = candidateServiceDateStartSeconds(command, candidateServiceDate);
 			Optional<Integer> departureSeconds = firstFeasibleDepartureSeconds(
 				command,
 				timetable,
@@ -70,6 +70,20 @@ class RouteTimetableRaptorPlanner {
 			}
 		}
 		return Optional.empty();
+	}
+
+	private static int candidateServiceDateStartSeconds(SearchRouteV2Command command, LocalDate candidateServiceDate) {
+		long seconds = Duration.between(
+			candidateServiceDate.atStartOfDay(SERVICE_ZONE),
+			command.departureTime().atZoneSameInstant(SERVICE_ZONE)
+		).toSeconds();
+		if (seconds <= 0) {
+			return 0;
+		}
+		if (seconds >= LoadRouteTimetablePort.SERVICE_DAY_SECONDS_LIMIT_EXCLUSIVE) {
+			return LoadRouteTimetablePort.SERVICE_DAY_SECONDS_LIMIT_EXCLUSIVE;
+		}
+		return Math.toIntExact(seconds);
 	}
 
 	private Optional<Integer> firstFeasibleDepartureSeconds(

@@ -9483,6 +9483,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /statusesOf/);
   assert.match(raptorPlanner, /class RouteTimetableRaptorPlanner/);
   assert.match(raptorPlanner, /Optional<OffsetDateTime> nextServiceTime/);
+  assert.match(raptorPlanner, /candidateServiceDateStartSeconds/);
   assert.match(raptorPlanner, /firstFeasibleDepartureSeconds/);
   assert.match(raptorPlanner, /scanDestinationLabels/);
   assert.doesNotMatch(raptorPlanner, /directDepartureSeconds/);
