@@ -9039,10 +9039,10 @@ test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계�
   assert.match(adminTemplate, /고장 신고 수/);
 	assert.match(adminTemplate, /정보 확인 중/);
 	assert.match(adminTemplate, /고장·공사 반영/);
-  // 내부 데이터 품질 라벨은 #1578에서 사용자 노출을 중립화했다(빈 문자열/false).
+  // 내부 데이터 품질 라벨은 #1578에서 사용자 노출을 중립화했다(빈 문자열).
   // 등급→사용자 문구 매핑을 다시 노출하지 않는지 가드한다.
+  // (표시 게이트 _showsDataQualityLabel은 #1569에서 즐겨찾기 역 목록 UI와 함께 제거됨.)
   assert.match(mobileStationSearch, /_dataQualityLabel\(String dataQualityLevel\) => '';/);
-  assert.match(mobileStationSearch, /_showsDataQualityLabel\(String dataQualityLevel\) => false;/);
   assert.doesNotMatch(mobileStationSearch, /'LEVEL_1' => '일부 정보는 확인 중이에요'/);
   // 경로 점수 가중치(등급→점수)는 사용자 라벨이 아니므로 유지한다.
   assert.match(mobileRouteRepository, /'LEVEL_1' => 40/);
@@ -9843,10 +9843,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /경로 피드백 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(routeSearch, /favoriteRouteSaveFailureNextAction/);
   assert.match(routeSearch, /네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요\./);
-  assert.match(routeSearch, /favoriteRouteLoadFailureNextAction/);
-  assert.match(routeSearch, /네트워크 상태를 확인한 뒤 다시 불러와 주세요\./);
+  // 즐겨찾기 경로 목록 화면(과 로드 실패 안내 카피)은 #1569에서 홈 인라인 리스트로 대체되며 제거됨.
   assert.match(widgetTest, /즐겨찾기 경로 저장 실패는 도움말을 쉬운 문구로 안내한다/);
-  assert.match(widgetTest, /즐겨찾기 경로 목록 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(routeSearch, /import 'core\/network\/api_client\.dart';/);
   assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
   assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*_apiClient\.postJson\(/);

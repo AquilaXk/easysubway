@@ -5307,33 +5307,6 @@ void main() {
     }
   });
 
-  testWidgets('즐겨찾기 역 목록은 경로 draft controller가 없으면 경로 설정 버튼을 숨긴다', (
-    tester,
-  ) async {
-    final favoriteRepository = FakeFavoriteStationRepository(
-      favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
-    );
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: FavoriteStationListContent(
-            repository: favoriteRepository,
-            stationRepository: FakeStationSearchRepository(),
-            reportRepository: FakeFacilityReportRepository(),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('상록수'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '출발지로 설정'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '도착지로 설정'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '역 상세 보기'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '시설 상태 확인'), findsOneWidget);
-  });
-
   testWidgets('홈 즐겨찾기 시설은 즐겨찾기한 시설을 큰 목록으로 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final favoriteFacilityRepository = FakeFavoriteFacilityRepository(
@@ -5535,45 +5508,6 @@ void main() {
     expect(searchAgainDraft?.origin?.id, 'station-sangnoksu');
     expect(searchAgainDraft?.destination?.id, 'station-sadang');
     expect(searchAgainMobilityType, 'WHEELCHAIR');
-  });
-
-  testWidgets('즐겨찾기 경로 목록 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
-    final semanticsHandle = tester.ensureSemantics();
-    final favoriteRouteRepository = FakeFavoriteRouteRepository()
-      ..error = const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했어요.');
-
-    try {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: FavoriteRouteListContent(repository: favoriteRouteRepository),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('즐겨찾기 경로를 불러오지 못했어요.'), findsOneWidget);
-      expect(find.text('네트워크 상태를 확인한 뒤 다시 불러와 주세요.'), findsOneWidget);
-      expect(
-        find.bySemanticsLabel('도움말, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.'),
-        findsOneWidget,
-      );
-      expect(
-        tester.getSemantics(
-          find.byKey(const Key('favoriteRouteLoadFailureNextAction')),
-        ),
-        isSemantics(
-          label: '도움말, 네트워크 상태를 확인한 뒤 다시 불러와 주세요.',
-          isLiveRegion: true,
-        ),
-      );
-      expect(
-        find.byKey(const Key('favoriteRoutesRetryButton')),
-        findsOneWidget,
-      );
-    } finally {
-      semanticsHandle.dispose();
-    }
   });
 
   testWidgets('역 검색은 검색 버튼 없이 타이핑(디바운스)만으로 결과를 보여준다', (tester) async {
