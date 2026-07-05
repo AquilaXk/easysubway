@@ -1370,31 +1370,6 @@ void main() {
     );
   });
 
-  test('즐겨찾기 역 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
-    final repository = FakeFavoriteStationRepository();
-    final controller = FavoriteStationListController(repository: repository);
-
-    repository.favorites = [
-      _favoriteStation(id: 'station-sangnoksu', name: '상록수'),
-    ];
-    await controller.load();
-
-    expect(controller.state.status, FavoriteStationListStatus.success);
-    expect(controller.state.favorites.single.nameKo, '상록수');
-
-    repository.favorites = const [];
-    await controller.load();
-
-    expect(controller.state.status, FavoriteStationListStatus.empty);
-    expect(controller.state.message, '즐겨찾기한 역이 없습니다.');
-
-    repository.error = const FavoriteStationException('즐겨찾기를 불러오지 못했어요.');
-    await controller.load();
-
-    expect(controller.state.status, FavoriteStationListStatus.failure);
-    expect(controller.state.message, '즐겨찾기를 불러오지 못했어요.');
-  });
-
   test('역 상세 즐겨찾기 컨트롤러는 저장과 해제를 순서대로 처리한다', () async {
     final repository = FakeFavoriteStationRepository();
     final controller = StationFavoriteToggleController(
