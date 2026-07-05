@@ -39,6 +39,86 @@ int routeMapZoomBucket(MapCameraState camera) {
   return 2;
 }
 
+/// 라벨 우선순위(낮을수록 먼저 자리 차지): 환승 0 > 주요 1 > 일반 2.
+int routeMapLabelPriorityFor(RouteMapLabelClass labelClass) {
+  switch (labelClass) {
+    case RouteMapLabelClass.transfer:
+      return 0;
+    case RouteMapLabelClass.major:
+      return 1;
+    case RouteMapLabelClass.regular:
+      return 2;
+  }
+}
+
+/// #1642 라벨 렌더 경로의 순수 후보 생성. painter의 `_paintLabels`와 동일한
+/// bucket·LOD·환승/역 규칙으로 [RouteMapLabelCandidate] 목록을 만든다. 텍스트
+/// 실측([measure])·가시성([isVisible])만 주입받아 순수 함수라, 테스트가 지역·
+/// zoom bucket별로 후보 구성과 (placeRouteMapLabels 후) 겹침 0을 기계 판정할 수
+/// 있다. bucket 0(선만)이나 텍스트 없는 역은 후보에서 제외한다.
+List<RouteMapLabelCandidate> routeMapLabelCandidates(
+  StructuredRouteMap map,
+  MapCameraState camera,
+  int bucket, {
+  required Map<String, String> labelTextByStationId,
+  required Size Function(String id, String text) measure,
+  required bool Function(Offset source) isVisible,
+  required double stationRadius,
+  required double transferAnchorPadding,
+}) {
+  final candidates = <RouteMapLabelCandidate>[];
+  if (bucket < 1) {
+    return candidates;
+  }
+  if (bucket >= minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
+    for (final group in map.transferGroups) {
+      if (!isVisible(group.centroid)) {
+        continue;
+      }
+      final text = labelTextByStationId[group.stationId];
+      if (text == null || text.isEmpty) {
+        continue;
+      }
+      final id = 'transfer:${group.stationId}';
+      candidates.add(
+        RouteMapLabelCandidate(
+          id: id,
+          anchor: camera.sourceToViewportPoint(group.centroid),
+          size: measure(id, text),
+          priority: routeMapLabelPriorityFor(RouteMapLabelClass.transfer),
+          anchorPadding: transferAnchorPadding,
+        ),
+      );
+    }
+  }
+  for (final station in map.stations) {
+    if (station.labelClass == RouteMapLabelClass.transfer) {
+      continue;
+    }
+    if (bucket < minLabelZoomBucketFor(station.labelClass)) {
+      continue;
+    }
+    if (!isVisible(station.position)) {
+      continue;
+    }
+    final text = labelTextByStationId[station.stationId];
+    if (text == null || text.isEmpty) {
+      continue;
+    }
+    final id = '${station.stationId}:${station.lineId}';
+    candidates.add(
+      RouteMapLabelCandidate(
+        id: id,
+        anchor: camera.sourceToViewportPoint(station.position),
+        size: measure(id, text),
+        priority: routeMapLabelPriorityFor(station.labelClass),
+        anchorPadding: stationRadius,
+      ),
+    );
+  }
+  return candidates;
+}
+
 /// polyline의 bounding box가 [rect]와 겹치는지 — viewport culling 판정.
 bool routeMapPolylineIntersectsRect(List<Offset> polyline, Rect rect) {
   if (polyline.isEmpty) {
@@ -111,18 +191,6 @@ class StructuredRouteMapPainter extends CustomPainter {
   // 텍스트 실측은 비싸므로 TextPainter를 캐시한다. 외부(StatefulWidget)가 캐시를
   // 주입하면 rebuild 간에도 유지되고 소유자가 dispose한다. 없으면 인스턴스 수명용.
   final Map<String, TextPainter> _labelPainters;
-
-  /// 라벨 class → 배치 우선순위(낮을수록 우선). #1636 station_labels.priority.
-  static int _labelPriorityFor(RouteMapLabelClass labelClass) {
-    switch (labelClass) {
-      case RouteMapLabelClass.transfer:
-        return 0;
-      case RouteMapLabelClass.major:
-        return 1;
-      case RouteMapLabelClass.regular:
-        return 2;
-    }
-  }
 
   // 프레임마다 재할당하지 않도록 Paint를 인스턴스/정적 필드로 hoist한다.
   final Paint _linePaint = Paint()
@@ -227,66 +295,19 @@ class StructuredRouteMapPainter extends CustomPainter {
       return;
     }
     final bucket = routeMapZoomBucket(camera);
-    // 어떤 class든 라벨 최소 bucket은 1 — bucket 0은 lines only.
-    if (bucket < 1) {
-      return;
-    }
-    final candidates = <RouteMapLabelCandidate>[];
+    // 후보 생성은 순수 함수 routeMapLabelCandidates로 공유 — painter와 테스트가
+    // 동일 bucket·LOD·환승/역 규칙을 태운다(#1642 겹침 0 기계 판정 가능).
     final painterById = <String, TextPainter>{};
-
-    // 환승 라벨: transferGroups 중심, 마커 반지름만큼 여백을 둔다.
-    if (bucket >= minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
-      for (final group in map.transferGroups) {
-        if (!visible.contains(group.centroid)) {
-          continue;
-        }
-        final text = labelTextByStationId[group.stationId];
-        if (text == null || text.isEmpty) {
-          continue;
-        }
-        final id = 'transfer:${group.stationId}';
-        final painter = _labelPainter(text);
-        painterById[id] = painter;
-        candidates.add(
-          RouteMapLabelCandidate(
-            id: id,
-            anchor: camera.sourceToViewportPoint(group.centroid),
-            size: painter.size,
-            priority: _labelPriorityFor(RouteMapLabelClass.transfer),
-            anchorPadding: transferStationRadius + _transferBorderWidth,
-          ),
-        );
-      }
-    }
-
-    // 비환승 역 라벨(주요/일반): class별 LOD·우선순위를 적용한다.
-    for (final station in map.stations) {
-      if (station.labelClass == RouteMapLabelClass.transfer) {
-        continue;
-      }
-      if (bucket < minLabelZoomBucketFor(station.labelClass)) {
-        continue;
-      }
-      if (!visible.contains(station.position)) {
-        continue;
-      }
-      final text = labelTextByStationId[station.stationId];
-      if (text == null || text.isEmpty) {
-        continue;
-      }
-      final id = '${station.stationId}:${station.lineId}';
-      final painter = _labelPainter(text);
-      painterById[id] = painter;
-      candidates.add(
-        RouteMapLabelCandidate(
-          id: id,
-          anchor: camera.sourceToViewportPoint(station.position),
-          size: painter.size,
-          priority: _labelPriorityFor(station.labelClass),
-          anchorPadding: stationRadius,
-        ),
-      );
-    }
+    final candidates = routeMapLabelCandidates(
+      map,
+      camera,
+      bucket,
+      labelTextByStationId: labelTextByStationId,
+      isVisible: visible.contains,
+      stationRadius: stationRadius,
+      transferAnchorPadding: transferStationRadius + _transferBorderWidth,
+      measure: (id, text) => (painterById[id] ??= _labelPainter(text)).size,
+    );
 
     final placed = placeRouteMapLabels(
       candidates,
