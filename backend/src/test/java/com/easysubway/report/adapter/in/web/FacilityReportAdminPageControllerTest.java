@@ -109,6 +109,28 @@ class FacilityReportAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("신고 대기열은 키보드 단축키 도움말과 버튼 대체 수단을 함께 제공한다")
+	void adminReportListPageExposesKeyboardShortcutAffordances() throws Exception {
+		createReport("단축키 대상 신고");
+
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+
+		assertThat(html)
+			// 키보드 리스너·행 마커·단축키 도움말이 렌더된다(런타임 키 동작은 #1749 접근성 QA에서 검증).
+			.contains("x-on:keydown.window=\"handleKey\"")
+			.contains("class=\"report-row\"")
+			.contains("키보드 단축키")
+			// 스크린리더·no-JS를 위해 모든 단축키 동작은 버튼으로도 존재한다: 상세(o)·승인(a)·반려(r)·도움말(?).
+			.contains(">상세 보기</a>")
+			.contains("value=\"ACCEPT\"")
+			.contains("value=\"REJECT\"")
+			.contains("단축키 도움말 열기");
+	}
+
+	@Test
 	@DisplayName("관리자는 신고 목록 화면에서 다음 페이지로 이동한다")
 	void adminReportListPageShowsNextPageLink() throws Exception {
 		createReport("페이지 이동 신고 1");
