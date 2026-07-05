@@ -198,15 +198,20 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
     return byPriority != 0 ? byPriority : a.id.compareTo(b.id);
   });
   final mapCenter = _designBoundsCenter(map, design);
+  final lineGrid = _RouteMapLineGrid.build(map, design);
   final placedRects = <Rect>[];
   final labels = <RouteMapStaticLabel>[];
   final badges = <RouteMapStaticBadge>[];
   var unresolved = 0;
   for (final candidate in candidates) {
     final order = routeMapMapOutwardAnchorOrder(candidate.anchor, mapCenter);
-    Rect? chosen;
-    Rect? bestFallback;
-    var bestOverlapArea = double.infinity;
+    // 라벨-라벨 겹침 0(하드 계약)을 먼저 만족한 뒤, 그중 선 겹침이 최소인 위치를
+    // 고른다 — 라벨이 선을 안 덮도록(사실상 선에 수직인 바깥쪽으로 밀려난다).
+    Rect? perfect; // 라벨 0 & 선 0.
+    Rect? bestClear; // 라벨 0, 선 최소.
+    var bestClearLine = double.infinity;
+    Rect? bestFallback; // 라벨 겹침 최소(전부 충돌 시).
+    var bestFallbackLabel = double.infinity;
     for (final gap in [
       kRouteMapDesignLabelGapPx,
       kRouteMapDesignLabelGapPx + 6,
@@ -218,29 +223,36 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
           anchor,
           gap + candidate.anchorPadding,
         );
-        var overlapArea = 0.0;
+        var labelOverlap = 0.0;
         for (final other in placedRects) {
           final overlap = rect.intersect(other);
           if (overlap.width > 0 && overlap.height > 0) {
-            overlapArea += overlap.width * overlap.height;
+            labelOverlap += overlap.width * overlap.height;
           }
         }
-        if (overlapArea == 0) {
-          chosen = rect;
-          break;
+        if (labelOverlap == 0) {
+          final lineOverlap = lineGrid.overlapArea(rect);
+          if (lineOverlap == 0) {
+            perfect = rect;
+            break;
+          }
+          if (lineOverlap < bestClearLine) {
+            bestClearLine = lineOverlap;
+            bestClear = rect;
+          }
         }
-        if (overlapArea < bestOverlapArea) {
-          bestOverlapArea = overlapArea;
+        if (labelOverlap < bestFallbackLabel) {
+          bestFallbackLabel = labelOverlap;
           bestFallback = rect;
         }
       }
-      if (chosen != null) {
+      if (perfect != null) {
         break;
       }
     }
-    final rect = chosen ?? bestFallback!;
-    if (chosen == null) {
-      unresolved += 1;
+    final rect = perfect ?? bestClear ?? bestFallback!;
+    if (perfect == null && bestClear == null) {
+      unresolved += 1; // 라벨-라벨 겹침을 못 피한 경우만 집계.
     }
     placedRects.add(rect);
     if (candidate.badgeLineId != null) {
@@ -303,4 +315,59 @@ Offset _designBoundsCenter(StructuredRouteMap map, RouteMapDesignSpace design) {
     return Offset.zero;
   }
   return design.toDesign(Offset((minX! + maxX!) / 2, (minY! + maxY!) / 2));
+}
+
+/// 선을 장애물 셀로 마킹한 그리드 — 라벨이 선을 덮는지 판정한다(#1789 라벨-선 회피).
+/// design space에서 각 선분을 반셀 간격으로 샘플해 점유 셀을 Set에 담고, 라벨 rect가
+/// 덮는 점유 셀 면적을 스코어로 돌려준다. 로드 시 1회라 비용은 무방하다.
+class _RouteMapLineGrid {
+  _RouteMapLineGrid._(this._occupied, this._cell);
+
+  final Set<int> _occupied;
+  final double _cell;
+
+  static _RouteMapLineGrid build(
+    StructuredRouteMap map,
+    RouteMapDesignSpace design, {
+    double cell = kRouteMapDesignLineWidthPx,
+  }) {
+    final occupied = <int>{};
+    void mark(Offset a, Offset b) {
+      final steps = ((b - a).distance / (cell / 2)).ceil();
+      for (var i = 0; i <= steps; i += 1) {
+        final t = steps == 0 ? 0.0 : i / steps;
+        final p = Offset.lerp(a, b, t)!;
+        occupied.add(_key((p.dx / cell).floor(), (p.dy / cell).floor()));
+      }
+    }
+
+    for (final line in map.lines) {
+      for (final poly in line.polylines) {
+        for (var i = 1; i < poly.length; i += 1) {
+          mark(design.toDesign(poly[i - 1]), design.toDesign(poly[i]));
+        }
+      }
+    }
+    return _RouteMapLineGrid._(occupied, cell);
+  }
+
+  // 20비트씩 pack (음수는 하위 20비트 마스크 — mark/query 일관 사용이라 정합).
+  static int _key(int x, int y) => (x & 0xFFFFF) | ((y & 0xFFFFF) << 20);
+
+  /// [rect]가 덮는 선-점유 셀의 면적(design px²). 없으면 0.
+  double overlapArea(Rect rect) {
+    final x0 = (rect.left / _cell).floor();
+    final x1 = (rect.right / _cell).ceil();
+    final y0 = (rect.top / _cell).floor();
+    final y1 = (rect.bottom / _cell).ceil();
+    var count = 0;
+    for (var y = y0; y < y1; y += 1) {
+      for (var x = x0; x < x1; x += 1) {
+        if (_occupied.contains(_key(x, y))) {
+          count += 1;
+        }
+      }
+    }
+    return count * _cell * _cell;
+  }
 }
