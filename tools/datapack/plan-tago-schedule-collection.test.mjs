@@ -9,6 +9,7 @@ import {
   buildTagoScheduleCollectionPlan,
   buildTagoScheduleCollectionSummary,
   collectTagoSchedules,
+  validateTagoScheduleSample,
 } from "./validate-tago-schedule-sample.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -134,6 +135,84 @@ test("TAGO 시간표 수집 summary는 완료 checkpoint와 evidence hash를 남
   assert.match(summary.rawSha256ByRequest["MTRKR4448|01|U"], /^[0-9a-f]{64}$/);
   assert.match(summary.evidenceHash, /^[0-9a-f]{64}$/);
   assert.equal(summary.productionUseAllowed, false);
+});
+
+test("TAGO 시간표 검증은 provider row order에 의존하지 않는다", () => {
+  const validation = validateTagoScheduleSample(
+    tagoResponse("MTRKR4448", "01", "U", [
+      ["052000", "052500"],
+      ["051000", "051500"],
+    ]),
+  );
+
+  assert.deepEqual(
+    validation.departures.map((departure) => departure.departureSeconds),
+    [18_900, 19_500],
+  );
+});
+
+test("TAGO 시간표 검증은 같은 시간 row도 deterministic하게 정렬한다", () => {
+  const first = validateTagoScheduleSample(
+    tagoResponse("MTRKR4448", "01", "U", [
+      ["051000", "051500", "MTRKR410"],
+      ["051000", "051500", "MTRKR409"],
+    ]),
+  );
+  const second = validateTagoScheduleSample(
+    tagoResponse("MTRKR4448", "01", "U", [
+      ["051000", "051500", "MTRKR409"],
+      ["051000", "051500", "MTRKR410"],
+    ]),
+  );
+
+  assert.deepEqual(first.providerRecordHashes, second.providerRecordHashes);
+});
+
+test("TAGO 시간표 단독 검증은 빈 provider 응답을 거부한다", () => {
+  assert.throws(
+    () => validateTagoScheduleSample(emptyTagoResponse()),
+    /TAGO schedule sample has no rows/,
+  );
+});
+
+test("TAGO 시간표 수집 summary는 빈 provider 응답을 완료 요청으로 기록한다", () => {
+  const summary = buildTagoScheduleCollectionSummary({
+    responses: [
+      {
+        requestKey: "MTRKR4448|02|U",
+        rawText: emptyTagoResponse(),
+      },
+    ],
+  });
+
+  assert.deepEqual(summary.completedRequestKeys, ["MTRKR4448|02|U"]);
+  assert.deepEqual(summary.responseRequestKeys, ["MTRKR4448|02|U"]);
+  assert.deepEqual(summary.emptyResponseRequestKeys, ["MTRKR4448|02|U"]);
+  assert.equal(summary.responseCount, 1);
+  assert.equal(summary.rowCount, 0);
+  assert.deepEqual(summary.providerRecordHashes, []);
+  assert.match(summary.rawSha256ByRequest["MTRKR4448|02|U"], /^[0-9a-f]{64}$/);
+});
+
+test("TAGO 시간표 수집 summary는 malformed 빈 응답을 checkpoint 완료로 보지 않는다", () => {
+  for (const rawText of [
+    JSON.stringify({}),
+    JSON.stringify({ response: { body: { items: {} } } }),
+    JSON.stringify({ response: { header: { resultCode: "00" }, body: {} } }),
+  ]) {
+    assert.throws(
+      () =>
+        buildTagoScheduleCollectionSummary({
+          responses: [
+            {
+              requestKey: "MTRKR4448|02|U",
+              rawText,
+            },
+          ],
+        }),
+      /TAGO schedule empty response shape is invalid/,
+    );
+  }
 });
 
 test("TAGO 시간표 수집 summary evidence hash는 checkpoint 상태를 포함한다", () => {
@@ -325,6 +404,47 @@ test("TAGO 시간표 수집기는 checkpoint 다음 batch만 호출하고 secret
   assert.deepEqual(summary.checkpoint.completedRequestKeys, collection.checkpoint.completedRequestKeys);
 });
 
+test("TAGO 시간표 수집기는 빈 provider 응답을 checkpoint에 포함하고 계속 진행한다", async () => {
+  const collection = await collectTagoSchedules(
+    {
+      stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }],
+    },
+    {
+      dailyLimit: 3,
+      serviceKey: "actual-secret-key",
+      fetchImpl: async (url) => {
+        const params = new URL(url).searchParams;
+        return {
+          ok: true,
+          status: 200,
+          async text() {
+            if (params.get("dailyTypeCode") === "02" && params.get("upDownTypeCode") === "U") {
+              return emptyTagoResponse();
+            }
+            return tagoResponse(
+              params.get("subwayStationId"),
+              params.get("dailyTypeCode"),
+              params.get("upDownTypeCode"),
+            );
+          },
+        };
+      },
+    },
+  );
+
+  assert.equal(collection.collectionStatus, "completed_batch");
+  assert.deepEqual(collection.completedRequestKeys, ["MTRKR4448|01|D", "MTRKR4448|01|U", "MTRKR4448|02|U"]);
+  assert.deepEqual(
+    collection.responses.map((response) => response.requestKey),
+    ["MTRKR4448|01|U", "MTRKR4448|01|D", "MTRKR4448|02|U"],
+  );
+
+  const summary = buildTagoScheduleCollectionSummary(collection);
+  assert.deepEqual(summary.emptyResponseRequestKeys, ["MTRKR4448|02|U"]);
+  assert.equal(summary.responseCount, 3);
+  assert.equal(summary.rowCount, 4);
+});
+
 test("TAGO 시간표 수집기는 encoded service key를 이중 인코딩하지 않는다", async () => {
   const fetchUrls = [];
   await collectTagoSchedules(
@@ -500,23 +620,41 @@ test("TAGO 시간표 수집기는 service key가 없으면 provider 호출 전�
   );
 });
 
-function tagoResponse(stationId, dailyTypeCode, upDownTypeCode) {
+function tagoResponse(
+  stationId,
+  dailyTypeCode,
+  upDownTypeCode,
+  times = [
+    ["051000", "051500"],
+    ["052000", "052500"],
+  ],
+) {
   return JSON.stringify({
     response: {
       header: { resultCode: "00" },
       body: {
         items: {
-          item: [
-            tagoRow(stationId, dailyTypeCode, upDownTypeCode, "051000", "051500"),
-            tagoRow(stationId, dailyTypeCode, upDownTypeCode, "052000", "052500"),
-          ],
+          item: times.map(([arrTime, depTime, endSubwayStationId]) =>
+            tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime, endSubwayStationId),
+          ),
         },
       },
     },
   });
 }
 
-function tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime) {
+function emptyTagoResponse() {
+  return JSON.stringify({
+    response: {
+      header: { resultCode: "00" },
+      body: {
+        items: {},
+      },
+    },
+  });
+}
+
+function tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime, endSubwayStationId = "MTRKR409") {
   return {
     subwayRouteId: "MTRKR4",
     subwayStationId: stationId,
@@ -526,6 +664,6 @@ function tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime) {
     arrTime,
     depTime,
     endSubwayStationNm: "당고개",
-    endSubwayStationId: "MTRKR409",
+    endSubwayStationId,
   };
 }

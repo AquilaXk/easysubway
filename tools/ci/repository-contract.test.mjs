@@ -1506,46 +1506,19 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   assert.match(widgetTest, /시설 신고 화면은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다/);
 });
 
-test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구로 보여준다", () => {
+test("모바일 오프라인 안내 화면(OfflineDataScreen)은 완전히 제거됐다 (#1570)", () => {
   const main = read("apps/mobile/lib/main.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const finalQaEvidence = readJson("apps/mobile/release/issue-1075-final-qa-evidence.json");
-  const offlineScreenMatch = main.match(/class OfflineDataScreen[\s\S]*?class _SupportSectionTitle/);
-  // 지원 범위 주장(검증 구간·안내 범위·상록수역·사당역 구간)은 #1559에서 화면에서
-  // 제거해, 오프라인 테스트는 이제 이들이 없음(findsNothing)을 확인한다. 패턴은 실제로
-  // 노출되는 저장 상태 안내 순서만 검증한다.
-  const offlineWidgetTestPattern = new RegExp([
-    "testWidgets\\('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다'",
-    // 더보기 진입점(offlineDataSettingsButton)은 #1570에서 제거해, 테스트는
-    // OfflineDataScreen을 직접 띄워 검증한다.
-    "OfflineDataScreen\\(\\)",
-    "저장된 안내 상태",
-    "검증 구간'\\), findsNothing",
-    "마지막 갱신",
-    "앱 설치 때 함께 받은 안내",
-    "저장 정보 다시 확인",
-    "저장 정보 기록을 확인할 수 없으면",
-    "안내 범위'\\), findsNothing",
-    "실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요",
-  ].join("[\\s\\S]*"));
-
-  assert.ok(offlineScreenMatch, "OfflineDataScreen block not found");
-  const offlineScreen = offlineScreenMatch[0];
-  // '저장된 안내' 섹션(인터넷 없이 이용 진입점)은 #1570에서 더보기에서 제거했다.
-  // OfflineDataScreen 화면 자체는 유지된다(직접 진입만 가능).
-  assert.match(main, /class OfflineDataScreen/);
-  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  // 진입점 없는 dead screen이라 화면·상태 헬퍼·스레딩(offlineDataExpiresAtLoader)까지
+  // 완전 삭제했다(#1570 후속). 오프라인 동작은 설명 없이 그냥 되는 것.
+  assert.doesNotMatch(main, /class OfflineDataScreen/);
   assert.doesNotMatch(main, /title:\s*'인터넷 없이 이용'/);
-  assert.match(main, /_offlineDataSourceOfTruth\s*=\s*'installed catalog metadata'/);
-  assert.match(offlineScreen, /저장된 안내 상태/);
-  assert.doesNotMatch(offlineScreen, /저장된 데이터 상태/);
-  // 지원 범위 주장(검증 구간·안내 범위 + ProductionScopeCopy)은 #1559에서 화면에서
-  // 제거했다. 오프라인 화면이 더는 범위 주장을 노출하지 않는지 가드한다.
-  assert.doesNotMatch(offlineScreen, /ProductionScopeCopy/);
-  assert.match(offlineScreen, /저장 정보 다시 확인[\s\S]*저장 정보 기록을 확인할 수 없으면/);
-  assert.match(offlineScreen, /마지막 갱신[\s\S]*앱 설치 때 함께 받은 안내/);
-  assert.match(offlineScreen, /인터넷 연결 필요[\s\S]*시설 제보[\s\S]*연결 필요/);
-  assert.match(widgetTest, offlineWidgetTestPattern);
+  assert.doesNotMatch(main, /저장된 안내 상태/);
+  assert.doesNotMatch(main, /_offlineDataSourceOfTruth/);
+  assert.doesNotMatch(main, /[Oo]fflineDataExpiresAtLoader/);
+  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  assert.doesNotMatch(widgetTest, /OfflineDataScreen/);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
   assert.match(widgetTest, /RepaintBoundary[\s\S]*toImage\(/);
   assert.equal(finalQaEvidence.issue, 1075);

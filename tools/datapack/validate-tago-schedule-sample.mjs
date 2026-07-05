@@ -47,7 +47,7 @@ function parseArgs(argv) {
   return args;
 }
 
-function validateTagoScheduleSample(rawText) {
+function validateTagoScheduleSample(rawText, options = {}) {
   const payload = JSON.parse(rawText);
   rejectCredentialLeak(rawText, payload);
   if (payload.response?.header && payload.response.header.resultCode !== "00") {
@@ -56,7 +56,13 @@ function validateTagoScheduleSample(rawText) {
 
   const rows = normalizeRows(payload.response?.body?.items?.item);
   if (rows.length === 0) {
-    throw new Error("TAGO schedule sample has no rows");
+    if (!options.allowEmptyRows) {
+      throw new Error("TAGO schedule sample has no rows");
+    }
+    if (!isNormalEmptyTagoSchedulePayload(payload)) {
+      throw new Error("TAGO schedule empty response shape is invalid");
+    }
+    return buildTagoScheduleValidationResult(rawText, rows, [], [], true);
   }
   const observedFields = new Set(rows.flatMap((row) => Object.keys(row)));
   for (const field of OBSERVED_FIELDS) {
@@ -65,9 +71,7 @@ function validateTagoScheduleSample(rawText) {
     }
   }
 
-  let previousDeparture = -1;
-  const providerRecordHashes = [];
-  const departures = [];
+  const parsedRows = [];
   for (const [index, row] of rows.entries()) {
     for (const field of REQUIRED_FIELDS) {
       if (typeof row[field] !== "string" || row[field].length === 0) {
@@ -85,12 +89,10 @@ function validateTagoScheduleSample(rawText) {
     if (arrivalSeconds > departureSeconds) {
       throw new Error(`TAGO schedule row ${index} arrival must be <= departure`);
     }
-    if (departureSeconds < previousDeparture) {
-      throw new Error(`TAGO schedule rows must be sorted by depTime`);
-    }
-    previousDeparture = departureSeconds;
-    providerRecordHashes.push(sha256(JSON.stringify(sortObject(row))));
-    departures.push({
+    const rowHash = sha256(JSON.stringify(sortObject(row)));
+    parsedRows.push({
+      row,
+      rowHash,
       subwayStationId: row.subwayStationId,
       subwayRouteId: row.subwayRouteId,
       dailyTypeCode: row.dailyTypeCode,
@@ -99,7 +101,19 @@ function validateTagoScheduleSample(rawText) {
       departureSeconds,
     });
   }
+  parsedRows.sort(
+    (left, right) =>
+      left.departureSeconds - right.departureSeconds ||
+      left.arrivalSeconds - right.arrivalSeconds ||
+      left.rowHash.localeCompare(right.rowHash),
+  );
+  const providerRecordHashes = parsedRows.map(({ rowHash }) => rowHash);
+  const departures = parsedRows.map(({ row: _row, rowHash: _rowHash, ...departure }) => departure);
 
+  return buildTagoScheduleValidationResult(rawText, rows, providerRecordHashes, departures, false);
+}
+
+function buildTagoScheduleValidationResult(rawText, rows, providerRecordHashes, departures, emptyProviderResponse) {
   return {
     artifactKind: "tago-schedule-sample-importer-validation",
     candidateId: "molit-tago-subway-info",
@@ -108,6 +122,7 @@ function validateTagoScheduleSample(rawText) {
     providerRecordHashes,
     rawSha256: sha256(rawText),
     departures,
+    emptyProviderResponse,
     stationLevelOnly: true,
     productionUseAllowed: false,
     remainingAdmissionBlocker: "line_wide_trip_stop_sequence_validation_required",
@@ -164,6 +179,7 @@ function buildTagoScheduleCollectionSummary(collection) {
     requestKeyParts(requestKey);
   }
   const responseRequestKeys = [];
+  const emptyResponseRequestKeys = [];
   const rawSha256ByRequest = {};
   const providerRecordHashes = [];
   let rowCount = 0;
@@ -178,9 +194,12 @@ function buildTagoScheduleCollectionSummary(collection) {
     if (typeof response.rawText !== "string" || response.rawText.length === 0) {
       throw new Error(`responses.rawText is required: ${response.requestKey}`);
     }
-    const validation = validateTagoScheduleSample(response.rawText);
+    const validation = validateTagoScheduleSample(response.rawText, { allowEmptyRows: true });
     assertResponseMatchesRequestKey(validation, response.requestKey);
     responseRequestKeys.push(response.requestKey);
+    if (validation.emptyProviderResponse) {
+      emptyResponseRequestKeys.push(response.requestKey);
+    }
     rawSha256ByRequest[response.requestKey] = validation.rawSha256;
     providerRecordHashes.push(...validation.providerRecordHashes);
     rowCount += validation.rowCount;
@@ -194,6 +213,7 @@ function buildTagoScheduleCollectionSummary(collection) {
     endpoint: TAGO_SCHEDULE_ENDPOINT,
     completedRequestKeys,
     responseRequestKeys,
+    emptyResponseRequestKeys,
     rawSha256ByRequest,
     providerRecordHashes,
   };
@@ -203,6 +223,7 @@ function buildTagoScheduleCollectionSummary(collection) {
     endpoint: evidencePayload.endpoint,
     completedRequestKeys,
     responseRequestKeys,
+    emptyResponseRequestKeys,
     checkpoint: { completedRequestKeys },
     responseCount: responseRequestKeys.length,
     rowCount,
@@ -260,7 +281,7 @@ async function collectTagoSchedules(input, options = {}) {
       );
     }
     try {
-      const validation = validateTagoScheduleSample(rawText);
+      const validation = validateTagoScheduleSample(rawText, { allowEmptyRows: true });
       assertResponseMatchesRequestKey(validation, request.requestKey);
     } catch (error) {
       throw new TagoScheduleCollectionError(
@@ -397,6 +418,17 @@ function normalizeRows(value) {
     return [value];
   }
   return [];
+}
+
+function isNormalEmptyTagoSchedulePayload(payload) {
+  if (payload.response?.header?.resultCode !== "00") {
+    return false;
+  }
+  const items = payload.response?.body?.items;
+  if (!items || typeof items !== "object" || Array.isArray(items)) {
+    return false;
+  }
+  return !("item" in items) || (Array.isArray(items.item) && items.item.length === 0);
 }
 
 function parseHhmmss(value, label) {
