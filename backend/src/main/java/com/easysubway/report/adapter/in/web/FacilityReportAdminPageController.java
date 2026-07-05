@@ -218,34 +218,80 @@ class FacilityReportAdminPageController {
 
 		// 링크는 컨트롤러에서 조립한다: Thymeleaf @{...(p=${null})}은 null도 빈 파라미터로 렌더해 URL을 오염시킨다.
 		String currentSort = sortParam == null ? null : sortParam.toString();
+		String keyword = query.keyword();
+		LocalDate createdFromDate = query.createdFrom();
+		LocalDate createdToDate = query.createdTo();
 		model.addAttribute("allFilter", new StatusFilterLink(
-			"전체", reportListHref(query, null, currentSort), query.status() == null));
+			"전체", hrefWith(null, keyword, createdFromDate, createdToDate, currentSort), query.status() == null));
 		model.addAttribute("statusFilters", statusOptions().stream()
 			.map(option -> new StatusFilterLink(
 				option.label(),
-				reportListHref(query, option.value(), currentSort),
+				hrefWith(option.value(), keyword, createdFromDate, createdToDate, currentSort),
 				query.status() == option.value()))
 			.toList());
 		model.addAttribute("statusSort", new SortHeaderLink(
-			reportListHref(query, query.status(), query.nextSortFor("status")),
+			hrefWith(query.status(), keyword, createdFromDate, createdToDate, query.nextSortFor("status")),
 			query.ariaSortFor("status")));
 		model.addAttribute("createdSort", new SortHeaderLink(
-			reportListHref(query, query.status(), query.nextSortFor("created_at")),
+			hrefWith(query.status(), keyword, createdFromDate, createdToDate, query.nextSortFor("created_at")),
 			query.ariaSortFor("created_at")));
+
+		// 기간 프리셋(오늘·최근 7일·최근 30일·전체 기간). 접수일 기준.
+		LocalDate today = LocalDate.now(clock);
+		model.addAttribute("datePresets", List.of(
+			datePreset(query, "오늘", today, today, currentSort),
+			datePreset(query, "최근 7일", today.minusDays(6), today, currentSort),
+			datePreset(query, "최근 30일", today.minusDays(29), today, currentSort),
+			new DatePresetLink("전체 기간",
+				hrefWith(query.status(), keyword, null, null, currentSort),
+				createdFromDate == null && createdToDate == null)
+		));
+
+		// 활성 필터 칩(개별 제거). 상태는 상단 필터 nav로 표현하므로 칩은 키워드·기간만 담는다.
+		List<FilterChip> chips = new java.util.ArrayList<>();
+		if (keyword != null) {
+			chips.add(new FilterChip("검색: " + keyword,
+				hrefWith(query.status(), null, createdFromDate, createdToDate, currentSort)));
+		}
+		if (createdFromDate != null || createdToDate != null) {
+			chips.add(new FilterChip("기간: " + dateRangeLabel(createdFromDate, createdToDate),
+				hrefWith(query.status(), keyword, null, null, currentSort)));
+		}
+		model.addAttribute("filterChips", chips);
 	}
 
-	// 상태·정렬·기간 필터를 유지하며 상태/정렬만 바꾼 링크 URL을 만든다. null 값은 생략한다.
-	private static String reportListHref(
+	private DatePresetLink datePreset(
 		FacilityReportListQuery query,
-		FacilityReportStatus statusOverride,
-		String sortOverride
+		String label,
+		LocalDate from,
+		LocalDate to,
+		String currentSort
+	) {
+		boolean active = from.equals(query.createdFrom()) && to.equals(query.createdTo());
+		return new DatePresetLink(label, hrefWith(query.status(), query.keyword(), from, to, currentSort), active);
+	}
+
+	private static String dateRangeLabel(LocalDate from, LocalDate to) {
+		if (from != null && to != null) {
+			return from.equals(to) ? from.toString() : from + " ~ " + to;
+		}
+		return from != null ? from + " ~" : "~ " + to;
+	}
+
+	// 상태·검색·기간·정렬을 명시적으로 받아 링크 URL을 만든다. null 값은 생략한다.
+	private static String hrefWith(
+		FacilityReportStatus status,
+		String keyword,
+		LocalDate from,
+		LocalDate to,
+		String sort
 	) {
 		UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/admin/reports/page");
-		appendParam(builder, "status", statusOverride);
-		appendParam(builder, "keyword", query.keyword());
-		appendParam(builder, "from", query.createdFrom());
-		appendParam(builder, "to", query.createdTo());
-		appendParam(builder, "sort", sortOverride);
+		appendParam(builder, "status", status);
+		appendParam(builder, "keyword", keyword);
+		appendParam(builder, "from", from);
+		appendParam(builder, "to", to);
+		appendParam(builder, "sort", sort);
 		return builder.build().encode().toUriString();
 	}
 
@@ -259,6 +305,12 @@ class FacilityReportAdminPageController {
 	}
 
 	record SortHeaderLink(String href, String ariaSort) {
+	}
+
+	record DatePresetLink(String label, String href, boolean active) {
+	}
+
+	record FilterChip(String label, String removeHref) {
 	}
 
 	// 급증 경고·처리 시간 카드는 fragment 밖 풀페이지 전용이라 부분 응답에서는 조회하지 않는다.

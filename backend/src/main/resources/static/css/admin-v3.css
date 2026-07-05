@@ -483,6 +483,45 @@ body.admin-v3 {
 	font-size: 9px;
 }
 
+.admin-v3 .table-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.admin-v3 .date-presets {
+	display: flex;
+	gap: 6px;
+}
+
+.admin-v3 .date-presets a[aria-current="true"] {
+	font-weight: 700;
+}
+
+.admin-v3 .filter-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.admin-v3 .filter-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 10px;
+	border: 1px solid var(--admin-border);
+	border-radius: 999px;
+	font-size: 12px;
+	color: var(--admin-ink-2);
+	text-decoration: none;
+}
+
+.admin-v3 .filter-chip:hover {
+	border-color: var(--admin-border-strong);
+}
+
 .admin-status {
 	font-size: 13px;
 }

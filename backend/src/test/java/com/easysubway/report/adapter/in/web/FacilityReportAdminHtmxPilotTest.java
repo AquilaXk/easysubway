@@ -201,6 +201,26 @@ class FacilityReportAdminHtmxPilotTest {
 			.contains("status=SUBMITTED");
 	}
 
+	@Test
+	@DisplayName("기간 프리셋이 렌더되고 활성 필터는 제거 칩으로 표시된다")
+	void datePresetsAndFilterChipsRender() throws Exception {
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.param("keyword", "엘리베이터")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("오늘")
+			.contains("최근 7일")
+			.contains("최근 30일")
+			.contains("전체 기간")
+			.contains("class=\"filter-chip\"")
+			.contains("검색: 엘리베이터");
+	}
+
 	private String createReport(String description) throws Exception {
 		String created = mockMvc.perform(post("/api/v1/reports")
 				.with(httpBasic("basic-user", "user-test-password"))

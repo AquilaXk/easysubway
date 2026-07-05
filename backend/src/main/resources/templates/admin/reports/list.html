@@ -67,6 +67,23 @@
 			<button type="submit">검색</button>
 		</form>
 
+		<div class="table-filters">
+			<nav class="date-presets" aria-label="접수 기간">
+				<a th:each="preset : ${datePresets}"
+				   th:href="${preset.href}"
+				   th:attr="hx-get=${preset.href},aria-current=${preset.active ? 'true' : null}"
+				   th:text="${preset.label}">오늘</a>
+			</nav>
+			<div class="filter-chips" th:if="${!filterChips.isEmpty()}" aria-label="적용된 필터">
+				<a th:each="chip : ${filterChips}" class="filter-chip"
+				   th:href="${chip.removeHref}" th:attr="hx-get=${chip.removeHref}"
+				   th:title="|${chip.label} 제거|">
+					<span th:text="${chip.label}">검색: 키워드</span>
+					<span aria-hidden="true">✕</span>
+				</a>
+			</div>
+		</div>
+
 		<nav class="status-filter" aria-label="신고 상태 필터">
 			<a th:href="${allFilter.href}"
 			   th:attr="hx-get=${allFilter.href},aria-current=${allFilter.current ? 'page' : null}">전체</a>
