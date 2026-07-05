@@ -538,6 +538,54 @@ class SupportAccessInfo {
   }
 }
 
+/// 앱 시작 시 온보딩 상태를 복원하는 짧은 구간에 보여주는 브랜디드 로딩 화면.
+///
+/// 예전에는 흰 배경 + 스피너만 떠서 네이티브 스플래시(브랜드)에서 홈으로 가는
+/// 사이에 흰 화면이 튀어 첫인상을 해쳤다(#1785). 브랜드 색과 앱 이름을 그대로
+/// 이어 스플래시에서 로딩, 콘텐츠까지 매끄럽게 연결되도록 한다.
+class _StartupLoadingScreen extends StatelessWidget {
+  const _StartupLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: const Key('startupLoadingScreen'),
+      backgroundColor: EasySubwayAccessibleColors.primary,
+      body: SafeArea(
+        child: Center(
+          child: Semantics(
+            label: '쉬운 지하철을 불러오는 중',
+            liveRegion: true,
+            child: ExcludeSemantics(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '쉬운 지하철',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EasySubwayHome extends StatefulWidget {
   const _EasySubwayHome({
     required this.repository,
@@ -624,9 +672,9 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   @override
   Widget build(BuildContext context) {
     if (_loadingOnboardingState) {
-      return const Scaffold(
-        body: SafeArea(child: Center(child: CircularProgressIndicator())),
-      );
+      // 스플래시와 홈 사이에 흰 화면+스피너가 튀지 않도록, 브랜드 색과 앱 이름을
+      // 그대로 잇는 브랜디드 로딩을 보여준다(#1785).
+      return const _StartupLoadingScreen();
     }
 
     final dataDeletionResult = _dataDeletionResult;
@@ -4087,8 +4135,10 @@ class _DataSourceAttributionScreenState
                         icon: Icons.fact_check_outlined,
                         iconColor: EasySubwayAccessibleColors.amber,
                         title: '현재 앱 표시',
+                        // 내부 거버넌스 언어(pilot·"~보장한다고 말하지 않아요") 대신
+                        // 어떤 자료로 무엇을 확인했는지 사실·metadata로 표현한다(#1765).
                         subtitle:
-                            '상록수·사당 pilot만 확인해요. 현장 또는 운영기관 확인 전에는 전국 쉬운 길이나 실시간 도착을 보장한다고 말하지 않아요.',
+                            '지도와 길·시설 안내는 공식·공개 자료를 바탕으로 해요. 상록수·사당역은 현장 확인까지 마쳤고, 나머지 역은 자료를 바탕으로 안내해요.',
                       ),
                     ),
                     const _AppSectionTitle(title: '지도 표시용 asset'),
@@ -4109,7 +4159,7 @@ class _DataSourceAttributionScreenState
                         iconColor: EasySubwayAccessibleColors.amber,
                         title: '품질 지표',
                         subtitle:
-                            '필수 시설 근거 비율, 운행상태 확인 비율, 최신 정보 비율, 검증된 쉬운 길 비율, 현장 확인 경로 비율을 함께 확인해요.',
+                            '필수 시설 근거 비율, 운행상태 확인 비율, 최신 정보 비율, 확인된 쉬운 길 비율, 현장 확인 경로 비율을 함께 확인해요.',
                       ),
                     ),
                     const _AppSectionTitle(title: '경로·시설 안내용 데이터'),

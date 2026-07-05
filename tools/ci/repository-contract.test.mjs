@@ -4364,8 +4364,9 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 11/);
+  assert.match(schema, /PRAGMA user_version = 12/);
   assert.match(schema, /CREATE TABLE stations/);
+  assert.match(schema, /CREATE TABLE transit_feed_info/);
   assert.match(schema, /CREATE TABLE station_facility_evidence/);
   assert.match(schema, /CREATE TABLE service_calendars/);
   assert.match(schema, /CREATE TABLE transit_trips/);
@@ -7513,6 +7514,7 @@ test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다"
   const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
   const adminPageRequest = read("backend/src/main/java/com/easysubway/common/web/pagination/AdminPageRequest.java");
   const reportPageRequest = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportPageRequest.java");
+  const reportListQuery = read("backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportListQuery.java");
   const paginationTest = read("backend/src/test/java/com/easysubway/common/web/pagination/EgovPaginationViewTest.java");
   const readOnlyAdminTest = read(
     "backend/src/test/java/com/easysubway/transit/adapter/in/web/TransitReadOnlyAdminPageModelTest.java",
@@ -7558,12 +7560,15 @@ test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다"
   assert.match(adminPageRequest, /limitForHasNext\(\)/);
   assert.match(reportPageRequest, /MAX_SIZE = 50/);
   assert.match(reportPageRequest, /limitForHasNext\(\)/);
+  // 신고 대기열 검색 질의(#1737)도 같은 상한을 통해 페이지 크기를 제한한다.
+  assert.match(reportListQuery, /FacilityReportPageRequest\.MAX_SIZE/);
+  assert.match(reportListQuery, /limitForHasNext\(\)/);
   assert.match(paginationTest, /adminPageRequestCapsSizeAndOffset/);
 
   for (const file of listControllers) {
     const source = read(file);
     assert.match(source, /EgovPaginationView/, `${file} must render paginated admin lists`);
-    assert.match(source, /(AdminPageRequest|FacilityReportPageRequest)\.of\(page, size\)/, `${file} must cap page size`);
+    assert.match(source, /(AdminPageRequest|FacilityReportPageRequest)\.of\(page, size\)|FacilityReportListQuery\.of\(/, `${file} must cap page size`);
     assert.doesNotMatch(source, /listRecent\(\s*\)|loadRecentRuns\(\s*\)|loadReportSummaries\(\s*status\s*\)/, `${file} must not call unbounded list loaders`);
   }
 
