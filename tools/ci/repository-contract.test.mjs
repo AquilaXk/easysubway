@@ -4364,8 +4364,9 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 11/);
+  assert.match(schema, /PRAGMA user_version = 12/);
   assert.match(schema, /CREATE TABLE stations/);
+  assert.match(schema, /CREATE TABLE transit_feed_info/);
   assert.match(schema, /CREATE TABLE station_facility_evidence/);
   assert.match(schema, /CREATE TABLE service_calendars/);
   assert.match(schema, /CREATE TABLE transit_trips/);
