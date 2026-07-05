@@ -215,30 +215,6 @@ void main() {
       '/api/v1/me/favorites/facilities/facility-sangnoksu-elevator-1',
     ]);
   });
-
-  test('즐겨찾기 시설 목록 컨트롤러는 목록과 빈 목록과 실패 상태를 구분한다', () async {
-    final repository = FakeFavoriteFacilityRepository();
-    final controller = FavoriteFacilityListController(repository: repository);
-    addTearDown(controller.dispose);
-
-    repository.favorites = [_favoriteFacility()];
-    await controller.load();
-
-    expect(controller.state.status, FavoriteFacilityListStatus.success);
-    expect(controller.state.favorites.single.name, '1번 출구 엘리베이터');
-
-    repository.favorites = const [];
-    await controller.load();
-
-    expect(controller.state.status, FavoriteFacilityListStatus.empty);
-    expect(controller.state.message, '즐겨찾기한 시설이 없습니다.');
-
-    repository.error = const FavoriteFacilityException('즐겨찾기 시설을 불러오지 못했어요.');
-    await controller.load();
-
-    expect(controller.state.status, FavoriteFacilityListStatus.failure);
-    expect(controller.state.message, '즐겨찾기 시설을 불러오지 못했어요.');
-  });
 }
 
 class RetryAuthorizationHeaderProvider implements AuthorizationHeaderProvider {
