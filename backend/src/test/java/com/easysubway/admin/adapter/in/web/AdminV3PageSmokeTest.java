@@ -45,6 +45,35 @@ class AdminV3PageSmokeTest {
 	}
 
 	@Test
+	@DisplayName("역 목록은 검색·지역·노선·정렬 툴바와 미확인 제보 뱃지를 렌더한다")
+	void stationListRendersV4ToolbarAndPendingBadge() throws Exception {
+		String html = mockMvc.perform(get("/admin/stations/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+
+		assertThat(html)
+			.contains("역 이름 검색")
+			.contains("지역 필터")
+			.contains("노선 필터")
+			.contains("미확인 제보 많은 순")
+			.contains("미확인 제보")
+			// 상록수 역 링크가 상세 허브로 연결된다.
+			.contains("/admin/stations/station-sangnoksu/page");
+
+		// 정렬·지역 파라미터가 페이지네이션/툴바에 유지된다(htmx 부분 갱신도 같은 필터 공유).
+		String sorted = mockMvc.perform(get("/admin/stations/page")
+				.param("sort", "pending")
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		assertThat(sorted)
+			.contains("id=\"station-results\"")
+			.doesNotContain("admin-shell");
+	}
+
+	@Test
 	@DisplayName("역 상세는 허브 탭으로 개요·시설·제보·현장·구조를 오간다")
 	void stationDetailHubTabsNavigate() throws Exception {
 		String overview = getStationHub(null);

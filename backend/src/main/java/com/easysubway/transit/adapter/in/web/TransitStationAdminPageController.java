@@ -39,7 +39,6 @@ import java.math.BigDecimal;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -103,28 +102,119 @@ class TransitStationAdminPageController {
 	@GetMapping("/admin/stations/page")
 	String stationsPage(
 		@RequestParam(required = false) String query,
+		@RequestParam(required = false) String region,
+		@RequestParam(required = false) String lineId,
+		@RequestParam(required = false) String sort,
 		@RequestParam(required = false) Integer page,
 		@RequestParam(required = false) Integer size,
 		Model model
 	) {
+		populateStationList(query, region, lineId, sort, page, size, model);
+		return "admin/stations/list";
+	}
+
+	// 역 목록 표준 테이블(#1741): 검색은 htmx 부분 갱신, no-JS는 form GET. 같은 모델·같은 필터를 공유한다.
+	@HxRequest
+	@GetMapping("/admin/stations/page")
+	String stationsListFragment(
+		@RequestParam(required = false) String query,
+		@RequestParam(required = false) String region,
+		@RequestParam(required = false) String lineId,
+		@RequestParam(required = false) String sort,
+		@RequestParam(required = false) Integer page,
+		@RequestParam(required = false) Integer size,
+		@RequestHeader(value = "HX-History-Restore-Request", required = false) boolean historyRestore,
+		Model model
+	) {
+		if (historyRestore) {
+			return stationsPage(query, region, lineId, sort, page, size, model);
+		}
+		populateStationList(query, region, lineId, sort, page, size, model);
+		return "admin/stations/list :: stationResults";
+	}
+
+	private void populateStationList(
+		String query,
+		String region,
+		String lineId,
+		String sort,
+		Integer page,
+		Integer size,
+		Model model
+	) {
 		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
 		Map<String, StationMasterDataCounts> counts = transitMasterQueryUseCase.countStationMasterDataByStationId();
-		List<StationRow> stations = transitMasterQueryUseCase.searchStations(new StationSearchCommand(query, null))
-			.stream()
-			.map(station -> StationRow.from(station, counts.getOrDefault(
-				station.station().id(),
-				StationMasterDataCounts.empty()
-			)))
+		Map<String, Long> pendingByStation = facilityReportUseCase.countPendingReportsByStation();
+		// 검색만 서버에서 걸고(searchStations), 지역·노선 필터·정렬은 결과 위에서 적용해 조회를 1회로 유지한다.
+		List<StationWithLines> matched = transitMasterQueryUseCase.searchStations(new StationSearchCommand(query, null));
+		// 필터 옵션(지역·노선)은 노선/지역 필터가 걸리기 전 결과에서 뽑아 항상 전체 후보를 보여준다.
+		model.addAttribute("regionOptions", distinctRegions(matched, region));
+		model.addAttribute("lineOptions", distinctLines(matched, lineId));
+
+		String activeRegion = blankToNull(region);
+		String activeLine = blankToNull(lineId);
+		List<StationRow> stations = matched.stream()
+			.filter(station -> activeRegion == null || activeRegion.equals(station.station().region()))
+			.filter(station -> activeLine == null
+				|| station.lines().stream().anyMatch(line -> activeLine.equals(line.id())))
+			.map(station -> StationRow.from(
+				station,
+				counts.getOrDefault(station.station().id(), StationMasterDataCounts.empty()),
+				pendingByStation.getOrDefault(station.station().id(), 0L)))
+			.sorted(stationOrder(sort))
 			.toList();
+
 		EgovPaginationView pageView = EgovPaginationView.from(pageRequest.page(), pageRequest.size(), stations.size());
 		model.addAttribute("stations", pageView.pageItems(stations));
 		model.addAttribute("page", pageView);
-		model.addAttribute("paginationLinks", pageView.links(
-			"/admin/stations/page",
-			Collections.singletonMap("query", query)
-		));
+		Map<String, Object> linkParams = new java.util.LinkedHashMap<>();
+		linkParams.put("query", query);
+		linkParams.put("region", activeRegion);
+		linkParams.put("lineId", activeLine);
+		linkParams.put("sort", blankToNull(sort));
+		model.addAttribute("paginationLinks", pageView.links("/admin/stations/page", linkParams));
 		model.addAttribute("query", query);
-		return "admin/stations/list";
+		model.addAttribute("selectedRegion", activeRegion);
+		model.addAttribute("selectedLine", activeLine);
+		model.addAttribute("selectedSort", blankToNull(sort));
+	}
+
+	private static List<FilterOption> distinctRegions(List<StationWithLines> stations, String selected) {
+		List<FilterOption> options = new java.util.ArrayList<>();
+		options.add(new FilterOption("", "전체 지역", blankToNull(selected) == null));
+		stations.stream()
+			.map(station -> station.station().region())
+			.filter(value -> value != null && !value.isBlank())
+			.distinct()
+			.sorted()
+			.forEach(value -> options.add(new FilterOption(value, value, value.equals(selected))));
+		return options;
+	}
+
+	private static List<FilterOption> distinctLines(List<StationWithLines> stations, String selected) {
+		List<FilterOption> options = new java.util.ArrayList<>();
+		options.add(new FilterOption("", "전체 노선", blankToNull(selected) == null));
+		stations.stream()
+			.flatMap(station -> station.lines().stream())
+			.collect(java.util.stream.Collectors.toMap(line -> line.id(), line -> line.name(), (a, b) -> a,
+				java.util.LinkedHashMap::new))
+			.entrySet()
+			.stream()
+			.sorted(Map.Entry.comparingByValue())
+			.forEach(entry -> options.add(
+				new FilterOption(entry.getKey(), entry.getValue(), entry.getKey().equals(selected))));
+		return options;
+	}
+
+	// 정렬: 미확인 제보 많은 순(pending)·역명 오름/내림차순. 기본은 역명 오름차순.
+	private static java.util.Comparator<StationRow> stationOrder(String sort) {
+		String value = sort == null ? "" : sort;
+		return switch (value) {
+			case "pending" -> java.util.Comparator.comparingLong(StationRow::pendingReportCount).reversed()
+				.thenComparing(StationRow::stationName);
+			case "name_desc" -> java.util.Comparator.comparing(StationRow::stationName).reversed();
+			default -> java.util.Comparator.comparing(StationRow::stationName);
+		};
 	}
 
 	@GetMapping("/admin/stations/{stationId}/page")
@@ -393,10 +483,15 @@ class TransitStationAdminPageController {
 		int facilityCount,
 		int layoutSourceCount,
 		int routeNodeCount,
-		int routeEdgeCount
+		int routeEdgeCount,
+		long pendingReportCount
 	) {
 
-		static StationRow from(StationWithLines stationWithLines, StationMasterDataCounts counts) {
+		static StationRow from(
+			StationWithLines stationWithLines,
+			StationMasterDataCounts counts,
+			long pendingReportCount
+		) {
 			return new StationRow(
 				stationWithLines.station().id(),
 				stationWithLines.station().nameKo(),
@@ -408,9 +503,14 @@ class TransitStationAdminPageController {
 				counts.facilityCount(),
 				counts.layoutSourceCount(),
 				counts.routeNodeCount(),
-				counts.routeEdgeCount()
+				counts.routeEdgeCount(),
+				pendingReportCount
 			);
 		}
+	}
+
+	// 역 목록 필터 select 옵션(지역·노선). value가 빈 문자열이면 "전체".
+	record FilterOption(String value, String label, boolean selected) {
 	}
 
 	record StationDetail(
