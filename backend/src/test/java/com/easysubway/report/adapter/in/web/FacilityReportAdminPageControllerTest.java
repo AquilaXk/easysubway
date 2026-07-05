@@ -513,6 +513,35 @@ class FacilityReportAdminPageControllerTest {
 			.andExpect(header().string("Location", "/admin/reports/page"));
 	}
 
+	@Test
+	@DisplayName("일괄 검수는 returnTo 필터 컨텍스트로 되돌아가고 외부 URL은 목록으로 막는다")
+	void bulkReviewHonorsSafeReturnTo() throws Exception {
+		String reportId = createReport("returnTo 유지 신고");
+
+		mockMvc.perform(post("/admin/reports/bulk-review")
+				.with(httpBasic("admin-test", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/reports/%s/page".formatted(reportId)))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("reportIds", reportId)
+				.param("decision", "ACCEPT")
+				.param("returnTo", "/admin/reports/page?status=SUBMITTED&keyword=x"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/reports/page?status=SUBMITTED&keyword=x"));
+
+		String otherReportId = createReport("open redirect 차단 신고");
+		mockMvc.perform(post("/admin/reports/bulk-review")
+				.with(httpBasic("admin-test", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/reports/%s/page".formatted(otherReportId)))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("reportIds", otherReportId)
+				.param("decision", "ACCEPT")
+				.param("returnTo", "https://evil.example.com/admin/reports/page"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/reports/page"));
+	}
+
 	private String createReport(String description) throws Exception {
 		return createReport(description, "BROKEN", "");
 	}

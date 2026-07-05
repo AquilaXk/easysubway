@@ -326,8 +326,9 @@ public class JdbcFacilityReportRepository implements
 			args.add(query.status().name());
 		}
 		if (query.hasKeyword()) {
-			clauses.add("LOWER(description) LIKE ?");
-			args.add("%" + query.keyword().toLowerCase(Locale.ROOT) + "%");
+			// LIKE 메타문자(%,_,\)를 이스케이프해 부분일치를 리터럴로 맞춘다(InMemory .contains()와 시맨틱 일치).
+			clauses.add("LOWER(description) LIKE ? ESCAPE '\\'");
+			args.add("%" + escapeLike(query.keyword().toLowerCase(Locale.ROOT)) + "%");
 		}
 		if (query.createdFrom() != null) {
 			clauses.add("created_at >= ?");
@@ -341,6 +342,10 @@ public class JdbcFacilityReportRepository implements
 			return "";
 		}
 		return "WHERE " + String.join(" AND ", clauses);
+	}
+
+	private static String escapeLike(String value) {
+		return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 	}
 
 	@Override

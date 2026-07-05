@@ -15,3 +15,9 @@ CREATE TABLE admin_saved_views (
 
 CREATE INDEX idx_admin_saved_views_owner_program
     ON admin_saved_views (admin_login_id, program_id);
+
+-- 화면당 기본 뷰는 최대 하나. 동시 make-default 경합까지 DB로 강제한다.
+-- (H2는 partial index를 지원하지 않아 h2 마이그레이션에는 없으며, 그쪽은 서비스 계층 clearDefault가 보장한다.)
+CREATE UNIQUE INDEX ux_admin_saved_views_single_default
+    ON admin_saved_views (admin_login_id, program_id)
+    WHERE is_default;

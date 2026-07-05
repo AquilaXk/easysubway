@@ -2,6 +2,7 @@ package com.easysubway.report.adapter.in.web;
 
 import com.easysubway.admin.audit.application.service.AdminAuditWriter;
 import com.easysubway.admin.savedview.application.port.in.AdminSavedViewUseCase;
+import com.easysubway.admin.savedview.domain.AdminSavedView;
 import com.easysubway.admin.web.AdminFormErrorView;
 import com.easysubway.admin.web.AdminMasterLabelResolver;
 import com.easysubway.common.domain.PageResult;
@@ -142,6 +143,11 @@ class FacilityReportAdminPageController {
 		Authentication authentication,
 		Model model
 	) {
+		// 기본 저장 뷰 자동 적용: 필터 없이 목록에 진입하면 사용자의 기본 뷰 질의로 리다이렉트한다.
+		String defaultViewUrl = defaultViewRedirect(status, keyword, from, to, sort, page, size, authentication);
+		if (defaultViewUrl != null) {
+			return "redirect:" + defaultViewUrl;
+		}
 		FacilityReportListQuery query = FacilityReportListQuery.of(status, keyword, from, to, sort, page, size);
 		EgovPaginationView pageView = reportListPageView(query);
 		if (pageView.page() != query.page() || pageView.size() != query.size()) {
@@ -150,6 +156,30 @@ class FacilityReportAdminPageController {
 		addReportResultsAttributes(query, pageView, authentication, model);
 		addReportSummaryAttributes(model);
 		return "admin/reports/list";
+	}
+
+	// 파라미터 없는 fresh 진입 + 기본 뷰(비어있지 않은 질의) 존재 시 그 질의 URL을 반환한다.
+	// 리다이렉트 후에는 파라미터가 붙어 fresh가 아니므로 재리다이렉트 루프가 없다.
+	private String defaultViewRedirect(
+		FacilityReportStatus status,
+		String keyword,
+		LocalDate from,
+		LocalDate to,
+		String sort,
+		Integer page,
+		Integer size,
+		Authentication authentication
+	) {
+		boolean freshEntry = status == null && keyword == null && from == null && to == null
+			&& sort == null && page == null && size == null;
+		if (!freshEntry || authentication == null) {
+			return null;
+		}
+		return savedViewUseCase.findDefaultView(authentication.getName(), REPORTS_PROGRAM_ID)
+			.map(AdminSavedView::queryParams)
+			.filter(queryParams -> queryParams != null && !queryParams.isBlank())
+			.map(queryParams -> "/admin/reports/page?" + queryParams)
+			.orElse(null);
 	}
 
 	// 진화형 향상 파일럿(#1736): 같은 URL·같은 모델을 htmx 부분 응답으로 반환한다.
@@ -241,6 +271,9 @@ class FacilityReportAdminPageController {
 				hrefWith(option.value(), keyword, createdFromDate, createdToDate, currentSort),
 				query.status() == option.value()))
 			.toList());
+		// 일괄 처리·저장된 뷰 변경 후 현재 필터·정렬 컨텍스트로 되돌아갈 returnTo.
+		model.addAttribute("currentListHref",
+			hrefWith(query.status(), keyword, createdFromDate, createdToDate, currentSort));
 		model.addAttribute("statusSort", new SortHeaderLink(
 			hrefWith(query.status(), keyword, createdFromDate, createdToDate, query.nextSortFor("status")),
 			query.ariaSortFor("status")));
@@ -516,6 +549,7 @@ class FacilityReportAdminPageController {
 	String bulkReviewReports(
 		@RequestParam(name = "reportIds", required = false) List<String> reportIds,
 		@RequestParam FacilityReportReviewDecision decision,
+		@RequestParam(required = false) String returnTo,
 		Principal principal,
 		RedirectAttributes redirectAttributes
 	) {
@@ -533,7 +567,19 @@ class FacilityReportAdminPageController {
 		}
 		redirectAttributes.addFlashAttribute("flashMessage", bulkReviewMessage(ids.size(), processed, failed));
 		redirectAttributes.addFlashAttribute("flashTone", failed == 0 ? "good" : "warning");
-		return "redirect:/admin/reports/page";
+		// 처리 후 현재 필터·정렬 컨텍스트로 되돌아간다(open redirect 방지: 목록 경로만 허용).
+		return "redirect:" + safeReportListReturnTo(returnTo);
+	}
+
+	private static String safeReportListReturnTo(String returnTo) {
+		if (returnTo != null
+			&& returnTo.startsWith("/admin/reports/page")
+			&& !returnTo.contains("://")
+			&& !returnTo.contains("\n")
+			&& !returnTo.contains("\r")) {
+			return returnTo;
+		}
+		return "/admin/reports/page";
 	}
 
 	private static String bulkReviewMessage(int total, int processed, int failed) {

@@ -227,6 +227,26 @@ class FacilityReportAdminHtmxPilotTest {
 	}
 
 	@Test
+	@DisplayName("기본 저장 뷰가 있으면 필터 없이 진입 시 그 질의로 리다이렉트된다(루프 없음)")
+	void defaultSavedViewAppliesOnFreshEntry() throws Exception {
+		var view = savedViewUseCase.saveView(new SaveAdminSavedViewCommand(
+			"admin-test", "a-reports", "기본 진입 뷰", "status=SUBMITTED", true));
+		try {
+			mockMvc.perform(get("/admin/reports/page")
+					.with(httpBasic("admin-test", "admin-test-password")))
+				.andExpect(status().is3xxRedirection())
+				.andExpect(header().string("Location", "/admin/reports/page?status=SUBMITTED"));
+			// 파라미터가 붙은 요청은 재리다이렉트하지 않는다(루프 방지).
+			mockMvc.perform(get("/admin/reports/page")
+					.param("status", "RESOLVED")
+					.with(httpBasic("admin-test", "admin-test-password")))
+				.andExpect(status().isOk());
+		} finally {
+			savedViewUseCase.deleteView("admin-test", view.viewId());
+		}
+	}
+
+	@Test
 	@DisplayName("저장된 뷰 저장 폼과 저장된 뷰 적용 링크가 렌더된다")
 	void savedViewsSectionRenders() throws Exception {
 		savedViewUseCase.saveView(new SaveAdminSavedViewCommand(

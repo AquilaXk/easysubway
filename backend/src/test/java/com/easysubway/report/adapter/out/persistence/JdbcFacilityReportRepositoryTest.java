@@ -366,6 +366,27 @@ class JdbcFacilityReportRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("키워드 검색은 LIKE 메타문자(%,_)를 리터럴로 처리한다")
+	void searchTreatsLikeMetacharactersLiterally() {
+		repository.saveReport(reportAt("pct-hit", "10% 할인 안내 오류", FacilityReportStatus.SUBMITTED,
+			LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.saveReport(reportAt("pct-miss", "1000원 요금 오류", FacilityReportStatus.SUBMITTED,
+			LocalDateTime.of(2026, 6, 17, 10, 0)));
+
+		var percentPage = repository.loadReportSummaries(
+			FacilityReportListQuery.of(null, "10%", null, null, null, 0, 20));
+		assertThat(percentPage.items()).extracting(FacilityReportSummary::id).containsExactly("pct-hit");
+
+		repository.saveReport(reportAt("us-hit", "a_b 코드 오류", FacilityReportStatus.SUBMITTED,
+			LocalDateTime.of(2026, 6, 17, 11, 0)));
+		repository.saveReport(reportAt("us-miss", "axb 코드 오류", FacilityReportStatus.SUBMITTED,
+			LocalDateTime.of(2026, 6, 17, 12, 0)));
+		var underscorePage = repository.loadReportSummaries(
+			FacilityReportListQuery.of(null, "a_b", null, null, null, 0, 20));
+		assertThat(underscorePage.items()).extracting(FacilityReportSummary::id).containsExactly("us-hit");
+	}
+
+	@Test
 	@DisplayName("검색 질의는 접수일 기간을 포함 경계로 거른다")
 	void searchFiltersByCreatedDateRangeInclusive() {
 		repository.saveReport(reportAt("r-15", "15일 신고", FacilityReportStatus.SUBMITTED,

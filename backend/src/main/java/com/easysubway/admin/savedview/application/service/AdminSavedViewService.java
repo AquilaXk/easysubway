@@ -68,6 +68,13 @@ public class AdminSavedViewService implements AdminSavedViewUseCase {
 	}
 
 	@Override
+	public java.util.Optional<AdminSavedView> findDefaultView(String adminLoginId, String programId) {
+		return repository.findByOwnerAndProgram(adminLoginId, programId).stream()
+			.filter(AdminSavedView::isDefault)
+			.findFirst();
+	}
+
+	@Override
 	@Transactional
 	public AdminSavedView setDefaultView(String adminLoginId, String viewId) {
 		AdminSavedView view = requireOwnedView(adminLoginId, viewId);
