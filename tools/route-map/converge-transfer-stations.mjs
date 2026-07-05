@@ -7,14 +7,7 @@
 //
 // Usage: node tools/route-map/converge-transfer-stations.mjs --region 수도권 [--check]
 
-import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { gzipSync, gunzipSync } from "node:zlib";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
-const root = path.resolve(import.meta.dirname, "../..");
+import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
 
 function parseArgs(argv) {
   const o = { pack: "apps/mobile/assets/datapacks/capital.sqlite.gz", index: "apps/mobile/assets/datapacks/index.json", region: "수도권", check: false };
@@ -25,16 +18,10 @@ function parseArgs(argv) {
   }
   return o;
 }
-const sha256 = (b) => createHash("sha256").update(b).digest("hex");
 
 function main() {
   const o = parseArgs(process.argv.slice(2));
-  const packPath = path.join(root, o.pack);
-  const raw = gunzipSync(readFileSync(packPath));
-  const dir = mkdtempSync(path.join(tmpdir(), "converge-"));
-  const sqlitePath = path.join(dir, "pack.sqlite");
-  writeFileSync(sqlitePath, raw);
-  const db = new DatabaseSync(sqlitePath);
+  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "converge-");
   try {
     // 환승역: 같은 station_id가 2+ line_id
     const byStation = new Map();
@@ -64,16 +51,10 @@ function main() {
     db.exec("VACUUM");
     db.close();
 
-    const newRaw = readFileSync(sqlitePath);
-    const gz = gzipSync(newRaw, { level: 9 });
-    writeFileSync(packPath, gz);
-    const indexPath = path.join(root, o.index);
-    const index = JSON.parse(readFileSync(indexPath, "utf8"));
-    const pk = index.packs.find((p) => o.pack.endsWith(p.asset));
-    if (pk) { pk.sha256 = sha256(gz); pk.sqliteSha256 = sha256(newRaw); pk.byteSize = gz.length; writeFileSync(indexPath, JSON.stringify(index, null, 2) + "\n"); }
-    console.log(`팩 갱신 (byteSize ${gz.length})`);
+    const { byteSize } = writePack({ sqlitePath, packPath, packRelPath: o.pack, indexRelPath: o.index });
+    console.log(`팩 갱신 (byteSize ${byteSize})`);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    cleanupPackDir(dir);
   }
 }
 

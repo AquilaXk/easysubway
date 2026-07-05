@@ -9,14 +9,8 @@
 // Usage: node tools/route-map/octolinearize-line-tracks.mjs
 //          --region 수도권 --line "수도권 신림선" [--line ...] [--check]
 
-import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { gzipSync, gunzipSync } from "node:zlib";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
-const root = path.resolve(import.meta.dirname, "../..");
+import { verticesToPath } from "./audit-octolinearity.mjs";
+import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
 
 /** 두 노드 a→b를 8방향 세그먼트 목록(정점 배열)으로 잇는다. 도그레그 1회 허용. */
 export function octilinearSegment(a, b) {
@@ -28,18 +22,13 @@ export function octilinearSegment(a, b) {
   if (dx === 0 || dy === 0 || adx === ady) {
     return [a, b];
   }
-  // 도그레그: 짧은 축 길이만큼 45° 이동한 꼭짓점 → 나머지 긴 축 직선.
+  // 도그레그: 짧은 축 길이(diag)만큼 45°로 이동한 꼭짓점 → 나머지 긴 축 직선.
+  // diag가 짧은 축과 같으므로 corner는 자동으로 긴 축의 b 좌표선에 놓인다
+  // (수평 우세면 corner.y=b.y, 수직 우세면 corner.x=b.x) — 두 경우 식이 동일하다.
   const diag = Math.min(adx, ady);
   const sx = Math.sign(dx);
   const sy = Math.sign(dy);
-  let corner;
-  if (adx > ady) {
-    // 먼저 45°(대각)로 diag만큼 간 뒤 수평.
-    corner = { x: a.x + sx * diag, y: a.y + sy * diag };
-  } else {
-    // 먼저 45°로 diag만큼 간 뒤 수직.
-    corner = { x: a.x + sx * diag, y: a.y + sy * diag };
-  }
+  const corner = { x: a.x + sx * diag, y: a.y + sy * diag };
   return [a, corner, b];
 }
 
@@ -55,10 +44,6 @@ export function octilinearPolyline(nodes) {
   return out;
 }
 
-function verticesToPath(verts) {
-  return "M " + verts.map((v, i) => (i === 0 ? `${v.x} ${v.y}` : `L ${v.x} ${v.y}`)).join(" ");
-}
-
 function parseArgs(argv) {
   const o = { pack: "apps/mobile/assets/datapacks/capital.sqlite.gz", index: "apps/mobile/assets/datapacks/index.json", region: "수도권", lines: [], all: false, check: false };
   for (let i = 0; i < argv.length; i += 1) {
@@ -72,16 +57,10 @@ function parseArgs(argv) {
   }
   return o;
 }
-const sha256 = (b) => createHash("sha256").update(b).digest("hex");
 
 function main() {
   const o = parseArgs(process.argv.slice(2));
-  const packPath = path.join(root, o.pack);
-  const raw = gunzipSync(readFileSync(packPath));
-  const dir = mkdtempSync(path.join(tmpdir(), "octolinearize-"));
-  const sqlitePath = path.join(dir, "pack.sqlite");
-  writeFileSync(sqlitePath, raw);
-  const db = new DatabaseSync(sqlitePath);
+  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "octolinearize-");
   try {
     const lineIds = [];
     if (o.all) {
@@ -127,16 +106,10 @@ function main() {
     if (o.check) { console.log("(--check: 미기록)"); return; }
     db.exec("VACUUM");
     db.close();
-    const newRaw = readFileSync(sqlitePath);
-    const gz = gzipSync(newRaw, { level: 9 });
-    writeFileSync(packPath, gz);
-    const indexPath = path.join(root, o.index);
-    const index = JSON.parse(readFileSync(indexPath, "utf8"));
-    const pk = index.packs.find((p) => o.pack.endsWith(p.asset));
-    if (pk) { pk.sha256 = sha256(gz); pk.sqliteSha256 = sha256(newRaw); pk.byteSize = gz.length; writeFileSync(indexPath, JSON.stringify(index, null, 2) + "\n"); }
-    console.log(`팩 갱신 (byteSize ${gz.length})`);
+    const { byteSize } = writePack({ sqlitePath, packPath, packRelPath: o.pack, indexRelPath: o.index });
+    console.log(`팩 갱신 (byteSize ${byteSize})`);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    cleanupPackDir(dir);
   }
 }
 

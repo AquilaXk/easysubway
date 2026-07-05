@@ -10,16 +10,11 @@
 //          --index apps/mobile/assets/datapacks/index.json
 //          --region 수도권 [--threshold 100] [--check] [--report out.json]
 
-import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { gzipSync, gunzipSync } from "node:zlib";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
-import { parsePathVertices, pointToSegmentDistance } from "./audit-octolinearity.mjs";
-
-const root = path.resolve(import.meta.dirname, "../..");
+import { parsePathVertices } from "./audit-octolinearity.mjs";
+import { cleanupPackDir, openPack, repoRoot, writePack } from "./pack-io.mjs";
 
 /** 점 p를 선분 (a,b)에 투영한 점과 거리. */
 export function projectPointToSegment(p, a, b) {
@@ -72,19 +67,9 @@ function parseArgs(argv) {
   return options;
 }
 
-function sha256(buffer) {
-  return createHash("sha256").update(buffer).digest("hex");
-}
-
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const packPath = path.join(root, options.pack);
-  const gz = readFileSync(packPath);
-  const sqliteBytes = gunzipSync(gz);
-  const dir = mkdtempSync(path.join(tmpdir(), "project-nodes-"));
-  const sqlitePath = path.join(dir, "pack.sqlite");
-  writeFileSync(sqlitePath, sqliteBytes);
-  const database = new DatabaseSync(sqlitePath);
+  const { db: database, dir, sqlitePath, packPath } = openPack(options.pack, "project-nodes-");
   try {
     // 노선별 track polyline
     const polylinesByLine = new Map();
@@ -143,7 +128,7 @@ function main() {
       overThreshold,
     };
     if (options.report) {
-      writeFileSync(path.isAbsolute(options.report) ? options.report : path.join(root, options.report), JSON.stringify(report, null, 2));
+      writeFileSync(path.isAbsolute(options.report) ? options.report : path.join(repoRoot, options.report), JSON.stringify(report, null, 2));
     }
     console.log(
       `[${options.region}] 노드 ${report.nodes} · 투영 이동 ${report.moved} · 임계(${options.threshold}) 초과 ${overThreshold.length}` +
@@ -173,21 +158,10 @@ function main() {
     database.close();
 
     // 팩 재압축 + index.json sha 갱신
-    const newSqlite = readFileSync(sqlitePath);
-    const newGz = gzipSync(newSqlite, { level: 9 });
-    writeFileSync(packPath, newGz);
-    const indexPath = path.join(root, options.index);
-    const index = JSON.parse(readFileSync(indexPath, "utf8"));
-    const pack = index.packs.find((p) => options.pack.endsWith(p.asset));
-    if (pack) {
-      pack.sha256 = sha256(newGz);
-      pack.sqliteSha256 = sha256(newSqlite);
-      pack.byteSize = newGz.length;
-      writeFileSync(indexPath, JSON.stringify(index, null, 2) + "\n");
-    }
-    console.log(`팩 갱신 완료 (byteSize ${newGz.length}, sha ${sha256(newGz).slice(0, 12)})`);
+    const { byteSize, sha256: gzSha } = writePack({ sqlitePath, packPath, packRelPath: options.pack, indexRelPath: options.index });
+    console.log(`팩 갱신 완료 (byteSize ${byteSize}, sha ${gzSha.slice(0, 12)})`);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    cleanupPackDir(dir);
   }
 }
 

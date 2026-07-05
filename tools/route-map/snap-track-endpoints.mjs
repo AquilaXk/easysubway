@@ -9,16 +9,11 @@
 // Usage: node tools/route-map/snap-track-endpoints.mjs
 //          --region 수도권 [--threshold 80] [--check] [--report out.json]
 
-import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { gzipSync, gunzipSync } from "node:zlib";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
-import { parsePathVertices } from "./audit-octolinearity.mjs";
-
-const root = path.resolve(import.meta.dirname, "../..");
+import { parsePathVertices, verticesToPath } from "./audit-octolinearity.mjs";
+import { cleanupPackDir, openPack, repoRoot, writePack } from "./pack-io.mjs";
 
 function nearestNode(vertex, nodes) {
   let best = null;
@@ -27,13 +22,6 @@ function nearestNode(vertex, nodes) {
     if (best === null || d < best.dist) best = { node: n, dist: d };
   }
   return best;
-}
-
-function verticesToPath(verts) {
-  return (
-    "M " +
-    verts.map((v, i) => (i === 0 ? `${v.x} ${v.y}` : `L ${v.x} ${v.y}`)).join(" ")
-  );
 }
 
 function parseArgs(argv) {
@@ -50,16 +38,9 @@ function parseArgs(argv) {
   return o;
 }
 
-const sha256 = (b) => createHash("sha256").update(b).digest("hex");
-
 function main() {
   const o = parseArgs(process.argv.slice(2));
-  const packPath = path.join(root, o.pack);
-  const raw = gunzipSync(readFileSync(packPath));
-  const dir = mkdtempSync(path.join(tmpdir(), "snap-junctions-"));
-  const sqlitePath = path.join(dir, "pack.sqlite");
-  writeFileSync(sqlitePath, raw);
-  const db = new DatabaseSync(sqlitePath);
+  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "snap-junctions-");
   try {
     const nodesByLine = new Map();
     for (const r of db.prepare("SELECT line_id, x, y FROM route_map_positions WHERE region = ?").all(o.region)) {
@@ -91,7 +72,7 @@ function main() {
     }
 
     const report = { artifactKind: "track-endpoint-snap-report", region: o.region, threshold: o.threshold, tracks: tracks.length, snapped, errors };
-    if (o.report) writeFileSync(path.isAbsolute(o.report) ? o.report : path.join(root, o.report), JSON.stringify(report, null, 2));
+    if (o.report) writeFileSync(path.isAbsolute(o.report) ? o.report : path.join(repoRoot, o.report), JSON.stringify(report, null, 2));
     console.log(`[${o.region}] track ${tracks.length} · 끝점 스냅 ${snapped} · 임계(${o.threshold}) 초과(추출오류 후보) ${errors.length}`);
     for (const e of errors) console.log(`  오류후보: ${e.line_id} 조각${e.track_index} ${e.end} 거리 ${e.dist}`);
 
@@ -104,16 +85,10 @@ function main() {
     db.exec("VACUUM");
     db.close();
 
-    const newRaw = readFileSync(sqlitePath);
-    const gz = gzipSync(newRaw, { level: 9 });
-    writeFileSync(packPath, gz);
-    const indexPath = path.join(root, o.index);
-    const index = JSON.parse(readFileSync(indexPath, "utf8"));
-    const pk = index.packs.find((p) => o.pack.endsWith(p.asset));
-    if (pk) { pk.sha256 = sha256(gz); pk.sqliteSha256 = sha256(newRaw); pk.byteSize = gz.length; writeFileSync(indexPath, JSON.stringify(index, null, 2) + "\n"); }
-    console.log(`팩 갱신 (byteSize ${gz.length})`);
+    const { byteSize } = writePack({ sqlitePath, packPath, packRelPath: o.pack, indexRelPath: o.index });
+    console.log(`팩 갱신 (byteSize ${byteSize})`);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    cleanupPackDir(dir);
   }
 }
 
