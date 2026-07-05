@@ -318,7 +318,11 @@ public class JdbcFacilityReportRepository implements
 		return count == null ? 0L : count;
 	}
 
-	// 상태·키워드(신고 내용 부분일치)·접수 기간을 동적 WHERE로 조립하고 바인딩 값을 args에 채운다.
+	// 사진 첨부 판정: 파일명·MIME·오브젝트 키가 모두 있어야 첨부로 본다(요약 has_photo 표현식과 동일).
+	private static final String HAS_PHOTO_PREDICATE =
+		"(photo_file_name IS NOT NULL AND photo_content_type IS NOT NULL AND photo_object_key IS NOT NULL)";
+
+	// 상태·키워드(신고 내용 부분일치)·역·유형·사진 유무·접수 기간을 동적 WHERE로 조립하고 바인딩 값을 args에 채운다.
 	private String buildReportSearchWhere(FacilityReportListQuery query, List<Object> args) {
 		List<String> clauses = new ArrayList<>();
 		if (query.status() != null) {
@@ -329,6 +333,18 @@ public class JdbcFacilityReportRepository implements
 			// LIKE 메타문자(%,_,\)를 이스케이프해 부분일치를 리터럴로 맞춘다(InMemory .contains()와 시맨틱 일치).
 			clauses.add("LOWER(description) LIKE ? ESCAPE '\\'");
 			args.add("%" + escapeLike(query.keyword().toLowerCase(Locale.ROOT)) + "%");
+		}
+		if (query.hasStation()) {
+			clauses.add("station_id = ?");
+			args.add(query.stationId());
+		}
+		if (query.hasReportType()) {
+			clauses.add("report_type = ?");
+			args.add(query.reportType().name());
+		}
+		if (query.hasPhotoFilter()) {
+			// 첨부 유무 필터: 참이면 첨부된 신고, 거짓이면 첨부 없는 신고만. 바인딩 값이 없는 리터럴 술어다.
+			clauses.add(query.hasPhoto() ? HAS_PHOTO_PREDICATE : "NOT " + HAS_PHOTO_PREDICATE);
 		}
 		if (query.createdFrom() != null) {
 			clauses.add("created_at >= ?");

@@ -70,6 +70,45 @@ class FacilityReportAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자는 유형·사진·역 필터로 신고 대기열을 좁힌다")
+	void adminReportListPageFiltersByTypeStationAndPhoto() throws Exception {
+		createReportWithPhotoAndLocation("사진 있는 고장 신고");
+		createReport("사진 없는 정보 오류 신고", "INFORMATION_WRONG", "");
+
+		// 유형 필터: INFORMATION_WRONG만 남기고 필터·페이지 링크에 type 파라미터가 유지된다.
+		String typeFiltered = mockMvc.perform(get("/admin/reports/page")
+				.param("type", "INFORMATION_WRONG")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		assertThat(typeFiltered)
+			.contains("사진 없는 정보 오류 신고")
+			.doesNotContain("사진 있는 고장 신고")
+			.contains("type=INFORMATION_WRONG");
+
+		// 사진 유무 필터: 사진 있는 신고만 남는다.
+		String photoFiltered = mockMvc.perform(get("/admin/reports/page")
+				.param("hasPhoto", "true")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		assertThat(photoFiltered)
+			.contains("사진 있는 고장 신고")
+			.doesNotContain("사진 없는 정보 오류 신고")
+			.contains("hasPhoto=true");
+
+		// 역 필터: 매칭되지 않는 역으로 좁히면 빈 상태 + 제거 가능한 역 칩이 뜬다.
+		String stationFiltered = mockMvc.perform(get("/admin/reports/page")
+				.param("station", "station-none")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		assertThat(stationFiltered)
+			.contains("확인할 신고가 없습니다.")
+			.contains("역: station-none");
+	}
+
+	@Test
 	@DisplayName("관리자는 신고 목록 화면에서 다음 페이지로 이동한다")
 	void adminReportListPageShowsNextPageLink() throws Exception {
 		createReport("페이지 이동 신고 1");

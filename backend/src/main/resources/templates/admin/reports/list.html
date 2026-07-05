@@ -51,16 +51,26 @@
 	-->
 	<div id="report-results" th:fragment="reportResults"
 	     hx-target="#report-results" hx-swap="outerHTML" hx-push-url="true">
-		<!-- 검색 툴바(#1737): 키워드 live search. JS 있으면 300ms debounce htmx 부분 갱신,
-		     없으면 form GET 제출로 동일 동작. 상태·정렬·기간은 hidden으로 유지된다. -->
+		<!-- 검색 툴바(#1737·#1740): 키워드 live search + 유형·사진 유무 select. JS 있으면 keyword는
+		     300ms debounce, select 변경(change)은 즉시 htmx 부분 갱신, 없으면 form GET 제출로 동일 동작.
+		     상태·정렬·기간·역은 hidden으로 유지된다(select·검색이 다른 필터를 덮어쓰지 않게). -->
 		<form class="table-toolbar" method="get" th:action="@{/admin/reports/page}"
 		      role="search" aria-label="신고 검색"
 		      hx-target="#report-results" hx-swap="outerHTML" hx-push-url="true"
 		      th:attr="hx-get=@{/admin/reports/page}"
-		      hx-trigger="submit, keyup changed delay:300ms">
+		      hx-trigger="submit, change, keyup changed delay:300ms">
 			<input type="search" name="keyword" th:value="${searchKeyword}"
 			       placeholder="신고 내용 검색" aria-label="신고 내용 검색" autocomplete="off">
+			<select name="type" aria-label="신고 유형 필터">
+				<option th:each="opt : ${typeFilters}" th:value="${opt.value}"
+				        th:text="${opt.label}" th:selected="${opt.selected}">전체 유형</option>
+			</select>
+			<select name="hasPhoto" aria-label="사진 유무 필터">
+				<option th:each="opt : ${photoFilters}" th:value="${opt.value}"
+				        th:text="${opt.label}" th:selected="${opt.selected}">사진 전체</option>
+			</select>
 			<input type="hidden" name="status" th:if="${selectedStatus != null}" th:value="${selectedStatus}">
+			<input type="hidden" name="station" th:if="${selectedStation != null}" th:value="${selectedStation}">
 			<input type="hidden" name="sort" th:if="${sortParam != null}" th:value="${sortParam}">
 			<input type="hidden" name="from" th:if="${createdFrom != null}" th:value="${createdFrom}">
 			<input type="hidden" name="to" th:if="${createdTo != null}" th:value="${createdTo}">

@@ -109,6 +109,9 @@ public class InMemoryFacilityReportRepository implements
 			.filter(report -> keyword == null
 				|| (report.description() != null
 					&& report.description().toLowerCase(Locale.ROOT).contains(keyword)))
+			.filter(report -> !query.hasStation() || query.stationId().equals(report.stationId()))
+			.filter(report -> !query.hasReportType() || report.reportType() == query.reportType())
+			.filter(report -> !query.hasPhotoFilter() || report.hasPhoto() == query.hasPhoto())
 			.filter(report -> query.createdFrom() == null
 				|| !report.createdAt().isBefore(query.createdFrom().atStartOfDay()))
 			.filter(report -> query.createdTo() == null

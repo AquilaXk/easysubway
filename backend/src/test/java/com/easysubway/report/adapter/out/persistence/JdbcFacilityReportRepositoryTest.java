@@ -358,11 +358,11 @@ class JdbcFacilityReportRepositoryTest {
 			LocalDateTime.of(2026, 6, 17, 10, 0)));
 
 		var page = repository.loadReportSummaries(
-			FacilityReportListQuery.of(null, "elevator", null, null, null, 0, 20));
+			FacilityReportListQuery.of(null, "elevator", null, null, null, null, null, null, 0, 20));
 
 		assertThat(page.items()).extracting(FacilityReportSummary::id).containsExactly("r-1");
 		assertThat(repository.countReports(
-			FacilityReportListQuery.of(null, "elevator", null, null, null, 0, 20))).isEqualTo(1L);
+			FacilityReportListQuery.of(null, "elevator", null, null, null, null, null, null, 0, 20))).isEqualTo(1L);
 	}
 
 	@Test
@@ -374,7 +374,7 @@ class JdbcFacilityReportRepositoryTest {
 			LocalDateTime.of(2026, 6, 17, 10, 0)));
 
 		var percentPage = repository.loadReportSummaries(
-			FacilityReportListQuery.of(null, "10%", null, null, null, 0, 20));
+			FacilityReportListQuery.of(null, "10%", null, null, null, null, null, null, 0, 20));
 		assertThat(percentPage.items()).extracting(FacilityReportSummary::id).containsExactly("pct-hit");
 
 		repository.saveReport(reportAt("us-hit", "a_b 코드 오류", FacilityReportStatus.SUBMITTED,
@@ -382,7 +382,7 @@ class JdbcFacilityReportRepositoryTest {
 		repository.saveReport(reportAt("us-miss", "axb 코드 오류", FacilityReportStatus.SUBMITTED,
 			LocalDateTime.of(2026, 6, 17, 12, 0)));
 		var underscorePage = repository.loadReportSummaries(
-			FacilityReportListQuery.of(null, "a_b", null, null, null, 0, 20));
+			FacilityReportListQuery.of(null, "a_b", null, null, null, null, null, null, 0, 20));
 		assertThat(underscorePage.items()).extracting(FacilityReportSummary::id).containsExactly("us-hit");
 	}
 
@@ -397,7 +397,8 @@ class JdbcFacilityReportRepositoryTest {
 			LocalDateTime.of(2026, 6, 19, 1, 0)));
 
 		var page = repository.loadReportSummaries(FacilityReportListQuery.of(
-			null, null, java.time.LocalDate.of(2026, 6, 16), java.time.LocalDate.of(2026, 6, 18), null, 0, 20));
+			null, null, null, null, null,
+			java.time.LocalDate.of(2026, 6, 16), java.time.LocalDate.of(2026, 6, 18), null, 0, 20));
 
 		assertThat(page.items()).extracting(FacilityReportSummary::id).containsExactly("r-17");
 	}
@@ -411,7 +412,7 @@ class JdbcFacilityReportRepositoryTest {
 			LocalDateTime.of(2026, 6, 17, 8, 0)));
 
 		var page = repository.loadReportSummaries(
-			FacilityReportListQuery.of(null, null, null, null, "created_at,asc", 0, 20));
+			FacilityReportListQuery.of(null, null, null, null, null, null, null, "created_at,asc", 0, 20));
 
 		assertThat(page.items()).extracting(FacilityReportSummary::id).containsExactly("r-old", "r-new");
 	}
@@ -427,12 +428,91 @@ class JdbcFacilityReportRepositoryTest {
 			LocalDateTime.of(2026, 6, 17, 10, 0)));
 
 		var query = FacilityReportListQuery.of(
-			FacilityReportStatus.SUBMITTED, "신고", null, null, null, 0, 20);
+			FacilityReportStatus.SUBMITTED, "신고", null, null, null, null, null, null, 0, 20);
 
 		assertThat(repository.loadReportSummaries(query).items())
 			.extracting(FacilityReportSummary::id)
 			.containsExactlyInAnyOrder("s-1", "s-2");
 		assertThat(repository.countReports(query)).isEqualTo(2L);
+	}
+
+	@Test
+	@DisplayName("검색 질의는 역 식별자로 신고를 거른다")
+	void searchFiltersByStationId() {
+		repository.saveReport(reportWith("sang-1", "station-sangnoksu", FacilityReportType.BROKEN, false,
+			LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.saveReport(reportWith("hanl-1", "station-hanlim", FacilityReportType.BROKEN, false,
+			LocalDateTime.of(2026, 6, 17, 10, 0)));
+
+		var query = FacilityReportListQuery.of(
+			null, null, "station-sangnoksu", null, null, null, null, null, 0, 20);
+
+		assertThat(repository.loadReportSummaries(query).items())
+			.extracting(FacilityReportSummary::id).containsExactly("sang-1");
+		assertThat(repository.countReports(query)).isEqualTo(1L);
+	}
+
+	@Test
+	@DisplayName("검색 질의는 신고 유형으로 거른다")
+	void searchFiltersByReportType() {
+		repository.saveReport(reportWith("broken-1", "station-sangnoksu", FacilityReportType.BROKEN, false,
+			LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.saveReport(reportWith("info-1", "station-sangnoksu", FacilityReportType.INFORMATION_WRONG, false,
+			LocalDateTime.of(2026, 6, 17, 10, 0)));
+
+		var query = FacilityReportListQuery.of(
+			null, null, null, FacilityReportType.INFORMATION_WRONG, null, null, null, null, 0, 20);
+
+		assertThat(repository.loadReportSummaries(query).items())
+			.extracting(FacilityReportSummary::id).containsExactly("info-1");
+		assertThat(repository.countReports(query)).isEqualTo(1L);
+	}
+
+	@Test
+	@DisplayName("검색 질의는 사진 유무로 거른다")
+	void searchFiltersByPhotoPresence() {
+		repository.saveReport(reportWith("with-photo", "station-sangnoksu", FacilityReportType.BROKEN, true,
+			LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.saveReport(reportWith("no-photo", "station-sangnoksu", FacilityReportType.BROKEN, false,
+			LocalDateTime.of(2026, 6, 17, 10, 0)));
+
+		var withPhoto = FacilityReportListQuery.of(
+			null, null, null, null, true, null, null, null, 0, 20);
+		var withoutPhoto = FacilityReportListQuery.of(
+			null, null, null, null, false, null, null, null, 0, 20);
+
+		assertThat(repository.loadReportSummaries(withPhoto).items())
+			.extracting(FacilityReportSummary::id).containsExactly("with-photo");
+		assertThat(repository.loadReportSummaries(withoutPhoto).items())
+			.extracting(FacilityReportSummary::id).containsExactly("no-photo");
+		assertThat(repository.countReports(withPhoto)).isEqualTo(1L);
+	}
+
+	private FacilityReport reportWith(
+		String reportId,
+		String stationId,
+		FacilityReportType reportType,
+		boolean withPhoto,
+		LocalDateTime createdAt
+	) {
+		return new FacilityReport(
+			reportId,
+			"anonymous-user-1",
+			stationId,
+			"facility-elevator-1",
+			reportType,
+			"신고 내용",
+			withPhoto ? "photo.jpg" : null,
+			withPhoto ? "image/jpeg" : null,
+			withPhoto ? "photo-object-key" : null,
+			null,
+			null,
+			null,
+			FacilityReportStatus.SUBMITTED,
+			createdAt,
+			null,
+			null
+		);
 	}
 
 	private FacilityReport reportAt(
