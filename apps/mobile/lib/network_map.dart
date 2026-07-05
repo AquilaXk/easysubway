@@ -2829,10 +2829,9 @@ MapCameraState _cameraForBounds(
   ).clamped(viewportMargin: 220);
 }
 
-/// 지역 초기 화면 카메라(contain-fit)를 만든다(#1764 A 테스트용). 이 카메라는
-/// scale == initialScale 이라 [routeMapZoomBucket]이 항상 bucket 1을 준다 — 즉
-/// 어떤 지역(크기 무관)이든 초기 화면에서 역 노드·환승/주요 라벨·노선 뱃지가
-/// 보이는 상태로 시작한다.
+/// 지역 초기 화면 카메라(contain-fit)를 만든다(테스트용). 이 카메라는
+/// scale == initialScale 이라 지역 전체가 화면에 담긴 상태로 시작한다(#1789
+/// 정적 스케일 렌더 — 초기 화면 = 축소 하한).
 @visibleForTesting
 MapCameraState networkMapInitialCameraForRegion({
   required Rect regionBounds,
