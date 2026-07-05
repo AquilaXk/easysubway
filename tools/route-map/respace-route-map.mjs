@@ -283,9 +283,11 @@ export function respaceGraph(graph, options) {
   const {
     unit,
     minRatio = 1.0,
-    maxRatio = 2.2, // Task 3 스윕에서 확정 (프로토타입 균형 config)
+    // 2026-07-06 스윕 실측(sweep-respacing.mjs): kAnchor=0.1, maxRatio=1.8 →
+    // free=26, octo=11, p95/p5=6.6 — 게이트는 이 실측치 + 소여유.
+    maxRatio = 1.8, // Task 3 스윕에서 확정 (균형 config)
     kLen = 0.3, // Task 3 스윕에서 확정 (길이 스프링 강도)
-    kAnchor = 0.15, // Task 3 스윕에서 확정 (원위치 앵커 강도)
+    kAnchor = 0.1, // Task 3 스윕에서 확정 (원위치 앵커 강도)
     iterations = 1500,
     tolerance = 0.01,
     polishSweeps = 150,
@@ -417,9 +419,11 @@ function parseArgs(argv) {
     index: "apps/mobile/assets/datapacks/index.json",
     region: "수도권",
     min: 1.0,
-    max: 2.5,
+    // 2026-07-06 스윕 실측(sweep-respacing.mjs): kAnchor=0.1, maxRatio=1.8 →
+    // free=26, octo=11, p95/p5=6.6 — CLI 기본값을 respaceGraph 함수 기본값과 정합.
+    max: 1.8,
     kLen: 0.3,
-    kAnchor: 0.15,
+    kAnchor: 0.1,
     check: false,
   };
   for (let i = 0; i < argv.length; i += 1) {

@@ -189,9 +189,10 @@ function parseArgs(argv) {
     region: "수도권",
     json: null,
     compare: null,
-    // 게이트 시작값 — Task 3 스윕에서 확정.
-    maxP95p5: 7.5,
-    maxFree: 24,
+    // 2026-07-06 스윕 실측(sweep-respacing.mjs): kAnchor=0.1, maxRatio=1.8 →
+    // free=26, octo=11, p95/p5=6.6 — 게이트는 이 실측치 + 소여유(p95/p5 +0.5, free +2).
+    maxP95p5: 7.1,
+    maxFree: 28,
   };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
