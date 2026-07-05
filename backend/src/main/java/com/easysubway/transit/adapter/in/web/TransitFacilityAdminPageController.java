@@ -169,16 +169,9 @@ class TransitFacilityAdminPageController {
 		};
 	}
 
-	// 확인이 필요한 상태(고장·공사·폐쇄·확인 필요·사용자 제보)를 앞으로 정렬하기 위한 순위.
+	// 확인이 필요한 상태(고장·공사·폐쇄·확인 필요·사용자 제보)를 앞으로 정렬하기 위한 순위. 판정은 도메인이 소유.
 	private static int attentionRank(AccessibilityFacilityStatus status) {
-		return needsAttention(status) ? 0 : 1;
-	}
-
-	static boolean needsAttention(AccessibilityFacilityStatus status) {
-		return switch (status) {
-			case BROKEN, UNDER_CONSTRUCTION, CLOSED, UNKNOWN, USER_REPORTED -> true;
-			case NORMAL, ADMIN_VERIFIED -> false;
-		};
+		return status.needsAttention() ? 0 : 1;
 	}
 
 	private static String blankToNull(String value) {
