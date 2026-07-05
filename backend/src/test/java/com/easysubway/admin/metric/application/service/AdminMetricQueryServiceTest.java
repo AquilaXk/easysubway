@@ -45,6 +45,21 @@ class AdminMetricQueryServiceTest {
 	}
 
 	@Test
+	@DisplayName("비율 지표는 합계 대신 값이 있는 날의 평균으로 비교한다")
+	void ratesAreComparedByAverageOfPresentDays() {
+		// 최근 7일 차단률: 07-06=30, 07-04=20 (present 2일 평균 25). 직전 7일: 06-29=10 (평균 10).
+		save(AdminMetricKeys.ROUTE_BLOCKED_RATE, TODAY, 30);
+		save(AdminMetricKeys.ROUTE_BLOCKED_RATE, TODAY.minusDays(2), 20);
+		save(AdminMetricKeys.ROUTE_BLOCKED_RATE, TODAY.minusDays(7), 10);
+
+		AdminMetricComparison comparison = service.compare(List.of(AdminMetricKeys.ROUTE_BLOCKED_RATE), 7).get(0);
+
+		assertThat(comparison.current()).isCloseTo(25.0, within(0.001));
+		assertThat(comparison.previous()).isCloseTo(10.0, within(0.001));
+		assertThat(comparison.deltaPercent()).isCloseTo(150.0, within(0.001));
+	}
+
+	@Test
 	@DisplayName("직전 기간 합계가 0이면 증감률은 정의하지 않는다(null)")
 	void undefinedPercentWhenPreviousIsZero() {
 		save(AdminMetricKeys.USERS_ACTIVE, TODAY, 30);

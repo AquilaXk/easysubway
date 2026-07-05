@@ -88,8 +88,9 @@ public class AdminMetricQueryService {
 		return keys.stream()
 			.map(key -> {
 				Map<LocalDate, Double> valuesByDate = byKey.getOrDefault(key, Map.of());
-				double current = sumRange(valuesByDate, currentFrom, today);
-				double previous = sumRange(valuesByDate, previousFrom, previousTo);
+				boolean rate = AdminMetricKeys.isRate(key);
+				double current = aggregate(valuesByDate, currentFrom, today, rate);
+				double previous = aggregate(valuesByDate, previousFrom, previousTo, rate);
 				Double deltaPercent = previous == 0.0 ? null : (current - previous) * 100 / previous;
 				return new AdminMetricComparison(
 					key, AdminMetricKeys.label(key), days, current, previous, current - previous, deltaPercent);
@@ -97,10 +98,28 @@ public class AdminMetricQueryService {
 			.toList();
 	}
 
-	private static double sumRange(Map<LocalDate, Double> valuesByDate, LocalDate fromInclusive, LocalDate toInclusive) {
-		return fromInclusive.datesUntil(toInclusive.plusDays(1))
-			.mapToDouble(date -> valuesByDate.getOrDefault(date, 0.0))
-			.sum();
+	/**
+	 * 기간 집계: 건수 지표는 합계(결측일 0), 비율·평균 지표는 값이 있는 날의 평균(결측일 제외)으로 모은다.
+	 * 비율을 합산하면(예: 7일 차단률 합) 무의미하므로 평균으로 본다.
+	 */
+	private static double aggregate(Map<LocalDate, Double> valuesByDate, LocalDate from, LocalDate to, boolean rate) {
+		if (!rate) {
+			return from.datesUntil(to.plusDays(1))
+				.mapToDouble(date -> valuesByDate.getOrDefault(date, 0.0))
+				.sum();
+		}
+		double[] present = from.datesUntil(to.plusDays(1))
+			.filter(valuesByDate::containsKey)
+			.mapToDouble(valuesByDate::get)
+			.toArray();
+		if (present.length == 0) {
+			return 0.0;
+		}
+		double sum = 0.0;
+		for (double value : present) {
+			sum += value;
+		}
+		return sum / present.length;
 	}
 
 	private static List<String> normalizeKeys(Collection<String> requestedKeys) {

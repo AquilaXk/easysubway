@@ -3,6 +3,7 @@ package com.easysubway.admin.metric.domain;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 일별 지표 스냅샷(#1739) 키. 대시보드 즉석 계산과 같은 소스에서 뽑아 "정합"을 보장한다.
@@ -52,8 +53,19 @@ public final class AdminMetricKeys {
 		return ALL;
 	}
 
+	private static final Set<String> RATE_METRICS = Set.of(
+		ROUTE_BLOCKED_RATE, API_ERROR_RATE, REPORTS_PROCESSING_AVG_MINUTES);
+
 	public static boolean isKnown(String metricKey) {
 		return ALL.contains(metricKey);
+	}
+
+	/**
+	 * 비율·평균 지표인지 여부. 기간 비교에서 이런 지표는 합계가 무의미하므로(예: 7일 차단률 합 = 175%)
+	 * 값이 있는 날의 평균으로 집계한다. 건수 지표는 합계로 집계한다.
+	 */
+	public static boolean isRate(String metricKey) {
+		return RATE_METRICS.contains(metricKey);
 	}
 
 	/** 차트·표에 쓰는 한글 표시 라벨. 미등록 키는 키 자체를 돌려준다. */
