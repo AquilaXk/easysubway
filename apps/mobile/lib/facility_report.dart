@@ -1483,15 +1483,6 @@ class _MyReportEmpty extends StatelessWidget {
                 height: 1.3,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '시설 제보를 남기면 여기에서 진행 상황을 확인할 수 있어요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                height: 1.4,
-              ),
-            ),
           ],
         ),
       ),
