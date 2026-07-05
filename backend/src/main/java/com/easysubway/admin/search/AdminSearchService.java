@@ -1,6 +1,10 @@
 package com.easysubway.admin.search;
 
 import com.easysubway.admin.navigation.AdminProgram;
+import com.easysubway.admin.web.AdminMasterLabelResolver;
+import com.easysubway.transit.application.port.in.StationSearchCommand;
+import com.easysubway.transit.application.port.in.TransitMasterQueryUseCase;
+import com.easysubway.transit.domain.StationWithLines;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -21,6 +25,13 @@ import org.springframework.stereotype.Service;
 public class AdminSearchService {
 
 	private static final int MENU_LIMIT = 8;
+	private static final int STATION_LIMIT = 6;
+
+	private final TransitMasterQueryUseCase transitMasterQuery;
+
+	public AdminSearchService(TransitMasterQueryUseCase transitMasterQuery) {
+		this.transitMasterQuery = transitMasterQuery;
+	}
 
 	public List<AdminSearchGroup> search(String query, Authentication authentication) {
 		String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
@@ -32,7 +43,31 @@ public class AdminSearchService {
 		if (!menuHits.isEmpty()) {
 			groups.add(new AdminSearchGroup("menu", "메뉴", menuHits));
 		}
+		List<AdminSearchHit> stationHits = searchStations(query, authentication);
+		if (!stationHits.isEmpty()) {
+			groups.add(new AdminSearchGroup("station", "역", stationHits));
+		}
 		return groups;
+	}
+
+	// 역 검색: 역 화면 권한(STATIONS=ADMIN_VIEW)이 없으면 제외한다. 이름(코드)로 표기, 역 상세로 이동.
+	private List<AdminSearchHit> searchStations(String query, Authentication authentication) {
+		if (!AdminProgram.visibleTo(authentication).contains(AdminProgram.STATIONS)) {
+			return List.of();
+		}
+		try {
+			return transitMasterQuery.searchStations(new StationSearchCommand(query.trim(), null)).stream()
+				.map(StationWithLines::station)
+				.limit(STATION_LIMIT)
+				.map(station -> new AdminSearchHit(
+					AdminMasterLabelResolver.label(station.nameKo(), station.id()),
+					"역",
+					"/admin/stations/" + station.id() + "/page"))
+				.toList();
+		} catch (RuntimeException exception) {
+			// 짧은 질의 등으로 검색이 거부되면 역 결과는 비운다(다른 그룹은 그대로).
+			return List.of();
+		}
 	}
 
 	private List<AdminSearchHit> searchMenus(String normalizedQuery, Authentication authentication) {
