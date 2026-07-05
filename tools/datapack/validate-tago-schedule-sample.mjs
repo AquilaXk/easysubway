@@ -59,6 +59,9 @@ function validateTagoScheduleSample(rawText, options = {}) {
     if (!options.allowEmptyRows) {
       throw new Error("TAGO schedule sample has no rows");
     }
+    if (!isNormalEmptyTagoSchedulePayload(payload)) {
+      throw new Error("TAGO schedule empty response shape is invalid");
+    }
     return buildTagoScheduleValidationResult(rawText, rows, [], [], true);
   }
   const observedFields = new Set(rows.flatMap((row) => Object.keys(row)));
@@ -415,6 +418,14 @@ function normalizeRows(value) {
     return [value];
   }
   return [];
+}
+
+function isNormalEmptyTagoSchedulePayload(payload) {
+  const items = payload.response?.body?.items;
+  if (!items || typeof items !== "object" || Array.isArray(items)) {
+    return false;
+  }
+  return !("item" in items) || (Array.isArray(items.item) && items.item.length === 0);
 }
 
 function parseHhmmss(value, label) {
