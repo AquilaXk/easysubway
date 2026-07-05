@@ -180,8 +180,6 @@ require_non_empty "$ARTIFACT_DIR/package.txt"
 adb_device logcat -c
 adb_device shell am force-stop "$PACKAGE"
 adb_device shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null 2>&1 || true
-# cold start → 노선도 첫 표시(#1643 cold start 지표): launch 직후부터 settle까지.
-launch_start_ns="$(adb_device shell 'echo $EPOCHREALTIME' | tr -d '\r' | tr -d '.')"
 adb_device shell monkey -p "$PACKAGE" 1 > "$ARTIFACT_DIR/launch.txt"
 sleep "$SETTLE_SECONDS"
 

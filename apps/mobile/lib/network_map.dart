@@ -2274,7 +2274,10 @@ void _logRouteMapFrameTimings(List<FrameTiming> timings) {
     final buildMs = timing.buildDuration.inMicroseconds / 1000.0;
     final rasterMs = timing.rasterDuration.inMicroseconds / 1000.0;
     final totalMs = timing.totalSpan.inMicroseconds / 1000.0;
-    debugPrint(
+    // debugPrint는 throttle(debugPrintThrottled)이라 pan 중 다량의 프레임 로그를
+    // 큐잉·드롭해 janky burst 구간을 undercount할 수 있다(jank% 하향 편향). 측정
+    // 정확도를 위해 unthrottled synchronous 출력으로 모든 프레임을 남긴다.
+    debugPrintSynchronously(
       'routeMapFrame '
       'buildMs=${buildMs.toStringAsFixed(2)} '
       'rasterMs=${rasterMs.toStringAsFixed(2)} '
