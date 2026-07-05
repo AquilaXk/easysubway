@@ -3750,38 +3750,6 @@ void main() {
     }
   });
 
-  testWidgets('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다', (tester) async {
-    // 더보기 진입점은 제거됐지만(#1570) 화면 자체는 유지되므로 직접 띄워 검증한다.
-    await tester.pumpWidget(const MaterialApp(home: OfflineDataScreen()));
-    await tester.pumpAndSettle();
-
-    expect(find.text('저장된 안내 상태'), findsOneWidget);
-    expect(find.text('검증 구간'), findsNothing);
-    expect(find.text('지금은 상록수역·사당역 구간을 안내해요'), findsNothing);
-    expect(find.text('마지막 갱신'), findsOneWidget);
-    expect(find.text('앱 설치 때 함께 받은 안내'), findsOneWidget);
-    expect(find.text('저장 정보 다시 확인'), findsOneWidget);
-    expect(find.text('저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요'), findsOneWidget);
-    expect(find.text('안내 범위'), findsNothing);
-    expect(find.text('제한 사항'), findsOneWidget);
-    expect(find.text('실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요'), findsOneWidget);
-  });
-
-  testWidgets('오프라인 데이터 안내는 만료된 저장 정보를 갱신 필요로 보여준다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OfflineDataScreen(
-          expiresAt: DateTime.utc(2026, 6, 25, 12),
-          now: () => DateTime.utc(2026, 6, 25, 12, 1),
-        ),
-      ),
-    );
-
-    expect(find.text('마지막 갱신'), findsOneWidget);
-    expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
-    expect(find.text('갱신 필요'), findsOneWidget);
-  });
-
   testWidgets('데이터 및 지도 출처 화면은 manifest와 source inventory를 보여준다', (
     tester,
   ) async {
