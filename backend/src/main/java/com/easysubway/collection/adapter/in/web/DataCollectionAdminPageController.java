@@ -85,6 +85,7 @@ class DataCollectionAdminPageController {
 
 	record DataCollectionRunRow(
 		String runId,
+		DataCollectionSource source,
 		String sourceLabel,
 		String statusLabel,
 		String requestedBy,
@@ -100,6 +101,7 @@ class DataCollectionAdminPageController {
 		static DataCollectionRunRow from(DataCollectionRun run) {
 			return new DataCollectionRunRow(
 				run.runId(),
+				run.source(),
 				DataCollectionAdminPageController.sourceLabel(run.source()),
 				DataCollectionAdminPageController.statusLabel(run.status()),
 				run.requestedBy(),
@@ -113,6 +115,17 @@ class DataCollectionAdminPageController {
 					.map(DataCollectionRunStepRow::from)
 					.toList()
 			);
+		}
+
+		public long failedStepCount() {
+			return steps.stream().filter(DataCollectionRunStepRow::failed).count();
+		}
+
+		public String stepSummaryLabel() {
+			long failed = failedStepCount();
+			return failed > 0
+				? "단계 %d개 · 실패 %d개".formatted(steps.size(), failed)
+				: "단계 %d개".formatted(steps.size());
 		}
 
 		public String failureLabel() {
@@ -137,6 +150,7 @@ class DataCollectionAdminPageController {
 	record DataCollectionRunStepRow(
 		String name,
 		String statusLabel,
+		boolean failed,
 		String inputSource,
 		String artifactReference,
 		String checksum,
@@ -148,6 +162,7 @@ class DataCollectionAdminPageController {
 			return new DataCollectionRunStepRow(
 				step.name(),
 				stepStatusLabel(step.status()),
+				step.status() == DataCollectionStepStatus.FAILED,
 				valueOrDash(step.inputSource()),
 				valueOrDash(step.artifactReference()),
 				valueOrDash(step.checksum()),
