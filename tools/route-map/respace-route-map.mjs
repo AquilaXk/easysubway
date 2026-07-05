@@ -218,3 +218,137 @@ export function buildRespaceGraph({ tracks, positions }) {
 
   return { nodes, tracks: outTracks, stationNodes, chains, clusters, warnings };
 }
+
+function dist2(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function chainLength(nodes, nodeIds) {
+  let sum = 0;
+  for (let i = 1; i < nodeIds.length; i += 1) {
+    sum += dist2(nodes[nodeIds[i - 1]], nodes[nodeIds[i]]);
+  }
+  return sum;
+}
+
+/** hasStationEnds chain 길이의 중앙값 (재간격 단위 unit 기본값). */
+export function medianStationChainLength(graph) {
+  const lengths = graph.chains
+    .filter((c) => c.hasStationEnds)
+    .map((c) => chainLength(graph.nodes, c.nodeIds))
+    .sort((a, b) => a - b);
+  return lengths.length ? lengths[Math.floor(lengths.length / 2)] : 0;
+}
+
+/**
+ * 방향 고정·길이 목표의 위치 기반 반복 완화(PBD식 Gauss–Seidel). 역-역 chain은
+ * [minRatio,maxRatio]·unit으로 클램프해 도심 확대·외곽 압축하고, 방향(원본 8선형)
+ * 은 마무리 폴리싱으로 정확 복원한다. 환승 cluster는 강체 결합으로 offset 유지.
+ */
+export function respaceGraph(graph, options) {
+  const {
+    unit,
+    minRatio = 1.0,
+    maxRatio = 2.5,
+    iterations = 800,
+    tolerance = 0.01,
+    polishSweeps = 50,
+  } = options;
+  const orig = graph.nodes;
+  const clampLen = (v) =>
+    Math.max(minRatio * unit, Math.min(maxRatio * unit, v));
+
+  // 세그먼트 목표 길이(chain scale) + 원본 방향(고정).
+  const segTargetByKey = new Map();
+  for (const chain of graph.chains) {
+    const ids = chain.nodeIds;
+    const cur = chainLength(orig, ids);
+    const target = chain.hasStationEnds ? clampLen(cur) : cur;
+    const scale = cur > 0 ? target / cur : 1;
+    for (let i = 1; i < ids.length; i += 1) {
+      const ol = dist2(orig[ids[i - 1]], orig[ids[i]]);
+      segTargetByKey.set(`${ids[i - 1]},${ids[i]}`, ol * scale);
+    }
+  }
+  const segments = [];
+  for (const track of graph.tracks) {
+    const ids = track.nodeIds;
+    for (let i = 1; i < ids.length; i += 1) {
+      const a = ids[i - 1];
+      const b = ids[i];
+      const ol = dist2(orig[a], orig[b]);
+      const dir =
+        ol > 0
+          ? { x: (orig[b].x - orig[a].x) / ol, y: (orig[b].y - orig[a].y) / ol }
+          : { x: 0, y: 0 };
+      const key = `${a},${b}`;
+      segments.push({
+        a,
+        b,
+        dir,
+        target: segTargetByKey.has(key) ? segTargetByKey.get(key) : ol,
+      });
+    }
+  }
+
+  const positions = orig.map((n) => ({ x: n.x, y: n.y }));
+  const anchor = 0; // nodes[0] 원좌표 고정(병진 자유도 제거).
+
+  const resyncClusters = () => {
+    for (const cluster of graph.clusters) {
+      let mx = 0;
+      let my = 0;
+      for (const m of cluster.members) {
+        mx += positions[m.nodeId].x - m.offset.x;
+        my += positions[m.nodeId].y - m.offset.y;
+      }
+      mx /= cluster.members.length;
+      my /= cluster.members.length;
+      for (const m of cluster.members) {
+        positions[m.nodeId] = { x: mx + m.offset.x, y: my + m.offset.y };
+      }
+    }
+  };
+
+  const sweep = (perpendicularOnly) => {
+    let maxCorrection = 0;
+    for (const seg of segments) {
+      const pa = positions[seg.a];
+      const pb = positions[seg.b];
+      let ex = pb.x - pa.x - seg.dir.x * seg.target;
+      let ey = pb.y - pa.y - seg.dir.y * seg.target;
+      if (perpendicularOnly) {
+        const along = ex * seg.dir.x + ey * seg.dir.y;
+        ex -= along * seg.dir.x;
+        ey -= along * seg.dir.y;
+      }
+      const mag = Math.hypot(ex, ey);
+      if (mag > maxCorrection) maxCorrection = mag;
+      if (seg.a === anchor && seg.b === anchor) continue;
+      if (seg.a === anchor) {
+        positions[seg.b] = { x: pb.x - ex, y: pb.y - ey };
+      } else if (seg.b === anchor) {
+        positions[seg.a] = { x: pa.x + ex, y: pa.y + ey };
+      } else {
+        positions[seg.a] = { x: pa.x + ex / 2, y: pa.y + ey / 2 };
+        positions[seg.b] = { x: pb.x - ex / 2, y: pb.y - ey / 2 };
+      }
+    }
+    return maxCorrection;
+  };
+
+  let sweeps = 0;
+  let maxResidual = 0;
+  for (let it = 0; it < iterations; it += 1) {
+    maxResidual = sweep(false);
+    resyncClusters();
+    sweeps += 1;
+    if (maxResidual < tolerance) break;
+  }
+  for (let it = 0; it < polishSweeps; it += 1) {
+    maxResidual = sweep(true);
+    resyncClusters();
+    sweeps += 1;
+  }
+  return { positions, report: { sweeps, maxResidual } };
+}
