@@ -1208,7 +1208,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 아직 알 수 없어요.'));
+    expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
     expect(result.warnings, isEmpty);
     expect(result.recommendationReasons.join('\n'), isNot(contains('확인했어요')));
   });
@@ -1692,7 +1692,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
+    expect(result.blockedReasons, contains('길이 이어지는지 확인하고 있어요.'));
   });
 
   test('생성 transfer edge만 있는 휠체어 환승 경로는 검증된 경로로 안내하지 않는다', () async {
@@ -1762,7 +1762,7 @@ void main() {
 
     expect(result.status, 'UNKNOWN');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('계단 없는 길인지 아직 알 수 없어요.'));
+    expect(result.blockedReasons, contains('길이 이어지는지 확인하고 있어요.'));
   });
 
   test('service pattern entry가 사용 불가이면 생성 entry로 우회하지 않는다', () async {
@@ -2063,7 +2063,7 @@ void main() {
 
     expect(result.status, isNot('FOUND'));
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 아직 알 수 없어요.'));
+    expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
   });
 
   test('검수 완료 시설에 연결된 available edge는 이동 가능하게 유지한다', () async {
@@ -2316,7 +2316,7 @@ void main() {
 
     expect(result.status, isNot('FOUND'));
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 아직 알 수 없어요.'));
+    expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
   });
 
   test('낮은 시설 품질 레코드는 연결된 edge의 신뢰도와 갱신 시각으로 전파된다', () async {
