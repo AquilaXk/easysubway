@@ -483,7 +483,7 @@ void main() {
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.needsConfirmation, isTrue);
     expect(result.attentionLabel, '살펴볼 내용');
-    expect(result.semanticLabel, contains('살펴볼 내용 길이 이어지는지 아직 확인하지 못했어요.'));
+    expect(result.semanticLabel, contains('살펴볼 내용 길이 이어지는지 확인하고 있어요.'));
     expect(result.semanticLabel, isNot(contains('안내 불가 이유')));
     expect(result.semanticLabel, isNot(contains('다음 행동')));
   });
@@ -495,8 +495,8 @@ void main() {
     );
 
     expect(result.isBlocked, isFalse);
-    expect(result.blockedReasonLabels, ['길이 이어지는지 아직 확인하지 못했어요.']);
-    expect(result.semanticLabel, contains('길이 이어지는지 아직 확인하지 못했어요.'));
+    expect(result.blockedReasonLabels, ['길이 이어지는지 확인하고 있어요.']);
+    expect(result.semanticLabel, contains('길이 이어지는지 확인하고 있어요.'));
   });
 
   test('경로 검색 localized reason은 쉬운 문구를 generic으로 바꾸지 않는다', () {
@@ -547,8 +547,8 @@ void main() {
       'createdAt': '2026-06-13T04:20:00',
     });
 
-    expect(result.warnings.single.userMessage, '일부 이동 정보를 확인하지 못했어요.');
-    expect(result.semanticLabel, contains('일부 이동 정보를 확인하지 못했어요.'));
+    expect(result.warnings.single.userMessage, '일부 안내를 확인하고 있어요.');
+    expect(result.semanticLabel, contains('일부 안내를 확인하고 있어요.'));
     expect(result.semanticLabel, isNot(contains('SERVER_RAW_WARNING')));
   });
 

@@ -164,7 +164,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.steps, isEmpty);
-    expect(result.blockedReasons, contains('엘리베이터와 통로 상태를 확인하지 못했어요.'));
+    expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
   });
 
   test('로컬 내부 이동 단계는 최근 확인 상태를 부담 라벨에서 구분한다', () async {
@@ -324,7 +324,7 @@ void main() {
     expect(wheelchairResult.steps, isEmpty);
     expect(
       wheelchairResult.blockedReasons,
-      contains('엘리베이터와 통로 상태를 확인하지 못했어요.'),
+      contains('엘리베이터·통로 상태를 확인하고 있어요.'),
     );
   });
 
