@@ -453,29 +453,34 @@ class StructuredRouteMapPainter extends CustomPainter {
       }
     }
 
-    // 환승 마커: 물리 역당 한 번, transferGroups 중심 좌표에, 전 bucket 표시.
-    // 흰 캡슐 배경 위에 환승 노선 색을 세로 도트로 쌓아 어느 노선이 만나는지
-    // 색으로 드러낸다(#1792 G3, 공식 노선도 관례).
+    // 환승 마커: 물리 역당 그룹 하나를 이격에 따라 3모드로 그린다(#1789).
+    // 비수렴 PD 기하에서 평행 노선들 위 멤버 노드를 캡슐이 걸치는 것이
+    // 공식 노선도 문법이다(한 점 수렴 강제는 기하 훼손이라 하지 않는다).
     for (final group in map.transferGroups) {
       if (!visible.contains(group.centroid)) {
         continue;
       }
-      final center = camera.sourceToViewportPoint(group.centroid);
-      final marker = routeMapTransferMarker(
-        center: center,
+      final markers = routeMapTransferMarkers(
+        memberCenters: [
+          for (final position in group.memberPositions)
+            camera.sourceToViewportPoint(position),
+        ],
         colors: [
           for (final lineId in group.lineIds)
             lineColors[lineId] ?? _fallbackLineColor,
         ],
+        sourceSpread: offsetsMaxPairwiseDistance(group.memberPositions),
         dotRadius: _transferDotRadius,
         dotGap: _transferDotGap,
         padding: _transferDotPadding,
       );
-      canvas.drawRRect(marker.capsule, _transferFillPaint);
-      canvas.drawRRect(marker.capsule, _transferBorderPaint);
-      for (final dot in marker.dots) {
-        _transferDotPaint.color = dot.color;
-        canvas.drawCircle(dot.center, _transferDotRadius, _transferDotPaint);
+      for (final marker in markers) {
+        canvas.drawRRect(marker.capsule, _transferFillPaint);
+        canvas.drawRRect(marker.capsule, _transferBorderPaint);
+        for (final dot in marker.dots) {
+          _transferDotPaint.color = dot.color;
+          canvas.drawCircle(dot.center, _transferDotRadius, _transferDotPaint);
+        }
       }
     }
   }
