@@ -12,6 +12,7 @@ import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
 import 'mobility_profile.dart';
+import 'route_hedge_labels.dart';
 import 'station_search.dart';
 
 const _routeSearchTimeout = Duration(seconds: 8);
@@ -87,7 +88,7 @@ String _routeDateLabel(String value) {
   if (trimmed.length >= 10) {
     return '최근 확인 ${trimmed.substring(0, 10)}';
   }
-  return '최근 확인일을 아직 알 수 없어요';
+  return '최근 확인일이 아직 없어요';
 }
 
 const routeEtaSourceLabels = <String, String>{
@@ -1348,7 +1349,7 @@ class RouteSearchResult {
         steps.every((step) => _routeStepStairState(step) == 'stepFree')) {
       return '계단 없는 길이에요';
     }
-    return '계단 여부를 아직 알 수 없어요';
+    return '계단 여부를 확인하고 있어요';
   }
 
   int get walkingDistanceMeters {
@@ -1390,13 +1391,13 @@ class RouteSearchResult {
     return switch (status) {
       'FOUND' => '경로를 찾았습니다',
       'BLOCKED' => '안내할 수 있는 경로가 없습니다',
-      _ => '경로 상태를 아직 알 수 없어요',
+      _ => '경로 상태를 확인하고 있어요',
     };
   }
 
   String get scoreLabel => burdenLevelLabel;
 
-  String get lineLabel => lineName.isEmpty ? '노선을 아직 알 수 없어요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선을 확인하고 있어요' : lineName;
 
   bool get isBlocked => status == 'BLOCKED';
 
@@ -2056,46 +2057,37 @@ String _routeDistanceLabel(int distanceMeters) {
   return '${kilometers.toStringAsFixed(1)}km';
 }
 
-String _routeWarningLabel(String code) {
-  return switch (code.trim()) {
-    'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
-    'STALE_ACCESSIBILITY_DATA' => '시설 상태 안내가 오래됐을 수 있어요.',
-    'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
-    'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
-    // 두 번째 문장('현장 안내를 먼저 봐 주세요')은 결과 하단 '안전 안내' 각주와
-    // 중복이라 제거한다. 헤지는 한 곳에서만 담당한다(#1577).
-    'GENERATED_CONNECTOR_UNVERIFIED' => '연결 위치를 아직 확인하지 못했어요.',
-    'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
-    'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
-    'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
-    _ => '일부 이동 정보를 확인하지 못했어요.',
-  };
-}
+// 하드 블록(경로를 실제로 못 찾음)은 헤지가 아니라 결과이므로 별도 문구로 안내한다.
+const _routeBlockedNoStepFreeRoute = '계단 없는 경로를 아직 찾지 못했어요.';
+const _routeBlockedFacilityUnavailable = '꼭 필요한 시설을 지금 이용하기 어려워요.';
+const _routeBlockedGeneric = '안내할 수 있는 경로를 아직 찾지 못했어요.';
 
 String _routeBlockedReasonLabel(String reason) {
-  final formalFailureSuffix = '${'못했'}습니다.';
-  final normalizedReason = reason.trim().replaceAll(
-    formalFailureSuffix,
-    '못했어요.',
-  );
+  final normalizedReason = reason.trim().replaceAll('못했습니다.', '못했어요.');
   return switch (normalizedReason) {
-    'STAIR_ONLY_ACCESS' => '계단 없는 경로를 아직 찾지 못했어요.',
-    'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 아직 알 수 없어요.',
-    'GENERATED_CONNECTOR_UNVERIFIED' => '계단 없는 길인지 아직 알 수 없어요.',
-    'FACILITY_UNAVAILABLE' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
-    'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
-    'ROUTE_GRAPH_UNKNOWN' => '길이 이어지는지 아직 확인하지 못했어요.',
-    '계단 없는 경로를 아직 찾지 못했어요.' => '계단 없는 경로를 아직 찾지 못했어요.',
-    '계단 없는 길인지 아직 알 수 없어요.' => '계단 없는 길인지 아직 알 수 없어요.',
-    '꼭 필요한 시설을 지금 이용하기 어려워요.' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
-    '엘리베이터와 통로 상태를 아직 알 수 없어요.' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
-    '길이 이어지는지 아직 확인하지 못했어요.' => '길이 이어지는지 아직 확인하지 못했어요.',
-    '계단 없는 경로를 찾지 못했어요.' => '계단 없는 경로를 아직 찾지 못했어요.',
-    '계단 없는 동선 여부를 확인할 수 없습니다.' => '계단 없는 길인지 아직 알 수 없어요.',
-    '필수 접근성 시설을 사용할 수 없습니다.' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
-    '접근성 시설 이용 가능 여부를 확인할 수 없습니다.' => '엘리베이터와 통로 상태를 아직 알 수 없어요.',
-    '경로 연결 정보를 확인할 수 없습니다.' => '길이 이어지는지 아직 확인하지 못했어요.',
-    _ => '안내할 수 있는 경로를 아직 찾지 못했어요.',
+    // 하드 블록.
+    'STAIR_ONLY_ACCESS' => _routeBlockedNoStepFreeRoute,
+    'FACILITY_UNAVAILABLE' => _routeBlockedFacilityUnavailable,
+    // 불확실성 계열은 헤지 사전 한 벌로 위임한다(#1577).
+    'STAIR_ONLY_ACCESS_UNKNOWN' => routeHedgeStepFreeUnknown,
+    'GENERATED_CONNECTOR_UNVERIFIED' ||
+    'ROUTE_GRAPH_UNKNOWN' => routeHedgeConnectivityUnknown,
+    'ACCESSIBILITY_STATE_UNKNOWN' => routeHedgeAccessibilityUnknown,
+    // 이미 번역된 라벨(레거시·재매핑·과거 문구)도 같은 사전으로 정규화해 멱등하게.
+    _routeBlockedNoStepFreeRoute ||
+    '계단 없는 경로를 찾지 못했어요.' => _routeBlockedNoStepFreeRoute,
+    _routeBlockedFacilityUnavailable ||
+    '필수 접근성 시설을 사용할 수 없습니다.' => _routeBlockedFacilityUnavailable,
+    routeHedgeStepFreeUnknown ||
+    '계단 없는 길인지 아직 알 수 없어요.' ||
+    '계단 없는 동선 여부를 확인할 수 없습니다.' => routeHedgeStepFreeUnknown,
+    routeHedgeAccessibilityUnknown ||
+    '엘리베이터와 통로 상태를 아직 알 수 없어요.' ||
+    '접근성 시설 이용 가능 여부를 확인할 수 없습니다.' => routeHedgeAccessibilityUnknown,
+    routeHedgeConnectivityUnknown ||
+    '길이 이어지는지 아직 확인하지 못했어요.' ||
+    '경로 연결 정보를 확인할 수 없습니다.' => routeHedgeConnectivityUnknown,
+    _ => _routeBlockedGeneric,
   };
 }
 
@@ -2164,7 +2156,7 @@ class RouteSearchWarning {
   final String code;
   final String message;
 
-  String get userMessage => _routeWarningLabel(code);
+  String get userMessage => routeWarningLabel(code);
 }
 
 enum RouteSearchViewStatus { idle, loading, success, failure }

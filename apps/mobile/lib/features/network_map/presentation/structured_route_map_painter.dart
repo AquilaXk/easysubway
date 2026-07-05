@@ -22,24 +22,64 @@ Map<String, Color> routeMapLineColors(Map<String, String> hexColorByLineId) {
   };
 }
 
-/// 카메라 scale을 #1636 LOD zoom bucket(0/1/2)으로 매핑한다.
-/// 0 = 최소 확대(선·환승만), 1 = 중간, 2 = 최대 확대(전체 역).
+/// bucket 1 진입 하한(초기 화면 대비 배율). 이보다 더 축소해야 bucket 0.
+const double routeMapBucket1EnterRatio = 0.75;
+
+/// bucket 2 진입 하한(초기 화면 대비 배율).
+const double routeMapBucket2EnterRatio = 1.8;
+
+/// 카메라 scale을 #1636 LOD zoom bucket(0/1/2)으로 매핑한다(#1764 A).
+/// 절대 scale이 아니라 **지역 초기 화면(initialScale) 대비 배율** `r`로 판정해,
+/// 지역 크기와 무관하게 "초기 화면 = bucket 1"을 보장한다. 초기 화면에서 역
+/// 노드·환승/주요 라벨이 보이고, 더 축소해야(r<0.75) 선 실루엣만 남는다.
+/// initialScale이 없으면(테스트 등) 현재 scale을 기준으로 봐 배율 1.0로 둔다.
 int routeMapZoomBucket(MapCameraState camera) {
-  final range = camera.maxScale - camera.minScale;
-  if (range <= 0) {
+  final base = camera.initialScale ?? camera.scale;
+  if (base <= 0) {
     return 2;
   }
-  final t = ((camera.scale - camera.minScale) / range).clamp(0.0, 1.0);
-  if (t < 1 / 3) {
+  final r = camera.scale / base;
+  if (r < routeMapBucket1EnterRatio) {
     return 0;
   }
-  if (t < 2 / 3) {
+  if (r < routeMapBucket2EnterRatio) {
     return 1;
   }
   return 2;
 }
 
-/// 라벨 우선순위(낮을수록 먼저 자리 차지): 환승 0 > 주요 1 > 일반 2.
+/// 노선 식별 뱃지 라벨(#1764 D). `lines.name_ko`(`<지역> <노선>` 형식)를
+/// 화면 뱃지용 2~4자 표기로 결정적 축약한다:
+/// - 지역 접두(첫 공백 앞)를 뗀다: "수도권 1호선" → "1호선".
+/// - 숫자 호선은 접두+숫자: "1호선"→"1", "인천1호선"→"인천1".
+/// - GTX 계열은 전체 유지: "GTX-A"→"GTX-A".
+/// - 그 외는 노선 표기 앞 4자: "수인분당"→"수인분당", "부산김해경전철"→"부산김해".
+/// 순수 함수라 전 노선 입력→출력을 스냅샷 테스트로 고정한다.
+String routeMapLineBadgeLabel(String nameKo) {
+  final trimmed = nameKo.trim();
+  final spaceIndex = trimmed.indexOf(' ');
+  final line = spaceIndex >= 0
+      ? trimmed.substring(spaceIndex + 1).trim()
+      : trimmed;
+  if (line.isEmpty) {
+    return trimmed;
+  }
+  final hosun = RegExp(r'^(\D*?)(\d+)호선').firstMatch(line);
+  if (hosun != null) {
+    return '${hosun.group(1)}${hosun.group(2)}';
+  }
+  if (line.startsWith('GTX')) {
+    return line;
+  }
+  return line.length <= 4 ? line : line.substring(0, 4);
+}
+
+/// 일반역 노드(점)를 이 bucket에서 그리는지 여부(#1764 B 단일 소스).
+/// bucket 0은 선 실루엣 조망이라 일반역 점을 생략하고, bucket 1(초기 화면)부터
+/// 표시한다. 환승 마커는 이 게이트와 무관하게 전 bucket 표시한다.
+bool routeMapShowsRegularStationNodes(int bucket) => bucket >= 1;
+
+/// 라벨 우선순위(낮을수록 먼저 자리 차지): 노선 뱃지 -1 > 환승 0 > 주요 1 > 일반 2.
 int routeMapLabelPriorityFor(RouteMapLabelClass labelClass) {
   switch (labelClass) {
     case RouteMapLabelClass.transfer:
@@ -119,6 +159,89 @@ List<RouteMapLabelCandidate> routeMapLabelCandidates(
   return candidates;
 }
 
+/// 노선 뱃지 후보(#1764 D)를 순수 함수로 생성한다. 각 노선 폴리라인 양 끝점에
+/// priority -1(역명보다 먼저 배치) pill 후보를 만든다. 전 bucket 표시라 bucket
+/// 인자를 받지 않는다. 끝점이 보이지 않으면([isVisible]=false) v1에서는 생략한다.
+/// painter와 겹침 테스트가 동일 후보를 태우도록 [routeMapLabelCandidates]와
+/// 같은 measure/isVisible 주입 패턴을 쓴다.
+///
+/// id 계약: `<idPrefix><lineId>:<start|end>`. painter는 이 id로 pill 색(lineId)을
+/// 되찾으므로, [idPrefix]는 painter의 `_badgeIdPrefix`와 반드시 동일해야 한다.
+/// 폐루프(순환선)는 시·종점이 같아 뱃지를 한 번만 둔다. 선행/후행 빈 sub-polyline은
+/// 건너뛰고 첫/마지막 non-empty 세그먼트에서 끝점을 취한다.
+List<RouteMapLabelCandidate> routeMapLineBadgeCandidates(
+  StructuredRouteMap map,
+  MapCameraState camera, {
+  required Map<String, String> badgeLabelByLineId,
+  required Size Function(String id, String text) measure,
+  required bool Function(Offset source) isVisible,
+  required double badgeRadius,
+  double horizontalPadding = 5.0,
+  String idPrefix = 'badge:',
+}) {
+  final candidates = <RouteMapLabelCandidate>[];
+  if (badgeLabelByLineId.isEmpty) {
+    return candidates;
+  }
+  final diameter = badgeRadius * 2;
+  for (final line in map.lines) {
+    final label = badgeLabelByLineId[line.lineId];
+    if (label == null || label.isEmpty) {
+      continue;
+    }
+    final start = _routeMapFirstVertex(line.polylines);
+    final end = _routeMapLastVertex(line.polylines);
+    if (start == null || end == null) {
+      continue;
+    }
+    // 순환선(폐루프)은 시·종점이 같으므로 뱃지를 한 번만 둔다.
+    final isLoop = start == end;
+    for (final which in isLoop
+        ? const ['start']
+        : const ['start', 'end']) {
+      final source = which == 'start' ? start : end;
+      if (!isVisible(source)) {
+        continue;
+      }
+      final id = '$idPrefix${line.lineId}:$which';
+      final width = math.max(
+        diameter,
+        measure(id, label).width + horizontalPadding * 2,
+      );
+      candidates.add(
+        RouteMapLabelCandidate(
+          id: id,
+          anchor: camera.sourceToViewportPoint(source),
+          size: Size(width, diameter),
+          priority: -1,
+          anchorPadding: badgeRadius,
+        ),
+      );
+    }
+  }
+  return candidates;
+}
+
+/// 첫 non-empty sub-polyline의 시작 정점(없으면 null).
+Offset? _routeMapFirstVertex(List<List<Offset>> polylines) {
+  for (final polyline in polylines) {
+    if (polyline.isNotEmpty) {
+      return polyline.first;
+    }
+  }
+  return null;
+}
+
+/// 마지막 non-empty sub-polyline의 끝 정점(없으면 null).
+Offset? _routeMapLastVertex(List<List<Offset>> polylines) {
+  for (var i = polylines.length - 1; i >= 0; i -= 1) {
+    if (polylines[i].isNotEmpty) {
+      return polylines[i].last;
+    }
+  }
+  return null;
+}
+
 /// polyline의 bounding box가 [rect]와 겹치는지 — viewport culling 판정.
 bool routeMapPolylineIntersectsRect(List<Offset> polyline, Rect rect) {
   if (polyline.isEmpty) {
@@ -147,11 +270,14 @@ class StructuredRouteMapPainter extends CustomPainter {
     required this.camera,
     required this.lineColors,
     this.labelTextByStationId = const {},
+    this.lineBadgeLabelByLineId = const {},
     this.attributionText,
     this.lineWidth = 4.0,
     this.stationRadius = 3.0,
     this.transferStationRadius = 5.0,
+    this.lineBadgeRadius = 9.0,
     this.labelStyle = _defaultLabelStyle,
+    this.badgeStyle = _defaultBadgeStyle,
     this.attributionStyle = _defaultAttributionStyle,
     Map<String, TextPainter>? labelPainterCache,
   }) : _labelPainters = labelPainterCache ?? {};
@@ -165,23 +291,37 @@ class StructuredRouteMapPainter extends CustomPainter {
   /// station_id → 역명. 비어 있으면 라벨을 그리지 않는다.
   final Map<String, String> labelTextByStationId;
 
+  /// line_id → 노선 식별 뱃지 라벨(#1764 D). 비어 있으면 뱃지를 그리지 않는다.
+  final Map<String, String> lineBadgeLabelByLineId;
+
   /// 출처 표기(#1637 attribution 필요 지역). null/빈 문자열이면 그리지 않는다.
   final String? attributionText;
   final double lineWidth;
   final double stationRadius;
   final double transferStationRadius;
+  final double lineBadgeRadius;
   final TextStyle labelStyle;
+  final TextStyle badgeStyle;
   final TextStyle attributionStyle;
 
   static const Color _transferFill = Color(0xFFFFFFFF);
   static const Color _transferBorder = Color(0xFF102A2C);
+  static const Color _regularStationFill = Color(0xFFFFFFFF);
   static const Color _fallbackLineColor = Color(0xFF8D8D8D);
   static const double _transferBorderWidth = 2.0;
+  static const double _regularStationBorderWidth = 1.6;
   static const double _labelGap = 4.0;
+  static const String _badgeIdPrefix = 'badge:';
+  static const double _badgeHorizontalPadding = 5.0;
   static const TextStyle _defaultLabelStyle = TextStyle(
     color: Color(0xFF102A2C),
     fontSize: 11,
     fontWeight: FontWeight.w600,
+  );
+  static const TextStyle _defaultBadgeStyle = TextStyle(
+    color: Color(0xFFFFFFFF),
+    fontSize: 10,
+    fontWeight: FontWeight.w700,
   );
   static const TextStyle _defaultAttributionStyle = TextStyle(
     color: Color(0xFF466467),
@@ -198,7 +338,17 @@ class StructuredRouteMapPainter extends CustomPainter {
     ..strokeJoin = StrokeJoin.round
     ..strokeCap = StrokeCap.round
     ..isAntiAlias = true;
-  final Paint _regularStationPaint = Paint()
+  // 일반역 노드: 상용 관례대로 흰 채움 + 노선색 테두리 원(#1764 B).
+  static final Paint _regularStationFillPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..color = _regularStationFill
+    ..isAntiAlias = true;
+  final Paint _regularStationBorderPaint = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = _regularStationBorderWidth
+    ..isAntiAlias = true;
+  // 노선 뱃지 pill 채움(노선색). 프레임마다 색만 갈아끼운다.
+  final Paint _badgeFillPaint = Paint()
     ..style = PaintingStyle.fill
     ..isAntiAlias = true;
   static final Paint _transferFillPaint = Paint()
@@ -255,31 +405,29 @@ class StructuredRouteMapPainter extends CustomPainter {
   void _paintStations(Canvas canvas, Rect visible) {
     final bucket = routeMapZoomBucket(camera);
 
-    // 일반(비환승) 역 점: LOD는 도메인 helper 단일 소스를 재사용한다.
-    // 환승 노드는 transferGroups에서 한 번만 그리므로 여기서 건너뛴다.
-    for (final station in map.stations) {
-      if (station.labelClass == RouteMapLabelClass.transfer) {
-        continue;
+    // 역 노드는 라벨 LOD와 무관하게 표시한다(#1764 B): 라벨은 겹침 때문에 LOD로
+    // 게이트하지만 노드(점)는 조망 상태에서도 "역이 여기 있다"를 보여야 한다.
+    // 일반역 점은 선 실루엣만 보는 bucket 0에서만 생략하고, bucket 1(초기 화면)
+    // 부터 상시 표시한다. 환승 마커는 bucket 0에도 유지한다.
+    if (routeMapShowsRegularStationNodes(bucket)) {
+      // 흰 채움 + 노선색 테두리 원. 환승 노드는 transferGroups에서 한 번만
+      // 그리므로 여기서 건너뛴다.
+      for (final station in map.stations) {
+        if (station.labelClass == RouteMapLabelClass.transfer) {
+          continue;
+        }
+        if (!visible.contains(station.position)) {
+          continue;
+        }
+        final center = camera.sourceToViewportPoint(station.position);
+        canvas.drawCircle(center, stationRadius, _regularStationFillPaint);
+        _regularStationBorderPaint.color =
+            lineColors[station.lineId] ?? _fallbackLineColor;
+        canvas.drawCircle(center, stationRadius, _regularStationBorderPaint);
       }
-      if (bucket < minLabelZoomBucketFor(station.labelClass)) {
-        continue;
-      }
-      if (!visible.contains(station.position)) {
-        continue;
-      }
-      _regularStationPaint.color =
-          lineColors[station.lineId] ?? _fallbackLineColor;
-      canvas.drawCircle(
-        camera.sourceToViewportPoint(station.position),
-        stationRadius,
-        _regularStationPaint,
-      );
     }
 
-    // 환승 마커: 물리 역당 한 번, transferGroups 중심 좌표에 그린다.
-    if (bucket < minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
-      return;
-    }
+    // 환승 마커: 물리 역당 한 번, transferGroups 중심 좌표에, 전 bucket 표시.
     for (final group in map.transferGroups) {
       if (!visible.contains(group.centroid)) {
         continue;
@@ -291,23 +439,43 @@ class StructuredRouteMapPainter extends CustomPainter {
   }
 
   void _paintLabels(Canvas canvas, Size size, Rect visible) {
-    if (labelTextByStationId.isEmpty) {
+    final bucket = routeMapZoomBucket(camera);
+    final painterById = <String, TextPainter>{};
+
+    // 노선 뱃지 후보(전 bucket)와 역 라벨 후보(bucket>=1)를 한 번의 충돌 배치에
+    // 태운다. 뱃지 priority -1 이라 역명(환승 0/주요 1/일반 2)보다 먼저 자리를
+    // 잡아 밀려나지 않는다(#1764 D). 후보 생성은 순수 함수 routeMapLabelCandidates로
+    // 공유 — painter와 테스트가 동일 bucket·LOD 규칙을 태운다(#1642 겹침 0 판정).
+    final candidates = <RouteMapLabelCandidate>[
+      ...routeMapLineBadgeCandidates(
+        map,
+        camera,
+        badgeLabelByLineId: lineBadgeLabelByLineId,
+        measure: (id, text) => (painterById[id] ??= _badgePainter(text)).size,
+        isVisible: visible.contains,
+        badgeRadius: lineBadgeRadius,
+        horizontalPadding: _badgeHorizontalPadding,
+        // id 프리픽스를 painter의 pill 판정(_badgeIdPrefix)과 결속 — 드리프트 방지.
+        idPrefix: _badgeIdPrefix,
+      ),
+    ];
+    if (labelTextByStationId.isNotEmpty) {
+      candidates.addAll(
+        routeMapLabelCandidates(
+          map,
+          camera,
+          bucket,
+          labelTextByStationId: labelTextByStationId,
+          isVisible: visible.contains,
+          stationRadius: stationRadius,
+          transferAnchorPadding: transferStationRadius + _transferBorderWidth,
+          measure: (id, text) => (painterById[id] ??= _labelPainter(text)).size,
+        ),
+      );
+    }
+    if (candidates.isEmpty) {
       return;
     }
-    final bucket = routeMapZoomBucket(camera);
-    // 후보 생성은 순수 함수 routeMapLabelCandidates로 공유 — painter와 테스트가
-    // 동일 bucket·LOD·환승/역 규칙을 태운다(#1642 겹침 0 기계 판정 가능).
-    final painterById = <String, TextPainter>{};
-    final candidates = routeMapLabelCandidates(
-      map,
-      camera,
-      bucket,
-      labelTextByStationId: labelTextByStationId,
-      isVisible: visible.contains,
-      stationRadius: stationRadius,
-      transferAnchorPadding: transferStationRadius + _transferBorderWidth,
-      measure: (id, text) => (painterById[id] ??= _labelPainter(text)).size,
-    );
 
     final placed = placeRouteMapLabels(
       candidates,
@@ -315,8 +483,42 @@ class StructuredRouteMapPainter extends CustomPainter {
       viewportBounds: Offset.zero & size,
     );
     for (final label in placed) {
-      painterById[label.candidate.id]?.paint(canvas, label.rect.topLeft);
+      final id = label.candidate.id;
+      final painter = painterById[id];
+      if (painter == null) {
+        continue;
+      }
+      if (id.startsWith(_badgeIdPrefix)) {
+        // 노선색 pill + 흰 라벨. lineId는 'badge:<lineId>:<start|end>'에서 뽑는다.
+        final rest = id.substring(_badgeIdPrefix.length);
+        final lineId = rest.substring(0, rest.lastIndexOf(':'));
+        _badgeFillPaint.color = lineColors[lineId] ?? _fallbackLineColor;
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            label.rect,
+            Radius.circular(label.rect.height / 2),
+          ),
+          _badgeFillPaint,
+        );
+        painter.paint(
+          canvas,
+          label.rect.center - Offset(painter.width / 2, painter.height / 2),
+        );
+      } else {
+        painter.paint(canvas, label.rect.topLeft);
+      }
     }
+  }
+
+  TextPainter _badgePainter(String text) {
+    return _labelPainters.putIfAbsent(
+      '$_badgeIdPrefix$text',
+      () => TextPainter(
+        text: TextSpan(text: text, style: badgeStyle),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout(),
+    );
   }
 
   void _paintAttribution(Canvas canvas, Size size) {
@@ -364,15 +566,22 @@ class StructuredRouteMapPainter extends CustomPainter {
   @override
   bool shouldRepaint(StructuredRouteMapPainter oldDelegate) {
     return oldDelegate.camera.revision != camera.revision ||
+        oldDelegate.camera.initialScale != camera.initialScale ||
         !identical(oldDelegate.map, map) ||
         !mapEquals(oldDelegate.lineColors, lineColors) ||
         !mapEquals(oldDelegate.labelTextByStationId, labelTextByStationId) ||
+        !mapEquals(
+          oldDelegate.lineBadgeLabelByLineId,
+          lineBadgeLabelByLineId,
+        ) ||
         oldDelegate.attributionText != attributionText ||
         oldDelegate.labelStyle != labelStyle ||
+        oldDelegate.badgeStyle != badgeStyle ||
         oldDelegate.attributionStyle != attributionStyle ||
         oldDelegate.lineWidth != lineWidth ||
         oldDelegate.stationRadius != stationRadius ||
-        oldDelegate.transferStationRadius != transferStationRadius;
+        oldDelegate.transferStationRadius != transferStationRadius ||
+        oldDelegate.lineBadgeRadius != lineBadgeRadius;
   }
 }
 
@@ -388,6 +597,7 @@ class StructuredRouteMapView extends StatefulWidget {
     required this.camera,
     required this.lineColors,
     this.labelTextByStationId = const {},
+    this.lineBadgeLabelByLineId = const {},
     this.attributionText,
     super.key,
   });
@@ -396,6 +606,7 @@ class StructuredRouteMapView extends StatefulWidget {
   final MapCameraState camera;
   final Map<String, Color> lineColors;
   final Map<String, String> labelTextByStationId;
+  final Map<String, String> lineBadgeLabelByLineId;
   final String? attributionText;
 
   @override
@@ -423,6 +634,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
         camera: widget.camera,
         lineColors: widget.lineColors,
         labelTextByStationId: widget.labelTextByStationId,
+        lineBadgeLabelByLineId: widget.lineBadgeLabelByLineId,
         attributionText: widget.attributionText,
         labelPainterCache: _labelPainters,
       ),
