@@ -96,11 +96,11 @@ void main() {
     );
   });
 
-  test('뱃지는 끝점 2개 + 반복 배치(긴 노선)', () {
-    final map = _gridMap(count: 60); // 폴리라인 길이 > 반복 간격 수 배
+  test('뱃지는 노선 종점 2개만 (반복 없음 — 역명 가림 방지)', () {
+    final map = _gridMap(count: 60);
     final layout = _solve(map);
-    // 끝점 2 + 내부 반복 ≥ floor(arcLen/interval) 근사 — 최소 3개 이상.
-    expect(layout.badges.length, greaterThanOrEqualTo(3));
+    // 공식 노선도 관례: 노선명은 종점에만. 중간 반복은 역명을 덮으므로 없앤다.
+    expect(layout.badges.length, 2);
   });
 
   test('전부 충돌이어도 숨기지 않고 최소 겹침 배치 + unresolved 집계', () {

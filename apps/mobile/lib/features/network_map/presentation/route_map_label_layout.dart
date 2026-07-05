@@ -123,21 +123,14 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       );
     }
 
+    // 노선 뱃지는 **종점에만** 둔다(공식 노선도 관례). 선 따라 반복하면 역명을
+    // 덮어 가독을 해친다 — 중간 구간은 선 색으로 노선을 식별한다(#1789 튜닝).
     Offset? first;
     Offset? last;
-    var sinceLastBadge = 0.0;
     for (final polyline in line.polylines) {
-      for (var v = 0; v < polyline.length; v += 1) {
-        first ??= polyline[v];
-        if (last != null) {
-          sinceLastBadge +=
-              (design.toDesign(polyline[v]) - design.toDesign(last)).distance;
-          if (sinceLastBadge >= kRouteMapDesignBadgeIntervalPx) {
-            emit(polyline[v]);
-            sinceLastBadge = 0;
-          }
-        }
-        last = polyline[v];
+      for (final point in polyline) {
+        first ??= point;
+        last = point;
       }
     }
     if (first != null) {
