@@ -91,7 +91,7 @@ test("재구성은 dayCd(평일/토/휴일)를 별도 trip과 serviceId로 분�
   const { transitTrips } = reconstructTransitTrips(rows, CONTEXT);
   assert.equal(transitTrips.length, 3);
   assert.deepEqual(
-    transitTrips.map((t) => t.serviceId).sort(),
+    transitTrips.map((t) => t.serviceId).sort((left, right) => left.localeCompare(right)),
     ["holiday-2026", "saturday-2026", "weekday-2026"],
   );
 });
@@ -162,7 +162,7 @@ test("재구성은 다른 노선의 동일 trnNo+dayCd를 별도 trip으로 분�
   const { transitTrips } = reconstructTransitTrips(rows, ctx);
   assert.equal(transitTrips.length, 2);
   assert.deepEqual(
-    transitTrips.map((t) => t.routeId).sort(),
+    transitTrips.map((t) => t.routeId).sort((left, right) => left.localeCompare(right)),
     ["route-seoul-2-inner", "route-seoul-4-oido"],
   );
 });

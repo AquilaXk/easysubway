@@ -57,7 +57,7 @@ export function reconstructTransitTrips(rows, context) {
       id: tripId,
       routeId,
       serviceId,
-      tripHeadsign: ordered[ordered.length - 1].stationId,
+      tripHeadsign: ordered.at(-1).stationId,
       directionId,
       servicePattern,
     });
@@ -100,7 +100,9 @@ function validateLineWideOrderAndDirection(ordered, key) {
 function resolveGroupServicePattern(groupRows, key) {
   const distinct = [...new Set(groupRows.map((row) => row.servicePattern).filter((value) => value != null && value !== ""))];
   if (distinct.length > 1) {
-    throw new Error(`reconstruct: inconsistent servicePattern within trip ${key}: ${distinct.sort().join(", ")}`);
+    throw new Error(
+      `reconstruct: inconsistent servicePattern within trip ${key}: ${[...distinct].sort((left, right) => left.localeCompare(right)).join(", ")}`,
+    );
   }
   return distinct[0] ?? DEFAULT_SERVICE_PATTERN;
 }
@@ -108,7 +110,7 @@ function resolveGroupServicePattern(groupRows, key) {
 function resolveLineSequence(lookup, row) {
   const value = lookup[`${row.stationId}|${row.lineId}`];
   if (!Number.isInteger(value)) {
-    throw new Error(`reconstruct: unknown lineSequence for ${row.stationId}|${row.lineId}`);
+    throw new TypeError(`reconstruct: unknown lineSequence for ${row.stationId}|${row.lineId}`);
   }
   return value;
 }
