@@ -974,9 +974,9 @@ function buildSqlitePack(sqlitePath, schema, pack) {
       insertRows(
         database,
         "transit_feed_info",
-        ["feed_end_date"],
+        ["id", "feed_end_date"],
         pack.transitFeedInfo ?? [],
-        (row) => [serviceDate(row.feedEndDate, "transitFeedInfo.feedEndDate")],
+        (row) => [1, serviceDate(row.feedEndDate, "transitFeedInfo.feedEndDate")],
       );
       insertRows(
         database,

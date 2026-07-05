@@ -556,7 +556,7 @@ test("데이터팩 생성기는 transit_feed_info feed_end_date를 적재하고 
   }
 });
 
-test("데이터팩 검증기는 transit_feed_info가 2개 이상 행을 가지면 거부한다", async () => {
+test("데이터팩 생성기는 transit_feed_info가 2개 이상이면 단일 행 제약으로 거부한다", async () => {
   const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
   const outputDir = path.join(tmpdir(), `easysubway-datapack-feed-info-multi-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");
@@ -566,19 +566,13 @@ test("데이터팩 검증기는 transit_feed_info가 2개 이상 행을 가지�
   fixture.packs[0].transitFeedInfo = [{ feedEndDate: "20261231" }, { feedEndDate: "20270101" }];
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
 
-  await execFileAsync(
-    process.execPath,
-    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
-    { cwd: root, env: productionEnv },
-  );
-
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      ["tools/datapack/validate-datapack.mjs", "--manifest", path.join(outputDir, "current.json"), "--root", outputDir],
+      ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
       { cwd: root, env: productionEnv },
     ),
-    /transit_feed_info must have at most one row/,
+    /transit_feed_info/,
   );
 });
 

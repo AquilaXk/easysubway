@@ -135,6 +135,7 @@ CREATE TABLE transit_frequencies (
 -- GTFS feed_info.feed_end_date (시간표 개정 유효 종료일). 단일 행(검증기가 강제). 요청 service date가
 -- 이 날짜를 지나면 planner가 PLANNED 대신 STALE_TIMETABLE로 강등한다.
 CREATE TABLE transit_feed_info (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
   feed_end_date TEXT NOT NULL,
   CHECK (feed_end_date GLOB '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]')
 );
