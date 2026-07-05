@@ -91,6 +91,31 @@ test("TAGO 시간표 수집 plan CLI는 checkpoint와 output을 적용한다", a
   );
 });
 
+test("TAGO 시간표 수집 plan CLI는 quiet 모드에서 stdout을 비운다", async (t) => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "tago-plan-quiet-"));
+  t.after(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+  const inputPath = path.join(dir, "input.json");
+  const outputPath = path.join(dir, "plan.json");
+  await writeFile(
+    inputPath,
+    `${JSON.stringify({
+      stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }],
+    })}\n`,
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [tagoScheduleToolPath, "--plan", "--quiet", "--input", inputPath, "--output", outputPath],
+    { timeout: 10_000 },
+  );
+
+  assert.equal(stdout, "");
+  const plan = JSON.parse(await readFile(outputPath, "utf8"));
+  assert.equal(plan.totalRequestCount, 6);
+});
+
 test("TAGO 시간표 수집 summary는 완료 checkpoint와 evidence hash를 남긴다", () => {
   const summary = buildTagoScheduleCollectionSummary({
     responses: [
