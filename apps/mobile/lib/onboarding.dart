@@ -880,7 +880,7 @@ class _OnboardingProfileCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              _profileDisplayTitle(profile),
+                              profile.title,
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
                                     color: EasySubwayAccessibleColors.text,
@@ -890,7 +890,11 @@ class _OnboardingProfileCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _profileDisplaySummary(profile),
+                              // 이동 조건 설명은 앱 전체가 mobilityProfileOptions의
+                              // summary 한 벌만 쓴다(#1568). 온보딩 전용 축약 문구
+                              // (_profileDisplaySummary)를 없애 화면마다 다른 표현을
+                              // 제거하고 카드 시맨틱 라벨과도 일치시킨다.
+                              profile.summary,
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(
                                     color: EasySubwayAccessibleColors.mutedText,
@@ -911,22 +915,6 @@ class _OnboardingProfileCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _profileDisplayTitle(MobilityProfileOption profile) {
-    return profile.title;
-  }
-
-  String _profileDisplaySummary(MobilityProfileOption profile) {
-    return switch (profile.id) {
-      'elderly' => '걷기와 환승 줄이기',
-      'wheelchair' => '계단 없는 길',
-      'stroller' => '엘리베이터 우선',
-      'pregnant' => '걷는 거리 줄이기',
-      'injured' => '계단 피하기',
-      'luggage' => '넓은 길 우선',
-      _ => profile.summary,
-    };
   }
 }
 
