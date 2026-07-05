@@ -2297,6 +2297,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   StructuredRouteMap? _structuredRouteMapCache;
   Map<String, Color>? _structuredLineColorsCache;
   Map<String, String>? _structuredLabelTextCache;
+  Map<String, String>? _structuredLineBadgeLabelCache;
   NetworkMapStation? _selectedStation;
 
   @override
@@ -2378,6 +2379,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               contain: true,
               minScale: minScale,
               revision: camera.revision + 1,
+              // 역 focus 후에도 LOD 기준은 지역 초기 화면 baseline을 유지한다.
+              initialScaleOverride: camera.initialScale,
             );
             _cameraFocusedStationId = focusedStation.id;
             _pendingCamera = null;
@@ -2669,6 +2672,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       camera: camera,
       lineColors: _structuredLineColorsCache!,
       labelTextByStationId: _structuredLabelTextCache!,
+      lineBadgeLabelByLineId: _structuredLineBadgeLabelCache!,
     );
   }
 
@@ -2688,6 +2692,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     });
     _structuredLabelTextCache = {
       for (final station in data.stations) station.id: station.nameKo,
+    };
+    _structuredLineBadgeLabelCache = {
+      for (final line in data.lines) line.id: routeMapLineBadgeLabel(line.name),
     };
   }
 }
@@ -2781,6 +2788,10 @@ MapCameraState _cameraForBounds(
   bool contain = false,
   double minScale = _minMapScale,
   int revision = 0,
+  // LOD 기준이 될 지역 baseline scale. null이면 이 카메라가 baseline이 되어
+  // 자신의 fit scale을 쓴다(초기 카메라). focus/파생 카메라는 지역 초기
+  // 카메라의 initialScale을 넘겨 baseline을 상속한다(#1764 A).
+  double? initialScaleOverride,
 }) {
   final viewportWidth = constraints.hasBoundedWidth
       ? constraints.maxWidth
@@ -2797,6 +2808,7 @@ MapCameraState _cameraForBounds(
       minScale: minScale,
       maxScale: _maxMapScale,
       revision: revision,
+      initialScale: initialScaleOverride ?? minScale,
     );
   }
   final widthScale = viewportWidth / bounds.width;
@@ -2804,16 +2816,35 @@ MapCameraState _cameraForBounds(
   final computedScale = contain
       ? math.min(widthScale, heightScale)
       : math.max(widthScale, heightScale);
-  final initialScale = computedScale.clamp(minScale, _maxMapScale).toDouble();
+  final fitScale = computedScale.clamp(minScale, _maxMapScale).toDouble();
   return MapCameraState(
     sourceBounds: sourceBounds,
     viewportSize: Size(viewportWidth, viewportHeight),
     center: bounds.center,
-    scale: initialScale,
+    scale: fitScale,
     minScale: minScale,
     maxScale: _maxMapScale,
     revision: revision,
+    initialScale: initialScaleOverride ?? fitScale,
   ).clamped(viewportMargin: 220);
+}
+
+/// 지역 초기 화면 카메라(contain-fit)를 만든다(#1764 A 테스트용). 이 카메라는
+/// scale == initialScale 이라 [routeMapZoomBucket]이 항상 bucket 1을 준다 — 즉
+/// 어떤 지역(크기 무관)이든 초기 화면에서 역 노드·환승/주요 라벨·노선 뱃지가
+/// 보이는 상태로 시작한다.
+@visibleForTesting
+MapCameraState networkMapInitialCameraForRegion({
+  required Rect regionBounds,
+  required Rect fullBounds,
+  required Size viewport,
+}) {
+  return _cameraForBounds(
+    regionBounds,
+    BoxConstraints.tightFor(width: viewport.width, height: viewport.height),
+    sourceBounds: fullBounds,
+    contain: true,
+  );
 }
 
 @visibleForTesting

@@ -4,9 +4,9 @@
     {
       "id": "core",
       "asset": "assets/datapacks/core.sqlite.gz",
-      "sha256": "a52709dfd6cbc66db30982a27b3e9c703e7b683d7471de1bbe193c14c70bf1e0",
-      "sqliteSha256": "b2019715fc027fccbb3ce52bc7e410ea3f8cb61817edc96b0fa127a696347f6f",
-      "byteSize": 242229
+      "sha256": "118f3cda7568c4bc4bf4e448e2c36be9465ab1c60fe4cdf66390f6487d341bf7",
+      "sqliteSha256": "2ce8bb8a969848b30252230b7caff0d429e28bf2b46b503e87da902d877eb37b",
+      "byteSize": 183868
     },
     {
       "id": "capital",

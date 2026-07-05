@@ -70,7 +70,15 @@ StructuredRouteMap _gridMap({required double spacing, int regularCount = 12}) {
     ));
   }
   return StructuredRouteMap(
-    lines: const [],
+    // 노선 뱃지 후보가 생기도록 폴리라인 하나를 둔다(양 끝점에 뱃지).
+    lines: [
+      RouteMapLineGeometry(
+        lineId: 'L1',
+        polylines: [
+          [at(0, 4), at(5, 4)],
+        ],
+      ),
+    ],
     stations: stations,
     transferGroups: transfers,
   );
@@ -79,6 +87,19 @@ StructuredRouteMap _gridMap({required double spacing, int regularCount = 12}) {
 Map<String, String> _labelText(StructuredRouteMap map) => {
       for (final s in map.stations) s.stationId: s.stationId,
     };
+
+const _badgeLabels = <String, String>{'L1': '2'};
+
+List<RouteMapLabelCandidate> _badgeCandidates(StructuredRouteMap map) {
+  return routeMapLineBadgeCandidates(
+    map,
+    _camera(),
+    badgeLabelByLineId: _badgeLabels,
+    measure: (_, _) => const Size(12, 12),
+    isVisible: (_) => true,
+    badgeRadius: 9,
+  );
+}
 
 List<PlacedRouteMapLabel> _place(StructuredRouteMap map, int bucket) {
   final candidates = routeMapLabelCandidates(
@@ -187,6 +208,85 @@ void main() {
       final placedIds = placed.map((p) => p.candidate.id).toSet();
       expect(placedIds.contains('transfer:transfer-0'), isTrue);
       expect(placedIds.contains('transfer:transfer-1'), isTrue);
+    });
+  });
+
+  group('노선 뱃지 후보 (#1764 D)', () {
+    test('뱃지는 노선 폴리라인 양 끝점에 2개 생기고 priority -1', () {
+      final badges = _badgeCandidates(_gridMap(spacing: 60));
+      expect(badges, hasLength(2));
+      expect(badges.every((b) => b.priority == -1), isTrue);
+      expect(
+        badges.map((b) => b.id).toSet(),
+        {'badge:L1:start', 'badge:L1:end'},
+      );
+    });
+
+    // 뱃지는 전 bucket 표시라, 라벨이 없는 bucket 0에서도 배치된다.
+    List<PlacedRouteMapLabel> placeCombined(StructuredRouteMap map, int bucket) {
+      final candidates = <RouteMapLabelCandidate>[
+        ..._badgeCandidates(map),
+        ..._candidates(map, bucket),
+      ];
+      return placeRouteMapLabels(
+        candidates,
+        gap: 4,
+        viewportBounds: const Rect.fromLTWH(-2000, -2000, 8000, 8000),
+      );
+    }
+
+    for (final bucket in [0, 1, 2]) {
+      test('bucket $bucket: 뱃지+라벨 결합 배치에 겹침 0, 뱃지는 유지', () {
+        final map = _gridMap(spacing: 60);
+        final placed = placeCombined(map, bucket);
+        final placedIds = placed.map((p) => p.candidate.id).toSet();
+        // priority -1 뱃지는 어느 bucket에서도 밀려나지 않는다.
+        expect(placedIds.contains('badge:L1:start'), isTrue);
+        expect(placedIds.contains('badge:L1:end'), isTrue);
+        expect(_overlapPairs(placed), 0, reason: 'bucket $bucket 뱃지+라벨 겹침');
+      });
+    }
+
+    test('밀집 지역에서도 뱃지(priority -1)는 역명보다 먼저 배치돼 유지된다', () {
+      final map = _gridMap(spacing: 8);
+      final placed = placeCombined(map, 2);
+      final placedIds = placed.map((p) => p.candidate.id).toSet();
+      expect(placedIds.contains('badge:L1:start'), isTrue);
+      expect(placedIds.contains('badge:L1:end'), isTrue);
+      expect(_overlapPairs(placed), 0);
+    });
+
+    StructuredRouteMap lineOnlyMap(List<List<Offset>> polylines) {
+      return StructuredRouteMap(
+        lines: [RouteMapLineGeometry(lineId: 'L1', polylines: polylines)],
+        stations: const [],
+        transferGroups: const [],
+      );
+    }
+
+    test('순환선(시·종점 동일)은 뱃지를 한 번만 둔다', () {
+      // 폐루프: 첫 정점 == 마지막 정점.
+      final map = lineOnlyMap([
+        const [Offset(100, 100), Offset(200, 100), Offset(100, 100)],
+      ]);
+      final badges = _badgeCandidates(map);
+      expect(badges, hasLength(1));
+      expect(badges.single.id, 'badge:L1:start');
+    });
+
+    test('선행/후행 빈 sub-polyline이 있어도 유효 세그먼트에서 뱃지 2개', () {
+      final map = lineOnlyMap([
+        const [],
+        const [Offset(100, 100), Offset(300, 100)],
+        const [],
+      ]);
+      final badges = _badgeCandidates(map);
+      expect(badges.map((b) => b.id).toSet(), {'badge:L1:start', 'badge:L1:end'});
+    });
+
+    test('모든 sub-polyline이 비면 뱃지 없음', () {
+      final map = lineOnlyMap([const [], const []]);
+      expect(_badgeCandidates(map), isEmpty);
     });
   });
 }
