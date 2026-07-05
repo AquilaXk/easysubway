@@ -21,6 +21,24 @@ const List<RouteMapLabelAnchor> kDefaultRouteMapLabelAnchors = [
   RouteMapLabelAnchor.below,
 ];
 
+/// 라벨을 화면 중심에서 **바깥쪽**으로 향하게 하는 anchor 시도 순서(#1789 통일성).
+/// [anchorPoint]가 [center] 기준 어느 쪽인지 보고 지배 축(수평/수직)의 바깥 방향을
+/// 우선 시도한다 — 좌우 난잡을 없애고, 중앙에 촘촘한 노선을 라벨이 덜 덮으며,
+/// 종점 뱃지는 선 끝에서 바깥으로 뻗는다. 바깥 배치가 막히면 나머지 방향으로 fallback.
+List<RouteMapLabelAnchor> routeMapOutwardAnchors(
+  Offset anchorPoint,
+  Offset center,
+) {
+  final dx = anchorPoint.dx - center.dx;
+  final dy = anchorPoint.dy - center.dy;
+  final h = dx >= 0 ? RouteMapLabelAnchor.right : RouteMapLabelAnchor.left;
+  final hOpp = dx >= 0 ? RouteMapLabelAnchor.left : RouteMapLabelAnchor.right;
+  final v = dy >= 0 ? RouteMapLabelAnchor.below : RouteMapLabelAnchor.above;
+  final vOpp = dy >= 0 ? RouteMapLabelAnchor.above : RouteMapLabelAnchor.below;
+  // 지배 축의 바깥 방향 우선 → 다른 축 바깥 → 다른 축 안쪽 → 지배 축 안쪽.
+  return dx.abs() >= dy.abs() ? [h, v, vOpp, hOpp] : [v, h, hOpp, vOpp];
+}
+
 /// 배치 후보 라벨 (viewport 공간).
 class RouteMapLabelCandidate {
   const RouteMapLabelCandidate({
@@ -118,8 +136,14 @@ List<PlacedRouteMapLabel> placeRouteMapLabels(
   });
   final placed = <PlacedRouteMapLabel>[];
   final placedRects = <Rect>[];
+  // viewportBounds가 있으면 그 중심 기준 바깥 방향으로 라벨을 일관 배치한다
+  // (#1789: 좌우 난잡 제거·중앙 노선 가림 완화). 없으면 기본 순서를 쓴다.
+  final center = viewportBounds?.center;
   for (final candidate in sorted) {
-    for (final anchor in anchors) {
+    final tryOrder = center == null
+        ? anchors
+        : routeMapOutwardAnchors(candidate.anchor, center);
+    for (final anchor in tryOrder) {
       final rect = routeMapLabelRect(
         candidate.anchor,
         candidate.size,

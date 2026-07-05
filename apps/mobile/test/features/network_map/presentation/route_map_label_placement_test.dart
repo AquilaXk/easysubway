@@ -135,4 +135,47 @@ void main() {
       expect(placed.single.candidate.id, 'a');
     });
   });
+
+  group('routeMapOutwardAnchors (바깥 방향 통일)', () {
+    const center = Offset(100, 100);
+    test('중심 오른쪽 라벨은 right 우선', () {
+      expect(
+        routeMapOutwardAnchors(const Offset(150, 100), center).first,
+        RouteMapLabelAnchor.right,
+      );
+    });
+    test('중심 왼쪽 라벨은 left 우선', () {
+      expect(
+        routeMapOutwardAnchors(const Offset(50, 100), center).first,
+        RouteMapLabelAnchor.left,
+      );
+    });
+    test('중심 위 라벨은 above 우선(수직 지배)', () {
+      expect(
+        routeMapOutwardAnchors(const Offset(100, 40), center).first,
+        RouteMapLabelAnchor.above,
+      );
+    });
+    test('중심 아래 라벨은 below 우선(수직 지배)', () {
+      expect(
+        routeMapOutwardAnchors(const Offset(100, 160), center).first,
+        RouteMapLabelAnchor.below,
+      );
+    });
+  });
+
+  group('placeRouteMapLabels 바깥 방향 배치', () {
+    test('viewportBounds를 주면 라벨을 화면 중심 바깥으로 일관 배치한다', () {
+      final placed = placeRouteMapLabels(
+        [
+          candidate(id: 'left', anchor: const Offset(20, 100), priority: 2),
+          candidate(id: 'right', anchor: const Offset(180, 100), priority: 2),
+        ],
+        viewportBounds: const Rect.fromLTWH(0, 0, 200, 200),
+      );
+      final byId = {for (final p in placed) p.candidate.id: p.anchor};
+      expect(byId['left'], RouteMapLabelAnchor.left);
+      expect(byId['right'], RouteMapLabelAnchor.right);
+    });
+  });
 }
