@@ -23,14 +23,16 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   coordinate:
     name: Automerge Queue
     if: github.event_name != 'pull_request' || github.event.label.name == 'automerge'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # update-branch API에 필요
+      pull-requests: write # auto-merge 예약, PR 코멘트, automerge 라벨 제거에 필요
     steps:
       - name: Process queue head
         env:
