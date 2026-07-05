@@ -1,9 +1,10 @@
 import 'dart:math' as math;
-import 'dart:ui' show Offset, Rect, Size;
+import 'dart:ui' show Color, Offset, Rect, Size;
 
 import '../domain/route_map_design_space.dart';
 import '../domain/structured_route_map.dart';
 import 'route_map_label_placement.dart';
+import 'route_map_transfer_marker.dart';
 
 // 정적 라벨 레이아웃 솔버 (#1789 스펙 S3·S4).
 //
@@ -87,6 +88,33 @@ class _Candidate {
   final double anchorPadding;
   final bool bold;
   final String? badgeLineId; // null이면 역 라벨.
+}
+
+/// 환승 캡슐의 design space 외접 Rect — 라벨 배치의 선점 장애물(#1789).
+/// painter와 같은 [routeMapTransferMarkers] 호출로 기하 정합을 보장한다
+/// (색은 캡슐 기하에 영향이 없어 placeholder를 넘긴다).
+List<Rect> routeMapTransferObstacleRects(
+  StructuredRouteMap map,
+  RouteMapDesignSpace design,
+) {
+  final rects = <Rect>[];
+  for (final group in map.transferGroups) {
+    final centers = [for (final p in group.memberPositions) design.toDesign(p)];
+    final markers = routeMapTransferMarkers(
+      memberCenters: centers,
+      colors: List<Color>.filled(centers.length, const Color(0xFF000000)),
+      designSpread:
+          offsetsMaxPairwiseDistance(group.memberPositions) *
+          design.designScale,
+      dotRadius: kRouteMapTransferDotRadiusPx,
+      dotGap: kRouteMapTransferDotGapPx,
+      padding: kRouteMapTransferDotPaddingPx,
+    );
+    for (final marker in markers) {
+      rects.add(marker.capsule.outerRect);
+    }
+  }
+  return rects;
 }
 
 RouteMapStaticLabelLayout solveRouteMapLabelLayout({
@@ -192,7 +220,9 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   });
   final mapCenter = _designBoundsCenter(map, design);
   final lineGrid = _RouteMapLineGrid.build(map, design);
-  final placedRects = <Rect>[];
+  // 환승 캡슐은 라벨보다 먼저 자리를 선점한 장애물이다 — 라벨이 캡슐을 덮지
+  // 않도록 시드한다(출력에는 포함되지 않음).
+  final placedRects = <Rect>[...routeMapTransferObstacleRects(map, design)];
   final labels = <RouteMapStaticLabel>[];
   final badges = <RouteMapStaticBadge>[];
   var unresolved = 0;

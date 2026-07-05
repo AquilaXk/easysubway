@@ -141,4 +141,60 @@ void main() {
     expect(byId['s29:L1']!.bold, isTrue); // 종착(마지막 sequence)
     expect(byId['s5:L1']!.bold, isFalse); // 일반
   });
+
+  test('라벨은 환승 캡슐 rect를 덮지 않는다 (캡슐 장애물)', () {
+    // 환승 1(스팬 캡슐) + 바로 옆 일반역 1 — 일반역 라벨의 기본 방향 후보가
+    // 캡슐과 부딪히도록 배치한다.
+    final map = StructuredRouteMap(
+      lines: const [],
+      stations: [
+        RouteMapStructuredStation(
+          stationId: 't',
+          lineId: 'L1',
+          sequence: 0,
+          position: const Offset(0, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.transfer,
+        ),
+        RouteMapStructuredStation(
+          stationId: 'r',
+          lineId: 'L1',
+          sequence: 1,
+          position: const Offset(30, 0),
+          labelPolygon: const [],
+          labelClass: RouteMapLabelClass.regular,
+        ),
+      ],
+      transferGroups: [
+        RouteMapTransferGroup(
+          stationId: 't',
+          lineIds: const ['L1', 'L2'],
+          centroid: const Offset(0, 0),
+          memberPositions: const [Offset(-6, 0), Offset(6, 0)], // 스팬 이격 12
+        ),
+      ],
+    );
+    const design = RouteMapDesignSpace(designScale: 1);
+    final obstacles = routeMapTransferObstacleRects(map, design);
+    expect(obstacles, hasLength(1));
+
+    final layout = solveRouteMapLabelLayout(
+      map: map,
+      design: design,
+      labelTextByStationId: const {'t': '환승역명', 'r': '일반역명'},
+      badgeLabelByLineId: const {},
+      measureLabel: _measureLabel,
+      measureBadge: _measureBadge,
+    );
+    for (final label in layout.labels) {
+      for (final obstacle in obstacles) {
+        final overlap = label.rect.intersect(obstacle);
+        expect(
+          overlap.width > 0 && overlap.height > 0,
+          isFalse,
+          reason: '${label.id} 라벨이 캡슐을 덮음',
+        );
+      }
+    }
+  });
 }
