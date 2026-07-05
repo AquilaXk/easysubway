@@ -171,6 +171,53 @@ class DataCollectionAdminPageControllerTest {
 			.andExpect(status().isForbidden());
 	}
 
+	@Test
+	@DisplayName("실행 중 수집이 있으면 live 폴러가 활성이고 fragment는 셸 없이 반환된다")
+	void collectionLiveActiveWhenRunning() throws Exception {
+		saveDataCollectionRunPort.saveRun(runningRun("running-run"));
+
+		String page = mockMvc.perform(get("/admin/data-collections/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		assertThat(page)
+			.contains("x-data=\"autoRefresh\"")
+			.contains("data-refresh-url=\"/admin/data-collections/page/live\"")
+			.contains("data-refresh-interval=\"10000\"")
+			.contains("data-refresh-active=\"true\"");
+
+		String fragment = mockMvc.perform(get("/admin/data-collections/page/live")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		assertThat(fragment)
+			.contains("id=\"collection-live\"")
+			.contains("최근 실행 기록")
+			.doesNotContain("admin-shell")
+			.doesNotContain("class=\"run-form\"");
+	}
+
+	private DataCollectionRun runningRun(String runId) {
+		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
+		return new DataCollectionRun(
+			runId,
+			DataCollectionSource.TRANSIT_MASTER,
+			DataCollectionStatus.RUNNING,
+			"admin-user",
+			now,
+			null,
+			0,
+			null,
+			false,
+			"수집이 진행 중입니다.",
+			List.of(new DataCollectionRunStep("FETCH", DataCollectionStepStatus.COMPLETED, null, null, null, 1, null))
+		);
+	}
+
 	private DataCollectionRun failedRun(String runId) {
 		LocalDateTime now = LocalDateTime.of(2026, 6, 27, 0, 0);
 		return new DataCollectionRun(

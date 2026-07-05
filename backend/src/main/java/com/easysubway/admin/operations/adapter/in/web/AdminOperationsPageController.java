@@ -130,6 +130,29 @@ class AdminOperationsPageController {
 		@RequestParam(required = false) Integer size,
 		Model model
 	) {
+		populateIncidents(model, page, size);
+		model.addAttribute("severityOptions", optionRows(AdminCommonCodeGroups.INCIDENT_SEVERITY));
+		model.addAttribute("statusOptions", optionRows(AdminCommonCodeGroups.INCIDENT_STATUS)
+			.stream()
+			.filter(option -> AdminIncidentStatus.RECEIVED.name().equals(option.code()))
+			.toList());
+		model.addAttribute("sourceOptions", optionRows(AdminCommonCodeGroups.INCIDENT_SOURCE));
+		model.addAttribute("healthStatus", checkHealthUseCase.checkHealth().status());
+		return "admin/incidents/list";
+	}
+
+	// 장애 목록 자동 갱신(#1742): 60초 폴링이 목록 live 영역만 받아간다(생성 폼·health 섹션은 유지).
+	@GetMapping("/admin/incidents/page/live")
+	String incidentsLive(
+		@RequestParam(required = false) Integer page,
+		@RequestParam(required = false) Integer size,
+		Model model
+	) {
+		populateIncidents(model, page, size);
+		return "admin/incidents/list :: live";
+	}
+
+	private void populateIncidents(Model model, Integer page, Integer size) {
 		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
 		List<AdminIncident> recent = incidentService.listRecent(pageRequest.limitForHasNext(), pageRequest.offset());
 		Map<String, List<AdminIncidentTransition>> timelines = incidentService.listTransitions(
@@ -138,18 +161,9 @@ class AdminOperationsPageController {
 			.map(incident -> IncidentRow.from(incident, timelines.getOrDefault(incident.incidentId(), List.of())))
 			.toList();
 		EgovPaginationView pageView = EgovPaginationView.fromSlice(pageRequest.page(), pageRequest.size(), incidents.size());
-		HealthStatus health = checkHealthUseCase.checkHealth();
 		model.addAttribute("incidents", pageView.visibleItems(incidents));
 		model.addAttribute("page", pageView);
 		model.addAttribute("paginationLinks", pageView.links("/admin/incidents/page", Collections.emptyMap()));
-		model.addAttribute("severityOptions", optionRows(AdminCommonCodeGroups.INCIDENT_SEVERITY));
-		model.addAttribute("statusOptions", optionRows(AdminCommonCodeGroups.INCIDENT_STATUS)
-			.stream()
-			.filter(option -> AdminIncidentStatus.RECEIVED.name().equals(option.code()))
-			.toList());
-		model.addAttribute("sourceOptions", optionRows(AdminCommonCodeGroups.INCIDENT_SOURCE));
-		model.addAttribute("healthStatus", health.status());
-		return "admin/incidents/list";
 	}
 
 	@PostMapping("/admin/incidents")

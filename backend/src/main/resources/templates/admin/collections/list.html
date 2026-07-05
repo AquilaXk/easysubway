@@ -34,8 +34,11 @@
 		<button type="submit">수집 실행</button>
 	</form>
 
-	<section>
+	<section id="collection-live" th:fragment="live">
 		<h2>최근 실행 기록</h2>
+		<div class="admin-auto-refresh" hidden x-data="autoRefresh"
+		     data-refresh-url="/admin/data-collections/page/live" data-refresh-target="#collection-live"
+		     data-refresh-interval="10000" th:attr="data-refresh-active=${hasRunning} ? 'true' : 'false'"></div>
 		<table>
 			<thead>
 			<tr>

@@ -239,6 +239,26 @@ class AdminOperationsPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("장애 화면은 60초 자동 갱신 폴러를 렌더링하고 live fragment는 목록 영역만 반환한다")
+	void incidentsPageRendersAutoRefreshPollerAndLiveFragment() throws Exception {
+		openIncident("database DOWN");
+
+		String page = getAdminHtml("/admin/incidents/page", new MockHttpSession());
+		assertThat(page)
+			.contains("x-data=\"autoRefresh\"")
+			.contains("data-refresh-url=\"/admin/incidents/page/live\"")
+			.contains("data-refresh-interval=\"60000\"")
+			.contains("data-refresh-active=\"true\"");
+
+		String fragment = getAdminHtml("/admin/incidents/page/live", new MockHttpSession());
+		assertThat(fragment)
+			.contains("id=\"incident-live\"")
+			.contains("최근 Incident")
+			.doesNotContain("admin-shell")
+			.doesNotContain("Incident 생성");
+	}
+
+	@Test
 	@DisplayName("역·노선 연결 장애는 역 허브 딥링크를 표시한다")
 	void incidentWithStationLinkShowsHubDeepLink() throws Exception {
 		mockMvc.perform(post("/admin/incidents")

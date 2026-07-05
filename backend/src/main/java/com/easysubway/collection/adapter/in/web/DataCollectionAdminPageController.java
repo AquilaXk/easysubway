@@ -36,14 +36,35 @@ class DataCollectionAdminPageController {
 		@RequestParam(required = false) Integer size,
 		Model model
 	) {
-		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
-		List<DataCollectionRunRow> runs = recentRunRows(pageRequest);
-		EgovPaginationView pageView = EgovPaginationView.fromSlice(pageRequest.page(), pageRequest.size(), runs.size());
 		model.addAttribute("sourceOptions", sourceOptions());
+		populateCollectionLive(model, page, size);
+		return "admin/collections/list";
+	}
+
+	// 데이터 수집 자동 갱신(#1742): 실행 중 수집이 있을 때만 10초 폴링이 live 영역(최근 실행)을 받아간다.
+	@GetMapping("/admin/data-collections/page/live")
+	String dataCollectionLive(
+		@RequestParam(required = false) Integer page,
+		@RequestParam(required = false) Integer size,
+		Model model
+	) {
+		populateCollectionLive(model, page, size);
+		return "admin/collections/list :: live";
+	}
+
+	private void populateCollectionLive(Model model, Integer page, Integer size) {
+		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
+		List<DataCollectionRun> recent = dataCollectionUseCase.listRecentRuns(
+			pageRequest.limitForHasNext(), pageRequest.offset());
+		List<DataCollectionRunRow> runs = recent.stream()
+			.map(DataCollectionRunRow::from)
+			.toList();
+		EgovPaginationView pageView = EgovPaginationView.fromSlice(pageRequest.page(), pageRequest.size(), runs.size());
 		model.addAttribute("runs", pageView.visibleItems(runs));
 		model.addAttribute("page", pageView);
 		model.addAttribute("paginationLinks", pageView.links("/admin/data-collections/page", Collections.emptyMap()));
-		return "admin/collections/list";
+		model.addAttribute("hasRunning", recent.stream()
+			.anyMatch(run -> run.status() == DataCollectionStatus.RUNNING));
 	}
 
 	@PostMapping("/admin/data-collections/page/run")
@@ -54,13 +75,6 @@ class DataCollectionAdminPageController {
 	) {
 		dataCollectionUseCase.runCollection(new RunDataCollectionCommand(source, principal.getName()));
 		return "redirect:/admin/data-collections/page";
-	}
-
-	private List<DataCollectionRunRow> recentRunRows(AdminPageRequest pageRequest) {
-		return dataCollectionUseCase.listRecentRuns(pageRequest.limitForHasNext(), pageRequest.offset())
-			.stream()
-			.map(DataCollectionRunRow::from)
-			.toList();
 	}
 
 	private static List<DataCollectionSourceOption> sourceOptions() {

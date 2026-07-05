@@ -64,16 +64,32 @@ class AdminBatchPageController {
 		@RequestParam(required = false) Integer size,
 		Model model
 	) {
+		model.addAttribute("jobs", batchOperationService.listJobs().stream().map(BatchJobRow::from).toList());
+		populateBatchLive(model, page, size);
+		return "admin/batches/list";
+	}
+
+	// 배치 운영 자동 갱신(#1742): 실행 중 배치가 있을 때만 10초 폴링이 live 영역(이력 차트·최근 실행)을 받아간다.
+	@GetMapping("/admin/batches/page/live")
+	String batchLive(
+		@RequestParam(required = false) Integer page,
+		@RequestParam(required = false) Integer size,
+		Model model
+	) {
+		populateBatchLive(model, page, size);
+		return "admin/batches/list :: live";
+	}
+
+	private void populateBatchLive(Model model, Integer page, Integer size) {
 		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
-		List<BatchRunRow> runs = batchOperationService.listExecutions(
-				pageRequest.limitForHasNext(),
-				pageRequest.offset()
-			)
-			.stream()
+		List<DataCollectionRun> recent = batchOperationService.listExecutions(
+			pageRequest.limitForHasNext(),
+			pageRequest.offset()
+		);
+		List<BatchRunRow> runs = recent.stream()
 			.flatMap(run -> BatchRunRow.from(run).stream())
 			.toList();
 		EgovPaginationView pageView = EgovPaginationView.fromSlice(pageRequest.page(), pageRequest.size(), runs.size());
-		model.addAttribute("jobs", batchOperationService.listJobs().stream().map(BatchJobRow::from).toList());
 		model.addAttribute("runs", pageView.visibleItems(runs));
 		model.addAttribute("page", pageView);
 		model.addAttribute("paginationLinks", pageView.links("/admin/batches/page", Collections.emptyMap()));
@@ -81,7 +97,8 @@ class AdminBatchPageController {
 			.stream()
 			.map(this::historyChart)
 			.toList());
-		return "admin/batches/list";
+		model.addAttribute("hasRunning", recent.stream()
+			.anyMatch(run -> run.status() == DataCollectionStatus.RUNNING));
 	}
 
 	private BatchHistoryChart historyChart(JobExecutionHistory history) {
