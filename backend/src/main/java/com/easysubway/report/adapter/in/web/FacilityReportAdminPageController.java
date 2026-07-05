@@ -44,6 +44,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -116,25 +117,32 @@ class FacilityReportAdminPageController {
 		if (pageView.page() != pageRequest.page() || pageView.size() != pageRequest.size()) {
 			return redirectToReportList(status, pageView);
 		}
-		addReportListAttributes(status, pageRequest, pageView, model);
+		addReportResultsAttributes(status, pageRequest, pageView, model);
+		addReportSummaryAttributes(model);
 		return "admin/reports/list";
 	}
 
 	// 진화형 향상 파일럿(#1736): 같은 URL·같은 모델을 htmx 부분 응답으로 반환한다.
 	// HX-Request 헤더가 있으면 상태 필터 nav·표·페이지네이션만 담은 reportResults fragment만 렌더한다.
 	// 부분 응답은 전체 새로고침 리다이렉트 대신 클램프된 페이지로 즉시 렌더해 htmx swap이 끊기지 않게 한다.
+	// 단, htmx 히스토리 복원 요청(스냅샷 캐시 부재)은 fragment가 아니라 셸까지 포함한 풀페이지를 돌려줘야
+	// body에 부분 응답만 스왑돼 화면이 깨지는 것을 막는다.
 	@HxRequest
 	@GetMapping("/admin/reports/page")
 	String reportListFragment(
 		@RequestParam(required = false) FacilityReportStatus status,
 		@RequestParam(required = false) Integer page,
 		@RequestParam(required = false) Integer size,
+		@RequestHeader(value = "HX-History-Restore-Request", required = false) boolean historyRestore,
 		Model model
 	) {
+		if (historyRestore) {
+			return reportListPage(status, page, size, model);
+		}
 		FacilityReportPageRequest pageRequest = FacilityReportPageRequest.of(page, size);
 		EgovPaginationView pageView = reportListPageView(status, pageRequest);
 		FacilityReportPageRequest clampedRequest = FacilityReportPageRequest.of(pageView.page(), pageView.size());
-		addReportListAttributes(status, clampedRequest, pageView, model);
+		addReportResultsAttributes(status, clampedRequest, pageView, model);
 		return "admin/reports/list :: reportResults";
 	}
 
@@ -147,7 +155,8 @@ class FacilityReportAdminPageController {
 		);
 	}
 
-	private void addReportListAttributes(
+	// reportResults fragment에 담기는 속성만 채운다(상태 필터·표·페이지네이션).
+	private void addReportResultsAttributes(
 		FacilityReportStatus status,
 		FacilityReportPageRequest query,
 		EgovPaginationView pageView,
@@ -158,7 +167,6 @@ class FacilityReportAdminPageController {
 			.stream()
 			.map(report -> FacilityReportListPageRow.from(report, messages))
 			.toList();
-		LocalDateTime surgeCutoff = LocalDateTime.now(clock).minusHours(REPORT_SURGE_LOOKBACK_HOURS);
 
 		model.addAttribute("reports", reports);
 		model.addAttribute("page", pageView);
@@ -168,6 +176,11 @@ class FacilityReportAdminPageController {
 		));
 		model.addAttribute("selectedStatus", status);
 		model.addAttribute("statusOptions", statusOptions());
+	}
+
+	// 급증 경고·처리 시간 카드는 fragment 밖 풀페이지 전용이라 부분 응답에서는 조회하지 않는다.
+	private void addReportSummaryAttributes(Model model) {
+		LocalDateTime surgeCutoff = LocalDateTime.now(clock).minusHours(REPORT_SURGE_LOOKBACK_HOURS);
 		model.addAttribute("reportSurgeAlert", ReportSurgeAlertView.from(
 			facilityReportUseCase.countReportsCreatedSince(surgeCutoff)
 		));

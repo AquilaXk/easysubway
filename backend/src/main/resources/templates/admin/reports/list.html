@@ -3,6 +3,9 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<!-- htmx는 기본으로 로드 시 인라인 <style>(indicator)을 head에 주입한다. CSP style-src 'self'에서
+	     차단되어 콘솔 위반이 나므로 끈다. htmx-indicator가 필요하면 admin-v3.css에 정의한다(#1736). -->
+	<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
 	<title>시설 신고 확인</title>
 	<link rel="stylesheet" th:href="@{/css/admin-v3.css}">
 </head>
@@ -90,6 +93,8 @@
 			</tbody>
 		</table>
 
+		<!-- 페이지네이션은 공용 pager fragment(hx-get 없음)라 이 파일럿에서는 전체 새로고침으로 동작한다.
+		     상태 필터만 htmx 부분 갱신 대상이며, 대기열 전체 htmx화는 #1740 범위다. -->
 		<div th:replace="~{admin/fragments/pagination :: pager('신고 목록 페이지', ${page}, ${paginationLinks})}"></div>
 	</div>
 </main>

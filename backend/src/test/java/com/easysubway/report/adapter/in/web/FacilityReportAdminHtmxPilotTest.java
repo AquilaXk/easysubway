@@ -85,6 +85,24 @@ class FacilityReportAdminHtmxPilotTest {
 	}
 
 	@Test
+	@DisplayName("htmx 히스토리 복원 요청은 fragment가 아니라 셸을 포함한 풀페이지를 반환한다")
+	void htmxHistoryRestoreRequestReturnsFullPageNotFragment() throws Exception {
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.header("HX-Request", "true")
+				.header("HX-History-Restore-Request", "true")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("<!doctype html>")
+			.contains("admin-sidebar")
+			.contains("id=\"report-results\"");
+	}
+
+	@Test
 	@DisplayName("상태 필터 링크는 no-JS fallback href와 htmx hx-get을 함께 갖는다")
 	void statusFilterLinksExposeBothHrefAndHxGet() throws Exception {
 		String html = mockMvc.perform(get("/admin/reports/page")
@@ -119,7 +137,10 @@ class FacilityReportAdminHtmxPilotTest {
 			.contains("/vendor/htmx-2.0.10/htmx.min.js")
 			.contains("/vendor/alpinejs-csp-3.15.12/cdn.min.js")
 			.contains("integrity=\"sha384-")
-			.contains("crossorigin=\"anonymous\"");
+			.contains("crossorigin=\"anonymous\"")
+			// htmx의 인라인 indicator <style> 주입을 꺼 style-src 'self' 위반을 방지한다.
+			.contains("name=\"htmx-config\"")
+			.contains("includeIndicatorStyles");
 		assertThat(html)
 			.doesNotContain("cdn.jsdelivr.net")
 			.doesNotContain("unpkg.com")
