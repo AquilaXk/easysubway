@@ -5,8 +5,10 @@ import 'package:flutter/widgets.dart';
 
 import '../../stations/domain/station_line.dart' show stationLineColor;
 import '../domain/map_camera.dart';
+import '../domain/route_map_parallel_offsets.dart';
 import '../domain/structured_route_map.dart';
 import 'route_map_label_placement.dart';
+import 'route_map_transfer_marker.dart';
 
 // 구조화 노선도 native canvas 렌더러 코어 (#1641 Stage 2).
 //
@@ -271,6 +273,7 @@ class StructuredRouteMapPainter extends CustomPainter {
     required this.lineColors,
     this.labelTextByStationId = const {},
     this.lineBadgeLabelByLineId = const {},
+    this.lineOffsets = const {},
     this.attributionText,
     this.lineWidth = 4.0,
     this.stationRadius = 3.0,
@@ -294,6 +297,11 @@ class StructuredRouteMapPainter extends CustomPainter {
   /// line_id → 노선 식별 뱃지 라벨(#1764 D). 비어 있으면 뱃지를 그리지 않는다.
   final Map<String, String> lineBadgeLabelByLineId;
 
+  /// line_id → (polyline별) → (정점별) 평행 오프셋 방향(#1792 G4). 공유 corridor
+  /// 에서 track이 겹치지 않도록 렌더 시 정점을 수직으로 민다. 비어 있으면 오프셋
+  /// 없음. 방향 벡터(단위 법선×rank)에 [lineWidth] px를 곱해 적용한다.
+  final Map<String, List<List<Offset>>> lineOffsets;
+
   /// 출처 표기(#1637 attribution 필요 지역). null/빈 문자열이면 그리지 않는다.
   final String? attributionText;
   final double lineWidth;
@@ -310,6 +318,10 @@ class StructuredRouteMapPainter extends CustomPainter {
   static const Color _fallbackLineColor = Color(0xFF8D8D8D);
   static const double _transferBorderWidth = 2.0;
   static const double _regularStationBorderWidth = 1.6;
+  // 환승 캡슐 안 색 도트: 노선 수만큼 세로로 쌓는다(#1792 G3).
+  static const double _transferDotRadius = 2.5;
+  static const double _transferDotGap = 1.5;
+  static const double _transferDotPadding = 2.0;
   static const double _labelGap = 4.0;
   static const String _badgeIdPrefix = 'badge:';
   static const double _badgeHorizontalPadding = 5.0;
@@ -360,6 +372,9 @@ class StructuredRouteMapPainter extends CustomPainter {
     ..strokeWidth = _transferBorderWidth
     ..color = _transferBorder
     ..isAntiAlias = true;
+  final Paint _transferDotPaint = Paint()
+    ..style = PaintingStyle.fill
+    ..isAntiAlias = true;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -381,18 +396,27 @@ class StructuredRouteMapPainter extends CustomPainter {
     _linePaint.strokeWidth = lineWidth;
     for (final line in map.lines) {
       _linePaint.color = lineColors[line.lineId] ?? _fallbackLineColor;
-      for (final polyline in line.polylines) {
+      // 공유 corridor 평행 오프셋(#1792 G4): 정점별 방향 벡터에 lineWidth px를
+      // 곱해 뷰포트에서 수직으로 민다 — 겹친 track을 나란히 갈라 놓는다.
+      final offsetsByPolyline = lineOffsets[line.lineId];
+      for (var p = 0; p < line.polylines.length; p += 1) {
+        final polyline = line.polylines[p];
         // viewport 밖 sub-polyline은 그리지 않는다 (culling).
         if (!routeMapPolylineIntersectsRect(polyline, visible)) {
           continue;
         }
+        final vertexOffsets =
+            offsetsByPolyline != null && p < offsetsByPolyline.length
+            ? offsetsByPolyline[p]
+            : null;
         final path = Path();
-        var isFirst = true;
-        for (final point in polyline) {
-          final viewportPoint = camera.sourceToViewportPoint(point);
-          if (isFirst) {
+        for (var v = 0; v < polyline.length; v += 1) {
+          var viewportPoint = camera.sourceToViewportPoint(polyline[v]);
+          if (vertexOffsets != null && v < vertexOffsets.length) {
+            viewportPoint += vertexOffsets[v] * lineWidth;
+          }
+          if (v == 0) {
             path.moveTo(viewportPoint.dx, viewportPoint.dy);
-            isFirst = false;
           } else {
             path.lineTo(viewportPoint.dx, viewportPoint.dy);
           }
@@ -428,13 +452,29 @@ class StructuredRouteMapPainter extends CustomPainter {
     }
 
     // 환승 마커: 물리 역당 한 번, transferGroups 중심 좌표에, 전 bucket 표시.
+    // 흰 캡슐 배경 위에 환승 노선 색을 세로 도트로 쌓아 어느 노선이 만나는지
+    // 색으로 드러낸다(#1792 G3, 공식 노선도 관례).
     for (final group in map.transferGroups) {
       if (!visible.contains(group.centroid)) {
         continue;
       }
       final center = camera.sourceToViewportPoint(group.centroid);
-      canvas.drawCircle(center, transferStationRadius, _transferFillPaint);
-      canvas.drawCircle(center, transferStationRadius, _transferBorderPaint);
+      final marker = routeMapTransferMarker(
+        center: center,
+        colors: [
+          for (final lineId in group.lineIds)
+            lineColors[lineId] ?? _fallbackLineColor,
+        ],
+        dotRadius: _transferDotRadius,
+        dotGap: _transferDotGap,
+        padding: _transferDotPadding,
+      );
+      canvas.drawRRect(marker.capsule, _transferFillPaint);
+      canvas.drawRRect(marker.capsule, _transferBorderPaint);
+      for (final dot in marker.dots) {
+        _transferDotPaint.color = dot.color;
+        canvas.drawCircle(dot.center, _transferDotRadius, _transferDotPaint);
+      }
     }
   }
 
@@ -616,6 +656,19 @@ class StructuredRouteMapView extends StatefulWidget {
 class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   final Map<String, TextPainter> _labelPainters = {};
 
+  // 평행 오프셋(#1792 G4)은 map 정점 전수 계산이라 프레임마다 하면 비싸다.
+  // map이 바뀔 때만 다시 계산해 painter로 넘긴다(라벨 캐시와 같은 State 소유).
+  StructuredRouteMap? _offsetsSourceMap;
+  Map<String, List<List<Offset>>> _lineOffsets = const {};
+
+  Map<String, List<List<Offset>>> _ensureLineOffsets() {
+    if (!identical(_offsetsSourceMap, widget.map)) {
+      _offsetsSourceMap = widget.map;
+      _lineOffsets = routeMapParallelLineOffsets(widget.map.lines);
+    }
+    return _lineOffsets;
+  }
+
   @override
   void dispose() {
     for (final painter in _labelPainters.values) {
@@ -635,6 +688,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
         lineColors: widget.lineColors,
         labelTextByStationId: widget.labelTextByStationId,
         lineBadgeLabelByLineId: widget.lineBadgeLabelByLineId,
+        lineOffsets: _ensureLineOffsets(),
         attributionText: widget.attributionText,
         labelPainterCache: _labelPainters,
       ),
