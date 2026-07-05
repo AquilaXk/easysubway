@@ -138,3 +138,39 @@ test("재구성은 인접 정차의 lineSequence가 같으면 거부한다", () 
   ];
   assert.throws(() => reconstructTransitTrips(rows, ctx), /lineSequence must change/);
 });
+
+test("재구성은 다른 노선의 동일 trnNo+dayCd를 별도 trip으로 분리한다(lineId 키)", () => {
+  const ctx = {
+    lineSequenceByStationLine: {
+      "station-sadang|seoul-4": 28,
+      "station-sangnoksu|seoul-4": 43,
+      "station-a|seoul-2": 1,
+      "station-b|seoul-2": 2,
+    },
+    routeIdByLineDirection: {
+      "seoul-4|up": "route-seoul-4-oido",
+      "seoul-2|up": "route-seoul-2-inner",
+    },
+    serviceIdByDayCd: { "01": "weekday-2026" },
+  };
+  const rows = [
+    { stationId: "station-sadang", lineId: "seoul-4", trnNo: "100", dayCd: "01", arrivalSeconds: 30000, departureSeconds: 30000 },
+    { stationId: "station-sangnoksu", lineId: "seoul-4", trnNo: "100", dayCd: "01", arrivalSeconds: 31200, departureSeconds: 31200 },
+    { stationId: "station-a", lineId: "seoul-2", trnNo: "100", dayCd: "01", arrivalSeconds: 30000, departureSeconds: 30000 },
+    { stationId: "station-b", lineId: "seoul-2", trnNo: "100", dayCd: "01", arrivalSeconds: 30300, departureSeconds: 30300 },
+  ];
+  const { transitTrips } = reconstructTransitTrips(rows, ctx);
+  assert.equal(transitTrips.length, 2);
+  assert.deepEqual(
+    transitTrips.map((t) => t.routeId).sort(),
+    ["route-seoul-2-inner", "route-seoul-4-oido"],
+  );
+});
+
+test("재구성은 한 trip 안에서 servicePattern이 섞이면 거부한다(결정성 계약)", () => {
+  const rows = [
+    { stationId: "station-sadang", lineId: "seoul-4", trnNo: "M100", dayCd: "01", arrivalSeconds: 30000, departureSeconds: 30000, servicePattern: "LOCAL" },
+    { stationId: "station-sangnoksu", lineId: "seoul-4", trnNo: "M100", dayCd: "01", arrivalSeconds: 31200, departureSeconds: 31200, servicePattern: "EXPRESS" },
+  ];
+  assert.throws(() => reconstructTransitTrips(rows, CONTEXT), /inconsistent servicePattern/);
+});

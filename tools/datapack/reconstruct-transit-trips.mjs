@@ -19,7 +19,8 @@ export function reconstructTransitTrips(rows, context) {
   const groups = new Map();
   for (const row of rows ?? []) {
     requireRow(row);
-    const key = `${row.trnNo}|${row.dayCd}`;
+    // lineId를 키에 포함 — 노선 간 동일 trnNo+dayCd 충돌로 다른 노선 정차가 한 trip으로 병합되는 것을 막는다.
+    const key = `${row.lineId}|${row.trnNo}|${row.dayCd}`;
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -49,7 +50,7 @@ export function reconstructTransitTrips(rows, context) {
     const { trnNo, dayCd } = groupRows[0];
     const routeId = requireMapping(routeIdByLineDirection, `${lineId}|${directionId}`, "route");
     const serviceId = requireMapping(serviceIdByDayCd, dayCd, "serviceId");
-    const servicePattern = groupRows[0].servicePattern ?? DEFAULT_SERVICE_PATTERN;
+    const servicePattern = resolveGroupServicePattern(groupRows, key);
     const tripId = `${routeId}-${trnNo}-${dayCd}`;
 
     transitTrips.push({
@@ -92,6 +93,16 @@ function validateLineWideOrderAndDirection(ordered, key) {
     }
   }
   return direction > 0 ? "up" : "down";
+}
+
+// 한 trip(그룹)의 servicePattern은 입력 순서가 아니라 그룹 값으로 결정한다. 값이 섞여 있으면
+// 데이터 오류이므로 거부하고, 없으면 LOCAL로 본다(결정적).
+function resolveGroupServicePattern(groupRows, key) {
+  const distinct = [...new Set(groupRows.map((row) => row.servicePattern).filter((value) => value != null && value !== ""))];
+  if (distinct.length > 1) {
+    throw new Error(`reconstruct: inconsistent servicePattern within trip ${key}: ${distinct.sort().join(", ")}`);
+  }
+  return distinct[0] ?? DEFAULT_SERVICE_PATTERN;
 }
 
 function resolveLineSequence(lookup, row) {
