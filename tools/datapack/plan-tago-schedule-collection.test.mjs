@@ -159,6 +159,53 @@ test("TAGO station discovery는 역명 query별 provider 후보를 secret 없이
   assert.doesNotMatch(JSON.stringify(discovery), /actual-secret-key|serviceKey=/);
 });
 
+test("TAGO station discovery 실패는 partial artifact에 quota와 성공 query를 보존한다", async () => {
+  await assert.rejects(
+    async () =>
+      collectTagoStationDiscovery(
+        {
+          stationLineRows: [{ stationNameKo: "상록수" }, { stationNameKo: "사당" }],
+        },
+        {
+          serviceKey: "actual-secret-key",
+          serviceKeyEnv: "DATA_GO_KR_SERVICE_KEY",
+          discoveredAt: "2026-07-05T00:00:00.000Z",
+          fetchImpl: async (url) => {
+            const stationNameKo = new URL(url).searchParams.get("subwayStationName");
+            if (stationNameKo === "사당") {
+              return {
+                ok: false,
+                status: 503,
+                async text() {
+                  return "";
+                },
+              };
+            }
+            return {
+              ok: true,
+              status: 200,
+              async text() {
+                return tagoStationDiscoveryResponse(stationNameKo);
+              },
+            };
+          },
+        },
+      ),
+    (error) => {
+      assert.equal(error.name, "TagoStationDiscoveryError");
+      assert.equal(error.collection.collectionStatus, "partial_failed");
+      assert.equal(error.collection.failedStationNameKo, "사당");
+      assert.equal(error.collection.quotaObservedRequestCount, 2);
+      assert.deepEqual(
+        error.collection.queries.map((query) => query.stationNameKo),
+        ["상록수"],
+      );
+      assert.doesNotMatch(JSON.stringify(error.collection), /actual-secret-key|serviceKey=/);
+      return true;
+    },
+  );
+});
+
 test("TAGO 시간표 수집 summary는 완료 checkpoint와 evidence hash를 남긴다", () => {
   const summary = buildTagoScheduleCollectionSummary({
     responses: [

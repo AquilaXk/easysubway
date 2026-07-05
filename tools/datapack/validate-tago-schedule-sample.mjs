@@ -332,26 +332,38 @@ async function collectTagoStationDiscovery(input, options = {}) {
   const queries = [];
 
   for (const stationNameKo of stationNames) {
-    const response = await fetchImpl(buildTagoStationDiscoveryRequestUrl(stationNameKo, serviceKey));
-    if (!response.ok) {
-      throw new Error(`TAGO station discovery failed: ${stationNameKo} status ${response.status}`);
+    try {
+      const response = await fetchImpl(buildTagoStationDiscoveryRequestUrl(stationNameKo, serviceKey));
+      if (!response.ok) {
+        throw new Error(`TAGO station discovery failed: ${stationNameKo} status ${response.status}`);
+      }
+      const rawText = await response.text();
+      const payload = JSON.parse(rawText);
+      rejectCredentialLeak(rawText, payload);
+      if (payload.response?.header && payload.response.header.resultCode !== "00") {
+        throw new Error(`TAGO station discovery is not normal service: ${stationNameKo}`);
+      }
+      const candidates = normalizeRows(payload.response?.body?.items?.item).map((row) => sortObject(row));
+      queries.push({
+        stationNameKo,
+        rawSha256: sha256(rawText),
+        rowCount: candidates.length,
+        providerRecordHashes: candidates.map((row) => sha256(JSON.stringify(row))),
+        candidates,
+      });
+    } catch (error) {
+      throw new TagoStationDiscoveryError(
+        error instanceof Error ? error.message : `TAGO station discovery failed: ${stationNameKo}`,
+        buildTagoStationDiscoveryArtifact(options, discoveredAt, queries, { failedStationNameKo: stationNameKo }),
+      );
     }
-    const rawText = await response.text();
-    const payload = JSON.parse(rawText);
-    rejectCredentialLeak(rawText, payload);
-    if (payload.response?.header && payload.response.header.resultCode !== "00") {
-      throw new Error(`TAGO station discovery is not normal service: ${stationNameKo}`);
-    }
-    const candidates = normalizeRows(payload.response?.body?.items?.item).map((row) => sortObject(row));
-    queries.push({
-      stationNameKo,
-      rawSha256: sha256(rawText),
-      rowCount: candidates.length,
-      providerRecordHashes: candidates.map((row) => sha256(JSON.stringify(row))),
-      candidates,
-    });
   }
 
+  return buildTagoStationDiscoveryArtifact(options, discoveredAt, queries);
+}
+
+function buildTagoStationDiscoveryArtifact(options, discoveredAt, queries, failure = {}) {
+  const failedRequestCount = failure.failedStationNameKo ? 1 : 0;
   return {
     artifactKind: "tago-station-discovery",
     sourceId: "molit-tago-subway-info",
@@ -359,7 +371,9 @@ async function collectTagoStationDiscovery(input, options = {}) {
     serviceKeyEnv: options.serviceKeyEnv ?? "DATA_GO_KR_SERVICE_KEY",
     discoveredAt,
     queryCount: queries.length,
-    quotaObservedRequestCount: queries.length,
+    quotaObservedRequestCount: queries.length + failedRequestCount,
+    collectionStatus: failure.failedStationNameKo ? "partial_failed" : "completed_batch",
+    ...(failure.failedStationNameKo ? { failedStationNameKo: failure.failedStationNameKo } : {}),
     queries,
   };
 }
@@ -404,6 +418,14 @@ class TagoScheduleCollectionError extends Error {
   constructor(message, collection) {
     super(message);
     this.name = "TagoScheduleCollectionError";
+    this.collection = collection;
+  }
+}
+
+class TagoStationDiscoveryError extends Error {
+  constructor(message, collection) {
+    super(message);
+    this.name = "TagoStationDiscoveryError";
     this.collection = collection;
   }
 }
@@ -579,10 +601,17 @@ async function main() {
     }
   } else if (args["discover-stations"]) {
     const serviceKeyEnv = args["service-key-env"] ?? "DATA_GO_KR_SERVICE_KEY";
-    result = await collectTagoStationDiscovery(JSON.parse(await readFile(inputPath, "utf8")), {
-      serviceKey: process.env[serviceKeyEnv],
-      serviceKeyEnv,
-    });
+    try {
+      result = await collectTagoStationDiscovery(JSON.parse(await readFile(inputPath, "utf8")), {
+        serviceKey: process.env[serviceKeyEnv],
+        serviceKeyEnv,
+      });
+    } catch (error) {
+      if (error instanceof TagoStationDiscoveryError && args.output) {
+        await writeJsonOutput(args.output, error.collection);
+      }
+      throw error;
+    }
   } else if (args.summary) {
     const input = JSON.parse(await readFile(inputPath, "utf8"));
     const inputDir = path.dirname(inputPath);

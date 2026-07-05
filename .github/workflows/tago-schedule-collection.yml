@@ -45,12 +45,13 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${DATA_GO_KR_SERVICE_KEY}"
+          discover_status=0
           node tools/datapack/validate-tago-schedule-sample.mjs \
             --discover-stations \
             --quiet \
             --input tools/datapack/inputs/capital-pilot-production-source-input.json \
             --service-key-env DATA_GO_KR_SERVICE_KEY \
-            --output "${RUNNER_TEMP}/tago-station-discovery.json"
+            --output "${RUNNER_TEMP}/tago-station-discovery.json" || discover_status=$?
           node -e 'const fs=require("fs"); const limit=Number(process.env.TAGO_DAILY_LIMIT); const discovery=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/tago-station-discovery.json", "utf8")).quotaObservedRequestCount; if (!Number.isInteger(limit) || limit <= 0) throw new Error("dailyLimit must be a positive integer"); const scheduleLimit=limit - discovery; if (scheduleLimit <= 0) throw new Error(`dailyLimit ${limit} is too small after ${discovery} discovery calls`); fs.writeFileSync(process.env.RUNNER_TEMP + "/tago-schedule-limit.env", `TAGO_SCHEDULE_DAILY_LIMIT=${scheduleLimit}\n`);'
           source "${RUNNER_TEMP}/tago-schedule-limit.env"
           node tools/datapack/validate-tago-schedule-sample.mjs \
@@ -78,6 +79,9 @@ jobs:
               --quiet \
               --input "${RUNNER_TEMP}/tago-collection.json" \
               --output "${RUNNER_TEMP}/tago-summary.json"
+          fi
+          if [[ "${discover_status}" -ne 0 ]]; then
+            exit "${discover_status}"
           fi
           exit "${collect_status}"
 
