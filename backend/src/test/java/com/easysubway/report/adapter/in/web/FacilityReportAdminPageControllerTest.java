@@ -303,6 +303,32 @@ class FacilityReportAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("사진 열람 권한이 있는 관리자만 목록에서 썸네일을 본다")
+	void adminReportListShowsPhotoThumbnailOnlyWithReadPermission() throws Exception {
+		String reportId = createReportWithPhotoAndLocation("썸네일로 확인할 신고");
+
+		// 사진 열람 권한이 있는 계정(admin-test): 썸네일 img + 원본 링크 노출.
+		String withPermission = mockMvc.perform(get("/admin/reports/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		assertThat(withPermission)
+			.contains("/admin/reports/%s/photo/thumbnail".formatted(reportId))
+			.contains("/admin/reports/%s/photo/original".formatted(reportId));
+
+		// 검수 권한만 있고 사진 열람 권한이 없는 계정: 썸네일 미노출, '있음' 텍스트만.
+		RequestPostProcessor reportReviewer = user("report-reviewer")
+			.authorities(new SimpleGrantedAuthority(AdminPermission.REPORT_REVIEW.authority()));
+		String withoutPermission = mockMvc.perform(get("/admin/reports/page")
+				.with(reportReviewer))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		assertThat(withoutPermission)
+			.doesNotContain("/admin/reports/%s/photo/thumbnail".formatted(reportId))
+			.contains("있음");
+	}
+
+	@Test
 	@DisplayName("관리자 신고 사진 조회는 object key query endpoint를 열지 않는다")
 	void adminReportPhotoQueryEndpointIsNotExposed() throws Exception {
 		createReportWithPhotoAndLocation("object key 조회를 막을 신고");

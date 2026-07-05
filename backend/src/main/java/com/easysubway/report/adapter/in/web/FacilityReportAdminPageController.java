@@ -64,6 +64,8 @@ class FacilityReportAdminPageController {
 	private static final int REPORT_SURGE_ALERT_THRESHOLD = 10;
 	private static final long REPORT_SURGE_LOOKBACK_HOURS = 24;
 	private static final String REPORTS_PROGRAM_ID = "a-reports";
+	// 사진 endpoint의 @PreAuthorize('admin.report.photo.read')와 같은 권한. 목록 썸네일 노출 게이팅에 쓴다.
+	private static final String REPORT_PHOTO_READ_AUTHORITY = "admin.report.photo.read";
 
 	private final FacilityReportUseCase facilityReportUseCase;
 	private final LoadFacilityReportPhotoPort loadFacilityReportPhotoPort;
@@ -267,6 +269,9 @@ class FacilityReportAdminPageController {
 
 		model.addAttribute("reports", reports);
 		model.addAttribute("page", pageView);
+		// 사진 열람 권한(REPORT_PHOTO_READ·V15)이 있는 계정에만 썸네일을 노출한다. 권한이 없으면
+		// 썸네일 endpoint 자체가 403이므로 깨진 이미지를 막고 '있음' 텍스트만 보여준다.
+		model.addAttribute("canReadPhoto", hasReportPhotoReadAuthority(authentication));
 		model.addAttribute("paginationLinks", pageView.links("/admin/reports/page", queryParams(query)));
 		model.addAttribute("selectedStatus", query.status());
 		model.addAttribute("statusOptions", statusOptions());
@@ -713,6 +718,11 @@ class FacilityReportAdminPageController {
 
 	private static boolean hasText(String value) {
 		return value != null && !value.isBlank();
+	}
+
+	private static boolean hasReportPhotoReadAuthority(Authentication authentication) {
+		return authentication != null && authentication.getAuthorities().stream()
+			.anyMatch(authority -> REPORT_PHOTO_READ_AUTHORITY.equals(authority.getAuthority()));
 	}
 
 	record FacilityReportListPageRow(

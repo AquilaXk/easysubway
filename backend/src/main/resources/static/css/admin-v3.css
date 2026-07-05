@@ -593,6 +593,20 @@ body.admin-v3 {
 	text-align: center;
 }
 
+/* 신고 사진 썸네일(#1740): 목록에서 첨부 미리보기, 클릭 시 원본으로 이동 */
+.admin-v3 .report-thumb {
+	display: inline-block;
+	line-height: 0;
+}
+
+.admin-v3 .report-thumb img {
+	width: 48px;
+	height: 48px;
+	object-fit: cover;
+	border-radius: 6px;
+	border: 1px solid var(--admin-border);
+}
+
 .admin-v3 .bulk-actionbar {
 	position: sticky;
 	bottom: 0;
