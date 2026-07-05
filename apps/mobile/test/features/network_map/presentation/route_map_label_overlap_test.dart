@@ -47,6 +47,7 @@ StructuredRouteMap _gridMap({required double spacing, int regularCount = 12}) {
       stationId: id,
       lineIds: const ['L1', 'L2'],
       centroid: at(t, 0),
+      memberPositions: [at(t, 0), at(t, 0)],
     ));
   }
   for (var m = 0; m < 3; m += 1) {

@@ -52,6 +52,7 @@ StructuredRouteMap sampleMap() {
         stationId: 'transfer',
         lineIds: ['L1', 'L2'],
         centroid: Offset(500, 500),
+        memberPositions: [Offset(500, 500), Offset(500, 500)],
       ),
     ],
   );

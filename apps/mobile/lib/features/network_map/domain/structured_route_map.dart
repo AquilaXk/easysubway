@@ -70,6 +70,7 @@ class RouteMapTransferGroup {
     required this.stationId,
     required this.lineIds,
     required this.centroid,
+    required this.memberPositions,
   });
 
   final String stationId;
@@ -79,6 +80,10 @@ class RouteMapTransferGroup {
 
   /// 표시 좌표: 해당 station_id route_map_positions의 중심값.
   final Offset centroid;
+
+  /// [lineIds]와 같은 순서의 노선별 노드 좌표. 비수렴 기하에서 캡슐이
+  /// 멤버들을 걸치도록 렌더러가 소비한다.
+  final List<Offset> memberPositions;
 }
 
 /// 구조화 노선도 집합 (렌더러 입력).
@@ -153,16 +158,17 @@ StructuredRouteMap buildStructuredRouteMap(
 
   // 물리 역(station_id)이 속한 line 집합 → 환승 판정.
   final lineIdsByStation = <String, Set<String>>{};
-  // 환승 중심 계산용: 환승역 후보만 좌표를 모은다.
-  final positionsByStation = <String, List<Offset>>{};
+  // 환승 중심·멤버 좌표 계산용: stationId → lineId → position.
+  final positionByStationLine = <String, Map<String, Offset>>{};
   final lineIdsWithStations = <String>{};
   for (final input in inputList) {
     lineIdsByStation
         .putIfAbsent(input.stationId, () => <String>{})
         .add(input.lineId);
-    positionsByStation
-        .putIfAbsent(input.stationId, () => <Offset>[])
-        .add(input.position);
+    positionByStationLine
+            .putIfAbsent(input.stationId, () => <String, Offset>{})[input
+            .lineId] =
+        input.position;
     lineIdsWithStations.add(input.lineId);
   }
 
@@ -210,11 +216,15 @@ StructuredRouteMap buildStructuredRouteMap(
       .toList()
     ..sort();
   for (final stationId in transferStationIds) {
+    final lineIds = lineIdsByStation[stationId]!.toList()..sort();
+    final byLine = positionByStationLine[stationId]!;
+    final memberPositions = [for (final lineId in lineIds) byLine[lineId]!];
     transferGroups.add(
       RouteMapTransferGroup(
         stationId: stationId,
-        lineIds: lineIdsByStation[stationId]!.toList()..sort(),
-        centroid: _centroid(positionsByStation[stationId]!),
+        lineIds: lineIds,
+        centroid: _centroid(memberPositions),
+        memberPositions: memberPositions,
       ),
     );
   }

@@ -138,6 +138,30 @@ void main() {
       expect(group.centroid, const Offset(5, 10));
     });
 
+    test('환승 그룹은 lineIds 순서와 정렬된 멤버 좌표를 노출한다', () {
+      final map = buildStructuredRouteMap(
+        [
+          input(
+            stationId: 's1',
+            lineId: 'line-b',
+            sequence: 1,
+            position: const Offset(10, 0),
+          ),
+          input(
+            stationId: 's1',
+            lineId: 'line-a',
+            sequence: 1,
+            position: Offset.zero,
+          ),
+        ],
+        lineTracks: const [],
+      );
+      final group = map.transferGroups.single;
+      expect(group.lineIds, ['line-a', 'line-b']);
+      expect(group.memberPositions, const [Offset(0, 0), Offset(10, 0)]);
+      expect(group.centroid, const Offset(5, 0));
+    });
+
     test('환승역은 transfer, 단일 노선역은 regular class', () {
       final map = buildStructuredRouteMap(
         [
