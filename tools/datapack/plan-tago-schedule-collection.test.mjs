@@ -9,6 +9,7 @@ import {
   buildTagoScheduleCollectionPlan,
   buildTagoScheduleCollectionSummary,
   collectTagoSchedules,
+  validateTagoScheduleSample,
 } from "./validate-tago-schedule-sample.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -134,6 +135,20 @@ test("TAGO 시간표 수집 summary는 완료 checkpoint와 evidence hash를 남
   assert.match(summary.rawSha256ByRequest["MTRKR4448|01|U"], /^[0-9a-f]{64}$/);
   assert.match(summary.evidenceHash, /^[0-9a-f]{64}$/);
   assert.equal(summary.productionUseAllowed, false);
+});
+
+test("TAGO 시간표 검증은 provider row order에 의존하지 않는다", () => {
+  const validation = validateTagoScheduleSample(
+    tagoResponse("MTRKR4448", "01", "U", [
+      ["052000", "052500"],
+      ["051000", "051500"],
+    ]),
+  );
+
+  assert.deepEqual(
+    validation.departures.map((departure) => departure.departureSeconds),
+    [18_900, 19_500],
+  );
 });
 
 test("TAGO 시간표 수집 summary evidence hash는 checkpoint 상태를 포함한다", () => {
@@ -500,16 +515,23 @@ test("TAGO 시간표 수집기는 service key가 없으면 provider 호출 전�
   );
 });
 
-function tagoResponse(stationId, dailyTypeCode, upDownTypeCode) {
+function tagoResponse(
+  stationId,
+  dailyTypeCode,
+  upDownTypeCode,
+  times = [
+    ["051000", "051500"],
+    ["052000", "052500"],
+  ],
+) {
   return JSON.stringify({
     response: {
       header: { resultCode: "00" },
       body: {
         items: {
-          item: [
-            tagoRow(stationId, dailyTypeCode, upDownTypeCode, "051000", "051500"),
-            tagoRow(stationId, dailyTypeCode, upDownTypeCode, "052000", "052500"),
-          ],
+          item: times.map(([arrTime, depTime]) =>
+            tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime),
+          ),
         },
       },
     },
