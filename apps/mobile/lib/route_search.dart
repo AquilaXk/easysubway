@@ -88,7 +88,7 @@ String _routeDateLabel(String value) {
   if (trimmed.length >= 10) {
     return '최근 확인 ${trimmed.substring(0, 10)}';
   }
-  return '최근 확인일을 아직 알 수 없어요';
+  return '최근 확인일이 아직 없어요';
 }
 
 const routeEtaSourceLabels = <String, String>{
@@ -1349,7 +1349,7 @@ class RouteSearchResult {
         steps.every((step) => _routeStepStairState(step) == 'stepFree')) {
       return '계단 없는 길이에요';
     }
-    return '계단 여부를 아직 알 수 없어요';
+    return '계단 여부를 확인하고 있어요';
   }
 
   int get walkingDistanceMeters {
@@ -1391,13 +1391,13 @@ class RouteSearchResult {
     return switch (status) {
       'FOUND' => '경로를 찾았습니다',
       'BLOCKED' => '안내할 수 있는 경로가 없습니다',
-      _ => '경로 상태를 아직 알 수 없어요',
+      _ => '경로 상태를 확인하고 있어요',
     };
   }
 
   String get scoreLabel => burdenLevelLabel;
 
-  String get lineLabel => lineName.isEmpty ? '노선을 아직 알 수 없어요' : lineName;
+  String get lineLabel => lineName.isEmpty ? '노선을 확인하고 있어요' : lineName;
 
   bool get isBlocked => status == 'BLOCKED';
 
