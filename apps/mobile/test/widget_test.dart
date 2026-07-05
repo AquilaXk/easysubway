@@ -1781,8 +1781,11 @@ void main() {
 
   testWidgets('노선도 viewport 밖 station semantics는 생성하지 않는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
-    const map = NetworkMapData(
-      regions: [NetworkMapRegion(name: '테스트권')],
+    // #1764 E: 소규모 지역(역 40 이하)은 초기에 전체를 조망하므로 viewport
+    // culling이 없다. 밖 역 semantics 미생성(culling)은 대형 지역에서만 유효하므로,
+    // 도심에 filler 역을 채워 대형 지역(역 40 초과) 경로로 검증한다.
+    final map = NetworkMapData(
+      regions: const [NetworkMapRegion(name: '테스트권')],
       selectedRegion: '테스트권',
       lines: [
         NetworkMapLine(
@@ -1891,8 +1894,28 @@ void main() {
             sourceId: 'fixture-route-map-source-capital-review',
           ),
         ),
+        // 도심(x≈4900)에 filler를 채워 역 40 초과 → 대형 지역 culling 경로(#1764 E).
+        for (var i = 0; i < 45; i += 1)
+          NetworkMapStation(
+            id: 'station-filler-$i',
+            nameKo: '채움$i',
+            nameEn: 'Filler $i',
+            region: '테스트권',
+            lineId: 'geometry-helper',
+            stationCode: 'F$i',
+            sequence: i,
+            position: NetworkMapPosition(
+              x: 4900 + i,
+              y: 100,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
       ],
-      edges: [],
+      edges: const [],
       positionSources: [
         NetworkMapPositionSource(
           id: 'fixture-route-map-source-capital-review',
@@ -1932,6 +1955,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+
+      // culling(밖 역 semantics 미생성)은 대형 지역 경로에서만 유효하다. filler로
+      // 임계를 넘겨 대형 지역임을 명시 단정 — 임계 상향으로 소규모 경로가 되면
+      // 이 단정이 깨져 vacuous pass를 막는다(#1764 E).
+      expect(
+        networkMapUsesWholeRegionInitialView(map.stations.length),
+        isFalse,
+        reason: 'filler로 대형 지역(전체 조망 아님) 경로를 유지해야 culling이 유효',
+      );
 
       final visibleStation = find.byKey(
         const Key('networkMapStation-visible-a-seoul-4'),

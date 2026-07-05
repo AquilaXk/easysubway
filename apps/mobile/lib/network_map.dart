@@ -9,6 +9,7 @@ import 'package:flutter/scheduler.dart';
 import 'accessible_design.dart';
 import 'ad_slot.dart';
 import 'features/network_map/domain/map_camera.dart';
+import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
@@ -112,6 +113,17 @@ class NetworkMapData {
   /// 렌더러(#1641)가 소비하는 line geometry / transfer group / label·LOD를
   /// route_map_positions 필드에서 계산한다.
   StructuredRouteMap toStructuredRouteMap() {
+    // major 거점 allowlist(비환승) 역명 → 현재 지역 station_id 집합(#1764 C).
+    // 종점 major는 빌더가 자동 산출하므로 여기서는 거점만 매핑한다.
+    final landmarkNames =
+        routeMapMajorLandmarkStationNamesByRegion[selectedRegion] ??
+        const <String>{};
+    final majorStationIds = landmarkNames.isEmpty
+        ? const <String>{}
+        : <String>{
+            for (final station in stations)
+              if (landmarkNames.contains(station.nameKo)) station.id,
+          };
     return buildStructuredRouteMap(
       stations.map(
         (station) => StructuredRouteMapStationInput(
@@ -130,6 +142,7 @@ class NetworkMapData {
         for (final track in lineTracks)
           RouteMapLineTrackInput(lineId: track.lineId, paths: track.paths),
       ],
+      majorStationIds: majorStationIds,
     );
   }
 }
@@ -3011,7 +3024,25 @@ double _minimumMapScaleForBounds(Rect bounds, BoxConstraints constraints) {
   return math.min(_minMapScale, fitScale);
 }
 
-Rect _readableBoundsFor(_MapGeometry geometry) {
+/// 이 역 수(route_map_positions 행) 이하 지역은 초기 화면에 지역 전체를 담는다
+/// (소규모 tight-fit, #1764 E). 광주·대전급(수십 역)은 소규모, 부산·대구·수도권급
+/// (백 역 이상)은 대형. 임계 40은 소규모(~20)와 대형(100+) 사이 넓은 간극에 둔다.
+const int _smallRegionStationCountThreshold = 40;
+
+/// 초기 화면에 지역 전체를 담는(소규모 tight-fit) 지역인지(#1764 E). 이 역 수
+/// 이하면 38% 도심 확대 대신 전체 조망으로 시작한다(광주·대전=true).
+@visibleForTesting
+bool networkMapUsesWholeRegionInitialView(int stationCount) =>
+    stationCount <= _smallRegionStationCountThreshold;
+
+Rect _readableBoundsFor(_MapGeometry geometry, {required int stationCount}) {
+  // 소규모 지역은 38% 도심 확대 대신 지역 전체를 초기 viewport로 둬 과확대를
+  // 막는다(초기 화면=bucket 1에서 전 역·환승/주요 라벨이 보이도록, #1764 E).
+  // 판정은 networkMapUsesWholeRegionInitialView 단일 소스를 쓴다(테스트가 실제
+  // 렌더 분기를 가드하도록).
+  if (networkMapUsesWholeRegionInitialView(stationCount)) {
+    return Rect.fromLTWH(0, 0, geometry.width, geometry.height);
+  }
   final width = math.min(
     geometry.width,
     math.max(320.0, geometry.width * 0.38),
@@ -3163,7 +3194,10 @@ class _MapGeometry {
       focus: geometry.focus,
       width: geometry.width,
       height: geometry.height,
-      initialBounds: _readableBoundsFor(geometry),
+      initialBounds: _readableBoundsFor(
+        geometry,
+        stationCount: stations.length,
+      ),
     );
     return result.copyWith(
       stationIndex: _StationSpatialIndex.fromStations(stations, result),

@@ -48,4 +48,19 @@ void main() {
       });
     });
   });
+
+  group('소규모 지역 초기 전체 조망 (#1764 E)', () {
+    test('광주·대전은 전체 조망, 부산·대구·수도권은 도심 확대', () {
+      expect(networkMapUsesWholeRegionInitialView(20), isTrue, reason: '광주');
+      expect(networkMapUsesWholeRegionInitialView(22), isTrue, reason: '대전');
+      expect(networkMapUsesWholeRegionInitialView(101), isFalse, reason: '대구');
+      expect(networkMapUsesWholeRegionInitialView(158), isFalse, reason: '부산');
+      expect(networkMapUsesWholeRegionInitialView(796), isFalse, reason: '수도권');
+    });
+
+    test('임계 40 경계', () {
+      expect(networkMapUsesWholeRegionInitialView(40), isTrue);
+      expect(networkMapUsesWholeRegionInitialView(41), isFalse);
+    });
+  });
 }
