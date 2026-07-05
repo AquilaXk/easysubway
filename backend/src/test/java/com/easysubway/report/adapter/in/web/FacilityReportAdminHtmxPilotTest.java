@@ -250,6 +250,23 @@ class FacilityReportAdminHtmxPilotTest {
 			.contains("/admin/reports/page?status=SUBMITTED");
 	}
 
+	@Test
+	@DisplayName("결과가 없으면 표준 빈 상태 컴포넌트가 안내 문구와 함께 렌더된다")
+	void emptyResultRendersEmptyStateComponent() throws Exception {
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.param("keyword", "존재하지않는키워드zzz")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("class=\"empty-state\"")
+			.contains("확인할 신고가 없습니다.")
+			.contains("검색어·상태·기간 필터를 조정해 보세요.");
+	}
+
 	private String createReport(String description) throws Exception {
 		String created = mockMvc.perform(post("/api/v1/reports")
 				.with(httpBasic("basic-user", "user-test-password"))

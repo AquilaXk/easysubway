@@ -570,6 +570,23 @@ body.admin-v3 {
 	margin: 0;
 }
 
+/* 표준 빈 상태(#1737) — 텍스트 중심, 과장 박스 금지 */
+.admin-v3 .empty-state {
+	padding: 24px 8px;
+	text-align: center;
+}
+
+.admin-v3 .empty-state-message {
+	color: var(--admin-ink);
+	margin: 0;
+}
+
+.admin-v3 .empty-state-hint {
+	color: var(--admin-ink-2);
+	font-size: 13px;
+	margin: 6px 0 0;
+}
+
 .admin-status {
 	font-size: 13px;
 }
