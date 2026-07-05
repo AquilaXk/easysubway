@@ -153,10 +153,13 @@ function buildTagoScheduleCollectionPlan(input, checkpoint = {}, dailyLimit = 10
 
 function buildTagoScheduleCollectionSummary(collection) {
   const responses = collection?.responses;
-  if (!Array.isArray(responses) || responses.length === 0) {
-    throw new Error("responses must be a non-empty array");
+  if (!Array.isArray(responses)) {
+    throw new Error("responses must be an array");
   }
   const checkpointRequestKeys = collection?.checkpoint?.completedRequestKeys ?? [];
+  if (responses.length === 0 && checkpointRequestKeys.length === 0) {
+    throw new Error("responses must be non-empty unless checkpoint has completedRequestKeys");
+  }
   for (const requestKey of checkpointRequestKeys) {
     requestKeyParts(requestKey);
   }
