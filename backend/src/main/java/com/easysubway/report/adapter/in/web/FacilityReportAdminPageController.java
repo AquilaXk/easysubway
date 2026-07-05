@@ -16,6 +16,7 @@ import com.easysubway.report.domain.FacilityReportSummary;
 import com.easysubway.report.domain.FacilityReportStatus;
 import com.easysubway.report.domain.ReportProcessingTimeSummary;
 import com.easysubway.transit.domain.MasterDataWriteNotAllowedException;
+import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -111,17 +112,48 @@ class FacilityReportAdminPageController {
 		Model model
 	) {
 		FacilityReportPageRequest pageRequest = FacilityReportPageRequest.of(page, size);
+		EgovPaginationView pageView = reportListPageView(status, pageRequest);
+		if (pageView.page() != pageRequest.page() || pageView.size() != pageRequest.size()) {
+			return redirectToReportList(status, pageView);
+		}
+		addReportListAttributes(status, pageRequest, pageView, model);
+		return "admin/reports/list";
+	}
+
+	// 진화형 향상 파일럿(#1736): 같은 URL·같은 모델을 htmx 부분 응답으로 반환한다.
+	// HX-Request 헤더가 있으면 상태 필터 nav·표·페이지네이션만 담은 reportResults fragment만 렌더한다.
+	// 부분 응답은 전체 새로고침 리다이렉트 대신 클램프된 페이지로 즉시 렌더해 htmx swap이 끊기지 않게 한다.
+	@HxRequest
+	@GetMapping("/admin/reports/page")
+	String reportListFragment(
+		@RequestParam(required = false) FacilityReportStatus status,
+		@RequestParam(required = false) Integer page,
+		@RequestParam(required = false) Integer size,
+		Model model
+	) {
+		FacilityReportPageRequest pageRequest = FacilityReportPageRequest.of(page, size);
+		EgovPaginationView pageView = reportListPageView(status, pageRequest);
+		FacilityReportPageRequest clampedRequest = FacilityReportPageRequest.of(pageView.page(), pageView.size());
+		addReportListAttributes(status, clampedRequest, pageView, model);
+		return "admin/reports/list :: reportResults";
+	}
+
+	private EgovPaginationView reportListPageView(FacilityReportStatus status, FacilityReportPageRequest pageRequest) {
 		Map<FacilityReportStatus, Long> statusCounts = facilityReportUseCase.countReportsByStatus();
-		EgovPaginationView pageView = EgovPaginationView.from(
+		return EgovPaginationView.from(
 			pageRequest.page(),
 			pageRequest.size(),
 			totalCountForStatus(status, statusCounts)
 		);
-		if (pageView.page() != pageRequest.page() || pageView.size() != pageRequest.size()) {
-			return redirectToReportList(status, pageView);
-		}
+	}
 
-		PageResult<FacilityReportSummary> reportPage = facilityReportUseCase.listReportSummaries(status, pageRequest);
+	private void addReportListAttributes(
+		FacilityReportStatus status,
+		FacilityReportPageRequest query,
+		EgovPaginationView pageView,
+		Model model
+	) {
+		PageResult<FacilityReportSummary> reportPage = facilityReportUseCase.listReportSummaries(status, query);
 		List<FacilityReportListPageRow> reports = reportPage.items()
 			.stream()
 			.map(report -> FacilityReportListPageRow.from(report, messages))
@@ -142,7 +174,6 @@ class FacilityReportAdminPageController {
 		model.addAttribute("processingTime", ReportProcessingTimeView.from(
 			facilityReportUseCase.summarizeReportProcessingTime()
 		));
-		return "admin/reports/list";
 	}
 
 	private static long totalCountForStatus(FacilityReportStatus status, Map<FacilityReportStatus, Long> statusCounts) {
