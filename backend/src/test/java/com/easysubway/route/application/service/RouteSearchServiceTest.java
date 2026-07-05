@@ -889,6 +889,27 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 planner는 미래 service day의 00시대 운행에 요청 직후 대기 시간을 반영한다")
+	void routeV2PlannerKeepsLeadTimeForFutureServiceDayNextService() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), futureMidnightNextServiceRouteTimetablePort());
+
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T23:55:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			false,
+			1,
+			3
+		));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+		assertThat(plan.itineraries()).isEmpty();
+		assertThat(plan.nextServiceTime()).isEqualTo(OffsetDateTime.parse("2026-07-02T00:03:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("V2 planner는 시간표 adapter 미연결 fallback에서는 기존 경로 검색을 유지한다")
 	void routeV2PlannerKeepsLegacySearchWhenTimetableAdapterMissing() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -2897,6 +2918,44 @@ class RouteSearchServiceTest {
 			List.of(
 				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0010", 1, "station-a", "seoul-4", 600, 600, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0010", 2, "station-b", "seoul-4", 1500, 1500, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0907", 1, "station-a", "seoul-4", 32820, 32820, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0907", 2, "station-b", "seoul-4", 33720, 33720, 0, 0)
+			),
+			List.of()
+		);
+	}
+
+	private static LoadRouteTimetablePort futureMidnightNextServiceRouteTimetablePort() {
+		return () -> new LoadRouteTimetablePort.RouteTimetable(
+			List.of(new LoadRouteTimetablePort.ServiceCalendar(
+				"weekday-2026",
+				true,
+				true,
+				true,
+				true,
+				true,
+				false,
+				false,
+				LocalDate.parse("2026-07-01"),
+				LocalDate.parse("2026-12-31"),
+				"Asia/Seoul"
+			)),
+			List.of(),
+			List.of(new LoadRouteTimetablePort.TransitRoute(
+				"route-seoul-4",
+				"seoul-4",
+				"4",
+				"수도권 4호선",
+				"사당 방면",
+				"Asia/Seoul"
+			)),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip("trip-seoul-4-0003", "route-seoul-4", "weekday-2026", "사당", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip("trip-seoul-4-0907", "route-seoul-4", "weekday-2026", "사당", "0", "LOCAL", 0)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0003", 1, "station-a", "seoul-4", 180, 180, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0003", 2, "station-b", "seoul-4", 1080, 1080, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0907", 1, "station-a", "seoul-4", 32820, 32820, 0, 0),
 				new LoadRouteTimetablePort.TransitStopTime("trip-seoul-4-0907", 2, "station-b", "seoul-4", 33720, 33720, 0, 0)
 			),

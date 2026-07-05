@@ -77,9 +77,6 @@ class RouteTimetableRaptorPlanner {
 			candidateServiceDate.atStartOfDay(SERVICE_ZONE),
 			command.departureTime().atZoneSameInstant(SERVICE_ZONE)
 		).toSeconds();
-		if (seconds <= 0) {
-			return 0;
-		}
 		if (seconds >= LoadRouteTimetablePort.SERVICE_DAY_SECONDS_LIMIT_EXCLUSIVE) {
 			return LoadRouteTimetablePort.SERVICE_DAY_SECONDS_LIMIT_EXCLUSIVE;
 		}
