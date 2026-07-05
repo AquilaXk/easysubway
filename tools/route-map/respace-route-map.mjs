@@ -258,25 +258,43 @@ export function medianStationChainLength(graph) {
   return lengths.length ? lengths[Math.floor(lengths.length / 2)] : 0;
 }
 
+/** 원본 방향을 가장 가까운 45° 배수로 스냅 — 원본이 95.6% octolinear라
+ *  스냅이 off-grid 잔재(baseline 위반 39건)까지 정리한다. */
+function snapOctolinearDir(dx, dy) {
+  const snapped = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+  return { x: Math.cos(snapped), y: Math.sin(snapped) };
+}
+
 /**
- * 방향 고정·길이 목표의 위치 기반 반복 완화(PBD식 Gauss–Seidel). 역-역 chain은
- * [minRatio,maxRatio]·unit으로 클램프해 도심 확대·외곽 압축하고, 방향(원본 8선형)
- * 은 마무리 폴리싱으로 정확 복원한다. 환승 cluster는 강체 결합으로 offset 유지.
+ * 하드 방향(45° 스냅) + 소프트 길이(스프링) + 소프트 앵커 완화 솔버.
+ *
+ * 하드 방향·하드 길이 정식화는 순환선·환승 cluster가 만드는 순환 제약
+ * 그래프에서 해가 없어 잔차 ~150px plateau에 갇힌다(2026-07-06 실측, 계획서
+ * "근본 원인 진단" ①). 길이를 스프링으로 풀면 cycle 불일치가 각도 붕괴 대신
+ * 미세 길이 신축으로 흡수된다 — 8선형은 하드(수직 성분 전량 제거 + 폴리싱),
+ * 길이는 kLen, 원위치는 kAnchor 가중(자유공간 교차 ↔ 간격 트레이드오프 축).
+ * cluster는 매 sweep 강체 재동기화 — 멤버 상대 offset은 렌더 정합상 정확해야
+ * 하며, 소프트 cluster + 최종 스냅 변형은 폴리싱을 깨 8선형 위반 11→300+로
+ * 악화되어 기각됐다(동 실측 ②).
+ *
+ * kLen/kAnchor/maxRatio 시작값은 상수로 두고 Task 3 스윕에서 실측 확정한다.
  */
 export function respaceGraph(graph, options) {
   const {
     unit,
     minRatio = 1.0,
-    maxRatio = 2.5,
-    iterations = 800,
+    maxRatio = 2.2, // Task 3 스윕에서 확정 (프로토타입 균형 config)
+    kLen = 0.3, // Task 3 스윕에서 확정 (길이 스프링 강도)
+    kAnchor = 0.15, // Task 3 스윕에서 확정 (원위치 앵커 강도)
+    iterations = 1500,
     tolerance = 0.01,
-    polishSweeps = 50,
+    polishSweeps = 150,
   } = options;
   const orig = graph.nodes;
   const clampLen = (v) =>
     Math.max(minRatio * unit, Math.min(maxRatio * unit, v));
 
-  // 세그먼트 목표 길이(chain scale) + 원본 방향(고정).
+  // 세그먼트 목표 길이(chain 비례 배분) + 스냅된 방향(고정).
   const segTargetByKey = new Map();
   for (const chain of graph.chains) {
     const ids = chain.nodeIds;
@@ -295,22 +313,18 @@ export function respaceGraph(graph, options) {
       const a = ids[i - 1];
       const b = ids[i];
       const ol = dist2(orig[a], orig[b]);
-      const dir =
-        ol > 0
-          ? { x: (orig[b].x - orig[a].x) / ol, y: (orig[b].y - orig[a].y) / ol }
-          : { x: 0, y: 0 };
+      if (ol === 0) continue;
       const key = `${a},${b}`;
       segments.push({
         a,
         b,
-        dir,
+        dir: snapOctolinearDir(orig[b].x - orig[a].x, orig[b].y - orig[a].y),
         target: segTargetByKey.has(key) ? segTargetByKey.get(key) : ol,
       });
     }
   }
 
   const positions = orig.map((n) => ({ x: n.x, y: n.y }));
-  const anchor = 0; // nodes[0] 원좌표 고정(병진 자유도 제거).
 
   const resyncClusters = () => {
     for (const cluster of graph.clusters) {
@@ -328,47 +342,71 @@ export function respaceGraph(graph, options) {
     }
   };
 
+  // perpendicularOnly=false: 수직 성분 전량 + 길이 오차의 kLen배를 보정.
+  // perpendicularOnly=true(폴리싱): 수직 성분만 — 8선형 방향 정확 복원.
   const sweep = (perpendicularOnly) => {
     let maxCorrection = 0;
     for (const seg of segments) {
       const pa = positions[seg.a];
       const pb = positions[seg.b];
-      let ex = pb.x - pa.x - seg.dir.x * seg.target;
-      let ey = pb.y - pa.y - seg.dir.y * seg.target;
-      if (perpendicularOnly) {
-        const along = ex * seg.dir.x + ey * seg.dir.y;
-        ex -= along * seg.dir.x;
-        ey -= along * seg.dir.y;
-      }
-      const mag = Math.hypot(ex, ey);
+      const ex = pb.x - pa.x;
+      const ey = pb.y - pa.y;
+      const along = ex * seg.dir.x + ey * seg.dir.y;
+      const lenErr = perpendicularOnly ? 0 : (along - seg.target) * kLen;
+      const cx = ex - along * seg.dir.x + lenErr * seg.dir.x;
+      const cy = ey - along * seg.dir.y + lenErr * seg.dir.y;
+      const mag = Math.hypot(cx, cy);
       if (mag > maxCorrection) maxCorrection = mag;
-      if (seg.a === anchor && seg.b === anchor) continue;
-      if (seg.a === anchor) {
-        positions[seg.b] = { x: pb.x - ex, y: pb.y - ey };
-      } else if (seg.b === anchor) {
-        positions[seg.a] = { x: pa.x + ex, y: pa.y + ey };
-      } else {
-        positions[seg.a] = { x: pa.x + ex / 2, y: pa.y + ey / 2 };
-        positions[seg.b] = { x: pb.x - ex / 2, y: pb.y - ey / 2 };
-      }
+      positions[seg.a] = { x: pa.x + cx / 2, y: pa.y + cy / 2 };
+      positions[seg.b] = { x: pb.x - cx / 2, y: pb.y - cy / 2 };
     }
     return maxCorrection;
   };
 
   let sweeps = 0;
-  let maxResidual = 0;
   for (let it = 0; it < iterations; it += 1) {
-    maxResidual = sweep(false);
+    const moved = sweep(false);
+    if (kAnchor > 0) {
+      for (let i = 0; i < positions.length; i += 1) {
+        positions[i].x += (orig[i].x - positions[i].x) * kAnchor;
+        positions[i].y += (orig[i].y - positions[i].y) * kAnchor;
+      }
+    }
     resyncClusters();
     sweeps += 1;
-    if (maxResidual < tolerance) break;
+    if (moved < tolerance) break;
   }
+  let maxPerpResidual = 0;
   for (let it = 0; it < polishSweeps; it += 1) {
-    maxResidual = sweep(true);
+    maxPerpResidual = sweep(true);
     resyncClusters();
     sweeps += 1;
   }
-  return { positions, report: { sweeps, maxResidual } };
+
+  const lengthErrs = segments
+    .map((seg) => {
+      const pa = positions[seg.a];
+      const pb = positions[seg.b];
+      const along =
+        (pb.x - pa.x) * seg.dir.x + (pb.y - pa.y) * seg.dir.y;
+      return Math.abs(along - seg.target);
+    })
+    .sort((a, b) => a - b);
+  const pct = (q) =>
+    lengthErrs.length
+      ? lengthErrs[
+          Math.max(0, Math.min(lengthErrs.length - 1, Math.ceil(q * lengthErrs.length) - 1))
+        ]
+      : 0;
+  return {
+    positions,
+    report: {
+      sweeps,
+      maxPerpResidual,
+      lengthErrP95: pct(0.95),
+      lengthErrMax: lengthErrs.length ? lengthErrs[lengthErrs.length - 1] : 0,
+    },
+  };
 }
 
 import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
@@ -380,6 +418,8 @@ function parseArgs(argv) {
     region: "수도권",
     min: 1.0,
     max: 2.5,
+    kLen: 0.3,
+    kAnchor: 0.15,
     check: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
@@ -389,6 +429,8 @@ function parseArgs(argv) {
       case "--region": o.region = argv[++i]; break;
       case "--min": o.min = Number(argv[++i]); break;
       case "--max": o.max = Number(argv[++i]); break;
+      case "--k-len": o.kLen = Number(argv[++i]); break;
+      case "--k-anchor": o.kAnchor = Number(argv[++i]); break;
       case "--check": o.check = true; break;
     }
   }
@@ -429,10 +471,14 @@ function main() {
       unit,
       minRatio: o.min,
       maxRatio: o.max,
+      kLen: o.kLen,
+      kAnchor: o.kAnchor,
     });
     console.log(
       `[${o.region}] unit ${round3(unit)} · sweeps ${report.sweeps} · ` +
-        `maxResidual ${round3(report.maxResidual)} · 투영경고 ${graph.warnings.length}`,
+        `방향잔차 ${round3(report.maxPerpResidual)} · ` +
+        `길이타협 p95 ${round3(report.lengthErrP95)} max ${round3(report.lengthErrMax)} · ` +
+        `투영경고 ${graph.warnings.length}`,
     );
     for (const w of graph.warnings.slice(0, 10)) console.log("  " + w);
     if (o.check) {

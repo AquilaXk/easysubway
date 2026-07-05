@@ -113,7 +113,7 @@ test("직선: 짧은 구간은 unit으로, 긴 구간은 maxRatio*unit으로 클
       { stationId: "c", lineId: "L1", x: 410, y: 0 },
     ],
   });
-  const { positions } = respaceGraph(graph, { unit: 100 });
+  const { positions } = respaceGraph(graph, { unit: 100, kAnchor: 0, maxRatio: 2.5 });
   const [a, b, c] = graph.stationNodes.map((s) => positions[s.nodeId]);
   assert.ok(Math.abs(dist(a, b) - 100) < 0.5, `a-b ${dist(a, b)}`);
   assert.ok(Math.abs(dist(b, c) - 250) < 0.5, `b-c ${dist(b, c)}`);
@@ -130,7 +130,7 @@ test("꺾임 포함 chain은 선분 비례 배분 + 45° 방향 보존", () => {
       { stationId: "b", lineId: "L1", x: 16, y: 8 },
     ],
   });
-  const { positions } = respaceGraph(graph, { unit: 100 });
+  const { positions } = respaceGraph(graph, { unit: 100, kAnchor: 0 });
   const [p0, p1, p2] = graph.tracks[0].nodeIds.map((id) => positions[id]);
   assert.ok(Math.abs(p1.y - p0.y) < 1e-3);
   assert.ok(Math.abs((p2.y - p1.y) - (p2.x - p1.x)) < 1e-3);
@@ -154,7 +154,7 @@ test("순환 track은 재간격 후에도 닫힘·방향이 유지된다", () =>
       { stationId: "s4", lineId: "ring", x: 0, y: 40 },
     ],
   });
-  const { positions } = respaceGraph(graph, { unit: 100 });
+  const { positions } = respaceGraph(graph, { unit: 100, kAnchor: 0 });
   const ids = graph.tracks[0].nodeIds;
   for (let i = 1; i < ids.length; i += 1) {
     const a = positions[ids[i - 1]];
@@ -236,4 +236,86 @@ test("medianStationChainLength는 역-역 chain 길이 중앙값", () => {
   });
   // 간격 10, 30, 100 → 중앙값 30.
   assert.equal(medianStationChainLength(graph), 30);
+});
+
+test("off-grid 원본 선분은 45° 배수로 스냅된다 (하드 방향)", () => {
+  // 원본 각도 ~1.7° — 폴리싱 후 수평(0°)이어야 한다.
+  const graph = buildRespaceGraph({
+    tracks: [
+      { lineId: "L1", trackIndex: 0, points: parsePathPoints("M 0 0 L 100 3") },
+    ],
+    positions: [
+      { stationId: "a", lineId: "L1", x: 0, y: 0 },
+      { stationId: "b", lineId: "L1", x: 100, y: 3 },
+    ],
+  });
+  const { positions } = respaceGraph(graph, { unit: 100, kAnchor: 0 });
+  const [a, b] = graph.tracks[0].nodeIds.map((id) => positions[id]);
+  assert.ok(Math.abs(a.y - b.y) < 1e-3, `수평 스냅 실패 dy=${b.y - a.y}`);
+});
+
+test("순환+환승 강결합에서도 수렴한다 — 과제약 plateau 회귀 방지", () => {
+  // 순환 track + 그 정점에 환승으로 결합된 직선 track: 하드 길이 정식화가
+  // ~150px plateau를 만들던 최소 재현 위상. 소프트 길이에서는 방향 정확
+  // (maxPerpResidual < 0.01)하게 수렴해야 한다.
+  const graph = buildRespaceGraph({
+    tracks: [
+      {
+        lineId: "ring",
+        trackIndex: 0,
+        points: parsePathPoints("M 0 0 L 60 0 L 60 60 L 0 60 L 0 0"),
+      },
+      { lineId: "L2", trackIndex: 0, points: parsePathPoints("M 60 4 L 300 4") },
+    ],
+    positions: [
+      { stationId: "s1", lineId: "ring", x: 0, y: 0 },
+      { stationId: "x", lineId: "ring", x: 60, y: 0 },
+      { stationId: "s3", lineId: "ring", x: 60, y: 60 },
+      { stationId: "x", lineId: "L2", x: 60, y: 4 },
+      { stationId: "far", lineId: "L2", x: 300, y: 4 },
+    ],
+  });
+  const { positions, report } = respaceGraph(graph, { unit: 100 });
+  assert.ok(
+    report.maxPerpResidual < 0.01,
+    `방향 잔차 ${report.maxPerpResidual}`,
+  );
+  // 8선형 정확: 모든 선분이 45° 배수 (0-길이 제외)
+  for (const track of graph.tracks) {
+    for (let i = 1; i < track.nodeIds.length; i += 1) {
+      const a = positions[track.nodeIds[i - 1]];
+      const b = positions[track.nodeIds[i]];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < 1e-9) continue;
+      const ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+      const mod = ((ang % 45) + 45) % 45;
+      assert.ok(
+        Math.min(mod, 45 - mod) < 0.1,
+        `track ${track.lineId} seg ${i} 각도 ${ang}`,
+      );
+    }
+  }
+});
+
+test("앵커는 이동을 유계시킨다 — 길이는 타협, 방향은 정확", () => {
+  const graph = buildRespaceGraph({
+    tracks: [
+      { lineId: "L1", trackIndex: 0, points: parsePathPoints("M 0 0 L 10 0 L 410 0") },
+    ],
+    positions: [
+      { stationId: "a", lineId: "L1", x: 0, y: 0 },
+      { stationId: "b", lineId: "L1", x: 10, y: 0 },
+      { stationId: "c", lineId: "L1", x: 410, y: 0 },
+    ],
+  });
+  const { positions } = respaceGraph(graph, {
+    unit: 100,
+    kAnchor: 0.3,
+    maxRatio: 2.5,
+  });
+  const [a, b, c] = graph.stationNodes.map((s) => positions[s.nodeId]);
+  const bc = Math.hypot(c.x - b.x, c.y - b.y);
+  // 앵커가 강하면 목표(250)까지 못 가고 원길이(400)와의 사이에서 평형.
+  assert.ok(bc > 250 && bc < 400, `bc=${bc}`);
+  assert.ok(Math.abs(a.y - b.y) < 1e-3 && Math.abs(b.y - c.y) < 1e-3);
 });
