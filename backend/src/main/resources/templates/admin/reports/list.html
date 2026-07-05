@@ -198,8 +198,11 @@
 					<td th:text="${report.coordinateLabel}">위치 없음</td>
 					<td th:text="${report.hasPhoto ? '있음' : '없음'}">없음</td>
 					<td>
+						<!-- 드로어로 열되(hx-target 오버라이드) no-JS는 상세 페이지로 이동. hx-push-url=false로 URL 유지 -->
 						<a class="detail-link"
-						   th:href="@{/admin/reports/{reportId}/page(reportId=${report.id})}">상세 보기</a>
+						   th:href="@{/admin/reports/{reportId}/page(reportId=${report.id})}"
+						   th:attr="hx-get=@{/admin/reports/{reportId}/page(reportId=${report.id})}"
+						   hx-target="#admin-drawer-body" hx-swap="innerHTML" hx-push-url="false">상세 보기</a>
 					</td>
 				</tr>
 				</tbody>
@@ -219,6 +222,7 @@
 </main>
 </div>
 <th:block th:replace="~{admin/fragments/shell :: toastRegion}"></th:block>
+<th:block th:replace="~{admin/fragments/shell :: drawer}"></th:block>
 <th:block th:replace="~{admin/fragments/shell :: scripts}"></th:block>
 </body>
 </html>

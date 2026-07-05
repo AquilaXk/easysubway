@@ -702,6 +702,42 @@ body.admin-v3 {
 	padding: 0 2px;
 }
 
+/* 드로어(사이드 패널, #1737) */
+.admin-drawer {
+	position: fixed;
+	inset: 0;
+	z-index: 70;
+}
+
+.admin-drawer-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(22, 48, 47, 0.35);
+}
+
+.admin-drawer-panel {
+	position: absolute;
+	top: 0;
+	right: 0;
+	height: 100%;
+	width: min(560px, 92vw);
+	overflow-y: auto;
+	background: var(--admin-surface);
+	border-left: 1px solid var(--admin-border);
+	box-shadow: -8px 0 24px rgba(22, 48, 47, 0.14);
+	padding: 16px 20px;
+}
+
+.admin-drawer-close {
+	position: sticky;
+	top: 0;
+	float: right;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	font-size: 16px;
+}
+
 .admin-status {
 	font-size: 13px;
 }

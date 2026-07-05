@@ -251,6 +251,45 @@ class FacilityReportAdminHtmxPilotTest {
 	}
 
 	@Test
+	@DisplayName("상세를 htmx로 열면 셸 없이 상세 본문 fragment만 오고 드로어 열기 트리거가 붙는다")
+	void detailDrawerFragmentReturnsBodyWithOpenTrigger() throws Exception {
+		String reportId = createReport("드로어로 볼 신고");
+
+		var result = mockMvc.perform(get("/admin/reports/{id}/page", reportId)
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andExpect(header().string("HX-Trigger", org.hamcrest.Matchers.containsString("admin-drawer-open")))
+			.andReturn();
+		String fragment = result.getResponse().getContentAsString();
+
+		assertThat(fragment)
+			.contains("제보 상세·판정")
+			.contains("드로어로 볼 신고");
+		assertThat(fragment)
+			.doesNotContain("<!doctype html>")
+			.doesNotContain("admin-sidebar");
+	}
+
+	@Test
+	@DisplayName("목록의 드로어 컨테이너와 상세 링크의 드로어 타깃이 렌더된다")
+	void drawerContainerAndDetailLinkRender() throws Exception {
+		createReport("드로어 링크 신고");
+
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("class=\"admin-drawer\"")
+			.contains("id=\"admin-drawer-body\"")
+			.contains("hx-target=\"#admin-drawer-body\"");
+	}
+
+	@Test
 	@DisplayName("토스트 영역이 aria-live와 함께 렌더된다(no-JS는 서버 flash가 대체)")
 	void toastRegionRenders() throws Exception {
 		String html = mockMvc.perform(get("/admin/reports/page")

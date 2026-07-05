@@ -20,6 +20,7 @@ import com.easysubway.report.domain.FacilityReportStatus;
 import com.easysubway.report.domain.ReportProcessingTimeSummary;
 import com.easysubway.transit.domain.MasterDataWriteNotAllowedException;
 import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
+import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxTrigger;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -397,6 +398,22 @@ class FacilityReportAdminPageController {
 		populateReportDetailModel(reportId, model, null);
 		auditReportDetailRead(authentication, request, reportId);
 		return "admin/reports/detail";
+	}
+
+	// 드로어(사이드 패널) 파일럿(#1737): 같은 URL을 htmx로 열면 상세 본문 fragment만 반환하고
+	// HX-Trigger로 admin-drawer-open 이벤트를 쏴 패널을 연다. no-JS에서는 상세 링크가 상세 페이지로 이동한다.
+	@HxRequest
+	@GetMapping("/admin/reports/{reportId}/page")
+	@HxTrigger("admin-drawer-open")
+	String reportDetailDrawer(
+		@PathVariable String reportId,
+		Model model,
+		Authentication authentication,
+		HttpServletRequest request
+	) {
+		populateReportDetailModel(reportId, model, null);
+		auditReportDetailRead(authentication, request, reportId);
+		return "admin/reports/detail :: detailBody";
 	}
 
 	private void populateReportDetailModel(String reportId, Model model, ReviewReportForm submittedForm) {
