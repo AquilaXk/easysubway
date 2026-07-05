@@ -56,16 +56,13 @@ class RouteTimetableRaptorPlanner {
 		ServiceDay serviceDay = serviceDay(command);
 		for (int dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
 			LocalDate candidateServiceDate = serviceDay.date().plusDays(dayOffset);
-			ServiceDay candidateServiceDay = new ServiceDay(candidateServiceDate, 0);
 			int startSeconds = dayOffset == 0 ? serviceDay.departureSeconds() : 0;
-			Optional<Integer> departureSeconds = scanDestinationLabels(
+			Optional<Integer> departureSeconds = firstFeasibleDepartureSeconds(
 				command,
 				timetable,
-				candidateServiceDay,
+				candidateServiceDate,
 				startSeconds
-			).labels().stream()
-				.map(label -> label.path().getFirst().from().departureSeconds())
-				.min(Integer::compareTo);
+			);
 			if (departureSeconds.isPresent()) {
 				return Optional.of(candidateServiceDate.atStartOfDay(SERVICE_ZONE)
 					.plusSeconds(departureSeconds.get())
@@ -75,26 +72,100 @@ class RouteTimetableRaptorPlanner {
 		return Optional.empty();
 	}
 
+	private Optional<Integer> firstFeasibleDepartureSeconds(
+		SearchRouteV2Command command,
+		RouteTimetable timetable,
+		LocalDate serviceDate,
+		int startSeconds
+	) {
+		List<ScheduledTrip> trips = activeScheduledTrips(timetable, serviceDate);
+		Integer firstDepartureSeconds = null;
+		int entrySeconds = profiledWalkSeconds(command, ENTRY_DURATION_SECONDS);
+		int slackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
+		for (ScheduledTrip trip : trips) {
+			List<TransitStopTime> stopTimes = trip.stopTimes();
+			for (int stopIndex = 0; stopIndex < stopTimes.size(); stopIndex += 1) {
+				TransitStopTime stopTime = stopTimes.get(stopIndex);
+				if (!command.originStationId().equals(stopTime.stationId())
+					|| !allowsPickup(stopTime)
+					|| stopTime.departureSeconds() < startSeconds + entrySeconds + slackSeconds) {
+					continue;
+				}
+				if (canReachDestinationAfterBoarding(command, trips, trip, stopIndex, 0, new HashSet<>())) {
+					firstDepartureSeconds = firstDepartureSeconds == null
+						? stopTime.departureSeconds()
+						: Math.min(firstDepartureSeconds, stopTime.departureSeconds());
+				}
+			}
+		}
+		return Optional.ofNullable(firstDepartureSeconds);
+	}
+
+	private boolean canReachDestinationAfterBoarding(
+		SearchRouteV2Command command,
+		List<ScheduledTrip> trips,
+		ScheduledTrip trip,
+		int boardingStopIndex,
+		int transfersUsed,
+		Set<String> visited
+	) {
+		List<TransitStopTime> stopTimes = trip.stopTimes();
+		for (int stopIndex = boardingStopIndex + 1; stopIndex < stopTimes.size(); stopIndex += 1) {
+			TransitStopTime stopTime = stopTimes.get(stopIndex);
+			if (!allowsDropOff(stopTime)) {
+				continue;
+			}
+			if (command.destinationStationId().equals(stopTime.stationId())) {
+				return true;
+			}
+			if (canReachDestinationAfterAlighting(command, trips, stopTime.stationId(), stopTime.arrivalSeconds(), transfersUsed, visited)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean canReachDestinationAfterAlighting(
+		SearchRouteV2Command command,
+		List<ScheduledTrip> trips,
+		String stationId,
+		int readySeconds,
+		int transfersUsed,
+		Set<String> visited
+	) {
+		if (transfersUsed >= command.maxTransfers()) {
+			return false;
+		}
+		String stateKey = stationId + "|" + readySeconds + "|" + transfersUsed;
+		if (!visited.add(stateKey)) {
+			return false;
+		}
+		int transferSeconds = profiledWalkSeconds(command, TRANSFER_DURATION_SECONDS);
+		int slackSeconds = BoardingSlackPolicy.secondsFor(command.mobilityType());
+		for (ScheduledTrip trip : trips) {
+			List<TransitStopTime> stopTimes = trip.stopTimes();
+			for (int stopIndex = 0; stopIndex < stopTimes.size(); stopIndex += 1) {
+				TransitStopTime stopTime = stopTimes.get(stopIndex);
+				if (!stationId.equals(stopTime.stationId())
+					|| !allowsPickup(stopTime)
+					|| stopTime.departureSeconds() < readySeconds + transferSeconds + slackSeconds) {
+					continue;
+				}
+				if (canReachDestinationAfterBoarding(command, trips, trip, stopIndex, transfersUsed + 1, visited)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	private ScanResult scanDestinationLabels(
 		SearchRouteV2Command command,
 		RouteTimetable timetable,
 		ServiceDay serviceDay,
 		int startSeconds
 	) {
-		Set<String> activeServiceIds = activeServiceIds(timetable, serviceDay.date());
-		if (activeServiceIds.isEmpty()) {
-			return new ScanResult(serviceDay, List.of());
-		}
-		Map<String, TransitRoute> routesById = routesById(timetable);
-		Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(timetable);
-		Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(timetable);
-		List<ScheduledTrip> trips = timetable.transitTrips().stream()
-			.filter(trip -> activeServiceIds.contains(trip.serviceId()))
-			.filter(trip -> stopTimesByTrip.getOrDefault(trip.id(), List.of()).size() > 1)
-			.flatMap(trip -> scheduledTrips(trip, routesById.get(trip.routeId()), stopTimesByTrip.get(trip.id()), frequenciesByTrip.getOrDefault(trip.id(), List.of())).stream())
-			.sorted(Comparator.comparing((ScheduledTrip scheduledTrip) -> scheduledTrip.trip().id())
-				.thenComparingInt(scheduledTrip -> scheduledTrip.stopTimes().getFirst().departureSeconds()))
-			.toList();
+		List<ScheduledTrip> trips = activeScheduledTrips(timetable, serviceDay.date());
 		if (trips.isEmpty()) {
 			return new ScanResult(serviceDay, List.of());
 		}
@@ -451,6 +522,23 @@ class RouteTimetableRaptorPlanner {
 			));
 		}
 		return java.util.Optional.of(List.copyOf(shifted));
+	}
+
+	private List<ScheduledTrip> activeScheduledTrips(RouteTimetable timetable, LocalDate serviceDate) {
+		Set<String> activeServiceIds = activeServiceIds(timetable, serviceDate);
+		if (activeServiceIds.isEmpty()) {
+			return List.of();
+		}
+		Map<String, TransitRoute> routesById = routesById(timetable);
+		Map<String, List<TransitStopTime>> stopTimesByTrip = stopTimesByTrip(timetable);
+		Map<String, List<TransitFrequency>> frequenciesByTrip = frequenciesByTrip(timetable);
+		return timetable.transitTrips().stream()
+			.filter(trip -> activeServiceIds.contains(trip.serviceId()))
+			.filter(trip -> stopTimesByTrip.getOrDefault(trip.id(), List.of()).size() > 1)
+			.flatMap(trip -> scheduledTrips(trip, routesById.get(trip.routeId()), stopTimesByTrip.get(trip.id()), frequenciesByTrip.getOrDefault(trip.id(), List.of())).stream())
+			.sorted(Comparator.comparing((ScheduledTrip scheduledTrip) -> scheduledTrip.trip().id())
+				.thenComparingInt(scheduledTrip -> scheduledTrip.stopTimes().getFirst().departureSeconds()))
+			.toList();
 	}
 
 	private static Set<String> activeServiceIds(RouteTimetable timetable, LocalDate serviceDate) {

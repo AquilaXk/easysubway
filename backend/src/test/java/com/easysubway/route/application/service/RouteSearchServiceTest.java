@@ -847,6 +847,27 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
+	@DisplayName("V2 planner는 먼저 출발한 유효 운행이 추월되어도 다음 운행 시각으로 유지한다")
+	void routeV2PlannerReturnsEarliestNextServiceTimeWhenLaterTripOvertakes() {
+		var planner = new RouteV2Planner(legacySearchMustNotBeCalled(), overtakenNextServiceRouteTimetablePort());
+
+		var plan = planner.search(new RouteV2SearchUseCase.SearchRouteV2Command(
+			"station-a",
+			"station-b",
+			OffsetDateTime.parse("2026-07-01T23:55:00+09:00"),
+			MobilityType.SENIOR,
+			ConstraintMode.PREFER_STEP_FREE,
+			false,
+			1,
+			3
+		));
+
+		assertThat(plan.statuses()).containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+		assertThat(plan.itineraries()).isEmpty();
+		assertThat(plan.nextServiceTime()).isEqualTo(OffsetDateTime.parse("2026-07-02T09:07:00+09:00"));
+	}
+
+	@Test
 	@DisplayName("V2 planner는 시간표 adapter 미연결 fallback에서는 기존 경로 검색을 유지한다")
 	void routeV2PlannerKeepsLegacySearchWhenTimetableAdapterMissing() {
 		var repository = new InMemoryRouteSearchRepository();
@@ -2788,6 +2809,40 @@ class RouteSearchServiceTest {
 
 	private static LoadRouteTimetablePort transferRouteTimetablePort() {
 		return transferRouteTimetablePort(33780);
+	}
+
+	private static LoadRouteTimetablePort overtakenNextServiceRouteTimetablePort() {
+		return () -> new LoadRouteTimetablePort.RouteTimetable(
+			List.of(new LoadRouteTimetablePort.ServiceCalendar(
+				"weekday-2026",
+				true,
+				true,
+				true,
+				true,
+				true,
+				false,
+				false,
+				LocalDate.parse("2026-07-01"),
+				LocalDate.parse("2026-12-31"),
+				"Asia/Seoul"
+			)),
+			List.of(),
+			List.of(
+				new LoadRouteTimetablePort.TransitRoute("route-local", "line-local", "L", "완행", "도착 방면", "Asia/Seoul"),
+				new LoadRouteTimetablePort.TransitRoute("route-express", "line-express", "X", "급행", "도착 방면", "Asia/Seoul")
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitTrip("local-0907", "route-local", "weekday-2026", "도착", "0", "LOCAL", 0),
+				new LoadRouteTimetablePort.TransitTrip("express-0909", "route-express", "weekday-2026", "도착", "0", "EXPRESS", 0)
+			),
+			List.of(
+				new LoadRouteTimetablePort.TransitStopTime("local-0907", 1, "station-a", "line-local", 32820, 32820, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("local-0907", 2, "station-b", "line-local", 34200, 34200, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("express-0909", 1, "station-a", "line-express", 32940, 32940, 0, 0),
+				new LoadRouteTimetablePort.TransitStopTime("express-0909", 2, "station-b", "line-express", 33600, 33600, 0, 0)
+			),
+			List.of()
+		);
 	}
 
 	private static LoadRouteTimetablePort sameArrivalRouteTimetablePort() {
