@@ -7014,6 +7014,10 @@ void main() {
         findsOneWidget,
       );
       expect(find.bySemanticsLabel('1번 출구 엘리베이터 시설 알려주기'), findsOneWidget);
+      // #1567: 카드 전체 탭이 상세를 열므로 중복 '상세 보기' 텍스트는 없애고,
+      // 보조 액션 '시설 알려주기'는 아웃라인 대신 텍스트 버튼 수준으로 낮춘다.
+      expect(find.text('상세 보기'), findsNothing);
+      expect(find.widgetWithText(TextButton, '시설 알려주기'), findsWidgets);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -7644,7 +7648,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(OutlinedButton, '즐겨찾기 저장'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '저장'), findsOneWidget);
       expect(find.bySemanticsLabel('상록수역 즐겨찾기 저장'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('stationFavoriteToggleButton')));
@@ -7652,7 +7656,7 @@ void main() {
 
       expect(favoriteRepository.savedStationIds, ['station-sangnoksu']);
       expect(find.text('즐겨찾기에 저장했습니다.'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '즐겨찾기 해제'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '저장됨'), findsOneWidget);
       expect(find.bySemanticsLabel('상록수역 즐겨찾기 해제'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('stationFavoriteToggleButton')));
@@ -7660,7 +7664,7 @@ void main() {
 
       expect(favoriteRepository.removedStationIds, ['station-sangnoksu']);
       expect(find.text('즐겨찾기에서 해제했습니다.'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '즐겨찾기 저장'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '저장'), findsOneWidget);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
@@ -7701,7 +7705,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(OutlinedButton, '즐겨찾기 해제'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '저장됨'), findsOneWidget);
     expect(find.bySemanticsLabel('상록수역 즐겨찾기 해제'), findsOneWidget);
   });
 
@@ -7748,7 +7752,7 @@ void main() {
     ]);
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(OutlinedButton, '즐겨찾기 해제'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '저장됨'), findsOneWidget);
   });
 
   testWidgets('역 상세 실시간 확인 불가는 다시 시도로 도착 정보를 불러온다', (tester) async {
