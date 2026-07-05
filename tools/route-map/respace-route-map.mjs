@@ -370,3 +370,106 @@ export function respaceGraph(graph, options) {
   }
   return { positions, report: { sweeps, maxResidual } };
 }
+
+import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
+
+function parseArgs(argv) {
+  const o = {
+    pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
+    index: "apps/mobile/assets/datapacks/index.json",
+    region: "수도권",
+    min: 1.0,
+    max: 2.5,
+    check: false,
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    switch (argv[i]) {
+      case "--pack": o.pack = argv[++i]; break;
+      case "--index": o.index = argv[++i]; break;
+      case "--region": o.region = argv[++i]; break;
+      case "--min": o.min = Number(argv[++i]); break;
+      case "--max": o.max = Number(argv[++i]); break;
+      case "--check": o.check = true; break;
+    }
+  }
+  return o;
+}
+
+function main() {
+  const o = parseArgs(process.argv.slice(2));
+  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "respace-");
+  try {
+    const trackRows = db
+      .prepare(
+        "SELECT line_id, track_index, path FROM route_map_line_tracks " +
+          "WHERE region = ? ORDER BY line_id, track_index",
+      )
+      .all(o.region);
+    const posRows = db
+      .prepare(
+        "SELECT station_id, line_id, x, y FROM route_map_positions WHERE region = ?",
+      )
+      .all(o.region);
+    const tracks = trackRows.map((r) => ({
+      lineId: r.line_id,
+      trackIndex: r.track_index,
+      points: parsePathPoints(r.path),
+    }));
+    const graph = buildRespaceGraph({
+      tracks,
+      positions: posRows.map((r) => ({
+        stationId: r.station_id,
+        lineId: r.line_id,
+        x: r.x,
+        y: r.y,
+      })),
+    });
+    const unit = medianStationChainLength(graph);
+    const { positions, report } = respaceGraph(graph, {
+      unit,
+      minRatio: o.min,
+      maxRatio: o.max,
+    });
+    console.log(
+      `[${o.region}] unit ${round3(unit)} · sweeps ${report.sweeps} · ` +
+        `maxResidual ${round3(report.maxResidual)} · 투영경고 ${graph.warnings.length}`,
+    );
+    for (const w of graph.warnings.slice(0, 10)) console.log("  " + w);
+    if (o.check) {
+      console.log("(--check: 미기록)");
+      return;
+    }
+    db.exec("BEGIN");
+    const updTrack = db.prepare(
+      "UPDATE route_map_line_tracks SET path = ? " +
+        "WHERE region = ? AND line_id = ? AND track_index = ?",
+    );
+    for (const t of graph.tracks) {
+      if (t.nodeIds.length === 0) continue;
+      const pts = t.nodeIds.map((id) => positions[id]);
+      updTrack.run(serializePathPoints(pts), o.region, t.lineId, t.trackIndex);
+    }
+    const updPos = db.prepare(
+      "UPDATE route_map_positions SET x = ?, y = ? " +
+        "WHERE region = ? AND station_id = ? AND line_id = ?",
+    );
+    for (const sn of graph.stationNodes) {
+      const p = positions[sn.nodeId];
+      updPos.run(round3(p.x), round3(p.y), o.region, sn.stationId, sn.lineId);
+    }
+    db.exec("COMMIT");
+    db.exec("VACUUM");
+    db.close();
+    const { byteSize } = writePack({
+      sqlitePath,
+      packPath,
+      packRelPath: o.pack,
+      indexRelPath: o.index,
+    });
+    console.log(`팩 갱신 (byteSize ${byteSize})`);
+  } finally {
+    cleanupPackDir(dir);
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();
