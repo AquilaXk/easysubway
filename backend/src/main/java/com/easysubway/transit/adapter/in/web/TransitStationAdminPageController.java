@@ -80,6 +80,7 @@ class TransitStationAdminPageController {
 	private final FieldVerificationUseCase fieldVerificationUseCase;
 	private final AdminMasterLabelResolver labelResolver;
 	private final WebMessageResolver messages;
+	private final TransitFacilityStatusAssembler facilityStatusAssembler;
 
 	TransitStationAdminPageController(
 		TransitMasterQueryUseCase transitMasterQueryUseCase,
@@ -88,7 +89,8 @@ class TransitStationAdminPageController {
 		FacilityReportUseCase facilityReportUseCase,
 		FieldVerificationUseCase fieldVerificationUseCase,
 		AdminMasterLabelResolver labelResolver,
-		WebMessageResolver messages
+		WebMessageResolver messages,
+		TransitFacilityStatusAssembler facilityStatusAssembler
 	) {
 		this.transitMasterQueryUseCase = transitMasterQueryUseCase;
 		this.transitMasterAdminUseCase = transitMasterAdminUseCase;
@@ -97,6 +99,7 @@ class TransitStationAdminPageController {
 		this.fieldVerificationUseCase = fieldVerificationUseCase;
 		this.labelResolver = labelResolver;
 		this.messages = messages;
+		this.facilityStatusAssembler = facilityStatusAssembler;
 	}
 
 	@GetMapping("/admin/stations/page")
@@ -145,6 +148,7 @@ class TransitStationAdminPageController {
 		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
 		Map<String, StationMasterDataCounts> counts = transitMasterQueryUseCase.countStationMasterDataByStationId();
 		Map<String, Long> pendingByStation = facilityReportUseCase.countPendingReportsByStation();
+		Map<String, Long> attentionByStation = attentionFacilitiesByStation();
 		// 검색만 서버에서 걸고(searchStations), 지역·노선 필터·정렬은 결과 위에서 적용해 조회를 1회로 유지한다.
 		List<StationWithLines> matched = transitMasterQueryUseCase.searchStations(new StationSearchCommand(query, null));
 		// 필터 옵션(지역·노선)은 노선/지역 필터가 걸리기 전 결과에서 뽑아 항상 전체 후보를 보여준다.
@@ -160,7 +164,8 @@ class TransitStationAdminPageController {
 			.map(station -> StationRow.from(
 				station,
 				counts.getOrDefault(station.station().id(), StationMasterDataCounts.empty()),
-				pendingByStation.getOrDefault(station.station().id(), 0L)))
+				pendingByStation.getOrDefault(station.station().id(), 0L),
+				attentionByStation.getOrDefault(station.station().id(), 0L)))
 			.sorted(stationOrder(sort))
 			.toList();
 
@@ -343,6 +348,15 @@ class TransitStationAdminPageController {
 		model.addAttribute("layoutEditorHref", "/admin/stations/%s/layouts/page".formatted(stationId));
 	}
 
+	// 확인이 필요한(고장·공사·폐쇄·확인 필요·사용자 제보) 시설 수를 역 단위로 집계한다(역 목록 "확인 필요 시설" 뱃지).
+	// 시설 상태판(#1741 3/N)과 같은 assemble() 소스·needsAttention 판정을 재사용해 두 화면의 수치가 정합한다.
+	private Map<String, Long> attentionFacilitiesByStation() {
+		return facilityStatusAssembler.assemble().stream()
+			.filter(row -> TransitFacilityAdminPageController.needsAttention(row.status()))
+			.collect(java.util.stream.Collectors.groupingBy(
+				FacilityStatusRow::stationId, java.util.stream.Collectors.counting()));
+	}
+
 	private long countPendingStationReports(String stationId) {
 		return countStationReports(stationId, FacilityReportStatus.SUBMITTED)
 			+ countStationReports(stationId, FacilityReportStatus.UNDER_REVIEW);
@@ -484,13 +498,15 @@ class TransitStationAdminPageController {
 		int layoutSourceCount,
 		int routeNodeCount,
 		int routeEdgeCount,
-		long pendingReportCount
+		long pendingReportCount,
+		long attentionFacilityCount
 	) {
 
 		static StationRow from(
 			StationWithLines stationWithLines,
 			StationMasterDataCounts counts,
-			long pendingReportCount
+			long pendingReportCount,
+			long attentionFacilityCount
 		) {
 			return new StationRow(
 				stationWithLines.station().id(),
@@ -504,7 +520,8 @@ class TransitStationAdminPageController {
 				counts.layoutSourceCount(),
 				counts.routeNodeCount(),
 				counts.routeEdgeCount(),
-				pendingReportCount
+				pendingReportCount,
+				attentionFacilityCount
 			);
 		}
 	}

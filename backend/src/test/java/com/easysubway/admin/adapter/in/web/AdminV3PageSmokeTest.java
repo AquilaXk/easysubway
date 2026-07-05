@@ -87,6 +87,7 @@ class AdminV3PageSmokeTest {
 			.contains("노선 필터")
 			.contains("미확인 제보 많은 순")
 			.contains("미확인 제보")
+			.contains("확인 필요 시설")
 			// 상록수 역 링크가 상세 허브로 연결된다.
 			.contains("/admin/stations/station-sangnoksu/page");
 

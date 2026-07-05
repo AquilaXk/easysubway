@@ -88,7 +88,8 @@ class TransitReadOnlyAdminPageModelTest {
 			mock(FacilityReportUseCase.class),
 			mock(FieldVerificationUseCase.class),
 			AdminMasterLabelResolver.empty(),
-			WebMessageResolver.defaultMessages()
+			WebMessageResolver.defaultMessages(),
+			new TransitFacilityStatusAssembler(transitMasterService)
 		);
 		var model = new ExtendedModelMap();
 
@@ -108,7 +109,8 @@ class TransitReadOnlyAdminPageModelTest {
 			mock(FacilityReportUseCase.class),
 			mock(FieldVerificationUseCase.class),
 			AdminMasterLabelResolver.empty(),
-			WebMessageResolver.defaultMessages()
+			WebMessageResolver.defaultMessages(),
+			new TransitFacilityStatusAssembler(transitMasterService)
 		);
 		var redirectAttributes = new RedirectAttributesModelMap();
 

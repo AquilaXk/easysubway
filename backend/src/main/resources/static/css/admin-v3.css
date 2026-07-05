@@ -734,7 +734,7 @@ body.admin-v3 {
 	flex-wrap: wrap;
 }
 
-/* 역 목록 미확인 제보 뱃지(#1741): 대기 건수, 클릭 시 역 필터 제보 대기열로 이동 */
+/* 역 목록 카운트 뱃지(#1741): 미확인 제보·확인 필요 시설. 클릭 시 해당 필터 화면으로 이동 */
 .admin-v3 .count-badge {
 	display: inline-flex;
 	align-items: center;
@@ -748,6 +748,10 @@ body.admin-v3 {
 	font-size: 12px;
 	font-weight: 600;
 	text-decoration: none;
+}
+
+.admin-v3 .count-badge.is-warn {
+	background: var(--admin-warn, #b4690e);
 }
 
 .admin-v3 .bulk-actionbar {
