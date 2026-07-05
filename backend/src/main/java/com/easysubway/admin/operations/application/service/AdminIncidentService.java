@@ -73,7 +73,9 @@ public class AdminIncidentService {
 			command.owner(),
 			now,
 			null,
-			null
+			null,
+			command.stationId(),
+			command.lineId()
 		));
 		repository.saveTransition(new AdminIncidentTransition(
 			incident.incidentId(),
@@ -92,7 +94,7 @@ public class AdminIncidentService {
 		}
 		String severity = "DOWN".equals(health.status()) ? "MAJOR" : "MINOR";
 		String summary = "Health %s: %s".formatted(health.status(), componentSummary(health.components()));
-		return open(new OpenAdminIncidentCommand(severity, INITIAL_STATUS, "HEALTH", summary, owner));
+		return open(new OpenAdminIncidentCommand(severity, INITIAL_STATUS, "HEALTH", summary, owner, null, null));
 	}
 
 	/**
@@ -161,7 +163,9 @@ public class AdminIncidentService {
 		String status,
 		String source,
 		String summary,
-		String owner
+		String owner,
+		String stationId,
+		String lineId
 	) {
 	}
 }

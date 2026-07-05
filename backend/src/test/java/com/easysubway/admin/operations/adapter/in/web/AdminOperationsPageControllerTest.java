@@ -239,6 +239,30 @@ class AdminOperationsPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("역·노선 연결 장애는 역 허브 딥링크를 표시한다")
+	void incidentWithStationLinkShowsHubDeepLink() throws Exception {
+		mockMvc.perform(post("/admin/incidents")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/incidents/page"))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("severity", "MAJOR")
+				.param("status", "RECEIVED")
+				.param("source", "HEALTH")
+				.param("summary", "platform gate down")
+				.param("owner", "ops")
+				.param("stationId", "STN-1")
+				.param("lineId", "L1"))
+			.andExpect(status().is3xxRedirection());
+
+		String html = getAdminHtml("/admin/incidents/page", new MockHttpSession());
+
+		assertThat(html)
+			.contains("/admin/stations/STN-1/page")
+			.contains("노선 L1");
+	}
+
+	@Test
 	@DisplayName("장애 화면은 전이 타임라인과 다음 전이 버튼을 표시한다")
 	void incidentsPageShowsTimelineAndTransitionOptions() throws Exception {
 		openIncident("database DOWN");

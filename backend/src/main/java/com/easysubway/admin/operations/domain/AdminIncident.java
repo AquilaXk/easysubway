@@ -11,7 +11,9 @@ public record AdminIncident(
 	String owner,
 	LocalDateTime openedAt,
 	LocalDateTime resolvedAt,
-	String resolution
+	String resolution,
+	String stationId,
+	String lineId
 ) {
 
 	public AdminIncident {
@@ -21,6 +23,8 @@ public record AdminIncident(
 		summary = clean(summary, "incident summary가 필요합니다.");
 		owner = clean(owner, "incident owner가 필요합니다.");
 		resolution = cleanNullable(resolution);
+		stationId = cleanNullable(stationId);
+		lineId = cleanNullable(lineId);
 		if (status == null) {
 			throw new IllegalArgumentException("incident status가 필요합니다.");
 		}
@@ -46,10 +50,10 @@ public record AdminIncident(
 		if (at == null) {
 			throw new IllegalArgumentException("전이 시각이 필요합니다.");
 		}
-		if (target.isResolved()) {
-			return new AdminIncident(incidentId, severity, target, source, summary, owner, openedAt, at, resolution);
-		}
-		return new AdminIncident(incidentId, severity, target, source, summary, owner, openedAt, null, null);
+		LocalDateTime nextResolvedAt = target.isResolved() ? at : null;
+		String nextResolution = target.isResolved() ? resolution : null;
+		return new AdminIncident(
+			incidentId, severity, target, source, summary, owner, openedAt, nextResolvedAt, nextResolution, stationId, lineId);
 	}
 
 	private static String clean(String value, String message) {

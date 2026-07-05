@@ -26,7 +26,7 @@ class JdbcAdminIncidentRepositoryTest {
 		var repository = new JdbcAdminIncidentRepository(dataSource);
 
 		AdminIncident received = repository.save(new AdminIncident(
-			"INC-1", "MAJOR", AdminIncidentStatus.RECEIVED, "HEALTH", "database DOWN", "ops", OPENED_AT, null, null));
+			"INC-1", "MAJOR", AdminIncidentStatus.RECEIVED, "HEALTH", "database DOWN", "ops", OPENED_AT, null, null, "STN-1", "L1"));
 		repository.saveTransition(new AdminIncidentTransition(
 			"INC-1", null, AdminIncidentStatus.RECEIVED, OPENED_AT, "ops", "접수"));
 
@@ -37,6 +37,8 @@ class JdbcAdminIncidentRepositoryTest {
 		AdminIncident found = repository.findById("INC-1").orElseThrow();
 		assertThat(found.status()).isEqualTo(AdminIncidentStatus.IN_PROGRESS);
 		assertThat(found.resolvedAt()).isNull();
+		assertThat(found.stationId()).isEqualTo("STN-1");
+		assertThat(found.lineId()).isEqualTo("L1");
 		assertThat(repository.findTransitions("INC-1"))
 			.extracting(AdminIncidentTransition::toStatus)
 			.containsExactly(AdminIncidentStatus.RECEIVED, AdminIncidentStatus.IN_PROGRESS);
@@ -48,9 +50,9 @@ class JdbcAdminIncidentRepositoryTest {
 		var dataSource = incidentDataSource();
 		var repository = new JdbcAdminIncidentRepository(dataSource);
 		repository.save(new AdminIncident(
-			"INC-1", "MAJOR", AdminIncidentStatus.RECEIVED, "HEALTH", "a", "ops", OPENED_AT, null, null));
+			"INC-1", "MAJOR", AdminIncidentStatus.RECEIVED, "HEALTH", "a", "ops", OPENED_AT, null, null, null, null));
 		repository.save(new AdminIncident(
-			"INC-2", "MINOR", AdminIncidentStatus.RECEIVED, "HEALTH", "b", "ops", OPENED_AT, null, null));
+			"INC-2", "MINOR", AdminIncidentStatus.RECEIVED, "HEALTH", "b", "ops", OPENED_AT, null, null, null, null));
 		repository.saveTransition(new AdminIncidentTransition(
 			"INC-1", null, AdminIncidentStatus.RECEIVED, OPENED_AT, "ops", null));
 		repository.saveTransition(new AdminIncidentTransition(
@@ -96,6 +98,8 @@ class JdbcAdminIncidentRepositoryTest {
 				opened_at TIMESTAMP NOT NULL,
 				resolved_at TIMESTAMP,
 				resolution VARCHAR(500),
+				station_id VARCHAR(40),
+				line_id VARCHAR(40),
 				created_at TIMESTAMP NOT NULL,
 				updated_at TIMESTAMP NOT NULL
 			)

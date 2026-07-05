@@ -54,6 +54,8 @@
 			</label>
 			<label>요약 <input name="summary" required></label>
 			<label>담당자 <input name="owner"></label>
+			<label>연결 역 ID <input name="stationId" placeholder="선택"></label>
+			<label>연결 노선 ID <input name="lineId" placeholder="선택"></label>
 			<button type="submit">생성</button>
 		</form>
 	</section>
@@ -90,6 +92,10 @@
 				<td>
 					<details class="admin-incident-detail">
 						<summary th:text="${'타임라인 (' + incident.timeline.size() + '건)'}">타임라인</summary>
+						<p class="admin-incident-target" th:if="${incident.stationId != null}">
+							연결 역: <a th:href="@{${incident.stationHubUrl}}" th:text="${incident.stationId}">역</a>
+							<th:block th:if="${incident.lineId != null}" th:text="${' · 노선 ' + incident.lineId}"></th:block>
+						</p>
 						<ol class="admin-timeline">
 							<li th:each="step : ${incident.timeline}">
 								<span class="admin-timeline-status">

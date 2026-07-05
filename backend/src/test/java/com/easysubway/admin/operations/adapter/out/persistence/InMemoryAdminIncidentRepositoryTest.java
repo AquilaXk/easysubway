@@ -65,6 +65,8 @@ class InMemoryAdminIncidentRepositoryTest {
 			"ops",
 			openedAt,
 			null,
+			null,
+			null,
 			null
 		);
 	}

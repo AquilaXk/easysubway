@@ -160,6 +160,8 @@ class AdminOperationsPageController {
 		@RequestParam String source,
 		@RequestParam String summary,
 		@RequestParam(required = false) String owner,
+		@RequestParam(required = false) String stationId,
+		@RequestParam(required = false) String lineId,
 		Principal principal,
 		Authentication authentication,
 		HttpServletRequest request
@@ -169,7 +171,9 @@ class AdminOperationsPageController {
 			status,
 			source,
 			summary,
-			ownerOrPrincipal(owner, principal)
+			ownerOrPrincipal(owner, principal),
+			stationId,
+			lineId
 		));
 		auditWriter.incidentChange(
 			authentication,
@@ -291,6 +295,9 @@ class AdminOperationsPageController {
 		String resolvedAt,
 		String resolution,
 		boolean open,
+		String stationId,
+		String lineId,
+		String stationHubUrl,
 		List<TransitionRow> timeline,
 		List<TransitionOption> transitionOptions
 	) {
@@ -308,6 +315,9 @@ class AdminOperationsPageController {
 				incident.resolvedAt() == null ? "-" : String.valueOf(incident.resolvedAt()),
 				incident.resolution(),
 				!incident.status().isResolved(),
+				incident.stationId(),
+				incident.lineId(),
+				incident.stationId() == null ? null : "/admin/stations/" + incident.stationId() + "/page",
 				transitions.stream().map(TransitionRow::from).toList(),
 				incident.status().allowedTransitions().stream()
 					.sorted()

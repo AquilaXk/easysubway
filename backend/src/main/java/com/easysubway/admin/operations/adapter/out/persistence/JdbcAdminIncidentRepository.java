@@ -38,7 +38,7 @@ public class JdbcAdminIncidentRepository implements AdminIncidentRepository {
 	@Override
 	public List<AdminIncident> findRecent(int limit, int offset) {
 		return jdbcTemplate.query("""
-			SELECT incident_id, severity, status, source, summary, owner, opened_at, resolved_at, resolution
+			SELECT incident_id, severity, status, source, summary, owner, opened_at, resolved_at, resolution, station_id, line_id
 			FROM admin_incidents
 			ORDER BY opened_at DESC, incident_id DESC
 			LIMIT ? OFFSET ?
@@ -49,7 +49,7 @@ public class JdbcAdminIncidentRepository implements AdminIncidentRepository {
 	public Optional<AdminIncident> findById(String incidentId) {
 		try {
 			return Optional.ofNullable(jdbcTemplate.queryForObject("""
-				SELECT incident_id, severity, status, source, summary, owner, opened_at, resolved_at, resolution
+				SELECT incident_id, severity, status, source, summary, owner, opened_at, resolved_at, resolution, station_id, line_id
 				FROM admin_incidents
 				WHERE incident_id = ?
 				""", this::mapIncident, incidentId));
@@ -62,7 +62,8 @@ public class JdbcAdminIncidentRepository implements AdminIncidentRepository {
 	public AdminIncident save(AdminIncident incident) {
 		int updated = jdbcTemplate.update("""
 			UPDATE admin_incidents
-			SET severity = ?, status = ?, source = ?, summary = ?, owner = ?, resolved_at = ?, resolution = ?, updated_at = CURRENT_TIMESTAMP
+			SET severity = ?, status = ?, source = ?, summary = ?, owner = ?, resolved_at = ?, resolution = ?,
+				station_id = ?, line_id = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE incident_id = ?
 			""",
 			incident.severity(),
@@ -72,14 +73,17 @@ public class JdbcAdminIncidentRepository implements AdminIncidentRepository {
 			incident.owner(),
 			incident.resolvedAt(),
 			incident.resolution(),
+			incident.stationId(),
+			incident.lineId(),
 			incident.incidentId()
 		);
 		if (updated == 0) {
 			jdbcTemplate.update("""
 				INSERT INTO admin_incidents (
-					incident_id, severity, status, source, summary, owner, opened_at, resolved_at, resolution, created_at, updated_at
+					incident_id, severity, status, source, summary, owner, opened_at, resolved_at, resolution,
+					station_id, line_id, created_at, updated_at
 				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 				""",
 				incident.incidentId(),
 				incident.severity(),
@@ -89,7 +93,9 @@ public class JdbcAdminIncidentRepository implements AdminIncidentRepository {
 				incident.owner(),
 				incident.openedAt(),
 				incident.resolvedAt(),
-				incident.resolution()
+				incident.resolution(),
+				incident.stationId(),
+				incident.lineId()
 			);
 		}
 		return incident;
@@ -151,7 +157,9 @@ public class JdbcAdminIncidentRepository implements AdminIncidentRepository {
 			resultSet.getString("owner"),
 			resultSet.getTimestamp("opened_at").toLocalDateTime(),
 			resolvedAt == null ? null : resolvedAt.toLocalDateTime(),
-			resultSet.getString("resolution")
+			resultSet.getString("resolution"),
+			resultSet.getString("station_id"),
+			resultSet.getString("line_id")
 		);
 	}
 

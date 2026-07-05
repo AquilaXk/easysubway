@@ -34,7 +34,9 @@ class AdminIncidentServiceTest {
 			"RECEIVED",
 			"HEALTH",
 			"database DOWN",
-			"ops"
+			"ops",
+			null,
+			null
 		));
 
 		service.transition(opened.incidentId(), "IN_PROGRESS", "ops", "복구 시작", null);
@@ -106,7 +108,9 @@ class AdminIncidentServiceTest {
 			"ops",
 			LocalDateTime.parse("2026-06-27T00:00:00"),
 			null,
-			"already fixed"
+			"already fixed",
+			null,
+			null
 		)).isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("열린 incident는 resolvedAt과 resolution을 가질 수 없습니다.");
 	}
@@ -119,7 +123,9 @@ class AdminIncidentServiceTest {
 			"RESOLVED",
 			"HEALTH",
 			"database restored",
-			"ops"
+			"ops",
+			null,
+			null
 		))).isInstanceOf(InvalidRequestException.class)
 			.hasMessageContaining("접수");
 	}
@@ -142,6 +148,6 @@ class AdminIncidentServiceTest {
 	}
 
 	private AdminIncident openReceived() {
-		return service.open(new OpenAdminIncidentCommand("MAJOR", "RECEIVED", "HEALTH", "database DOWN", "ops"));
+		return service.open(new OpenAdminIncidentCommand("MAJOR", "RECEIVED", "HEALTH", "database DOWN", "ops", null, null));
 	}
 }
