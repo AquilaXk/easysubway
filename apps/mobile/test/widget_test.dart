@@ -8013,7 +8013,7 @@ void main() {
       // 폼 요약의 조건 요약 부제는 제거됐다(#1568). 조건명만 노출.
       expect(find.text('계단 피하기 · 환승 줄이기'), findsNothing);
       expect(find.text('천천히 이동'), findsWidgets);
-      expect(find.text('계단 여부를 아직 알 수 없어요'), findsWidgets);
+      expect(find.text('계단 여부를 확인하고 있어요'), findsWidgets);
       expect(find.text('계단 없음'), findsNothing);
       expect(find.text('엘리베이터 이용'), findsNothing);
       expect(find.text('7분'), findsOneWidget);
@@ -8064,14 +8064,14 @@ void main() {
       );
       expect(
         find.descendant(
-          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 아직 알 수 없어요')),
+          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 확인하고 있어요')),
           matching: find.byIcon(Icons.help_outline),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 아직 알 수 없어요')),
+          of: find.byKey(const Key('routeDarkSummaryChip-계단 여부를 확인하고 있어요')),
           matching: find.byIcon(Icons.check),
         ),
         findsNothing,
@@ -8524,7 +8524,7 @@ void main() {
     await tester.pumpAndSettle();
     await _openFirstRouteResultDetail(tester);
 
-    expect(find.text('경로 상태를 아직 알 수 없어요'), findsWidgets);
+    expect(find.text('경로 상태를 확인하고 있어요'), findsWidgets);
     expect(find.text('확인 후 이동'), findsOneWidget);
     expect(find.text('추천 경로'), findsNothing);
     expect(find.textContaining('이동할 수 있는 경로'), findsNothing);
@@ -8890,7 +8890,7 @@ void main() {
           .getSemantics(find.byKey(const Key('routeResultListItem')))
           .getSemanticsData();
       expect(routeItemSemantics.hasAction(SemanticsAction.tap), isTrue);
-      expect(routeItemSemantics.label, contains('계단 여부를 아직 알 수 없어요'));
+      expect(routeItemSemantics.label, contains('계단 여부를 확인하고 있어요'));
     } finally {
       semanticsHandle.dispose();
     }

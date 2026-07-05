@@ -810,7 +810,7 @@ void main() {
     );
 
     expect(result.status, 'UNKNOWN');
-    expect(result.destinationStationName, '역 이름을 아직 알 수 없어요');
+    expect(result.destinationStationName, '역 이름을 확인하고 있어요');
     expect(result.isLocalResult, isTrue);
   });
 

@@ -465,7 +465,7 @@ void main() {
   test('경로 검색 결과는 확인 필요 상태를 이동 가능으로 안내하지 않는다', () {
     final result = _sampleRouteSearchResult(status: 'REVIEW_REQUIRED');
 
-    expect(result.statusLabel, '경로 상태를 아직 알 수 없어요');
+    expect(result.statusLabel, '경로 상태를 확인하고 있어요');
     expect(result.guidanceLabel, '확인 후 이동');
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.semanticLabel, isNot(contains('이동할 수 있는 경로')));
@@ -478,7 +478,7 @@ void main() {
     );
 
     expect(result.isBlocked, isFalse);
-    expect(result.statusLabel, '경로 상태를 아직 알 수 없어요');
+    expect(result.statusLabel, '경로 상태를 확인하고 있어요');
     expect(result.guidanceLabel, '확인 후 이동');
     expect(result.guidanceIcon, Icons.warning_amber);
     expect(result.needsConfirmation, isTrue);
@@ -999,7 +999,7 @@ void main() {
     expect(result.steps.first.userDescription, contains('승강장 접근'));
     expect(result.steps.last.estimatedMinutes, 26);
     expect(result.steps.first.stairAccessState, 'unknown');
-    expect(result.stairAccessLabel, '계단 여부를 아직 알 수 없어요');
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
     expect(result.transferSlackSeconds, isNull);
     expect(result.hasOutOfStationTransfer, isFalse);
   });
@@ -1319,8 +1319,8 @@ void main() {
       ],
     );
 
-    expect(result.stairAccessLabel, '계단 여부를 아직 알 수 없어요');
-    expect(result.semanticLabel, contains('계단 여부를 아직 알 수 없어요'));
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    expect(result.semanticLabel, contains('계단 여부를 확인하고 있어요'));
     expect(result.semanticLabel, isNot(contains('계단 없음')));
   });
 
