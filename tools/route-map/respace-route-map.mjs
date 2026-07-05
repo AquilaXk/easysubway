@@ -52,10 +52,41 @@ export function serializePathPoints(points) {
  * 삽입하고, 역-역 chain·환승 cluster를 산출한다(스펙 R1 Task 4).
  */
 export function buildRespaceGraph({ tracks, positions }) {
-  const posByLine = new Map();
-  for (const p of positions) {
-    if (!posByLine.has(p.lineId)) posByLine.set(p.lineId, []);
-    posByLine.get(p.lineId).push(p);
+  // 트랙별 기하 사전 계산(closed/verts/segCount).
+  const trackInfo = tracks.map((track) => {
+    const pts = track.points;
+    const closed =
+      pts.length >= 2 &&
+      Math.abs(pts[0].x - pts[pts.length - 1].x) < EPS &&
+      Math.abs(pts[0].y - pts[pts.length - 1].y) < EPS;
+    const verts = closed ? pts.slice(0, pts.length - 1) : pts.slice();
+    const segCount = pts.length === 0 ? 0 : closed ? verts.length : verts.length - 1;
+    return { track, closed, verts, segCount };
+  });
+  const trackIdxByLine = new Map();
+  trackInfo.forEach((info, idx) => {
+    if (!trackIdxByLine.has(info.track.lineId)) {
+      trackIdxByLine.set(info.track.lineId, []);
+    }
+    trackIdxByLine.get(info.track.lineId).push(idx);
+  });
+  // 각 역을 **자기 노선의 트랙들 중 최근접 트랙 1개**에만 배정한다(다중 조각
+  // 노선에서 엉뚱한 조각에 중복 삽입되던 버그 방지). positions 순회 순서 보존.
+  const assignByTrack = new Map(); // trackIdx → [{station, seg, t, x, y, dist}]
+  for (const st of positions) {
+    let best = null;
+    for (const tIdx of trackIdxByLine.get(st.lineId) ?? []) {
+      const { verts, segCount } = trackInfo[tIdx];
+      for (let s = 0; s < segCount; s += 1) {
+        const a = verts[s];
+        const b = verts[(s + 1) % verts.length];
+        const pr = projectWithParam(st, a, b);
+        if (best === null || pr.dist < best.dist) best = { ...pr, seg: s, tIdx };
+      }
+    }
+    if (best === null) continue;
+    if (!assignByTrack.has(best.tIdx)) assignByTrack.set(best.tIdx, []);
+    assignByTrack.get(best.tIdx).push({ station: st, ...best });
   }
 
   const nodes = [];
@@ -66,9 +97,8 @@ export function buildRespaceGraph({ tracks, positions }) {
   const clusterAcc = new Map(); // stationId → [{nodeId, point}]
 
   for (let ti = 0; ti < tracks.length; ti += 1) {
-    const track = tracks[ti];
-    const pts = track.points;
-    if (pts.length === 0) {
+    const { track, closed, verts } = trackInfo[ti];
+    if (track.points.length === 0) {
       outTracks.push({
         lineId: track.lineId,
         trackIndex: track.trackIndex,
@@ -77,45 +107,32 @@ export function buildRespaceGraph({ tracks, positions }) {
       });
       continue;
     }
-    const closed =
-      pts.length >= 2 &&
-      Math.abs(pts[0].x - pts[pts.length - 1].x) < EPS &&
-      Math.abs(pts[0].y - pts[pts.length - 1].y) < EPS;
-    // 닫힌 track은 중복 끝점을 떼고(뒤에서 alias) 순환 세그먼트로 다룬다.
-    const verts = closed ? pts.slice(0, pts.length - 1) : pts.slice();
-    const segCount = closed ? verts.length : verts.length - 1;
 
-    // 이 노선 역을 최근접 세그먼트에 투영 → 기존 정점 재사용 or 삽입 예약.
+    // 이 트랙에 배정된 역만 기존 정점 재사용 or 삽입 예약.
     const insertions = new Map(); // segIndex → [{t, station, x, y}]
     const exactVertex = []; // {station, vertexIndex}
-    for (const st of posByLine.get(track.lineId) ?? []) {
-      let best = null;
-      for (let s = 0; s < segCount; s += 1) {
-        const a = verts[s];
-        const b = verts[(s + 1) % verts.length];
-        const pr = projectWithParam(st, a, b);
-        if (best === null || pr.dist < best.dist) best = { ...pr, seg: s };
+    const assigned = assignByTrack.get(ti) ?? [];
+    for (const asg of assigned) {
+      const st = asg.station;
+      if (asg.dist > WARN_DIST) {
+        warnings.push(`${st.stationId} 투영거리 ${round3(asg.dist)}`);
       }
-      if (best === null) continue;
-      if (best.dist > WARN_DIST) {
-        warnings.push(`${st.stationId} 투영거리 ${round3(best.dist)}`);
-      }
-      const a = verts[best.seg];
-      const b = verts[(best.seg + 1) % verts.length];
+      const a = verts[asg.seg];
+      const b = verts[(asg.seg + 1) % verts.length];
       if (Math.hypot(st.x - a.x, st.y - a.y) < REUSE_DIST) {
-        exactVertex.push({ station: st, vertexIndex: best.seg });
+        exactVertex.push({ station: st, vertexIndex: asg.seg });
       } else if (Math.hypot(st.x - b.x, st.y - b.y) < REUSE_DIST) {
         exactVertex.push({
           station: st,
-          vertexIndex: (best.seg + 1) % verts.length,
+          vertexIndex: (asg.seg + 1) % verts.length,
         });
       } else {
-        if (!insertions.has(best.seg)) insertions.set(best.seg, []);
-        insertions.get(best.seg).push({
-          t: best.t,
+        if (!insertions.has(asg.seg)) insertions.set(asg.seg, []);
+        insertions.get(asg.seg).push({
+          t: asg.t,
           station: st,
-          x: best.x,
-          y: best.y,
+          x: asg.x,
+          y: asg.y,
         });
       }
     }
@@ -154,7 +171,8 @@ export function buildRespaceGraph({ tracks, positions }) {
 
     // stationNodes + cluster 누적. (positions 순서 보존을 위해 순회 순서 유지.)
     const stationVertexIndices = [];
-    for (const st of posByLine.get(track.lineId) ?? []) {
+    for (const asg of assigned) {
+      const st = asg.station;
       if (!stationToVertex.has(st)) continue;
       const vIndex = stationToVertex.get(st);
       const nodeId = baseNodeId + vIndex;
