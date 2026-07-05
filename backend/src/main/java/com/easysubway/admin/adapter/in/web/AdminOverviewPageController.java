@@ -1,7 +1,15 @@
 package com.easysubway.admin.adapter.in.web;
 
+import com.easysubway.admin.alert.AdminAlertService;
+import com.easysubway.admin.alert.AdminAlertSummary;
 import com.easysubway.admin.authorization.AdminAuthorization;
 import com.easysubway.admin.authorization.AdminPermission;
+import com.easysubway.admin.metric.application.service.AdminDashboardCardService;
+import com.easysubway.admin.metric.application.service.AdminDashboardCardService.DashboardCard;
+import com.easysubway.admin.metric.application.service.AdminMetricSnapshotService;
+import com.easysubway.admin.metric.application.service.AdminMetricSnapshotStatusHolder;
+import com.easysubway.admin.metric.domain.AdminMetricKeys;
+import com.easysubway.admin.navigation.AdminProgram;
 import com.easysubway.collection.application.port.in.DataCollectionUseCase;
 import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase;
@@ -19,12 +27,16 @@ import com.easysubway.route.domain.RouteSearchDashboardSummary;
 import com.easysubway.usage.application.port.in.UserActivityDashboardUseCase;
 import com.easysubway.usage.domain.UserActivityDashboardSummary;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 class AdminOverviewPageController {
@@ -37,6 +49,10 @@ class AdminOverviewPageController {
 	private final DataCollectionUseCase dataCollectionUseCase;
 	private final CheckHealthUseCase checkHealthUseCase;
 	private final DatapackReleaseBlockerSummaryUseCase datapackReleaseBlockerSummaryUseCase;
+	private final AdminDashboardCardService dashboardCardService;
+	private final AdminAlertService alertService;
+	private final AdminMetricSnapshotService metricSnapshotService;
+	private final AdminMetricSnapshotStatusHolder metricSnapshotStatusHolder;
 
 	AdminOverviewPageController(
 		DataQualityUseCase dataQualityUseCase,
@@ -46,7 +62,11 @@ class AdminOverviewPageController {
 		UserActivityDashboardUseCase userActivityDashboardUseCase,
 		DataCollectionUseCase dataCollectionUseCase,
 		CheckHealthUseCase checkHealthUseCase,
-		DatapackReleaseBlockerSummaryUseCase datapackReleaseBlockerSummaryUseCase
+		DatapackReleaseBlockerSummaryUseCase datapackReleaseBlockerSummaryUseCase,
+		AdminDashboardCardService dashboardCardService,
+		AdminAlertService alertService,
+		AdminMetricSnapshotService metricSnapshotService,
+		AdminMetricSnapshotStatusHolder metricSnapshotStatusHolder
 	) {
 		this.dataQualityUseCase = dataQualityUseCase;
 		this.facilityReportUseCase = facilityReportUseCase;
@@ -56,6 +76,10 @@ class AdminOverviewPageController {
 		this.dataCollectionUseCase = dataCollectionUseCase;
 		this.checkHealthUseCase = checkHealthUseCase;
 		this.datapackReleaseBlockerSummaryUseCase = datapackReleaseBlockerSummaryUseCase;
+		this.dashboardCardService = dashboardCardService;
+		this.alertService = alertService;
+		this.metricSnapshotService = metricSnapshotService;
+		this.metricSnapshotStatusHolder = metricSnapshotStatusHolder;
 	}
 
 	@GetMapping("/admin/dashboard/page")
@@ -83,7 +107,52 @@ class AdminOverviewPageController {
 		if (AdminAuthorization.hasPermission(authentication, AdminPermission.DATAPACK_READ)) {
 			model.addAttribute("datapackReleaseSummary", datapackReleaseBlockerSummaryUseCase.summarize());
 		}
+
+		// 핵심 카드: 현재 값 + 7일 스파크라인 + 전일 대비. 화면 권한이 있는 카드만 노출(역할 인지).
+		long pending = count(reportCounts, FacilityReportStatus.SUBMITTED)
+			+ count(reportCounts, FacilityReportStatus.UNDER_REVIEW);
+		double blockedRate = routes.totalCount() == 0
+			? 0.0 : (double) routes.blockedCount() * 100 / routes.totalCount();
+		List<AdminProgram> visible = AdminProgram.visibleTo(authentication);
+		List<DashboardCard> cards = new ArrayList<>();
+		if (visible.contains(AdminProgram.REPORTS)) {
+			cards.add(dashboardCardService.card("확인할 제보", AdminProgram.REPORTS.path(),
+				AdminMetricKeys.REPORTS_PENDING, pending, String.valueOf(pending)));
+		}
+		if (visible.contains(AdminProgram.FACILITIES)) {
+			long needsVerification = quality.needsVerificationFacilityCount();
+			cards.add(dashboardCardService.card("확인 필요 시설", AdminProgram.FACILITIES.path(),
+				AdminMetricKeys.FACILITIES_NEEDS_VERIFICATION, needsVerification, String.valueOf(needsVerification)));
+		}
+		if (visible.contains(AdminProgram.ROUTE_SEARCHES)) {
+			cards.add(dashboardCardService.card("경로 차단률", AdminProgram.ROUTE_SEARCHES.path(),
+				AdminMetricKeys.ROUTE_BLOCKED_RATE, blockedRate, String.format("%.1f%%", blockedRate)));
+		}
+		if (visible.contains(AdminProgram.PUSH)) {
+			cards.add(dashboardCardService.card("푸시 실패", AdminProgram.PUSH.path(),
+				AdminMetricKeys.PUSH_FAILED, push.failedCount(), String.valueOf(push.failedCount())));
+		}
+		model.addAttribute("cards", cards);
+
+		// 긴급 줄: 알림 센터 신호 요약(있을 때만). 지표 스냅샷 마지막 실행 상태.
+		model.addAttribute("alertSummary", alertService.summarize(authentication));
+		model.addAttribute("snapshotStatus", metricSnapshotStatusHolder.latest().orElse(null));
 		return "admin/dashboard";
+	}
+
+	// 지표 스냅샷 수동 재실행(#1739). 스케줄과 별개로 지금 즉시 오늘 집계를 다시 돌린다(멱등).
+	@PostMapping("/admin/dashboard/metrics/snapshot")
+	@PreAuthorize("hasAuthority('admin.data.operate')")
+	String rerunSnapshot(RedirectAttributes redirectAttributes) {
+		try {
+			metricSnapshotService.snapshotToday();
+			redirectAttributes.addFlashAttribute("flashMessage", "지표 스냅샷을 다시 집계했습니다.");
+			redirectAttributes.addFlashAttribute("flashTone", "good");
+		} catch (RuntimeException exception) {
+			redirectAttributes.addFlashAttribute("flashMessage", "지표 스냅샷 집계에 실패했습니다.");
+			redirectAttributes.addFlashAttribute("flashTone", "failure");
+		}
+		return "redirect:/admin/dashboard/page";
 	}
 
 	@GetMapping("/admin/system/page")
