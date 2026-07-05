@@ -143,7 +143,7 @@ function main() {
       overThreshold,
     };
     if (options.report) {
-      writeFileSync(path.join(root, options.report), JSON.stringify(report, null, 2));
+      writeFileSync(path.isAbsolute(options.report) ? options.report : path.join(root, options.report), JSON.stringify(report, null, 2));
     }
     console.log(
       `[${options.region}] 노드 ${report.nodes} · 투영 이동 ${report.moved} · 임계(${options.threshold}) 초과 ${overThreshold.length}` +
