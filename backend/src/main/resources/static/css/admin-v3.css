@@ -1262,3 +1262,70 @@ body.admin-v3 {
 .admin-v3 .admin-breadcrumb [aria-current="page"] {
 	color: var(--admin-ink);
 }
+
+/* 커맨드 팔레트(#1738) */
+.admin-v3 .command-palette {
+	margin-bottom: 10px;
+}
+
+.admin-v3 .command-palette-trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-height: 36px;
+	padding: 0 12px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-surface);
+	color: var(--admin-ink-2);
+	text-decoration: none;
+	font-size: 13px;
+}
+
+.admin-v3 .command-palette-trigger kbd {
+	padding: 1px 6px;
+	border: 1px solid var(--admin-border-strong);
+	border-radius: 4px;
+	font-size: 11px;
+	color: var(--admin-ink-2);
+}
+
+.command-palette-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 80;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	padding-top: 12vh;
+}
+
+.command-palette-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(22, 48, 47, 0.35);
+}
+
+.command-palette-panel {
+	position: relative;
+	width: min(560px, 92vw);
+	background: var(--admin-surface);
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-card);
+	box-shadow: 0 12px 32px rgba(22, 48, 47, 0.2);
+	padding: 12px;
+}
+
+.command-palette-panel form {
+	display: flex;
+	gap: 8px;
+}
+
+.command-palette-panel input[type="search"] {
+	flex: 1;
+	min-width: 0;
+}
+
+.command-palette-results {
+	margin-top: 8px;
+}

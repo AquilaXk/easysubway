@@ -43,6 +43,54 @@ document.addEventListener('alpine:init', function () {
 		};
 	});
 
+	// 커맨드 팔레트(#1738): Cmd/Ctrl+K로 열고, 검색 입력을 htmx로 /admin/search에 debounce 조회한다.
+	// Esc·백드롭으로 닫고, 열릴 때 입력에 포커스. 방향키로 결과 링크 사이를 이동한다.
+	// 진화형 향상 — JS가 없으면 topbar 검색 버튼이 /admin/search 전용 페이지로 이동한다(no-JS 대체).
+	Alpine.data('commandPalette', function () {
+		return {
+			open: false,
+			show: function () {
+				this.open = true;
+				var input = this.$refs.input;
+				this.$nextTick(function () {
+					if (input) {
+						input.focus();
+					}
+				});
+			},
+			hide: function () {
+				this.open = false;
+			},
+			// 입력에서 아래 방향키 → 첫 결과 링크로 포커스 이동.
+			focusResults: function () {
+				var first = this.$root.querySelector('#palette-results a');
+				if (first) {
+					first.focus();
+				}
+			},
+			// 결과 링크에서 위/아래 방향키 → 인접 링크로 포커스 이동(CSP 빌드용 인자 없는 래퍼).
+			moveDown: function (event) {
+				this.moveFocus(event, 1);
+			},
+			moveUp: function (event) {
+				this.moveFocus(event, -1);
+			},
+			moveFocus: function (event, delta) {
+				var links = Array.prototype.slice.call(this.$root.querySelectorAll('#palette-results a'));
+				var index = links.indexOf(event.target);
+				var next = links[index + delta];
+				if (next) {
+					next.focus();
+				} else if (delta < 0) {
+					var input = this.$refs.input;
+					if (input) {
+						input.focus();
+					}
+				}
+			},
+		};
+	});
+
 	// 드로어(사이드 패널): htmx가 상세 fragment를 로드하고 HX-Trigger로 admin-drawer-open을 쏘면 열린다.
 	// Esc·백드롭 클릭·닫기 버튼으로 닫고, 열릴 때 패널로 포커스를 옮긴다(접근성).
 	// 진화형 향상 — JS가 없으면 상세 링크가 상세 페이지로 이동한다(no-JS 대체).

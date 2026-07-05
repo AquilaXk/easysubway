@@ -100,6 +100,26 @@ class AdminSearchControllerTest {
 	}
 
 	@Test
+	@DisplayName("topbar에 커맨드 팔레트 트리거가 렌더되고 no-JS는 검색 페이지로 이동한다")
+	void topbarRendersCommandPalette() throws Exception {
+		String html = mockMvc.perform(get("/admin/search")
+				.param("q", "제보")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("class=\"command-palette\"")
+			.contains("command-palette-trigger")
+			.contains("x-data=\"commandPalette\"")
+			.contains("id=\"palette-results\"")
+			// no-JS fallback: 트리거는 검색 전용 페이지로 이동
+			.contains("href=\"/admin/search\"");
+	}
+
+	@Test
 	@DisplayName("결과가 없으면 빈 상태를 보여준다")
 	void emptyResultShowsEmptyState() throws Exception {
 		String html = mockMvc.perform(get("/admin/search")

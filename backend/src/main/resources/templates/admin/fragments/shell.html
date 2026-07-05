@@ -18,6 +18,35 @@
 </nav>
 <a th:fragment="skipLink" class="skip-link" href="#admin-content">본문으로 건너뛰기</a>
 <div th:fragment="topbar" class="admin-topbar">
+	<!--
+	  커맨드 팔레트(#1738): Cmd/Ctrl+K 또는 검색 버튼으로 연다. no-JS는 버튼이 /admin/search로 이동.
+	  팔레트는 scripts(Alpine·htmx)가 로드된 화면에서 활성화된다(전 화면 hoist는 후속).
+	-->
+	<div class="command-palette" x-data="commandPalette"
+	     x-on:keydown.cmd.k.window.prevent="show"
+	     x-on:keydown.ctrl.k.window.prevent="show"
+	     x-on:keydown.escape.window="hide">
+		<a class="command-palette-trigger" th:href="@{/admin/search}" x-on:click.prevent="show">
+			<span>검색</span><kbd>⌘K</kbd>
+		</a>
+		<div class="command-palette-overlay" x-cloak x-show="open"
+		     role="dialog" aria-modal="true" aria-label="통합 검색">
+			<div class="command-palette-backdrop" x-on:click="hide"></div>
+			<div class="command-palette-panel">
+				<form role="search" method="get" th:action="@{/admin/search}"
+				      hx-target="#palette-results" hx-swap="innerHTML"
+				      th:attr="hx-get=@{/admin/search}" hx-trigger="keyup changed delay:300ms">
+					<input type="search" name="q" x-ref="input" placeholder="메뉴·역 검색"
+					       aria-label="검색어" autocomplete="off"
+					       x-on:keydown.arrow-down.prevent="focusResults">
+					<button type="submit">검색</button>
+				</form>
+				<div id="palette-results" class="command-palette-results"
+				     x-on:keydown.arrow-down.prevent="moveDown"
+				     x-on:keydown.arrow-up.prevent="moveUp"></div>
+			</div>
+		</div>
+	</div>
 	<div class="admin-topbar-row" aria-label="관리자 실행 환경">
 		<div class="admin-topbar-meta">
 			<span class="admin-env-badge"
