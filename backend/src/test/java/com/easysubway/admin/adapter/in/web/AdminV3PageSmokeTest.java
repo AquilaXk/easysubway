@@ -45,6 +45,35 @@ class AdminV3PageSmokeTest {
 	}
 
 	@Test
+	@DisplayName("시설 상태판은 유형·상태·역 필터 툴바와 제보·허브 크로스링크를 렌더한다")
+	void facilityStatusBoardRendersV4ToolbarAndCrossLinks() throws Exception {
+		String html = mockMvc.perform(get("/admin/facilities/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+
+		assertThat(html)
+			.contains("시설·역 이름 검색")
+			.contains("유형 필터")
+			.contains("상태 필터")
+			.contains("역 필터")
+			.contains("확인 필요 먼저")
+			// 역명은 허브(시설 탭)로, 제보는 역 필터 제보 대기열로 크로스링크한다.
+			.contains("/admin/stations/station-sangnoksu/page?tab=facilities")
+			.contains("/admin/reports/page?station=station-sangnoksu");
+
+		String fragment = mockMvc.perform(get("/admin/facilities/page")
+				.param("sort", "attention")
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+		assertThat(fragment)
+			.contains("id=\"facility-results\"")
+			.doesNotContain("admin-shell");
+	}
+
+	@Test
 	@DisplayName("역 목록은 검색·지역·노선·정렬 툴바와 미확인 제보 뱃지를 렌더한다")
 	void stationListRendersV4ToolbarAndPendingBadge() throws Exception {
 		String html = mockMvc.perform(get("/admin/stations/page")

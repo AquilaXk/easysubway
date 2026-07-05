@@ -49,7 +49,7 @@ class TransitReadOnlyAdminPageModelTest {
 		);
 		var model = new ExtendedModelMap();
 
-		String viewName = controller.facilitiesPage(null, null, model);
+		String viewName = controller.facilitiesPage(null, null, null, null, null, null, null, model);
 
 		assertThat(viewName).isEqualTo("admin/facilities/list");
 		assertThat(model.get("masterDataWritable")).isEqualTo(false);
