@@ -1,0 +1,109 @@
+name: Automerge Queue
+
+# 다중 세션 병합 경합 해소용 FIFO 코디네이터 (#1751).
+# automerge 라벨이 붙은 PR을 생성순으로 한 번에 하나만 처리한다:
+# head PR에 auto-merge를 예약하고 BEHIND면 update-branch 한다.
+# 병합이 일어나면 push 이벤트가 이 워크플로우를 다시 실행해 다음 PR을 처리한다.
+# 라벨은 merge-workflow 규약 4단계(코드리뷰 게이트) 완료 후에만 붙인다.
+# 코디네이터는 review 객체가 없는 PR을 큐에서 제외해 규약을 재검증한다.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - labeled
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: automerge-queue
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  coordinate:
+    name: Automerge Queue
+    if: github.event_name != 'pull_request' || github.event.label.name == 'automerge'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process queue head
+        env:
+          # GITHUB_TOKEN의 push는 PR CI를 트리거하지 못하므로 PAT가 없으면 체인이 멈춘다.
+          GH_TOKEN: ${{ secrets.AUTOMERGE_PAT != '' && secrets.AUTOMERGE_PAT || github.token }}
+          HAS_PAT: ${{ secrets.AUTOMERGE_PAT != '' }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ "${HAS_PAT}" != "true" ]; then
+            echo "::warning::AUTOMERGE_PAT secret이 없어 GITHUB_TOKEN으로 실행한다. update-branch push가 PR CI를 트리거하지 못해 큐 체인이 멈출 수 있다."
+          fi
+
+          required_checks='["Changes","Repository CI","Backend CI","Mobile App CI","Android CI"]'
+
+          queue=$(gh pr list --repo "${REPO}" --label automerge --base main --state open \
+            --json number,createdAt,isDraft \
+            --jq 'sort_by(.createdAt) | map(select(.isDraft | not)) | .[].number')
+
+          if [ -z "${queue}" ]; then
+            echo "automerge 큐가 비어 있다."
+            exit 0
+          fi
+
+          derail() {
+            pr_number="$1"
+            reason="$2"
+            gh pr comment "${pr_number}" --repo "${REPO}" \
+              --body "automerge 큐에서 제외: ${reason} 해결 후 automerge 라벨을 다시 붙여주세요."
+            gh pr edit "${pr_number}" --repo "${REPO}" --remove-label automerge
+          }
+
+          for pr_number in ${queue}; do
+            state=$(gh pr view "${pr_number}" --repo "${REPO}" \
+              --json mergeStateStatus,reviews,statusCheckRollup)
+            merge_state=$(jq -r '.mergeStateStatus' <<<"${state}")
+            review_count=$(jq -r '.reviews | length' <<<"${state}")
+            failed_required=$(jq -r --argjson required "${required_checks}" \
+              '[.statusCheckRollup[]?
+                | select(($required | index(.name? // .context?)) != null)
+                | select(((.conclusion? // .state?) // "") as $c
+                  | $c == "FAILURE" or $c == "ERROR")] | length' <<<"${state}")
+
+            echo "PR #${pr_number}: mergeStateStatus=${merge_state}, reviews=${review_count}, failedRequiredChecks=${failed_required}"
+
+            if [ "${review_count}" -eq 0 ]; then
+              derail "${pr_number}" "GitHub PR Review 객체가 없습니다 (merge-workflow 규약 4단계 코드리뷰 게이트 미충족)."
+              continue
+            fi
+
+            if [ "${merge_state}" = "DIRTY" ]; then
+              derail "${pr_number}" "main과 충돌(DIRTY) 상태입니다. 충돌 해결이 필요합니다."
+              continue
+            fi
+
+            if [ "${failed_required}" -gt 0 ]; then
+              derail "${pr_number}" "실패한 필수 status check가 있습니다."
+              continue
+            fi
+
+            # 여기부터 큐 head 확정 — 한 번에 하나만 처리한다.
+            gh pr merge "${pr_number}" --repo "${REPO}" --squash --auto \
+              || echo "::warning::PR #${pr_number} auto-merge 예약 실패 — 다음 트리거에서 재시도한다."
+
+            if [ "${merge_state}" = "BEHIND" ]; then
+              gh api --method PUT "repos/${REPO}/pulls/${pr_number}/update-branch" \
+                -H "Accept: application/vnd.github+json" \
+                || echo "::warning::PR #${pr_number} update-branch 실패(transient 가능) — 다음 트리거에서 재시도한다."
+            fi
+
+            echo "큐 head PR #${pr_number} 처리 완료 — 필수 체크 통과 시 auto-merge가 병합한다."
+            exit 0
+          done
+
+          echo "큐에 병합 가능 후보가 없다."
