@@ -190,6 +190,17 @@ public class InMemoryFacilityReportRepository implements
 	}
 
 	@Override
+	public List<FacilityReportSummary> loadReportsForFacility(String stationId, String facilityId, int limit) {
+		return reports.values()
+			.stream()
+			.filter(report -> stationId.equals(report.stationId()) && facilityId.equals(report.facilityId()))
+			.sorted(reportOrder())
+			.limit(Math.max(limit, 0))
+			.map(FacilityReportSummary::from)
+			.toList();
+	}
+
+	@Override
 	public FacilityReport saveReport(FacilityReport report) {
 		reports.put(report.id(), report);
 		return report;

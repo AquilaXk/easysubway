@@ -265,6 +265,27 @@ class FacilityReportAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("신고 상세는 역·시설 이름을 보여주고 같은 시설 신고 목록을 노출한다")
+	void adminReportDetailShowsLabelsAndSameFacilityReports() throws Exception {
+		String first = createReport("첫 신고");
+		String second = createReport("같은 시설 두 번째 신고");
+
+		String html = mockMvc.perform(get("/admin/reports/{reportId}/page", first)
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn().getResponse().getContentAsString();
+
+		assertThat(html)
+			// 원시 ID 단독 노출 제거: '역 ID'/'시설 ID' 라벨 대신 역·시설 이름(코드).
+			.doesNotContain("역 ID")
+			.doesNotContain("시설 ID")
+			// 같은 시설 신고 목록에 다른 신고와 상세 크로스링크가 뜬다(현재 신고는 제외).
+			.contains("같은 시설 신고")
+			.contains("같은 시설 두 번째 신고")
+			.contains("/admin/reports/%s/page".formatted(second));
+	}
+
+	@Test
 	@DisplayName("관리자는 시설 상태 증거가 아닌 신고에서 override 링크를 보지 않는다")
 	void adminReportDetailPageHidesOverrideLinkForNonFacilityStatusEvidence() throws Exception {
 		String reportId = createReport("경로가 막힌 신고", "ROUTE_BLOCKED", "");

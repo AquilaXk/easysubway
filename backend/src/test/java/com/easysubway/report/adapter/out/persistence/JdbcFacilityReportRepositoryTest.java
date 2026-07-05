@@ -488,6 +488,64 @@ class JdbcFacilityReportRepositoryTest {
 		assertThat(repository.countReports(withPhoto)).isEqualTo(1L);
 	}
 
+	@Test
+	@DisplayName("같은 시설 신고 조회는 역·시설이 일치하는 신고만 최신순으로 돌려준다")
+	void loadReportsForFacilityReturnsMatchingReportsNewestFirst() {
+		repository.saveReport(reportAtFacility("f1-old", "station-a", "facility-1",
+			LocalDateTime.of(2026, 6, 17, 8, 0)));
+		repository.saveReport(reportAtFacility("f1-new", "station-a", "facility-1",
+			LocalDateTime.of(2026, 6, 17, 10, 0)));
+		repository.saveReport(reportAtFacility("f2", "station-a", "facility-2",
+			LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.saveReport(reportAtFacility("other-station", "station-b", "facility-1",
+			LocalDateTime.of(2026, 6, 17, 9, 0)));
+
+		assertThat(repository.loadReportsForFacility("station-a", "facility-1", 10))
+			.extracting(FacilityReportSummary::id)
+			.containsExactly("f1-new", "f1-old");
+	}
+
+	@Test
+	@DisplayName("같은 시설 신고 조회는 limit로 상한을 둔다")
+	void loadReportsForFacilityRespectsLimit() {
+		repository.saveReport(reportAtFacility("a", "station-a", "facility-1",
+			LocalDateTime.of(2026, 6, 17, 8, 0)));
+		repository.saveReport(reportAtFacility("b", "station-a", "facility-1",
+			LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.saveReport(reportAtFacility("c", "station-a", "facility-1",
+			LocalDateTime.of(2026, 6, 17, 10, 0)));
+
+		assertThat(repository.loadReportsForFacility("station-a", "facility-1", 2))
+			.extracting(FacilityReportSummary::id)
+			.containsExactly("c", "b");
+	}
+
+	private FacilityReport reportAtFacility(
+		String reportId,
+		String stationId,
+		String facilityId,
+		LocalDateTime createdAt
+	) {
+		return new FacilityReport(
+			reportId,
+			"anonymous-user-1",
+			stationId,
+			facilityId,
+			FacilityReportType.BROKEN,
+			"신고 내용",
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			FacilityReportStatus.SUBMITTED,
+			createdAt,
+			null,
+			null
+		);
+	}
+
 	private FacilityReport reportWith(
 		String reportId,
 		String stationId,

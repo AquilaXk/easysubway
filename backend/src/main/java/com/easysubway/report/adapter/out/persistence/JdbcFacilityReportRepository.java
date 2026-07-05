@@ -448,6 +448,44 @@ public class JdbcFacilityReportRepository implements
 	}
 
 	@Override
+	public List<FacilityReportSummary> loadReportsForFacility(String stationId, String facilityId, int limit) {
+		return jdbcTemplate.query(
+			"""
+				SELECT report_id,
+					public_receipt_code,
+					user_id,
+					station_id,
+					facility_id,
+					report_type,
+					description,
+					CASE
+						WHEN photo_file_name IS NOT NULL
+							AND photo_content_type IS NOT NULL
+							AND photo_object_key IS NOT NULL
+						THEN TRUE
+						ELSE FALSE
+					END AS has_photo,
+					latitude,
+					longitude,
+					duplicate_of_report_id,
+					status,
+					created_at,
+					reviewed_at,
+					reviewed_by
+				FROM facility_reports
+				WHERE station_id = ?
+					AND facility_id = ?
+				ORDER BY created_at DESC, report_id ASC
+				LIMIT ?
+				""",
+			this::mapFacilityReportSummary,
+			stationId,
+			facilityId,
+			limit
+		);
+	}
+
+	@Override
 	public FacilityReport saveReport(FacilityReport report) {
 		upsertReport(report);
 		return report;

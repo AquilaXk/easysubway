@@ -503,7 +503,7 @@ class FacilityReportAdminPageController {
 		Authentication authentication,
 		HttpServletRequest request
 	) {
-		populateReportDetailModel(reportId, model, null);
+		populateReportDetailModel(reportId, model, null, authentication);
 		auditReportDetailRead(authentication, request, reportId);
 		return "admin/reports/detail";
 	}
@@ -519,13 +519,35 @@ class FacilityReportAdminPageController {
 		Authentication authentication,
 		HttpServletRequest request
 	) {
-		populateReportDetailModel(reportId, model, null);
+		populateReportDetailModel(reportId, model, null, authentication);
 		auditReportDetailRead(authentication, request, reportId);
 		return "admin/reports/detail :: detailBody";
 	}
 
-	private void populateReportDetailModel(String reportId, Model model, ReviewReportForm submittedForm) {
-		model.addAttribute("report", FacilityReportDetailPageView.from(facilityReportUseCase.getReport(reportId), messages));
+	private void populateReportDetailModel(
+		String reportId,
+		Model model,
+		ReviewReportForm submittedForm,
+		Authentication authentication
+	) {
+		FacilityReport report = facilityReportUseCase.getReport(reportId);
+		model.addAttribute("report", FacilityReportDetailPageView.from(report, messages));
+		// 원시 ID 단독 노출 금지(#1740): 역·시설을 "이름(코드)"로 해석한다. 같은 시설 신고 행에도 재사용한다.
+		Map<String, String> stationLabels = labelResolver.stationLabels(List.of(report.stationId()));
+		Map<String, String> facilityLabels = labelResolver.facilityLabels(List.of(report.facilityId()));
+		model.addAttribute("stationLabel", stationLabels.getOrDefault(report.stationId(), report.stationId()));
+		model.addAttribute("facilityLabel", facilityLabels.getOrDefault(report.facilityId(), report.facilityId()));
+		model.addAttribute("canReadPhoto", hasReportPhotoReadAuthority(authentication));
+		// 같은 시설 신고 목록(#1740): 현재 신고는 제외하고 최신순으로 보여준다. 판정 전 반복 신고 맥락을 준다.
+		// #1163 중복 병합 기능과 독립적인 읽기 전용 목록이라 회귀 위험이 없다.
+		LocalDateTime now = LocalDateTime.now(clock);
+		List<FacilityReportListPageRow> sameFacilityReports = facilityReportUseCase
+			.listReportsForFacility(report.stationId(), report.facilityId())
+			.stream()
+			.filter(summary -> !summary.id().equals(reportId))
+			.map(summary -> FacilityReportListPageRow.from(summary, messages, stationLabels, facilityLabels, now))
+			.toList();
+		model.addAttribute("sameFacilityReports", sameFacilityReports);
 		model.addAttribute(
 			"reviewAudits",
 			facilityReportUseCase.listReviewAudits(reportId)
@@ -602,7 +624,7 @@ class FacilityReportAdminPageController {
 	) {
 		if (bindingResult.hasErrors()) {
 			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-			populateReportDetailModel(reportId, model, form);
+			populateReportDetailModel(reportId, model, form, authentication);
 			auditReportDetailRead(authentication, request, reportId);
 			AdminFormErrorView.expose(model, bindingResult);
 			return "admin/reports/detail";
