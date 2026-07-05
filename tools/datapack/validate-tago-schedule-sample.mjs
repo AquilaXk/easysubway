@@ -501,7 +501,7 @@ function tagoStationIds(input) {
     stationIds.add(`MTRKR4${row.stationCode}`);
   }
   if (stationIds.size === 0) {
-    throw new Error("stationLineRows must contain at least one stationCode");
+    throw new Error("stationLineRows must contain at least one providerStationId or stationCode");
   }
   return [...stationIds];
 }
