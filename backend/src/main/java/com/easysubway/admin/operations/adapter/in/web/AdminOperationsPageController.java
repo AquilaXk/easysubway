@@ -10,6 +10,8 @@ import com.easysubway.admin.code.domain.AdminCommonCodeGroups;
 import com.easysubway.admin.operations.application.service.AdminIncidentService;
 import com.easysubway.admin.operations.application.service.AdminIncidentService.OpenAdminIncidentCommand;
 import com.easysubway.admin.operations.domain.AdminIncident;
+import com.easysubway.admin.operations.domain.AdminIncidentStatus;
+import com.easysubway.admin.operations.domain.AdminIncidentTransition;
 import com.easysubway.common.web.pagination.AdminPageRequest;
 import com.easysubway.common.web.pagination.EgovPaginationView;
 import com.easysubway.health.application.port.in.CheckHealthUseCase;
@@ -18,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -128,10 +131,11 @@ class AdminOperationsPageController {
 		Model model
 	) {
 		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
-		List<IncidentRow> incidents = incidentService
-			.listRecent(pageRequest.limitForHasNext(), pageRequest.offset())
-			.stream()
-			.map(IncidentRow::from)
+		List<AdminIncident> recent = incidentService.listRecent(pageRequest.limitForHasNext(), pageRequest.offset());
+		Map<String, List<AdminIncidentTransition>> timelines = incidentService.listTransitions(
+			recent.stream().map(AdminIncident::incidentId).toList());
+		List<IncidentRow> incidents = recent.stream()
+			.map(incident -> IncidentRow.from(incident, timelines.getOrDefault(incident.incidentId(), List.of())))
 			.toList();
 		EgovPaginationView pageView = EgovPaginationView.fromSlice(pageRequest.page(), pageRequest.size(), incidents.size());
 		HealthStatus health = checkHealthUseCase.checkHealth();
@@ -141,7 +145,7 @@ class AdminOperationsPageController {
 		model.addAttribute("severityOptions", optionRows(AdminCommonCodeGroups.INCIDENT_SEVERITY));
 		model.addAttribute("statusOptions", optionRows(AdminCommonCodeGroups.INCIDENT_STATUS)
 			.stream()
-			.filter(option -> "OPEN".equals(option.code()))
+			.filter(option -> AdminIncidentStatus.RECEIVED.name().equals(option.code()))
 			.toList());
 		model.addAttribute("sourceOptions", optionRows(AdminCommonCodeGroups.INCIDENT_SOURCE));
 		model.addAttribute("healthStatus", health.status());
@@ -193,22 +197,26 @@ class AdminOperationsPageController {
 		return "redirect:/admin/incidents/page";
 	}
 
-	@PostMapping("/admin/incidents/{incidentId}/resolve")
+	@PostMapping("/admin/incidents/{incidentId}/transition")
 	@Transactional
-	String resolveIncident(
+	String transitionIncident(
 		@PathVariable String incidentId,
-		@RequestParam String resolution,
+		@RequestParam String targetStatus,
+		@RequestParam(required = false) String note,
+		@RequestParam(required = false) String resolution,
+		Principal principal,
 		Authentication authentication,
 		HttpServletRequest request
 	) {
-		AdminIncident incident = incidentService.resolve(incidentId, resolution);
+		AdminIncident incident = incidentService.transition(incidentId, targetStatus, principal.getName(), note, resolution);
+		boolean resolved = incident.status().isResolved();
 		auditWriter.incidentChange(
 			authentication,
 			request,
 			incident.incidentId(),
-			"RESOLVE_INCIDENT",
+			resolved ? "RESOLVE_INCIDENT" : "TRANSITION_INCIDENT",
 			AdminAuditOutcome.SUCCESS,
-			"resolutionLength=%d".formatted(incident.resolution().length())
+			resolved ? "resolutionLength=%d".formatted(incident.resolution().length()) : "to=%s".formatted(incident.status().name())
 		);
 		return "redirect:/admin/incidents/page";
 	}
@@ -275,28 +283,65 @@ class AdminOperationsPageController {
 		String incidentId,
 		String severity,
 		String status,
+		String statusLabel,
 		String source,
 		String summary,
 		String owner,
 		String openedAt,
 		String resolvedAt,
 		String resolution,
-		boolean open
+		boolean open,
+		List<TransitionRow> timeline,
+		List<TransitionOption> transitionOptions
 	) {
 
-		static IncidentRow from(AdminIncident incident) {
+		static IncidentRow from(AdminIncident incident, List<AdminIncidentTransition> transitions) {
 			return new IncidentRow(
 				incident.incidentId(),
 				incident.severity(),
-				incident.status(),
+				incident.status().name(),
+				incident.status().label(),
 				incident.source(),
 				incident.summary(),
 				incident.owner(),
 				String.valueOf(incident.openedAt()),
 				incident.resolvedAt() == null ? "-" : String.valueOf(incident.resolvedAt()),
 				incident.resolution(),
-				!"RESOLVED".equals(incident.status())
+				!incident.status().isResolved(),
+				transitions.stream().map(TransitionRow::from).toList(),
+				incident.status().allowedTransitions().stream()
+					.sorted()
+					.map(TransitionOption::from)
+					.toList()
 			);
+		}
+	}
+
+	record TransitionRow(
+		String fromLabel,
+		String toLabel,
+		String changedAt,
+		String changedBy,
+		String note,
+		boolean initial
+	) {
+
+		static TransitionRow from(AdminIncidentTransition transition) {
+			return new TransitionRow(
+				transition.isInitial() ? "-" : transition.fromStatus().label(),
+				transition.toStatus().label(),
+				String.valueOf(transition.changedAt()),
+				transition.changedBy(),
+				transition.note() == null ? "" : transition.note(),
+				transition.isInitial()
+			);
+		}
+	}
+
+	record TransitionOption(String code, String label, boolean requiresResolution) {
+
+		static TransitionOption from(AdminIncidentStatus status) {
+			return new TransitionOption(status.name(), status.label(), status.isResolved());
 		}
 	}
 }
