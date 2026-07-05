@@ -151,6 +151,23 @@ test("TAGO 시간표 검증은 provider row order에 의존하지 않는다", ()
   );
 });
 
+test("TAGO 시간표 검증은 같은 시간 row도 deterministic하게 정렬한다", () => {
+  const first = validateTagoScheduleSample(
+    tagoResponse("MTRKR4448", "01", "U", [
+      ["051000", "051500", "MTRKR410"],
+      ["051000", "051500", "MTRKR409"],
+    ]),
+  );
+  const second = validateTagoScheduleSample(
+    tagoResponse("MTRKR4448", "01", "U", [
+      ["051000", "051500", "MTRKR409"],
+      ["051000", "051500", "MTRKR410"],
+    ]),
+  );
+
+  assert.deepEqual(first.providerRecordHashes, second.providerRecordHashes);
+});
+
 test("TAGO 시간표 수집 summary evidence hash는 checkpoint 상태를 포함한다", () => {
   const response = {
     requestKey: "MTRKR4448|02|U",
@@ -529,8 +546,8 @@ function tagoResponse(
       header: { resultCode: "00" },
       body: {
         items: {
-          item: times.map(([arrTime, depTime]) =>
-            tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime),
+          item: times.map(([arrTime, depTime, endSubwayStationId]) =>
+            tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime, endSubwayStationId),
           ),
         },
       },
@@ -538,7 +555,7 @@ function tagoResponse(
   });
 }
 
-function tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime) {
+function tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime, endSubwayStationId = "MTRKR409") {
   return {
     subwayRouteId: "MTRKR4",
     subwayStationId: stationId,
@@ -548,6 +565,6 @@ function tagoRow(stationId, dailyTypeCode, upDownTypeCode, arrTime, depTime) {
     arrTime,
     depTime,
     endSubwayStationNm: "당고개",
-    endSubwayStationId: "MTRKR409",
+    endSubwayStationId,
   };
 }
