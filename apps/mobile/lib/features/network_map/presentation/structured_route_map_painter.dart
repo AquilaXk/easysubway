@@ -316,12 +316,14 @@ class StructuredRouteMapPainter extends CustomPainter {
   static const Color _transferBorder = Color(0xFF102A2C);
   static const Color _regularStationFill = Color(0xFFFFFFFF);
   static const Color _fallbackLineColor = Color(0xFF8D8D8D);
-  static const double _transferBorderWidth = 2.0;
+  // 환승 캡슐 테두리: 공식 노선도 비율(테두리:선 = 3:8 ≈ 0.375). 선 4px 기준 1.5.
+  static const double _transferBorderWidth = 1.5;
   static const double _regularStationBorderWidth = 1.6;
-  // 환승 캡슐 안 색 도트: 노선 수만큼 세로로 쌓는다(#1792 G3).
-  static const double _transferDotRadius = 2.5;
-  static const double _transferDotGap = 1.5;
-  static const double _transferDotPadding = 2.0;
+  // 환승 캡슐 안 색 도트: 노선 수만큼 세로로 쌓는다(#1792 G3). map_korea_page1
+  // _review.png 실측 비율(선8·도트10·캡슐짧은축19·간격13)을 선 4px로 환산.
+  static const double _transferDotRadius = 2.5; // 도트 지름 5 (10/8×4)
+  static const double _transferDotGap = 1.5; // 중심 간격 6.5 (13/8×4)
+  static const double _transferDotPadding = 1.5; // 캡슐 짧은축 outer≈9.5 (19/8×4)
   static const double _labelGap = 4.0;
   static const String _badgeIdPrefix = 'badge:';
   static const double _badgeHorizontalPadding = 5.0;
