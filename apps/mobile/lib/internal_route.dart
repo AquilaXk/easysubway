@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'core/network/api_client.dart';
 import 'mobile_error_reporter.dart';
+import 'route_hedge_labels.dart';
 
 const _internalRouteErrorMessage = '역 안 이동 안내를 불러오지 못했어요.';
 
@@ -418,16 +419,8 @@ class InternalRouteWarning {
 
   String get message => userMessage;
 
-  String get userMessage {
-    return switch (code.trim()) {
-      'LOW_DATA_CONFIDENCE' => '일부 시설 안내를 준비 중이에요.',
-      'STALE_ACCESSIBILITY_DATA' => '엘리베이터와 통로 상태를 최근에 확인하지 못했어요.',
-      'STAIR_ONLY_ACCESS' => '계단 포함 구간이 있습니다.',
-      'STAIR_ONLY_ACCESS_UNKNOWN' => '계단 없는 길인지 확인하지 못했어요.',
-      'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 확인하지 못했어요.',
-      _ => '일부 이동 정보를 확인하지 못했어요.',
-    };
-  }
+  // 역 안 이동 주의 문구도 길찾기 결과와 같은 헤지 사전 한 벌을 쓴다(#1577).
+  String get userMessage => routeWarningLabel(code);
 }
 
 enum InternalRouteViewStatus { loading, success, failure, unavailable }

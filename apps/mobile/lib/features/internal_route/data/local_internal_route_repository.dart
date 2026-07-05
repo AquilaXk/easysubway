@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../../../core/database/catalog/catalog_database.dart'
     hide InternalRouteNode;
 import '../../../internal_route.dart';
+import '../../../route_hedge_labels.dart';
 import '../../routes/domain/route_request.dart' as local;
 import '../../routes/domain/route_result.dart' as local;
 import '../application/internal_route_engine.dart' as engine;
@@ -141,7 +142,8 @@ class LocalInternalRouteRepository implements InternalRouteRepository {
           .map(
             (code) => switch (code) {
               'STAIR_ONLY_ACCESS' => '계단 없는 역 안 이동 경로를 찾지 못했어요.',
-              'ACCESSIBILITY_STATE_UNKNOWN' => '엘리베이터와 통로 상태를 확인하지 못했어요.',
+              // 불확실성 헤지는 앱 공통 사전 한 벌로(#1577).
+              'ACCESSIBILITY_STATE_UNKNOWN' => routeHedgeAccessibilityUnknown,
               'FACILITY_UNAVAILABLE' => '역 안 이동에 필요한 시설을 이용할 수 없어요.',
               _ => '역 안 이동 경로를 이용할 수 없어요.',
             },
