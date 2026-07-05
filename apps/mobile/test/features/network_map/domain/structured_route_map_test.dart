@@ -138,22 +138,101 @@ void main() {
       expect(group.centroid, const Offset(5, 10));
     });
 
-    test('환승역은 transfer, 단일 노선역은 regular class', () {
+    test('환승역은 transfer, 단일 노선 중간역은 regular, 종점은 major', () {
       final map = buildStructuredRouteMap(
         [
           input(stationId: 's1', lineId: 'L1', sequence: 1),
           input(stationId: 's1', lineId: 'L2', sequence: 1),
-          input(stationId: 's2', lineId: 'L1', sequence: 2),
+          input(stationId: 's2', lineId: 'L1', sequence: 2), // 단일·중간
+          input(stationId: 's3', lineId: 'L1', sequence: 3), // 단일·종점
         ],
         lineTracks: const [],
       );
 
       final transfer = map.stations.firstWhere((s) => s.stationId == 's1');
       final regular = map.stations.firstWhere((s) => s.stationId == 's2');
+      final terminal = map.stations.firstWhere((s) => s.stationId == 's3');
+      // s1은 L1 종점(seq 최소)이지만 환승이라 transfer가 우선한다.
       expect(transfer.labelClass, RouteMapLabelClass.transfer);
       expect(regular.labelClass, RouteMapLabelClass.regular);
+      expect(terminal.labelClass, RouteMapLabelClass.major);
       expect(transfer.minLabelZoomBucket, 1);
       expect(regular.minLabelZoomBucket, 2);
+      expect(terminal.minLabelZoomBucket, 1);
+    });
+
+    test('노선 양 종점은 major(자동), 환승은 transfer 우선', () {
+      final map = buildStructuredRouteMap(
+        [
+          input(stationId: 'a', lineId: 'L1', sequence: 5), // 최소 seq=종점
+          input(stationId: 'b', lineId: 'L1', sequence: 7),
+          input(stationId: 'c', lineId: 'L1', sequence: 9), // 최대 seq=종점
+        ],
+        lineTracks: const [],
+      );
+      RouteMapLabelClass cls(String id) =>
+          map.stations.firstWhere((s) => s.stationId == id).labelClass;
+      expect(cls('a'), RouteMapLabelClass.major);
+      expect(cls('b'), RouteMapLabelClass.regular);
+      expect(cls('c'), RouteMapLabelClass.major);
+    });
+
+    test('거점 allowlist(majorStationIds) 역은 major, 단 환승이면 transfer 우선', () {
+      final map = buildStructuredRouteMap(
+        [
+          input(stationId: 'start', lineId: 'L1', sequence: 1),
+          input(stationId: 'hub', lineId: 'L1', sequence: 2), // 중간·거점
+          input(stationId: 'end', lineId: 'L1', sequence: 3),
+          input(stationId: 'x', lineId: 'L1', sequence: 4),
+          input(stationId: 'x', lineId: 'L2', sequence: 1), // 환승·거점
+        ],
+        lineTracks: const [],
+        majorStationIds: const {'hub', 'x'},
+      );
+      RouteMapLabelClass cls(String id) =>
+          map.stations.firstWhere((s) => s.stationId == id).labelClass;
+      // 중간역이지만 allowlist라 major.
+      expect(cls('hub'), RouteMapLabelClass.major);
+      // allowlist이자 환승이면 transfer가 우선(major 아님).
+      expect(cls('x'), RouteMapLabelClass.transfer);
+    });
+
+    test('순환선(양 극점 인접)은 종점 major를 만들지 않는다', () {
+      // seq 1..4 루프: 극점 s1(seq1)·s4(seq4)이 노선 span 대비 가깝다(루프 닫힘).
+      final map = buildStructuredRouteMap(
+        [
+          input(stationId: 's1', lineId: 'loop', sequence: 1, position: Offset(100, 100)),
+          input(stationId: 's2', lineId: 'loop', sequence: 2, position: Offset(300, 100)),
+          input(stationId: 's3', lineId: 'loop', sequence: 3, position: Offset(300, 300)),
+          input(stationId: 's4', lineId: 'loop', sequence: 4, position: Offset(106, 106)),
+        ],
+        lineTracks: const [],
+      );
+      for (final station in map.stations) {
+        expect(
+          station.labelClass,
+          RouteMapLabelClass.regular,
+          reason: '${station.stationId}: 순환선은 종점 major 없음',
+        );
+      }
+    });
+
+    test('sequence 동률 종점(분기)은 극값 역을 모두 major로 포함', () {
+      final map = buildStructuredRouteMap(
+        [
+          input(stationId: 'trunk', lineId: 'L', sequence: 1, position: Offset(0, 0)),
+          input(stationId: 'mid', lineId: 'L', sequence: 2, position: Offset(200, 0)),
+          input(stationId: 'branchA', lineId: 'L', sequence: 3, position: Offset(400, 0)),
+          input(stationId: 'branchB', lineId: 'L', sequence: 3, position: Offset(400, 200)),
+        ],
+        lineTracks: const [],
+      );
+      RouteMapLabelClass cls(String id) =>
+          map.stations.firstWhere((s) => s.stationId == id).labelClass;
+      expect(cls('trunk'), RouteMapLabelClass.major); // seq 최소 극값
+      expect(cls('branchA'), RouteMapLabelClass.major); // seq 최대 극값
+      expect(cls('branchB'), RouteMapLabelClass.major); // 동률 극값도 포함
+      expect(cls('mid'), RouteMapLabelClass.regular);
     });
 
     test('LOD: transfer/major는 zoom1, regular는 zoom2', () {
