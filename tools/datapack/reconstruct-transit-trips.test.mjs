@@ -174,3 +174,48 @@ test("재구성은 한 trip 안에서 servicePattern이 섞이면 거부한다(�
   ];
   assert.throws(() => reconstructTransitTrips(rows, CONTEXT), /inconsistent servicePattern/);
 });
+
+test("재구성은 필수 필드 누락·잘못된 시각·arr>dep 행을 거부한다", () => {
+  const base = { stationId: "station-sadang", lineId: "seoul-4", trnNo: "E1", dayCd: "01", arrivalSeconds: 30000, departureSeconds: 30000 };
+  assert.throws(() => reconstructTransitTrips([{ ...base, stationId: "" }], CONTEXT), /missing field stationId/);
+  assert.throws(() => reconstructTransitTrips([{ ...base, arrivalSeconds: -1 }], CONTEXT), /arrivalSeconds must be a non-negative integer/);
+  assert.throws(() => reconstructTransitTrips([{ ...base, arrivalSeconds: 31000, departureSeconds: 30000 }], CONTEXT), /arrivalSeconds must be <= departureSeconds/);
+});
+
+test("재구성은 lineSequence·route·serviceId 매핑이 없으면 거부한다", () => {
+  const rows = [
+    { stationId: "station-sadang", lineId: "seoul-4", trnNo: "E2", dayCd: "01", arrivalSeconds: 30000, departureSeconds: 30000 },
+    { stationId: "station-unknown", lineId: "seoul-4", trnNo: "E2", dayCd: "01", arrivalSeconds: 31000, departureSeconds: 31000 },
+  ];
+  assert.throws(() => reconstructTransitTrips(rows, CONTEXT), /unknown lineSequence for station-unknown/);
+
+  const upOnly = { ...CONTEXT, routeIdByLineDirection: { "seoul-4|up": "route-seoul-4-oido" } };
+  const downRows = [
+    { stationId: "station-sangnoksu", lineId: "seoul-4", trnNo: "E3", dayCd: "01", arrivalSeconds: 40000, departureSeconds: 40000 },
+    { stationId: "station-sadang", lineId: "seoul-4", trnNo: "E3", dayCd: "01", arrivalSeconds: 41000, departureSeconds: 41000 },
+  ];
+  assert.throws(() => reconstructTransitTrips(downRows, upOnly), /no route mapping for seoul-4\|down/);
+
+  const noService = { ...CONTEXT, serviceIdByDayCd: { "01": "weekday-2026" } };
+  const satRows = [
+    { stationId: "station-sadang", lineId: "seoul-4", trnNo: "E4", dayCd: "02", arrivalSeconds: 30000, departureSeconds: 30000 },
+    { stationId: "station-sangnoksu", lineId: "seoul-4", trnNo: "E4", dayCd: "02", arrivalSeconds: 31000, departureSeconds: 31000 },
+  ];
+  assert.throws(() => reconstructTransitTrips(satRows, noService), /no serviceId mapping for 02/);
+});
+
+test("재구성 context는 Map도 허용하고, 누락되면 거부한다", () => {
+  const rows = [
+    { stationId: "station-sadang", lineId: "seoul-4", trnNo: "E5", dayCd: "01", arrivalSeconds: 30000, departureSeconds: 30000 },
+    { stationId: "station-sangnoksu", lineId: "seoul-4", trnNo: "E5", dayCd: "01", arrivalSeconds: 31000, departureSeconds: 31000 },
+  ];
+  const mapCtx = {
+    lineSequenceByStationLine: new Map([["station-sadang|seoul-4", 28], ["station-sangnoksu|seoul-4", 43]]),
+    routeIdByLineDirection: new Map([["seoul-4|up", "route-seoul-4-oido"]]),
+    serviceIdByDayCd: new Map([["01", "weekday-2026"]]),
+  };
+  const { transitTrips } = reconstructTransitTrips(rows, mapCtx);
+  assert.equal(transitTrips[0].routeId, "route-seoul-4-oido");
+
+  assert.throws(() => reconstructTransitTrips(rows, { ...CONTEXT, serviceIdByDayCd: null }), /context.serviceIdByDayCd is required/);
+});
