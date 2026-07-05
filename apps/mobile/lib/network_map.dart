@@ -3376,8 +3376,10 @@ _StationTapScore? _stationTapScore(
   );
   final nodeHitRect = Rect.fromCenter(
     center: nodeCenter,
-    width: _maximumStationHitDistance * 2,
-    height: _maximumStationHitDistance * 2,
+    // 노출 상수를 단일 소스로 써서, 48dp 접근성 회귀 가드 테스트가 실제 hit
+    // rect를 지키게 한다(상수와 rect의 독립 재유도 드리프트 방지).
+    width: networkMapStationHitTargetLogicalSize,
+    height: networkMapStationHitTargetLogicalSize,
   );
   final containsNode = nodeHitRect.contains(viewportPosition);
   final nodeDistance = (viewportPosition - nodeCenter).distance;
