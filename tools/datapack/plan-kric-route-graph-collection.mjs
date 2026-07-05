@@ -28,9 +28,7 @@ function planRequest(candidate, priority) {
   requireCandidateState(candidate);
   const evidence = candidate.evidence ?? {};
   const sampleUrl = forceJsonFormat(requiredText(evidence.sampleUrl, `${candidate.id}.evidence.sampleUrl`));
-  if (!/[?&]serviceKey=\[서비스키값\](?:&|$)/.test(sampleUrl)) {
-    throw new Error(`${candidate.id} sampleUrl must keep serviceKey redacted`);
-  }
+  assertRedactedServiceKey(sampleUrl, candidate.id);
   if (!(evidence.formats ?? []).some((format) => String(format).toLowerCase() === "json")) {
     throw new Error(`${candidate.id} must support JSON sample collection`);
   }
@@ -61,6 +59,13 @@ function forceJsonFormat(sampleUrl) {
   const url = new URL(sampleUrl);
   url.searchParams.set("format", "json");
   return url.toString().replace("serviceKey=%5B%EC%84%9C%EB%B9%84%EC%8A%A4%ED%82%A4%EA%B0%92%5D", "serviceKey=[서비스키값]");
+}
+
+function assertRedactedServiceKey(sampleUrl, candidateId) {
+  const serviceKeys = new URL(sampleUrl).searchParams.getAll("serviceKey");
+  if (serviceKeys.length !== 1 || serviceKeys[0] !== "[서비스키값]") {
+    throw new Error(`${candidateId} sampleUrl must keep exactly one redacted serviceKey`);
+  }
 }
 
 function requiredText(value, label) {

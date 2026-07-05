@@ -6268,6 +6268,7 @@ test("KRIC route graph 수집 계획은 실제 serviceKey가 섞인 후보를 �
   await mkdir(outputDir, { recursive: true });
   const candidates = JSON.parse(await readFile("tools/datapack/source-candidates.json", "utf8"));
   const candidate = candidates.candidates.find((entry) => entry.id === "kric-subway-route-info");
+  const originalSampleUrl = candidate.evidence.sampleUrl;
   candidate.evidence.sampleUrl = candidate.evidence.sampleUrl.replace("[서비스키값]", "real-secret-key");
   await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
 
@@ -6283,7 +6284,24 @@ test("KRIC route graph 수집 계획은 실제 serviceKey가 섞인 후보를 �
       ],
       { cwd: root },
     ),
-    /sampleUrl must keep serviceKey redacted/,
+    /sampleUrl must keep exactly one redacted serviceKey/,
+  );
+
+  candidate.evidence.sampleUrl = `${originalSampleUrl}&serviceKey=real-secret-key`;
+  await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/plan-kric-route-graph-collection.mjs",
+        "--candidates",
+        candidatesPath,
+        "--candidate",
+        "kric-subway-route-info",
+      ],
+      { cwd: root },
+    ),
+    /sampleUrl must keep exactly one redacted serviceKey/,
   );
 });
 
