@@ -41,7 +41,6 @@ const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
 const _mainScaffoldBackgroundColor = EasySubwayAccessibleColors.scaffoldSurface;
-const _dataDeletionResultIconRadius = 16.0;
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(12));
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
 const _appCardShadowColor = EasySubwayAccessibleColors.cardShadow;
@@ -627,7 +626,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   late OnboardingResult? _lastPersistedOnboardingResult =
       widget.initialOnboardingState.result;
   UserDataDeletionResult? _dataDeletionResult;
-  UserDataDeletionScope _dataDeletionScope = UserDataDeletionScope.deviceOnly;
 
   @override
   void initState() {
@@ -650,12 +648,9 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     final dataDeletionResult = _dataDeletionResult;
     if (dataDeletionResult != null) {
       return UserDataDeletionResultScreen(
-        result: dataDeletionResult,
-        deletionScope: _dataDeletionScope,
         onRestart: () {
           setState(() {
             _dataDeletionResult = null;
-            _dataDeletionScope = UserDataDeletionScope.deviceOnly;
           });
         },
       );
@@ -757,9 +752,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _startScreenDismissed = false;
       _introScreenDismissed = false;
       _dataDeletionResult = result;
-      _dataDeletionScope = _userDataDeletionScope(
-        widget.userDataDeletionRepository,
-      );
     });
   }
 
@@ -3955,15 +3947,8 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
 }
 
 class UserDataDeletionResultScreen extends StatelessWidget {
-  const UserDataDeletionResultScreen({
-    required this.result,
-    required this.deletionScope,
-    required this.onRestart,
-    super.key,
-  });
+  const UserDataDeletionResultScreen({required this.onRestart, super.key});
 
-  final UserDataDeletionResult result;
-  final UserDataDeletionScope deletionScope;
   final VoidCallback onRestart;
 
   @override
@@ -4013,63 +3998,6 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const _AppSectionTitle(title: '삭제 결과'),
-            _AppCard(
-              child: Column(
-                children: [
-                  _DataDeletionResultRow(
-                    id: 'favoriteStations',
-                    icon: Icons.train_outlined,
-                    title: '즐겨찾기한 역',
-                    value: '${result.deletedFavoriteStationCount}개 삭제',
-                  ),
-                  const SizedBox(height: 16),
-                  _DataDeletionResultRow(
-                    id: 'favoriteFacilities',
-                    icon: Icons.elevator_outlined,
-                    title: '즐겨찾기한 시설',
-                    value: '${result.deletedFavoriteFacilityCount}개 삭제',
-                  ),
-                  const SizedBox(height: 16),
-                  _DataDeletionResultRow(
-                    id: 'favoriteRoutes',
-                    icon: Icons.route_outlined,
-                    title: '즐겨찾기한 경로',
-                    value: '${result.deletedFavoriteRouteCount}개 삭제',
-                  ),
-                  const SizedBox(height: 16),
-                  _DataDeletionResultRow(
-                    id: 'notifications',
-                    icon: Icons.notifications_none,
-                    title: '알림 설정',
-                    value: result.notificationSettingsDeleted
-                        ? '삭제'
-                        : '알림 설정은 이미 비어 있어요',
-                  ),
-                  const SizedBox(height: 12),
-                  _DataDeletionResultRow(
-                    id: 'reportReceipts',
-                    icon: Icons.report_outlined,
-                    title: deletionScope == UserDataDeletionScope.deviceOnly
-                        ? '이 기기의 제보 기록'
-                        : '보낸 제보 기록',
-                    value: deletionScope == UserDataDeletionScope.deviceOnly
-                        ? '${result.anonymizedReportCount}건 삭제'
-                        : '${result.anonymizedReportCount}건을 누구의 정보인지 알 수 없게 바꿈',
-                  ),
-                  if (deletionScope != UserDataDeletionScope.deviceOnly)
-                    const SizedBox(height: 16),
-                  if (deletionScope != UserDataDeletionScope.deviceOnly)
-                    _DataDeletionResultRow(
-                      id: 'routeFeedback',
-                      icon: Icons.rate_review_outlined,
-                      title: '경로 의견',
-                      value:
-                          '${result.anonymizedRouteFeedbackCount}건을 누구의 정보인지 알 수 없게 바꿈',
-                    ),
-                ],
-              ),
-            ),
             const SizedBox(height: 12),
             const _AppCard(
               showBorder: true,
@@ -4078,115 +4006,6 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                 iconColor: EasySubwayAccessibleColors.primary,
                 title: '노선도와 역 정보는 계속 이용할 수 있어요',
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DataDeletionResultRow extends StatelessWidget {
-  const _DataDeletionResultRow({
-    required this.id,
-    required this.icon,
-    required this.title,
-    required this.value,
-  });
-
-  final String id;
-  final IconData icon;
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final textScaler = MediaQuery.textScalerOf(context).scale(1);
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: textTheme.titleMedium?.copyWith(
-            color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: textTheme.bodyMedium?.copyWith(
-            color: EasySubwayAccessibleColors.mutedText,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-    // 삭제 완료는 복구/완료 상태 의미가 있어 민트 뱃지를 유지한다.
-    final statusBadge = Container(
-      key: Key('dataDeletionResultStatus-$id'),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.mintSoft,
-        borderRadius: _mainThemeControlRadius,
-        border: Border.all(color: EasySubwayAccessibleColors.mintBorder),
-      ),
-      child: const Text(
-        '완료',
-        style: TextStyle(
-          color: EasySubwayAccessibleColors.mintDark,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-
-    return Semantics(
-      key: Key('dataDeletionResultRow-$id'),
-      container: true,
-      label: '$title, $value, 완료',
-      child: ExcludeSemantics(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              key: Key('dataDeletionResultIcon-$id'),
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(
-                  _dataDeletionResultIconRadius,
-                ),
-                border: Border.all(
-                  color: EasySubwayAccessibleColors.mintDark,
-                  width: 2,
-                ),
-              ),
-              child: Icon(
-                icon,
-                color: EasySubwayAccessibleColors.mintDark,
-                size: 30,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: textScaler >= 1.5
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        content,
-                        const SizedBox(height: 8),
-                        statusBadge,
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Expanded(child: content),
-                        const SizedBox(width: 12),
-                        statusBadge,
-                      ],
-                    ),
             ),
           ],
         ),
