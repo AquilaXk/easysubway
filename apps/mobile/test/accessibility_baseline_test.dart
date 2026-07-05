@@ -5,6 +5,7 @@ import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
@@ -22,6 +23,16 @@ void main() {
     expect(
       _contrastRatio(EasySubwayAccessibleColors.mutedText, appBackground),
       greaterThanOrEqualTo(4.5),
+    );
+  });
+
+  test('노선도 역 tap hit target은 48dp 최소 상호작용 크기를 만족한다', () {
+    // AGENTS.md 큰 터치 영역 hard rule + WCAG 2.5.5(target size 48×48).
+    // 노드 중심 사방 24px hit → 48×48 hit rect. #1642 접근성 회귀 가드:
+    // _maximumStationHitDistance를 24 미만으로 낮추면(=<48dp) 이 테스트가 잡는다.
+    expect(
+      networkMapStationHitTargetLogicalSize,
+      greaterThanOrEqualTo(kMinInteractiveDimension),
     );
   });
 

@@ -1,0 +1,86 @@
+name: TAGO Schedule Collection
+
+on:
+  workflow_dispatch:
+    inputs:
+      dailyLimit:
+        description: Maximum provider calls for this batch
+        required: true
+        default: "12"
+      checkpointJson:
+        description: Previous checkpoint JSON
+        required: true
+        default: '{"completedRequestKeys":[]}'
+
+jobs:
+  collect:
+    name: TAGO Schedule Collection
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      TAGO_DAILY_LIMIT: ${{ github.event.inputs.dailyLimit }}
+      TAGO_CHECKPOINT_JSON: ${{ github.event.inputs.checkpointJson }}
+
+    steps:
+      - name: TAGO Schedule Collection / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: TAGO Schedule Collection / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: TAGO Schedule Collection / Prepare checkpoint
+        run: |
+          set -euo pipefail
+          node -e 'const fs=require("fs"); const value=JSON.parse(process.env.TAGO_CHECKPOINT_JSON); if (!Array.isArray(value.completedRequestKeys)) throw new Error("checkpointJson.completedRequestKeys must be an array"); fs.writeFileSync(process.env.RUNNER_TEMP + "/tago-checkpoint.json", JSON.stringify(value, null, 2) + "\n");'
+
+      - name: TAGO Schedule Collection / Collect pilot batch
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${DATA_GO_KR_SERVICE_KEY}"
+          node tools/datapack/validate-tago-schedule-sample.mjs \
+            --plan \
+            --quiet \
+            --input tools/datapack/inputs/capital-pilot-production-source-input.json \
+            --daily-limit "${TAGO_DAILY_LIMIT}" \
+            --checkpoint "${RUNNER_TEMP}/tago-checkpoint.json" \
+            --output "${RUNNER_TEMP}/tago-plan.json"
+          collect_status=0
+          node tools/datapack/validate-tago-schedule-sample.mjs \
+            --collect \
+            --quiet \
+            --input tools/datapack/inputs/capital-pilot-production-source-input.json \
+            --daily-limit "${TAGO_DAILY_LIMIT}" \
+            --checkpoint "${RUNNER_TEMP}/tago-checkpoint.json" \
+            --service-key-env DATA_GO_KR_SERVICE_KEY \
+            --output "${RUNNER_TEMP}/tago-collection.json" || collect_status=$?
+          if [[ -f "${RUNNER_TEMP}/tago-collection.json" ]]; then
+            node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/tago-collection.json", "utf8")); delete c.responses; fs.writeFileSync(process.env.RUNNER_TEMP + "/tago-report.json", JSON.stringify(c, null, 2) + "\n");'
+          fi
+          if [[ -f "${RUNNER_TEMP}/tago-collection.json" ]] && node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/tago-collection.json", "utf8")); process.exit(((c.responses?.length ?? 0) > 0 || (c.checkpoint?.completedRequestKeys?.length ?? 0) > 0) ? 0 : 1);'; then
+            node tools/datapack/validate-tago-schedule-sample.mjs \
+              --summary \
+              --quiet \
+              --input "${RUNNER_TEMP}/tago-collection.json" \
+              --output "${RUNNER_TEMP}/tago-summary.json"
+          fi
+          exit "${collect_status}"
+
+      - name: TAGO Schedule Collection / Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tago-schedule-collection-evidence
+          path: |
+            ${{ runner.temp }}/tago-plan.json
+            ${{ runner.temp }}/tago-summary.json
+            ${{ runner.temp }}/tago-report.json
+          if-no-files-found: error
+          retention-days: 14

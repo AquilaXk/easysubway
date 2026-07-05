@@ -30,7 +30,7 @@ function parseArgs(argv) {
     if (!flag.startsWith("--")) {
       throw new Error(`unexpected argument: ${flag}`);
     }
-    if (flag === "--plan" || flag === "--summary" || flag === "--collect") {
+    if (flag === "--plan" || flag === "--summary" || flag === "--collect" || flag === "--quiet") {
       args[flag.slice(2)] = true;
       continue;
     }
@@ -65,9 +65,7 @@ function validateTagoScheduleSample(rawText) {
     }
   }
 
-  let previousDeparture = -1;
-  const providerRecordHashes = [];
-  const departures = [];
+  const parsedRows = [];
   for (const [index, row] of rows.entries()) {
     for (const field of REQUIRED_FIELDS) {
       if (typeof row[field] !== "string" || row[field].length === 0) {
@@ -85,12 +83,10 @@ function validateTagoScheduleSample(rawText) {
     if (arrivalSeconds > departureSeconds) {
       throw new Error(`TAGO schedule row ${index} arrival must be <= departure`);
     }
-    if (departureSeconds < previousDeparture) {
-      throw new Error(`TAGO schedule rows must be sorted by depTime`);
-    }
-    previousDeparture = departureSeconds;
-    providerRecordHashes.push(sha256(JSON.stringify(sortObject(row))));
-    departures.push({
+    const rowHash = sha256(JSON.stringify(sortObject(row)));
+    parsedRows.push({
+      row,
+      rowHash,
       subwayStationId: row.subwayStationId,
       subwayRouteId: row.subwayRouteId,
       dailyTypeCode: row.dailyTypeCode,
@@ -99,6 +95,14 @@ function validateTagoScheduleSample(rawText) {
       departureSeconds,
     });
   }
+  parsedRows.sort(
+    (left, right) =>
+      left.departureSeconds - right.departureSeconds ||
+      left.arrivalSeconds - right.arrivalSeconds ||
+      left.rowHash.localeCompare(right.rowHash),
+  );
+  const providerRecordHashes = parsedRows.map(({ rowHash }) => rowHash);
+  const departures = parsedRows.map(({ row: _row, rowHash: _rowHash, ...departure }) => departure);
 
   return {
     artifactKind: "tago-schedule-sample-importer-validation",
@@ -153,10 +157,13 @@ function buildTagoScheduleCollectionPlan(input, checkpoint = {}, dailyLimit = 10
 
 function buildTagoScheduleCollectionSummary(collection) {
   const responses = collection?.responses;
-  if (!Array.isArray(responses) || responses.length === 0) {
-    throw new Error("responses must be a non-empty array");
+  if (!Array.isArray(responses)) {
+    throw new Error("responses must be an array");
   }
   const checkpointRequestKeys = collection?.checkpoint?.completedRequestKeys ?? [];
+  if (responses.length === 0 && checkpointRequestKeys.length === 0) {
+    throw new Error("responses must be non-empty unless checkpoint has completedRequestKeys");
+  }
   for (const requestKey of checkpointRequestKeys) {
     requestKeyParts(requestKey);
   }
@@ -486,7 +493,9 @@ async function main() {
   if (args.output) {
     await writeJsonOutput(args.output, result);
   }
-  console.log(JSON.stringify(result, null, 2));
+  if (!args.quiet) {
+    console.log(JSON.stringify(result, null, 2));
+  }
 }
 
 async function writeJsonOutput(outputPath, value) {

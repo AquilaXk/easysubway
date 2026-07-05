@@ -3729,11 +3729,11 @@ void main() {
       );
       expect(
         settingsActionSemantics(
-          '알림 설정, 시설 상태, 제보 진행 상황, 최신 안내 알림을 관리해요',
+          '알림 설정',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
-      // 자명한 행은 부가설명 없이 제목만 시맨틱에 담는다(#1570).
+      // 자명한 행은 부가설명 없이 제목만 시맨틱에 담는다(#1570·#1572).
       expect(
         settingsActionSemantics(
           '도움말·문의',

@@ -2525,7 +2525,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       key: const Key('notificationSettingsButton'),
                       icon: Icons.notifications_active_outlined,
                       title: '알림 설정',
-                      subtitle: '시설 상태, 제보 진행 상황, 최신 안내 알림을 관리해요',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
