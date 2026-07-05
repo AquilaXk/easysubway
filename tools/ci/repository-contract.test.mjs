@@ -1506,46 +1506,19 @@ test("모바일 설정 저장 실패와 시설 제보 위치 실패 회귀 테�
   assert.match(widgetTest, /시설 신고 화면은 GPS가 꺼져 있으면 위치 설정으로 이동할 수 있다/);
 });
 
-test("모바일 오프라인 안내는 저장된 안내 상태를 쉬운 문구로 보여준다", () => {
+test("모바일 오프라인 안내 화면(OfflineDataScreen)은 완전히 제거됐다 (#1570)", () => {
   const main = read("apps/mobile/lib/main.dart");
   const widgetTest = read("apps/mobile/test/widget_test.dart");
   const finalQaEvidence = readJson("apps/mobile/release/issue-1075-final-qa-evidence.json");
-  const offlineScreenMatch = main.match(/class OfflineDataScreen[\s\S]*?class _SupportSectionTitle/);
-  // 지원 범위 주장(검증 구간·안내 범위·상록수역·사당역 구간)은 #1559에서 화면에서
-  // 제거해, 오프라인 테스트는 이제 이들이 없음(findsNothing)을 확인한다. 패턴은 실제로
-  // 노출되는 저장 상태 안내 순서만 검증한다.
-  const offlineWidgetTestPattern = new RegExp([
-    "testWidgets\\('오프라인 데이터 안내는 저장 범위와 품질 제한을 보여준다'",
-    // 더보기 진입점(offlineDataSettingsButton)은 #1570에서 제거해, 테스트는
-    // OfflineDataScreen을 직접 띄워 검증한다.
-    "OfflineDataScreen\\(\\)",
-    "저장된 안내 상태",
-    "검증 구간'\\), findsNothing",
-    "마지막 갱신",
-    "앱 설치 때 함께 받은 안내",
-    "저장 정보 다시 확인",
-    "저장 정보 기록을 확인할 수 없으면",
-    "안내 범위'\\), findsNothing",
-    "실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요",
-  ].join("[\\s\\S]*"));
-
-  assert.ok(offlineScreenMatch, "OfflineDataScreen block not found");
-  const offlineScreen = offlineScreenMatch[0];
-  // '저장된 안내' 섹션(인터넷 없이 이용 진입점)은 #1570에서 더보기에서 제거했다.
-  // OfflineDataScreen 화면 자체는 유지된다(직접 진입만 가능).
-  assert.match(main, /class OfflineDataScreen/);
-  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  // 진입점 없는 dead screen이라 화면·상태 헬퍼·스레딩(offlineDataExpiresAtLoader)까지
+  // 완전 삭제했다(#1570 후속). 오프라인 동작은 설명 없이 그냥 되는 것.
+  assert.doesNotMatch(main, /class OfflineDataScreen/);
   assert.doesNotMatch(main, /title:\s*'인터넷 없이 이용'/);
-  assert.match(main, /_offlineDataSourceOfTruth\s*=\s*'installed catalog metadata'/);
-  assert.match(offlineScreen, /저장된 안내 상태/);
-  assert.doesNotMatch(offlineScreen, /저장된 데이터 상태/);
-  // 지원 범위 주장(검증 구간·안내 범위 + ProductionScopeCopy)은 #1559에서 화면에서
-  // 제거했다. 오프라인 화면이 더는 범위 주장을 노출하지 않는지 가드한다.
-  assert.doesNotMatch(offlineScreen, /ProductionScopeCopy/);
-  assert.match(offlineScreen, /저장 정보 다시 확인[\s\S]*저장 정보 기록을 확인할 수 없으면/);
-  assert.match(offlineScreen, /마지막 갱신[\s\S]*앱 설치 때 함께 받은 안내/);
-  assert.match(offlineScreen, /인터넷 연결 필요[\s\S]*시설 제보[\s\S]*연결 필요/);
-  assert.match(widgetTest, offlineWidgetTestPattern);
+  assert.doesNotMatch(main, /저장된 안내 상태/);
+  assert.doesNotMatch(main, /_offlineDataSourceOfTruth/);
+  assert.doesNotMatch(main, /[Oo]fflineDataExpiresAtLoader/);
+  assert.doesNotMatch(main, /offlineDataSettingsButton/);
+  assert.doesNotMatch(widgetTest, /OfflineDataScreen/);
   assert.match(widgetTest, /testWidgets\('홈 200% 글자 screenshot smoke는 핵심 CTA 렌더 이미지를 만든다'/);
   assert.match(widgetTest, /RepaintBoundary[\s\S]*toImage\(/);
   assert.equal(finalQaEvidence.issue, 1075);
@@ -9066,10 +9039,10 @@ test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계�
   assert.match(adminTemplate, /고장 신고 수/);
 	assert.match(adminTemplate, /정보 확인 중/);
 	assert.match(adminTemplate, /고장·공사 반영/);
-  // 내부 데이터 품질 라벨은 #1578에서 사용자 노출을 중립화했다(빈 문자열/false).
+  // 내부 데이터 품질 라벨은 #1578에서 사용자 노출을 중립화했다(빈 문자열).
   // 등급→사용자 문구 매핑을 다시 노출하지 않는지 가드한다.
+  // (표시 게이트 _showsDataQualityLabel은 #1569에서 즐겨찾기 역 목록 UI와 함께 제거됨.)
   assert.match(mobileStationSearch, /_dataQualityLabel\(String dataQualityLevel\) => '';/);
-  assert.match(mobileStationSearch, /_showsDataQualityLabel\(String dataQualityLevel\) => false;/);
   assert.doesNotMatch(mobileStationSearch, /'LEVEL_1' => '일부 정보는 확인 중이에요'/);
   // 경로 점수 가중치(등급→점수)는 사용자 라벨이 아니므로 유지한다.
   assert.match(mobileRouteRepository, /'LEVEL_1' => 40/);
@@ -9870,10 +9843,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /경로 피드백 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(routeSearch, /favoriteRouteSaveFailureNextAction/);
   assert.match(routeSearch, /네트워크 상태를 확인한 뒤 자주 쓰는 경로 저장을 다시 눌러 주세요\./);
-  assert.match(routeSearch, /favoriteRouteLoadFailureNextAction/);
-  assert.match(routeSearch, /네트워크 상태를 확인한 뒤 다시 불러와 주세요\./);
+  // 즐겨찾기 경로 목록 화면(과 로드 실패 안내 카피)은 #1569에서 홈 인라인 리스트로 대체되며 제거됨.
   assert.match(widgetTest, /즐겨찾기 경로 저장 실패는 도움말을 쉬운 문구로 안내한다/);
-  assert.match(widgetTest, /즐겨찾기 경로 목록 실패는 도움말을 쉬운 문구로 안내한다/);
   assert.match(routeSearch, /import 'core\/network\/api_client\.dart';/);
   assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*final ApiClient _apiClient;/);
   assert.match(routeSearch, /class RouteSearchApiRepository[\s\S]*_apiClient\.postJson\(/);
