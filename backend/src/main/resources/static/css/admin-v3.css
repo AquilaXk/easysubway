@@ -1165,11 +1165,12 @@ body.admin-v3 {
 	background: var(--admin-danger);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
 	.admin-shell {
 		grid-template-columns: 1fr;
 	}
 
+	/* no-JS 기본: 사이드바가 본문 위에 스택으로 보인다(전 기능 접근 가능). */
 	.admin-sidebar {
 		position: static;
 		min-height: auto;
@@ -1188,6 +1189,46 @@ body.admin-v3 {
 	.admin-grid-2,
 	.admin-page-head {
 		display: block;
+	}
+
+	.admin-sidebar-toggle {
+		display: inline-flex;
+	}
+
+	/* JS 있으면 오프캔버스: 사이드바를 화면 밖에 두고 토글로 연다(body.sidebar-open). */
+	.has-js .admin-sidebar {
+		position: fixed;
+		top: 0;
+		left: 0;
+		bottom: 0;
+		width: min(280px, 82vw);
+		min-height: 100vh;
+		max-height: none;
+		overflow-y: auto;
+		transform: translateX(-100%);
+		transition: transform 0.2s ease;
+		z-index: 90;
+		box-shadow: 0 0 40px rgba(22, 48, 47, 0.35);
+	}
+
+	.has-js.sidebar-open .admin-sidebar {
+		transform: translateX(0);
+	}
+
+	.admin-sidebar-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 80;
+		background: rgba(22, 48, 47, 0.4);
+	}
+}
+
+/* ≤768px: 표준 테이블 밀도를 좁힌다(가로 스크롤은 table min-width + section overflow-x가 담당). */
+@media (max-width: 768px) {
+	.admin-v3 th,
+	.admin-v3 td {
+		padding: 8px 10px;
+		font-size: 13px;
 	}
 }
 
@@ -1440,4 +1481,27 @@ body.admin-v3 {
 	box-shadow: none;
 	padding: 0;
 	border: 0;
+}
+
+/* 반응형 사이드바 토글(#1738): 데스크톱(>1024px)에서는 숨긴다. ≤1024px 규칙에서 노출한다. */
+.admin-sidebar-nav-control {
+	display: contents;
+}
+
+.admin-sidebar-toggle {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-surface);
+	color: var(--admin-ink);
+	font-size: 16px;
+	cursor: pointer;
+}
+
+.admin-sidebar-backdrop {
+	display: none;
 }

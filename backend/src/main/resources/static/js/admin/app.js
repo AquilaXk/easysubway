@@ -9,7 +9,33 @@
 // 진화형 향상(progressive enhancement) 원칙:
 //   - JS가 꺼져도 화면은 온전히 동작한다. 여기 등록되는 컴포넌트는 "이미 동작하는 화면에
 //     선택적 편의"만 얹는다(예: 이미 보이는 알림을 닫는 버튼).
+// JS 사용 가능 표식: 반응형 사이드바 오프캔버스는 JS가 있을 때만 켠다(no-JS는 스택 표시).
+// app.js는 defer라 이 시점에 document.body가 존재한다.
+document.body.classList.add('has-js');
+
 document.addEventListener('alpine:init', function () {
+	// 반응형 사이드바 토글(#1738): ≤1024px에서 사이드바를 오프캔버스로 여닫는다.
+	// 사이드바 표시는 body.sidebar-open 클래스가, 백드롭은 open 프로퍼티(x-show)가 함께 반영한다.
+	// 메뉴 링크로 이동하면 페이지가 새로 로드되며 자연히 닫힌다. CSP 빌드: 메서드·게터 이름만 쓴다.
+	Alpine.data('sidebarToggle', function () {
+		return {
+			open: false,
+			get ariaExpanded() {
+				return this.open ? 'true' : 'false';
+			},
+			setOpen: function (value) {
+				this.open = value;
+				document.body.classList.toggle('sidebar-open', value);
+			},
+			toggle: function () {
+				this.setOpen(!this.open);
+			},
+			close: function () {
+				this.setOpen(false);
+			},
+		};
+	});
+
 	// 관리자 플래시/토스트 알림: JS가 있으면 닫기 버튼으로 사라진다. 없으면 그대로 표시된다.
 	Alpine.data('dismissibleAlert', function () {
 		return {
