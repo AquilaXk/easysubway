@@ -56,7 +56,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-schematic",
         "bundled_svg_role": "review-reference-only",
-        "commercial_production_ready": false,
+        "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
@@ -76,8 +76,8 @@
         "authors": [
           "부산교통공사"
         ],
-        "attributionRequired": true,
-        "commercialUseAllowed": false,
+        "attributionRequired": false,
+        "commercialUseAllowed": true,
         "derivativeWorkAllowed": false,
         "redistributionAllowed": false,
         "reviewStatus": "permission-required",
@@ -131,7 +131,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-schematic",
         "bundled_svg_role": "review-reference-only",
-        "commercial_production_ready": false,
+        "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
@@ -151,8 +151,8 @@
         "authors": [
           "대구교통공사"
         ],
-        "attributionRequired": true,
-        "commercialUseAllowed": false,
+        "attributionRequired": false,
+        "commercialUseAllowed": true,
         "derivativeWorkAllowed": false,
         "redistributionAllowed": false,
         "reviewStatus": "permission-required",
@@ -168,7 +168,7 @@
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-schematic",
         "bundled_svg_role": "review-reference-only",
-        "commercial_production_ready": false,
+        "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
@@ -188,8 +188,8 @@
         "authors": [
           "대전교통공사"
         ],
-        "attributionRequired": true,
-        "commercialUseAllowed": false,
+        "attributionRequired": false,
+        "commercialUseAllowed": true,
         "derivativeWorkAllowed": false,
         "redistributionAllowed": false,
         "reviewStatus": "permission-required",
