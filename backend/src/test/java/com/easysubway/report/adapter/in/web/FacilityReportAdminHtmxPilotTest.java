@@ -251,6 +251,26 @@ class FacilityReportAdminHtmxPilotTest {
 	}
 
 	@Test
+	@DisplayName("표 보기 설정(밀도·컬럼 토글)과 표 스코프가 렌더된다")
+	void tableViewControlsRender() throws Exception {
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("x-data=\"reportTable\"")
+			.contains("class=\"table-viewbar\"")
+			.contains("좁게")
+			.contains("넓게")
+			.contains("좌표 숨김")
+			.contains("사진 숨김")
+			.contains("x-bind:class=\"tableClass\"");
+	}
+
+	@Test
 	@DisplayName("결과가 없으면 표준 빈 상태 컴포넌트가 안내 문구와 함께 렌더된다")
 	void emptyResultRendersEmptyStateComponent() throws Exception {
 		String html = mockMvc.perform(get("/admin/reports/page")

@@ -610,6 +610,52 @@ body.admin-v3 {
 	margin-right: auto;
 }
 
+/* 표 보기 설정: 밀도 3단·컬럼 표시 토글(#1737) */
+.admin-v3 .table-viewbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 16px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.admin-v3 .table-viewbar fieldset {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	border: 0;
+	padding: 0;
+	margin: 0;
+}
+
+.admin-v3 .table-viewbar legend {
+	float: none;
+	width: auto;
+	font-size: 12px;
+	color: var(--admin-ink-2);
+	padding: 0;
+	margin-right: 4px;
+}
+
+.admin-v3 table.density-compact td,
+.admin-v3 table.density-compact th {
+	padding-top: 6px;
+	padding-bottom: 6px;
+}
+
+.admin-v3 table.density-comfortable td,
+.admin-v3 table.density-comfortable th {
+	padding-top: 16px;
+	padding-bottom: 16px;
+}
+
+.admin-v3 table.hide-col-coordinate td:nth-child(8),
+.admin-v3 table.hide-col-coordinate th:nth-child(8),
+.admin-v3 table.hide-col-photo td:nth-child(9),
+.admin-v3 table.hide-col-photo th:nth-child(9) {
+	display: none;
+}
+
 .admin-status {
 	font-size: 13px;
 }
