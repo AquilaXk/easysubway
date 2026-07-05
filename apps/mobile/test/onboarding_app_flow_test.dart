@@ -1,3 +1,4 @@
+import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/main.dart';
@@ -20,6 +21,31 @@ import 'fake_secure_key_value_storage.dart';
 // 첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다
 
 void main() {
+  testWidgets('앱 시작 로딩은 흰 화면 대신 브랜디드 로딩을 보여준다', (tester) async {
+    await tester.pumpWidget(
+      _testApp(onboardingStore: MemoryOnboardingResultStore()),
+    );
+
+    // 온보딩 상태를 복원하는 첫 프레임에는 흰 배경+스피너가 아니라 브랜드 색과
+    // 앱 이름을 그대로 잇는 로딩을 보여준다(#1785).
+    expect(find.byKey(const Key('startupLoadingScreen')), findsOneWidget);
+    expect(find.text('쉬운 지하철'), findsOneWidget);
+    final loadingScaffold = tester.widget<Scaffold>(
+      find.byKey(const Key('startupLoadingScreen')),
+    );
+    expect(loadingScaffold.backgroundColor, EasySubwayAccessibleColors.primary);
+    expect(find.bySemanticsLabel('쉬운 지하철을 불러오는 중'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+
+    // 복원이 끝나면 로딩은 사라지고 온보딩 인트로가 뜬다.
+    expect(find.byKey(const Key('startupLoadingScreen')), findsNothing);
+    expect(
+      find.text('빠른 길보다,\n갈 수 있는 길을\n먼저 안내해요.', findRichText: true),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore();
     final legacyCredentialStorage = FakeSecureKeyValueStorage()

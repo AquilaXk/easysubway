@@ -538,6 +538,54 @@ class SupportAccessInfo {
   }
 }
 
+/// 앱 시작 시 온보딩 상태를 복원하는 짧은 구간에 보여주는 브랜디드 로딩 화면.
+///
+/// 예전에는 흰 배경 + 스피너만 떠서 네이티브 스플래시(브랜드)에서 홈으로 가는
+/// 사이에 흰 화면이 튀어 첫인상을 해쳤다(#1785). 브랜드 색과 앱 이름을 그대로
+/// 이어 스플래시에서 로딩, 콘텐츠까지 매끄럽게 연결되도록 한다.
+class _StartupLoadingScreen extends StatelessWidget {
+  const _StartupLoadingScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: const Key('startupLoadingScreen'),
+      backgroundColor: EasySubwayAccessibleColors.primary,
+      body: SafeArea(
+        child: Center(
+          child: Semantics(
+            label: '쉬운 지하철을 불러오는 중',
+            liveRegion: true,
+            child: ExcludeSemantics(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '쉬운 지하철',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const SizedBox(
+                    width: 26,
+                    height: 26,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EasySubwayHome extends StatefulWidget {
   const _EasySubwayHome({
     required this.repository,
@@ -624,9 +672,9 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   @override
   Widget build(BuildContext context) {
     if (_loadingOnboardingState) {
-      return const Scaffold(
-        body: SafeArea(child: Center(child: CircularProgressIndicator())),
-      );
+      // 스플래시와 홈 사이에 흰 화면+스피너가 튀지 않도록, 브랜드 색과 앱 이름을
+      // 그대로 잇는 브랜디드 로딩을 보여준다(#1785).
+      return const _StartupLoadingScreen();
     }
 
     final dataDeletionResult = _dataDeletionResult;
