@@ -421,6 +421,9 @@ function normalizeRows(value) {
 }
 
 function isNormalEmptyTagoSchedulePayload(payload) {
+  if (payload.response?.header?.resultCode !== "00") {
+    return false;
+  }
   const items = payload.response?.body?.items;
   if (!items || typeof items !== "object" || Array.isArray(items)) {
     return false;

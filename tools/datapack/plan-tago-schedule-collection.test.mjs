@@ -197,6 +197,7 @@ test("TAGO 시간표 수집 summary는 빈 provider 응답을 완료 요청으�
 test("TAGO 시간표 수집 summary는 malformed 빈 응답을 checkpoint 완료로 보지 않는다", () => {
   for (const rawText of [
     JSON.stringify({}),
+    JSON.stringify({ response: { body: { items: {} } } }),
     JSON.stringify({ response: { header: { resultCode: "00" }, body: {} } }),
   ]) {
     assert.throws(
