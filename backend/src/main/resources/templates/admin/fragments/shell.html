@@ -56,6 +56,20 @@
 			<span>권한 <strong th:text="${adminShell != null ? adminShell.rolesLabel : '권한 없음'}">admin.view</strong></span>
 		</div>
 		<div class="admin-topbar-meta">
+			<!--
+			  알림 센터(#1738): topbar 벨. 벨을 누르면 요약 패널이 열린다(Cmd 없이 클릭으로).
+			  live 영역은 alertCenter 컴포넌트가 60초마다 htmx로 /admin/alerts를 폴링해 채운다.
+			  탭이 비활성이면 폴링을 멈춘다. no-JS는 벨이 /admin/alerts 전용 페이지로 이동한다.
+			-->
+			<div class="admin-alert-center" x-data="alertCenter"
+			     x-bind:class="rootClass" x-on:keydown.escape.window="hide">
+				<a class="admin-alert-bell" th:href="@{/admin/alerts}" x-on:click.prevent="toggle"
+				   aria-haspopup="dialog" x-bind:aria-expanded="ariaExpanded"
+				   aria-controls="admin-alert-live" aria-label="알림 센터">
+					<span class="admin-alert-bell-icon" aria-hidden="true">🔔</span>
+				</a>
+				<div id="admin-alert-live" class="admin-alert-live"></div>
+			</div>
 			<span>revision <strong th:text="${adminShell != null ? adminShell.revision : 'local'}">local</strong></span>
 			<span>master data <strong th:text="${adminShell != null ? adminShell.masterDataVersion : 'unknown'}">unknown</strong></span>
 			<form th:if="${adminShell != null && adminShell.username != 'anonymous'}"

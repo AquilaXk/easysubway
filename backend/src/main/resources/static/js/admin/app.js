@@ -117,6 +117,68 @@ document.addEventListener('alpine:init', function () {
 		};
 	});
 
+	// 알림 센터(#1738): topbar 벨. 60초마다 /admin/alerts를 htmx로 폴링해 #admin-alert-live를 갱신한다.
+	// 탭이 비활성(document.hidden)이면 폴링을 멈추고, 다시 활성화되면 즉시 갱신 후 재개한다(query budget 보호).
+	// 벨 클릭으로 요약 패널을 여닫는다(열림 상태는 .admin-alert-center.is-open 클래스로 CSS가 표시).
+	// 진화형 향상 — JS가 없으면 벨이 /admin/alerts 전용 페이지로 이동한다(no-JS 대체).
+	// CSP 빌드 규약: x-on/x-bind에는 메서드·프로퍼티(게터) 이름만 쓴다.
+	Alpine.data('alertCenter', function () {
+		return {
+			open: false,
+			timer: null,
+			get rootClass() {
+				return this.open ? 'is-open' : '';
+			},
+			get ariaExpanded() {
+				return this.open ? 'true' : 'false';
+			},
+			init: function () {
+				var self = this;
+				this.refresh();
+				this.start();
+				document.addEventListener('visibilitychange', function () {
+					if (document.hidden) {
+						self.stop();
+					} else {
+						self.refresh();
+						self.start();
+					}
+				});
+			},
+			start: function () {
+				if (this.timer) {
+					return;
+				}
+				var self = this;
+				this.timer = setInterval(function () {
+					if (!document.hidden) {
+						self.refresh();
+					}
+				}, 60000);
+			},
+			stop: function () {
+				if (this.timer) {
+					clearInterval(this.timer);
+					this.timer = null;
+				}
+			},
+			refresh: function () {
+				if (window.htmx) {
+					window.htmx.ajax('GET', '/admin/alerts', {
+						target: '#admin-alert-live',
+						swap: 'innerHTML',
+					});
+				}
+			},
+			toggle: function () {
+				this.open = !this.open;
+			},
+			hide: function () {
+				this.open = false;
+			},
+		};
+	});
+
 	// 표준 테이블: 일괄 선택(선택 수·전체 선택) + 밀도 3단 + 컬럼 표시 토글.
 	// 진화형 향상 — JS가 없으면 개별 체크박스 + 액션 버튼(no-JS 폼)이 그대로 동작하고, 표는 기본 밀도로 보인다.
 	// CSP 빌드 규약: x-on/x-text/x-bind에는 메서드·프로퍼티(게터) 이름만 쓰고 표현식은 쓰지 않는다.
