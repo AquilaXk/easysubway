@@ -64,7 +64,7 @@ jobs:
           if [[ -f "${RUNNER_TEMP}/tago-collection.json" ]]; then
             node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/tago-collection.json", "utf8")); delete c.responses; fs.writeFileSync(process.env.RUNNER_TEMP + "/tago-report.json", JSON.stringify(c, null, 2) + "\n");'
           fi
-          if [[ "${collect_status}" -eq 0 ]]; then
+          if [[ -f "${RUNNER_TEMP}/tago-collection.json" ]]; then
             node tools/datapack/validate-tago-schedule-sample.mjs \
               --summary \
               --quiet \
