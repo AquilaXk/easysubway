@@ -60,27 +60,29 @@ StructuredRouteMap sampleMap() {
 
 void main() {
   group('routeMapZoomBucket', () {
-    // #1764 A: 절대 scale이 아니라 지역 초기 화면(initialScale) 대비 배율로 판정.
-    test('초기 화면 배율 1.0은 bucket 1', () {
-      expect(routeMapZoomBucket(camera(scale: 1.0, initialScale: 1.0)), 1);
-      // 지역 크기가 달라도(초기 scale 0.3) 배율 1.0이면 초기 화면은 bucket 1.
-      expect(routeMapZoomBucket(camera(scale: 0.3, initialScale: 0.3)), 1);
+    // #1789 LOD: 지역 초기 화면(initialScale) 대비 배율로 판정. 초기 화면(배율
+    // 1.0)은 bucket 0(선 실루엣만)이라 고정 크기 노드·캡슐·라벨이 노선을 안 덮는다.
+    test('초기 화면 배율 1.0은 bucket 0 (선만)', () {
+      expect(routeMapZoomBucket(camera(scale: 1.0, initialScale: 1.0)), 0);
+      // 지역 크기가 달라도(초기 scale 0.3) 배율 1.0이면 초기 화면은 bucket 0.
+      expect(routeMapZoomBucket(camera(scale: 0.3, initialScale: 0.3)), 0);
     });
 
-    test('초기보다 더 축소(r<0.75)하면 bucket 0', () {
-      expect(routeMapZoomBucket(camera(scale: 0.7, initialScale: 1.0)), 0);
-      expect(routeMapZoomBucket(camera(scale: 0.74, initialScale: 1.0)), 0);
+    test('초기 대비 1.5배 이상 확대해야 bucket 1 (환승 캡슐·뱃지)', () {
+      expect(routeMapZoomBucket(camera(scale: 1.49, initialScale: 1.0)), 0);
+      expect(routeMapZoomBucket(camera(scale: 1.5, initialScale: 1.0)), 1);
+      expect(routeMapZoomBucket(camera(scale: 2.9, initialScale: 1.0)), 1);
     });
 
-    test('초기 대비 1.8배 이상 확대해야 bucket 2', () {
-      expect(routeMapZoomBucket(camera(scale: 1.79, initialScale: 1.0)), 1);
-      expect(routeMapZoomBucket(camera(scale: 1.8, initialScale: 1.0)), 2);
-      expect(routeMapZoomBucket(camera(scale: 3.6, initialScale: 1.0)), 2);
+    test('초기 대비 3.0배 이상 확대해야 bucket 2 (역 노드·역명)', () {
+      expect(routeMapZoomBucket(camera(scale: 2.99, initialScale: 1.0)), 1);
+      expect(routeMapZoomBucket(camera(scale: 3.0, initialScale: 1.0)), 2);
+      expect(routeMapZoomBucket(camera(scale: 4.5, initialScale: 1.0)), 2);
     });
 
-    test('initialScale 미지정이면 현재 scale 기준(배율 1.0) → bucket 1', () {
-      expect(routeMapZoomBucket(camera(scale: 2.0)), 1);
-      expect(routeMapZoomBucket(camera(scale: 0.5)), 1);
+    test('initialScale 미지정이면 현재 scale 기준(배율 1.0) → bucket 0', () {
+      expect(routeMapZoomBucket(camera(scale: 2.0)), 0);
+      expect(routeMapZoomBucket(camera(scale: 0.5)), 0);
     });
   });
 

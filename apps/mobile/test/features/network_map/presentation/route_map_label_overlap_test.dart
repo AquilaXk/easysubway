@@ -149,11 +149,9 @@ void main() {
       expect(_candidates(_gridMap(spacing: 60), 0), isEmpty);
     });
 
-    test('bucket 1은 환승·주요만, 일반은 제외한다', () {
-      final ids = _candidates(_gridMap(spacing: 60), 1).map((c) => c.id);
-      expect(ids.where((id) => id.startsWith('transfer:')), hasLength(2));
-      expect(ids.where((id) => id.startsWith('major-')), hasLength(3));
-      expect(ids.any((id) => id.startsWith('regular-')), isFalse);
+    test('bucket 1은 라벨 후보가 없다 (선·캡슐만, #1789 LOD)', () {
+      // 역명 라벨은 최대 확대(bucket 2)에서만 — 축소에선 글자가 노선을 덮는다.
+      expect(_candidates(_gridMap(spacing: 60), 1), isEmpty);
     });
 
     test('bucket 2는 일반 라벨까지 후보에 포함한다', () {
@@ -172,7 +170,8 @@ void main() {
   });
 
   group('라벨 겹침 0건 (지역 × zoom bucket)', () {
-    for (final bucket in [1, 2]) {
+    // 라벨은 bucket 2에서만 렌더된다(#1789 LOD) — 겹침 판정도 bucket 2만.
+    for (final bucket in [2]) {
       test('bucket $bucket: 배치된 라벨은 서로 겹치지 않는다 (여유 배치)', () {
         final placed = _place(_gridMap(spacing: 80), bucket);
         expect(placed, isNotEmpty);

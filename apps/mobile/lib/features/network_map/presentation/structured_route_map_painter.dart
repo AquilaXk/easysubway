@@ -24,16 +24,18 @@ Map<String, Color> routeMapLineColors(Map<String, String> hexColorByLineId) {
   };
 }
 
-/// bucket 1 진입 하한(초기 화면 대비 배율). 이보다 더 축소해야 bucket 0.
-const double routeMapBucket1EnterRatio = 0.75;
+/// bucket 1 진입 하한(초기 화면 대비 배율). 초기 화면(배율 1.0)은 bucket 0이라
+/// 선 실루엣만 보이고, 이만큼 확대해야 환승 캡슐·노선 뱃지가 나타난다(#1789 LOD).
+const double routeMapBucket1EnterRatio = 1.5;
 
-/// bucket 2 진입 하한(초기 화면 대비 배율).
-const double routeMapBucket2EnterRatio = 1.8;
+/// bucket 2 진입 하한(초기 화면 대비 배율). 이만큼 확대해야 역 노드·역명이 나타난다.
+const double routeMapBucket2EnterRatio = 3.0;
 
-/// 카메라 scale을 #1636 LOD zoom bucket(0/1/2)으로 매핑한다(#1764 A).
+/// 카메라 scale을 LOD zoom bucket(0/1/2)으로 매핑한다(#1789 LOD 정비).
 /// 절대 scale이 아니라 **지역 초기 화면(initialScale) 대비 배율** `r`로 판정해,
-/// 지역 크기와 무관하게 "초기 화면 = bucket 1"을 보장한다. 초기 화면에서 역
-/// 노드·환승/주요 라벨이 보이고, 더 축소해야(r<0.75) 선 실루엣만 남는다.
+/// 지역 크기와 무관하게 일관된 LOD를 준다. **초기 화면 = bucket 0**(선 실루엣만)
+/// 이라 고정 크기 노드·캡슐·라벨이 촘촘한 노선을 덮지 않는다. 확대할수록 캡슐·뱃지
+/// (bucket 1) → 역 노드·역명(bucket 2)이 단계적으로 나타난다.
 /// initialScale이 없으면(테스트 등) 현재 scale을 기준으로 봐 배율 1.0로 둔다.
 int routeMapZoomBucket(MapCameraState camera) {
   final base = camera.initialScale ?? camera.scale;
@@ -76,10 +78,14 @@ String routeMapLineBadgeLabel(String nameKo) {
   return line.length <= 4 ? line : line.substring(0, 4);
 }
 
-/// 일반역 노드(점)를 이 bucket에서 그리는지 여부(#1764 B 단일 소스).
-/// bucket 0은 선 실루엣 조망이라 일반역 점을 생략하고, bucket 1(초기 화면)부터
-/// 표시한다. 환승 마커는 이 게이트와 무관하게 전 bucket 표시한다.
-bool routeMapShowsRegularStationNodes(int bucket) => bucket >= 1;
+/// 일반역 노드(점)를 이 bucket에서 그리는지 여부(#1789 LOD 정비).
+/// 축소(bucket 0·1)에선 고정 크기 노드가 촘촘한 역 간격을 덮어 노선을 가리므로
+/// 생략하고, 최대 확대(bucket 2)에서만 표시한다. 환승 마커·라벨도 확대 시 표시.
+bool routeMapShowsRegularStationNodes(int bucket) => bucket >= 2;
+
+/// 환승 캡슐을 이 bucket에서 그리는지(#1789 LOD): bucket 0(선 실루엣)에선 캡슐도
+/// 선을 덮으므로 생략하고, bucket 1부터 표시한다.
+bool routeMapShowsTransferMarkers(int bucket) => bucket >= 1;
 
 /// 라벨 우선순위(낮을수록 먼저 자리 차지): 노선 뱃지 -1 > 환승 0 > 주요 1 > 일반 2.
 int routeMapLabelPriorityFor(RouteMapLabelClass labelClass) {
@@ -109,7 +115,9 @@ List<RouteMapLabelCandidate> routeMapLabelCandidates(
   required double transferAnchorPadding,
 }) {
   final candidates = <RouteMapLabelCandidate>[];
-  if (bucket < 1) {
+  // 역명 라벨은 최대 확대(bucket 2)에서만 — 축소에선 글자가 겹쳐 노선을 덮는다
+  // (#1789 LOD). 노선 뱃지는 별도(전 bucket)라 축소에서도 노선 식별이 된다.
+  if (bucket < 2) {
     return candidates;
   }
   if (bucket >= minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
@@ -456,6 +464,10 @@ class StructuredRouteMapPainter extends CustomPainter {
     // 환승 마커: 물리 역당 그룹 하나를 이격에 따라 3모드로 그린다(#1789).
     // 비수렴 PD 기하에서 평행 노선들 위 멤버 노드를 캡슐이 걸치는 것이
     // 공식 노선도 문법이다(한 점 수렴 강제는 기하 훼손이라 하지 않는다).
+    // bucket 0(선 실루엣 조망)에선 캡슐도 선을 덮으므로 생략한다(#1789 LOD).
+    if (!routeMapShowsTransferMarkers(bucket)) {
+      return;
+    }
     for (final group in map.transferGroups) {
       if (!visible.contains(group.centroid)) {
         continue;
@@ -489,22 +501,23 @@ class StructuredRouteMapPainter extends CustomPainter {
     final bucket = routeMapZoomBucket(camera);
     final painterById = <String, TextPainter>{};
 
-    // 노선 뱃지 후보(전 bucket)와 역 라벨 후보(bucket>=1)를 한 번의 충돌 배치에
-    // 태운다. 뱃지 priority -1 이라 역명(환승 0/주요 1/일반 2)보다 먼저 자리를
-    // 잡아 밀려나지 않는다(#1764 D). 후보 생성은 순수 함수 routeMapLabelCandidates로
-    // 공유 — painter와 테스트가 동일 bucket·LOD 규칙을 태운다(#1642 겹침 0 판정).
+    // 노선 뱃지(bucket>=1)와 역 라벨(bucket>=2)을 한 번의 충돌 배치에 태운다.
+    // bucket 0(최대 축소)은 고정 크기 뱃지가 촘촘한 노선을 덮으므로 뱃지도 생략해
+    // 선 실루엣만 보인다(#1789 LOD). 뱃지 priority -1 이라 역명보다 먼저 자리를
+    // 잡는다(#1764 D). 후보는 순수 함수로 생성해 테스트와 동일 규칙을 태운다.
     final candidates = <RouteMapLabelCandidate>[
-      ...routeMapLineBadgeCandidates(
-        map,
-        camera,
-        badgeLabelByLineId: lineBadgeLabelByLineId,
-        measure: (id, text) => (painterById[id] ??= _badgePainter(text)).size,
-        isVisible: visible.contains,
-        badgeRadius: lineBadgeRadius,
-        horizontalPadding: _badgeHorizontalPadding,
-        // id 프리픽스를 painter의 pill 판정(_badgeIdPrefix)과 결속 — 드리프트 방지.
-        idPrefix: _badgeIdPrefix,
-      ),
+      if (bucket >= 1)
+        ...routeMapLineBadgeCandidates(
+          map,
+          camera,
+          badgeLabelByLineId: lineBadgeLabelByLineId,
+          measure: (id, text) => (painterById[id] ??= _badgePainter(text)).size,
+          isVisible: visible.contains,
+          badgeRadius: lineBadgeRadius,
+          horizontalPadding: _badgeHorizontalPadding,
+          // id 프리픽스를 painter의 pill 판정(_badgeIdPrefix)과 결속 — 드리프트 방지.
+          idPrefix: _badgeIdPrefix,
+        ),
     ];
     if (labelTextByStationId.isNotEmpty) {
       candidates.addAll(
