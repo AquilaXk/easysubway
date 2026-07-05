@@ -20,7 +20,6 @@ jobs:
       contents: read
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
-      DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
       TAGO_DAILY_LIMIT: ${{ github.event.inputs.dailyLimit }}
       TAGO_CHECKPOINT_JSON: ${{ github.event.inputs.checkpointJson }}
 
@@ -41,6 +40,8 @@ jobs:
           node -e 'const fs=require("fs"); const value=JSON.parse(process.env.TAGO_CHECKPOINT_JSON); if (!Array.isArray(value.completedRequestKeys)) throw new Error("checkpointJson.completedRequestKeys must be an array"); fs.writeFileSync(process.env.RUNNER_TEMP + "/tago-checkpoint.json", JSON.stringify(value, null, 2) + "\n");'
 
       - name: TAGO Schedule Collection / Collect pilot batch
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
         run: |
           set -euo pipefail
           test -n "${DATA_GO_KR_SERVICE_KEY}"
