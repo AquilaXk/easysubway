@@ -16,6 +16,7 @@ import com.easysubway.report.application.port.in.ReviewFacilityReportCommand;
 import com.easysubway.report.domain.FacilityReport;
 import com.easysubway.report.domain.FacilityReportReviewAudit;
 import com.easysubway.report.domain.FacilityReportReviewDecision;
+import com.easysubway.report.domain.ReportSlaBadge;
 import com.easysubway.report.domain.FacilityReportSummary;
 import com.easysubway.report.domain.FacilityReportStatus;
 import com.easysubway.report.domain.ReportProcessingTimeSummary;
@@ -242,7 +243,8 @@ class FacilityReportAdminPageController {
 		Map<String, String> facilityLabels = labelResolver.facilityLabels(
 			items.stream().map(FacilityReportSummary::facilityId).toList());
 		List<FacilityReportListPageRow> reports = items.stream()
-			.map(report -> FacilityReportListPageRow.from(report, messages, stationLabels, facilityLabels))
+			.map(report -> FacilityReportListPageRow.from(
+				report, messages, stationLabels, facilityLabels, LocalDateTime.now(clock)))
 			.toList();
 
 		model.addAttribute("reports", reports);
@@ -656,15 +658,19 @@ class FacilityReportAdminPageController {
 		String statusLabel,
 		LocalDateTime createdAt,
 		boolean hasPhoto,
-		String coordinateLabel
+		String coordinateLabel,
+		String slaLabel,
+		String slaTone
 	) {
 
 		static FacilityReportListPageRow from(
 			FacilityReportSummary report,
 			WebMessageResolver messages,
 			Map<String, String> stationLabels,
-			Map<String, String> facilityLabels
+			Map<String, String> facilityLabels,
+			LocalDateTime now
 		) {
+			ReportSlaBadge sla = ReportSlaBadge.of(report.status(), report.createdAt(), now);
 			return new FacilityReportListPageRow(
 				report.id(),
 				report.stationId(),
@@ -676,7 +682,9 @@ class FacilityReportAdminPageController {
 				messages.enumLabel("admin.report.status", report.status()),
 				report.createdAt(),
 				FacilityReportAdminPageController.hasCompletePhoto(report),
-				FacilityReportAdminPageController.coordinateLabel(report.latitude(), report.longitude())
+				FacilityReportAdminPageController.coordinateLabel(report.latitude(), report.longitude()),
+				sla.label(),
+				sla.tone()
 			);
 		}
 	}

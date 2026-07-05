@@ -649,10 +649,11 @@ body.admin-v3 {
 	padding-bottom: 16px;
 }
 
-.admin-v3 table.hide-col-coordinate td:nth-child(8),
-.admin-v3 table.hide-col-coordinate th:nth-child(8),
-.admin-v3 table.hide-col-photo td:nth-child(9),
-.admin-v3 table.hide-col-photo th:nth-child(9) {
+/* 경과 컬럼(#1740)이 접수일과 좌표 사이(8열)에 들어가 좌표=9열·사진=10열로 밀렸다. */
+.admin-v3 table.hide-col-coordinate td:nth-child(9),
+.admin-v3 table.hide-col-coordinate th:nth-child(9),
+.admin-v3 table.hide-col-photo td:nth-child(10),
+.admin-v3 table.hide-col-photo th:nth-child(10) {
 	display: none;
 }
 
