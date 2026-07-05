@@ -501,23 +501,22 @@ class StructuredRouteMapPainter extends CustomPainter {
     final bucket = routeMapZoomBucket(camera);
     final painterById = <String, TextPainter>{};
 
-    // 노선 뱃지(bucket>=1)와 역 라벨(bucket>=2)을 한 번의 충돌 배치에 태운다.
-    // bucket 0(최대 축소)은 고정 크기 뱃지가 촘촘한 노선을 덮으므로 뱃지도 생략해
-    // 선 실루엣만 보인다(#1789 LOD). 뱃지 priority -1 이라 역명보다 먼저 자리를
-    // 잡는다(#1764 D). 후보는 순수 함수로 생성해 테스트와 동일 규칙을 태운다.
+    // 노선 뱃지(노선명, 전 bucket)와 역 라벨(bucket>=2)을 한 번의 충돌 배치에
+    // 태운다. 뱃지는 노선 끝점의 소수라 촘촘한 노선을 덮지 않으므로 축소 화면에도
+    // 남겨 노선 식별을 돕는다(#1789 LOD). 뱃지 priority -1 이라 역명보다 먼저
+    // 자리를 잡는다(#1764 D). 후보는 순수 함수로 생성해 테스트와 동일 규칙을 태운다.
     final candidates = <RouteMapLabelCandidate>[
-      if (bucket >= 1)
-        ...routeMapLineBadgeCandidates(
-          map,
-          camera,
-          badgeLabelByLineId: lineBadgeLabelByLineId,
-          measure: (id, text) => (painterById[id] ??= _badgePainter(text)).size,
-          isVisible: visible.contains,
-          badgeRadius: lineBadgeRadius,
-          horizontalPadding: _badgeHorizontalPadding,
-          // id 프리픽스를 painter의 pill 판정(_badgeIdPrefix)과 결속 — 드리프트 방지.
-          idPrefix: _badgeIdPrefix,
-        ),
+      ...routeMapLineBadgeCandidates(
+        map,
+        camera,
+        badgeLabelByLineId: lineBadgeLabelByLineId,
+        measure: (id, text) => (painterById[id] ??= _badgePainter(text)).size,
+        isVisible: visible.contains,
+        badgeRadius: lineBadgeRadius,
+        horizontalPadding: _badgeHorizontalPadding,
+        // id 프리픽스를 painter의 pill 판정(_badgeIdPrefix)과 결속 — 드리프트 방지.
+        idPrefix: _badgeIdPrefix,
+      ),
     ];
     if (labelTextByStationId.isNotEmpty) {
       candidates.addAll(
