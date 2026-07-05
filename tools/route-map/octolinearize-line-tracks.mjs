@@ -60,11 +60,12 @@ function verticesToPath(verts) {
 }
 
 function parseArgs(argv) {
-  const o = { pack: "apps/mobile/assets/datapacks/capital.sqlite.gz", index: "apps/mobile/assets/datapacks/index.json", region: "수도권", lines: [], check: false };
+  const o = { pack: "apps/mobile/assets/datapacks/capital.sqlite.gz", index: "apps/mobile/assets/datapacks/index.json", region: "수도권", lines: [], all: false, check: false };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
       case "--region": o.region = argv[++i]; break;
       case "--line": o.lines.push(argv[++i]); break;
+      case "--all": o.all = true; break;
       case "--check": o.check = true; break;
       case "--pack": o.pack = argv[++i]; break;
     }
@@ -83,9 +84,16 @@ function main() {
   const db = new DatabaseSync(sqlitePath);
   try {
     const lineIds = [];
-    for (const nm of o.lines) {
-      const row = db.prepare("SELECT id FROM lines WHERE name_ko = ?").get(nm);
-      if (row) lineIds.push({ id: row.id, name: nm });
+    if (o.all) {
+      // 지역 내 route_map_positions에 노드가 있는 전 노선.
+      for (const r of db.prepare("SELECT DISTINCT rmp.line_id AS id, l.name_ko AS name FROM route_map_positions rmp JOIN lines l ON l.id = rmp.line_id WHERE rmp.region = ? ORDER BY l.name_ko").all(o.region)) {
+        lineIds.push({ id: r.id, name: r.name });
+      }
+    } else {
+      for (const nm of o.lines) {
+        const row = db.prepare("SELECT id FROM lines WHERE name_ko = ?").get(nm);
+        if (row) lineIds.push({ id: row.id, name: nm });
+      }
     }
     for (const { id, name } of lineIds) {
       // 노드를 line_sequence 순서로 (동일 물리역은 x/y 그대로)
