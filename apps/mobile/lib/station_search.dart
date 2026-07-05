@@ -404,7 +404,7 @@ class FavoriteStation {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 아직 알 수 없어요';
+      return '노선을 확인하고 있어요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -471,7 +471,7 @@ class StationSearchResult {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 아직 알 수 없어요';
+      return '노선을 확인하고 있어요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -556,7 +556,7 @@ class StationDetail {
 
   String get lineLabel {
     if (lines.isEmpty) {
-      return '노선을 아직 알 수 없어요';
+      return '노선을 확인하고 있어요';
     }
     return lines.map((line) => line.name).join(', ');
   }
@@ -615,7 +615,7 @@ class StationExitInfo {
   final String fieldValidationStatus;
 
   String get elevatorConnectionLabel {
-    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결을 아직 알 수 없어요';
+    return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결을 확인하고 있어요';
   }
 
   String get stairPathLabel {
@@ -4393,7 +4393,7 @@ String _facilityFloorLabel(StationFacilityInfo facility) {
   final from = facility.floorFrom.trim();
   final to = facility.floorTo.trim();
   if (from.isEmpty && to.isEmpty) {
-    return '연결 위치를 아직 알 수 없어요';
+    return '연결 위치를 확인하고 있어요';
   }
   if (from.isEmpty || to.isEmpty) {
     return '연결 위치 ${from.isEmpty ? to : from}';
