@@ -10,7 +10,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
-import 'core/datapack/data_pack_update_state.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
 import 'favorite_facility.dart';
@@ -77,9 +76,6 @@ Future<void> main() async {
         : null,
   );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
-  final dataPackUpdateStateRepository = DataPackUpdateStateRepository(
-    userDatabase: bootstrap.userDatabase,
-  );
   runApp(
     AppBootstrapLifecycle(
       close: bootstrap.close,
@@ -90,9 +86,6 @@ Future<void> main() async {
             const SecureFacilityReportDraftTargetStore(),
         facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
         legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
-        offlineDataExpiresAtLoader: () async =>
-            (await dataPackUpdateStateRepository.readManifestCache())
-                ?.expiresAt,
       ),
     ),
   );
@@ -276,7 +269,6 @@ class EasySubwayApp extends StatelessWidget {
         const SupportAccessInfo.fromEnvironment(),
     SupportAccessLauncher supportAccessLauncher =
         const UrlLauncherSupportAccessLauncher(),
-    OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
@@ -311,7 +303,6 @@ class EasySubwayApp extends StatelessWidget {
            isReleaseMode: kReleaseMode,
          ),
          supportAccessLauncher: supportAccessLauncher,
-         offlineDataExpiresAtLoader: offlineDataExpiresAtLoader,
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
@@ -329,7 +320,6 @@ class EasySubwayApp extends StatelessWidget {
     required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
-    required this.offlineDataExpiresAtLoader,
     required this.recentRoutesFuture,
     super.key,
   }) : repository = dependencies.repository,
@@ -373,7 +363,6 @@ class EasySubwayApp extends StatelessWidget {
   final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
-  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -454,14 +443,11 @@ class EasySubwayApp extends StatelessWidget {
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
-        offlineDataExpiresAtLoader: offlineDataExpiresAtLoader,
         recentRoutesFuture: recentRoutesFuture,
       ),
     );
   }
 }
-
-typedef OfflineDataExpiresAtLoader = Future<DateTime?> Function();
 
 class EasySubwayScrollBehavior extends MaterialScrollBehavior {
   const EasySubwayScrollBehavior();
@@ -577,7 +563,6 @@ class _EasySubwayHome extends StatefulWidget {
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
-    required this.offlineDataExpiresAtLoader,
     required this.recentRoutesFuture,
   });
 
@@ -604,7 +589,6 @@ class _EasySubwayHome extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
-  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -722,7 +706,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         supportAccessLauncher: widget.supportAccessLauncher,
         userDataDeletionRepository: widget.userDataDeletionRepository,
         recentRoutesFuture: widget.recentRoutesFuture,
-        offlineDataExpiresAtLoader: widget.offlineDataExpiresAtLoader,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
         onViewPreferencesChanged: _saveViewPreferences,
@@ -1225,7 +1208,6 @@ class HomeScreen extends StatefulWidget {
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
-    this.offlineDataExpiresAtLoader,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
@@ -1255,7 +1237,6 @@ class HomeScreen extends StatefulWidget {
   final Future<void> Function(OnboardingViewPreferences preferences)
   onViewPreferencesChanged;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
-  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final String initialMobilityType;
   final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
@@ -1586,7 +1567,6 @@ class _HomeScreenState extends State<HomeScreen> {
           onOpenMobilityProfile: _openMobilityProfile,
           onOpenSupportAccess: openSupportAccess,
           onOpenMyReports: openMyReports,
-          offlineDataExpiresAtLoader: widget.offlineDataExpiresAtLoader,
         ),
       );
     }
@@ -2379,14 +2359,12 @@ class _AppInfoRow extends StatelessWidget {
     required this.iconColor,
     required this.title,
     this.subtitle,
-    this.trailing,
   });
 
   final IconData icon;
   final Color iconColor;
   final String title;
   final String? subtitle;
-  final String? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -2422,49 +2400,11 @@ class _AppInfoRow extends StatelessWidget {
         ],
       ],
     );
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    if (textScale >= 2) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              leading,
-              const SizedBox(width: 12),
-              Expanded(child: content),
-            ],
-          ),
-          if (trailing != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8, left: 55),
-              child: Text(
-                trailing!,
-                style: const TextStyle(
-                  color: EasySubwayAccessibleColors.text,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
-      );
-    }
     return Row(
       children: [
         leading,
         const SizedBox(width: 12),
         Expanded(child: content),
-        if (trailing != null) ...[
-          const SizedBox(width: 8),
-          Text(
-            trailing!,
-            style: const TextStyle(
-              color: EasySubwayAccessibleColors.text,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -2480,7 +2420,6 @@ class AppSettingsScreen extends StatefulWidget {
     required this.onOpenMobilityProfile,
     required this.onOpenSupportAccess,
     required this.onOpenMyReports,
-    this.offlineDataExpiresAtLoader,
     this.bottomNavigationBar,
     super.key,
   });
@@ -2494,7 +2433,6 @@ class AppSettingsScreen extends StatefulWidget {
   final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenMyReports;
-  final OfflineDataExpiresAtLoader? offlineDataExpiresAtLoader;
   final Widget? bottomNavigationBar;
 
   @override
@@ -2576,9 +2514,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   ),
                 ],
               ),
-              // '저장된 안내'(인터넷 없이 이용·데이터 출처) 섹션 제거(#1570):
-              // 오프라인 동작은 설명 없이 그냥 되는 것이고, 데이터·지도 출처는
-              // 도움말·문의 하위에 이미 있어 중복 진입을 없앤다.
+              // 오프라인 안내 섹션·화면은 완전히 제거됐다(#1570): 오프라인 동작은
+              // 설명 없이 그냥 되는 것이고, 데이터·지도 출처는 도움말·문의 하위에 이미 있다.
               if (widget.notificationRepository != null)
                 _AppSettingsSection(
                   key: const Key('settingsSection-notification'),
@@ -3262,150 +3199,6 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class OfflineDataScreen extends StatelessWidget {
-  const OfflineDataScreen({
-    super.key,
-    this.expiresAt,
-    this.expiresAtLoader,
-    this.now,
-  });
-
-  // ponytail: v1 stale badge only needs manifest expiry; add source freshness when surfaced here.
-  static const _offlineDataSourceOfTruth = 'installed catalog metadata';
-
-  final DateTime? expiresAt;
-  final OfflineDataExpiresAtLoader? expiresAtLoader;
-  final DateTime Function()? now;
-
-  @override
-  Widget build(BuildContext context) {
-    assert(_offlineDataSourceOfTruth == 'installed catalog metadata');
-    final loader = expiresAtLoader;
-    if (loader != null && expiresAt == null) {
-      return FutureBuilder<DateTime?>(
-        future: loader(),
-        builder: (context, snapshot) => _buildScaffold(context, snapshot.data),
-      );
-    }
-    return _buildScaffold(context, expiresAt);
-  }
-
-  Widget _buildScaffold(BuildContext context, DateTime? effectiveExpiresAt) {
-    final storedDataStatus = _storedDataStatus(
-      expiresAt: effectiveExpiresAt,
-      now: now,
-    );
-    return Scaffold(
-      appBar: AppBar(title: const Text('인터넷 없이 이용')),
-      body: SafeArea(
-        child: ListView(
-          padding: _mainPagePadding,
-          children: [
-            const _AppCard(
-              showBorder: true,
-              child: _AppInfoRow(
-                icon: Icons.check_circle_outline,
-                iconColor: EasySubwayAccessibleColors.primary,
-                title: '인터넷 없이도 이용할 수 있어요',
-                subtitle: '마지막으로 받은 노선도와 역 정보를 보여줍니다.',
-              ),
-            ),
-            const _AppSectionTitle(title: '저장된 안내 상태'),
-            _AppCard(
-              child: Column(
-                children: [
-                  _AppInfoRow(
-                    icon: Icons.update,
-                    iconColor: EasySubwayAccessibleColors.brand,
-                    title: '마지막 갱신',
-                    subtitle: storedDataStatus.subtitle,
-                    trailing: storedDataStatus.trailing,
-                  ),
-                  const _AppInfoRow(
-                    icon: Icons.manage_search_outlined,
-                    iconColor: EasySubwayAccessibleColors.amber,
-                    title: '저장 정보 다시 확인',
-                    subtitle: '저장 정보 기록을 확인할 수 없으면 현장 안내를 우선 확인해 주세요',
-                    trailing: '확인',
-                  ),
-                  const _AppInfoRow(
-                    icon: Icons.info_outline,
-                    iconColor: EasySubwayAccessibleColors.amber,
-                    title: '제한 사항',
-                    subtitle: '실시간 시설 상태와 제보 전송은 인터넷 연결이 필요해요',
-                    trailing: '주의',
-                  ),
-                ],
-              ),
-            ),
-            const _AppSectionTitle(title: '이용 가능'),
-            const _AppCard(
-              child: Column(
-                children: [
-                  _AppInfoRow(
-                    icon: Icons.map_outlined,
-                    iconColor: EasySubwayAccessibleColors.mintDark,
-                    title: '노선도',
-                    subtitle: '지역·노선·역 보기',
-                    trailing: '가능',
-                  ),
-                  _AppInfoRow(
-                    icon: Icons.train_outlined,
-                    iconColor: EasySubwayAccessibleColors.mintDark,
-                    title: '역·시설 정보',
-                    subtitle: '출구와 엘리베이터 보기',
-                    trailing: '가능',
-                  ),
-                  _AppInfoRow(
-                    icon: Icons.bookmark_border,
-                    iconColor: EasySubwayAccessibleColors.mintDark,
-                    title: '즐겨찾기한 항목',
-                    subtitle: '역·시설·경로 보기',
-                    trailing: '가능',
-                  ),
-                ],
-              ),
-            ),
-            const _AppSectionTitle(title: '인터넷 연결 필요'),
-            const _AppCard(
-              child: Column(
-                children: [
-                  _AppInfoRow(
-                    icon: Icons.report_outlined,
-                    iconColor: EasySubwayAccessibleColors.amber,
-                    title: '시설 제보',
-                    subtitle: '사진과 제보 보내기',
-                    trailing: '연결 필요',
-                  ),
-                  _AppInfoRow(
-                    icon: Icons.refresh,
-                    iconColor: EasySubwayAccessibleColors.amber,
-                    title: '시설 상태 새로 확인',
-                    subtitle: '최신 고장·복구 확인',
-                    trailing: '연결 필요',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-({String subtitle, String trailing}) _storedDataStatus({
-  DateTime? expiresAt,
-  DateTime Function()? now,
-}) {
-  final expiry = expiresAt;
-  final current = (now ?? DateTime.now)().toUtc();
-  if (expiry != null && !current.isBefore(expiry.toUtc())) {
-    return (subtitle: '저장된 데이터 기준 · 갱신 필요', trailing: '갱신 필요');
-  }
-  return (subtitle: '앱 설치 때 함께 받은 안내', trailing: '저장됨');
 }
 
 class SupportAccessScreen extends StatelessWidget {
