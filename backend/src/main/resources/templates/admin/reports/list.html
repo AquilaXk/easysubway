@@ -84,6 +84,45 @@
 			</div>
 		</div>
 
+		<!--
+		  저장된 뷰(#1737): 계정별 검색 스냅샷. 적용은 htmx/no-JS 링크, 저장·기본·삭제는 command token +
+		  CSRF POST(no-JS 기준선, 처리 후 목록으로 리다이렉트). 화면군 이슈가 이 패턴을 복제한다.
+		-->
+		<div class="saved-views" aria-label="저장된 뷰">
+			<div class="saved-view-list" th:if="${!savedViews.isEmpty()}">
+				<span th:each="view : ${savedViews}" class="saved-view">
+					<a th:href="${view.applyHref}" th:attr="hx-get=${view.applyHref}"
+					   th:classappend="${view.isDefault} ? ' is-default'"
+					   th:text="${view.name}">저장된 뷰</a>
+					<form method="post" th:if="${!view.isDefault}"
+					      th:action="@{/admin/saved-views/{id}/default(id=${view.viewId})}">
+						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
+						<input type="hidden" name="returnTo" value="/admin/reports/page">
+						<button type="submit" title="기본으로 지정" aria-label="기본 뷰로 지정">★</button>
+					</form>
+					<form method="post" th:action="@{/admin/saved-views/{id}/delete(id=${view.viewId})}">
+						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
+						<input type="hidden" name="returnTo" value="/admin/reports/page">
+						<button type="submit" title="삭제" aria-label="저장된 뷰 삭제">✕</button>
+					</form>
+				</span>
+			</div>
+			<form class="save-view" method="post" th:action="@{/admin/saved-views}">
+				<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+				<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
+				<input type="hidden" name="programId" value="a-reports">
+				<input type="hidden" name="queryParams" th:value="${currentQueryString}">
+				<input type="hidden" name="returnTo" value="/admin/reports/page">
+				<input type="text" name="name" placeholder="현재 검색 저장" aria-label="저장된 뷰 이름" required>
+				<label class="save-view-default">
+					<input type="checkbox" name="makeDefault" value="true"> 기본
+				</label>
+				<button type="submit">저장</button>
+			</form>
+		</div>
+
 		<nav class="status-filter" aria-label="신고 상태 필터">
 			<a th:href="${allFilter.href}"
 			   th:attr="hx-get=${allFilter.href},aria-current=${allFilter.current ? 'page' : null}">전체</a>

@@ -1,6 +1,7 @@
 package com.easysubway.report.adapter.in.web;
 
 import com.easysubway.admin.audit.application.service.AdminAuditWriter;
+import com.easysubway.admin.savedview.application.port.in.AdminSavedViewUseCase;
 import com.easysubway.admin.web.AdminFormErrorView;
 import com.easysubway.admin.web.AdminMasterLabelResolver;
 import com.easysubway.common.domain.PageResult;
@@ -58,12 +59,14 @@ class FacilityReportAdminPageController {
 
 	private static final int REPORT_SURGE_ALERT_THRESHOLD = 10;
 	private static final long REPORT_SURGE_LOOKBACK_HOURS = 24;
+	private static final String REPORTS_PROGRAM_ID = "a-reports";
 
 	private final FacilityReportUseCase facilityReportUseCase;
 	private final LoadFacilityReportPhotoPort loadFacilityReportPhotoPort;
 	private final WebMessageResolver messages;
 	private final AdminAuditWriter auditWriter;
 	private final AdminMasterLabelResolver labelResolver;
+	private final AdminSavedViewUseCase savedViewUseCase;
 	private final Clock clock;
 
 	@Autowired
@@ -73,6 +76,7 @@ class FacilityReportAdminPageController {
 		WebMessageResolver messages,
 		AdminAuditWriter auditWriter,
 		AdminMasterLabelResolver labelResolver,
+		AdminSavedViewUseCase savedViewUseCase,
 		ObjectProvider<Clock> clockProvider
 	) {
 		this(
@@ -81,6 +85,7 @@ class FacilityReportAdminPageController {
 			messages,
 			auditWriter,
 			labelResolver,
+			savedViewUseCase,
 			clockProvider.getIfAvailable(Clock::systemDefaultZone)
 		);
 	}
@@ -101,6 +106,7 @@ class FacilityReportAdminPageController {
 			messages,
 			AdminAuditWriter.noop(),
 			AdminMasterLabelResolver.empty(),
+			AdminSavedViewUseCase.readOnlyEmpty(),
 			clock
 		);
 	}
@@ -111,6 +117,7 @@ class FacilityReportAdminPageController {
 		WebMessageResolver messages,
 		AdminAuditWriter auditWriter,
 		AdminMasterLabelResolver labelResolver,
+		AdminSavedViewUseCase savedViewUseCase,
 		Clock clock
 	) {
 		this.facilityReportUseCase = facilityReportUseCase;
@@ -118,6 +125,7 @@ class FacilityReportAdminPageController {
 		this.messages = messages;
 		this.auditWriter = auditWriter;
 		this.labelResolver = labelResolver;
+		this.savedViewUseCase = savedViewUseCase;
 		this.clock = clock;
 	}
 
@@ -130,6 +138,7 @@ class FacilityReportAdminPageController {
 		@RequestParam(required = false) String sort,
 		@RequestParam(required = false) Integer page,
 		@RequestParam(required = false) Integer size,
+		Authentication authentication,
 		Model model
 	) {
 		FacilityReportListQuery query = FacilityReportListQuery.of(status, keyword, from, to, sort, page, size);
@@ -137,7 +146,7 @@ class FacilityReportAdminPageController {
 		if (pageView.page() != query.page() || pageView.size() != query.size()) {
 			return redirectToReportList(query, pageView);
 		}
-		addReportResultsAttributes(query, pageView, model);
+		addReportResultsAttributes(query, pageView, authentication, model);
 		addReportSummaryAttributes(model);
 		return "admin/reports/list";
 	}
@@ -158,14 +167,15 @@ class FacilityReportAdminPageController {
 		@RequestParam(required = false) Integer page,
 		@RequestParam(required = false) Integer size,
 		@RequestHeader(value = "HX-History-Restore-Request", required = false) boolean historyRestore,
+		Authentication authentication,
 		Model model
 	) {
 		if (historyRestore) {
-			return reportListPage(status, keyword, from, to, sort, page, size, model);
+			return reportListPage(status, keyword, from, to, sort, page, size, authentication, model);
 		}
 		FacilityReportListQuery query = FacilityReportListQuery.of(status, keyword, from, to, sort, page, size);
 		EgovPaginationView pageView = reportListPageView(query);
-		addReportResultsAttributes(clampQuery(query, pageView), pageView, model);
+		addReportResultsAttributes(clampQuery(query, pageView), pageView, authentication, model);
 		return "admin/reports/list :: reportResults";
 	}
 
@@ -186,10 +196,11 @@ class FacilityReportAdminPageController {
 		);
 	}
 
-	// reportResults fragment에 담기는 속성만 채운다(검색·필터 툴바·표·페이지네이션).
+	// reportResults fragment에 담기는 속성만 채운다(검색·필터 툴바·표·페이지네이션·저장된 뷰).
 	private void addReportResultsAttributes(
 		FacilityReportListQuery query,
 		EgovPaginationView pageView,
+		Authentication authentication,
 		Model model
 	) {
 		PageResult<FacilityReportSummary> reportPage = facilityReportUseCase.searchReportSummaries(query);
@@ -258,6 +269,29 @@ class FacilityReportAdminPageController {
 				hrefWith(query.status(), keyword, null, null, currentSort)));
 		}
 		model.addAttribute("filterChips", chips);
+
+		// 저장된 뷰(#1737): 계정별 목록 + 현재 검색을 저장할 질의 문자열. 목록 진입 시 적용/기본/삭제 링크.
+		String loginId = authentication == null ? null : authentication.getName();
+		model.addAttribute("currentQueryString", buildQueryString(query));
+		model.addAttribute("savedViews", savedViewUseCase.listViews(loginId, REPORTS_PROGRAM_ID).stream()
+			.map(view -> new SavedViewLink(
+				view.name(), savedViewApplyHref(view.queryParams()), view.viewId(), view.isDefault()))
+			.toList());
+	}
+
+	// 현재 필터·정렬을 인코딩된 질의 문자열로 만든다(page·size 제외). 저장된 뷰의 저장·적용에 쓴다.
+	private static String buildQueryString(FacilityReportListQuery query) {
+		UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/admin/reports/page");
+		queryParams(query).forEach((key, value) -> appendParam(builder, key, value));
+		String queryString = builder.build().encode().getQuery();
+		return queryString == null ? "" : queryString;
+	}
+
+	private static String savedViewApplyHref(String queryParams) {
+		if (queryParams == null || queryParams.isBlank()) {
+			return "/admin/reports/page";
+		}
+		return "/admin/reports/page?" + queryParams;
 	}
 
 	private DatePresetLink datePreset(
@@ -311,6 +345,9 @@ class FacilityReportAdminPageController {
 	}
 
 	record FilterChip(String label, String removeHref) {
+	}
+
+	record SavedViewLink(String name, String applyHref, String viewId, boolean isDefault) {
 	}
 
 	// 급증 경고·처리 시간 카드는 fragment 밖 풀페이지 전용이라 부분 응답에서는 조회하지 않는다.

@@ -15,4 +15,29 @@ public interface AdminSavedViewUseCase {
 
 	/** 소유자 확인 후 삭제. */
 	AdminSavedView deleteView(String adminLoginId, String viewId);
+
+	/** 저장된 뷰가 없는 읽기 전용 구현(경량 컨트롤러 단위 테스트용). 변경은 지원하지 않는다. */
+	static AdminSavedViewUseCase readOnlyEmpty() {
+		return new AdminSavedViewUseCase() {
+			@Override
+			public AdminSavedView saveView(SaveAdminSavedViewCommand command) {
+				throw new UnsupportedOperationException("read-only saved view use case");
+			}
+
+			@Override
+			public List<AdminSavedView> listViews(String adminLoginId, String programId) {
+				return List.of();
+			}
+
+			@Override
+			public AdminSavedView setDefaultView(String adminLoginId, String viewId) {
+				throw new UnsupportedOperationException("read-only saved view use case");
+			}
+
+			@Override
+			public AdminSavedView deleteView(String adminLoginId, String viewId) {
+				throw new UnsupportedOperationException("read-only saved view use case");
+			}
+		};
+	}
 }

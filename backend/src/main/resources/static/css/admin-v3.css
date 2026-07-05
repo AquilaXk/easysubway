@@ -522,6 +522,54 @@ body.admin-v3 {
 	border-color: var(--admin-border-strong);
 }
 
+/* 저장된 뷰(#1737) */
+.admin-v3 .saved-views {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.admin-v3 .saved-view-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.admin-v3 .saved-view {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	border: 1px solid var(--admin-border);
+	border-radius: 6px;
+	padding: 0 4px 0 10px;
+}
+
+.admin-v3 .saved-view a.is-default {
+	font-weight: 700;
+}
+
+.admin-v3 .saved-view form {
+	display: inline;
+	margin: 0;
+}
+
+.admin-v3 .saved-view button {
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	padding: 2px 4px;
+	color: var(--admin-ink-2);
+}
+
+.admin-v3 .save-view {
+	display: inline-flex;
+	gap: 6px;
+	align-items: center;
+	margin: 0;
+}
+
 .admin-status {
 	font-size: 13px;
 }

@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easysubway.admin.savedview.application.port.in.AdminSavedViewUseCase;
+import com.easysubway.admin.savedview.application.port.in.SaveAdminSavedViewCommand;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,9 @@ class FacilityReportAdminHtmxPilotTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@Autowired
+	private AdminSavedViewUseCase savedViewUseCase;
 
 	@Test
 	@DisplayName("일반 요청은 셸·스크립트·결과 fragment를 모두 포함한 풀페이지를 반환한다")
@@ -219,6 +224,30 @@ class FacilityReportAdminHtmxPilotTest {
 			.contains("전체 기간")
 			.contains("class=\"filter-chip\"")
 			.contains("검색: 엘리베이터");
+	}
+
+	@Test
+	@DisplayName("저장된 뷰 저장 폼과 저장된 뷰 적용 링크가 렌더된다")
+	void savedViewsSectionRenders() throws Exception {
+		savedViewUseCase.saveView(new SaveAdminSavedViewCommand(
+			"admin-test", "a-reports", "미확인 급증", "status=SUBMITTED", false));
+
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			// 저장 폼
+			.contains("class=\"save-view\"")
+			.contains("name=\"programId\"")
+			.contains("현재 검색 저장")
+			.contains("name=\"commandToken\"")
+			// 적용 링크
+			.contains("미확인 급증")
+			.contains("/admin/reports/page?status=SUBMITTED");
 	}
 
 	private String createReport(String description) throws Exception {
