@@ -25,7 +25,7 @@ class JdbcRouteTimetableRepositoryTest {
 		jdbcTemplate = new JdbcTemplate(dataSource);
 		jdbcTemplate.execute("DROP ALL OBJECTS");
 		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V29__canonical_transit_schedule.sql'");
-		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V35__transit_feed_info.sql'");
+		jdbcTemplate.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V37__transit_feed_info.sql'");
 		repository = new JdbcRouteTimetableRepository(jdbcTemplate);
 	}
 
