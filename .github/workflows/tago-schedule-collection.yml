@@ -46,6 +46,12 @@ jobs:
           set -euo pipefail
           test -n "${DATA_GO_KR_SERVICE_KEY}"
           node tools/datapack/validate-tago-schedule-sample.mjs \
+            --discover-stations \
+            --quiet \
+            --input tools/datapack/inputs/capital-pilot-production-source-input.json \
+            --service-key-env DATA_GO_KR_SERVICE_KEY \
+            --output "${RUNNER_TEMP}/tago-station-discovery.json"
+          node tools/datapack/validate-tago-schedule-sample.mjs \
             --plan \
             --quiet \
             --input tools/datapack/inputs/capital-pilot-production-source-input.json \
@@ -82,5 +88,6 @@ jobs:
             ${{ runner.temp }}/tago-plan.json
             ${{ runner.temp }}/tago-summary.json
             ${{ runner.temp }}/tago-report.json
+            ${{ runner.temp }}/tago-station-discovery.json
           if-no-files-found: error
           retention-days: 14
