@@ -96,6 +96,10 @@ void main() {
       expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
       expect(find.text('천천히 이동'), findsOneWidget);
       expect(find.text('휠체어 이용'), findsOneWidget);
+      // 이동 조건 설명은 mobilityProfileOptions.summary 한 벌로 통일됐다(#1568):
+      // 온보딩 전용 축약 문구를 없애고 카드 본문이 정본 summary를 그대로 보여준다.
+      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
+      expect(find.text('걷기와 환승 줄이기'), findsNothing);
 
       final disabledDoneButton = tester.widget<FilledButton>(
         find.byKey(const Key('onboardingDoneButton')),
