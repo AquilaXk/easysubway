@@ -40,6 +40,37 @@ test("TAGO 시간표 수집 plan은 daily limit과 checkpoint resume을 적용�
   assert.ok(plan.batches.every((batch) => batch.requests.length <= 3));
 });
 
+test("TAGO 시간표 수집 plan은 명시된 providerStationId를 formula보다 우선한다", () => {
+  const plan = buildTagoScheduleCollectionPlan(
+    {
+      stationLineRows: [{ stationCode: "433", lineId: "seoul-4", providerStationId: "MTRS14433" }],
+    },
+    { completedRequestKeys: [] },
+    12,
+  );
+  assert.equal(plan.stationCount, 1);
+  assert.ok(
+    plan.batches.every((batch) => batch.requests.every((request) => request.requestKey.startsWith("MTRS14433|"))),
+    "plan은 discovery로 확인된 providerStationId(MTRS14433)를 써야 한다",
+  );
+  assert.ok(
+    !plan.batches.some((batch) => batch.requests.some((request) => request.requestKey.startsWith("MTRKR4433"))),
+    "formula로 만든 잘못된 MTRKR4433을 쓰면 안 된다",
+  );
+});
+
+test("TAGO 시간표 수집 plan은 providerStationId 없으면 seoul-4 formula로 폴백한다", () => {
+  const plan = buildTagoScheduleCollectionPlan(
+    { stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }] },
+    { completedRequestKeys: [] },
+    12,
+  );
+  assert.ok(
+    plan.batches.every((batch) => batch.requests.every((request) => request.requestKey.startsWith("MTRKR4448|"))),
+    "providerStationId 없으면 seoul-4 formula(MTRKR4448)로 폴백해야 한다",
+  );
+});
+
 test("TAGO 시간표 수집 plan은 파일럿 매핑 대상이 아닌 lineId를 거부한다", () => {
   assert.throws(
     () =>

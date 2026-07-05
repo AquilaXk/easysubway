@@ -483,8 +483,14 @@ function requestKeyParts(requestKey) {
 function tagoStationIds(input) {
   const stationIds = new Set();
   for (const row of input.stationLineRows ?? []) {
+    // discovery(GetKwrdFndSubwaySttnList)로 확인된 실제 provider station id를 formula보다 우선한다.
+    // 운영기관 prefix가 다르므로(코레일 MTRKR vs 서울교통공사 MTRS1) formula는 사당 등 비-코레일 역에서 틀린다.
+    if (row.providerStationId) {
+      stationIds.add(row.providerStationId);
+      continue;
+    }
     if (!row.stationCode) continue;
-    // TODO: pilot line 4 mapping only; replace with explicit provider station ids before nationwide collection.
+    // seoul-4 코레일 구간 한정 폴백. 비-코레일 역은 providerStationId를 명시해야 한다.
     if (row.stationCode.startsWith("MTRKR")) {
       stationIds.add(row.stationCode);
       continue;
