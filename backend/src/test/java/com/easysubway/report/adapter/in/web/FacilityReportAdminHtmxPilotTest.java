@@ -147,6 +147,60 @@ class FacilityReportAdminHtmxPilotTest {
 			.doesNotContain("cdnjs.cloudflare.com");
 	}
 
+	@Test
+	@DisplayName("키워드 검색은 신고 내용으로 목록을 거른다")
+	void keywordSearchFiltersReports() throws Exception {
+		createReport("엘리베이터가 멈췄습니다");
+		createReport("에스컬레이터 소음 문제");
+
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.param("keyword", "엘리베이터")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("엘리베이터가 멈췄습니다")
+			.doesNotContain("에스컬레이터 소음 문제");
+	}
+
+	@Test
+	@DisplayName("검색 툴바와 정렬 헤더가 접근성 속성과 함께 렌더된다")
+	void searchToolbarAndSortableHeadersRender() throws Exception {
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("role=\"search\"")
+			.contains("name=\"keyword\"")
+			// 기본 정렬은 접수일 내림차순
+			.contains("aria-sort=\"descending\"")
+			.contains("sort=status,asc")
+			.contains("sort=created_at,asc");
+	}
+
+	@Test
+	@DisplayName("검색·상태 필터 링크는 현재 키워드를 유지한다")
+	void filterLinksPreserveKeyword() throws Exception {
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.param("keyword", "엘리베이터")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("keyword=%EC%97%98%EB%A6%AC%EB%B2%A0%EC%9D%B4%ED%84%B0")
+			.contains("status=SUBMITTED");
+	}
+
 	private String createReport(String description) throws Exception {
 		String created = mockMvc.perform(post("/api/v1/reports")
 				.with(httpBasic("basic-user", "user-test-password"))

@@ -51,23 +51,44 @@
 	-->
 	<div id="report-results" th:fragment="reportResults"
 	     hx-target="#report-results" hx-swap="outerHTML" hx-push-url="true">
+		<!-- 검색 툴바(#1737): 키워드 live search. JS 있으면 300ms debounce htmx 부분 갱신,
+		     없으면 form GET 제출로 동일 동작. 상태·정렬·기간은 hidden으로 유지된다. -->
+		<form class="table-toolbar" method="get" th:action="@{/admin/reports/page}"
+		      role="search" aria-label="신고 검색"
+		      hx-target="#report-results" hx-swap="outerHTML" hx-push-url="true"
+		      th:attr="hx-get=@{/admin/reports/page}"
+		      hx-trigger="submit, keyup changed delay:300ms">
+			<input type="search" name="keyword" th:value="${searchKeyword}"
+			       placeholder="신고 내용 검색" aria-label="신고 내용 검색" autocomplete="off">
+			<input type="hidden" name="status" th:if="${selectedStatus != null}" th:value="${selectedStatus}">
+			<input type="hidden" name="sort" th:if="${sortParam != null}" th:value="${sortParam}">
+			<input type="hidden" name="from" th:if="${createdFrom != null}" th:value="${createdFrom}">
+			<input type="hidden" name="to" th:if="${createdTo != null}" th:value="${createdTo}">
+			<button type="submit">검색</button>
+		</form>
+
 		<nav class="status-filter" aria-label="신고 상태 필터">
-			<a th:href="@{/admin/reports/page}"
-			   th:attr="hx-get=@{/admin/reports/page},aria-current=${selectedStatus == null ? 'page' : null}">전체</a>
-			<a th:each="statusOption : ${statusOptions}"
-			   th:href="@{/admin/reports/page(status=${statusOption.value})}"
-			   th:attr="hx-get=@{/admin/reports/page(status=${statusOption.value})},aria-current=${selectedStatus == statusOption.value ? 'page' : null}"
-			   th:text="${statusOption.label}">접수됨</a>
+			<a th:href="${allFilter.href}"
+			   th:attr="hx-get=${allFilter.href},aria-current=${allFilter.current ? 'page' : null}">전체</a>
+			<a th:each="filter : ${statusFilters}"
+			   th:href="${filter.href}"
+			   th:attr="hx-get=${filter.href},aria-current=${filter.current ? 'page' : null}"
+			   th:text="${filter.label}">접수됨</a>
 		</nav>
 
 		<table>
 			<thead>
 			<tr>
-				<th scope="col">상태</th>
+				<th scope="col" th:attr="aria-sort=${statusSort.ariaSort}">
+					<a th:href="${statusSort.href}" th:attr="hx-get=${statusSort.href}">상태</a>
+				</th>
 				<th scope="col">유형</th>
 				<th scope="col">신고 내용</th>
-				<th scope="col">역 ID</th>
-				<th scope="col">시설 ID</th>
+				<th scope="col">역</th>
+				<th scope="col">시설</th>
+				<th scope="col" th:attr="aria-sort=${createdSort.ariaSort}">
+					<a th:href="${createdSort.href}" th:attr="hx-get=${createdSort.href}">접수일</a>
+				</th>
 				<th scope="col">좌표</th>
 				<th scope="col">사진</th>
 				<th scope="col">상세</th>
@@ -75,14 +96,15 @@
 			</thead>
 			<tbody>
 			<tr th:if="${reports.isEmpty()}">
-				<td class="empty" colspan="8">확인할 신고가 없습니다.</td>
+				<td class="empty" colspan="9">확인할 신고가 없습니다.</td>
 			</tr>
 			<tr th:each="report : ${reports}">
 				<td><span th:replace="~{admin/fragments/shell :: statusAuto(${report.statusLabel})}">접수됨</span></td>
 				<td th:text="${report.reportTypeLabel}">고장</td>
 				<td th:text="${report.description}">신고 내용</td>
-				<td th:text="${report.stationId}">station-id</td>
-				<td th:text="${report.facilityId}">facility-id</td>
+				<td th:text="${report.stationLabel}">상록수(station-id)</td>
+				<td th:text="${report.facilityLabel}">엘리베이터(facility-id)</td>
+				<td th:text="${#temporals.format(report.createdAt, 'yyyy-MM-dd HH:mm')}">2026-06-17 09:00</td>
 				<td th:text="${report.coordinateLabel}">위치 없음</td>
 				<td th:text="${report.hasPhoto ? '있음' : '없음'}">없음</td>
 				<td>

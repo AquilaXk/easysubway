@@ -142,6 +142,20 @@ public record FacilityReportListQuery(
 		return sortDirection == SortDirection.ASC ? "ascending" : "descending";
 	}
 
+	/** 템플릿용: 컬럼 토큰(created_at·status)으로 aria-sort 값을 준다. */
+	public String ariaSortFor(String columnToken) {
+		return ariaSort(columnOf(columnToken));
+	}
+
+	/** 템플릿용: 컬럼 토큰으로 다음 정렬 토큰을 준다(같은 컬럼이면 방향 토글). */
+	public String nextSortFor(String columnToken) {
+		return nextSortToken(columnOf(columnToken));
+	}
+
+	private static SortField columnOf(String columnToken) {
+		return "status".equalsIgnoreCase(columnToken) ? SortField.STATUS : SortField.CREATED_AT;
+	}
+
 	public FacilityReportPageRequest toPageRequest() {
 		return new FacilityReportPageRequest(page, size);
 	}

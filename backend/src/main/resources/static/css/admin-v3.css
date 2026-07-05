@@ -453,6 +453,36 @@ body.admin-v3 {
 	background: rgba(22, 48, 47, 0.08);
 }
 
+/* 표준 테이블 검색 툴바·정렬 헤더(#1737) */
+.admin-v3 .table-toolbar {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.admin-v3 .table-toolbar input[type="search"] {
+	flex: 1;
+	min-width: 0;
+}
+
+.admin-v3 table th[aria-sort] a {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: inherit;
+}
+
+.admin-v3 table th[aria-sort="ascending"] a::after {
+	content: "▲";
+	font-size: 9px;
+}
+
+.admin-v3 table th[aria-sort="descending"] a::after {
+	content: "▼";
+	font-size: 9px;
+}
+
 .admin-status {
 	font-size: 13px;
 }

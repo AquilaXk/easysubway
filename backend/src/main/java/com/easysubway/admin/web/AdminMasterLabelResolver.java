@@ -3,9 +3,14 @@ package com.easysubway.admin.web;
 import com.easysubway.transit.application.port.out.LoadTransitMasterPort;
 import com.easysubway.transit.domain.AccessibilityFacility;
 import com.easysubway.transit.domain.Station;
+import com.easysubway.transit.domain.StationExit;
+import com.easysubway.transit.domain.StationLine;
+import com.easysubway.transit.domain.SubwayLine;
+import com.easysubway.transit.domain.TransitOperator;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -23,6 +28,11 @@ public class AdminMasterLabelResolver {
 
 	public AdminMasterLabelResolver(LoadTransitMasterPort loadTransitMasterPort) {
 		this.loadTransitMasterPort = loadTransitMasterPort;
+	}
+
+	/** 마스터 조회 없이 모든 코드를 코드 그대로 반환하는 resolver(경량 단위 테스트용). */
+	public static AdminMasterLabelResolver empty() {
+		return new AdminMasterLabelResolver(EmptyTransitMasterPort.INSTANCE);
 	}
 
 	public Map<String, String> stationLabels(Collection<String> stationIds) {
@@ -76,6 +86,40 @@ public class AdminMasterLabelResolver {
 	private void fillFallback(Set<String> wanted, Map<String, String> labels) {
 		for (String id : wanted) {
 			labels.putIfAbsent(id, id);
+		}
+	}
+
+	private enum EmptyTransitMasterPort implements LoadTransitMasterPort {
+		INSTANCE;
+
+		@Override
+		public List<TransitOperator> loadOperators() {
+			return List.of();
+		}
+
+		@Override
+		public List<SubwayLine> loadLines() {
+			return List.of();
+		}
+
+		@Override
+		public List<Station> loadStations() {
+			return List.of();
+		}
+
+		@Override
+		public List<StationLine> loadStationLines() {
+			return List.of();
+		}
+
+		@Override
+		public List<StationExit> loadStationExits() {
+			return List.of();
+		}
+
+		@Override
+		public List<AccessibilityFacility> loadAccessibilityFacilities() {
+			return List.of();
 		}
 	}
 }
