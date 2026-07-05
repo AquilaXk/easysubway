@@ -1867,7 +1867,7 @@ class StationSearchScreen extends StatefulWidget {
   State<StationSearchScreen> createState() => _StationSearchScreenState();
 }
 
-enum StationSearchEntryMode { search, recent, nearby }
+enum StationSearchEntryMode { search, nearby }
 
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
@@ -1938,7 +1938,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isRecentEntry = widget.entryMode == StationSearchEntryMode.recent;
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
     const showSearchInput = true;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
@@ -1996,24 +1995,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       builder: (context, _) {
         final isSearching =
             _controller.state.status == StationSearchStatus.loading;
-        if (isNearbyEntry || _hasSearchQuery) {
+        if (isNearbyEntry || _hasSearchQuery || _recentQueries.isEmpty) {
           return const SizedBox.shrink();
-        }
-        if (_recentQueries.isEmpty) {
-          return isRecentEntry
-              ? Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _StationRecentSearchEmptyState(
-                    onSearchTap: _openStationSearch,
-                  ),
-                )
-              : const SizedBox.shrink();
         }
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: _StationRecentSearchSection(
             queries: _recentQueries,
-            showTitle: !isRecentEntry,
             enabled: !isSearching && !_isNearbySearchRunning,
             onQuerySelected: _searchRecentQuery,
             onQueryRemoved: _removeRecentQuery,
@@ -2074,12 +2062,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(switch (widget.entryMode) {
-          StationSearchEntryMode.recent => '최근 검색',
           StationSearchEntryMode.nearby => '가까운 역',
           StationSearchEntryMode.search => '역 검색',
         }),
         actions: [
-          if (!isRecentEntry && !isNearbyEntry)
+          if (!isNearbyEntry)
             TextButton.icon(
               key: const Key('nearbyStationAppBarButton'),
               onPressed: _isNearbySearchRunning ? null : _searchNearby,
@@ -2143,26 +2130,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       selection: TextSelection.collapsed(offset: query.length),
     );
     _submit(query);
-  }
-
-  void _openStationSearch() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => StationSearchScreen(
-          repository: widget.repository,
-          locationProvider: widget.locationProvider,
-          reportRepository: widget.reportRepository,
-          favoriteRepository: widget.favoriteRepository,
-          searchHistoryRepository: widget.searchHistoryRepository,
-          realtimeRepository: widget.realtimeRepository,
-          routeDraftController: widget.routeDraftController,
-          onOpenRouteSearch: widget.onOpenRouteSearch,
-          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
-          internalRouteRepository: widget.internalRouteRepository,
-          internalRouteMobilityType: widget.internalRouteMobilityType,
-        ),
-      ),
-    );
   }
 
   Future<void> _removeRecentQuery(String query) async {
@@ -2301,7 +2268,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 class _StationRecentSearchSection extends StatelessWidget {
   const _StationRecentSearchSection({
     required this.queries,
-    required this.showTitle,
     required this.enabled,
     required this.onQuerySelected,
     required this.onQueryRemoved,
@@ -2309,7 +2275,6 @@ class _StationRecentSearchSection extends StatelessWidget {
   });
 
   final List<String> queries;
-  final bool showTitle;
   final bool enabled;
   final ValueChanged<String> onQuerySelected;
   final ValueChanged<String> onQueryRemoved;
@@ -2321,30 +2286,15 @@ class _StationRecentSearchSection extends StatelessWidget {
       key: const Key('stationRecentSearchSection'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (showTitle) ...[
-          Text(
-            '최근 검색',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
-              height: 1.25,
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
         Row(
           children: [
             Expanded(
-              child: Semantics(
-                excludeSemantics: true,
-                label: '최근 사용 순서로 ${queries.length}개 표시',
-                child: Text(
-                  '최근 사용 순서 · ${queries.length}개',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.mutedText,
-                    fontWeight: FontWeight.w700,
-                    height: 1.3,
-                  ),
+              child: Text(
+                '최근 검색',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
                 ),
               ),
             ),
@@ -2472,33 +2422,6 @@ class _StationRecentSearchItem extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _StationRecentSearchEmptyState extends StatelessWidget {
-  const _StationRecentSearchEmptyState({required this.onSearchTap});
-
-  final VoidCallback onSearchTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      key: const Key('stationRecentSearchEmptyState'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const _StationSearchMessage(
-          message: '최근 검색한 역이 없습니다.',
-          liveRegion: false,
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          key: const Key('stationRecentSearchEmptySearchButton'),
-          onPressed: onSearchTap,
-          icon: const Icon(Icons.search),
-          label: const Text('역 검색하기'),
-        ),
-      ],
     );
   }
 }
