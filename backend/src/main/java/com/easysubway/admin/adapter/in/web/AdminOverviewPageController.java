@@ -6,11 +6,16 @@ import com.easysubway.admin.authorization.AdminAuthorization;
 import com.easysubway.admin.authorization.AdminPermission;
 import com.easysubway.admin.metric.application.service.AdminDashboardCardService;
 import com.easysubway.admin.metric.application.service.AdminDashboardCardService.DashboardCard;
+import com.easysubway.admin.metric.application.service.AdminMetricQueryService;
+import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricChart;
 import com.easysubway.admin.metric.application.service.AdminMetricSnapshotService;
 import com.easysubway.admin.metric.application.service.AdminMetricSnapshotStatusHolder;
 import com.easysubway.admin.metric.domain.AdminMetricKeys;
 import com.easysubway.admin.navigation.AdminProgram;
 import com.easysubway.collection.application.port.in.DataCollectionUseCase;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
 import com.easysubway.collection.domain.DataCollectionRun;
 import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase;
 import com.easysubway.health.application.port.in.CheckHealthUseCase;
@@ -36,6 +41,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
@@ -53,6 +59,8 @@ class AdminOverviewPageController {
 	private final AdminAlertService alertService;
 	private final AdminMetricSnapshotService metricSnapshotService;
 	private final AdminMetricSnapshotStatusHolder metricSnapshotStatusHolder;
+	private final AdminMetricQueryService metricQueryService;
+	private final ObjectMapper objectMapper;
 
 	AdminOverviewPageController(
 		DataQualityUseCase dataQualityUseCase,
@@ -66,7 +74,9 @@ class AdminOverviewPageController {
 		AdminDashboardCardService dashboardCardService,
 		AdminAlertService alertService,
 		AdminMetricSnapshotService metricSnapshotService,
-		AdminMetricSnapshotStatusHolder metricSnapshotStatusHolder
+		AdminMetricSnapshotStatusHolder metricSnapshotStatusHolder,
+		AdminMetricQueryService metricQueryService,
+		ObjectMapper objectMapper
 	) {
 		this.dataQualityUseCase = dataQualityUseCase;
 		this.facilityReportUseCase = facilityReportUseCase;
@@ -80,10 +90,16 @@ class AdminOverviewPageController {
 		this.alertService = alertService;
 		this.metricSnapshotService = metricSnapshotService;
 		this.metricSnapshotStatusHolder = metricSnapshotStatusHolder;
+		this.metricQueryService = metricQueryService;
+		this.objectMapper = objectMapper;
 	}
 
 	@GetMapping("/admin/dashboard/page")
-	String dashboardPage(Model model, Authentication authentication) {
+	String dashboardPage(
+		@RequestParam(name = "days", defaultValue = "7") int days,
+		Model model,
+		Authentication authentication
+	) {
 		DataQualitySummary quality = dataQualityUseCase.summarizeDataQuality();
 		Map<FacilityReportStatus, Long> reportCounts = facilityReportUseCase.countReportsByStatus();
 		RouteSearchDashboardSummary routes = routeSearchDashboardUseCase.summarizeRouteSearches();
@@ -137,7 +153,49 @@ class AdminOverviewPageController {
 		// 긴급 줄: 알림 센터 신호 요약(있을 때만). 지표 스냅샷 마지막 실행 상태.
 		model.addAttribute("alertSummary", alertService.summarize(authentication));
 		model.addAttribute("snapshotStatus", metricSnapshotStatusHolder.latest().orElse(null));
+
+		// 추이 섹션: 기간(7/30/90) 라인 차트 2개. 기간 전환은 htmx 부분 갱신(fragment 재호출).
+		populateTrends(days, model);
 		return "admin/dashboard";
+	}
+
+	// 추이 섹션 부분 갱신(#1739): 기간 버튼이 이 fragment를 htmx로 다시 불러 차트·대체표를 갈아끼운다.
+	@HxRequest
+	@GetMapping("/admin/dashboard/trends")
+	String dashboardTrends(
+		@RequestParam(name = "days", defaultValue = "7") int days,
+		Model model
+	) {
+		populateTrends(days, model);
+		return "admin/dashboard-trends :: section";
+	}
+
+	private void populateTrends(int days, Model model) {
+		List<TrendChart> trends = List.of(
+			trendChart("trend-reports", "제보 추이",
+				List.of(AdminMetricKeys.REPORTS_RECENT_24H, AdminMetricKeys.REPORTS_PENDING), days),
+			trendChart("trend-quality", "경로 차단률·API 오류율 추이",
+				List.of(AdminMetricKeys.ROUTE_BLOCKED_RATE, AdminMetricKeys.API_ERROR_RATE), days));
+		model.addAttribute("trends", trends);
+		// 정규화된 실제 기간(허용 밖 입력은 서비스가 7로 되돌리므로 첫 차트에서 읽는다).
+		model.addAttribute("trendDays", trends.get(0).data().days());
+	}
+
+	private TrendChart trendChart(String id, String title, List<String> keys, int days) {
+		AdminMetricChart chart = metricQueryService.chart(keys, days);
+		return new TrendChart(id, title, chart, toJson(chart));
+	}
+
+	// Chart.js가 읽을 데이터 섬(JSON). 직렬화 실패 시 빈 차트로 안전 폴백.
+	private String toJson(AdminMetricChart chart) {
+		try {
+			return objectMapper.writeValueAsString(chart);
+		} catch (JsonProcessingException exception) {
+			return "{\"labels\":[],\"series\":[]}";
+		}
+	}
+
+	record TrendChart(String id, String title, AdminMetricChart data, String json) {
 	}
 
 	// 지표 스냅샷 수동 재실행(#1739). 스케줄과 별개로 지금 즉시 오늘 집계를 다시 돌린다(멱등).

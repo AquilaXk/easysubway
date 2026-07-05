@@ -1618,3 +1618,46 @@ body.admin-v3 {
 	color: var(--admin-ink-2);
 	font-size: 13px;
 }
+
+.trend-periods {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 12px;
+}
+
+.trend-periods a {
+	min-height: 32px;
+	display: inline-flex;
+	align-items: center;
+	padding: 0 12px;
+	border: 1px solid var(--admin-border);
+	border-radius: var(--admin-radius-control);
+	background: var(--admin-surface);
+	color: var(--admin-ink-2);
+	text-decoration: none;
+	font-size: 13px;
+}
+
+.trend-periods a.is-active {
+	border-color: var(--admin-accent);
+	background: var(--admin-accent-soft);
+	color: var(--admin-accent);
+	font-weight: var(--admin-w-strong);
+}
+
+.trend-charts {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: 16px;
+	margin-bottom: 20px;
+}
+
+.trend-canvas-wrap {
+	position: relative;
+	height: 240px;
+}
+
+.trend-canvas {
+	width: 100%;
+	height: 100%;
+}

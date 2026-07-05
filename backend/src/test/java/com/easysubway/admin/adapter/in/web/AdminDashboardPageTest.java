@@ -72,6 +72,43 @@ class AdminDashboardPageTest {
 			.andExpect(header().string("Location", "/admin/dashboard/page"));
 	}
 
+	@Test
+	@DisplayName("추이 섹션은 차트 canvas와 접근성 대체 표·기간 선택을 렌더한다")
+	void rendersTrendChartsWithAltTable() throws Exception {
+		String html = mockMvc.perform(get("/admin/dashboard/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("class=\"trend-periods\"")
+			.contains("class=\"trend-canvas\"")
+			.contains("data-chart=")
+			.contains("role=\"img\"")
+			.contains("데이터 표로 보기")
+			.contains("/js/admin/dashboard-charts.js");
+	}
+
+	@Test
+	@DisplayName("기간 버튼은 HX-Request로 추이 fragment만 부분 갱신한다")
+	void trendsHxFragmentSwitchesPeriod() throws Exception {
+		String fragment = mockMvc.perform(get("/admin/dashboard/trends")
+				.param("days", "30")
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(fragment)
+			.contains("class=\"trend-canvas\"")
+			.doesNotContain("<!doctype html>")
+			.doesNotContain("admin-sidebar");
+	}
+
 	private String issueCommandToken(MockHttpSession session) throws Exception {
 		String html = mockMvc.perform(get("/admin/dashboard/page")
 				.session(session)

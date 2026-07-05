@@ -60,6 +60,11 @@
 		</a>
 	</div>
 
+	<!-- 추이 섹션: 기간(7/30/90) 라인 차트 2개. 기간 버튼이 이 컨테이너를 htmx로 부분 갱신한다. -->
+	<div id="dashboard-trends">
+		<div th:replace="~{admin/dashboard-trends :: section}"></div>
+	</div>
+
 	<section class="admin-panel" th:if="${datapackReleaseSummary != null}">
 		<div class="admin-panel-head">
 			<h2>데이터팩 출시 준비</h2>
@@ -123,5 +128,7 @@
 </div>
 <th:block th:replace="~{admin/fragments/shell :: toastRegion}"></th:block>
 <th:block th:replace="~{admin/fragments/shell :: scripts}"></th:block>
+<th:block th:replace="~{admin/fragments/shell :: chartScripts}"></th:block>
+<script th:src="@{/js/admin/dashboard-charts.js}" defer></script>
 </body>
 </html>
