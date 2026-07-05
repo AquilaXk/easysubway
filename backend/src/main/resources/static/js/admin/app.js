@@ -20,6 +20,29 @@ document.addEventListener('alpine:init', function () {
 		};
 	});
 
+	// 토스트: htmx 응답의 HX-Trigger("admin-toast", {message, tone}) 이벤트로 우상단에 알림을 띄운다.
+	// 진화형 향상 — JS가 없으면 서버 flash(<output>)가 기존 자리에 그대로 렌더된다(no-JS 대체).
+	// CSP 빌드 규약: x-on/x-text/x-show/x-bind에는 메서드·프로퍼티(게터) 이름만 쓴다.
+	Alpine.data('toastHub', function () {
+		return {
+			message: '',
+			tone: 'good',
+			visible: false,
+			get toneClass() {
+				return 'is-' + this.tone;
+			},
+			show: function (event) {
+				var detail = event && event.detail ? event.detail : {};
+				this.message = detail.message || '';
+				this.tone = detail.tone || 'good';
+				this.visible = this.message !== '';
+			},
+			hide: function () {
+				this.visible = false;
+			},
+		};
+	});
+
 	// 표준 테이블: 일괄 선택(선택 수·전체 선택) + 밀도 3단 + 컬럼 표시 토글.
 	// 진화형 향상 — JS가 없으면 개별 체크박스 + 액션 버튼(no-JS 폼)이 그대로 동작하고, 표는 기본 밀도로 보인다.
 	// CSP 빌드 규약: x-on/x-text/x-bind에는 메서드·프로퍼티(게터) 이름만 쓰고 표현식은 쓰지 않는다.

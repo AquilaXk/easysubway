@@ -251,6 +251,22 @@ class FacilityReportAdminHtmxPilotTest {
 	}
 
 	@Test
+	@DisplayName("토스트 영역이 aria-live와 함께 렌더된다(no-JS는 서버 flash가 대체)")
+	void toastRegionRenders() throws Exception {
+		String html = mockMvc.perform(get("/admin/reports/page")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("class=\"toast-region\"")
+			.contains("aria-live=\"polite\"")
+			.contains("x-data=\"toastHub\"");
+	}
+
+	@Test
 	@DisplayName("표 보기 설정(밀도·컬럼 토글)과 표 스코프가 렌더된다")
 	void tableViewControlsRender() throws Exception {
 		String html = mockMvc.perform(get("/admin/reports/page")
