@@ -120,7 +120,7 @@ List<RouteMapLabelCandidate> routeMapLabelCandidates(
   if (bucket < 2) {
     return candidates;
   }
-  if (bucket >= minLabelZoomBucketFor(RouteMapLabelClass.transfer)) {
+  if (bucket >= 0) {
     for (final group in map.transferGroups) {
       if (!isVisible(group.centroid)) {
         continue;
@@ -145,7 +145,7 @@ List<RouteMapLabelCandidate> routeMapLabelCandidates(
     if (station.labelClass == RouteMapLabelClass.transfer) {
       continue;
     }
-    if (bucket < minLabelZoomBucketFor(station.labelClass)) {
+    if (bucket < 0) {
       continue;
     }
     if (!isVisible(station.position)) {

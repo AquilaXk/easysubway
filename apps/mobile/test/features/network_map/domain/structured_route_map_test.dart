@@ -176,14 +176,6 @@ void main() {
       final regular = map.stations.firstWhere((s) => s.stationId == 's2');
       expect(transfer.labelClass, RouteMapLabelClass.transfer);
       expect(regular.labelClass, RouteMapLabelClass.regular);
-      expect(transfer.minLabelZoomBucket, 1);
-      expect(regular.minLabelZoomBucket, 2);
-    });
-
-    test('LOD: transfer/major는 zoom1, regular는 zoom2', () {
-      expect(minLabelZoomBucketFor(RouteMapLabelClass.transfer), 1);
-      expect(minLabelZoomBucketFor(RouteMapLabelClass.major), 1);
-      expect(minLabelZoomBucketFor(RouteMapLabelClass.regular), 2);
     });
 
     test('빈 입력은 빈 구조', () {
@@ -191,6 +183,48 @@ void main() {
         buildStructuredRouteMap(const [], lineTracks: const []).isEmpty,
         isTrue,
       );
+    });
+  });
+
+  group('종착역 파생 (#1789 볼드 스타일)', () {
+    RouteMapStructuredStation station(
+      String id,
+      String lineId,
+      int seq,
+      Offset pos,
+    ) => RouteMapStructuredStation(
+      stationId: id,
+      lineId: lineId,
+      sequence: seq,
+      position: pos,
+      labelPolygon: const [],
+      labelClass: RouteMapLabelClass.regular,
+    );
+
+    test('노선별 sequence 양 끝 역이 종착', () {
+      final map = StructuredRouteMap(
+        lines: const [],
+        stations: [
+          station('a', 'L1', 1, const Offset(0, 0)),
+          station('b', 'L1', 2, const Offset(10, 0)),
+          station('c', 'L1', 3, const Offset(20, 0)),
+        ],
+        transferGroups: const [],
+      );
+      expect(routeMapTerminusStationIds(map), {'a', 'c'});
+    });
+
+    test('순환선(시·종점 좌표 동일)은 종착 없음', () {
+      final map = StructuredRouteMap(
+        lines: const [],
+        stations: [
+          station('a', 'L2', 1, const Offset(0, 0)),
+          station('b', 'L2', 2, const Offset(10, 0)),
+          station('a2', 'L2', 3, const Offset(0, 0)),
+        ],
+        transferGroups: const [],
+      );
+      expect(routeMapTerminusStationIds(map), isEmpty);
     });
   });
 }

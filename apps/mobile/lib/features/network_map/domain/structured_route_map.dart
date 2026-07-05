@@ -12,24 +12,12 @@
 // - LOD: zoom0 lines only, zoom1 환승/주요 라벨, zoom2 전체 역 라벨
 import 'dart:ui' show Offset;
 
-/// 라벨 우선순위 class (#1636 station_labels.priority).
+/// 라벨 우선순위·볼드 class (#1636 station_labels.priority).
 ///
 /// [major]는 #1636 majorRule("별도 검수된 주요 거점")을 위한 예약 값이다.
-/// 현재 데이터팩에는 검수 컬럼이 없어 빌더는 transfer/regular만 산출하지만,
-/// 계약과 LOD 매핑을 위해 값과 zoom bucket을 유지한다.
+/// LOD zoom bucket 매핑은 #1789 정적 스케일 렌더 전환에서 폐지됐다(로드 시 1회
+/// 정적 배치·전부 표시). 이 enum은 배치 우선순위와 볼드 판정에만 쓰인다.
 enum RouteMapLabelClass { transfer, major, regular }
-
-/// 라벨 class → 최초 표시 zoom bucket (#1636 LOD).
-/// 0 = lines only(라벨 없음), 1 = 환승/주요 라벨, 2 = 전체 역 라벨.
-int minLabelZoomBucketFor(RouteMapLabelClass labelClass) {
-  switch (labelClass) {
-    case RouteMapLabelClass.transfer:
-    case RouteMapLabelClass.major:
-      return 1;
-    case RouteMapLabelClass.regular:
-      return 2;
-  }
-}
 
 /// 한 노선의 track geometry. 데이터 hole(인접 세그먼트가 이어지지 않는 지점)에서
 /// 끊어 여러 sub-polyline으로 둔다 — 끊긴 두 역을 직선으로 잇는 phantom edge를
@@ -60,8 +48,6 @@ class RouteMapStructuredStation {
   final Offset position;
   final List<Offset> labelPolygon;
   final RouteMapLabelClass labelClass;
-
-  int get minLabelZoomBucket => minLabelZoomBucketFor(labelClass);
 }
 
 /// 환승 그룹 (#1636 transfer_groups): 같은 물리 역의 노선 묶음.
@@ -247,4 +233,29 @@ Offset _centroid(List<Offset> points) {
     sumY += point.dy;
   }
   return Offset(sumX / points.length, sumY / points.length);
+}
+
+/// 노선별 종착역(sequence 최소/최대) station_id 집합 (#1789 볼드 스타일).
+/// 시·종점 좌표가 같은 순환선은 종착 개념이 없어 제외한다.
+Set<String> routeMapTerminusStationIds(StructuredRouteMap map) {
+  final byLine = <String, List<RouteMapStructuredStation>>{};
+  for (final station in map.stations) {
+    (byLine[station.lineId] ??= []).add(station);
+  }
+  final ids = <String>{};
+  for (final stations in byLine.values) {
+    if (stations.length < 2) {
+      continue;
+    }
+    stations.sort((a, b) => a.sequence.compareTo(b.sequence));
+    final first = stations.first;
+    final last = stations.last;
+    if (first.position == last.position) {
+      continue; // 순환선.
+    }
+    ids
+      ..add(first.stationId)
+      ..add(last.stationId);
+  }
+  return ids;
 }
