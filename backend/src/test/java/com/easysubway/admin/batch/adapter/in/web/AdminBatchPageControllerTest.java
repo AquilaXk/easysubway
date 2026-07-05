@@ -79,6 +79,28 @@ class AdminBatchPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("배치 화면은 잡별 실행 이력 차트와 데이터 표 대체를 렌더링한다")
+	void batchPageRendersJobHistoryChart() throws Exception {
+		saveDataCollectionRunPort.saveRun(completedRun("done-run"));
+		saveDataCollectionRunPort.saveRun(failedRun("failed-run"));
+
+		String html = mockMvc.perform(get("/admin/batches/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("잡별 실행 이력")
+			.contains("batch-history-canvas")
+			.contains("data-chart=")
+			.contains("&quot;statuses&quot;")
+			.contains("데이터 표로 보기")
+			.contains("/js/admin/batch-history-charts.js");
+	}
+
+	@Test
 	@DisplayName("배치 실행 목록은 page size와 현재 페이지를 링크에 표시한다")
 	void batchPageShowsPaginationLinks() throws Exception {
 		saveDataCollectionRunPort.saveRun(failedRun("failed-run-1"));
