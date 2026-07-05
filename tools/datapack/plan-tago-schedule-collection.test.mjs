@@ -293,6 +293,31 @@ test("TAGO 시간표 검증은 arrTime이 '0'(서울교통공사 미제공)이�
   );
 });
 
+test("TAGO 시간표 검증은 depTime이 '0'(종착 열차)이면 출발=도착으로 처리한다", () => {
+  const validation = validateTagoScheduleSample(
+    tagoResponse("MTRS14433", "01", "U", [
+      ["051000", "0"],
+      ["052000", "0"],
+    ]),
+  );
+
+  assert.deepEqual(
+    validation.departures.map((departure) => departure.arrivalSeconds),
+    [18_600, 19_200],
+  );
+  assert.deepEqual(
+    validation.departures.map((departure) => departure.departureSeconds),
+    [18_600, 19_200],
+  );
+});
+
+test("TAGO 시간표 검증은 arrTime과 depTime이 모두 '0'이면 거부한다", () => {
+  assert.throws(
+    () => validateTagoScheduleSample(tagoResponse("MTRS14433", "01", "U", [["0", "0"]])),
+    /has neither arrTime nor depTime/,
+  );
+});
+
 test("TAGO 시간표 검증은 같은 시간 row도 deterministic하게 정렬한다", () => {
   const first = validateTagoScheduleSample(
     tagoResponse("MTRKR4448", "01", "U", [

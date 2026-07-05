@@ -91,12 +91,17 @@ function validateTagoScheduleSample(rawText, options = {}) {
     if (!UP_DOWN_CODES.has(row.upDownTypeCode)) {
       throw new Error(`TAGO schedule row ${index} has unknown upDownTypeCode: ${row.upDownTypeCode}`);
     }
-    const departureSeconds = parseHhmmss(row.depTime, `row ${index} depTime`);
-    // 서울교통공사 등 일부 운영기관은 arrTime을 제공하지 않고 "0"으로 반환한다 → 도착=출발(무정차 대기)로 처리.
-    // 코레일 등은 arrTime을 정상 HHMMSS로 제공하므로 그대로 파싱한다.
-    const arrivalSeconds = isMissingTagoArrivalTime(row.arrTime)
-      ? departureSeconds
-      : parseHhmmss(row.arrTime, `row ${index} arrTime`);
+    // 서울교통공사 스케줄은 시발(origin) 열차의 arrTime, 종착(terminal) 열차의 depTime을 "0"으로 채운다.
+    // 한쪽이 없으면 있는 쪽으로 대체(도착=출발 무정차 대기). 코레일 등은 둘 다 정상 HHMMSS로 제공한다.
+    const arrMissing = isMissingTagoTime(row.arrTime);
+    const depMissing = isMissingTagoTime(row.depTime);
+    if (arrMissing && depMissing) {
+      throw new Error(`TAGO schedule row ${index} has neither arrTime nor depTime`);
+    }
+    const parsedArrival = arrMissing ? null : parseHhmmss(row.arrTime, `row ${index} arrTime`);
+    const parsedDeparture = depMissing ? null : parseHhmmss(row.depTime, `row ${index} depTime`);
+    const arrivalSeconds = parsedArrival ?? parsedDeparture;
+    const departureSeconds = parsedDeparture ?? parsedArrival;
     if (arrivalSeconds > departureSeconds) {
       throw new Error(`TAGO schedule row ${index} arrival must be <= departure`);
     }
@@ -539,8 +544,8 @@ function isNormalEmptyTagoSchedulePayload(payload) {
   return !("item" in items) || (Array.isArray(items.item) && items.item.length === 0);
 }
 
-function isMissingTagoArrivalTime(value) {
-  // 서울교통공사 스케줄 응답은 arrTime을 제공하지 않고 "0"(또는 전부 0)으로 채운다.
+function isMissingTagoTime(value) {
+  // 서울교통공사 스케줄은 시발역 arrTime·종착역 depTime을 "0"(또는 전부 0)으로 채운다(미제공 표기).
   return /^0+$/.test(value);
 }
 
