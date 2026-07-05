@@ -18,6 +18,9 @@ public final class AdminMetricKeys {
 	public static final String FACILITIES_DELAYED = "facilities.delayed";
 	public static final String ROUTE_SEARCHES = "route.searches";
 	public static final String ROUTE_BLOCKED_RATE = "route.blocked_rate";
+	public static final String ROUTE_FEEDBACK_HELPFUL = "route.feedback_helpful";
+	public static final String ROUTE_FEEDBACK_NOT_HELPFUL = "route.feedback_not_helpful";
+	public static final String ROUTE_FEEDBACK_BLOCKED = "route.feedback_blocked";
 	public static final String PUSH_ATTEMPTED = "push.attempted";
 	public static final String PUSH_FAILED = "push.failed";
 	public static final String API_ERROR_RATE = "api.error_rate";
@@ -31,6 +34,9 @@ public final class AdminMetricKeys {
 		FACILITIES_DELAYED,
 		ROUTE_SEARCHES,
 		ROUTE_BLOCKED_RATE,
+		ROUTE_FEEDBACK_HELPFUL,
+		ROUTE_FEEDBACK_NOT_HELPFUL,
+		ROUTE_FEEDBACK_BLOCKED,
 		PUSH_ATTEMPTED,
 		PUSH_FAILED,
 		API_ERROR_RATE,
@@ -64,6 +70,9 @@ public final class AdminMetricKeys {
 		labels.put(FACILITIES_DELAYED, "지연 시설 상태");
 		labels.put(ROUTE_SEARCHES, "경로 검색");
 		labels.put(ROUTE_BLOCKED_RATE, "경로 차단률(%)");
+		labels.put(ROUTE_FEEDBACK_HELPFUL, "도움이 됨");
+		labels.put(ROUTE_FEEDBACK_NOT_HELPFUL, "도움이 안 됨");
+		labels.put(ROUTE_FEEDBACK_BLOCKED, "현장 차단 신고");
 		labels.put(PUSH_ATTEMPTED, "푸시 시도");
 		labels.put(PUSH_FAILED, "푸시 실패");
 		labels.put(API_ERROR_RATE, "API 오류율(%)");

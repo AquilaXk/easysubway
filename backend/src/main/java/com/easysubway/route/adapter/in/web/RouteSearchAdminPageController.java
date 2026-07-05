@@ -1,8 +1,8 @@
 package com.easysubway.route.adapter.in.web;
 
+import com.easysubway.admin.metric.adapter.in.web.AnalyticsComparisonCard;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricChart;
-import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricComparison;
 import com.easysubway.admin.metric.domain.AdminMetricKeys;
 import com.easysubway.route.application.port.in.RouteSearchDashboardUseCase;
 import com.easysubway.route.domain.RouteSearchDashboardSummary;
@@ -67,7 +67,7 @@ class RouteSearchAdminPageController {
 		model.addAttribute("trendDays", chart.days());
 		model.addAttribute("comparisons", metricQueryService.compare(TREND_KEYS, days)
 			.stream()
-			.map(ComparisonCardView::from)
+			.map(comparison -> AnalyticsComparisonCard.from(comparison, HIGHER_IS_BETTER.contains(comparison.key())))
 			.toList());
 	}
 
@@ -77,41 +77,6 @@ class RouteSearchAdminPageController {
 			return objectMapper.writeValueAsString(chart);
 		} catch (JsonProcessingException exception) {
 			return "{\"labels\":[],\"series\":[]}";
-		}
-	}
-
-	/**
-	 * 증감 요약 카드 뷰. 최근 기간 합계·증감률·개선 여부(tone)를 표시용으로 정리한다.
-	 */
-	record ComparisonCardView(
-		String label,
-		String currentLabel,
-		String previousLabel,
-		String deltaPercentLabel,
-		String tone,
-		boolean up
-	) {
-
-		static ComparisonCardView from(AdminMetricComparison comparison) {
-			boolean higherIsBetter = HIGHER_IS_BETTER.contains(comparison.key());
-			boolean up = comparison.delta() > 0;
-			String tone = comparison.delta() == 0
-				? "neutral"
-				: (comparison.improved(higherIsBetter) ? "good" : "bad");
-			return new ComparisonCardView(
-				comparison.label(),
-				formatValue(comparison.current()),
-				formatValue(comparison.previous()),
-				comparison.deltaPercent() == null
-					? "직전 없음"
-					: "%+.1f%%".formatted(comparison.deltaPercent()),
-				tone,
-				up
-			);
-		}
-
-		private static String formatValue(double value) {
-			return value == Math.rint(value) ? "%.0f".formatted(value) : "%.1f".formatted(value);
 		}
 	}
 }
