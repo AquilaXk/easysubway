@@ -167,7 +167,7 @@ class AdminOverviewPageController {
 		Model model
 	) {
 		populateTrends(days, model);
-		return "admin/dashboard-trends :: section";
+		return "admin/fragments/dashboard-trends :: section";
 	}
 
 	private void populateTrends(int days, Model model) {

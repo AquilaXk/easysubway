@@ -62,7 +62,7 @@
 
 	<!-- 추이 섹션: 기간(7/30/90) 라인 차트 2개. 기간 버튼이 이 컨테이너를 htmx로 부분 갱신한다. -->
 	<div id="dashboard-trends">
-		<div th:replace="~{admin/dashboard-trends :: section}"></div>
+		<div th:replace="~{admin/fragments/dashboard-trends :: section}"></div>
 	</div>
 
 	<section class="admin-panel" th:if="${datapackReleaseSummary != null}">
