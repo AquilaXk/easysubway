@@ -115,6 +115,28 @@ class RouteSearchAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("차단 상위 역 랭킹은 역 허브 딥링크로 표시된다")
+	void routeSearchPageRendersBlockedStationRankingWithHubLink() throws Exception {
+		saveRouteSearchPort.saveRouteSearch(blockedRouteSearch(
+			"route-search-blocked-1", "계단 없는 역 접근 경로를 확인할 수 없습니다."));
+		saveRouteSearchPort.saveRouteSearch(blockedRouteSearch(
+			"route-search-blocked-2", "계단 없는 역 접근 경로를 확인할 수 없습니다."));
+
+		String html = mockMvc.perform(get("/admin/routes/searches/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("차단 상위 역")
+			.contains("/admin/stations/station-sangnoksu/page")
+			.contains("/admin/stations/station-sadang/page")
+			.contains("is-blocked-surge");
+	}
+
+	@Test
 	@DisplayName("경로 검색 화면은 기간 추이 차트·증감 카드·기간 버튼을 렌더링한다")
 	void routeSearchPageRendersTrendChartAndComparison() throws Exception {
 		String html = mockMvc.perform(get("/admin/routes/searches/page")

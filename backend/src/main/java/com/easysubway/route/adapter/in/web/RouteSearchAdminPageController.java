@@ -5,10 +5,12 @@ import com.easysubway.admin.metric.application.service.AdminMetricQueryService;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricChart;
 import com.easysubway.admin.metric.domain.AdminMetricKeys;
 import com.easysubway.route.application.port.in.RouteSearchDashboardUseCase;
+import com.easysubway.route.domain.BlockedStationRanking;
 import com.easysubway.route.domain.RouteSearchDashboardSummary;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Controller;
@@ -23,6 +25,7 @@ class RouteSearchAdminPageController {
 	private static final Set<String> HIGHER_IS_BETTER = Set.of(AdminMetricKeys.ROUTE_SEARCHES);
 	private static final List<String> TREND_KEYS =
 		List.of(AdminMetricKeys.ROUTE_SEARCHES, AdminMetricKeys.ROUTE_BLOCKED_RATE);
+	private static final int TOP_BLOCKED_STATIONS = 10;
 
 	private final RouteSearchDashboardUseCase routeSearchDashboardUseCase;
 	private final AdminMetricQueryService metricQueryService;
@@ -45,6 +48,8 @@ class RouteSearchAdminPageController {
 	) {
 		RouteSearchDashboardSummary summary = routeSearchDashboardUseCase.summarizeRouteSearches();
 		model.addAttribute("summary", RouteSearchDashboardView.from(summary));
+		model.addAttribute("blockedStationRankings",
+			BlockedStationRankingRow.from(routeSearchDashboardUseCase.topBlockedStations(TOP_BLOCKED_STATIONS)));
 		populateTrends(days, model);
 		return "admin/routes/searches";
 	}
@@ -78,6 +83,35 @@ class RouteSearchAdminPageController {
 			return objectMapper.writeValueAsString(chart);
 		} catch (JsonProcessingException exception) {
 			return "{\"labels\":[],\"series\":[]}";
+		}
+	}
+
+	/**
+	 * 차단 상위 역 랭킹 행 뷰. 순위·역 허브 딥링크·최다 차단 행 강조를 표시용으로 정리한다.
+	 */
+	record BlockedStationRankingRow(
+		int rank,
+		String stationId,
+		String stationName,
+		long blockedCount,
+		String hubUrl,
+		boolean highlight
+	) {
+
+		static List<BlockedStationRankingRow> from(List<BlockedStationRanking> rankings) {
+			long maxBlocked = rankings.stream().mapToLong(BlockedStationRanking::blockedCount).max().orElse(0);
+			List<BlockedStationRankingRow> rows = new ArrayList<>(rankings.size());
+			for (int index = 0; index < rankings.size(); index++) {
+				BlockedStationRanking ranking = rankings.get(index);
+				rows.add(new BlockedStationRankingRow(
+					index + 1,
+					ranking.stationId(),
+					ranking.stationName(),
+					ranking.blockedCount(),
+					"/admin/stations/" + ranking.stationId() + "/page",
+					ranking.blockedCount() == maxBlocked && maxBlocked > 0));
+			}
+			return rows;
 		}
 	}
 }
