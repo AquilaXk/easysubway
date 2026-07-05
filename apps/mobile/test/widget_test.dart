@@ -6248,17 +6248,20 @@ void main() {
 
       await tester.tap(find.byKey(const Key('networkMapMenuButton')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('networkMapMenuRecentButton')));
+      await tester.tap(
+        find.byKey(const Key('networkMapMenuStationSearchButton')),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('최근 검색'), findsOneWidget);
+      // 최근 검색은 역 검색 화면의 빈 상태 섹션으로 통합됐다(#1581).
       expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
       expect(
         find.byKey(const Key('stationRecentSearchSection')),
         findsOneWidget,
       );
-      expect(find.text('최근 사용 순서 · 2개'), findsOneWidget);
-      expect(find.bySemanticsLabel('최근 사용 순서로 2개 표시'), findsOneWidget);
+      expect(find.text('최근 검색'), findsOneWidget);
+      // 시스템 캡션('최근 사용 순서 …')은 제거됐다(#1581).
+      expect(find.textContaining('최근 사용 순서'), findsNothing);
       expect(find.text('최근 사용 1번째'), findsOneWidget);
       expect(
         find.byKey(const Key('stationRecentSearchQuery-상록수')),
@@ -6299,7 +6302,7 @@ void main() {
     }
   });
 
-  testWidgets('역 검색 최근 검색은 개별 삭제와 전체 삭제 및 빈 상태 CTA를 제공한다', (tester) async {
+  testWidgets('역 검색 화면 안에서 최근 검색을 개별·전체 삭제한다', (tester) async {
     final searchHistoryRepository = FakeSearchHistoryRepository(['상록수', '사당']);
 
     await tester.pumpWidget(
@@ -6315,7 +6318,9 @@ void main() {
 
     await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('networkMapMenuRecentButton')));
+    await tester.tap(
+      find.byKey(const Key('networkMapMenuStationSearchButton')),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('stationRecentSearchRemove-상록수')));
@@ -6323,26 +6328,17 @@ void main() {
 
     expect(searchHistoryRepository.removedQueries, ['상록수']);
     expect(find.byKey(const Key('stationRecentSearchQuery-상록수')), findsNothing);
-    expect(find.text('최근 사용 순서 · 1개'), findsOneWidget);
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsOneWidget);
 
     await tester.tap(
       find.byKey(const Key('stationRecentSearchClearAllButton')),
     );
     await tester.pumpAndSettle();
 
+    // 최근 검색이 비면 전용 빈 상태 대신 섹션이 사라지고 검색 입력만 남는다(#1581).
     expect(searchHistoryRepository.clearCount, 1);
-    expect(
-      find.byKey(const Key('stationRecentSearchEmptyState')),
-      findsOneWidget,
-    );
-    expect(find.text('최근 검색한 역이 없습니다.'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '역 검색하기'), findsOneWidget);
-
-    await tester.tap(
-      find.byKey(const Key('stationRecentSearchEmptySearchButton')),
-    );
-    await tester.pumpAndSettle();
-
+    expect(find.byKey(const Key('stationRecentSearchSection')), findsNothing);
+    expect(find.text('최근 검색한 역이 없습니다.'), findsNothing);
     expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
   });
 

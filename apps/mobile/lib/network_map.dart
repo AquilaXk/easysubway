@@ -368,7 +368,6 @@ class NetworkMapScreen extends StatefulWidget {
     this.viewportRepository,
     this.realtimeRepository,
     this.onOpenSavedItems,
-    this.onOpenRecentSearch,
     this.onOpenNearbyStations,
     this.onOpenSettings,
     this.onOpenDataSources,
@@ -386,7 +385,6 @@ class NetworkMapScreen extends StatefulWidget {
   final NetworkMapViewportRepository? viewportRepository;
   final RealtimeRepository? realtimeRepository;
   final VoidCallback? onOpenSavedItems;
-  final VoidCallback? onOpenRecentSearch;
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenDataSources;
@@ -761,7 +759,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           onOpenRouteSearch: widget.onOpenRouteSearch,
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenNearbyStations: widget.onOpenNearbyStations,
-          onOpenRecentSearch: widget.onOpenRecentSearch,
           onOpenSettings: widget.onOpenSettings,
           onOpenDataSources: widget.onOpenDataSources,
         );
@@ -1900,7 +1897,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
     required this.onOpenRouteSearch,
     required this.onOpenSavedItems,
     required this.onOpenNearbyStations,
-    required this.onOpenRecentSearch,
     required this.onOpenSettings,
     required this.onOpenDataSources,
   });
@@ -1909,7 +1905,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   final Future<void> Function() onOpenRouteSearch;
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenNearbyStations;
-  final VoidCallback? onOpenRecentSearch;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenDataSources;
 
@@ -1970,13 +1965,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                           label: '가까운 역',
                           onTap: () =>
                               _runAction(context, onOpenNearbyStations!),
-                        ),
-                      if (onOpenRecentSearch != null)
-                        _NetworkMapMenuTile(
-                          key: const Key('networkMapMenuRecentButton'),
-                          icon: Icons.history,
-                          label: '최근 검색',
-                          onTap: () => _runAction(context, onOpenRecentSearch!),
                         ),
                       if (onOpenSavedItems != null ||
                           onOpenSettings != null) ...[
@@ -2702,7 +2690,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       for (final station in data.stations) station.id: station.nameKo,
     };
   }
-
 }
 
 String _networkMapStationLineKey(String stationId, String lineId) =>
