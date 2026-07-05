@@ -81,3 +81,88 @@ RouteMapTransferMarker routeMapTransferMarker({
     dots: dots,
   );
 }
+
+/// 점 집합의 최대 쌍거리. 0·1개면 0.
+double offsetsMaxPairwiseDistance(List<Offset> points) {
+  var max = 0.0;
+  for (var i = 0; i < points.length; i += 1) {
+    for (var j = i + 1; j < points.length; j += 1) {
+      final d = (points[i] - points[j]).distance;
+      if (d > max) {
+        max = d;
+      }
+    }
+  }
+  return max;
+}
+
+Offset _meanOffset(List<Offset> points) {
+  var sum = Offset.zero;
+  for (final point in points) {
+    sum += point;
+  }
+  return points.isEmpty ? Offset.zero : sum / points.length.toDouble();
+}
+
+/// 환승 그룹 하나를 이격(sourceSpread, source 좌표계 기준)에 따라 3모드로 그린다:
+/// 스택(사실상 한 점) / 스팬(평행 노선들을 캡슐이 걸침, 공식 노선도 문법) /
+/// 분리(대이격 — 동명이역 오병합·검수 대상은 별개 마커가 정직한 표현).
+/// [memberCenters]는 viewport 좌표이고 [colors]와 같은 순서다.
+List<RouteMapTransferMarker> routeMapTransferMarkers({
+  required List<Offset> memberCenters,
+  required List<Color> colors,
+  required double sourceSpread,
+  required double dotRadius,
+  required double dotGap,
+  required double padding,
+  double stackedMaxSourceSpread = 8,
+  double spanMaxSourceSpread = 60,
+}) {
+  if (memberCenters.isEmpty || memberCenters.length != colors.length) {
+    return const [];
+  }
+  if (sourceSpread <= stackedMaxSourceSpread) {
+    return [
+      routeMapTransferMarker(
+        center: _meanOffset(memberCenters),
+        colors: colors,
+        dotRadius: dotRadius,
+        dotGap: dotGap,
+        padding: padding,
+      ),
+    ];
+  }
+  if (sourceSpread <= spanMaxSourceSpread) {
+    var bounds = Rect.fromCenter(
+      center: memberCenters.first,
+      width: 0,
+      height: 0,
+    );
+    for (final center in memberCenters.skip(1)) {
+      bounds = bounds.expandToInclude(
+        Rect.fromCenter(center: center, width: 0, height: 0),
+      );
+    }
+    final inflated = bounds.inflate(dotRadius + padding);
+    final radius = inflated.shortestSide / 2;
+    return [
+      RouteMapTransferMarker(
+        capsule: RRect.fromRectAndRadius(inflated, Radius.circular(radius)),
+        dots: [
+          for (var i = 0; i < memberCenters.length; i += 1)
+            RouteMapTransferDot(center: memberCenters[i], color: colors[i]),
+        ],
+      ),
+    ];
+  }
+  return [
+    for (var i = 0; i < memberCenters.length; i += 1)
+      routeMapTransferMarker(
+        center: memberCenters[i],
+        colors: [colors[i]],
+        dotRadius: dotRadius,
+        dotGap: dotGap,
+        padding: padding,
+      ),
+  ];
+}
