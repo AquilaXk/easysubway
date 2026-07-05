@@ -1228,7 +1228,7 @@ class _RouteCatalogSnapshot {
   }
 
   String stationName(String stationId) {
-    return stationsById[stationId] ?? '역 이름을 아직 알 수 없어요';
+    return stationsById[stationId] ?? '역 이름을 확인하고 있어요';
   }
 
   bool hasStation(String stationId) {
