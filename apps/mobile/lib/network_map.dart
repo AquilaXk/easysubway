@@ -3244,6 +3244,14 @@ class _StationSpatialCell {
 
 const _maximumStationHitDistance = 24.0;
 
+/// 역 tap hit target 한 변 길이(logical px). 노드 중심에서 사방
+/// [_maximumStationHitDistance]까지 tap을 받으므로 hit rect 한 변은 그 2배다.
+/// AGENTS.md 큰 터치 영역 hard rule + WCAG 2.5.5(target size 최소 48×48)를
+/// 노선도 역 선택에 보장한다 — #1642 접근성 회귀 가드.
+@visibleForTesting
+const double networkMapStationHitTargetLogicalSize =
+    _maximumStationHitDistance * 2;
+
 List<NetworkMapStation> _canonicalStations(
   Iterable<NetworkMapStation> stations,
   _MapGeometry geometry,
