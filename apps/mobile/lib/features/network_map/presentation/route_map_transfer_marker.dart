@@ -8,6 +8,12 @@
 // 좌표·크기 계산만 순수 함수로 두어 지오메트리를 기계 판정할 수 있게 한다.
 import 'dart:ui' show Color, Offset, RRect, Radius, Rect;
 
+// 환승 캡슐 실측 비율 상수(선8·도트10·캡슐짧은축19·간격13 → 선 4px 환산, #1792 G3).
+// painter와 라벨 솔버(장애물 rect)가 같은 값을 소비해 기하 정합을 보장한다.
+const double kRouteMapTransferDotRadiusPx = 2.5;
+const double kRouteMapTransferDotGapPx = 1.5;
+const double kRouteMapTransferDotPaddingPx = 1.5;
+
 /// 환승 마커의 색 도트 한 개 (노선별).
 class RouteMapTransferDot {
   const RouteMapTransferDot({required this.center, required this.color});
@@ -104,24 +110,30 @@ Offset _meanOffset(List<Offset> points) {
   return points.isEmpty ? Offset.zero : sum / points.length.toDouble();
 }
 
-/// 환승 그룹 하나를 이격(sourceSpread, source 좌표계 기준)에 따라 3모드로 그린다:
-/// 스택(사실상 한 점) / 스팬(평행 노선들을 캡슐이 걸침, 공식 노선도 문법) /
-/// 분리(대이격 — 동명이역 오병합·검수 대상은 별개 마커가 정직한 표현).
-/// [memberCenters]는 viewport 좌표이고 [colors]와 같은 순서다.
+/// 환승 그룹 하나를 이격(designSpread, design px)에 따라 그린다:
+/// - 스택(사실상 한 점): centroid에 표준 폭 캡슐 + 세로 도트.
+/// - 스팬(소이격 평행 노선): 멤버를 캡슐이 걸침 — 긴축 상한 spanMax+표준폭.
+/// - 강등 스택(스팬 상한 초과~분리 하한): 이격을 무시하고 centroid 고정 크기 —
+///   캡슐이 이격에 비례해 커지던 "초거대 원/타원"을 제거한다(#1789 캡슐 통일).
+/// - 분리(대이격): 동명이역 오병합·좌표 검수 대상은 별개 마커가 정직한 표현.
+/// 임계는 전부 design px 기준이며 캘리브레이션 값이다(실기기 QA로 튜닝 가능).
 List<RouteMapTransferMarker> routeMapTransferMarkers({
   required List<Offset> memberCenters,
   required List<Color> colors,
-  required double sourceSpread,
+  required double designSpread,
   required double dotRadius,
   required double dotGap,
   required double padding,
-  double stackedMaxSourceSpread = 8,
-  double spanMaxSourceSpread = 60,
+  double stackedMaxDesignSpread = 8,
+  double spanMaxDesignSpread = 16,
+  double separateMinDesignSpread = 28,
 }) {
   if (memberCenters.isEmpty || memberCenters.length != colors.length) {
     return const [];
   }
-  if (sourceSpread <= stackedMaxSourceSpread) {
+  if (designSpread <= stackedMaxDesignSpread ||
+      (designSpread > spanMaxDesignSpread &&
+          designSpread <= separateMinDesignSpread)) {
     return [
       routeMapTransferMarker(
         center: _meanOffset(memberCenters),
@@ -132,7 +144,7 @@ List<RouteMapTransferMarker> routeMapTransferMarkers({
       ),
     ];
   }
-  if (sourceSpread <= spanMaxSourceSpread) {
+  if (designSpread <= spanMaxDesignSpread) {
     var bounds = Rect.fromCenter(
       center: memberCenters.first,
       width: 0,

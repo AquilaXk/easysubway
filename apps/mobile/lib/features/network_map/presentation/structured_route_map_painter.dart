@@ -79,11 +79,9 @@ const Color _transferFill = Color(0xFFFFFFFF);
 const Color _transferBorder = Color(0xFF102A2C);
 const Color _regularStationFill = Color(0xFFFFFFFF);
 // 환승 캡슐 실측 비율(선8·도트10·캡슐짧은축19·간격13 → 선 4px 환산, #1792 G3).
+// 도트 크기 상수는 route_map_transfer_marker.dart의 kRouteMapTransferDot*Px 재사용.
 const double _transferBorderWidth = 1.5;
 const double _regularStationBorderWidth = 1.6;
-const double _transferDotRadius = 2.5;
-const double _transferDotGap = 1.5;
-const double _transferDotPadding = 1.5;
 
 final Paint _regularStationFillPaint = Paint()
   ..style = PaintingStyle.fill
@@ -176,19 +174,23 @@ ui.Picture recordRouteMapPicture({
       colors: [
         for (final id in group.lineIds) lineColors[id] ?? _fallbackLineColor,
       ],
-      sourceSpread:
+      designSpread:
           offsetsMaxPairwiseDistance(group.memberPositions) *
           design.designScale,
-      dotRadius: _transferDotRadius,
-      dotGap: _transferDotGap,
-      padding: _transferDotPadding,
+      dotRadius: kRouteMapTransferDotRadiusPx,
+      dotGap: kRouteMapTransferDotGapPx,
+      padding: kRouteMapTransferDotPaddingPx,
     );
     for (final marker in markers) {
       canvas.drawRRect(marker.capsule, _transferFillPaint);
       canvas.drawRRect(marker.capsule, _transferBorderPaint);
       for (final dot in marker.dots) {
         _transferDotPaint.color = dot.color;
-        canvas.drawCircle(dot.center, _transferDotRadius, _transferDotPaint);
+        canvas.drawCircle(
+          dot.center,
+          kRouteMapTransferDotRadiusPx,
+          _transferDotPaint,
+        );
       }
     }
   }

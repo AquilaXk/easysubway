@@ -78,58 +78,47 @@ void main() {
     });
   });
 
-  group('routeMapTransferMarkers 3모드', () {
-    const colors = [Color(0xFF111111), Color(0xFF222222)];
+  group('모드 임계 (design px, #1789 캡슐 통일)', () {
+    const dot = kRouteMapTransferDotRadiusPx;
+    const gap = kRouteMapTransferDotGapPx;
+    const pad = kRouteMapTransferDotPaddingPx;
+    const standardWidth = 2 * (dot + pad); // 8.0 — 모든 비스팬 캡슐의 폭 계약
 
-    test('소이격은 평균점 세로 스택 캡슐 하나다', () {
-      final markers = routeMapTransferMarkers(
-        memberCenters: const [Offset(10, 10), Offset(12, 10)],
-        colors: colors,
-        sourceSpread: 2,
-        dotRadius: 2.5,
-        dotGap: 1.5,
-        padding: 1.5,
-      );
-      expect(markers, hasLength(1));
-      expect(markers.single.capsule.center, const Offset(11, 10));
-      expect(markers.single.dots, hasLength(2));
-      // 세로 스택: 도트 x 동일.
+    List<RouteMapTransferMarker> markersFor(double spread) =>
+        routeMapTransferMarkers(
+          memberCenters: [Offset.zero, Offset(spread, 0)],
+          colors: const [Color(0xFF111111), Color(0xFF222222)],
+          designSpread: spread,
+          dotRadius: dot,
+          dotGap: gap,
+          padding: pad,
+        );
+
+    test('스팬 상한(16) 초과 이격은 centroid 고정 크기 스택으로 강등', () {
+      final markers = markersFor(20.0); // 16 < 20 <= 28
+      expect(markers.length, 1);
+      final capsule = markers.single.capsule.outerRect;
+      expect(capsule.width, standardWidth); // 표준 폭 — 이격과 무관
+      expect(capsule.center.dx, 10.0); // 멤버 평균
+      expect(capsule.center.dy, 0.0);
+    });
+
+    test('스팬 캡슐 긴축은 상한 내(≤ spanMax + 표준 폭)', () {
+      final markers = markersFor(15.0); // 8 < 15 <= 16 → 스팬 유지
+      final capsule = markers.single.capsule.outerRect;
+      expect(capsule.width, lessThanOrEqualTo(16.0 + standardWidth));
+      expect(capsule.height, standardWidth); // 수평 스팬의 짧은축 = 표준 폭
+    });
+
+    test('분리 모드는 separateMin(28) 초과에서만', () {
+      expect(markersFor(28.0).length, 1); // 강등 스택
+      expect(markersFor(28.1).length, 2); // 분리 (오병합 의심 — 정직 표현)
+    });
+
+    test('강등 스택 캡슐도 도트는 노선 수만큼 세로 스택', () {
+      final markers = markersFor(20.0);
+      expect(markers.single.dots.length, 2);
       expect(markers.single.dots[0].center.dx, markers.single.dots[1].center.dx);
-    });
-
-    test('중이격은 멤버를 걸치는 스팬 캡슐 하나, 도트는 멤버 자리에', () {
-      final markers = routeMapTransferMarkers(
-        memberCenters: const [Offset(0, 0), Offset(40, 0)],
-        colors: colors,
-        sourceSpread: 40,
-        dotRadius: 2.5,
-        dotGap: 1.5,
-        padding: 1.5,
-      );
-      expect(markers, hasLength(1));
-      final capsule = markers.single.capsule;
-      // bounding box(폭 40, 높이 0)를 dotRadius+padding=4 만큼 inflate.
-      expect(capsule.left, -4);
-      expect(capsule.right, 44);
-      expect(capsule.top, -4);
-      expect(capsule.bottom, 4);
-      expect(markers.single.dots[0].center, const Offset(0, 0));
-      expect(markers.single.dots[1].center, const Offset(40, 0));
-      expect(markers.single.dots[0].color, colors[0]);
-    });
-
-    test('대이격은 멤버별 단색 마커로 분리한다', () {
-      final markers = routeMapTransferMarkers(
-        memberCenters: const [Offset(0, 0), Offset(300, 300)],
-        colors: colors,
-        sourceSpread: 120,
-        dotRadius: 2.5,
-        dotGap: 1.5,
-        padding: 1.5,
-      );
-      expect(markers, hasLength(2));
-      expect(markers[0].dots.single.color, colors[0]);
-      expect(markers[1].dots.single.center, const Offset(300, 300));
     });
   });
 
