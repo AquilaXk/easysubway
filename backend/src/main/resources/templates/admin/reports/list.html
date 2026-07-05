@@ -188,6 +188,7 @@
 				<tr th:each="report : ${reports}">
 					<td class="select-col">
 						<input type="checkbox" name="reportIds" th:value="${report.id}"
+						       aria-label="신고 선택"
 						       x-on:change="recount" th:attr="aria-label=|${report.stationLabel} 신고 선택|">
 					</td>
 					<td><span th:replace="~{admin/fragments/shell :: statusAuto(${report.statusLabel})}">접수됨</span></td>
