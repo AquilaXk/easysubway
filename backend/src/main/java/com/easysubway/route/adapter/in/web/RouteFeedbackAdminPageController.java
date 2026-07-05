@@ -64,6 +64,7 @@ class RouteFeedbackAdminPageController {
 		model.addAttribute("trendChart", chart);
 		model.addAttribute("trendJson", toJson(chart));
 		model.addAttribute("trendDays", chart.days());
+		model.addAttribute("exportKeys", TREND_KEYS);
 		model.addAttribute("comparisons", metricQueryService.compare(TREND_KEYS, days)
 			.stream()
 			.map(comparison -> AnalyticsComparisonCard.from(comparison, HIGHER_IS_BETTER.contains(comparison.key())))

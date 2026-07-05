@@ -50,6 +50,11 @@
 			   th:text="|${d}일|">7일</a>
 		</div>
 
+		<p class="admin-export">
+			<a class="admin-export-link" th:href="@{/admin/analytics/metrics/export(keys=${exportKeys},days=${trendDays})}"
+			   download>CSV 내보내기</a>
+		</p>
+
 		<div class="metric-grid" aria-label="전 기간 대비 증감">
 			<div th:each="card : ${comparisons}" class="metric" th:classappend="${'tone-' + card.tone}">
 				<span th:text="${card.label}">지표</span>
