@@ -1657,9 +1657,7 @@ void main() {
         find.byKey(const Key('networkMapInteractiveViewer')),
         findsNothing,
       );
-      final renderer = tester.getSize(
-        find.byType(StructuredRouteMapView),
-      );
+      final renderer = tester.getSize(find.byType(StructuredRouteMapView));
       final surface = tester.getSize(
         find.byKey(const Key('networkMapSurface')),
       );
@@ -4879,35 +4877,19 @@ void main() {
     expect(deletionRepository.deleteCount, 1);
     expect(find.text('삭제 완료'), findsOneWidget);
     expect(find.text('내 정보가 삭제됐어요'), findsOneWidget);
-    expect(find.text('즐겨찾기한 역'), findsOneWidget);
-    expect(find.text('1개 삭제'), findsWidgets);
-    expect(find.text('이 기기의 제보 기록'), findsOneWidget);
-    expect(find.text('1건 삭제'), findsOneWidget);
+    expect(find.text('앱이 처음 사용하는 상태로 돌아갑니다.'), findsOneWidget);
+    expect(find.text('노선도와 역 정보는 계속 이용할 수 있어요'), findsOneWidget);
+    // 내부 처리 카테고리 카운트·시스템 독백은 결과 화면에서 사라진다(#1580).
+    expect(find.textContaining('개 삭제'), findsNothing);
+    expect(find.textContaining('건 삭제'), findsNothing);
+    expect(find.textContaining('누구의 정보인지 알 수 없게'), findsNothing);
+    expect(
+      find.byKey(const Key('dataDeletionResultRow-favoriteStations')),
+      findsNothing,
+    );
     expect(find.textContaining('연결 정보'), findsNothing);
     expect(find.textContaining('익명화'), findsNothing);
     expect(find.textContaining('local-user'), findsNothing);
-    expect(
-      find.byKey(const Key('dataDeletionResultStatus-favoriteStations')),
-      findsOneWidget,
-    );
-    final stationIconBadge = tester.widget<Container>(
-      find.byKey(const Key('dataDeletionResultIcon-favoriteStations')),
-    );
-    final stationIconDecoration = stationIconBadge.decoration! as BoxDecoration;
-    expect(stationIconDecoration.border, isNotNull);
-    expect(stationIconDecoration.color, Colors.white);
-    expect(
-      (stationIconDecoration.border! as Border).top.color,
-      EasySubwayAccessibleColors.mintDark,
-    );
-    expect((stationIconDecoration.border! as Border).top.width, 2);
-    final stationRow = tester.getRect(
-      find.byKey(const Key('dataDeletionResultRow-favoriteStations')),
-    );
-    final facilityRow = tester.getRect(
-      find.byKey(const Key('dataDeletionResultRow-favoriteFacilities')),
-    );
-    expect(facilityRow.top - stationRow.bottom, greaterThanOrEqualTo(16));
     expectNoForbiddenUserCopy(tester);
 
     await tester.tap(find.byKey(const Key('dataDeletionResultStartButton')));
@@ -4933,24 +4915,7 @@ void main() {
     addTearDown(tester.view.resetViewPadding);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: UserDataDeletionResultScreen(
-          result: const UserDataDeletionResult(
-            userId: 'anonymous-user-1',
-            deletedFavoriteStationCount: 1,
-            deletedFavoriteFacilityCount: 1,
-            deletedFavoriteRouteCount: 1,
-            anonymizedRouteFeedbackCount: 1,
-            notificationSettingsDeleted: true,
-            deletedRegisteredDeviceCount: 1,
-            deletedPushNotificationCount: 1,
-            mobilityProfileDeleted: true,
-            anonymizedReportCount: 1,
-          ),
-          deletionScope: UserDataDeletionScope.deviceOnly,
-          onRestart: () {},
-        ),
-      ),
+      MaterialApp(home: UserDataDeletionResultScreen(onRestart: () {})),
     );
 
     final screenBottom =
@@ -4962,58 +4927,21 @@ void main() {
     expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
   });
 
-  testWidgets('데이터 삭제 결과는 지울 알림 설정이 없을 때 쉬운 문구로 보여준다', (tester) async {
+  testWidgets('데이터 삭제 결과는 완료 안내와 다음 행동만 보여준다', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: UserDataDeletionResultScreen(
-          result: const UserDataDeletionResult(
-            userId: 'anonymous-user-1',
-            deletedFavoriteStationCount: 0,
-            deletedFavoriteFacilityCount: 0,
-            deletedFavoriteRouteCount: 0,
-            anonymizedRouteFeedbackCount: 0,
-            notificationSettingsDeleted: false,
-            deletedRegisteredDeviceCount: 0,
-            deletedPushNotificationCount: 0,
-            mobilityProfileDeleted: false,
-            anonymizedReportCount: 0,
-          ),
-          deletionScope: UserDataDeletionScope.deviceOnly,
-          onRestart: () {},
-        ),
-      ),
+      MaterialApp(home: UserDataDeletionResultScreen(onRestart: () {})),
     );
 
-    expect(find.text('알림 설정은 이미 비어 있어요'), findsOneWidget);
-    expect(find.text('삭제할 항목 없음'), findsNothing);
-  });
-
-  testWidgets('데이터 삭제 결과는 보낸 정보 정리를 쉬운 문구로 보여준다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: UserDataDeletionResultScreen(
-          result: const UserDataDeletionResult(
-            userId: 'anonymous-user-1',
-            deletedFavoriteStationCount: 0,
-            deletedFavoriteFacilityCount: 0,
-            deletedFavoriteRouteCount: 0,
-            anonymizedRouteFeedbackCount: 1,
-            notificationSettingsDeleted: false,
-            deletedRegisteredDeviceCount: 0,
-            deletedPushNotificationCount: 0,
-            mobilityProfileDeleted: false,
-            anonymizedReportCount: 2,
-          ),
-          deletionScope: UserDataDeletionScope.remoteAndDevice,
-          onRestart: () {},
-        ),
-      ),
+    expect(find.text('내 정보가 삭제됐어요'), findsOneWidget);
+    expect(find.text('노선도와 역 정보는 계속 이용할 수 있어요'), findsOneWidget);
+    expect(
+      find.byKey(const Key('dataDeletionResultStartButton')),
+      findsOneWidget,
     );
-
-    expect(find.text('보낸 제보 기록'), findsOneWidget);
-    expect(find.text('2건을 누구의 정보인지 알 수 없게 바꿈'), findsOneWidget);
-    expect(find.text('경로 의견'), findsOneWidget);
-    expect(find.text('1건을 누구의 정보인지 알 수 없게 바꿈'), findsOneWidget);
+    // 내부 처리 카테고리·시스템 독백은 노출하지 않는다(#1580).
+    expect(find.text('삭제 결과'), findsNothing);
+    expect(find.text('알림 설정은 이미 비어 있어요'), findsNothing);
+    expect(find.textContaining('누구의 정보인지 알 수 없게'), findsNothing);
     expectNoForbiddenUserCopy(tester);
   });
 
