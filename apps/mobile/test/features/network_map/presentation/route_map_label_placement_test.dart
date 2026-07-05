@@ -136,46 +136,35 @@ void main() {
     });
   });
 
-  group('routeMapOutwardAnchors (바깥 방향 통일)', () {
-    const center = Offset(100, 100);
-    test('중심 오른쪽 라벨은 right 우선', () {
-      expect(
-        routeMapOutwardAnchors(const Offset(150, 100), center).first,
-        RouteMapLabelAnchor.right,
+  group('8방향 anchor (#1789 정적 배치)', () {
+    test('대각 anchor rect는 두 축 모두 gap의 1/√2만큼 띄운다', () {
+      const size = Size(40, 12);
+      final rect = routeMapLabelRect(
+        Offset.zero,
+        size,
+        RouteMapLabelAnchor.aboveRight,
+        10,
       );
+      expect(rect.left, closeTo(10 * 0.707, 0.01));
+      expect(rect.bottom, closeTo(-10 * 0.707, 0.01));
     });
-    test('중심 왼쪽 라벨은 left 우선', () {
-      expect(
-        routeMapOutwardAnchors(const Offset(50, 100), center).first,
-        RouteMapLabelAnchor.left,
-      );
-    });
-    test('중심 위 라벨은 above 우선(수직 지배)', () {
-      expect(
-        routeMapOutwardAnchors(const Offset(100, 40), center).first,
-        RouteMapLabelAnchor.above,
-      );
-    });
-    test('중심 아래 라벨은 below 우선(수직 지배)', () {
-      expect(
-        routeMapOutwardAnchors(const Offset(100, 160), center).first,
-        RouteMapLabelAnchor.below,
-      );
-    });
-  });
 
-  group('placeRouteMapLabels 바깥 방향 배치', () {
-    test('viewportBounds를 주면 라벨을 화면 중심 바깥으로 일관 배치한다', () {
-      final placed = placeRouteMapLabels(
-        [
-          candidate(id: 'left', anchor: const Offset(20, 100), priority: 2),
-          candidate(id: 'right', anchor: const Offset(180, 100), priority: 2),
-        ],
-        viewportBounds: const Rect.fromLTWH(0, 0, 200, 200),
+    test('지도 중심 outward 순서는 8값 전부·중복 없음·바깥 우선', () {
+      // anchor가 중심의 오른쪽 위 → right(수평 지배) 우선, 안쪽(left/below)은 뒤.
+      final order = routeMapMapOutwardAnchorOrder(
+        const Offset(100, -40),
+        Offset.zero,
       );
-      final byId = {for (final p in placed) p.candidate.id: p.anchor};
-      expect(byId['left'], RouteMapLabelAnchor.left);
-      expect(byId['right'], RouteMapLabelAnchor.right);
+      expect(order.toSet().length, 8);
+      expect(order.first, RouteMapLabelAnchor.right);
+      expect(order[1], RouteMapLabelAnchor.aboveRight);
+      expect(order.last, RouteMapLabelAnchor.left);
+    });
+
+    test('순서는 화면(뷰포트)이 아니라 지도 중심에만 의존한다 — 결정적', () {
+      final a = routeMapMapOutwardAnchorOrder(const Offset(5, 5), Offset.zero);
+      final b = routeMapMapOutwardAnchorOrder(const Offset(5, 5), Offset.zero);
+      expect(a, b);
     });
   });
 }
