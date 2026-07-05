@@ -98,6 +98,19 @@ List<PlacedRouteMapLabel> _place(StructuredRouteMap map, int bucket) {
   );
 }
 
+List<RouteMapLabelCandidate> _candidates(StructuredRouteMap map, int bucket) {
+  return routeMapLabelCandidates(
+    map,
+    _camera(),
+    bucket,
+    labelTextByStationId: _labelText(map),
+    measure: (_, _) => _labelSize,
+    isVisible: (_) => true,
+    stationRadius: 3,
+    transferAnchorPadding: 7,
+  );
+}
+
 int _overlapPairs(List<PlacedRouteMapLabel> placed) {
   var count = 0;
   for (var i = 0; i < placed.length; i += 1) {
@@ -111,50 +124,28 @@ int _overlapPairs(List<PlacedRouteMapLabel> placed) {
 void main() {
   group('routeMapLabelCandidates LOD 정책', () {
     test('bucket 0은 라벨 후보가 없다 (선만)', () {
-      final map = _gridMap(spacing: 60);
-      final candidates = routeMapLabelCandidates(
-        map,
-        _camera(),
-        0,
-        labelTextByStationId: _labelText(map),
-        measure: (_, _) => _labelSize,
-        isVisible: (_) => true,
-        stationRadius: 3,
-        transferAnchorPadding: 7,
-      );
-      expect(candidates, isEmpty);
+      expect(_candidates(_gridMap(spacing: 60), 0), isEmpty);
     });
 
     test('bucket 1은 환승·주요만, 일반은 제외한다', () {
-      final map = _gridMap(spacing: 60);
-      final ids = routeMapLabelCandidates(
-        map,
-        _camera(),
-        1,
-        labelTextByStationId: _labelText(map),
-        measure: (_, _) => _labelSize,
-        isVisible: (_) => true,
-        stationRadius: 3,
-        transferAnchorPadding: 7,
-      ).map((c) => c.id).toList();
+      final ids = _candidates(_gridMap(spacing: 60), 1).map((c) => c.id);
       expect(ids.where((id) => id.startsWith('transfer:')), hasLength(2));
       expect(ids.where((id) => id.startsWith('major-')), hasLength(3));
       expect(ids.any((id) => id.startsWith('regular-')), isFalse);
     });
 
     test('bucket 2는 일반 라벨까지 후보에 포함한다', () {
-      final map = _gridMap(spacing: 60);
-      final ids = routeMapLabelCandidates(
-        map,
-        _camera(),
-        2,
-        labelTextByStationId: _labelText(map),
-        measure: (_, _) => _labelSize,
-        isVisible: (_) => true,
-        stationRadius: 3,
-        transferAnchorPadding: 7,
-      ).map((c) => c.id).toList();
+      final ids = _candidates(_gridMap(spacing: 60), 2).map((c) => c.id);
       expect(ids.any((id) => id.startsWith('regular-')), isTrue);
+    });
+
+    // painter는 candidate.id로 painterById를 keying해 배치 후 paint한다. id 포맷이
+    // 드리프트하면 paint lookup이 null이 되어 라벨이 조용히 누락되므로 계약으로 핀.
+    test('candidate id 포맷은 painter의 painterById key 규약을 따른다', () {
+      final ids = _candidates(_gridMap(spacing: 60), 2).map((c) => c.id).toSet();
+      expect(ids.contains('transfer:transfer-0'), isTrue);
+      expect(ids.contains('regular-0:L1'), isTrue);
+      expect(ids.contains('major-0:L1'), isTrue);
     });
   });
 
@@ -167,29 +158,32 @@ void main() {
       });
 
       test('bucket $bucket: 밀집 배치에서도 겹침 0 (충돌분은 숨김)', () {
-        final placed = _place(_gridMap(spacing: 14), bucket);
+        final map = _gridMap(spacing: 8);
+        final candidates = _candidates(map, bucket);
+        final placed = _place(map, bucket);
+        // vacuous pass 방지: 후보는 있는데 전부 사라지면 안 되고(추출 회귀),
+        // 충돌 해소가 실제로 일어났음(placed < candidates)을 함께 단정한다.
+        expect(candidates, isNotEmpty);
+        expect(placed, isNotEmpty, reason: 'bucket $bucket 최우선 라벨은 남아야');
+        expect(
+          placed.length,
+          lessThan(candidates.length),
+          reason: 'bucket $bucket 밀집인데 억제가 없다',
+        );
         expect(_overlapPairs(placed), 0, reason: 'bucket $bucket 밀집 겹침');
       });
     }
 
     test('여유 있는 지역은 모든 후보가 배치된다 (과잉 숨김 없음)', () {
       final map = _gridMap(spacing: 80);
-      final candidates = routeMapLabelCandidates(
-        map,
-        _camera(),
-        2,
-        labelTextByStationId: _labelText(map),
-        measure: (_, _) => _labelSize,
-        isVisible: (_) => true,
-        stationRadius: 3,
-        transferAnchorPadding: 7,
-      );
+      final candidates = _candidates(map, 2);
       final placed = _place(map, 2);
+      expect(candidates, isNotEmpty);
       expect(placed, hasLength(candidates.length));
     });
 
     test('밀집 지역에서 환승(최우선) 라벨은 반드시 배치된다', () {
-      final placed = _place(_gridMap(spacing: 14), 2);
+      final placed = _place(_gridMap(spacing: 8), 2);
       final placedIds = placed.map((p) => p.candidate.id).toSet();
       expect(placedIds.contains('transfer:transfer-0'), isTrue);
       expect(placedIds.contains('transfer:transfer-1'), isTrue);
