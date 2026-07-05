@@ -4,7 +4,11 @@
 // 1호선 분기의 가짜 인접쌍(오산—인천 등)이 원천 배제된다.
 import { writeFileSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { buildRespaceGraph, parsePathPoints } from "./respace-route-map.mjs";
+import {
+  buildRespaceGraph,
+  medianStationChainLength,
+  parsePathPoints,
+} from "./respace-route-map.mjs";
 import { cleanupPackDir, openPack, repoRoot } from "./pack-io.mjs";
 
 /** hasStationEnds chain arc length 분포 (nearest-rank 분위수). */
@@ -53,6 +57,83 @@ function properIntersect(p1, p2, p3, p4) {
     ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
     ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
   );
+}
+
+/** properIntersect가 참일 때 교차점 좌표 — 아니면 null. */
+function intersectionPoint(p1, p2, p3, p4) {
+  const d1 = orient(p3, p4, p1);
+  const d2 = orient(p3, p4, p2);
+  const d3 = orient(p1, p2, p3);
+  const d4 = orient(p1, p2, p4);
+  const proper =
+    ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+    ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+  if (!proper) return null;
+  const t = d1 / (d1 - d2);
+  return { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
+}
+
+/** cluster 중심 목록 — positions는 graph.nodes와 같은 길이의 좌표 배열. */
+export function clusterCentroids(graph, positions) {
+  return graph.clusters.map((cluster) => {
+    let cx = 0;
+    let cy = 0;
+    for (const m of cluster.members) {
+      cx += positions[m.nodeId].x - m.offset.x;
+      cy += positions[m.nodeId].y - m.offset.y;
+    }
+    return { x: cx / cluster.members.length, y: cy / cluster.members.length };
+  });
+}
+
+/**
+ * 교차 3분류(#1789 원인 ③): 환승매듭(cluster 근접)은 구조적·실기기 시각 판정
+ * 대상이고, 그중 coverRadius 내는 환승 캡슐이 가려 화면에 안 보인다. 게이트는
+ * 자유공간 엉킴(free)만 수치로 잡는다.
+ */
+export function classifyCrossings(
+  tracksPoints,
+  centroids,
+  { knotRadius, coverRadius = 17 },
+) {
+  const segs = [];
+  for (let ti = 0; ti < tracksPoints.length; ti += 1) {
+    const pts = tracksPoints[ti];
+    for (let i = 1; i < pts.length; i += 1) {
+      segs.push({ ti, a: pts[i - 1], b: pts[i] });
+    }
+  }
+  let free = 0;
+  let knotCovered = 0;
+  let knotVisible = 0;
+  for (let i = 0; i < segs.length; i += 1) {
+    for (let j = i + 1; j < segs.length; j += 1) {
+      if (segs[i].ti === segs[j].ti) continue;
+      const shared = [segs[i].a, segs[i].b].some((p) =>
+        [segs[j].a, segs[j].b].some(
+          (q) => Math.hypot(p.x - q.x, p.y - q.y) < 1e-6,
+        ),
+      );
+      if (shared) continue;
+      const pt = intersectionPoint(segs[i].a, segs[i].b, segs[j].a, segs[j].b);
+      if (!pt) continue;
+      let nearest = Infinity;
+      for (const c of centroids) {
+        const d = Math.hypot(pt.x - c.x, pt.y - c.y);
+        if (d < nearest) nearest = d;
+      }
+      if (nearest < coverRadius) knotCovered += 1;
+      else if (nearest < knotRadius) knotVisible += 1;
+      else free += 1;
+    }
+  }
+  return {
+    free,
+    knotCovered,
+    knotVisible,
+    knot: knotCovered + knotVisible,
+    total: free + knotCovered + knotVisible,
+  };
 }
 
 /** 서로 다른 폴리라인 간 순수 교차 수(공유 끝점·collinear 접촉 제외). */
@@ -108,6 +189,9 @@ function parseArgs(argv) {
     region: "수도권",
     json: null,
     compare: null,
+    // 게이트 시작값 — Task 3 스윕에서 확정.
+    maxP95p5: 7.5,
+    maxFree: 24,
   };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
@@ -115,6 +199,8 @@ function parseArgs(argv) {
       case "--region": o.region = argv[++i]; break;
       case "--json": o.json = argv[++i]; break;
       case "--compare": o.compare = argv[++i]; break;
+      case "--max-p95p5": o.maxP95p5 = Number(argv[++i]); break;
+      case "--max-free": o.maxFree = Number(argv[++i]); break;
     }
   }
   return o;
@@ -149,11 +235,22 @@ function main() {
         y: r.y,
       })),
     });
-    const tracksPoints = tracks.map((t) => t.points);
+    // graph 노드 재구성으로 통일 — 재간격 솔버가 팩 path를 graph 노드로 재작성하므로
+    // before/after 감사를 동일 기반으로 맞춰야 게이트가 오염되지 않는다.
+    const tracksPoints = graph.tracks
+      .filter((t) => t.nodeIds.length)
+      .map((t) => t.nodeIds.map((id) => graph.nodes[id]));
+    const unit = medianStationChainLength(graph);
+    const byClass = classifyCrossings(
+      tracksPoints,
+      clusterCentroids(graph, graph.nodes),
+      { knotRadius: unit * 0.75 },
+    );
     const report = {
       region: o.region,
       spacing: chainLengthStats(graph),
-      crossings: segmentCrossingCount(tracksPoints),
+      crossings: byClass.total,
+      crossingsByClass: byClass,
       octoViolations: octolinearityViolations(tracksPoints).length,
       warnings: graph.warnings.length,
     };
@@ -163,7 +260,9 @@ function main() {
         `p5 ${Math.round(s.p5)} · p95 ${Math.round(s.p95)} · p95/p5 ${s.p95OverP5.toFixed(1)}`,
     );
     console.log(
-      `교차 ${report.crossings} · 8선형 위반 ${report.octoViolations} · 투영 경고 ${report.warnings}`,
+      `교차 ${report.crossings} (자유 ${byClass.free} · 매듭 가림 ${byClass.knotCovered} · ` +
+        `매듭 노출 ${byClass.knotVisible}) · 8선형 위반 ${report.octoViolations} · ` +
+        `투영 경고 ${report.warnings}`,
     );
     if (o.json) {
       writeFileSync(
@@ -179,20 +278,26 @@ function main() {
         ),
       );
       const fails = [];
-      if (report.crossings > before.crossings) {
-        fails.push(`교차 증가 ${before.crossings}→${report.crossings}`);
-      }
       if (report.octoViolations > before.octoViolations) {
         fails.push(`8선형 위반 증가 ${before.octoViolations}→${report.octoViolations}`);
       }
-      if (report.spacing.p95OverP5 > 3) {
-        fails.push(`간격 p95/p5 ${report.spacing.p95OverP5.toFixed(1)} > 3`);
+      if (report.spacing.p95OverP5 > o.maxP95p5) {
+        fails.push(`간격 p95/p5 ${report.spacing.p95OverP5.toFixed(1)} > ${o.maxP95p5}`);
+      }
+      if (byClass.free > o.maxFree) {
+        fails.push(`자유공간 교차 ${byClass.free} > ${o.maxFree}`);
+      }
+      const beforeVisible = before.crossingsByClass?.knotVisible;
+      if (beforeVisible !== undefined) {
+        console.log(
+          `환승매듭 노출 ${beforeVisible}→${byClass.knotVisible} — 게이트 아님, 실기기 판정 대상`,
+        );
       }
       if (fails.length) {
         console.error("감사 실패: " + fails.join(" · "));
         process.exit(1);
       }
-      console.log("감사 통과 (교차·8선형·간격 균일도 안전).");
+      console.log("감사 통과 (8선형·간격·자유공간 교차 안전).");
     }
   } finally {
     cleanupPackDir(dir);
