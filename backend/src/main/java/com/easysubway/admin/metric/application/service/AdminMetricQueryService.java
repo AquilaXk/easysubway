@@ -54,10 +54,13 @@ public class AdminMetricQueryService {
 		}
 
 		List<AdminMetricSeries> series = keys.stream()
-			.map(key -> new AdminMetricSeries(
-				key,
-				AdminMetricKeys.label(key),
-				dates.stream().map(date -> byKey.getOrDefault(key, Map.of()).get(date)).toList()))
+			.map(key -> {
+				Map<LocalDate, Double> valuesByDate = byKey.getOrDefault(key, Map.of());
+				return new AdminMetricSeries(
+					key,
+					AdminMetricKeys.label(key),
+					dates.stream().map(valuesByDate::get).toList());
+			})
 			.toList();
 		List<String> labels = dates.stream().map(LocalDate::toString).toList();
 		return new AdminMetricChart(days, labels, series);
