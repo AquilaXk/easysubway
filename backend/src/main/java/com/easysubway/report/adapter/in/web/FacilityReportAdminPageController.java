@@ -492,6 +492,43 @@ class FacilityReportAdminPageController {
 		return "redirect:/admin/reports/%s/page".formatted(reportId);
 	}
 
+	// 일괄 검수(#1737): 선택한 신고들을 한 번에 승인/반려한다. no-JS 폼으로 동작하며 개별 실패는
+	// 집계해 안내한다(이미 처리됨·읽기 전용 마스터·낙관적 락 충돌 등은 실패로 센다).
+	@PostMapping("/admin/reports/bulk-review")
+	@PreAuthorize("hasAuthority('admin.report.review')")
+	String bulkReviewReports(
+		@RequestParam(name = "reportIds", required = false) List<String> reportIds,
+		@RequestParam FacilityReportReviewDecision decision,
+		Principal principal,
+		RedirectAttributes redirectAttributes
+	) {
+		List<String> ids = reportIds == null ? List.of() : reportIds;
+		int processed = 0;
+		int failed = 0;
+		for (String reportId : ids) {
+			try {
+				facilityReportUseCase.reviewReport(
+					new ReviewFacilityReportCommand(reportId, decision, principal.getName(), null));
+				processed++;
+			} catch (RuntimeException exception) {
+				failed++;
+			}
+		}
+		redirectAttributes.addFlashAttribute("flashMessage", bulkReviewMessage(ids.size(), processed, failed));
+		redirectAttributes.addFlashAttribute("flashTone", failed == 0 ? "good" : "warning");
+		return "redirect:/admin/reports/page";
+	}
+
+	private static String bulkReviewMessage(int total, int processed, int failed) {
+		if (total == 0) {
+			return "선택한 신고가 없습니다.";
+		}
+		if (failed == 0) {
+			return "선택한 신고 %d건을 처리했습니다.".formatted(processed);
+		}
+		return "선택한 %d건 중 %d건 처리, %d건은 처리하지 못했습니다.".formatted(total, processed, failed);
+	}
+
 	private void auditReportDetailRead(Authentication authentication, HttpServletRequest request, String reportId) {
 		auditWriter.privacyRead(
 			authentication,

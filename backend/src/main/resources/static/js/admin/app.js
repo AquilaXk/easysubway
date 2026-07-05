@@ -19,4 +19,29 @@ document.addEventListener('alpine:init', function () {
 			},
 		};
 	});
+
+	// 표준 테이블 일괄 선택: 선택 개수를 실시간 표시하고 전체 선택을 토글한다.
+	// 진화형 향상 — JS가 없으면 개별 체크박스 + 액션 버튼(no-JS 폼)이 그대로 동작한다.
+	// CSP 빌드 규약: x-on/x-text에는 메서드·프로퍼티 이름만 쓰고 표현식은 쓰지 않는다.
+	Alpine.data('bulkSelect', function () {
+		return {
+			count: 0,
+			get selectionLabel() {
+				return this.count > 0 ? '선택한 신고 ' + this.count + '건' : '선택한 신고 일괄 처리';
+			},
+			get hasSelection() {
+				return this.count > 0;
+			},
+			recount: function () {
+				this.count = this.$root.querySelectorAll('input[name="reportIds"]:checked').length;
+			},
+			toggleAll: function (event) {
+				var checked = event.target.checked;
+				this.$root.querySelectorAll('input[name="reportIds"]').forEach(function (checkbox) {
+					checkbox.checked = checked;
+				});
+				this.recount();
+			},
+		};
+	});
 });

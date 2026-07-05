@@ -471,6 +471,48 @@ class FacilityReportAdminPageControllerTest {
 			.andExpect(status().isForbidden());
 	}
 
+	@Test
+	@DisplayName("관리자는 선택한 신고들을 일괄 승인해 접수 대기열에서 뺀다")
+	void bulkReviewAcceptsSelectedReports() throws Exception {
+		String firstReportId = createReport("일괄 승인 신고 1");
+		String secondReportId = createReport("일괄 승인 신고 2");
+
+		mockMvc.perform(post("/admin/reports/bulk-review")
+				.with(httpBasic("admin-test", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/reports/%s/page".formatted(firstReportId)))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("reportIds", firstReportId, secondReportId)
+				.param("decision", "ACCEPT"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/reports/page"));
+
+		String submittedHtml = mockMvc.perform(get("/admin/reports/page")
+				.param("status", "SUBMITTED")
+				.with(httpBasic("admin-test", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(submittedHtml)
+			.doesNotContain("일괄 승인 신고 1")
+			.doesNotContain("일괄 승인 신고 2");
+	}
+
+	@Test
+	@DisplayName("일괄 검수는 선택이 없으면 안내만 하고 목록으로 돌아온다")
+	void bulkReviewWithoutSelectionReturnsToList() throws Exception {
+		mockMvc.perform(post("/admin/reports/bulk-review")
+				.with(httpBasic("admin-test", "admin-test-password"))
+				.with(csrf())
+				.with(commandToken("/admin/reports/page"))
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("decision", "ACCEPT"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("Location", "/admin/reports/page"));
+	}
+
 	private String createReport(String description) throws Exception {
 		return createReport(description, "BROKEN", "");
 	}

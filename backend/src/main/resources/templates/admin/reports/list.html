@@ -132,46 +132,66 @@
 			   th:text="${filter.label}">접수됨</a>
 		</nav>
 
-		<table>
-			<thead>
-			<tr>
-				<th scope="col" th:attr="aria-sort=${statusSort.ariaSort}">
-					<a th:href="${statusSort.href}" th:attr="hx-get=${statusSort.href}">상태</a>
-				</th>
-				<th scope="col">유형</th>
-				<th scope="col">신고 내용</th>
-				<th scope="col">역</th>
-				<th scope="col">시설</th>
-				<th scope="col" th:attr="aria-sort=${createdSort.ariaSort}">
-					<a th:href="${createdSort.href}" th:attr="hx-get=${createdSort.href}">접수일</a>
-				</th>
-				<th scope="col">좌표</th>
-				<th scope="col">사진</th>
-				<th scope="col">상세</th>
-			</tr>
-			</thead>
-			<tbody>
-			<tr th:if="${reports.isEmpty()}">
-				<td class="empty" colspan="9">
-					<div th:replace="~{admin/fragments/empty-state :: panel('확인할 신고가 없습니다.', '검색어·상태·기간 필터를 조정해 보세요.')}"></div>
-				</td>
-			</tr>
-			<tr th:each="report : ${reports}">
-				<td><span th:replace="~{admin/fragments/shell :: statusAuto(${report.statusLabel})}">접수됨</span></td>
-				<td th:text="${report.reportTypeLabel}">고장</td>
-				<td th:text="${report.description}">신고 내용</td>
-				<td th:text="${report.stationLabel}">상록수(station-id)</td>
-				<td th:text="${report.facilityLabel}">엘리베이터(facility-id)</td>
-				<td th:text="${#temporals.format(report.createdAt, 'yyyy-MM-dd HH:mm')}">2026-06-17 09:00</td>
-				<td th:text="${report.coordinateLabel}">위치 없음</td>
-				<td th:text="${report.hasPhoto ? '있음' : '없음'}">없음</td>
-				<td>
-					<a class="detail-link"
-					   th:href="@{/admin/reports/{reportId}/page(reportId=${report.id})}">상세 보기</a>
-				</td>
-			</tr>
-			</tbody>
-		</table>
+		<!--
+		  일괄 검수(#1737): 체크박스로 선택한 신고를 한 번에 승인/반려한다. command token + CSRF POST.
+		  진화형 향상 — JS 없으면 체크박스 + 액션 버튼이 그대로 동작하고, 있으면 전체 선택·선택 수 표시가 붙는다.
+		-->
+		<form class="bulk-form" method="post" th:action="@{/admin/reports/bulk-review}" x-data="bulkSelect">
+			<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+			<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
+			<table>
+				<thead>
+				<tr>
+					<th scope="col" class="select-col">
+						<input type="checkbox" aria-label="목록 전체 선택" x-on:change="toggleAll">
+					</th>
+					<th scope="col" th:attr="aria-sort=${statusSort.ariaSort}">
+						<a th:href="${statusSort.href}" th:attr="hx-get=${statusSort.href}">상태</a>
+					</th>
+					<th scope="col">유형</th>
+					<th scope="col">신고 내용</th>
+					<th scope="col">역</th>
+					<th scope="col">시설</th>
+					<th scope="col" th:attr="aria-sort=${createdSort.ariaSort}">
+						<a th:href="${createdSort.href}" th:attr="hx-get=${createdSort.href}">접수일</a>
+					</th>
+					<th scope="col">좌표</th>
+					<th scope="col">사진</th>
+					<th scope="col">상세</th>
+				</tr>
+				</thead>
+				<tbody>
+				<tr th:if="${reports.isEmpty()}">
+					<td class="empty" colspan="10">
+						<div th:replace="~{admin/fragments/empty-state :: panel('확인할 신고가 없습니다.', '검색어·상태·기간 필터를 조정해 보세요.')}"></div>
+					</td>
+				</tr>
+				<tr th:each="report : ${reports}">
+					<td class="select-col">
+						<input type="checkbox" name="reportIds" th:value="${report.id}"
+						       x-on:change="recount" th:attr="aria-label=|${report.stationLabel} 신고 선택|">
+					</td>
+					<td><span th:replace="~{admin/fragments/shell :: statusAuto(${report.statusLabel})}">접수됨</span></td>
+					<td th:text="${report.reportTypeLabel}">고장</td>
+					<td th:text="${report.description}">신고 내용</td>
+					<td th:text="${report.stationLabel}">상록수(station-id)</td>
+					<td th:text="${report.facilityLabel}">엘리베이터(facility-id)</td>
+					<td th:text="${#temporals.format(report.createdAt, 'yyyy-MM-dd HH:mm')}">2026-06-17 09:00</td>
+					<td th:text="${report.coordinateLabel}">위치 없음</td>
+					<td th:text="${report.hasPhoto ? '있음' : '없음'}">없음</td>
+					<td>
+						<a class="detail-link"
+						   th:href="@{/admin/reports/{reportId}/page(reportId=${report.id})}">상세 보기</a>
+					</td>
+				</tr>
+				</tbody>
+			</table>
+			<div class="bulk-actionbar">
+				<span class="bulk-count" x-text="selectionLabel">선택한 신고 일괄 처리</span>
+				<button type="submit" name="decision" value="ACCEPT">선택 승인</button>
+				<button type="submit" name="decision" value="REJECT">선택 반려</button>
+			</div>
+		</form>
 
 		<!-- 페이지네이션은 공용 pager fragment(hx-get 없음)라 이 파일럿에서는 전체 새로고침으로 동작한다.
 		     상태 필터만 htmx 부분 갱신 대상이며, 대기열 전체 htmx화는 #1740 범위다. -->
