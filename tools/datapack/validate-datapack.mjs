@@ -146,6 +146,7 @@ function validateSqlite(sqlitePath, pack, requireProduction) {
     validateNoRealtimePayloadTables(database, pack);
     validateNetworkEdgeReferences(database, pack);
     validateTransitSchedule(database, pack);
+    validateTransitFeedInfo(database, pack);
     validateStationPathways(database, pack);
     const productionCoverageError = validateProductionNetworkEdgeProvenance(database, pack);
     validateProductionInternalRouteEdgeProvenance(database, pack);
@@ -316,6 +317,16 @@ function serviceCalendarHasActiveDate(calendar, addedDates) {
     calendar.saturday,
     calendar.sunday,
   ].some((value) => value === 1);
+}
+
+function validateTransitFeedInfo(database, pack) {
+  if (!hasTable(database, "transit_feed_info")) {
+    return;
+  }
+  const count = database.prepare("SELECT COUNT(*) AS count FROM transit_feed_info").get().count;
+  if (count > 1) {
+    throw new Error(`${pack.id}@${pack.version} transit_feed_info must have at most one row`);
+  }
 }
 
 function validateStationPathways(database, pack) {
