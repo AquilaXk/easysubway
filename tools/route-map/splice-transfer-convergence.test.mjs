@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets } from "./splice-transfer-convergence.mjs";
+import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets, spliceTrackToNode } from "./splice-transfer-convergence.mjs";
 
 test("transferGroups는 2+노선 역만 그룹화하고 span=최대쌍거리", () => {
   const rows = [
@@ -49,4 +49,42 @@ test("capsuleTargets는 centroid 중심 targetSpan 폭으로 축 따라 균등 �
 test("capsuleTargets 단일 멤버는 centroid(자기 위치)에 그대로 둔다", () => {
   const t = capsuleTargets([{ lineId: "X", x: 10, y: 20 }], 13, "H");
   assert.deepEqual(t, [{ lineId: "X", x: 10, y: 20 }]);
+});
+
+test("spliceTrackToNode는 근처 정점을 newPos로 이동, 국소 rectify", () => {
+  // 수평 5-정점 트랙: (0,100), (100,100), (200,100), (300,100), (400,100)
+  const verts = [
+    { x: 0, y: 100 },
+    { x: 100, y: 100 },
+    { x: 200, y: 100 },
+    { x: 300, y: 100 },
+    { x: 400, y: 100 },
+  ];
+
+  // 중앙 정점(200,100)을 (200,108)로 이동, radius=1 국소 rectify
+  const result = spliceTrackToNode(verts, { x: 200, y: 100 }, { x: 200, y: 108 }, { radius: 1, eps: 1 });
+
+  // 결과는 새 배열
+  assert.notEqual(result, verts);
+
+  // 끝 정점은 변경 안 됨: 첫 점이 (0,100), 마지막 점이 (400,100)
+  assert.equal(result[0].x, 0);
+  assert.equal(result[0].y, 100);
+  assert.equal(result[result.length - 1].x, 400);
+  assert.equal(result[result.length - 1].y, 100);
+
+  // 8선형 검사: 모든 세그먼트가 8방향(±0.5°)
+  assert.ok(result.length >= 2, `결과 배열이 최소 2개 점을 가져야 함, 실제: ${result.length}`);
+  for (let i = 0; i < result.length - 1; i += 1) {
+    const dx = result[i + 1].x - result[i].x;
+    const dy = result[i + 1].y - result[i].y;
+    if (dx === 0 && dy === 0) continue; // 중복 점 무시
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    // 8선형: 0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°
+    const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+    const minDiff = Math.min(
+      ...snapAngles.map((a) => Math.min(Math.abs(angle - a), Math.abs(angle - a + 360), Math.abs(angle - a - 360)))
+    );
+    assert.ok(minDiff <= 0.5, `세그먼트 ${i}->${i + 1} 각도=${angle.toFixed(2)}°, 8선형 오차=${minDiff.toFixed(2)}°`);
+  }
 });

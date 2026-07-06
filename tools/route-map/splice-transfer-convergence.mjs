@@ -2,6 +2,8 @@
 // #1789: 환승 그룹 티어 분류 — 오라클 스팬과 실측 스팬의 displacement 기반
 // 분류로, 렌더 3-모드 선택(스택/스팬/분리)의 데이터 근거를 제공한다.
 
+import { rectifyPolyline } from "./octi-to-pack.mjs";
+
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** posRows({station_id,line_id,x,y}) → 환승 그룹(2+ 노선). span=최대 쌍거리. */
@@ -63,4 +65,59 @@ export function capsuleTargets(members, targetSpan, axis) {
       ? { lineId: m.lineId, x: cx + off, y: cy }
       : { lineId: m.lineId, x: cx, y: cy + off };
   });
+}
+
+/**
+ * oldPos에서 가장 가까운 정점 인덱스를 찾는다 (threshold 30px).
+ * 범위 내 정점이 없으면 -1 반환.
+ * @internal
+ */
+function nearestVertexIndex(verts, oldPos, threshold = 30) {
+  let minDist = Infinity;
+  let minIdx = -1;
+  for (let i = 0; i < verts.length; i += 1) {
+    const d = dist(verts[i], oldPos);
+    if (d < minDist) {
+      minDist = d;
+      minIdx = i;
+    }
+  }
+  return minDist <= threshold ? minIdx : -1;
+}
+
+/**
+ * 트랙 정점 배열에서 oldPos 근처 정점을 newPos로 이동하고,
+ * 국소 윈도우(idx-radius ~ idx+radius)만 rectify한다.
+ * @param verts - 정점 배열 [{x,y}, ...]
+ * @param oldPos - 찾을 위치
+ * @param newPos - 이동할 위치
+ * @param options - {radius=1, eps=1}
+ * @returns 새 배열 (입력 변경 안 함)
+ */
+export function spliceTrackToNode(verts, oldPos, newPos, { radius = 1, eps = 1 } = {}) {
+  const idx = nearestVertexIndex(verts, oldPos);
+  if (idx === -1) {
+    // 범위 내 정점이 없으면 변경 없이 복사본 반환
+    return verts.slice();
+  }
+
+  // idx 정점을 newPos로 이동한 배열 생성
+  const modified = verts.map((v, i) => (i === idx ? { x: newPos.x, y: newPos.y } : { x: v.x, y: v.y }));
+
+  // rectify 윈도우 범위: [Math.max(0, idx-radius), Math.min(len-1, idx+radius)]
+  const windowStart = Math.max(0, idx - radius);
+  const windowEnd = Math.min(verts.length - 1, idx + radius);
+
+  // 윈도우 추출 후 rectify
+  const window = modified.slice(windowStart, windowEnd + 1);
+  const rectified = rectifyPolyline(window, { eps, tol: 0.5 });
+
+  // 결과 배열: prefix + rectified + suffix
+  const result = [
+    ...modified.slice(0, windowStart),
+    ...rectified,
+    ...modified.slice(windowEnd + 1),
+  ];
+
+  return result;
 }
