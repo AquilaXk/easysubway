@@ -2,7 +2,7 @@
 // #1789: 환승 그룹 티어 분류 — 오라클 스팬과 실측 스팬의 displacement 기반
 // 분류로, 렌더 3-모드 선택(스택/스팬/분리)의 데이터 근거를 제공한다.
 
-import { rectifyPolyline } from "./octi-to-pack.mjs";
+import { octilinearPolyline } from "./octolinearize-line-tracks.mjs";
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -86,38 +86,17 @@ function nearestVertexIndex(verts, oldPos, threshold = 30) {
 }
 
 /**
- * 트랙 정점 배열에서 oldPos 근처 정점을 newPos로 이동하고,
- * 국소 윈도우(idx-radius ~ idx+radius)만 rectify한다.
- * @param verts - 정점 배열 [{x,y}, ...]
- * @param oldPos - 찾을 위치
- * @param newPos - 이동할 위치
- * @param options - {radius=1, eps=1}
- * @returns 새 배열 (입력 변경 안 함)
+ * 허브 정점을 newPos로 옮기고 [idx-radius, idx+radius] 윈도우만 8선형 재구성(원위 불변).
+ * octilinearPolyline은 입력 정점(윈도우 끝점 + 이동한 허브)을 정확히 보존하고 45° dogleg를
+ * 삽입해 8선형화한다 — rectify와 달리 수직 오프셋 지점을 정확히 통과한다(국소 dogleg는
+ * radius-1 국소라 전역 재생성의 자유교차와 무관, 교차는 Task 6 게이트가 실측).
  */
-export function spliceTrackToNode(verts, oldPos, newPos, { radius = 1, eps = 1 } = {}) {
+export function spliceTrackToNode(verts, oldPos, newPos, { radius = 1 } = {}) {
   const idx = nearestVertexIndex(verts, oldPos);
-  if (idx === -1) {
-    // 범위 내 정점이 없으면 변경 없이 복사본 반환
-    return verts.slice();
-  }
-
-  // idx 정점을 newPos로 이동한 배열 생성
-  const modified = verts.map((v, i) => (i === idx ? { x: newPos.x, y: newPos.y } : { x: v.x, y: v.y }));
-
-  // rectify 윈도우 범위: [Math.max(0, idx-radius), Math.min(len-1, idx+radius)]
-  const windowStart = Math.max(0, idx - radius);
-  const windowEnd = Math.min(verts.length - 1, idx + radius);
-
-  // 윈도우 추출 후 rectify
-  const window = modified.slice(windowStart, windowEnd + 1);
-  const rectified = rectifyPolyline(window, { eps, tol: 0.5 });
-
-  // 결과 배열: prefix + rectified + suffix
-  const result = [
-    ...modified.slice(0, windowStart),
-    ...rectified,
-    ...modified.slice(windowEnd + 1),
-  ];
-
-  return result;
+  if (idx < 0) return verts.slice(); // 멤버가 track 밖 — 건드리지 않음
+  const moved = verts.map((v, i) => (i === idx ? { x: newPos.x, y: newPos.y } : { x: v.x, y: v.y }));
+  const lo = Math.max(0, idx - radius);
+  const hi = Math.min(moved.length - 1, idx + radius);
+  const local = octilinearPolyline(moved.slice(lo, hi + 1));
+  return [...moved.slice(0, lo), ...local, ...moved.slice(hi + 1)];
 }

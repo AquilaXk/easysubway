@@ -51,6 +51,18 @@ test("capsuleTargets 단일 멤버는 centroid(자기 위치)에 그대로 둔�
   assert.deepEqual(t, [{ lineId: "X", x: 10, y: 20 }]);
 });
 
+test("spliceTrackToNode는 track 끝점 허브도 새 위치로 이동(한쪽 윈도우)", () => {
+  const verts = [{ x: 0, y: 100 }, { x: 100, y: 100 }, { x: 200, y: 100 }];
+  const out = spliceTrackToNode(verts, { x: 0, y: 100 }, { x: 0, y: 112 }, { radius: 1 });
+  assert.ok(out.some((v) => Math.abs(v.y - 112) < 1e-6), "끝점 허브 이동");
+  for (let i = 1; i < out.length; i += 1) {
+    const dx = out[i].x - out[i - 1].x, dy = out[i].y - out[i - 1].y;
+    if (Math.hypot(dx, dy) === 0) continue;
+    const ang = (Math.atan2(dy, dx) * 180) / Math.PI, mod = ((ang % 45) + 45) % 45;
+    assert.ok(Math.min(mod, 45 - mod) <= 0.5, `세그 ${i} 비8선형`);
+  }
+});
+
 test("spliceTrackToNode는 근처 정점을 newPos로 이동, 국소 rectify", () => {
   // 수평 5-정점 트랙: (0,100), (100,100), (200,100), (300,100), (400,100)
   const verts = [
@@ -66,6 +78,10 @@ test("spliceTrackToNode는 근처 정점을 newPos로 이동, 국소 rectify", (
 
   // 결과는 새 배열
   assert.notEqual(result, verts);
+
+  // 허브 정점이 새 위치(y≈108)로 이동
+  const moved = result.find((v) => Math.abs(v.y - 108) < 1e-6);
+  assert.ok(moved, "허브 정점이 새 위치(y≈108)로 이동");
 
   // 끝 정점은 변경 안 됨: 첫 점이 (0,100), 마지막 점이 (400,100)
   assert.equal(result[0].x, 0);
