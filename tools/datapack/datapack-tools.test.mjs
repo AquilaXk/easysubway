@@ -1,6 +1,6 @@
 import { gzipSync, gunzipSync } from "node:zlib";
 import { createHash, createSign } from "node:crypto";
-import { copyFile, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "node:http";
 import assert from "node:assert/strict";
@@ -10587,6 +10587,52 @@ test("데이터팩 만료 알림 evidence는 SLA 임박 manifest를 FIRING으로
   assert.equal(evidence.alert.status, "FIRING");
   assert.equal(evidence.alert.severity, "warning");
   assert.equal(evidence.alert.secondsUntilExpiry, 19800);
+});
+
+test("게시 plan은 schemaVersion 2에서 releases/<seq>.json 불변 스텝을 manifest 스텝보다 먼저 넣는다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "publish-plan-"));
+  try {
+    // manifestVersion 2 + releaseSequence 3 매니페스트와 pack 하나를 스테이징한다.
+    const packBytes = gzipSync(Buffer.from("fixture-pack"));
+    await mkdir(path.join(workspace, "catalog"), { recursive: true });
+    await writeFile(path.join(workspace, "catalog", "capital-v1.sqlite.gz"), packBytes);
+    const manifest = {
+      manifestVersion: 2,
+      channel: "staging",
+      releaseSequence: 3,
+      publishedAt: "2026-07-06T00:00:00.000Z",
+      expiresAt: "2026-08-06T00:00:00.000Z",
+      keyId: "test-key",
+      ttlSeconds: 3600,
+      signature: { algorithm: "rsa-sha256-manifest-v2", value: "AA" },
+      packs: [{ id: "capital", version: "1", sizeBytes: packBytes.length, sha256: sha256(packBytes) }],
+    };
+    const manifestPath = path.join(workspace, "catalog", "current.json");
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    const outputPath = path.join(workspace, "plan.json");
+
+    await execFileAsync("node", [
+      path.join(root, "tools/datapack/create-publish-plan.mjs"),
+      "--manifest", manifestPath,
+      "--root", workspace,
+      "--output", outputPath,
+    ]);
+
+    const plan = JSON.parse(await readFile(outputPath, "utf8"));
+    assert.equal(plan.schemaVersion, 2);
+    const types = plan.steps.map((step) => step.type);
+    assert.deepEqual(types, [
+      "put-pack-object", "verify-pack-object",
+      "put-release-manifest-object", "verify-release-manifest-object",
+      "put-manifest-object", "verify-manifest-object",
+    ]);
+    const releasePut = plan.steps.find((s) => s.type === "put-release-manifest-object");
+    assert.equal(releasePut.objectKey, "catalog/releases/3.json");
+    assert.equal(releasePut.immutable, true);
+    assert.equal(releasePut.sourcePath, "catalog/current.json");
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 function sha256(bytes) {
