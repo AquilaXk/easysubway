@@ -13,7 +13,12 @@
 // (대표가 비면 흡수분에서 가져옴).
 //
 // 사용: node tools/route-map/merge-oversplit-transfers.mjs [--pack …] [--check]
-import { mutatePack, parsePackArgs, reparentLine } from "./station-surgery.mjs";
+import {
+  mutatePack,
+  parsePackArgs,
+  reparentLine,
+  rehomeAllStationNodes,
+} from "./station-surgery.mjs";
 import { planMerge } from "./merge-alias-stations.mjs";
 
 /** 병합 대상. keepId=대표(노선 많은/번호 호선), dropId=흡수, expectedSub=병합 후 부역명. */
@@ -29,14 +34,25 @@ export const MERGES = [
 
 /** 순수: 병합 후 부역명 = 대표 우선, 없으면 흡수분. */
 export function reconcileNameSub(keepSub, dropSub) {
-  return keepSub && keepSub.length > 0 ? keepSub : dropSub ?? "";
+  return keepSub || dropSub || "";
 }
 
 function applyMerge(db, spec) {
   const keep = db.prepare("SELECT id, name_sub FROM stations WHERE id=?").get(spec.keepId);
   const drop = db.prepare("SELECT id, name_sub FROM stations WHERE id=?").get(spec.dropId);
   if (!keep) throw new Error(`${spec.name}: 대표 역 없음 ${spec.keepId}`);
-  if (!drop) return { name: spec.name, skipped: "이미 병합됨" };
+  if (!drop) {
+    // 이미 병합됨: 대표가 기대 부역명을 실제로 보유하는지로 id 유효성을 확인하고
+    // (오타/드리프트한 dropId를 완료된 병합과 구분), 흡수 역의 잔여 라우팅 노드가
+    // 남아 있으면 대표로 재지정한다(network_edges 정합, idempotent 복구).
+    if (spec.expectedSub && keep.name_sub !== spec.expectedSub) {
+      throw new Error(
+        `${spec.name}: 이미 병합됐다고 보기엔 대표 부역명이 기대와 다름 ("${keep.name_sub}" ≠ "${spec.expectedSub}") — id 확인 필요`,
+      );
+    }
+    rehomeAllStationNodes(db, spec.dropId, spec.keepId);
+    return { name: spec.name, skipped: "이미 병합됨(엣지 정합 확인)" };
+  }
   const dropLines = db
     .prepare("SELECT * FROM station_lines WHERE station_id=? ORDER BY line_id")
     .all(spec.dropId);
@@ -44,8 +60,13 @@ function applyMerge(db, spec) {
   for (const r of plan.reassignments) {
     reparentLine(db, { ...r, label: spec.name });
   }
-  // 부역명 보존
+  // 부역명 보존 + 기대값 검증(하드코딩 불변식 강제)
   const mergedSub = reconcileNameSub(keep.name_sub, drop.name_sub);
+  if (spec.expectedSub && mergedSub !== spec.expectedSub) {
+    throw new Error(
+      `${spec.name}: 병합 부역명이 기대와 다름 ("${mergedSub}" ≠ "${spec.expectedSub}") — 소스 확인 필요`,
+    );
+  }
   db.prepare("UPDATE stations SET name_sub=? WHERE id=?").run(mergedSub, spec.keepId);
   db.prepare("DELETE FROM stations WHERE id=?").run(plan.deleteStationId);
   const memberCount = db

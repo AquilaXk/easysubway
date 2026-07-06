@@ -14,7 +14,12 @@
 //
 // 사용: node tools/route-map/split-mismerged-stations.mjs [--pack …] [--check]
 import { createHash } from "node:crypto";
-import { mutatePack, parsePackArgs, reparentLine } from "./station-surgery.mjs";
+import {
+  mutatePack,
+  parsePackArgs,
+  reparentLine,
+  rehomeLineNode,
+} from "./station-surgery.mjs";
 
 const REGION = "수도권";
 const GYEONGUI = "line-6e39be0cb6e2"; // 수도권 경의중앙 — 분리 시 떼어낼 쪽
@@ -67,6 +72,15 @@ function applySplit(db, spec) {
     .prepare("SELECT * FROM stations WHERE id=?")
     .get(spec.stationId);
   if (!station) throw new Error(`${spec.name}: 역 없음 ${spec.stationId}`);
+  const { newStation, reassignment } = planSplit(station, spec.moveLineId);
+  // 멤버십 검사보다 먼저: 이미 분리됐으면(신규 id 존재) 멤버십은 이미 원 id에서
+  // 빠졌으므로 아래 검사가 오히려 throw한다. 이 경우 이동 노선의 잔여 라우팅 노드가
+  // 원 id를 계속 가리키면 신규 id로 재지정하고 종료한다(network_edges 정합).
+  const exists = db.prepare("SELECT 1 FROM stations WHERE id=?").get(newStation.id);
+  if (exists) {
+    rehomeLineNode(db, spec.stationId, newStation.id, spec.moveLineId);
+    return { name: spec.name, skipped: "이미 분리됨(엣지 정합 확인)", newId: newStation.id };
+  }
   const members = db
     .prepare(
       "SELECT line_id FROM station_lines WHERE station_id=? ORDER BY line_id",
@@ -80,11 +94,6 @@ function applySplit(db, spec) {
   }
   if (members.length < 2) {
     throw new Error(`${spec.name}: 분리하려면 노선 2개 이상 필요`);
-  }
-  const { newStation, reassignment } = planSplit(station, spec.moveLineId);
-  const exists = db.prepare("SELECT 1 FROM stations WHERE id=?").get(newStation.id);
-  if (exists) {
-    return { name: spec.name, skipped: "이미 분리됨", newId: newStation.id };
   }
   // 신규 역 행 삽입(원 메타 보존) 후, 이동 노선의 위상·좌표를 신규 id로 재지정.
   const cols = Object.keys(newStation);
