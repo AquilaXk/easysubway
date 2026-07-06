@@ -209,7 +209,7 @@ function quote(value) {
     // 로더는 한 줄=한 statement로 파싱하므로 값에 개행이 있으면 statement가 쪼개진다(불변식 강제).
     throw new Error(`value must not contain a newline (single-line statement invariant): ${JSON.stringify(text)}`);
   }
-  return `'${text.split("'").join("''")}'`;
+  return `'${text.replaceAll("'", "''")}'`;
 }
 
 function bool(value) {
