@@ -221,10 +221,11 @@ class PushNotificationAdminPageController {
 		return "good";
 	}
 
-	// open-redirect 방지: 푸시 화면 경로만 허용한다.
+	// open-redirect 방지: 푸시 화면 경로(/page·/page/history)만 허용한다. 넓은 접두사(.../push)는
+	// /pushEVIL 같은 우회를 허용하므로 /page 전체 접두사로 좁힌다.
 	private static String safePushReturnTo(String returnTo) {
 		if (returnTo != null
-			&& returnTo.startsWith(PUSH_PAGE_PATH.substring(0, PUSH_PAGE_PATH.lastIndexOf('/')))
+			&& returnTo.startsWith(PUSH_PAGE_PATH)
 			&& !returnTo.contains("://")
 			&& !returnTo.contains("\n")
 			&& !returnTo.contains("\r")) {
