@@ -1,18 +1,19 @@
 #!/usr/bin/env node
-// Bring the main branch ruleset's required_status_checks in line with the CI
-// jobs that must gate merges (issue #1685). The live PUT is an irreversible
-// governance change, so this tool defaults to a dry run and only mutates when
-// invoked with --apply; it always writes a backup first for a rollback path.
+// Compute the main branch ruleset payload whose required_status_checks are in
+// line with the CI jobs that must gate merges (issue #1685). This is a pure
+// transform — it does NOT call the GitHub API itself; the owner runs the gh
+// get/put around it, keeping the irreversible governance change explicit and
+// out of any spawned process.
 //
 // Usage (owner-run):
-//   node tools/ci/apply-main-ruleset-required-checks.mjs --backup ruleset-backup.json
-//     → dry run: prints which contexts would be added.
-//   node tools/ci/apply-main-ruleset-required-checks.mjs --backup ruleset-backup.json --apply
-//     → writes backup, then PUTs the updated ruleset.
+//   gh api repos/AquilaXk/easysubway/rulesets/17584352 > current.json
+//   node tools/ci/apply-main-ruleset-required-checks.mjs \
+//     --input current.json --output updated.json --backup ruleset-backup.json
+//   # review updated.json, then apply:
+//   gh api -X PUT repos/AquilaXk/easysubway/rulesets/17584352 --input updated.json
 //
 // The context list is the single source of truth shared (via the contract test)
 // with ci.yml job names and the automerge-queue coordinator fallback.
-import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { argValue } from "../release/summary-validation-utils.mjs";
 
@@ -52,27 +53,22 @@ export function ensureRequiredChecks(ruleset, contexts) {
   return { ruleset: next, added };
 }
 
-// The GitHub PUT rejects read-only envelope fields returned by GET.
-function toWritableRuleset(ruleset) {
+// The GitHub PUT rejects the read-only envelope fields returned by GET.
+export function toWritableRuleset(ruleset) {
   const { name, target, enforcement, bypass_actors, conditions, rules } = ruleset;
   return { name, target, enforcement, bypass_actors, conditions, rules };
 }
 
-function ghApi(args, stdin) {
-  return execFileSync("gh", ["api", ...args], { encoding: "utf8", input: stdin });
-}
-
 function main() {
   const args = process.argv.slice(2);
-  const apply = args.includes("--apply");
-  const backupPath = argValue(args, "--backup");
-  const repo = argValue(args, "--repo", process.env.GITHUB_REPOSITORY || "AquilaXk/easysubway");
   const inputPath = argValue(args, "--input");
+  if (!inputPath) {
+    throw new Error("--input <ruleset-json> is required (gh api repos/.../rulesets/17584352 > current.json)");
+  }
+  const outputPath = argValue(args, "--output");
+  const backupPath = argValue(args, "--backup");
 
-  const current = inputPath
-    ? JSON.parse(readFileSync(inputPath, "utf8"))
-    : JSON.parse(ghApi([`repos/${repo}/rulesets/${MAIN_RULESET_ID}`]));
-
+  const current = JSON.parse(readFileSync(inputPath, "utf8"));
   if (backupPath) {
     writeFileSync(backupPath, `${JSON.stringify(current, null, 2)}\n`);
     console.error(`backup written: ${backupPath}`);
@@ -81,21 +77,17 @@ function main() {
   const { ruleset, added } = ensureRequiredChecks(current, REQUIRED_STATUS_CHECK_CONTEXTS);
   if (added.length === 0) {
     console.error("required_status_checks already up to date; nothing to add");
-    return;
-  }
-  console.error(`contexts to add: ${added.join(", ")}`);
-
-  if (!apply) {
-    console.error("dry run (pass --apply to PUT the updated ruleset)");
-    return;
-  }
-  if (!backupPath) {
-    throw new Error("--backup is required with --apply (rollback path)");
+  } else {
+    console.error(`contexts to add: ${added.join(", ")}`);
   }
 
-  const body = JSON.stringify(toWritableRuleset(ruleset));
-  ghApi(["-X", "PUT", `repos/${repo}/rulesets/${MAIN_RULESET_ID}`, "--input", "-"], body);
-  console.error("ruleset updated");
+  const payload = `${JSON.stringify(toWritableRuleset(ruleset), null, 2)}\n`;
+  if (outputPath) {
+    writeFileSync(outputPath, payload);
+    console.error(`updated ruleset written: ${outputPath} (review, then gh api -X PUT --input ${outputPath})`);
+  } else {
+    process.stdout.write(payload);
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
