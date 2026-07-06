@@ -17,7 +17,6 @@ import {
   parseDotenv,
   readServiceAccount,
   requestJson,
-  requireEnv,
   requireJsonString,
   uploadMedia,
 } from "../ci/lib/google-play-auth.mjs";

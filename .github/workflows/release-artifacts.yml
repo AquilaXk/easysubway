@@ -454,6 +454,11 @@ jobs:
     needs: android-production-rc-release
     permissions:
       contents: read
+    # Google Play allows only one active edit per app; serialize uploads and
+    # never cancel an in-flight one so a running commit is not interrupted.
+    concurrency:
+      group: play-internal-upload
+      cancel-in-progress: false
     # Shares the android-production-rc environment approval gate. Opt-in only:
     # play_upload=internal keeps the default build-only flow unchanged (#1689).
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.android_rc_signing_mode == 'production-upload-key' && inputs.play_upload == 'internal' && needs.android-production-rc-release.result == 'success' }}

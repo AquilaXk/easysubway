@@ -6,6 +6,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { runUploadPlayInternal } from "./upload-play-internal.mjs";
+import { assertRequestUrl } from "../ci/lib/google-play-auth.mjs";
 
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 
@@ -147,4 +148,16 @@ test("fails when the uploaded bundle versionCode does not match the expected one
       /does not match expected 10005/,
     );
   });
+});
+
+test("assertRequestUrl only accepts absolute HTTPS URLs (SSRF guard)", () => {
+  assert.equal(
+    assertRequestUrl("https://androidpublisher.googleapis.com/androidpublisher/v3/x"),
+    "https://androidpublisher.googleapis.com/androidpublisher/v3/x",
+  );
+  assert.throws(() => assertRequestUrl("http://androidpublisher.googleapis.com"), /must be https/);
+  assert.throws(() => assertRequestUrl("http://169.254.169.254/latest/meta-data"), /must be https/);
+  assert.throws(() => assertRequestUrl("ftp://example.com/x"), /must be https/);
+  assert.throws(() => assertRequestUrl("/relative/path"), /invalid google play request url/);
+  assert.throws(() => assertRequestUrl("not a url"), /invalid google play request url/);
 });
