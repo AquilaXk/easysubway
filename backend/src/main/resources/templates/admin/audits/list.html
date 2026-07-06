@@ -68,6 +68,16 @@
 				전체 <strong th:text="${total}">0</strong>건
 			</p>
 
+			<!--
+			  개인정보 로그 점검 배너(#1747): 현재 필터에서 조회 사유가 비어 있는 건수를 노출하고,
+			  그 조건만 거르는 빠른 필터 링크를 제공한다(htmx 부분 갱신 + no-JS href 공존).
+			-->
+			<p class="compliance-banner tone-warning" th:if="${privacyMode and reasonMissingCount > 0}">
+				조회 사유가 비어 있는 항목 <strong th:text="${reasonMissingCount}">0</strong>건 — 점검이 필요합니다.
+				<a th:href="@{${reasonMissingHref}}" th:attr="hx-get=@{${reasonMissingHref}}"
+				   class="filter-quick">사유 없는 조회만 보기</a>
+			</p>
+
 			<p class="admin-export">
 				<a class="admin-export-link"
 				   th:href="@{${exportPath}(eventType=${selectedEventType},actor=${selectedActor},outcome=${selectedOutcome},keyword=${keyword},from=${from},to=${to},reasonMissing=${reasonMissing},format='csv')}"

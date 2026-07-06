@@ -180,6 +180,37 @@ class AdminAuditPageController {
 		model.addAttribute("eventTypeOptions", eventTypeOptions(pageQuery.eventType()));
 		model.addAttribute("outcomeOptions", outcomeOptions(pageQuery.outcome()));
 		model.addAttribute("actorOptions", actorOptions(context.forcedEventType(), pageQuery.actor()));
+
+		// 개인정보 로그 컴플라이언스 신호(#1747): 같은 필터에서 "조회 사유가 비어 있는" 건수를 세어
+		// 점검 배너로 노출하고, 그 조건만 거르는 빠른 필터 링크를 제공한다.
+		if (context.privacyMode()) {
+			long reasonMissingCount = pageQuery.reasonMissing()
+				? total
+				: auditEventRepository.count(withReasonMissing(pageQuery));
+			model.addAttribute("reasonMissingCount", reasonMissingCount);
+			model.addAttribute("reasonMissingHref",
+				context.path() + reasonMissingLinkQuery(pageQuery));
+		}
+	}
+
+	private static AdminAuditQuery withReasonMissing(AdminAuditQuery query) {
+		return new AdminAuditQuery(
+			query.eventType(), query.actor(), query.outcome(), query.targetKeyword(),
+			query.occurredFrom(), query.occurredTo(), true, 0, query.size());
+	}
+
+	// 현재 필터를 유지하며 reasonMissing=true만 추가한 목록 링크.
+	private static String reasonMissingLinkQuery(AdminAuditQuery query) {
+		Map<String, Object> params = new LinkedHashMap<>(filterParams(query));
+		params.put("reasonMissing", "true");
+		org.springframework.web.util.UriComponentsBuilder builder =
+			org.springframework.web.util.UriComponentsBuilder.newInstance();
+		params.forEach((name, value) -> {
+			if (value != null && !value.toString().isBlank()) {
+				builder.queryParam(name, value);
+			}
+		});
+		return builder.build().encode().toUriString();
 	}
 
 	// 페이지네이션·필터 링크가 현재 필터를 유지하도록 활성 파라미터만 전달한다(널·빈·거짓 값 생략).
@@ -271,7 +302,7 @@ class AdminAuditPageController {
 				event.action(),
 				event.outcome().name(),
 				AuditLabels.outcome(event.outcome()),
-				event.outcome() == AdminAuditOutcome.FAILURE ? "failure" : "success",
+				event.outcome() == AdminAuditOutcome.FAILURE ? "failure" : "ok",
 				orDash(event.reason()),
 				event.occurredAt().toString()
 			);

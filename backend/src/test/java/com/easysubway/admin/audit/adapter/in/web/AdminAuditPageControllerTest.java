@@ -129,6 +129,26 @@ class AdminAuditPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("개인정보 로그는 사유 없는 조회 건수를 점검 배너로 노출한다")
+	void privacyPageShowsReasonMissingComplianceBanner() throws Exception {
+		auditEventRepository.save(event(AdminAuditEventType.PRIVACY_READ, "alice", "WITH_REASON",
+			AdminAuditOutcome.SUCCESS, "업무 맥락: 민원 처리"));
+		auditEventRepository.save(event(AdminAuditEventType.PRIVACY_READ, "bob", "NO_REASON",
+			AdminAuditOutcome.SUCCESS, null));
+
+		String html = mockMvc.perform(get("/admin/audits/privacy/page")
+				.with(user("privacy").authorities(new SimpleGrantedAuthority("admin.privacy-log.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("compliance-banner")
+			.contains("사유 없는 조회만 보기");
+	}
+
+	@Test
 	@DisplayName("상세 드로어는 htmx 요청에 detailBody fragment와 admin-drawer-open 트리거를 돌려주고 전후 타임라인을 담는다")
 	void auditDetailDrawerReturnsFragmentWithTimeline() throws Exception {
 		LocalDateTime base = LocalDateTime.of(2026, 6, 27, 9, 0);
