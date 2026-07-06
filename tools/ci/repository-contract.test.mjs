@@ -4061,12 +4061,42 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
   assert.match(preflight, /EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL/);
   assert.doesNotMatch(preflight, /console\.log\(.*env\[/, "preflight must not print secret values");
 
-  assert.match(playApiAccess, /https:\/\/www\.googleapis\.com\/auth\/androidpublisher/);
+  // The OAuth scope and JWT auth now live in the shared lib that both the access
+  // checker and the internal-track uploader import (issue #1689).
+  const playAuthLib = read("tools/ci/lib/google-play-auth.mjs");
+  assert.match(playAuthLib, /https:\/\/www\.googleapis\.com\/auth\/androidpublisher/);
+  assert.match(playApiAccess, /from "\.\/lib\/google-play-auth\.mjs"/);
   assert.match(playApiAccess, /\/applications\/\$\{encodePath\(packageName\)\}\/edits/);
   assert.match(playApiAccess, /\/tracks/);
   assert.match(playApiAccess, /:validate/);
   assert.match(playApiAccess, /method: "DELETE"/);
   assert.doesNotMatch(playApiAccess, /client_email=.*\$\{/, "API access report must not print service account email");
+});
+
+test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 갖춘 자체 도구로 수행한다", () => {
+  const tool = read("tools/release/upload-play-internal.mjs");
+  const workflow = read(".github/workflows/release-artifacts.yml");
+
+  // Self-contained tool reusing the shared auth lib (no third-party action).
+  assert.match(tool, /from "\.\.\/ci\/lib\/google-play-auth\.mjs"/);
+  // versionCode monotonic policy enforced before any binary upload.
+  assert.match(tool, /is not greater than current Play max/);
+  const gateIndex = tool.indexOf("is not greater than current Play max");
+  const uploadIndex = tool.indexOf("/bundles?uploadType=media");
+  assert.ok(gateIndex !== -1 && uploadIndex !== -1 && gateIndex < uploadIndex, "monotonic gate must precede bundle upload");
+  // Bundle, deobfuscation mapping, track completion, commit.
+  assert.match(tool, /\/bundles\?uploadType=media/);
+  assert.match(tool, /\/deobfuscationFiles\/\$\{encodePath\(String\(versionCode\)\)\}\/proguard/);
+  assert.match(tool, /status: "completed", versionCodes: \[String\(versionCode\)\]/);
+  assert.match(tool, /:commit\?changesNotSentForReview=/);
+
+  // Opt-in workflow job that shares the RC environment approval and default off.
+  assert.match(workflow, /play_upload:\n\s*description:[\s\S]*options:\n\s*- none\n\s*- internal/);
+  assert.match(workflow, /play-internal-upload:/);
+  assert.match(workflow, /inputs\.play_upload == 'internal'/);
+  assert.match(workflow, /environment:\n\s*name: android-production-rc/);
+  assert.match(workflow, /node tools\/release\/upload-play-internal\.mjs/);
+  assert.match(workflow, /name: easysubway-play-internal-upload-\$\{\{ github\.sha \}\}/);
 });
 
 test("스토어 배포 증거 preflight는 iOS 누락을 Android 출시 blocker로 보지 않는다", async () => {
