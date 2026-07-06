@@ -1922,6 +1922,23 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     playProductionAccessGate.latestApiAccessCheck.localOnlyEvidence,
     /\.codex\/evidence\/release\/play-production-access\/1016-api-recheck-20260629\//,
   );
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.qaEvidenceDateKst, "2026-07-05");
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account.type, "personal");
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account["createdAfter2023-11-13"], true);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account.identityVerification, "COMPLETE");
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account.paymentsProfileRegistered, true);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.consoleUsers.leastPrivilege, true);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.consoleUsers.twoFactorEnabled, true);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.consoleUsers.serviceAccountUser.adminPrivilege, false);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.app.created, true);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.productionAccess.available, false);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.productionAccess.closedTestRequirementApplies, true);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.productionAccess.currentOptedInTesters, 0);
+  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.secretValuesPrinted, false);
+  assert.match(
+    playProductionAccessGate.consoleAccountAndProductionAccess.localOnlyEvidence,
+    /\.codex\/evidence\/release\/play-production-access\/1016-console-account-access-20260705\//,
+  );
   assert.equal(playProductionAccessGate.officialPolicy.closedTestMinimumOptedInTesters, 12);
   assert.equal(playProductionAccessGate.officialPolicy.closedTestContinuousOptInDays, 14);
   assert.match(playProductionAccessGate.officialPolicy.source, /^https:\/\/support\.google\.com\/googleplay\/android-developer\/answer\/14151465/);
@@ -3642,6 +3659,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v2/routes/{routeSearchId}/refresh",
       "/api/v1/realtime/arrivals",
       "/api/v1/realtime/train-positions",
+      "/api/notices/active",
     ],
   );
   assert.deepEqual(
@@ -3660,6 +3678,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/actuator/health/liveness",
       "/actuator/health/readiness",
       "/api/v1/realtime/**",
+      "/api/notices/active",
     ],
   );
   const publicApiMatcherScope = securityConfig.match(
