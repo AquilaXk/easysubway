@@ -12,6 +12,7 @@ import com.easysubway.notification.application.port.in.PushNotificationHistoryQu
 import com.easysubway.notification.application.port.in.PushNotificationHistoryUseCase;
 import com.easysubway.notification.domain.PushNotification;
 import com.easysubway.notification.domain.PushNotificationDashboardSummary;
+import com.easysubway.notification.domain.PushNotificationFailureReasonCount;
 import com.easysubway.notification.domain.PushNotificationStatus;
 import com.easysubway.notification.domain.PushNotificationType;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -30,6 +31,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Controller
 class PushNotificationAdminPageController {
@@ -66,6 +68,7 @@ class PushNotificationAdminPageController {
 		@RequestParam(name = "status", required = false) PushNotificationStatus status,
 		@RequestParam(name = "type", required = false) PushNotificationType type,
 		@RequestParam(name = "keyword", required = false) String keyword,
+		@RequestParam(name = "reason", required = false) String reason,
 		@RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 		@RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 		@RequestParam(name = "page", required = false) Integer page,
@@ -76,7 +79,7 @@ class PushNotificationAdminPageController {
 		PushNotificationDashboardSummary summary = pushNotificationDashboardUseCase.summarizePushNotifications();
 		model.addAttribute("summary", PushNotificationDashboardView.from(summary));
 		populateTrends(days, model);
-		populateHistory(historyQuery(status, type, keyword, from, to, page), authentication, request, model);
+		populateHistory(historyQuery(status, type, keyword, reason, from, to, page), authentication, request, model);
 		return "admin/notifications/push";
 	}
 
@@ -86,6 +89,7 @@ class PushNotificationAdminPageController {
 		@RequestParam(name = "status", required = false) PushNotificationStatus status,
 		@RequestParam(name = "type", required = false) PushNotificationType type,
 		@RequestParam(name = "keyword", required = false) String keyword,
+		@RequestParam(name = "reason", required = false) String reason,
 		@RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 		@RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 		@RequestParam(name = "page", required = false) Integer page,
@@ -93,7 +97,8 @@ class PushNotificationAdminPageController {
 		HttpServletRequest request,
 		Model model
 	) {
-		return pushNotificationDashboardPage(7, status, type, keyword, from, to, page, authentication, request, model);
+		return pushNotificationDashboardPage(
+			7, status, type, keyword, reason, from, to, page, authentication, request, model);
 	}
 
 	// 발송 이력 부분 갱신(#1746): 필터·페이지 링크가 이 fragment를 htmx로 다시 불러 표·페이지네이션만 갈아끼운다.
@@ -104,6 +109,7 @@ class PushNotificationAdminPageController {
 		@RequestParam(name = "status", required = false) PushNotificationStatus status,
 		@RequestParam(name = "type", required = false) PushNotificationType type,
 		@RequestParam(name = "keyword", required = false) String keyword,
+		@RequestParam(name = "reason", required = false) String reason,
 		@RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 		@RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 		@RequestParam(name = "page", required = false) Integer page,
@@ -113,9 +119,10 @@ class PushNotificationAdminPageController {
 		Model model
 	) {
 		if (historyRestore) {
-			return pushNotificationHistoryPage(status, type, keyword, from, to, page, authentication, request, model);
+			return pushNotificationHistoryPage(
+				status, type, keyword, reason, from, to, page, authentication, request, model);
 		}
-		populateHistory(historyQuery(status, type, keyword, from, to, page), authentication, request, model);
+		populateHistory(historyQuery(status, type, keyword, reason, from, to, page), authentication, request, model);
 		return "admin/notifications/push :: historyResults";
 	}
 
@@ -123,11 +130,12 @@ class PushNotificationAdminPageController {
 		PushNotificationStatus status,
 		PushNotificationType type,
 		String keyword,
+		String reason,
 		LocalDate from,
 		LocalDate to,
 		Integer page
 	) {
-		return PushNotificationHistoryQuery.of(status, type, keyword, from, to, page, null);
+		return PushNotificationHistoryQuery.of(status, type, keyword, reason, from, to, page, null);
 	}
 
 	// 발송 이력 표준 테이블: 필터·페이지네이션이 적용된 목록을 채운다. 수신자 식별자는 마스킹되며
@@ -158,6 +166,26 @@ class PushNotificationAdminPageController {
 		model.addAttribute("historyStatusOptions", statusOptions(pageQuery.status()));
 		model.addAttribute("historyTypeOptions", typeOptions(pageQuery.type()));
 
+		// 실패 사유별 분해(막대) + 드릴다운. 목록과 같은 필터 컨텍스트를 공유해 분해 수치 = 사유 필터 목록 건수 정합.
+		List<PushNotificationFailureReasonCount> breakdown =
+			pushNotificationHistoryUseCase.summarizeFailureReasons(pageQuery);
+		long maxReasonCount = breakdown.stream()
+			.mapToLong(PushNotificationFailureReasonCount::count)
+			.max()
+			.orElse(0L);
+		List<FailureBreakdownBar> bars = breakdown.stream()
+			.map(item -> new FailureBreakdownBar(
+				item.reason(),
+				item.count(),
+				maxReasonCount == 0 ? 0 : Math.round(item.count() * 100.0 / maxReasonCount),
+				historyReasonHref(pageQuery, item.reason()),
+				item.reason().equals(pageQuery.failureReason())))
+			.toList();
+		model.addAttribute("failureBreakdown", bars);
+		model.addAttribute("hasReasonFilter", pageQuery.hasFailureReason());
+		model.addAttribute("selectedReason", pageQuery.failureReason());
+		model.addAttribute("clearReasonHref", historyReasonHref(pageQuery, null));
+
 		// 마스킹된 수신자 식별자를 노출하는 조회라 열람 자체를 감사에 남긴다(원문·free-text 없음).
 		auditWriter.privacyRead(
 			authentication,
@@ -175,9 +203,26 @@ class PushNotificationAdminPageController {
 		params.put("status", query.status());
 		params.put("type", query.type());
 		params.put("keyword", query.keyword());
+		params.put("reason", query.failureReason());
 		params.put("from", query.createdFrom());
 		params.put("to", query.createdTo());
 		return params;
+	}
+
+	// 사유 드릴다운 링크: 현재 필터(상태·유형·검색·기간)를 유지하고 reason만 설정/해제한다(페이지는 처음으로).
+	private static String historyReasonHref(PushNotificationHistoryQuery query, String reason) {
+		Map<String, Object> params = new LinkedHashMap<>(historyParams(query));
+		params.put("reason", reason);
+		UriComponentsBuilder builder = UriComponentsBuilder.fromPath(HISTORY_PATH);
+		params.forEach((name, value) -> {
+			if (value != null && !value.toString().isBlank()) {
+				builder.queryParam(name, value);
+			}
+		});
+		return builder.build().encode().toUriString();
+	}
+
+	record FailureBreakdownBar(String reason, long count, long percent, String href, boolean active) {
 	}
 
 	private static List<FilterOption> statusOptions(PushNotificationStatus selected) {

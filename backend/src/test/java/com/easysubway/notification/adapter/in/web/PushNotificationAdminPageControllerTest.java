@@ -153,6 +153,48 @@ class PushNotificationAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("발송 이력은 실패 사유별 분해 막대와 사유 드릴다운 링크를 렌더링한다")
+	void pushHistoryRendersFailureBreakdownWithDrilldown() throws Exception {
+		registerDevice();
+		dispatchNotification("REPORT_STATUS", "신고 처리 알림");
+		deliverPendingNotifications();
+
+		String html = mockMvc.perform(get("/admin/notifications/push/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("실패 사유별 분해")
+			.contains("외부 푸시 발송 어댑터가 설정되지 않았습니다")
+			.contains("reason=");
+	}
+
+	@Test
+	@DisplayName("사유 드릴다운은 해당 사유의 실패만 목록에 남기고 분해 건수와 정합한다")
+	void pushHistoryDrilldownFiltersByReason() throws Exception {
+		registerDevice();
+		dispatchNotification("REPORT_STATUS", "신고 처리 알림");
+		deliverPendingNotifications();
+
+		String fragment = mockMvc.perform(get("/admin/notifications/push/history")
+				.param("reason", "외부 푸시 발송 어댑터가 설정되지 않았습니다.")
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(fragment)
+			.contains("신고 처리 알림")
+			.contains("전체 <strong>1</strong>")
+			.contains("해제");
+	}
+
+	@Test
 	@DisplayName("발송 이력 fragment는 상태 필터를 적용하고 셸 없이 목록만 반환한다")
 	void pushHistoryFragmentFiltersByStatus() throws Exception {
 		registerDevice();

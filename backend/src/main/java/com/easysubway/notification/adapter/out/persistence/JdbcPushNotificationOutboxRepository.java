@@ -9,6 +9,7 @@ import com.easysubway.notification.application.port.out.SummarizePushNotificatio
 import com.easysubway.notification.domain.DevicePlatform;
 import com.easysubway.notification.domain.PushNotification;
 import com.easysubway.notification.domain.PushNotificationDashboardSummary;
+import com.easysubway.notification.domain.PushNotificationFailureReasonCount;
 import com.easysubway.notification.domain.PushNotificationStatus;
 import com.easysubway.notification.domain.PushNotificationType;
 import com.easysubway.user.application.port.out.DeleteUserPushNotificationPort;
@@ -261,6 +262,10 @@ public class JdbcPushNotificationOutboxRepository implements
 			arguments.add(pattern);
 			arguments.add(pattern);
 		}
+		if (query.hasFailureReason()) {
+			conditions.add("failure_reason = ?");
+			arguments.add(query.failureReason());
+		}
 		if (query.createdFrom() != null) {
 			conditions.add("created_at >= ?");
 			arguments.add(query.createdFrom().atStartOfDay());
@@ -271,6 +276,50 @@ public class JdbcPushNotificationOutboxRepository implements
 		}
 		if (conditions.isEmpty()) {
 			return "";
+		}
+		return " WHERE " + String.join(" AND ", conditions);
+	}
+
+	@Override
+	public List<PushNotificationFailureReasonCount> countFailureReasons(PushNotificationHistoryQuery query) {
+		// 분해는 항상 실패 전체를 사유별로 본다: status=FAILED 강제, 사유 드릴다운은 제외하고 기간·유형·검색만 반영.
+		List<Object> arguments = new ArrayList<>();
+		String whereClause = buildFailureBreakdownWhere(query, arguments);
+		return jdbcTemplate.query(
+			"SELECT failure_reason, COUNT(*) AS count FROM push_notification_outbox"
+				+ whereClause
+				+ " GROUP BY failure_reason ORDER BY count DESC, failure_reason ASC",
+			(resultSet, rowNumber) -> new PushNotificationFailureReasonCount(
+				resultSet.getString("failure_reason"),
+				resultSet.getLong("count")
+			),
+			arguments.toArray()
+		);
+	}
+
+	// 실패 분해 WHERE: status=FAILED 고정 + 유형·검색·기간(사유 드릴다운·상태 필터는 무시).
+	private String buildFailureBreakdownWhere(PushNotificationHistoryQuery query, List<Object> arguments) {
+		List<String> conditions = new ArrayList<>();
+		conditions.add("status = ?");
+		arguments.add(PushNotificationStatus.FAILED.name());
+		conditions.add("failure_reason IS NOT NULL");
+		if (query.hasType()) {
+			conditions.add("notification_type = ?");
+			arguments.add(query.type().name());
+		}
+		if (query.hasKeyword()) {
+			conditions.add("(LOWER(title) LIKE ? ESCAPE '\\' OR LOWER(body) LIKE ? ESCAPE '\\')");
+			String pattern = "%" + escapeLike(query.keyword().toLowerCase(java.util.Locale.ROOT)) + "%";
+			arguments.add(pattern);
+			arguments.add(pattern);
+		}
+		if (query.createdFrom() != null) {
+			conditions.add("created_at >= ?");
+			arguments.add(query.createdFrom().atStartOfDay());
+		}
+		if (query.createdTo() != null) {
+			conditions.add("created_at < ?");
+			arguments.add(query.createdTo().plusDays(1).atStartOfDay());
 		}
 		return " WHERE " + String.join(" AND ", conditions);
 	}

@@ -5,6 +5,7 @@ import com.easysubway.notification.application.port.in.PushNotificationHistoryQu
 import com.easysubway.notification.application.port.in.PushNotificationHistoryUseCase;
 import com.easysubway.notification.application.port.out.SearchPushNotificationOutboxPort;
 import com.easysubway.notification.domain.PushNotification;
+import com.easysubway.notification.domain.PushNotificationFailureReasonCount;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -26,5 +27,10 @@ public class PushNotificationHistoryService implements PushNotificationHistoryUs
 	@Override
 	public long countPushNotifications(PushNotificationHistoryQuery query) {
 		return searchPushNotificationOutboxPort.countPushNotifications(query);
+	}
+
+	@Override
+	public List<PushNotificationFailureReasonCount> summarizeFailureReasons(PushNotificationHistoryQuery query) {
+		return searchPushNotificationOutboxPort.countFailureReasons(query);
 	}
 }

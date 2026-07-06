@@ -120,13 +120,40 @@ class InMemoryPushNotificationOutboxRepositoryTest {
 
 		assertThat(repository.searchPushNotifications(
 			new com.easysubway.notification.application.port.in.PushNotificationHistoryQuery(
-				null, null, null, null, null, 0, 2)))
+				null, null, null, null, null, null, 0, 2)))
 			.extracting(PushNotification::notificationId).containsExactly("push-4", "push-3");
 		assertThat(repository.searchPushNotifications(
 			new com.easysubway.notification.application.port.in.PushNotificationHistoryQuery(
-				null, null, null, null, null, 2, 2)))
+				null, null, null, null, null, null, 2, 2)))
 			.extracting(PushNotification::notificationId).containsExactly("push-0");
 		assertThat(repository.countPushNotifications(query(null, null, null))).isEqualTo(5);
+	}
+
+	@Test
+	@DisplayName("실패 사유별 분해는 status=FAILED를 사유별로 GROUP BY 하고 목록 건수와 정합한다")
+	void countFailureReasonsGroupsFailedByReason() {
+		repository.savePushNotification(new PushNotification(
+			"push-1", "user-1", DevicePlatform.ANDROID, "device-token-1", PushNotificationType.REPORT_STATUS,
+			"제목", "본문", PushNotificationStatus.FAILED, "provider timeout", LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.savePushNotification(new PushNotification(
+			"push-2", "user-2", DevicePlatform.ANDROID, "device-token-2", PushNotificationType.REPORT_STATUS,
+			"제목", "본문", PushNotificationStatus.FAILED, "provider timeout", LocalDateTime.of(2026, 6, 17, 10, 0)));
+		repository.savePushNotification(new PushNotification(
+			"push-3", "user-3", DevicePlatform.ANDROID, "device-token-3", PushNotificationType.DATA_QUALITY,
+			"제목", "본문", PushNotificationStatus.FAILED, "invalid token", LocalDateTime.of(2026, 6, 17, 11, 0)));
+		repository.savePushNotification(historyNotification(
+			"push-4", "user-4", PushNotificationType.REPORT_STATUS, PushNotificationStatus.SENT,
+			"제목", LocalDateTime.of(2026, 6, 17, 12, 0)));
+
+		assertThat(repository.countFailureReasons(query(null, null, null)))
+			.extracting(
+				com.easysubway.notification.domain.PushNotificationFailureReasonCount::reason,
+				com.easysubway.notification.domain.PushNotificationFailureReasonCount::count)
+			.containsExactly(tuple("provider timeout", 2L), tuple("invalid token", 1L));
+
+		var drilldown = com.easysubway.notification.application.port.in.PushNotificationHistoryQuery.of(
+			null, null, null, "provider timeout", null, null, null, null);
+		assertThat(repository.countPushNotifications(drilldown)).isEqualTo(2);
 	}
 
 	private static com.easysubway.notification.application.port.in.PushNotificationHistoryQuery query(
@@ -135,7 +162,7 @@ class InMemoryPushNotificationOutboxRepositoryTest {
 		String keyword
 	) {
 		return com.easysubway.notification.application.port.in.PushNotificationHistoryQuery.of(
-			status, type, keyword, null, null, null, null);
+			status, type, keyword, null, null, null, null, null);
 	}
 
 	private PushNotification historyNotification(

@@ -167,7 +167,35 @@
 
 			<p class="table-summary" aria-live="polite">
 				전체 <strong th:text="${historyTotal}">0</strong>건
+				<span th:if="${hasReasonFilter}">
+					· 사유: <strong th:text="${selectedReason}">실패 사유</strong>
+					<a th:href="${clearReasonHref}" th:attr="hx-get=${clearReasonHref}" class="filter-clear">해제</a>
+				</span>
 			</p>
+
+			<!--
+			  실패 사유별 분해(#1746): 같은 필터 컨텍스트에서 status=FAILED 를 사유별로 GROUP BY 한 막대.
+			  막대는 CSP-safe한 서버 SVG(인라인 style 금지)로 그리며, 각 막대는 사유 드릴다운 링크다.
+			  분해 수치 = 해당 사유로 필터한 목록 건수(같은 질의 공유).
+			-->
+			<section class="failure-breakdown" th:if="${!failureBreakdown.isEmpty()}"
+			         aria-labelledby="push-failure-breakdown-heading">
+				<h3 id="push-failure-breakdown-heading">실패 사유별 분해</h3>
+				<ul class="breakdown-bars">
+					<li th:each="bar : ${failureBreakdown}">
+						<a th:href="${bar.href}"
+						   th:attr="hx-get=${bar.href},aria-current=${bar.active ? 'true' : null}"
+						   th:title="|${bar.reason} · ${bar.count}건|">
+							<span class="breakdown-reason" th:text="${bar.reason}">발송 어댑터 미설정</span>
+							<svg class="breakdown-bar" viewBox="0 0 100 12" preserveAspectRatio="none"
+							     role="img" th:attr="aria-label=|${bar.reason} ${bar.count}건|">
+								<rect x="0" y="0" height="12" th:attr="width=${bar.percent}"></rect>
+							</svg>
+							<span class="breakdown-count" th:text="${bar.count}">0</span>
+						</a>
+					</li>
+				</ul>
+			</section>
 
 			<table th:if="${!historyRows.isEmpty()}">
 				<caption class="sr-only">푸시 발송 이력</caption>

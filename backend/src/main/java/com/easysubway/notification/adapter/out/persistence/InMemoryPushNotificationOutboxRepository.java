@@ -8,6 +8,7 @@ import com.easysubway.notification.application.port.out.SearchPushNotificationOu
 import com.easysubway.notification.application.port.out.SummarizePushNotificationOutboxPort;
 import com.easysubway.notification.domain.PushNotification;
 import com.easysubway.notification.domain.PushNotificationDashboardSummary;
+import com.easysubway.notification.domain.PushNotificationFailureReasonCount;
 import com.easysubway.notification.domain.PushNotificationStatus;
 import com.easysubway.user.application.port.out.DeleteUserPushNotificationPort;
 import java.time.Clock;
@@ -179,6 +180,41 @@ public class InMemoryPushNotificationOutboxRepository implements
 		return matchingHistory(query).count();
 	}
 
+	@Override
+	public List<PushNotificationFailureReasonCount> countFailureReasons(PushNotificationHistoryQuery query) {
+		Map<String, Long> countsByReason = new java.util.LinkedHashMap<>();
+		notificationsByUserId.values().stream()
+			.flatMap(List::stream)
+			.filter(notification -> matchesFailureBreakdown(notification, query))
+			.forEach(notification ->
+				countsByReason.merge(notification.failureReason(), 1L, Long::sum));
+		return countsByReason.entrySet().stream()
+			.map(entry -> new PushNotificationFailureReasonCount(entry.getKey(), entry.getValue()))
+			.sorted(Comparator
+				.comparingLong(PushNotificationFailureReasonCount::count).reversed()
+				.thenComparing(PushNotificationFailureReasonCount::reason))
+			.toList();
+	}
+
+	// 실패 분해: status=FAILED 고정 + 유형·검색·기간(사유 드릴다운·상태 필터는 무시).
+	private boolean matchesFailureBreakdown(PushNotification notification, PushNotificationHistoryQuery query) {
+		if (notification.status() != PushNotificationStatus.FAILED || notification.failureReason() == null) {
+			return false;
+		}
+		if (query.hasType() && notification.type() != query.type()) {
+			return false;
+		}
+		if (query.hasKeyword() && !matchesKeyword(notification, query.keyword())) {
+			return false;
+		}
+		LocalDateTime createdAt = notification.createdAt();
+		if (query.createdFrom() != null && createdAt.isBefore(query.createdFrom().atStartOfDay())) {
+			return false;
+		}
+		return query.createdTo() == null
+			|| createdAt.isBefore(query.createdTo().plusDays(1).atStartOfDay());
+	}
+
 	private Stream<PushNotification> matchingHistory(PushNotificationHistoryQuery query) {
 		return notificationsByUserId.values().stream()
 			.flatMap(List::stream)
@@ -193,6 +229,9 @@ public class InMemoryPushNotificationOutboxRepository implements
 			return false;
 		}
 		if (query.hasKeyword() && !matchesKeyword(notification, query.keyword())) {
+			return false;
+		}
+		if (query.hasFailureReason() && !query.failureReason().equals(notification.failureReason())) {
 			return false;
 		}
 		LocalDateTime createdAt = notification.createdAt();

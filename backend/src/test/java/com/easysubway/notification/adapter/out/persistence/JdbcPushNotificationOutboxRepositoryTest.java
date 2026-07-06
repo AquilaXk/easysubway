@@ -274,10 +274,10 @@ class JdbcPushNotificationOutboxRepositoryTest {
 
 		var firstPage = repository.searchPushNotifications(
 			new com.easysubway.notification.application.port.in.PushNotificationHistoryQuery(
-				null, null, null, null, null, 0, 2));
+				null, null, null, null, null, null, 0, 2));
 		var secondPage = repository.searchPushNotifications(
 			new com.easysubway.notification.application.port.in.PushNotificationHistoryQuery(
-				null, null, null, null, null, 1, 2));
+				null, null, null, null, null, null, 1, 2));
 
 		assertThat(firstPage).extracting(PushNotification::notificationId).containsExactly("push-4", "push-3");
 		assertThat(secondPage).extracting(PushNotification::notificationId).containsExactly("push-2", "push-1");
@@ -299,13 +299,38 @@ class JdbcPushNotificationOutboxRepositoryTest {
 			.containsExactly("push-pct");
 	}
 
+	@Test
+	@DisplayName("실패 사유별 분해는 status=FAILED를 사유별로 GROUP BY 하고 목록 건수와 정합한다")
+	void countFailureReasonsGroupsFailedByReason() {
+		repository.savePushNotification(failedNotification(
+			"push-1", "user-1", PushNotificationType.REPORT_STATUS, "provider timeout", 9));
+		repository.savePushNotification(failedNotification(
+			"push-2", "user-2", PushNotificationType.REPORT_STATUS, "provider timeout", 10));
+		repository.savePushNotification(failedNotification(
+			"push-3", "user-3", PushNotificationType.DATA_QUALITY, "invalid token", 11));
+		repository.savePushNotification(notification("push-4", "user-4", PushNotificationType.REPORT_STATUS, 12));
+
+		var breakdown = repository.countFailureReasons(query(null, null, null));
+
+		assertThat(breakdown)
+			.extracting(
+				com.easysubway.notification.domain.PushNotificationFailureReasonCount::reason,
+				com.easysubway.notification.domain.PushNotificationFailureReasonCount::count)
+			.containsExactly(tuple("provider timeout", 2L), tuple("invalid token", 1L));
+
+		// 분해 수치 = 사유 드릴다운 목록 건수 정합.
+		var drilldown = com.easysubway.notification.application.port.in.PushNotificationHistoryQuery.of(
+			null, null, null, "provider timeout", null, null, null, null);
+		assertThat(repository.countPushNotifications(drilldown)).isEqualTo(2);
+	}
+
 	private static com.easysubway.notification.application.port.in.PushNotificationHistoryQuery query(
 		PushNotificationStatus status,
 		PushNotificationType type,
 		String keyword
 	) {
 		return com.easysubway.notification.application.port.in.PushNotificationHistoryQuery.of(
-			status, type, keyword, null, null, null, null);
+			status, type, keyword, null, null, null, null, null);
 	}
 
 	private PushNotification notification(
