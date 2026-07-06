@@ -6778,6 +6778,9 @@ test("eGovFrame pagination import는 common web pagination 경계에만 둔다",
     .sort();
 
   assert.deepEqual(egovFrameFiles, [
+    "backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java",
+    "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+    "backend/src/main/java/com/easysubway/common/web/export/EgovExcelExportSupport.java",
     "backend/src/main/java/com/easysubway/common/web/pagination/EgovPaginationView.java",
     "backend/src/test/java/com/easysubway/support/EgovFrameRuntimeTest.java",
   ]);
@@ -6805,24 +6808,163 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
     "token_or_crypto_security_boundary",
     "domain_application_public_json_contracts",
   ]);
-  assert.equal(gate.pocDecision.egovframeBatCore.status, "deferred_until_dependency_convergence_and_local_mirror");
-  assert.equal(gate.pocDecision.egovframeBatCore.currentImplementation, "spring_batch_control_plane_job");
+  assert.equal(
+    gate.utilizationDefinition.formula,
+    "adopted_modules / gate_approved_applicable_modules",
+  );
+  assert.deepEqual(gate.utilizationDefinition.denominatorExcludes, [
+    "noGoSurface",
+    "pending_separate_decision(psl-dataaccess, fdl-access)",
+  ]);
+  assert.equal(gate.utilizationDefinition.target, "100_percent");
+  assert.equal(
+    gate.utilizationDefinition.supersedes,
+    "adoption_plan_docx_whole_codebase_30_percent",
+  );
+
+  // S1: the four target modules enter adoption_in_progress with an explicit
+  // target status. no-go / pending-decision modules stay byte-unchanged.
+  assert.equal(gate.pocDecision.egovframeBatCore.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.egovframeBatCore.currentImplementation,
+    "backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java",
+  );
+  assert.equal(
+    gate.pocDecision.egovframeBatCore.verification,
+    "backend/src/test/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfigTest.java",
+  );
   assert.equal(gate.pocDecision.fdlLogging.status, "classpath_verified_control_plane_only");
-  assert.equal(gate.pocDecision.fdlProperty.status, "not_enabled_for_production");
-  assert.equal(gate.pocDecision.fdlIdgnr.status, "not_enabled_for_production");
+  assert.equal(gate.pocDecision.fdlProperty.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.fdlProperty.currentImplementation,
+    "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+  );
+  assert.equal(
+    gate.pocDecision.fdlProperty.verification,
+    "backend/src/test/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfigTest.java",
+  );
+  assert.equal(gate.pocDecision.fdlIdgnr.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.fdlIdgnr.currentImplementation,
+    "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+  );
+  assert.equal(
+    gate.pocDecision.fdlIdgnr.verification,
+    "backend/src/test/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfigTest.java",
+  );
   assert.equal(gate.pocDecision.pslDataaccess.status, "forbidden_until_poc_passes");
   assert.equal(gate.pocDecision.fdlAccess.status, "forbidden_until_poc_passes");
-  assert.equal(gate.pocDecision.fdlExcel.status, "forbidden_until_poc_passes");
+  assert.equal(gate.pocDecision.fdlExcel.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.fdlExcel.currentImplementation,
+    "backend/src/main/java/com/easysubway/common/web/export/EgovExcelExportSupport.java",
+  );
+  assert.equal(
+    gate.pocDecision.fdlExcel.verification,
+    "backend/src/test/java/com/easysubway/common/web/export/EgovExcelExportSupportTest.java",
+  );
+
+  // S2: bat-core moves from deferred to allowed as a direct dependency.
+  // psl-dataaccess stays deferred — it only rides in as bat-core's inert transitive.
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-bat-core"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-bat-core"));
+  assert.ok(gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-psl-dataaccess"));
+
+  // S3: fdl-property + fdl-idgnr move to allowed for control-plane operational id/property.
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-fdl-property"));
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-fdl-idgnr"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-property"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-idgnr"));
+
+  // S4: fdl-excel moves to allowed; xlsx exports run alongside the unchanged CSV contract.
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-fdl-excel"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-excel"));
+
+  // S4: the CSV export contract stays byte-for-byte intact — xlsx is additive only.
+  const fieldVerificationController = read(
+    "backend/src/main/java/com/easysubway/field/adapter/in/web/FieldVerificationAdminController.java",
+  );
+  const operatorAccessibilityController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportController.java",
+  );
+  assert.match(fieldVerificationController, /\/admin\/field-verifications\/stations\/\{stationId\}\/export\.csv/);
+  assert.match(fieldVerificationController, /\/admin\/field-verifications\/stations\/\{stationId\}\/export\.xlsx/);
+  assert.match(operatorAccessibilityController, /\/operator\/api\/accessibility-report\/proposal\.csv/);
+  assert.match(operatorAccessibilityController, /\/operator\/api\/accessibility-report\/proposal\.xlsx/);
+  // controllers route xlsx through the support class — no direct eGovFrame import.
+  assert.doesNotMatch(fieldVerificationController, /org\.egovframe/);
+  assert.doesNotMatch(operatorAccessibilityController, /org\.egovframe/);
 
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
   assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-batch'/);
-  assert.doesNotMatch(build, /egovframe-rte-bat-core/);
-  assert.doesNotMatch(build, /egovframe-rte-fdl-property/);
-  assert.doesNotMatch(build, /egovframe-rte-fdl-idgnr/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-bat-core'/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-fdl-property'/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-fdl-idgnr'/);
   assert.doesNotMatch(build, /egovframe-rte-psl-dataaccess/);
   assert.doesNotMatch(build, /egovframe-boot-starter-(access|crypto|security)/);
-  assert.doesNotMatch(build, /egovframe-rte-fdl-excel/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-fdl-excel'/);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-logging:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-bat-core:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-property:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-idgnr:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-excel:5\.0\.0=/m);
+
+  // S1: local mirror must carry the four target modules plus their org.egovframe
+  // transitive closure so S2~S4 resolve offline (remote-only is gate-forbidden).
+  for (const module of [
+    "egovframe-rte-bat-core",
+    "egovframe-rte-fdl-property",
+    "egovframe-rte-fdl-idgnr",
+    "egovframe-rte-fdl-excel",
+    "egovframe-rte-psl-dataaccess",
+    "egovframe-rte-fdl-filehandling",
+    "egovframe-rte-fdl-string",
+  ]) {
+    for (const ext of ["jar", "pom"]) {
+      assert.ok(
+        existsSync(
+          path.join(
+            root,
+            `backend/gradle/local-maven/org/egovframe/rte/${module}/5.0.0/${module}-5.0.0.${ext}`,
+          ),
+        ),
+        `${module}-5.0.0.${ext} must be mirrored for offline resolution`,
+      );
+    }
+  }
+
+  // no-go invariants — must stay byte-identical across the whole expansion epic.
+  assert.deepEqual(gate.dependencyPolicy.directForbidden, [
+    "org.egovframe.boot:egovframe-boot-starter-crypto",
+    "org.egovframe.boot:egovframe-boot-starter-security",
+  ]);
+  assert.deepEqual(gate.mustNotDo, [
+    "increase eGovFrame usage percentage mechanically",
+    "move mobile or public JSON contracts to eGovFrame types",
+    "replace token, crypto, receipt, or auth boundaries with eGovFrame starters",
+    "add remote-only eGovFrame dependencies without lockfile and local mirror evidence",
+  ]);
+
+  // S3: operational id/property adoption must not leak into token/notification/
+  // datapack security boundaries — eGovFrame id generation stays off those surfaces.
+  const adminCommandTokenService = read(
+    "backend/src/main/java/com/easysubway/admin/web/AdminCommandTokenService.java",
+  );
+  assert.doesNotMatch(adminCommandTokenService, /egovframe/i);
+  const securityBoundaryFiles = execFileSync("git", [
+    "ls-files",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "backend/src/main/java/com/easysubway/notification",
+    "backend/src/main/java/com/easysubway/datapack",
+  ], { cwd: root, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  for (const file of securityBoundaryFiles) {
+    assert.ok(
+      !read(file).toLowerCase().includes("egovframe"),
+      `${file} must not reference eGovFrame (id/property stays off this boundary)`,
+    );
+  }
 
   assert.match(readme, /eGovFrame은 backend control-plane에만 선택 적용한다/);
   assert.match(readme, /Flutter mobile runtime, ordinary mobile API, realtime hot path, token\/crypto boundary/);
