@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { transferGroups, classifyGroup } from "./splice-transfer-convergence.mjs";
+import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets } from "./splice-transfer-convergence.mjs";
 
 test("transferGroups는 2+노선 역만 그룹화하고 span=최대쌍거리", () => {
   const rows = [
@@ -23,4 +23,24 @@ test("classifyGroup은 변위=(span-target)/2로 티어를 나눈다", () => {
   assert.equal(classifyGroup({ memberCount: 2, span: 216 }, oracle).tier, "extreme");
   // span 14, target 13 → 변위 0.5 → mild
   assert.equal(classifyGroup({ memberCount: 2, span: 14 }, oracle).tier, "mild");
+});
+
+test("capsuleAxis는 멤버 분산 주방향을 H/V로 스냅한다", () => {
+  // 수평으로 벌어진 멤버 → H
+  assert.equal(capsuleAxis([{ x: 0, y: 0 }, { x: 100, y: 5 }]), "H");
+  // 수직으로 벌어진 멤버 → V
+  assert.equal(capsuleAxis([{ x: 0, y: 0 }, { x: 5, y: 100 }]), "V");
+});
+
+test("capsuleTargets는 centroid 중심 targetSpan 폭으로 축 따라 균등 배치", () => {
+  const members = [
+    { lineId: "A", x: 0, y: 0 }, { lineId: "B", x: 60, y: 0 }, // centroid (30,0)
+  ];
+  const t = capsuleTargets(members, 13, "H");
+  // 2멤버, 폭 13, centroid x=30 → x=23.5, 36.5, y=centroid 0
+  assert.equal(t.length, 2);
+  assert.ok(Math.abs((t[1].x - t[0].x) - 13) < 1e-9, `피치 ${t[1].x - t[0].x}`);
+  assert.ok(Math.abs(((t[0].x + t[1].x) / 2) - 30) < 1e-9); // centroid 보존
+  assert.equal(t[0].y, 0);
+  assert.deepEqual(t.map((m) => m.lineId), ["A", "B"]); // 순서 안정
 });

@@ -39,3 +39,28 @@ export function classifyGroup(group, oracle, { extremeDisp = 35 } = {}) {
   else tier = "extreme";
   return { target, displacement, tier };
 }
+
+/** 멤버 분산 주방향을 H/V로 스냅(분산이 큰 축). */
+export function capsuleAxis(members) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const m of members) {
+    minX = Math.min(minX, m.x); maxX = Math.max(maxX, m.x);
+    minY = Math.min(minY, m.y); maxY = Math.max(maxY, m.y);
+  }
+  return maxX - minX >= maxY - minY ? "H" : "V";
+}
+
+/** centroid 중심, targetSpan 폭, axis(H/V) 따라 멤버를 균등 배치. 입력 순서 보존. */
+export function capsuleTargets(members, targetSpan, axis) {
+  const n = members.length;
+  const cx = members.reduce((s, m) => s + m.x, 0) / n;
+  const cy = members.reduce((s, m) => s + m.y, 0) / n;
+  const pitch = n > 1 ? targetSpan / (n - 1) : 0;
+  const start = -(targetSpan) / 2;
+  return members.map((m, i) => {
+    const off = start + i * pitch;
+    return axis === "H"
+      ? { lineId: m.lineId, x: cx + off, y: cy }
+      : { lineId: m.lineId, x: cx, y: cy + off };
+  });
+}
