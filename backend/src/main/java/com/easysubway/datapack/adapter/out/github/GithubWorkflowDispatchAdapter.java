@@ -30,6 +30,7 @@ public class GithubWorkflowDispatchAdapter implements DatapackWorkflowDispatchPo
 	private final String apiBaseUrl;
 	private final String token;
 
+	@org.springframework.beans.factory.annotation.Autowired
 	public GithubWorkflowDispatchAdapter(
 		@Value("${easysubway.datapack.github-actions-dispatch-token:}") String token,
 		@Value("${easysubway.datapack.github-api-base-url:https://api.github.com}") String apiBaseUrl
