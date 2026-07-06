@@ -18,6 +18,7 @@
 //         --loom /tmp/capital-loom.geojson --transform /tmp/capital-geo.transform.json \
 //         [--region 수도권] [--bundle-spacing 6] [--eps 2] [--tol 0.5] [--check]
 import { readFileSync } from "node:fs";
+import { makeToDesignFromParams } from "./export-loom-geojson.mjs";
 import { verticesToPath } from "./audit-octolinearity.mjs";
 import { projectPointToPolylines } from "./project-nodes-to-tracks.mjs";
 import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
@@ -55,13 +56,15 @@ export function rdpSimplify(pts, eps) {
   const b = pts[pts.length - 1];
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const len = Math.hypot(dx, dy) || 1;
+  const len = Math.hypot(dx, dy);
   let maxDist = -1;
   let idx = -1;
   for (let i = 1; i < pts.length - 1; i += 1) {
-    // 점-직선 수직거리(a,b 동일점이면 점-점거리)
+    // 점-직선 수직거리(a,b 동일점=폐곡선이면 점-점거리로 폴백 — 순환선 붕괴 방지)
     const d =
-      Math.abs((pts[i].x - a.x) * dy - (pts[i].y - a.y) * dx) / len;
+      len === 0
+        ? Math.hypot(pts[i].x - a.x, pts[i].y - a.y)
+        : Math.abs((pts[i].x - a.x) * dy - (pts[i].y - a.y) * dx) / len;
     if (d > maxDist) {
       maxDist = d;
       idx = i;
@@ -192,17 +195,13 @@ export function chainEdgesForLine(edges) {
 
 // ── 오케스트레이션 ────────────────────────────────────────────────────────
 
-/** transform.json 파라미터 → loom(lon,lat) → design 역변환 클로저(동일 역변환 1개). */
+/**
+ * transform.json 파라미터 → loom(lon,lat) → design 역변환 클로저(동일 역변환 1개).
+ * export-loom-geojson의 forward(buildGeoTransform)와 **동일 수식 1벌**을 공유해
+ * forward↔inverse 부호가 조용히 어긋나지 않게 한다.
+ */
 export function makeToDesign(tf) {
-  const { M_PER_DEG_LON, k, cx, cy, CMX, CMY, R } = tf;
-  const mercY = (lat) => {
-    const s = Math.sin((lat * Math.PI) / 180);
-    return (R / 2) * Math.log((1 + s) / (1 - s));
-  };
-  return (lon, lat) => ({
-    x: cx + (lon * M_PER_DEG_LON - CMX) / k,
-    y: cy - (mercY(lat) - CMY) / k,
-  });
+  return makeToDesignFromParams(tf);
 }
 
 /** loom GeoJSON + 역변환에서 노선별 track(rectified·offset) + 역 중심좌표를 만든다. */

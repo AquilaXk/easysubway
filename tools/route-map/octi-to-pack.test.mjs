@@ -33,6 +33,18 @@ test("rdpSimplify는 서브픽셀 계단 지터를 제거하고 끝점을 보존
   assert.ok(out.length < pts.length, `${out.length} 정점 (단순화 안 됨)`);
 });
 
+test("rdpSimplify는 폐곡선(start==end)을 단일 점으로 붕괴시키지 않는다(순환선)", () => {
+  // 2호선 순환선처럼 끝점이 시작점과 동일한 사각 루프
+  const loop = [
+    { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }, { x: 0, y: 0 },
+  ];
+  const out = rdpSimplify(loop, 2);
+  assert.ok(out.length >= 3, `폐곡선이 ${out.length}점으로 붕괴`);
+  // 점-점거리 폴백으로 반대편 코너가 보존되어야 한다
+  assert.ok(Math.max(...out.map((p) => p.x)) >= 100);
+  assert.ok(Math.max(...out.map((p) => p.y)) >= 100);
+});
+
 test("rectifyPolyline은 8선형 근사 폴리라인을 위반 0으로 만들고 끝점을 고정한다", () => {
   // 수평 근사(1.5° 기울기) → 45° 근사(43°) 코너, 서브픽셀 지터 섞임
   const pts = [

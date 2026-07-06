@@ -45,13 +45,27 @@ export function buildGeoTransform({ minX, maxX, minY, maxY }) {
     const my = CMY - (y - cy) * k; // y 뒤집기
     return [round6(mx / M_PER_DEG_LON), round6(invMercLat(my))];
   };
-  // lat/lon → webmerc → design (octi 출력 역변환 — P1.3이 사용)
-  const toDesign = (lon, lat) => ({
+  // lat/lon → webmerc → design (octi 출력 역변환 — P1.3이 사용). forward와 동일 수식 1벌
+  // 을 공유하도록 makeToDesignFromParams로 위임(octi-to-pack.makeToDesign도 같은 벌 사용).
+  const transform = { R, M_PER_DEG_LON, k, cx, cy, CMX, CMY, CLON, CLAT };
+  const toDesign = makeToDesignFromParams(transform);
+  return { toGeo, toDesign, transform };
+}
+
+/**
+ * 순수: transform 파라미터(직렬화 가능) → loom(lon,lat) → design 역변환 클로저.
+ * buildGeoTransform(같은 프로세스)과 octi-to-pack(transform.json 재로드) 공용 — 역변환
+ * 수식을 한 곳에만 둬 forward와의 부호/스케일 불일치를 원천 차단한다.
+ */
+export function makeToDesignFromParams({ R, M_PER_DEG_LON, k, cx, cy, CMX, CMY }) {
+  const mercY = (latDeg) => {
+    const s = Math.sin((latDeg * Math.PI) / 180);
+    return (R / 2) * Math.log((1 + s) / (1 - s));
+  };
+  return (lon, lat) => ({
     x: cx + (lon * M_PER_DEG_LON - CMX) / k,
     y: cy - (mercY(lat) - CMY) / k,
   });
-  const transform = { R, M_PER_DEG_LON, k, cx, cy, CMX, CMY, CLON, CLAT };
-  return { toGeo, toDesign, transform };
 }
 
 /** 간선 목록의 노드 차수 맵. */
@@ -67,15 +81,24 @@ function degreeOf(edgeList) {
 /**
  * 순수: 위상(노드 좌표 맵 + 간선 목록) → octi 8방향 제약을 위해 degree>8 노드를 분할한다.
  * 초과 노드를 두 정점으로 쪼개 incident edge를 반씩 나누고 짧은 연결 edge를 추가한다.
- * 재주입 시 '#' 앞이 station_id. nodeCoord·edgeList를 제자리 변형하고 분할 로그를 반환.
+ * 1회 분할은 각 절반을 ceil(d/2)+1로 낮추므로 degree>14 허브는 여전히 >8 — degree≤8이
+ * 될 때까지 **반복 분할**한다(유니크 접미 #2,#3,…). 재주입 시 '#' 앞이 station_id.
+ * nodeCoord·edgeList를 제자리 변형하고 분할 로그를 반환.
  */
 export function splitHighDegreeNodes(nodeCoord, edgeList) {
   const splitNodes = [];
-  for (const [id, d] of degreeOf(edgeList)) {
-    if (d <= 8) continue;
+  for (;;) {
+    let id = null;
+    let d = 0;
+    for (const [nid, nd] of degreeOf(edgeList)) {
+      if (nd > 8) { id = nid; d = nd; break; }
+    }
+    if (id === null) break;
     splitNodes.push({ id, name: nodeCoord.get(id)?.name, d });
     const c = nodeCoord.get(id);
-    const id2 = `${id}#2`;
+    let suffix = 2;
+    while (nodeCoord.has(`${id}#${suffix}`)) suffix += 1; // 반복 분할 접미 충돌 회피
+    const id2 = `${id}#${suffix}`;
     nodeCoord.set(id2, { x: c.x + 1, y: c.y + 1, name: c.name });
     const incident = edgeList.filter((e) => e.from === id || e.to === id);
     for (let k = Math.ceil(incident.length / 2); k < incident.length; k += 1) {

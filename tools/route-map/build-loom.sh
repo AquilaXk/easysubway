@@ -19,7 +19,8 @@ WORK="${LOOM_WORK:-/tmp/loom-work}"
 
 build() {
   mkdir -p "$WORK" && cd "$WORK"
-  # 고정 커밋을 정확히 가져오려면 얕은 fetch로 해당 커밋만 받는다(--depth 1 HEAD 금지).
+  # full clone 후 고정 커밋을 checkout해 재현성을 확보한다. shallow --depth 1(HEAD)만 받으면
+  # 핀 커밋이 없어 checkout이 실패하므로 금지 — 전체 이력을 받아 임의 커밋 checkout을 보장.
   if [[ ! -d loom ]]; then
     git clone --recursive "$LOOM_REPO"
     cd loom && git checkout "$LOOM_COMMIT" && git submodule update --init --recursive
@@ -32,7 +33,7 @@ build() {
 }
 
 run() {
-  local bin="$1" out="${2:-/tmp}"
+  local bin="${1:?사용: $0 run <octi-bin-dir> [out-dir]}" out="${2:-/tmp}"
   # P1.1 export: 팩 위상 → LOOM GeoJSON (mercator 정확 왕복, degree>8 분할)
   node tools/route-map/export-loom-geojson.mjs --out "$out/capital-geo.geojson"
   # P1.2a octi: 8선형 그리드 재배치 (~41s, 657역 id 보존). Hanan 그리드 2회 = 도심 인접 여유.
