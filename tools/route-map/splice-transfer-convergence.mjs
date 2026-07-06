@@ -23,7 +23,8 @@ export function transferGroups(posRows) {
   }
   const groups = [];
   for (const [stationId, rows] of byStation) {
-    if (new Set(rows.map((r) => r.line_id)).size < 2) continue;
+    const lineIds = new Set(rows.map((r) => r.line_id));
+    if (lineIds.size < 2) continue;
     let span = 0;
     for (let i = 0; i < rows.length; i += 1)
       for (let j = i + 1; j < rows.length; j += 1)
@@ -31,7 +32,7 @@ export function transferGroups(posRows) {
     groups.push({
       stationId,
       members: rows.map((r) => ({ lineId: r.line_id, x: r.x, y: r.y })),
-      memberCount: new Set(rows.map((r) => r.line_id)).size,
+      memberCount: lineIds.size,
       span,
     });
   }
@@ -178,8 +179,8 @@ export function convergeGroup(group, oracle, tracksByLine) {
       positionUpdates.push({
         stationId: group.stationId,
         lineId: m.lineId,
-        x: Math.round(nt.x),
-        y: Math.round(nt.y),
+        x: newPos.x, // splice에 넘긴 정수 newPos와 동일값(반올림 이중 계산 제거)
+        y: newPos.y,
       });
     }
   }
@@ -216,6 +217,12 @@ function main() {
     console.error(`oracle 파일을 읽을 수 없음: ${o.oracle} (${e.message}) — oracle-metrics.mjs로 먼저 생성하세요`);
     process.exit(1);
   }
+  if (!oracle) {
+    // 유효 JSON이나 spanP90ByMemberCount 키 없음(스키마 불일치·잘못된 --oracle 경로) →
+    // try-catch를 통과해 undefined가 되므로 여기서 명시 실패(안 하면 classifyGroup서 TypeError).
+    console.error(`oracle 파일에 spanP90ByMemberCount 키가 없음: ${o.oracle}`);
+    process.exit(1);
+  }
   const selected = new Set(o.tiers.split(","));
   const { db, dir, sqlitePath, packPath } = openPack(o.pack, "splice-conv-");
   try {
@@ -243,12 +250,12 @@ function main() {
     if (!o.check) db.exec("BEGIN");
     const tierCount = { mild: 0, mid: 0, large: 0, extreme: 0 };
     for (const g of groups) {
-      const { tier } = classifyGroup(g, oracle);
-      tierCount[tier] += 1;
-      if (!selected.has(tier)) continue;
-      if (!needsConvergence(g, oracle)) continue; // 이미 오라클 이내 — 압축만, 스프레드 금지
+      const cls = classifyGroup(g, oracle); // 그룹당 1회(tier·target 재사용)
+      tierCount[cls.tier] += 1;
+      if (!selected.has(cls.tier)) continue;
+      if (g.span <= cls.target) continue; // 이미 오라클 이내 — 압축만, 스프레드 금지(needsConvergence 동치)
       const { positionUpdates, trackUpdates } = convergeGroup(g, oracle, tracksByLine);
-      applied += 1;
+      if (positionUpdates.length) applied += 1; // 실제 갱신을 낸 그룹만 카운트(부착 실패 그룹 제외)
       // 누적 갱신: 같은 track에 여러 그룹이 splice할 때 이전 그룹의 결과 위에 덧쌓이게
       // tracksByLine을 제자리 갱신(다음 그룹이 최신 정점을 사용하도록).
       for (const tu of trackUpdates) {
@@ -286,6 +293,7 @@ function main() {
     const { byteSize } = writePack({ sqlitePath, packPath, packRelPath: o.pack, indexRelPath: o.index });
     console.log(`팩 갱신 (byteSize ${byteSize})`);
   } finally {
+    try { db.close(); } catch { /* 이미 닫힘(정상 경로) — 예외 이탈 시 핸들 누수 방지용 */ }
     cleanupPackDir(dir);
   }
 }
