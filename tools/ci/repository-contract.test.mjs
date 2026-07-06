@@ -4423,6 +4423,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   const schema = read("tools/datapack/schema/catalog-schema.sql");
   const builder = read("tools/datapack/build-datapack.mjs");
   const validator = read("tools/datapack/validate-datapack.mjs");
+  const manifestValidation = read("tools/datapack/lib/manifest-validation.mjs");
 
   assert.equal(fixture.manifest.ttlSeconds, 3600);
   assert.deepEqual(fixture.manifest.activePack, { id: "capital", version: "1" });
@@ -4561,8 +4562,8 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.match(validator, /station_pathway_edges generated connector cannot be VERIFIED/);
   assert.match(validator, /transfer_rules strict step-free edge is not step-free/);
   assert.match(validator, /station_pathway_edges legacy mapping mismatch/);
-  assert.match(validator, /manifest\.schema\.json/);
-  assert.match(validator, /validateManifestJsonSchema/);
+  assert.match(manifestValidation, /manifest\.schema\.json/);
+  assert.match(manifestValidation, /validateManifestJsonSchema/);
   assert.match(validator, /validateRegionalQualityMetricsMatchDatabase/);
   assert.match(validator, /validateAccessEdgeEndpointShape/);
   assert.match(validator, /stationIdFromStationLineNode/);
@@ -4592,6 +4593,7 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
   const manifestSchema = readJson("tools/datapack/schema/manifest.schema.json");
   const builder = read("tools/datapack/build-datapack.mjs");
   const validator = read("tools/datapack/validate-datapack.mjs");
+  const manifestValidation = read("tools/datapack/lib/manifest-validation.mjs");
 
   assert.equal(fixture.packs[0].artifactKind, "fixture");
   assert.match(fixture.packs[0].sourceInventory[0].url, /^https:\/\/easysubway\.local\/fixtures\//);
@@ -4607,8 +4609,8 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
   );
   assert.match(builder, /production pack url must not use a local placeholder host/);
   assert.match(builder, /production sourceInventory\.url must not use a local placeholder host/);
-  assert.match(validator, /production pack url must not use a local placeholder host/);
-  assert.match(validator, /production sourceInventory\.url must not use a local placeholder host/);
+  assert.match(manifestValidation, /production pack url must not use a local placeholder host/);
+  assert.match(manifestValidation, /production sourceInventory\.url must not use a local placeholder host/);
   assert.match(readme, /local placeholder host/);
   assert.match(readme, /production data pack/);
   assert.match(readme, /fixture artifact/);
@@ -6255,8 +6257,8 @@ test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 r
   assert.match(importer, /sourceIngestAdapter: "official-source-ingest-v1"/);
 
   const builder = read("tools/datapack/build-datapack.mjs");
-  const validator = read("tools/datapack/validate-datapack.mjs");
-  for (const source of [builder, validator]) {
+  const manifestValidation = read("tools/datapack/lib/manifest-validation.mjs");
+  for (const source of [builder, manifestValidation]) {
     assert.match(source, /productionMinimumTableRowNames = \[[\s\S]+"station_facility_evidence"[\s\S]+\]/);
     assert.match(
       source,
