@@ -353,3 +353,33 @@ test("⑥ current.json은 pretty-print 바이트를 재직렬화 없이 저장�
     storage.server.close();
   }
 });
+
+// ─── 테스트 ⑦: --dry-run 플래그는 스왑을 수행하지 않음 ────────────────────────
+// --dry-run 실행 후에도 catalog/current.json은 원본 바이트를 유지해야 한다.
+
+test("⑦ --dry-run은 current.json을 수정하지 않으면서 exit 0으로 성공한다", async () => {
+  const manifest = buildManifest();
+  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  const originalCurrentBytes = Buffer.from("old");
+
+  const storage = await startStorage([
+    ["catalog/releases/2.json", { body: manifestBytes }],
+    ["catalog/capital-v1.sqlite.gz", { body: Buffer.from("pack") }],
+    ["catalog/current.json", { body: originalCurrentBytes }],
+  ]);
+  const baseUrl = `http://127.0.0.1:${storage.port}`;
+  try {
+    // --dry-run 플래그로 실행
+    const { stdout } = await runRollback(
+      ["--dry-run", "--target-sequence", "2", "--channel", "staging", "--reason", "test", "--idempotency-key", "k7"],
+      baseUrl,
+    );
+    // exit 0 성공, 리포트 생성됨
+    const report = JSON.parse(stdout);
+    assert.equal(report.targetSequence, 2);
+    // 중요: current.json은 원본 바이트 그대로 (스왑 미수행)
+    assert.deepEqual(storage.objects.get("catalog/current.json").body, originalCurrentBytes);
+  } finally {
+    storage.server.close();
+  }
+});

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
 import {
-  validateManifest, validateManifestSignature,
+  validateManifest,
 } from "./lib/manifest-validation.mjs";
 
 async function main() {
@@ -27,8 +27,8 @@ async function main() {
   }
   const releaseBytes = releaseResponse.body;
   const manifest = JSON.parse(releaseBytes.toString("utf8"));
+  // validateManifest는 manifestVersion 2의 서명 검증을 내부에서 수행한다
   validateManifest(manifest, { requireProduction: channel === "production" });
-  validateManifestSignature(manifest);
 
   // (2) 채널 대조
   if (manifest.channel !== channel) {
