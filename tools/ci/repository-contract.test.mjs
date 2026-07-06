@@ -6776,6 +6776,7 @@ test("eGovFrame pagination import는 common web pagination 경계에만 둔다",
     .sort();
 
   assert.deepEqual(egovFrameFiles, [
+    "backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java",
     "backend/src/main/java/com/easysubway/common/web/pagination/EgovPaginationView.java",
     "backend/src/test/java/com/easysubway/support/EgovFrameRuntimeTest.java",
   ]);
@@ -6819,9 +6820,15 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
 
   // S1: the four target modules enter adoption_in_progress with an explicit
   // target status. no-go / pending-decision modules stay byte-unchanged.
-  assert.equal(gate.pocDecision.egovframeBatCore.status, "adoption_in_progress");
-  assert.equal(gate.pocDecision.egovframeBatCore.targetStatus, "adopted_control_plane_only");
-  assert.equal(gate.pocDecision.egovframeBatCore.currentImplementation, "spring_batch_control_plane_job");
+  assert.equal(gate.pocDecision.egovframeBatCore.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.egovframeBatCore.currentImplementation,
+    "backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java",
+  );
+  assert.equal(
+    gate.pocDecision.egovframeBatCore.verification,
+    "backend/src/test/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfigTest.java",
+  );
   assert.equal(gate.pocDecision.fdlLogging.status, "classpath_verified_control_plane_only");
   assert.equal(gate.pocDecision.fdlProperty.status, "adoption_in_progress");
   assert.equal(gate.pocDecision.fdlProperty.targetStatus, "adopted_control_plane_only");
@@ -6832,15 +6839,22 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
   assert.equal(gate.pocDecision.fdlExcel.status, "adoption_in_progress");
   assert.equal(gate.pocDecision.fdlExcel.targetStatus, "adopted_control_plane_only");
 
+  // S2: bat-core moves from deferred to allowed as a direct dependency.
+  // psl-dataaccess stays deferred — it only rides in as bat-core's inert transitive.
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-bat-core"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-bat-core"));
+  assert.ok(gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-psl-dataaccess"));
+
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
   assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-batch'/);
-  assert.doesNotMatch(build, /egovframe-rte-bat-core/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-bat-core'/);
   assert.doesNotMatch(build, /egovframe-rte-fdl-property/);
   assert.doesNotMatch(build, /egovframe-rte-fdl-idgnr/);
   assert.doesNotMatch(build, /egovframe-rte-psl-dataaccess/);
   assert.doesNotMatch(build, /egovframe-boot-starter-(access|crypto|security)/);
   assert.doesNotMatch(build, /egovframe-rte-fdl-excel/);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-logging:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-bat-core:5\.0\.0=/m);
 
   // S1: local mirror must carry the four target modules plus their org.egovframe
   // transitive closure so S2~S4 resolve offline (remote-only is gate-forbidden).
