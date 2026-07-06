@@ -127,6 +127,21 @@ class JdbcAdminAuditEventRepositoryTest {
 		assertThat(context.after()).extracting(AdminAuditEvent::targetId).containsExactly("a-4", "a-5");
 	}
 
+	@Test
+	@DisplayName("target 검색은 LIKE 메타문자(%,_)를 리터럴로 이스케이프해 오매칭을 막는다")
+	void searchEscapesLikeMetacharacters() {
+		var repository = new JdbcAdminAuditEventRepository(adminAuditDataSource());
+		LocalDateTime base = LocalDateTime.of(2026, 6, 27, 9, 0);
+		repository.save(fullEvent(AdminAuditEventType.ADMIN_ACTION, "admin-a", AdminAuditOutcome.SUCCESS,
+			"REPORT", "a%b", "업무 맥락", base));
+		repository.save(fullEvent(AdminAuditEventType.ADMIN_ACTION, "admin-a", AdminAuditOutcome.SUCCESS,
+			"REPORT", "axb", "업무 맥락", base.plusMinutes(1)));
+
+		// '%'가 와일드카드로 해석되면 axb도 매칭되지만, 이스케이프되어 a%b만 매칭돼야 한다.
+		assertThat(repository.search(query(null, null, null, "a%b", false)))
+			.extracting(AdminAuditEvent::targetId).containsExactly("a%b");
+	}
+
 	private static AdminAuditQuery query(
 		AdminAuditEventType eventType,
 		String actor,
