@@ -14,9 +14,11 @@ import 'dart:ui' show Offset;
 
 /// 라벨 우선순위·볼드 class (#1636 station_labels.priority).
 ///
-/// [major]는 #1636 majorRule("별도 검수된 주요 거점")을 위한 예약 값이다.
+/// [major](주요역)는 [buildStructuredRouteMap]이 런타임 산출한다(#1764 C):
+/// 각 노선 양 종점(sequence min/max)이거나 비환승 거점 allowlist
+/// (route_map_major_stations)에 속하는 역. 환승역은 [transfer]로 우선 처리된다.
 /// LOD zoom bucket 매핑은 #1789 정적 스케일 렌더 전환에서 폐지됐다(로드 시 1회
-/// 정적 배치·전부 표시). 이 enum은 배치 우선순위와 볼드 판정에만 쓰인다.
+/// 정적 배치·전부 표시) — 이 enum은 배치 우선순위와 볼드 판정에만 쓰인다.
 enum RouteMapLabelClass { transfer, major, regular }
 
 /// 한 노선의 track geometry. 데이터 hole(인접 세그먼트가 이어지지 않는 지점)에서
@@ -123,10 +125,9 @@ List<Offset> parseRouteMapPolyline(String path) {
   if (path.trim().isEmpty) {
     return const [];
   }
-  final numbers = RegExp(r'-?\d+(?:\.\d+)?')
-      .allMatches(path)
-      .map((match) => double.parse(match.group(0)!))
-      .toList();
+  final numbers = RegExp(
+    r'-?\d+(?:\.\d+)?',
+  ).allMatches(path).map((match) => double.parse(match.group(0)!)).toList();
   final points = <Offset>[];
   for (var index = 0; index + 1 < numbers.length; index += 2) {
     points.add(Offset(numbers[index], numbers[index + 1]));
@@ -139,6 +140,7 @@ List<Offset> parseRouteMapPolyline(String path) {
 StructuredRouteMap buildStructuredRouteMap(
   Iterable<StructuredRouteMapStationInput> inputs, {
   required List<RouteMapLineTrackInput> lineTracks,
+  Set<String> majorStationIds = const <String>{},
 }) {
   final inputList = inputs.toList(growable: false);
 
@@ -147,16 +149,24 @@ StructuredRouteMap buildStructuredRouteMap(
   // 환승 중심·멤버 좌표 계산용: stationId → lineId → position.
   final positionByStationLine = <String, Map<String, Offset>>{};
   final lineIdsWithStations = <String>{};
+  // 노선별 입력(양 종점 자동 산출용, #1764 C major).
+  final inputsByLine = <String, List<StructuredRouteMapStationInput>>{};
   for (final input in inputList) {
     lineIdsByStation
         .putIfAbsent(input.stationId, () => <String>{})
         .add(input.lineId);
-    positionByStationLine
-            .putIfAbsent(input.stationId, () => <String, Offset>{})[input
-            .lineId] =
-        input.position;
+    positionByStationLine.putIfAbsent(
+      input.stationId,
+      () => <String, Offset>{},
+    )[input.lineId] = input.position;
     lineIdsWithStations.add(input.lineId);
+    inputsByLine
+        .putIfAbsent(input.lineId, () => <StructuredRouteMapStationInput>[])
+        .add(input);
   }
+
+  // 각 노선 양 종점 station_id 집합(자동 major 후보).
+  final terminalStationIds = _routeMapTerminalStationIds(inputsByLine);
 
   // line geometry: 노선별 실제 track polyline을 저장된 path 그대로 파싱한다.
   // 조각(끊긴 track)은 phantom 직선 없이 분리 유지, 정점 2개 미만은 버린다.
@@ -180,6 +190,11 @@ StructuredRouteMap buildStructuredRouteMap(
   final stations = <RouteMapStructuredStation>[];
   for (final input in inputList) {
     final isTransfer = (lineIdsByStation[input.stationId]?.length ?? 0) > 1;
+    // 환승이 아니면서 노선 종점이거나 거점 allowlist에 속하면 major(#1764 C).
+    final isMajor =
+        !isTransfer &&
+        (terminalStationIds.contains(input.stationId) ||
+            majorStationIds.contains(input.stationId));
     stations.add(
       RouteMapStructuredStation(
         stationId: input.stationId,
@@ -189,6 +204,8 @@ StructuredRouteMap buildStructuredRouteMap(
         labelPolygon: input.labelPolygon,
         labelClass: isTransfer
             ? RouteMapLabelClass.transfer
+            : isMajor
+            ? RouteMapLabelClass.major
             : RouteMapLabelClass.regular,
       ),
     );
@@ -196,11 +213,12 @@ StructuredRouteMap buildStructuredRouteMap(
 
   // 환승 그룹: 2개 이상 노선에 속한 역, 중심 좌표.
   final transferGroups = <RouteMapTransferGroup>[];
-  final transferStationIds = lineIdsByStation.entries
-      .where((entry) => entry.value.length > 1)
-      .map((entry) => entry.key)
-      .toList()
-    ..sort();
+  final transferStationIds =
+      lineIdsByStation.entries
+          .where((entry) => entry.value.length > 1)
+          .map((entry) => entry.key)
+          .toList()
+        ..sort();
   for (final stationId in transferStationIds) {
     final lineIds = lineIdsByStation[stationId]!.toList()..sort();
     final byLine = positionByStationLine[stationId]!;
@@ -220,6 +238,64 @@ StructuredRouteMap buildStructuredRouteMap(
     stations: stations,
     transferGroups: transferGroups,
   );
+}
+
+/// 각 노선의 양 종점 station_id(자동 major 후보, #1764 C). 규칙:
+/// - sequence 극값(최소·최대) 역을 종점으로 본다. 동률(분기/지선 종점)이면 그
+///   극값 역을 모두 포함한다(첫 역만 취하지 않는다).
+/// - 순환선(수도권 2호선 등)은 양 극점이 노선 전체 span 대비 가까워 종점이 없다.
+///   이때는 내부 루프 역이 종점으로 오판돼 major가 되지 않도록 제외한다.
+Set<String> _routeMapTerminalStationIds(
+  Map<String, List<StructuredRouteMapStationInput>> inputsByLine,
+) {
+  const loopSpanRatio = 0.25;
+  final terminals = <String>{};
+  for (final inputs in inputsByLine.values) {
+    if (inputs.length < 2) {
+      continue;
+    }
+    var minSeq = inputs.first.sequence;
+    var maxSeq = inputs.first.sequence;
+    for (final input in inputs) {
+      if (input.sequence < minSeq) minSeq = input.sequence;
+      if (input.sequence > maxSeq) maxSeq = input.sequence;
+    }
+    if (minSeq == maxSeq) {
+      continue;
+    }
+    final minStations = inputs.where((i) => i.sequence == minSeq).toList();
+    final maxStations = inputs.where((i) => i.sequence == maxSeq).toList();
+    final span = _routeMapLineSpan(inputs);
+    final endpointGap =
+        (minStations.first.position - maxStations.first.position).distance;
+    if (span > 0 && endpointGap < span * loopSpanRatio) {
+      // 순환선: 종점 강조 대상 아님.
+      continue;
+    }
+    for (final input in minStations) {
+      terminals.add(input.stationId);
+    }
+    for (final input in maxStations) {
+      terminals.add(input.stationId);
+    }
+  }
+  return terminals;
+}
+
+/// 노선 역 좌표 bbox 대각 길이(순환선 판정용 노선 규모).
+double _routeMapLineSpan(List<StructuredRouteMapStationInput> inputs) {
+  var minX = inputs.first.position.dx;
+  var maxX = minX;
+  var minY = inputs.first.position.dy;
+  var maxY = minY;
+  for (final input in inputs) {
+    final point = input.position;
+    if (point.dx < minX) minX = point.dx;
+    if (point.dx > maxX) maxX = point.dx;
+    if (point.dy < minY) minY = point.dy;
+    if (point.dy > maxY) maxY = point.dy;
+  }
+  return (Offset(maxX, maxY) - Offset(minX, minY)).distance;
 }
 
 Offset _centroid(List<Offset> points) {

@@ -60,22 +60,29 @@ void main() {
 
     // 라벨-선·뱃지 겹침(실기기 클러터) 악화 금지.
     final design = routeMapDesignSpaceFor(fixture.map);
-    final labelLine = routeMapLabelLineOverlapCount(layout, fixture.map, design);
+    final labelLine = routeMapLabelLineOverlapCount(
+      layout,
+      fixture.map,
+      design,
+    );
     final badge = routeMapBadgeOverlapCounts(layout, fixture.map, design);
     expect(
       labelLine,
       lessThanOrEqualTo(kCapitalLabelLineOverlapBaseline),
-      reason: '라벨-선 겹침 $labelLine — baseline $kCapitalLabelLineOverlapBaseline 악화 금지',
+      reason:
+          '라벨-선 겹침 $labelLine — baseline $kCapitalLabelLineOverlapBaseline 악화 금지',
     );
     expect(
       badge.line,
       lessThanOrEqualTo(kCapitalBadgeLineOverlapBaseline),
-      reason: '뱃지-선 겹침 ${badge.line} — baseline $kCapitalBadgeLineOverlapBaseline 악화 금지',
+      reason:
+          '뱃지-선 겹침 ${badge.line} — baseline $kCapitalBadgeLineOverlapBaseline 악화 금지',
     );
     expect(
       badge.label,
       lessThanOrEqualTo(kCapitalBadgeLabelOverlapBaseline),
-      reason: '뱃지-라벨 겹침 ${badge.label} — baseline $kCapitalBadgeLabelOverlapBaseline 악화 금지',
+      reason:
+          '뱃지-라벨 겹침 ${badge.label} — baseline $kCapitalBadgeLabelOverlapBaseline 악화 금지',
     );
   });
 }

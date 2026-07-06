@@ -126,8 +126,16 @@ void main() {
         ),
       ]);
 
-      expect(offsets['A']!.first, const [Offset.zero, Offset.zero, Offset.zero]);
-      expect(offsets['B']!.first, const [Offset.zero, Offset.zero, Offset.zero]);
+      expect(offsets['A']!.first, const [
+        Offset.zero,
+        Offset.zero,
+        Offset.zero,
+      ]);
+      expect(offsets['B']!.first, const [
+        Offset.zero,
+        Offset.zero,
+        Offset.zero,
+      ]);
     });
   });
 }

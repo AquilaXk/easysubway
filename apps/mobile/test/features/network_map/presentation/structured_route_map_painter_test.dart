@@ -40,7 +40,8 @@ void main() {
       design: design,
       labelTextByStationId: const {'s0': '가역', 's1': '나역', 's2': '다역'},
       badgeLabelByLineId: const {'L1': '1'},
-      measureLabel: (text, {required bool bold}) => Size(text.length * 13.0, 13),
+      measureLabel: (text, {required bool bold}) =>
+          Size(text.length * 13.0, 13),
       measureBadge: (text) => Size(text.length * 11.0 + 10, 18),
     );
     final picture = recordRouteMapPicture(

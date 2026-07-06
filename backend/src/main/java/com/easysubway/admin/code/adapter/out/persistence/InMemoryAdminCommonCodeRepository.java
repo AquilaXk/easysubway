@@ -29,6 +29,7 @@ public class InMemoryAdminCommonCodeRepository implements AdminCommonCodeReposit
 		seedGroup(AdminCommonCodeGroups.INCIDENT_SEVERITY, "장애 심각도", "운영 incident 심각도", 40, now);
 		seedGroup(AdminCommonCodeGroups.INCIDENT_STATUS, "장애 상태", "운영 incident 처리 상태", 50, now);
 		seedGroup(AdminCommonCodeGroups.INCIDENT_SOURCE, "장애 출처", "incident 발생 출처", 60, now);
+		seedGroup(AdminCommonCodeGroups.PUSH_RESEND_LIMIT, "푸시 재발송 상한", "1회 재발송으로 처리할 수 있는 최대 건수", 70, now);
 		seedCode(AdminCommonCodeGroups.REPORT_REJECTION_REASON, "DUPLICATE", "중복 제보", "이미 처리 중인 동일 제보", 10, true, now);
 		seedCode(AdminCommonCodeGroups.REPORT_REJECTION_REASON, "INSUFFICIENT", "정보 부족", "역·시설·사진 정보 부족", 20, true, now);
 		seedCode(AdminCommonCodeGroups.FACILITY_STATUS_REASON, "INSPECTION", "정기 점검", "운영기관 정기 점검", 10, true, now);
@@ -37,10 +38,13 @@ public class InMemoryAdminCommonCodeRepository implements AdminCommonCodeReposit
 		seedCode(AdminCommonCodeGroups.BATCH_FAILURE_CATEGORY, "VALIDATION_ERROR", "확인 실패", "수집 산출물 확인 실패", 20, true, now);
 		seedCode(AdminCommonCodeGroups.INCIDENT_SEVERITY, "MAJOR", "Major", "사용자 기능 영향", 10, true, now);
 		seedCode(AdminCommonCodeGroups.INCIDENT_SEVERITY, "MINOR", "Minor", "운영 확인 필요", 20, true, now);
-		seedCode(AdminCommonCodeGroups.INCIDENT_STATUS, "OPEN", "Open", "처리 전", 10, true, now);
-		seedCode(AdminCommonCodeGroups.INCIDENT_STATUS, "RESOLVED", "Resolved", "해결됨", 20, true, now);
+		seedCode(AdminCommonCodeGroups.INCIDENT_STATUS, "RECEIVED", "접수", "접수됨, 조치 대기", 10, true, now);
+		seedCode(AdminCommonCodeGroups.INCIDENT_STATUS, "IN_PROGRESS", "조치 중", "원인 파악·복구 진행", 20, true, now);
+		seedCode(AdminCommonCodeGroups.INCIDENT_STATUS, "MONITORING", "모니터링", "복구 후 관찰", 30, true, now);
+		seedCode(AdminCommonCodeGroups.INCIDENT_STATUS, "RESOLVED", "종결", "해결·종료됨", 40, true, now);
 		seedCode(AdminCommonCodeGroups.INCIDENT_SOURCE, "HEALTH", "Health", "health 상태", 10, true, now);
 		seedCode(AdminCommonCodeGroups.INCIDENT_SOURCE, "BATCH", "Batch", "배치 실행", 20, true, now);
+		seedCode(AdminCommonCodeGroups.PUSH_RESEND_LIMIT, "50", "1회 재발송 상한(건)", "한 번에 재발송할 수 있는 최대 실패 건수", 10, true, now);
 	}
 
 	@Override

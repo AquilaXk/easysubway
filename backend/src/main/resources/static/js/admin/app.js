@@ -9,7 +9,33 @@
 // 진화형 향상(progressive enhancement) 원칙:
 //   - JS가 꺼져도 화면은 온전히 동작한다. 여기 등록되는 컴포넌트는 "이미 동작하는 화면에
 //     선택적 편의"만 얹는다(예: 이미 보이는 알림을 닫는 버튼).
+// JS 사용 가능 표식: 반응형 사이드바 오프캔버스는 JS가 있을 때만 켠다(no-JS는 스택 표시).
+// app.js는 defer라 이 시점에 document.body가 존재한다.
+document.body.classList.add('has-js');
+
 document.addEventListener('alpine:init', function () {
+	// 반응형 사이드바 토글(#1738): ≤1024px에서 사이드바를 오프캔버스로 여닫는다.
+	// 사이드바 표시는 body.sidebar-open 클래스가, 백드롭은 open 프로퍼티(x-show)가 함께 반영한다.
+	// 메뉴 링크로 이동하면 페이지가 새로 로드되며 자연히 닫힌다. CSP 빌드: 메서드·게터 이름만 쓴다.
+	Alpine.data('sidebarToggle', function () {
+		return {
+			open: false,
+			get ariaExpanded() {
+				return this.open ? 'true' : 'false';
+			},
+			setOpen: function (value) {
+				this.open = value;
+				document.body.classList.toggle('sidebar-open', value);
+			},
+			toggle: function () {
+				this.setOpen(!this.open);
+			},
+			close: function () {
+				this.setOpen(false);
+			},
+		};
+	});
+
 	// 관리자 플래시/토스트 알림: JS가 있으면 닫기 버튼으로 사라진다. 없으면 그대로 표시된다.
 	Alpine.data('dismissibleAlert', function () {
 		return {
@@ -43,6 +69,54 @@ document.addEventListener('alpine:init', function () {
 		};
 	});
 
+	// 커맨드 팔레트(#1738): Cmd/Ctrl+K로 열고, 검색 입력을 htmx로 /admin/search에 debounce 조회한다.
+	// Esc·백드롭으로 닫고, 열릴 때 입력에 포커스. 방향키로 결과 링크 사이를 이동한다.
+	// 진화형 향상 — JS가 없으면 topbar 검색 버튼이 /admin/search 전용 페이지로 이동한다(no-JS 대체).
+	Alpine.data('commandPalette', function () {
+		return {
+			open: false,
+			show: function () {
+				this.open = true;
+				var input = this.$refs.input;
+				this.$nextTick(function () {
+					if (input) {
+						input.focus();
+					}
+				});
+			},
+			hide: function () {
+				this.open = false;
+			},
+			// 입력에서 아래 방향키 → 첫 결과 링크로 포커스 이동.
+			focusResults: function () {
+				var first = this.$root.querySelector('#palette-results a');
+				if (first) {
+					first.focus();
+				}
+			},
+			// 결과 링크에서 위/아래 방향키 → 인접 링크로 포커스 이동(CSP 빌드용 인자 없는 래퍼).
+			moveDown: function (event) {
+				this.moveFocus(event, 1);
+			},
+			moveUp: function (event) {
+				this.moveFocus(event, -1);
+			},
+			moveFocus: function (event, delta) {
+				var links = Array.prototype.slice.call(this.$root.querySelectorAll('#palette-results a'));
+				var index = links.indexOf(event.target);
+				var next = links[index + delta];
+				if (next) {
+					next.focus();
+				} else if (delta < 0) {
+					var input = this.$refs.input;
+					if (input) {
+						input.focus();
+					}
+				}
+			},
+		};
+	});
+
 	// 드로어(사이드 패널): htmx가 상세 fragment를 로드하고 HX-Trigger로 admin-drawer-open을 쏘면 열린다.
 	// Esc·백드롭 클릭·닫기 버튼으로 닫고, 열릴 때 패널로 포커스를 옮긴다(접근성).
 	// 진화형 향상 — JS가 없으면 상세 링크가 상세 페이지로 이동한다(no-JS 대체).
@@ -69,6 +143,138 @@ document.addEventListener('alpine:init', function () {
 		};
 	});
 
+	// 알림 센터(#1738): topbar 벨. 60초마다 /admin/alerts를 htmx로 폴링해 #admin-alert-live를 갱신한다.
+	// 탭이 비활성(document.hidden)이면 폴링을 멈추고, 다시 활성화되면 즉시 갱신 후 재개한다(query budget 보호).
+	// 벨 클릭으로 요약 패널을 여닫는다(열림 상태는 .admin-alert-center.is-open 클래스로 CSS가 표시).
+	// 진화형 향상 — JS가 없으면 벨이 /admin/alerts 전용 페이지로 이동한다(no-JS 대체).
+	// CSP 빌드 규약: x-on/x-bind에는 메서드·프로퍼티(게터) 이름만 쓴다.
+	Alpine.data('alertCenter', function () {
+		return {
+			open: false,
+			timer: null,
+			get rootClass() {
+				return this.open ? 'is-open' : '';
+			},
+			get ariaExpanded() {
+				return this.open ? 'true' : 'false';
+			},
+			init: function () {
+				var self = this;
+				this.refresh();
+				this.start();
+				document.addEventListener('visibilitychange', function () {
+					if (document.hidden) {
+						self.stop();
+					} else {
+						self.refresh();
+						self.start();
+					}
+				});
+			},
+			start: function () {
+				if (this.timer) {
+					return;
+				}
+				var self = this;
+				this.timer = setInterval(function () {
+					if (!document.hidden) {
+						self.refresh();
+					}
+				}, 60000);
+			},
+			stop: function () {
+				if (this.timer) {
+					clearInterval(this.timer);
+					this.timer = null;
+				}
+			},
+			refresh: function () {
+				if (window.htmx) {
+					window.htmx.ajax('GET', '/admin/alerts', {
+						target: '#admin-alert-live',
+						swap: 'innerHTML',
+					});
+				}
+			},
+			toggle: function () {
+				this.open = !this.open;
+			},
+			hide: function () {
+				this.open = false;
+			},
+		};
+	});
+
+	// 운영 화면 자동 갱신(#1742): 실행 중 배치/수집·장애 목록을 새로고침 없이 반영한다.
+	// alertCenter 폴링 패턴을 재사용한다 — 설정은 요소의 data-refresh-* 속성에서 읽고(CSP: 표현식 금지),
+	// data-refresh-active="true"일 때만 폴링한다(배치/수집은 실행 중일 때만 요소가 렌더되어 없으면 정지).
+	// 탭 비활성(document.hidden)이면 멈추고 활성화 시 즉시 갱신 후 재개한다(query budget 보호).
+	// htmx 부분 갱신(hx-select로 live 영역만)이라 폼 포커스·스크롤은 스왑 영역 밖에서 보존된다.
+	Alpine.data('autoRefresh', function () {
+		return {
+			timer: null,
+			active: false,
+			url: '',
+			target: '',
+			interval: 60000,
+			onVisibility: null,
+			init: function () {
+				var dataset = this.$el.dataset;
+				this.url = dataset.refreshUrl || '';
+				this.target = dataset.refreshTarget || '';
+				this.interval = parseInt(dataset.refreshInterval, 10) || 60000;
+				this.active = dataset.refreshActive === 'true';
+				if (!this.active || !this.url || !this.target) {
+					return;
+				}
+				var self = this;
+				this.onVisibility = function () {
+					if (document.hidden) {
+						self.stop();
+					} else {
+						self.refresh();
+						self.start();
+					}
+				};
+				document.addEventListener('visibilitychange', this.onVisibility);
+				this.start();
+			},
+			start: function () {
+				if (this.timer || !this.active) {
+					return;
+				}
+				var self = this;
+				this.timer = setInterval(function () {
+					if (!document.hidden) {
+						self.refresh();
+					}
+				}, this.interval);
+			},
+			stop: function () {
+				if (this.timer) {
+					clearInterval(this.timer);
+					this.timer = null;
+				}
+			},
+			refresh: function () {
+				if (window.htmx) {
+					window.htmx.ajax('GET', this.url, {
+						target: this.target,
+						select: this.target,
+						swap: 'outerHTML',
+					});
+				}
+			},
+			destroy: function () {
+				this.stop();
+				if (this.onVisibility) {
+					document.removeEventListener('visibilitychange', this.onVisibility);
+					this.onVisibility = null;
+				}
+			},
+		};
+	});
+
 	// 표준 테이블: 일괄 선택(선택 수·전체 선택) + 밀도 3단 + 컬럼 표시 토글.
 	// 진화형 향상 — JS가 없으면 개별 체크박스 + 액션 버튼(no-JS 폼)이 그대로 동작하고, 표는 기본 밀도로 보인다.
 	// CSP 빌드 규약: x-on/x-text/x-bind에는 메서드·프로퍼티(게터) 이름만 쓰고 표현식은 쓰지 않는다.
@@ -78,6 +284,7 @@ document.addEventListener('alpine:init', function () {
 			density: 'default',
 			hideCoordinate: false,
 			hidePhoto: false,
+			helpVisible: false,
 			get selectionLabel() {
 				return this.count > 0 ? '선택한 신고 ' + this.count + '건' : '선택한 신고 일괄 처리';
 			},
@@ -107,6 +314,154 @@ document.addEventListener('alpine:init', function () {
 			},
 			togglePhoto: function (event) {
 				this.hidePhoto = event.target.checked;
+			},
+			// 키보드 단축키(#1740): j/k 행 이동·o 상세 열기·a 승인·r 반려·Esc 닫기·? 도움말.
+			// 모더레이터가 마우스 없이 대기열을 처리하도록 한다(Reddit modqueue·모더레이션 API 공통 패턴).
+			// 진화형 향상 — 모든 단축키 동작은 버튼(상세 링크·일괄 승인/반려·도움말)으로도 존재해 스크린리더/no-JS를
+			// 커버한다. 입력·select·textarea 포커스 중에는 비활성해 타이핑을 방해하지 않는다.
+			// 런타임/실제 키 입력 검증은 브라우저가 필요해 접근성 QA(#1749)로 이월한다.
+			get helpExpanded() {
+				return this.helpVisible ? 'true' : 'false';
+			},
+			toggleHelp: function () {
+				this.helpVisible = !this.helpVisible;
+			},
+			hideHelp: function () {
+				this.helpVisible = false;
+			},
+			rowLinks: function () {
+				return Array.prototype.slice.call(this.$root.querySelectorAll('.report-row .detail-link'));
+			},
+			// 현재 포커스가 향한 행의 상세 링크. 포커스가 표 밖이면 첫 행으로 대체한다(비파괴 동작 전용).
+			currentLink: function () {
+				var links = this.rowLinks();
+				if (!links.length) {
+					return null;
+				}
+				return this.focusedRowLink() || links[0];
+			},
+			// 포커스가 실제로 어느 행 안에 있을 때만 그 행의 상세 링크를 준다(없으면 null, 첫 행 폴백 없음).
+			// 승인·반려처럼 파괴적인 단축키가 포커스가 표 밖일 때 첫 행을 잘못 처리하지 않게 한다.
+			focusedRowLink: function () {
+				var active = document.activeElement;
+				var links = this.rowLinks();
+				if (links.indexOf(active) !== -1) {
+					return active;
+				}
+				var row = active && active.closest ? active.closest('.report-row') : null;
+				return row ? row.querySelector('.detail-link') : null;
+			},
+			isFormField: function (element) {
+				if (!element) {
+					return false;
+				}
+				var tag = element.tagName ? element.tagName.toLowerCase() : '';
+				return tag === 'input' || tag === 'textarea' || tag === 'select' || element.isContentEditable;
+			},
+			moveActive: function (delta) {
+				var links = this.rowLinks();
+				if (!links.length) {
+					return;
+				}
+				var index = links.indexOf(document.activeElement);
+				var next;
+				if (index === -1) {
+					next = delta > 0 ? links[0] : links[links.length - 1];
+				} else {
+					next = links[index + delta];
+				}
+				if (next) {
+					next.focus();
+				}
+			},
+			openActive: function () {
+				var link = this.currentLink();
+				if (link) {
+					link.click();
+				}
+			},
+			// 활성 행 하나만 선택 상태로 만들고 일괄 검수 폼을 해당 결정으로 제출한다(단일 처리 시맨틱).
+			// 포커스가 표 밖이면 아무 것도 하지 않는다(첫 행 오처리 방지) — focusedRowLink는 폴백이 없다.
+			processActive: function (decision) {
+				var link = this.focusedRowLink();
+				if (!link) {
+					return;
+				}
+				var row = link.closest('.report-row');
+				var form = this.$root.querySelector('.bulk-form');
+				if (!row || !form) {
+					return;
+				}
+				this.$root.querySelectorAll('input[name="reportIds"]').forEach(function (checkbox) {
+					checkbox.checked = false;
+				});
+				var checkbox = row.querySelector('input[name="reportIds"]');
+				if (checkbox) {
+					checkbox.checked = true;
+				}
+				var button = form.querySelector('button[value="' + decision + '"]');
+				if (button) {
+					button.click();
+				}
+			},
+			handleKey: function (event) {
+				if (this.isFormField(document.activeElement) || event.ctrlKey || event.metaKey || event.altKey) {
+					return;
+				}
+				switch (event.key) {
+					case '?':
+						this.toggleHelp();
+						event.preventDefault();
+						break;
+					case 'j':
+						this.moveActive(1);
+						event.preventDefault();
+						break;
+					case 'k':
+						this.moveActive(-1);
+						event.preventDefault();
+						break;
+					case 'o':
+						this.openActive();
+						event.preventDefault();
+						break;
+					case 'a':
+						this.processActive('ACCEPT');
+						event.preventDefault();
+						break;
+					case 'r':
+						this.processActive('REJECT');
+						event.preventDefault();
+						break;
+					case 'Escape':
+						if (this.helpVisible) {
+							this.hideHelp();
+						}
+						break;
+					default:
+						break;
+				}
+			},
+		};
+	});
+
+	// 실패 푸시 재발송 선택(#1746): 확인 단계에 선택 건수를 보여주고, 선택이 없으면 제출을 막는다.
+	// 진화형 향상 — no-JS에서는 버튼이 항상 활성이고 서버가 빈 선택을 안내한다. 런타임/키 검증은 #1749.
+	Alpine.data('pushResendSelection', function () {
+		return {
+			count: 0,
+			get selectionLabel() {
+				return this.count > 0 ? '선택한 실패 ' + this.count + '건 재발송' : '재발송할 실패 건 선택';
+			},
+			get hasSelection() {
+				return this.count > 0;
+			},
+			// CSP 빌드는 x-bind 안의 연산자(!)를 평가하지 않는다 — 부정은 getter로 노출한다.
+			get submitDisabled() {
+				return this.count === 0;
+			},
+			recount: function () {
+				this.count = this.$root.querySelectorAll('input[name="notificationIds"]:checked').length;
 			},
 		};
 	});

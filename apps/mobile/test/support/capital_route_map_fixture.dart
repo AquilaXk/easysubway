@@ -29,7 +29,8 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({String region = '수도권'})
       ..writeAsBytesSync(gzip.decode(gzBytes));
     final db = sqlite3.open(sqliteFile.path);
     try {
-      final stationRows = db.select('''
+      final stationRows = db.select(
+        '''
         SELECT p.station_id, p.line_id, p.x, p.y, sl.line_sequence, s.name_ko
         FROM route_map_positions p
         JOIN station_lines sl
@@ -37,7 +38,9 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({String region = '수도권'})
         JOIN stations s ON s.id = p.station_id
         WHERE p.region = ?
         ORDER BY p.line_id, sl.line_sequence, p.station_id
-      ''', [region]);
+      ''',
+        [region],
+      );
       final trackRows = db.select(
         'SELECT line_id, path FROM route_map_line_tracks '
         'WHERE region = ? ORDER BY line_id, track_index',

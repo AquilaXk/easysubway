@@ -21,7 +21,12 @@ void main() {
     const anchor = Offset(100, 100);
     const size = Size(40, 12);
     test('right는 점 오른쪽, 세로 중앙 정렬', () {
-      final rect = routeMapLabelRect(anchor, size, RouteMapLabelAnchor.right, 4);
+      final rect = routeMapLabelRect(
+        anchor,
+        size,
+        RouteMapLabelAnchor.right,
+        4,
+      );
       expect(rect, const Rect.fromLTWH(104, 94, 40, 12));
     });
     test('left는 점 왼쪽', () {
@@ -92,10 +97,9 @@ void main() {
     });
 
     test('viewportBounds 밖 위치는 건너뛴다', () {
-      final placed = placeRouteMapLabels(
-        [candidate(id: 'far', anchor: const Offset(5000, 5000), priority: 0)],
-        viewportBounds: const Rect.fromLTWH(0, 0, 400, 400),
-      );
+      final placed = placeRouteMapLabels([
+        candidate(id: 'far', anchor: const Offset(5000, 5000), priority: 0),
+      ], viewportBounds: const Rect.fromLTWH(0, 0, 400, 400));
       expect(placed, isEmpty);
     });
 

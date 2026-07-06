@@ -126,6 +126,28 @@ public class AdminAuditWriter {
 		writeAudit(authentication, request, AdminAuditEventType.ADMIN_ACTION, "ADMIN_SAVED_VIEW", targetId, action, outcome, reason);
 	}
 
+	public void pushResend(
+		Authentication authentication,
+		HttpServletRequest request,
+		String targetId,
+		String action,
+		AdminAuditOutcome outcome,
+		String reason
+	) {
+		writeAudit(authentication, request, AdminAuditEventType.ADMIN_ACTION, "PUSH_NOTIFICATION_RESEND", targetId, action, outcome, reason);
+	}
+
+	public void analyticsExport(
+		Authentication authentication,
+		HttpServletRequest request,
+		String targetId,
+		String action,
+		AdminAuditOutcome outcome,
+		String reason
+	) {
+		writeAudit(authentication, request, AdminAuditEventType.ADMIN_ACTION, "ANALYTICS_EXPORT", targetId, action, outcome, reason);
+	}
+
 	private void writeAudit(
 		Authentication authentication,
 		HttpServletRequest request,

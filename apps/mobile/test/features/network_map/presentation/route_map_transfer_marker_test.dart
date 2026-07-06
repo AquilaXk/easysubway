@@ -144,7 +144,10 @@ void main() {
     test('강등 스택 캡슐도 도트는 노선 수만큼 세로 스택', () {
       final markers = markersFor(20.0);
       expect(markers.single.dots.length, 2);
-      expect(markers.single.dots[0].center.dx, markers.single.dots[1].center.dx);
+      expect(
+        markers.single.dots[0].center.dx,
+        markers.single.dots[1].center.dx,
+      );
     });
   });
 
@@ -152,7 +155,11 @@ void main() {
     expect(offsetsMaxPairwiseDistance(const []), 0);
     expect(offsetsMaxPairwiseDistance(const [Offset(1, 1)]), 0);
     expect(
-      offsetsMaxPairwiseDistance(const [Offset(0, 0), Offset(3, 4), Offset(1, 0)]),
+      offsetsMaxPairwiseDistance(const [
+        Offset(0, 0),
+        Offset(3, 4),
+        Offset(1, 0),
+      ]),
       5,
     );
   });

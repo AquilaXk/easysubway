@@ -109,6 +109,9 @@ public class InMemoryFacilityReportRepository implements
 			.filter(report -> keyword == null
 				|| (report.description() != null
 					&& report.description().toLowerCase(Locale.ROOT).contains(keyword)))
+			.filter(report -> !query.hasStation() || query.stationId().equals(report.stationId()))
+			.filter(report -> !query.hasReportType() || report.reportType() == query.reportType())
+			.filter(report -> !query.hasPhotoFilter() || report.hasPhoto() == query.hasPhoto())
 			.filter(report -> query.createdFrom() == null
 				|| !report.createdAt().isBefore(query.createdFrom().atStartOfDay()))
 			.filter(report -> query.createdTo() == null
@@ -132,6 +135,18 @@ public class InMemoryFacilityReportRepository implements
 		Map<FacilityReportStatus, Long> counts = new EnumMap<>(FacilityReportStatus.class);
 		for (FacilityReport report : reports.values()) {
 			counts.merge(report.status(), 1L, Long::sum);
+		}
+		return Map.copyOf(counts);
+	}
+
+	@Override
+	public Map<String, Long> countPendingReportsByStation() {
+		Map<String, Long> counts = new HashMap<>();
+		for (FacilityReport report : reports.values()) {
+			if (report.status() == FacilityReportStatus.SUBMITTED
+				|| report.status() == FacilityReportStatus.UNDER_REVIEW) {
+				counts.merge(report.stationId(), 1L, Long::sum);
+			}
 		}
 		return Map.copyOf(counts);
 	}
@@ -183,6 +198,17 @@ public class InMemoryFacilityReportRepository implements
 				.reversed()
 				.thenComparing(RepeatedBrokenFacilityReportSummary::stationId)
 				.thenComparing(RepeatedBrokenFacilityReportSummary::facilityId))
+			.toList();
+	}
+
+	@Override
+	public List<FacilityReportSummary> loadReportsForFacility(String stationId, String facilityId, int limit) {
+		return reports.values()
+			.stream()
+			.filter(report -> stationId.equals(report.stationId()) && facilityId.equals(report.facilityId()))
+			.sorted(reportOrder())
+			.limit(Math.max(limit, 0))
+			.map(FacilityReportSummary::from)
 			.toList();
 	}
 

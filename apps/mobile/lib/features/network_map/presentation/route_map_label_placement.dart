@@ -194,10 +194,11 @@ List<PlacedRouteMapLabel> placeRouteMapLabels(
   double gap = 4.0,
   Rect? viewportBounds,
 }) {
-  final sorted = [...candidates]..sort((a, b) {
-    final byPriority = a.priority.compareTo(b.priority);
-    return byPriority != 0 ? byPriority : a.id.compareTo(b.id);
-  });
+  final sorted = [...candidates]
+    ..sort((a, b) {
+      final byPriority = a.priority.compareTo(b.priority);
+      return byPriority != 0 ? byPriority : a.id.compareTo(b.id);
+    });
   final placed = <PlacedRouteMapLabel>[];
   final placedRects = <Rect>[];
   for (final candidate in sorted) {
@@ -214,11 +215,7 @@ List<PlacedRouteMapLabel> placeRouteMapLabels(
       final collides = placedRects.any((other) => other.overlaps(rect));
       if (!collides) {
         placed.add(
-          PlacedRouteMapLabel(
-            candidate: candidate,
-            rect: rect,
-            anchor: anchor,
-          ),
+          PlacedRouteMapLabel(candidate: candidate, rect: rect, anchor: anchor),
         );
         placedRects.add(rect);
         break;
