@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -26,7 +27,12 @@ public class ServiceNoticeService {
 	private final ServiceNoticeRepository repository;
 	private final Clock clock;
 
-	public ServiceNoticeService(ServiceNoticeRepository repository, Clock clock) {
+	@Autowired
+	public ServiceNoticeService(ServiceNoticeRepository repository) {
+		this(repository, Clock.systemUTC());
+	}
+
+	ServiceNoticeService(ServiceNoticeRepository repository, Clock clock) {
 		this.repository = repository;
 		this.clock = clock;
 	}
