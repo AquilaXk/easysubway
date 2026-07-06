@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets, spliceTrackToNode, convergeGroup } from "./splice-transfer-convergence.mjs";
+import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets, spliceTrackToNode, convergeGroup, needsConvergence } from "./splice-transfer-convergence.mjs";
 
 test("transferGroups는 2+노선 역만 그룹화하고 span=최대쌍거리", () => {
   const rows = [
@@ -122,4 +122,12 @@ test("convergeGroup은 그룹 멤버를 캡슐로 수렴하고 각 노선 track�
   assert.ok(Math.abs(dx - 13) < 1e-6, `수렴 스팬 ${dx}`);
   // 각 노선 track 갱신 존재
   assert.equal(r.trackUpdates.length, 2);
+});
+
+test("needsConvergence는 span>target(과분산)만 참, 이미 타이트/coincident는 거짓", () => {
+  const oracle = { "2": 13 };
+  assert.equal(needsConvergence({ memberCount: 2, span: 50 }, oracle), true);  // 과분산 → 압축 대상
+  assert.equal(needsConvergence({ memberCount: 2, span: 13 }, oracle), false); // 정확히 오라클 → 스킵
+  assert.equal(needsConvergence({ memberCount: 2, span: 5 }, oracle), false);  // 이미 타이트 → 스킵
+  assert.equal(needsConvergence({ memberCount: 2, span: 0 }, oracle), false);  // coincident → 스킵(스프레드 금지)
 });

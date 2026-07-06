@@ -45,6 +45,11 @@ export function classifyGroup(group, oracle, { extremeDisp = 35 } = {}) {
   return { target, displacement, tier };
 }
 
+/** span이 오라클 target을 초과하는 그룹만 수렴 대상(오라클=상한, 이미 타이트/coincident는 보존). */
+export function needsConvergence(group, oracle) {
+  return group.span > classifyGroup(group, oracle).target;
+}
+
 /** 멤버 분산 주방향을 H/V로 스냅(분산이 큰 축). */
 export function capsuleAxis(members) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -192,6 +197,7 @@ function main() {
       const { tier } = classifyGroup(g, oracle);
       tierCount[tier] += 1;
       if (!selected.has(tier)) continue;
+      if (!needsConvergence(g, oracle)) continue; // 이미 오라클 이내 — 압축만, 스프레드 금지
       const { positionUpdates, trackUpdates } = convergeGroup(g, oracle, tracksByLine);
       applied += 1;
       if (o.check) continue;
