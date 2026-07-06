@@ -794,6 +794,22 @@
           "dptTm",
           "exptCd"
         ],
+        "liveSampleRetrievedAt": "2026-07-06T23:40:56Z",
+        "liveSampleRowCount": 473,
+        "liveSampleRawSha256": "7c8badc40b31498d71d5326c50df0f87ee349103b18e416a32c133363e22e8cc",
+        "liveSampleSchemaFingerprint": "44585c58909db0d14ed103ecf357291e4f337fc432e9e8938043a39097d904ff",
+        "liveSampleEvidenceHash": "918f97c9da55bf3279bfe280bf00beaa2902a7d20e8b3733a027471c4dff171e",
+        "liveSampleFields": [
+          "arvTm",
+          "dayCd",
+          "dayNm",
+          "dptTm",
+          "lnCd",
+          "railOprIsttCd",
+          "stinCd",
+          "trnNo"
+        ],
+        "liveSampleNote": "subwayTimetable base operation 라이브 응답(4호선 stinCd=433·dayCd=8) 해시. exptCd는 subwayTimetableExp에서만 반환되어 base 샘플 필드에는 없다(outputFields는 문서화 상위집합). 원본은 커밋하지 않음(rawCollectionArtifactCommitted:false와 동일 정책) — 해시로 재현 검증.",
         "collectionOperations": [
           {
             "operation": "subwayTimetable",

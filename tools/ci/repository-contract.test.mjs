@@ -5979,6 +5979,20 @@ test("KRIC subwayTimetable 후보는 line-wide trip/stop-sequence 검증 증거�
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
 
+  // validated_live_sample은 라이브 샘플 해시 3종을 동반한다(admitted sibling과 동일 규약).
+  // 승격 시 validate-source-inventory:validateAdmissionEvidence가 liveSampleEvidenceHash를 강제하므로,
+  // 후보 시점부터 실샘플 해시를 기록해 status와 증거를 일치시킨다(라이브 캡처, 원본 미커밋).
+  assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
+  assert.ok(Number.isInteger(candidate.evidence.liveSampleRowCount) && candidate.evidence.liveSampleRowCount > 0);
+  assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  // base subwayTimetable 샘플 필드는 trip 재구성 축(trnNo)+시각(arvTm/dptTm)을 포함하되 exptCd는 없다(Exp 전용).
+  assert.ok(candidate.evidence.liveSampleFields.includes("trnNo"));
+  assert.ok(candidate.evidence.liveSampleFields.includes("arvTm"));
+  assert.ok(candidate.evidence.liveSampleFields.includes("dptTm"));
+  assert.equal(candidate.evidence.liveSampleFields.includes("exptCd"), false);
+
   // B(evidence 기록 → admin review 대기): 세션이 스스로 admitted로 올리지 않는다.
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(productionSourceIds.has(candidate.id), false, "미승격 후보는 production inventory에 없어야 한다");
