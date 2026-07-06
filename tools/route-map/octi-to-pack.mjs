@@ -225,6 +225,11 @@ export function buildTracksAndCenters(geojson, toDesign, { bundleSpacing, eps, t
     }
   }
   // 노선별 에지(번들 오프셋 적용)
+  // ⚠️ 알려진 한계(#1789 C3 판정 시점): 오프셋은 각 에지의 from→to 프레임에서 왼쪽으로
+  // 적용된다. loom lines[] 순서도 그 프레임 기준이라 에지 내부 번들 순서는 일관되나,
+  // 인접 에지의 from→to 방향이 뒤집히면 물리적 오프셋 쪽이 어긋나 번들-내부 교차가
+  // 소량 생긴다(수도권 실측 free +11). octi 경로를 되살릴 경우 노선별 "한쪽" 부호를
+  // 전역 일관되게 배정해야 한다(현재는 C3 폴백으로 octi 미채택 — 도구 보존용 주석).
   const byLine = new Map();
   for (const e of edges) {
     const size = e.lines.length;
