@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Profile("prod | staging | release | prod-like")
@@ -137,30 +138,40 @@ public class JdbcAdminAuditEventRepository implements AdminAuditEventRepository 
 		""";
 
 	@Override
-	public Optional<AdminAuditEvent> findById(long id, AdminAuditEventType scopeEventType) {
-		String sql = SELECT_COLUMNS + "WHERE audit_id = ?"
-			+ (scopeEventType == null ? "" : " AND event_type = ?");
-		Object[] arguments = scopeEventType == null
-			? new Object[] {id}
-			: new Object[] {id, scopeEventType.name()};
-		return jdbcTemplate.query(sql, this::mapEvent, arguments).stream().findFirst();
+	public Optional<AdminAuditEvent> findById(long id, AdminAuditEventType scopeEventType, boolean excludePrivacyRead) {
+		List<Object> arguments = new ArrayList<>();
+		arguments.add(id);
+		StringBuilder sql = new StringBuilder(SELECT_COLUMNS).append("WHERE audit_id = ?");
+		if (scopeEventType != null) {
+			sql.append(" AND event_type = ?");
+			arguments.add(scopeEventType.name());
+		}
+		if (excludePrivacyRead) {
+			sql.append(" AND event_type <> ?");
+			arguments.add(AdminAuditEventType.PRIVACY_READ.name());
+		}
+		return jdbcTemplate.query(sql.toString(), this::mapEvent, arguments.toArray()).stream().findFirst();
 	}
 
+	// before/after를 별도 조회로 가져오므로 읽기 트랜잭션으로 묶어 두 조회가 같은 스냅샷을 보게 한다.
 	@Override
+	@Transactional(readOnly = true)
 	public AdminAuditActorContext findActorContext(
-		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, int radius) {
+		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, boolean excludePrivacyRead, int radius) {
 		if (radius <= 0) {
 			return AdminAuditActorContext.empty();
 		}
 		// pivot 직전(occurred_at·audit_id 튜플 비교) radius개를 DESC로 뽑아 시간 오름차순으로 뒤집는다.
-		List<AdminAuditEvent> before = new ArrayList<>(actorNeighbors(pivot, scopeEventType, radius, true));
+		List<AdminAuditEvent> before =
+			new ArrayList<>(actorNeighbors(pivot, scopeEventType, excludePrivacyRead, radius, true));
 		java.util.Collections.reverse(before);
-		List<AdminAuditEvent> after = actorNeighbors(pivot, scopeEventType, radius, false);
+		List<AdminAuditEvent> after = actorNeighbors(pivot, scopeEventType, excludePrivacyRead, radius, false);
 		return new AdminAuditActorContext(before, after);
 	}
 
 	private List<AdminAuditEvent> actorNeighbors(
-		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, int radius, boolean before) {
+		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, boolean excludePrivacyRead,
+		int radius, boolean before) {
 		String comparator = before ? "<" : ">";
 		String order = before ? "DESC" : "ASC";
 		List<Object> arguments = new ArrayList<>();
@@ -169,6 +180,10 @@ public class JdbcAdminAuditEventRepository implements AdminAuditEventRepository 
 		if (scopeEventType != null) {
 			sql.append(" AND event_type = ?");
 			arguments.add(scopeEventType.name());
+		}
+		if (excludePrivacyRead) {
+			sql.append(" AND event_type <> ?");
+			arguments.add(AdminAuditEventType.PRIVACY_READ.name());
 		}
 		sql.append(" AND (occurred_at ").append(comparator).append(" ? OR (occurred_at = ? AND audit_id ")
 			.append(comparator).append(" ?))");
@@ -212,6 +227,10 @@ public class JdbcAdminAuditEventRepository implements AdminAuditEventRepository 
 		}
 		if (query.reasonMissing()) {
 			conditions.add("reason IS NULL");
+		}
+		if (query.excludePrivacyRead()) {
+			conditions.add("event_type <> ?");
+			arguments.add(AdminAuditEventType.PRIVACY_READ.name());
 		}
 		if (conditions.isEmpty()) {
 			return "";

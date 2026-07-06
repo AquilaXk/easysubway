@@ -122,10 +122,11 @@ class AdminAuditPageController {
 	}
 
 	private void populateDetailModel(Model model, ScreenContext context, long id) {
-		AdminAuditEvent event = auditEventRepository.findById(id, context.forcedEventType())
+		AdminAuditEvent event = auditEventRepository
+			.findById(id, context.forcedEventType(), context.excludePrivacyRead())
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "감사 이벤트를 찾을 수 없습니다."));
-		AdminAuditActorContext timeline =
-			auditEventRepository.findActorContext(event, context.forcedEventType(), TIMELINE_RADIUS);
+		AdminAuditActorContext timeline = auditEventRepository.findActorContext(
+			event, context.forcedEventType(), context.excludePrivacyRead(), TIMELINE_RADIUS);
 
 		model.addAttribute("title", context.title());
 		model.addAttribute("activeProgram", context.activeProgram());
@@ -138,13 +139,15 @@ class AdminAuditPageController {
 	}
 
 	private static ScreenContext auditContext() {
-		return new ScreenContext("관리자 감사", "a-audits", AUDITS_PATH, AUDITS_BASE, null, false);
+		// 관리자 감사 화면은 개인정보 조회(PRIVACY_READ)를 제외한다 — 개인정보 로그는 별도 권한의 전용
+		// 화면에서만 본다(AUDIT_READ로는 개인정보 조회 이력·사유·전후 흐름에 접근 불가).
+		return new ScreenContext("관리자 감사", "a-audits", AUDITS_PATH, AUDITS_BASE, null, false, true);
 	}
 
 	private static ScreenContext privacyContext() {
 		return new ScreenContext(
 			"개인정보 조회 로그", "a-privacy-audits", PRIVACY_PATH, PRIVACY_BASE,
-			AdminAuditEventType.PRIVACY_READ, true);
+			AdminAuditEventType.PRIVACY_READ, true, false);
 	}
 
 	private void populateAuditModel(Model model, ScreenContext context, AuditFilterParams params) {
@@ -159,7 +162,8 @@ class AdminAuditPageController {
 			params.to(),
 			params.reasonMissing(),
 			params.page(),
-			params.size()
+			params.size(),
+			context.excludePrivacyRead()
 		);
 
 		long total = auditEventRepository.count(query);
@@ -208,7 +212,7 @@ class AdminAuditPageController {
 	private static AdminAuditQuery withReasonMissing(AdminAuditQuery query) {
 		return new AdminAuditQuery(
 			query.eventType(), query.actor(), query.outcome(), query.targetKeyword(),
-			query.occurredFrom(), query.occurredTo(), true, 0, query.size());
+			query.occurredFrom(), query.occurredTo(), true, 0, query.size(), query.excludePrivacyRead());
 	}
 
 	// 현재 필터를 유지하며 reasonMissing=true만 추가한 목록 링크.
@@ -253,6 +257,10 @@ class AdminAuditPageController {
 		List<FilterOption> options = new ArrayList<>();
 		options.add(new FilterOption("", "유형 전체", selected == null));
 		for (AdminAuditEventType type : AdminAuditEventType.values()) {
+			// 유형 필터는 관리자 감사 화면에서만 노출된다. 개인정보 조회는 전용 화면에서만 보므로 제외한다.
+			if (type == AdminAuditEventType.PRIVACY_READ) {
+				continue;
+			}
 			options.add(new FilterOption(type.name(), AuditLabels.eventType(type), type == selected));
 		}
 		return options;
@@ -276,7 +284,8 @@ class AdminAuditPageController {
 		String path,
 		String detailBase,
 		AdminAuditEventType forcedEventType,
-		boolean privacyMode
+		boolean privacyMode,
+		boolean excludePrivacyRead
 	) {
 	}
 
@@ -296,6 +305,7 @@ class AdminAuditPageController {
 		String outcomeLabel,
 		String outcomeTone,
 		String reason,
+		boolean reasonMissing,
 		String occurredAt
 	) {
 
@@ -316,6 +326,8 @@ class AdminAuditPageController {
 				AuditLabels.outcome(event.outcome()),
 				event.outcome() == AdminAuditOutcome.FAILURE ? "failure" : "ok",
 				orDash(event.reason()),
+				// 사유 누락은 표시 문자열("-")이 아니라 실제 도메인 값(null·공백)으로 판정한다.
+				event.reason() == null || event.reason().isBlank(),
 				event.occurredAt().toString()
 			);
 		}

@@ -115,7 +115,7 @@
 						<span class="status-badge" th:classappend="${'tone-' + event.outcomeTone}"
 						      th:text="${event.outcomeLabel}">성공</span>
 					</td>
-					<td th:class="${privacyMode and event.reason == '-'} ? 'reason-missing'"
+					<td th:class="${privacyMode and event.reasonMissing} ? 'reason-missing'"
 					    th:text="${event.reason}">-</td>
 					<td>
 						<a th:href="@{${detailBase} + '/' + ${event.id}}"

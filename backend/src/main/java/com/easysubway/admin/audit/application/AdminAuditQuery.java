@@ -21,7 +21,8 @@ public record AdminAuditQuery(
 	LocalDate occurredTo,
 	boolean reasonMissing,
 	int page,
-	int size
+	int size,
+	boolean excludePrivacyRead
 ) {
 
 	public static final int DEFAULT_PAGE = 0;
@@ -43,9 +44,26 @@ public record AdminAuditQuery(
 		}
 	}
 
+	/** excludePrivacyRead 없이 만드는 하위 호환 생성자(기본 false = 제외 안 함). */
+	public AdminAuditQuery(
+		AdminAuditEventType eventType,
+		String actor,
+		AdminAuditOutcome outcome,
+		String targetKeyword,
+		LocalDate occurredFrom,
+		LocalDate occurredTo,
+		boolean reasonMissing,
+		int page,
+		int size
+	) {
+		this(eventType, actor, outcome, targetKeyword, occurredFrom, occurredTo, reasonMissing, page, size, false);
+	}
+
 	/**
-	 * @param forcedEventType null이면 사용자가 고른 유형(nullable)을 쓰고, 지정되면 그 유형으로 고정한다
-	 *                        (개인정보 로그 화면이 PRIVACY_READ로 강제).
+	 * @param forcedEventType   null이면 사용자가 고른 유형(nullable)을 쓰고, 지정되면 그 유형으로 고정한다
+	 *                          (개인정보 로그 화면이 PRIVACY_READ로 강제).
+	 * @param excludePrivacyRead true면 PRIVACY_READ 이벤트를 결과에서 제외한다(관리자 감사 화면이 개인정보
+	 *                          조회 로그와 권한 분리되도록 — 개인정보는 별도 권한의 전용 화면에서만 본다).
 	 */
 	public static AdminAuditQuery of(
 		AdminAuditEventType forcedEventType,
@@ -57,24 +75,36 @@ public record AdminAuditQuery(
 		LocalDate occurredTo,
 		Boolean reasonMissing,
 		Integer page,
-		Integer size
+		Integer size,
+		boolean excludePrivacyRead
 	) {
+		// 잘못된 요청값(?page=-1, ?size=0, from>to)이 500으로 새지 않도록 질의 생성 전에 보정한다.
+		int safePage = (page == null || page < 0) ? DEFAULT_PAGE : page;
+		int safeSize = (size == null || size <= 0) ? DEFAULT_SIZE : size;
+		LocalDate from = occurredFrom;
+		LocalDate to = occurredTo;
+		if (from != null && to != null && from.isAfter(to)) {
+			LocalDate swap = from;
+			from = to;
+			to = swap;
+		}
 		return new AdminAuditQuery(
 			forcedEventType != null ? forcedEventType : eventType,
 			actor,
 			outcome,
 			targetKeyword,
-			occurredFrom,
-			occurredTo,
+			from,
+			to,
 			Boolean.TRUE.equals(reasonMissing),
-			page == null ? DEFAULT_PAGE : page,
-			size == null ? DEFAULT_SIZE : size
+			safePage,
+			safeSize,
+			excludePrivacyRead
 		);
 	}
 
 	public AdminAuditQuery withPage(int nextPage) {
-		return new AdminAuditQuery(
-			eventType, actor, outcome, targetKeyword, occurredFrom, occurredTo, reasonMissing, nextPage, size);
+		return new AdminAuditQuery(eventType, actor, outcome, targetKeyword, occurredFrom, occurredTo,
+			reasonMissing, nextPage, size, excludePrivacyRead);
 	}
 
 	public boolean hasEventType() {

@@ -54,7 +54,7 @@
 					<a th:if="${targetHref != null}" th:href="@{${targetHref}}" class="target-link">대상 열기</a>
 				</dd>
 				<dt>사유</dt>
-				<dd th:class="${privacyMode and event.reason == '-'} ? 'reason-missing'"
+				<dd th:class="${privacyMode and event.reasonMissing} ? 'reason-missing'"
 				    th:text="${event.reason}">-</dd>
 				<dt>요청 ID</dt>
 				<dd th:text="${event.requestId}">-</dd>

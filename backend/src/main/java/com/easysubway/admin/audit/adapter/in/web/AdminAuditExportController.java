@@ -61,7 +61,7 @@ class AdminAuditExportController {
 		Authentication authentication,
 		HttpServletRequest request
 	) {
-		return export(params, format, null, "admin-audit", authentication, request);
+		return export(params, format, null, true, "admin-audit", authentication, request);
 	}
 
 	@GetMapping("/admin/audits/privacy/export")
@@ -72,18 +72,19 @@ class AdminAuditExportController {
 		Authentication authentication,
 		HttpServletRequest request
 	) {
-		return export(params, format, AdminAuditEventType.PRIVACY_READ, "privacy-audit", authentication, request);
+		return export(params, format, AdminAuditEventType.PRIVACY_READ, false, "privacy-audit", authentication, request);
 	}
 
 	private ResponseEntity<byte[]> export(
 		AuditFilterParams params,
 		String format,
 		AdminAuditEventType forcedEventType,
+		boolean excludePrivacyRead,
 		String filenameBase,
 		Authentication authentication,
 		HttpServletRequest request
 	) {
-		AdminAuditQuery query = params.toQuery(forcedEventType, 0, null);
+		AdminAuditQuery query = params.toQuery(forcedEventType, excludePrivacyRead, 0, null);
 		List<AdminAuditEvent> events = auditEventRepository.findForExport(query, MAX_EXPORT_ROWS);
 		boolean json = "json".equalsIgnoreCase(format);
 
@@ -158,7 +159,13 @@ class AdminAuditExportController {
 		return value == null ? "" : value;
 	}
 
-	private static String csvField(String value) {
+	private static String csvField(String rawValue) {
+		// CSV/수식 인젝션(CWE-1236) 방어: user-agent·client-ip 등 헤더 유래 값이 =,+,-,@로 시작하면
+		// 엑셀 등이 수식으로 해석·실행할 수 있으므로 작은따옴표를 앞에 붙여 무력화한다.
+		String value = rawValue;
+		if (!value.isEmpty() && "=+-@".indexOf(value.charAt(0)) >= 0) {
+			value = "'" + value;
+		}
 		if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
 			return '"' + value.replace("\"", "\"\"") + '"';
 		}

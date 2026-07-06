@@ -94,6 +94,24 @@ class AdminAuditPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("관리자 감사 목록은 개인정보 조회(PRIVACY_READ) 이벤트를 제외한다(권한 분리)")
+	void auditPageExcludesPrivacyReadEvents() throws Exception {
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "ADMIN_ROW",
+			AdminAuditOutcome.SUCCESS, "업무"));
+		auditEventRepository.save(event(AdminAuditEventType.PRIVACY_READ, "alice", "PRIVACY_ROW",
+			AdminAuditOutcome.SUCCESS, "민원 확인"));
+
+		String html = mockMvc.perform(get("/admin/audits/page")
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html).contains("ADMIN_ROW").doesNotContain("PRIVACY_ROW");
+	}
+
+	@Test
 	@DisplayName("사유 없는 조회만 거르는 필터를 제공한다")
 	void auditPageFiltersReasonMissing() throws Exception {
 		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "WITH_REASON", AdminAuditOutcome.SUCCESS, "사유 있음"));
@@ -108,6 +126,21 @@ class AdminAuditPageControllerTest {
 			.getContentAsString();
 
 		assertThat(html).contains("NO_REASON").doesNotContain("WITH_REASON");
+	}
+
+	@Test
+	@DisplayName("잘못된 페이지·기간 요청값은 500이 아니라 보정되어 정상 렌더된다")
+	void invalidRequestParamsAreSanitized() throws Exception {
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "SANE_ROW",
+			AdminAuditOutcome.SUCCESS, "업무"));
+
+		mockMvc.perform(get("/admin/audits/page")
+				.param("page", "-1")
+				.param("size", "0")
+				.param("from", "2026-06-30")
+				.param("to", "2026-06-01")
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isOk());
 	}
 
 	@Test
@@ -198,15 +231,15 @@ class AdminAuditPageControllerTest {
 				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
 			.andExpect(status().isForbidden());
 
+		// 관리자 감사 화면 상세는 PRIVACY_READ 이벤트를 제외하므로 404(권한 분리 — 개인정보는 전용 화면에서만).
+		mockMvc.perform(get("/admin/audits/" + privacyId)
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isNotFound());
+
 		// 개인정보 로그 권한이 있으면 개인정보 상세를 연다.
 		mockMvc.perform(get("/admin/audits/privacy/" + privacyId)
 				.with(user("privacy").authorities(new SimpleGrantedAuthority("admin.privacy-log.read"))))
 			.andExpect(status().isOk());
-
-		// 존재하지 않는 감사 이벤트는 404.
-		mockMvc.perform(get("/admin/audits/999999")
-				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
-			.andExpect(status().isNotFound());
 	}
 
 	@Test

@@ -30,8 +30,12 @@ record AuditFilterParams(
 		return parseEnum(outcome, AdminAuditOutcome.class);
 	}
 
-	/** 목록·내보내기가 같은 필터를 공유하도록 질의를 만든다. forcedEventType은 개인정보 화면(PRIVACY_READ) 강제. */
-	AdminAuditQuery toQuery(AdminAuditEventType forcedEventType, Integer pageOverride, Integer sizeOverride) {
+	/**
+	 * 목록·내보내기가 같은 필터를 공유하도록 질의를 만든다. forcedEventType은 개인정보 화면(PRIVACY_READ)
+	 * 강제, excludePrivacyRead는 관리자 감사 화면에서 개인정보 조회 이벤트를 제외(권한 분리).
+	 */
+	AdminAuditQuery toQuery(
+		AdminAuditEventType forcedEventType, boolean excludePrivacyRead, Integer pageOverride, Integer sizeOverride) {
 		return AdminAuditQuery.of(
 			forcedEventType,
 			eventTypeOrNull(),
@@ -42,7 +46,8 @@ record AuditFilterParams(
 			to,
 			reasonMissing,
 			pageOverride,
-			sizeOverride
+			sizeOverride,
+			excludePrivacyRead
 		);
 	}
 

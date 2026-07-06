@@ -119,10 +119,10 @@ class JdbcAdminAuditEventRepositoryTest {
 				new AdminAuditQuery(null, "admin-a", null, "a-3", null, null, false, 0, 10))
 			.get(0);
 
-		assertThat(repository.findById(pivot.id(), null)).isPresent();
-		assertThat(repository.findById(pivot.id(), AdminAuditEventType.PRIVACY_READ)).isEmpty();
+		assertThat(repository.findById(pivot.id(), null, false)).isPresent();
+		assertThat(repository.findById(pivot.id(), AdminAuditEventType.PRIVACY_READ, false)).isEmpty();
 
-		var context = repository.findActorContext(pivot, AdminAuditEventType.ADMIN_ACTION, 2);
+		var context = repository.findActorContext(pivot, AdminAuditEventType.ADMIN_ACTION, false, 2);
 		assertThat(context.before()).extracting(AdminAuditEvent::targetId).containsExactly("a-1", "a-2");
 		assertThat(context.after()).extracting(AdminAuditEvent::targetId).containsExactly("a-4", "a-5");
 	}
@@ -135,7 +135,7 @@ class JdbcAdminAuditEventRepositoryTest {
 		boolean reasonMissing
 	) {
 		return AdminAuditQuery.of(
-			null, eventType, actor, outcome, targetKeyword, null, null, reasonMissing, null, null);
+			null, eventType, actor, outcome, targetKeyword, null, null, reasonMissing, null, null, false);
 	}
 
 	private AdminAuditEvent fullEvent(

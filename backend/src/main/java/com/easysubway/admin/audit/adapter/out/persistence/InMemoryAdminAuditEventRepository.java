@@ -103,16 +103,18 @@ public class InMemoryAdminAuditEventRepository implements AdminAuditEventReposit
 	}
 
 	@Override
-	public synchronized Optional<AdminAuditEvent> findById(long id, AdminAuditEventType scopeEventType) {
+	public synchronized Optional<AdminAuditEvent> findById(
+		long id, AdminAuditEventType scopeEventType, boolean excludePrivacyRead) {
 		return events.stream()
 			.filter(event -> event.id() != null && event.id() == id)
 			.filter(event -> scopeEventType == null || event.eventType() == scopeEventType)
+			.filter(event -> !excludePrivacyRead || event.eventType() != AdminAuditEventType.PRIVACY_READ)
 			.findFirst();
 	}
 
 	@Override
 	public synchronized AdminAuditActorContext findActorContext(
-		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, int radius) {
+		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, boolean excludePrivacyRead, int radius) {
 		if (radius <= 0) {
 			return AdminAuditActorContext.empty();
 		}
@@ -123,6 +125,7 @@ public class InMemoryAdminAuditEventRepository implements AdminAuditEventReposit
 		List<AdminAuditEvent> sameActor = events.stream()
 			.filter(event -> event.actor().equals(pivot.actor()))
 			.filter(event -> scopeEventType == null || event.eventType() == scopeEventType)
+			.filter(event -> !excludePrivacyRead || event.eventType() != AdminAuditEventType.PRIVACY_READ)
 			.filter(event -> !event.id().equals(pivot.id()))
 			.sorted(chronological)
 			.toList();
@@ -156,6 +159,9 @@ public class InMemoryAdminAuditEventRepository implements AdminAuditEventReposit
 			return false;
 		}
 		if (query.reasonMissing() && event.reason() != null) {
+			return false;
+		}
+		if (query.excludePrivacyRead() && event.eventType() == AdminAuditEventType.PRIVACY_READ) {
 			return false;
 		}
 		LocalDateTime occurredAt = event.occurredAt();

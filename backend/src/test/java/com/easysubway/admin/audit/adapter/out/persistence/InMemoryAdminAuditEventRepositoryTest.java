@@ -65,9 +65,30 @@ class InMemoryAdminAuditEventRepositoryTest {
 		AdminAuditEvent stored = repository.search(
 			new AdminAuditQuery(null, null, null, null, null, null, false, 0, 10)).get(0);
 
-		assertThat(repository.findById(stored.id(), null)).isPresent();
-		assertThat(repository.findById(stored.id(), AdminAuditEventType.PRIVACY_READ)).isEmpty();
-		assertThat(repository.findById(999L, null)).isEmpty();
+		assertThat(repository.findById(stored.id(), null, false)).isPresent();
+		assertThat(repository.findById(stored.id(), AdminAuditEventType.PRIVACY_READ, false)).isEmpty();
+		assertThat(repository.findById(999L, null, false)).isEmpty();
+	}
+
+	@Test
+	@DisplayName("관리자 감사 화면(excludePrivacyRead)은 PRIVACY_READ를 목록·단건·타임라인에서 제외한다")
+	void excludePrivacyReadPartitionsGeneralScreen() {
+		LocalDateTime base = LocalDateTime.of(2026, 6, 27, 9, 0);
+		repository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", AdminAuditOutcome.SUCCESS,
+			"REPORT", "admin-1", "업무", base));
+		repository.save(event(AdminAuditEventType.PRIVACY_READ, "alice", AdminAuditOutcome.SUCCESS,
+			"REPORT", "priv-1", "업무", base.plusMinutes(1)));
+		AdminAuditEvent privacyEvent = repository.search(
+				new AdminAuditQuery(null, "alice", null, null, null, null, false, 0, 10))
+			.stream().filter(e -> e.targetId().equals("priv-1")).findFirst().orElseThrow();
+
+		// 일반 화면 질의는 PRIVACY_READ를 제외한다.
+		AdminAuditQuery generalQuery =
+			new AdminAuditQuery(null, "alice", null, null, null, null, false, 0, 10, true);
+		assertThat(repository.search(generalQuery)).extracting(AdminAuditEvent::targetId).containsExactly("admin-1");
+		assertThat(repository.count(generalQuery)).isEqualTo(1);
+		// 일반 화면 단건은 PRIVACY_READ를 열 수 없다.
+		assertThat(repository.findById(privacyEvent.id(), null, true)).isEmpty();
 	}
 
 	@Test
@@ -85,7 +106,7 @@ class InMemoryAdminAuditEventRepositoryTest {
 			new AdminAuditQuery(null, "admin-a", null, null, null, null, false, 0, 10));
 		AdminAuditEvent pivot = all.stream().filter(event -> event.targetId().equals("a-3")).findFirst().orElseThrow();
 
-		AdminAuditActorContext context = repository.findActorContext(pivot, null, 2);
+		AdminAuditActorContext context = repository.findActorContext(pivot, null, false, 2);
 
 		assertThat(context.before()).extracting(AdminAuditEvent::targetId).containsExactly("a-1", "a-2");
 		assertThat(context.after()).extracting(AdminAuditEvent::targetId).containsExactly("a-4", "a-5");
@@ -99,7 +120,7 @@ class InMemoryAdminAuditEventRepositoryTest {
 		boolean reasonMissing
 	) {
 		return AdminAuditQuery.of(
-			null, eventType, actor, outcome, targetKeyword, null, null, reasonMissing, null, null);
+			null, eventType, actor, outcome, targetKeyword, null, null, reasonMissing, null, null, false);
 	}
 
 	private AdminAuditEvent event(

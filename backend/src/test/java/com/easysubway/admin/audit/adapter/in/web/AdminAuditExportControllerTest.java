@@ -78,6 +78,25 @@ class AdminAuditExportControllerTest {
 	}
 
 	@Test
+	@DisplayName("CSV 내보내기는 수식 인젝션 위험 값(=,+,-,@ 시작)을 작은따옴표로 무력화한다")
+	void csvExportNeutralizesFormulaInjection() throws Exception {
+		auditEventRepository.save(new AdminAuditEvent(
+			null, AdminAuditEventType.ADMIN_ACTION, "=cmd|calc", "admin.view", "req", "127.0.0.1",
+			"@SUM(1)", "FACILITY_REPORT", "report-1", "VIEW", AdminAuditOutcome.SUCCESS, "업무 맥락",
+			LocalDateTime.of(2026, 6, 27, 9, 0)));
+
+		String csv = mockMvc.perform(get("/admin/audits/export")
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(csv).contains("'=cmd|calc").contains("'@SUM(1)");
+		assertThat(csv).doesNotContain(",=cmd|calc,").doesNotContain(",@SUM(1),");
+	}
+
+	@Test
 	@DisplayName("개인정보 로그 내보내기는 개인정보 로그 권한을 요구한다(권한 분리)")
 	void privacyExportRequiresPrivacyPermission() throws Exception {
 		mockMvc.perform(get("/admin/audits/privacy/export")
