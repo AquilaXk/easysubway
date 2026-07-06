@@ -114,6 +114,7 @@ function objectStorageClient() {
         headers: {
           "content-length": String(bytes.length),
           "content-type": contentTypeForKey(key),
+          "cache-control": cacheControlForKey(key),
           "x-amz-meta-sha256": step.sha256,
           "x-amz-meta-size-bytes": String(step.sizeBytes),
         },
@@ -142,6 +143,10 @@ function objectStorageClient() {
       if (response.headers["x-amz-meta-sha256"] !== step.sha256) {
         throw new Error(`${key} uploaded checksum mismatch`);
       }
+      const expectedCacheControl = cacheControlForKey(key);
+      if (response.headers["cache-control"] !== expectedCacheControl) {
+        throw new Error(`${key} cache-control mismatch: ${response.headers["cache-control"]} != ${expectedCacheControl}`);
+      }
     },
     headObject: async (key) => {
       const response = await signedRequest({
@@ -167,6 +172,7 @@ function preauthenticatedObjectStorageClient(baseUrl) {
         headers: {
           "content-length": String(bytes.length),
           "content-type": contentTypeForKey(key),
+          "cache-control": cacheControlForKey(key),
           "opc-meta-sha256": step.sha256,
           "opc-meta-size-bytes": String(step.sizeBytes),
         },
@@ -189,6 +195,10 @@ function preauthenticatedObjectStorageClient(baseUrl) {
       }
       if (sha256(response.body) !== step.sha256) {
         throw new Error(`${key} uploaded checksum mismatch`);
+      }
+      const expectedCacheControl = cacheControlForKey(key);
+      if (response.headers["cache-control"] !== expectedCacheControl) {
+        console.warn(`warning: ${key} cache-control not verified in preauth mode (got ${response.headers["cache-control"] ?? "none"})`);
       }
     },
     headObject: async (key) => {
@@ -462,6 +472,12 @@ function contentTypeForKey(key) {
     return "image/svg+xml";
   }
   return "application/octet-stream";
+}
+
+function cacheControlForKey(key) {
+  return key === "catalog/current.json"
+    ? "public, max-age=60"
+    : "public, max-age=31536000, immutable";
 }
 
 function amzTimestamp(date) {

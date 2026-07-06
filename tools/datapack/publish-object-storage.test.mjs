@@ -162,3 +162,33 @@ test("signed 클라이언트는 releases 객체 불변 제약과 멱등 skip을 
     await rm(workspace, { recursive: true, force: true });
   }
 });
+
+test("게시 실행기는 current=max-age=60, releases=immutable Cache-Control을 PUT에 부여한다", async () => {
+  const mock = await startMockStorage();
+  const workspace = await mkdtemp(path.join(tmpdir(), "publish-cc-"));
+  const baseUrl = `http://127.0.0.1:${mock.port}`;
+  try {
+    await mkdir(path.join(workspace, "catalog"), { recursive: true });
+    const manifestBytes = Buffer.from(JSON.stringify({ ok: 2 }));
+    await writeFile(path.join(workspace, "catalog", "current.json"), manifestBytes);
+    const step = (type, objectKey) => ({ type, sourcePath: "catalog/current.json", objectKey,
+      sha256: sha256(manifestBytes), sizeBytes: manifestBytes.length, packCount: 1, immutable: type.includes("release") });
+    const plan = { schemaVersion: 2, mode: "object-storage-preflight", manifestObjectKey: "catalog/current.json",
+      steps: [
+        step("put-release-manifest-object", "catalog/releases/9.json"),
+        { type: "verify-release-manifest-object", objectKey: "catalog/releases/9.json", sha256: sha256(manifestBytes), sizeBytes: manifestBytes.length, packCount: 1, immutable: true },
+        step("put-manifest-object", "catalog/current.json"),
+        { type: "verify-manifest-object", objectKey: "catalog/current.json", sha256: sha256(manifestBytes), sizeBytes: manifestBytes.length, packCount: 1 },
+      ] };
+    const planPath = path.join(workspace, "plan.json");
+    await writeFile(planPath, JSON.stringify(plan));
+
+    await runPublish(planPath, workspace, baseUrl);
+
+    assert.equal(mock.objects.get("catalog/current.json").cacheControl, "public, max-age=60");
+    assert.equal(mock.objects.get("catalog/releases/9.json").cacheControl, "public, max-age=31536000, immutable");
+  } finally {
+    mock.server.close();
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
