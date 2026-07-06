@@ -53,6 +53,14 @@ String routeMapLineBadgeLabel(String nameKo) {
   return line.length <= 4 ? line : line.substring(0, 4);
 }
 
+/// 노선도 라벨용 역명 축약: '역명(부역명)' → '역명'(#1789). 준지리형 외곽 역의
+/// 긴 부역명이 라벨 겹침의 주원인이라 괄호 부역명을 떼어 표시한다(부역명은 역
+/// 탭 정보에서 제공). 첫 '(' 이전만 취하고, '('가 없거나 맨 앞이면 원문 유지.
+String routeMapStationLabel(String nameKo) {
+  final i = nameKo.indexOf('(');
+  return i <= 0 ? nameKo : nameKo.substring(0, i);
+}
+
 // 스타일 상수 (design px — 캘리브레이션 상수 소비).
 const TextStyle _labelStyle = TextStyle(
   color: Color(0xFF102A2C),

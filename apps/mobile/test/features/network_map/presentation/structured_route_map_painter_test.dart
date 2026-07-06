@@ -101,4 +101,11 @@ void main() {
     expect(moved.shouldRepaint(a), isTrue);
     picture.dispose();
   });
+
+  test('routeMapStationLabel은 괄호 부역명을 축약한다', () {
+    expect(routeMapStationLabel('굴봉산(제이드가든)'), '굴봉산');
+    expect(routeMapStationLabel('신금호'), '신금호');
+    // 맨 앞이 '('이면 축약할 역명이 없으므로 원문 유지.
+    expect(routeMapStationLabel('(임시)역'), '(임시)역');
+  });
 }

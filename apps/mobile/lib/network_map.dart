@@ -2691,7 +2691,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       for (final line in data.lines) line.id: line.color,
     });
     _structuredLabelTextCache = {
-      for (final station in data.stations) station.id: station.nameKo,
+      for (final station in data.stations)
+        station.id: routeMapStationLabel(station.nameKo),
     };
     _structuredLineBadgeLabelCache = {
       for (final line in data.lines) line.id: routeMapLineBadgeLabel(line.name),

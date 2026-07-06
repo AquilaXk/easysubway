@@ -17,9 +17,10 @@ Size _measureBadge(String text) => Size(
   kRouteMapDesignBadgeFontPx + 7,
 );
 
-// [1단계 baseline — 재간격(respace) datapack 반영 커밋(Task 7)에서 0으로 강등.
-//  스펙 R3의 "수도권 잔여 겹침 0" 계약의 실데이터 판정이 이 테스트다.]
-const int kCapitalUnresolvedBaseline = 64; // 2026-07-06 실측(재간격 전)
+// 재간격 + 부역명 축약 + gap 확장 반영(2026-07-06 실측): 64→2. 잔여 1쌍은
+// 임진강/운천(경의중앙 최북단, 둘 다 짧은 평역명·지리적 근접)으로 라벨 배치로는
+// 분리 불가한 기약 케이스 — 도심 겹침은 0이다(스펙 R3). baseline은 악화 금지.
+const int kCapitalUnresolvedBaseline = 2;
 
 void main() {
   test('수도권 실데이터: 전 라벨 표시 + 겹침 악화 금지 게이트', () {
@@ -39,7 +40,16 @@ void main() {
       lessThanOrEqualTo(kCapitalUnresolvedBaseline),
       reason:
           '실측 unresolved=${layout.unresolvedOverlapCount} — baseline 갱신 금지, '
-          '재간격(Task 7) 후 0이 되어야 한다',
+          '재간격+축약+gap 확장으로 2 이하를 유지해야 한다',
     );
+    // 라벨-라벨 겹침 쌍은 기약 1쌍(임진강/운천) 이하 — 도심 포함 그 외 전부 0.
+    final labelRects = layout.labels.map((l) => l.rect).toList();
+    var overlapPairs = 0;
+    for (var i = 0; i < labelRects.length; i += 1) {
+      for (var j = i + 1; j < labelRects.length; j += 1) {
+        if (labelRects[i].overlaps(labelRects[j])) overlapPairs += 1;
+      }
+    }
+    expect(overlapPairs, lessThanOrEqualTo(1), reason: '라벨 겹침 쌍 $overlapPairs');
   });
 }

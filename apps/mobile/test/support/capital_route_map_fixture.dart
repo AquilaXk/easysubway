@@ -3,7 +3,7 @@ import 'dart:ui' show Offset;
 
 import 'package:easysubway_mobile/features/network_map/domain/structured_route_map.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart'
-    show routeMapLineBadgeLabel;
+    show routeMapLineBadgeLabel, routeMapStationLabel;
 import 'package:sqlite3/sqlite3.dart';
 
 /// capital 팩(assets/datapacks/capital.sqlite.gz)을 직접 열어 프로덕션과 같은
@@ -49,7 +49,7 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({String region = '수도권'})
       final inputs = <StructuredRouteMapStationInput>[];
       for (final row in stationRows) {
         final stationId = row['station_id'] as String;
-        labelText[stationId] = row['name_ko'] as String;
+        labelText[stationId] = routeMapStationLabel(row['name_ko'] as String);
         inputs.add(
           StructuredRouteMapStationInput(
             stationId: stationId,
