@@ -7768,6 +7768,8 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(envExample, /EASYSUBWAY_ADMIN_MASTER_DATA_VERSION=unknown/);
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_ADMIN_REVISION$/m);
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_ADMIN_MASTER_DATA_VERSION$/m);
+  // #1694 Part A: 워크플로 전용 조회/콜백 API의 서비스 토큰(안전 기본값 = 미설정 시 전면 거부).
+  assert.match(backendEnvAllowlist, /^EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN$/m);
   assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_REVISION "\$\{DEPLOY_SHA\}"/);
   assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_MASTER_DATA_VERSION "\$\{DEPLOY_SHA\}"/);
 
@@ -9741,7 +9743,8 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /ObjectProvider<LoadRouteTimetablePort>/);
   assert.match(planner, /getIfAvailable\(\)/);
   assert.match(planner, /timetableRequired && routeTimetablePort != null/);
-  assert.match(planner, /timetableRequired && !routeTimetablePort\.hasRouteTimetable\(\)/);
+  assert.match(planner, /timetableRequired && canUseTimetableRaptor\(command\) && timetableCovers\(command\)/);
+  assert.match(planner, /coveredStationIds\(\)/);
   assert.match(planner, /hasRouteTimetable\(\)/);
   assert.match(planner, /!command\.useRealtime\(\)/);
   assert.match(planner, /canUseTimetableRaptor/);
