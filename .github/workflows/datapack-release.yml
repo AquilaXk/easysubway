@@ -20,51 +20,19 @@ on:
         type: choice
         required: true
         default: exploratory
-        options:
-          - exploratory
-          - release-candidate
-          - production-publish
-          - rollback
-      buildSpecPath:
-        description: Production build spec path
-        required: true
-        default: tools/datapack/fixtures/candidate-build-spec.json
-      allowGaps:
-        description: Allow exploratory coverage gaps
-        type: boolean
-        required: true
-        default: false
+        options: [exploratory, release-candidate, production-publish, rollback]
       targetChannel:
         description: Target data pack channel
         type: choice
         required: true
         default: dev
-        options:
-          - dev
-          - staging
-          - production
-      releaseRequestId:
-        description: Admin release request id
+        options: [dev, staging, production]
+      modeArgs:
+        description: >-
+          Mode-specific args as JSON. 예:
+          {"buildSpecPath":"tools/datapack/fixtures/candidate-build-spec.json","releaseRequestId":"exploratory-local","allowGaps":"false"}
         required: true
-        default: exploratory-local
-      releaseRequestPath:
-        description: Admin release request record path
-        required: false
-      androidEvidencePath:
-        description: Android datapack evidence bundle path
-        required: false
-      strictRouteRegressionPath:
-        description: Strict route regression evidence path
-        required: false
-      rollbackTargetSequence:
-        description: Target release sequence number for rollback (rollback mode only)
-        required: false
-      rollbackReason:
-        description: Reason for rollback (rollback mode only)
-        required: false
-      rollbackIdempotencyKey:
-        description: Idempotency key for rollback (rollback mode only)
-        required: false
+        default: '{"buildSpecPath":"tools/datapack/fixtures/candidate-build-spec.json","releaseRequestId":"exploratory-local","allowGaps":"false"}'
 
 concurrency:
   group: datapack-release-${{ github.workflow }}-${{ github.ref }}
@@ -111,17 +79,29 @@ jobs:
             echo "EASYSUBWAY_RELEASE_EVIDENCE_BUNDLE=${{ runner.temp }}/easysubway-datapack-stage/release-evidence-bundle.json"
           } >> "${GITHUB_ENV}"
 
+      - name: Data Pack Release / Parse modeArgs
+        id: args
+        env:
+          MODE_ARGS_INPUT: ${{ github.event.inputs.modeArgs }}
+        run: |
+          node -e '
+            const a = JSON.parse(process.env.MODE_ARGS_INPUT || "{}");
+            const keys = ["buildSpecPath","releaseRequestId","releaseRequestPath","androidEvidencePath","strictRouteRegressionPath","allowGaps","rollbackTargetSequence","rollbackReason","rollbackIdempotencyKey"];
+            const fs = require("fs");
+            for (const k of keys) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${k}=${a[k] ?? ""}\n`);
+          '
+
       - name: Data Pack Release / Validate release mode inputs
         id: release-mode
         env:
           MODE_INPUT: ${{ github.event.inputs.mode }}
-          BUILD_SPEC_PATH_INPUT: ${{ github.event.inputs.buildSpecPath }}
-          ALLOW_GAPS_INPUT: ${{ github.event.inputs.allowGaps }}
+          BUILD_SPEC_PATH_INPUT: ${{ steps.args.outputs.buildSpecPath }}
+          ALLOW_GAPS_INPUT: ${{ steps.args.outputs.allowGaps }}
           TARGET_CHANNEL_INPUT: ${{ github.event.inputs.targetChannel }}
-          RELEASE_REQUEST_ID_INPUT: ${{ github.event.inputs.releaseRequestId }}
-          RELEASE_REQUEST_PATH_INPUT: ${{ github.event.inputs.releaseRequestPath }}
-          ANDROID_EVIDENCE_PATH_INPUT: ${{ github.event.inputs.androidEvidencePath }}
-          STRICT_ROUTE_REGRESSION_PATH_INPUT: ${{ github.event.inputs.strictRouteRegressionPath }}
+          RELEASE_REQUEST_ID_INPUT: ${{ steps.args.outputs.releaseRequestId }}
+          RELEASE_REQUEST_PATH_INPUT: ${{ steps.args.outputs.releaseRequestPath }}
+          ANDROID_EVIDENCE_PATH_INPUT: ${{ steps.args.outputs.androidEvidencePath }}
+          STRICT_ROUTE_REGRESSION_PATH_INPUT: ${{ steps.args.outputs.strictRouteRegressionPath }}
         run: |
           set -euo pipefail
           mode="${MODE_INPUT:-exploratory}"
@@ -589,10 +569,10 @@ jobs:
         if: ${{ steps.release-mode.outputs.mode == 'rollback' && steps.remote-publish-env.outputs.enabled == 'true' && github.ref == 'refs/heads/main' }}
         env:
           # workflow_dispatch 자유입력을 셸에 직접 보간하지 않고 env로 전달한다(GHA expression injection 방지).
-          ROLLBACK_TARGET_SEQUENCE: ${{ github.event.inputs.rollbackTargetSequence }}
+          ROLLBACK_TARGET_SEQUENCE: ${{ steps.args.outputs.rollbackTargetSequence }}
           ROLLBACK_TARGET_CHANNEL: ${{ github.event.inputs.targetChannel }}
-          ROLLBACK_REASON: ${{ github.event.inputs.rollbackReason }}
-          ROLLBACK_IDEMPOTENCY_KEY: ${{ github.event.inputs.rollbackIdempotencyKey }}
+          ROLLBACK_REASON: ${{ steps.args.outputs.rollbackReason }}
+          ROLLBACK_IDEMPOTENCY_KEY: ${{ steps.args.outputs.rollbackIdempotencyKey }}
         run: |
           set -euo pipefail
           node tools/datapack/rollback-manifest.mjs \
