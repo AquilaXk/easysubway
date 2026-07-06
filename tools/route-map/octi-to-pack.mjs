@@ -95,7 +95,11 @@ export function rectifyPolyline(pts, { eps = 2, tol = 0.5 } = {}) {
   }
   const start = s[0];
   const end = s[s.length - 1];
-  const anchorOf = (i) => (i === 0 ? start : i === dirs.length - 1 ? end : s[i]);
+  const anchorOf = (i) => {
+    if (i === 0) return start;
+    if (i === dirs.length - 1) return end;
+    return s[i];
+  };
   const out = [start];
   let prevPoint = start;
   let prevDir = dirs[0];
@@ -203,7 +207,6 @@ export function makeToDesign(tf) {
 
 /** loom GeoJSON + 역변환에서 노선별 track(rectified·offset) + 역 중심좌표를 만든다. */
 export function buildTracksAndCenters(geojson, toDesign, { bundleSpacing, eps, tol }) {
-  const nodeById = new Map(); // loom id → {x,y,label}
   const stationCenter = new Map(); // station_id → {x,y}(base label)
   const edges = [];
   for (const f of geojson.features) {
@@ -211,7 +214,6 @@ export function buildTracksAndCenters(geojson, toDesign, { bundleSpacing, eps, t
       const label = f.properties.station_label || "";
       const [lon, lat] = f.geometry.coordinates;
       const p = toDesign(lon, lat);
-      nodeById.set(f.properties.id, { ...p, label });
       if (label.startsWith("station-") && !label.includes("#")) {
         stationCenter.set(label, p);
       }
@@ -255,8 +257,8 @@ function parseArgs(argv) {
     pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
     index: "apps/mobile/assets/datapacks/index.json",
     region: "수도권",
-    loom: "/tmp/capital-loom.geojson",
-    transform: "/tmp/capital-geo.transform.json",
+    loom: null,
+    transform: null,
     bundleSpacing: 6,
     eps: 2,
     tol: 0.5,
@@ -280,6 +282,9 @@ function parseArgs(argv) {
 
 function main() {
   const o = parseArgs(process.argv.slice(2));
+  if (!o.loom || !o.transform) {
+    throw new Error("사용: --loom <loom.geojson> --transform <transform.json> 필수");
+  }
   const geojson = JSON.parse(readFileSync(o.loom, "utf8"));
   const tf = JSON.parse(readFileSync(o.transform, "utf8"));
   const toDesign = makeToDesign(tf);

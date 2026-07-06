@@ -24,7 +24,7 @@ export const round6 = (v) => Math.round(v * 1e6) / 1e6;
  */
 export function buildGeoTransform({ minX, maxX, minY, maxY }) {
   const R = 6378137.0;
-  const M_PER_DEG_LON = 111319.4907932735677; // R·π/180
+  const M_PER_DEG_LON = (R * Math.PI) / 180; // R·π/180 (식으로 — 리터럴 정밀도 손실 회피)
   const mercY = (latDeg) => {
     const s = Math.sin((latDeg * Math.PI) / 180);
     return (R / 2) * Math.log((1 + s) / (1 - s));
@@ -83,7 +83,7 @@ export function splitHighDegreeNodes(nodeCoord, edgeList) {
       if (e.from === id) e.from = id2;
       else e.to = id2;
     }
-    edgeList.push({ from: id, to: id2, lines: new Set([...incident[0].lines]) });
+    edgeList.push({ from: id, to: id2, lines: new Set(incident[0].lines) });
   }
   return splitNodes;
 }
@@ -92,7 +92,7 @@ function parseArgs(argv) {
   const o = {
     pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
     region: "수도권",
-    out: "/tmp/capital-loom.geojson",
+    out: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
@@ -106,6 +106,7 @@ function parseArgs(argv) {
 
 function main() {
   const o = parseArgs(process.argv.slice(2));
+  if (!o.out) throw new Error("사용: --out <출력.geojson> 필수");
   const { db, dir } = openPack(o.pack, "loom-export-");
   try {
     const posRows = db

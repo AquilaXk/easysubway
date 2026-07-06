@@ -20,7 +20,7 @@ WORK="${LOOM_WORK:-/tmp/loom-work}"
 build() {
   mkdir -p "$WORK" && cd "$WORK"
   # 고정 커밋을 정확히 가져오려면 얕은 fetch로 해당 커밋만 받는다(--depth 1 HEAD 금지).
-  if [ ! -d loom ]; then
+  if [[ ! -d loom ]]; then
     git clone --recursive "$LOOM_REPO"
     cd loom && git checkout "$LOOM_COMMIT" && git submodule update --init --recursive
   else
