@@ -109,7 +109,9 @@ jobs:
       digest: ${{ steps.push.outputs.digest }}
     steps:
       - name: CD Build image / Checkout target SHA
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        # Not fork code: workflow_run is gated to same-repo main CI by the plan
+        # job's `if`, and the ref is a plan-verified main-ancestor SHA.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # NOSONAR
         with:
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
