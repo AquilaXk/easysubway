@@ -163,4 +163,48 @@ void main() {
       5,
     );
   });
+
+  group('routeMapTransferRings (서울메트로 흰 원)', () {
+    test('수렴 멤버는 centroid 흰 원 1개, 연결선 없음', () {
+      final m = routeMapTransferRings(
+        members: const [Offset(100, 100), Offset(100, 100)],
+      );
+      expect(m.rings, hasLength(1));
+      expect(m.rings.single.center, const Offset(100, 100));
+      expect(m.connectors, isEmpty);
+    });
+
+    test('소분산(< 2*radius) 멤버도 centroid 원 1개', () {
+      final m = routeMapTransferRings(
+        members: const [Offset(100, 100), Offset(104, 100)],
+        radius: 6,
+      );
+      expect(m.rings, hasLength(1));
+      expect(m.rings.single.center, const Offset(102, 100));
+      expect(m.connectors, isEmpty);
+    });
+
+    test('대분산(>= 2*radius) 멤버는 멤버별 원 + centroid 연결선', () {
+      final m = routeMapTransferRings(
+        members: const [Offset(0, 0), Offset(100, 0)],
+        radius: 6,
+      );
+      expect(m.rings, hasLength(2));
+      expect(
+        m.rings.map((r) => r.center),
+        containsAll(const [Offset(0, 0), Offset(100, 0)]),
+      );
+      expect(m.connectors, hasLength(2));
+      // 각 연결선의 끝점은 centroid.
+      for (final c in m.connectors) {
+        expect(c.last, const Offset(50, 0));
+      }
+    });
+
+    test('멤버 0개는 빈 마커', () {
+      final m = routeMapTransferRings(members: const []);
+      expect(m.rings, isEmpty);
+      expect(m.connectors, isEmpty);
+    });
+  });
 }

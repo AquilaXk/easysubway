@@ -14,6 +14,10 @@ const double kRouteMapTransferDotRadiusPx = 2.5;
 const double kRouteMapTransferDotGapPx = 1.5;
 const double kRouteMapTransferDotPaddingPx = 1.5;
 
+// 서울메트로 흰 원 환승 마커 반경(design px). 간선 색 선이 만나는 지점에 흰
+// 채움+짙은 테두리 원을 얹는다(#1789 캡슐+도트 스택 대체). 캘리브레이션 값.
+const double kRouteMapTransferRingRadiusPx = 6.0;
+
 /// 환승 마커의 색 도트 한 개 (노선별).
 class RouteMapTransferDot {
   const RouteMapTransferDot({required this.center, required this.color});
@@ -210,4 +214,64 @@ List<RouteMapTransferMarker> routeMapTransferMarkers({
         horizontalDots: horizontalDots,
       ),
   ];
+}
+
+/// 환승 흰 원 하나(서울메트로 룩). 간선 색 선 위에 얹히는 흰 채움+테두리 원.
+class RouteMapTransferRing {
+  const RouteMapTransferRing({required this.center, required this.radius});
+
+  final Offset center;
+  final double radius;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RouteMapTransferRing &&
+      other.center == center &&
+      other.radius == radius;
+
+  @override
+  int get hashCode => Object.hash(center, radius);
+}
+
+/// 한 환승역의 링 마커 기하: 흰 원(들) + (대분산 시) centroid 연결선.
+class RouteMapTransferMarkerV2 {
+  const RouteMapTransferMarkerV2({
+    required this.rings,
+    required this.connectors,
+  });
+
+  final List<RouteMapTransferRing> rings;
+
+  /// 각 원소가 [멤버, centroid] 2점 선분(대분산 환승의 도보 연결 표현).
+  final List<List<Offset>> connectors;
+}
+
+/// 환승 멤버 좌표에서 서울메트로식 흰 원 마커를 만든다(#1789 접근 A 하이브리드).
+///
+/// - 멤버 spread < 2*[radius](수렴·소분산): centroid에 **흰 원 1개**. 간선 선이
+///   원에 닿아 색이 자연 연결된다.
+/// - spread >= 2*[radius](대분산, 물리적으로 먼 환승): 멤버별 원 + centroid로
+///   잇는 얇은 연결선(공식 지도의 도보 연결 표현).
+RouteMapTransferMarkerV2 routeMapTransferRings({
+  required List<Offset> members,
+  double radius = kRouteMapTransferRingRadiusPx,
+}) {
+  if (members.isEmpty) {
+    return const RouteMapTransferMarkerV2(rings: [], connectors: []);
+  }
+  final centroid = _meanOffset(members);
+  if (offsetsMaxPairwiseDistance(members) < 2 * radius) {
+    return RouteMapTransferMarkerV2(
+      rings: [RouteMapTransferRing(center: centroid, radius: radius)],
+      connectors: const [],
+    );
+  }
+  return RouteMapTransferMarkerV2(
+    rings: [
+      for (final m in members) RouteMapTransferRing(center: m, radius: radius),
+    ],
+    connectors: [
+      for (final m in members) [m, centroid],
+    ],
+  );
 }
