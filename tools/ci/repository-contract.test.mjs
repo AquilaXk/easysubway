@@ -6778,6 +6778,7 @@ test("eGovFrame pagination import는 common web pagination 경계에만 둔다",
   assert.deepEqual(egovFrameFiles, [
     "backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java",
     "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+    "backend/src/main/java/com/easysubway/common/web/export/EgovExcelExportSupport.java",
     "backend/src/main/java/com/easysubway/common/web/pagination/EgovPaginationView.java",
     "backend/src/test/java/com/easysubway/support/EgovFrameRuntimeTest.java",
   ]);
@@ -6851,8 +6852,15 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
   );
   assert.equal(gate.pocDecision.pslDataaccess.status, "forbidden_until_poc_passes");
   assert.equal(gate.pocDecision.fdlAccess.status, "forbidden_until_poc_passes");
-  assert.equal(gate.pocDecision.fdlExcel.status, "adoption_in_progress");
-  assert.equal(gate.pocDecision.fdlExcel.targetStatus, "adopted_control_plane_only");
+  assert.equal(gate.pocDecision.fdlExcel.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.fdlExcel.currentImplementation,
+    "backend/src/main/java/com/easysubway/common/web/export/EgovExcelExportSupport.java",
+  );
+  assert.equal(
+    gate.pocDecision.fdlExcel.verification,
+    "backend/src/test/java/com/easysubway/common/web/export/EgovExcelExportSupportTest.java",
+  );
 
   // S2: bat-core moves from deferred to allowed as a direct dependency.
   // psl-dataaccess stays deferred — it only rides in as bat-core's inert transitive.
@@ -6866,6 +6874,25 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
   assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-property"));
   assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-idgnr"));
 
+  // S4: fdl-excel moves to allowed; xlsx exports run alongside the unchanged CSV contract.
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-fdl-excel"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-excel"));
+
+  // S4: the CSV export contract stays byte-for-byte intact — xlsx is additive only.
+  const fieldVerificationController = read(
+    "backend/src/main/java/com/easysubway/field/adapter/in/web/FieldVerificationAdminController.java",
+  );
+  const operatorAccessibilityController = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportController.java",
+  );
+  assert.match(fieldVerificationController, /\/admin\/field-verifications\/stations\/\{stationId\}\/export\.csv/);
+  assert.match(fieldVerificationController, /\/admin\/field-verifications\/stations\/\{stationId\}\/export\.xlsx/);
+  assert.match(operatorAccessibilityController, /\/operator\/api\/accessibility-report\/proposal\.csv/);
+  assert.match(operatorAccessibilityController, /\/operator\/api\/accessibility-report\/proposal\.xlsx/);
+  // controllers route xlsx through the support class — no direct eGovFrame import.
+  assert.doesNotMatch(fieldVerificationController, /org\.egovframe/);
+  assert.doesNotMatch(operatorAccessibilityController, /org\.egovframe/);
+
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
   assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-batch'/);
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-bat-core'/);
@@ -6873,11 +6900,12 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-fdl-idgnr'/);
   assert.doesNotMatch(build, /egovframe-rte-psl-dataaccess/);
   assert.doesNotMatch(build, /egovframe-boot-starter-(access|crypto|security)/);
-  assert.doesNotMatch(build, /egovframe-rte-fdl-excel/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-fdl-excel'/);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-logging:5\.0\.0=/m);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-bat-core:5\.0\.0=/m);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-property:5\.0\.0=/m);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-idgnr:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-excel:5\.0\.0=/m);
 
   // S1: local mirror must carry the four target modules plus their org.egovframe
   // transitive closure so S2~S4 resolve offline (remote-only is gate-forbidden).
