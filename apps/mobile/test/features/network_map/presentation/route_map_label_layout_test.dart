@@ -96,11 +96,29 @@ void main() {
     );
   });
 
-  test('뱃지는 노선 종점 2개만 (반복 없음 — 역명 가림 방지)', () {
+  test('노선번호 뱃지는 역명을 가리지 않고 노선당 소수', () {
     final map = _gridMap(count: 60);
     final layout = _solve(map);
-    // 공식 노선도 관례: 노선명은 종점에만. 중간 반복은 역명을 덮으므로 없앤다.
-    expect(layout.badges.length, 2);
+    // 역명 판독 우선(#1789): 뱃지가 어떤 역 라벨도 덮지 않는다(겹치면 생략).
+    for (final b in layout.badges) {
+      for (final l in layout.labels) {
+        final o = b.rect.intersect(l.rect);
+        expect(
+          o.width > 0 && o.height > 0,
+          isFalse,
+          reason: '뱃지 ${b.lineId}가 라벨 ${l.id}를 덮음',
+        );
+      }
+    }
+    // 노선당 최대 3개(간선 위 소수), clear 자리 없으면 0개 허용.
+    expect(layout.badges.length, lessThanOrEqualTo(3));
+  });
+
+  test('여유 구간에서는 노선번호 뱃지가 간선 위에 배치된다', () {
+    // 널널한 단일 행 노선(긴 트렁크) → 뱃지가 라벨 없는 간선 구간에 배치.
+    final map = _gridMap(count: 6, sourceSpacing: 200);
+    final layout = _solve(map);
+    expect(layout.badges, isNotEmpty);
   });
 
   test('전부 충돌이어도 숨기지 않고 최소 겹침 배치 + unresolved 집계', () {
@@ -142,9 +160,9 @@ void main() {
     expect(byId['s5:L1']!.bold, isFalse); // 일반
   });
 
-  test('라벨은 환승 캡슐 rect를 덮지 않는다 (캡슐 장애물)', () {
-    // 환승 1(스팬 캡슐) + 바로 옆 일반역 1 — 일반역 라벨의 기본 방향 후보가
-    // 캡슐과 부딪히도록 배치한다.
+  test('라벨은 환승 흰 원 rect를 덮지 않는다 (원 장애물)', () {
+    // 환승 1(소분산 → 단일 흰 원) + 바로 옆 일반역 1 — 일반역 라벨의 기본 방향
+    // 후보가 원과 부딪히도록 배치한다.
     final map = StructuredRouteMap(
       lines: const [],
       stations: [
@@ -170,7 +188,7 @@ void main() {
           stationId: 't',
           lineIds: const ['L1', 'L2'],
           centroid: const Offset(0, 0),
-          memberPositions: const [Offset(-6, 0), Offset(6, 0)], // 스팬 이격 12
+          memberPositions: const [Offset(-3, 0), Offset(3, 0)], // 소분산 → 원 1개
         ),
       ],
     );
@@ -192,7 +210,7 @@ void main() {
         expect(
           overlap.width > 0 && overlap.height > 0,
           isFalse,
-          reason: '${label.id} 라벨이 캡슐을 덮음',
+          reason: '${label.id} 라벨이 환승 원을 덮음',
         );
       }
     }

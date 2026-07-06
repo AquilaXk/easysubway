@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui' show Color, Offset, Rect, Size;
+import 'dart:ui' show Offset, Rect, Size;
 
 import '../domain/route_map_design_space.dart';
 import '../domain/structured_route_map.dart';
@@ -78,7 +78,6 @@ class _Candidate {
     required this.priority,
     required this.anchorPadding,
     required this.bold,
-    this.badgeLineId,
   });
   final String id;
   final String text;
@@ -87,31 +86,80 @@ class _Candidate {
   final int priority;
   final double anchorPadding;
   final bool bold;
-  final String? badgeLineId; // null이면 역 라벨.
 }
 
-/// 환승 캡슐의 design space 외접 Rect — 라벨 배치의 선점 장애물(#1789).
-/// painter와 같은 [routeMapTransferMarkers] 호출로 기하 정합을 보장한다
-/// (색은 캡슐 기하에 영향이 없어 placeholder를 넘긴다).
+// 노선 뱃지 개수: 트렁크가 길면 3, 아니면 2(#1789 — 노선당 소수, 클러터 회피).
+int _badgeCountForLine(RouteMapLineGeometry line, RouteMapDesignSpace design) {
+  var maxLen = 0.0;
+  for (final poly in line.polylines) {
+    var len = 0.0;
+    for (var i = 1; i < poly.length; i += 1) {
+      len += (design.toDesign(poly[i]) - design.toDesign(poly[i - 1])).distance;
+    }
+    if (len > maxLen) {
+      maxLen = len;
+    }
+  }
+  return maxLen > 2000 ? 3 : 2;
+}
+
+// 간선(가장 긴 polyline) arc-length 균등 후보 앵커(design px). 후보를 넉넉히 만들어
+//   겹치는 위치를 건너뛰고 다음을 시도할 여지를 준다(1/8..7/8).
+List<Offset> _badgeAnchorsAlong(
+  RouteMapLineGeometry line,
+  RouteMapDesignSpace design,
+) {
+  var trunk = const <Offset>[];
+  var trunkLen = -1.0;
+  for (final poly in line.polylines) {
+    final pts = [for (final p in poly) design.toDesign(p)];
+    var len = 0.0;
+    for (var i = 1; i < pts.length; i += 1) {
+      len += (pts[i] - pts[i - 1]).distance;
+    }
+    if (len > trunkLen) {
+      trunkLen = len;
+      trunk = pts;
+    }
+  }
+  if (trunk.length < 2 || trunkLen <= 0) {
+    return const [];
+  }
+  const divisions = 7;
+  return [
+    for (var i = 1; i <= divisions; i += 1)
+      _pointAtFraction(trunk, trunkLen, i / (divisions + 1)),
+  ];
+}
+
+// polyline 위 arc-length fraction(0..1) 위치의 점.
+Offset _pointAtFraction(List<Offset> pts, double totalLen, double fraction) {
+  final target = totalLen * fraction;
+  var acc = 0.0;
+  for (var i = 1; i < pts.length; i += 1) {
+    final seg = (pts[i] - pts[i - 1]).distance;
+    if (acc + seg >= target) {
+      final t = seg == 0 ? 0.0 : (target - acc) / seg;
+      return Offset.lerp(pts[i - 1], pts[i], t)!;
+    }
+    acc += seg;
+  }
+  return pts.last;
+}
+
+/// 환승 흰 원의 design space 외접 Rect — 라벨 배치의 선점 장애물(#1789).
+/// painter와 같은 [routeMapTransferRings] 호출로 기하 정합을 보장한다.
 List<Rect> routeMapTransferObstacleRects(
   StructuredRouteMap map,
   RouteMapDesignSpace design,
 ) {
   final rects = <Rect>[];
   for (final group in map.transferGroups) {
-    final centers = [for (final p in group.memberPositions) design.toDesign(p)];
-    final markers = routeMapTransferMarkers(
-      memberCenters: centers,
-      colors: List<Color>.filled(centers.length, const Color(0xFF000000)),
-      designSpread:
-          offsetsMaxPairwiseDistance(group.memberPositions) *
-          design.designScale,
-      dotRadius: kRouteMapTransferDotRadiusPx,
-      dotGap: kRouteMapTransferDotGapPx,
-      padding: kRouteMapTransferDotPaddingPx,
+    final marker = routeMapTransferRings(
+      members: [for (final p in group.memberPositions) design.toDesign(p)],
     );
-    for (final marker in markers) {
-      rects.add(marker.capsule.outerRect);
+    for (final ring in marker.rings) {
+      rects.add(Rect.fromCircle(center: ring.center, radius: ring.radius));
     }
   }
   return rects;
@@ -128,66 +176,10 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   final terminusIds = routeMapTerminusStationIds(map);
   final candidates = <_Candidate>[];
 
-  // 1) 노선 뱃지: 끝점 + arc length 반복 (스펙 S4 — 노선 중간 확대에도 식별).
-  for (final line in map.lines) {
-    final label = badgeLabelByLineId[line.lineId];
-    if (label == null || label.isEmpty) {
-      continue;
-    }
-    final size = measureBadge(label);
-    var emitted = 0;
-    void emit(Offset source) {
-      candidates.add(
-        _Candidate(
-          id: 'badge:${line.lineId}:${emitted++}',
-          text: label,
-          anchor: design.toDesign(source),
-          size: size,
-          priority: -1,
-          anchorPadding: kRouteMapDesignBadgeRadiusPx,
-          bold: false,
-          badgeLineId: line.lineId,
-        ),
-      );
-    }
+  // 노선 뱃지(색 원)는 역 라벨 배치가 끝난 뒤 별도 pass에서 간선 arc-length 위에
+  //   놓는다(아래) — 역명을 가리면 생략(역명 판독 우선, #1789).
 
-    // 노선 뱃지는 **종점에만** 둔다(공식 노선도 관례). 선 따라 반복하면 역명을
-    // 덮어 가독을 해친다 — 중간 구간은 선 색으로 노선을 식별한다(#1789 튜닝).
-    //
-    // anchor = 실제 양 극점(모든 조각 끝점 중 상호 최원 쌍). 다중 조각 노선에서
-    // first/last가 중앙 조각 경계로 잡혀 뱃지가 도심을 덮던 문제를 고친다(#1789).
-    final endpoints = <Offset>[];
-    for (final polyline in line.polylines) {
-      if (polyline.isEmpty) {
-        continue;
-      }
-      endpoints.add(polyline.first);
-      if (polyline.length > 1) {
-        endpoints.add(polyline.last);
-      }
-    }
-    Offset? a;
-    Offset? b;
-    var maxD = -1.0;
-    for (var i = 0; i < endpoints.length; i += 1) {
-      for (var j = i + 1; j < endpoints.length; j += 1) {
-        final d = (endpoints[i] - endpoints[j]).distanceSquared;
-        if (d > maxD) {
-          maxD = d;
-          a = endpoints[i];
-          b = endpoints[j];
-        }
-      }
-    }
-    if (a != null) {
-      emit(a);
-    }
-    if (b != null && b != a) {
-      emit(b); // 순환선(양 극점 근접)은 a==b → 한 번만.
-    }
-  }
-
-  // 2) 환승 라벨(그룹당 1) + 역 라벨(환승 멤버 제외).
+  // 환승 라벨(그룹당 1) + 역 라벨(환승 멤버 제외).
   for (final group in map.transferGroups) {
     final text = labelTextByStationId[group.stationId];
     if (text == null || text.isEmpty) {
@@ -297,25 +289,52 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       unresolved += 1; // 라벨-라벨 겹침을 못 피한 경우만 집계.
     }
     placedRects.add(rect);
-    if (candidate.badgeLineId != null) {
+    labels.add(
+      RouteMapStaticLabel(
+        id: candidate.id,
+        text: candidate.text,
+        rect: rect,
+        bold: candidate.bold,
+      ),
+    );
+  }
+
+  // 노선 뱃지 색 원: 간선 arc-length 위 후보 중 이미 배치된 역 라벨·환승 원·다른
+  //   뱃지와 안 겹치는 위치에만 놓는다(역명 판독 > 노선번호 존재 — 겹치면 생략,
+  //   노선당 0개 허용). 간선 색 위에 놓이는 것은 정상(공식 서울메트로 룩).
+  for (final line in map.lines) {
+    final label = badgeLabelByLineId[line.lineId];
+    if (label == null || label.isEmpty) {
+      continue;
+    }
+    final size = measureBadge(label);
+    final radius = math.max(kRouteMapDesignBadgeRadiusPx, size.width / 2 + 1);
+    final maxBadges = _badgeCountForLine(line, design);
+    var placed = 0;
+    for (final anchor in _badgeAnchorsAlong(line, design)) {
+      if (placed >= maxBadges) {
+        break;
+      }
+      final rect = Rect.fromCircle(center: anchor, radius: radius);
+      var clash = false;
+      for (final other in placedRects) {
+        final overlap = rect.intersect(other);
+        if (overlap.width > 0 && overlap.height > 0) {
+          clash = true;
+          break;
+        }
+      }
+      if (clash) {
+        continue; // 역명 등과 겹치면 이 위치는 생략(어거지 삽입 금지).
+      }
+      placedRects.add(rect);
       badges.add(
-        RouteMapStaticBadge(
-          lineId: candidate.badgeLineId!,
-          label: candidate.text,
-          rect: rect,
-        ),
+        RouteMapStaticBadge(lineId: line.lineId, label: label, rect: rect),
       );
-    } else {
-      labels.add(
-        RouteMapStaticLabel(
-          id: candidate.id,
-          text: candidate.text,
-          rect: rect,
-          bold: candidate.bold,
-        ),
-      );
+      placed += 1;
     }
   }
+
   return RouteMapStaticLabelLayout(
     labels: labels,
     badges: badges,

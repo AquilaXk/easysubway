@@ -22,10 +22,12 @@ Size _measureBadge(String text) => Size(
 // 분리 불가한 기약 케이스 — 도심 겹침은 0이다(스펙 R3). baseline은 악화 금지.
 const int kCapitalUnresolvedBaseline = 2;
 
-// 2026-07-06 실기기 클러터 게이트 확장 — 라벨-라벨 외 라벨-선·뱃지 겹침도 측정해
-// "게이트=실기기 체감" 정합. baseline은 현재 실측값(악화 금지); 후속 #2·#3 수정이 낮춘다.
+// 2026-07-06 실기기 클러터 게이트 — 라벨-라벨 외 라벨-선 겹침도 측정해 "게이트=
+// 실기기 체감" 정합. baseline은 현재 실측값(악화 금지).
 const int kCapitalLabelLineOverlapBaseline = 17;
-const int kCapitalBadgeLineOverlapBaseline = 1;
+// 노선번호 색 원은 간선 위에 얹히는 게 서울메트로 룩의 의도라 뱃지-선 겹침은 측정
+// 하지 않는다(#1789). 대신 뱃지가 역명을 가리지 않는 것(뱃지-라벨 겹침 0)이 핵심
+// 제약 — 뱃지 pass가 라벨과 겹치는 후보를 생략한다.
 const int kCapitalBadgeLabelOverlapBaseline = 0;
 
 void main() {
@@ -72,17 +74,11 @@ void main() {
       reason:
           '라벨-선 겹침 $labelLine — baseline $kCapitalLabelLineOverlapBaseline 악화 금지',
     );
-    expect(
-      badge.line,
-      lessThanOrEqualTo(kCapitalBadgeLineOverlapBaseline),
-      reason:
-          '뱃지-선 겹침 ${badge.line} — baseline $kCapitalBadgeLineOverlapBaseline 악화 금지',
-    );
+    // 노선번호 원이 역명을 가리지 않는다(핵심 제약) — 간선 위 배치는 의도.
     expect(
       badge.label,
       lessThanOrEqualTo(kCapitalBadgeLabelOverlapBaseline),
-      reason:
-          '뱃지-라벨 겹침 ${badge.label} — baseline $kCapitalBadgeLabelOverlapBaseline 악화 금지',
+      reason: '뱃지-라벨 겹침 ${badge.label} — 역명 판독 우선(0 유지, 겹치는 후보는 생략)',
     );
   });
 }
