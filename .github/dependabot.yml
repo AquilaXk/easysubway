@@ -1,0 +1,63 @@
+# Dependabot keeps SHA-pinned actions and lockfiles from silently aging — the
+# counterpart to this repo's pinning policy (issue #1684).
+#
+# Governance (see #1751 automerge FIFO queue):
+# - groups keep the weekly PR burst to ~1 PR per ecosystem.
+# - auto-rebase is turned off — the merge-queue coordinator owns up-to-date
+#   (branch update); Dependabot must not race it by auto-rebasing.
+# - No automerge label is auto-attached: labels are added only after the code
+#   review gate, Dependabot PRs included.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      actions-all:
+        patterns:
+          - "*"
+
+  - package-ecosystem: gradle
+    directory: "/backend"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      gradle-backend-minor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: gradle
+    directory: "/apps/mobile/android"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      gradle-android-minor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: pub
+    directory: "/apps/mobile"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    rebase-strategy: disabled
+    groups:
+      pub-minor:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
