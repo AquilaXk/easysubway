@@ -8,6 +8,22 @@ export const androidPublisherScope = "https://www.googleapis.com/auth/androidpub
 export const defaultTokenUri = "https://oauth2.googleapis.com/token";
 export const defaultApiBaseUrl = "https://androidpublisher.googleapis.com/androidpublisher/v3";
 
+// Validate a request URL before it reaches fetch: only absolute HTTPS URLs are
+// allowed, so a bad token_uri / base-url cannot be used to reach an arbitrary
+// (e.g. http or internal) endpoint.
+export function assertRequestUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("invalid google play request url");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("google play request url must be https");
+  }
+  return parsed.toString();
+}
+
 export async function fetchAccessToken(serviceAccount, fetchImpl = fetch) {
   const tokenUri = serviceAccount.token_uri || defaultTokenUri;
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -22,7 +38,7 @@ export async function fetchAccessToken(serviceAccount, fetchImpl = fetch) {
   const unsignedToken = `${header}.${claim}`;
   const signature = createSign("RSA-SHA256").update(unsignedToken).sign(requireJsonString(serviceAccount, "private_key"));
   const assertion = `${unsignedToken}.${signature.toString("base64url")}`;
-  const response = await fetchImpl(tokenUri, {
+  const response = await fetchImpl(assertRequestUrl(tokenUri), {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -38,7 +54,7 @@ export async function fetchAccessToken(serviceAccount, fetchImpl = fetch) {
 }
 
 export async function requestJson(url, { method, token, body }, fetchImpl = fetch) {
-  const response = await fetchImpl(url, {
+  const response = await fetchImpl(assertRequestUrl(url), {
     method,
     headers: {
       authorization: `Bearer ${token}`,
@@ -59,7 +75,7 @@ export async function requestJson(url, { method, token, body }, fetchImpl = fetc
 
 // Uploads a binary body (AAB / mapping) to an Android Publisher upload endpoint.
 export async function uploadMedia(url, { token, contentType, data }, fetchImpl = fetch) {
-  const response = await fetchImpl(url, {
+  const response = await fetchImpl(assertRequestUrl(url), {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": contentType },
     body: data,
