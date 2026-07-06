@@ -249,6 +249,25 @@ class DatapackReleaseCallbackServiceTest {
             String.class)).isEqualTo("cand-1");
     }
 
+    @Test
+    @DisplayName("(i) PASS + production 채널 존재 + evidence bundle 미등록 → status PUBLISHED 유지 + promote_outcome=REJECTED")
+    void passWithChannelButNoEvidenceBundle_publishesAndRejectsPromote() {
+        insertRow("DISPATCHED");
+        insertCallbackTestCandidate(CAND_PREV, SHA_PREV);
+        insertCallbackTestCandidate("cand-1", SHA);
+        insertCallbackTestChannel(CAND_PREV, SHA_PREV);
+        // evidence bundle 미삽입 → ensureProductionEvidenceBundle 게이트 거부 경로
+
+        String sig = computeSignature("PASS");
+        CallbackResult result = service.receive(command("PASS", sig));
+
+        assertThat(result.status()).isEqualTo("PUBLISHED");
+        assertThat(result.idempotentReplay()).isFalse();
+        assertThat(statusOf()).isEqualTo("PUBLISHED");
+        assertThat(promoteOutcomeOf()).isEqualTo("REJECTED");
+        assertThat(promoteDetailOf()).contains("evidence");
+    }
+
     @TestConfiguration
     static class CallbackSignatureTestConfig {
 

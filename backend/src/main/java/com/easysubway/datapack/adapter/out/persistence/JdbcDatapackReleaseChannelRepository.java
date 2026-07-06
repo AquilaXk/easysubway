@@ -68,6 +68,7 @@ public class JdbcDatapackReleaseChannelRepository implements DatapackReleaseChan
 			""", this::mapCommandEvent, channel, idempotencyKey).stream().findFirst();
 	}
 
+	@Override
 	public Optional<ReleaseChannelState> findChannel(String channel) {
 		return jdbcTemplate.query("""
 			SELECT channel, candidate_id, manifest_sha256,

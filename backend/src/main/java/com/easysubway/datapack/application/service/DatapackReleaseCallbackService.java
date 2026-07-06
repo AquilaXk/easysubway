@@ -1,8 +1,9 @@
 package com.easysubway.datapack.application.service;
 
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseChannelRepository;
+import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
+import com.easysubway.datapack.application.service.DatapackReleaseChannelCommandService.ReleaseChannelCommand;
 import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import java.time.Clock;
@@ -15,7 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 워크플로가 보낸 release callback payload를 수신해 HMAC 검증 → release request 상태 전이 → 멱등 재수신
- * no-op를 처리한다. best-effort promote는 Task 7에서 훅으로 추가한다.
+ * no-op를 처리한다. PASS 시 production 채널로 best-effort 자동 promote를 시도한다.
+ * promote 게이트 거부 시에도 status=PUBLISHED를 유지하고 promote_outcome=REJECTED를 기록한다.
  */
 @Service
 public class DatapackReleaseCallbackService {
@@ -25,18 +27,18 @@ public class DatapackReleaseCallbackService {
     private final DatapackReleaseRequestRepository repository;
     private final CallbackSignature signature;
     private final Clock clock;
-    private final DatapackReleaseChannelCommandService channelCommandService;
-    private final JdbcDatapackReleaseChannelRepository channelRepository;
+    private final DatapackReleaseChannelCommandPort channelCommandPort;
+    private final DatapackReleasePromoteDelegate promoteDelegate;
 
     public DatapackReleaseCallbackService(DatapackReleaseRequestRepository repository,
         CallbackSignature signature, ObjectProvider<Clock> clockProvider,
-        DatapackReleaseChannelCommandService channelCommandService,
-        JdbcDatapackReleaseChannelRepository channelRepository) {
+        DatapackReleaseChannelCommandPort channelCommandPort,
+        DatapackReleasePromoteDelegate promoteDelegate) {
         this.repository = repository;
         this.signature = signature;
         this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
-        this.channelCommandService = channelCommandService;
-        this.channelRepository = channelRepository;
+        this.channelCommandPort = channelCommandPort;
+        this.promoteDelegate = promoteDelegate;
     }
 
     @Transactional
@@ -84,9 +86,9 @@ public class DatapackReleaseCallbackService {
 
     private void tryPromote(DatapackReleaseRequest r, CallbackCommand cmd) {
         try {
-            var channel = channelRepository.findChannel("production")
+            var channel = channelCommandPort.findChannel("production")
                 .orElseThrow(() -> new IllegalStateException("production channel missing"));
-            channelCommandService.promote(new DatapackReleaseChannelCommandService.ReleaseChannelCommand(
+            promoteDelegate.promote(new ReleaseChannelCommand(
                 "production", channel.candidateId(), r.candidateId(),
                 channel.manifestSha256(), cmd.manifestSha256(),
                 r.requestedBy(), r.approvedBy(), "auto-promote via release callback",
