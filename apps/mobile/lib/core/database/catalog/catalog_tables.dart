@@ -48,6 +48,9 @@ class Stations extends Table {
   TextColumn get nameKo => text().named('name_ko')();
   TextColumn get nameEn =>
       text().named('name_en').withDefault(const Constant(''))();
+  // 부역명(#1789 P0.2). name_ko는 역명만, 부역명은 이 필드로 분리한다.
+  TextColumn get nameSub =>
+      text().named('name_sub').withDefault(const Constant(''))();
   TextColumn get normalizedName => text().named('normalized_name')();
   TextColumn get region => text().withDefault(const Constant(''))();
   RealColumn get latitude => real().nullable()();
