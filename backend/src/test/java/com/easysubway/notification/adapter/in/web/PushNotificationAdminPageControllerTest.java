@@ -72,6 +72,45 @@ class PushNotificationAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("푸시 화면은 실패 분석 추이 차트·증감 카드·기간 버튼을 렌더링한다")
+	void pushPageRendersFailureTrendChart() throws Exception {
+		String html = mockMvc.perform(get("/admin/notifications/push/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("id=\"push-trends\"")
+			.contains("추이 기간 선택")
+			.contains("/admin/notifications/push/trends")
+			.contains("전 기간 대비 증감")
+			.contains("push-trend-canvas")
+			.contains("발송 시도·실패")
+			.contains("/js/admin/dashboard-charts.js");
+	}
+
+	@Test
+	@DisplayName("기간 추이 fragment는 셸 없이 추이 영역만 반환한다")
+	void pushTrendsFragmentReturnsSectionOnly() throws Exception {
+		String fragment = mockMvc.perform(get("/admin/notifications/push/trends")
+				.param("days", "30")
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(fragment)
+			.contains("id=\"push-trends\"")
+			.contains("최근 30일 추이")
+			.doesNotContain("admin-shell")
+			.doesNotContain("상태별 알림");
+	}
+
+	@Test
 	@DisplayName("푸시 알림 현황 페이지는 관리자 인증을 요구한다")
 	void pushNotificationDashboardRequiresAdminAuthentication() throws Exception {
 		mockMvc.perform(get("/admin/notifications/push/page"))
