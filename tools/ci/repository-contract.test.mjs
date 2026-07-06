@@ -1029,6 +1029,7 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
   const dataPackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
   const sonarCloudWorkflow = read(".github/workflows/sonarcloud.yml");
   const storeDistributionWorkflow = read(".github/workflows/store-distribution-evidence.yml");
+  const osvScheduledWorkflow = read(".github/workflows/osv-scheduled.yml");
   const inlineSlackWorkflows = [
     ciWorkflow,
     cdWorkflow,
@@ -1036,29 +1037,31 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
     dataPackReleaseWorkflow,
     sonarCloudWorkflow,
     storeDistributionWorkflow,
+    osvScheduledWorkflow,
   ].join("\n---\n");
   const readme = read("README.md");
   const envExample = read(".env.example");
 
   assert.ok(!existsSync(path.join(root, removedWorkflowPath)), "Slack notification workflow must not create standalone skipped runs");
-  assert.equal((inlineSlackWorkflows.match(/uses: slackapi\/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c/g) ?? []).length, 6);
-  assert.equal((inlineSlackWorkflows.match(/webhook-type: incoming-webhook/g) ?? []).length, 6);
+  assert.equal((inlineSlackWorkflows.match(/uses: slackapi\/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c/g) ?? []).length, 7);
+  assert.equal((inlineSlackWorkflows.match(/webhook-type: incoming-webhook/g) ?? []).length, 7);
   assert.doesNotMatch(inlineSlackWorkflows, /uses: slackapi\/slack-github-action@v3\.0\.3/);
   const slackPayloads = inlineSlackWorkflows.match(/payload: \|\n(?: {10,}.+\n?)*/g) ?? [];
-  assert.equal(slackPayloads.length, 6);
+  assert.equal(slackPayloads.length, 7);
   for (const payload of slackPayloads) {
     assert.doesNotMatch(payload, /^\s+(channel|username|icon_emoji|icon_url):/m);
   }
   assert.doesNotMatch(inlineSlackWorkflows, /webhook:\s*\$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
   assert.equal((inlineSlackWorkflows.match(/SLACK_CI_WEBHOOK_URL: \$\{\{ secrets\.SLACK_CI_WEBHOOK_URL \}\}/g) ?? []).length, 1);
   assert.equal((inlineSlackWorkflows.match(/SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/g) ?? []).length, 4);
-  assert.equal((inlineSlackWorkflows.match(/SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/g) ?? []).length, 1);
+  assert.equal((inlineSlackWorkflows.match(/SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/g) ?? []).length, 2);
   assert.match(ciWorkflow, /notify-slack-ci-failure:[\s\S]*needs:\s*\n\s*-\s*changes[\s\S]*github\.event_name == 'push'[\s\S]*github\.ref == 'refs\/heads\/main'[\s\S]*contains\(needs\.\*\.result, 'failure'\)/);
   assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*deploy[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(releaseArtifactsWorkflow, /notify-slack-release-result:[\s\S]*github\.event_name != 'pull_request'[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(dataPackReleaseWorkflow, /notify-slack-datapack-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(storeDistributionWorkflow, /notify-slack-store-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(sonarCloudWorkflow, /notify-slack-security-failure:[\s\S]*github\.event_name == 'push'[\s\S]*SLACK_SECURITY_WEBHOOK_URL/);
+  assert.match(osvScheduledWorkflow, /notify-slack-security-failure:[\s\S]*needs:\s*\n\s*-\s*osv-scan[\s\S]*SLACK_SECURITY_WEBHOOK_URL/);
 
   assert.match(readme, /Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다/);
   assert.match(readme, /SLACK_CI_WEBHOOK_URL/);
@@ -1068,6 +1071,60 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
   assert.match(envExample, /^SLACK_CI_WEBHOOK_URL=$/m);
   assert.match(envExample, /^SLACK_RELEASE_WEBHOOK_URL=$/m);
   assert.match(envExample, /^SLACK_SECURITY_WEBHOOK_URL=$/m);
+});
+
+test("스케줄 취약점 스캔은 PR 스캔과 동일 SHA·동일 lockfile로 상시 감시한다", () => {
+  const scheduled = read(".github/workflows/osv-scheduled.yml");
+  const ci = read(".github/workflows/ci.yml");
+
+  // Same pinned reusable OSV workflow SHA as ci.yml, non-PR variant.
+  assert.match(
+    ci,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable-pr\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+  );
+  assert.match(
+    scheduled,
+    /uses: google\/osv-scanner-action\/\.github\/workflows\/osv-scanner-reusable\.yml@9a498708959aeaef5ef730655706c5a1df1edbc2/,
+  );
+  assert.match(scheduled, /- cron: "17 21 \* \* 1"/);
+  assert.match(scheduled, /workflow_dispatch:/);
+  for (const lockfile of [
+    "--lockfile=apps/mobile/pubspec.lock",
+    "--lockfile=apps/mobile/android/app/gradle.lockfile",
+    "--lockfile=backend/gradle.lockfile",
+  ]) {
+    assert.ok(scheduled.includes(lockfile), `scheduled scan must include ${lockfile}`);
+  }
+  // Least privilege on the scan job; top-level workflow has no ambient perms.
+  assert.match(scheduled, /permissions: \{\}/);
+  assert.match(scheduled, /security-events: write/);
+
+  // Dependabot PR titles bypass the human bracket-prefix check via actor skip,
+  // not by loosening the regex (skipped == satisfied for required checks).
+  assert.match(ci, /github\.actor != 'dependabot\[bot\]'/);
+});
+
+test("Dependabot는 4개 ecosystem을 큐 규약(그룹·rebase 비활성)으로 자동 업데이트한다", () => {
+  const dependabot = read(".github/dependabot.yml");
+  assert.match(dependabot, /^version: 2$/m);
+
+  const ecosystems = [...dependabot.matchAll(/package-ecosystem: (\S+)\n\s*directory: "([^"]+)"/g)].map(
+    (match) => `${match[1]}:${match[2]}`,
+  );
+  assert.deepEqual(ecosystems.sort(), [
+    "github-actions:/",
+    "gradle:/apps/mobile/android",
+    "gradle:/backend",
+    "pub:/apps/mobile",
+  ]);
+
+  // #1751 coordinator owns branch-up-to-date; Dependabot must not auto-rebase.
+  assert.equal((dependabot.match(/rebase-strategy: disabled/g) ?? []).length, 4);
+  // Grouped so the weekly burst stays ~1 PR per ecosystem.
+  assert.equal((dependabot.match(/groups:/g) ?? []).length, 4);
+  assert.equal((dependabot.match(/open-pull-requests-limit: 5/g) ?? []).length, 4);
+  // No auto-label: the automerge label is added only after the review gate.
+  assert.doesNotMatch(dependabot, /labels:/);
 });
 
 test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () => {
