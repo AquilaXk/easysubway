@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,6 +20,32 @@ void main() {
     test('임계 40 경계', () {
       expect(networkMapUsesWholeRegionInitialView(40), isTrue);
       expect(networkMapUsesWholeRegionInitialView(41), isFalse);
+    });
+  });
+
+  group('초기 카메라는 축소 하한(scale == initialScale) contain-fit', () {
+    const viewport = Size(1080, 2000);
+    // 대표 지역 bounds: 광주(초소형·세로 긴 1호선)~수도권(초대형 격자).
+    const regions = <String, Rect>{
+      '광주(초소형)': Rect.fromLTWH(0, 0, 300, 1500),
+      '대전(소형)': Rect.fromLTWH(0, 0, 900, 700),
+      '부산(중형)': Rect.fromLTWH(0, 0, 2000, 1600),
+      '수도권(초대형)': Rect.fromLTWH(0, 0, 4000, 4400),
+    };
+
+    regions.forEach((label, bounds) {
+      test('$label 초기 화면은 축소 하한에서 시작', () {
+        final camera = networkMapInitialCameraForRegion(
+          regionBounds: bounds,
+          fullBounds: bounds,
+          viewport: viewport,
+        );
+        // 정적 스케일 렌더: 초기 카메라 = 지역 전체가 담긴 축소 하한
+        // (scale == initialScale, 확대는 이 위로만). #1789 전환 후 bucket 무관.
+        expect(camera.initialScale, isNotNull);
+        expect(camera.initialScale, greaterThan(0));
+        expect(camera.scale, camera.initialScale);
+      });
     });
   });
 }
