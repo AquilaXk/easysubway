@@ -1,5 +1,6 @@
 package com.easysubway.admin.audit.adapter.in.web;
 
+import com.easysubway.admin.audit.application.AdminAuditActorContext;
 import com.easysubway.admin.audit.application.AdminAuditQuery;
 import com.easysubway.admin.audit.application.port.out.AdminAuditEventRepository;
 import com.easysubway.admin.audit.domain.AdminAuditEvent;
@@ -7,18 +8,22 @@ import com.easysubway.admin.audit.domain.AdminAuditEventType;
 import com.easysubway.admin.audit.domain.AdminAuditOutcome;
 import com.easysubway.common.web.pagination.EgovPaginationView;
 import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
+import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxTrigger;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * 관리자 감사·개인정보 조회 로그 표준 테이블(#1747). 유형·actor·결과·기간·target 검색·"사유 없는 조회"
@@ -79,6 +84,59 @@ class AdminAuditPageController {
 	) {
 		populateAuditModel(model, privacyContext(), params);
 		return historyRestore ? "admin/audits/list" : "admin/audits/list :: auditResults";
+	}
+
+	// 상세 드로어 전후 타임라인의 반경(같은 actor 직전·직후 각 5건).
+	private static final int TIMELINE_RADIUS = 5;
+
+	@GetMapping(AUDITS_BASE + "/{id}")
+	@PreAuthorize("hasAuthority('admin.audit.read')")
+	String auditDetailPage(@PathVariable long id, Model model) {
+		populateDetailModel(model, auditContext(), id);
+		return "admin/audits/detail";
+	}
+
+	// 상세 드로어(#1747): 같은 URL을 htmx로 열면 상세 본문 fragment만 반환하고 HX-Trigger로
+	// admin-drawer-open을 쏴 패널을 연다. no-JS에서는 상세 링크가 상세 페이지로 이동한다.
+	@HxRequest
+	@GetMapping(AUDITS_BASE + "/{id}")
+	@HxTrigger("admin-drawer-open")
+	@PreAuthorize("hasAuthority('admin.audit.read')")
+	String auditDetailDrawer(@PathVariable long id, Model model) {
+		populateDetailModel(model, auditContext(), id);
+		return "admin/audits/detail :: detailBody";
+	}
+
+	@GetMapping(PRIVACY_BASE + "/{id}")
+	@PreAuthorize("hasAuthority('admin.privacy-log.read')")
+	String privacyDetailPage(@PathVariable long id, Model model) {
+		populateDetailModel(model, privacyContext(), id);
+		return "admin/audits/detail";
+	}
+
+	@HxRequest
+	@GetMapping(PRIVACY_BASE + "/{id}")
+	@HxTrigger("admin-drawer-open")
+	@PreAuthorize("hasAuthority('admin.privacy-log.read')")
+	String privacyDetailDrawer(@PathVariable long id, Model model) {
+		populateDetailModel(model, privacyContext(), id);
+		return "admin/audits/detail :: detailBody";
+	}
+
+	private void populateDetailModel(Model model, ScreenContext context, long id) {
+		AdminAuditEvent event = auditEventRepository.findById(id, context.forcedEventType())
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "감사 이벤트를 찾을 수 없습니다."));
+		AdminAuditActorContext timeline =
+			auditEventRepository.findActorContext(event, context.forcedEventType(), TIMELINE_RADIUS);
+
+		model.addAttribute("title", context.title());
+		model.addAttribute("activeProgram", context.activeProgram());
+		model.addAttribute("basePath", context.path());
+		model.addAttribute("privacyMode", context.privacyMode());
+		model.addAttribute("event", AuditEventRow.from(event));
+		model.addAttribute("targetHref", AuditTargetLink.hrefFor(event.targetType(), event.targetId()));
+		model.addAttribute("timelineBefore", timeline.before().stream().map(AuditEventRow::from).toList());
+		model.addAttribute("timelineAfter", timeline.after().stream().map(AuditEventRow::from).toList());
 	}
 
 	private static ScreenContext auditContext() {

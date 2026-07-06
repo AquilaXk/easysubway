@@ -1,9 +1,11 @@
 package com.easysubway.admin.audit.application.port.out;
 
+import com.easysubway.admin.audit.application.AdminAuditActorContext;
 import com.easysubway.admin.audit.application.AdminAuditQuery;
 import com.easysubway.admin.audit.domain.AdminAuditEvent;
 import com.easysubway.admin.audit.domain.AdminAuditEventType;
 import java.util.List;
+import java.util.Optional;
 
 public interface AdminAuditEventRepository {
 
@@ -26,4 +28,13 @@ public interface AdminAuditEventRepository {
 	 * 정렬된 distinct 목록.
 	 */
 	List<String> findDistinctActors(AdminAuditEventType scopeEventType);
+
+	/** 상세 드로어용 단건 조회. scopeEventType이 지정되면 그 유형만(권한 분리 강제). */
+	Optional<AdminAuditEvent> findById(long id, AdminAuditEventType scopeEventType);
+
+	/**
+	 * 상세 드로어의 "같은 actor 전후 타임라인": pivot 기준 같은 actor의 직전·직후 이벤트를 각 radius개씩
+	 * 시간순으로 준다. scopeEventType이 지정되면 그 유형만(개인정보 로그).
+	 */
+	AdminAuditActorContext findActorContext(AdminAuditEvent pivot, AdminAuditEventType scopeEventType, int radius);
 }

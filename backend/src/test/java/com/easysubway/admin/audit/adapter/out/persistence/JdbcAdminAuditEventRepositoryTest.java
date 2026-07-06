@@ -103,6 +103,30 @@ class JdbcAdminAuditEventRepositoryTest {
 		assertThat(repository.findDistinctActors(AdminAuditEventType.PRIVACY_READ)).containsExactly("admin-b");
 	}
 
+	@Test
+	@DisplayName("단건 조회와 actor 전후 타임라인은 scope 유형을 지키고 전후를 시간순으로 나눈다")
+	void findByIdAndActorContext() {
+		var repository = new JdbcAdminAuditEventRepository(adminAuditDataSource());
+		LocalDateTime base = LocalDateTime.of(2026, 6, 27, 9, 0);
+		for (int index = 0; index < 6; index++) {
+			repository.save(fullEvent(AdminAuditEventType.ADMIN_ACTION, "admin-a", AdminAuditOutcome.SUCCESS,
+				"REPORT", "a-" + index, "업무 맥락", base.plusMinutes(index)));
+		}
+		repository.save(fullEvent(AdminAuditEventType.PRIVACY_READ, "admin-a", AdminAuditOutcome.SUCCESS,
+			"REPORT", "priv-0", "업무 맥락", base.plusSeconds(200)));
+
+		AdminAuditEvent pivot = repository.search(
+				new AdminAuditQuery(null, "admin-a", null, "a-3", null, null, false, 0, 10))
+			.get(0);
+
+		assertThat(repository.findById(pivot.id(), null)).isPresent();
+		assertThat(repository.findById(pivot.id(), AdminAuditEventType.PRIVACY_READ)).isEmpty();
+
+		var context = repository.findActorContext(pivot, AdminAuditEventType.ADMIN_ACTION, 2);
+		assertThat(context.before()).extracting(AdminAuditEvent::targetId).containsExactly("a-1", "a-2");
+		assertThat(context.after()).extracting(AdminAuditEvent::targetId).containsExactly("a-4", "a-5");
+	}
+
 	private static AdminAuditQuery query(
 		AdminAuditEventType eventType,
 		String actor,

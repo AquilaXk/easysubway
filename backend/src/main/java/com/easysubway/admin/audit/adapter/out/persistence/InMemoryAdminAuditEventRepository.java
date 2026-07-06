@@ -1,5 +1,6 @@
 package com.easysubway.admin.audit.adapter.out.persistence;
 
+import com.easysubway.admin.audit.application.AdminAuditActorContext;
 import com.easysubway.admin.audit.application.AdminAuditQuery;
 import com.easysubway.admin.audit.application.port.out.AdminAuditEventRepository;
 import com.easysubway.admin.audit.domain.AdminAuditEvent;
@@ -9,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import org.springframework.context.annotation.Profile;
@@ -87,6 +89,42 @@ public class InMemoryAdminAuditEventRepository implements AdminAuditEventReposit
 			.distinct()
 			.sorted()
 			.toList();
+	}
+
+	@Override
+	public synchronized Optional<AdminAuditEvent> findById(long id, AdminAuditEventType scopeEventType) {
+		return events.stream()
+			.filter(event -> event.id() != null && event.id() == id)
+			.filter(event -> scopeEventType == null || event.eventType() == scopeEventType)
+			.findFirst();
+	}
+
+	@Override
+	public synchronized AdminAuditActorContext findActorContext(
+		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, int radius) {
+		if (radius <= 0) {
+			return AdminAuditActorContext.empty();
+		}
+		// pivot 기준 (occurred_at, id) 튜플 비교로 같은 actor의 직전·직후를 시간 오름차순으로 나눈다.
+		Comparator<AdminAuditEvent> chronological = Comparator
+			.comparing(AdminAuditEvent::occurredAt)
+			.thenComparing(AdminAuditEvent::id);
+		List<AdminAuditEvent> sameActor = events.stream()
+			.filter(event -> event.actor().equals(pivot.actor()))
+			.filter(event -> scopeEventType == null || event.eventType() == scopeEventType)
+			.filter(event -> !event.id().equals(pivot.id()))
+			.sorted(chronological)
+			.toList();
+		List<AdminAuditEvent> before = sameActor.stream()
+			.filter(event -> chronological.compare(event, pivot) < 0)
+			.toList();
+		List<AdminAuditEvent> after = sameActor.stream()
+			.filter(event -> chronological.compare(event, pivot) > 0)
+			.limit(radius)
+			.toList();
+		// 직전은 pivot에 가까운 radius개만 남기되(뒤쪽), 표시는 시간 오름차순 유지.
+		List<AdminAuditEvent> nearestBefore = before.subList(Math.max(0, before.size() - radius), before.size());
+		return new AdminAuditActorContext(List.copyOf(nearestBefore), after);
 	}
 
 	private Stream<AdminAuditEvent> matching(AdminAuditQuery query) {

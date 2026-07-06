@@ -1,5 +1,6 @@
 package com.easysubway.admin.audit.adapter.out.persistence;
 
+import com.easysubway.admin.audit.application.AdminAuditActorContext;
 import com.easysubway.admin.audit.application.AdminAuditQuery;
 import com.easysubway.admin.audit.application.port.out.AdminAuditEventRepository;
 import com.easysubway.admin.audit.domain.AdminAuditEvent;
@@ -10,6 +11,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
@@ -114,6 +116,56 @@ public class JdbcAdminAuditEventRepository implements AdminAuditEventRepository 
 		return jdbcTemplate.queryForList(
 			"SELECT DISTINCT actor FROM admin_audit_events WHERE event_type = ? ORDER BY actor ASC",
 			String.class, scopeEventType.name());
+	}
+
+	private static final String SELECT_COLUMNS = """
+		SELECT audit_id, event_type, actor, role_permission, request_id, client_ip, user_agent,
+			target_type, target_id, action, outcome, reason, occurred_at
+		FROM admin_audit_events
+		""";
+
+	@Override
+	public Optional<AdminAuditEvent> findById(long id, AdminAuditEventType scopeEventType) {
+		String sql = SELECT_COLUMNS + "WHERE audit_id = ?"
+			+ (scopeEventType == null ? "" : " AND event_type = ?");
+		Object[] arguments = scopeEventType == null
+			? new Object[] {id}
+			: new Object[] {id, scopeEventType.name()};
+		return jdbcTemplate.query(sql, this::mapEvent, arguments).stream().findFirst();
+	}
+
+	@Override
+	public AdminAuditActorContext findActorContext(
+		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, int radius) {
+		if (radius <= 0) {
+			return AdminAuditActorContext.empty();
+		}
+		// pivot 직전(occurred_at·audit_id 튜플 비교) radius개를 DESC로 뽑아 시간 오름차순으로 뒤집는다.
+		List<AdminAuditEvent> before = new ArrayList<>(actorNeighbors(pivot, scopeEventType, radius, true));
+		java.util.Collections.reverse(before);
+		List<AdminAuditEvent> after = actorNeighbors(pivot, scopeEventType, radius, false);
+		return new AdminAuditActorContext(before, after);
+	}
+
+	private List<AdminAuditEvent> actorNeighbors(
+		AdminAuditEvent pivot, AdminAuditEventType scopeEventType, int radius, boolean before) {
+		String comparator = before ? "<" : ">";
+		String order = before ? "DESC" : "ASC";
+		List<Object> arguments = new ArrayList<>();
+		arguments.add(pivot.actor());
+		StringBuilder sql = new StringBuilder(SELECT_COLUMNS).append("WHERE actor = ?");
+		if (scopeEventType != null) {
+			sql.append(" AND event_type = ?");
+			arguments.add(scopeEventType.name());
+		}
+		sql.append(" AND (occurred_at ").append(comparator).append(" ? OR (occurred_at = ? AND audit_id ")
+			.append(comparator).append(" ?))");
+		arguments.add(pivot.occurredAt());
+		arguments.add(pivot.occurredAt());
+		arguments.add(pivot.id());
+		sql.append(" ORDER BY occurred_at ").append(order).append(", audit_id ").append(order).append(" LIMIT ?");
+		arguments.add(radius);
+		return jdbcTemplate.query(sql.toString(), this::mapEvent, arguments.toArray());
 	}
 
 	// 감사 필터를 화이트리스트 컬럼으로만 조립한다. target 키워드는 target_id·target_type만 LIKE(메타문자
