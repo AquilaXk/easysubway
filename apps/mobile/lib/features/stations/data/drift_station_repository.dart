@@ -527,6 +527,7 @@ class DriftStationRepository
             s.id,
             s.name_ko,
             s.name_en,
+            s.name_sub,
             s.region,
             s.latitude,
             s.longitude,
@@ -556,6 +557,7 @@ class DriftStationRepository
           id: stationId,
           nameKo: row.read<String>('name_ko'),
           nameEn: row.read<String?>('name_en') ?? '',
+          nameSub: row.read<String?>('name_sub') ?? '',
           region: row.read<String>('region'),
           latitude: row.read<double?>('latitude'),
           longitude: row.read<double?>('longitude'),
@@ -610,6 +612,7 @@ class _LocalStationSummary {
     required this.id,
     required this.nameKo,
     required this.nameEn,
+    required this.nameSub,
     required this.region,
     required this.latitude,
     required this.longitude,
@@ -623,6 +626,7 @@ class _LocalStationSummary {
   final String id;
   final String nameKo;
   final String nameEn;
+  final String nameSub;
   final String region;
   final double? latitude;
   final double? longitude;
@@ -642,6 +646,7 @@ class _LocalStationSummary {
       nameKo,
       '$nameKo역',
       nameEn,
+      if (nameSub.isNotEmpty) nameSub,
       ...aliases,
       ...lines.map((line) => line.stationCode),
       ...lines.map((line) => '${_lineSearchName(line.name)}$nameKo'),
