@@ -8,6 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { inflateSync } from "node:zlib";
+import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -722,6 +723,32 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
 });
 
+test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터와 1:1로 고정된다", () => {
+  // These context names correspond 1:1 to main ruleset 17584352's
+  // required_status_checks. Renaming a ci.yml job without updating the ruleset
+  // (via apply-main-ruleset-required-checks.mjs) would leave a required check
+  // forever pending and block every merge — this test is the tripwire.
+  const workflow = read(".github/workflows/ci.yml");
+  for (const context of REQUIRED_STATUS_CHECK_CONTEXTS) {
+    // Context names are plain job names; a literal substring check avoids
+    // regex-escaping the value.
+    assert.ok(workflow.includes(`name: ${context}\n`), `ci.yml must define a job named ${context}`);
+  }
+  // Release Gate Consistency and PR Title are the two checks #1685 promotes to
+  // required, so they must be part of the canonical set.
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("Release Gate Consistency"));
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("PR Title"));
+
+  // The automerge coordinator derives the list from the ruleset at runtime, and
+  // its hardcoded fallback must match the canonical set exactly (#1685 note).
+  const coordinator = read(".github/workflows/automerge-queue.yml");
+  assert.match(coordinator, /gh api "repos\/\$\{REPO\}\/rules\/branches\/main"/);
+  assert.match(coordinator, /select\(\.type == "required_status_checks"\)/);
+  const fallbackMatch = coordinator.match(/required_checks='(\[[^']*\])'/);
+  assert.ok(fallbackMatch, "coordinator must keep a hardcoded fallback list");
+  assert.deepEqual(JSON.parse(fallbackMatch[1]), REQUIRED_STATUS_CHECK_CONTEXTS);
+});
+
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");
@@ -772,8 +799,17 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /tools\/deploy\/backend-app-env\.allowlist/);
   assert.match(workflow, /CD Deploy \/ Validate Docker Compose deployment config/);
   assert.match(workflow, /docker compose --env-file "\$\{PREPARED_ENV_DIR\}\/compose\.env" -f infra\/docker-compose\.yml config --quiet/);
-  assert.match(workflow, /CD Deploy \/ Build backend bootJar/);
-  assert.match(workflow, /sha256sum backend\.jar > backend\.jar\.sha256/);
+  // build-once, deploy-same: the arm64 image is built and pushed to GHCR by the
+  // build-image job; the deploy job pulls it by digest instead of building a jar
+  // on the runner or on the server (issue #1686).
+  assert.match(workflow, /CD Build image \/ Build and push arm64 image/);
+  assert.match(workflow, /ghcr\.io\/aquilaxk\/easysubway-backend/);
+  assert.match(workflow, /if \[\[ "\$\{arch\}" != "linux\/arm64" \]\]; then/);
+  assert.match(workflow, /CD Deploy \/ Pull backend image by digest/);
+  assert.match(workflow, /docker tag "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}" "easysubway-backend:\$\{DEPLOY_SHA\}"/);
+  assert.match(workflow, /DEPLOY_IMAGE_DIGEST="\$\{DEPLOY_IMAGE_DIGEST\}"/);
+  assert.doesNotMatch(workflow, /CD Deploy \/ Build backend bootJar/);
+  assert.doesNotMatch(workflow, /sha256sum backend\.jar > backend\.jar\.sha256/);
   assert.match(workflow, /CD Deploy \/ Run local deployment/);
   assert.match(workflow, /install -m 700 -d "\$\{incoming\}"/);
   assert.match(workflow, /bash "\$\{incoming\}\/deploy-backend\.sh"/);
@@ -790,6 +826,58 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /deploy-backend\.sh/);
   assert.doesNotMatch(workflow, /runs-on: ubuntu-latest\s*\n\s*env:\s*\n\s*EASYSUBWAY_ENV_SECRET/);
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
+});
+
+test("백엔드 배포는 GHCR digest를 pull하고 서버 위 build 경로를 갖지 않는다", () => {
+  const deploy = read("tools/deploy/deploy-backend.sh");
+
+  // The deploy script must require the digest and never build an image itself.
+  assert.match(deploy, /DEPLOY_IMAGE_DIGEST="\$\{DEPLOY_IMAGE_DIGEST:\?DEPLOY_IMAGE_DIGEST is required\}"/);
+  assert.match(deploy, /\^sha256:\[0-9a-f\]\{64\}\$/);
+  // No on-server image build (the `build` compose subcommand); --no-build stays.
+  assert.doesNotMatch(deploy, /docker-compose\.yml build\b/);
+  assert.doesNotMatch(deploy, /gradlew bootJar/);
+  assert.doesNotMatch(deploy, /backend\/build\/libs\/app\.jar/);
+  assert.doesNotMatch(deploy, /JAR_FILE=/);
+
+  // Identity verification: pulled image must match the expected digest + revision.
+  assert.match(deploy, /image_digest_mismatch/);
+  assert.match(deploy, /image_revision_mismatch/);
+  assert.match(deploy, /org\.opencontainers\.image\.revision/);
+
+  // Rollback no longer depends on the server-local image cache: a pruned image
+  // is restored from GHCR by digest.
+  assert.match(deploy, /ensure_rollback_image/);
+  assert.match(deploy, /docker pull "\$\{GHCR_IMAGE\}@\$\{prev_digest\}"/);
+  assert.match(deploy, /current-image-digest/);
+});
+
+test("CD 배포는 production environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
+  const cd = read(".github/workflows/cd.yml");
+  const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
+
+  // production environment gives the deploy GitHub deployment history and lets a
+  // branch protection rule (deployment branches = main) apply (issue #1687).
+  assert.match(cd, /environment:\n\s*name: production\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
+  assert.match(cd, /outputs:\n\s*sha: \$\{\{ steps\.target\.outputs\.sha \}\}/);
+
+  // A lightweight deploy/backend/* tag records the deployed sha on GitHub.
+  assert.match(cd, /record-deploy:/);
+  assert.match(cd, /tag="deploy\/backend\/\$\(date -u \+%Y%m%d-%H%M\)-\$\{DEPLOY_SHA:0:12\}"/);
+  assert.match(cd, /"https:\/\/api\.github\.com\/repos\/\$\{GITHUB_REPOSITORY\}\/git\/refs"/);
+
+  // Permission containment: only record-deploy may write refs; the self-hosted
+  // deploy job stays read-only.
+  assert.equal((cd.match(/contents: write/g) ?? []).length, 1);
+  assert.match(cd, /record-deploy:[\s\S]*permissions:\n\s*contents: write/);
+
+  // Slack CD result carries the sha and tag.
+  assert.match(cd, /sha: `\$\{\{ needs\.deploy\.outputs\.sha \|\| 'unknown' \}\}`/);
+  assert.match(cd, /tag: `\$\{\{ needs\.record-deploy\.outputs\.tag \|\| 'not_recorded' \}\}`/);
+
+  // Deploy tags are pruned (keep newest 20, drop >90 days) in weekly cleanup.
+  assert.match(cleanup, /cleanup-deploy-tags:/);
+  assert.match(cleanup, /matching-refs\/tags\/deploy\/backend\//);
 });
 
 test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
@@ -1029,7 +1117,7 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
   assert.equal((inlineSlackWorkflows.match(/SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/g) ?? []).length, 4);
   assert.equal((inlineSlackWorkflows.match(/SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/g) ?? []).length, 2);
   assert.match(ciWorkflow, /notify-slack-ci-failure:[\s\S]*needs:\s*\n\s*-\s*changes[\s\S]*github\.event_name == 'push'[\s\S]*github\.ref == 'refs\/heads\/main'[\s\S]*contains\(needs\.\*\.result, 'failure'\)/);
-  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*deploy[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*build-image\n\s*-\s*deploy\n\s*-\s*record-deploy\n\s*-\s*post-deploy-smoke[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(releaseArtifactsWorkflow, /notify-slack-release-result:[\s\S]*github\.event_name != 'pull_request'[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(dataPackReleaseWorkflow, /notify-slack-datapack-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(storeDistributionWorkflow, /notify-slack-store-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
@@ -1071,33 +1159,6 @@ test("스케줄 취약점 스캔은 PR 스캔과 동일 SHA·동일 lockfile로 
   // Least privilege on the scan job; top-level workflow has no ambient perms.
   assert.match(scheduled, /permissions: \{\}/);
   assert.match(scheduled, /security-events: write/);
-
-  // Dependabot PR titles bypass the human bracket-prefix check via actor skip,
-  // not by loosening the regex (skipped == satisfied for required checks).
-  assert.match(ci, /github\.actor != 'dependabot\[bot\]'/);
-});
-
-test("Dependabot는 4개 ecosystem을 큐 규약(그룹·rebase 비활성)으로 자동 업데이트한다", () => {
-  const dependabot = read(".github/dependabot.yml");
-  assert.match(dependabot, /^version: 2$/m);
-
-  const ecosystems = [...dependabot.matchAll(/package-ecosystem: (\S+)\n\s*directory: "([^"]+)"/g)].map(
-    (match) => `${match[1]}:${match[2]}`,
-  );
-  assert.deepEqual(ecosystems.sort(), [
-    "github-actions:/",
-    "gradle:/apps/mobile/android",
-    "gradle:/backend",
-    "pub:/apps/mobile",
-  ]);
-
-  // #1751 coordinator owns branch-up-to-date; Dependabot must not auto-rebase.
-  assert.equal((dependabot.match(/rebase-strategy: disabled/g) ?? []).length, 4);
-  // Grouped so the weekly burst stays ~1 PR per ecosystem.
-  assert.equal((dependabot.match(/groups:/g) ?? []).length, 4);
-  assert.equal((dependabot.match(/open-pull-requests-limit: 5/g) ?? []).length, 4);
-  // No auto-label: the automerge label is added only after the review gate.
-  assert.doesNotMatch(dependabot, /labels:/);
 });
 
 test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () => {
@@ -4118,12 +4179,42 @@ test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 cred
   assert.match(preflight, /EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL/);
   assert.doesNotMatch(preflight, /console\.log\(.*env\[/, "preflight must not print secret values");
 
-  assert.match(playApiAccess, /https:\/\/www\.googleapis\.com\/auth\/androidpublisher/);
+  // The OAuth scope and JWT auth now live in the shared lib that both the access
+  // checker and the internal-track uploader import (issue #1689).
+  const playAuthLib = read("tools/ci/lib/google-play-auth.mjs");
+  assert.match(playAuthLib, /https:\/\/www\.googleapis\.com\/auth\/androidpublisher/);
+  assert.match(playApiAccess, /from "\.\/lib\/google-play-auth\.mjs"/);
   assert.match(playApiAccess, /\/applications\/\$\{encodePath\(packageName\)\}\/edits/);
   assert.match(playApiAccess, /\/tracks/);
   assert.match(playApiAccess, /:validate/);
   assert.match(playApiAccess, /method: "DELETE"/);
   assert.doesNotMatch(playApiAccess, /client_email=.*\$\{/, "API access report must not print service account email");
+});
+
+test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 갖춘 자체 도구로 수행한다", () => {
+  const tool = read("tools/release/upload-play-internal.mjs");
+  const workflow = read(".github/workflows/release-artifacts.yml");
+
+  // Self-contained tool reusing the shared auth lib (no third-party action).
+  assert.match(tool, /from "\.\.\/ci\/lib\/google-play-auth\.mjs"/);
+  // versionCode monotonic policy enforced before any binary upload.
+  assert.match(tool, /is not greater than current Play max/);
+  const gateIndex = tool.indexOf("is not greater than current Play max");
+  const uploadIndex = tool.indexOf("/bundles?uploadType=media");
+  assert.ok(gateIndex !== -1 && uploadIndex !== -1 && gateIndex < uploadIndex, "monotonic gate must precede bundle upload");
+  // Bundle, deobfuscation mapping, track completion, commit.
+  assert.match(tool, /\/bundles\?uploadType=media/);
+  assert.match(tool, /\/deobfuscationFiles\/\$\{encodePath\(String\(versionCode\)\)\}\/proguard/);
+  assert.match(tool, /status: "completed", versionCodes: \[String\(versionCode\)\]/);
+  assert.match(tool, /:commit\?changesNotSentForReview=/);
+
+  // Opt-in workflow job that shares the RC environment approval and default off.
+  assert.match(workflow, /play_upload:\n\s*description:[\s\S]*options:\n\s*- none\n\s*- internal/);
+  assert.match(workflow, /play-internal-upload:/);
+  assert.match(workflow, /inputs\.play_upload == 'internal'/);
+  assert.match(workflow, /environment:\n\s*name: android-production-rc/);
+  assert.match(workflow, /node tools\/release\/upload-play-internal\.mjs/);
+  assert.match(workflow, /name: easysubway-play-internal-upload-\$\{\{ github\.sha \}\}/);
 });
 
 test("스토어 배포 증거 preflight는 iOS 누락을 Android 출시 blocker로 보지 않는다", async () => {

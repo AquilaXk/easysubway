@@ -142,11 +142,15 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   const composeConfig = 'compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" config --quiet';
   assert.equal(deploy.match(/git checkout --detach "\$\{DEPLOY_SHA\}"/g)?.length, 1);
   assert.ok(deploy.indexOf(checkoutTarget) < deploy.indexOf(composeConfig));
-  assert.match(deploy, /sha256sum -c/);
+  // The deployed artifact is verified by GHCR digest, not by re-hashing a jar,
+  // and there is no on-server image build (issue #1686).
+  assert.doesNotMatch(deploy, /sha256sum -c/);
+  assert.match(deploy, /docker image inspect "easysubway-backend:\$\{DEPLOY_SHA\}"/);
+  assert.match(deploy, /image_digest_mismatch/);
   assert.match(deploy, /up -d --no-build postgres object-storage/);
   assert.doesNotMatch(deploy, /timeout [0-9]+ compose/);
   assert.match(deploy, /timeout 600 docker compose/);
-  assert.match(deploy, /timeout 900 docker compose/);
+  assert.doesNotMatch(deploy, /timeout 900 docker compose/);
   assert.match(deploy, /wait_stateful_service/);
   assert.match(deploy, /report_upload_bucket="\$\(read_env_value "\$\{BACKEND_ENV\}" EASYSUBWAY_REPORT_UPLOAD_BUCKET\)"/);
   assert.match(deploy, /stop_legacy_backend_service\(\)/);
@@ -249,6 +253,24 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.doesNotMatch(cd, /uses: actions\/setup-java@be66141d4002b0e783cc31e5449d3f9f3267ffd9/);
   assert.match(cd, /if \[\[ -n "\$\{EASYSUBWAY_ENV_FILE:-\}" \]\]; then/);
   assert.doesNotMatch(cd, /EASYSUBWAY_ENV_FILE:-\/dev\/null/);
+});
+
+test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API 스모크로 게이트한다", () => {
+  const cd = read(".github/workflows/cd.yml");
+
+  // The old skip-on-unset public readiness step is removed: "not configured, so
+  // it passed" is not a gate (issue #1688).
+  assert.doesNotMatch(cd, /DEPLOY_PUBLIC_API_BASE_URL is not configured; remote local readiness was already checked/);
+
+  // A dedicated ubuntu-latest smoke job runs the contract-driven smoke script,
+  // requires the public base URL, and fails when it is unset.
+  assert.match(cd, /post-deploy-smoke:/);
+  assert.match(cd, /node tools\/ops\/post-deploy-smoke\.mjs/);
+  assert.match(cd, /DEPLOY_PUBLIC_API_BASE_URL repo variable is not configured/);
+  assert.match(cd, /if: \$\{\{ needs\.deploy\.outputs\.deploy_ready == 'true' \}\}/);
+
+  // Smoke failures must propagate into the CD result Slack notification.
+  assert.match(cd, /needs:\n {6}- plan\n {6}- build-image\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
 });
 
 test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인딩을 사용한다", () => {
