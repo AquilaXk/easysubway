@@ -60,11 +60,21 @@ jobs:
           # Keep the 10 newest versions for rollback headroom (issue #1686); the
           # digest of the previous deploy is what rollback pulls, so retention
           # must comfortably exceed the depth we might roll back to.
+          # per_page=100 (single page, no --paginate): the backend image keeps
+          # only ~10 tagged versions, so one page covers retention; --paginate
+          # would run --jq per page and break the cross-page created_at sort.
+          versions_err="$(mktemp)"
           versions="$(gh api \
             "/users/${OWNER}/packages/container/${PACKAGE}/versions?per_page=100" \
-            --jq 'sort_by(.created_at) | reverse | .[].id' 2>/dev/null || true)"
+            --jq 'sort_by(.created_at) | reverse | .[].id' 2>"${versions_err}" || true)"
+          if [ -s "${versions_err}" ]; then
+            # Surface a real error (auth/rate-limit/wrong path) instead of a
+            # silently green no-op that pruned nothing.
+            echo "::warning title=GHCR cleanup::versions 조회 오류: $(tr '\n' ' ' <"${versions_err}")"
+          fi
+          rm -f "${versions_err}"
           if [ -z "${versions}" ]; then
-            echo "::notice title=GHCR cleanup::no ${PACKAGE} versions found or token lacks packages scope."
+            echo "::notice title=GHCR cleanup::no ${PACKAGE} versions to prune (or token lacks packages scope)."
             exit 0
           fi
 
