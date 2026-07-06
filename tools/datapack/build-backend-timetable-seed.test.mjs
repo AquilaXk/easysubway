@@ -157,3 +157,13 @@ test("trip 내 인접 정차 시각이 단조가 아니면 거부한다(departur
   };
   assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /monoton|단조|order|departure/i);
 });
+
+test("transit_feed_info를 feed_end_date와 함께 방출한다(기본=endDate)", () => {
+  const { sql } = buildBackendTimetableSeed(ARTIFACT, OPTIONS);
+  assert.match(sql, /INSERT INTO transit_feed_info \(id, feed_end_date\) VALUES \(1, '20261231'\);/);
+});
+
+test("--feed-end-date 명시 시 endDate와 분리된다", () => {
+  const { sql } = buildBackendTimetableSeed(ARTIFACT, { ...OPTIONS, feedEndDate: "20260930" });
+  assert.match(sql, /INSERT INTO transit_feed_info \(id, feed_end_date\) VALUES \(1, '20260930'\);/);
+});
