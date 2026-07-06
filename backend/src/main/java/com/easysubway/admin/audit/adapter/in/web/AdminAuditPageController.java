@@ -148,7 +148,19 @@ class AdminAuditPageController {
 	}
 
 	private void populateAuditModel(Model model, ScreenContext context, AuditFilterParams params) {
-		AdminAuditQuery query = params.toQuery(context.forcedEventType(), params.page(), params.size());
+		// 목록·내보내기가 공유하는 바운드 질의(AdminAuditQuery가 size를 MAX_SIZE로 캡한다).
+		AdminAuditQuery query = AdminAuditQuery.of(
+			context.forcedEventType(),
+			params.eventTypeOrNull(),
+			params.actor(),
+			params.outcomeOrNull(),
+			params.keyword(),
+			params.from(),
+			params.to(),
+			params.reasonMissing(),
+			params.page(),
+			params.size()
+		);
 
 		long total = auditEventRepository.count(query);
 		EgovPaginationView pageView = EgovPaginationView.from(query.page(), query.size(), total);
