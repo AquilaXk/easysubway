@@ -1,6 +1,6 @@
-# Backend Gradle lockfile advisory exceptions. Keep these vulnerability-id
-# scoped, reasoned, and adjacent to this lockfile so new advisories still
-# fail the PR gate. Remove each entry once the fixed version is adopted.
+# backend Gradle lockfile 취약점 예외 목록. 예외는 취약점 ID 단위로 좁게, 사유를
+# 명시해 lockfile 옆에 유지한다 — 새 advisory는 계속 PR 게이트에서 실패한다.
+# 수정 버전을 채택하면 해당 항목을 즉시 제거한다.
 
 [[IgnoredVulns]]
 id = "GHSA-5jmj-h7xm-6q6v"
