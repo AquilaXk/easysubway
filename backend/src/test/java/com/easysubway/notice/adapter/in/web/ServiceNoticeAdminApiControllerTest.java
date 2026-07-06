@@ -96,6 +96,19 @@ class ServiceNoticeAdminApiControllerTest {
 	}
 
 	@Test
+	@DisplayName("알 수 없는 severity 발행은 500이 아닌 400으로 거부된다")
+	void unknownSeverityRejectedAsBadRequest() throws Exception {
+		mockMvc.perform(post("/admin/notices")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"scope\":\"ALL\",\"title\":\"x\",\"body\":\"y\",\"severity\":\"WARN\"}"))
+			.andExpect(status().isBadRequest());
+
+		assertThat(repository.findActiveAt(LocalDateTime.now(ZoneOffset.UTC))).isEmpty();
+	}
+
+	@Test
 	@DisplayName("인증 없는 발행은 거부된다")
 	void unauthenticatedPublishRejected() throws Exception {
 		mockMvc.perform(post("/admin/notices")
