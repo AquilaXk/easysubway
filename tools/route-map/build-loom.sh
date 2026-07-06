@@ -12,12 +12,21 @@
 set -euo pipefail
 
 LOOM_REPO="https://github.com/ad-freiburg/loom"
+# 재현성: upstream을 고정 커밋에 핀한다(계획서 "LOOM 재현성"). HEAD 클론은 upstream이
+# 움직이면 게이트 수치가 바뀌는 구멍 — #1789 게이트 실측을 이 커밋에서 산출했다.
+LOOM_COMMIT="${LOOM_COMMIT:-9d0a87a096abd8fd49d233dbc7df312c0438ad11}"
 WORK="${LOOM_WORK:-/tmp/loom-work}"
 
 build() {
   mkdir -p "$WORK" && cd "$WORK"
-  [ -d loom ] || git clone --recursive --depth 1 "$LOOM_REPO"
-  cd loom && mkdir -p build && cd build
+  # 고정 커밋을 정확히 가져오려면 얕은 fetch로 해당 커밋만 받는다(--depth 1 HEAD 금지).
+  if [ ! -d loom ]; then
+    git clone --recursive "$LOOM_REPO"
+    cd loom && git checkout "$LOOM_COMMIT" && git submodule update --init --recursive
+  else
+    cd loom && git checkout "$LOOM_COMMIT" && git submodule update --init --recursive
+  fi
+  mkdir -p build && cd build
   cmake -DCMAKE_BUILD_TYPE=Release .. && make -j4
   echo "산출: $WORK/loom/build/{octi,loom,topo}"
 }
