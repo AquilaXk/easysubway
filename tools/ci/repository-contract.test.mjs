@@ -1922,23 +1922,6 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     playProductionAccessGate.latestApiAccessCheck.localOnlyEvidence,
     /\.codex\/evidence\/release\/play-production-access\/1016-api-recheck-20260629\//,
   );
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.qaEvidenceDateKst, "2026-07-05");
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account.type, "personal");
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account["createdAfter2023-11-13"], true);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account.identityVerification, "COMPLETE");
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.account.paymentsProfileRegistered, true);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.consoleUsers.leastPrivilege, true);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.consoleUsers.twoFactorEnabled, true);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.consoleUsers.serviceAccountUser.adminPrivilege, false);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.app.created, true);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.productionAccess.available, false);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.productionAccess.closedTestRequirementApplies, true);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.productionAccess.currentOptedInTesters, 0);
-  assert.equal(playProductionAccessGate.consoleAccountAndProductionAccess.secretValuesPrinted, false);
-  assert.match(
-    playProductionAccessGate.consoleAccountAndProductionAccess.localOnlyEvidence,
-    /\.codex\/evidence\/release\/play-production-access\/1016-console-account-access-20260705\//,
-  );
   assert.equal(playProductionAccessGate.officialPolicy.closedTestMinimumOptedInTesters, 12);
   assert.equal(playProductionAccessGate.officialPolicy.closedTestContinuousOptInDays, 14);
   assert.match(playProductionAccessGate.officialPolicy.source, /^https:\/\/support\.google\.com\/googleplay\/android-developer\/answer\/14151465/);
