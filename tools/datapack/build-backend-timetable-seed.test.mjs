@@ -101,3 +101,59 @@ test("미지 serviceId(캘린더 매핑 없음)는 거부한다", () => {
   };
   assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /unknown-kric|service/i);
 });
+
+test("stop_time의 tripId가 trips에 없으면 거부한다(FK)", () => {
+  const bad = {
+    transitTrips: ARTIFACT.transitTrips,
+    transitStopTimes: [
+      { tripId: "route-seoul-4-orphan", stopSequence: 1, stationId: "station-seoul-4-448", lineId: "seoul-4", arrivalSeconds: 30000, departureSeconds: 30030 },
+    ],
+  };
+  assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /orphan|trip_id|tripId|references|not found/i);
+});
+
+test("(tripId, stopSequence) 중복은 거부한다(PK)", () => {
+  const bad = {
+    transitTrips: ARTIFACT.transitTrips,
+    transitStopTimes: [
+      { tripId: "route-seoul-4-up-4719-8", stopSequence: 1, stationId: "station-seoul-4-448", lineId: "seoul-4", arrivalSeconds: 30000, departureSeconds: 30030 },
+      { tripId: "route-seoul-4-up-4719-8", stopSequence: 1, stationId: "station-seoul-4-433", lineId: "seoul-4", arrivalSeconds: 30900, departureSeconds: 30930 },
+    ],
+  };
+  assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /duplicate|중복|stop_sequence/i);
+});
+
+test("trip.id 중복은 거부한다(PK)", () => {
+  const bad = {
+    transitTrips: [ARTIFACT.transitTrips[0], { ...ARTIFACT.transitTrips[0] }],
+    transitStopTimes: [ARTIFACT.transitStopTimes[0]],
+  };
+  assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /duplicate|중복|transitTrips\.id/i);
+});
+
+test("service_pattern이 LOCAL/EXPRESS가 아니면 거부한다(V29 CHECK)", () => {
+  const bad = {
+    transitTrips: [{ ...ARTIFACT.transitTrips[0], servicePattern: "RAPID" }],
+    transitStopTimes: [ARTIFACT.transitStopTimes[0]],
+  };
+  assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /service_pattern|LOCAL|EXPRESS|RAPID/i);
+});
+
+test("service_day_start_seconds가 범위(0~107999)를 벗어나면 거부한다(V29 CHECK)", () => {
+  const bad = {
+    transitTrips: [{ ...ARTIFACT.transitTrips[0], serviceDayStartSeconds: 200000 }],
+    transitStopTimes: [ARTIFACT.transitStopTimes[0]],
+  };
+  assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /service_day_start|range|107999|200000/i);
+});
+
+test("trip 내 인접 정차 시각이 단조가 아니면 거부한다(departure[N] > arrival[N+1])", () => {
+  const bad = {
+    transitTrips: ARTIFACT.transitTrips,
+    transitStopTimes: [
+      { tripId: "route-seoul-4-up-4719-8", stopSequence: 1, stationId: "station-seoul-4-448", lineId: "seoul-4", arrivalSeconds: 30000, departureSeconds: 30030 },
+      { tripId: "route-seoul-4-up-4719-8", stopSequence: 2, stationId: "station-seoul-4-433", lineId: "seoul-4", arrivalSeconds: 29000, departureSeconds: 29000 },
+    ],
+  };
+  assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /monoton|단조|order|departure/i);
+});

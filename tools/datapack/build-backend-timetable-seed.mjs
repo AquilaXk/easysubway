@@ -39,7 +39,8 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
   const endDate = options.endDate ?? DEFAULT_END_DATE;
   const dayMap = options.serviceCalendarDayMap ?? SERVICE_CALENDAR_DAY_MAP;
 
-  validateStopTimes(stopTimes);
+  const tripIds = validateTrips(trips);
+  validateStopTimes(stopTimes, tripIds);
 
   const calendars = deriveCalendars(trips, dayMap, startDate, endDate);
   const routes = deriveRoutes(trips, lineId);
@@ -55,18 +56,68 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
   return { sql, statements, calendars, routes, tripCount: trips.length, stopTimeCount: stopTimes.length };
 }
 
-function validateStopTimes(stopTimes) {
+const ALLOWED_SERVICE_PATTERNS = new Set(["LOCAL", "EXPRESS"]);
+
+// trip 행이 V29 제약(id PK 유일, service_pattern CHECK, service_day_start_seconds 범위)을 만족하는지
+// 생성 단계에서 검증한다(로드-시점 FK/CHECK 실패를 앞당김). trip id 집합을 stop_times FK 검증용으로 반환.
+function validateTrips(trips) {
+  const ids = new Set();
+  for (const trip of trips) {
+    const id = requireString(trip.id, "transitTrips.id");
+    if (ids.has(id)) {
+      throw new Error(`transit_trips duplicate id (PK): ${id}`);
+    }
+    ids.add(id);
+    const pattern = trip.servicePattern ?? "LOCAL";
+    if (!ALLOWED_SERVICE_PATTERNS.has(pattern)) {
+      throw new Error(`transit_trips service_pattern must be LOCAL or EXPRESS: ${id}:${pattern}`);
+    }
+    const dayStart = trip.serviceDayStartSeconds ?? 0;
+    if (!Number.isInteger(dayStart) || dayStart < 0 || dayStart >= SECONDS_LIMIT_EXCLUSIVE) {
+      throw new Error(`transit_trips service_day_start_seconds out of range [0,${SECONDS_LIMIT_EXCLUSIVE}): ${id}:${dayStart}`);
+    }
+  }
+  return ids;
+}
+
+function validateStopTimes(stopTimes, tripIds) {
+  const seenKeys = new Set();
+  const byTrip = new Map();
   for (const row of stopTimes) {
+    const tripId = requireString(row.tripId, "transitStopTimes.tripId");
+    const stopSequence = requireInteger(row.stopSequence, "stopSequence");
     const arrival = requireInteger(row.arrivalSeconds, "arrivalSeconds");
     const departure = requireInteger(row.departureSeconds, "departureSeconds");
+    if (!tripIds.has(tripId)) {
+      throw new Error(`transit_stop_times trip_id not found in transitTrips (FK): ${tripId}:${stopSequence}`);
+    }
     if (arrival < 0 || arrival >= SECONDS_LIMIT_EXCLUSIVE || departure < 0 || departure >= SECONDS_LIMIT_EXCLUSIVE) {
-      throw new Error(`transit_stop_times seconds out of range [0,${SECONDS_LIMIT_EXCLUSIVE}): ${row.tripId}:${row.stopSequence}`);
+      throw new Error(`transit_stop_times seconds out of range [0,${SECONDS_LIMIT_EXCLUSIVE}): ${tripId}:${stopSequence}`);
     }
     if (arrival > departure) {
-      throw new Error(`transit_stop_times arrival must be <= departure: ${row.tripId}:${row.stopSequence}`);
+      throw new Error(`transit_stop_times arrival must be <= departure: ${tripId}:${stopSequence}`);
     }
-    if (requireInteger(row.stopSequence, "stopSequence") < 1) {
-      throw new Error(`transit_stop_times stop_sequence must be >= 1: ${row.tripId}`);
+    if (stopSequence < 1) {
+      throw new Error(`transit_stop_times stop_sequence must be >= 1: ${tripId}`);
+    }
+    const key = `${tripId}:${stopSequence}`;
+    if (seenKeys.has(key)) {
+      throw new Error(`transit_stop_times duplicate (trip_id, stop_sequence) (PK): ${key}`);
+    }
+    seenKeys.add(key);
+    const rows = byTrip.get(tripId) ?? [];
+    rows.push({ stopSequence, arrival, departure });
+    byTrip.set(tripId, rows);
+  }
+  // intra-trip 시각 단조성: stopSequence 순서로 departure[N] <= arrival[N+1] (음/영 소요시간 방지, RAPTOR 전제).
+  for (const [tripId, rows] of byTrip) {
+    rows.sort((left, right) => left.stopSequence - right.stopSequence);
+    for (let index = 1; index < rows.length; index += 1) {
+      if (rows[index - 1].departure > rows[index].arrival) {
+        throw new Error(
+          `transit_stop_times departure must be <= next arrival (monotonic order): ${tripId}:${rows[index - 1].stopSequence}->${rows[index].stopSequence}`,
+        );
+      }
     }
   }
 }
