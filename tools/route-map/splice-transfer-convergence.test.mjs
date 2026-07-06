@@ -105,7 +105,7 @@ test("spliceTrackToNode는 근처 정점을 newPos로 이동, 국소 rectify", (
   ];
 
   // 중앙 정점(200,100)을 (200,108)로 이동, radius=1 국소 rectify
-  const { verts: result, attached } = spliceTrackToNode(verts, { x: 200, y: 100 }, { x: 200, y: 108 }, { radius: 1, eps: 1 });
+  const { verts: result, attached } = spliceTrackToNode(verts, { x: 200, y: 100 }, { x: 200, y: 108 }, { radius: 1 });
   assert.equal(attached, true);
 
   // 결과는 새 배열

@@ -1,6 +1,11 @@
 #!/usr/bin/env node
-// #1789: 환승 그룹 티어 분류 — 오라클 스팬과 실측 스팬의 displacement 기반
-// 분류로, 렌더 3-모드 선택(스택/스팬/분리)의 데이터 근거를 제공한다.
+// #1789 C3 P1 (B-국소): 환승 멤버를 전역 재생성 없이 국소 splice로 오라클 스팬 캡슐로
+// 수렴한다. 오라클 스팬 초과(과분산) 그룹만 압축(코인시던트 보존), 각 노선 track을 국소
+// 윈도우에서 45° dogleg(octilinearPolyline)로 splice해 newPos를 정확 통과·8선형 유지.
+// 파이프라인: transferGroups → classifyGroup(변위 티어) → needsConvergence(과분산만) →
+// capsuleTargets(H/V) → spliceTrackToNode(정점 이동 or mid-segment 삽입) → convergeGroup
+// (원자성: track 부착한 멤버만 position 이동). CLI가 티어별로 팩에 적용(게이트 하). 가드레일
+// 5조: CSV 좌표 미사용 — 오라클은 집계 스팬만.
 
 import { readFileSync } from "node:fs";
 import { octilinearPolyline } from "./octolinearize-line-tracks.mjs";
@@ -166,7 +171,9 @@ export function convergeGroup(group, oracle, tracksByLine) {
         }
       }
     }
-    // 원자성: 부착 성공한 멤버만 positionUpdate 발행
+    // 원자성: 부착 성공한 멤버만 positionUpdate 발행. attached:true가 "position이 track 위"를
+    // 보장하는 근거 = octilinearPolyline이 입력 정점(정수 np)을 절대 드롭하지 않는 계약
+    // (octolinearize-line-tracks.mjs). 그 헬퍼가 RDP/단순화로 바뀌면 이 불변식이 깨진다.
     if (memberAttached) {
       positionUpdates.push({
         stationId: group.stationId,
