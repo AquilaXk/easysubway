@@ -14,7 +14,7 @@
 //
 // 사용: node tools/route-map/split-mismerged-stations.mjs [--pack …] [--check]
 import { createHash } from "node:crypto";
-import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
+import { mutatePack, parsePackArgs, reparentLine } from "./station-surgery.mjs";
 
 const REGION = "수도권";
 const GYEONGUI = "line-6e39be0cb6e2"; // 수도권 경의중앙 — 분리 시 떼어낼 쪽
@@ -62,22 +62,6 @@ export function planSplit(station, moveLineId) {
   };
 }
 
-function parseArgs(argv) {
-  const o = {
-    pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
-    index: "apps/mobile/assets/datapacks/index.json",
-    check: false,
-  };
-  for (let i = 0; i < argv.length; i += 1) {
-    switch (argv[i]) {
-      case "--pack": o.pack = argv[++i]; break;
-      case "--index": o.index = argv[++i]; break;
-      case "--check": o.check = true; break;
-    }
-  }
-  return o;
-}
-
 function applySplit(db, spec) {
   const station = db
     .prepare("SELECT * FROM stations WHERE id=?")
@@ -102,33 +86,12 @@ function applySplit(db, spec) {
   if (exists) {
     return { name: spec.name, skipped: "이미 분리됨", newId: newStation.id };
   }
-  // route_map_positions.(station_id,line_id) → station_lines FK가 걸려 있어
-  // (station_lines를 먼저 바꾸면 positions가 순간 고아) FK를 끄지 않고
-  // 복제→positions 재지정→원행 삭제 순서로 무결성을 유지한다.
-  const from = reassignment.fromStationId;
-  const to = reassignment.toStationId;
-  const line = reassignment.lineId;
-  // 1) 신규 역 행 삽입(원 메타 보존).
+  // 신규 역 행 삽입(원 메타 보존) 후, 이동 노선의 위상·좌표를 신규 id로 재지정.
   const cols = Object.keys(newStation);
   db.prepare(
     `INSERT INTO stations (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`,
   ).run(...cols.map((c) => newStation[c]));
-  // 2) 이동 노선의 station_lines 행을 신규 id로 복제(원행은 아직 유지).
-  const sl = db
-    .prepare("SELECT * FROM station_lines WHERE station_id=? AND line_id=?")
-    .get(from, line);
-  const slCols = Object.keys(sl);
-  db.prepare(
-    `INSERT INTO station_lines (${slCols.join(",")}) VALUES (${slCols.map(() => "?").join(",")})`,
-  ).run(...slCols.map((c) => (c === "station_id" ? to : sl[c])));
-  // 3) route_map_positions 이동 노선 행을 신규 id로 재지정(FK 타깃 존재).
-  db.prepare(
-    "UPDATE route_map_positions SET station_id=? WHERE station_id=? AND line_id=?",
-  ).run(to, from, line);
-  // 4) 원 station_lines 행 삭제(참조하던 positions는 이미 이동).
-  db.prepare(
-    "DELETE FROM station_lines WHERE station_id=? AND line_id=?",
-  ).run(from, line);
+  reparentLine(db, { ...reassignment, label: spec.name });
   return {
     name: spec.name,
     keepId: spec.stationId,
@@ -139,15 +102,12 @@ function applySplit(db, spec) {
 }
 
 function main() {
-  const o = parseArgs(process.argv.slice(2));
-  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "split-mismerged-");
-  try {
+  const o = parsePackArgs(process.argv.slice(2));
+  mutatePack({ ...o, tmpPrefix: "split-mismerged-", run: (db) => {
     if (o.check) {
       for (const spec of SPLITS) {
         const spreadRow = db
-          .prepare(
-            `SELECT COUNT(*) c FROM station_lines WHERE station_id=?`,
-          )
+          .prepare("SELECT COUNT(*) c FROM station_lines WHERE station_id=?")
           .get(spec.stationId);
         console.log(
           `(--check) ${spec.name} ${spec.stationId}: 노선 ${spreadRow.c}개 → 신규 id ${newStationId(spec.stationId, spec.moveLineId)} 예정 (유지=${spec.keepEvidence} / 분리=${spec.moveEvidence})`,
@@ -162,22 +122,10 @@ function main() {
       if (r.skipped) {
         console.log(`${r.name}: ${r.skipped} (${r.newId})`);
       } else {
-        console.log(
-          `${r.name}: 유지 ${r.keepId}(${r.keep}) · 분리 ${r.newId}(${r.moved})`,
-        );
+        console.log(`${r.name}: 유지 ${r.keepId}(${r.keep}) · 분리 ${r.newId}(${r.moved})`);
       }
     }
-    db.close();
-    const { byteSize } = writePack({
-      sqlitePath,
-      packPath,
-      packRelPath: o.pack,
-      indexRelPath: o.index,
-    });
-    console.log(`팩 갱신 (byteSize ${byteSize}) — enrich 재실행으로 정합 확인 권장.`);
-  } finally {
-    cleanupPackDir(dir);
-  }
+  } });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

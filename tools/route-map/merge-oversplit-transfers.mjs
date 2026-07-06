@@ -13,7 +13,7 @@
 // (대표가 비면 흡수분에서 가져옴).
 //
 // 사용: node tools/route-map/merge-oversplit-transfers.mjs [--pack …] [--check]
-import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
+import { mutatePack, parsePackArgs, reparentLine } from "./station-surgery.mjs";
 import { planMerge } from "./merge-alias-stations.mjs";
 
 /** 병합 대상. keepId=대표(노선 많은/번호 호선), dropId=흡수, expectedSub=병합 후 부역명. */
@@ -32,22 +32,6 @@ export function reconcileNameSub(keepSub, dropSub) {
   return keepSub && keepSub.length > 0 ? keepSub : dropSub ?? "";
 }
 
-function parseArgs(argv) {
-  const o = {
-    pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
-    index: "apps/mobile/assets/datapacks/index.json",
-    check: false,
-  };
-  for (let i = 0; i < argv.length; i += 1) {
-    switch (argv[i]) {
-      case "--pack": o.pack = argv[++i]; break;
-      case "--index": o.index = argv[++i]; break;
-      case "--check": o.check = true; break;
-    }
-  }
-  return o;
-}
-
 function applyMerge(db, spec) {
   const keep = db.prepare("SELECT id, name_sub FROM stations WHERE id=?").get(spec.keepId);
   const drop = db.prepare("SELECT id, name_sub FROM stations WHERE id=?").get(spec.dropId);
@@ -57,21 +41,8 @@ function applyMerge(db, spec) {
     .prepare("SELECT * FROM station_lines WHERE station_id=? ORDER BY line_id")
     .all(spec.dropId);
   const plan = planMerge(spec.dropId, dropLines.map((r) => r.line_id), spec.keepId);
-  // FK 순서(route_map_positions.(station_id,line_id)→station_lines): 대표로 복제→
-  // positions 재지정→흡수 행 삭제.
-  for (const sl of dropLines) {
-    const dup = db
-      .prepare("SELECT 1 FROM station_lines WHERE station_id=? AND line_id=?")
-      .get(spec.keepId, sl.line_id);
-    if (dup) throw new Error(`${spec.name}: 대표가 이미 ${sl.line_id} 멤버 — 수동 확인`);
-    const cols = Object.keys(sl);
-    db.prepare(
-      `INSERT INTO station_lines (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`,
-    ).run(...cols.map((c) => (c === "station_id" ? spec.keepId : sl[c])));
-    db.prepare(
-      "UPDATE route_map_positions SET station_id=? WHERE station_id=? AND line_id=?",
-    ).run(spec.keepId, spec.dropId, sl.line_id);
-    db.prepare("DELETE FROM station_lines WHERE station_id=? AND line_id=?").run(spec.dropId, sl.line_id);
+  for (const r of plan.reassignments) {
+    reparentLine(db, { ...r, label: spec.name });
   }
   // 부역명 보존
   const mergedSub = reconcileNameSub(keep.name_sub, drop.name_sub);
@@ -84,9 +55,8 @@ function applyMerge(db, spec) {
 }
 
 function main() {
-  const o = parseArgs(process.argv.slice(2));
-  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "merge-oversplit-");
-  try {
+  const o = parsePackArgs(process.argv.slice(2));
+  mutatePack({ ...o, tmpPrefix: "merge-oversplit-", run: (db) => {
     if (o.check) {
       for (const spec of MERGES) {
         const drop = db.prepare("SELECT name_ko FROM stations WHERE id=?").get(spec.dropId);
@@ -101,12 +71,7 @@ function main() {
       if (r.skipped) console.log(`${r.name}: ${r.skipped}`);
       else console.log(`${r.name}: ${r.dropId} → ${r.keepId} · 멤버 ${r.memberCount} · 부역명 "${r.mergedSub}"`);
     }
-    db.close();
-    const { byteSize } = writePack({ sqlitePath, packPath, packRelPath: o.pack, indexRelPath: o.index });
-    console.log(`팩 갱신 (byteSize ${byteSize})`);
-  } finally {
-    cleanupPackDir(dir);
-  }
+  } });
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
