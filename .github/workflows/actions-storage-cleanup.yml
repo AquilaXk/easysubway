@@ -39,3 +39,42 @@ jobs:
         run: |
           set -euo pipefail
           gh cache delete --all --succeed-on-no-caches
+
+  cleanup-deploy-tags:
+    name: Prune old deploy tags
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Delete deploy/backend tags older than 90 days
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # deploy/backend/<UTC yyyyMMdd-HHmm>-<sha> tags accumulate one per
+          # deploy (issue #1687). Always keep the 20 most recent; among the rest,
+          # delete any dated more than 90 days ago. Names sort chronologically.
+          mapfile -t tags < <(gh api --paginate \
+            "repos/${REPO}/git/matching-refs/tags/deploy/backend/" \
+            --jq '.[].ref' 2>/dev/null | sed 's#refs/tags/##' | sort || true)
+
+          count=${#tags[@]}
+          if [ "${count}" -le 20 ]; then
+            echo "only ${count} deploy tags; nothing to prune."
+            exit 0
+          fi
+
+          cutoff="$(date -u -d '90 days ago' +%Y%m%d)"
+          prune_upto=$((count - 20))
+          for ((i = 0; i < prune_upto; i++)); do
+            tag="${tags[i]}"
+            datepart="${tag#deploy/backend/}"
+            datepart="${datepart%%-*}"
+            if [[ "${datepart}" =~ ^[0-9]{8}$ && "${datepart}" < "${cutoff}" ]]; then
+              echo "deleting ${tag}"
+              gh api -X DELETE "repos/${REPO}/git/refs/tags/${tag}" || true
+            fi
+          done
