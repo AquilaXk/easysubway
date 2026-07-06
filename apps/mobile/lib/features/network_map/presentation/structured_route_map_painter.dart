@@ -108,43 +108,12 @@ final Paint _transferBorderPaint = Paint()
   ..strokeWidth = _transferBorderWidth
   ..color = _transferBorder
   ..isAntiAlias = true;
-final Paint _transferDotPaint = Paint()
-  ..style = PaintingStyle.fill
+// 대분산 환승(물리적으로 먼 두 역)의 도보 연결 표현 — 얇은 회색 선.
+final Paint _transferConnectorPaint = Paint()
+  ..style = PaintingStyle.stroke
+  ..strokeWidth = _transferBorderWidth
+  ..color = _transferBorder.withValues(alpha: 0.45)
   ..isAntiAlias = true;
-
-// 환승 국소 corridor 우세 방향(design px) → 도트 가로/세로 결정. 멤버 노선들의
-// centroid 최근접 선분 방향을 반원으로 접어(반대 방향 상쇄 방지) 평균한다.
-bool _transferDotsHorizontal(
-  StructuredRouteMap map,
-  RouteMapTransferGroup group,
-  RouteMapDesignSpace design,
-) {
-  final c = design.toDesign(group.centroid);
-  var sx = 0.0, sy = 0.0;
-  for (final line in map.lines) {
-    if (!group.lineIds.contains(line.lineId)) continue;
-    var best = double.infinity;
-    var bestDir = Offset.zero;
-    for (final poly in line.polylines) {
-      for (var i = 1; i < poly.length; i += 1) {
-        final a = design.toDesign(poly[i - 1]);
-        final b = design.toDesign(poly[i]);
-        final d = ((a + b) / 2 - c).distanceSquared;
-        final seg = b - a;
-        if (d < best && seg.distance > 0) {
-          best = d;
-          bestDir = seg / seg.distance;
-        }
-      }
-    }
-    if (bestDir.dx < 0 || (bestDir.dx == 0 && bestDir.dy < 0)) {
-      bestDir = -bestDir; // 반원 접기
-    }
-    sx += bestDir.dx;
-    sy += bestDir.dy;
-  }
-  return sx.abs() > sy.abs();
-}
 
 /// design space에서 전 레이어를 1회 녹화한다 (#1789 스펙 S6).
 /// 프레임 루프에는 이 Picture의 재생만 남는다. 호출자가 dispose 책임.
@@ -207,34 +176,20 @@ ui.Picture recordRouteMapPicture({
     );
   }
 
-  // 3) 환승 캡슐 — 기존 routeMapTransferMarkers를 design 좌표로 호출.
+  // 3) 환승 흰 원(서울메트로 룩) — 간선 색 선이 만나는 지점에 흰 채움+짙은 테두리
+  //    원을 얹는다. 수렴·소분산은 원 1개, 대분산(물리적으로 먼 환승)은 멤버별 원 +
+  //    centroid 연결선(공식 지도의 도보 연결 표현).
   for (final group in map.transferGroups) {
-    final markers = routeMapTransferMarkers(
-      memberCenters: [
-        for (final p in group.memberPositions) design.toDesign(p),
-      ],
-      colors: [
-        for (final id in group.lineIds) lineColors[id] ?? _fallbackLineColor,
-      ],
-      designSpread:
-          offsetsMaxPairwiseDistance(group.memberPositions) *
-          design.designScale,
-      dotRadius: kRouteMapTransferDotRadiusPx,
-      dotGap: kRouteMapTransferDotGapPx,
-      padding: kRouteMapTransferDotPaddingPx,
-      horizontalDots: _transferDotsHorizontal(map, group, design),
+    final marker = routeMapTransferRings(
+      members: [for (final p in group.memberPositions) design.toDesign(p)],
     );
-    for (final marker in markers) {
-      canvas.drawRRect(marker.capsule, _transferFillPaint);
-      canvas.drawRRect(marker.capsule, _transferBorderPaint);
-      for (final dot in marker.dots) {
-        _transferDotPaint.color = dot.color;
-        canvas.drawCircle(
-          dot.center,
-          kRouteMapTransferDotRadiusPx,
-          _transferDotPaint,
-        );
-      }
+    // 연결선을 먼저(원 아래).
+    for (final connector in marker.connectors) {
+      canvas.drawLine(connector.first, connector.last, _transferConnectorPaint);
+    }
+    for (final ring in marker.rings) {
+      canvas.drawCircle(ring.center, ring.radius, _transferFillPaint);
+      canvas.drawCircle(ring.center, ring.radius, _transferBorderPaint);
     }
   }
 
