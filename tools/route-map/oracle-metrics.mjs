@@ -28,7 +28,7 @@ export function parseReviewedCsv(text, cols = { station: 0, line: 1, x: 2, y: 3 
   const rows = [];
   for (let i = 1; i < lines.length; i += 1) { // 헤더 스킵
     const c = lines[i].split(",");
-    if (c.length < 4) continue;
+    if (c.length <= Math.max(cols.station, cols.line, cols.x, cols.y)) continue;
     rows.push({
       stationName: c[cols.station].trim(),
       lineId: c[cols.line].trim(),
@@ -66,7 +66,7 @@ function main() {
     if (argv[i] === "--csv") csv = argv[++i];
     else if (argv[i] === "--out") out = argv[++i];
     else if (argv[i] === "--map") {
-      const map = argv[++i].split(",").map(x => parseInt(x));
+      const map = argv[++i].split(",").map(x => Number(x));
       cols = { station: map[0], line: map[1], x: map[2], y: map[3] };
     }
   }
