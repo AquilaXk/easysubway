@@ -39,3 +39,10 @@ test("modeArgs 파싱 스텝이 개별 인자를 output으로 펼친다", () => 
   assert.match(yml, /buildSpecPath/);
   assert.match(yml, /releaseRequestId/);
 });
+
+test("modeArgs 파싱 스텝은 비-JSON·개행 주입을 방어한다", () => {
+  // JSON.parse 실패·비객체 입력 → 명확한 실패(try/catch + object 검증)
+  assert.match(yml, /modeArgs must be a JSON object/);
+  // GITHUB_OUTPUT 개행 주입 차단 — 값에 개행이 있으면 거부
+  assert.match(yml, /must not contain newlines/);
+});
