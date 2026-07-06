@@ -86,10 +86,10 @@ class DatapackReleaseRequestAdminPageController {
 		return "redirect:/admin/datapack/release-requests/page";
 	}
 
-	// 자동 dispatch가 실패한(DISPATCH_FAILED) 승인 건을 운영자가 재시도한다.
-	// 이미 승인된 요청의 기계적 재발화이므로 staging promote 권한으로 허용한다.
+	// 자동 dispatch가 실패한(DISPATCH_FAILED) 승인 건을 재시도한다. 재시도는 production 게시
+	// 워크플로를 재발화하므로 approve와 동일한 production approve 권한을 요구한다(권한 경계 일치).
 	@PostMapping("/admin/datapack/release-requests/{approvalId}/retry-dispatch")
-	@PreAuthorize("hasAuthority('admin.datapack.staging.promote')")
+	@PreAuthorize("hasAuthority('admin.datapack.production.approve')")
 	String retryDispatch(@PathVariable("approvalId") String approvalId) {
 		releaseRequestService.retryDispatch(approvalId);
 		return "redirect:/admin/datapack/release-requests/page";

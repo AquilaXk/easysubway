@@ -152,14 +152,14 @@ class DatapackReleaseRequestAdminPageControllerTest {
 	}
 
 	@Test
-	@DisplayName("DISPATCH_FAILED 요청은 staging promote 권한으로 dispatch를 재시도해 DISPATCHED로 전이한다")
+	@DisplayName("DISPATCH_FAILED 요청은 production approve 권한으로 dispatch를 재시도해 DISPATCHED로 전이한다")
 	void retryDispatchRecoversFailedRequest() throws Exception {
 		insertReleaseRequest("rr-failed-1", "DISPATCH_FAILED", null);
 		dispatchPort.willReturn(DatapackWorkflowDispatchPort.DispatchResult.succeeded("stub ok"));
 
 		mockMvc.perform(post("/admin/datapack/release-requests/{id}/retry-dispatch", "rr-failed-1")
 				.with(csrf()).with(commandToken())
-				.with(user("carol").authorities(new SimpleGrantedAuthority("admin.datapack.staging.promote"))))
+				.with(user("carol").authorities(new SimpleGrantedAuthority("admin.datapack.production.approve"))))
 			.andExpect(status().is3xxRedirection())
 			.andExpect(redirectedUrl("/admin/datapack/release-requests/page"));
 
@@ -169,10 +169,17 @@ class DatapackReleaseRequestAdminPageControllerTest {
 	}
 
 	@Test
-	@DisplayName("staging promote 권한이 없으면 retry-dispatch는 거부된다")
-	void retryDispatchRequiresStagingPromote() throws Exception {
+	@DisplayName("retry-dispatch는 production publish를 재발화하므로 staging promote 권한으로는 거부된다")
+	void retryDispatchRequiresProductionApprove() throws Exception {
 		insertReleaseRequest("rr-failed-2", "DISPATCH_FAILED", null);
 
+		// staging promote(하위 권한)만 있으면 거부 — approve와 동일한 production approve 필요
+		mockMvc.perform(post("/admin/datapack/release-requests/{id}/retry-dispatch", "rr-failed-2")
+				.with(csrf()).with(commandToken())
+				.with(user("carol").authorities(new SimpleGrantedAuthority("admin.datapack.staging.promote"))))
+			.andExpect(status().isForbidden());
+
+		// read 전용도 거부
 		mockMvc.perform(post("/admin/datapack/release-requests/{id}/retry-dispatch", "rr-failed-2")
 				.with(csrf()).with(commandToken())
 				.with(user("viewer").authorities(new SimpleGrantedAuthority("admin.datapack.read"))))

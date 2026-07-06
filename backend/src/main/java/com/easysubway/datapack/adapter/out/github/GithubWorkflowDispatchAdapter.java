@@ -44,6 +44,16 @@ public class GithubWorkflowDispatchAdapter implements DatapackWorkflowDispatchPo
 		this.token = token;
 	}
 
+	// mode는 targetChannel에서 도출한다. datapack-release.yml은 production-publish에 대해
+	// targetChannel=production을 강제(아니면 워크플로 즉시 실패)하므로, production이 아닌 채널에
+	// production-publish를 보내면 backend는 DISPATCHED로 기록하나 워크플로는 게이트에서 실패한다.
+	// production이 아니면 비게이트 모드(exploratory)로 보낸다.
+	// NOTE(Part C): production-publish는 androidEvidencePath·strictRouteRegressionPath·
+	// releaseRequestPath 입력도 요구한다 — evidence 경로 배선은 Part C(콜백·게시 파이프라인)에서 채운다.
+	private static String modeFor(String targetChannel) {
+		return "production".equals(targetChannel) ? "production-publish" : "exploratory";
+	}
+
 	@Override
 	public DispatchResult dispatch(DispatchCommand command) {
 		if (token == null || token.isBlank()) {
@@ -54,7 +64,7 @@ public class GithubWorkflowDispatchAdapter implements DatapackWorkflowDispatchPo
 			body = OBJECT_MAPPER.writeValueAsString(Map.of(
 				"ref", "main",
 				"inputs", Map.of(
-					"mode", "production-publish",
+					"mode", modeFor(command.targetChannel()),
 					"targetChannel", command.targetChannel(),
 					"releaseRequestId", command.releaseRequestId(),
 					"buildSpecPath", command.buildSpecPath())));

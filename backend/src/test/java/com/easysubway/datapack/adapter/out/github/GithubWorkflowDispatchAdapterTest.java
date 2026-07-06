@@ -77,6 +77,21 @@ class GithubWorkflowDispatchAdapterTest {
 	}
 
 	@Test
+	@DisplayName("production이 아닌 채널은 mode=exploratory로 보낸다(워크플로 production-publish 게이트 회피)")
+	void nonProductionChannelUsesExploratoryMode() throws IOException {
+		String base = startServer(204);
+		var adapter = new GithubWorkflowDispatchAdapter(HttpClient.newHttpClient(), base, "test-pat");
+
+		var result = adapter.dispatch(
+			new DispatchCommand("staging", "release-request-2", "tools/datapack/build-spec.json"));
+
+		assertThat(result.ok()).isTrue();
+		assertThat(capturedBody.get())
+			.contains("\"mode\":\"exploratory\"")
+			.contains("\"targetChannel\":\"staging\"");
+	}
+
+	@Test
 	@DisplayName("비2xx 응답이면 ok=false로 실패를 표현한다")
 	void failsOnNon2xx() throws IOException {
 		String base = startServer(500);

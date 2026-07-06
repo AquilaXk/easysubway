@@ -11,6 +11,8 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Service
 public class DatapackReleaseRequestService {
+
+	private static final Logger log = LoggerFactory.getLogger(DatapackReleaseRequestService.class);
 
 	private final DatapackReleaseRequestRepository repository;
 	private final DatapackWorkflowDispatchPort dispatchPort;
@@ -89,7 +93,14 @@ public class DatapackReleaseRequestService {
 			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 				@Override
 				public void afterCommit() {
-					selfProvider.getObject().dispatchAndPersist(approvalId, command);
+					// 승인은 이미 커밋됐다 — afterCommit 예외를 approve() 호출자로 전파하면(500) 승인
+					// 실패로 오인된다. dispatch/persist 실패는 여기서 격리·로깅하고 DISPATCH_FAILED로
+					// 남겨 UI 재시도 경로로 흡수한다.
+					try {
+						selfProvider.getObject().dispatchAndPersist(approvalId, command);
+					} catch (RuntimeException e) {
+						log.error("release request {} dispatch after commit failed", approvalId, e);
+					}
 				}
 			});
 		} else {
@@ -126,12 +137,17 @@ public class DatapackReleaseRequestService {
 		return new DispatchCommand(request.targetChannel(), request.approvalId(), buildSpecPath);
 	}
 
+	// 워크플로가 fetch 가능한 상태: 승인됨(APPROVED, dormant/수동) + 자동 dispatch 완료(DISPATCHED).
+	// dispatch가 성공하면 status는 DISPATCHED로 전이하므로, APPROVED만 서빙하면 트리거된 워크플로가
+	// 정작 자기 release request 페이로드를 404로 받는다(자동화 자기모순). DISPATCH_FAILED/FAILED 등
+	// 미발화·실패 상태는 서빙 대상이 아니다.
+	private static final Set<DatapackReleaseRequestStatus> SERVABLE_STATUSES =
+		Set.of(DatapackReleaseRequestStatus.APPROVED, DatapackReleaseRequestStatus.DISPATCHED);
+
 	@Transactional(readOnly = true)
 	public Optional<DatapackReleaseRequest> findApproved(String approvalId) {
-		// APPROVED 상태에서만 서빙한다. approvedBy는 승인 이후 상태(DISPATCHED/FAILED 등)에도 남으므로
-		// approvedBy 기준으로 넓히면 실패한 release request가 승인된 것처럼 서빙될 수 있다.
 		return repository.findByApprovalId(approvalId)
-			.filter(r -> r.status() == DatapackReleaseRequestStatus.APPROVED);
+			.filter(r -> SERVABLE_STATUSES.contains(r.status()));
 	}
 
 	public record CreateReleaseRequestCommand(

@@ -62,13 +62,30 @@ class DatapackReleaseRequestServiceTest {
 	}
 
 	@Test
-	@DisplayName("승인 성공 시 findApproved가 반환, 미승인은 empty (dispatch dormant일 때 APPROVED 유지)")
-	void findApprovedGatesOnApproval() {
-		var created = service.create(cmd("alice"));
-		assertThat(service.findApproved(created.approvalId())).isEmpty();
+	@DisplayName("findApproved는 미승인=empty, APPROVED(dormant)·DISPATCHED=present, DISPATCH_FAILED=empty")
+	void findApprovedServesApprovedAndDispatched() {
+		// 미승인 → empty
+		var dormant = service.create(cmd("alice"));
+		assertThat(service.findApproved(dormant.approvalId())).isEmpty();
+
+		// dormant 승인(skip) → APPROVED 유지 → present
 		dispatchPort.willReturn(DatapackWorkflowDispatchPort.DispatchResult.skippedResult());
-		service.approve(created.approvalId(), "bob");
-		assertThat(service.findApproved(created.approvalId())).isPresent();
+		service.approve(dormant.approvalId(), "bob");
+		assertThat(service.findApproved(dormant.approvalId())).isPresent();
+
+		// 자동 dispatch 성공 → DISPATCHED → 여전히 present(트리거된 워크플로가 페이로드를 fetch해야 함)
+		var dispatched = service.create(cmd("alice"));
+		dispatchPort.willReturn(DatapackWorkflowDispatchPort.DispatchResult.succeeded("stub ok"));
+		service.approve(dispatched.approvalId(), "bob");
+		assertThat(status(dispatched.approvalId())).isEqualTo("DISPATCHED");
+		assertThat(service.findApproved(dispatched.approvalId())).isPresent();
+
+		// dispatch 실패 → DISPATCH_FAILED → empty(미발화이므로 서빙 안 함)
+		var failed = service.create(cmd("alice"));
+		dispatchPort.willReturn(DatapackWorkflowDispatchPort.DispatchResult.failed("HTTP 500"));
+		service.approve(failed.approvalId(), "bob");
+		assertThat(status(failed.approvalId())).isEqualTo("DISPATCH_FAILED");
+		assertThat(service.findApproved(failed.approvalId())).isEmpty();
 	}
 
 	@Test
