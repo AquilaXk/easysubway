@@ -72,6 +72,63 @@ class AdminAuditPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("actor·결과 2필터로 특정 관리자의 실패 이벤트만 좁혀 볼 수 있다")
+	void auditPageFiltersByActorAndOutcome() throws Exception {
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "OK_ONE", AdminAuditOutcome.SUCCESS, "정상"));
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "FAIL_ALICE", AdminAuditOutcome.FAILURE, "실패"));
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "bob", "FAIL_BOB", AdminAuditOutcome.FAILURE, "실패"));
+
+		String html = mockMvc.perform(get("/admin/audits/page")
+				.param("actor", "alice")
+				.param("outcome", "FAILURE")
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("FAIL_ALICE")
+			.doesNotContain("OK_ONE")
+			.doesNotContain("FAIL_BOB");
+	}
+
+	@Test
+	@DisplayName("사유 없는 조회만 거르는 필터를 제공한다")
+	void auditPageFiltersReasonMissing() throws Exception {
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "WITH_REASON", AdminAuditOutcome.SUCCESS, "사유 있음"));
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "NO_REASON", AdminAuditOutcome.SUCCESS, null));
+
+		String html = mockMvc.perform(get("/admin/audits/page")
+				.param("reasonMissing", "true")
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html).contains("NO_REASON").doesNotContain("WITH_REASON");
+	}
+
+	@Test
+	@DisplayName("htmx 요청은 셸 없이 결과 fragment만 돌려준다")
+	void auditPageHtmxReturnsFragmentOnly() throws Exception {
+		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "alice", "FRAG_ACTION", AdminAuditOutcome.SUCCESS, "사유"));
+
+		String html = mockMvc.perform(get("/admin/audits/page")
+				.header("HX-Request", "true")
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("FRAG_ACTION")
+			.doesNotContain("admin-shell");
+	}
+
+	@Test
 	@DisplayName("감사 조회 화면은 page size와 현재 페이지를 링크에 표시한다")
 	void auditPageShowsPaginationLinks() throws Exception {
 		auditEventRepository.save(event(AdminAuditEventType.ADMIN_ACTION, "FIRST_ACTION"));
@@ -93,10 +150,20 @@ class AdminAuditPageControllerTest {
 	}
 
 	private AdminAuditEvent event(AdminAuditEventType type, String action) {
+		return event(type, "admin-user", action, AdminAuditOutcome.SUCCESS, "업무 맥락: 신고 상세 조회");
+	}
+
+	private AdminAuditEvent event(
+		AdminAuditEventType type,
+		String actor,
+		String action,
+		AdminAuditOutcome outcome,
+		String reason
+	) {
 		return new AdminAuditEvent(
 			null,
 			type,
-			"admin-user",
+			actor,
 			"admin.view",
 			"request-1",
 			"127.0.0.1",
@@ -104,8 +171,8 @@ class AdminAuditPageControllerTest {
 			"FACILITY_REPORT",
 			"report-1",
 			action,
-			AdminAuditOutcome.SUCCESS,
-			"업무 맥락: 신고 상세 조회",
+			outcome,
+			reason,
 			LocalDateTime.of(2026, 6, 27, 0, 0)
 		);
 	}
