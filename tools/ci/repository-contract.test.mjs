@@ -4054,14 +4054,16 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   const workflow = read(".github/workflows/datapack-release.yml");
   const releaseEvidenceBundleSchema = readJson("tools/datapack/schema/release-evidence-bundle.schema.json");
 
-  assert.match(workflow, /mode:[\s\S]*options:[\s\S]*- exploratory[\s\S]*- release-candidate[\s\S]*- production-publish/);
+  assert.match(workflow, /mode:[\s\S]*options:\s*\[exploratory, release-candidate, production-publish/);
   assert.match(workflow, /schedule:[\s\S]*cron: "17 18 \* \* \*"/);
   assert.match(workflow, /apps\/mobile\/release\/datapack-freshness-sla\.json/);
-  assert.match(workflow, /buildSpecPath:[\s\S]*required: true/);
-  assert.match(workflow, /allowGaps:[\s\S]*default: false/);
-  assert.match(workflow, /targetChannel:[\s\S]*options:[\s\S]*- dev[\s\S]*- staging[\s\S]*- production/);
-  assert.match(workflow, /releaseRequestId:/);
-  assert.match(workflow, /releaseRequestPath:/);
+  // 입력 표면은 modeArgs 단일 JSON으로 통합됨(#1694 C0). 게이트 관련 인자는 parse 스텝(id: args)이 outputs로 펼친다.
+  assert.match(workflow, /modeArgs:[\s\S]*required: true/);
+  assert.match(workflow, /steps\.args\.outputs\.buildSpecPath/);
+  assert.match(workflow, /"allowGaps":"false"/);
+  assert.match(workflow, /targetChannel:[\s\S]*options:\s*\[dev, staging, production\]/);
+  assert.match(workflow, /steps\.args\.outputs\.releaseRequestId/);
+  assert.match(workflow, /steps\.args\.outputs\.releaseRequestPath/);
   assert.match(workflow, /production-datapack/);
   assert.match(workflow, /Data Pack Release \/ Validate release mode inputs/);
   assert.match(workflow, /release-candidate\|production-publish/);
