@@ -904,6 +904,18 @@ class $StationsTable extends Stations with TableInfo<$StationsTable, Station> {
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _nameSubMeta = const VerificationMeta(
+    'nameSub',
+  );
+  @override
+  late final GeneratedColumn<String> nameSub = GeneratedColumn<String>(
+    'name_sub',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _normalizedNameMeta = const VerificationMeta(
     'normalizedName',
   );
@@ -988,6 +1000,7 @@ class $StationsTable extends Stations with TableInfo<$StationsTable, Station> {
     id,
     nameKo,
     nameEn,
+    nameSub,
     normalizedName,
     region,
     latitude,
@@ -1025,6 +1038,12 @@ class $StationsTable extends Stations with TableInfo<$StationsTable, Station> {
       context.handle(
         _nameEnMeta,
         nameEn.isAcceptableOrUnknown(data['name_en']!, _nameEnMeta),
+      );
+    }
+    if (data.containsKey('name_sub')) {
+      context.handle(
+        _nameSubMeta,
+        nameSub.isAcceptableOrUnknown(data['name_sub']!, _nameSubMeta),
       );
     }
     if (data.containsKey('normalized_name')) {
@@ -1104,6 +1123,10 @@ class $StationsTable extends Stations with TableInfo<$StationsTable, Station> {
         DriftSqlType.string,
         data['${effectivePrefix}name_en'],
       )!,
+      nameSub: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_sub'],
+      )!,
       normalizedName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}normalized_name'],
@@ -1145,6 +1168,7 @@ class Station extends DataClass implements Insertable<Station> {
   final String id;
   final String nameKo;
   final String nameEn;
+  final String nameSub;
   final String normalizedName;
   final String region;
   final double? latitude;
@@ -1156,6 +1180,7 @@ class Station extends DataClass implements Insertable<Station> {
     required this.id,
     required this.nameKo,
     required this.nameEn,
+    required this.nameSub,
     required this.normalizedName,
     required this.region,
     this.latitude,
@@ -1170,6 +1195,7 @@ class Station extends DataClass implements Insertable<Station> {
     map['id'] = Variable<String>(id);
     map['name_ko'] = Variable<String>(nameKo);
     map['name_en'] = Variable<String>(nameEn);
+    map['name_sub'] = Variable<String>(nameSub);
     map['normalized_name'] = Variable<String>(normalizedName);
     map['region'] = Variable<String>(region);
     if (!nullToAbsent || latitude != null) {
@@ -1191,6 +1217,7 @@ class Station extends DataClass implements Insertable<Station> {
       id: Value(id),
       nameKo: Value(nameKo),
       nameEn: Value(nameEn),
+      nameSub: Value(nameSub),
       normalizedName: Value(normalizedName),
       region: Value(region),
       latitude: latitude == null && nullToAbsent
@@ -1216,6 +1243,7 @@ class Station extends DataClass implements Insertable<Station> {
       id: serializer.fromJson<String>(json['id']),
       nameKo: serializer.fromJson<String>(json['nameKo']),
       nameEn: serializer.fromJson<String>(json['nameEn']),
+      nameSub: serializer.fromJson<String>(json['nameSub']),
       normalizedName: serializer.fromJson<String>(json['normalizedName']),
       region: serializer.fromJson<String>(json['region']),
       latitude: serializer.fromJson<double?>(json['latitude']),
@@ -1232,6 +1260,7 @@ class Station extends DataClass implements Insertable<Station> {
       'id': serializer.toJson<String>(id),
       'nameKo': serializer.toJson<String>(nameKo),
       'nameEn': serializer.toJson<String>(nameEn),
+      'nameSub': serializer.toJson<String>(nameSub),
       'normalizedName': serializer.toJson<String>(normalizedName),
       'region': serializer.toJson<String>(region),
       'latitude': serializer.toJson<double?>(latitude),
@@ -1246,6 +1275,7 @@ class Station extends DataClass implements Insertable<Station> {
     String? id,
     String? nameKo,
     String? nameEn,
+    String? nameSub,
     String? normalizedName,
     String? region,
     Value<double?> latitude = const Value.absent(),
@@ -1257,6 +1287,7 @@ class Station extends DataClass implements Insertable<Station> {
     id: id ?? this.id,
     nameKo: nameKo ?? this.nameKo,
     nameEn: nameEn ?? this.nameEn,
+    nameSub: nameSub ?? this.nameSub,
     normalizedName: normalizedName ?? this.normalizedName,
     region: region ?? this.region,
     latitude: latitude.present ? latitude.value : this.latitude,
@@ -1272,6 +1303,7 @@ class Station extends DataClass implements Insertable<Station> {
       id: data.id.present ? data.id.value : this.id,
       nameKo: data.nameKo.present ? data.nameKo.value : this.nameKo,
       nameEn: data.nameEn.present ? data.nameEn.value : this.nameEn,
+      nameSub: data.nameSub.present ? data.nameSub.value : this.nameSub,
       normalizedName: data.normalizedName.present
           ? data.normalizedName.value
           : this.normalizedName,
@@ -1296,6 +1328,7 @@ class Station extends DataClass implements Insertable<Station> {
           ..write('id: $id, ')
           ..write('nameKo: $nameKo, ')
           ..write('nameEn: $nameEn, ')
+          ..write('nameSub: $nameSub, ')
           ..write('normalizedName: $normalizedName, ')
           ..write('region: $region, ')
           ..write('latitude: $latitude, ')
@@ -1312,6 +1345,7 @@ class Station extends DataClass implements Insertable<Station> {
     id,
     nameKo,
     nameEn,
+    nameSub,
     normalizedName,
     region,
     latitude,
@@ -1327,6 +1361,7 @@ class Station extends DataClass implements Insertable<Station> {
           other.id == this.id &&
           other.nameKo == this.nameKo &&
           other.nameEn == this.nameEn &&
+          other.nameSub == this.nameSub &&
           other.normalizedName == this.normalizedName &&
           other.region == this.region &&
           other.latitude == this.latitude &&
@@ -1340,6 +1375,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
   final Value<String> id;
   final Value<String> nameKo;
   final Value<String> nameEn;
+  final Value<String> nameSub;
   final Value<String> normalizedName;
   final Value<String> region;
   final Value<double?> latitude;
@@ -1352,6 +1388,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
     this.id = const Value.absent(),
     this.nameKo = const Value.absent(),
     this.nameEn = const Value.absent(),
+    this.nameSub = const Value.absent(),
     this.normalizedName = const Value.absent(),
     this.region = const Value.absent(),
     this.latitude = const Value.absent(),
@@ -1365,6 +1402,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
     required String id,
     required String nameKo,
     this.nameEn = const Value.absent(),
+    this.nameSub = const Value.absent(),
     required String normalizedName,
     this.region = const Value.absent(),
     this.latitude = const Value.absent(),
@@ -1380,6 +1418,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
     Expression<String>? id,
     Expression<String>? nameKo,
     Expression<String>? nameEn,
+    Expression<String>? nameSub,
     Expression<String>? normalizedName,
     Expression<String>? region,
     Expression<double>? latitude,
@@ -1393,6 +1432,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
       if (id != null) 'id': id,
       if (nameKo != null) 'name_ko': nameKo,
       if (nameEn != null) 'name_en': nameEn,
+      if (nameSub != null) 'name_sub': nameSub,
       if (normalizedName != null) 'normalized_name': normalizedName,
       if (region != null) 'region': region,
       if (latitude != null) 'latitude': latitude,
@@ -1408,6 +1448,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
     Value<String>? id,
     Value<String>? nameKo,
     Value<String>? nameEn,
+    Value<String>? nameSub,
     Value<String>? normalizedName,
     Value<String>? region,
     Value<double?>? latitude,
@@ -1421,6 +1462,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
       id: id ?? this.id,
       nameKo: nameKo ?? this.nameKo,
       nameEn: nameEn ?? this.nameEn,
+      nameSub: nameSub ?? this.nameSub,
       normalizedName: normalizedName ?? this.normalizedName,
       region: region ?? this.region,
       latitude: latitude ?? this.latitude,
@@ -1443,6 +1485,9 @@ class StationsCompanion extends UpdateCompanion<Station> {
     }
     if (nameEn.present) {
       map['name_en'] = Variable<String>(nameEn.value);
+    }
+    if (nameSub.present) {
+      map['name_sub'] = Variable<String>(nameSub.value);
     }
     if (normalizedName.present) {
       map['normalized_name'] = Variable<String>(normalizedName.value);
@@ -1477,6 +1522,7 @@ class StationsCompanion extends UpdateCompanion<Station> {
           ..write('id: $id, ')
           ..write('nameKo: $nameKo, ')
           ..write('nameEn: $nameEn, ')
+          ..write('nameSub: $nameSub, ')
           ..write('normalizedName: $normalizedName, ')
           ..write('region: $region, ')
           ..write('latitude: $latitude, ')
@@ -16184,6 +16230,7 @@ typedef $$StationsTableCreateCompanionBuilder =
       required String id,
       required String nameKo,
       Value<String> nameEn,
+      Value<String> nameSub,
       required String normalizedName,
       Value<String> region,
       Value<double?> latitude,
@@ -16198,6 +16245,7 @@ typedef $$StationsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> nameKo,
       Value<String> nameEn,
+      Value<String> nameSub,
       Value<String> normalizedName,
       Value<String> region,
       Value<double?> latitude,
@@ -16229,6 +16277,11 @@ class $$StationsTableFilterComposer
 
   ColumnFilters<String> get nameEn => $composableBuilder(
     column: $table.nameEn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameSub => $composableBuilder(
+    column: $table.nameSub,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16292,6 +16345,11 @@ class $$StationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get nameSub => $composableBuilder(
+    column: $table.nameSub,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get normalizedName => $composableBuilder(
     column: $table.normalizedName,
     builder: (column) => ColumnOrderings(column),
@@ -16345,6 +16403,9 @@ class $$StationsTableAnnotationComposer
 
   GeneratedColumn<String> get nameEn =>
       $composableBuilder(column: $table.nameEn, builder: (column) => column);
+
+  GeneratedColumn<String> get nameSub =>
+      $composableBuilder(column: $table.nameSub, builder: (column) => column);
 
   GeneratedColumn<String> get normalizedName => $composableBuilder(
     column: $table.normalizedName,
@@ -16407,6 +16468,7 @@ class $$StationsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> nameKo = const Value.absent(),
                 Value<String> nameEn = const Value.absent(),
+                Value<String> nameSub = const Value.absent(),
                 Value<String> normalizedName = const Value.absent(),
                 Value<String> region = const Value.absent(),
                 Value<double?> latitude = const Value.absent(),
@@ -16419,6 +16481,7 @@ class $$StationsTableTableManager
                 id: id,
                 nameKo: nameKo,
                 nameEn: nameEn,
+                nameSub: nameSub,
                 normalizedName: normalizedName,
                 region: region,
                 latitude: latitude,
@@ -16433,6 +16496,7 @@ class $$StationsTableTableManager
                 required String id,
                 required String nameKo,
                 Value<String> nameEn = const Value.absent(),
+                Value<String> nameSub = const Value.absent(),
                 required String normalizedName,
                 Value<String> region = const Value.absent(),
                 Value<double?> latitude = const Value.absent(),
@@ -16445,6 +16509,7 @@ class $$StationsTableTableManager
                 id: id,
                 nameKo: nameKo,
                 nameEn: nameEn,
+                nameSub: nameSub,
                 normalizedName: normalizedName,
                 region: region,
                 latitude: latitude,

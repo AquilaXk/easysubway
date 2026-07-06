@@ -21,6 +21,26 @@ void main() {
     }
   });
 
+  test('로컬 역 검색은 부역명(name_sub)으로도 역을 찾는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement(
+      "INSERT INTO stations "
+      "(id, name_ko, name_en, name_sub, normalized_name, region, "
+      "data_quality_level, data_source_type) "
+      "VALUES ('station-gongneung', '공릉', '', '서울과학기술대', '공릉', "
+      "'수도권', 'LEVEL_1', 'OFFICIAL_FILE')",
+    );
+    final repository = DriftStationRepository(database: database);
+
+    final results = await repository.searchStations('서울과학기술대');
+
+    expect(results, hasLength(1));
+    expect(results.single.id, 'station-gongneung');
+    expect(results.single.nameKo, '공릉');
+  });
+
   test('로컬 역 검색은 빈 값과 결과 없는 검색어를 빈 목록으로 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
