@@ -10589,6 +10589,7 @@ test("데이터팩 만료 알림 evidence는 SLA 임박 manifest를 FIRING으로
   assert.equal(evidence.alert.secondsUntilExpiry, 19800);
 });
 
+// TODO: --current-manifest 발산 경로 (currentManifestBytes !== manifestBytes)는 #1692로 의도적 미연기 → 미커버
 test("게시 plan은 schemaVersion 2에서 releases/<seq>.json 불변 스텝을 manifest 스텝보다 먼저 넣는다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "publish-plan-"));
   try {
@@ -10630,6 +10631,10 @@ test("게시 plan은 schemaVersion 2에서 releases/<seq>.json 불변 스텝을 
     assert.equal(releasePut.objectKey, "catalog/releases/3.json");
     assert.equal(releasePut.immutable, true);
     assert.equal(releasePut.sourcePath, "catalog/current.json");
+    const manifestBytes = Buffer.from(JSON.stringify(manifest));
+    assert.equal(releasePut.sha256, sha256(manifestBytes));
+    assert.equal(releasePut.sizeBytes, manifestBytes.length);
+    assert.equal(releasePut.packCount, 1);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
