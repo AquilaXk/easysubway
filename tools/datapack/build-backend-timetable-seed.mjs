@@ -40,6 +40,9 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
   const startDate = options.startDate ?? DEFAULT_START_DATE;
   const endDate = options.endDate ?? DEFAULT_END_DATE;
   const feedEndDate = options.feedEndDate ?? endDate;
+  if (!/^\d{8}$/.test(feedEndDate)) {
+    throw new Error(`feed_end_date must be 8-digit YYYYMMDD (transit_feed_info VARCHAR(8)): ${feedEndDate}`);
+  }
   const dayMap = options.serviceCalendarDayMap ?? SERVICE_CALENDAR_DAY_MAP;
 
   const tripIds = validateTrips(trips);
@@ -201,7 +204,12 @@ function feedInfoInsert(feedEndDate) {
 }
 
 function quote(value) {
-  return `'${String(value).split("'").join("''")}'`;
+  const text = String(value);
+  if (/[\r\n]/.test(text)) {
+    // 로더는 한 줄=한 statement로 파싱하므로 값에 개행이 있으면 statement가 쪼개진다(불변식 강제).
+    throw new Error(`value must not contain a newline (single-line statement invariant): ${JSON.stringify(text)}`);
+  }
+  return `'${text.split("'").join("''")}'`;
 }
 
 function bool(value) {

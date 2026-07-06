@@ -61,7 +61,17 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			return;
 		}
 		List<String> statements = readStatements(seedResource);
-		transactionTemplate.executeWithoutResult(status -> executeBatch(statements));
+		try {
+			transactionTemplate.executeWithoutResult(status -> executeBatch(statements));
+		} catch (RuntimeException exception) {
+			// 다중 replica 동시 배포 경쟁: 다른 인스턴스가 먼저 적재하면 이 배치는 PK/싱글턴 충돌로 실패한다.
+			// 실패 후 이미 적재됐으면(경쟁 loser) 관용 처리한다(부팅 crash loop 방지). 아니면 실제 오류로 재던진다.
+			if (routeTimetablePort.hasRouteTimetable()) {
+				log.info("transit timetable was seeded concurrently by another instance; batch failure is benign");
+				return;
+			}
+			throw exception;
+		}
 		log.info("transit timetable seeded from {} ({} statements)", seedResource, statements.size());
 	}
 
@@ -74,14 +84,17 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			statement.executeBatch();
 		} catch (SQLException exception) {
 			throw new IllegalStateException("transit timetable seed failed", exception);
+		} finally {
+			DataSourceUtils.releaseConnection(connection, dataSource);
 		}
 	}
 
 	// 도구가 한 줄당 한 statement(;로 종료)로 방출하므로 라인 단위 파싱으로 충분하다. .gz면 gunzip.
 	private static List<String> readStatements(Resource resource) {
-		try (InputStream raw = resource.getInputStream()) {
-			String filename = resource.getFilename();
-			InputStream data = filename != null && filename.endsWith(".gz") ? new GZIPInputStream(raw) : raw;
+		String filename = resource.getFilename();
+		boolean gzip = filename != null && filename.endsWith(".gz");
+		try (InputStream raw = resource.getInputStream();
+				InputStream data = gzip ? new GZIPInputStream(raw) : raw) {
 			String sql = new String(data.readAllBytes(), StandardCharsets.UTF_8);
 			return sql.lines()
 				.map(String::strip)

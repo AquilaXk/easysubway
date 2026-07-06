@@ -167,3 +167,15 @@ test("--feed-end-date 명시 시 endDate와 분리된다", () => {
   const { sql } = buildBackendTimetableSeed(ARTIFACT, { ...OPTIONS, feedEndDate: "20260930" });
   assert.match(sql, /INSERT INTO transit_feed_info \(id, feed_end_date\) VALUES \(1, '20260930'\);/);
 });
+
+test("feed_end_date가 8자리 YYYYMMDD가 아니면 거부한다(transit_feed_info VARCHAR(8))", () => {
+  assert.throws(() => buildBackendTimetableSeed(ARTIFACT, { ...OPTIONS, feedEndDate: "2026-12-31" }), /feed_end_date|YYYYMMDD|8/i);
+});
+
+test("값에 개행이 있으면 거부한다(한 줄=한 statement 불변식, 로더 라인 파서 전제)", () => {
+  const bad = {
+    transitTrips: [{ ...ARTIFACT.transitTrips[0], tripHeadsign: "사당\n방면" }],
+    transitStopTimes: [ARTIFACT.transitStopTimes[0]],
+  };
+  assert.throws(() => buildBackendTimetableSeed(bad, OPTIONS), /newline|개행|single-line|한 줄/i);
+});

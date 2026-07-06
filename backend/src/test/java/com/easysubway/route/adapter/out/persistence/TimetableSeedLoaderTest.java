@@ -55,6 +55,33 @@ class TimetableSeedLoaderTest {
 	}
 
 	@Test
+	void toleratesConcurrentSeedWhenAnotherInstanceWon() {
+		var seed = new ClassPathResource("timetable/test-line4-seed.sql");
+		// 다른 replica가 먼저 적재한 상태를 만든다.
+		loader(seed).run(null);
+
+		// 경쟁 loser 시뮬: 사전체크는 empty(false)로 보지만 재확인 시 true → 배치는 PK 충돌 → 관용 처리(예외 없음).
+		var racingPort = new com.easysubway.route.application.port.out.LoadRouteTimetablePort() {
+			private int calls = 0;
+
+			@Override
+			public boolean hasRouteTimetable() {
+				return calls++ > 0;
+			}
+
+			@Override
+			public RouteTimetable loadRouteTimetable() {
+				return RouteTimetable.empty();
+			}
+		};
+		var loser = new TimetableSeedLoader(
+			racingPort, dataSource, new DataSourceTransactionManager(dataSource), seed);
+		loser.run(null); // 예외 없이 반환해야 한다.
+
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_stop_times", Integer.class)).isEqualTo(2);
+	}
+
+	@Test
 	void rollsBackOnMidScriptFailureLeavingNoPartialData() {
 		// trips 성공 후 stop_times FK 위반으로 실패 → all-or-nothing 롤백(부분 적재 없음).
 		var bad = new ByteArrayResource((
