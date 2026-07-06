@@ -324,7 +324,10 @@ public class RealtimeGatewayService {
 			if (providerReceivedAt == null || !isProviderFresh(providerReceivedAt, receivedAt)) {
 				continue;
 			}
-			RealtimeArrival adjusted = adjustArrivalEta(arrival, providerReceivedAt, receivedAt);
+			// provider 로컬(예: TOPIS KST "yyyy-MM-dd HH:mm:ss") timestamp를 경계에서 ISO(Instant)로
+			// 정규화해 하류 소비처(route resolver의 Instant.parse)가 파싱 가능하게 한다. 원문 포맷 누출 차단.
+			RealtimeArrival normalized = withProviderReceivedAt(arrival, providerReceivedAt.toString());
+			RealtimeArrival adjusted = adjustArrivalEta(normalized, providerReceivedAt, receivedAt);
 			freshArrivals.add(canonicalizeArrival(adjusted, normalizedQuery));
 		}
 		return List.copyOf(freshArrivals);
@@ -362,6 +365,24 @@ public class RealtimeGatewayService {
 			arrivalMessage(adjustedEtaSeconds),
 			arrival.positionMessage(),
 			arrival.providerReceivedAt(),
+			arrival.servicePattern(),
+			arrival.rawDestination(),
+			arrival.rawDirection(),
+			arrival.rawServicePattern()
+		);
+	}
+
+	private static RealtimeArrival withProviderReceivedAt(RealtimeArrival arrival, String providerReceivedAt) {
+		return new RealtimeArrival(
+			arrival.lineId(),
+			arrival.stationName(),
+			arrival.destination(),
+			arrival.direction(),
+			arrival.trainNo(),
+			arrival.etaSeconds(),
+			arrival.message(),
+			arrival.positionMessage(),
+			providerReceivedAt,
 			arrival.servicePattern(),
 			arrival.rawDestination(),
 			arrival.rawDirection(),
