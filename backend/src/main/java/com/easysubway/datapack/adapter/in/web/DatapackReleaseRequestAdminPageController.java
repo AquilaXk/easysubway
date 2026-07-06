@@ -7,6 +7,7 @@ import com.easysubway.datapack.application.service.DatapackReleaseRequestService
 import com.easysubway.datapack.application.service.DatapackReleaseRequestService.CreateReleaseRequestCommand;
 import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import java.time.LocalDateTime;
+import java.util.Set;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -21,6 +22,8 @@ class DatapackReleaseRequestAdminPageController {
 
 	private static final int CANDIDATE_LIMIT = 20;
 	private static final int REQUEST_LIMIT = 20;
+	// 릴리스 요청 대상은 승인/승격을 통과한 candidate만(미승인·실패 후보의 게시 경로 차단).
+	private static final Set<String> RELEASE_ELIGIBLE_CANDIDATE_STATUSES = Set.of("APPROVED", "PROMOTED");
 
 	private final JdbcDatapackCandidateRepository candidateRepository;
 	private final DatapackReleaseRequestRepository releaseRequestRepository;
@@ -40,6 +43,7 @@ class DatapackReleaseRequestAdminPageController {
 	@PreAuthorize("hasAuthority('admin.datapack.read')")
 	String page(Model model) {
 		model.addAttribute("candidates", candidateRepository.listRecentCandidates(CANDIDATE_LIMIT).stream()
+			.filter(c -> RELEASE_ELIGIBLE_CANDIDATE_STATUSES.contains(c.approvalStatus()))
 			.map(CandidateOption::from)
 			.toList());
 		model.addAttribute("requests", releaseRequestRepository.findRecent(REQUEST_LIMIT).stream()
@@ -57,6 +61,11 @@ class DatapackReleaseRequestAdminPageController {
 	) {
 		CandidateRow candidate = candidateRepository.findCandidate(candidateId)
 			.orElseThrow(() -> new IllegalArgumentException("candidate not found: " + candidateId));
+		// 서버측 적격성 강제: 폼 우회로 미승인/실패 candidate가 release request가 되는 것을 차단.
+		if (!RELEASE_ELIGIBLE_CANDIDATE_STATUSES.contains(candidate.approvalStatus())) {
+			throw new IllegalArgumentException(
+				"candidate is not release-eligible: " + candidate.approvalStatus());
+		}
 		// 스펙 A-1: 파생값은 candidate에서 채운다(사용자 자유 입력 아님).
 		// approvedLedgerHash ← candidate.overrideSetHash(승인된 오버라이드 장부 해시).
 		releaseRequestService.create(new CreateReleaseRequestCommand(

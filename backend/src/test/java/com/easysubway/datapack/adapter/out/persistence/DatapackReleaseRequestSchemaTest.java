@@ -2,7 +2,6 @@ package com.easysubway.datapack.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +28,17 @@ class DatapackReleaseRequestSchemaTest {
 			"b".repeat(64), "c".repeat(64), "requester", "REQUESTED",
 			java.sql.Timestamp.valueOf("2026-07-06 00:00:00"), java.sql.Timestamp.valueOf("2026-07-06 00:00:00"));
 
-		List<String> statuses = jdbcTemplate.queryForList(
-			"SELECT status FROM datapack_release_request WHERE approval_id = ?", String.class, "appr-1");
-		assertThat(statuses).containsExactly("REQUESTED");
+		var row = jdbcTemplate.queryForMap(
+			"SELECT candidate_id, scope_id, target_channel, build_spec_sha256, source_snapshot_set_hash,"
+				+ " approved_ledger_hash, requested_by, status FROM datapack_release_request WHERE approval_id = ?",
+			"appr-1");
+		assertThat(row.get("candidate_id")).isEqualTo("cand-1");
+		assertThat(row.get("scope_id")).isEqualTo("scope-1");
+		assertThat(row.get("target_channel")).isEqualTo("staging");
+		assertThat(row.get("build_spec_sha256")).isEqualTo("a".repeat(64));
+		assertThat(row.get("source_snapshot_set_hash")).isEqualTo("b".repeat(64));
+		assertThat(row.get("approved_ledger_hash")).isEqualTo("c".repeat(64));
+		assertThat(row.get("requested_by")).isEqualTo("requester");
+		assertThat(row.get("status")).isEqualTo("REQUESTED");
 	}
 }

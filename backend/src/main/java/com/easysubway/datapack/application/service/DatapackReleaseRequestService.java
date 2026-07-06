@@ -50,8 +50,10 @@ public class DatapackReleaseRequestService {
 
 	@Transactional(readOnly = true)
 	public Optional<DatapackReleaseRequest> findApproved(String approvalId) {
+		// APPROVED 상태에서만 서빙한다. approvedBy는 승인 이후 상태(DISPATCHED/FAILED 등)에도 남으므로
+		// approvedBy 기준으로 넓히면 실패한 release request가 승인된 것처럼 서빙될 수 있다.
 		return repository.findByApprovalId(approvalId)
-			.filter(r -> r.status() == DatapackReleaseRequestStatus.APPROVED || r.approvedBy() != null);
+			.filter(r -> r.status() == DatapackReleaseRequestStatus.APPROVED);
 	}
 
 	public record CreateReleaseRequestCommand(

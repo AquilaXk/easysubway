@@ -43,8 +43,8 @@ public record DatapackReleaseRequest(
 	}
 
 	public DatapackReleaseRequest approve(String approver, LocalDateTime at) {
-		if (status != DatapackReleaseRequestStatus.REQUESTED) {
-			throw new IllegalStateException("release request is not in REQUESTED state: " + status);
+		if (!status.canTransitionTo(DatapackReleaseRequestStatus.APPROVED)) {
+			throw new IllegalStateException("release request cannot be approved from state: " + status);
 		}
 		if (approver == null || approver.isBlank()) {
 			throw new IllegalArgumentException("approvedBy is required");

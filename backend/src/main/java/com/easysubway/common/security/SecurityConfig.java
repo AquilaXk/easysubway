@@ -82,7 +82,7 @@ public class SecurityConfig {
 			.csrf(csrf -> csrf.disable())
 			.sessionManagement(sm -> sm.sessionCreationPolicy(
 				org.springframework.security.config.http.SessionCreationPolicy.STATELESS))
-			.authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+			.authorizeHttpRequests(authorize -> authorize.anyRequest().hasRole("DATAPACK_WORKFLOW"))
 			.addFilterBefore(
 				new com.easysubway.datapack.adapter.in.web.WorkflowServiceTokenFilter(workflowToken),
 				org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
