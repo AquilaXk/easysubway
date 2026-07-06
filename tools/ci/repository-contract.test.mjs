@@ -730,7 +730,9 @@ test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터
   // forever pending and block every merge — this test is the tripwire.
   const workflow = read(".github/workflows/ci.yml");
   for (const context of REQUIRED_STATUS_CHECK_CONTEXTS) {
-    assert.match(workflow, new RegExp(`name: ${context.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\n`));
+    // Context names are plain job names; a literal substring check avoids
+    // regex-escaping the value.
+    assert.ok(workflow.includes(`name: ${context}\n`), `ci.yml must define a job named ${context}`);
   }
   // Release Gate Consistency and PR Title are the two checks #1685 promotes to
   // required, so they must be part of the canonical set.
