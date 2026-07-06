@@ -168,24 +168,24 @@ export function chainEdgesForLine(edges) {
   const orientedPts = (e, fromNode) =>
     e.from === fromNode ? e.pts : e.pts.slice().reverse();
   const chains = [];
+  const walkChain = (startNode, startIdx) => {
+    const chain = [];
+    let node = startNode;
+    let curIdx = startIdx;
+    for (;;) {
+      used[curIdx] = true;
+      const seg = orientedPts(edges[curIdx], node);
+      chain.push(...(chain.length === 0 ? seg : seg.slice(1)));
+      node = edges[curIdx].from === node ? edges[curIdx].to : edges[curIdx].from;
+      const next = deg(node) === 2 ? adj.get(node).find((a) => !used[a.idx]) : undefined;
+      if (!next) break;
+      curIdx = next.idx;
+    }
+    return chain;
+  };
   const walkFrom = (startNode) => {
     for (const start of adj.get(startNode)) {
-      if (used[start.idx]) continue;
-      const chain = [];
-      let node = startNode;
-      let curIdx = start.idx;
-      for (;;) {
-        used[curIdx] = true;
-        const seg = orientedPts(edges[curIdx], node);
-        if (chain.length === 0) chain.push(...seg);
-        else chain.push(...seg.slice(1));
-        node = edges[curIdx].from === node ? edges[curIdx].to : edges[curIdx].from;
-        if (deg(node) !== 2) break;
-        const next = adj.get(node).find((a) => !used[a.idx]);
-        if (!next) break;
-        curIdx = next.idx;
-      }
-      chains.push(chain);
+      if (!used[start.idx]) chains.push(walkChain(startNode, start.idx));
     }
   };
   for (const [node] of adj) if (deg(node) !== 2) walkFrom(node);
@@ -340,6 +340,7 @@ function main() {
     );
     if (o.check) {
       console.log("(--check: 팩 미기록)");
+      db.close();
       return;
     }
 

@@ -99,3 +99,14 @@ test("chainEdgesForLine은 인접 에지를 순서대로 잇고 분기점에서 
   const allX = new Set(branched.flat().map((p) => `${p.x},${p.y}`));
   assert.ok(allX.has("20,0") && allX.has("10,10"));
 });
+
+test("chainEdgesForLine은 전 노드 차수2인 폐루프(순환선)를 하나의 체인으로 닫는다", () => {
+  // 2호선처럼 모든 노드가 차수2인 순환선 — 첫 루프(차수≠2)를 건너뛰고 fallback 경로로만 처리
+  const loop = chainEdgesForLine([
+    { from: "a", to: "b", pts: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+    { from: "b", to: "c", pts: [{ x: 10, y: 0 }, { x: 10, y: 10 }] },
+    { from: "c", to: "a", pts: [{ x: 10, y: 10 }, { x: 0, y: 0 }] },
+  ]);
+  assert.equal(loop.length, 1, "순환선은 체인 1개");
+  assert.deepEqual(loop[0][0], loop[0][loop[0].length - 1], "시작점==끝점");
+});

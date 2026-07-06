@@ -85,15 +85,19 @@ function degreeOf(edgeList) {
  * 될 때까지 **반복 분할**한다(유니크 접미 #2,#3,…). 재주입 시 '#' 앞이 station_id.
  * nodeCoord·edgeList를 제자리 변형하고 분할 로그를 반환.
  */
+function firstOverDegree(edgeList) {
+  for (const [nid, nd] of degreeOf(edgeList)) {
+    if (nd > 8) return { id: nid, d: nd };
+  }
+  return null;
+}
+
 export function splitHighDegreeNodes(nodeCoord, edgeList) {
   const splitNodes = [];
   for (;;) {
-    let id = null;
-    let d = 0;
-    for (const [nid, nd] of degreeOf(edgeList)) {
-      if (nd > 8) { id = nid; d = nd; break; }
-    }
-    if (id === null) break;
+    const over = firstOverDegree(edgeList);
+    if (over === null) break;
+    const { id, d } = over;
     splitNodes.push({ id, name: nodeCoord.get(id)?.name, d });
     const c = nodeCoord.get(id);
     let suffix = 2;
