@@ -153,19 +153,37 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
 
     // 노선 뱃지는 **종점에만** 둔다(공식 노선도 관례). 선 따라 반복하면 역명을
     // 덮어 가독을 해친다 — 중간 구간은 선 색으로 노선을 식별한다(#1789 튜닝).
-    Offset? first;
-    Offset? last;
+    //
+    // anchor = 실제 양 극점(모든 조각 끝점 중 상호 최원 쌍). 다중 조각 노선에서
+    // first/last가 중앙 조각 경계로 잡혀 뱃지가 도심을 덮던 문제를 고친다(#1789).
+    final endpoints = <Offset>[];
     for (final polyline in line.polylines) {
-      for (final point in polyline) {
-        first ??= point;
-        last = point;
+      if (polyline.isEmpty) {
+        continue;
+      }
+      endpoints.add(polyline.first);
+      if (polyline.length > 1) {
+        endpoints.add(polyline.last);
       }
     }
-    if (first != null) {
-      emit(first);
+    Offset? a;
+    Offset? b;
+    var maxD = -1.0;
+    for (var i = 0; i < endpoints.length; i += 1) {
+      for (var j = i + 1; j < endpoints.length; j += 1) {
+        final d = (endpoints[i] - endpoints[j]).distanceSquared;
+        if (d > maxD) {
+          maxD = d;
+          a = endpoints[i];
+          b = endpoints[j];
+        }
+      }
     }
-    if (last != null && last != first) {
-      emit(last); // 순환선(first==last)은 한 번만.
+    if (a != null) {
+      emit(a);
+    }
+    if (b != null && b != a) {
+      emit(b); // 순환선(양 극점 근접)은 a==b → 한 번만.
     }
   }
 
