@@ -1,12 +1,15 @@
 package com.easysubway.admin.audit.adapter.out.persistence;
 
+import com.easysubway.admin.audit.application.AdminAuditQuery;
 import com.easysubway.admin.audit.application.port.out.AdminAuditEventRepository;
 import com.easysubway.admin.audit.domain.AdminAuditEvent;
 import com.easysubway.admin.audit.domain.AdminAuditEventType;
 import com.easysubway.admin.audit.domain.AdminAuditOutcome;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
@@ -72,6 +75,88 @@ public class JdbcAdminAuditEventRepository implements AdminAuditEventRepository 
 			ORDER BY occurred_at DESC, audit_id DESC
 			LIMIT ? OFFSET ?
 			""", this::mapEvent, eventType.name(), limit, Math.max(offset, 0));
+	}
+
+	@Override
+	public List<AdminAuditEvent> search(AdminAuditQuery query) {
+		List<Object> arguments = new ArrayList<>();
+		String whereClause = buildWhere(query, arguments);
+		arguments.add(query.size());
+		arguments.add(query.offset());
+		return jdbcTemplate.query("""
+			SELECT audit_id, event_type, actor, role_permission, request_id, client_ip, user_agent,
+				target_type, target_id, action, outcome, reason, occurred_at
+			FROM admin_audit_events
+			"""
+			+ whereClause
+			+ " ORDER BY occurred_at DESC, audit_id DESC LIMIT ? OFFSET ?",
+			this::mapEvent,
+			arguments.toArray());
+	}
+
+	@Override
+	public long count(AdminAuditQuery query) {
+		List<Object> arguments = new ArrayList<>();
+		String whereClause = buildWhere(query, arguments);
+		Long count = jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM admin_audit_events" + whereClause,
+			Long.class,
+			arguments.toArray());
+		return count == null ? 0L : count;
+	}
+
+	@Override
+	public List<String> findDistinctActors(AdminAuditEventType scopeEventType) {
+		if (scopeEventType == null) {
+			return jdbcTemplate.queryForList(
+				"SELECT DISTINCT actor FROM admin_audit_events ORDER BY actor ASC", String.class);
+		}
+		return jdbcTemplate.queryForList(
+			"SELECT DISTINCT actor FROM admin_audit_events WHERE event_type = ? ORDER BY actor ASC",
+			String.class, scopeEventType.name());
+	}
+
+	// 감사 필터를 화이트리스트 컬럼으로만 조립한다. target 키워드는 target_id·target_type만 LIKE(메타문자
+	// 이스케이프). 기간은 occurred_at 기준(종료일 포함). 사유 없는 조회는 reason IS NULL.
+	private String buildWhere(AdminAuditQuery query, List<Object> arguments) {
+		List<String> conditions = new ArrayList<>();
+		if (query.hasEventType()) {
+			conditions.add("event_type = ?");
+			arguments.add(query.eventType().name());
+		}
+		if (query.hasActor()) {
+			conditions.add("actor = ?");
+			arguments.add(query.actor());
+		}
+		if (query.hasOutcome()) {
+			conditions.add("outcome = ?");
+			arguments.add(query.outcome().name());
+		}
+		if (query.hasTargetKeyword()) {
+			conditions.add("(LOWER(target_id) LIKE ? ESCAPE '\\' OR LOWER(target_type) LIKE ? ESCAPE '\\')");
+			String pattern = "%" + escapeLike(query.targetKeyword().toLowerCase(Locale.ROOT)) + "%";
+			arguments.add(pattern);
+			arguments.add(pattern);
+		}
+		if (query.occurredFrom() != null) {
+			conditions.add("occurred_at >= ?");
+			arguments.add(query.occurredFrom().atStartOfDay());
+		}
+		if (query.occurredTo() != null) {
+			conditions.add("occurred_at < ?");
+			arguments.add(query.occurredTo().plusDays(1).atStartOfDay());
+		}
+		if (query.reasonMissing()) {
+			conditions.add("reason IS NULL");
+		}
+		if (conditions.isEmpty()) {
+			return "";
+		}
+		return " WHERE " + String.join(" AND ", conditions);
+	}
+
+	private static String escapeLike(String value) {
+		return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
 	}
 
 	private AdminAuditEvent mapEvent(ResultSet resultSet, int rowNumber) throws SQLException {
