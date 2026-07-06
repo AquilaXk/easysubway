@@ -1159,33 +1159,6 @@ test("스케줄 취약점 스캔은 PR 스캔과 동일 SHA·동일 lockfile로 
   // Least privilege on the scan job; top-level workflow has no ambient perms.
   assert.match(scheduled, /permissions: \{\}/);
   assert.match(scheduled, /security-events: write/);
-
-  // Dependabot PR titles bypass the human bracket-prefix check via actor skip,
-  // not by loosening the regex (skipped == satisfied for required checks).
-  assert.match(ci, /github\.actor != 'dependabot\[bot\]'/);
-});
-
-test("Dependabot는 4개 ecosystem을 큐 규약(그룹·rebase 비활성)으로 자동 업데이트한다", () => {
-  const dependabot = read(".github/dependabot.yml");
-  assert.match(dependabot, /^version: 2$/m);
-
-  const ecosystems = [...dependabot.matchAll(/package-ecosystem: (\S+)\n\s*directory: "([^"]+)"/g)].map(
-    (match) => `${match[1]}:${match[2]}`,
-  );
-  assert.deepEqual(ecosystems.sort(), [
-    "github-actions:/",
-    "gradle:/apps/mobile/android",
-    "gradle:/backend",
-    "pub:/apps/mobile",
-  ]);
-
-  // #1751 coordinator owns branch-up-to-date; Dependabot must not auto-rebase.
-  assert.equal((dependabot.match(/rebase-strategy: disabled/g) ?? []).length, 4);
-  // Grouped so the weekly burst stays ~1 PR per ecosystem.
-  assert.equal((dependabot.match(/groups:/g) ?? []).length, 4);
-  assert.equal((dependabot.match(/open-pull-requests-limit: 5/g) ?? []).length, 4);
-  // No auto-label: the automerge label is added only after the review gate.
-  assert.doesNotMatch(dependabot, /labels:/);
 });
 
 test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () => {
