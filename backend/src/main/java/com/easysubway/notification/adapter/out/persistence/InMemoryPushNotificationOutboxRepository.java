@@ -215,6 +215,18 @@ public class InMemoryPushNotificationOutboxRepository implements
 			|| createdAt.isBefore(query.createdTo().plusDays(1).atStartOfDay());
 	}
 
+	@Override
+	public List<PushNotification> loadPushNotificationsByIds(List<String> notificationIds) {
+		if (notificationIds == null || notificationIds.isEmpty()) {
+			return List.of();
+		}
+		java.util.Set<String> ids = new java.util.HashSet<>(notificationIds);
+		return notificationsByUserId.values().stream()
+			.flatMap(List::stream)
+			.filter(notification -> ids.contains(notification.notificationId()))
+			.toList();
+	}
+
 	private Stream<PushNotification> matchingHistory(PushNotificationHistoryQuery query) {
 		return notificationsByUserId.values().stream()
 			.flatMap(List::stream)

@@ -7,6 +7,7 @@ import com.easysubway.notification.domain.PushNotification;
 import com.easysubway.notification.domain.PushNotificationStatus;
 import com.easysubway.notification.domain.PushNotificationType;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -322,6 +323,19 @@ class JdbcPushNotificationOutboxRepositoryTest {
 		var drilldown = com.easysubway.notification.application.port.in.PushNotificationHistoryQuery.of(
 			null, null, null, "provider timeout", null, null, null, null);
 		assertThat(repository.countPushNotifications(drilldown)).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("식별자 목록으로 알림들을 로드한다(재발송 대상 검증용)")
+	void loadPushNotificationsByIdsReturnsMatchingNotifications() {
+		repository.savePushNotification(notification("push-1", "user-1", PushNotificationType.REPORT_STATUS, 9));
+		repository.savePushNotification(notification("push-2", "user-2", PushNotificationType.DATA_QUALITY, 10));
+		repository.savePushNotification(notification("push-3", "user-3", PushNotificationType.REPORT_STATUS, 11));
+
+		assertThat(repository.loadPushNotificationsByIds(List.of("push-1", "push-3", "missing")))
+			.extracting(PushNotification::notificationId)
+			.containsExactlyInAnyOrder("push-1", "push-3");
+		assertThat(repository.loadPushNotificationsByIds(List.of())).isEmpty();
 	}
 
 	private static com.easysubway.notification.application.port.in.PushNotificationHistoryQuery query(

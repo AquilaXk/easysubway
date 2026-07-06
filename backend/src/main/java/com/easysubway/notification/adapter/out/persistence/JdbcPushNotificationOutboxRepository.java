@@ -244,6 +244,31 @@ public class JdbcPushNotificationOutboxRepository implements
 		return count == null ? 0L : count;
 	}
 
+	@Override
+	public List<PushNotification> loadPushNotificationsByIds(List<String> notificationIds) {
+		if (notificationIds == null || notificationIds.isEmpty()) {
+			return List.of();
+		}
+		String placeholders = String.join(", ", java.util.Collections.nCopies(notificationIds.size(), "?"));
+		return jdbcTemplate.query(
+			"""
+				SELECT notification_id,
+					user_id,
+					platform,
+					device_token,
+					notification_type,
+					title,
+					body,
+					status,
+					failure_reason,
+					created_at
+				FROM push_notification_outbox
+				WHERE notification_id IN (""" + placeholders + ")",
+			this::mapPushNotification,
+			notificationIds.toArray()
+		);
+	}
+
 	// 이력 필터를 화이트리스트 컬럼으로만 조립한다. 키워드는 제목·본문만 매칭하고(수신자 식별자는 제외)
 	// LIKE 메타문자를 이스케이프한다. 기간은 created_at 기준(종료일 포함).
 	private String buildHistoryWhere(PushNotificationHistoryQuery query, List<Object> arguments) {

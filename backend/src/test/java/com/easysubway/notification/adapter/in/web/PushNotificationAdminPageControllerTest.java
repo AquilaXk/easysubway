@@ -12,9 +12,12 @@ import com.easysubway.admin.audit.domain.AdminAuditEventType;
 import com.easysubway.notification.application.port.in.NotificationPreferenceUseCase;
 import com.easysubway.notification.application.port.in.RegisterDeviceCommand;
 import com.easysubway.notification.domain.DevicePlatform;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -140,7 +143,7 @@ class PushNotificationAdminPageControllerTest {
 	@Test
 	@DisplayName("발송 이력 조회는 열람 감사(PRIVACY_READ)를 남긴다")
 	void pushHistoryViewWritesPrivacyReadAudit() throws Exception {
-		mockMvc.perform(get("/admin/notifications/push/history")
+		mockMvc.perform(get("/admin/notifications/push/page/history")
 				.header("HX-Request", "true")
 				.with(httpBasic("admin-user", "admin-test-password")))
 			.andExpect(status().isOk());
@@ -179,7 +182,7 @@ class PushNotificationAdminPageControllerTest {
 		dispatchNotification("REPORT_STATUS", "신고 처리 알림");
 		deliverPendingNotifications();
 
-		String fragment = mockMvc.perform(get("/admin/notifications/push/history")
+		String fragment = mockMvc.perform(get("/admin/notifications/push/page/history")
 				.param("reason", "외부 푸시 발송 어댑터가 설정되지 않았습니다.")
 				.header("HX-Request", "true")
 				.with(httpBasic("admin-user", "admin-test-password")))
@@ -200,7 +203,7 @@ class PushNotificationAdminPageControllerTest {
 		registerDevice();
 		dispatchNotification("REPORT_STATUS", "대기 중 알림");
 
-		String fragment = mockMvc.perform(get("/admin/notifications/push/history")
+		String fragment = mockMvc.perform(get("/admin/notifications/push/page/history")
 				.param("status", "FAILED")
 				.header("HX-Request", "true")
 				.with(httpBasic("admin-user", "admin-test-password")))
@@ -214,6 +217,60 @@ class PushNotificationAdminPageControllerTest {
 			.contains("조건에 맞는 발송 이력이 없습니다.")
 			.doesNotContain("admin-shell")
 			.doesNotContain("대기 중 알림");
+	}
+
+	@Test
+	@DisplayName("재발송은 command token 없이는 차단된다(중복·위조 방지)")
+	void resendRequiresCommandToken() throws Exception {
+		mockMvc.perform(post("/admin/notifications/push/resend")
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("notificationIds", "push-x")
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf()))
+			.andExpect(status().isConflict());
+	}
+
+	@Test
+	@DisplayName("실패 건 재발송은 command token으로 처리하고 결과 토스트·감사를 남긴다")
+	void resendFailedNotificationTogglesToPendingAndAudits() throws Exception {
+		registerDevice();
+		dispatchNotification("REPORT_STATUS", "신고 처리 알림");
+		deliverPendingNotifications();
+
+		MockHttpSession session = new MockHttpSession();
+		String html = mockMvc.perform(get("/admin/notifications/push/page")
+				.session(session)
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		// 실패 행의 재발송 체크박스 값과 폼의 command token을 페이지에서 뽑아 no-JS 폼처럼 제출한다.
+		assertThat(html).contains("최대 <strong>50</strong>건");
+		String token = extract(html, "name=\"commandToken\" value=\"([^\"]+)\"");
+		String notificationId = extract(html, "name=\"notificationIds\" value=\"([^\"]+)\"");
+
+		mockMvc.perform(post("/admin/notifications/push/resend")
+				.session(session)
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("notificationIds", notificationId)
+				.param("commandToken", token)
+				.with(httpBasic("admin-user", "admin-test-password"))
+				.with(csrf()))
+			.andExpect(status().is3xxRedirection());
+
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.ADMIN_ACTION, 10))
+			.anySatisfy(event -> {
+				assertThat(event.action()).isEqualTo("RESEND_PUSH");
+				assertThat(event.targetType()).isEqualTo("PUSH_NOTIFICATION_RESEND");
+			});
+	}
+
+	private static String extract(String html, String regex) {
+		Matcher matcher = Pattern.compile(regex).matcher(html);
+		assertThat(matcher.find()).isTrue();
+		return matcher.group(1);
 	}
 
 	@Test

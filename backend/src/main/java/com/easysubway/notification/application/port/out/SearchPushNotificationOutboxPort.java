@@ -17,6 +17,9 @@ public interface SearchPushNotificationOutboxPort {
 
 	long countPushNotifications(PushNotificationHistoryQuery query);
 
+	/** 선택한 알림 식별자들의 현재 상태를 로드한다(재발송 대상 검증·멱등 판정용). 순서·존재는 보장하지 않는다. */
+	List<PushNotification> loadPushNotificationsByIds(List<String> notificationIds);
+
 	/**
 	 * 같은 필터 컨텍스트(기간·유형·검색)에서 status=FAILED 를 사유별로 GROUP BY 한 분해. 사유 드릴다운·상태
 	 * 필터는 무시한다(분해는 항상 실패 전체를 사유별로 보여줘야 함). 건수 내림차순.

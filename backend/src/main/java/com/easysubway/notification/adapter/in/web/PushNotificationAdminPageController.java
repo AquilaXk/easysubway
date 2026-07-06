@@ -1,6 +1,10 @@
 package com.easysubway.notification.adapter.in.web;
 
 import com.easysubway.admin.audit.application.service.AdminAuditWriter;
+import com.easysubway.admin.audit.domain.AdminAuditOutcome;
+import com.easysubway.admin.code.application.service.AdminCommonCodeService;
+import com.easysubway.admin.code.domain.AdminCommonCode;
+import com.easysubway.admin.code.domain.AdminCommonCodeGroups;
 import com.easysubway.admin.metric.adapter.in.web.AnalyticsComparisonCard;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricChart;
@@ -10,9 +14,12 @@ import com.easysubway.common.web.pagination.EgovPaginationView;
 import com.easysubway.notification.application.port.in.PushNotificationDashboardUseCase;
 import com.easysubway.notification.application.port.in.PushNotificationHistoryQuery;
 import com.easysubway.notification.application.port.in.PushNotificationHistoryUseCase;
+import com.easysubway.notification.application.port.in.PushNotificationResendUseCase;
+import com.easysubway.notification.application.port.in.ResendPushNotificationsCommand;
 import com.easysubway.notification.domain.PushNotification;
 import com.easysubway.notification.domain.PushNotificationDashboardSummary;
 import com.easysubway.notification.domain.PushNotificationFailureReasonCount;
+import com.easysubway.notification.domain.PushNotificationResendResult;
 import com.easysubway.notification.domain.PushNotificationStatus;
 import com.easysubway.notification.domain.PushNotificationType;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -29,8 +36,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Controller
@@ -40,24 +49,34 @@ class PushNotificationAdminPageController {
 	private static final Set<String> HIGHER_IS_BETTER = Set.of(AdminMetricKeys.PUSH_ATTEMPTED);
 	private static final List<String> TREND_KEYS =
 		List.of(AdminMetricKeys.PUSH_ATTEMPTED, AdminMetricKeys.PUSH_FAILED);
-	private static final String HISTORY_PATH = "/admin/notifications/push/history";
+	// URL에 "/page"가 있어야 AdminHtmlRequest.matches가 commandTokens를 노출한다(#1742 gotcha와 동일).
+	private static final String HISTORY_PATH = "/admin/notifications/push/page/history";
+	private static final String PUSH_PAGE_PATH = "/admin/notifications/push/page";
+	// 공통코드가 없거나 숫자가 아닐 때의 안전한 기본 상한(대량 오발송 방지).
+	private static final int DEFAULT_RESEND_LIMIT = 50;
 
 	private final PushNotificationDashboardUseCase pushNotificationDashboardUseCase;
 	private final PushNotificationHistoryUseCase pushNotificationHistoryUseCase;
+	private final PushNotificationResendUseCase pushNotificationResendUseCase;
 	private final AdminMetricQueryService metricQueryService;
+	private final AdminCommonCodeService commonCodeService;
 	private final AdminAuditWriter auditWriter;
 	private final ObjectMapper objectMapper;
 
 	PushNotificationAdminPageController(
 		PushNotificationDashboardUseCase pushNotificationDashboardUseCase,
 		PushNotificationHistoryUseCase pushNotificationHistoryUseCase,
+		PushNotificationResendUseCase pushNotificationResendUseCase,
 		AdminMetricQueryService metricQueryService,
+		AdminCommonCodeService commonCodeService,
 		AdminAuditWriter auditWriter,
 		ObjectMapper objectMapper
 	) {
 		this.pushNotificationDashboardUseCase = pushNotificationDashboardUseCase;
 		this.pushNotificationHistoryUseCase = pushNotificationHistoryUseCase;
+		this.pushNotificationResendUseCase = pushNotificationResendUseCase;
 		this.metricQueryService = metricQueryService;
+		this.commonCodeService = commonCodeService;
 		this.auditWriter = auditWriter;
 		this.objectMapper = objectMapper;
 	}
@@ -126,6 +145,91 @@ class PushNotificationAdminPageController {
 		return "admin/notifications/push :: historyResults";
 	}
 
+	// 실패 푸시 재발송(#1746): 선택 실패 건을 재발송한다. no-JS 폼 기준선(command token + CSRF는 인터셉터가 검증).
+	// 멱등(성공 건 제외)·1회 상한(대량 오발송 방지)은 유스케이스가 보장하고, 결과는 flash 토스트로 안내한다.
+	@PostMapping("/admin/notifications/push/resend")
+	String resendPushNotifications(
+		@RequestParam(name = "notificationIds", required = false) List<String> notificationIds,
+		@RequestParam(name = "returnTo", required = false) String returnTo,
+		Authentication authentication,
+		HttpServletRequest request,
+		RedirectAttributes redirectAttributes
+	) {
+		int limit = resendLimit();
+		List<String> ids = notificationIds == null ? List.of() : notificationIds;
+		PushNotificationResendResult result = pushNotificationResendUseCase.resend(
+			new ResendPushNotificationsCommand(ids, limit));
+
+		auditWriter.pushResend(
+			authentication,
+			request,
+			"selection",
+			"RESEND_PUSH",
+			result.blocked() ? AdminAuditOutcome.FAILURE : AdminAuditOutcome.SUCCESS,
+			"업무 맥락: 실패 푸시 재발송 요청 %d건(상한 %d)".formatted(result.requestedCount(), limit)
+		);
+
+		redirectAttributes.addFlashAttribute("flashMessage", resendMessage(result));
+		redirectAttributes.addFlashAttribute("flashTone", resendTone(result));
+		return "redirect:" + safePushReturnTo(returnTo);
+	}
+
+	private static String resendMessage(PushNotificationResendResult result) {
+		if (result.blocked()) {
+			return "선택 %d건이 1회 재발송 상한(%d건)을 초과해 재발송하지 않았습니다. 나눠서 다시 시도해 주세요."
+				.formatted(result.requestedCount(), result.maxPerResend());
+		}
+		if (result.requestedCount() == 0) {
+			return "재발송할 항목을 선택해 주세요.";
+		}
+		if (result.resentCount() == 0) {
+			return "선택 %d건은 이미 처리되었거나 실패 상태가 아니라 재발송하지 않았습니다.".formatted(result.requestedCount());
+		}
+		if (result.skippedCount() == 0) {
+			return "실패 %d건을 재발송했습니다.".formatted(result.resentCount());
+		}
+		return "실패 %d건을 재발송하고, %d건은 이미 처리되어 제외했습니다."
+			.formatted(result.resentCount(), result.skippedCount());
+	}
+
+	private static String resendTone(PushNotificationResendResult result) {
+		if (result.blocked() || result.requestedCount() == 0 || result.resentCount() == 0) {
+			return "warning";
+		}
+		return "good";
+	}
+
+	// open-redirect 방지: 푸시 화면 경로만 허용한다.
+	private static String safePushReturnTo(String returnTo) {
+		if (returnTo != null
+			&& returnTo.startsWith(PUSH_PAGE_PATH.substring(0, PUSH_PAGE_PATH.lastIndexOf('/')))
+			&& !returnTo.contains("://")
+			&& !returnTo.contains("\n")
+			&& !returnTo.contains("\r")) {
+			return returnTo;
+		}
+		return PUSH_PAGE_PATH;
+	}
+
+	// 1회 재발송 상한을 공통코드(PUSH_RESEND_LIMIT)에서 읽는다. 값은 code 문자열의 정수이며, 없거나
+	// 숫자가 아니면 안전한 기본값으로 폴백한다. 활성 code가 여러 개면 가장 작은 값(가장 보수적)을 쓴다.
+	private int resendLimit() {
+		return commonCodeService.enabledCodes(AdminCommonCodeGroups.PUSH_RESEND_LIMIT).stream()
+			.map(AdminCommonCode::code)
+			.map(PushNotificationAdminPageController::parsePositiveInt)
+			.filter(value -> value != null && value > 0)
+			.min(Integer::compareTo)
+			.orElse(DEFAULT_RESEND_LIMIT);
+	}
+
+	private static Integer parsePositiveInt(String value) {
+		try {
+			return Integer.valueOf(value.trim());
+		} catch (NumberFormatException exception) {
+			return null;
+		}
+	}
+
 	private static PushNotificationHistoryQuery historyQuery(
 		PushNotificationStatus status,
 		PushNotificationType type,
@@ -185,6 +289,10 @@ class PushNotificationAdminPageController {
 		model.addAttribute("hasReasonFilter", pageQuery.hasFailureReason());
 		model.addAttribute("selectedReason", pageQuery.failureReason());
 		model.addAttribute("clearReasonHref", historyReasonHref(pageQuery, null));
+
+		// 재발송 안전장치(#1746): 실패 행 선택 → 재발송 폼의 확인 단계에 노출할 1회 상한·되돌아갈 목록 URL.
+		model.addAttribute("resendLimit", resendLimit());
+		model.addAttribute("currentListHref", historyReasonHref(pageQuery, pageQuery.failureReason()));
 
 		// 마스킹된 수신자 식별자를 노출하는 조회라 열람 자체를 감사에 남긴다(원문·free-text 없음).
 		auditWriter.privacyRead(

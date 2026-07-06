@@ -145,10 +145,10 @@
 		-->
 		<div id="push-history" th:fragment="historyResults"
 		     hx-target="#push-history" hx-swap="outerHTML" hx-push-url="true">
-			<form class="table-toolbar" method="get" th:action="@{/admin/notifications/push/history}"
+			<form class="table-toolbar" method="get" th:action="@{/admin/notifications/push/page/history}"
 			      role="search" aria-label="발송 이력 검색"
 			      hx-target="#push-history" hx-swap="outerHTML" hx-push-url="true"
-			      th:attr="hx-get=@{/admin/notifications/push/history}"
+			      th:attr="hx-get=@{/admin/notifications/push/page/history}"
 			      hx-trigger="submit, change, keyup changed delay:300ms">
 				<input type="search" name="keyword" th:value="${historyKeyword}"
 				       placeholder="제목·본문 검색" aria-label="발송 내용 검색" autocomplete="off">
@@ -197,47 +197,73 @@
 				</ul>
 			</section>
 
-			<table th:if="${!historyRows.isEmpty()}">
-				<caption class="sr-only">푸시 발송 이력</caption>
-				<thead>
-				<tr>
-					<th scope="col">발송 시각</th>
-					<th scope="col">유형</th>
-					<th scope="col">상태</th>
-					<th scope="col">수신자</th>
-					<th scope="col">제목</th>
-					<th scope="col">상세</th>
-				</tr>
-				</thead>
-				<tbody>
-				<tr th:each="row : ${historyRows}">
-					<td th:text="${#temporals.format(row.createdAt, 'yyyy-MM-dd HH:mm')}">2026-07-06 09:00</td>
-					<td th:text="${row.typeLabel}">제보 처리 상태</td>
-					<td>
-						<span class="status-badge" th:classappend="${'tone-' + row.statusTone}"
-						      th:text="${row.statusLabel}">발송 완료</span>
-					</td>
-					<td th:text="${row.maskedUserId}">ano••••</td>
-					<td th:text="${row.title}">알림 제목</td>
-					<td>
-						<details class="row-detail">
-							<summary>시도 이력</summary>
-							<dl class="row-detail-list">
-								<dt>기기 토큰</dt>
-								<dd th:text="${row.maskedDeviceToken}">device••••</dd>
-								<dt>플랫폼</dt>
-								<dd th:text="${row.platformLabel}">안드로이드</dd>
-								<dt>발송 상태</dt>
-								<dd th:text="${row.statusLabel}">발송 완료</dd>
-								<dt th:if="${row.failureReason != null}">실패 사유</dt>
-								<dd th:if="${row.failureReason != null}" class="failure-reason"
-								    th:text="${row.failureReason}">외부 발송 어댑터가 설정되지 않았습니다.</dd>
-							</dl>
-						</details>
-					</td>
-				</tr>
-				</tbody>
-			</table>
+			<!--
+			  재발송 안전장치(#1746): 실패 행을 선택 → 재발송. no-JS 폼 기준선(command token + CSRF는 인터셉터가 검증).
+			  멱등(이미 성공한 건 서버가 제외)·1회 상한(대량 오발송 방지)은 유스케이스가 보장한다. 확인 단계는
+			  네이티브 details 안의 제출 버튼이며, JS가 있으면 선택 건수를 보여주고 선택이 없으면 제출을 막는다.
+			-->
+			<form th:if="${!historyRows.isEmpty()}" method="post"
+			      th:action="@{/admin/notifications/push/resend}" class="resend-form"
+			      x-data="pushResendSelection" x-on:change="recount">
+				<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+				<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
+				<input type="hidden" name="returnTo" th:value="${currentListHref}">
+				<table>
+					<caption class="sr-only">푸시 발송 이력</caption>
+					<thead>
+					<tr>
+						<th scope="col"><span class="sr-only">재발송 선택</span></th>
+						<th scope="col">발송 시각</th>
+						<th scope="col">유형</th>
+						<th scope="col">상태</th>
+						<th scope="col">수신자</th>
+						<th scope="col">제목</th>
+						<th scope="col">상세</th>
+					</tr>
+					</thead>
+					<tbody>
+					<tr th:each="row : ${historyRows}">
+						<td>
+							<input type="checkbox" name="notificationIds" th:value="${row.notificationId}"
+							       th:if="${row.statusTone == 'failure'}"
+							       th:attr="aria-label=|재발송 선택 ${row.title}|">
+						</td>
+						<td th:text="${#temporals.format(row.createdAt, 'yyyy-MM-dd HH:mm')}">2026-07-06 09:00</td>
+						<td th:text="${row.typeLabel}">제보 처리 상태</td>
+						<td>
+							<span class="status-badge" th:classappend="${'tone-' + row.statusTone}"
+							      th:text="${row.statusLabel}">발송 완료</span>
+						</td>
+						<td th:text="${row.maskedUserId}">ano••••</td>
+						<td th:text="${row.title}">알림 제목</td>
+						<td>
+							<details class="row-detail">
+								<summary>시도 이력</summary>
+								<dl class="row-detail-list">
+									<dt>기기 토큰</dt>
+									<dd th:text="${row.maskedDeviceToken}">device••••</dd>
+									<dt>플랫폼</dt>
+									<dd th:text="${row.platformLabel}">안드로이드</dd>
+									<dt>발송 상태</dt>
+									<dd th:text="${row.statusLabel}">발송 완료</dd>
+									<dt th:if="${row.failureReason != null}">실패 사유</dt>
+									<dd th:if="${row.failureReason != null}" class="failure-reason"
+									    th:text="${row.failureReason}">외부 발송 어댑터가 설정되지 않았습니다.</dd>
+								</dl>
+							</details>
+						</td>
+					</tr>
+					</tbody>
+				</table>
+
+				<details class="resend-confirm">
+					<summary><span x-text="selectionLabel">선택한 실패 건 재발송</span></summary>
+					<p>선택한 실패 알림을 재발송합니다. 이미 발송 성공한 건은 자동으로 제외되며,
+						한 번에 최대 <strong th:text="${resendLimit}">50</strong>건까지 처리합니다.
+						상한을 넘으면 재발송되지 않으니 나눠서 처리하세요.</p>
+					<button type="submit" x-bind:disabled="!hasSelection">선택한 실패 건 재발송</button>
+				</details>
+			</form>
 
 			<div th:if="${historyRows.isEmpty()}"
 			     th:replace="~{admin/fragments/empty-state :: panel('조건에 맞는 발송 이력이 없습니다.', '필터를 변경하거나 기간을 넓혀 보세요.')}"></div>
