@@ -40,6 +40,7 @@ class DataPackClient {
     if (etag != null && etag.isNotEmpty) {
       request.headers.set(HttpHeaders.ifNoneMatchHeader, etag);
     }
+    request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
 
     final response = await request.close().timeout(_manifestFetchTimeout);
     if (response.statusCode == HttpStatus.notModified && cache != null) {
