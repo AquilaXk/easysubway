@@ -49,7 +49,10 @@ async function main() {
   for (const pack of fixture.packs) {
     const artifactKind = pack.artifactKind ?? "fixture";
     const packUrl = pack.url ?? `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
-    validatePackUrl(requiredString(packUrl, "pack.url"), "pack.url");
+    // requiredString은 non-empty 문자열을 강제하고, 검증·경로 파생·매니페스트는 모두 raw packUrl을
+    // 대상으로 한다(추출 전 로컬 validatePackUrl과 동일 — 검증 대상과 실사용 문자열 일치).
+    requiredString(packUrl, "pack.url");
+    validatePackUrl(packUrl, "pack.url");
     validatePackUrlMatchesStagedPath(packUrl, pack, "pack.url");
     const outputPackPath = outputPathForPack(outputDir, packUrl, pack);
     const sqlitePath = outputPackPath.replace(/\.gz$/, "");
@@ -1557,8 +1560,10 @@ function validateFixture(fixture) {
       throw new Error("pack.artifactKind must be fixture or production");
     }
     schemaVersionNumber(pack.schemaVersion, "pack.schemaVersion");
-    validatePackUrl(requiredString(pack.url ?? stagedPackPath(pack), "pack.url"), "pack.url");
-    validatePackUrlMatchesStagedPath(pack.url ?? stagedPackPath(pack), pack, "pack.url");
+    const validatedPackUrl = pack.url ?? stagedPackPath(pack);
+    requiredString(validatedPackUrl, "pack.url");
+    validatePackUrl(validatedPackUrl, "pack.url");
+    validatePackUrlMatchesStagedPath(validatedPackUrl, pack, "pack.url");
     if (artifactKind === "production" && !isAbsoluteHttpsWithHost(pack.url)) {
       throw new Error("production pack url must be an absolute HTTPS URL");
     }

@@ -89,7 +89,7 @@ function request(url, method, body = Buffer.alloc(0), headers = {}) {
       res.on("end", () => { res.body = Buffer.concat(chunks); resolve(res); });
     });
     req.on("error", reject);
-    if (method !== "HEAD" && body.length > 0) req.write(body);
+    if (body.length > 0) req.write(body);
     req.end();
   });
 }

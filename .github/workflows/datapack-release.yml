@@ -587,14 +587,20 @@ jobs:
 
       - name: Data Pack Release / Rollback pointer swap
         if: ${{ steps.release-mode.outputs.mode == 'rollback' && steps.remote-publish-env.outputs.enabled == 'true' && github.ref == 'refs/heads/main' }}
+        env:
+          # workflow_dispatch 자유입력을 셸에 직접 보간하지 않고 env로 전달한다(GHA expression injection 방지).
+          ROLLBACK_TARGET_SEQUENCE: ${{ github.event.inputs.rollbackTargetSequence }}
+          ROLLBACK_TARGET_CHANNEL: ${{ github.event.inputs.targetChannel }}
+          ROLLBACK_REASON: ${{ github.event.inputs.rollbackReason }}
+          ROLLBACK_IDEMPOTENCY_KEY: ${{ github.event.inputs.rollbackIdempotencyKey }}
         run: |
           set -euo pipefail
           node tools/datapack/rollback-manifest.mjs \
-            --target-sequence "${{ github.event.inputs.rollbackTargetSequence }}" \
-            --channel "${{ github.event.inputs.targetChannel }}" \
+            --target-sequence "${ROLLBACK_TARGET_SEQUENCE}" \
+            --channel "${ROLLBACK_TARGET_CHANNEL}" \
             --base-url "${EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL}" \
-            --reason "${{ github.event.inputs.rollbackReason }}" \
-            --idempotency-key "${{ github.event.inputs.rollbackIdempotencyKey }}"
+            --reason "${ROLLBACK_REASON}" \
+            --idempotency-key "${ROLLBACK_IDEMPOTENCY_KEY}"
 
       - name: Data Pack Release / Write observability metadata
         if: ${{ always() }}
