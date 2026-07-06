@@ -40,12 +40,18 @@ async function main() {
     throw new Error("rollback target expired; rebuild required");
   }
 
-  // (4) 참조 팩 존재·sha256
+  // (4) 참조 팩 존재·sha256 대조
+  // preauth(OCI PAR) 대상은 HEAD/meta sha를 신뢰할 수 없어(publish-object-storage와 동일 이유)
+  // GET 본문 sha256을 manifest pack.sha256과 직접 대조한다 — 팩이 훼손·교체되면 스왑 거부(fail-closed).
   for (const pack of manifest.packs) {
     const packKey = pack.url && !/^https:\/\//.test(pack.url) ? pack.url : `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
-    const head = await request(objectUrl(baseUrl, packKey), "HEAD");
-    if (head.statusCode !== 200) {
-      throw new Error(`rollback target references missing pack ${packKey} (HTTP ${head.statusCode})`);
+    const packResponse = await request(objectUrl(baseUrl, packKey), "GET");
+    if (packResponse.statusCode !== 200) {
+      throw new Error(`rollback target references missing pack ${packKey} (HTTP ${packResponse.statusCode})`);
+    }
+    const storedSha256 = sha256(packResponse.body);
+    if (storedSha256 !== pack.sha256) {
+      throw new Error(`rollback target pack ${packKey} sha256 mismatch: stored=${storedSha256} manifest=${pack.sha256}`);
     }
   }
 

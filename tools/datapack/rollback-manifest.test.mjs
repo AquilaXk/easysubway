@@ -285,6 +285,32 @@ test("③ 참조 팩이 스토리지에 없으면 거부한다", async () => {
   }
 });
 
+// ─── 테스트 ⑧: 참조 팩 sha256 불일치 거부 ───────────────────────────────────
+// 팩 객체가 존재해도 저장 바이트의 sha256이 manifest pack.sha256과 다르면
+// (훼손·교체) 롤백을 거부해야 한다 (spec §4-4: 존재·sha256 대조).
+
+test("⑧ 참조 팩 sha256이 manifest와 불일치하면 거부한다", async () => {
+  const manifest = buildManifest();
+  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  const storage = await startStorage([
+    ["catalog/releases/2.json", { body: manifestBytes }],
+    // manifest pack.sha256 = sha256("pack") 인데 다른 바이트를 심는다.
+    ["catalog/capital-v1.sqlite.gz", { body: Buffer.from("tampered") }],
+    ["catalog/current.json", { body: Buffer.from("old") }],
+  ]);
+  const baseUrl = `http://127.0.0.1:${storage.port}`;
+  try {
+    await assert.rejects(
+      runRollback(["--target-sequence", "2", "--channel", "staging", "--reason", "test", "--idempotency-key", "k8"], baseUrl),
+      /sha256 mismatch/,
+    );
+    // 스왑이 수행되지 않았어야 한다 (거부 시 current.json 원본 보존).
+    assert.deepEqual(storage.objects.get("catalog/current.json").body, Buffer.from("old"));
+  } finally {
+    storage.server.close();
+  }
+});
+
 // ─── 테스트 ④: 훼손된 서명 거부 ─────────────────────────────────────────────
 // 유효 manifest에서 signature.value 한 글자를 변경하면 RSA 검증이 실패해야 한다.
 
