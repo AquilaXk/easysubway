@@ -11614,11 +11614,23 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
   const androidManifest = read(mergedManifestPath);
   const permissions = androidManifestPermissions(androidManifest);
 
+  // 하차 알림(#1766)이 flutter_local_notifications를 도입하며 알림 표시용
+  // POST_NOTIFICATIONS·VIBRATE와 시간표 기반 정확 예약용 SCHEDULE_EXACT_ALARM이
+  // release 매니페스트에 병합된다. 셋 다 위치·저장소·미디어 같은 개인정보 침해
+  // 권한이 아니며 알림 기능에 직접 필요하다. 백그라운드 위치·부팅 완료 수신 등은
+  // 병합되지 않음을 아래 doesNotMatch로 계속 강제한다.
   assert.deepEqual(permissions, [
     "android.permission.ACCESS_COARSE_LOCATION",
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.INTERNET",
+    "android.permission.POST_NOTIFICATIONS",
+    "android.permission.SCHEDULE_EXACT_ALARM",
+    "android.permission.VIBRATE",
   ]);
+  // 무추적 불변: 알람·캘린더 앱 전용인 USE_EXACT_ALARM과 부팅 재예약용
+  // RECEIVE_BOOT_COMPLETED는 도입하지 않는다(#1766 강등 사다리·비범위).
+  assert.doesNotMatch(androidManifest, /android\.permission\.USE_EXACT_ALARM/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.RECEIVE_BOOT_COMPLETED/);
   assert.doesNotMatch(androidManifest, /android\.permission\.ACCESS_BACKGROUND_LOCATION/);
   assert.doesNotMatch(androidManifest, /android\.permission\.CAMERA/);
   assert.doesNotMatch(androidManifest, /android\.permission\.READ_EXTERNAL_STORAGE/);
