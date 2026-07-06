@@ -8,6 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 import { inflateSync } from "node:zlib";
+import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -720,6 +721,30 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Mobile App CI \/ Run mobile contracts/);
   assert.match(workflow, /Android CI \/ Build Flutter Android debug APK/);
   assert.doesNotMatch(releaseGateJob, /iOS CI \/ Build Flutter iOS simulator app/);
+});
+
+test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터와 1:1로 고정된다", () => {
+  // These context names correspond 1:1 to main ruleset 17584352's
+  // required_status_checks. Renaming a ci.yml job without updating the ruleset
+  // (via apply-main-ruleset-required-checks.mjs) would leave a required check
+  // forever pending and block every merge — this test is the tripwire.
+  const workflow = read(".github/workflows/ci.yml");
+  for (const context of REQUIRED_STATUS_CHECK_CONTEXTS) {
+    assert.match(workflow, new RegExp(`name: ${context.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\n`));
+  }
+  // Release Gate Consistency and PR Title are the two checks #1685 promotes to
+  // required, so they must be part of the canonical set.
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("Release Gate Consistency"));
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("PR Title"));
+
+  // The automerge coordinator derives the list from the ruleset at runtime, and
+  // its hardcoded fallback must match the canonical set exactly (#1685 note).
+  const coordinator = read(".github/workflows/automerge-queue.yml");
+  assert.match(coordinator, /gh api "repos\/\$\{REPO\}\/rules\/branches\/main"/);
+  assert.match(coordinator, /select\(\.type == "required_status_checks"\)/);
+  const fallbackMatch = coordinator.match(/required_checks='(\[[^']*\])'/);
+  assert.ok(fallbackMatch, "coordinator must keep a hardcoded fallback list");
+  assert.deepEqual(JSON.parse(fallbackMatch[1]), REQUIRED_STATUS_CHECK_CONTEXTS);
 });
 
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
