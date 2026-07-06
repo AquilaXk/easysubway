@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets, spliceTrackToNode } from "./splice-transfer-convergence.mjs";
+import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets, spliceTrackToNode, convergeGroup } from "./splice-transfer-convergence.mjs";
 
 test("transferGroups는 2+노선 역만 그룹화하고 span=최대쌍거리", () => {
   const rows = [
@@ -103,4 +103,23 @@ test("spliceTrackToNode는 근처 정점을 newPos로 이동, 국소 rectify", (
     );
     assert.ok(minDiff <= 0.5, `세그먼트 ${i}->${i + 1} 각도=${angle.toFixed(2)}°, 8선형 오차=${minDiff.toFixed(2)}°`);
   }
+});
+
+test("convergeGroup은 그룹 멤버를 캡슐로 수렴하고 각 노선 track을 splice한다", () => {
+  const group = {
+    stationId: "hub", memberCount: 2,
+    members: [{ lineId: "A", x: 0, y: 100 }, { lineId: "B", x: 60, y: 100 }],
+    span: 60,
+  };
+  const oracle = { "2": 13 };
+  const tracksByLine = new Map([
+    ["A", [{ trackIndex: 0, verts: [{ x: -100, y: 100 }, { x: 0, y: 100 }, { x: 0, y: 0 }] }]],
+    ["B", [{ trackIndex: 0, verts: [{ x: 160, y: 100 }, { x: 60, y: 100 }, { x: 60, y: 0 }] }]],
+  ]);
+  const r = convergeGroup(group, oracle, tracksByLine);
+  // 두 멤버 위치가 오라클 스팬(13)으로 수렴
+  const dx = Math.abs(r.positionUpdates[0].x - r.positionUpdates[1].x);
+  assert.ok(Math.abs(dx - 13) < 1e-6, `수렴 스팬 ${dx}`);
+  // 각 노선 track 갱신 존재
+  assert.equal(r.trackUpdates.length, 2);
 });

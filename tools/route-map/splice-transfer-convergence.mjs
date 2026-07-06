@@ -2,7 +2,10 @@
 // #1789: 환승 그룹 티어 분류 — 오라클 스팬과 실측 스팬의 displacement 기반
 // 분류로, 렌더 3-모드 선택(스택/스팬/분리)의 데이터 근거를 제공한다.
 
+import { readFileSync } from "node:fs";
 import { octilinearPolyline } from "./octolinearize-line-tracks.mjs";
+import { parsePathVertices, verticesToPath } from "./audit-octolinearity.mjs";
+import { openPack, writePack, cleanupPackDir } from "./pack-io.mjs";
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -100,3 +103,117 @@ export function spliceTrackToNode(verts, oldPos, newPos, { radius = 1 } = {}) {
   const local = octilinearPolyline(moved.slice(lo, hi + 1));
   return [...moved.slice(0, lo), ...local, ...moved.slice(hi + 1)];
 }
+
+/** 한 그룹 수렴: 캡슐 타깃 → 각 노선 track splice.
+ * tracksByLine = Map(lineId → [{trackIndex, verts}]).
+ * 반환: { positionUpdates:[{stationId,lineId,x,y}], trackUpdates:[{lineId,trackIndex,verts}] }
+ */
+export function convergeGroup(group, oracle, tracksByLine) {
+  const { target } = classifyGroup(group, oracle);
+  const axis = capsuleAxis(group.members);
+  const targets = capsuleTargets(group.members, target, axis);
+  const targetByLine = new Map(targets.map((t) => [t.lineId, t]));
+  const positionUpdates = targets.map((t) => ({
+    stationId: group.stationId,
+    lineId: t.lineId,
+    x: Math.round(t.x),
+    y: Math.round(t.y),
+  }));
+  const trackUpdates = [];
+  for (const m of group.members) {
+    const nt = targetByLine.get(m.lineId);
+    for (const trk of tracksByLine.get(m.lineId) ?? []) {
+      const spliced = spliceTrackToNode(trk.verts, { x: m.x, y: m.y }, { x: nt.x, y: nt.y });
+      if (JSON.stringify(spliced) !== JSON.stringify(trk.verts)) {
+        trackUpdates.push({ lineId: m.lineId, trackIndex: trk.trackIndex, verts: spliced });
+      }
+    }
+  }
+  return { positionUpdates, trackUpdates };
+}
+
+function parseArgs(argv) {
+  const o = {
+    pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
+    index: "apps/mobile/assets/datapacks/index.json",
+    region: "수도권",
+    oracle: "tools/route-map/oracle-transfer-spans.json",
+    tiers: "mild,mid,large",
+    check: false,
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--pack") o.pack = argv[++i];
+    else if (a === "--index") o.index = argv[++i];
+    else if (a === "--region") o.region = argv[++i];
+    else if (a === "--oracle") o.oracle = argv[++i];
+    else if (a === "--tiers") o.tiers = argv[++i];
+    else if (a === "--check") o.check = true;
+  }
+  return o;
+}
+
+function main() {
+  const o = parseArgs(process.argv.slice(2));
+  const oracle = JSON.parse(readFileSync(o.oracle, "utf8")).spanP90ByMemberCount;
+  const selected = new Set(o.tiers.split(","));
+  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "splice-conv-");
+  try {
+    const posRows = db
+      .prepare("SELECT station_id, line_id, x, y FROM route_map_positions WHERE region=?")
+      .all(o.region);
+    const trackRows = db
+      .prepare(
+        "SELECT line_id, track_index, path FROM route_map_line_tracks WHERE region=? ORDER BY line_id, track_index",
+      )
+      .all(o.region);
+    const tracksByLine = new Map();
+    for (const t of trackRows) {
+      if (!tracksByLine.has(t.line_id)) tracksByLine.set(t.line_id, []);
+      tracksByLine.get(t.line_id).push({ trackIndex: t.track_index, verts: parsePathVertices(t.path) });
+    }
+    const groups = transferGroups(posRows);
+    let applied = 0;
+    const posU = db.prepare(
+      "UPDATE route_map_positions SET x=?, y=? WHERE region=? AND station_id=? AND line_id=?",
+    );
+    const trkU = db.prepare(
+      "UPDATE route_map_line_tracks SET path=? WHERE region=? AND line_id=? AND track_index=?",
+    );
+    if (!o.check) db.exec("BEGIN");
+    const tierCount = { mild: 0, mid: 0, large: 0, extreme: 0 };
+    for (const g of groups) {
+      const { tier } = classifyGroup(g, oracle);
+      tierCount[tier] += 1;
+      if (!selected.has(tier)) continue;
+      const { positionUpdates, trackUpdates } = convergeGroup(g, oracle, tracksByLine);
+      applied += 1;
+      if (o.check) continue;
+      for (const p of positionUpdates)
+        posU.run(p.x, p.y, o.region, p.stationId, p.lineId);
+      for (const tu of trackUpdates)
+        trkU.run(
+          verticesToPath(tu.verts.map((v) => ({ x: Math.round(v.x), y: Math.round(v.y) }))),
+          o.region,
+          tu.lineId,
+          tu.trackIndex,
+        );
+    }
+    console.log(
+      `[${o.region}] 환승 ${groups.length} · 티어 ${JSON.stringify(tierCount)} · 적용(${o.tiers}) ${applied}`,
+    );
+    if (o.check) {
+      console.log("(--check: 미기록)");
+      return;
+    }
+    db.exec("COMMIT");
+    db.exec("VACUUM");
+    db.close();
+    const { byteSize } = writePack({ sqlitePath, packPath, packRelPath: o.pack, indexRelPath: o.index });
+    console.log(`팩 갱신 (byteSize ${byteSize})`);
+  } finally {
+    cleanupPackDir(dir);
+  }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();
