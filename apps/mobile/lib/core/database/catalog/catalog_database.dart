@@ -53,7 +53,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -110,6 +110,9 @@ class CatalogDatabase extends _$CatalogDatabase {
         }
         if (from < 12) {
           await _createRouteMapLineTracksTable();
+        }
+        if (from < 13) {
+          await _addStationNameSubColumn();
         }
       },
       beforeOpen: (_) async {
@@ -841,6 +844,15 @@ class CatalogDatabase extends _$CatalogDatabase {
     await _addColumnIfMissing(
       'route_map_positions',
       'label_polygon',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  // 부역명 필드(#1789 P0.2). 구팩(name_sub 없음)에서도 열리도록 idempotent.
+  Future<void> _addStationNameSubColumn() async {
+    await _addColumnIfMissing(
+      'stations',
+      'name_sub',
       "TEXT NOT NULL DEFAULT ''",
     );
   }
