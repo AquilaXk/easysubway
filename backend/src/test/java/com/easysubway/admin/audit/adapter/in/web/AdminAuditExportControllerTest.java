@@ -97,6 +97,29 @@ class AdminAuditExportControllerTest {
 	}
 
 	@Test
+	@DisplayName("CSV 내보내기는 MAX_EXPORT_ROWS(5000) 행 상한에서 잘린다")
+	void csvExportCapsAtMaxRows() throws Exception {
+		// AdminAuditExportController.MAX_EXPORT_ROWS(=5000)보다 많은 행을 심어 상한 절삭을 검증한다.
+		LocalDateTime base = LocalDateTime.of(2026, 6, 27, 9, 0);
+		for (int i = 0; i < 5005; i++) {
+			auditEventRepository.save(eventAt(AdminAuditEventType.ADMIN_ACTION, "flooder", "FLOOD",
+				AdminAuditOutcome.SUCCESS, base.plusSeconds(i)));
+		}
+
+		String csv = mockMvc.perform(get("/admin/audits/export")
+				.param("actor", "flooder")
+				.with(user("auditor").authorities(new SimpleGrantedAuthority("admin.audit.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		// 헤더에는 actor 이름이 없으므로 "flooder"를 담은 줄 = 데이터 행. 5005개를 심어도 상한 5000에서 잘린다.
+		long dataRows = csv.lines().filter(line -> line.contains("flooder")).count();
+		assertThat(dataRows).isEqualTo(5000);
+	}
+
+	@Test
 	@DisplayName("개인정보 로그 내보내기는 개인정보 로그 권한을 요구한다(권한 분리)")
 	void privacyExportRequiresPrivacyPermission() throws Exception {
 		mockMvc.perform(get("/admin/audits/privacy/export")
