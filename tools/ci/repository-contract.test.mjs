@@ -6777,6 +6777,7 @@ test("eGovFrame pagination import는 common web pagination 경계에만 둔다",
 
   assert.deepEqual(egovFrameFiles, [
     "backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java",
+    "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
     "backend/src/main/java/com/easysubway/common/web/pagination/EgovPaginationView.java",
     "backend/src/test/java/com/easysubway/support/EgovFrameRuntimeTest.java",
   ]);
@@ -6830,10 +6831,24 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
     "backend/src/test/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfigTest.java",
   );
   assert.equal(gate.pocDecision.fdlLogging.status, "classpath_verified_control_plane_only");
-  assert.equal(gate.pocDecision.fdlProperty.status, "adoption_in_progress");
-  assert.equal(gate.pocDecision.fdlProperty.targetStatus, "adopted_control_plane_only");
-  assert.equal(gate.pocDecision.fdlIdgnr.status, "adoption_in_progress");
-  assert.equal(gate.pocDecision.fdlIdgnr.targetStatus, "adopted_control_plane_only");
+  assert.equal(gate.pocDecision.fdlProperty.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.fdlProperty.currentImplementation,
+    "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+  );
+  assert.equal(
+    gate.pocDecision.fdlProperty.verification,
+    "backend/src/test/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfigTest.java",
+  );
+  assert.equal(gate.pocDecision.fdlIdgnr.status, "adopted_control_plane_only");
+  assert.equal(
+    gate.pocDecision.fdlIdgnr.currentImplementation,
+    "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+  );
+  assert.equal(
+    gate.pocDecision.fdlIdgnr.verification,
+    "backend/src/test/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfigTest.java",
+  );
   assert.equal(gate.pocDecision.pslDataaccess.status, "forbidden_until_poc_passes");
   assert.equal(gate.pocDecision.fdlAccess.status, "forbidden_until_poc_passes");
   assert.equal(gate.pocDecision.fdlExcel.status, "adoption_in_progress");
@@ -6845,16 +6860,24 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
   assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-bat-core"));
   assert.ok(gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-psl-dataaccess"));
 
+  // S3: fdl-property + fdl-idgnr move to allowed for control-plane operational id/property.
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-fdl-property"));
+  assert.ok(gate.dependencyPolicy.directAllowed.includes("org.egovframe.rte:egovframe-rte-fdl-idgnr"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-property"));
+  assert.ok(!gate.dependencyPolicy.directDeferredUntilPocPasses.includes("org.egovframe.rte:egovframe-rte-fdl-idgnr"));
+
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
   assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-batch'/);
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-bat-core'/);
-  assert.doesNotMatch(build, /egovframe-rte-fdl-property/);
-  assert.doesNotMatch(build, /egovframe-rte-fdl-idgnr/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-fdl-property'/);
+  assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-fdl-idgnr'/);
   assert.doesNotMatch(build, /egovframe-rte-psl-dataaccess/);
   assert.doesNotMatch(build, /egovframe-boot-starter-(access|crypto|security)/);
   assert.doesNotMatch(build, /egovframe-rte-fdl-excel/);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-logging:5\.0\.0=/m);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-bat-core:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-property:5\.0\.0=/m);
+  assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-idgnr:5\.0\.0=/m);
 
   // S1: local mirror must carry the four target modules plus their org.egovframe
   // transitive closure so S2~S4 resolve offline (remote-only is gate-forbidden).
@@ -6891,6 +6914,27 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
     "replace token, crypto, receipt, or auth boundaries with eGovFrame starters",
     "add remote-only eGovFrame dependencies without lockfile and local mirror evidence",
   ]);
+
+  // S3: operational id/property adoption must not leak into token/notification/
+  // datapack security boundaries — eGovFrame id generation stays off those surfaces.
+  const adminCommandTokenService = read(
+    "backend/src/main/java/com/easysubway/admin/web/AdminCommandTokenService.java",
+  );
+  assert.doesNotMatch(adminCommandTokenService, /egovframe/i);
+  const securityBoundaryFiles = execFileSync("git", [
+    "ls-files",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "backend/src/main/java/com/easysubway/notification",
+    "backend/src/main/java/com/easysubway/datapack",
+  ], { cwd: root, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  for (const file of securityBoundaryFiles) {
+    assert.ok(
+      !read(file).toLowerCase().includes("egovframe"),
+      `${file} must not reference eGovFrame (id/property stays off this boundary)`,
+    );
+  }
 
   assert.match(readme, /eGovFrame은 backend control-plane에만 선택 적용한다/);
   assert.match(readme, /Flutter mobile runtime, ordinary mobile API, realtime hot path, token\/crypto boundary/);
