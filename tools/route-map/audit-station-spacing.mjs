@@ -5,9 +5,8 @@
 import { writeFileSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
-  buildRespaceGraph,
+  loadRegionRespaceGraph,
   medianStationChainLength,
-  parsePathPoints,
 } from "./respace-route-map.mjs";
 import { cleanupPackDir, openPack, repoRoot } from "./pack-io.mjs";
 
@@ -211,31 +210,7 @@ function main() {
   const o = parseArgs(process.argv.slice(2));
   const { db, dir } = openPack(o.pack, "audit-spacing-");
   try {
-    const trackRows = db
-      .prepare(
-        "SELECT line_id, track_index, path FROM route_map_line_tracks " +
-          "WHERE region = ? ORDER BY line_id, track_index",
-      )
-      .all(o.region);
-    const posRows = db
-      .prepare(
-        "SELECT station_id, line_id, x, y FROM route_map_positions WHERE region = ?",
-      )
-      .all(o.region);
-    const tracks = trackRows.map((r) => ({
-      lineId: r.line_id,
-      trackIndex: r.track_index,
-      points: parsePathPoints(r.path),
-    }));
-    const graph = buildRespaceGraph({
-      tracks,
-      positions: posRows.map((r) => ({
-        stationId: r.station_id,
-        lineId: r.line_id,
-        x: r.x,
-        y: r.y,
-      })),
-    });
+    const graph = loadRegionRespaceGraph(db, o.region);
     // graph 노드 재구성으로 통일 — 재간격 솔버가 팩 path를 graph 노드로 재작성하므로
     // before/after 감사를 동일 기반으로 맞춰야 게이트가 오염되지 않는다.
     const tracksPoints = graph.tracks
