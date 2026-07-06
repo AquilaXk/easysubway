@@ -109,4 +109,17 @@ void main() {
     // 맨 앞이 '('이면 축약할 역명이 없으므로 원문 유지.
     expect(routeMapStationLabel('(임시)역'), '(임시)역');
   });
+
+  test('routeMapBadgeTextColor: 밝은 노선색은 검정, 어두운색은 흰색', () {
+    // 3호선 계열 노랑(밝음) → 검정.
+    expect(
+      routeMapBadgeTextColor(const Color(0xFFFFD400)),
+      const Color(0xFF000000),
+    );
+    // 1호선 파랑(어두움) → 흰색.
+    expect(
+      routeMapBadgeTextColor(const Color(0xFF0052A4)),
+      const Color(0xFFFFFFFF),
+    );
+  });
 }

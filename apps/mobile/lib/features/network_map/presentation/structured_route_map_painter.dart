@@ -61,6 +61,13 @@ String routeMapStationLabel(String nameKo) {
   return i <= 0 ? nameKo : nameKo.substring(0, i);
 }
 
+/// 노선 색 원 뱃지 위 텍스트 대비색(#1789 서울메트로 룩). 노선 색의 WCAG 상대
+/// 휘도가 높으면(밝은 색) 검정, 낮으면 흰색 — 번호 판독을 보장한다.
+Color routeMapBadgeTextColor(Color lineColor) =>
+    lineColor.computeLuminance() > 0.5
+    ? const Color(0xFF000000)
+    : const Color(0xFFFFFFFF);
+
 // 스타일 상수 (design px — 캘리브레이션 상수 소비).
 const TextStyle _labelStyle = TextStyle(
   color: Color(0xFF102A2C),
@@ -207,21 +214,19 @@ ui.Picture recordRouteMapPicture({
     painter.dispose();
   }
 
-  // 5) 노선 뱃지 pill.
+  // 5) 노선 번호 색 원(서울메트로 룩) — 노선 색 원 + 대비색 번호. 간선 위에 얹힌다.
   final badgeFill = Paint()
     ..style = PaintingStyle.fill
     ..isAntiAlias = true;
   for (final badge in layout.badges) {
-    badgeFill.color = lineColors[badge.lineId] ?? _fallbackLineColor;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        badge.rect,
-        Radius.circular(badge.rect.height / 2),
-      ),
-      badgeFill,
-    );
+    final lineColor = lineColors[badge.lineId] ?? _fallbackLineColor;
+    badgeFill.color = lineColor;
+    canvas.drawCircle(badge.rect.center, badge.rect.width / 2, badgeFill);
     final painter = TextPainter(
-      text: TextSpan(text: badge.label, style: _badgeStyle),
+      text: TextSpan(
+        text: badge.label,
+        style: _badgeStyle.copyWith(color: routeMapBadgeTextColor(lineColor)),
+      ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
     )..layout();
