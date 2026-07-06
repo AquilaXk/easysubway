@@ -304,6 +304,7 @@ public class SecurityConfig {
 					"/privacy",
 					"/easysubway/privacy",
 					"/api/v1/realtime/**",
+					"/api/notices/active",
 					"/favicon.ico",
 					"/css/**",
 					"/js/**",
