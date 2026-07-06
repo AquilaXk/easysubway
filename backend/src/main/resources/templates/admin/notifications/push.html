@@ -238,7 +238,7 @@
 						<td>
 							<input type="checkbox" name="notificationIds" th:value="${row.notificationId}"
 							       th:if="${row.statusTone == 'failure'}"
-							       th:attr="aria-label=|재발송 선택 ${row.title}|">
+							       aria-label="재발송 대상 선택">
 						</td>
 						<td th:text="${#temporals.format(row.createdAt, 'yyyy-MM-dd HH:mm')}">2026-07-06 09:00</td>
 						<td th:text="${row.typeLabel}">제보 처리 상태</td>
