@@ -132,6 +132,91 @@
 			</tbody>
 		</table>
 	</section>
+
+	<section aria-labelledby="push-history-heading">
+		<h2 id="push-history-heading">발송 이력</h2>
+		<p class="section-hint">수신자 식별자는 개인정보 보호를 위해 마스킹됩니다. 열람 기록은 감사 로그에 남습니다.</p>
+
+		<!--
+		  발송 이력 표준 테이블(#1746): 기간·상태·유형 필터·내용 검색·페이지네이션을 historyResults fragment로 묶는다.
+		  필터·페이지 링크는 th:href(진화형 향상 fallback)와 hx-get을 함께 갖는다. JS가 있으면 htmx가
+		  이 컨테이너만 부분 갱신하고, 없으면 링크·폼 제출로 풀페이지가 동작한다.
+		  hx-target·hx-swap·hx-push-url은 이 컨테이너에서 하위 링크로 상속된다.
+		-->
+		<div id="push-history" th:fragment="historyResults"
+		     hx-target="#push-history" hx-swap="outerHTML" hx-push-url="true">
+			<form class="table-toolbar" method="get" th:action="@{/admin/notifications/push/history}"
+			      role="search" aria-label="발송 이력 검색"
+			      hx-target="#push-history" hx-swap="outerHTML" hx-push-url="true"
+			      th:attr="hx-get=@{/admin/notifications/push/history}"
+			      hx-trigger="submit, change, keyup changed delay:300ms">
+				<input type="search" name="keyword" th:value="${historyKeyword}"
+				       placeholder="제목·본문 검색" aria-label="발송 내용 검색" autocomplete="off">
+				<select name="status" aria-label="발송 상태 필터">
+					<option th:each="opt : ${historyStatusOptions}" th:value="${opt.value}"
+					        th:text="${opt.label}" th:selected="${opt.selected}">상태 전체</option>
+				</select>
+				<select name="type" aria-label="알림 유형 필터">
+					<option th:each="opt : ${historyTypeOptions}" th:value="${opt.value}"
+					        th:text="${opt.label}" th:selected="${opt.selected}">유형 전체</option>
+				</select>
+				<input type="date" name="from" th:value="${historyFrom}" aria-label="발송 기간 시작">
+				<input type="date" name="to" th:value="${historyTo}" aria-label="발송 기간 종료">
+				<button type="submit">검색</button>
+			</form>
+
+			<p class="table-summary" aria-live="polite">
+				전체 <strong th:text="${historyTotal}">0</strong>건
+			</p>
+
+			<table th:if="${!historyRows.isEmpty()}">
+				<caption class="sr-only">푸시 발송 이력</caption>
+				<thead>
+				<tr>
+					<th scope="col">발송 시각</th>
+					<th scope="col">유형</th>
+					<th scope="col">상태</th>
+					<th scope="col">수신자</th>
+					<th scope="col">제목</th>
+					<th scope="col">상세</th>
+				</tr>
+				</thead>
+				<tbody>
+				<tr th:each="row : ${historyRows}">
+					<td th:text="${#temporals.format(row.createdAt, 'yyyy-MM-dd HH:mm')}">2026-07-06 09:00</td>
+					<td th:text="${row.typeLabel}">제보 처리 상태</td>
+					<td>
+						<span class="status-badge" th:classappend="${'tone-' + row.statusTone}"
+						      th:text="${row.statusLabel}">발송 완료</span>
+					</td>
+					<td th:text="${row.maskedUserId}">ano••••</td>
+					<td th:text="${row.title}">알림 제목</td>
+					<td>
+						<details class="row-detail">
+							<summary>시도 이력</summary>
+							<dl class="row-detail-list">
+								<dt>기기 토큰</dt>
+								<dd th:text="${row.maskedDeviceToken}">device••••</dd>
+								<dt>플랫폼</dt>
+								<dd th:text="${row.platformLabel}">안드로이드</dd>
+								<dt>발송 상태</dt>
+								<dd th:text="${row.statusLabel}">발송 완료</dd>
+								<dt th:if="${row.failureReason != null}">실패 사유</dt>
+								<dd th:if="${row.failureReason != null}" class="failure-reason"
+								    th:text="${row.failureReason}">외부 발송 어댑터가 설정되지 않았습니다.</dd>
+							</dl>
+						</details>
+					</td>
+				</tr>
+				</tbody>
+			</table>
+
+			<div th:if="${historyRows.isEmpty()}"
+			     th:replace="~{admin/fragments/empty-state :: panel('조건에 맞는 발송 이력이 없습니다.', '필터를 변경하거나 기간을 넓혀 보세요.')}"></div>
+
+			<div th:replace="~{admin/fragments/pagination :: pager('발송 이력 페이지', ${historyPage}, ${historyPaginationLinks})}"></div>
+		</div>
+	</section>
 </main>
 </div>
 <th:block th:replace="~{admin/fragments/shell :: scripts}"></th:block>

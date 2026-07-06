@@ -1,8 +1,10 @@
 package com.easysubway.notification.adapter.out.persistence;
 
+import com.easysubway.notification.application.port.in.PushNotificationHistoryQuery;
 import com.easysubway.notification.application.port.out.LoadPendingPushNotificationOutboxPort;
 import com.easysubway.notification.application.port.out.LoadPushNotificationOutboxPort;
 import com.easysubway.notification.application.port.out.SavePushNotificationOutboxPort;
+import com.easysubway.notification.application.port.out.SearchPushNotificationOutboxPort;
 import com.easysubway.notification.application.port.out.SummarizePushNotificationOutboxPort;
 import com.easysubway.notification.domain.PushNotification;
 import com.easysubway.notification.domain.PushNotificationDashboardSummary;
@@ -13,7 +15,9 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -26,6 +30,7 @@ public class InMemoryPushNotificationOutboxRepository implements
 	LoadPushNotificationOutboxPort,
 	LoadPendingPushNotificationOutboxPort,
 	SavePushNotificationOutboxPort,
+	SearchPushNotificationOutboxPort,
 	SummarizePushNotificationOutboxPort,
 	DeleteUserPushNotificationPort {
 
@@ -154,6 +159,54 @@ public class InMemoryPushNotificationOutboxRepository implements
 			failedCount,
 			latestFailedNotification == null ? null : latestFailedNotification.failureReason()
 		);
+	}
+
+	@Override
+	public List<PushNotification> searchPushNotifications(PushNotificationHistoryQuery query) {
+		List<PushNotification> matched = matchingHistory(query)
+			.sorted(Comparator
+				.comparing(PushNotification::createdAt)
+				.thenComparing(PushNotification::notificationId)
+				.reversed())
+			.toList();
+		int fromIndex = Math.min(query.offset(), matched.size());
+		int toIndex = Math.min(fromIndex + query.size(), matched.size());
+		return List.copyOf(matched.subList(fromIndex, toIndex));
+	}
+
+	@Override
+	public long countPushNotifications(PushNotificationHistoryQuery query) {
+		return matchingHistory(query).count();
+	}
+
+	private Stream<PushNotification> matchingHistory(PushNotificationHistoryQuery query) {
+		return notificationsByUserId.values().stream()
+			.flatMap(List::stream)
+			.filter(notification -> matchesHistory(notification, query));
+	}
+
+	private boolean matchesHistory(PushNotification notification, PushNotificationHistoryQuery query) {
+		if (query.hasStatus() && notification.status() != query.status()) {
+			return false;
+		}
+		if (query.hasType() && notification.type() != query.type()) {
+			return false;
+		}
+		if (query.hasKeyword() && !matchesKeyword(notification, query.keyword())) {
+			return false;
+		}
+		LocalDateTime createdAt = notification.createdAt();
+		if (query.createdFrom() != null && createdAt.isBefore(query.createdFrom().atStartOfDay())) {
+			return false;
+		}
+		return query.createdTo() == null
+			|| createdAt.isBefore(query.createdTo().plusDays(1).atStartOfDay());
+	}
+
+	private static boolean matchesKeyword(PushNotification notification, String keyword) {
+		String needle = keyword.toLowerCase(Locale.ROOT);
+		return notification.title().toLowerCase(Locale.ROOT).contains(needle)
+			|| notification.body().toLowerCase(Locale.ROOT).contains(needle);
 	}
 
 	@Override

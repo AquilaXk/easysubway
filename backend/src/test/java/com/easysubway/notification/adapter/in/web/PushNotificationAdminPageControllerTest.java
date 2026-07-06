@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easysubway.admin.audit.adapter.out.persistence.InMemoryAdminAuditEventRepository;
+import com.easysubway.admin.audit.domain.AdminAuditEventType;
 import com.easysubway.notification.application.port.in.NotificationPreferenceUseCase;
 import com.easysubway.notification.application.port.in.RegisterDeviceCommand;
 import com.easysubway.notification.domain.DevicePlatform;
@@ -35,6 +37,9 @@ class PushNotificationAdminPageControllerTest {
 
 	@Autowired
 	private NotificationPreferenceUseCase notificationPreferenceUseCase;
+
+	@Autowired
+	private InMemoryAdminAuditEventRepository auditEventRepository;
 
 	@Test
 	@DisplayName("관리자는 푸시 알림 outbox의 전체와 상태별 건수를 확인한다")
@@ -108,6 +113,65 @@ class PushNotificationAdminPageControllerTest {
 			.contains("최근 30일 추이")
 			.doesNotContain("admin-shell")
 			.doesNotContain("상태별 알림");
+	}
+
+	@Test
+	@DisplayName("발송 이력은 수신자 식별자를 마스킹하고 원문 토큰·사용자ID를 노출하지 않는다")
+	void pushHistoryMasksRecipientIdentifiers() throws Exception {
+		registerDevice();
+		dispatchNotification("REPORT_STATUS", "신고 처리 알림");
+
+		String html = mockMvc.perform(get("/admin/notifications/push/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("발송 이력")
+			.contains("신고 처리 알림")
+			.contains("제보 처리 상태")
+			.contains("••••")
+			.doesNotContain("secret-device-token")
+			.doesNotContain("anonymous-user-1");
+	}
+
+	@Test
+	@DisplayName("발송 이력 조회는 열람 감사(PRIVACY_READ)를 남긴다")
+	void pushHistoryViewWritesPrivacyReadAudit() throws Exception {
+		mockMvc.perform(get("/admin/notifications/push/history")
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk());
+
+		assertThat(auditEventRepository.findRecent(AdminAuditEventType.PRIVACY_READ, 5))
+			.anySatisfy(event -> {
+				assertThat(event.action()).isEqualTo("VIEW_PUSH_HISTORY");
+				assertThat(event.targetType()).isEqualTo("PUSH_NOTIFICATION_HISTORY");
+			});
+	}
+
+	@Test
+	@DisplayName("발송 이력 fragment는 상태 필터를 적용하고 셸 없이 목록만 반환한다")
+	void pushHistoryFragmentFiltersByStatus() throws Exception {
+		registerDevice();
+		dispatchNotification("REPORT_STATUS", "대기 중 알림");
+
+		String fragment = mockMvc.perform(get("/admin/notifications/push/history")
+				.param("status", "FAILED")
+				.header("HX-Request", "true")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(fragment)
+			.contains("id=\"push-history\"")
+			.contains("조건에 맞는 발송 이력이 없습니다.")
+			.doesNotContain("admin-shell")
+			.doesNotContain("대기 중 알림");
 	}
 
 	@Test

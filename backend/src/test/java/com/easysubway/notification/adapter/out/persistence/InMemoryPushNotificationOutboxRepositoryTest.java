@@ -87,6 +87,70 @@ class InMemoryPushNotificationOutboxRepositoryTest {
 			.isTrue();
 	}
 
+	@Test
+	@DisplayName("이력 검색은 상태·유형·키워드로 필터하고 최신순으로 정렬한다")
+	void searchPushNotificationsFiltersAndOrders() {
+		repository.savePushNotification(historyNotification(
+			"push-1", "user-1", PushNotificationType.REPORT_STATUS, PushNotificationStatus.PENDING,
+			"신고 처리 알림", LocalDateTime.of(2026, 6, 17, 9, 0)));
+		repository.savePushNotification(new PushNotification(
+			"push-2", "user-2", DevicePlatform.ANDROID, "device-token-2", PushNotificationType.DATA_QUALITY,
+			"데이터 품질 알림", "본문", PushNotificationStatus.FAILED, "provider timeout",
+			LocalDateTime.of(2026, 6, 17, 10, 0)));
+		repository.savePushNotification(historyNotification(
+			"push-3", "user-3", PushNotificationType.REPORT_STATUS, PushNotificationStatus.SENT,
+			"신고 완료 알림", LocalDateTime.of(2026, 6, 17, 11, 0)));
+
+		assertThat(repository.searchPushNotifications(query(PushNotificationStatus.FAILED, null, null)))
+			.extracting(PushNotification::notificationId).containsExactly("push-2");
+		assertThat(repository.searchPushNotifications(query(null, PushNotificationType.REPORT_STATUS, null)))
+			.extracting(PushNotification::notificationId).containsExactly("push-3", "push-1");
+		assertThat(repository.searchPushNotifications(query(null, null, "품질")))
+			.extracting(PushNotification::notificationId).containsExactly("push-2");
+	}
+
+	@Test
+	@DisplayName("이력 검색은 페이지 크기·오프셋으로 잘라내고 전체 건수를 센다")
+	void searchPushNotificationsPaginatesAndCounts() {
+		for (int index = 0; index < 5; index++) {
+			repository.savePushNotification(historyNotification(
+				"push-" + index, "user-1", PushNotificationType.REPORT_STATUS, PushNotificationStatus.PENDING,
+				"신고 알림 " + index, LocalDateTime.of(2026, 6, 17, 9 + index, 0)));
+		}
+
+		assertThat(repository.searchPushNotifications(
+			new com.easysubway.notification.application.port.in.PushNotificationHistoryQuery(
+				null, null, null, null, null, 0, 2)))
+			.extracting(PushNotification::notificationId).containsExactly("push-4", "push-3");
+		assertThat(repository.searchPushNotifications(
+			new com.easysubway.notification.application.port.in.PushNotificationHistoryQuery(
+				null, null, null, null, null, 2, 2)))
+			.extracting(PushNotification::notificationId).containsExactly("push-0");
+		assertThat(repository.countPushNotifications(query(null, null, null))).isEqualTo(5);
+	}
+
+	private static com.easysubway.notification.application.port.in.PushNotificationHistoryQuery query(
+		PushNotificationStatus status,
+		PushNotificationType type,
+		String keyword
+	) {
+		return com.easysubway.notification.application.port.in.PushNotificationHistoryQuery.of(
+			status, type, keyword, null, null, null, null);
+	}
+
+	private PushNotification historyNotification(
+		String notificationId,
+		String userId,
+		PushNotificationType type,
+		PushNotificationStatus status,
+		String title,
+		LocalDateTime createdAt
+	) {
+		return new PushNotification(
+			notificationId, userId, DevicePlatform.ANDROID, "device-token-" + notificationId, type,
+			title, "본문 " + notificationId, status, createdAt);
+	}
+
 	private static org.assertj.core.groups.Tuple tuple(Object... values) {
 		return org.assertj.core.api.Assertions.tuple(values);
 	}
