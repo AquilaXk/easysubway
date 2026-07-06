@@ -5,6 +5,7 @@ import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -62,6 +63,13 @@ public class JdbcDatapackReleaseRequestRepository implements DatapackReleaseRequ
 		} catch (EmptyResultDataAccessException e) {
 			return Optional.empty();
 		}
+	}
+
+	@Override
+	public List<DatapackReleaseRequest> findRecent(int limit) {
+		return jdbcTemplate.query(
+			"SELECT * FROM datapack_release_request ORDER BY created_at DESC, approval_id DESC LIMIT ?",
+			ROW_MAPPER, limit);
 	}
 
 	private static Timestamp toTs(LocalDateTime v) {
