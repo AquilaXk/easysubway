@@ -98,7 +98,12 @@ function canonicalValue(value) {
     return value.map(canonicalValue);
   }
   if (typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalValue(value[key])]));
+    // 서명 계산에 쓰이는 정준 직렬화: 기본 .sort()와 바이트 동일한 UTF-16 code-unit
+    // 비교자를 명시한다. localeCompare는 정렬 순서가 달라 이미 서명된 매니페스트의
+    // 검증을 깨뜨리므로 사용 금지.
+    return Object.fromEntries(
+      Object.keys(value).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).map((key) => [key, canonicalValue(value[key])]),
+    );
   }
   throw new Error("manifest canonical value is unsupported");
 }
@@ -123,7 +128,7 @@ function validateTableName(value) {
   }
 }
 
-function validatePackIdentity(value, label) {
+export function validatePackIdentity(value, label) {
   if (!value || typeof value !== "object") {
     throw new Error(`${label} must be an object`);
   }
@@ -137,7 +142,7 @@ function validatePackIdentity(value, label) {
   }
 }
 
-function validatePackUrl(packUrl, label) {
+export function validatePackUrl(packUrl, label) {
   if (/%[0-9a-f]{2}/i.test(packUrl)) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);
   }
@@ -159,7 +164,7 @@ function validatePackUrl(packUrl, label) {
   }
 }
 
-function validatePackUrlMatchesStagedPath(packUrl, pack, label) {
+export function validatePackUrlMatchesStagedPath(packUrl, pack, label) {
   if (!/^https:\/\//.test(packUrl)) {
     return;
   }
