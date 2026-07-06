@@ -419,6 +419,7 @@ class StationSearchResult {
     required this.id,
     required this.nameKo,
     required this.nameEn,
+    this.nameSub = '',
     required this.region,
     required this.dataQualityLevel,
     this.dataSourceType = '',
@@ -437,6 +438,7 @@ class StationSearchResult {
       id: _requiredString(json, 'id'),
       nameKo: _requiredString(json, 'nameKo'),
       nameEn: _requiredString(json, 'nameEn'),
+      nameSub: _stringOrEmpty(json, 'nameSub'),
       region: _requiredString(json, 'region'),
       dataQualityLevel: _requiredString(json, 'dataQualityLevel'),
       dataSourceType: _stringOrEmpty(json, 'dataSourceType'),
@@ -456,6 +458,7 @@ class StationSearchResult {
   final String id;
   final String nameKo;
   final String nameEn;
+  final String nameSub;
   final String region;
   final String dataQualityLevel;
   final String dataSourceType;
@@ -501,6 +504,7 @@ class StationDetail {
     required this.id,
     required this.nameKo,
     required this.nameEn,
+    this.nameSub = '',
     required this.region,
     this.latitude,
     this.longitude,
@@ -520,6 +524,7 @@ class StationDetail {
       id: _requiredString(json, 'id'),
       nameKo: _requiredString(json, 'nameKo'),
       nameEn: _requiredString(json, 'nameEn'),
+      nameSub: _stringOrEmpty(json, 'nameSub'),
       region: _requiredString(json, 'region'),
       latitude: _optionalDouble(json, 'latitude'),
       longitude: _optionalDouble(json, 'longitude'),
@@ -542,6 +547,7 @@ class StationDetail {
   final String id;
   final String nameKo;
   final String nameEn;
+  final String nameSub;
   final String region;
   final double? latitude;
   final double? longitude;
@@ -3684,6 +3690,19 @@ class _StationDetailHeader extends StatelessWidget {
                         height: 1.2,
                       ),
                     ),
+                    // 부역명(#1789 P0.2). name_ko에서 분리한 부역명을 역명 아래
+                    // 보조 표기로 노출한다(있을 때만).
+                    if (detail.nameSub.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        detail.nameSub,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: EasySubwayAccessibleColors.secondaryText,
+                          fontWeight: FontWeight.w600,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       detail.lineLabel,
