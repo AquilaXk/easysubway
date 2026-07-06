@@ -39,3 +39,43 @@ jobs:
         run: |
           set -euo pipefail
           gh cache delete --all --succeed-on-no-caches
+
+  cleanup-ghcr-backend-images:
+    name: Prune old GHCR backend images
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Keep the latest 10 backend image versions
+        env:
+          # github.token can prune package versions only if it owns them; a
+          # classic PAT with delete:packages is the fallback for user-owned GHCR.
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_PAT != '' && secrets.GHCR_CLEANUP_PAT || github.token }}
+          OWNER: aquilaxk
+          PACKAGE: easysubway-backend
+        run: |
+          set -euo pipefail
+
+          # Keep the 10 newest versions for rollback headroom (issue #1686); the
+          # digest of the previous deploy is what rollback pulls, so retention
+          # must comfortably exceed the depth we might roll back to.
+          versions="$(gh api \
+            "/users/${OWNER}/packages/container/${PACKAGE}/versions?per_page=100" \
+            --jq 'sort_by(.created_at) | reverse | .[].id' 2>/dev/null || true)"
+          if [ -z "${versions}" ]; then
+            echo "::notice title=GHCR cleanup::no ${PACKAGE} versions found or token lacks packages scope."
+            exit 0
+          fi
+
+          index=0
+          while read -r version_id; do
+            [ -n "${version_id}" ] || continue
+            index=$((index + 1))
+            if [ "${index}" -le 10 ]; then
+              continue
+            fi
+            echo "deleting ${PACKAGE} version ${version_id}"
+            gh api -X DELETE \
+              "/users/${OWNER}/packages/container/${PACKAGE}/versions/${version_id}" || true
+          done <<< "${versions}"

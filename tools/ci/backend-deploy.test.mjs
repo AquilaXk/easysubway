@@ -142,11 +142,15 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   const composeConfig = 'compose "${BACKEND_ENV}" "${COMPOSE_ENV}" "${DEPLOY_SHA}" config --quiet';
   assert.equal(deploy.match(/git checkout --detach "\$\{DEPLOY_SHA\}"/g)?.length, 1);
   assert.ok(deploy.indexOf(checkoutTarget) < deploy.indexOf(composeConfig));
-  assert.match(deploy, /sha256sum -c/);
+  // The deployed artifact is verified by GHCR digest, not by re-hashing a jar,
+  // and there is no on-server image build (issue #1686).
+  assert.doesNotMatch(deploy, /sha256sum -c/);
+  assert.match(deploy, /docker image inspect "easysubway-backend:\$\{DEPLOY_SHA\}"/);
+  assert.match(deploy, /image_digest_mismatch/);
   assert.match(deploy, /up -d --no-build postgres object-storage/);
   assert.doesNotMatch(deploy, /timeout [0-9]+ compose/);
   assert.match(deploy, /timeout 600 docker compose/);
-  assert.match(deploy, /timeout 900 docker compose/);
+  assert.doesNotMatch(deploy, /timeout 900 docker compose/);
   assert.match(deploy, /wait_stateful_service/);
   assert.match(deploy, /report_upload_bucket="\$\(read_env_value "\$\{BACKEND_ENV\}" EASYSUBWAY_REPORT_UPLOAD_BUCKET\)"/);
   assert.match(deploy, /stop_legacy_backend_service\(\)/);
