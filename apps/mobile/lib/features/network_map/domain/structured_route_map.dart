@@ -12,24 +12,14 @@
 // - LOD: zoom0 lines only, zoom1 환승/주요 라벨, zoom2 전체 역 라벨
 import 'dart:ui' show Offset;
 
-/// 라벨 우선순위 class (#1636 station_labels.priority).
+/// 라벨 우선순위·볼드 class (#1636 station_labels.priority).
 ///
 /// [major](주요역)는 [buildStructuredRouteMap]이 런타임 산출한다(#1764 C):
 /// 각 노선 양 종점(sequence min/max)이거나 비환승 거점 allowlist
 /// (route_map_major_stations)에 속하는 역. 환승역은 [transfer]로 우선 처리된다.
+/// LOD zoom bucket 매핑은 #1789 정적 스케일 렌더 전환에서 폐지됐다(로드 시 1회
+/// 정적 배치·전부 표시) — 이 enum은 배치 우선순위와 볼드 판정에만 쓰인다.
 enum RouteMapLabelClass { transfer, major, regular }
-
-/// 라벨 class → 최초 표시 zoom bucket (#1636 LOD).
-/// 0 = lines only(라벨 없음), 1 = 환승/주요 라벨, 2 = 전체 역 라벨.
-int minLabelZoomBucketFor(RouteMapLabelClass labelClass) {
-  switch (labelClass) {
-    case RouteMapLabelClass.transfer:
-    case RouteMapLabelClass.major:
-      return 1;
-    case RouteMapLabelClass.regular:
-      return 2;
-  }
-}
 
 /// 한 노선의 track geometry. 데이터 hole(인접 세그먼트가 이어지지 않는 지점)에서
 /// 끊어 여러 sub-polyline으로 둔다 — 끊긴 두 역을 직선으로 잇는 phantom edge를
@@ -60,8 +50,6 @@ class RouteMapStructuredStation {
   final Offset position;
   final List<Offset> labelPolygon;
   final RouteMapLabelClass labelClass;
-
-  int get minLabelZoomBucket => minLabelZoomBucketFor(labelClass);
 }
 
 /// 환승 그룹 (#1636 transfer_groups): 같은 물리 역의 노선 묶음.
@@ -70,6 +58,7 @@ class RouteMapTransferGroup {
     required this.stationId,
     required this.lineIds,
     required this.centroid,
+    required this.memberPositions,
   });
 
   final String stationId;
@@ -79,6 +68,10 @@ class RouteMapTransferGroup {
 
   /// 표시 좌표: 해당 station_id route_map_positions의 중심값.
   final Offset centroid;
+
+  /// [lineIds]와 같은 순서의 노선별 노드 좌표. 비수렴 기하에서 캡슐이
+  /// 멤버들을 걸치도록 렌더러가 소비한다.
+  final List<Offset> memberPositions;
 }
 
 /// 구조화 노선도 집합 (렌더러 입력).
@@ -132,10 +125,9 @@ List<Offset> parseRouteMapPolyline(String path) {
   if (path.trim().isEmpty) {
     return const [];
   }
-  final numbers = RegExp(r'-?\d+(?:\.\d+)?')
-      .allMatches(path)
-      .map((match) => double.parse(match.group(0)!))
-      .toList();
+  final numbers = RegExp(
+    r'-?\d+(?:\.\d+)?',
+  ).allMatches(path).map((match) => double.parse(match.group(0)!)).toList();
   final points = <Offset>[];
   for (var index = 0; index + 1 < numbers.length; index += 2) {
     points.add(Offset(numbers[index], numbers[index + 1]));
@@ -154,8 +146,8 @@ StructuredRouteMap buildStructuredRouteMap(
 
   // 물리 역(station_id)이 속한 line 집합 → 환승 판정.
   final lineIdsByStation = <String, Set<String>>{};
-  // 환승 중심 계산용: 환승역 후보만 좌표를 모은다.
-  final positionsByStation = <String, List<Offset>>{};
+  // 환승 중심·멤버 좌표 계산용: stationId → lineId → position.
+  final positionByStationLine = <String, Map<String, Offset>>{};
   final lineIdsWithStations = <String>{};
   // 노선별 입력(양 종점 자동 산출용, #1764 C major).
   final inputsByLine = <String, List<StructuredRouteMapStationInput>>{};
@@ -163,9 +155,10 @@ StructuredRouteMap buildStructuredRouteMap(
     lineIdsByStation
         .putIfAbsent(input.stationId, () => <String>{})
         .add(input.lineId);
-    positionsByStation
-        .putIfAbsent(input.stationId, () => <Offset>[])
-        .add(input.position);
+    positionByStationLine.putIfAbsent(
+      input.stationId,
+      () => <String, Offset>{},
+    )[input.lineId] = input.position;
     lineIdsWithStations.add(input.lineId);
     inputsByLine
         .putIfAbsent(input.lineId, () => <StructuredRouteMapStationInput>[])
@@ -220,17 +213,22 @@ StructuredRouteMap buildStructuredRouteMap(
 
   // 환승 그룹: 2개 이상 노선에 속한 역, 중심 좌표.
   final transferGroups = <RouteMapTransferGroup>[];
-  final transferStationIds = lineIdsByStation.entries
-      .where((entry) => entry.value.length > 1)
-      .map((entry) => entry.key)
-      .toList()
-    ..sort();
+  final transferStationIds =
+      lineIdsByStation.entries
+          .where((entry) => entry.value.length > 1)
+          .map((entry) => entry.key)
+          .toList()
+        ..sort();
   for (final stationId in transferStationIds) {
+    final lineIds = lineIdsByStation[stationId]!.toList()..sort();
+    final byLine = positionByStationLine[stationId]!;
+    final memberPositions = [for (final lineId in lineIds) byLine[lineId]!];
     transferGroups.add(
       RouteMapTransferGroup(
         stationId: stationId,
-        lineIds: lineIdsByStation[stationId]!.toList()..sort(),
-        centroid: _centroid(positionsByStation[stationId]!),
+        lineIds: lineIds,
+        centroid: _centroid(memberPositions),
+        memberPositions: memberPositions,
       ),
     );
   }
@@ -311,4 +309,29 @@ Offset _centroid(List<Offset> points) {
     sumY += point.dy;
   }
   return Offset(sumX / points.length, sumY / points.length);
+}
+
+/// 노선별 종착역(sequence 최소/최대) station_id 집합 (#1789 볼드 스타일).
+/// 시·종점 좌표가 같은 순환선은 종착 개념이 없어 제외한다.
+Set<String> routeMapTerminusStationIds(StructuredRouteMap map) {
+  final byLine = <String, List<RouteMapStructuredStation>>{};
+  for (final station in map.stations) {
+    (byLine[station.lineId] ??= []).add(station);
+  }
+  final ids = <String>{};
+  for (final stations in byLine.values) {
+    if (stations.length < 2) {
+      continue;
+    }
+    stations.sort((a, b) => a.sequence.compareTo(b.sequence));
+    final first = stations.first;
+    final last = stations.last;
+    if (first.position == last.position) {
+      continue; // 순환선.
+    }
+    ids
+      ..add(first.stationId)
+      ..add(last.stationId);
+  }
+  return ids;
 }

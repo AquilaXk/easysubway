@@ -21,7 +21,12 @@ void main() {
     const anchor = Offset(100, 100);
     const size = Size(40, 12);
     test('right는 점 오른쪽, 세로 중앙 정렬', () {
-      final rect = routeMapLabelRect(anchor, size, RouteMapLabelAnchor.right, 4);
+      final rect = routeMapLabelRect(
+        anchor,
+        size,
+        RouteMapLabelAnchor.right,
+        4,
+      );
       expect(rect, const Rect.fromLTWH(104, 94, 40, 12));
     });
     test('left는 점 왼쪽', () {
@@ -92,10 +97,9 @@ void main() {
     });
 
     test('viewportBounds 밖 위치는 건너뛴다', () {
-      final placed = placeRouteMapLabels(
-        [candidate(id: 'far', anchor: const Offset(5000, 5000), priority: 0)],
-        viewportBounds: const Rect.fromLTWH(0, 0, 400, 400),
-      );
+      final placed = placeRouteMapLabels([
+        candidate(id: 'far', anchor: const Offset(5000, 5000), priority: 0),
+      ], viewportBounds: const Rect.fromLTWH(0, 0, 400, 400));
       expect(placed, isEmpty);
     });
 
@@ -133,6 +137,38 @@ void main() {
       );
       expect(placed, hasLength(1));
       expect(placed.single.candidate.id, 'a');
+    });
+  });
+
+  group('8방향 anchor (#1789 정적 배치)', () {
+    test('대각 anchor rect는 두 축 모두 gap의 1/√2만큼 띄운다', () {
+      const size = Size(40, 12);
+      final rect = routeMapLabelRect(
+        Offset.zero,
+        size,
+        RouteMapLabelAnchor.aboveRight,
+        10,
+      );
+      expect(rect.left, closeTo(10 * 0.707, 0.01));
+      expect(rect.bottom, closeTo(-10 * 0.707, 0.01));
+    });
+
+    test('지도 중심 outward 순서는 8값 전부·중복 없음·바깥 우선', () {
+      // anchor가 중심의 오른쪽 위 → right(수평 지배) 우선, 안쪽(left/below)은 뒤.
+      final order = routeMapMapOutwardAnchorOrder(
+        const Offset(100, -40),
+        Offset.zero,
+      );
+      expect(order.toSet().length, 8);
+      expect(order.first, RouteMapLabelAnchor.right);
+      expect(order[1], RouteMapLabelAnchor.aboveRight);
+      expect(order.last, RouteMapLabelAnchor.left);
+    });
+
+    test('순서는 화면(뷰포트)이 아니라 지도 중심에만 의존한다 — 결정적', () {
+      final a = routeMapMapOutwardAnchorOrder(const Offset(5, 5), Offset.zero);
+      final b = routeMapMapOutwardAnchorOrder(const Offset(5, 5), Offset.zero);
+      expect(a, b);
     });
   });
 }
