@@ -1825,6 +1825,28 @@ body.admin-v3 {
 }
 
 /* 발송 이력 콘솔(#1746) */
+.admin-v3 .card-sparkline {
+	display: block;
+	width: 100%;
+	height: 24px;
+	margin-top: 6px;
+}
+
+.admin-v3 .card-sparkline polyline {
+	stroke: #b3261e;
+	stroke-width: 1.5;
+	vector-effect: non-scaling-stroke;
+}
+
+.admin-v3 .metric .card-sparkline polyline {
+	fill: none;
+}
+
+.admin-v3 .delivery-alert-link {
+	margin: -8px 0 12px;
+	font-size: 14px;
+}
+
 .admin-v3 .section-hint {
 	color: #5f6b7a;
 	font-size: 13px;

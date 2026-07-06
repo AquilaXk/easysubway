@@ -8,7 +8,9 @@ import com.easysubway.admin.code.domain.AdminCommonCodeGroups;
 import com.easysubway.admin.metric.adapter.in.web.AnalyticsComparisonCard;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService;
 import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricChart;
+import com.easysubway.admin.metric.application.service.AdminMetricQueryService.AdminMetricSeries;
 import com.easysubway.admin.metric.domain.AdminMetricKeys;
+import com.easysubway.admin.metric.domain.AdminMetricSparkline;
 import com.easysubway.common.domain.PageResult;
 import com.easysubway.common.web.pagination.EgovPaginationView;
 import com.easysubway.notification.application.port.in.PushNotificationDashboardUseCase;
@@ -98,8 +100,28 @@ class PushNotificationAdminPageController {
 		PushNotificationDashboardSummary summary = pushNotificationDashboardUseCase.summarizePushNotifications();
 		model.addAttribute("summary", PushNotificationDashboardView.from(summary));
 		populateTrends(days, model);
+		populateSummarySparklines(model);
 		populateHistory(historyQuery(status, type, keyword, reason, from, to, page), authentication, request, model);
 		return "admin/notifications/push";
+	}
+
+	// 요약 카드 7일 스파크라인(#1746): 발송 시도·실패의 최근 7일 추이를 CSP-safe 서버 SVG polyline으로 그린다.
+	// 기간 버튼과 무관하게 항상 7일이며, 실패 카드에는 실패 목록 필터 딥링크를 함께 노출한다.
+	private void populateSummarySparklines(Model model) {
+		AdminMetricChart weekChart = metricQueryService.chart(TREND_KEYS, 7);
+		model.addAttribute("attemptedSparkline", sparklinePoints(weekChart, AdminMetricKeys.PUSH_ATTEMPTED));
+		model.addAttribute("failedSparkline", sparklinePoints(weekChart, AdminMetricKeys.PUSH_FAILED));
+		// 실패 경고·실패 카드에서 실패 이력으로 바로 가는 딥링크.
+		model.addAttribute("failedHistoryHref", PUSH_PAGE_PATH + "?status=FAILED");
+	}
+
+	private static String sparklinePoints(AdminMetricChart chart, String key) {
+		return chart.series().stream()
+			.filter(series -> series.key().equals(key))
+			.findFirst()
+			.map(AdminMetricSeries::values)
+			.map(values -> AdminMetricSparkline.points(values, 100, 24))
+			.orElse("");
 	}
 
 	// no-JS 발송 이력 필터: 폼 제출이 이 경로로 GET하면 이력이 채워진 풀페이지를 돌려준다.

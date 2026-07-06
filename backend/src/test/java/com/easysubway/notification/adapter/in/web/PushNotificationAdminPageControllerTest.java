@@ -220,6 +220,25 @@ class PushNotificationAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("실패가 있으면 실패 경고에 실패 이력 필터 딥링크를 노출한다")
+	void pushPageShowsFailureDeepLinkWhenFailuresExist() throws Exception {
+		registerDevice();
+		dispatchNotification("REPORT_STATUS", "신고 처리 알림");
+		deliverPendingNotifications();
+
+		String html = mockMvc.perform(get("/admin/notifications/push/page")
+				.with(httpBasic("admin-user", "admin-test-password")))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("실패 발송 목록 보기")
+			.contains("status=FAILED");
+	}
+
+	@Test
 	@DisplayName("재발송은 command token 없이는 차단된다(중복·위조 방지)")
 	void resendRequiresCommandToken() throws Exception {
 		mockMvc.perform(post("/admin/notifications/push/resend")

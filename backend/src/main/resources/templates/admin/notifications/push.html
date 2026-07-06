@@ -37,10 +37,18 @@
 		<div class="metric">
 			<span>발송 실패</span>
 			<strong th:text="${summary.failedCount}">0</strong>
+			<svg th:if="${failedSparkline != ''}" class="card-sparkline" viewBox="0 0 100 24"
+			     preserveAspectRatio="none" role="img" aria-label="발송 실패 최근 7일 추이">
+				<polyline th:attr="points=${failedSparkline}" fill="none"></polyline>
+			</svg>
 		</div>
 		<div class="metric">
 			<span>발송 시도</span>
 			<strong th:text="${summary.deliveryAttemptCount}">0</strong>
+			<svg th:if="${attemptedSparkline != ''}" class="card-sparkline" viewBox="0 0 100 24"
+			     preserveAspectRatio="none" role="img" aria-label="발송 시도 최근 7일 추이">
+				<polyline th:attr="points=${attemptedSparkline}" fill="none"></polyline>
+			</svg>
 		</div>
 		<div class="metric">
 			<span>발송 성공률</span>
@@ -55,6 +63,10 @@
 	<p th:class="'delivery-alert ' + ${summary.failureAlertClass}"
 	   th:text="${summary.failureAlertLabel} + ': ' + ${summary.failureAlertDescription}">
 		점검 필요: 발송 실패가 있어 푸시 어댑터와 provider 상태를 확인하세요.
+	</p>
+
+	<p class="delivery-alert-link" th:if="${summary.failedCount > 0}">
+		<a th:href="${failedHistoryHref}">실패 발송 목록 보기</a>
 	</p>
 
 	<p class="failure-reason"
