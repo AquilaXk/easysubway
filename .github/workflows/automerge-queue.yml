@@ -47,7 +47,22 @@ jobs:
             echo "::warning::AUTOMERGE_PAT secret이 없어 GITHUB_TOKEN으로 실행한다. update-branch push가 PR CI를 트리거하지 못해 큐 체인이 멈출 수 있다."
           fi
 
-          required_checks='["Changes","Repository CI","Backend CI","Mobile App CI","Android CI"]'
+          # Derive the required checks from the main ruleset so newly required
+          # checks (Release Gate Consistency, PR Title — #1685) are honored
+          # without editing this workflow. Fall back to the known set if the
+          # ruleset query fails, so a transient API error never lets a PR with a
+          # failing required check slip past the derail logic.
+          ruleset_err="$(mktemp)"
+          required_checks=$(gh api "repos/${REPO}/rules/branches/main" \
+            --jq '[.[] | select(.type == "required_status_checks")
+              | .parameters.required_status_checks[].context]' 2>"${ruleset_err}" || true)
+          if [ -z "${required_checks}" ] || [ "${required_checks}" = "[]" ]; then
+            # Preserve the underlying gh api error so repeated fallbacks are
+            # diagnosable from the workflow log (permission/API change/transient).
+            echo "::warning::main ruleset required_status_checks 동적 조회 실패($(tr '\n' ' ' <"${ruleset_err}")) — 하드코딩 폴백 사용."
+            required_checks='["Changes","Repository CI","Backend CI","Mobile App CI","Android CI","Release Gate Consistency","PR Title"]'
+          fi
+          rm -f "${ruleset_err}"
 
           queue=$(gh pr list --repo "${REPO}" --label automerge --base main --state open \
             --json number,createdAt,isDraft \
