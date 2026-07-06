@@ -11903,3 +11903,43 @@ async function classifyChangedFiles(files) {
   });
   return Object.fromEntries(stdout.trim().split("\n").map((line) => line.split("=")));
 }
+
+test("get-off-alarm policy contract pins the no-location, degrade-ladder invariants", () => {
+  const policyPath = "apps/mobile/release/get-off-alarm-policy.json";
+  assert.equal(existsSync(path.join(root, policyPath)), true, "get-off-alarm policy must exist");
+
+  const policy = readJson(policyPath);
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.applicationId, "easysubway");
+  assert.equal(policy.androidApplicationId, "com.easysubway.app");
+  assert.equal(policy.policyName, "get-off-alarm-policy");
+  assert.equal(policy.issue, 1766);
+  assert.equal(policy.parentTracker, 1762);
+
+  // 위치 미사용 불변(area:privacy — 위치 추적으로 절대 회귀 금지).
+  assert.equal(policy.locationTrackingUsed, false);
+
+  // 리드타임 기본값은 Dart 스케줄러의 단일 진실 원본.
+  assert.equal(policy.leadTime.defaultLeadSeconds, 120);
+  assert.equal(policy.leadTime.transferAlarmDefaultOn, true);
+  assert.ok(policy.leadTime.minLeadSeconds < policy.leadTime.defaultLeadSeconds);
+  assert.ok(policy.leadTime.maxLeadSeconds > policy.leadTime.defaultLeadSeconds);
+
+  // 단일 경로 활성 알림(동시 다중 경로는 v1 비범위).
+  assert.equal(policy.activeAlarm.maxConcurrentRoutes, 1);
+  assert.equal(policy.activeAlarm.cancelOnRouteEnd, true);
+  assert.equal(policy.activeAlarm.cancelOnNewSearch, true);
+
+  // 정확 알람 강등 사다리: SCHEDULE_EXACT_ALARM 요청, USE_EXACT_ALARM 금지,
+  // 거부 시 고지 문구와 함께 부정확으로 강등 — 무음 실패 금지.
+  assert.equal(policy.exactAlarm.permissionName, "SCHEDULE_EXACT_ALARM");
+  assert.equal(policy.exactAlarm.forbiddenPermission, "USE_EXACT_ALARM");
+  assert.equal(policy.exactAlarm.degradeToInexactOnDeny, true);
+  assert.equal(policy.exactAlarm.silentFailureAllowed, false);
+  assert.ok(policy.exactAlarm.inexactNoticeKo.length > 0);
+
+  // 실시간 보정은 온라인 전용 overlay 재사용; 오프라인은 PLANNED 유지.
+  assert.equal(policy.realtimeCorrection.recomputeOnForeground, true);
+  assert.equal(policy.realtimeCorrection.offlineEtaSource, "PLANNED");
+  assert.equal(policy.realtimeCorrection.correctionOverlayIssue, 1416);
+});
