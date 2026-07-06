@@ -83,7 +83,8 @@ test("capsuleTargets 단일 멤버는 centroid(자기 위치)에 그대로 둔�
 
 test("spliceTrackToNode는 track 끝점 허브도 새 위치로 이동(한쪽 윈도우)", () => {
   const verts = [{ x: 0, y: 100 }, { x: 100, y: 100 }, { x: 200, y: 100 }];
-  const out = spliceTrackToNode(verts, { x: 0, y: 100 }, { x: 0, y: 112 }, { radius: 1 });
+  const { verts: out, attached } = spliceTrackToNode(verts, { x: 0, y: 100 }, { x: 0, y: 112 }, { radius: 1 });
+  assert.equal(attached, true);
   assert.ok(out.some((v) => Math.abs(v.y - 112) < 1e-6), "끝점 허브 이동");
   for (let i = 1; i < out.length; i += 1) {
     const dx = out[i].x - out[i - 1].x, dy = out[i].y - out[i - 1].y;
@@ -104,7 +105,8 @@ test("spliceTrackToNode는 근처 정점을 newPos로 이동, 국소 rectify", (
   ];
 
   // 중앙 정점(200,100)을 (200,108)로 이동, radius=1 국소 rectify
-  const result = spliceTrackToNode(verts, { x: 200, y: 100 }, { x: 200, y: 108 }, { radius: 1, eps: 1 });
+  const { verts: result, attached } = spliceTrackToNode(verts, { x: 200, y: 100 }, { x: 200, y: 108 }, { radius: 1, eps: 1 });
+  assert.equal(attached, true);
 
   // 결과는 새 배열
   assert.notEqual(result, verts);
@@ -160,4 +162,26 @@ test("needsConvergence는 span>target(과분산)만 참, 이미 타이트/coinci
   assert.equal(needsConvergence({ memberCount: 2, span: 13 }, oracle), false); // 정확히 오라클 → 스킵
   assert.equal(needsConvergence({ memberCount: 2, span: 5 }, oracle), false);  // 이미 타이트 → 스킵
   assert.equal(needsConvergence({ memberCount: 2, span: 0 }, oracle), false);  // coincident → 스킵(스프레드 금지)
+});
+
+test("spliceTrackToNode는 정점이 없어도 최근접 세그먼트에 정점을 삽입해 부착한다", () => {
+  // 긴 수평 세그먼트, 역은 그 중간(정점 아님)에 위치
+  const verts = [{ x: 0, y: 100 }, { x: 400, y: 100 }];
+  const { verts: out, attached } = spliceTrackToNode(verts, { x: 200, y: 100 }, { x: 200, y: 112 }, { radius: 1 });
+  assert.equal(attached, true);
+  assert.ok(out.some((v) => Math.abs(v.x - 200) < 1e-9 && Math.abs(v.y - 112) < 1e-9), "삽입된 newPos 정점 존재");
+  // 8선형
+  for (let i = 1; i < out.length; i += 1) {
+    const dx = out[i].x - out[i - 1].x, dy = out[i].y - out[i - 1].y;
+    if (Math.hypot(dx, dy) === 0) continue;
+    const ang = (Math.atan2(dy, dx) * 180) / Math.PI, mod = ((ang % 45) + 45) % 45;
+    assert.ok(Math.min(mod, 45 - mod) <= 0.5, `비8선형 ${ang}`);
+  }
+});
+
+test("spliceTrackToNode는 모든 세그먼트가 maxDist 밖이면 attached:false·원본 반환", () => {
+  const verts = [{ x: 0, y: 0 }, { x: 10, y: 0 }];
+  const { verts: out, attached } = spliceTrackToNode(verts, { x: 500, y: 500 }, { x: 505, y: 505 }, { radius: 1, maxDist: 30 });
+  assert.equal(attached, false);
+  assert.deepEqual(out, verts);
 });

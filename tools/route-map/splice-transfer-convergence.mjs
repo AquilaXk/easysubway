@@ -4,7 +4,7 @@
 
 import { readFileSync } from "node:fs";
 import { octilinearPolyline } from "./octolinearize-line-tracks.mjs";
-import { parsePathVertices, verticesToPath } from "./audit-octolinearity.mjs";
+import { parsePathVertices, pointToSegmentDistance, verticesToPath } from "./audit-octolinearity.mjs";
 import { openPack, writePack, cleanupPackDir } from "./pack-io.mjs";
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -95,22 +95,53 @@ function nearestVertexIndex(verts, oldPos, threshold = 30) {
 
 /**
  * 허브 정점을 newPos로 옮기고 [idx-radius, idx+radius] 윈도우만 8선형 재구성(원위 불변).
- * octilinearPolyline은 입력 정점(윈도우 끝점 + 이동한 허브)을 정확히 보존하고 45° dogleg를
- * 삽입해 8선형화한다 — rectify와 달리 수직 오프셋 지점을 정확히 통과한다(국소 dogleg는
- * radius-1 국소라 전역 재생성의 자유교차와 무관, 교차는 Task 6 게이트가 실측).
+ * 정점이 없는 경우(mid-segment) 최근접 세그먼트에 np를 삽입한다.
+ * 원위 정점은 반올림하지 않고(float base + 정확 45° dogleg 보존), 이동/삽입하는 np만 정수.
+ * @returns {{ verts: Array<{x:number,y:number}>, attached: boolean }}
  */
-export function spliceTrackToNode(verts, oldPos, newPos, { radius = 1 } = {}) {
-  const idx = nearestVertexIndex(verts, oldPos);
-  if (idx < 0) return verts.slice(); // 멤버가 track 밖 — 건드리지 않음
-  const moved = verts.map((v, i) => (i === idx ? { x: newPos.x, y: newPos.y } : { x: v.x, y: v.y }));
-  const lo = Math.max(0, idx - radius);
-  const hi = Math.min(moved.length - 1, idx + radius);
-  const local = octilinearPolyline(moved.slice(lo, hi + 1));
-  return [...moved.slice(0, lo), ...local, ...moved.slice(hi + 1)];
+export function spliceTrackToNode(verts, oldPos, newPos, { radius = 1, maxDist = 30 } = {}) {
+  // newPos를 정수로 한번만 반올림 — position과 동일 정수라 track 정합 보장
+  const np = { x: Math.round(newPos.x), y: Math.round(newPos.y) };
+
+  // Step 1: oldPos 가장 가까운 정점 탐색 (maxDist 이내)
+  const idx = nearestVertexIndex(verts, oldPos, maxDist);
+  if (idx >= 0) {
+    const moved = verts.map((v, i) => (i === idx ? np : { x: v.x, y: v.y }));
+    const lo = Math.max(0, idx - radius);
+    const hi = Math.min(moved.length - 1, idx + radius);
+    const local = octilinearPolyline(moved.slice(lo, hi + 1));
+    return { verts: [...moved.slice(0, lo), ...local, ...moved.slice(hi + 1)], attached: true };
+  }
+
+  // Step 2: 최근접 세그먼트에 mid-segment 삽입
+  let bestSegDist = Infinity;
+  let bestSegIdx = -1;
+  for (let i = 0; i + 1 < verts.length; i += 1) {
+    const d = pointToSegmentDistance(oldPos, verts[i], verts[i + 1]);
+    if (d < bestSegDist) {
+      bestSegDist = d;
+      bestSegIdx = i;
+    }
+  }
+  if (bestSegIdx >= 0 && bestSegDist <= maxDist) {
+    const i = bestSegIdx;
+    // np를 i+1 위치에 삽입; 원위 정점은 반올림하지 않음
+    const moved = [...verts.slice(0, i + 1), np, ...verts.slice(i + 1)];
+    // np는 index i+1; 윈도우 [i, (i+1)+radius]로 국소 8선형화
+    const lo = Math.max(0, i);
+    const hi = Math.min(moved.length - 1, (i + 1) + radius);
+    const local = octilinearPolyline(moved.slice(lo, hi + 1));
+    return { verts: [...moved.slice(0, lo), ...local, ...moved.slice(hi + 1)], attached: true };
+  }
+
+  // Step 3: 모든 세그먼트가 maxDist 밖 — 부착 실패
+  return { verts: verts.slice(), attached: false };
 }
 
 /** 한 그룹 수렴: 캡슐 타깃 → 각 노선 track splice.
  * tracksByLine = Map(lineId → [{trackIndex, verts}]).
+ * 원자성 불변식: 멤버 track에 부착(attached:true)한 경우에만 positionUpdate를 발행한다.
+ * 어떤 track도 부착하지 못한 멤버는 positionUpdate를 발행하지 않는다.
  * 반환: { positionUpdates:[{stationId,lineId,x,y}], trackUpdates:[{lineId,trackIndex,verts}] }
  */
 export function convergeGroup(group, oracle, tracksByLine) {
@@ -118,23 +149,31 @@ export function convergeGroup(group, oracle, tracksByLine) {
   const axis = capsuleAxis(group.members);
   const targets = capsuleTargets(group.members, target, axis);
   const targetByLine = new Map(targets.map((t) => [t.lineId, t]));
-  const positionUpdates = targets.map((t) => ({
-    stationId: group.stationId,
-    lineId: t.lineId,
-    x: Math.round(t.x),
-    y: Math.round(t.y),
-  }));
+  const positionUpdates = [];
   const trackUpdates = [];
   for (const m of group.members) {
     const nt = targetByLine.get(m.lineId);
     // splice newPos는 정수로 반올림해 넘긴다(position과 동일 정수). octilinearSegment가
     // 정수 좌표에서 정확한 45°/축 corner를 내므로 dogleg 후 8선형이 반올림에 깨지지 않는다.
     const newPos = { x: Math.round(nt.x), y: Math.round(nt.y) };
+    let memberAttached = false;
     for (const trk of tracksByLine.get(m.lineId) ?? []) {
-      const spliced = spliceTrackToNode(trk.verts, { x: m.x, y: m.y }, newPos);
-      if (JSON.stringify(spliced) !== JSON.stringify(trk.verts)) {
-        trackUpdates.push({ lineId: m.lineId, trackIndex: trk.trackIndex, verts: spliced });
+      const { verts: spliced, attached } = spliceTrackToNode(trk.verts, { x: m.x, y: m.y }, newPos);
+      if (attached) {
+        memberAttached = true;
+        if (JSON.stringify(spliced) !== JSON.stringify(trk.verts)) {
+          trackUpdates.push({ lineId: m.lineId, trackIndex: trk.trackIndex, verts: spliced });
+        }
       }
+    }
+    // 원자성: 부착 성공한 멤버만 positionUpdate 발행
+    if (memberAttached) {
+      positionUpdates.push({
+        stationId: group.stationId,
+        lineId: m.lineId,
+        x: Math.round(nt.x),
+        y: Math.round(nt.y),
+      });
     }
   }
   return { positionUpdates, trackUpdates };
@@ -203,6 +242,15 @@ function main() {
       if (!needsConvergence(g, oracle)) continue; // 이미 오라클 이내 — 압축만, 스프레드 금지
       const { positionUpdates, trackUpdates } = convergeGroup(g, oracle, tracksByLine);
       applied += 1;
+      // 누적 갱신: 같은 track에 여러 그룹이 splice할 때 이전 그룹의 결과 위에 덧쌓이게
+      // tracksByLine을 제자리 갱신(다음 그룹이 최신 정점을 사용하도록).
+      for (const tu of trackUpdates) {
+        const tracks = tracksByLine.get(tu.lineId);
+        if (tracks) {
+          const idx = tracks.findIndex((t) => t.trackIndex === tu.trackIndex);
+          if (idx >= 0) tracks[idx] = { trackIndex: tu.trackIndex, verts: tu.verts };
+        }
+      }
       if (o.check) continue;
       for (const p of positionUpdates)
         posU.run(p.x, p.y, o.region, p.stationId, p.lineId);
