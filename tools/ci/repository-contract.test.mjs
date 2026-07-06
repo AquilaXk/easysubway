@@ -11726,6 +11726,16 @@ test("노선도 Android evidence analyzer는 profile frame, memory, 렌더러 �
   assert.equal(output.aggregate.noCrashesInAllRuns, true);
 });
 
+test("데이터팩 게시 도구는 releases 불변 경로와 Cache-Control 정책을 고정한다", () => {
+  const createPlan = read("tools/datapack/create-publish-plan.mjs");
+  const publish = read("tools/datapack/publish-object-storage.mjs");
+  assert.match(createPlan, /put-release-manifest-object/);
+  assert.match(createPlan, /catalog\/releases\/\$\{releaseSequence\}\.json/);
+  assert.match(publish, /public, max-age=60/);
+  assert.match(publish, /public, max-age=31536000, immutable/);
+  assert.match(publish, /immutable violation/);
+});
+
 async function classifyChangedFiles(files) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-ci-"));
   const changedFilesPath = path.join(dir, "changed-files.txt");
