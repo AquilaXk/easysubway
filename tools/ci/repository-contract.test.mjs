@@ -6803,14 +6803,34 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
     "token_or_crypto_security_boundary",
     "domain_application_public_json_contracts",
   ]);
-  assert.equal(gate.pocDecision.egovframeBatCore.status, "deferred_until_dependency_convergence_and_local_mirror");
+  assert.equal(
+    gate.utilizationDefinition.formula,
+    "adopted_modules / gate_approved_applicable_modules",
+  );
+  assert.deepEqual(gate.utilizationDefinition.denominatorExcludes, [
+    "noGoSurface",
+    "pending_separate_decision(psl-dataaccess, fdl-access)",
+  ]);
+  assert.equal(gate.utilizationDefinition.target, "100_percent");
+  assert.equal(
+    gate.utilizationDefinition.supersedes,
+    "adoption_plan_docx_whole_codebase_30_percent",
+  );
+
+  // S1: the four target modules enter adoption_in_progress with an explicit
+  // target status. no-go / pending-decision modules stay byte-unchanged.
+  assert.equal(gate.pocDecision.egovframeBatCore.status, "adoption_in_progress");
+  assert.equal(gate.pocDecision.egovframeBatCore.targetStatus, "adopted_control_plane_only");
   assert.equal(gate.pocDecision.egovframeBatCore.currentImplementation, "spring_batch_control_plane_job");
   assert.equal(gate.pocDecision.fdlLogging.status, "classpath_verified_control_plane_only");
-  assert.equal(gate.pocDecision.fdlProperty.status, "not_enabled_for_production");
-  assert.equal(gate.pocDecision.fdlIdgnr.status, "not_enabled_for_production");
+  assert.equal(gate.pocDecision.fdlProperty.status, "adoption_in_progress");
+  assert.equal(gate.pocDecision.fdlProperty.targetStatus, "adopted_control_plane_only");
+  assert.equal(gate.pocDecision.fdlIdgnr.status, "adoption_in_progress");
+  assert.equal(gate.pocDecision.fdlIdgnr.targetStatus, "adopted_control_plane_only");
   assert.equal(gate.pocDecision.pslDataaccess.status, "forbidden_until_poc_passes");
   assert.equal(gate.pocDecision.fdlAccess.status, "forbidden_until_poc_passes");
-  assert.equal(gate.pocDecision.fdlExcel.status, "forbidden_until_poc_passes");
+  assert.equal(gate.pocDecision.fdlExcel.status, "adoption_in_progress");
+  assert.equal(gate.pocDecision.fdlExcel.targetStatus, "adopted_control_plane_only");
 
   assert.match(build, /implementation 'org\.egovframe\.rte:egovframe-rte-ptl-mvc'/);
   assert.match(build, /implementation 'org\.springframework\.boot:spring-boot-starter-batch'/);
@@ -6821,6 +6841,42 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
   assert.doesNotMatch(build, /egovframe-boot-starter-(access|crypto|security)/);
   assert.doesNotMatch(build, /egovframe-rte-fdl-excel/);
   assert.match(lockfile, /^org\.egovframe\.rte:egovframe-rte-fdl-logging:5\.0\.0=/m);
+
+  // S1: local mirror must carry the four target modules plus their org.egovframe
+  // transitive closure so S2~S4 resolve offline (remote-only is gate-forbidden).
+  for (const module of [
+    "egovframe-rte-bat-core",
+    "egovframe-rte-fdl-property",
+    "egovframe-rte-fdl-idgnr",
+    "egovframe-rte-fdl-excel",
+    "egovframe-rte-psl-dataaccess",
+    "egovframe-rte-fdl-filehandling",
+    "egovframe-rte-fdl-string",
+  ]) {
+    for (const ext of ["jar", "pom"]) {
+      assert.ok(
+        existsSync(
+          path.join(
+            root,
+            `backend/gradle/local-maven/org/egovframe/rte/${module}/5.0.0/${module}-5.0.0.${ext}`,
+          ),
+        ),
+        `${module}-5.0.0.${ext} must be mirrored for offline resolution`,
+      );
+    }
+  }
+
+  // no-go invariants — must stay byte-identical across the whole expansion epic.
+  assert.deepEqual(gate.dependencyPolicy.directForbidden, [
+    "org.egovframe.boot:egovframe-boot-starter-crypto",
+    "org.egovframe.boot:egovframe-boot-starter-security",
+  ]);
+  assert.deepEqual(gate.mustNotDo, [
+    "increase eGovFrame usage percentage mechanically",
+    "move mobile or public JSON contracts to eGovFrame types",
+    "replace token, crypto, receipt, or auth boundaries with eGovFrame starters",
+    "add remote-only eGovFrame dependencies without lockfile and local mirror evidence",
+  ]);
 
   assert.match(readme, /eGovFrame은 backend control-plane에만 선택 적용한다/);
   assert.match(readme, /Flutter mobile runtime, ordinary mobile API, realtime hot path, token\/crypto boundary/);
