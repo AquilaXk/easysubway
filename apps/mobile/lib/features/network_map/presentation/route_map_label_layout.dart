@@ -305,6 +305,73 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
   );
 }
 
+/// 세그먼트 a→b가 rect를 관통하나 — 끝점 내부 or 4변 교차(정확 판정).
+bool _segmentHitsRect(Offset a, Offset b, Rect r) {
+  if (r.contains(a) || r.contains(b)) return true;
+  bool segCross(Offset p1, Offset p2, Offset p3, Offset p4) {
+    double cross(Offset o, Offset x, Offset y) =>
+        (x.dx - o.dx) * (y.dy - o.dy) - (x.dy - o.dy) * (y.dx - o.dx);
+    final d1 = cross(p3, p4, p1), d2 = cross(p3, p4, p2);
+    final d3 = cross(p1, p2, p3), d4 = cross(p1, p2, p4);
+    return ((d1 > 0) != (d2 > 0)) && ((d3 > 0) != (d4 > 0));
+  }
+
+  final tl = r.topLeft, tr = r.topRight, br = r.bottomRight, bl = r.bottomLeft;
+  return segCross(a, b, tl, tr) ||
+      segCross(a, b, tr, br) ||
+      segCross(a, b, br, bl) ||
+      segCross(a, b, bl, tl);
+}
+
+/// 라벨 rect를 노선 track이 관통하는 라벨 수(#1789 실기기 클러터 게이트) — 선을
+/// 덮는 라벨은 게이트에 없던 실기기 겹침의 주원인이다.
+int routeMapLabelLineOverlapCount(
+  RouteMapStaticLabelLayout layout,
+  StructuredRouteMap map,
+  RouteMapDesignSpace design,
+) {
+  final segs = <(Offset, Offset)>[];
+  for (final line in map.lines) {
+    for (final poly in line.polylines) {
+      for (var i = 1; i < poly.length; i += 1) {
+        segs.add((design.toDesign(poly[i - 1]), design.toDesign(poly[i])));
+      }
+    }
+  }
+  var count = 0;
+  for (final label in layout.labels) {
+    for (final s in segs) {
+      if (_segmentHitsRect(s.$1, s.$2, label.rect)) {
+        count += 1;
+        break;
+      }
+    }
+  }
+  return count;
+}
+
+/// 뱃지가 노선 track / 역명 라벨을 덮는 수(#1789).
+({int line, int label}) routeMapBadgeOverlapCounts(
+  RouteMapStaticLabelLayout layout,
+  StructuredRouteMap map,
+  RouteMapDesignSpace design,
+) {
+  final segs = <(Offset, Offset)>[];
+  for (final line in map.lines) {
+    for (final poly in line.polylines) {
+      for (var i = 1; i < poly.length; i += 1) {
+        segs.add((design.toDesign(poly[i - 1]), design.toDesign(poly[i])));
+      }
+    }
+  }
+  var line = 0, lbl = 0;
+  for (final b in layout.badges) {
+    if (segs.any((s) => _segmentHitsRect(s.$1, s.$2, b.rect))) line += 1;
+    if (layout.labels.any((l) => l.rect.overlaps(b.rect))) lbl += 1;
+  }
+  return (line: line, label: lbl);
+}
+
 double _memberSpread(List<Offset> positions) {
   var maxDistance = 0.0;
   for (var i = 0; i < positions.length; i += 1) {

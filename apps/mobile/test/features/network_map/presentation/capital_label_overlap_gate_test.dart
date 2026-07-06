@@ -22,6 +22,12 @@ Size _measureBadge(String text) => Size(
 // 분리 불가한 기약 케이스 — 도심 겹침은 0이다(스펙 R3). baseline은 악화 금지.
 const int kCapitalUnresolvedBaseline = 2;
 
+// 2026-07-06 실기기 클러터 게이트 확장 — 라벨-라벨 외 라벨-선·뱃지 겹침도 측정해
+// "게이트=실기기 체감" 정합. baseline은 현재 실측값(악화 금지); 후속 #2·#3 수정이 낮춘다.
+const int kCapitalLabelLineOverlapBaseline = 17;
+const int kCapitalBadgeLineOverlapBaseline = 1;
+const int kCapitalBadgeLabelOverlapBaseline = 0;
+
 void main() {
   test('수도권 실데이터: 전 라벨 표시 + 겹침 악화 금지 게이트', () {
     final fixture = loadCapitalRouteMapFixture();
@@ -51,5 +57,25 @@ void main() {
       }
     }
     expect(overlapPairs, lessThanOrEqualTo(1), reason: '라벨 겹침 쌍 $overlapPairs');
+
+    // 라벨-선·뱃지 겹침(실기기 클러터) 악화 금지.
+    final design = routeMapDesignSpaceFor(fixture.map);
+    final labelLine = routeMapLabelLineOverlapCount(layout, fixture.map, design);
+    final badge = routeMapBadgeOverlapCounts(layout, fixture.map, design);
+    expect(
+      labelLine,
+      lessThanOrEqualTo(kCapitalLabelLineOverlapBaseline),
+      reason: '라벨-선 겹침 $labelLine — baseline $kCapitalLabelLineOverlapBaseline 악화 금지',
+    );
+    expect(
+      badge.line,
+      lessThanOrEqualTo(kCapitalBadgeLineOverlapBaseline),
+      reason: '뱃지-선 겹침 ${badge.line} — baseline $kCapitalBadgeLineOverlapBaseline 악화 금지',
+    );
+    expect(
+      badge.label,
+      lessThanOrEqualTo(kCapitalBadgeLabelOverlapBaseline),
+      reason: '뱃지-라벨 겹침 ${badge.label} — baseline $kCapitalBadgeLabelOverlapBaseline 악화 금지',
+    );
   });
 }
