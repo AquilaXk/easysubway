@@ -1,10 +1,14 @@
 package com.easysubway.datapack.application.service;
 
+import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseChannelRepository;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
+import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,15 +20,23 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DatapackReleaseCallbackService {
 
+    private static final Logger log = LoggerFactory.getLogger(DatapackReleaseCallbackService.class);
+
     private final DatapackReleaseRequestRepository repository;
     private final CallbackSignature signature;
     private final Clock clock;
+    private final DatapackReleaseChannelCommandService channelCommandService;
+    private final JdbcDatapackReleaseChannelRepository channelRepository;
 
     public DatapackReleaseCallbackService(DatapackReleaseRequestRepository repository,
-        CallbackSignature signature, ObjectProvider<Clock> clockProvider) {
+        CallbackSignature signature, ObjectProvider<Clock> clockProvider,
+        DatapackReleaseChannelCommandService channelCommandService,
+        JdbcDatapackReleaseChannelRepository channelRepository) {
         this.repository = repository;
         this.signature = signature;
         this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
+        this.channelCommandService = channelCommandService;
+        this.channelRepository = channelRepository;
     }
 
     @Transactional
@@ -63,9 +75,27 @@ public class DatapackReleaseCallbackService {
             : request.markFailed("publish " + cmd.publishStatus(), now);
         repository.save(updated);
 
-        // TODO(Task 7): best-effort promote 훅 삽입 지점
+        if (pass) {
+            tryPromote(updated, cmd);
+        }
 
         return new CallbackResult(terminal.name(), false);
+    }
+
+    private void tryPromote(DatapackReleaseRequest r, CallbackCommand cmd) {
+        try {
+            var channel = channelRepository.findChannel("production")
+                .orElseThrow(() -> new IllegalStateException("production channel missing"));
+            channelCommandService.promote(new DatapackReleaseChannelCommandService.ReleaseChannelCommand(
+                "production", channel.candidateId(), r.candidateId(),
+                channel.manifestSha256(), cmd.manifestSha256(),
+                r.requestedBy(), r.approvedBy(), "auto-promote via release callback",
+                "callback:" + r.approvalId(), cmd.workflowRunUrl(), cmd.evidenceBundleSha256()));
+            repository.save(r.withPromoteOutcome("SUCCEEDED", null));
+        } catch (RuntimeException e) {
+            log.warn("auto-promote rejected for {}: {}", r.approvalId(), e.getMessage());
+            repository.save(r.withPromoteOutcome("REJECTED", e.getMessage()));
+        }
     }
 
     public record CallbackCommand(

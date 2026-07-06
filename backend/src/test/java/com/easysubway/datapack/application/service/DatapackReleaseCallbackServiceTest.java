@@ -23,9 +23,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class DatapackReleaseCallbackServiceTest {
 
     private static final String SHA = "a".repeat(64);
+    private static final String SHA_PREV = "f".repeat(64);
     private static final String APPROVAL_ID = "release-request-callback-test-1";
     private static final String WORKFLOW_URL = "https://github.com/example/actions/runs/9001";
     private static final LocalDateTime T0 = LocalDateTime.parse("2026-07-06T00:00:00");
+    private static final String CAND_PREV = "cand-cbk-prev";
 
     @Autowired
     private DatapackReleaseCallbackService service;
@@ -36,6 +38,13 @@ class DatapackReleaseCallbackServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 채널 이벤트 → 채널 → 에비던스·candidate 순으로 FK 제약 만족하며 정리
+        jdbcTemplate.update("DELETE FROM datapack_release_channel_events WHERE channel = 'production'");
+        jdbcTemplate.update("DELETE FROM datapack_release_channels WHERE channel = 'production'");
+        jdbcTemplate.update(
+            "DELETE FROM datapack_release_evidence_bundles WHERE candidate_id = 'cand-1' OR candidate_id LIKE 'cand-cbk-%'");
+        jdbcTemplate.update(
+            "DELETE FROM datapack_candidates WHERE id = 'cand-1' OR id LIKE 'cand-cbk-%'");
         jdbcTemplate.update(
             "DELETE FROM datapack_release_request WHERE approval_id = ?", APPROVAL_ID);
     }
@@ -147,6 +156,97 @@ class DatapackReleaseCallbackServiceTest {
         return jdbcTemplate.queryForObject(
             "SELECT promote_detail FROM datapack_release_request WHERE approval_id = ?",
             String.class, APPROVAL_ID);
+    }
+
+    private String promoteOutcomeOf() {
+        return jdbcTemplate.queryForObject(
+            "SELECT promote_outcome FROM datapack_release_request WHERE approval_id = ?",
+            String.class, APPROVAL_ID);
+    }
+
+    private void insertCallbackTestCandidate(String id, String manifestSha256) {
+        jdbcTemplate.update("""
+            INSERT INTO datapack_candidates (
+                id, scope_id, artifact_kind, version, source_snapshot_set_hash,
+                override_set_hash, build_spec_sha256, source_inventory_sha256,
+                sqlite_sha256, gzip_sha256, manifest_sha256, coverage_status,
+                validator_status, route_regression_status, android_evidence_status,
+                approval_status, created_at
+            )
+            VALUES (?, 'scope-1', 'DATAPACK', '2026.07.01-cbk.1',
+                ?, ?, ?, ?, ?, ?, ?,
+                'PASS', 'PASS', 'PASS', 'PASS', 'APPROVED', '2026-07-01 00:00:00')
+            """,
+            id,
+            "a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64),
+            SHA, SHA, manifestSha256);
+    }
+
+    private void insertCallbackTestChannel(String currentCandidateId, String currentManifestSha256) {
+        jdbcTemplate.update("""
+            INSERT INTO datapack_release_channels (
+                channel, candidate_id, manifest_url, manifest_sha256,
+                previous_stable_candidate_id, previous_manifest_sha256,
+                rollback_available, last_operation_type, last_operation_status,
+                requested_by, approved_by, reason, idempotency_key, updated_at
+            )
+            VALUES ('production', ?,
+                'https://datapack.example.com/production/current.json', ?,
+                NULL, NULL, FALSE, 'PROMOTE', 'PASS',
+                'data-operator', 'release-approver', 'initial release',
+                'idem-cbk-initial', '2026-07-01 00:00:00')
+            """,
+            currentCandidateId, currentManifestSha256);
+    }
+
+    private void insertCallbackTestEvidenceBundle(String candidateId, String evidenceBundleSha256) {
+        jdbcTemplate.update("""
+            INSERT INTO datapack_release_evidence_bundles (
+                id, candidate_id, evidence_bundle_sha256, workflow_run_url,
+                validator_status, route_regression_status, manifest_signature_status,
+                android_evidence_status, created_at
+            )
+            VALUES (?, ?, ?,
+                'https://github.com/AquilaXk/easysubway/actions/runs/9001',
+                'PASS', 'PASS', 'PASS', 'PASS', '2026-07-01 00:00:00')
+            """,
+            "evidence-cbk-" + candidateId, candidateId, evidenceBundleSha256);
+    }
+
+    @Test
+    @DisplayName("(g) PASS + production 채널 없음 → status PUBLISHED 유지 + promote_outcome=REJECTED + promote_detail에 사유")
+    void passWithNoProductionChannel_publishesAndRejectsPromote() {
+        insertRow("DISPATCHED");
+        // 채널을 삽입하지 않음 → findChannel returns empty → promote REJECTED
+        String sig = computeSignature("PASS");
+        CallbackResult result = service.receive(command("PASS", sig));
+
+        assertThat(result.status()).isEqualTo("PUBLISHED");
+        assertThat(result.idempotentReplay()).isFalse();
+        assertThat(statusOf()).isEqualTo("PUBLISHED");
+        assertThat(promoteOutcomeOf()).isEqualTo("REJECTED");
+        assertThat(promoteDetailOf()).contains("production channel missing");
+    }
+
+    @Test
+    @DisplayName("(h) PASS + evidence 사전등록 완비 → promote_outcome=SUCCEEDED, 채널 포인터 갱신")
+    void passWithEvidenceBundle_publishesAndSucceedsPromote() {
+        insertRow("DISPATCHED");
+        insertCallbackTestCandidate(CAND_PREV, SHA_PREV);
+        insertCallbackTestCandidate("cand-1", SHA);
+        insertCallbackTestChannel(CAND_PREV, SHA_PREV);
+        insertCallbackTestEvidenceBundle("cand-1", SHA);
+
+        String sig = computeSignature("PASS");
+        CallbackResult result = service.receive(command("PASS", sig));
+
+        assertThat(result.status()).isEqualTo("PUBLISHED");
+        assertThat(result.idempotentReplay()).isFalse();
+        assertThat(statusOf()).isEqualTo("PUBLISHED");
+        assertThat(promoteOutcomeOf()).isEqualTo("SUCCEEDED");
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT candidate_id FROM datapack_release_channels WHERE channel = 'production'",
+            String.class)).isEqualTo("cand-1");
     }
 
     @TestConfiguration
