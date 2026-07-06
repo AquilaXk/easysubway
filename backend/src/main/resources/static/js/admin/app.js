@@ -456,6 +456,10 @@ document.addEventListener('alpine:init', function () {
 			get hasSelection() {
 				return this.count > 0;
 			},
+			// CSP 빌드는 x-bind 안의 연산자(!)를 평가하지 않는다 — 부정은 getter로 노출한다.
+			get submitDisabled() {
+				return this.count === 0;
+			},
 			recount: function () {
 				this.count = this.$root.querySelectorAll('input[name="notificationIds"]:checked').length;
 			},
