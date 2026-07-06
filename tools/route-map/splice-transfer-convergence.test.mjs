@@ -42,5 +42,11 @@ test("capsuleTargets는 centroid 중심 targetSpan 폭으로 축 따라 균등 �
   assert.ok(Math.abs((t[1].x - t[0].x) - 13) < 1e-9, `피치 ${t[1].x - t[0].x}`);
   assert.ok(Math.abs(((t[0].x + t[1].x) / 2) - 30) < 1e-9); // centroid 보존
   assert.equal(t[0].y, 0);
+  assert.equal(t[1].y, 0);
   assert.deepEqual(t.map((m) => m.lineId), ["A", "B"]); // 순서 안정
+});
+
+test("capsuleTargets 단일 멤버는 centroid(자기 위치)에 그대로 둔다", () => {
+  const t = capsuleTargets([{ lineId: "X", x: 10, y: 20 }], 13, "H");
+  assert.deepEqual(t, [{ lineId: "X", x: 10, y: 20 }]);
 });

@@ -56,7 +56,7 @@ export function capsuleTargets(members, targetSpan, axis) {
   const cx = members.reduce((s, m) => s + m.x, 0) / n;
   const cy = members.reduce((s, m) => s + m.y, 0) / n;
   const pitch = n > 1 ? targetSpan / (n - 1) : 0;
-  const start = -(targetSpan) / 2;
+  const start = n > 1 ? -(targetSpan) / 2 : 0;
   return members.map((m, i) => {
     const off = start + i * pitch;
     return axis === "H"
