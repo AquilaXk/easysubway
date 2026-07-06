@@ -2,6 +2,36 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { transferGroups, classifyGroup, capsuleAxis, capsuleTargets, spliceTrackToNode, convergeGroup, needsConvergence } from "./splice-transfer-convergence.mjs";
 
+test("convergeGroup은 float base track에서도 정수 newPos·8선형 dogleg trackUpdate를 낸다", () => {
+  // base track이 float 좌표(준지리형)라도 splice newPos는 정수, dogleg는 정확 8선형이어야
+  // 한다(정수 반올림이 45°를 깨는 회귀 방지 — track은 반올림 안 함).
+  const group = {
+    stationId: "hub", memberCount: 2,
+    members: [{ lineId: "A", x: 0, y: 100 }, { lineId: "B", x: 60, y: 100 }],
+    span: 60,
+  };
+  const oracle = { "2": 13 };
+  const tracksByLine = new Map([
+    ["A", [{ trackIndex: 0, verts: [{ x: -100.7, y: 100.3 }, { x: 0, y: 100 }, { x: 0.2, y: 0.5 }] }]],
+    ["B", [{ trackIndex: 0, verts: [{ x: 160.4, y: 100.9 }, { x: 60, y: 100 }, { x: 60.1, y: 0.3 }] }]],
+  ]);
+  const r = convergeGroup(group, oracle, tracksByLine);
+  // 각 노선 track의 모든 세그먼트가 8선형(±0.5°)
+  for (const tu of r.trackUpdates) {
+    for (let i = 1; i < tu.verts.length; i += 1) {
+      const dx = tu.verts[i].x - tu.verts[i - 1].x, dy = tu.verts[i].y - tu.verts[i - 1].y;
+      if (Math.hypot(dx, dy) === 0) continue;
+      const ang = (Math.atan2(dy, dx) * 180) / Math.PI, mod = ((ang % 45) + 45) % 45;
+      assert.ok(Math.min(mod, 45 - mod) <= 0.5, `dogleg 비8선형 ${ang}°`);
+    }
+  }
+  // position(정수)이 해당 track 위에 정확히 존재(newPos 정점)
+  for (const p of r.positionUpdates) {
+    const tu = r.trackUpdates.find((t) => t.lineId === p.lineId);
+    assert.ok(tu.verts.some((v) => Math.abs(v.x - p.x) < 1e-9 && Math.abs(v.y - p.y) < 1e-9), `${p.lineId} position이 track 정점 아님`);
+  }
+});
+
 test("transferGroups는 2+노선 역만 그룹화하고 span=최대쌍거리", () => {
   const rows = [
     { station_id: "s1", line_id: "L1", x: 0, y: 0 },

@@ -127,8 +127,11 @@ export function convergeGroup(group, oracle, tracksByLine) {
   const trackUpdates = [];
   for (const m of group.members) {
     const nt = targetByLine.get(m.lineId);
+    // splice newPos는 정수로 반올림해 넘긴다(position과 동일 정수). octilinearSegment가
+    // 정수 좌표에서 정확한 45°/축 corner를 내므로 dogleg 후 8선형이 반올림에 깨지지 않는다.
+    const newPos = { x: Math.round(nt.x), y: Math.round(nt.y) };
     for (const trk of tracksByLine.get(m.lineId) ?? []) {
-      const spliced = spliceTrackToNode(trk.verts, { x: m.x, y: m.y }, { x: nt.x, y: nt.y });
+      const spliced = spliceTrackToNode(trk.verts, { x: m.x, y: m.y }, newPos);
       if (JSON.stringify(spliced) !== JSON.stringify(trk.verts)) {
         trackUpdates.push({ lineId: m.lineId, trackIndex: trk.trackIndex, verts: spliced });
       }
@@ -204,8 +207,11 @@ function main() {
       for (const p of positionUpdates)
         posU.run(p.x, p.y, o.region, p.stationId, p.lineId);
       for (const tu of trackUpdates)
+        // track 정점은 반올림하지 않는다: base track이 float(3158.219…)이고 octilinearSegment
+        // dogleg corner는 float에서 정확한 45°/축이라, 정수 반올림하면 45°가 깨진다(48.8° 등).
+        // 정합은 splice에 넘긴 정수 newPos가 position과 동일 정수라 보장된다(convergeGroup).
         trkU.run(
-          verticesToPath(tu.verts.map((v) => ({ x: Math.round(v.x), y: Math.round(v.y) }))),
+          verticesToPath(tu.verts),
           o.region,
           tu.lineId,
           tu.trackIndex,
