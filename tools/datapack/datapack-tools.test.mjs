@@ -10686,6 +10686,7 @@ async function startObjectStorageServer({ requireAuthorization = true, basePath 
           sizeBytes: body.length,
           contentType: request.headers["content-type"],
           metadataSha256: request.headers["x-amz-meta-sha256"],
+          cacheControl: request.headers["cache-control"],
         });
         response.writeHead(200, { etag: `"${sha256(body).slice(0, 32)}"` });
         response.end();
@@ -10699,10 +10700,14 @@ async function startObjectStorageServer({ requireAuthorization = true, basePath 
           response.end();
           return;
         }
-        response.writeHead(200, {
+        const headers = {
           "content-length": String(object.sizeBytes),
           "x-amz-meta-sha256": object.metadataSha256,
-        });
+        };
+        if (object.cacheControl !== undefined) {
+          headers["cache-control"] = object.cacheControl;
+        }
+        response.writeHead(200, headers);
         response.end();
         return;
       }
@@ -10714,9 +10719,11 @@ async function startObjectStorageServer({ requireAuthorization = true, basePath 
           response.end();
           return;
         }
-        response.writeHead(200, {
-          "content-length": String(object.sizeBytes),
-        });
+        const headers = { "content-length": String(object.sizeBytes) };
+        if (object.cacheControl !== undefined) {
+          headers["cache-control"] = object.cacheControl;
+        }
+        response.writeHead(200, headers);
         response.end(object.body);
         return;
       }
