@@ -266,7 +266,7 @@ test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API
   assert.match(cd, /if: \$\{\{ needs\.deploy\.outputs\.deploy_ready == 'true' \}\}/);
 
   // Smoke failures must propagate into the CD result Slack notification.
-  assert.match(cd, /needs:\n {6}- plan\n {6}- deploy\n {6}- post-deploy-smoke/);
+  assert.match(cd, /needs:\n {6}- plan\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
 });
 
 test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인딩을 사용한다", () => {
