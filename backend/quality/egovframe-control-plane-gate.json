@@ -7,6 +7,15 @@
     "java": "21"
   },
   "decision": "selective_control_plane_only",
+  "utilizationDefinition": {
+    "formula": "adopted_modules / gate_approved_applicable_modules",
+    "denominatorExcludes": [
+      "noGoSurface",
+      "pending_separate_decision(psl-dataaccess, fdl-access)"
+    ],
+    "target": "100_percent",
+    "supersedes": "adoption_plan_docx_whole_codebase_30_percent"
+  },
   "allowedProductionSurface": [
     "backend_admin_operator_pages",
     "data_collection_batch_control_plane",
@@ -21,15 +30,15 @@
   ],
   "dependencyPolicy": {
     "directAllowed": [
-      "org.egovframe.rte:egovframe-rte-ptl-mvc"
-    ],
-    "directDeferredUntilPocPasses": [
+      "org.egovframe.rte:egovframe-rte-ptl-mvc",
       "org.egovframe.rte:egovframe-rte-bat-core",
       "org.egovframe.rte:egovframe-rte-fdl-property",
       "org.egovframe.rte:egovframe-rte-fdl-idgnr",
-      "org.egovframe.rte:egovframe-rte-psl-dataaccess",
-      "org.egovframe.boot:egovframe-boot-starter-access",
       "org.egovframe.rte:egovframe-rte-fdl-excel"
+    ],
+    "directDeferredUntilPocPasses": [
+      "org.egovframe.rte:egovframe-rte-psl-dataaccess",
+      "org.egovframe.boot:egovframe-boot-starter-access"
     ],
     "directForbidden": [
       "org.egovframe.boot:egovframe-boot-starter-crypto",
@@ -43,9 +52,10 @@
       "verification": "backend/src/test/java/com/easysubway/common/web/pagination/EgovPaginationViewTest.java"
     },
     "egovframeBatCore": {
-      "status": "deferred_until_dependency_convergence_and_local_mirror",
-      "currentImplementation": "spring_batch_control_plane_job",
-      "reason": "local eGovFrame mirror contains MVC, common, and logging artifacts only; Spring Batch job already verifies restart/idempotency without adding a remote-only runtime dependency"
+      "status": "adopted_control_plane_only",
+      "currentImplementation": "backend/src/main/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfig.java",
+      "verification": "backend/src/test/java/com/easysubway/collection/adapter/out/batch/TransitMasterCollectionBatchConfigTest.java",
+      "reason": "collection batch seeds standardized batch variables into the ExecutionContext and gets lifecycle logging via bat-core EgovJobVariableListener/EgovStepVariableListener; Spring Batch JobRepository, restart, and idempotency semantics and job/step names stay unchanged. psl-dataaccess rides in only as bat-core's inert transitive (classpath-verified, never imported)."
     },
     "fdlLogging": {
       "status": "classpath_verified_control_plane_only",
@@ -53,12 +63,16 @@
       "constraint": "do not import eGovFrame logging types outside backend support runtime verification"
     },
     "fdlProperty": {
-      "status": "not_enabled_for_production",
-      "constraint": "Spring Boot configuration remains the source of truth until a control-plane-only PoC proves value"
+      "status": "adopted_control_plane_only",
+      "currentImplementation": "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+      "verification": "backend/src/test/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfigTest.java",
+      "constraint": "Spring Boot application.yml remains the bootstrap source of truth; only the operational collection run id prefix is externalized to egovframe/collection-control-plane.properties. No credentials or secrets in eGovFrame property."
     },
     "fdlIdgnr": {
-      "status": "not_enabled_for_production",
-      "constraint": "UUID, database IDs, receipt tokens, and security identifiers must not move to eGovFrame ID generation"
+      "status": "adopted_control_plane_only",
+      "currentImplementation": "backend/src/main/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfig.java",
+      "verification": "backend/src/test/java/com/easysubway/collection/adapter/out/idgnr/CollectionControlPlaneEgovConfigTest.java",
+      "constraint": "UUID, database IDs, receipt tokens, and security identifiers must not move to eGovFrame ID generation; adopted only for the operational collection run id (collection-<id>) via the Table strategy on the ids table."
     },
     "pslDataaccess": {
       "status": "forbidden_until_poc_passes",
@@ -69,8 +83,10 @@
       "constraint": "admin/operator auth stays on Spring Security and does not cross token or crypto boundaries"
     },
     "fdlExcel": {
-      "status": "forbidden_until_poc_passes",
-      "constraint": "exports must prove memory, privacy, and CI cost before adding Excel-specific runtime dependencies"
+      "status": "adopted_control_plane_only",
+      "currentImplementation": "backend/src/main/java/com/easysubway/common/web/export/EgovExcelExportSupport.java",
+      "verification": "backend/src/test/java/com/easysubway/common/web/export/EgovExcelExportSupportTest.java",
+      "constraint": "admin/operator xlsx exports run alongside the unchanged CSV contract via fdl-excel AbstractPOIExcelView; in-memory XSSF is bounded by MAX_EXPORT_ROWS (fail on exceed), privacy columns match the CSV policy (verifiedBy unchanged), and eGovFrame excel types stay inside the export support class."
     }
   },
   "compatibilityEvidence": {
