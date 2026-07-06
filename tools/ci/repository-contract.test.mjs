@@ -799,8 +799,17 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /tools\/deploy\/backend-app-env\.allowlist/);
   assert.match(workflow, /CD Deploy \/ Validate Docker Compose deployment config/);
   assert.match(workflow, /docker compose --env-file "\$\{PREPARED_ENV_DIR\}\/compose\.env" -f infra\/docker-compose\.yml config --quiet/);
-  assert.match(workflow, /CD Deploy \/ Build backend bootJar/);
-  assert.match(workflow, /sha256sum backend\.jar > backend\.jar\.sha256/);
+  // build-once, deploy-same: the arm64 image is built and pushed to GHCR by the
+  // build-image job; the deploy job pulls it by digest instead of building a jar
+  // on the runner or on the server (issue #1686).
+  assert.match(workflow, /CD Build image \/ Build and push arm64 image/);
+  assert.match(workflow, /ghcr\.io\/aquilaxk\/easysubway-backend/);
+  assert.match(workflow, /if \[\[ "\$\{arch\}" != "linux\/arm64" \]\]; then/);
+  assert.match(workflow, /CD Deploy \/ Pull backend image by digest/);
+  assert.match(workflow, /docker tag "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}" "easysubway-backend:\$\{DEPLOY_SHA\}"/);
+  assert.match(workflow, /DEPLOY_IMAGE_DIGEST="\$\{DEPLOY_IMAGE_DIGEST\}"/);
+  assert.doesNotMatch(workflow, /CD Deploy \/ Build backend bootJar/);
+  assert.doesNotMatch(workflow, /sha256sum backend\.jar > backend\.jar\.sha256/);
   assert.match(workflow, /CD Deploy \/ Run local deployment/);
   assert.match(workflow, /install -m 700 -d "\$\{incoming\}"/);
   assert.match(workflow, /bash "\$\{incoming\}\/deploy-backend\.sh"/);
@@ -817,6 +826,30 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /deploy-backend\.sh/);
   assert.doesNotMatch(workflow, /runs-on: ubuntu-latest\s*\n\s*env:\s*\n\s*EASYSUBWAY_ENV_SECRET/);
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
+});
+
+test("백엔드 배포는 GHCR digest를 pull하고 서버 위 build 경로를 갖지 않는다", () => {
+  const deploy = read("tools/deploy/deploy-backend.sh");
+
+  // The deploy script must require the digest and never build an image itself.
+  assert.match(deploy, /DEPLOY_IMAGE_DIGEST="\$\{DEPLOY_IMAGE_DIGEST:\?DEPLOY_IMAGE_DIGEST is required\}"/);
+  assert.match(deploy, /\^sha256:\[0-9a-f\]\{64\}\$/);
+  // No on-server image build (the `build` compose subcommand); --no-build stays.
+  assert.doesNotMatch(deploy, /docker-compose\.yml build\b/);
+  assert.doesNotMatch(deploy, /gradlew bootJar/);
+  assert.doesNotMatch(deploy, /backend\/build\/libs\/app\.jar/);
+  assert.doesNotMatch(deploy, /JAR_FILE=/);
+
+  // Identity verification: pulled image must match the expected digest + revision.
+  assert.match(deploy, /image_digest_mismatch/);
+  assert.match(deploy, /image_revision_mismatch/);
+  assert.match(deploy, /org\.opencontainers\.image\.revision/);
+
+  // Rollback no longer depends on the server-local image cache: a pruned image
+  // is restored from GHCR by digest.
+  assert.match(deploy, /ensure_rollback_image/);
+  assert.match(deploy, /docker pull "\$\{GHCR_IMAGE\}@\$\{prev_digest\}"/);
+  assert.match(deploy, /current-image-digest/);
 });
 
 test("CD 배포는 production environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
@@ -1084,7 +1117,7 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
   assert.equal((inlineSlackWorkflows.match(/SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/g) ?? []).length, 4);
   assert.equal((inlineSlackWorkflows.match(/SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/g) ?? []).length, 2);
   assert.match(ciWorkflow, /notify-slack-ci-failure:[\s\S]*needs:\s*\n\s*-\s*changes[\s\S]*github\.event_name == 'push'[\s\S]*github\.ref == 'refs\/heads\/main'[\s\S]*contains\(needs\.\*\.result, 'failure'\)/);
-  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*deploy\n\s*-\s*record-deploy[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*build-image\n\s*-\s*deploy\n\s*-\s*record-deploy\n\s*-\s*post-deploy-smoke[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(releaseArtifactsWorkflow, /notify-slack-release-result:[\s\S]*github\.event_name != 'pull_request'[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(dataPackReleaseWorkflow, /notify-slack-datapack-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(storeDistributionWorkflow, /notify-slack-store-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
