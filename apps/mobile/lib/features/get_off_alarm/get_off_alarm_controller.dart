@@ -84,6 +84,15 @@ class GetOffAlarmController extends ChangeNotifier {
     required List<GetOffAlarmStop> stops,
     required bool transferAlarmEnabled,
   }) async {
+    // destination 스톱이 없는 stops는 하차 알림 대상이 아니다. 예약·저장을
+    // 건너뛰어 아래 _subscriptionFrom의 firstWhere가 StateError를 던지지 않게
+    // 조기 반환한다.
+    final hasDestination = stops.any(
+      (stop) => stop.kind == GetOffAlarmKind.destination,
+    );
+    if (!hasDestination) {
+      return;
+    }
     final permitted = await permissionGate.requestExactAlarmPermission();
     final resolution = resolveGetOffAlarmScheduleMode(
       exactAlarmPermitted: permitted,

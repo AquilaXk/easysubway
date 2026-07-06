@@ -125,6 +125,27 @@ void main() {
     expect(c.state.activeRouteId, isNull);
   });
 
+  test('destination 스톱이 없으면 예약·저장 없이 조기 반환한다', () async {
+    final c = controller(exactPermitted: true);
+
+    await c.enable(
+      routeId: 'r1',
+      stops: [
+        GetOffAlarmStop(
+          stationId: 'transfer',
+          stationName: '동작',
+          arrivalAt: DateTime(2026, 7, 6, 9, 15, 0),
+          kind: GetOffAlarmKind.transfer,
+        ),
+      ],
+      transferAlarmEnabled: true,
+    );
+
+    expect(notifier.scheduledAlarms, isNull);
+    expect(c.state.enabled, isFalse);
+    expect(await repository.loadActive(), isNull);
+  });
+
   test('restore는 영속된 활성 구독을 켜진 상태로 복원한다', () async {
     final first = controller(exactPermitted: true);
     await first.enable(
