@@ -155,7 +155,13 @@ function parseArgs(argv) {
 
 function main() {
   const o = parseArgs(process.argv.slice(2));
-  const oracle = JSON.parse(readFileSync(o.oracle, "utf8")).spanP90ByMemberCount;
+  let oracle;
+  try {
+    oracle = JSON.parse(readFileSync(o.oracle, "utf8")).spanP90ByMemberCount;
+  } catch (e) {
+    console.error(`oracle 파일을 읽을 수 없음: ${o.oracle} (${e.message}) — oracle-metrics.mjs로 먼저 생성하세요`);
+    process.exit(1);
+  }
   const selected = new Set(o.tiers.split(","));
   const { db, dir, sqlitePath, packPath } = openPack(o.pack, "splice-conv-");
   try {
@@ -204,6 +210,7 @@ function main() {
     );
     if (o.check) {
       console.log("(--check: 미기록)");
+      db.close();
       return;
     }
     db.exec("COMMIT");
