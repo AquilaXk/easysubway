@@ -18,7 +18,7 @@
       "source_url": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
       "route_map_strategy": {
         "rendering_strategy": "official-svg",
-        "bundled_svg_role": "app-render-source",
+        "bundled_svg_role": "review-reference-only",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
