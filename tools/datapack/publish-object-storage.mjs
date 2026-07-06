@@ -61,6 +61,29 @@ async function main() {
       continue;
     }
 
+    if (step.type === "put-release-manifest-object") {
+      const bytes = await readAndVerifySource(root, step);
+      if (!dryRun && !verifyOnly) {
+        const existing = await client.headObject(step.objectKey);
+        if (existing.exists) {
+          if (existing.sha256 !== step.sha256) {
+            throw new Error(`${step.objectKey} immutable violation: stored sha ${existing.sha256} != ${step.sha256}`);
+          }
+          // 동일 바이트 → 멱등 skip.
+        } else {
+          await client.putObject(step.objectKey, bytes, step);
+        }
+      }
+      continue;
+    }
+
+    if (step.type === "verify-release-manifest-object") {
+      if (!dryRun) {
+        await client.verifyObject(step.objectKey, step);
+      }
+      continue;
+    }
+
     throw new Error(`unsupported publish step: ${step.type}`);
   }
 }
@@ -120,6 +143,17 @@ function objectStorageClient() {
         throw new Error(`${key} uploaded checksum mismatch`);
       }
     },
+    headObject: async (key) => {
+      const response = await signedRequest({
+        endpoint, bucket, key, region, accessKey, secretKey,
+        method: "HEAD", body: Buffer.alloc(0),
+      });
+      if (response.statusCode === 404) return { exists: false };
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw new Error(`${key} HEAD failed with HTTP ${response.statusCode}`);
+      }
+      return { exists: true, sha256: response.headers["x-amz-meta-sha256"] };
+    },
   };
 }
 
@@ -156,6 +190,14 @@ function preauthenticatedObjectStorageClient(baseUrl) {
       if (sha256(response.body) !== step.sha256) {
         throw new Error(`${key} uploaded checksum mismatch`);
       }
+    },
+    headObject: async (key) => {
+      const response = await unsignedRequest({ url: preauthObjectUrl(baseUrl, key), method: "GET", body: Buffer.alloc(0) });
+      if (response.statusCode === 404) return { exists: false };
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw new Error(`${key} GET failed with HTTP ${response.statusCode}${errorBodySuffix(response.body)}`);
+      }
+      return { exists: true, sha256: sha256(response.body) };
     },
   };
 }
