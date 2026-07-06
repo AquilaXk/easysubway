@@ -7772,7 +7772,7 @@ test("관리자 E2E와 query budget 회귀 gate는 CI에서 직접 검증된다"
   for (const file of listControllers) {
     const source = read(file);
     assert.match(source, /EgovPaginationView/, `${file} must render paginated admin lists`);
-    assert.match(source, /(AdminPageRequest|FacilityReportPageRequest)\.of\(page, size\)|FacilityReportListQuery\.of\(/, `${file} must cap page size`);
+    assert.match(source, /(AdminPageRequest|FacilityReportPageRequest)\.of\(page, size\)|(FacilityReportListQuery|AdminAuditQuery)\.of\(/, `${file} must cap page size`);
     assert.doesNotMatch(source, /listRecent\(\s*\)|loadRecentRuns\(\s*\)|loadReportSummaries\(\s*status\s*\)/, `${file} must not call unbounded list loaders`);
   }
 
