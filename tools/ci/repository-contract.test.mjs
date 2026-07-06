@@ -12002,6 +12002,28 @@ test("데이터팩 게시 도구는 releases 불변 경로와 Cache-Control 정�
   assert.match(publish, /immutable violation/);
 });
 
+test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture 벡터 HMAC을 낸다", async () => {
+  const vec = JSON.parse(read("tools/datapack/fixtures/release-callback-signature-vector.json"));
+  const f = vec.fields;
+  const { execFileSync } = await import("node:child_process");
+  const out = execFileSync("node", ["tools/datapack/build-release-callback.mjs"], {
+    cwd: root, encoding: "utf8",
+    env: { ...process.env,
+      RELEASE_REQUEST_ID: f.releaseRequestId, WORKFLOW_RUN_URL: f.workflowRunUrl,
+      MANIFEST_SHA256: f.manifestSha256, SQLITE_SHA256: f.sqliteSha256, GZIP_SHA256: f.gzipSha256,
+      EVIDENCE_BUNDLE_SHA256: f.evidenceBundleSha256, VALIDATOR_STATUS: f.validatorStatus,
+      ROUTE_REGRESSION_STATUS: f.routeRegressionStatus, PUBLISH_STATUS: f.publishStatus,
+      EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY: vec.hmacKey },
+  });
+  const payload = JSON.parse(out);
+  assert.equal(payload.artifactKind, "datapack-release-callback");
+  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.callbackVerifier.kind, "payload-signature");
+  assert.equal(payload.callbackVerifier.value, vec.expectedHmacHex); // node↔Java 합의
+  // required 12필드 + additionalProperties:false 준수
+  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","evidenceBundleSha256","gzipSha256","manifestSha256","publishStatus","releaseRequestId","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
+});
+
 async function classifyChangedFiles(files) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-ci-"));
   const changedFilesPath = path.join(dir, "changed-files.txt");
