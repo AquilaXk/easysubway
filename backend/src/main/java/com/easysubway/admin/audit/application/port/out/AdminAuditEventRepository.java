@@ -24,6 +24,12 @@ public interface AdminAuditEventRepository {
 	long count(AdminAuditQuery query);
 
 	/**
+	 * 내보내기용 조회: 질의의 페이지네이션은 무시하고 같은 필터로 최신순 {@code limit}건까지 준다.
+	 * 목록과 같은 WHERE를 공유해 화면과 내보내기 결과가 정합한다.
+	 */
+	List<AdminAuditEvent> findForExport(AdminAuditQuery query, int limit);
+
+	/**
 	 * actor 필터 select 옵션용. scopeEventType이 지정되면(개인정보 로그) 그 유형 이벤트의 actor만 준다.
 	 * 정렬된 distinct 목록.
 	 */

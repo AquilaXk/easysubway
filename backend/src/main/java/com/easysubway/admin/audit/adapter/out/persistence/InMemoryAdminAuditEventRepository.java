@@ -82,6 +82,17 @@ public class InMemoryAdminAuditEventRepository implements AdminAuditEventReposit
 	}
 
 	@Override
+	public synchronized List<AdminAuditEvent> findForExport(AdminAuditQuery query, int limit) {
+		return matching(query)
+			.sorted(Comparator
+				.comparing(AdminAuditEvent::occurredAt)
+				.thenComparing(AdminAuditEvent::id)
+				.reversed())
+			.limit(Math.max(limit, 0))
+			.toList();
+	}
+
+	@Override
 	public synchronized List<String> findDistinctActors(AdminAuditEventType scopeEventType) {
 		return events.stream()
 			.filter(event -> scopeEventType == null || event.eventType() == scopeEventType)

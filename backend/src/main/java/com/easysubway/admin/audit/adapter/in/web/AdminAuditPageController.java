@@ -9,12 +9,10 @@ import com.easysubway.admin.audit.domain.AdminAuditOutcome;
 import com.easysubway.common.web.pagination.EgovPaginationView;
 import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxRequest;
 import io.github.wimdeblauwe.htmx.spring.boot.mvc.HxTrigger;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
@@ -150,18 +148,7 @@ class AdminAuditPageController {
 	}
 
 	private void populateAuditModel(Model model, ScreenContext context, AuditFilterParams params) {
-		AdminAuditQuery query = AdminAuditQuery.of(
-			context.forcedEventType(),
-			params.eventTypeOrNull(),
-			params.actor(),
-			params.outcomeOrNull(),
-			params.keyword(),
-			params.from(),
-			params.to(),
-			params.reasonMissing(),
-			params.page(),
-			params.size()
-		);
+		AdminAuditQuery query = params.toQuery(context.forcedEventType(), params.page(), params.size());
 
 		long total = auditEventRepository.count(query);
 		EgovPaginationView pageView = EgovPaginationView.from(query.page(), query.size(), total);
@@ -248,42 +235,6 @@ class AdminAuditPageController {
 		AdminAuditEventType forcedEventType,
 		boolean privacyMode
 	) {
-	}
-
-	/**
-	 * 감사 필터 폼 바인딩. 빈 문자열이 enum 변환 400을 내지 않도록 String으로 받아 파싱한다
-	 * (Spring StringToEnum이 빈 문자열도 변환 시도하는 것과 무관하게 안전).
-	 */
-	record AuditFilterParams(
-		String eventType,
-		String actor,
-		String outcome,
-		String keyword,
-		@DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-		@DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-		Boolean reasonMissing,
-		Integer page,
-		Integer size
-	) {
-
-		AdminAuditEventType eventTypeOrNull() {
-			return parseEnum(eventType, AdminAuditEventType.class);
-		}
-
-		AdminAuditOutcome outcomeOrNull() {
-			return parseEnum(outcome, AdminAuditOutcome.class);
-		}
-
-		private static <E extends Enum<E>> E parseEnum(String value, Class<E> type) {
-			if (value == null || value.isBlank()) {
-				return null;
-			}
-			try {
-				return Enum.valueOf(type, value.trim());
-			} catch (IllegalArgumentException exception) {
-				return null;
-			}
-		}
 	}
 
 	record AuditEventRow(

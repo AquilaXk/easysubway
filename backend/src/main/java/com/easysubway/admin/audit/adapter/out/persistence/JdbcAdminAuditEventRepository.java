@@ -97,6 +97,18 @@ public class JdbcAdminAuditEventRepository implements AdminAuditEventRepository 
 	}
 
 	@Override
+	public List<AdminAuditEvent> findForExport(AdminAuditQuery query, int limit) {
+		List<Object> arguments = new ArrayList<>();
+		String whereClause = buildWhere(query, arguments);
+		arguments.add(Math.max(limit, 0));
+		return jdbcTemplate.query(SELECT_COLUMNS
+			+ whereClause
+			+ " ORDER BY occurred_at DESC, audit_id DESC LIMIT ?",
+			this::mapEvent,
+			arguments.toArray());
+	}
+
+	@Override
 	public long count(AdminAuditQuery query) {
 		List<Object> arguments = new ArrayList<>();
 		String whereClause = buildWhere(query, arguments);
