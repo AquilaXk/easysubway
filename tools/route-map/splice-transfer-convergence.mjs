@@ -4,57 +4,38 @@
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
-/**
- * route_map_positions 행을 역별 환승 그룹(memberCount, span)으로 묶는다.
- * - station_id별 그룹화
- * - 2노선 이상만 반환
- * - span = 최대 쌍거리
- */
-export function transferGroups(rows) {
+/** posRows({station_id,line_id,x,y}) → 환승 그룹(2+ 노선). span=최대 쌍거리. */
+export function transferGroups(posRows) {
   const byStation = new Map();
-  for (const row of rows) {
-    if (!byStation.has(row.station_id)) {
-      byStation.set(row.station_id, []);
-    }
-    byStation.get(row.station_id).push(row);
+  for (const r of posRows) {
+    if (!byStation.has(r.station_id)) byStation.set(r.station_id, []);
+    byStation.get(r.station_id).push(r);
   }
-
   const groups = [];
-  for (const [stationId, members] of byStation) {
-    const lineIds = new Set(members.map((m) => m.line_id));
-    if (lineIds.size < 2) continue;
-
+  for (const [stationId, rows] of byStation) {
+    if (new Set(rows.map((r) => r.line_id)).size < 2) continue;
     let span = 0;
-    for (let i = 0; i < members.length; i += 1) {
-      for (let j = i + 1; j < members.length; j += 1) {
-        span = Math.max(span, dist(members[i], members[j]));
-      }
-    }
-
+    for (let i = 0; i < rows.length; i += 1)
+      for (let j = i + 1; j < rows.length; j += 1)
+        span = Math.max(span, Math.hypot(rows[i].x - rows[j].x, rows[i].y - rows[j].y));
     groups.push({
-      station_id: stationId,
-      memberCount: lineIds.size,
+      stationId,
+      members: rows.map((r) => ({ lineId: r.line_id, x: r.x, y: r.y })),
+      memberCount: new Set(rows.map((r) => r.line_id)).size,
       span,
     });
   }
-
   return groups;
 }
 
-/**
- * 환승 그룹을 displacement 기반으로 분류한다.
- * displacement = (span - target) / 2
- * - mild: 0 ≤ displacement ≤ 5
- * - mid: 5 < displacement ≤ 10
- * - large: 10 < displacement ≤ 20
- * - extreme: displacement > 20
- */
-export function classifyGroup(group, oracle) {
-  const target = oracle[String(group.memberCount)] ?? oracle["2"];
-  const displacement = (group.span - target) / 2;
-
-  if (displacement <= 5) return "mild";
-  if (displacement <= 10) return "mid";
-  if (displacement <= 20) return "large";
-  return "extreme";
+/** 변위=(span-target)/2. 티어: mild<4·mid<20·large<extremeDisp·나머지 extreme. */
+export function classifyGroup(group, oracle, { extremeDisp = 35 } = {}) {
+  const target = oracle[String(group.memberCount)] ?? oracle["5"] ?? 56;
+  const displacement = Math.max(0, (group.span - target) / 2);
+  let tier;
+  if (displacement < 4) tier = "mild";
+  else if (displacement < 20) tier = "mid";
+  else if (displacement < extremeDisp) tier = "large";
+  else tier = "extreme";
+  return { target, displacement, tier };
 }
