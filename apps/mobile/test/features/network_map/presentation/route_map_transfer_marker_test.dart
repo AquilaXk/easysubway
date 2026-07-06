@@ -64,6 +64,32 @@ void main() {
       expect(marker.capsule.height, 16 + 6 + 4);
     });
 
+    test('horizontalDots=true는 도트를 가로로 쌓고 가로 캡슐을 만든다', () {
+      const dotRadius = 3.0;
+      const dotGap = 2.0;
+      const padding = 2.0;
+      final marker = routeMapTransferMarker(
+        center: const Offset(100, 100),
+        colors: const [Color(0xFF0052A4), Color(0xFF00A84D)],
+        dotRadius: dotRadius,
+        dotGap: dotGap,
+        padding: padding,
+        horizontalDots: true,
+      );
+
+      // 두 도트는 같은 dy, dx는 center-to-center = 2*dotRadius+dotGap 만큼 벌어짐.
+      expect(marker.dots, hasLength(2));
+      expect(marker.dots[0].center.dy, marker.dots[1].center.dy);
+      expect(
+        marker.dots[1].center.dx - marker.dots[0].center.dx,
+        2 * dotRadius + dotGap,
+      );
+
+      // 캡슐: 가로가 세로보다 길고, 세로(짧은축) = 2*(dotRadius+padding).
+      expect(marker.capsule.width, greaterThan(marker.capsule.height));
+      expect(marker.capsule.height, 2 * (dotRadius + padding));
+    });
+
     test('색이 없으면 도트 없이 빈 마커를 반환한다', () {
       final marker = routeMapTransferMarker(
         center: const Offset(5, 5),

@@ -42,9 +42,13 @@ class RouteMapTransferMarker {
   final List<RouteMapTransferDot> dots;
 }
 
-/// 환승 그룹 중심 [center]에 노선 수([colors])만큼 색 도트를 세로로 쌓은
-/// 마커 기하를 만든다. 도트는 center 기준 세로 대칭으로 균등 배치하고, 캡슐은
-/// 도트 전체를 [padding]만큼 여백을 두고 감싼다(가로 반폭 = corner radius).
+/// 환승 그룹 중심 [center]에 노선 수([colors])만큼 색 도트를 쌓은 마커 기하를
+/// 만든다. 도트는 center 기준 대칭으로 균등 배치하고, 캡슐은 도트 전체를
+/// [padding]만큼 여백을 두고 감싼다(짧은축 반폭 = corner radius).
+///
+/// [horizontalDots]가 true면 도트를 가로로 쌓고 캡슐을 가로 스타디움으로 만든다
+/// (국소 corridor가 수평인 환승의 자연스러운 배치). false(기본)면 기존 세로 스택
+/// 동작을 그대로 유지한다.
 ///
 /// - 도트 center-to-center 간격 = 2*[dotRadius] + [dotGap].
 /// - 노선 1개면 정사각 캡슐(원형 pill), 0개면 빈 마커.
@@ -54,6 +58,7 @@ RouteMapTransferMarker routeMapTransferMarker({
   required double dotRadius,
   required double dotGap,
   required double padding,
+  bool horizontalDots = false,
 }) {
   if (colors.isEmpty) {
     return RouteMapTransferMarker(
@@ -67,8 +72,29 @@ RouteMapTransferMarker routeMapTransferMarker({
 
   final spacing = 2 * dotRadius + dotGap;
   final span = (colors.length - 1) * spacing;
-  final firstDy = center.dy - span / 2;
+  final thickness = 2 * (dotRadius + padding);
 
+  if (horizontalDots) {
+    final firstDx = center.dx - span / 2;
+    final dots = <RouteMapTransferDot>[
+      for (var index = 0; index < colors.length; index += 1)
+        RouteMapTransferDot(
+          center: Offset(firstDx + index * spacing, center.dy),
+          color: colors[index],
+        ),
+    ];
+    final width = span + thickness;
+    final height = thickness;
+    return RouteMapTransferMarker(
+      capsule: RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center, width: width, height: height),
+        Radius.circular(height / 2),
+      ),
+      dots: dots,
+    );
+  }
+
+  final firstDy = center.dy - span / 2;
   final dots = <RouteMapTransferDot>[
     for (var index = 0; index < colors.length; index += 1)
       RouteMapTransferDot(
@@ -77,8 +103,8 @@ RouteMapTransferMarker routeMapTransferMarker({
       ),
   ];
 
-  final width = 2 * (dotRadius + padding);
-  final height = span + 2 * (dotRadius + padding);
+  final width = thickness;
+  final height = span + thickness;
   return RouteMapTransferMarker(
     capsule: RRect.fromRectAndRadius(
       Rect.fromCenter(center: center, width: width, height: height),
@@ -117,6 +143,10 @@ Offset _meanOffset(List<Offset> points) {
 ///   캡슐이 이격에 비례해 커지던 "초거대 원/타원"을 제거한다(#1789 캡슐 통일).
 /// - 분리(대이격): 동명이역 오병합·좌표 검수 대상은 별개 마커가 정직한 표현.
 /// 임계는 전부 design px 기준이며 캘리브레이션 값이다(실기기 QA로 튜닝 가능).
+///
+/// [horizontalDots]는 스택·강등 스택 모드의 도트/캡슐을 가로로 눕힌다(국소
+/// corridor가 수평인 환승용). 스팬 모드 캡슐은 멤버 좌표 spread를 그대로 따르므로
+/// 영향받지 않는다.
 List<RouteMapTransferMarker> routeMapTransferMarkers({
   required List<Offset> memberCenters,
   required List<Color> colors,
@@ -124,6 +154,7 @@ List<RouteMapTransferMarker> routeMapTransferMarkers({
   required double dotRadius,
   required double dotGap,
   required double padding,
+  bool horizontalDots = false,
   double stackedMaxDesignSpread = 8,
   double spanMaxDesignSpread = 16,
   double separateMinDesignSpread = 28,
@@ -141,6 +172,7 @@ List<RouteMapTransferMarker> routeMapTransferMarkers({
         dotRadius: dotRadius,
         dotGap: dotGap,
         padding: padding,
+        horizontalDots: horizontalDots,
       ),
     ];
   }
@@ -175,6 +207,7 @@ List<RouteMapTransferMarker> routeMapTransferMarkers({
         dotRadius: dotRadius,
         dotGap: dotGap,
         padding: padding,
+        horizontalDots: horizontalDots,
       ),
   ];
 }

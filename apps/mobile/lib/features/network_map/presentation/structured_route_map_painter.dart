@@ -112,6 +112,40 @@ final Paint _transferDotPaint = Paint()
   ..style = PaintingStyle.fill
   ..isAntiAlias = true;
 
+// 환승 국소 corridor 우세 방향(design px) → 도트 가로/세로 결정. 멤버 노선들의
+// centroid 최근접 선분 방향을 반원으로 접어(반대 방향 상쇄 방지) 평균한다.
+bool _transferDotsHorizontal(
+  StructuredRouteMap map,
+  RouteMapTransferGroup group,
+  RouteMapDesignSpace design,
+) {
+  final c = design.toDesign(group.centroid);
+  var sx = 0.0, sy = 0.0;
+  for (final line in map.lines) {
+    if (!group.lineIds.contains(line.lineId)) continue;
+    var best = double.infinity;
+    var bestDir = Offset.zero;
+    for (final poly in line.polylines) {
+      for (var i = 1; i < poly.length; i += 1) {
+        final a = design.toDesign(poly[i - 1]);
+        final b = design.toDesign(poly[i]);
+        final d = ((a + b) / 2 - c).distanceSquared;
+        final seg = b - a;
+        if (d < best && seg.distance > 0) {
+          best = d;
+          bestDir = seg / seg.distance;
+        }
+      }
+    }
+    if (bestDir.dx < 0 || (bestDir.dx == 0 && bestDir.dy < 0)) {
+      bestDir = -bestDir; // 반원 접기
+    }
+    sx += bestDir.dx;
+    sy += bestDir.dy;
+  }
+  return sx.abs() > sy.abs();
+}
+
 /// design space에서 전 레이어를 1회 녹화한다 (#1789 스펙 S6).
 /// 프레임 루프에는 이 Picture의 재생만 남는다. 호출자가 dispose 책임.
 ui.Picture recordRouteMapPicture({
@@ -188,6 +222,7 @@ ui.Picture recordRouteMapPicture({
       dotRadius: kRouteMapTransferDotRadiusPx,
       dotGap: kRouteMapTransferDotGapPx,
       padding: kRouteMapTransferDotPaddingPx,
+      horizontalDots: _transferDotsHorizontal(map, group, design),
     );
     for (final marker in markers) {
       canvas.drawRRect(marker.capsule, _transferFillPaint);
