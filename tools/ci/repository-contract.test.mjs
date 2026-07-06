@@ -792,6 +792,34 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.doesNotMatch(workflow, /secrets\.EASYSUBWAY_(DATASOURCE|REDIS|TRUSTED_PROXY|POSTGRES)/);
 });
 
+test("CD 배포는 production environment를 선언하고 배포 태그는 record-deploy 잡만 기록한다", () => {
+  const cd = read(".github/workflows/cd.yml");
+  const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
+
+  // production environment gives the deploy GitHub deployment history and lets a
+  // branch protection rule (deployment branches = main) apply (issue #1687).
+  assert.match(cd, /environment:\n\s*name: production\n\s*url: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/);
+  assert.match(cd, /outputs:\n\s*sha: \$\{\{ steps\.target\.outputs\.sha \}\}/);
+
+  // A lightweight deploy/backend/* tag records the deployed sha on GitHub.
+  assert.match(cd, /record-deploy:/);
+  assert.match(cd, /tag="deploy\/backend\/\$\(date -u \+%Y%m%d-%H%M\)-\$\{DEPLOY_SHA:0:12\}"/);
+  assert.match(cd, /"https:\/\/api\.github\.com\/repos\/\$\{GITHUB_REPOSITORY\}\/git\/refs"/);
+
+  // Permission containment: only record-deploy may write refs; the self-hosted
+  // deploy job stays read-only.
+  assert.equal((cd.match(/contents: write/g) ?? []).length, 1);
+  assert.match(cd, /record-deploy:[\s\S]*permissions:\n\s*contents: write/);
+
+  // Slack CD result carries the sha and tag.
+  assert.match(cd, /sha: `\$\{\{ needs\.deploy\.outputs\.sha \|\| 'unknown' \}\}`/);
+  assert.match(cd, /tag: `\$\{\{ needs\.record-deploy\.outputs\.tag \|\| 'not_recorded' \}\}`/);
+
+  // Deploy tags are pruned (keep newest 20, drop >90 days) in weekly cleanup.
+  assert.match(cleanup, /cleanup-deploy-tags:/);
+  assert.match(cleanup, /matching-refs\/tags\/deploy\/backend\//);
+});
+
 test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
   const template = read(".github/pull_request_template.md");
 
@@ -1027,7 +1055,7 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
   assert.equal((inlineSlackWorkflows.match(/SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/g) ?? []).length, 4);
   assert.equal((inlineSlackWorkflows.match(/SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/g) ?? []).length, 1);
   assert.match(ciWorkflow, /notify-slack-ci-failure:[\s\S]*needs:\s*\n\s*-\s*changes[\s\S]*github\.event_name == 'push'[\s\S]*github\.ref == 'refs\/heads\/main'[\s\S]*contains\(needs\.\*\.result, 'failure'\)/);
-  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*deploy[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*deploy\n\s*-\s*record-deploy[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(releaseArtifactsWorkflow, /notify-slack-release-result:[\s\S]*github\.event_name != 'pull_request'[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(dataPackReleaseWorkflow, /notify-slack-datapack-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(storeDistributionWorkflow, /notify-slack-store-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
