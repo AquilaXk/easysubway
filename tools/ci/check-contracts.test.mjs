@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { collectContractErrors, loadJson, validateJson } from "./check-contracts.mjs";
+import { collectContractErrors, loadJson, validateDatapackManifest, validateJson } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
 test("번들 datapack index 실물이 계약 스키마를 통과한다", () => {
@@ -37,6 +37,15 @@ test("필수 계약 입력 파일이 없으면 실패한다", () => {
   validateJson("contracts/missing.schema.json", "contracts/missing-value.json", errors);
 
   assert.deepEqual(errors, ["contracts/missing.schema.json 누락", "contracts/missing-value.json 누락"]);
+});
+
+test("v1 datapack manifest는 activePack을 요구하고 v2는 생략할 수 있다", () => {
+  const errors = [];
+
+  validateDatapackManifest({ ttlSeconds: 1, packs: [] }, "manifest-v1.json", errors);
+  validateDatapackManifest({ manifestVersion: 2, ttlSeconds: 1, packs: [] }, "manifest-v2.json", errors);
+
+  assert.deepEqual(errors, ["manifest-v1.json: manifestVersion 1은 activePack이 필요하다"]);
 });
 
 test("OpenAPI 문서가 golden fixture 목록과 정합하다", () => {

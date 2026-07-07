@@ -36,6 +36,13 @@ export function validateJson(schemaPath, valuePath, errors) {
   if (missing) return;
   const result = validateSchema(loadJson(schemaPath), loadJson(valuePath));
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
+  if (schemaPath === "contracts/datapack/datapack-manifest.schema.json") validateDatapackManifest(loadJson(valuePath), valuePath, errors);
+}
+
+export function validateDatapackManifest(manifest, valuePath, errors) {
+  if ((manifest.manifestVersion ?? 1) === 1 && manifest.activePack === undefined) {
+    errors.push(`${valuePath}: manifestVersion 1은 activePack이 필요하다`);
+  }
 }
 
 function validateBoundaries(errors) {
