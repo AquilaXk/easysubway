@@ -63,3 +63,22 @@ test("applyCorridor는 회랑 역들을 track축 간격으로 벌리고 전 노�
   const pa = r.positionUpdates.find((p) => p.stationId === "a"), pb = r.positionUpdates.find((p) => p.stationId === "b");
   assert.ok(Math.abs(Math.abs(pa.y - pb.y) - 30) < 1e-6, `y간격 ${Math.abs(pa.y - pb.y)}`); // 세로축 30px
 });
+
+test("applyCorridor는 다중 노선노드를 동일 델타로 강체 이동(캡슐 span 보존, 붕괴 방지)", () => {
+  // a: 2노선 노드가 6px 오프셋(캡슐), b: 1노선. 붕괴 근접.
+  const membersSeq = [{ stationId: "a", x: 100, y: 100, seq: 1 }, { stationId: "b", x: 100, y: 100, seq: 2 }];
+  const verts = [{ x: 100, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 300 }];
+  const memberLines = new Map([
+    ["a", [{ lineId: "L1", x: 97, y: 100 }, { lineId: "L2", x: 103, y: 100 }]], // 캡슐 span 6
+    ["b", [{ lineId: "L", x: 100, y: 100 }]],
+  ]);
+  const tracksByLine = new Map([
+    ["L1", [{ trackIndex: 0, verts: [{ x: 97, y: 0 }, { x: 97, y: 100 }, { x: 97, y: 300 }] }]],
+    ["L2", [{ trackIndex: 0, verts: [{ x: 103, y: 0 }, { x: 103, y: 100 }, { x: 103, y: 300 }] }]],
+    ["L", [{ trackIndex: 0, verts }]],
+  ]);
+  const r = applyCorridor(membersSeq, verts, memberLines, tracksByLine, 40);
+  const aL1 = r.positionUpdates.find((p) => p.stationId === "a" && p.lineId === "L1");
+  const aL2 = r.positionUpdates.find((p) => p.stationId === "a" && p.lineId === "L2");
+  assert.ok(Math.abs(Math.abs(aL1.x - aL2.x) - 6) < 1e-6, `캡슐 span 6 보존, 실제 ${Math.abs(aL1.x - aL2.x)}`); // 붕괴 아님
+});
