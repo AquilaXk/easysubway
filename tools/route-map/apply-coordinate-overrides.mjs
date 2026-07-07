@@ -20,6 +20,9 @@ export function applyOverrideGroup(group, override, tracksByLine) {
     const newPos = { x: Math.round(nt.x), y: Math.round(nt.y) };
     let attachedAny = false;
     for (const trk of tracksByLine.get(m.lineId) ?? []) {
+      // override.maxDist는 nearestVertexIndex 탐색 반경도 겸한다 — 테이블은 대략 2×변위+여유로
+      // 잡는다(대변위 극단역 부착용). ⚠️ 과도하게 키우면 허브서 먼 distal 정점을 잡아 기하를
+      // 왜곡할 수 있다(현 게이트 8선형 0·미부착 0으로 무왜곡 확인). C2 7건 한정, 무단 확대 금지.
       const { verts, attached } = spliceTrackToNode(trk.verts, { x: m.x, y: m.y }, newPos, { maxDist: override.maxDist });
       if (attached) {
         attachedAny = true;
