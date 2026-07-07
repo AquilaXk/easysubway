@@ -11,6 +11,8 @@ import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
+import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
+import 'package:easysubway_mobile/features/service_notice/domain/service_notice.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/internal_route.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
@@ -54,6 +56,15 @@ OnboardingState _completedOnboardingStateWithPreferences({
       preferences: preferences,
     ),
   );
+}
+
+class _FakeNoticeRepository implements NoticeRepository {
+  _FakeNoticeRepository(this._result);
+
+  final ActiveNoticesResult _result;
+
+  @override
+  Future<ActiveNoticesResult> activeNotices() async => _result;
 }
 
 Future<void> _openFavoriteList(
@@ -1291,6 +1302,87 @@ void main() {
     expect(find.text('노선도별로 보기'), findsNothing);
     expect(find.text('노선별 역 보기'), findsNothing);
     expect(find.text('노선별 목록에서 역을 선택하세요.'), findsNothing);
+  });
+
+  testWidgets('운행 공지 disruption은 홈 배너·좌측 메뉴·목록까지 배선된다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        noticeRepository: _FakeNoticeRepository(
+          ActiveNoticesResult(
+            notices: [
+              ServiceNotice(
+                id: 'n1',
+                scope: NoticeScope.all,
+                title: '2호선 강남–역삼 지연 — 우회 경로를 확인하세요',
+                body: '상행 지연이 이어지고 있어요.',
+                severity: NoticeSeverity.disruption,
+                publishedAt: DateTime(2026, 7, 6, 9, 0, 0),
+              ),
+            ],
+            stale: false,
+          ),
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // ① 홈 상단 disruption 배너.
+    expect(find.byKey(const Key('serviceNoticeBanner')), findsOneWidget);
+    expect(find.text('2호선 강남–역삼 지연 — 우회 경로를 확인하세요'), findsOneWidget);
+
+    // ② 좌측 메뉴 "운행 공지" 진입점 → 목록 화면.
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('networkMapMenuServiceNoticesButton')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('networkMapMenuServiceNoticesButton')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('운행 공지'), findsOneWidget); // 목록 화면 AppBar 제목.
+    expect(find.text('상행 지연이 이어지고 있어요.'), findsOneWidget);
+  });
+
+  testWidgets('운행 공지 배너는 닫기로 사라진다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        noticeRepository: _FakeNoticeRepository(
+          ActiveNoticesResult(
+            notices: [
+              ServiceNotice(
+                id: 'n1',
+                scope: NoticeScope.all,
+                title: '1호선 지연 안내',
+                body: '지연이 이어지고 있어요.',
+                severity: NoticeSeverity.disruption,
+                publishedAt: DateTime(2026, 7, 6, 9, 0, 0),
+              ),
+            ],
+            stale: false,
+          ),
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('serviceNoticeBanner')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('serviceNoticeBannerDismiss')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('serviceNoticeBanner')), findsNothing);
   });
 
   test('노선도 camera revision은 같은 gesture update에서도 단조 증가한다', () {

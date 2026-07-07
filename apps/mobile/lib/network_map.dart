@@ -384,7 +384,9 @@ class NetworkMapScreen extends StatefulWidget {
     this.onOpenNearbyStations,
     this.onOpenSettings,
     this.onOpenDataSources,
+    this.onOpenServiceNotices,
     this.notificationAction,
+    this.disruptionBanner,
     this.bottomNavigationBar,
     super.key,
   });
@@ -401,7 +403,13 @@ class NetworkMapScreen extends StatefulWidget {
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenDataSources;
+
+  /// 좌측 메뉴 "운행 공지" 목록 화면 열기.
+  final VoidCallback? onOpenServiceNotices;
   final Widget? notificationAction;
+
+  /// 상단 disruption 공지 1줄 배너. 표시할 공지가 없으면 스스로 빈 위젯이 된다.
+  final Widget? disruptionBanner;
   final Widget? bottomNavigationBar;
 
   @override
@@ -507,6 +515,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               expressView: _expressView,
               showServicePatternToggle: true,
               notificationAction: widget.notificationAction,
+              disruptionBanner: widget.disruptionBanner,
               onMenuTap: _openMapMenu,
               onSearchTap: widget.onOpenStationSearch,
               onRegionSelected: (region) => _reload(region: region),
@@ -531,6 +540,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               expressView: _expressView,
               showServicePatternToggle: true,
               notificationAction: widget.notificationAction,
+              disruptionBanner: widget.disruptionBanner,
               onMenuTap: _openMapMenu,
               onSearchTap: widget.onOpenStationSearch,
               onRegionSelected: (region) => _reload(region: region),
@@ -563,6 +573,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             expressView: _expressView,
             showServicePatternToggle: true,
             notificationAction: widget.notificationAction,
+            disruptionBanner: widget.disruptionBanner,
             onMenuTap: _openMapMenu,
             onSearchTap: widget.onOpenStationSearch,
             onRegionSelected: (region) => _reload(region: region),
@@ -772,6 +783,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           onOpenRouteSearch: widget.onOpenRouteSearch,
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenNearbyStations: widget.onOpenNearbyStations,
+          onOpenServiceNotices: widget.onOpenServiceNotices,
           onOpenSettings: widget.onOpenSettings,
           onOpenDataSources: widget.onOpenDataSources,
         );
@@ -878,6 +890,7 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.expressView,
     required this.showServicePatternToggle,
     required this.notificationAction,
+    required this.disruptionBanner,
     required this.onMenuTap,
     required this.onSearchTap,
     required this.onRegionSelected,
@@ -898,6 +911,7 @@ class _NetworkMapChrome extends StatelessWidget {
   final bool expressView;
   final bool showServicePatternToggle;
   final Widget? notificationAction;
+  final Widget? disruptionBanner;
   final VoidCallback onMenuTap;
   final VoidCallback onSearchTap;
   final ValueChanged<String> onRegionSelected;
@@ -934,6 +948,13 @@ class _NetworkMapChrome extends StatelessWidget {
             onRegionSelected: onRegionSelected,
           ),
         ),
+        if (disruptionBanner != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: topPadding + _networkMapTopBarHeight,
+            child: disruptionBanner!,
+          ),
         if (showServicePatternToggle)
           Positioned(
             left: 16,
@@ -1910,6 +1931,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
     required this.onOpenRouteSearch,
     required this.onOpenSavedItems,
     required this.onOpenNearbyStations,
+    required this.onOpenServiceNotices,
     required this.onOpenSettings,
     required this.onOpenDataSources,
   });
@@ -1918,6 +1940,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   final Future<void> Function() onOpenRouteSearch;
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenNearbyStations;
+  final VoidCallback? onOpenServiceNotices;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenDataSources;
 
@@ -1997,17 +2020,29 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                             onTap: () => _runAction(context, onOpenSettings!),
                           ),
                       ],
-                      if (onOpenDataSources != null) ...[
+                      if (onOpenServiceNotices != null ||
+                          onOpenDataSources != null) ...[
                         const _NetworkMapMenuSectionLabel('안내'),
-                        _NetworkMapMenuTile(
-                          key: const Key('networkMapMenuDataSourcesButton'),
-                          icon: Icons.source_outlined,
-                          label: '자료 제공 정보',
-                          onTap: () => _runActionAfterMenuClose(
-                            context,
-                            onOpenDataSources!,
+                        if (onOpenServiceNotices != null)
+                          _NetworkMapMenuTile(
+                            key: const Key(
+                              'networkMapMenuServiceNoticesButton',
+                            ),
+                            icon: Icons.campaign_outlined,
+                            label: '운행 공지',
+                            onTap: () =>
+                                _runAction(context, onOpenServiceNotices!),
                           ),
-                        ),
+                        if (onOpenDataSources != null)
+                          _NetworkMapMenuTile(
+                            key: const Key('networkMapMenuDataSourcesButton'),
+                            icon: Icons.source_outlined,
+                            label: '자료 제공 정보',
+                            onTap: () => _runActionAfterMenuClose(
+                              context,
+                              onOpenDataSources!,
+                            ),
+                          ),
                       ],
                     ],
                   ),
