@@ -427,6 +427,16 @@ void main() {
     expect(cache?.checkedAt, DateTime.utc(2026, 6, 25, 12));
   });
 
+  test('rollout salt는 최초 생성 후 안정적으로 재사용된다', () async {
+    final db = user_db.UserDatabase.memory();
+    addTearDown(db.close);
+    final repo = DataPackUpdateStateRepository(userDatabase: db);
+    final s1 = await repo.readOrCreateRolloutSalt();
+    final s2 = await repo.readOrCreateRolloutSalt();
+    expect(s1, matches(RegExp(r'^[a-f0-9]{32}$')));
+    expect(s2, s1); // 안정
+  });
+
   test('update state는 v2 manifest downgrade와 equivocation을 거부한다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
