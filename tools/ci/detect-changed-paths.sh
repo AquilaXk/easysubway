@@ -105,6 +105,7 @@ while IFS= read -r file; do
       android=true
       ios=true
       release=true
+      contracts=true
       ;;
     apps/mobile/android/app/build.gradle.kts)
       mobile=true

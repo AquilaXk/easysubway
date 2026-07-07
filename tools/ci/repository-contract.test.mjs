@@ -11796,6 +11796,7 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
 
   const releaseGate = await classifyChangedFiles(["apps/mobile/release/release-governance-gate.json"]);
   assert.equal(releaseGate.release, "true");
+  assert.equal(releaseGate.contracts, "true");
   assert.equal(releaseGate.mobile, "true");
 });
 
