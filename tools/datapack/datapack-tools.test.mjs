@@ -12052,3 +12052,176 @@ test("manifest-signing: manifestSignatureValue는 canonicalJson(withoutSignature
     else delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
   }
 });
+
+// ─── buildRolloutManifest 단위 테스트 (#1692) ──────────────────────────────────
+// production releases 픽스처 생성 헬퍼 (keyId="production-v1", RSA-SHA256 서명 계산)
+
+function _rolloutCanonicalValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map(_rolloutCanonicalValue);
+  return Object.fromEntries(
+    Object.keys(value).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).map((k) => [k, _rolloutCanonicalValue(value[k])]),
+  );
+}
+
+function _rolloutCanonicalJson(value) {
+  return JSON.stringify(_rolloutCanonicalValue(value));
+}
+
+function _rolloutSign(data) {
+  return createSign("RSA-SHA256").update(data).sign(testPrivateKeyPem).toString("base64url");
+}
+
+function buildProductionReleasesManifest(overrides = {}) {
+  const hex64 = "a".repeat(64);
+  const base = {
+    manifestVersion: 2,
+    channel: "production",
+    releaseSequence: 5,
+    publishedAt: "2026-07-07T00:00:00.000Z",
+    expiresAt: "2999-01-01T00:00:00.000Z",
+    keyId: "production-v1",
+    ttlSeconds: 3600,
+    signature: { algorithm: "rsa-sha256-manifest-v2", value: "placeholder" },
+    packs: [
+      {
+        id: "capital",
+        version: "1",
+        artifactKind: "production",
+        url: "https://cdn.example.com/catalog/capital-v1.sqlite.gz",
+        sha256: hex64,
+        sqliteSha256: hex64,
+        sizeBytes: 1000,
+        signature: {
+          algorithm: "rsa-sha256-pack-manifest-v2",
+          value: _rolloutSign("pack-payload"),
+        },
+        schemaVersion: "1",
+        sourceInventory: [
+          {
+            id: "src1",
+            owner: "test-owner",
+            url: "https://data.example.com/catalog",
+            license: "CC-BY-4.0",
+            licenseStatus: "redistributable",
+            redistributionAllowed: true,
+            updateFrequency: "daily",
+            updatedAt: "2026-07-07T00:00:00.000Z",
+            fields: ["stations"],
+            coverageScope: {
+              regionIds: ["seoul"],
+              operatorIds: ["seoulmetro"],
+              sourceDomains: ["station_map"],
+            },
+          },
+        ],
+        regionalQualityMetrics: {
+          stationCount: 100,
+          edgeCount: 200,
+          facilityCoverageRatio: 0.5,
+          requiredFacilityEvidenceCoverageRatio: 0.5,
+          strictRouteEligibleFacilityRatio: 0.5,
+          operationalKnownRatio: 1.0,
+          freshnessValidRatio: 0.8,
+          fieldVerifiedPathwayRatio: 0.3,
+          unknownAccessibilityRatio: 0.2,
+          unknownEdgeRatioByProfile: { wheelchair: 0.1, stroller: 0.1, lowMobility: 0.1 },
+        },
+        representativeRouteRegressions: [],
+        representativeRouteRegressionSignature: {
+          algorithm: "rsa-sha256-route-regression-v1",
+          value: _rolloutSign("regression-payload"),
+        },
+        requiredTables: ["stations"],
+        minimumTableRows: {
+          stations: 1,
+          station_lines: 1,
+          network_edges: 1,
+          facilities: 1,
+          station_facility_evidence: 1,
+        },
+      },
+    ],
+    ...overrides,
+  };
+  const { signature: _dropSig, ...unsigned } = base;
+  base.signature = {
+    algorithm: "rsa-sha256-manifest-v2",
+    value: _rolloutSign(_rolloutCanonicalJson(unsigned)),
+  };
+  return base;
+}
+
+test("buildRolloutManifest (a): percentage 50 → rollout{50,seed hex32} + validateManifest 통과(재서명 유효)", async () => {
+  const { buildRolloutManifest } = await import("./update-rollout.mjs");
+  const { verifyRsaSha256Signature, canonicalJson, withoutSignature } = await import("./lib/manifest-validation.mjs");
+  const releases = buildProductionReleasesManifest();
+  const savedPriv = process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+  const savedPub = process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM;
+  try {
+    process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = testPrivateKeyPem;
+    process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM = testPublicKeyPem;
+    const result = buildRolloutManifest({ releases, current: null, targetSequence: 5, percentage: 50 });
+    assert.ok(result.rollout, "rollout 필드 있어야 함");
+    assert.equal(result.rollout.percentage, 50);
+    assert.match(result.rollout.seed, /^[a-f0-9]{32}$/, "seed hex32 이어야 함");
+    assert.ok(
+      verifyRsaSha256Signature(testPublicKeyPem, canonicalJson(withoutSignature(result)), result.signature.value),
+      "재서명이 공개키로 검증되어야 함",
+    );
+    assert.doesNotThrow(() => validateManifest(result, { requireProduction: true }), "validateManifest 통과해야 함");
+  } finally {
+    if (savedPriv !== undefined) process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = savedPriv;
+    else delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+    if (savedPub !== undefined) process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM = savedPub;
+    else delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM;
+  }
+});
+
+test("buildRolloutManifest (b): percentage 100 → rollout 없음, releases에서 rollout 제거한 구조와 deepStrictEqual", async () => {
+  const { buildRolloutManifest } = await import("./update-rollout.mjs");
+  const releases = buildProductionReleasesManifest();
+  const { rollout: _dropRollout, ...releasesWithoutRollout } = releases;
+  const result = buildRolloutManifest({ releases, current: null, targetSequence: releases.releaseSequence, percentage: 100 });
+  assert.deepStrictEqual(result, releasesWithoutRollout);
+});
+
+test("buildRolloutManifest (c): current.rollout.seed 존재 → 신규 percentage 결과 seed 계승", async () => {
+  const { buildRolloutManifest } = await import("./update-rollout.mjs");
+  const releases = buildProductionReleasesManifest();
+  const existingSeed = "b".repeat(32);
+  const current = { ...releases, rollout: { percentage: 30, seed: existingSeed } };
+  const savedPriv = process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+  const savedPub = process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM;
+  try {
+    process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = testPrivateKeyPem;
+    process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM = testPublicKeyPem;
+    const result = buildRolloutManifest({ releases, current, targetSequence: releases.releaseSequence, percentage: 70 });
+    assert.equal(result.rollout.seed, existingSeed, "seed 계승해야 함");
+    assert.equal(result.rollout.percentage, 70);
+  } finally {
+    if (savedPriv !== undefined) process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = savedPriv;
+    else delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+    if (savedPub !== undefined) process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM = savedPub;
+    else delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM;
+  }
+});
+
+test("buildRolloutManifest (d): targetSequence ≠ releases.releaseSequence → throws /sequence mismatch/", async () => {
+  const { buildRolloutManifest } = await import("./update-rollout.mjs");
+  const releases = buildProductionReleasesManifest();
+  assert.throws(
+    () => buildRolloutManifest({ releases, current: null, targetSequence: 999, percentage: 50 }),
+    /sequence mismatch/,
+  );
+});
+
+test("buildRolloutManifest (e): current.releaseSequence ≠ targetSequence → throws /다른 릴리즈/", async () => {
+  const { buildRolloutManifest } = await import("./update-rollout.mjs");
+  const releases = buildProductionReleasesManifest();
+  const staleRelease = buildProductionReleasesManifest({ releaseSequence: 3 });
+  assert.throws(
+    () => buildRolloutManifest({ releases, current: staleRelease, targetSequence: releases.releaseSequence, percentage: 50 }),
+    /다른 릴리즈/,
+  );
+});
