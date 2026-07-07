@@ -11,6 +11,11 @@ repository=false
 docs_only=true
 ci=false
 deploy=false
+datapack=false
+route_map=false
+realtime=false
+release=false
+contracts=false
 saw_file=false
 
 is_docs_file() {
@@ -33,6 +38,10 @@ while IFS= read -r file; do
   fi
 
   case "${file}" in
+    contracts/**)
+      repository=true
+      contracts=true
+      ;;
     .github/workflows/*.yml|tools/ci/**)
       ci=true
       repository=true
@@ -50,16 +59,19 @@ while IFS= read -r file; do
       ;;
     tools/datapack/**)
       repository=true
+      datapack=true
       mobile=true
       android=true
       ios=true
       deploy=true
       ;;
-    tools/route-map/**)
+    tools/route-map/**|tools/routes/**)
       repository=true
+      route_map=true
       ;;
     tools/realtime/**)
       repository=true
+      realtime=true
       ;;
     tools/security/**)
       repository=true
@@ -69,11 +81,13 @@ while IFS= read -r file; do
       ;;
     tools/release/**)
       repository=true
+      release=true
       ;;
     apps/mobile/release/**)
       mobile=true
       android=true
       ios=true
+      release=true
       ;;
     apps/mobile/android/app/build.gradle.kts)
       mobile=true
@@ -123,6 +137,11 @@ if [[ "${saw_file}" == "false" ]]; then
   ios=true
   repository=true
   deploy=true
+  datapack=true
+  route_map=true
+  realtime=true
+  release=true
+  contracts=true
   docs_only=false
 fi
 
@@ -132,6 +151,11 @@ if [[ "${ci}" == "true" ]]; then
   mobile=true
   ios=true
   repository=true
+  datapack=true
+  route_map=true
+  realtime=true
+  release=true
+  contracts=true
   docs_only=false
 fi
 
@@ -145,6 +169,11 @@ repository=${repository}
 docs_only=${docs_only}
 ci=${ci}
 deploy=${deploy}
+datapack=${datapack}
+route_map=${route_map}
+realtime=${realtime}
+release=${release}
+contracts=${contracts}
 EOF
 }
 
@@ -168,6 +197,11 @@ write_summary() {
     echo "- docs_only: ${docs_only}"
     echo "- ci: ${ci}"
     echo "- deploy: ${deploy}"
+    echo "- datapack: ${datapack}"
+    echo "- route_map: ${route_map}"
+    echo "- realtime: ${realtime}"
+    echo "- release: ${release}"
+    echo "- contracts: ${contracts}"
   } >> "${GITHUB_STEP_SUMMARY}"
 }
 

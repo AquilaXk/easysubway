@@ -1,0 +1,88 @@
+const SUPPORTED = new Set([
+  "$id",
+  "$schema",
+  "additionalProperties",
+  "const",
+  "description",
+  "enum",
+  "items",
+  "minItems",
+  "minimum",
+  "pattern",
+  "properties",
+  "required",
+  "title",
+  "type",
+]);
+
+export function validateSchema(schema, value) {
+  const errors = [];
+  walk(schema, value, "$", errors);
+  return { ok: errors.length === 0, errors };
+}
+
+function walk(schema, value, path, errors) {
+  for (const key of Object.keys(schema)) {
+    if (!SUPPORTED.has(key)) {
+      throw new Error(`json-schema-lite: 미지원 키워드 '${key}' (${path})`);
+    }
+  }
+
+  if (schema.const !== undefined && value !== schema.const) {
+    errors.push(`${path}: const ${JSON.stringify(schema.const)} 불일치`);
+    return;
+  }
+  if (schema.enum && !schema.enum.includes(value)) {
+    errors.push(`${path}: enum ${JSON.stringify(schema.enum)} 밖의 값`);
+    return;
+  }
+  if (schema.type && !matchesType(schema.type, value)) {
+    errors.push(`${path}: type ${schema.type} 불일치`);
+    return;
+  }
+  if (schema.type === "string" && schema.pattern && !new RegExp(schema.pattern).test(value)) {
+    errors.push(`${path}: pattern ${schema.pattern} 불일치`);
+  }
+  if (typeof value === "number" && schema.minimum !== undefined && value < schema.minimum) {
+    errors.push(`${path}: minimum ${schema.minimum} 미만`);
+  }
+  if (schema.type === "object" && value && typeof value === "object" && !Array.isArray(value)) {
+    for (const req of schema.required ?? []) {
+      if (!(req in value)) errors.push(`${dot(path, req)}: 필수 필드 누락`);
+    }
+    for (const [key, child] of Object.entries(value)) {
+      const propSchema = schema.properties?.[key];
+      if (propSchema) walk(propSchema, child, dot(path, key), errors);
+      else if (schema.additionalProperties === false) errors.push(`${dot(path, key)}: 허용되지 않은 필드`);
+    }
+  }
+  if (schema.type === "array" && Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      errors.push(`${path}: minItems ${schema.minItems} 미만`);
+    }
+    if (schema.items) value.forEach((item, i) => walk(schema.items, item, dot(path, String(i)), errors));
+  }
+}
+
+function matchesType(type, value) {
+  switch (type) {
+    case "object":
+      return value !== null && typeof value === "object" && !Array.isArray(value);
+    case "array":
+      return Array.isArray(value);
+    case "string":
+      return typeof value === "string";
+    case "integer":
+      return Number.isInteger(value);
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    default:
+      throw new Error(`json-schema-lite: 미지원 type '${type}'`);
+  }
+}
+
+function dot(path, key) {
+  return `${path}.${key}`;
+}

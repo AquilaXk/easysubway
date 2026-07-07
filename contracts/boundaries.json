@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "areas": {
+    "mobile": { "roots": ["apps/mobile"] },
+    "backend": { "roots": ["backend"] },
+    "datapack": { "roots": ["tools/datapack"] },
+    "routeMap": { "roots": ["tools/route-map", "tools/routes"] },
+    "realtime": { "roots": ["tools/realtime"] },
+    "release": { "roots": ["tools/release", "apps/mobile/release"] },
+    "infra": { "roots": ["infra", "tools/deploy"] },
+    "ops": { "roots": ["tools/ops"] },
+    "security": { "roots": ["tools/security"] },
+    "ci": { "roots": [".github/workflows", "tools/ci", "tools/repo"] },
+    "contracts": { "roots": ["contracts"] }
+  },
+  "splitOrder": ["datapack", "infra", "backend", "mobile"],
+  "forbiddenReferences": [
+    {
+      "from": "apps/mobile/lib",
+      "pattern": "\\.\\./backend",
+      "reason": "mobile은 backend 소스를 모른다"
+    },
+    {
+      "from": "backend/src",
+      "pattern": "apps/mobile",
+      "reason": "backend는 mobile 소스를 모른다"
+    },
+    {
+      "from": "tools/datapack",
+      "pattern": "apps/mobile/lib",
+      "reason": "datapack 도구는 앱 구현을 모른다. assets 산출물 경로만 허용"
+    }
+  ],
+  "allowlist": []
+}

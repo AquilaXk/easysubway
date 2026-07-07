@@ -35,6 +35,11 @@ jobs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       ci: ${{ steps.filter.outputs.ci }}
       deploy: ${{ steps.filter.outputs.deploy }}
+      datapack: ${{ steps.filter.outputs.datapack }}
+      route_map: ${{ steps.filter.outputs.route_map }}
+      realtime: ${{ steps.filter.outputs.realtime }}
+      release: ${{ steps.filter.outputs.release }}
+      contracts: ${{ steps.filter.outputs.contracts }}
 
     steps:
       - name: Changes / Checkout repository
@@ -169,6 +174,14 @@ jobs:
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
         run: node --test tools/ci/*.test.mjs
+
+      - name: Repository CI / Validate contracts
+        if: ${{ needs.changes.outputs.contracts == 'true' }}
+        run: node tools/ci/check-contracts.mjs
+
+      - name: Repository CI / Check directory boundaries
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' }}
+        run: node tools/ci/check-boundaries.mjs
 
       - name: Repository CI / Run data pack tool tests
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' }}
