@@ -81,6 +81,13 @@ test("capsuleTargets 단일 멤버는 centroid(자기 위치)에 그대로 둔�
   assert.deepEqual(t, [{ lineId: "X", x: 10, y: 20 }]);
 });
 
+test("capsuleTargets는 입력 순서가 축순서와 달라도 축 투영 순서로 배치(좌우 뒤바뀜 방지)", () => {
+  // 입력 순서 [B(x=60), A(x=0)] — 축(H) 순서와 반대
+  const t = capsuleTargets([{ lineId: "B", x: 60, y: 0 }, { lineId: "A", x: 0, y: 0 }], 13, "H");
+  const byLine = Object.fromEntries(t.map((p) => [p.lineId, p.x]));
+  assert.ok(byLine.A < byLine.B, `A(x=${byLine.A})가 B(x=${byLine.B}) 왼쪽이어야`);
+});
+
 test("spliceTrackToNode는 track 끝점 허브도 새 위치로 이동(한쪽 윈도우)", () => {
   const verts = [{ x: 0, y: 100 }, { x: 100, y: 100 }, { x: 200, y: 100 }];
   const { verts: out, attached } = spliceTrackToNode(verts, { x: 0, y: 100 }, { x: 0, y: 112 }, { radius: 1 });

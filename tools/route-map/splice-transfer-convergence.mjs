@@ -66,15 +66,20 @@ export function capsuleAxis(members) {
   return maxX - minX >= maxY - minY ? "H" : "V";
 }
 
-/** centroid 중심, targetSpan 폭, axis(H/V) 따라 멤버를 균등 배치. 입력 순서 보존. */
+/** centroid 중심, targetSpan 폭, axis(H/V) 따라 멤버를 균등 배치.
+ * 오프셋은 축 투영 순서로 배정해 입력 순서가 축 순서와 달라도 교차/뒤바뀜을 방지한다. */
 export function capsuleTargets(members, targetSpan, axis) {
   const n = members.length;
   const cx = members.reduce((s, m) => s + m.x, 0) / n;
   const cy = members.reduce((s, m) => s + m.y, 0) / n;
   const pitch = n > 1 ? targetSpan / (n - 1) : 0;
   const start = n > 1 ? -(targetSpan) / 2 : 0;
+  // 축 투영 순서로 오프셋 배정(입력 순서가 축 순서와 달라도 좌우 뒤바뀜/교차 방지)
+  const order = members.map((_, i) => i).sort((a, b) =>
+    axis === "H" ? members[a].x - members[b].x : members[a].y - members[b].y);
+  const offByIdx = new Map(order.map((idx, k) => [idx, start + k * pitch]));
   return members.map((m, i) => {
-    const off = start + i * pitch;
+    const off = offByIdx.get(i);
     return axis === "H"
       ? { lineId: m.lineId, x: cx + off, y: cy }
       : { lineId: m.lineId, x: cx, y: cy + off };
@@ -187,6 +192,58 @@ export function convergeGroup(group, oracle, tracksByLine) {
   return { positionUpdates, trackUpdates };
 }
 
+/** route_map_line_tracks → Map(lineId → [{trackIndex, verts}]). */
+function loadTracksByLine(db, region) {
+  const trackRows = db
+    .prepare(
+      "SELECT line_id, track_index, path FROM route_map_line_tracks WHERE region=? ORDER BY line_id, track_index",
+    )
+    .all(region);
+  const tracksByLine = new Map();
+  for (const t of trackRows) {
+    if (!tracksByLine.has(t.line_id)) tracksByLine.set(t.line_id, []);
+    tracksByLine.get(t.line_id).push({ trackIndex: t.track_index, verts: parsePathVertices(t.path) });
+  }
+  return tracksByLine;
+}
+
+/** 그룹별 수렴 루프: DB 기록(check=false 시) + 누적 tracksByLine 갱신.
+ * @returns {{ applied: number, tierCount: object }}
+ */
+function applyConvergence(db, groups, oracle, selected, tracksByLine, check, region) {
+  const posU = db.prepare(
+    "UPDATE route_map_positions SET x=?, y=? WHERE region=? AND station_id=? AND line_id=?",
+  );
+  const trkU = db.prepare(
+    "UPDATE route_map_line_tracks SET path=? WHERE region=? AND line_id=? AND track_index=?",
+  );
+  let applied = 0;
+  const tierCount = { mild: 0, mid: 0, large: 0, extreme: 0 };
+  for (const g of groups) {
+    const cls = classifyGroup(g, oracle);
+    tierCount[cls.tier] += 1;
+    if (!selected.has(cls.tier)) continue;
+    if (g.span <= cls.target) continue; // 이미 오라클 이내 — 스프레드 금지
+    const { positionUpdates, trackUpdates } = convergeGroup(g, oracle, tracksByLine);
+    if (positionUpdates.length) applied += 1;
+    // 누적 갱신: 다음 그룹이 최신 정점을 사용하도록 tracksByLine 제자리 갱신
+    for (const tu of trackUpdates) {
+      const tracks = tracksByLine.get(tu.lineId);
+      if (tracks) {
+        const idx = tracks.findIndex((t) => t.trackIndex === tu.trackIndex);
+        if (idx >= 0) tracks[idx] = { trackIndex: tu.trackIndex, verts: tu.verts };
+      }
+    }
+    if (check) continue;
+    for (const p of positionUpdates)
+      posU.run(p.x, p.y, region, p.stationId, p.lineId);
+    for (const tu of trackUpdates)
+      // track 정점은 반올림하지 않는다: float base + 정확 45° dogleg 보존(convergeGroup 주석 참조)
+      trkU.run(verticesToPath(tu.verts), region, tu.lineId, tu.trackIndex);
+  }
+  return { applied, tierCount };
+}
+
 function parseArgs(argv) {
   const o = {
     pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
@@ -229,56 +286,10 @@ function main() {
     const posRows = db
       .prepare("SELECT station_id, line_id, x, y FROM route_map_positions WHERE region=?")
       .all(o.region);
-    const trackRows = db
-      .prepare(
-        "SELECT line_id, track_index, path FROM route_map_line_tracks WHERE region=? ORDER BY line_id, track_index",
-      )
-      .all(o.region);
-    const tracksByLine = new Map();
-    for (const t of trackRows) {
-      if (!tracksByLine.has(t.line_id)) tracksByLine.set(t.line_id, []);
-      tracksByLine.get(t.line_id).push({ trackIndex: t.track_index, verts: parsePathVertices(t.path) });
-    }
+    const tracksByLine = loadTracksByLine(db, o.region);
     const groups = transferGroups(posRows);
-    let applied = 0;
-    const posU = db.prepare(
-      "UPDATE route_map_positions SET x=?, y=? WHERE region=? AND station_id=? AND line_id=?",
-    );
-    const trkU = db.prepare(
-      "UPDATE route_map_line_tracks SET path=? WHERE region=? AND line_id=? AND track_index=?",
-    );
     if (!o.check) db.exec("BEGIN");
-    const tierCount = { mild: 0, mid: 0, large: 0, extreme: 0 };
-    for (const g of groups) {
-      const cls = classifyGroup(g, oracle); // 그룹당 1회(tier·target 재사용)
-      tierCount[cls.tier] += 1;
-      if (!selected.has(cls.tier)) continue;
-      if (g.span <= cls.target) continue; // 이미 오라클 이내 — 압축만, 스프레드 금지(needsConvergence 동치)
-      const { positionUpdates, trackUpdates } = convergeGroup(g, oracle, tracksByLine);
-      if (positionUpdates.length) applied += 1; // 실제 갱신을 낸 그룹만 카운트(부착 실패 그룹 제외)
-      // 누적 갱신: 같은 track에 여러 그룹이 splice할 때 이전 그룹의 결과 위에 덧쌓이게
-      // tracksByLine을 제자리 갱신(다음 그룹이 최신 정점을 사용하도록).
-      for (const tu of trackUpdates) {
-        const tracks = tracksByLine.get(tu.lineId);
-        if (tracks) {
-          const idx = tracks.findIndex((t) => t.trackIndex === tu.trackIndex);
-          if (idx >= 0) tracks[idx] = { trackIndex: tu.trackIndex, verts: tu.verts };
-        }
-      }
-      if (o.check) continue;
-      for (const p of positionUpdates)
-        posU.run(p.x, p.y, o.region, p.stationId, p.lineId);
-      for (const tu of trackUpdates)
-        // track 정점은 반올림하지 않는다: base track이 float(3158.219…)이고 octilinearSegment
-        // dogleg corner는 float에서 정확한 45°/축이라, 정수 반올림하면 45°가 깨진다(48.8° 등).
-        // 정합은 splice에 넘긴 정수 newPos가 position과 동일 정수라 보장된다(convergeGroup).
-        trkU.run(
-          verticesToPath(tu.verts),
-          o.region,
-          tu.lineId,
-          tu.trackIndex,
-        );
-    }
+    const { applied, tierCount } = applyConvergence(db, groups, oracle, selected, tracksByLine, o.check, o.region);
     console.log(
       `[${o.region}] 환승 ${groups.length} · 티어 ${JSON.stringify(tierCount)} · 적용(${o.tiers}) ${applied}`,
     );
