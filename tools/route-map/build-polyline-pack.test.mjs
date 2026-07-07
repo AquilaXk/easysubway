@@ -319,6 +319,17 @@ test("균등 투영: 닫힌 루프 구간 내 인접 간격 상대오차 ≤1%",
   }
   // 모든 12개 역 배치.
   assert.equal(positions.length, 12);
+  // [I-2] wrap 구간(l2-9→l2-0, 세로선 x=100) 중간역 좌표 검증.
+  // l2-9(100,300)→l2-0(100,100): 길이 200, 중간역 2개 → step≈66.667.
+  // l2-10: x=100, y≈233.333 / l2-11: x=100, y≈166.667.
+  const p10 = byId.get("l2-10");
+  const p11 = byId.get("l2-11");
+  assert.equal(p10.x, 100, "l2-10 x=100 이어야 함(세로 wrap 구간)");
+  assert.ok(p10.y > 100 && p10.y < 300, `l2-10 y=${p10.y} — 100~300 범위 벗어남`);
+  assert.equal(p11.x, 100, "l2-11 x=100 이어야 함(세로 wrap 구간)");
+  assert.ok(p11.y > 100 && p11.y < 300, `l2-11 y=${p11.y} — 100~300 범위 벗어남`);
+  // l2-10 이 l2-11 보다 l2-9(y=300)에 가까워야 함(순서 검증).
+  assert.ok(p10.y > p11.y, `wrap 순서: l2-10(y=${p10.y}) > l2-11(y=${p11.y}) 기대`);
 });
 
 test("고정 정점 역 = anchor 좌표, 공유 anchor 두 노선 좌표 일치", () => {
@@ -353,6 +364,33 @@ test("세그먼트 예산 위반 → 실패", () => {
   assert.throws(
     () => planLine({ line: model.lines[1], sequence: L4_STATIONS.map((s) => s.id), minGap: 200 }),
     /필요 길이/,
+  );
+});
+
+// ── [I-1] 역방향 폴리라인 방향성 검증 ─────────────────────────────────────
+
+test("[I-1] 역방향 비루프 폴리라인 → seqPos 방향성 에러", () => {
+  // 4호선: l4-0(seqPos=0)→l4-3(seqPos=3) 정방향을 역순으로 넘기면 에러.
+  const model = loadAndValidateDefs(validDefs());
+  const l4 = model.lines[1]; // 테스트 4호선(비루프)
+  const reversedLine = { ...l4, vertices: [...l4.vertices].reverse() };
+  // 역순 정점: [{l4-3, seqPos=3}, {l4-0, seqPos=0}] — seqPos 감소.
+  assert.throws(
+    () => planLine({ line: reversedLine, sequence: L4_STATIONS.map((s) => s.id) }),
+    /전진 방향과 반대/,
+  );
+});
+
+test("[I-1] 역방향 루프 폴리라인(seqPos=[9,6,3,0]) → seqPos 방향성 에러", () => {
+  // 2호선(loop): 코너 seqPos=[0,3,6,9]를 역순([9,6,3,0])으로 넘기면 에러.
+  // I-1 시나리오 재현: 정점 4개 seqPos=[9,6,3,0].
+  const model = loadAndValidateDefs(validDefs());
+  const l2 = model.lines[0]; // 테스트 2호선(loop)
+  const reversedLine = { ...l2, vertices: [...l2.vertices].reverse() };
+  // 역순 정점: [{l2-9,seqPos=9},{l2-6,seqPos=6},{l2-3,seqPos=3},{l2-0,seqPos=0}].
+  assert.throws(
+    () => planLine({ line: reversedLine, sequence: L2_STATIONS.map((s) => s.id) }),
+    /전진 방향과 반대/,
   );
 });
 

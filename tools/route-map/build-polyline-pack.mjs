@@ -63,6 +63,7 @@
 // Usage: node tools/route-map/build-polyline-pack.mjs
 //          --defs <정의 JSON> --base-pack <baseline 팩> --out <스파이크 팩 경로>
 //          [--region 수도권] [--min-gap 26] [--target-gap 50] [--check]
+//   (--check 지정 시 --out은 무시되며 파일을 쓰지 않고 통계만 출력한다)
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -351,6 +352,35 @@ export function planLine({ line, sequence, minGap = DEFAULT_MIN_GAP }) {
     });
     if (fixedV.length < 2) return; // 고정 정점 부족 — 중간역 배치 없음.
 
+    // seqPos 방향성 검증: 폴리라인 정점 순서가 line_sequence 전진 방향이어야 함.
+    if (!closed) {
+      for (let i = 1; i < fixedV.length; i += 1) {
+        if (fixedV[i].seqPos <= fixedV[i - 1].seqPos) {
+          throw new Error(
+            `${pieceLabel}: 폴리라인 정점 순서가 line_sequence 전진 방향과 반대입니다. ` +
+              `정점 ${fixedV[i - 1].vIndex}(seqPos=${fixedV[i - 1].seqPos}) → ` +
+              `정점 ${fixedV[i].vIndex}(seqPos=${fixedV[i].seqPos}): seqPos가 감소합니다.`,
+          );
+        }
+      }
+    } else {
+      // 루프: 최소 seqPos 위치로 회전 후 단조 증가 확인.
+      const minIdx = fixedV.reduce(
+        (mi, v, i) => (v.seqPos < fixedV[mi].seqPos ? i : mi),
+        0,
+      );
+      const rotated = [...fixedV.slice(minIdx), ...fixedV.slice(0, minIdx)];
+      for (let i = 1; i < rotated.length; i += 1) {
+        if (rotated[i].seqPos <= rotated[i - 1].seqPos) {
+          throw new Error(
+            `${pieceLabel}: 폴리라인 정점 순서가 line_sequence 전진 방향과 반대입니다(루프). ` +
+              `정점 ${rotated[i - 1].vIndex}(seqPos=${rotated[i - 1].seqPos}) → ` +
+              `정점 ${rotated[i].vIndex}(seqPos=${rotated[i].seqPos}): seqPos가 감소합니다.`,
+          );
+        }
+      }
+    }
+
     const arcs = [];
     for (let i = 0; i + 1 < fixedV.length; i += 1) arcs.push([fixedV[i], fixedV[i + 1]]);
     if (closed) arcs.push([fixedV[fixedV.length - 1], fixedV[0]]);
@@ -388,7 +418,7 @@ export function planLine({ line, sequence, minGap = DEFAULT_MIN_GAP }) {
         to: b.station,
         middles: middles.length,
         arcLen: round3(arcLen),
-        gap: middles.length + 1 > 0 ? round3(arcLen / (middles.length + 1)) : 0,
+        gap: round3(arcLen / (middles.length + 1)),
       });
     }
   };
@@ -467,101 +497,111 @@ export function buildPolylinePack({
   const { dir, sqlitePath } = readPackToTemp(basePackPath, "polyline-pack-");
   try {
     const db = new DatabaseSync(sqlitePath);
-
-    // 노선명 → line_id, line_sequence 조회 + 계획.
-    const plans = [];
-    for (const line of model.lines) {
-      const lineRow = db.prepare("SELECT id FROM lines WHERE name_ko = ?").get(line.name);
-      if (!lineRow) {
-        db.close();
-        throw new Error(`팩 lines에 없는 노선명: "${line.name}".`);
+    let allStats;
+    try {
+      // 노선명 → line_id, line_sequence 조회 + 계획.
+      const plans = [];
+      for (const line of model.lines) {
+        const lineRow = db.prepare("SELECT id FROM lines WHERE name_ko = ?").get(line.name);
+        if (!lineRow) {
+          throw new Error(`팩 lines에 없는 노선명: "${line.name}".`);
+        }
+        const lineId = lineRow.id;
+        // 순서는 station_lines.line_sequence, 대상은 baseline이 이 region에 가진
+        // 역만(station_lines는 region 비의존이라 타 region 역 유입을 막는다).
+        const seq = db
+          .prepare(
+            `SELECT sl.station_id
+             FROM station_lines sl
+             JOIN route_map_positions rmp
+               ON rmp.station_id = sl.station_id AND rmp.line_id = sl.line_id
+             WHERE sl.line_id = ? AND rmp.region = ?
+             ORDER BY sl.line_sequence`,
+          )
+          .all(lineId, targetRegion)
+          .map((r) => r.station_id);
+        const plan = planLine({ line, sequence: seq, minGap });
+        // 라이선스 메타는 baseline positions에서 승계(교체 전 확보).
+        const meta = db
+          .prepare(
+            `SELECT source_id, source_name, source_url, license, license_status,
+                    commercial_use_allowed, attribution_required
+             FROM route_map_positions WHERE region = ? AND line_id = ? LIMIT 1`,
+          )
+          .get(targetRegion, lineId);
+        plans.push({ line, lineId, plan, meta });
       }
-      const lineId = lineRow.id;
-      // 순서는 station_lines.line_sequence, 대상은 baseline이 이 region에 가진
-      // 역만(station_lines는 region 비의존이라 타 region 역 유입을 막는다).
-      const seq = db
-        .prepare(
-          `SELECT sl.station_id
-           FROM station_lines sl
-           JOIN route_map_positions rmp
-             ON rmp.station_id = sl.station_id AND rmp.line_id = sl.line_id
-           WHERE sl.line_id = ? AND rmp.region = ?
-           ORDER BY sl.line_sequence`,
-        )
-        .all(lineId, targetRegion)
-        .map((r) => r.station_id);
-      const plan = planLine({ line, sequence: seq, minGap });
-      // 라이선스 메타는 baseline positions에서 승계(교체 전 확보).
-      const meta = db
-        .prepare(
-          `SELECT source_id, source_name, source_url, license, license_status,
-                  commercial_use_allowed, attribution_required
-           FROM route_map_positions WHERE region = ? AND line_id = ? LIMIT 1`,
-        )
-        .get(targetRegion, lineId);
-      plans.push({ line, lineId, plan, meta });
-    }
 
-    const allStats = plans.map((p) => ({
-      line: p.line.name,
-      vertices: p.line.vertices.length,
-      spurs: p.line.spurs.length,
-      arcs: p.plan.stats,
-      positions: p.plan.positions.length,
-    }));
+      allStats = plans.map((p) => ({
+        line: p.line.name,
+        vertices: p.line.vertices.length,
+        spurs: p.line.spurs.length,
+        arcs: p.plan.stats,
+        positions: p.plan.positions.length,
+      }));
 
-    if (check) {
+      if (check) {
+        return { region: targetRegion, check: true, stats: allStats };
+      }
+
+      // 대상 region의 tracks/positions를 전부 지우고 정의 노선분만 재기록.
+      db.exec("BEGIN");
+      db.prepare("DELETE FROM route_map_line_tracks WHERE region = ?").run(targetRegion);
+      db.prepare("DELETE FROM route_map_positions WHERE region = ?").run(targetRegion);
+      const now = Math.floor(Date.now() / 1000);
+
+      const insTrack = db.prepare(
+        `INSERT INTO route_map_line_tracks
+          (region, line_id, track_index, path, svg_color, source_id, source_name,
+           source_url, license, license_status, commercial_use_allowed,
+           attribution_required, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      );
+      const insPos = db.prepare(
+        `INSERT INTO route_map_positions
+          (station_id, line_id, region, x, y, label_dx, label_dy, up_path, down_path,
+           source_id, source_name, source_url, license, license_status,
+           commercial_use_allowed, attribution_required, updated_at, label_polygon)
+         VALUES (?,?,?,?,?,0,0,'','',?,?,?,?,?,?,?,?,'')`,
+      );
+
+      for (const { lineId, plan, meta } of plans) {
+        if (!meta) {
+          db.exec("ROLLBACK");
+          throw new Error(`라이선스 메타를 찾지 못했습니다(line_id ${lineId}).`);
+        }
+        for (const t of plan.tracks) {
+          insTrack.run(
+            targetRegion, lineId, t.trackIndex, t.path, "",
+            meta.source_id, meta.source_name, meta.source_url, meta.license,
+            meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
+          );
+        }
+        for (const p of plan.positions) {
+          const rx = Math.round(p.x);
+          const ry = Math.round(p.y);
+          if (rx < 0 || ry < 0) {
+            db.exec("ROLLBACK");
+            throw new Error(
+              `역 "${p.stationId}" 좌표(${rx}, ${ry})가 음수입니다. ` +
+                `폴리라인 정의의 좌표 범위를 확인하세요.`,
+            );
+          }
+          insPos.run(
+            p.stationId, lineId, targetRegion, rx, ry,
+            meta.source_id, meta.source_name, meta.source_url, meta.license,
+            meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
+          );
+        }
+      }
+      db.exec("COMMIT");
+      db.exec("VACUUM");
+    } finally {
+      // 예외·정상 경로 모두 db 닫힘 보장.
       db.close();
-      return { region: targetRegion, check: true, stats: allStats };
     }
 
-    // 대상 region의 tracks/positions를 전부 지우고 정의 노선분만 재기록.
-    db.exec("BEGIN");
-    db.prepare("DELETE FROM route_map_line_tracks WHERE region = ?").run(targetRegion);
-    db.prepare("DELETE FROM route_map_positions WHERE region = ?").run(targetRegion);
-    const now = Math.floor(Date.now() / 1000);
-
-    const insTrack = db.prepare(
-      `INSERT INTO route_map_line_tracks
-        (region, line_id, track_index, path, svg_color, source_id, source_name,
-         source_url, license, license_status, commercial_use_allowed,
-         attribution_required, updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    );
-    const insPos = db.prepare(
-      `INSERT INTO route_map_positions
-        (station_id, line_id, region, x, y, label_dx, label_dy, up_path, down_path,
-         source_id, source_name, source_url, license, license_status,
-         commercial_use_allowed, attribution_required, updated_at, label_polygon)
-       VALUES (?,?,?,?,?,0,0,'','',?,?,?,?,?,?,?,?,'')`,
-    );
-
-    for (const { lineId, plan, meta } of plans) {
-      if (!meta) {
-        db.exec("ROLLBACK");
-        db.close();
-        throw new Error(`라이선스 메타를 찾지 못했습니다(line_id ${lineId}).`);
-      }
-      for (const t of plan.tracks) {
-        insTrack.run(
-          targetRegion, lineId, t.trackIndex, t.path, "",
-          meta.source_id, meta.source_name, meta.source_url, meta.license,
-          meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
-        );
-      }
-      for (const p of plan.positions) {
-        insPos.run(
-          p.stationId, lineId, targetRegion,
-          Math.max(0, Math.round(p.x)), Math.max(0, Math.round(p.y)),
-          meta.source_id, meta.source_name, meta.source_url, meta.license,
-          meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
-        );
-      }
-    }
-    db.exec("COMMIT");
-    db.exec("VACUUM");
-    db.close();
-
+    // db가 닫힌 뒤 팩 파일 기록(check=true는 이미 return되어 여기 미도달).
     const { byteSize, sha256: gzSha } = writeSpikePack(sqlitePath, outPath);
     return { region: targetRegion, check: false, byteSize, sha256: gzSha, stats: allStats };
   } finally {
