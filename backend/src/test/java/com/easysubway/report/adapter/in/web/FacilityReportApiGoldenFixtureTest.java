@@ -143,6 +143,7 @@ class FacilityReportApiGoldenFixtureTest {
 			data.put("receiptToken", "__RECEIPT_TOKEN__");
 		}
 		if (data.has("publicReceiptCode")) {
+			assertHasNonNull(data, "publicReceiptCode");
 			data.put("publicReceiptCode", "__PUBLIC_RECEIPT_CODE__");
 		}
 		return root;

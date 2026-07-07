@@ -15,12 +15,13 @@ function datapackChecks() {
   const boundaries = loadJson("contracts/boundaries.json");
   const datapackRules = (boundaries.forbiddenReferences ?? []).filter((rule) => rule.from === "tools/datapack");
   const errors = collectContractErrors();
+  const datapackReleaseWorkflow = readTextIfExists(".github/workflows/datapack-release.yml");
   return [
     check("boundary.datapack", findViolations(datapackRules, { allowlist: boundaries.allowlist ?? [] }).length === 0),
     check("datapack.producer-test", existsSync("tools/datapack/contract-producer.test.mjs")),
     check("datapack.mobile-consumer-test", existsSync("apps/mobile/test/contract/datapack_index_fixture_test.dart")),
     check("datapack.compatibility-matrix", errors.every((error) => !error.includes("compatibility-matrix"))),
-    check("datapack.release-workflow-no-flutter", !readFileSync(".github/workflows/datapack-release.yml", "utf8").includes("flutter")),
+    check("datapack.release-workflow-no-flutter", datapackReleaseWorkflow !== null && !datapackReleaseWorkflow.includes("flutter")),
     check("datapack.env-scope-isolated", scopesDisjoint("datapack-release", "store-release")),
   ];
 }
@@ -37,11 +38,11 @@ function infraChecks() {
 
 function backendChecks() {
   const boundaries = loadJson("contracts/boundaries.json");
-  const cd = readFileSync(".github/workflows/cd.yml", "utf8");
+  const cd = readTextIfExists(".github/workflows/cd.yml");
   return [
     check("backend.openapi-golden", existsSync("contracts/api/report-api.openapi.yaml") && existsSync("contracts/api/fixtures/report-status.ok.json")),
     check("backend.archunit", existsSync("backend/src/test/java/com/easysubway/architecture/PackageDependencyRulesTest.java")),
-    check("backend.cd-ghcr-digest", cd.includes("ghcr.io/aquilaxk/easysubway-backend") && cd.includes("DEPLOY_IMAGE_DIGEST") && cd.includes('docker tag "${IMAGE}@${DEPLOY_IMAGE_DIGEST}"')),
+    check("backend.cd-ghcr-digest", cd !== null && cd.includes("ghcr.io/aquilaxk/easysubway-backend") && cd.includes("DEPLOY_IMAGE_DIGEST") && cd.includes('docker tag "${IMAGE}@${DEPLOY_IMAGE_DIGEST}"')),
     check("backend.boundary", findViolations(boundaries.forbiddenReferences ?? [], { allowlist: boundaries.allowlist ?? [] }).length === 0),
   ];
 }
@@ -70,6 +71,11 @@ function check(id, ok) {
 
 function hasComposeBuild(compose) {
   return compose.split(/\r?\n/).some((line) => line.trimStart().startsWith("build:"));
+}
+
+function readTextIfExists(path) {
+  if (!existsSync(path)) return null;
+  return readFileSync(path, "utf8");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

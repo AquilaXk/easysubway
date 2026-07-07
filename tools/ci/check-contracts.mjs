@@ -3,6 +3,12 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
+const DATAPACK_MANIFEST_SCHEMA_PATH = "contracts/datapack/datapack-manifest.schema.json";
+const DATAPACK_COMPATIBILITY_MATRIX_PATH = "contracts/datapack/compatibility-matrix.json";
+const DATAPACK_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
+const RELEASE_GATE_INDEX_PATH = "contracts/release/gate-index.json";
+const RELEASE_GATE_DIRECTORY = "apps/mobile/release";
+
 export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
@@ -36,7 +42,7 @@ export function validateJson(schemaPath, valuePath, errors) {
   if (missing) return;
   const result = validateSchema(loadJson(schemaPath), loadJson(valuePath));
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
-  if (schemaPath === "contracts/datapack/datapack-manifest.schema.json") validateDatapackManifest(loadJson(valuePath), valuePath, errors);
+  if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(loadJson(valuePath), valuePath, errors);
 }
 
 export function validateDatapackManifest(manifest, valuePath, errors) {
@@ -92,9 +98,13 @@ function validateOpenApiFixtures(errors) {
 }
 
 function validateCompatibilityMatrix(errors) {
-  if (!existsSync("contracts/datapack/compatibility-matrix.json")) return;
-  const matrix = loadJson("contracts/datapack/compatibility-matrix.json");
-  const index = loadJson("apps/mobile/assets/datapacks/index.json");
+  if (!existsSync(DATAPACK_COMPATIBILITY_MATRIX_PATH)) return;
+  if (!existsSync(DATAPACK_INDEX_PATH)) {
+    errors.push(`${DATAPACK_INDEX_PATH} 누락`);
+    return;
+  }
+  const matrix = loadJson(DATAPACK_COMPATIBILITY_MATRIX_PATH);
+  const index = loadJson(DATAPACK_INDEX_PATH);
   validateCompatibilityMatrixPayload(matrix, index, errors);
 }
 
@@ -105,9 +115,13 @@ export function validateCompatibilityMatrixPayload(matrix, index, errors) {
 }
 
 function validateGateIndex(errors) {
-  if (!existsSync("contracts/release/gate-index.json")) return;
-  const index = loadJson("contracts/release/gate-index.json");
-  const actual = readdirSync("apps/mobile/release").filter((file) => file.endsWith(".json")).sort(compareText);
+  if (!existsSync(RELEASE_GATE_INDEX_PATH)) return;
+  if (!existsSync(RELEASE_GATE_DIRECTORY)) {
+    errors.push(`${RELEASE_GATE_DIRECTORY} 디렉터리 누락`);
+    return;
+  }
+  const index = loadJson(RELEASE_GATE_INDEX_PATH);
+  const actual = readdirSync(RELEASE_GATE_DIRECTORY).filter((file) => file.endsWith(".json")).sort(compareText);
   const indexed = (index.gates ?? []).map((gate) => gate.file).sort(compareText);
   if (JSON.stringify(actual) !== JSON.stringify(indexed)) {
     errors.push("contracts/release/gate-index.json: apps/mobile/release 실물과 1:1 대응하지 않는다");

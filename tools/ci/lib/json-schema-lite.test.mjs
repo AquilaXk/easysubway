@@ -48,3 +48,14 @@ test("중첩 객체 오류 경로를 점 표기로 보고한다", () => {
   assert.equal(result.ok, false);
   assert.match(result.errors[0], /packs\.0\.asset/);
 });
+
+test("객체·배열 전용 키워드는 type 누락 시 스키마 작성 오류로 실패한다", () => {
+  assert.throws(
+    () => validateSchema({ properties: { id: { type: "string" } } }, { id: "core" }),
+    /type: object/,
+  );
+  assert.throws(
+    () => validateSchema({ items: { type: "string" } }, ["core"]),
+    /type: array/,
+  );
+});

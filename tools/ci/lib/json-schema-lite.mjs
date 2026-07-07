@@ -57,7 +57,13 @@ function validateScalar(schema, value, path, errors) {
 }
 
 function validateObject(schema, value, path, errors) {
-  if (schema.type !== "object" || value === null || typeof value !== "object" || Array.isArray(value)) return;
+  if (schema.type !== "object") {
+    if (schema.properties || schema.required) {
+      throw new Error(`json-schema-lite: properties/required 사용 시 type: object 명시 필요 (${path})`);
+    }
+    return;
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return;
   for (const req of schema.required ?? []) {
     if (!(req in value)) errors.push(`${dot(path, req)}: 필수 필드 누락`);
   }
@@ -69,7 +75,13 @@ function validateObject(schema, value, path, errors) {
 }
 
 function validateArray(schema, value, path, errors) {
-  if (schema.type !== "array" || !Array.isArray(value)) return;
+  if (schema.type !== "array") {
+    if (schema.items || schema.minItems !== undefined) {
+      throw new Error(`json-schema-lite: items/minItems 사용 시 type: array 명시 필요 (${path})`);
+    }
+    return;
+  }
+  if (!Array.isArray(value)) return;
   if (schema.minItems !== undefined && value.length < schema.minItems) {
     errors.push(`${path}: minItems ${schema.minItems} 미만`);
   }
