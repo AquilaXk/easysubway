@@ -10,6 +10,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 import { sortJson } from "./run-source-admission-pipeline.mjs";
+import { validateManifest } from "./lib/manifest-validation.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -11925,3 +11926,78 @@ function representativeRouteRegressionPayload(routes) {
     })),
   );
 }
+
+// rollout 검증 단위 테스트용 최소 유효 v1 fixture 매니페스트 생성 헬퍼
+function minimalFixtureManifest() {
+  const hex64 = "a".repeat(64);
+  return {
+    ttlSeconds: 3600,
+    packs: [
+      {
+        id: "test",
+        version: "1",
+        artifactKind: "fixture",
+        url: "catalog/test-v1.sqlite.gz",
+        sha256: hex64,
+        sqliteSha256: hex64,
+        sizeBytes: 1,
+        signature: { algorithm: "sha256-pack-manifest-v1", value: hex64 },
+        schemaVersion: "1",
+        sourceInventory: [
+          {
+            id: "src",
+            owner: "test",
+            url: "https://example.com",
+            license: "fixture",
+            licenseStatus: "fixture-only",
+            redistributionAllowed: false,
+            updateFrequency: "manual",
+            updatedAt: "2026-01-01",
+            fields: ["test"],
+          },
+        ],
+        regionalQualityMetrics: {
+          stationCount: 0,
+          facilityCoverageRatio: 0,
+          requiredFacilityEvidenceCoverageRatio: 0,
+          strictRouteEligibleFacilityRatio: 0,
+          operationalKnownRatio: 0,
+          freshnessValidRatio: 0,
+          fieldVerifiedPathwayRatio: 0,
+          edgeCount: 0,
+          unknownAccessibilityRatio: 0,
+          unknownEdgeRatioByProfile: { wheelchair: 0, stroller: 0, lowMobility: 0 },
+        },
+        representativeRouteRegressions: [],
+        representativeRouteRegressionSignature: {
+          algorithm: "sha256-route-regression-v1",
+          value: hex64,
+        },
+        requiredTables: ["catalog_metadata"],
+      },
+    ],
+  };
+}
+
+test("매니페스트 rollout은 percentage 0~100·seed hex32만 허용한다", () => {
+  const base = minimalFixtureManifest();
+  const ok = { ...base, rollout: { percentage: 10, seed: "a".repeat(32) } };
+  assert.doesNotThrow(() => validateManifest(ok));
+  assert.throws(
+    () => validateManifest({ ...base, rollout: { percentage: 101, seed: "a".repeat(32) } }),
+    /rollout.*percentage/,
+  );
+  assert.throws(
+    () => validateManifest({ ...base, rollout: { percentage: 10, seed: "zz" } }),
+    /rollout.*seed/,
+  );
+});
+
+test("releases 게시 대상 매니페스트에 rollout이 있으면 거부한다", () => {
+  const base = minimalFixtureManifest();
+  const withRollout = { ...base, rollout: { percentage: 10, seed: "a".repeat(32) } };
+  assert.throws(
+    () => validateManifest(withRollout, { releasesTarget: true }),
+    /releases.*rollout/i,
+  );
+});
