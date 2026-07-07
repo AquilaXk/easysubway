@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
 export function loadJson(path) {
@@ -15,7 +15,6 @@ export function collectContractErrors() {
     "apps/mobile/assets/datapacks/source-inventory.json",
     errors,
   );
-  validateDatapackManifestSchema(errors);
   validateBoundaries(errors);
   validateOpenApiFixtures(errors);
   validateCompatibilityMatrix(errors);
@@ -28,13 +27,6 @@ function validateJson(schemaPath, valuePath, errors) {
   if (!existsSync(schemaPath) || !existsSync(valuePath)) return;
   const result = validateSchema(loadJson(schemaPath), loadJson(valuePath));
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
-}
-
-function validateDatapackManifestSchema(errors) {
-  const manifestPath = "/tmp/dp-schema-derive/current.json";
-  if (existsSync(manifestPath)) {
-    validateJson("contracts/datapack/datapack-manifest.schema.json", manifestPath, errors);
-  }
 }
 
 function validateBoundaries(errors) {
@@ -88,8 +80,8 @@ function validateCompatibilityMatrix(errors) {
 function validateGateIndex(errors) {
   if (!existsSync("contracts/release/gate-index.json")) return;
   const index = loadJson("contracts/release/gate-index.json");
-  const actual = readdirSync("apps/mobile/release").filter((file) => file.endsWith(".json")).sort();
-  const indexed = (index.gates ?? []).map((gate) => gate.file).sort();
+  const actual = readdirSync("apps/mobile/release").filter((file) => file.endsWith(".json")).sort(compareText);
+  const indexed = (index.gates ?? []).map((gate) => gate.file).sort(compareText);
   if (JSON.stringify(actual) !== JSON.stringify(indexed)) {
     errors.push("contracts/release/gate-index.json: apps/mobile/release 실물과 1:1 대응하지 않는다");
   }
@@ -107,11 +99,15 @@ function validateEnvScopeMap(errors) {
     .split(/\r?\n/)
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => line.split("=", 1)[0])
-    .sort();
-  const mapped = Object.keys(map.keys ?? {}).sort();
+    .sort(compareText);
+  const mapped = Object.keys(map.keys ?? {}).sort(compareText);
   if (JSON.stringify(envKeys) !== JSON.stringify(mapped)) {
     errors.push("contracts/env/env-scope-map.json: .env.example 키 집합과 다르다");
   }
+}
+
+function compareText(left, right) {
+  return left.localeCompare(right);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

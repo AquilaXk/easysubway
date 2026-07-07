@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { loadJson } from "./check-contracts.mjs";
@@ -27,15 +26,6 @@ export function findViolations(rules, { root = ".", allowlist = [] } = {}) {
 }
 
 function filesForRule(root, from) {
-  if (root === ".") {
-    try {
-      return execFileSync("git", ["ls-files", from], { encoding: "utf8" })
-        .split(/\r?\n/)
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
   return walk(path.join(root, from)).map((file) => path.relative(root, file));
 }
 

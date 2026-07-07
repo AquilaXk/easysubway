@@ -28,7 +28,7 @@ function datapackChecks() {
 function infraChecks() {
   const compose = readFileSync("infra/docker-compose.yml", "utf8");
   return [
-    check("infra.compose-no-build", !/^\s+build:/m.test(compose)),
+    check("infra.compose-no-build", !hasComposeBuild(compose)),
     check("infra.local-build-override", existsSync("infra/docker-compose.local-build.yml")),
     check("infra.env-scope-shared-explicit", scopeExists("shared")),
     { id: "infra.observability-required-metrics", status: "pass", note: "deferred until split execution" },
@@ -68,11 +68,16 @@ function check(id, ok) {
   return { id, status: ok ? "pass" : "fail" };
 }
 
+function hasComposeBuild(compose) {
+  return compose.split(/\r?\n/).some((line) => line.trimStart().startsWith("build:"));
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const target = process.argv.includes("--target") ? process.argv[process.argv.indexOf("--target") + 1] : "datapack";
   const result = evaluateReadiness(target);
   for (const check of result.checks) {
-    console.log(`${check.status.toUpperCase()} ${check.id}${check.note ? ` (${check.note})` : ""}`);
+    const note = check.note ? ` (${check.note})` : "";
+    console.log(`${check.status.toUpperCase()} ${check.id}${note}`);
   }
   if (result.checks.some((check) => check.status === "fail")) process.exit(1);
 }
