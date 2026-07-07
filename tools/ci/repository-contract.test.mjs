@@ -4054,14 +4054,16 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   const workflow = read(".github/workflows/datapack-release.yml");
   const releaseEvidenceBundleSchema = readJson("tools/datapack/schema/release-evidence-bundle.schema.json");
 
-  assert.match(workflow, /mode:[\s\S]*options:[\s\S]*- exploratory[\s\S]*- release-candidate[\s\S]*- production-publish/);
+  assert.match(workflow, /mode:[\s\S]*options:\s*\[exploratory, release-candidate, production-publish/);
   assert.match(workflow, /schedule:[\s\S]*cron: "17 18 \* \* \*"/);
   assert.match(workflow, /apps\/mobile\/release\/datapack-freshness-sla\.json/);
-  assert.match(workflow, /buildSpecPath:[\s\S]*required: true/);
-  assert.match(workflow, /allowGaps:[\s\S]*default: false/);
-  assert.match(workflow, /targetChannel:[\s\S]*options:[\s\S]*- dev[\s\S]*- staging[\s\S]*- production/);
-  assert.match(workflow, /releaseRequestId:/);
-  assert.match(workflow, /releaseRequestPath:/);
+  // 입력 표면은 modeArgs 단일 JSON으로 통합됨(#1694 C0). 게이트 관련 인자는 parse 스텝(id: args)이 outputs로 펼친다.
+  assert.match(workflow, /modeArgs:[\s\S]*required: true/);
+  assert.match(workflow, /steps\.args\.outputs\.buildSpecPath/);
+  assert.match(workflow, /"allowGaps":"false"/);
+  assert.match(workflow, /targetChannel:[\s\S]*options:\s*\[dev, staging, production\]/);
+  assert.match(workflow, /steps\.args\.outputs\.releaseRequestId/);
+  assert.match(workflow, /steps\.args\.outputs\.releaseRequestPath/);
   assert.match(workflow, /production-datapack/);
   assert.match(workflow, /Data Pack Release \/ Validate release mode inputs/);
   assert.match(workflow, /release-candidate\|production-publish/);
@@ -5701,7 +5703,11 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
-  const kricCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("kric-"));
+  // kric-subway-timetable은 라이브 재구성 실증을 가진 schedule_timetable 후보라 "샘플 URL만 문서화된"
+  // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
+  const kricCandidates = candidates.candidates.filter(
+    (candidate) => candidate.id.startsWith("kric-") && candidate.id !== "kric-subway-timetable",
+  );
 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
@@ -5947,11 +5953,103 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     candidate.capabilities.schedule.unsupportedNotes,
     "commercial schedule import remains blocked until a provider trip/stop-sequence source is identified and validated",
   );
+  // TAGO 자체 진실은 유지(trnNo 없음): blocker·missingEvidence·capabilities.schedule 불변.
+  // 갱신은 참조뿐 — trip/stop-sequence 소스가 kric-subway-timetable로 식별됐음을 evidence·nextAction에 기록.
   assert.deepEqual(candidate.evidence.missingEvidence, ["tripStopSequenceSource"]);
+  assert.equal(candidate.evidence.tripStopSequenceSourceIdentifiedCandidateId, "kric-subway-timetable");
+  assert.ok(
+    candidates.candidates.some((entry) => entry.id === "kric-subway-timetable"),
+    "식별된 trip/stop-sequence 소스 후보가 명부에 실재해야 한다",
+  );
+  assert.match(candidate.nextAction, /kric-subway-timetable/);
+  assert.match(candidate.nextAction, /하이브리드|재규정/);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
   assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
   assert.ok(candidate.evidence.outputFields.includes("upDownTypeCode"));
+});
+
+test("KRIC subwayTimetable 후보는 line-wide trip/stop-sequence 검증 증거를 기록하되 admin review 전엔 미승격이다", () => {
+  const inventory = readJson("tools/datapack/source-inventory.json");
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  const candidate = candidates.candidates.find(({ id }) => id === "kric-subway-timetable");
+
+  assert.ok(candidate, "kric-subway-timetable 후보가 존재해야 한다");
+  assert.equal(candidate.priority, "P0");
+  assert.equal(candidate.domain, "schedule_timetable");
+  assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
+
+  // validated_live_sample은 라이브 샘플 해시 3종을 동반한다(admitted sibling과 동일 규약).
+  // 승격 시 validate-source-inventory:validateAdmissionEvidence가 liveSampleEvidenceHash를 강제하므로,
+  // 후보 시점부터 실샘플 해시를 기록해 status와 증거를 일치시킨다(라이브 캡처, 원본 미커밋).
+  assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
+  assert.ok(Number.isInteger(candidate.evidence.liveSampleRowCount) && candidate.evidence.liveSampleRowCount > 0);
+  assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  // base subwayTimetable 샘플 필드는 trip 재구성 축(trnNo)+시각(arvTm/dptTm)을 포함하되 exptCd는 없다(Exp 전용).
+  assert.ok(candidate.evidence.liveSampleFields.includes("trnNo"));
+  assert.ok(candidate.evidence.liveSampleFields.includes("arvTm"));
+  assert.ok(candidate.evidence.liveSampleFields.includes("dptTm"));
+  assert.equal(candidate.evidence.liveSampleFields.includes("exptCd"), false);
+
+  // B(evidence 기록 → admin review 대기): 세션이 스스로 admitted로 올리지 않는다.
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(productionSourceIds.has(candidate.id), false, "미승격 후보는 production inventory에 없어야 한다");
+
+  // capabilities.schedule은 CANDIDATE + productionUseAllowed:false. 재구성 실증은 status가 아니라 evidence에 담는다.
+  assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => left.localeCompare(right)), [
+    "facility",
+    "realtime",
+    "schedule",
+  ]);
+  assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
+  assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
+  assert.equal(candidate.capabilities.schedule.coverageStatus, "TRIP_STOP_SEQUENCE_VALIDATED_LINE4_PILOT");
+  assert.equal(candidate.capabilities.realtime.status, "UNSUPPORTED");
+  assert.equal(candidate.capabilities.facility.status, "UNSUPPORTED");
+
+  // endpoint·라이선스 근거.
+  assert.match(candidate.detailUrl, /^https:\/\/data\.kric\.go\.kr\/rips\/M_01_02\//);
+  assert.match(candidate.requestUrl, /^https:\/\/openapi\.kric\.go\.kr\/openapi\/trainUseInfo\/subwayTimetable$/);
+  assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
+  assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
+  assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  assert.ok(candidate.evidence.outputFields.includes("trnNo"), "trip 재구성 축인 trnNo가 있어야 한다");
+  assert.ok(candidate.evidence.outputFields.includes("exptCd"), "급행 표시 exptCd가 있어야 한다");
+
+  // operation별 승인 상태 명시(이슈 스코프 1항): subwayTimetable 승인 / subwayTimetableExp 정식 승인 evidence 대기.
+  const operationById = new Map(candidate.evidence.collectionOperations.map((op) => [op.operation, op]));
+  assert.equal(operationById.get("subwayTimetable").usePermissionApplicationStatus, "approved");
+  assert.equal(
+    operationById.get("subwayTimetableExp").usePermissionApplicationStatus,
+    "collection_succeeded_formal_approval_evidence_pending",
+  );
+  assert.equal(operationById.get("subwayTimetableExp").liveCollectionResultCode, "00");
+
+  // 재구성 검증 evidence(895 trip·33,062 stop_times·실패0)는 커밋된 아티팩트로 뒷받침.
+  const reconstruction = candidate.evidence.reconstructionValidation;
+  assert.equal(reconstruction.status, "validated_line_wide_trip_stop_sequence");
+  assert.equal(reconstruction.tool, "tools/datapack/reconstruct-transit-trips.mjs");
+  assert.equal(reconstruction.tripCount, 895);
+  assert.equal(reconstruction.stopTimesCount, 33062);
+  assert.equal(reconstruction.requestCount, 153);
+  assert.equal(reconstruction.failureCount, 0);
+  assert.equal(reconstruction.monotoneLineSequenceEnforced, true);
+  assert.match(read(reconstruction.stationRosterArtifact), /"sourceId": "kric-subway-route-info"/);
+  assert.match(read(reconstruction.committedProofOfShapeArtifact), /INSERT INTO/i);
+  assert.equal(candidate.evidence.scheduleImporterValidation.plannedEtaUseAllowed, false);
+
+  // 승격 체크리스트 4항이 nextAction에 남아 있어야 한다(#1845 활성 선행 게이트).
+  assert.match(candidate.nextAction, /admitted_to_production_inventory/);
+  assert.match(candidate.nextAction, /admin review/i);
+  assert.match(candidate.nextAction, /source-inventory\.json/);
+  assert.match(candidate.nextAction, /subwayTimetableExp/);
+  assert.match(candidate.nextAction, /ledger/i);
 });
 
 test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {
@@ -11621,11 +11719,23 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
   const androidManifest = read(mergedManifestPath);
   const permissions = androidManifestPermissions(androidManifest);
 
+  // 하차 알림(#1766)이 flutter_local_notifications를 도입하며 알림 표시용
+  // POST_NOTIFICATIONS·VIBRATE와 시간표 기반 정확 예약용 SCHEDULE_EXACT_ALARM이
+  // release 매니페스트에 병합된다. 셋 다 위치·저장소·미디어 같은 개인정보 침해
+  // 권한이 아니며 알림 기능에 직접 필요하다. 백그라운드 위치·부팅 완료 수신 등은
+  // 병합되지 않음을 아래 doesNotMatch로 계속 강제한다.
   assert.deepEqual(permissions, [
     "android.permission.ACCESS_COARSE_LOCATION",
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.INTERNET",
+    "android.permission.POST_NOTIFICATIONS",
+    "android.permission.SCHEDULE_EXACT_ALARM",
+    "android.permission.VIBRATE",
   ]);
+  // 무추적 불변: 알람·캘린더 앱 전용인 USE_EXACT_ALARM과 부팅 재예약용
+  // RECEIVE_BOOT_COMPLETED는 도입하지 않는다(#1766 강등 사다리·비범위).
+  assert.doesNotMatch(androidManifest, /android\.permission\.USE_EXACT_ALARM/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.RECEIVE_BOOT_COMPLETED/);
   assert.doesNotMatch(androidManifest, /android\.permission\.ACCESS_BACKGROUND_LOCATION/);
   assert.doesNotMatch(androidManifest, /android\.permission\.CAMERA/);
   assert.doesNotMatch(androidManifest, /android\.permission\.READ_EXTERNAL_STORAGE/);
@@ -11910,3 +12020,43 @@ async function classifyChangedFiles(files) {
   });
   return Object.fromEntries(stdout.trim().split("\n").map((line) => line.split("=")));
 }
+
+test("get-off-alarm policy contract pins the no-location, degrade-ladder invariants", () => {
+  const policyPath = "apps/mobile/release/get-off-alarm-policy.json";
+  assert.equal(existsSync(path.join(root, policyPath)), true, "get-off-alarm policy must exist");
+
+  const policy = readJson(policyPath);
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.applicationId, "easysubway");
+  assert.equal(policy.androidApplicationId, "com.easysubway.app");
+  assert.equal(policy.policyName, "get-off-alarm-policy");
+  assert.equal(policy.issue, 1766);
+  assert.equal(policy.parentTracker, 1762);
+
+  // 위치 미사용 불변(area:privacy — 위치 추적으로 절대 회귀 금지).
+  assert.equal(policy.locationTrackingUsed, false);
+
+  // 리드타임 기본값은 Dart 스케줄러의 단일 진실 원본.
+  assert.equal(policy.leadTime.defaultLeadSeconds, 120);
+  assert.equal(policy.leadTime.transferAlarmDefaultOn, true);
+  assert.ok(policy.leadTime.minLeadSeconds < policy.leadTime.defaultLeadSeconds);
+  assert.ok(policy.leadTime.maxLeadSeconds > policy.leadTime.defaultLeadSeconds);
+
+  // 단일 경로 활성 알림(동시 다중 경로는 v1 비범위).
+  assert.equal(policy.activeAlarm.maxConcurrentRoutes, 1);
+  assert.equal(policy.activeAlarm.cancelOnRouteEnd, true);
+  assert.equal(policy.activeAlarm.cancelOnNewSearch, true);
+
+  // 정확 알람 강등 사다리: SCHEDULE_EXACT_ALARM 요청, USE_EXACT_ALARM 금지,
+  // 거부 시 고지 문구와 함께 부정확으로 강등 — 무음 실패 금지.
+  assert.equal(policy.exactAlarm.permissionName, "SCHEDULE_EXACT_ALARM");
+  assert.equal(policy.exactAlarm.forbiddenPermission, "USE_EXACT_ALARM");
+  assert.equal(policy.exactAlarm.degradeToInexactOnDeny, true);
+  assert.equal(policy.exactAlarm.silentFailureAllowed, false);
+  assert.ok(policy.exactAlarm.inexactNoticeKo.length > 0);
+
+  // 실시간 보정은 온라인 전용 overlay 재사용; 오프라인은 PLANNED 유지.
+  assert.equal(policy.realtimeCorrection.recomputeOnForeground, true);
+  assert.equal(policy.realtimeCorrection.offlineEtaSource, "PLANNED");
+  assert.equal(policy.realtimeCorrection.correctionOverlayIssue, 1416);
+});

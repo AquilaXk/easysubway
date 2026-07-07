@@ -40,6 +40,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications(하차 알림 #1766)가 java.time API를 써서
+        // core library desugaring을 요구한다.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -91,4 +94,5 @@ configurations.configureEach {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.18.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
