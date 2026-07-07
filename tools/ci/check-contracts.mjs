@@ -43,6 +43,15 @@ export function validateDatapackManifest(manifest, valuePath, errors) {
   if ((manifest.manifestVersion ?? 1) === 1 && manifest.activePack === undefined) {
     errors.push(`${valuePath}: manifestVersion 1은 activePack이 필요하다`);
   }
+  if (manifest.manifestVersion === 2) {
+    for (const key of ["signature", "keyId", "channel", "releaseSequence", "publishedAt", "expiresAt"]) {
+      if (!(key in manifest)) errors.push(`${valuePath}: manifestVersion 2는 ${key}이 필요하다`);
+    }
+  }
+  const rolloutPercentage = manifest.rollout?.percentage;
+  if (rolloutPercentage !== undefined && rolloutPercentage > 100) {
+    errors.push(`${valuePath}: rollout.percentage는 100 이하여야 한다`);
+  }
 }
 
 function validateBoundaries(errors) {

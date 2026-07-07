@@ -43,9 +43,76 @@ test("v1 datapack manifest는 activePack을 요구하고 v2는 생략할 수 있
   const errors = [];
 
   validateDatapackManifest({ ttlSeconds: 1, packs: [] }, "manifest-v1.json", errors);
-  validateDatapackManifest({ manifestVersion: 2, ttlSeconds: 1, packs: [] }, "manifest-v2.json", errors);
+  validateDatapackManifest(minimalV2Manifest(), "manifest-v2.json", errors);
 
   assert.deepEqual(errors, ["manifest-v1.json: manifestVersion 1은 activePack이 필요하다"]);
+});
+
+test("v2 datapack manifest는 envelope 필드를 요구한다", () => {
+  const errors = [];
+
+  validateDatapackManifest({ manifestVersion: 2, ttlSeconds: 1, packs: [] }, "manifest-v2.json", errors);
+
+  assert.deepEqual(errors, [
+    "manifest-v2.json: manifestVersion 2는 signature이 필요하다",
+    "manifest-v2.json: manifestVersion 2는 keyId이 필요하다",
+    "manifest-v2.json: manifestVersion 2는 channel이 필요하다",
+    "manifest-v2.json: manifestVersion 2는 releaseSequence이 필요하다",
+    "manifest-v2.json: manifestVersion 2는 publishedAt이 필요하다",
+    "manifest-v2.json: manifestVersion 2는 expiresAt이 필요하다",
+  ]);
+});
+
+test("datapack manifest rollout percentage는 100을 넘을 수 없다", () => {
+  const errors = [];
+
+  validateDatapackManifest(
+    {
+      ttlSeconds: 1,
+      activePack: { id: "capital", version: "1" },
+      rollout: { percentage: 101 },
+      packs: [],
+    },
+    "manifest-v1.json",
+    errors,
+  );
+
+  assert.deepEqual(errors, ["manifest-v1.json: rollout.percentage는 100 이하여야 한다"]);
+});
+
+test("datapack manifest 스키마는 production URL과 RSA 서명을 허용한다", () => {
+  const schema = loadJson("contracts/datapack/datapack-manifest.schema.json");
+  const manifest = {
+    ttlSeconds: 1,
+    activePack: { id: "capital", version: "1" },
+    packs: [
+      {
+        id: "capital",
+        version: "1",
+        artifactKind: "production",
+        url: "https://cdn.easysubway.kr/releases/catalog/capital-v1.sqlite.gz",
+        sha256: "a".repeat(64),
+        sqliteSha256: "b".repeat(64),
+        sizeBytes: 1,
+        signature: {
+          algorithm: "rsa-sha256-pack-manifest-v1",
+          value: "rsaSha256PackSignature_1",
+        },
+        schemaVersion: "1",
+        sourceInventory: [{ id: "official-source", licenseStatus: "redistributable", updatedAt: "2026-07-07" }],
+        regionalQualityMetrics: {},
+        representativeRouteRegressions: [],
+        representativeRouteRegressionSignature: {
+          algorithm: "rsa-sha256-route-regression-v1",
+          value: "rsaSha256RouteSignature_1",
+        },
+        requiredTables: ["stations"],
+        minimumTableRows: { stations: 1 },
+      },
+    ],
+  };
+
+  assert.deepEqual(validateSchema(schema, manifest).errors, []);
 });
 
 test("OpenAPI 문서가 golden fixture 목록과 정합하다", () => {
@@ -80,3 +147,17 @@ test("env-scope-map이 .env.example 키와 1:1 대응한다", () => {
 
   assert.deepEqual(errors, []);
 });
+
+function minimalV2Manifest() {
+  return {
+    manifestVersion: 2,
+    ttlSeconds: 1,
+    signature: { algorithm: "sha256-manifest-v2", value: "a".repeat(64) },
+    keyId: "fixture",
+    channel: "stable",
+    releaseSequence: 1,
+    publishedAt: "2026-07-07T00:00:00.000Z",
+    expiresAt: "2026-07-08T00:00:00.000Z",
+    packs: [],
+  };
+}
