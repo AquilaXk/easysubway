@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/domain/service_notice.dart';
 import 'package:easysubway_mobile/features/service_notice/presentation/notice_controller.dart';
@@ -34,6 +36,18 @@ class _ThrowingRepository implements NoticeRepository {
   @override
   Future<ActiveNoticesResult> activeNotices() async {
     throw StateError('boom');
+  }
+}
+
+class _DeferredRepository implements NoticeRepository {
+  _DeferredRepository(this._future);
+  final Future<ActiveNoticesResult> _future;
+  int calls = 0;
+
+  @override
+  Future<ActiveNoticesResult> activeNotices() {
+    calls++;
+    return _future;
   }
 }
 
@@ -115,5 +129,43 @@ void main() {
     await Future.wait([controller.refresh(), controller.refresh()]);
 
     expect(repo.calls, 1);
+  });
+
+  test('dispose 후 in-flight refresh가 완료돼도 통지하지 않는다', () async {
+    final completer = Completer<ActiveNoticesResult>();
+    final controller = NoticeController(
+      repository: _DeferredRepository(completer.future),
+    );
+    var notifiedAfterDispose = false;
+
+    final pending = controller.refresh();
+    controller.addListener(() => notifiedAfterDispose = true);
+    controller.dispose();
+    completer.complete(const ActiveNoticesResult(notices: [], stale: false));
+
+    // dispose된 ChangeNotifier에 통지하면 FlutterError를 던진다 — 던지지 않아야 한다.
+    await expectLater(pending, completes);
+    expect(notifiedAfterDispose, isFalse);
+  });
+
+  test('staleLabel은 stale일 때만 라벨을 낸다', () async {
+    final now = DateTime(2026, 7, 6, 12, 0, 0);
+    final fresh = _FakeRepository([
+      ActiveNoticesResult(notices: [notice('n1')], stale: false),
+    ]);
+    final freshController = NoticeController(repository: fresh);
+    await freshController.refresh();
+    expect(freshController.staleLabel(now), isNull);
+
+    final stale = _FakeRepository([
+      ActiveNoticesResult(
+        notices: [notice('n1')],
+        stale: true,
+        asOf: DateTime(2026, 7, 6, 9, 0, 0),
+      ),
+    ]);
+    final staleController = NoticeController(repository: stale);
+    await staleController.refresh();
+    expect(staleController.staleLabel(now), '3시간 전 기준');
   });
 }

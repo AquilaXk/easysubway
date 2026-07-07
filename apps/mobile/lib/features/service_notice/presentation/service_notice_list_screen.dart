@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../accessible_design.dart';
 import '../domain/service_notice.dart';
 import 'notice_controller.dart';
-import 'notice_time_label.dart';
 
 /// 좌측 메뉴 "운행 공지"에서 여는 목록 화면. 활성 공지 전체(info·disruption)를
 /// 보여주고, 오프라인 강등이면 마지막 수신 시각을 함께 알린다.
@@ -31,39 +30,37 @@ class ServiceNoticeListScreen extends StatelessWidget {
         listenable: controller,
         builder: (context, _) {
           final notices = controller.notices;
-          final asOf = controller.asOf;
-          final staleLabel = controller.isStale && asOf != null
-              ? formatNoticeAsOf(asOf, now())
-              : null;
+          final staleLabel = controller.staleLabel(now());
+          if (notices.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: controller.refresh,
+              child: _EmptyNotices(staleLabel: staleLabel),
+            );
+          }
+          // stale 바는 리스트 항목이 아니라 헤더로 둔다 — 항목 인덱스가 notices와
+          // 1:1이라 offset 산술이 사라진다.
           return RefreshIndicator(
             onRefresh: controller.refresh,
-            child: notices.isEmpty
-                ? _EmptyNotices(staleLabel: staleLabel)
-                : ListView.separated(
+            child: Column(
+              children: [
+                if (staleLabel != null) _StaleBar(label: staleLabel),
+                Expanded(
+                  child: ListView.separated(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: notices.length + (staleLabel == null ? 0 : 1),
-                    separatorBuilder: (context, index) {
-                      if (staleLabel != null && index == 0) {
-                        return const SizedBox.shrink();
-                      }
-                      return const Divider(
-                        height: 1,
-                        indent: 20,
-                        endIndent: 20,
-                        color: EasySubwayAccessibleColors.line,
-                      );
-                    },
-                    itemBuilder: (context, index) {
-                      if (staleLabel != null) {
-                        if (index == 0) {
-                          return _StaleBar(label: staleLabel);
-                        }
-                        return _NoticeItem(notice: notices[index - 1]);
-                      }
-                      return _NoticeItem(notice: notices[index]);
-                    },
+                    itemCount: notices.length,
+                    separatorBuilder: (context, index) => const Divider(
+                      height: 1,
+                      indent: 20,
+                      endIndent: 20,
+                      color: EasySubwayAccessibleColors.line,
+                    ),
+                    itemBuilder: (context, index) =>
+                        _NoticeItem(notice: notices[index]),
                   ),
+                ),
+              ],
+            ),
           );
         },
       ),

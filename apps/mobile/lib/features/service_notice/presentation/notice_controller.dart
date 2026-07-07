@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/notice_repository.dart';
 import '../domain/service_notice.dart';
+import 'notice_time_label.dart';
 
 /// 운행 공지의 앱 시작·포그라운드 복귀 조회 상태를 들고, 노선도 홈 배너와
 /// "운행 공지" 목록 화면이 함께 구독하는 컨트롤러.
@@ -16,6 +17,7 @@ class NoticeController extends ChangeNotifier {
 
   ActiveNoticesResult? _result;
   bool _loading = false;
+  bool _disposed = false;
   Future<void>? _inFlight;
   final Set<String> _dismissedBannerIds = <String>{};
 
@@ -28,6 +30,16 @@ class NoticeController extends ChangeNotifier {
   bool get isStale => _result?.stale ?? false;
 
   DateTime? get asOf => _result?.asOf;
+
+  /// 오프라인 강등 시 마지막 수신 시각 라벨("N시간 전 기준"). 배너·목록이 공유하는
+  /// 단일 출처(신선하면 null).
+  String? staleLabel(DateTime now) {
+    final at = asOf;
+    if (!isStale || at == null) {
+      return null;
+    }
+    return formatNoticeAsOf(at, now);
+  }
 
   /// 배너로 승격할 첫 disruption. 이미 닫은 공지는 제외한다.
   ServiceNotice? get topDisruption {
@@ -46,7 +58,7 @@ class NoticeController extends ChangeNotifier {
 
   Future<void> _run() async {
     _loading = true;
-    notifyListeners();
+    _safeNotify();
     try {
       final result = await repository.activeNotices();
       _result = result;
@@ -57,13 +69,27 @@ class NoticeController extends ChangeNotifier {
     } finally {
       _loading = false;
       _inFlight = null;
-      notifyListeners();
+      // 조회가 in-flight인 동안 소유 State가 dispose되면 컨트롤러가 먼저 dispose되므로,
+      // 완료 후 통지는 dispose 이후 사용(FlutterError)을 피하려 가드한다.
+      _safeNotify();
     }
   }
 
   void dismissBanner(String id) {
     if (_dismissedBannerIds.add(id)) {
+      _safeNotify();
+    }
+  }
+
+  void _safeNotify() {
+    if (!_disposed) {
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

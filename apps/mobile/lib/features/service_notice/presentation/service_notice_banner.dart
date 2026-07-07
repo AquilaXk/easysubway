@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
 import 'notice_controller.dart';
-import 'notice_time_label.dart';
 
 /// 노선도 홈 상단에 얹는 disruption 공지 1줄 배너.
 ///
@@ -30,10 +29,7 @@ class ServiceNoticeBanner extends StatelessWidget {
         if (notice == null) {
           return const SizedBox.shrink();
         }
-        final asOf = controller.asOf;
-        final staleLabel = controller.isStale && asOf != null
-            ? formatNoticeAsOf(asOf, now())
-            : null;
+        final staleLabel = controller.staleLabel(now());
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           child: Material(
