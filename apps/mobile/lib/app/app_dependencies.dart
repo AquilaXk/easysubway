@@ -316,7 +316,9 @@ class _UnavailableNetworkMapRepository implements NetworkMapRepository {
   }
 }
 
-GetOffAlarmController? _resolveGetOffAlarmController(UserDatabase? userDatabase) {
+GetOffAlarmController? _resolveGetOffAlarmController(
+  UserDatabase? userDatabase,
+) {
   if (userDatabase == null) {
     return null;
   }
