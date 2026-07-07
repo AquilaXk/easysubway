@@ -275,10 +275,13 @@ test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API
 
 test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인딩을 사용한다", () => {
   const compose = read("infra/docker-compose.yml");
+  const localBuildCompose = read("infra/docker-compose.local-build.yml");
 
-  assert.match(compose, /\n  backend:\n[\s\S]*?context: \.\.\/backend/);
+  assert.doesNotMatch(compose, /\n  backend:\n[\s\S]*?context: \.\.\/backend/);
+  assert.match(localBuildCompose, /\n  backend:\n[\s\S]*?context: \.\.\/backend/);
+  assert.match(localBuildCompose, /\n  back-worker:\n[\s\S]*?context: \.\.\/backend/);
   assert.match(compose, /image: easysubway-backend:\$\{EASYSUBWAY_BACKEND_IMAGE_TAG:-local\}/);
-  assert.match(compose, /com\.easysubway\.jar\.sha256: \$\{EASYSUBWAY_BACKEND_JAR_SHA256:-unknown\}/);
+  assert.match(localBuildCompose, /com\.easysubway\.jar\.sha256: \$\{EASYSUBWAY_BACKEND_JAR_SHA256:-unknown\}/);
   assert.match(compose, /env_file:\s*\n\s*-\s*\$\{EASYSUBWAY_BACKEND_ENV_FILE:-\.\.\/\.env\.example\}/);
   assert.match(compose, /EASYSUBWAY_DATASOURCE_URL: jdbc:postgresql:\/\/postgres:5432\/\$\{EASYSUBWAY_POSTGRES_DB:-easysubway\}/);
   assert.match(compose, /EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT: http:\/\/object-storage:9000/);

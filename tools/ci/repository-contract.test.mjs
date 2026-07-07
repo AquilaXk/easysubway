@@ -711,6 +711,32 @@ test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로
   assert.doesNotMatch(androidJob, /\n    if:/);
 });
 
+test("Repository CI boundary check는 checkout과 Node setup 이후에만 실행된다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const repositoryJob = jobBlock(workflow, "repository-contracts", "backend");
+  const requiredSignals = [
+    "needs.changes.outputs.contracts == 'true'",
+    "needs.changes.outputs.backend == 'true'",
+    "needs.changes.outputs.mobile == 'true'",
+    "needs.changes.outputs.datapack == 'true'",
+  ];
+  const checkoutStart = repositoryJob.indexOf("Repository CI / Checkout repository");
+  const nodeStart = repositoryJob.indexOf("Repository CI / Set up Node.js");
+  const boundaryStart = repositoryJob.indexOf("Repository CI / Check directory boundaries");
+  const checkoutBlock = repositoryJob.slice(checkoutStart, nodeStart);
+  const nodeBlock = repositoryJob.slice(nodeStart, boundaryStart);
+  const boundaryBlock = repositoryJob.slice(boundaryStart);
+
+  assert.notEqual(checkoutStart, -1);
+  assert.notEqual(nodeStart, -1);
+  assert.notEqual(boundaryStart, -1);
+  for (const signal of requiredSignals) {
+    assert.ok(checkoutBlock.includes(signal), `checkout must include ${signal}`);
+    assert.ok(nodeBlock.includes(signal), `node setup must include ${signal}`);
+    assert.ok(boundaryBlock.includes(signal), `boundary check must include ${signal}`);
+  }
+});
+
 test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을 검증한다", () => {
   const workflow = read(".github/workflows/cd.yml");
 
@@ -7067,7 +7093,13 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   for (const id of ["checkstyle", "spotbugs", "errorprone", "archunit", "jacoco"]) {
     const tool = tools.get(id);
     assert.ok(tool, `${id} must be listed in backend static analysis gate`);
-    assert.equal(tool.enforcement, "not_enabled_in_this_slice");
+    if (id === "archunit") {
+      assert.equal(tool.enforcement, "enabled");
+      assert.match(build, /com\.tngtech\.archunit:archunit-junit5:1\.4\.2/);
+      assert.ok(tool.evidence.ciRuntimeMeasurement.includes("PackageDependencyRulesTest"));
+    } else {
+      assert.equal(tool.enforcement, "not_enabled_in_this_slice");
+    }
     assert.ok(tool.requires.length > 0, `${id} must declare enforcement prerequisites`);
   }
 
@@ -7082,7 +7114,6 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   assert.doesNotMatch(build, /id ['"]com\.github\.spotbugs['"]/);
   assert.doesNotMatch(build, /id ['"]net\.ltgt\.errorprone['"]/);
   assert.doesNotMatch(build, /id ['"]jacoco['"]/);
-  assert.doesNotMatch(build, /com\.tngtech\.archunit/);
 
 });
 
@@ -11668,6 +11699,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(repository.repository, "true");
   assert.equal(repository.docs_only, "false");
 
+  const contracts = await classifyChangedFiles(["contracts/datapack/datapack-index.schema.json"]);
+  assert.equal(contracts.contracts, "true");
+  assert.equal(contracts.repository, "true");
+  assert.equal(contracts.docs_only, "false");
+
   const backend = await classifyChangedFiles(["backend/easysubway-api/src/main/java/com/easysubway/App.java"]);
   assert.equal(backend.backend, "true");
   assert.equal(backend.deploy, "true");
@@ -11689,6 +11725,14 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
 
+  const repoTool = await classifyChangedFiles(["tools/repo/check-split-readiness.mjs"]);
+  assert.equal(repoTool.repository, "true");
+  assert.equal(repoTool.ci, "true");
+
+  const envExample = await classifyChangedFiles([".env.example"]);
+  assert.equal(envExample.repository, "true");
+  assert.equal(envExample.contracts, "true");
+
   const infra = await classifyChangedFiles(["infra/docker-compose.yml"]);
   assert.equal(infra.repository, "true");
   assert.equal(infra.deploy, "true");
@@ -11699,6 +11743,15 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(datapack.android, "true");
   assert.equal(datapack.ios, "true");
   assert.equal(datapack.deploy, "true");
+  assert.equal(datapack.datapack, "true");
+
+  const bundledDatapack = await classifyChangedFiles(["apps/mobile/assets/datapacks/index.json"]);
+  assert.equal(bundledDatapack.repository, "true");
+  assert.equal(bundledDatapack.contracts, "true");
+  assert.equal(bundledDatapack.mobile, "true");
+  assert.equal(bundledDatapack.android, "true");
+  assert.equal(bundledDatapack.ios, "true");
+  assert.equal(bundledDatapack.datapack, "true");
 
   const routeMapTool = await classifyChangedFiles(["tools/route-map/extract-svg-geometry.mjs"]);
   assert.equal(routeMapTool.repository, "true");
@@ -11706,6 +11759,10 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(routeMapTool.android, "false");
   assert.equal(routeMapTool.ios, "false");
   assert.equal(routeMapTool.deploy, "false");
+  assert.equal(routeMapTool.route_map, "true");
+
+  const routeTool = await classifyChangedFiles(["tools/routes/fixture.mjs"]);
+  assert.equal(routeTool.route_map, "true");
 
   const realtimeTool = await classifyChangedFiles(["tools/realtime/seoul-topis-provider-contract.json"]);
   assert.equal(realtimeTool.repository, "true");
@@ -11713,6 +11770,7 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(realtimeTool.android, "false");
   assert.equal(realtimeTool.ios, "false");
   assert.equal(realtimeTool.deploy, "false");
+  assert.equal(realtimeTool.realtime, "true");
 
   const securityTool = await classifyChangedFiles(["tools/security/validate-abuse-penetration-summary.mjs"]);
   assert.equal(securityTool.repository, "true");
@@ -11734,6 +11792,12 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(releaseTool.android, "false");
   assert.equal(releaseTool.ios, "false");
   assert.equal(releaseTool.deploy, "false");
+  assert.equal(releaseTool.release, "true");
+
+  const releaseGate = await classifyChangedFiles(["apps/mobile/release/release-governance-gate.json"]);
+  assert.equal(releaseGate.release, "true");
+  assert.equal(releaseGate.contracts, "true");
+  assert.equal(releaseGate.mobile, "true");
 });
 
 test("경로 분류기는 백엔드 품질 gate 변경을 repository contract 대상으로 처리한다", async () => {
