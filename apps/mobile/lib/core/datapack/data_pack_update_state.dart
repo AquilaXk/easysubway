@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:drift/drift.dart';
 
 import '../database/user/user_database.dart' as user_db;
@@ -16,9 +18,11 @@ class DataPackUpdateStateRepository {
   static const _acceptedSequencePrefix = 'datapack_manifest_accepted_sequence_';
   static const _acceptedHashPrefix = 'datapack_manifest_accepted_hash_';
   static const _acceptedAtPrefix = 'datapack_manifest_accepted_at_ms_';
+  static const _rolloutSaltKey = 'datapack_rollout_salt';
 
   final user_db.UserDatabase userDatabase;
   final DateTime Function() _now;
+  final _secureRandom = Random.secure();
 
   Future<DataPackManifestCache?> readManifestCache() async {
     final rows = await userDatabase
@@ -92,9 +96,7 @@ class DataPackUpdateStateRepository {
   Future<void> ensureManifestCanBeAccepted(DataPackManifest manifest) async {
     if (!manifest.hasReplayProtection) {
       if (await hasAcceptedManifestState()) {
-        throw const DataPackManifestReplayException(
-          '앱 이동 정보를 안전하게 확인하지 못했어요.',
-        );
+        throw const DataPackManifestReplayException('앱 이동 정보를 안전하게 확인하지 못했어요.');
       }
       return;
     }
@@ -192,6 +194,31 @@ class DataPackUpdateStateRepository {
       return false;
     }
     return !now.isAfter(cache.checkedAt.add(cache.ttl));
+  }
+
+  Future<String?> _readValue(String key) async {
+    final rows = await userDatabase
+        .customSelect(
+          'SELECT value FROM data_pack_update_state WHERE key = ?',
+          variables: [Variable<String>(key)],
+          readsFrom: {userDatabase.dataPackUpdateState},
+        )
+        .get();
+    if (rows.isEmpty) return null;
+    return rows.single.read<String>('value');
+  }
+
+  /// 단말별 rollout 버킷 판정용 salt를 로컬에서 1회 생성·영속한다.
+  /// 재호출 시 동일 값 반환(안정). salt는 절대 네트워크로 전송하지 않는다.
+  Future<String> readOrCreateRolloutSalt() async {
+    final existing = await _readValue(_rolloutSaltKey);
+    if (existing != null && RegExp(r'^[a-f0-9]{32}$').hasMatch(existing)) {
+      return existing;
+    }
+    final bytes = List<int>.generate(16, (_) => _secureRandom.nextInt(256));
+    final salt = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    await _put(_rolloutSaltKey, salt, _now());
+    return salt;
   }
 
   Future<void> _put(String key, String value, DateTime updatedAt) async {

@@ -653,6 +653,16 @@ void main() {
     );
   });
 
+  test('rollout 필드를 파싱한다(부재 시 null)', () {
+    final withR = DataPackManifest.fromJson(
+      _v2ManifestJson(rollout: {'percentage': 10, 'seed': 'a' * 32}),
+    );
+    expect(withR.rollout!.percentage, 10);
+    expect(withR.rollout!.seed, 'a' * 32);
+    final without = DataPackManifest.fromJson(_v2ManifestJson());
+    expect(without.rollout, isNull);
+  });
+
   test('데이터팩 manifest는 파일 경로로 안전하지 않은 pack id와 version을 거부한다', () {
     expect(
       () => DataPackManifest.fromJson({
@@ -820,6 +830,72 @@ String _signatureValue(
         utf8.encode('$id:$version:$compressedSha256:$sqliteSha256:$sizeBytes'),
       )
       .toString();
+}
+
+Map<String, Object?> _v2ManifestJson({Map<String, Object?>? rollout}) {
+  final manifest = <String, Object?>{
+    'manifestVersion': 2,
+    'channel': 'production',
+    'releaseSequence': 42,
+    'publishedAt': '2026-06-25T00:00:00.000Z',
+    'expiresAt': '2026-06-26T00:00:00.000Z',
+    'ttlSeconds': 3600,
+    'keyId': 'fixture-key',
+    'activePack': {'id': 'capital', 'version': '18'},
+    'packs': [
+      {
+        'id': 'capital',
+        'version': '18',
+        'url': 'catalog/capital-v18.sqlite.gz',
+        'sha256': 'a' * 64,
+        'sqliteSha256': 'b' * 64,
+        'sizeBytes': 1024,
+        'artifactKind': 'fixture',
+        'representativeRouteRegressions': _representativeRouteRegressions,
+        'representativeRouteRegressionSignature': {
+          'algorithm': 'sha256-route-regression-v1',
+          'value': _routeRegressionSignatureValue(
+            'capital',
+            '18',
+            'a' * 64,
+            'b' * 64,
+            1024,
+          ),
+        },
+        'signature': {
+          'algorithm': 'sha256-pack-manifest-v2',
+          'value': _signatureValue('capital', '18', 'a' * 64, 'b' * 64, 1024),
+        },
+        'sourceInventory': [
+          {
+            'id': 'fixture-capital-catalog',
+            'owner': '테스트',
+            'url': 'https://example.invalid/fixture',
+            'license': 'fixture-only',
+            'licenseStatus': 'fixture-only',
+            'redistributionAllowed': false,
+            'updateFrequency': 'manual',
+            'updatedAt': '2026-06-19T00:00:00.000Z',
+            'fields': ['stations', 'network_edges'],
+          },
+        ],
+        'regionalQualityMetrics': {
+          'stationCount': 2,
+          'facilityCoverageRatio': 0.5,
+          'edgeCount': 2,
+          'unknownAccessibilityRatio': 0.0,
+        },
+        'schemaVersion': '1',
+        'requiredTables': ['catalog_metadata', 'stations'],
+      },
+    ],
+    'rollout': ?rollout,
+  };
+  manifest['signature'] = {
+    'algorithm': 'sha256-manifest-v2',
+    'value': sha256.convert(utf8.encode(_canonicalJson(manifest))).toString(),
+  };
+  return manifest;
 }
 
 Map<String, Object?> _v2FixtureManifest() {

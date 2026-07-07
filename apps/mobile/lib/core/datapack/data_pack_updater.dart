@@ -1,5 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
+import 'package:meta/meta.dart';
 
 import 'data_pack_client.dart';
 import 'data_pack_installer.dart';
@@ -32,6 +37,20 @@ class DataPackUpdater {
       return const [];
     }
 
+    // rollout 버킷 판정 — salt + seed → sha256 → bucket % 100
+    final rollout = manifest.rollout;
+    bool isRolloutApplied = true; // rollout 부재 = 100%(항상 채택)
+    if (rollout != null) {
+      final salt = await client.stateRepository.readOrCreateRolloutSalt();
+      isRolloutApplied = rolloutApplies(salt, rollout);
+    }
+    final rolloutDecision = rollout == null
+        ? 'noRollout'
+        : isRolloutApplied
+        ? 'applied'
+        : 'heldOut';
+    developer.log('rolloutDecision=$rolloutDecision', name: 'DataPackUpdater');
+
     final preUpdateCurrentPointer = await _readCurrentPointerSafely();
     final override = manifest.emergencyOverride;
     final protectedVersionsByPackId = <String, Set<String>>{};
@@ -51,7 +70,7 @@ class DataPackUpdater {
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
-    final packs = _packsToInstall(manifest);
+    final packs = _packsToInstall(manifest, rolloutApplies: isRolloutApplied);
     final results = <DataPackInstallResult>[];
     for (final pack in packs) {
       final uri = packBaseUri.resolve(pack.url.toString());
@@ -72,6 +91,7 @@ class DataPackUpdater {
       final currentPointer = await _currentPointerForManifest(
         manifest: manifest,
         results: results,
+        rolloutApplies: isRolloutApplied,
       );
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
@@ -131,14 +151,20 @@ class DataPackUpdater {
     }
   }
 
-  List<DataPackManifestEntry> _packsToInstall(DataPackManifest manifest) {
+  List<DataPackManifestEntry> _packsToInstall(
+    DataPackManifest manifest, {
+    bool rolloutApplies = true,
+  }) {
     final activePack = manifest.activePack;
     final override = manifest.emergencyOverride;
     final selectedPacks = manifest.packs
         .where((pack) {
+          // emergencyOverride 대상 팩은 rollout과 무관하게 항상 포함
+          if (_matchesOverride(pack, override)) return true;
+          // rollout 비대상이면 일반 팩 제외
+          if (!rolloutApplies) return false;
           final selectedActiveId = activePack?.id ?? activePackId;
-          return pack.id == selectedActiveId ||
-              _matchesOverride(pack, override);
+          return pack.id == selectedActiveId;
         })
         .toList(growable: false);
     final selectedDependencies = selectedPacks
@@ -162,6 +188,7 @@ class DataPackUpdater {
   Future<InstalledDataPackPointer?> _currentPointerForManifest({
     required DataPackManifest manifest,
     required List<DataPackInstallResult> results,
+    bool rolloutApplies = true,
   }) async {
     final activePack = manifest.activePack;
     if (activePack != null) {
@@ -179,6 +206,11 @@ class DataPackUpdater {
       );
       if (installedPointer != null) {
         return installedPointer;
+      }
+      // heldOut 단말 + activePack 미설치: 예외 대신 null 반환(기존 포인터 유지).
+      // rolloutApplied 단말이거나 activePack이 설치된 경우는 이미 위에서 반환.
+      if (!rolloutApplies) {
+        return null;
       }
       throw const DataPackClientException('사용할 이동 정보를 선택하지 못했어요.');
     }
@@ -288,4 +320,23 @@ void _protectVersion(
 
 String _normalizedVersion(String version) {
   return _versionNumber(version).toString();
+}
+
+/// salt + seed → sha256 → 첫 8 hex 자리를 정수로 파싱 → % 100 → 0~99 버킷.
+///
+/// 버킷은 seed에만 의존하므로 percentage와 독립적이다. percentage를 올려도
+/// 기존 버킷이 변하지 않아 단조 편입(monotonic enrollment)이 자동 성립한다.
+@visibleForTesting
+int rolloutBucket(String salt, String seed) {
+  final digest = sha256.convert(utf8.encode('$salt:$seed')).toString();
+  return int.parse(digest.substring(0, 8), radix: 16) % 100;
+}
+
+/// [rolloutBucket] 결과가 [r.percentage] 미만이면 채택(true), 그렇지 않으면 보류(false).
+///
+/// percentage == 0 이면 항상 false(전면 heldOut = kill switch).
+/// percentage == 100 이면 항상 true(전면 채택).
+@visibleForTesting
+bool rolloutApplies(String salt, RolloutManifest r) {
+  return rolloutBucket(salt, r.seed) < r.percentage;
 }
