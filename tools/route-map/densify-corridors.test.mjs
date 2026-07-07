@@ -64,6 +64,24 @@ test("applyCorridor는 회랑 역들을 track축 간격으로 벌리고 전 노�
   assert.ok(Math.abs(Math.abs(pa.y - pb.y) - 30) < 1e-6, `y간격 ${Math.abs(pa.y - pb.y)}`); // 세로축 30px
 });
 
+test("applyCorridor: 단일 공유 정점 붕괴쌍도 두 역 모두 track 정점 위 안착(캐스케이드 오염 방지)", () => {
+  // 정점 1개 (100,100)이 두 역 담당(진짜 0px 공유 정점). 첫 역이 정점을 옮기면
+  // 둘째 역이 이동된 정점을 재포착해 첫 역을 off-track으로 밀던 F1 회귀 방지.
+  const membersSeq = [{ stationId: "a", x: 100, y: 100, seq: 1 }, { stationId: "b", x: 100, y: 100, seq: 2 }];
+  const verts = [{ x: 100, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 300 }];
+  const memberLines = new Map([
+    ["a", [{ lineId: "L", x: 100, y: 100 }]],
+    ["b", [{ lineId: "L", x: 100, y: 100 }]],
+  ]);
+  const tracksByLine = new Map([["L", [{ trackIndex: 0, verts }]]]);
+  const r = applyCorridor(membersSeq, verts, memberLines, tracksByLine, 40);
+  const pa = r.positionUpdates.find((p) => p.stationId === "a"), pb = r.positionUpdates.find((p) => p.stationId === "b");
+  const finalVerts = tracksByLine.get("L")[0].verts;
+  const onTrack = (p) => finalVerts.some((v) => Math.hypot(v.x - p.x, v.y - p.y) <= 1);
+  assert.ok(onTrack(pa), `a off-track: ${pa.x},${pa.y} vs ${JSON.stringify(finalVerts)}`);
+  assert.ok(onTrack(pb), `b off-track: ${pb.x},${pb.y} vs ${JSON.stringify(finalVerts)}`);
+});
+
 test("applyCorridor는 다중 노선노드를 동일 델타로 강체 이동(캡슐 span 보존, 붕괴 방지)", () => {
   // a: 2노선 노드가 6px 오프셋(캡슐), b: 1노선. 붕괴 근접.
   const membersSeq = [{ stationId: "a", x: 100, y: 100, seq: 1 }, { stationId: "b", x: 100, y: 100, seq: 2 }];

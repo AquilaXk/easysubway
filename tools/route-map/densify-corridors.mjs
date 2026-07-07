@@ -84,7 +84,9 @@ export function applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine,
       nodeNew.push({ node, nnp });
       let nodeAttached = false;
       for (const trk of tracksByLine.get(node.lineId) ?? []) {
-        const { verts, attached } = spliceTrackToNode(trk.verts, { x: node.x, y: node.y }, nnp, { maxDist });
+        // matchDist=2: 붕괴 회랑서 앞 역이 옮긴 정점을 뒤 역이 재포착하지 않도록 자기
+        // 정점(≈0px)만 이동, 그 외엔 mid-segment 삽입(F1 캐스케이드 오염 방지).
+        const { verts, attached } = spliceTrackToNode(trk.verts, { x: node.x, y: node.y }, nnp, { maxDist, matchDist: 2 });
         if (attached) { attachedAny = true; nodeAttached = true; if (JSON.stringify(verts) !== JSON.stringify(trk.verts)) pending.push({ lineId: node.lineId, trackIndex: trk.trackIndex, verts, trk }); }
       }
       if (!nodeAttached) unattached.push(node.lineId);
@@ -104,6 +106,9 @@ export function applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine,
  */
 export function applyNoSharedLine(g, memberLines, tracksByLine, repr, targetGap = 30, maxDist = 30) {
   const [aId, bId] = g;
+  // 이 분기는 쌍(반포↔잠원)을 전제로 한 역만 분리한다. union-find가 공유노선 없는
+  // 3+역 성분을 반환하면 index 2+ 멤버는 미처리 — 조용히 잔존하지 않도록 진단.
+  if (g.length > 2) console.warn(`  ⚠️ 공유노선 없는 ${g.length}역 그룹 — 첫 역만 분리, 나머지 ${g.slice(2).join(",")} 미처리`);
   const a = repr.get(aId), b = repr.get(bId);
   const aLine = (memberLines.get(aId) ?? [])[0];
   const track = aLine ? (tracksByLine.get(aLine.lineId) ?? [])[0] : null;
@@ -113,14 +118,21 @@ export function applyNoSharedLine(g, memberLines, tracksByLine, repr, targetGap 
   const dx = away * targetGap * axis.ux, dy = away * targetGap * axis.uy;   // 강체 델타
   const positionUpdates = [], trackUpdates = [];
   let attached = false;
+  const unattached = [];                                                   // 트랙 미부착 노선노드(진단용)
   for (const node of memberLines.get(aId) ?? []) {
     const nnp = { x: Math.round(node.x + dx), y: Math.round(node.y + dy) };
+    let nodeAttached = false;
     for (const trk of tracksByLine.get(node.lineId) ?? []) {
       const r = spliceTrackToNode(trk.verts, { x: node.x, y: node.y }, nnp, { maxDist });
-      if (r.attached) { attached = true; if (JSON.stringify(r.verts) !== JSON.stringify(trk.verts)) { trk.verts = r.verts; trackUpdates.push({ lineId: node.lineId, trackIndex: trk.trackIndex, verts: r.verts }); } }
+      if (r.attached) { attached = true; nodeAttached = true; if (JSON.stringify(r.verts) !== JSON.stringify(trk.verts)) { trk.verts = r.verts; trackUpdates.push({ lineId: node.lineId, trackIndex: trk.trackIndex, verts: r.verts }); } }
     }
+    if (!nodeAttached) unattached.push(node.lineId);
   }
-  if (attached) for (const node of memberLines.get(aId) ?? []) positionUpdates.push({ stationId: aId, lineId: node.lineId, x: Math.round(node.x + dx), y: Math.round(node.y + dy) });
+  if (attached) {
+    // applyCorridor와 대칭: 이동하되 자기 트랙 부착 실패한 노드는 진단(트랙 밖 뜰 수 있음).
+    if (unattached.length) console.warn(`  ⚠️ ${aId}: 노선 ${unattached.join(",")} 트랙 미부착(이동만, maxDist ${maxDist} 밖)`);
+    for (const node of memberLines.get(aId) ?? []) positionUpdates.push({ stationId: aId, lineId: node.lineId, x: Math.round(node.x + dx), y: Math.round(node.y + dy) });
+  }
   return { positionUpdates, trackUpdates };
 }
 
