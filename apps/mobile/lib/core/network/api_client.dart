@@ -116,16 +116,25 @@ class ApiClient {
       }
 
       final response = await request.close().timeout(timeout);
+      final etag = response.headers.value(HttpHeaders.etagHeader);
       final responseBody = await utf8.decodeStream(response).timeout(timeout);
       if (!_isSuccessStatus(response.statusCode)) {
-        return ApiResponse(statusCode: response.statusCode, jsonBody: null);
+        return ApiResponse(
+          statusCode: response.statusCode,
+          jsonBody: null,
+          etag: etag,
+        );
       }
       final decoded = _decodeJson(
         responseBody,
         statusCode: response.statusCode,
         uri: uri,
       );
-      return ApiResponse(statusCode: response.statusCode, jsonBody: decoded);
+      return ApiResponse(
+        statusCode: response.statusCode,
+        jsonBody: decoded,
+        etag: etag,
+      );
     } on ApiException {
       rethrow;
     } on TimeoutException catch (error, stackTrace) {
@@ -167,10 +176,19 @@ class ApiClient {
 }
 
 class ApiResponse {
-  const ApiResponse({required this.statusCode, required this.jsonBody});
+  const ApiResponse({
+    required this.statusCode,
+    required this.jsonBody,
+    this.etag,
+  });
 
   final int statusCode;
   final Object? jsonBody;
+
+  /// 응답 ETag 헤더(있으면). 조건부 GET(If-None-Match) 캐시에 쓴다.
+  final String? etag;
+
+  bool get isNotModified => statusCode == HttpStatus.notModified;
 
   bool get isUnauthorized => statusCode == HttpStatus.unauthorized;
   bool get isOk => statusCode == HttpStatus.ok;
