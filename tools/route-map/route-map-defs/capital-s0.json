@@ -104,6 +104,14 @@
     "한강-잠실": {
       "x": 3360,
       "y": 1894
+    },
+    "노원": {
+      "x": 3000,
+      "y": 618
+    },
+    "이수": {
+      "x": 2215,
+      "y": 1885
     }
   },
   "lines": [
@@ -288,6 +296,92 @@
               "station": "station-sinseoldong"
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "수도권 4호선",
+      "vertices": [
+        {
+          "x": 3498,
+          "y": 120,
+          "station": "station-3e091a24f4c3"
+        },
+        {
+          "anchor": "노원",
+          "station": "station-239ba3bb73a6"
+        },
+        {
+          "anchor": "동대문역사문화공원",
+          "station": "station-b1f32d3f7d4d"
+        },
+        {
+          "x": 2050,
+          "y": 1568
+        },
+        {
+          "anchor": "한강-동작",
+          "station": "station-e95f8616788c"
+        },
+        {
+          "anchor": "이수",
+          "station": "station-2a2d0080fa4a"
+        },
+        {
+          "anchor": "사당",
+          "station": "station-sadang"
+        },
+        {
+          "x": 1515,
+          "y": 2940,
+          "station": "station-5c711e1beea4"
+        }
+      ]
+    },
+    {
+      "name": "수도권 7호선",
+      "vertices": [
+        {
+          "x": 3000,
+          "y": 318,
+          "station": "station-3f057ea30a7d"
+        },
+        {
+          "anchor": "노원",
+          "station": "station-239ba3bb73a6"
+        },
+        {
+          "x": 3692,
+          "y": 1310
+        },
+        {
+          "anchor": "건대입구",
+          "station": "station-e773d203ef9f"
+        },
+        {
+          "x": 2790,
+          "y": 1310
+        },
+        {
+          "anchor": "이수",
+          "station": "station-2a2d0080fa4a"
+        },
+        {
+          "x": 2136,
+          "y": 1964
+        },
+        {
+          "anchor": "대림",
+          "station": "station-b6c9b1f02168"
+        },
+        {
+          "x": 1140,
+          "y": 2264
+        },
+        {
+          "x": 440,
+          "y": 2264,
+          "station": "station-57db2f1fb4f6"
         }
       ]
     }
