@@ -11699,6 +11699,14 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
 
+  const repoTool = await classifyChangedFiles(["tools/repo/check-split-readiness.mjs"]);
+  assert.equal(repoTool.repository, "true");
+  assert.equal(repoTool.ci, "true");
+
+  const envExample = await classifyChangedFiles([".env.example"]);
+  assert.equal(envExample.repository, "true");
+  assert.equal(envExample.contracts, "true");
+
   const infra = await classifyChangedFiles(["infra/docker-compose.yml"]);
   assert.equal(infra.repository, "true");
   assert.equal(infra.deploy, "true");

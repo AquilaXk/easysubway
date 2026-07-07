@@ -173,14 +173,14 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/ci/*.test.mjs tools/ci/lib/*.test.mjs
+        run: node --test tools/ci/*.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs
 
       - name: Repository CI / Validate contracts
         if: ${{ needs.changes.outputs.contracts == 'true' }}
         run: node tools/ci/check-contracts.mjs
 
       - name: Repository CI / Check directory boundaries
-        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' }}
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.datapack == 'true' }}
         run: node tools/ci/check-boundaries.mjs
 
       - name: Repository CI / Run data pack tool tests
