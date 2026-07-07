@@ -1,8 +1,13 @@
+#!/usr/bin/env node
 // #1789 P2.1: 밀집 회랑을 공유 노선 track 방향으로 arc-length 재배치하고 그룹-원자 splice로 옮긴다
 // (캡슐 강체 보존, respace 무재실행). 축은 track 로컬 방향(붕괴 그룹도 정의됨), 정렬은 line_sequence.
 // track 방향 이동이라 8선형이 구성상 보존된다.
 
+import { readFileSync } from "node:fs";
 import { spliceTrackToNode } from "./splice-transfer-convergence.mjs";
+import { parsePathVertices, verticesToPath } from "./audit-octolinearity.mjs";
+import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
+import { denseHubs } from "./densify-hubs.mjs";
 
 const SNAP8 = [
   { ux: 1, uy: 0 }, { ux: Math.SQRT1_2, uy: Math.SQRT1_2 }, { ux: 0, uy: 1 }, { ux: -Math.SQRT1_2, uy: Math.SQRT1_2 },
@@ -114,3 +119,72 @@ export function applyNoSharedLine(g, memberLines, tracksByLine, repr, targetGap 
   if (attached) for (const node of memberLines.get(aId) ?? []) positionUpdates.push({ stationId: aId, lineId: node.lineId, x: Math.round(node.x + dx), y: Math.round(node.y + dy) });
   return { positionUpdates, trackUpdates };
 }
+
+function parseArgs(argv) {
+  const o = { pack: "apps/mobile/assets/datapacks/capital.sqlite.gz", index: "apps/mobile/assets/datapacks/index.json", region: "수도권", threshold: 26, gap: 30, check: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a === "--pack") o.pack = argv[++i]; else if (a === "--index") o.index = argv[++i];
+    else if (a === "--region") o.region = argv[++i]; else if (a === "--threshold") o.threshold = Number(argv[++i]);
+    else if (a === "--gap") o.gap = Number(argv[++i]); else if (a === "--check") o.check = true;
+  }
+  return o;
+}
+
+function main() {
+  const o = parseArgs(process.argv.slice(2));
+  const { db, dir, sqlitePath, packPath } = openPack(o.pack, "densify-cor-");
+  try {
+    const posRows = db.prepare("SELECT station_id, line_id, x, y FROM route_map_positions WHERE region=?").all(o.region);
+    const memberLines = new Map(); // stationId → [{lineId,x,y}]
+    const repr = new Map();        // stationId → {x,y} 대표(평균)
+    for (const r of posRows) {
+      if (!memberLines.has(r.station_id)) memberLines.set(r.station_id, []);
+      memberLines.get(r.station_id).push({ lineId: r.line_id, x: r.x, y: r.y });
+    }
+    for (const [id, ns] of memberLines) repr.set(id, { x: ns.reduce((s, n) => s + n.x, 0) / ns.length, y: ns.reduce((s, n) => s + n.y, 0) / ns.length });
+    const stations = [...repr].map(([stationId, p]) => ({ stationId, ...p }));
+    const groups = denseHubs(stations, o.threshold);
+    // station_lines: stationId → [{lineId, seq}] (공유 노선·순서 판정용)
+    const stationLines = new Map();
+    for (const r of db.prepare("SELECT sl.station_id, sl.line_id, sl.line_sequence AS seq FROM station_lines sl JOIN route_map_positions p ON p.station_id=sl.station_id AND p.line_id=sl.line_id AND p.region=?").all(o.region)) {
+      if (!stationLines.has(r.station_id)) stationLines.set(r.station_id, []);
+      stationLines.get(r.station_id).push({ lineId: r.line_id, seq: r.seq });
+    }
+    const trackRows = db.prepare("SELECT line_id, track_index, path FROM route_map_line_tracks WHERE region=? ORDER BY line_id, track_index").all(o.region);
+    const tracksByLine = new Map();
+    for (const t of trackRows) { if (!tracksByLine.has(t.line_id)) tracksByLine.set(t.line_id, []); tracksByLine.get(t.line_id).push({ trackIndex: t.track_index, verts: parsePathVertices(t.path) }); }
+    console.log(`[${o.region}] 밀집 회랑 ${groups.length}그룹 (역 ${groups.reduce((s, g) => s + g.length, 0)})`);
+    const posU = db.prepare("UPDATE route_map_positions SET x=?, y=? WHERE region=? AND station_id=? AND line_id=?");
+    const trkU = db.prepare("UPDATE route_map_line_tracks SET path=? WHERE region=? AND line_id=? AND track_index=?");
+    if (!o.check) db.exec("BEGIN");
+    let applied = 0;
+    for (const g of groups) {
+      // 공유 노선(전 멤버 교집합) 판정
+      let common = null;
+      for (const id of g) { const ls = new Set((stationLines.get(id) ?? []).map((x) => x.lineId)); common = common === null ? ls : new Set([...common].filter((l) => ls.has(l))); }
+      const sharedLine = common && common.size ? [...common][0] : null;
+      let positionUpdates, trackUpdates;
+      if (sharedLine && (tracksByLine.get(sharedLine) ?? [])[0]) {
+        const trackVerts = tracksByLine.get(sharedLine)[0].verts;
+        const membersSeq = g.map((id) => ({ stationId: id, ...repr.get(id), seq: (stationLines.get(id) ?? []).find((x) => x.lineId === sharedLine)?.seq ?? 0 }));
+        ({ positionUpdates, trackUpdates } = applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine, o.gap * 2 + 20));
+      } else {
+        // 공유 노선 없음(반포↔잠원): 한 역만 자기 노선 track 방향으로 이동
+        ({ positionUpdates, trackUpdates } = applyNoSharedLine(g, memberLines, tracksByLine, repr, o.gap, o.gap * 2 + 20));
+      }
+      if (!positionUpdates.length) { console.log(`  미부착 그룹: ${g.join(",")}`); continue; }
+      applied += 1;
+      if (o.check) continue;
+      for (const p of positionUpdates) posU.run(p.x, p.y, o.region, p.stationId, p.lineId);
+      for (const tu of trackUpdates) trkU.run(verticesToPath(tu.verts), o.region, tu.lineId, tu.trackIndex);
+    }
+    console.log(`  적용 ${applied}/${groups.length}`);
+    if (o.check) { console.log("(--check: 미기록)"); db.close(); return; }
+    db.exec("COMMIT"); db.exec("VACUUM"); db.close();
+    const { byteSize } = writePack({ sqlitePath, packPath, packRelPath: o.pack, indexRelPath: o.index });
+    console.log(`팩 갱신 (byteSize ${byteSize})`);
+  } finally { try { db.close(); } catch { /* 이미 닫힘 */ } cleanupPackDir(dir); }
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) main();
