@@ -3,7 +3,7 @@
   "$id": "easysubway/contracts/datapack/datapack-manifest",
   "title": "원격 데이터팩 manifest",
   "type": "object",
-  "required": ["ttlSeconds", "packs", "activePack"],
+  "required": ["ttlSeconds", "packs"],
   "additionalProperties": false,
   "properties": {
     "manifestVersion": { "type": "integer", "enum": [1, 2] },
