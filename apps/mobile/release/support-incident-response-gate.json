@@ -30,7 +30,7 @@
       "id": "support_email",
       "source": "EASYSUBWAY_SUPPORT_EMAIL",
       "ownerKo": "고객지원 담당자",
-      "readyWhenKo": "스토어 연락처, 앱 도움말, README의 support email이 같은 운영 수신함으로 연결되고 수신 테스트를 통과한다.",
+      "readyWhenKo": "스토어 연락처, 앱 도움말, 공개 정책 페이지의 support email이 같은 운영 수신함으로 연결되고 수신 테스트를 통과한다.",
       "requiredEvidence": ["support-mailbox-receive-test", "store-contact-preview", "app-help-screen-contact-check"]
     },
     {

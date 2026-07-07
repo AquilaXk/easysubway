@@ -40,8 +40,7 @@
       "linkedArtifacts": [
         "tools/ops/facility-report-photo-backup.sh",
         "tools/ops/facility-report-photo-restore-check.mjs",
-        "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql",
-        "README.md"
+        "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql"
       ]
     },
     {

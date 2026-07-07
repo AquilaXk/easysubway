@@ -234,7 +234,7 @@
       "ownerKo": "개인정보/릴리즈 담당",
       "readyWhenKo": "Data safety, App Privacy, PrivacyInfo, 스토어 심사 정보, 앱 도움말, 보안 문의 경로와 release network trace가 같은 데이터 처리와 삭제 요청 기준을 설명한다.",
       "evidence": ["privacy-inventory-cross-check", "store-submission-readiness-review", "help-screen-review", "release-network-trace-review"],
-      "linkedArtifacts": ["apps/mobile/release/store-privacy-inventory.json", "apps/mobile/release/store-submission-readiness.json", "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy", "README.md"]
+      "linkedArtifacts": ["apps/mobile/release/store-privacy-inventory.json", "apps/mobile/release/store-submission-readiness.json", "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy"]
     }
   ]
 }
