@@ -91,6 +91,7 @@ class FacilityReportApiGoldenFixtureTest {
 
 		ObjectNode root = (ObjectNode) objectMapper.readTree(body);
 		ObjectNode data = (ObjectNode) root.get("data");
+		assertHasNonNull(data, "objectKey", "uploadUrl", "expiresAt");
 		data.put("objectKey", "reports/__REPORT_UPLOAD_OBJECT_KEY__.jpg");
 		data.put("uploadUrl", "/api/v1/report-uploads/__REPORT_UPLOAD_ID__");
 		data.put("expiresAt", "__EXPIRES_AT__");
@@ -129,6 +130,10 @@ class FacilityReportApiGoldenFixtureTest {
 	private JsonNode normalizeReport(String body, boolean includeReceiptToken) throws Exception {
 		ObjectNode root = (ObjectNode) objectMapper.readTree(body);
 		ObjectNode data = (ObjectNode) root.get("data");
+		assertHasNonNull(data, "id", "createdAt");
+		if (includeReceiptToken) {
+			assertHasNonNull(data, "receiptToken");
+		}
 		data.put("id", "__REPORT_ID__");
 		data.put("createdAt", "__CREATED_AT__");
 		if (data.has("reviewedAt") && !data.get("reviewedAt").isNull()) {
@@ -141,6 +146,12 @@ class FacilityReportApiGoldenFixtureTest {
 			data.put("publicReceiptCode", "__PUBLIC_RECEIPT_CODE__");
 		}
 		return root;
+	}
+
+	private void assertHasNonNull(ObjectNode data, String... fields) {
+		for (String field : fields) {
+			assertThat(data.hasNonNull(field)).as(field).isTrue();
+		}
 	}
 
 	private void assertFixture(String fileName, JsonNode actual) throws Exception {

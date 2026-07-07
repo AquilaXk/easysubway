@@ -41,6 +41,11 @@ while IFS= read -r file; do
     contracts/**)
       repository=true
       contracts=true
+      backend=true
+      mobile=true
+      android=true
+      ios=true
+      datapack=true
       ;;
     .github/workflows/*.yml|tools/ci/**)
       ci=true
