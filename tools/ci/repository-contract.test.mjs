@@ -3144,7 +3144,10 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   ]) {
     const item = readinessItems.get(id);
     assert.ok(item, `${id} must be present in store submission readiness`);
-    assert.ok(item.linkedArtifacts.length > 0, `${id} must link at least one public evidence artifact`);
+    assert.ok(
+      item.linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"),
+      `${id} must link the store privacy inventory as its public evidence anchor`,
+    );
   }
 
 
