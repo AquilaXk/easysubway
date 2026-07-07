@@ -5701,7 +5701,11 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
-  const kricCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("kric-"));
+  // kric-subway-timetable은 라이브 재구성 실증을 가진 schedule_timetable 후보라 "샘플 URL만 문서화된"
+  // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
+  const kricCandidates = candidates.candidates.filter(
+    (candidate) => candidate.id.startsWith("kric-") && candidate.id !== "kric-subway-timetable",
+  );
 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
@@ -5947,11 +5951,103 @@ test("TAGO 시간표 후보는 production PLANNED ETA 근거로 자동 승격되
     candidate.capabilities.schedule.unsupportedNotes,
     "commercial schedule import remains blocked until a provider trip/stop-sequence source is identified and validated",
   );
+  // TAGO 자체 진실은 유지(trnNo 없음): blocker·missingEvidence·capabilities.schedule 불변.
+  // 갱신은 참조뿐 — trip/stop-sequence 소스가 kric-subway-timetable로 식별됐음을 evidence·nextAction에 기록.
   assert.deepEqual(candidate.evidence.missingEvidence, ["tripStopSequenceSource"]);
+  assert.equal(candidate.evidence.tripStopSequenceSourceIdentifiedCandidateId, "kric-subway-timetable");
+  assert.ok(
+    candidates.candidates.some((entry) => entry.id === "kric-subway-timetable"),
+    "식별된 trip/stop-sequence 소스 후보가 명부에 실재해야 한다",
+  );
+  assert.match(candidate.nextAction, /kric-subway-timetable/);
+  assert.match(candidate.nextAction, /하이브리드|재규정/);
   assert.ok(candidate.evidence.outputFields.includes("depTime"));
   assert.ok(candidate.evidence.outputFields.includes("arrTime"));
   assert.ok(candidate.evidence.outputFields.includes("dailyTypeCode"));
   assert.ok(candidate.evidence.outputFields.includes("upDownTypeCode"));
+});
+
+test("KRIC subwayTimetable 후보는 line-wide trip/stop-sequence 검증 증거를 기록하되 admin review 전엔 미승격이다", () => {
+  const inventory = readJson("tools/datapack/source-inventory.json");
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
+  const candidate = candidates.candidates.find(({ id }) => id === "kric-subway-timetable");
+
+  assert.ok(candidate, "kric-subway-timetable 후보가 존재해야 한다");
+  assert.equal(candidate.priority, "P0");
+  assert.equal(candidate.domain, "schedule_timetable");
+  assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
+
+  // validated_live_sample은 라이브 샘플 해시 3종을 동반한다(admitted sibling과 동일 규약).
+  // 승격 시 validate-source-inventory:validateAdmissionEvidence가 liveSampleEvidenceHash를 강제하므로,
+  // 후보 시점부터 실샘플 해시를 기록해 status와 증거를 일치시킨다(라이브 캡처, 원본 미커밋).
+  assert.match(candidate.evidence.liveSampleRawSha256, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleSchemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
+  assert.ok(Number.isInteger(candidate.evidence.liveSampleRowCount) && candidate.evidence.liveSampleRowCount > 0);
+  assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  // base subwayTimetable 샘플 필드는 trip 재구성 축(trnNo)+시각(arvTm/dptTm)을 포함하되 exptCd는 없다(Exp 전용).
+  assert.ok(candidate.evidence.liveSampleFields.includes("trnNo"));
+  assert.ok(candidate.evidence.liveSampleFields.includes("arvTm"));
+  assert.ok(candidate.evidence.liveSampleFields.includes("dptTm"));
+  assert.equal(candidate.evidence.liveSampleFields.includes("exptCd"), false);
+
+  // B(evidence 기록 → admin review 대기): 세션이 스스로 admitted로 올리지 않는다.
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(productionSourceIds.has(candidate.id), false, "미승격 후보는 production inventory에 없어야 한다");
+
+  // capabilities.schedule은 CANDIDATE + productionUseAllowed:false. 재구성 실증은 status가 아니라 evidence에 담는다.
+  assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => left.localeCompare(right)), [
+    "facility",
+    "realtime",
+    "schedule",
+  ]);
+  assert.equal(candidate.capabilities.schedule.status, "CANDIDATE");
+  assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
+  assert.equal(candidate.capabilities.schedule.coverageStatus, "TRIP_STOP_SEQUENCE_VALIDATED_LINE4_PILOT");
+  assert.equal(candidate.capabilities.realtime.status, "UNSUPPORTED");
+  assert.equal(candidate.capabilities.facility.status, "UNSUPPORTED");
+
+  // endpoint·라이선스 근거.
+  assert.match(candidate.detailUrl, /^https:\/\/data\.kric\.go\.kr\/rips\/M_01_02\//);
+  assert.match(candidate.requestUrl, /^https:\/\/openapi\.kric\.go\.kr\/openapi\/trainUseInfo\/subwayTimetable$/);
+  assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
+  assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
+  assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  assert.ok(candidate.evidence.outputFields.includes("trnNo"), "trip 재구성 축인 trnNo가 있어야 한다");
+  assert.ok(candidate.evidence.outputFields.includes("exptCd"), "급행 표시 exptCd가 있어야 한다");
+
+  // operation별 승인 상태 명시(이슈 스코프 1항): subwayTimetable 승인 / subwayTimetableExp 정식 승인 evidence 대기.
+  const operationById = new Map(candidate.evidence.collectionOperations.map((op) => [op.operation, op]));
+  assert.equal(operationById.get("subwayTimetable").usePermissionApplicationStatus, "approved");
+  assert.equal(
+    operationById.get("subwayTimetableExp").usePermissionApplicationStatus,
+    "collection_succeeded_formal_approval_evidence_pending",
+  );
+  assert.equal(operationById.get("subwayTimetableExp").liveCollectionResultCode, "00");
+
+  // 재구성 검증 evidence(895 trip·33,062 stop_times·실패0)는 커밋된 아티팩트로 뒷받침.
+  const reconstruction = candidate.evidence.reconstructionValidation;
+  assert.equal(reconstruction.status, "validated_line_wide_trip_stop_sequence");
+  assert.equal(reconstruction.tool, "tools/datapack/reconstruct-transit-trips.mjs");
+  assert.equal(reconstruction.tripCount, 895);
+  assert.equal(reconstruction.stopTimesCount, 33062);
+  assert.equal(reconstruction.requestCount, 153);
+  assert.equal(reconstruction.failureCount, 0);
+  assert.equal(reconstruction.monotoneLineSequenceEnforced, true);
+  assert.match(read(reconstruction.stationRosterArtifact), /"sourceId": "kric-subway-route-info"/);
+  assert.match(read(reconstruction.committedProofOfShapeArtifact), /INSERT INTO/i);
+  assert.equal(candidate.evidence.scheduleImporterValidation.plannedEtaUseAllowed, false);
+
+  // 승격 체크리스트 4항이 nextAction에 남아 있어야 한다(#1845 활성 선행 게이트).
+  assert.match(candidate.nextAction, /admitted_to_production_inventory/);
+  assert.match(candidate.nextAction, /admin review/i);
+  assert.match(candidate.nextAction, /source-inventory\.json/);
+  assert.match(candidate.nextAction, /subwayTimetableExp/);
+  assert.match(candidate.nextAction, /ledger/i);
 });
 
 test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {
