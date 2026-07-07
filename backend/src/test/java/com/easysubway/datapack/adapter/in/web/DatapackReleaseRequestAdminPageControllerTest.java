@@ -187,6 +187,17 @@ class DatapackReleaseRequestAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("PUBLISHED + promote REJECTED 행은 'promote 수동 필요'와 사유를 렌더한다")
+	void listRendersPromoteRejected() throws Exception {
+		insertReleaseRequest("rr-pub-1", "PUBLISHED", "https://run/1");
+		jdbcTemplate.update("UPDATE datapack_release_request SET promote_outcome='REJECTED', promote_detail='evidence bundle not registered' WHERE approval_id='rr-pub-1'");
+		String html = mockMvc.perform(get("/admin/datapack/release-requests/page")
+				.with(user("viewer").authorities(new SimpleGrantedAuthority("admin.datapack.read"))))
+			.andReturn().getResponse().getContentAsString();
+		assertThat(html).contains("promote 수동 필요").contains("evidence bundle not registered");
+	}
+
+	@Test
 	@DisplayName("목록은 DISPATCH_FAILED 행에 재시도 버튼을, workflow run URL이 있으면 링크를 렌더한다")
 	void listRendersRetryButtonAndWorkflowRunLink() throws Exception {
 		insertReleaseRequest("rr-failed-3", "DISPATCH_FAILED", null);
