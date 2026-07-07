@@ -196,7 +196,7 @@ export function loadAndValidateDefs(defs) {
   if (!defs || typeof defs !== "object") {
     throw new Error("정의가 객체가 아닙니다.");
   }
-  if (!defs.region) throw new Error("정의에 region이 없습니다.");
+  // region은 선택 필드 — 없으면 null 반환(buildPolylinePack에서 CLI --region으로 보완).
   if (!Array.isArray(defs.lines) || defs.lines.length === 0) {
     throw new Error("정의에 lines가 없습니다.");
   }
@@ -288,7 +288,7 @@ export function loadAndValidateDefs(defs) {
     }
   }
 
-  return { region: defs.region, anchors, lines, guides: defs.guides ?? [] };
+  return { region: defs.region ?? null, anchors, lines, guides: defs.guides ?? [] };
 }
 
 // ── 역 배치(고정 + 중간역 균등 투영) ──────────────────────────────────────
@@ -309,6 +309,9 @@ function subPolyline(vertices, startIdx, endIdx, closed) {
  * 세그먼트 예산 위반·미배치 역은 한국어 throw.
  */
 export function planLine({ line, sequence, minGap = DEFAULT_MIN_GAP }) {
+  if (!Number.isFinite(minGap) || minGap <= 0) {
+    throw new Error(`minGap은 양의 유한수여야 합니다(현재값: ${minGap}).`);
+  }
   const seqIndex = new Map();
   sequence.forEach((sid, i) => seqIndex.set(sid, i));
 
@@ -491,8 +494,27 @@ export function buildPolylinePack({
   targetGap = DEFAULT_TARGET_GAP,
   check = false,
 }) {
+  // --region 오버라이드 불일치 검증: defs.region이 있고 CLI region이 다르면 즉시 에러.
+  if (region !== null && region !== undefined && defs.region && region !== defs.region) {
+    throw new Error(
+      `--region "${region}"이(가) 정의 파일의 region "${defs.region}"과(와) 불일치합니다. ` +
+        `정의를 수정하거나 --region을 생략하세요.`,
+    );
+  }
+  // minGap / targetGap 숫자 검증: NaN·0·음수이면 세그먼트 예산 검증이 조용히 무력화됨.
+  if (!Number.isFinite(minGap) || minGap <= 0) {
+    throw new Error(`minGap은 양의 유한수여야 합니다(현재값: ${minGap}).`);
+  }
+  if (!Number.isFinite(targetGap) || targetGap <= 0) {
+    throw new Error(`targetGap은 양의 유한수여야 합니다(현재값: ${targetGap}).`);
+  }
   const model = loadAndValidateDefs(defs);
   const targetRegion = region ?? model.region;
+  if (!targetRegion) {
+    throw new Error(
+      "region이 지정되지 않았습니다(--region 인자 또는 정의의 region 필드 필요).",
+    );
+  }
 
   const { dir, sqlitePath } = readPackToTemp(basePackPath, "polyline-pack-");
   try {
@@ -627,8 +649,24 @@ function parseArgs(argv) {
       case "--base-pack": o.basePack = argv[++i]; break;
       case "--out": o.out = argv[++i]; break;
       case "--region": o.region = argv[++i]; break;
-      case "--min-gap": o.minGap = Number(argv[++i]); break;
-      case "--target-gap": o.targetGap = Number(argv[++i]); break;
+      case "--min-gap": {
+        const raw = argv[++i];
+        const v = Number(raw);
+        if (!Number.isFinite(v) || v <= 0) {
+          throw new Error(`--min-gap은 양의 유한수여야 합니다: "${raw}".`);
+        }
+        o.minGap = v;
+        break;
+      }
+      case "--target-gap": {
+        const raw = argv[++i];
+        const v = Number(raw);
+        if (!Number.isFinite(v) || v <= 0) {
+          throw new Error(`--target-gap은 양의 유한수여야 합니다: "${raw}".`);
+        }
+        o.targetGap = v;
+        break;
+      }
       case "--check": o.check = true; break;
       default:
         throw new Error(`알 수 없는 인자: ${argv[i]}`);
@@ -662,6 +700,14 @@ function main() {
       `[${result.region}] ${line.line}: 정점 ${line.vertices} · 지선 ${line.spurs} · ` +
         `구간 ${line.arcs.length} · 역 ${line.positions} · 간격 min ${min}/med ${median}/max ${max}`,
     );
+    // 구간별 실제 간격 vs. targetGap 편차 표시.
+    for (const arc of line.arcs) {
+      const pct = round3(((arc.gap - o.targetGap) / o.targetGap) * 100);
+      const sign = pct >= 0 ? "+" : "";
+      console.log(
+        `  ${arc.from}→${arc.to}: gap ${arc.gap} (target ${o.targetGap}, ${sign}${pct}%)`,
+      );
+    }
   }
   if (result.check) {
     console.log("(--check: 스파이크 팩 미기록)");

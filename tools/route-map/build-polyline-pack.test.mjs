@@ -457,6 +457,93 @@ test("buildPolylinePack: baseline 불변 + 스파이크에 대상 노선만", ()
   }
 });
 
+// ── [CR-1] --region 오버라이드 불일치 검증 ────────────────────────────────
+
+test("[CR-1] --region이 defs.region과 다르면 즉시 에러(두 값 포함)", () => {
+  const { dir, packPath } = buildFixturePack();
+  try {
+    // defs.region = "수도권", CLI region = "부산" → 불일치 에러.
+    assert.throws(
+      () =>
+        buildPolylinePack({
+          defs: validDefs(),
+          basePackPath: packPath,
+          outPath: path.join(dir, "spike.sqlite.gz"),
+          region: "부산",
+        }),
+      (err) => {
+        assert.ok(/불일치/.test(err.message), `에러 메시지에 "불일치" 없음: ${err.message}`);
+        assert.ok(/부산/.test(err.message), `에러 메시지에 CLI 값 "부산" 없음: ${err.message}`);
+        assert.ok(/수도권/.test(err.message), `에러 메시지에 defs 값 "수도권" 없음: ${err.message}`);
+        return true;
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("[CR-1] --region이 defs.region과 동일하면 통과", () => {
+  const { dir, packPath } = buildFixturePack();
+  try {
+    // defs.region = "수도권", CLI region = "수도권" → 일치, 에러 없음.
+    assert.doesNotThrow(() =>
+      buildPolylinePack({
+        defs: validDefs(),
+        basePackPath: packPath,
+        outPath: path.join(dir, "spike2.sqlite.gz"),
+        region: "수도권",
+      }),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── [CR-2] --min-gap / --target-gap 숫자 검증 ────────────────────────────
+
+test("[CR-2] NaN minGap → 양의 유한수 에러(planLine 직접 호출)", () => {
+  const model = loadAndValidateDefs(validDefs());
+  assert.throws(
+    () => planLine({ line: model.lines[1], sequence: L4_STATIONS.map((s) => s.id), minGap: NaN }),
+    /양의 유한수/,
+  );
+});
+
+test("[CR-2] 음수 minGap → 에러", () => {
+  const model = loadAndValidateDefs(validDefs());
+  assert.throws(
+    () => planLine({ line: model.lines[1], sequence: L4_STATIONS.map((s) => s.id), minGap: -1 }),
+    /양의 유한수/,
+  );
+});
+
+test("[CR-2] 0 minGap → 에러", () => {
+  const model = loadAndValidateDefs(validDefs());
+  assert.throws(
+    () => planLine({ line: model.lines[1], sequence: L4_STATIONS.map((s) => s.id), minGap: 0 }),
+    /양의 유한수/,
+  );
+});
+
+test("[CR-2] NaN targetGap → buildPolylinePack 에러", () => {
+  const { dir, packPath } = buildFixturePack();
+  try {
+    assert.throws(
+      () =>
+        buildPolylinePack({
+          defs: validDefs(),
+          basePackPath: packPath,
+          outPath: path.join(dir, "spike.sqlite.gz"),
+          targetGap: NaN,
+        }),
+      /양의 유한수/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("buildPolylinePack --check: 파일 미기록 + 통계", () => {
   const { dir, packPath } = buildFixturePack();
   try {
