@@ -50,6 +50,10 @@ class DatapackReleaseCallbackServiceTest {
     }
 
     private void insertRow(String status) {
+        insertRow(status, "staging");
+    }
+
+    private void insertRow(String status, String targetChannel) {
         jdbcTemplate.update(
             "INSERT INTO datapack_release_request "
                 + "(approval_id, candidate_id, scope_id, target_channel, "
@@ -57,7 +61,7 @@ class DatapackReleaseCallbackServiceTest {
                 + "requested_by, approved_by, status, dispatch_idempotency_key, workflow_run_url, "
                 + "created_at, approved_at, updated_at, promote_outcome, promote_detail) "
                 + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            APPROVAL_ID, "cand-1", "scope-1", "staging",
+            APPROVAL_ID, "cand-1", "scope-1", targetChannel,
             SHA, SHA, SHA,
             "alice", "bob", status, "idem-key", null,
             Timestamp.valueOf(T0), Timestamp.valueOf(T0), Timestamp.valueOf(T0),
@@ -216,7 +220,7 @@ class DatapackReleaseCallbackServiceTest {
     @Test
     @DisplayName("(g) PASS + production 채널 없음 → status PUBLISHED 유지 + promote_outcome=REJECTED + promote_detail에 사유")
     void passWithNoProductionChannel_publishesAndRejectsPromote() {
-        insertRow("DISPATCHED");
+        insertRow("DISPATCHED", "production");
         // 채널을 삽입하지 않음 → findChannel returns empty → promote REJECTED
         String sig = computeSignature("PASS");
         CallbackResult result = service.receive(command("PASS", sig));
@@ -231,7 +235,7 @@ class DatapackReleaseCallbackServiceTest {
     @Test
     @DisplayName("(h) PASS + evidence 사전등록 완비 → promote_outcome=SUCCEEDED, 채널 포인터 갱신")
     void passWithEvidenceBundle_publishesAndSucceedsPromote() {
-        insertRow("DISPATCHED");
+        insertRow("DISPATCHED", "production");
         insertCallbackTestCandidate(CAND_PREV, SHA_PREV);
         insertCallbackTestCandidate("cand-1", SHA);
         insertCallbackTestChannel(CAND_PREV, SHA_PREV);
@@ -252,7 +256,7 @@ class DatapackReleaseCallbackServiceTest {
     @Test
     @DisplayName("(i) PASS + production 채널 존재 + evidence bundle 미등록 → status PUBLISHED 유지 + promote_outcome=REJECTED")
     void passWithChannelButNoEvidenceBundle_publishesAndRejectsPromote() {
-        insertRow("DISPATCHED");
+        insertRow("DISPATCHED", "production");
         insertCallbackTestCandidate(CAND_PREV, SHA_PREV);
         insertCallbackTestCandidate("cand-1", SHA);
         insertCallbackTestChannel(CAND_PREV, SHA_PREV);

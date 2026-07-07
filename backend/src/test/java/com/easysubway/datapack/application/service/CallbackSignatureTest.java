@@ -23,6 +23,18 @@ class CallbackSignatureTest {
     }
 
     @Test
+    @DisplayName("빈 키로 생성된 CallbackSignature의 verify는 false 반환(dormant 경로)")
+    void emptyKeyVerifyReturnsFalse() {
+        var sig = new CallbackSignature("");
+        var f = new CanonicalFields(1, "datapack-release-callback", "req-001",
+            "https://github.com/example/actions/runs/1",
+            "a".repeat(64), "b".repeat(64), "c".repeat(64), "d".repeat(64),
+            "PASS", "PASS", "PASS");
+        assertThat(sig.verify(f, "any-value")).isFalse();
+        assertThat(sig.verify(f, null)).isFalse();
+    }
+
+    @Test
     @DisplayName("공유 fixture 벡터의 기대 HMAC과 일치하고 위조는 verify=false")
     void matchesSharedVector() throws Exception {
         var root = Path.of(System.getProperty("user.dir")).getParent(); // backend → repo root

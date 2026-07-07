@@ -26,7 +26,7 @@ public class CallbackSignature {
     }
 
     public boolean verify(CanonicalFields f, String provided) {
-        if (provided == null) {
+        if (provided == null || key.length == 0) {
             return false;
         }
         byte[] a = sign(f).getBytes(StandardCharsets.UTF_8);

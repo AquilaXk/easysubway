@@ -86,10 +86,10 @@ public class DatapackReleaseCallbackService {
 
     private void tryPromote(DatapackReleaseRequest r, CallbackCommand cmd) {
         try {
-            var channel = channelCommandPort.findChannel("production")
-                .orElseThrow(() -> new IllegalStateException("production channel missing"));
+            var channel = channelCommandPort.findChannel(r.targetChannel())
+                .orElseThrow(() -> new IllegalStateException(r.targetChannel() + " channel missing"));
             promoteDelegate.promote(new ReleaseChannelCommand(
-                "production", channel.candidateId(), r.candidateId(),
+                r.targetChannel(), channel.candidateId(), r.candidateId(),
                 channel.manifestSha256(), cmd.manifestSha256(),
                 r.requestedBy(), r.approvedBy(), "auto-promote via release callback",
                 "callback:" + r.approvalId(), cmd.workflowRunUrl(), cmd.evidenceBundleSha256()));

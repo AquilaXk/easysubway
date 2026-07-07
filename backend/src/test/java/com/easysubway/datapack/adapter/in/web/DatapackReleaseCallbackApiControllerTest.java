@@ -147,4 +147,21 @@ class DatapackReleaseCallbackApiControllerTest {
                 .content(payload))
             .andExpect(status().isNotFound());
     }
+
+    @Test
+    @DisplayName("(e) 미존재 releaseRequestId에 'verifier' 부분문자열 포함 + 유효 HMAC → 404(403 아님)")
+    void nonExistentIdContainingVerifierSubstringReturns404() throws Exception {
+        // "verifier" 부분문자열 포함 ID: contains 검사 시 403으로 오분류되는 회귀 케이스
+        String idWithVerifier = "verifier-run-001";
+        jdbcTemplate.update(
+            "DELETE FROM datapack_release_request WHERE approval_id = ?", idWithVerifier);
+        String hmac = signPayload(idWithVerifier, "PASS");
+        String payload = buildPayload(idWithVerifier, "PASS", hmac);
+
+        mockMvc.perform(post("/admin/api/datapack/release-callbacks")
+                .header("Authorization", "Bearer test-workflow-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(payload))
+            .andExpect(status().isNotFound());
+    }
 }

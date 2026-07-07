@@ -158,7 +158,7 @@ jobs:
               if [[ -n "${release_request_path}" ]]; then
                 test -f "${release_request_path}"
               else
-                test -n "${release_request_id}" # ID-only: release request will be fetched from API
+                test -n "${release_request_id}" # ID만 있으면 release request는 API에서 조회한다
               fi
             fi
             node - "${build_spec}" "${release_request_id}" "${release_request_path}" "${target_channel}" "${mode}" <<'NODE'

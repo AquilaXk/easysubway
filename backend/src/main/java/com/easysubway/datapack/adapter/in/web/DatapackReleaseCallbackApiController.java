@@ -52,10 +52,10 @@ public class DatapackReleaseCallbackApiController {
     @ExceptionHandler(IllegalArgumentException.class)
     ResponseEntity<Void> handleIllegalArgument(IllegalArgumentException e) {
         String msg = e.getMessage() != null ? e.getMessage() : "";
-        if (msg.contains("verifier")) {
+        if (msg.equals("callback verifier mismatch")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        if (msg.contains("not found")) {
+        if (msg.startsWith("release request not found")) {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.badRequest().build();
