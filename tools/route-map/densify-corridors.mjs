@@ -3,7 +3,6 @@
 // (캡슐 강체 보존, respace 무재실행). 축은 track 로컬 방향(붕괴 그룹도 정의됨), 정렬은 line_sequence.
 // track 방향 이동이라 8선형이 구성상 보존된다.
 
-import { readFileSync } from "node:fs";
 import { spliceTrackToNode } from "./splice-transfer-convergence.mjs";
 import { parsePathVertices, verticesToPath } from "./audit-octolinearity.mjs";
 import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
