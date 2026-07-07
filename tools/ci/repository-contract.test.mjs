@@ -711,6 +711,32 @@ test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로
   assert.doesNotMatch(androidJob, /\n    if:/);
 });
 
+test("Repository CI boundary check는 checkout과 Node setup 이후에만 실행된다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const repositoryJob = jobBlock(workflow, "repository-contracts", "backend");
+  const requiredSignals = [
+    "needs.changes.outputs.contracts == 'true'",
+    "needs.changes.outputs.backend == 'true'",
+    "needs.changes.outputs.mobile == 'true'",
+    "needs.changes.outputs.datapack == 'true'",
+  ];
+  const checkoutStart = repositoryJob.indexOf("Repository CI / Checkout repository");
+  const nodeStart = repositoryJob.indexOf("Repository CI / Set up Node.js");
+  const boundaryStart = repositoryJob.indexOf("Repository CI / Check directory boundaries");
+  const checkoutBlock = repositoryJob.slice(checkoutStart, nodeStart);
+  const nodeBlock = repositoryJob.slice(nodeStart, boundaryStart);
+  const boundaryBlock = repositoryJob.slice(boundaryStart);
+
+  assert.notEqual(checkoutStart, -1);
+  assert.notEqual(nodeStart, -1);
+  assert.notEqual(boundaryStart, -1);
+  for (const signal of requiredSignals) {
+    assert.ok(checkoutBlock.includes(signal), `checkout must include ${signal}`);
+    assert.ok(nodeBlock.includes(signal), `node setup must include ${signal}`);
+    assert.ok(boundaryBlock.includes(signal), `boundary check must include ${signal}`);
+  }
+});
+
 test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을 검증한다", () => {
   const workflow = read(".github/workflows/cd.yml");
 
