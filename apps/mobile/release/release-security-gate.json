@@ -94,7 +94,7 @@
       "ownerKo": "백엔드/운영 담당",
       "readyWhenKo": "운영 프로필은 Basic auth를 기본 비활성화하고, 예외적으로 켤 때는 owner와 만료일을 명시한 승인 기록, 관리자와 운영기관 인증 실패 lockout 검증, OIDC/MFA/SSO 전환 결정 증거가 PR 검증 증거에 남아야 한다.",
       "evidence": ["admin-auth-transition-decision-record", "basic-auth-prod-disable-test", "basic-auth-exception-expiry-record", "admin-basic-auth-lockout-tests", "admin-security-config-review"],
-      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java", "backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java", ".github/pull_request_template.md", "tools/ci/repository-contract.test.mjs"]
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java", "backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java", ".github/PULL_REQUEST_TEMPLATE/full.md", "tools/ci/repository-contract.test.mjs"]
     },
     {
       "id": "backend_role_authorization",
@@ -224,7 +224,7 @@
       "ownerKo": "보안/릴리즈 담당",
       "readyWhenKo": "프로덕션 제출 후보 commit에 대해 Codex Security 저장소 scan과 모바일/백엔드 의존성 점검 결과를 PR 또는 release gate 기록에 남긴다.",
       "evidence": ["codex-security-scan-result", "release-candidate-review"],
-      "linkedArtifacts": ["tools/ci/repository-contract.test.mjs", ".github/pull_request_template.md", ".github/workflows/ci.yml"]
+      "linkedArtifacts": ["tools/ci/repository-contract.test.mjs", ".github/PULL_REQUEST_TEMPLATE/full.md", ".github/workflows/ci.yml"]
     },
     {
       "id": "cross_store_privacy_security_consistency",

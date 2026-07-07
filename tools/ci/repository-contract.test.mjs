@@ -11290,7 +11290,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java"));
-  assert.ok(adminBasicAuthGate.linkedArtifacts.includes(".github/pull_request_template.md"));
+  assert.ok(adminBasicAuthGate.linkedArtifacts.includes(".github/PULL_REQUEST_TEMPLATE/full.md"));
   assert.match(adminOperatorLockoutProvider, /LockedException/);
   assert.match(adminOperatorLockoutProvider, /BadCredentialsException/);
   assert.match(adminOperatorLockoutProvider, /AdminIdentityRepository/);
