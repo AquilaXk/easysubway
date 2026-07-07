@@ -6,6 +6,21 @@
   "required": ["ttlSeconds", "packs", "activePack"],
   "additionalProperties": false,
   "properties": {
+    "manifestVersion": { "type": "integer", "enum": [1, 2] },
+    "channel": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]*$" },
+    "releaseSequence": { "type": "integer", "minimum": 1 },
+    "publishedAt": { "type": "string" },
+    "expiresAt": { "type": "string" },
+    "keyId": { "type": "string" },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string" },
+        "value": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    },
     "ttlSeconds": { "type": "integer", "minimum": 1 },
     "activePack": {
       "type": "object",
@@ -14,6 +29,25 @@
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
         "version": { "type": "string", "pattern": "^[0-9]+$" }
+      }
+    },
+    "emergencyOverride": {
+      "type": "object",
+      "required": ["id", "version", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "version": { "type": "string", "pattern": "^[0-9]+$" },
+        "reason": { "type": "string" }
+      }
+    },
+    "rollout": {
+      "type": "object",
+      "required": ["percentage", "seed"],
+      "additionalProperties": false,
+      "properties": {
+        "percentage": { "type": "integer", "minimum": 0 },
+        "seed": { "type": "string", "pattern": "^[a-f0-9]{32}$" }
       }
     },
     "packs": {

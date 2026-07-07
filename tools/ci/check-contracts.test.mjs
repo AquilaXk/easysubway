@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { collectContractErrors, loadJson } from "./check-contracts.mjs";
+import { collectContractErrors, loadJson, validateJson } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
 test("번들 datapack index 실물이 계약 스키마를 통과한다", () => {
@@ -29,6 +29,14 @@ test("boundaries.json이 스스로 정합하다", () => {
 
 test("check-contracts CLI 검증 오류가 없다", () => {
   assert.deepEqual(collectContractErrors(), []);
+});
+
+test("필수 계약 입력 파일이 없으면 실패한다", () => {
+  const errors = [];
+
+  validateJson("contracts/missing.schema.json", "contracts/missing-value.json", errors);
+
+  assert.deepEqual(errors, ["contracts/missing.schema.json 누락", "contracts/missing-value.json 누락"]);
 });
 
 test("OpenAPI 문서가 golden fixture 목록과 정합하다", () => {

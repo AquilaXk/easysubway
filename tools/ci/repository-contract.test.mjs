@@ -11711,6 +11711,14 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(datapack.deploy, "true");
   assert.equal(datapack.datapack, "true");
 
+  const bundledDatapack = await classifyChangedFiles(["apps/mobile/assets/datapacks/index.json"]);
+  assert.equal(bundledDatapack.repository, "true");
+  assert.equal(bundledDatapack.contracts, "true");
+  assert.equal(bundledDatapack.mobile, "true");
+  assert.equal(bundledDatapack.android, "true");
+  assert.equal(bundledDatapack.ios, "true");
+  assert.equal(bundledDatapack.datapack, "true");
+
   const routeMapTool = await classifyChangedFiles(["tools/route-map/extract-svg-geometry.mjs"]);
   assert.equal(routeMapTool.repository, "true");
   assert.equal(routeMapTool.mobile, "false");

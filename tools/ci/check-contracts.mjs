@@ -23,8 +23,17 @@ export function collectContractErrors() {
   return errors;
 }
 
-function validateJson(schemaPath, valuePath, errors) {
-  if (!existsSync(schemaPath) || !existsSync(valuePath)) return;
+export function validateJson(schemaPath, valuePath, errors) {
+  let missing = false;
+  if (!existsSync(schemaPath)) {
+    errors.push(`${schemaPath} 누락`);
+    missing = true;
+  }
+  if (!existsSync(valuePath)) {
+    errors.push(`${valuePath} 누락`);
+    missing = true;
+  }
+  if (missing) return;
   const result = validateSchema(loadJson(schemaPath), loadJson(valuePath));
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
 }

@@ -47,6 +47,14 @@ while IFS= read -r file; do
       ios=true
       datapack=true
       ;;
+    apps/mobile/assets/datapacks/**)
+      repository=true
+      contracts=true
+      mobile=true
+      android=true
+      ios=true
+      datapack=true
+      ;;
     .github/workflows/*.yml|tools/ci/**)
       ci=true
       repository=true
