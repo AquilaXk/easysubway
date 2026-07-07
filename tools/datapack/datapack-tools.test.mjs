@@ -12001,3 +12001,54 @@ test("releases 게시 대상 매니페스트에 rollout이 있으면 거부한�
     /releases.*rollout/i,
   );
 });
+
+test("manifest-signing: rsaSha256Signature는 base64url 서명을 반환하고 공개키로 검증된다", async () => {
+  const { rsaSha256Signature } = await import("./lib/manifest-signing.mjs");
+  const { verifyRsaSha256Signature } = await import("./lib/manifest-validation.mjs");
+  const value = "manifest-signing-unit-test-fixture-payload";
+  const sig = rsaSha256Signature(testPrivateKeyPem, value);
+  assert.ok(typeof sig === "string", "서명은 문자열이어야 함");
+  assert.ok(/^[A-Za-z0-9_-]+$/.test(sig), "base64url 형식이어야 함");
+  assert.ok(verifyRsaSha256Signature(testPublicKeyPem, value, sig), "공개키로 검증되어야 함");
+});
+
+test("manifest-signing: signingPrivateKey는 env 미설정 시 throw, 설정 시 PEM 반환", async () => {
+  const { signingPrivateKey } = await import("./lib/manifest-signing.mjs");
+  const savedKey = process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+  try {
+    delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+    assert.throws(() => signingPrivateKey(), /EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM/);
+    process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = testPrivateKeyPem;
+    assert.equal(signingPrivateKey(), testPrivateKeyPem.trim());
+  } finally {
+    if (savedKey !== undefined) process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = savedKey;
+    else delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+  }
+});
+
+test("manifest-signing: manifestSignatureValue는 canonicalJson(withoutSignature) 기반 RSA 서명을 반환한다", async () => {
+  const { manifestSignatureValue } = await import("./lib/manifest-signing.mjs");
+  const { verifyRsaSha256Signature, canonicalJson, withoutSignature } = await import("./lib/manifest-validation.mjs");
+  const manifest = {
+    manifestVersion: 2,
+    channel: "test",
+    releaseSequence: 1,
+    publishedAt: "2026-01-01T00:00:00.000Z",
+    expiresAt: "2026-01-02T00:00:00.000Z",
+    keyId: "test-key",
+    ttlSeconds: 3600,
+    packs: [],
+    signature: { algorithm: "rsa-sha256-manifest-v2", value: "PLACEHOLDER" },
+  };
+  const savedKey = process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+  try {
+    process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = testPrivateKeyPem;
+    const sigValue = manifestSignatureValue(manifest);
+    const canonical = canonicalJson(withoutSignature(manifest));
+    assert.ok(/^[A-Za-z0-9_-]+$/.test(sigValue), "base64url 형식이어야 함");
+    assert.ok(verifyRsaSha256Signature(testPublicKeyPem, canonical, sigValue), "서명 검증 통과해야 함");
+  } finally {
+    if (savedKey !== undefined) process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM = savedKey;
+    else delete process.env.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
+  }
+});
