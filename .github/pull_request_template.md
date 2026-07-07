@@ -1,10 +1,16 @@
+<!--
+작업 등급에 맞는 템플릿을 사용하세요.
+- A등급(제품/운영 위험: route, accessibility, mobile UX, backend API, DB migration, deploy, auth, security, datapack release, CI workflow·계약 테스트·release gate JSON 변경): .github/PULL_REQUEST_TEMPLATE/full.md 내용으로 교체합니다.
+- B/C등급(일반 코드 변경·낮은 위험 maintenance): .github/PULL_REQUEST_TEMPLATE/short.md 내용으로 교체합니다(아래 기본형과 동일).
+- 웹 UI에서는 ?template=full.md 또는 ?template=short.md 쿼리를 쓸 수 있습니다. gh CLI는 template 쿼리를 지원하지 않으므로 템플릿 파일 내용을 body로 직접 채웁니다.
+- 리뷰·automerge 게이트는 등급과 무관하게 모든 PR 공통입니다.
+-->
+
 ## 관련 이슈
 
-close #
+<!-- 단일 PR은 `Closes #N`, 스택 중간/umbrella는 `Refs #N`, C등급 issue 생략 시 `이슈 없음(C등급)` 명기. 빈 칸 금지. -->
 
-## 작업 배경
-
--
+Refs #
 
 ## 작업 내용
 
@@ -14,59 +20,16 @@ close #
 
 - 실행한 명령과 결과:
 
-## 검증 증거
+## 영향
 
-UI, 접근성, 수동 QA, 배포 확인이 필요한 항목은 증거 첨부, 링크, 또는 로컬 evidence 경로를 적습니다. 증거가 필요 없는 항목은 사유를 적습니다.
-
-| 항목 | 플랫폼 | 확인 방법 | 증거 | 결과 |
-| --- | --- | --- | --- | --- |
-|  |  |  |  |  |
-
-## Version impact
-
-- [ ] no version change
-- [ ] mobile patch
-- [ ] mobile minor
-- [ ] mobile major
-- [ ] backend deploy only
-- [ ] datapack release only
-- [ ] route/realtime contract change
-- [ ] DB migration change
-
-## Route commercialization gate impact
-
-- [ ] route-commercialization-gate.json 영향 없음
-- [ ] route ETA accuracy, realtime coverage, accessibility regression, route v2 contract report를 갱신했다.
-- [ ] 상용 경로/ETA claim을 추가하거나 변경하지 않는다.
-
-## Route release readiness tracker impact
-
-- [ ] route-release-readiness-tracker.json 영향 없음
-- [ ] #1414 하위 release blocker issue 또는 production evidence 완료 조건을 갱신했다.
-- [ ] 실시간/교통약자 길찾기 출시 준비 완료 claim을 추가하거나 변경하지 않는다.
-
-### Version decision
-
-- mobile versionName:
-- mobile versionCode:
-- datapack version:
-- route contract:
-- realtime contract:
-- backend identity:
-
-## 리뷰어 메모
-
-- 리뷰어가 먼저 봐야 할 지점:
-
-## 리스크
-
--
+- [ ] 제품/운영 위험 없음 (route/accessibility/mobile UX/backend API/auth/security 아님)
+- [ ] DB migration 없음
+- [ ] 배포 영향 없음
+- [ ] route/realtime/datapack contract 영향 없음
+- [ ] CI workflow·계약 테스트·release gate JSON 변경 없음 (있으면 full.md로 전환)
 
 ## 체크리스트
 
-- [ ] PR 본문은 이 템플릿 섹션을 삭제하지 않고 모두 채웠다.
+- [ ] 작업 등급에 맞는 템플릿을 사용했다.
 - [ ] CI 결과를 확인했다.
-- [ ] CodeRabbit 리뷰를 확인했다.
 - [ ] GitHub PR Review 객체가 있는지 확인했다. CodeRabbit status check만으로는 리뷰 완료로 보지 않는다.
-- [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다.
-- [ ] 배포 영향이 있는 경우 CD 상태를 확인했다.
