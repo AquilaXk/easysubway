@@ -12,9 +12,12 @@ export function findViolations(rules, { root = ".", allowlist = [] } = {}) {
       if (!new RegExp(rule.pattern).test(text)) continue;
       const allowed = allow.get(file);
       if (allowed) {
+        const expiresAt = Date.parse(allowed.expires);
         if (!allowed.reason || !allowed.expires) {
           violations.push({ file, why: "allowlist reason/expires 누락" });
-        } else if (Date.parse(allowed.expires) < Date.now()) {
+        } else if (Number.isNaN(expiresAt)) {
+          violations.push({ file, why: `allowlist 만료일 불량: ${allowed.expires}` });
+        } else if (expiresAt < Date.now()) {
           violations.push({ file, why: `allowlist 만료: ${allowed.expires}` });
         }
         continue;

@@ -95,10 +95,12 @@ function validateCompatibilityMatrix(errors) {
   if (!existsSync("contracts/datapack/compatibility-matrix.json")) return;
   const matrix = loadJson("contracts/datapack/compatibility-matrix.json");
   const index = loadJson("apps/mobile/assets/datapacks/index.json");
-  for (const mobile of matrix.mobile ?? []) {
-    if (!mobile.acceptsIndexSchemaVersions?.includes(index.schemaVersion)) {
-      errors.push("contracts/datapack/compatibility-matrix.json: 번들 index schemaVersion 미지원");
-    }
+  validateCompatibilityMatrixPayload(matrix, index, errors);
+}
+
+export function validateCompatibilityMatrixPayload(matrix, index, errors) {
+  if (!(matrix.mobile ?? []).some((mobile) => mobile.acceptsIndexSchemaVersions?.includes(index.schemaVersion))) {
+    errors.push("contracts/datapack/compatibility-matrix.json: 번들 index schemaVersion 미지원");
   }
 }
 

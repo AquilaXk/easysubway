@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { collectContractErrors, loadJson, validateDatapackManifest, validateJson } from "./check-contracts.mjs";
+import {
+  collectContractErrors,
+  loadJson,
+  validateCompatibilityMatrixPayload,
+  validateDatapackManifest,
+  validateJson,
+} from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
 test("번들 datapack index 실물이 계약 스키마를 통과한다", () => {
@@ -134,6 +140,23 @@ test("datapack compatibility matrix가 번들 index schemaVersion을 허용한�
     matrix.mobile.some((mobile) => mobile.acceptsIndexSchemaVersions.includes(index.schemaVersion)),
     "현재 번들 index schemaVersion을 허용하는 mobile 범위가 없다",
   );
+});
+
+test("datapack compatibility matrix는 현재 번들을 지원하는 mobile 행 하나를 요구한다", () => {
+  const errors = [];
+
+  validateCompatibilityMatrixPayload(
+    {
+      mobile: [
+        { appVersionRange: "<1.0.0", acceptsIndexSchemaVersions: [0] },
+        { appVersionRange: ">=1.0.0", acceptsIndexSchemaVersions: [1] },
+      ],
+    },
+    { schemaVersion: 1 },
+    errors,
+  );
+
+  assert.deepEqual(errors, []);
 });
 
 test("gate-index가 apps/mobile/release 실물과 1:1 대응한다", () => {
