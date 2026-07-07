@@ -4105,7 +4105,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     .map((line) => line.match(/^\s*/)[0].length);
   assert.deepEqual(
     nodeTerminatorIndents,
-    [10, 10, 10],
+    [10, 10, 10, 10],
     "workflow heredoc terminators must start at shell column 1 after YAML indentation is stripped",
   );
 
@@ -7879,6 +7879,8 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN$/m);
   // #1694 Part B: backend→GitHub Actions workflow_dispatch용 PAT(미설정 시 자동 dispatch dormant = 안전 기본값).
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_GITHUB_ACTIONS_DISPATCH_TOKEN$/m);
+  // #1694 Part C: 데이터팩 콜백 HMAC 키(webhook 서명 검증용, 안전 기본값 = 미설정 시 전면 거부).
+  assert.match(backendEnvAllowlist, /^EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY$/m);
   assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_REVISION "\$\{DEPLOY_SHA\}"/);
   assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_MASTER_DATA_VERSION "\$\{DEPLOY_SHA\}"/);
 
@@ -12002,6 +12004,28 @@ test("데이터팩 게시 도구는 releases 불변 경로와 Cache-Control 정�
   assert.match(publish, /public, max-age=60/);
   assert.match(publish, /public, max-age=31536000, immutable/);
   assert.match(publish, /immutable violation/);
+});
+
+test("build-release-callback.mjs는 스키마 유효 payload와 공유 fixture 벡터 HMAC을 낸다", async () => {
+  const vec = JSON.parse(read("tools/datapack/fixtures/release-callback-signature-vector.json"));
+  const f = vec.fields;
+  const { execFileSync } = await import("node:child_process");
+  const out = execFileSync("node", ["tools/datapack/build-release-callback.mjs"], {
+    cwd: root, encoding: "utf8",
+    env: { ...process.env,
+      RELEASE_REQUEST_ID: f.releaseRequestId, WORKFLOW_RUN_URL: f.workflowRunUrl,
+      MANIFEST_SHA256: f.manifestSha256, SQLITE_SHA256: f.sqliteSha256, GZIP_SHA256: f.gzipSha256,
+      EVIDENCE_BUNDLE_SHA256: f.evidenceBundleSha256, VALIDATOR_STATUS: f.validatorStatus,
+      ROUTE_REGRESSION_STATUS: f.routeRegressionStatus, PUBLISH_STATUS: f.publishStatus,
+      EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY: vec.hmacKey },
+  });
+  const payload = JSON.parse(out);
+  assert.equal(payload.artifactKind, "datapack-release-callback");
+  assert.equal(payload.schemaVersion, 1);
+  assert.equal(payload.callbackVerifier.kind, "payload-signature");
+  assert.equal(payload.callbackVerifier.value, vec.expectedHmacHex); // node↔Java 합의
+  // required 12필드 + additionalProperties:false 준수
+  assert.deepEqual(Object.keys(payload).sort(), ["artifactKind","callbackVerifier","evidenceBundleSha256","gzipSha256","manifestSha256","publishStatus","releaseRequestId","routeRegressionStatus","schemaVersion","sqliteSha256","validatorStatus","workflowRunUrl"]);
 });
 
 async function classifyChangedFiles(files) {
