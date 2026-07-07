@@ -19,6 +19,7 @@ class DataPackManifest {
     this.keyId,
     this.signature,
     this.manifestHash,
+    this.rollout,
   });
 
   factory DataPackManifest.fromJson(
@@ -73,6 +74,7 @@ class DataPackManifest {
       manifestHash: manifestVersion == 2
           ? sha256.convert(utf8.encode(signedCanonicalManifest!)).toString()
           : null,
+      rollout: manifestVersion == 2 ? _parseRollout(json['rollout']) : null,
     );
     manifest._validateEnvelopeSignature(json, productionSigningPublicKey);
     return manifest;
@@ -90,6 +92,7 @@ class DataPackManifest {
   final String? keyId;
   final DataPackSignature? signature;
   final String? manifestHash;
+  final RolloutManifest? rollout;
 
   bool get hasReplayProtection => manifestVersion == 2;
 
@@ -698,6 +701,31 @@ const _representativeRoutePatterns = {
   'LOOP_BRANCH',
   'EXPRESS_LOCAL',
 };
+
+class RolloutManifest {
+  const RolloutManifest({required this.percentage, required this.seed});
+
+  final int percentage;
+  final String seed;
+}
+
+RolloutManifest? _parseRollout(Object? raw) {
+  if (raw == null) return null;
+  if (raw is! Map<String, Object?>) {
+    throw const FormatException('Invalid data pack manifest rollout.');
+  }
+  final percentage = raw['percentage'];
+  final seed = raw['seed'];
+  if (percentage is! int || percentage < 0 || percentage > 100) {
+    throw const FormatException(
+      'Invalid data pack manifest rollout percentage.',
+    );
+  }
+  if (seed is! String || seed.isEmpty) {
+    throw const FormatException('Invalid data pack manifest rollout seed.');
+  }
+  return RolloutManifest(percentage: percentage, seed: seed);
+}
 
 class EmergencyOverrideManifest {
   const EmergencyOverrideManifest({
