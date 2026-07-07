@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+
+import 'package:crypto/crypto.dart';
 
 import 'data_pack_client.dart';
 import 'data_pack_installer.dart';
@@ -32,6 +35,25 @@ class DataPackUpdater {
       return const [];
     }
 
+    // rollout 버킷 판정 — salt + seed → sha256 → bucket % 100
+    final rollout = manifest.rollout;
+    bool rolloutApplies = true; // rollout 부재 = 100%(항상 채택)
+    if (rollout != null) {
+      final salt = await client.stateRepository.readOrCreateRolloutSalt();
+      final digest = sha256
+          .convert(utf8.encode('$salt:${rollout.seed}'))
+          .toString();
+      final bucket = int.parse(digest.substring(0, 8), radix: 16) % 100;
+      rolloutApplies = bucket < rollout.percentage;
+    }
+    final rolloutDecision = rollout == null
+        ? 'noRollout'
+        : rolloutApplies
+        ? 'applied'
+        : 'heldOut';
+    // ignore: avoid_print
+    print('[DataPackUpdater] rolloutDecision=$rolloutDecision');
+
     final preUpdateCurrentPointer = await _readCurrentPointerSafely();
     final override = manifest.emergencyOverride;
     final protectedVersionsByPackId = <String, Set<String>>{};
@@ -51,7 +73,7 @@ class DataPackUpdater {
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
-    final packs = _packsToInstall(manifest);
+    final packs = _packsToInstall(manifest, rolloutApplies: rolloutApplies);
     final results = <DataPackInstallResult>[];
     for (final pack in packs) {
       final uri = packBaseUri.resolve(pack.url.toString());
@@ -131,14 +153,20 @@ class DataPackUpdater {
     }
   }
 
-  List<DataPackManifestEntry> _packsToInstall(DataPackManifest manifest) {
+  List<DataPackManifestEntry> _packsToInstall(
+    DataPackManifest manifest, {
+    bool rolloutApplies = true,
+  }) {
     final activePack = manifest.activePack;
     final override = manifest.emergencyOverride;
     final selectedPacks = manifest.packs
         .where((pack) {
+          // emergencyOverride 대상 팩은 rollout과 무관하게 항상 포함
+          if (_matchesOverride(pack, override)) return true;
+          // rollout 비대상이면 일반 팩 제외
+          if (!rolloutApplies) return false;
           final selectedActiveId = activePack?.id ?? activePackId;
-          return pack.id == selectedActiveId ||
-              _matchesOverride(pack, override);
+          return pack.id == selectedActiveId;
         })
         .toList(growable: false);
     final selectedDependencies = selectedPacks

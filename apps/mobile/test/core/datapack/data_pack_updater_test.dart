@@ -1408,6 +1408,255 @@ void main() {
     expect(override?.version, '17');
     expect(override?.reason, '시설 상태 긴급 정정');
   });
+
+  // ─── rollout 버킷 판정 테스트 ────────────────────────────────────────────
+
+  test('updater는 rollout percentage 0일 때 일반 팩 채택을 건너뛴다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-rollout-held-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      if (request.uri.path.endsWith('/current.json')) {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.json
+          ..write(
+            jsonEncode(
+              _addV2Signature({
+                'manifestVersion': 2,
+                'channel': 'production',
+                'releaseSequence': 1,
+                'publishedAt': '2026-07-07T00:00:00.000Z',
+                'expiresAt': '2099-01-01T00:00:00.000Z',
+                'keyId': 'test-key',
+                'ttlSeconds': 60,
+                'packs': [
+                  {
+                    'id': 'capital',
+                    'version': '18',
+                    'url': 'catalog/capital-v18.sqlite.gz',
+                    'sha256': '0' * 64,
+                    'sqliteSha256': '0' * 64,
+                    'schemaVersion': '1',
+                    'requiredTables': ['catalog_metadata'],
+                    'artifactKind': 'fixture',
+                  },
+                ],
+                'rollout': {'percentage': 0, 'seed': 'held-out-seed'},
+              }),
+            ),
+          )
+          ..close();
+        return;
+      }
+      // 팩 다운로드 요청이 오면 안 됨
+      request.response
+        ..statusCode = HttpStatus.internalServerError
+        ..close();
+    });
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 7, 7, 10),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: Directory('${directory.path}/catalog'),
+        userDatabase: userDatabase,
+      ),
+    );
+
+    final results = await updater.checkForUpdates();
+
+    // heldOut → 일반 팩 채택 없음
+    expect(results, isEmpty);
+  });
+
+  test('updater는 rollout heldOut이어도 emergencyOverride 팩을 채택한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-rollout-override-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final overrideSqliteBytes = await _validCatalogSqliteBytes(directory);
+    final overrideCompressedBytes = gzip.encode(overrideSqliteBytes);
+    final overrideCompressedSha256 = sha256
+        .convert(overrideCompressedBytes)
+        .toString();
+    final overrideSqliteSha256 = sha256.convert(overrideSqliteBytes).toString();
+    final overrideRepository = EmergencyOverrideRepository(
+      userDatabase: userDatabase,
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode(
+                _addV2Signature({
+                  'manifestVersion': 2,
+                  'channel': 'production',
+                  'releaseSequence': 1,
+                  'publishedAt': '2026-07-07T00:00:00.000Z',
+                  'expiresAt': '2099-01-01T00:00:00.000Z',
+                  'keyId': 'test-key',
+                  'ttlSeconds': 60,
+                  'emergencyOverride': {
+                    'id': 'capital',
+                    'version': '18',
+                    'reason': '테스트 긴급 정정',
+                  },
+                  'packs': [
+                    // 일반 팩(v19) — rollout heldOut으로 건너뜀
+                    {
+                      'id': 'capital',
+                      'version': '19',
+                      'url': 'catalog/capital-v19.sqlite.gz',
+                      'sha256': '0' * 64,
+                      'sqliteSha256': '0' * 64,
+                      'schemaVersion': '1',
+                      'requiredTables': ['catalog_metadata'],
+                      'artifactKind': 'fixture',
+                    },
+                    // override 팩(v18) — rollout 무관, 항상 채택
+                    {
+                      'id': 'capital',
+                      'version': '18',
+                      'url': 'catalog/capital-v18.sqlite.gz',
+                      'sha256': overrideCompressedSha256,
+                      'sqliteSha256': overrideSqliteSha256,
+                      'schemaVersion': '1',
+                      'requiredTables': ['catalog_metadata'],
+                      'artifactKind': 'fixture',
+                    },
+                  ],
+                  'rollout': {'percentage': 0, 'seed': 'held-out-seed'},
+                }),
+              ),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v18.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(overrideCompressedBytes)
+            ..close();
+        default:
+          // v19 다운로드 요청이 오면 안 됨
+          request.response
+            ..statusCode = HttpStatus.internalServerError
+            ..close();
+      }
+    });
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 7, 7, 10),
+        ),
+      ),
+      installer: installer,
+      emergencyOverrideRepository: overrideRepository,
+    );
+
+    final results = await updater.checkForUpdates();
+    final override = await overrideRepository.readOverride();
+
+    // override 팩(v18)만 채택됨
+    expect(results.single.status, DataPackInstallStatus.installed);
+    expect(results.single.pointer?.id, 'capital');
+    expect(results.single.pointer?.version, '18');
+    // emergencyOverride 저장됨
+    expect(override?.id, 'capital');
+    expect(override?.version, '18');
+  });
+
+  test('updater는 rollout 부재(v1 manifest) 시 항상 팩을 채택한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-no-rollout-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'packs': [
+                  _packJson(
+                    version: '18',
+                    url: 'catalog/capital-v18.sqlite.gz',
+                    compressedBytes: compressedBytes,
+                    sqliteBytes: sqliteBytes,
+                  ),
+                ],
+                // rollout 없음 → 항상 채택
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v18.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(compressedBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: DataPackUpdateStateRepository(
+          userDatabase: userDatabase,
+          now: () => DateTime.utc(2026, 7, 7, 11),
+        ),
+      ),
+      installer: DataPackInstaller(
+        catalogDirectory: catalogDirectory,
+        userDatabase: userDatabase,
+      ),
+    );
+
+    final results = await updater.checkForUpdates();
+
+    // rollout 부재 → 채택(하위 호환)
+    expect(results.single.status, DataPackInstallStatus.installed);
+  });
 }
 
 Map<String, Object?> _packJson({
@@ -1520,6 +1769,35 @@ String _routeRegressionSignatureValue(
         ),
       )
       .toString();
+}
+
+// ─── v2 매니페스트 서명 헬퍼 ────────────────────────────────────────────────
+
+/// 매니페스트 객체(signature 제외)를 받아 sha256-manifest-v2 서명을 추가한다.
+Map<String, Object?> _addV2Signature(
+  Map<String, Object?> bodyWithoutSignature,
+) {
+  final canonical = jsonEncode(_canonicalMapValue(bodyWithoutSignature));
+  final signatureValue = sha256.convert(utf8.encode(canonical)).toString();
+  return {
+    ...bodyWithoutSignature,
+    'signature': {'algorithm': 'sha256-manifest-v2', 'value': signatureValue},
+  };
+}
+
+/// data_pack_manifest.dart 의 _canonicalValue 를 테스트에서 복제한다(private 접근 불가).
+Object? _canonicalMapValue(Object? value) {
+  if (value == null || value is String || value is num || value is bool) {
+    return value;
+  }
+  if (value is List<Object?>) {
+    return value.map(_canonicalMapValue).toList(growable: false);
+  }
+  if (value is Map<String, Object?>) {
+    final sortedKeys = value.keys.toList()..sort();
+    return {for (final key in sortedKeys) key: _canonicalMapValue(value[key])};
+  }
+  throw ArgumentError('Unsupported canonical value type: ${value.runtimeType}');
 }
 
 Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {
