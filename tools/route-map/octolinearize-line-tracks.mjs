@@ -8,6 +8,10 @@
 //
 // Usage: node tools/route-map/octolinearize-line-tracks.mjs
 //          --region 수도권 --line "수도권 신림선" [--line ...] [--check]
+//          [--branches tools/route-map/line-branches.json] [--all] [--pack <상대경로>]
+//   --branches: 분기 정본(JSON)을 읽어 본선에서 spur 역을 제외하고 각 지선을
+//               junction에서 시작하는 별도 track 조각으로 그린다(#1793).
+//   --all: 지역 전 노선 재생성(baseline 전체 갱신 — 주의). --branches와 동시 사용 불가.
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -33,6 +37,37 @@ export function octilinearSegment(a, b) {
   const sy = Math.sign(dy);
   const corner = { x: a.x + sx * diag, y: a.y + sy * diag };
   return [a, corner, b];
+}
+
+/**
+ * 세그먼트 길이가 이상치(정상 간격의 배수 초과)인 지점에서 노드열을 끊어
+ * 별도 조각들로 나눈다. 원본 좌표에 오류가 있는 역(예: 경의중앙 양평 —
+ * line_sequence는 오빈·원덕 사이지만 좌표가 도심으로 잘못 찍혀 장거리 detour를
+ * 만든다)이 본선 폴리라인에 그려지며 타 노선과 대량 교차하는 회귀를 자동 차단한다.
+ * 좌표는 건드리지 않고 "연결(세그먼트)만" 생략한다 — 수동 시드가 아니다.
+ * 조각 경계에서 홀로 남는 노드(양쪽이 모두 이상치 간격)는 조각화되며 <2노드로 버려진다.
+ */
+export function splitAtOutlierGaps(nodes, { absFloor = 400, p90Mult = 4 } = {}) {
+  if (nodes.length < 3) return nodes.length >= 2 ? [nodes.slice()] : [];
+  const segLens = [];
+  for (let i = 1; i < nodes.length; i += 1) {
+    segLens.push(Math.hypot(nodes[i].x - nodes[i - 1].x, nodes[i].y - nodes[i - 1].y));
+  }
+  const sorted = [...segLens].sort((a, b) => a - b);
+  const p90 = sorted[Math.floor(sorted.length * 0.9)] ?? 0;
+  const threshold = Math.max(absFloor, p90Mult * p90);
+  const runs = [];
+  let cur = [nodes[0]];
+  for (let i = 1; i < nodes.length; i += 1) {
+    if (segLens[i - 1] > threshold) {
+      runs.push(cur);
+      cur = [nodes[i]];
+    } else {
+      cur.push(nodes[i]);
+    }
+  }
+  runs.push(cur);
+  return runs.filter((r) => r.length >= 2);
 }
 
 /** 노드 목록(sequence 순)을 8선형 polyline 정점 배열로. */
@@ -64,6 +99,13 @@ function parseArgs(argv) {
 
 function main() {
   const o = parseArgs(process.argv.slice(2));
+  if (o.all && o.branches) {
+    console.error(
+      "오류: --all과 --branches는 동시에 지정할 수 없습니다. 분기 위상 정정은 " +
+        "영향 노선만 --line으로 지정해 실행하세요(baseline 전체 재생성 금지).",
+    );
+    process.exit(1);
+  }
   const { db, dir, sqlitePath, packPath } = openPack(o.pack, "octolinearize-");
   // 분기(지선) 데이터: { "<노선명>": [{junction, spur:[역명...]}...] }
   const branchesByLine = {};
@@ -103,8 +145,10 @@ function main() {
       const branches = branchesByLine[name] ?? [];
       const spurNames = new Set(branches.flatMap((b) => b.spur));
       // 본선: spur 역을 제외한 sequence(분기점 junction은 본선에 남는다).
+      // 좌표 오류로 생기는 장거리 detour는 이상치 간격에서 끊어 별도 조각으로
+      // 나눈다(교차 회귀 자동 차단). 정상 노선은 조각 1개 그대로.
       const mainNodes = nodeRows.filter((r) => !spurNames.has(r.name)).map((r) => ({ x: r.x, y: r.y }));
-      const paths = [verticesToPath(octilinearPolyline(mainNodes))];
+      const paths = splitAtOutlierGaps(mainNodes).map((run) => verticesToPath(octilinearPolyline(run)));
       // 각 지선: junction 역에서 시작해 spur 역들을 잇는 별도 조각.
       for (const b of branches) {
         const jn = nodeRows.find((r) => r.name === b.junction);
