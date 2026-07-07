@@ -80,7 +80,7 @@ test("route commercialization release gate blocks unsupported commercial route c
 
   const gate = readJson(gatePath);
   const readme = read("README.md");
-  const prTemplate = read(".github/pull_request_template.md");
+  const prTemplate = read(".github/PULL_REQUEST_TEMPLATE/full.md");
   const contractReportBuilder = "tools/routes/build-route-v2-contract-report.mjs";
   const routeGraphCoverageBuilder = "tools/routes/build-route-graph-coverage-report.mjs";
 
@@ -271,7 +271,7 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
 
   const tracker = readJson(trackerPath);
   const readme = read("README.md");
-  const prTemplate = read(".github/pull_request_template.md");
+  const prTemplate = read(".github/PULL_REQUEST_TEMPLATE/full.md");
   const issueNumbers = tracker.requiredChildIssues.map((issue) => issue.number);
 
   assert.equal(tracker.schemaVersion, 1);
@@ -670,6 +670,7 @@ test("로컬 에이전트 문서와 README 외 Markdown은 gitignore로 추적�
   assert.match(gitignore, /^\*\.md$/m);
   assert.match(gitignore, /^!\/README\.md$/m);
   assert.match(gitignore, /^!\/\.github\/pull_request_template\.md$/m);
+  assert.match(gitignore, /^!\/\.github\/PULL_REQUEST_TEMPLATE\/\*\.md$/m);
   assert.match(gitignore, /^AGENTS\.md$/m);
   assert.match(gitignore, /^docs\/$/m);
   assert.match(gitignore, /^\.codex\/$/m);
@@ -678,7 +679,10 @@ test("로컬 에이전트 문서와 README 외 Markdown은 gitignore로 추적�
 test("지속적 통합은 README 외 Markdown과 로컬 에이전트 문서 추적 금지를 검사한다", () => {
   const workflow = read(".github/workflows/ci.yml");
 
-  assert.match(workflow, /git ls-files '\*\.md' ':!:README\.md' ':!:\.github\/pull_request_template\.md'/);
+  assert.match(
+    workflow,
+    /git ls-files '\*\.md' ':!:README\.md' ':!:\.github\/pull_request_template\.md' ':!:\.github\/PULL_REQUEST_TEMPLATE\/\*\.md'/,
+  );
   assert.match(workflow, /Unexpected tracked Markdown file/);
   assert.match(workflow, /git ls-files AGENTS\.md CLAUDE\.md GEMINI\.md CURSOR\.md COPILOT\.md docs \.codex/);
   assert.match(workflow, /Unexpected tracked local agent file/);
@@ -880,8 +884,8 @@ test("CD 배포는 production environment를 선언하고 배포 태그는 recor
   assert.match(cleanup, /matching-refs\/tags\/deploy\/backend\//);
 });
 
-test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
-  const template = read(".github/pull_request_template.md");
+test("full PR 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
+  const template = read(".github/PULL_REQUEST_TEMPLATE/full.md");
 
   assert.match(template, /## 관련 이슈/);
   assert.match(template, /## 검증/);
@@ -896,6 +900,58 @@ test("풀 리퀘스트 템플릿은 리뷰와 배포 확인 게이트를 포함�
   assert.match(template, /CodeRabbit status check만으로는 리뷰 완료로 보지 않는다/);
   assert.match(template, /CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다/);
   assert.match(template, /CD 상태를 확인했다/);
+});
+
+test("full PR 템플릿은 A등급 12개 섹션 전부를 유지한다", () => {
+  const template = read(".github/PULL_REQUEST_TEMPLATE/full.md");
+
+  for (const heading of [
+    "## 관련 이슈",
+    "## 작업 배경",
+    "## 작업 내용",
+    "## 검증",
+    "## 검증 증거",
+    "## Version impact",
+    "## Route commercialization gate impact",
+    "## Route release readiness tracker impact",
+    "### Version decision",
+    "## 리뷰어 메모",
+    "## 리스크",
+    "## 체크리스트",
+  ]) {
+    assert.ok(template.includes(heading), `full template must include ${heading}`);
+  }
+});
+
+test("short PR 템플릿은 B/C등급 5개 섹션과 리뷰 게이트를 유지한다", () => {
+  const template = read(".github/PULL_REQUEST_TEMPLATE/short.md");
+
+  for (const heading of ["## 관련 이슈", "## 작업 내용", "## 검증", "## 영향", "## 체크리스트"]) {
+    assert.ok(template.includes(heading), `short template must include ${heading}`);
+  }
+  assert.match(template, /이슈 없음\(C등급\)/);
+  assert.match(template, /full\.md를 사용/);
+  assert.match(template, /실행한 명령과 결과/);
+  assert.match(template, /DB migration 없음/);
+  assert.match(template, /CI workflow·계약 테스트·release gate JSON 변경 없음/);
+  assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
+  assert.match(template, /CodeRabbit status check만으로는 리뷰 완료로 보지 않는다/);
+  assert.match(template, /폴백 리뷰를 단일 PR review로 게시했다/);
+});
+
+test("기본 PR 템플릿은 등급 안내와 최소 섹션을 포함한다", () => {
+  const template = read(".github/pull_request_template.md");
+
+  assert.match(template, /A등급/);
+  assert.match(template, /B\/C등급/);
+  assert.match(template, /PULL_REQUEST_TEMPLATE\/full\.md/);
+  assert.match(template, /PULL_REQUEST_TEMPLATE\/short\.md/);
+  assert.match(template, /gh CLI는 template 쿼리를 지원하지 않으므로/);
+  assert.match(template, /리뷰·automerge 게이트는 등급과 무관하게 모든 PR 공통/);
+  for (const heading of ["## 관련 이슈", "## 작업 내용", "## 검증", "## 영향", "## 체크리스트"]) {
+    assert.ok(template.includes(heading), `default template must include ${heading}`);
+  }
+  assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
 });
 
 test("이슈 템플릿은 에이전트 서술 없이 개발자 판단 정보를 수집한다", () => {
@@ -11234,7 +11290,7 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java"));
   assert.ok(adminBasicAuthGate.linkedArtifacts.includes("backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java"));
-  assert.ok(adminBasicAuthGate.linkedArtifacts.includes(".github/pull_request_template.md"));
+  assert.ok(adminBasicAuthGate.linkedArtifacts.includes(".github/PULL_REQUEST_TEMPLATE/full.md"));
   assert.match(adminOperatorLockoutProvider, /LockedException/);
   assert.match(adminOperatorLockoutProvider, /BadCredentialsException/);
   assert.match(adminOperatorLockoutProvider, /AdminIdentityRepository/);

@@ -1,5 +1,5 @@
 name: "리팩터링"
-description: "구조 개선, 책임 분리, 중복 제거처럼 동작 유지가 중요한 개선 작업을 정리합니다."
+description: "구조 개선, 책임 분리, 중복 제거처럼 동작 유지가 중요한 개선 작업을 정리합니다. A등급 제품/운영 위험 작업만 새 issue가 필수입니다. B/C등급은 기존 umbrella issue 재사용 또는 issue 생략을 우선 검토하세요."
 labels: ["enhancement"]
 body:
   - type: markdown
