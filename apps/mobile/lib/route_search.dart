@@ -11,6 +11,9 @@ import 'core/network/api_client.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
+import 'features/get_off_alarm/get_off_alarm_controller.dart';
+import 'features/get_off_alarm/get_off_alarm_route_mapping.dart';
+import 'features/get_off_alarm/get_off_alarm_toggle.dart';
 import 'mobility_profile.dart';
 import 'route_hedge_labels.dart';
 import 'station_search.dart';
@@ -1828,6 +1831,8 @@ class RouteSearchStep {
     this.timeSource = '',
     this.distanceSource = '',
     this.confidenceLabel = '',
+    this.plannedArrivalTimeIso = '',
+    this.realtimeArrivalTimeIso = '',
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
@@ -1905,6 +1910,8 @@ class RouteSearchStep {
       timeSource: leg.etaSource,
       distanceSource: 'BACKEND_V2',
       confidenceLabel: leg.confidence,
+      plannedArrivalTimeIso: leg.plannedArrivalTime,
+      realtimeArrivalTimeIso: leg.realtimeArrivalTime ?? '',
     );
   }
 
@@ -1921,6 +1928,11 @@ class RouteSearchStep {
   final bool includesStairs;
   final String stairAccessState;
   final bool requiresAccessibilityCheck;
+
+  /// 하차 알림(#1766)용 절대 도착 시각(ISO). V2 승차 leg에서만 채워지고,
+  /// 그 외 경로/step에서는 빈 문자열이다.
+  final String plannedArrivalTimeIso;
+  final String realtimeArrivalTimeIso;
   final String actionTitle;
   final String actionDetail;
   final String reason;
@@ -2358,6 +2370,7 @@ class RouteSearchScreen extends StatefulWidget {
     this.initialDraft,
     this.shellNavigationBar,
     this.onShellBackToHome,
+    this.getOffAlarmController,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType = _resolveInitialMobilityType(initialMobilityType);
@@ -2366,6 +2379,7 @@ class RouteSearchScreen extends StatefulWidget {
   final StationSearchRepository stationRepository;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final GetOffAlarmController? getOffAlarmController;
   final RouteDraft? initialDraft;
   final Widget? shellNavigationBar;
   final VoidCallback? onShellBackToHome;
@@ -2580,6 +2594,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     routeFeedbackRepository: widget.routeFeedbackRepository,
                     favoriteRouteRepository: widget.favoriteRouteRepository,
                     onShellBackToHome: widget.onShellBackToHome,
+                    getOffAlarmController: widget.getOffAlarmController,
                   ),
                 ),
               ],
@@ -3724,12 +3739,14 @@ class _RouteSearchBody extends StatelessWidget {
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
     required this.onShellBackToHome,
+    required this.getOffAlarmController,
   });
 
   final RouteSearchState state;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final VoidCallback? onShellBackToHome;
+  final GetOffAlarmController? getOffAlarmController;
 
   @override
   Widget build(BuildContext context) {
@@ -3755,6 +3772,7 @@ class _RouteSearchBody extends StatelessWidget {
         routeFeedbackRepository: routeFeedbackRepository,
         favoriteRouteRepository: favoriteRouteRepository,
         onShellBackToHome: onShellBackToHome,
+        getOffAlarmController: getOffAlarmController,
       ),
     };
   }
@@ -3896,6 +3914,7 @@ class _RouteSearchResultCard extends StatefulWidget {
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
     required this.onShellBackToHome,
+    required this.getOffAlarmController,
   });
 
   final RouteSearchResult result;
@@ -3904,6 +3923,7 @@ class _RouteSearchResultCard extends StatefulWidget {
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
   final VoidCallback? onShellBackToHome;
+  final GetOffAlarmController? getOffAlarmController;
 
   @override
   State<_RouteSearchResultCard> createState() => _RouteSearchResultCardState();
@@ -3931,6 +3951,11 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
             result: result,
             onOpenDetail: () => _openDetail(result),
           ),
+          if (widget.getOffAlarmController != null)
+            _GetOffAlarmEntryPoint(
+              controller: widget.getOffAlarmController!,
+              result: result,
+            ),
         ],
       ),
     );
@@ -4037,6 +4062,48 @@ class _RouteStageScaffold extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
           child: child,
         ),
+      ),
+    );
+  }
+}
+
+/// 하차 알림(#1766) 임시 진입점. 경로 결과의 승차 step을 도착역·도착시각으로
+/// 투영해 하차 알림 토글에 넘긴다. 승차 step에 절대 도착시각이 없으면(레거시
+/// 경로 등) 노출하지 않는다. #1704 타임라인 개편 시 이 위젯 삽입을 그 컴포넌트로
+/// 이동하면 되며(재작성 불필요), 투영·토글 로직은 features/get_off_alarm/에 있다.
+class _GetOffAlarmEntryPoint extends StatelessWidget {
+  const _GetOffAlarmEntryPoint({
+    required this.controller,
+    required this.result,
+  });
+
+  final GetOffAlarmController controller;
+  final RouteSearchResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final rideLegs = <RideLegArrival>[];
+    for (final step in result.steps) {
+      if (step.stepType == 'ride' && step.plannedArrivalTimeIso.isNotEmpty) {
+        rideLegs.add(
+          RideLegArrival(
+            toStationId: step.toStationId,
+            plannedArrivalIso: step.plannedArrivalTimeIso,
+            realtimeArrivalIso: step.realtimeArrivalTimeIso,
+          ),
+        );
+      }
+    }
+    if (rideLegs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: GetOffAlarmToggle(
+        controller: controller,
+        routeId: result.routeSearchId,
+        rideLegs: rideLegs,
+        stationName: (id) => id,
       ),
     );
   }
