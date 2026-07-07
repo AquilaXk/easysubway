@@ -15,6 +15,8 @@ import '../features/network_map/data/drift_network_map_viewport_repository.dart'
 import '../features/preferences/data/drift_notification_settings_repository.dart';
 import '../features/realtime/realtime_repository.dart';
 import '../features/search_history/data/drift_search_history_repository.dart';
+import '../features/service_notice/data/drift_notice_cache_store.dart';
+import '../features/service_notice/data/notice_repository.dart';
 import '../features/stations/data/station_api_repository.dart';
 import '../features/stations/data/drift_station_repository.dart';
 import '../internal_route.dart';
@@ -50,6 +52,7 @@ class AppDependencies {
     required this.locationProvider,
     required this.userDataDeletionRepository,
     this.getOffAlarmController,
+    required this.noticeRepository,
   });
 
   factory AppDependencies.resolve({
@@ -69,6 +72,7 @@ class AppDependencies {
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
     UserDataDeletionRepository? userDataDeletionRepository,
+    NoticeRepository? noticeRepository,
     CatalogDatabase? catalogDatabase,
     UserDatabase? userDatabase,
     Uri? Function() apiBaseUri = defaultOptionalStationApiBaseUri,
@@ -240,6 +244,11 @@ class AppDependencies {
             userDatabase: userDatabase,
           ),
       getOffAlarmController: _resolveGetOffAlarmController(userDatabase),
+      noticeRepository:
+          noticeRepository ??
+          (userDatabase == null
+              ? null
+              : _LazyDefaultNoticeRepository(optionalBaseUri, userDatabase)),
     );
   }
 
@@ -260,6 +269,47 @@ class AppDependencies {
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
   final GetOffAlarmController? getOffAlarmController;
+  final NoticeRepository? noticeRepository;
+}
+
+/// 공개 공지 API는 선택 기능이라 앱 시작 중 base URL을 강제 평가하지 않는다.
+/// 첫 조회 시점에 base URL을 해소하고, 없으면 조용히 빈 결과를 돌려준다.
+class _LazyDefaultNoticeRepository implements NoticeRepository {
+  _LazyDefaultNoticeRepository(this._baseUri, this._userDatabase);
+
+  final Uri? Function() _baseUri;
+  final UserDatabase _userDatabase;
+  NoticeRepository? _delegate;
+
+  @override
+  Future<ActiveNoticesResult> activeNotices() {
+    return _resolveDelegate().activeNotices();
+  }
+
+  NoticeRepository _resolveDelegate() {
+    final cachedDelegate = _delegate;
+    if (cachedDelegate != null) {
+      return cachedDelegate;
+    }
+    final resolvedBaseUri = _baseUri();
+    final resolvedDelegate = resolvedBaseUri == null
+        ? const _UnavailableNoticeRepository()
+        : ApiNoticeRepository(
+            apiClient: HttpNoticeApiClient(ApiClient(baseUri: resolvedBaseUri)),
+            cacheStore: DriftNoticeCacheStore(userDatabase: _userDatabase),
+          );
+    _delegate = resolvedDelegate;
+    return resolvedDelegate;
+  }
+}
+
+class _UnavailableNoticeRepository implements NoticeRepository {
+  const _UnavailableNoticeRepository();
+
+  @override
+  Future<ActiveNoticesResult> activeNotices() async {
+    return const ActiveNoticesResult(notices: [], stale: false);
+  }
 }
 
 RealtimeRepository _defaultRealtimeRepository({
