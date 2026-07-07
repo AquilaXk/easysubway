@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { trackAxis8, corridorLayout, corridorTargets } from "./densify-corridors.mjs";
+import { trackAxis8, corridorLayout, corridorTargets, applyCorridor, applyNoSharedLine } from "./densify-corridors.mjs";
 
 test("trackAxis8은 centroid 인접 세그먼트 긴 쪽 방향을 8축 스냅(세로 track→(0,1))", () => {
   // 세로 track, centroid가 (100,100) 근처 — 인접 세그먼트 모두 수직
@@ -33,4 +33,33 @@ test("corridorTargets는 track축 따라 targetGap 간격·seq 순·centroid 중
   assert.ok(ys[1] - ys[0] === 30 && ys[2] - ys[1] === 30, `y간격 ${ys}`); // 세로축 펼침
   assert.ok(Math.abs((ys[0] + ys[2]) / 2 - 100) < 1, "centroid y≈100 보존");
   assert.ok(["a", "b", "c"].every((id) => t.get(id).x === 100), "비축(x) 성분 통일");
+});
+
+test("applyNoSharedLine은 공유노선 없는 쌍의 한 역만 자기 노선 방향으로 벌린다", () => {
+  // 반포↔잠원형: (100,100) 근접, A(반포)는 세로 노선 → A만 세로로 이동해 분리
+  const g = ["A", "B"];
+  const repr = new Map([["A", { x: 100, y: 100 }], ["B", { x: 100, y: 102 }]]);
+  const memberLines = new Map([["A", [{ lineId: "LA", x: 100, y: 100 }]], ["B", [{ lineId: "LB", x: 100, y: 102 }]]]);
+  const tracksByLine = new Map([
+    ["LA", [{ trackIndex: 0, verts: [{ x: 100, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 300 }] }]],
+    ["LB", [{ trackIndex: 0, verts: [{ x: 0, y: 102 }, { x: 100, y: 102 }, { x: 200, y: 102 }] }]],
+  ]);
+  const r = applyNoSharedLine(g, memberLines, tracksByLine, repr, 30, 40);
+  const pa = r.positionUpdates.find((p) => p.stationId === "A");
+  assert.ok(pa && Math.hypot(pa.x - 100, pa.y - 102) >= 30 - 1e-6, `분리 거리 부족`);
+  assert.ok(!r.positionUpdates.some((p) => p.stationId === "B"), "B는 미이동(한 역만)");
+});
+
+test("applyCorridor는 회랑 역들을 track축 간격으로 벌리고 전 노선노드 강체 이동", () => {
+  // 2역 (100,100) 붕괴, 세로 track, seq 1/2
+  const membersSeq = [{ stationId: "a", x: 100, y: 100, seq: 1 }, { stationId: "b", x: 100, y: 100, seq: 2 }];
+  const verts = [{ x: 100, y: 0 }, { x: 100, y: 100 }, { x: 100, y: 300 }];
+  const memberLines = new Map([
+    ["a", [{ lineId: "L", x: 100, y: 100 }]],
+    ["b", [{ lineId: "L", x: 100, y: 100 }]],
+  ]);
+  const tracksByLine = new Map([["L", [{ trackIndex: 0, verts }]]]);
+  const r = applyCorridor(membersSeq, verts, memberLines, tracksByLine, 40);
+  const pa = r.positionUpdates.find((p) => p.stationId === "a"), pb = r.positionUpdates.find((p) => p.stationId === "b");
+  assert.ok(Math.abs(Math.abs(pa.y - pb.y) - 30) < 1e-6, `y간격 ${Math.abs(pa.y - pb.y)}`); // 세로축 30px
 });

@@ -2,6 +2,8 @@
 // (캡슐 강체 보존, respace 무재실행). 축은 track 로컬 방향(붕괴 그룹도 정의됨), 정렬은 line_sequence.
 // track 방향 이동이라 8선형이 구성상 보존된다.
 
+import { spliceTrackToNode } from "./splice-transfer-convergence.mjs";
+
 const SNAP8 = [
   { ux: 1, uy: 0 }, { ux: Math.SQRT1_2, uy: Math.SQRT1_2 }, { ux: 0, uy: 1 }, { ux: -Math.SQRT1_2, uy: Math.SQRT1_2 },
 ];
@@ -52,4 +54,54 @@ export function corridorTargets(membersSeq, trackVerts, targetGap = 30) {
     out.set(id, { x: Math.round(perp.x + s * axis.ux), y: Math.round(perp.y + s * axis.uy) });
   });
   return out;
+}
+
+/** 회랑 그룹 적용: 전 노선노드 강체 이동 + 노선 track splice(부착 실패 역 원자적 미이동). */
+export function applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine, maxDist = 30) {
+  const targets = corridorTargets(membersSeq, trackVerts, 30);
+  const positionUpdates = [];
+  const trackUpdates = [];
+  // 목표 축좌표 오름차순으로 처리(공유 정점 단일 패스 — 순서대로 옮겨 이전 splice 결과 위에 쌓임)
+  const order = [...targets.keys()].sort((a, b) => targets.get(a).x - targets.get(b).x || targets.get(a).y - targets.get(b).y);
+  for (const stationId of order) {
+    const np = targets.get(stationId);
+    const nodes = memberLines.get(stationId) ?? [];
+    let attachedAny = false;
+    const pending = [];
+    for (const node of nodes) {
+      for (const trk of tracksByLine.get(node.lineId) ?? []) {
+        const { verts, attached } = spliceTrackToNode(trk.verts, { x: node.x, y: node.y }, np, { maxDist });
+        if (attached) { attachedAny = true; if (JSON.stringify(verts) !== JSON.stringify(trk.verts)) pending.push({ lineId: node.lineId, trackIndex: trk.trackIndex, verts, trk }); }
+      }
+    }
+    if (!attachedAny) continue; // 원자성: 부착 실패 역은 미이동
+    for (const p of pending) { p.trk.verts = p.verts; trackUpdates.push({ lineId: p.lineId, trackIndex: p.trackIndex, verts: p.verts }); } // 누적(공유 정점)
+    for (const node of nodes) positionUpdates.push({ stationId, lineId: node.lineId, x: np.x, y: np.y }); // 전 노선노드 강체
+  }
+  return { positionUpdates, trackUpdates };
+}
+
+/**
+ * 공유 노선 없는 그룹(반포↔잠원): 첫 역만 자기 노선 track 방향으로 targetGap 이동해 분리.
+ * 둘 다 기하축으로 밀면 둘 다 자기 track 밖으로 나가므로 한 역만 자기 노선 방향으로.
+ */
+export function applyNoSharedLine(g, memberLines, tracksByLine, repr, targetGap = 30, maxDist = 30) {
+  const [aId, bId] = g;
+  const a = repr.get(aId), b = repr.get(bId);
+  const aLine = (memberLines.get(aId) ?? [])[0];
+  const track = aLine ? (tracksByLine.get(aLine.lineId) ?? [])[0] : null;
+  if (!track) return { positionUpdates: [], trackUpdates: [] };
+  const axis = trackAxis8(track.verts, a);
+  const away = ((a.x - b.x) * axis.ux + (a.y - b.y) * axis.uy) >= 0 ? 1 : -1; // B에서 멀어지는 부호
+  const np = { x: Math.round(a.x + away * targetGap * axis.ux), y: Math.round(a.y + away * targetGap * axis.uy) };
+  const positionUpdates = [], trackUpdates = [];
+  let attached = false;
+  for (const node of memberLines.get(aId) ?? []) {
+    for (const trk of tracksByLine.get(node.lineId) ?? []) {
+      const r = spliceTrackToNode(trk.verts, { x: node.x, y: node.y }, np, { maxDist });
+      if (r.attached) { attached = true; if (JSON.stringify(r.verts) !== JSON.stringify(trk.verts)) { trk.verts = r.verts; trackUpdates.push({ lineId: node.lineId, trackIndex: trk.trackIndex, verts: r.verts }); } }
+    }
+  }
+  if (attached) for (const node of memberLines.get(aId) ?? []) positionUpdates.push({ stationId: aId, lineId: node.lineId, x: np.x, y: np.y });
+  return { positionUpdates, trackUpdates };
 }
