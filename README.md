@@ -1,60 +1,47 @@
 <div align="center">
 
 <!-- TODO: 앱 완성 후 로고/배너 이미지 첨부 -->
-<!-- <img alt="쉬운 지하철 배너" src="docs/assets/banner.png" width="600" /> -->
+<!-- <img alt="쉬운 지하철" src="docs/assets/banner.png" width="600" /> -->
 
 # 쉬운 지하철
 
-**빠른 길보다, 갈 수 있는 길을 먼저 안내합니다.**
+### 빠른 길보다, 갈 수 있는 길.
 
-계단과 이동 장벽 없이 지하철을 탈 수 있도록 돕는 교통약자 중심 길찾기 앱
+계단 하나가 누군가에게는 벽이 됩니다.
+<br>쉬운 지하철은 질문을 바꿉니다.
+<br>**"얼마나 빨리"가 아니라, "갈 수 있는가".**
+
+<br>
 
 [![CI](https://github.com/AquilaXk/easysubway/actions/workflows/ci.yml/badge.svg)](https://github.com/AquilaXk/easysubway/actions/workflows/ci.yml)
-[![CD](https://github.com/AquilaXk/easysubway/actions/workflows/cd.yml/badge.svg)](https://github.com/AquilaXk/easysubway/actions/workflows/cd.yml)
-[![SonarCloud](https://github.com/AquilaXk/easysubway/actions/workflows/sonarcloud.yml/badge.svg)](https://github.com/AquilaXk/easysubway/actions/workflows/sonarcloud.yml)
-
 ![Flutter](https://img.shields.io/badge/Flutter-02569B?logo=flutter&logoColor=white)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot%203.5-6DB33F?logo=springboot&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL%20%2B%20PostGIS-4169E1?logo=postgresql&logoColor=white)
-![Android](https://img.shields.io/badge/Android%20v1-3DDC84?logo=android&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
 
 </div>
 
----
+<br>
 
-## 소개
+## 지하에서도. 인터넷 없이도.
 
-**쉬운 지하철(easysubway)**은 고령자, 유모차 이용자, 휠체어 이용자, 임산부, 일시적 부상자, 큰 짐을 든 승객이 계단과 이동 장벽을 피해서 도시철도를 이용할 수 있도록 돕는 Android 우선 모바일 앱입니다.
+역 검색도, 길찾기도 기기 안에서 끝납니다. 신호가 끊긴 지하 세 층 아래에서도.
 
-핵심 메시지는 **빠른 길보다, 갈 수 있는 길을 먼저 안내합니다.** 입니다.
+## 당신의 상황이 곧 기준.
 
-## 왜 쉬운 지하철인가
+휠체어. 유모차. 불편한 걸음. 당신을 고르는 순간, 길이 달라집니다. 계단 없는 길이 먼저 옵니다.
 
-휠체어를 타거나 유모차를 밀고 있다면, 환승 통로의 계단 하나가 가장 빠른 경로를 통째로 무너뜨립니다. 쉬운 지하철은 "얼마나 빨리 가는가"보다 **"실제로 갈 수 있는가"**를 먼저 답합니다.
+## 아는 것과 모르는 것을 구분합니다.
 
-- **정직한 정보** — 엘리베이터·에스컬레이터 정보가 어디서 왔고 언제 확인됐는지 숨기지 않습니다. 모르는 것은 모른다고 표시합니다.
-- **오프라인 우선** — 역 검색, 경로 검색, 즐겨찾기는 인터넷 없이도 동작합니다. 지하에서 신호가 끊겨도 설치된 데이터 범위 안에서는 안내를 이어갑니다.
-- **확인된 범위만 안내** — 현장 또는 운영기관에서 확인한 시설만 교통약자 경로의 근거로 사용합니다.
+모든 정보에 출처와 확인한 날짜가 붙습니다. 그리고 모르는 건, 모른다고 말합니다.
 
-그리고 하지 않는 것도 분명합니다.
+## 신고는 가입 없이.
 
-- 계정 가입을 요구하지 않습니다. 시설 고장 신고조차 가입 없이 할 수 있습니다.
-- 사용자를 추적하지 않고, 개인정보를 팔지 않고, 제3자와 공유하지 않습니다.
-- 확인되지 않은 경로를 확인된 것처럼 안내하지 않습니다.
+엘리베이터가 멈췄다면 바로 알려주세요. 계정도 이름도 필요 없습니다. 접수 번호 하나면 충분합니다.
 
-## 주요 기능
+## 당신을 따라다니지 않습니다.
 
-- 🚉 **역·경로 검색** — 인터넷이 안 되는 지하에서도 역을 찾고 경로를 검색할 수 있습니다.
-- ♿ **내 상황에 맞는 경로** — 휠체어, 유모차, 걷기 불편함 등 내 상황을 고르면 계단 없는 길을 먼저 보여줍니다.
-- 🗺️ **노선도** — 앱을 열면 바로 보이는 노선도에서 역을 찾고 출발할 수 있습니다.
-- 🏷️ **믿을 수 있는 정보 표시** — 역·시설 정보마다 출처와 마지막 확인 날짜를 함께 보여줍니다.
-- ⭐ **즐겨찾기·최근 검색** — 자주 가는 역을 저장할 수 있고, 이 정보는 내 기기에만 남습니다.
-- 📮 **시설 고장 신고** — 엘리베이터 고장 등을 가입 없이 신고하고, 접수 번호로 처리 상태를 확인합니다.
-- 📚 **정보 출처 확인** — 앱이 쓰는 모든 데이터의 출처를 앱 안에서 직접 볼 수 있습니다.
+계정 없음. 추적 없음. 개인정보 판매 없음. 당신이 저장한 즐겨찾기는 당신의 기기에만 남습니다.
 
-## 지금은 어디까지 되나요
-
-정식 출시 전 단계로, 지금은 **상록수역·사당역 구간**을 중심으로 현장 확인을 마친 범위만 안내합니다. 확인된 범위는 단계적으로 넓혀가며, 어느 역이 어느 수준까지 확인됐는지는 앱 안에서 그대로 보여드립니다. 확인되지 않은 곳을 확인된 것처럼 안내하지 않습니다.
+<br>
 
 ## 스크린샷
 
@@ -67,219 +54,17 @@
 </p>
 -->
 
-> 스크린샷은 앱 화면이 확정되는 대로 추가할 예정입니다.
+> 앱 화면이 확정되는 대로 추가합니다.
+
+## 지금은
+
+상록수역과 사당역에서 시작합니다. 직접 걸어서 확인한 범위부터, 단계적으로 넓혀갑니다. 어디까지 확인됐는지는 앱이 그대로 보여줍니다.
 
 ## 다운로드
 
-Android 버전을 Google Play 출시 목표로 준비하고 있습니다. iOS는 Android 출시 이후 단계로 계획되어 있습니다.
+Android부터 시작합니다. Google Play 출시를 준비하고 있고, iOS는 그다음입니다.
 
-출시 소식과 문의는 [Issues](https://github.com/AquilaXk/easysubway/issues)에서 받습니다.
-
----
-
-# 개발자·운영 문서
-
-여기부터는 앱을 빌드하거나 데이터 품질·출시 계약을 확인하려는 개발자를 위한 내용입니다. 일반 사용자는 읽지 않아도 됩니다.
-
-## 지원 범위 (Scope)
-
-- 장기 서비스 분모는 전국 도시철도, 광역철도, 공항철도, GTX, 경전철을 포함합니다.
-- Android v1의 현재 공개 지원 claim은 `상록수·사당 검증 pilot`로 제한합니다. 전국/수도권 전체/실시간 ETA/교통약자 경로 보장 claim은 `tools/datapack/nationwide-coverage-targets.json`의 단계별 source admission roadmap과 release gate 증거가 모두 닫힐 때까지 NO-GO입니다.
-- 지역별 데이터 품질은 Level 1-4로 구분하고, 신뢰도와 마지막 갱신일을 숨기지 않습니다.
-- 초기 현장 검증 지역은 상록수역입니다.
-
-## Data Quality Levels
-
-- Level 1: 역·노선 기본 식별 정보와 출처가 있고, `stationCount`/`edgeCount`로 분모를 공개합니다.
-- Level 2: 역-노선 × 필수 시설 유형 근거가 채워지며, `requiredFacilityEvidenceCoverageRatio`로 측정합니다.
-- Level 3: 운행상태와 freshness가 확인된 시설만 경로 근거로 쓰며, `operationalKnownRatio`와 `freshnessValidRatio`로 측정합니다.
-- Level 4: 현장 또는 운영기관 검증 pathway만 교통약자 경로 claim에 쓰며, `strictRouteEligibleFacilityRatio`와 `fieldVerifiedPathwayRatio`로 측정합니다.
-- `unknownEdgeRatioByProfile`은 휠체어·유모차·저이동성 profile에서 UNKNOWN edge가 strict 경로를 만들지 않는지 확인하는 보조 차단 지표입니다.
-
-교통·역·경로·접근성 사실은 공식 운영기관/정부 출처를 우선합니다.
-
-## 기술 스택
-
-| 영역 | 기술 |
-|---|---|
-| Mobile | Flutter, Dart, Riverpod, go_router, Dio, Drift |
-| Backend | Java, eGovFrame 5.0, Spring Boot 3.5, Spring MVC, Spring Security, Spring Batch |
-| Data | PostgreSQL, PostGIS |
-| Infra | Docker, Docker Compose, GitHub Actions |
-| Maps | Kakao Map only |
-
-## 아키텍처
-
-The local-first mobile runtime is the default user path. Station search, route search, station details, favorites, report receipt recovery, and accessibility copy must read installed data packs and the user database before any network fallback. A missing API base URL must not stop local database-backed startup.
-
-The backend control-plane runtime is kept for report intake, report review, admin/operator pages, data-pack source control, and release operations. Removed mobile station, route, account, profile, notification, and favorite APIs must not become required for ordinary app launch or offline route guidance.
-
-eGovFrame은 backend control-plane에만 선택 적용한다. 현재 production 허용 영역은 admin/operator pagination, data collection batch control-plane(eGovFrame bat-core 변수 리스너 채택), 운영 logging 및 수집 run ID의 fdl-property 접두어·fdl-idgnr 발번, admin/operator 내보내기 fdl-excel xlsx(CSV 병행) 채택이며(게이트 허용 영역 활용률 100%), Flutter mobile runtime, ordinary mobile API, realtime hot path, token/crypto boundary, domain/application/public JSON contracts에는 eGovFrame type이나 starter를 흘리지 않는다. 이 기준은 `backend/quality/egovframe-control-plane-gate.json`과 repository contract test로 검증한다.
-
-The receipt-token report boundary lets a user check or confirm a submitted report without an account. The plain receipt token is issued once, stored on the device, and must not be logged, returned again, or used in URLs after issuance; the backend stores only a peppered hash.
-
-The data-pack pointer contract is atomic: an installed pack becomes current only after size, hash, gzip, SQLite quick check, schema, table, and production signature validation. Failed updates keep the previous `current.json` pointer and preserve user-owned data.
-
-The user-data preservation contract separates replaceable catalog data from user-owned rows. Catalog pack swaps may replace station, route, facility, and data-quality records, but must not delete favorites, recent searches, report receipts, drafts, app preferences, or installed-pack audit rows.
-
-## Production Routing Graph
-
-- Production LOCAL `RIDE` edge는 같은 노선의 인접 `lineSequence`만 연결합니다. 비인접 요약 edge는 regression fixture 전용이며 production pack에서 제외합니다. 공식 정차 패턴이 검증된 `EXPRESS` edge를 추가하기 전까지 pilot summary edge를 `route-graph-topology-report`의 release-blocking `nonAdjacentExpressRide` violation 또는 ETA 근거로 쓰지 않습니다.
-- 기본 route node는 station-line(`stationId:lineId`)입니다. platform node는 공식 platform/source가 admission되기 전까지 만들지 않고, 방향 문구는 `platformInfo`에만 둡니다.
-- 표시용 SVG asset은 앱 지도 표시용입니다. canonical route map position은 `routeMapPositions`의 source, license, `sourceSha256`, `reviewedAt`, `updatedAt`, label polygon으로만 판정합니다.
-- 앱의 `데이터 및 지도 출처` 화면은 source inventory와 manifest를 보여주는 사용자 연결점입니다. Level 4 또는 전국 claim은 #1397 source admission과 #1400 인접역 graph/position 확장 증거가 닫힐 때까지 NO-GO입니다.
-
-## Mobile Data
-
-사용자 로컬 DB는 즐겨찾기, 최근 검색, 신고 receipt처럼 사용자가 만든 데이터를 보관합니다. 앱 업데이트로 schema가 바뀔 때는 Drift `MigrationStrategy.onUpgrade`에 단계별 migration을 추가하고, v1 fixture에서 현재 schema로 열었을 때 사용자 데이터가 유지되는 테스트를 먼저 갱신합니다.
-
-Migration 실패를 무시하고 DB를 삭제하거나 재생성하지 않습니다. 복구가 필요한 변경은 사용자 데이터 보존 범위, 실패 시 차단 동작, 롤백 가능 여부를 코드와 테스트로 먼저 고정한 뒤 릴리즈합니다.
-
-production data pack의 pack URL과 sourceInventory URL은 공개 HTTPS host만 사용할 수 있으며, `localhost`, `*.localhost`, `*.local` 같은 local placeholder host를 쓰면 빌드와 검증 단계에서 실패해야 합니다. local placeholder host 값은 fixture artifact의 source 식별자 또는 manifest schema `$id`처럼 운영 배포 URL이 아닌 계약 값에만 남길 수 있습니다.
-
-## 개발하기
-
-### Workspace
-
-- `apps/mobile/`: Flutter Android/iOS app
-- `backend/`: eGovFrame/Spring Boot backend modules
-- `infra/`: local runtime and deployment infrastructure
-- `scripts/`: data import and local development utilities
-- `tools/ci/`: repository and CI contract checks
-
-### Runtime Environment
-
-`.env.example`은 로컬 실행과 배포에 필요한 dotenv 양식입니다. 실제 값은 git에 올리지 않는 로컬 `.env`에만 둡니다.
-
-GitHub Actions에는 애플리케이션 환경값을 개별 환경변수로 여러 개 만들지 않고, 로컬 `.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다. 단, provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY`, `KRIC_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다.
-
-```bash
-scripts/github/sync-actions-env-secret.sh .env
-```
-
-워크플로에서 실제 배포 값을 사용할 때는 `secrets.EASYSUBWAY_ENV`를 파일로 복원한 뒤 provider key overlay를 append하고, 그 파일을 `docker compose --env-file` 또는 애플리케이션 실행 환경에 넘깁니다. PR CI는 민감값이 필요하지 않으므로 `.env.example`로 양식만 검증합니다.
-
-Provider 호출 안전 범위는 공식 한도보다 낮게 둡니다. TOPIS backend 실시간 호출은 서울 Open API 실시간 지하철 한도 1,000/day 아래로 `EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1`, `EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800`까지 clamp합니다. TAGO/Data.go.kr admission은 개발계정 10,000/day 안에서 자동 반복 수집 없이 `run-source-admission-pipeline.mjs` 1회 실행당 live fetch 1회만 수행합니다.
-
-Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다. GitHub Actions 알림은 `.env.example`에 빈 양식으로 남긴 `SLACK_CI_WEBHOOK_URL`, `SLACK_RELEASE_WEBHOOK_URL`, `SLACK_SECURITY_WEBHOOK_URL`을 채널별 incoming webhook repository secret으로 등록해 사용합니다. Slack 알림은 별도 `workflow_run` workflow가 아니라 원본 workflow 내부 notify job에서 전송합니다. CI와 SonarCloud는 `main` push 실패, 취소 결과만 보내고, CD/Data Pack Release/Release Artifacts/Store Distribution Evidence는 release 채널로 성공, 실패, 취소 결과를 보냅니다.
-
-CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리합니다. self-hosted production runner에서 직접 배포하므로 GitHub `production` environment approval을 기다리지 않습니다. `DEPLOY_ROOT`, `DEPLOY_COMPOSE_PROJECT`, 선택 값 `DEPLOY_PUBLIC_API_BASE_URL`은 repository variable로 둘 수 있고, 없으면 `/opt/easysubway`와 `easysubway` 기본값을 사용합니다.
-
-CD는 `main`의 CI가 성공한 뒤 `workflow_run`으로 자동 실행됩니다. 수동 실행은 대상 SHA가 `main`에 있고 해당 SHA의 CI 성공 기록이 있을 때만 배포할 수 있습니다. `preflight` 모드는 dotenv 검증, Compose config, backend bootJar 생성까지만 확인합니다.
-
-`EASYSUBWAY_OBJECT_STORAGE_ENDPOINT`는 data pack publish용 공개 S3 endpoint 계약을 유지합니다. backend report 사진 저장소가 Compose 내부 MinIO에 붙을 때는 `EASYSUBWAY_REPORT_OBJECT_STORAGE_INTERNAL_ENDPOINT=http://object-storage:9000`을 별도로 설정합니다.
-
-`EASYSUBWAY_TRUSTED_PROXY_CIDRS`는 ALB, Nginx, API Gateway처럼 애플리케이션 앞단에 있는 신뢰 가능한 프록시 IP 또는 CIDR 목록입니다. 예: `10.0.0.0/8,192.168.0.10`. 운영에서는 누락 시 시작 단계에서 설정 오류가 드러나도록 기본값을 두지 않습니다. 개발 환경은 프록시 없이도 로컬 실행할 수 있도록 빈 기본값을 허용하며, 이 경우 전달 헤더를 익명 인증 발급 제한 키로 사용하지 않습니다.
-
-운영 프로필은 관리자 화면과 API를 열 수 있는 계정이 반드시 필요합니다. `EASYSUBWAY_ADMIN_USERNAME`과 `EASYSUBWAY_ADMIN_PASSWORD`가 비어 있으면 백엔드가 시작되지 않습니다.
-
-모바일 앱의 도움말 화면은 개인정보처리방침, 고객지원, 보안 문의, 데이터 삭제 요청 경로를 `dart-define`으로 받습니다. 릴리즈 빌드는 아래 값이 비어 있으면 시작 단계에서 실패하며, 개인정보처리방침은 HTTPS URL, 나머지는 메일 주소 형식이어야 합니다. 릴리즈 빌드 전 로컬 `.env`와 GitHub Actions `EASYSUBWAY_ENV`에 값을 맞춘 뒤 Flutter 빌드 명령에 전달합니다.
-
-- `EASYSUBWAY_PRIVACY_POLICY_URL`
-- `EASYSUBWAY_SUPPORT_EMAIL`
-- `EASYSUBWAY_SECURITY_EMAIL`
-- `EASYSUBWAY_DATA_DELETION_EMAIL`
-
-푸시 알림은 실제 FCM/APNs 공급자와 기기 QA가 끝나기 전까지 릴리즈 기본 범위에서 제외합니다. 알림 설정 화면과 저장소 연동을 테스트할 때만 `--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=true`를 명시하고, 기본값은 `.env.example`처럼 `false`로 유지합니다.
-
-### Release Gates
-
-앱 스토어 제출과 상용 배포는 아래 gate 계약을 전부 통과해야 합니다. 각 gate는 JSON 계약 파일과 repository contract test로 검증됩니다.
-
-<details>
-<summary><strong>출시 게이트와 증거 계약 (펼쳐 보기)</strong></summary>
-
-<br/>
-
-모바일 signed release artifact gate는 `apps/mobile/release/signed-release-artifact-gate.json`으로 검증합니다. Android-first 배포 파이프라인은 Android AAB와 backend image만 생성하며, CI의 Android AAB는 임시 self-signed keystore로 생성하므로 store-ready가 아닙니다. 정식 RC는 `workflow_dispatch`에서 `production-upload-key`를 선택하고 `android-production-rc` GitHub Environment 승인을 통과한 뒤 production upload key로 서명해야 하며, metadata에는 versionCode, production upload key fingerprint, Play App Signing fingerprint, mapping 90일 보관 정책을 남깁니다. iOS artifact와 dSYM 보관은 iOS 출시 준비 단계까지 deferred 상태로 두고 현재 workflow에서는 생성하지 않습니다. Android 제출 준비 상태는 Android 15 (API 35) target requirement, production signing key material, Play App Signing, Play internal track 업로드 또는 pre-launch report 증거가 있어야 합니다. Android RC와 Google Play 제출 증거는 `apps/mobile/release/android-rc-store-evidence.json` 계약에 맞춰 Play-generated APK 또는 Play-installed build smoke, 16 KB page-size, TalkBack/시스템 글자 크기/작은 화면, Data Safety/network trace, pre-review/pre-launch 결과를 수집합니다. iOS 제출 증거는 Android Google Play v1 release blocker가 아니며 future iOS release gate로 deferred 상태이고, 그때 Xcode 26, Apple distribution signing, TestFlight, dSYM 90일 보관 workflow를 다시 확인합니다. 민감한 설치/스토어 콘솔 증거는 GitHub에 파일로 올리지 않고 `.codex/evidence/release/mobile-signed-artifacts/` 또는 `.codex/evidence/release/android-rc-store/<rc-or-run>/` 아래 로컬 전용 경로에 보관한 뒤 PR에는 요약만 남깁니다.
-
-Android 16 KB page-size gate는 `apps/mobile/release/android-16kb-page-size-gate.json`으로 검증합니다. AAB evidence는 `tools/mobile/check-android-aab-16kb-page-size.sh`로 bundletool config와 native `.so` LOAD segment alignment를 확인하고, runtime evidence는 `tools/mobile/run-android-16kb-page-size-smoke.sh`로 로컬 Android emulator의 `adb shell getconf PAGE_SIZE` 출력이 `16384`인지 먼저 확인합니다. 현재 로컬 emulator가 4 KB page-size이면 Go evidence로 쓰지 않고 16 KB system image 또는 Play-installed build 증거를 다시 수집합니다.
-
-Google Play production access와 신규 personal account closed test gate는 `apps/mobile/release/play-production-access-gate.json`으로 검증합니다. 2023-11-13 이후 생성된 personal developer account라면 production access 신청 전 closed test 12명 이상, 14일 연속 opt-in, tester feedback/issue response, production readiness 답변과 승인 결과를 local-only evidence로 보관해야 합니다. 조직 계정이거나 기존 personal account라 closed test requirement가 적용되지 않더라도 Play Console account type, creation date, identity verification, Console 권한, 2단계 인증, production access 상태 summary는 release blocker 증거로 남깁니다. 모바일 표시 버전은 SemVer 형식으로 관리하고, 빌드 번호는 스토어 업로드마다 단조 증가하는 정수로 관리합니다. Android는 `versionName+versionCode`, iOS는 `CFBundleShortVersionString+CFBundleVersion` 구조로 맞춥니다. 다음 후보는 `node tools/release/bump-mobile-version.mjs --latest-play-version-code <현재 Play 최신 versionCode> --write`로 갱신하며, Play internal track에 이미 업로드된 `versionCode=1`과 `versionCode=10001`은 consumed artifact로 보고 재사용하지 않습니다. `store-distribution-evidence.yml` preflight는 `EASYSUBWAY_GOOGLE_PLAY_APP_SIGNING_SHA256`와 `EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE`를 확인해 Play App Signing 지문 형식과 현재 `apps/mobile/pubspec.yaml` versionCode 증가 조건을 먼저 막습니다.
-
-Google Play App Content, Data Safety, 한국어 listing gate는 `apps/mobile/release/play-store-submission-content.json`으로 검증합니다. Data Safety 답변은 `apps/mobile/release/store-privacy-inventory.json`의 수집 데이터, 암호화 전송, 삭제 지원, 제3자 공유 없음, tracking 없음 값과 일치해야 하며 listing은 데이터 기준일, 지원 지역, 실시간 지원 범위, 확인 필요 상태를 명시합니다. “반드시 이동 가능”, “100% 안전”, “모든 역 완벽 지원”, “실시간 위치 정확”, “휠체어 경로 보장” 같은 보장 표현은 store copy와 screenshot 설명에서 사용할 수 없습니다.
-
-Play-generated APK와 device compatibility matrix gate는 `apps/mobile/release/play-generated-apk-device-matrix-gate.json`으로 검증합니다. 로컬 AAB만으로는 Go evidence가 될 수 없고 Internal App Sharing, internal/closed testing, App Bundle Explorer generated APK, Play-installed build 중 하나에서 split APK manifest, Play App Signing certificate, package/versionCode, RC evidence manifest identity, permission/network security config를 남겨야 합니다. App Bundle Explorer 또는 generatedApks 다운로드 APK를 adb/shell로 설치한 증거는 artifact identity와 manifest 확인에만 쓰고, Play-installed build smoke는 `installerPackageName=com.android.vending`, `initiatingPackageName=com.android.vending`, 앱 foreground 실행 화면 또는 UI tree까지 별도로 남겨야 합니다. Android 15/16, 16 KB page-size, 작은 화면, 시스템 글자 크기, TalkBack, network block, low storage, low memory/process death smoke summary도 이 설치 출처와 함께 기록합니다.
-
-Android 출시 후 2시간/24시간/7일/30일 운영 검토는 `apps/mobile/release/post-launch-operations-review-gate.json`으로 검증합니다. Play review, crash/ANR, 지원 문의, 데이터 오류, provider quota, 신고 backlog, data-pack adoption 신호와 backend/datapack/realtime kill switch owner를 확인해야 하며, P0 앱 문제는 최초 공개에서는 staged rollout halt 대신 새 versionCode의 fixed release로 제출합니다. fixed release regression 증거는 실기기 대신 로컬 Android emulator에서 수집하고 민감한 Console, support, provider 증거는 `.codex/evidence/release/post-launch-operations-review/<rc-or-run>/` 아래 local-only summary로 보관합니다.
-
-사용자 지원, 데이터 오류, 장애 대응 gate는 `apps/mobile/release/support-incident-response-gate.json`으로 검증합니다. support email/site, FAQ, 장애 공지 문구, 문의 분류 기준, P0 안전 오류 triage, 운영기관 연락 경로, emergency datapack release/rollback, 오래된 신고 retention, duplicate 처리, 잘못된 override 회수 절차가 준비되어야 합니다. 도움말/공지 화면 증거는 로컬 Android emulator에서 screenshot 또는 UI tree로 수집하고, support mailbox 개인 정보, receipt token, 운영기관 private contact, provider credential은 GitHub에 올리지 않습니다.
-
-Abuse-case와 penetration rehearsal gate는 `apps/mobile/release/abuse-penetration-rehearsal-gate.json`으로 검증합니다. Android AAB 또는 Play-generated APK secret/endpoint scan, report photo upload, receipt token, signed URL lifecycle, admin/operator auth, session/CSRF, tenant authorization, distributed rate limit, object storage lifecycle abuse를 확인해야 합니다. rehearsal 증거는 raw receipt token, signed URL, photo binary, provider credential, operator password, session cookie를 제거한 local-only summary로 보관하고 critical/high finding은 0이거나 #1020 waiver와 fix plan이 있어야 합니다.
-
-Android 출시 100% 범위와 Go/No-Go 계약은 `apps/mobile/release/release-governance-gate.json`으로 검증합니다. 이번 release blocker는 Android Google Play v1이며 iOS는 `DEFERRED_OUT_OF_SCOPE`로 기록해 Android 출시 완료를 차단하지 않습니다. open Android P0가 있거나 RC evidence의 git SHA, AAB hash, backend artifact, data pack manifest, route/realtime contract가 서로 맞지 않으면 최종 Go 판단을 하지 않습니다.
-
-Route commercialization gate는 `apps/mobile/release/route-commercialization-gate.json`과 `tools/routes/check-route-commercialization-gate.mjs`로 검증합니다. `artifacts/route-v2-contract-report.json`은 실제 V2 route runtime response 묶음을 `tools/routes/build-route-v2-contract-report.mjs --input <responses.json> --output artifacts/route-v2-contract-report.json`로 산출합니다. 이 gate는 ETA accuracy, realtime provider coverage, strict step-free accessibility regression, route v2 contract report를 모두 읽고, fixture-only sample이나 stale realtime sample을 상용 ETA 품질 증거로 인정하지 않습니다. strict step-free known stair false positive, generated connector를 verified accessibility evidence로 집계한 경우, D-2/D-3/H-1 blocker 없이 out-of-station transfer claim을 켜는 경우는 release blocker입니다.
-
-Datapack release readiness gate는 `apps/mobile/release/datapack-release-readiness-gate.json`으로 검증합니다. #1419는 #1414에 흡수되었고, #1414가 오프라인 데이터팩과 온라인 실시간 overlay를 분리하고, 인접역 graph, 시간표, 시설·pathway, 노선도 좌표, realtime join key, 배포 artifact 검증, ETA 실측 정확도, claim scan 증거가 모두 닫히기 전까지 데이터팩 상용 준비 완료나 실시간 ETA 정확 claim을 막는 P0 release blocker입니다.
-
-Route release readiness tracker는 `apps/mobile/release/route-release-readiness-tracker.json`으로 #1414 하위 P0 issue와 production evidence 완료 조건을 잠급니다. 모든 하위 release blocker issue가 닫히고 route accuracy/accessibility/coverage/contract report가 production 또는 manual realtime evidence로 연결되기 전에는 상용 실시간 길찾기나 교통약자 경로 안내 출시 준비 완료 claim을 하지 않습니다.
-
-RC evidence manifest는 `apps/mobile/release/rc-evidence-manifest-contract.json`과 `tools/release/generate-rc-evidence-manifest.mjs`로 생성하며, EasySubway release identity의 최종 기준으로 사용합니다. manifest는 git SHA, app version, versionCode, AAB SHA-256, backend image digest 또는 artifact SHA-256, data pack manifest SHA-256, release sequence, route/realtime contract version, #547/#571/#1015/#1016/#1017/#1018/#1019/#1021/#1022 evidence entry를 같은 RC 식별자로 묶습니다. backend와 data pack은 mobile 앱 버전에 억지로 맞추지 않고 digest, manifest hash, contract version으로 호환성을 판단합니다. open Android P0, gate status, identity mismatch, evidence entry 누락이 있으면 readiness는 `NO_GO`로 계산되며, Android PR evidence는 물리 기기 대신 로컬 Android emulator 기준으로 남깁니다.
-
-Android 출시 UX·접근성·성능 gate는 `apps/mobile/release/android-release-quality-gate.json`으로 검증합니다. PR 증거는 local Android emulator evidence를 우선 사용하며, 물리 기기 증거는 Codex PR 증거로 사용하지 않습니다. 실제 Google Play Go 판단 전에는 #1015의 exact RC와 #1016의 Play-installed build에서 TalkBack, 150%/200% 시스템 글자 크기, 작은 화면, 권한/네트워크/업로드 오류 복구, 노선도 성능, 지원 범위/출처 화면, crash/ANR privacy-safe reporting 증거를 다시 수집해야 합니다.
-
-</details>
-
-## Privacy Policy
-
-EasySubway collects and stores only the data needed to provide subway accessibility guidance, local route search, favorites, app settings, diagnostics, and facility report submission.
-
-The mobile app can process location, station or route searches, accessibility preferences, report text, report photos, report receipt metadata, crash logs, and performance diagnostics for app functionality. Report photos and report text are used only for facility report review and are not used for advertising. EasySubway does not sell personal or sensitive user data.
-
-Data is transmitted over HTTPS when network submission is required. Local favorites, recent searches, report receipts, drafts, preferences, and installed data-pack audit records remain on the user's device unless the user submits a report or requests deletion. Users can request deletion of report data or ask privacy questions through `privacy@aquilaxk.site`.
-
-Store submission and release contact points:
-
-- Privacy policy URL: `https://easysubway-api.aquilaxk.site/easysubway/privacy`
-- Support: `support@aquilaxk.site`
-- Security: `security@aquilaxk.site`
-- Data deletion and privacy requests: `privacy@aquilaxk.site`
-
-## Operations
-
-운영 관측성과 알림 기준선은 `apps/mobile/release/operations-observability-gate.json`을 기준으로 검증합니다. 이 gate는 release blocker이며, PR에서는 `node --test tools/ci/*.test.mjs`로 필수 신호와 artifact 보관 계약을 확인합니다. 릴리즈 후보의 실제 CD, rollback, migration, restore rehearsal, alert routing 증거는 `apps/mobile/release/operations-release-evidence.json` 계약에 맞춰 `.codex/evidence/operations-release/<rc-or-run>` 아래 로컬 전용으로 보관하고 PR에는 요약만 남깁니다. 같은 계약의 backend control-plane 섹션은 public API surface inventory, `SecurityConfig` matcher comparison, default-deny security matcher, Basic auth/OIDC/MFA/SSO 전환 예외, single-instance abuse-control exception, GitHub production environment protection, audit redaction evidence를 #1017 release blocker로 묶습니다.
-
-백엔드 CD는 서버의 기존 PostgreSQL과 object-storage 컨테이너를 보존한 상태에서 backend 서비스만 교체합니다. 배포 스크립트는 배포 lock, main ancestry, 이전 배포 SHA, image drift, JAR checksum, env hash, migration 변경 시 PostgreSQL dump 검증, readiness, 실패 시 이전 backend image 재기동을 확인합니다. readiness 실패 로그와 백업 산출물은 서버의 `DEPLOY_ROOT` 아래에 보관하고 GitHub에는 민감값을 올리지 않습니다.
-
-필수 운영 신호 ID:
-
-- `backend_health_readiness_storage_datapack_report`
-- `report_api_error_rate`
-- `admin_review_latency`
-- `datapack_release_publish_result`
-- `mobile_crash_free_rate`
-- `mobile_anr_rate`
-- `mobile_app_start_failure_rate`
-- `route_search_found_blocked_unknown_distribution`
-- `route_quality_observability_dashboard`
-- `datapack_install_rollback_failure_rate`
-- `realtime_provider_success_stale_timeout_latency_eta_error`
-- `report_upload_failure_duplicate_orphan_cleanup_rate`
-- `cross_version_correlation_ids`
-- `android_mapping_retention`
-- `ios_dsym_retention`
-
-운영 로그와 artifact에는 receipt token, upload URL, photo metadata를 남기지 않습니다. 장애 증거에는 app version, datapack version, route engine version, provider snapshot id를 함께 기록해야 하며, 외부 provider나 store console이 필요한 신호는 PR 검증 증거에 외부 차단 조건과 남은 리스크를 기록합니다.
-
-백업과 복구 리허설 기준선은 `apps/mobile/release/backup-restore-rehearsal-gate.json`으로 검증합니다. PR과 릴리즈 후보에서는 `node tools/ops/backup-restore-rehearsal-check.mjs`로 PostgreSQL dump, 신고 사진 object manifest, 데이터팩 source inventory, 데이터팩 release manifest history가 모두 복구 리허설 대상에 포함되는지 확인하고, 신고 사진 백업은 `node tools/ops/facility-report-photo-restore-check.mjs "$EASYSUBWAY_PHOTO_RESTORE_DIR"`로 `manifest.tsv`와 `objects/` 산출물을 검증합니다. 실제 database dump, 사진 object, signed URL, credential, receipt token은 GitHub에 올리지 않고 `.codex/evidence/backup-restore-rehearsal/<date>/` 아래 로컬 전용 증거로만 보관합니다.
-
-backend static analysis feasibility gate는 `backend/quality/static-analysis-gate.json`으로 검증합니다. Checkstyle, SpotBugs, Error Prone, ArchUnit, JaCoCo는 P0 보안/경로/release contract가 안정화되고 CI runtime budget 측정이 끝나기 전까지 한 번에 필수 gate로 켜지 않습니다. 새 품질 도구를 추가할 때는 baseline 위반 수, suppression 근거, 추가 CI 시간, 기존 security/route/release 테스트 보존 여부를 먼저 PR 증거에 남깁니다.
-
-## Workflow
-
-Tracked work follows this order:
-
-1. Create or confirm a GitHub issue.
-2. Create a branch from `main`.
-3. Implement the scoped work.
-4. Open a pull request.
-5. Wait for CI.
-6. Check CodeRabbit review, or run Codex CLI code review if CodeRabbit cannot run.
-7. Merge after review and CI are clear.
-8. Confirm the deployment or CD status when the change affects deployment.
-
-Tracked documents are limited to this root `README.md` and GitHub issue/PR templates under `.github/`. Product plans, agent briefs, handoff notes, and operational state are kept local.
+출시 소식과 문의는 [Issues](https://github.com/AquilaXk/easysubway/issues)에서.
 
 ---
 

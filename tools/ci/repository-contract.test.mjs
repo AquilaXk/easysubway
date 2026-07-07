@@ -79,7 +79,6 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.equal(existsSync(path.join(root, gatePath)), true, "route commercialization gate must exist");
 
   const gate = readJson(gatePath);
-  const readme = read("README.md");
   const prTemplate = read(".github/PULL_REQUEST_TEMPLATE/full.md");
   const contractReportBuilder = "tools/routes/build-route-v2-contract-report.mjs";
   const routeGraphCoverageBuilder = "tools/routes/build-route-graph-coverage-report.mjs";
@@ -127,9 +126,6 @@ test("route commercialization release gate blocks unsupported commercial route c
 
   assert.equal(existsSync(path.join(root, contractReportBuilder)), true, "route v2 contract report builder must exist");
   assert.equal(existsSync(path.join(root, routeGraphCoverageBuilder)), true, "route graph coverage report builder must exist");
-  assert.match(readme, /Route commercialization gate/);
-  assert.match(readme, /apps\/mobile\/release\/route-commercialization-gate\.json/);
-  assert.match(readme, /tools\/routes\/build-route-v2-contract-report\.mjs/);
   assert.match(prTemplate, /Route commercialization gate impact/);
   assert.match(prTemplate, /route-commercialization-gate\.json/);
 });
@@ -141,7 +137,6 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   const gate = readJson(gatePath);
   const governance = readJson("apps/mobile/release/release-governance-gate.json");
   const scope = readJson("apps/mobile/release/production-datapack-scope.json");
-  const readme = read("README.md");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -215,54 +210,6 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.equal(governance.childIssueLinks.includes(1419), false);
   assert.ok(scope.linkedReleaseBlockers.includes(1414));
   assert.equal(scope.linkedReleaseBlockers.includes(1419), false);
-  assert.match(readme, /datapack-release-readiness-gate\.json/);
-  assert.match(readme, /오프라인 데이터팩과 온라인 실시간 overlay를 분리/);
-});
-
-test("README maps data quality levels to production datapack metrics", () => {
-  const readme = read("README.md");
-
-  for (const text of [
-    "## Data Quality Levels",
-    "Level 1",
-    "Level 2",
-    "Level 3",
-    "Level 4",
-    "stationCount",
-    "edgeCount",
-    "requiredFacilityEvidenceCoverageRatio",
-    "operationalKnownRatio",
-    "freshnessValidRatio",
-    "strictRouteEligibleFacilityRatio",
-    "fieldVerifiedPathwayRatio",
-    "unknownEdgeRatioByProfile",
-  ]) {
-    assert.ok(readme.includes(text), `README must include ${text}`);
-  }
-});
-
-test("README fixes production routing graph admission policy", () => {
-  const readme = read("README.md");
-
-  for (const text of [
-    "## Production Routing Graph",
-    "Production LOCAL `RIDE` edge",
-    "인접 `lineSequence`",
-    "regression fixture",
-    "`EXPRESS`",
-    "release-blocking",
-    "nonAdjacentExpressRide",
-    "station-line(`stationId:lineId`)",
-    "`platformInfo`",
-    "canonical route map position",
-    "`routeMapPositions`",
-    "sourceSha256",
-    "데이터 및 지도 출처",
-    "#1397 source admission",
-    "#1400 인접역 graph/position 확장 증거",
-  ]) {
-    assert.ok(readme.includes(text), `README must include ${text}`);
-  }
 });
 
 test("route release readiness tracker keeps issue 1414 as a release blocker", () => {
@@ -270,7 +217,6 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
   assert.equal(existsSync(path.join(root, trackerPath)), true, "route release readiness tracker must exist");
 
   const tracker = readJson(trackerPath);
-  const readme = read("README.md");
   const prTemplate = read(".github/PULL_REQUEST_TEMPLATE/full.md");
   const issueNumbers = tracker.requiredChildIssues.map((issue) => issue.number);
 
@@ -313,8 +259,6 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
   assert.equal(tracker.evidencePolicy.productionOrManualRealtimeEvidenceRequired, true);
   assert.equal(tracker.evidencePolicy.localOnlyEvidenceRoot, ".codex/evidence/release/route-readiness/<rc-or-run>/");
 
-  assert.match(readme, /Route release readiness tracker/);
-  assert.match(readme, /apps\/mobile\/release\/route-release-readiness-tracker\.json/);
   assert.match(prTemplate, /Route release readiness tracker impact/);
   assert.match(prTemplate, /route-release-readiness-tracker\.json/);
 });
@@ -340,8 +284,6 @@ function currentMobileVersion() {
 test("Android versionCode는 표시 버전과 분리된 단조 증가 빌드 번호다", () => {
   const mobileVersion = currentMobileVersion();
   assert.ok(mobileVersion.code > 0, "Android versionCode must be positive");
-  assert.match(read("README.md"), /표시 버전은 SemVer/);
-  assert.match(read("README.md"), /빌드 번호는 스토어 업로드마다 단조 증가/);
 });
 
 function escapeRegExp(value) {
@@ -1098,23 +1040,10 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
 });
 
 test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관리한다", () => {
-  const readme = read("README.md");
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
   const datapackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
 
-  assert.match(readme, /로컬 `\.env` 파일 전체를 `EASYSUBWAY_ENV` secret 하나로 저장합니다/);
-  assert.match(readme, /provider key 회전은 전체 dotenv 재업로드 없이 `EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY`, `DATA_GO_KR_SERVICE_KEY`, `KRIC_SERVICE_KEY` repository secret으로 덮어쓸 수 있습니다/);
-  assert.match(readme, /scripts\/github\/sync-actions-env-secret\.sh \.env/);
-  assert.match(readme, /secrets\.EASYSUBWAY_ENV/);
-  assert.match(readme, /provider key overlay를 append/);
-  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE=1/);
-  assert.match(readme, /EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY=800/);
-  assert.match(readme, /실시간 지하철 한도 1,000\/day 아래/);
-  assert.match(readme, /개발계정 10,000\/day 안에서/);
-  assert.match(readme, /1회 실행당 live fetch 1회/);
-  assert.match(readme, /CD workflow는 `EASYSUBWAY_ENV` repository secret이 있으면 배포 dotenv 계약을 검증하고 Compose env와 backend env로 분리/);
-  assert.match(readme, /GitHub `production` environment approval을 기다리지 않습니다/);
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
   assert.match(script, /gh secret set "\$\{SECRET_NAME\}" --repo "\$\{REPO\}" < "\$\{ENV_FILE\}"/);
@@ -1156,7 +1085,6 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
     storeDistributionWorkflow,
     osvScheduledWorkflow,
   ].join("\n---\n");
-  const readme = read("README.md");
   const envExample = read(".env.example");
 
   assert.ok(!existsSync(path.join(root, removedWorkflowPath)), "Slack notification workflow must not create standalone skipped runs");
@@ -1180,11 +1108,6 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
   assert.match(sonarCloudWorkflow, /notify-slack-security-failure:[\s\S]*github\.event_name == 'push'[\s\S]*SLACK_SECURITY_WEBHOOK_URL/);
   assert.match(osvScheduledWorkflow, /notify-slack-security-failure:[\s\S]*needs:\s*\n\s*-\s*osv-scan[\s\S]*SLACK_SECURITY_WEBHOOK_URL/);
 
-  assert.match(readme, /Slack webhook secret은 애플리케이션 런타임 dotenv인 `EASYSUBWAY_ENV`에 섞지 않습니다/);
-  assert.match(readme, /SLACK_CI_WEBHOOK_URL/);
-  assert.match(readme, /SLACK_RELEASE_WEBHOOK_URL/);
-  assert.match(readme, /SLACK_SECURITY_WEBHOOK_URL/);
-  assert.match(readme, /원본 workflow 내부 notify job/);
   assert.match(envExample, /^SLACK_CI_WEBHOOK_URL=$/m);
   assert.match(envExample, /^SLACK_RELEASE_WEBHOOK_URL=$/m);
   assert.match(envExample, /^SLACK_SECURITY_WEBHOOK_URL=$/m);
@@ -1904,7 +1827,6 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
-  const readme = read("README.md");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -2697,41 +2619,6 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
   assert.doesNotMatch(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/ios\/signed-release-artifact-gate\.json/);
 
-  assert.match(readme, /signed release artifact gate/);
-  assert.match(readme, /Android-first 배포 파이프라인은 Android AAB와 backend image만 생성/);
-  assert.match(readme, /Android 15 \(API 35\)/);
-  assert.match(readme, /Xcode 26/);
-  assert.match(readme, /TestFlight/);
-  assert.match(readme, /dSYM 90일 보관 workflow/);
-  assert.match(readme, /Play internal track/);
-  assert.match(readme, /production upload key/);
-  assert.match(readme, /android-production-rc/);
-  assert.match(readme, /versionCode/);
-  assert.match(readme, /Android 16 KB page-size gate/);
-  assert.match(readme, /Google Play production access/);
-  assert.match(readme, /12명 이상/);
-  assert.match(readme, /14일 연속 opt-in/);
-  assert.match(readme, /Google Play App Content, Data Safety, 한국어 listing gate/);
-  assert.match(readme, /store-privacy-inventory\.json/);
-  assert.match(readme, /휠체어 경로 보장/);
-  assert.match(readme, /Play-generated APK와 device compatibility matrix gate/);
-  assert.match(readme, /로컬 AAB만으로는 Go evidence가 될 수 없고/);
-  assert.match(readme, /generatedApks 다운로드 APK를 adb\/shell로 설치한 증거는 artifact identity와 manifest 확인에만 쓰고/);
-  assert.match(readme, /Play-installed build smoke는 `installerPackageName=com\.android\.vending`/);
-  assert.match(readme, /16 KB page-size/);
-  assert.match(readme, /Android 출시 후 2시간\/24시간\/7일\/30일 운영 검토/);
-  assert.match(readme, /post-launch-operations-review-gate\.json/);
-  assert.match(readme, /로컬 Android emulator/);
-  assert.match(readme, /사용자 지원, 데이터 오류, 장애 대응 gate/);
-  assert.match(readme, /support-incident-response-gate\.json/);
-  assert.match(readme, /emergency datapack release\/rollback/);
-  assert.match(readme, /Abuse-case와 penetration rehearsal gate/);
-  assert.match(readme, /abuse-penetration-rehearsal-gate\.json/);
-  assert.match(readme, /critical\/high finding/);
-  assert.match(readme, /RC evidence manifest/);
-  assert.match(readme, /generate-rc-evidence-manifest\.mjs/);
-  assert.match(readme, /#547\/#571\/#1015\/#1016\/#1017\/#1018\/#1019\/#1021\/#1022 evidence entry/);
-  assert.match(readme, /로컬 Android emulator 기준/);
 });
 
 test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성한다", async () => {
@@ -2964,7 +2851,6 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.equal(existsSync(path.join(root, gatePath)), true, "release governance gate must exist");
 
   const gate = readJson(gatePath);
-  const readme = read("README.md");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -3164,9 +3050,6 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   }
   assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO|PLACEHOLDER)\b|\.{3}/i);
 
-  assert.match(readme, /release-governance-gate\.json/);
-  assert.match(readme, /Android Google Play v1/);
-  assert.match(readme, /iOS는 `DEFERRED_OUT_OF_SCOPE`/);
 });
 
 test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 산출물 빌드를 실행한다", async () => {
@@ -3214,7 +3097,6 @@ test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 �
 
 test("스토어 개인정보 제출 기준선은 release artifact placeholder 값을 거부한다", async () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
-  const readme = read("README.md");
   const storeReadiness = readJson("apps/mobile/release/store-submission-readiness.json");
   const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
 
@@ -3265,15 +3147,6 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     assert.ok(item.linkedArtifacts.includes("README.md"), `${id} must link README for public user-facing path`);
   }
 
-  assert.match(readme, /EASYSUBWAY_PRIVACY_POLICY_URL/);
-  assert.match(readme, /EASYSUBWAY_DATA_DELETION_EMAIL/);
-  assert.match(readme, /## Privacy Policy/);
-  assert.match(readme, /https:\/\/easysubway-api\.aquilaxk\.site\/easysubway\/privacy/);
-  assert.match(readme, /EasySubway does not sell personal or sensitive user data\./);
-  assert.match(readme, /support@aquilaxk\.site/);
-  assert.match(readme, /security@aquilaxk\.site/);
-  assert.match(readme, /privacy@aquilaxk\.site/);
-  assert.doesNotMatch(readme, /easysubway\.local|@easysubway\.local/);
 
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-store-privacy-env-"));
   const validEnv = path.join(dir, "valid.env");
@@ -3430,8 +3303,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   );
 });
 
-test("공개 source contract 불변식은 README와 public interfaces에 남는다", () => {
-  const readme = read("README.md");
+test("공개 source contract 불변식은 public interfaces에 남는다", () => {
   const facilityReportUseCase = read(
     "backend/src/main/java/com/easysubway/report/application/port/in/FacilityReportUseCase.java",
   );
@@ -3448,16 +3320,6 @@ test("공개 source contract 불변식은 README와 public interfaces에 남는�
   const dataPackManifest = read("apps/mobile/lib/core/datapack/data_pack_manifest.dart");
   const catalogDatabase = read("apps/mobile/lib/core/database/catalog/catalog_database.dart");
   const userDatabase = read("apps/mobile/lib/core/database/user/user_database.dart");
-
-  for (const marker of [
-    "local-first mobile runtime",
-    "backend control-plane runtime",
-    "receipt-token report boundary",
-    "data-pack pointer contract",
-    "user-data preservation contract",
-  ]) {
-    assert.match(readme, new RegExp(marker), `README must document ${marker}`);
-  }
 
   assert.match(facilityReportUseCase, /receipt-token report boundary/);
   assert.match(facilityReportUseCase, /plain receipt token must never be logged or returned after issuance/);
@@ -3506,7 +3368,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const operationsEvidencePath = "apps/mobile/release/operations-release-evidence.json";
   const operationsEvidence = readJson(operationsEvidencePath);
   const backupRestoreGate = readJson("apps/mobile/release/backup-restore-rehearsal-gate.json");
-  const readme = read("README.md");
   const datapackWorkflow = read(".github/workflows/datapack-release.yml");
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
@@ -3570,16 +3431,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.ok(signals.get("route_quality_observability_dashboard").evidence.includes("route-accuracy-report"));
   assert.ok(signals.get("route_quality_observability_dashboard").evidence.includes("route-v2-contract-report"));
 
-  assert.match(readme, /## Operations/);
-  assert.match(readme, /operations-observability-gate\.json/);
-  assert.match(readme, /operations-release-evidence\.json/);
-  assert.match(readme, /backend control-plane/);
-  assert.match(readme, /public API surface/);
-  assert.match(readme, /single-instance/);
-  assert.match(readme, /backend_health_readiness_storage_datapack_report/);
-  assert.match(readme, /route_quality_observability_dashboard/);
-  assert.match(readme, /realtime_provider_success_stale_timeout_latency_eta_error/);
-  assert.match(readme, /receipt token|upload URL|photo metadata/i);
   assert.equal(operationsEvidence.schemaVersion, 1);
   assert.equal(operationsEvidence.applicationId, "easysubway");
   assert.equal(operationsEvidence.releaseGate, "operations-release-evidence");
@@ -4648,7 +4499,6 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
 });
 
 test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 local host를 거부한다", () => {
-  const readme = read("README.md");
   const fixture = readJson("tools/datapack/fixtures/catalog-fixture.json");
   const manifestSchema = readJson("tools/datapack/schema/manifest.schema.json");
   const builder = read("tools/datapack/build-datapack.mjs");
@@ -4671,9 +4521,6 @@ test("운영 환경 placeholder 계약은 production 데이터팩 URL에서 loca
   assert.match(builder, /production sourceInventory\.url must not use a local placeholder host/);
   assert.match(manifestValidation, /production pack url must not use a local placeholder host/);
   assert.match(manifestValidation, /production sourceInventory\.url must not use a local placeholder host/);
-  assert.match(readme, /local placeholder host/);
-  assert.match(readme, /production data pack/);
-  assert.match(readme, /fixture artifact/);
 });
 
 test("모바일 데이터팩 updater는 published manifest rollback 검증을 유지한다", () => {
@@ -6689,7 +6536,6 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   const gate = readJson(gatePath);
   const checkScript = read(checkScriptPath);
   const photoRestoreCheckScript = read(photoRestoreCheckPath);
-  const readme = read("README.md");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -6736,10 +6582,6 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   assert.match(checkScript, /datapack_release_manifest_history/);
   assert.match(photoRestoreCheckScript, /manifest\.tsv/);
   assert.match(photoRestoreCheckScript, /sha256/);
-  assert.match(readme, /backup-restore-rehearsal-gate\.json/);
-  assert.match(readme, /tools\/ops\/backup-restore-rehearsal-check\.mjs/);
-  assert.match(readme, /tools\/ops\/facility-report-photo-restore-check\.mjs/);
-  assert.doesNotMatch(readme, /backup secret|restore secret/i);
 
   execFileSync(process.execPath, [checkScriptPath], { cwd: root, encoding: "utf8" });
 });
@@ -6953,7 +6795,6 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
   const gate = readJson("backend/quality/egovframe-control-plane-gate.json");
   const build = read("backend/build.gradle");
   const lockfile = read("backend/gradle.lockfile");
-  const readme = read("README.md");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.gateId, "egovframe-control-plane-adoption");
@@ -7129,8 +6970,6 @@ test("eGovFrame control-plane 선택 적용 gate는 허용 영역과 no-go 경�
     );
   }
 
-  assert.match(readme, /eGovFrame은 backend control-plane에만 선택 적용한다/);
-  assert.match(readme, /Flutter mobile runtime, ordinary mobile API, realtime hot path, token\/crypto boundary/);
 });
 
 test("백엔드 web message source는 기본 한국어 bundle과 code 기반 validation을 사용한다", () => {
@@ -7213,7 +7052,6 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   const gate = readJson(gatePath);
   const build = read("backend/build.gradle");
   const ci = read(".github/workflows/ci.yml");
-  const readme = read("README.md");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.gateId, "backend-static-analysis-feasibility");
@@ -7243,11 +7081,6 @@ test("백엔드 품질 gate feasibility는 정적 분석 도입 조건을 계약
   assert.doesNotMatch(build, /id ['"]jacoco['"]/);
   assert.doesNotMatch(build, /com\.tngtech\.archunit/);
 
-  assert.match(readme, /backend static analysis feasibility gate/);
-  assert.match(readme, /Checkstyle/);
-  assert.match(readme, /SpotBugs/);
-  assert.match(readme, /ArchUnit/);
-  assert.match(readme, /JaCoCo/);
 });
 
 test("MVP 기본 경로는 익명 계정과 bearer token 인증을 발급하지 않는다", () => {
@@ -10287,8 +10120,6 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /Release \$label must be a valid email address\./);
   assert.match(main, /Release \$label must be configured\./);
   assert.match(main, /supportAccessInfo\.validatedForBuild\([\s\S]*isReleaseMode: kReleaseMode/);
-  assert.match(read("README.md"), /EASYSUBWAY_SECURITY_EMAIL/);
-  assert.match(read("README.md"), /릴리즈 빌드는 아래 값이 비어 있으면 시작 단계에서 실패/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 모두 설정되어야 한다/);
   assert.match(supportAccessInfoTest, /릴리즈 도움말 연락 경로는 HTTPS와 메일 주소 형식만 허용한다/);
   assert.match(supportAccessInfoTest, /Release privacy policy URL must use HTTPS\./);
@@ -10448,7 +10279,6 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   const gate = readJson("apps/mobile/release/android-release-quality-gate.json");
   const androidRcEvidence = readJson("apps/mobile/release/android-rc-store-evidence.json");
   const governance = readJson("apps/mobile/release/release-governance-gate.json");
-  const readme = read("README.md");
   const smokeScript = read("tools/mobile/run-android-release-quality-emulator-smoke.sh");
 
   assert.equal(gate.schemaVersion, 1);
@@ -10721,8 +10551,6 @@ test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 b
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("local-emulator-ui-tree-screenshots"));
   assert.ok(androidRcEvidence.requiredEvidence.androidAccessibilityQa.includes("route-map-performance-summary"));
   assert.ok(governance.childIssueLinks.includes(1021));
-  assert.match(readme, /Android 출시 UX·접근성·성능 gate/);
-  assert.match(readme, /local Android emulator evidence/);
   assert.match(smokeScript, /ro\.kernel\.qemu/);
   assert.match(smokeScript, /--expected-font-scale/);
   assert.match(smokeScript, /MIN_ANDROID_API=35/);
