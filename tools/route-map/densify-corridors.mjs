@@ -61,8 +61,8 @@ export function corridorTargets(membersSeq, trackVerts, targetGap = 30) {
 }
 
 /** 회랑 그룹 적용: 전 노선노드 강체 델타 이동(캡슐 보존) + 노선 track splice(부착 실패 원자적 미이동). */
-export function applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine, maxDist = 30) {
-  const targets = corridorTargets(membersSeq, trackVerts, 30);
+export function applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine, maxDist = 30, targetGap = 30) {
+  const targets = corridorTargets(membersSeq, trackVerts, targetGap);
   const { axis } = corridorLayout(membersSeq, trackVerts);            // 정렬용 축
   const reprById = new Map(membersSeq.map((m) => [m.stationId, { x: m.x, y: m.y }]));
   const positionUpdates = [];
@@ -78,15 +78,20 @@ export function applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine,
     let attachedAny = false;
     const pending = [];
     const nodeNew = [];
+    const unattached = [];                                            // 트랙 미부착 노선노드(진단용)
     for (const node of nodes) {
       const nnp = { x: Math.round(node.x + dx), y: Math.round(node.y + dy) };  // 노드별 동일 델타
       nodeNew.push({ node, nnp });
+      let nodeAttached = false;
       for (const trk of tracksByLine.get(node.lineId) ?? []) {
         const { verts, attached } = spliceTrackToNode(trk.verts, { x: node.x, y: node.y }, nnp, { maxDist });
-        if (attached) { attachedAny = true; if (JSON.stringify(verts) !== JSON.stringify(trk.verts)) pending.push({ lineId: node.lineId, trackIndex: trk.trackIndex, verts, trk }); }
+        if (attached) { attachedAny = true; nodeAttached = true; if (JSON.stringify(verts) !== JSON.stringify(trk.verts)) pending.push({ lineId: node.lineId, trackIndex: trk.trackIndex, verts, trk }); }
       }
+      if (!nodeAttached) unattached.push(node.lineId);
     }
     if (!attachedAny) continue;                                       // 원자성
+    // 캡슐 강체(G3)상 이동은 하되 자기 트랙엔 dogleg이 없는 노드 — 트랙 밖에 뜰 수 있어 경고.
+    if (unattached.length) console.warn(`  ⚠️ ${stationId}: 노선 ${unattached.join(",")} 트랙 미부착(캡슐 강체로 이동만, maxDist ${maxDist} 밖)`);
     for (const p of pending) { p.trk.verts = p.verts; trackUpdates.push({ lineId: p.lineId, trackIndex: p.trackIndex, verts: p.verts }); }
     for (const { node, nnp } of nodeNew) positionUpdates.push({ stationId, lineId: node.lineId, x: nnp.x, y: nnp.y });
   }
@@ -167,7 +172,7 @@ function main() {
       if (sharedLine && (tracksByLine.get(sharedLine) ?? [])[0]) {
         const trackVerts = tracksByLine.get(sharedLine)[0].verts;
         const membersSeq = g.map((id) => ({ stationId: id, ...repr.get(id), seq: (stationLines.get(id) ?? []).find((x) => x.lineId === sharedLine)?.seq ?? 0 }));
-        ({ positionUpdates, trackUpdates } = applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine, o.gap * 2 + 20));
+        ({ positionUpdates, trackUpdates } = applyCorridor(membersSeq, trackVerts, memberLines, tracksByLine, o.gap * 2 + 20, o.gap));
       } else {
         // 공유 노선 없음(반포↔잠원): 한 역만 자기 노선 track 방향으로 이동
         ({ positionUpdates, trackUpdates } = applyNoSharedLine(g, memberLines, tracksByLine, repr, o.gap, o.gap * 2 + 20));
