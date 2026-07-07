@@ -22,6 +22,10 @@ import 'legacy_credential_cleanup.dart';
 import 'mobility_profile.dart';
 import 'network_map.dart';
 import 'notification_settings.dart';
+import 'features/service_notice/data/notice_repository.dart';
+import 'features/service_notice/presentation/notice_controller.dart';
+import 'features/service_notice/presentation/service_notice_banner.dart';
+import 'features/service_notice/presentation/service_notice_list_screen.dart';
 import 'onboarding.dart';
 import 'route_search.dart';
 import 'station_search.dart';
@@ -261,6 +265,7 @@ class EasySubwayApp extends StatelessWidget {
     NotificationPermissionProvider? notificationPermissionProvider,
     CurrentLocationProvider? locationProvider,
     UserDataDeletionRepository? userDataDeletionRepository,
+    NoticeRepository? noticeRepository,
     LegacyCredentialCleaner legacyCredentialCleaner =
         const NoLegacyCredentialCleaner(),
     OnboardingResultStore? onboardingStore,
@@ -293,6 +298,7 @@ class EasySubwayApp extends StatelessWidget {
                notificationPermissionProvider: notificationPermissionProvider,
                locationProvider: locationProvider,
                userDataDeletionRepository: userDataDeletionRepository,
+               noticeRepository: noticeRepository,
                enablePushNotifications: enablePushNotifications,
              ),
          initialOnboardingState: initialOnboardingState,
@@ -340,7 +346,8 @@ class EasySubwayApp extends StatelessWidget {
            dependencies.notificationPermissionProvider,
        locationProvider = dependencies.locationProvider,
        userDataDeletionRepository = dependencies.userDataDeletionRepository,
-       getOffAlarmController = dependencies.getOffAlarmController;
+       getOffAlarmController = dependencies.getOffAlarmController,
+       noticeRepository = dependencies.noticeRepository;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
@@ -359,6 +366,7 @@ class EasySubwayApp extends StatelessWidget {
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
   final GetOffAlarmController? getOffAlarmController;
+  final NoticeRepository? noticeRepository;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -447,6 +455,7 @@ class EasySubwayApp extends StatelessWidget {
         supportAccessInfo: supportAccessInfo,
         supportAccessLauncher: supportAccessLauncher,
         userDataDeletionRepository: userDataDeletionRepository,
+        noticeRepository: noticeRepository,
         recentRoutesFuture: recentRoutesFuture,
       ),
     );
@@ -616,6 +625,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
+    required this.noticeRepository,
     required this.recentRoutesFuture,
   });
 
@@ -643,6 +653,7 @@ class _EasySubwayHome extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final NoticeRepository? noticeRepository;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -760,6 +771,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         supportAccessInfo: widget.supportAccessInfo,
         supportAccessLauncher: widget.supportAccessLauncher,
         userDataDeletionRepository: widget.userDataDeletionRepository,
+        noticeRepository: widget.noticeRepository,
         recentRoutesFuture: widget.recentRoutesFuture,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
@@ -1257,6 +1269,7 @@ class HomeScreen extends StatefulWidget {
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
     required this.userDataDeletionRepository,
+    this.noticeRepository,
     required this.onUserDataDeleted,
     required this.onMobilityProfileChanged,
     required this.onViewPreferencesChanged,
@@ -1288,6 +1301,7 @@ class HomeScreen extends StatefulWidget {
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final NoticeRepository? noticeRepository;
   final Future<void> Function(UserDataDeletionResult result)? onUserDataDeleted;
   final Future<void> Function(MobilityProfileOption profile)?
   onMobilityProfileChanged;
@@ -1303,13 +1317,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _selectedTabIndex = 0;
   late String _mobilityType;
   String? _routeTabMobilityType;
   late final RouteDraftController _routeDraftController;
   Future<List<FavoriteFacility>>? _favoriteFacilitiesFuture;
   late Future<bool> _hasNotificationItemsFuture;
+  NoticeController? _noticeController;
 
   @override
   void initState() {
@@ -1319,10 +1334,31 @@ class _HomeScreenState extends State<HomeScreen> {
     final facilitiesFuture = _loadNotificationFacilities();
     _favoriteFacilitiesFuture = facilitiesFuture;
     _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
+    final noticeRepository = widget.noticeRepository;
+    if (noticeRepository != null) {
+      final controller = NoticeController(repository: noticeRepository);
+      _noticeController = controller;
+      // 앱 시작 시 최초 조회. 이후 조회는 포그라운드 복귀 트리거에서만 일어난다
+      // (별도 폴링 주기를 신설하지 않는다).
+      unawaited(controller.refresh());
+      WidgetsBinding.instance.addObserver(this);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_noticeController?.refresh());
+    }
   }
 
   @override
   void dispose() {
+    if (_noticeController != null) {
+      WidgetsBinding.instance.removeObserver(this);
+      _noticeController!.dispose();
+    }
     _routeDraftController.dispose();
     super.dispose();
   }
@@ -1518,6 +1554,18 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final noticeController = _noticeController;
+    void openServiceNotices() {
+      if (noticeController == null) {
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => ServiceNoticeListScreen(controller: noticeController),
+        ),
+      );
+    }
+
     Widget rootTab(Widget child) {
       return PopScope(
         canPop: false,
@@ -1547,6 +1595,15 @@ class _HomeScreenState extends State<HomeScreen> {
               unawaited(openStationSearch(StationSearchEntryMode.nearby)),
           onOpenSettings: openMoreTab,
           onOpenDataSources: openDataSources,
+          onOpenServiceNotices: noticeController == null
+              ? null
+              : openServiceNotices,
+          disruptionBanner: noticeController == null
+              ? null
+              : ServiceNoticeBanner(
+                  controller: noticeController,
+                  onOpenList: openServiceNotices,
+                ),
           notificationAction: notificationRepository == null
               ? null
               : FutureBuilder<bool>(
