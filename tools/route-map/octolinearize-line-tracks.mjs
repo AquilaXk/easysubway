@@ -70,9 +70,8 @@ export function splitAtOutlierGaps(nodes, { absFloor = 400, p90Mult = 4 } = {}) 
   const valid = runs.filter((r) => r.length >= 2);
   const dropped = runs.filter((r) => r.length < 2).flat();
   if (dropped.length > 0) {
-    console.warn(
-      `[splitAtOutlierGaps] 고립 노드 ${dropped.length}개 드롭됨: ${dropped.map((n) => `(${n.x},${n.y})`).join(", ")}`,
-    );
+    const droppedCoords = dropped.map((n) => `(${n.x},${n.y})`).join(", ");
+    console.warn(`[splitAtOutlierGaps] 고립 노드 ${dropped.length}개 드롭됨: ${droppedCoords}`);
   }
   return valid;
 }
@@ -171,10 +170,16 @@ function main() {
           paths.push(verticesToPath(octilinearPolyline(run)));
         }
       }
-      console.log(`  ${name}: 노드 ${nodeRows.length} → 본선+지선 조각 ${paths.length}${branches.length ? ` (지선 ${branches.length})` : ""}`);
+      const branchSuffix = branches.length ? ` (지선 ${branches.length})` : "";
+      console.log(`  ${name}: 노드 ${nodeRows.length} → 본선+지선 조각 ${paths.length}${branchSuffix}`);
       if (!o.check) {
         // 기존 조각 삭제 후 본선+지선 조각으로 재생성(라이선스 컬럼은 기존 첫 행 승계)
         const meta = db.prepare("SELECT svg_color, source_id, source_name, source_url, license, license_status, commercial_use_allowed, attribution_required, updated_at FROM route_map_line_tracks WHERE region=? AND line_id=? ORDER BY track_index LIMIT 1").get(o.region, id);
+        if (!meta) {
+          throw new Error(
+            `${name}: 기존 track 메타가 없어 재생성할 수 없습니다(라이선스·색 메타 부재). --line 지정을 확인하세요`,
+          );
+        }
         db.exec("BEGIN");
         db.prepare("DELETE FROM route_map_line_tracks WHERE region=? AND line_id=?").run(o.region, id);
         const ins = db.prepare("INSERT INTO route_map_line_tracks (region, line_id, track_index, path, svg_color, source_id, source_name, source_url, license, license_status, commercial_use_allowed, attribution_required, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
