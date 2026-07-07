@@ -81,6 +81,17 @@ flutter {
     source = "../.."
 }
 
+// AGP UTP 내부 구성(_internal-unified-test-platform-gradle-work-action)이 끌어오는
+// bcprov 1.79의 GHSA-574f-3g2m-x479(CVE-2025-14813) 해소 — 권고 최소 패치 1.80.2 강제.
+// bcpkix·bcutil은 bcprov와 버전 정합을 위해 함께 맞춘다.
+configurations.configureEach {
+    resolutionStrategy {
+        force("org.bouncycastle:bcprov-jdk18on:1.80.2")
+        force("org.bouncycastle:bcpkix-jdk18on:1.80.2")
+        force("org.bouncycastle:bcutil-jdk18on:1.80.2")
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.18.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")

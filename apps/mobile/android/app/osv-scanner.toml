@@ -95,10 +95,6 @@ id = "GHSA-mj4r-2hfc-f8p6"
 reason = "기존 Android Gradle lockfile 기준선에서 발견된 취약점은 별도 업그레이드 작업으로 처리한다."
 
 [[IgnoredVulns]]
-id = "GHSA-p93r-85wp-75v3"
-reason = "기존 Android Gradle lockfile 기준선에서 발견된 취약점은 별도 업그레이드 작업으로 처리한다."
-
-[[IgnoredVulns]]
 id = "GHSA-prj3-ccx8-p6x4"
 reason = "기존 Android Gradle lockfile 기준선에서 발견된 취약점은 별도 업그레이드 작업으로 처리한다."
 
