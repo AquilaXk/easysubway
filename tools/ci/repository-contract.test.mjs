@@ -3642,6 +3642,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v2/routes/{routeSearchId}/refresh",
       "/api/v1/realtime/arrivals",
       "/api/v1/realtime/train-positions",
+      "/api/notices/active",
     ],
   );
   assert.deepEqual(
@@ -3660,6 +3661,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/actuator/health/liveness",
       "/actuator/health/readiness",
       "/api/v1/realtime/**",
+      "/api/notices/active",
     ],
   );
   const publicApiMatcherScope = securityConfig.match(
