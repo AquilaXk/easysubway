@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -48,8 +49,7 @@ class DataPackUpdater {
         : isRolloutApplied
         ? 'applied'
         : 'heldOut';
-    // ignore: avoid_print
-    print('[DataPackUpdater] rolloutDecision=$rolloutDecision');
+    developer.log('rolloutDecision=$rolloutDecision', name: 'DataPackUpdater');
 
     final preUpdateCurrentPointer = await _readCurrentPointerSafely();
     final override = manifest.emergencyOverride;
@@ -91,6 +91,7 @@ class DataPackUpdater {
       final currentPointer = await _currentPointerForManifest(
         manifest: manifest,
         results: results,
+        rolloutApplies: isRolloutApplied,
       );
       if (currentPointer != null) {
         await installer.activateCurrentPointer(currentPointer);
@@ -187,6 +188,7 @@ class DataPackUpdater {
   Future<InstalledDataPackPointer?> _currentPointerForManifest({
     required DataPackManifest manifest,
     required List<DataPackInstallResult> results,
+    bool rolloutApplies = true,
   }) async {
     final activePack = manifest.activePack;
     if (activePack != null) {
@@ -204,6 +206,11 @@ class DataPackUpdater {
       );
       if (installedPointer != null) {
         return installedPointer;
+      }
+      // heldOut 단말 + activePack 미설치: 예외 대신 null 반환(기존 포인터 유지).
+      // rolloutApplied 단말이거나 activePack이 설치된 경우는 이미 위에서 반환.
+      if (!rolloutApplies) {
+        return null;
       }
       throw const DataPackClientException('사용할 이동 정보를 선택하지 못했어요.');
     }
