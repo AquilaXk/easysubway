@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:meta/meta.dart';
 
 import 'data_pack_client.dart';
 import 'data_pack_installer.dart';
@@ -37,18 +38,14 @@ class DataPackUpdater {
 
     // rollout 버킷 판정 — salt + seed → sha256 → bucket % 100
     final rollout = manifest.rollout;
-    bool rolloutApplies = true; // rollout 부재 = 100%(항상 채택)
+    bool isRolloutApplied = true; // rollout 부재 = 100%(항상 채택)
     if (rollout != null) {
       final salt = await client.stateRepository.readOrCreateRolloutSalt();
-      final digest = sha256
-          .convert(utf8.encode('$salt:${rollout.seed}'))
-          .toString();
-      final bucket = int.parse(digest.substring(0, 8), radix: 16) % 100;
-      rolloutApplies = bucket < rollout.percentage;
+      isRolloutApplied = rolloutApplies(salt, rollout);
     }
     final rolloutDecision = rollout == null
         ? 'noRollout'
-        : rolloutApplies
+        : isRolloutApplied
         ? 'applied'
         : 'heldOut';
     // ignore: avoid_print
@@ -73,7 +70,7 @@ class DataPackUpdater {
     }
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
-    final packs = _packsToInstall(manifest, rolloutApplies: rolloutApplies);
+    final packs = _packsToInstall(manifest, rolloutApplies: isRolloutApplied);
     final results = <DataPackInstallResult>[];
     for (final pack in packs) {
       final uri = packBaseUri.resolve(pack.url.toString());
@@ -316,4 +313,23 @@ void _protectVersion(
 
 String _normalizedVersion(String version) {
   return _versionNumber(version).toString();
+}
+
+/// salt + seed → sha256 → 첫 8 hex 자리를 정수로 파싱 → % 100 → 0~99 버킷.
+///
+/// 버킷은 seed에만 의존하므로 percentage와 독립적이다. percentage를 올려도
+/// 기존 버킷이 변하지 않아 단조 편입(monotonic enrollment)이 자동 성립한다.
+@visibleForTesting
+int rolloutBucket(String salt, String seed) {
+  final digest = sha256.convert(utf8.encode('$salt:$seed')).toString();
+  return int.parse(digest.substring(0, 8), radix: 16) % 100;
+}
+
+/// [rolloutBucket] 결과가 [r.percentage] 미만이면 채택(true), 그렇지 않으면 보류(false).
+///
+/// percentage == 0 이면 항상 false(전면 heldOut = kill switch).
+/// percentage == 100 이면 항상 true(전면 채택).
+@visibleForTesting
+bool rolloutApplies(String salt, RolloutManifest r) {
+  return rolloutBucket(salt, r.seed) < r.percentage;
 }
