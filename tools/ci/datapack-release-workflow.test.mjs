@@ -53,4 +53,8 @@ test("production-publish는 release request 조회 스텝과 !cancelled() 콜백
   assert.match(yml, /build-release-callback\.mjs/);
   assert.match(yml, /!cancelled\(\)\s*&&/); // 콜백 조건에 !cancelled()
   assert.match(yml, /manifestSha256/);
+  // 콜백 조건은 production-publish 스텝 출력 기준이어야 한다 — 비-production 모드에선 빈값
+  assert.match(yml, /steps\.production-publish\.outputs\.manifestSha256/);
+  // evidence-bundle 출력을 콜백 게이트로 사용하면 release-candidate에서도 발사 → 금지
+  assert.doesNotMatch(yml, /steps\.evidence-bundle\.outputs\.manifestSha256/);
 });
