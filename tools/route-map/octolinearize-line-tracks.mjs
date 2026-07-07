@@ -67,7 +67,14 @@ export function splitAtOutlierGaps(nodes, { absFloor = 400, p90Mult = 4 } = {}) 
     }
   }
   runs.push(cur);
-  return runs.filter((r) => r.length >= 2);
+  const valid = runs.filter((r) => r.length >= 2);
+  const dropped = runs.filter((r) => r.length < 2).flat();
+  if (dropped.length > 0) {
+    console.warn(
+      `[splitAtOutlierGaps] 고립 노드 ${dropped.length}개 드롭됨: ${dropped.map((n) => `(${n.x},${n.y})`).join(", ")}`,
+    );
+  }
+  return valid;
 }
 
 /** 노드 목록(sequence 순)을 8선형 polyline 정점 배열로. */
@@ -147,9 +154,11 @@ function main() {
       // 본선: spur 역을 제외한 sequence(분기점 junction은 본선에 남는다).
       // 좌표 오류로 생기는 장거리 detour는 이상치 간격에서 끊어 별도 조각으로
       // 나눈다(교차 회귀 자동 차단). 정상 노선은 조각 1개 그대로.
+      // 지선도 동일하게 splitAtOutlierGaps를 통과시켜 이상치 간격 방어 적용.
       const mainNodes = nodeRows.filter((r) => !spurNames.has(r.name)).map((r) => ({ x: r.x, y: r.y }));
       const paths = splitAtOutlierGaps(mainNodes).map((run) => verticesToPath(octilinearPolyline(run)));
       // 각 지선: junction 역에서 시작해 spur 역들을 잇는 별도 조각.
+      // 이상치 간격이 있는 지선도 각 run을 별도 track 조각으로 나눠 본선과 동일하게 방어한다.
       for (const b of branches) {
         const jn = nodeRows.find((r) => r.name === b.junction);
         const spurNodes = b.spur.map((sn) => nodeRows.find((r) => r.name === sn)).filter(Boolean);
@@ -158,7 +167,9 @@ function main() {
           continue;
         }
         const chain = [jn, ...spurNodes].map((r) => ({ x: r.x, y: r.y }));
-        paths.push(verticesToPath(octilinearPolyline(chain)));
+        for (const run of splitAtOutlierGaps(chain)) {
+          paths.push(verticesToPath(octilinearPolyline(run)));
+        }
       }
       console.log(`  ${name}: 노드 ${nodeRows.length} → 본선+지선 조각 ${paths.length}${branches.length ? ` (지선 ${branches.length})` : ""}`);
       if (!o.check) {
