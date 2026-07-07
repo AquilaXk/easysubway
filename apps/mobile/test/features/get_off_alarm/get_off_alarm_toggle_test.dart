@@ -89,6 +89,45 @@ void main() {
     expect(notifier.scheduled!.single.stationName, '사당');
   });
 
+  testWidgets('토글을 다시 끄면 disable로 알림을 취소하고 상태가 꺼진다', (tester) async {
+    final notifier = _RecordingNotifier();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubGate(true),
+      repository: _FakeRepo(),
+      now: () => DateTime(2026, 7, 6, 9, 0, 0),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GetOffAlarmToggle(
+            controller: controller,
+            routeId: 'r1',
+            rideLegs: const [
+              RideLegArrival(
+                toStationId: 'sadang',
+                plannedArrivalIso: '2026-07-06T09:30:00',
+              ),
+            ],
+            stationName: (id) => id,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+    expect(controller.state.enabled, isTrue);
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.enabled, isFalse);
+    expect(notifier.cancelCount, greaterThanOrEqualTo(1));
+  });
+
   testWidgets('exact 권한 거부 시 오차 고지 문구를 노출한다', (tester) async {
     final controller = GetOffAlarmController(
       notifier: _RecordingNotifier(),

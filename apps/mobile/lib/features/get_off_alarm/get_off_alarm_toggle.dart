@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../mobile_error_reporter.dart';
 import 'get_off_alarm_controller.dart';
 import 'get_off_alarm_route_mapping.dart';
 
@@ -25,6 +26,8 @@ class GetOffAlarmToggle extends StatefulWidget {
 }
 
 class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
+  bool _busy = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,18 +52,35 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
   }
 
   Future<void> _onToggle(bool enabled) async {
-    if (enabled) {
-      final stops = getOffAlarmStopsFromRideLegs(
-        rideLegs: widget.rideLegs,
-        stationName: widget.stationName,
-      );
-      await widget.controller.enable(
-        routeId: widget.routeId,
-        stops: stops,
-        transferAlarmEnabled: true,
-      );
-    } else {
-      await widget.controller.disable();
+    if (_busy) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      if (enabled) {
+        final stops = getOffAlarmStopsFromRideLegs(
+          rideLegs: widget.rideLegs,
+          stationName: widget.stationName,
+        );
+        await widget.controller.enable(
+          routeId: widget.routeId,
+          stops: stops,
+          transferAlarmEnabled: true,
+        );
+      } else {
+        await widget.controller.disable();
+      }
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '하차 알림 설정 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('하차 알림을 바꾸지 못했어요. 다시 시도해 주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
@@ -76,7 +96,7 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           value: on,
-          onChanged: _onToggle,
+          onChanged: _busy ? null : _onToggle,
           title: const Text('하차 알림'),
           subtitle: Text(
             on ? '도착·환승 전에 알려드려요.' : '폰을 보지 않아도 내릴 때 알려드려요.',

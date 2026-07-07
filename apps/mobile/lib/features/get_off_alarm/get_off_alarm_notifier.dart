@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
@@ -60,22 +62,24 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
       );
 
   List<int> _activeIds = const [];
-  bool _initialized = false;
+  Future<void>? _initialization;
 
-  /// 첫 예약 전에 플러그인·타임존을 1회 초기화한다. 앱 시작 경로를 무겁게 하지
-  /// 않도록 지연 초기화한다.
-  Future<void> _ensureInitialized() async {
-    if (_initialized) {
-      return;
-    }
+  /// 첫 예약 전에 플러그인·타임존을 1회 초기화한다. 진행 중인 초기화 Future를
+  /// 캐싱해, 연속 호출(예: 토글 빠른 재탭) 시 initialize가 중복 실행되지 않게
+  /// 한다(TOCTOU 방지). 앱 시작 경로를 무겁게 하지 않도록 지연 초기화한다.
+  Future<void> _ensureInitialized() {
+    return _initialization ??= _initialize();
+  }
+
+  Future<void> _initialize() async {
     tz_data.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
+    // Android 전용 초기화(iOS는 #571 DEFERRED). iOS 진입은 아래 Platform 가드가 막는다.
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
     );
-    _initialized = true;
   }
 
   @override
@@ -83,6 +87,9 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   }) async {
+    if (!Platform.isAndroid) {
+      return;
+    }
     await _ensureInitialized();
     await cancelAll();
     final scheduleMode = androidScheduleModeFor(mode);
@@ -111,6 +118,9 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
 
   @override
   Future<void> cancelAll() async {
+    if (!Platform.isAndroid) {
+      return;
+    }
     for (final id in _activeIds) {
       try {
         await _plugin.cancel(id: id);
