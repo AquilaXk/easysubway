@@ -13,7 +13,7 @@
     "privacyPolicyUrl": {
       "result": "PASS_PUBLIC_HTTPS",
       "url": "https://easysubway-api.aquilaxk.site/easysubway/privacy",
-      "requiredIn": ["Play Console", "app help", "README.md or public policy page"],
+      "requiredIn": ["Play Console", "app help", "public policy page"],
       "remainingActionKo": "Play Console URL 입력 화면과 앱 도움말 화면의 같은 URL 캡처를 최종 제출 전에 다시 확인한다."
     },
     "publicContactMailboxes": {
@@ -410,7 +410,7 @@
   "privacyPolicyRequirements": {
     "urlMustBePublicHttps": true,
     "urlMustBeUnauthenticated": true,
-    "sameUrlRequiredIn": ["Play Console", "app help", "README.md or public policy page"],
+    "sameUrlRequiredIn": ["Play Console", "app help", "public policy page"],
     "requiredContentKo": [
       "수집 항목",
       "수집 목적",

@@ -3144,7 +3144,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   ]) {
     const item = readinessItems.get(id);
     assert.ok(item, `${id} must be present in store submission readiness`);
-    assert.ok(item.linkedArtifacts.includes("README.md"), `${id} must link README for public user-facing path`);
+    assert.ok(item.linkedArtifacts.length > 0, `${id} must link at least one public evidence artifact`);
   }
 
 
@@ -10650,7 +10650,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.deepEqual(playStoreContent.latestQaEvidenceSummary.privacyPolicyUrl.requiredIn, [
     "Play Console",
     "app help",
-    "README.md or public policy page",
+    "public policy page",
   ]);
   assert.equal(
     playStoreContent.latestQaEvidenceSummary.publicContactMailboxes.result,
@@ -10847,7 +10847,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.deepEqual(playStoreContent.privacyPolicyRequirements.sameUrlRequiredIn, [
     "Play Console",
     "app help",
-    "README.md or public policy page",
+    "public policy page",
   ]);
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("제3자 공유 없음"));
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("tracking 없음"));
