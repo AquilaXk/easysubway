@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
+import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
 import 'favorite_facility.dart';
@@ -338,7 +339,8 @@ class EasySubwayApp extends StatelessWidget {
        notificationPermissionProvider =
            dependencies.notificationPermissionProvider,
        locationProvider = dependencies.locationProvider,
-       userDataDeletionRepository = dependencies.userDataDeletionRepository;
+       userDataDeletionRepository = dependencies.userDataDeletionRepository,
+       getOffAlarmController = dependencies.getOffAlarmController;
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
@@ -356,6 +358,7 @@ class EasySubwayApp extends StatelessWidget {
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final GetOffAlarmController? getOffAlarmController;
   final OnboardingState initialOnboardingState;
   final OnboardingResultStore? onboardingStore;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -424,6 +427,7 @@ class EasySubwayApp extends StatelessWidget {
         reportRepository: reportRepository,
         routeRepository: routeRepository,
         routeFeedbackRepository: routeFeedbackRepository,
+        getOffAlarmController: getOffAlarmController,
         favoriteRepository: favoriteRepository,
         favoriteFacilityRepository: favoriteFacilityRepository,
         favoriteRouteRepository: favoriteRouteRepository,
@@ -592,6 +596,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.reportRepository,
     required this.routeRepository,
     required this.routeFeedbackRepository,
+    required this.getOffAlarmController,
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
@@ -618,6 +623,7 @@ class _EasySubwayHome extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final RouteFeedbackRepository? routeFeedbackRepository;
+  final GetOffAlarmController? getOffAlarmController;
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
@@ -735,6 +741,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         reportRepository: widget.reportRepository,
         routeRepository: widget.routeRepository,
         routeFeedbackRepository: widget.routeFeedbackRepository,
+        getOffAlarmController: widget.getOffAlarmController,
         favoriteRepository: widget.favoriteRepository,
         favoriteFacilityRepository: widget.favoriteFacilityRepository,
         favoriteRouteRepository: widget.favoriteRouteRepository,
@@ -1235,6 +1242,7 @@ class HomeScreen extends StatefulWidget {
     required this.reportRepository,
     required this.routeRepository,
     required this.routeFeedbackRepository,
+    required this.getOffAlarmController,
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
@@ -1265,6 +1273,7 @@ class HomeScreen extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final RouteSearchRepository routeRepository;
   final RouteFeedbackRepository? routeFeedbackRepository;
+  final GetOffAlarmController? getOffAlarmController;
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
@@ -1355,6 +1364,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final networkMapRepository = widget.networkMapRepository;
     final realtimeRepository = widget.realtimeRepository;
     final routeFeedbackRepository = widget.routeFeedbackRepository;
+    final getOffAlarmController = widget.getOffAlarmController;
     final notificationRepository = widget.notificationRepository;
     final notificationPermissionProvider =
         widget.notificationPermissionProvider;
@@ -1576,6 +1586,7 @@ class _HomeScreenState extends State<HomeScreen> {
         repository: routeRepository,
         stationRepository: repository,
         routeFeedbackRepository: routeFeedbackRepository,
+        getOffAlarmController: getOffAlarmController,
         favoriteRouteRepository: favoriteRouteRepository,
         initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
         initialDraft: _routeDraftController.draft,
