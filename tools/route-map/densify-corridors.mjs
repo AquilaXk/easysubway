@@ -38,3 +38,18 @@ export function corridorLayout(membersSeq, trackVerts) {
   const ordered = [...membersSeq].sort((a, b) => a.seq - b.seq).map((m) => m.stationId);
   return { axis, ordered, centroid: { x: cx, y: cy } };
 }
+
+/** 회랑 역들을 track축 따라 targetGap 간격·seq 순·centroid 중심 재배치(비축=centroid 통일, 정수). */
+export function corridorTargets(membersSeq, trackVerts, targetGap = 30) {
+  const { axis, ordered, centroid } = corridorLayout(membersSeq, trackVerts);
+  const n = ordered.length;
+  const cProj = centroid.x * axis.ux + centroid.y * axis.uy;       // centroid 축좌표
+  const perp = { x: centroid.x - cProj * axis.ux, y: centroid.y - cProj * axis.uy }; // centroid 비축 성분(통일)
+  const start = cProj - ((n - 1) * targetGap) / 2;
+  const out = new Map();
+  ordered.forEach((id, k) => {
+    const s = start + k * targetGap;
+    out.set(id, { x: Math.round(perp.x + s * axis.ux), y: Math.round(perp.y + s * axis.uy) });
+  });
+  return out;
+}
