@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "policyName": "get-off-alarm-policy",
+  "issue": 1766,
+  "parentTracker": 1762,
+  "policyOwner": "QA",
+  "locationTrackingUsed": false,
+  "leadTime": {
+    "defaultLeadSeconds": 120,
+    "minLeadSeconds": 30,
+    "maxLeadSeconds": 900,
+    "transferAlarmDefaultOn": true,
+    "transferLeadSeconds": 120
+  },
+  "activeAlarm": {
+    "maxConcurrentRoutes": 1,
+    "cancelOnRouteEnd": true,
+    "cancelOnNewSearch": true
+  },
+  "exactAlarm": {
+    "requestPermission": true,
+    "permissionName": "SCHEDULE_EXACT_ALARM",
+    "forbiddenPermission": "USE_EXACT_ALARM",
+    "degradeToInexactOnDeny": true,
+    "silentFailureAllowed": false,
+    "inexactNoticeKo": "정확 알람 권한이 없어 ±수 분 오차가 있을 수 있어요."
+  },
+  "realtimeCorrection": {
+    "recomputeOnForeground": true,
+    "offlineEtaSource": "PLANNED",
+    "correctionOverlayIssue": 1416
+  },
+  "requiredEvidence": [
+    "device-background-alarm-recording",
+    "exact-deny-inexact-degrade-screenshot",
+    "foreground-realtime-recompute-log",
+    "offline-planned-alarm-evidence",
+    "no-location-permission-review-evidence"
+  ]
+}
