@@ -120,7 +120,8 @@
         "/api/v2/routes/search",
         "/api/v2/routes/{routeSearchId}/refresh",
         "/api/v1/realtime/arrivals",
-        "/api/v1/realtime/train-positions"
+        "/api/v1/realtime/train-positions",
+        "/api/notices/active"
       ],
       "allowedPublicSecurityMatchers": [
         "/api/v1/report-uploads",
@@ -135,7 +136,8 @@
         "/actuator/health",
         "/actuator/health/liveness",
         "/actuator/health/readiness",
-        "/api/v1/realtime/**"
+        "/api/v1/realtime/**",
+        "/api/notices/active"
       ],
       "requiredEvidence": [
         "backend-public-api-surface-inventory",
