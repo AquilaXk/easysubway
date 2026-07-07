@@ -9,8 +9,11 @@
 // Usage: node tools/route-map/octolinearize-line-tracks.mjs
 //          --region 수도권 --line "수도권 신림선" [--line ...] [--check]
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { verticesToPath } from "./audit-octolinearity.mjs";
-import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
+import { cleanupPackDir, openPack, repoRoot, writePack } from "./pack-io.mjs";
 
 /** 두 노드 a→b를 8방향 세그먼트 목록(정점 배열)으로 잇는다. 도그레그 1회 허용. */
 export function octilinearSegment(a, b) {
@@ -45,12 +48,13 @@ export function octilinearPolyline(nodes) {
 }
 
 function parseArgs(argv) {
-  const o = { pack: "apps/mobile/assets/datapacks/capital.sqlite.gz", index: "apps/mobile/assets/datapacks/index.json", region: "수도권", lines: [], all: false, check: false };
+  const o = { pack: "apps/mobile/assets/datapacks/capital.sqlite.gz", index: "apps/mobile/assets/datapacks/index.json", region: "수도권", lines: [], all: false, branches: null, check: false };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
       case "--region": o.region = argv[++i]; break;
       case "--line": o.lines.push(argv[++i]); break;
       case "--all": o.all = true; break;
+      case "--branches": o.branches = argv[++i]; break;
       case "--check": o.check = true; break;
       case "--pack": o.pack = argv[++i]; break;
     }
@@ -61,6 +65,12 @@ function parseArgs(argv) {
 function main() {
   const o = parseArgs(process.argv.slice(2));
   const { db, dir, sqlitePath, packPath } = openPack(o.pack, "octolinearize-");
+  // 분기(지선) 데이터: { "<노선명>": [{junction, spur:[역명...]}...] }
+  const branchesByLine = {};
+  if (o.branches) {
+    const bj = JSON.parse(readFileSync(path.join(repoRoot, o.branches), "utf8"));
+    Object.assign(branchesByLine, bj.linesByRegion?.[o.region] ?? {});
+  }
   try {
     const lineIds = [];
     if (o.all) {
@@ -75,31 +85,45 @@ function main() {
       }
     }
     for (const { id, name } of lineIds) {
-      // 노드를 line_sequence 순서로 (동일 물리역은 x/y 그대로)
-      const nodes = db
+      // 노드를 역명 + line_sequence 순서로 (동일 물리역은 x/y 그대로).
+      const nodeRows = db
         .prepare(
-          `SELECT rmp.x AS x, rmp.y AS y, sl.line_sequence AS seq
+          `SELECT s.name_ko AS name, rmp.x AS x, rmp.y AS y, sl.line_sequence AS seq
            FROM route_map_positions rmp
            JOIN station_lines sl ON sl.station_id = rmp.station_id AND sl.line_id = rmp.line_id
+           JOIN stations s ON s.id = rmp.station_id
            WHERE rmp.region = ? AND rmp.line_id = ?
            ORDER BY sl.line_sequence`,
         )
-        .all(o.region, id)
-        .map((r) => ({ x: r.x, y: r.y }));
-      if (nodes.length < 2) {
-        console.log(`  ${name}: 노드 ${nodes.length} → 스킵`);
+        .all(o.region, id);
+      if (nodeRows.length < 2) {
+        console.log(`  ${name}: 노드 ${nodeRows.length} → 스킵`);
         continue;
       }
-      const verts = octilinearPolyline(nodes);
-      const newPath = verticesToPath(verts);
-      console.log(`  ${name}: 노드 ${nodes.length} → 정점 ${verts.length} (기존 조각 대체)`);
+      const branches = branchesByLine[name] ?? [];
+      const spurNames = new Set(branches.flatMap((b) => b.spur));
+      // 본선: spur 역을 제외한 sequence(분기점 junction은 본선에 남는다).
+      const mainNodes = nodeRows.filter((r) => !spurNames.has(r.name)).map((r) => ({ x: r.x, y: r.y }));
+      const paths = [verticesToPath(octilinearPolyline(mainNodes))];
+      // 각 지선: junction 역에서 시작해 spur 역들을 잇는 별도 조각.
+      for (const b of branches) {
+        const jn = nodeRows.find((r) => r.name === b.junction);
+        const spurNodes = b.spur.map((sn) => nodeRows.find((r) => r.name === sn)).filter(Boolean);
+        if (!jn || spurNodes.length === 0) {
+          console.log(`  ${name}/${b.name}: junction·spur 노드 부족 → 스킵`);
+          continue;
+        }
+        const chain = [jn, ...spurNodes].map((r) => ({ x: r.x, y: r.y }));
+        paths.push(verticesToPath(octilinearPolyline(chain)));
+      }
+      console.log(`  ${name}: 노드 ${nodeRows.length} → 본선+지선 조각 ${paths.length}${branches.length ? ` (지선 ${branches.length})` : ""}`);
       if (!o.check) {
-        // 기존 조각 삭제 후 단일 조각으로 재생성(라이선스 컬럼은 기존 첫 행 승계)
+        // 기존 조각 삭제 후 본선+지선 조각으로 재생성(라이선스 컬럼은 기존 첫 행 승계)
         const meta = db.prepare("SELECT svg_color, source_id, source_name, source_url, license, license_status, commercial_use_allowed, attribution_required, updated_at FROM route_map_line_tracks WHERE region=? AND line_id=? ORDER BY track_index LIMIT 1").get(o.region, id);
         db.exec("BEGIN");
         db.prepare("DELETE FROM route_map_line_tracks WHERE region=? AND line_id=?").run(o.region, id);
-        db.prepare("INSERT INTO route_map_line_tracks (region, line_id, track_index, path, svg_color, source_id, source_name, source_url, license, license_status, commercial_use_allowed, attribution_required, updated_at) VALUES (?,?,0,?,?,?,?,?,?,?,?,?,?)")
-          .run(o.region, id, newPath, meta.svg_color, meta.source_id, meta.source_name, meta.source_url, meta.license, meta.license_status, meta.commercial_use_allowed, meta.attribution_required, meta.updated_at);
+        const ins = db.prepare("INSERT INTO route_map_line_tracks (region, line_id, track_index, path, svg_color, source_id, source_name, source_url, license, license_status, commercial_use_allowed, attribution_required, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        paths.forEach((p, ti) => ins.run(o.region, id, ti, p, meta.svg_color, meta.source_id, meta.source_name, meta.source_url, meta.license, meta.license_status, meta.commercial_use_allowed, meta.attribution_required, meta.updated_at));
         db.exec("COMMIT");
       }
     }
