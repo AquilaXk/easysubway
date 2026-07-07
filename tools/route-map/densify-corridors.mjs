@@ -1,10 +1,6 @@
-#!/usr/bin/env node
 // #1789 P2.1: 밀집 회랑을 공유 노선 track 방향으로 arc-length 재배치하고 그룹-원자 splice로 옮긴다
 // (캡슐 강체 보존, respace 무재실행). 축은 track 로컬 방향(붕괴 그룹도 정의됨), 정렬은 line_sequence.
 // track 방향 이동이라 8선형이 구성상 보존된다.
-import { spliceTrackToNode } from "./splice-transfer-convergence.mjs";
-import { parsePathVertices, verticesToPath } from "./audit-octolinearity.mjs";
-import { cleanupPackDir, openPack, writePack } from "./pack-io.mjs";
 
 const SNAP8 = [
   { ux: 1, uy: 0 }, { ux: Math.SQRT1_2, uy: Math.SQRT1_2 }, { ux: 0, uy: 1 }, { ux: -Math.SQRT1_2, uy: Math.SQRT1_2 },
@@ -21,11 +17,16 @@ export function trackAxis8(trackVerts, centroid) {
   let idx = 0, bd = Infinity;
   for (let i = 0; i < trackVerts.length; i += 1) { const d = Math.hypot(trackVerts[i].x - centroid.x, trackVerts[i].y - centroid.y); if (d < bd) { bd = d; idx = i; } }
   const segs = [];
-  if (idx > 0) segs.push([trackVerts[idx - 1], trackVerts[idx]]);
-  if (idx < trackVerts.length - 1) segs.push([trackVerts[idx], trackVerts[idx + 1]]);
+  let buildIdx = 0;
+  if (idx > 0) segs.push({ seg: [trackVerts[idx - 1], trackVerts[idx]], buildIdx: buildIdx++ });
+  if (idx < trackVerts.length - 1) segs.push({ seg: [trackVerts[idx], trackVerts[idx + 1]], buildIdx: buildIdx++ });
   if (segs.length === 0) return { ux: 1, uy: 0 };
-  segs.sort((a, b) => Math.hypot(b[1].x - b[0].x, b[1].y - b[0].y) - Math.hypot(a[1].x - a[0].x, a[1].y - a[0].y));
-  const [p, q] = segs[0];
+  segs.sort((a, b) => {
+    const lenA = Math.hypot(a.seg[1].x - a.seg[0].x, a.seg[1].y - a.seg[0].y);
+    const lenB = Math.hypot(b.seg[1].x - b.seg[0].x, b.seg[1].y - b.seg[0].y);
+    return (lenB - lenA) || (b.buildIdx - a.buildIdx);
+  });
+  const [p, q] = segs[0].seg;
   return snapAxis(q.x - p.x, q.y - p.y);
 }
 
