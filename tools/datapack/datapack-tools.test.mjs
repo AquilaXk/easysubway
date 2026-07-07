@@ -12225,3 +12225,220 @@ test("buildRolloutManifest (e): current.releaseSequence ≠ targetSequence → t
     /다른 릴리즈/,
   );
 });
+
+// ─── publish-rollout CLI 테스트 (#1692) ────────────────────────────────────────
+// rollback-manifest.test.mjs의 startStorage·패턴을 재사용해 mock 객체스토리지를 구성.
+
+const ROLLOUT_PACK_BYTES = Buffer.from("rollout-test-pack-bytes");
+const ROLLOUT_PACK_SHA = createHash("sha256").update(ROLLOUT_PACK_BYTES).digest("hex");
+
+function buildRolloutTestReleasesManifest(overrides = {}) {
+  const sqliteSha = "a".repeat(64);
+  const base = {
+    manifestVersion: 2,
+    channel: "production",
+    releaseSequence: 10,
+    publishedAt: "2026-07-07T00:00:00.000Z",
+    expiresAt: "2999-01-01T00:00:00.000Z",
+    keyId: "production-v1",
+    ttlSeconds: 3600,
+    signature: { algorithm: "rsa-sha256-manifest-v2", value: "placeholder" },
+    packs: [
+      {
+        id: "capital",
+        version: "1",
+        artifactKind: "production",
+        url: "https://cdn.example.com/catalog/capital-v1.sqlite.gz",
+        sha256: ROLLOUT_PACK_SHA,
+        sqliteSha256: sqliteSha,
+        sizeBytes: ROLLOUT_PACK_BYTES.length,
+        signature: {
+          algorithm: "rsa-sha256-pack-manifest-v2",
+          value: _rolloutSign("rollout-pack-payload"),
+        },
+        schemaVersion: "1",
+        sourceInventory: [
+          {
+            id: "src1",
+            owner: "test-owner",
+            url: "https://data.example.com/catalog",
+            license: "CC-BY-4.0",
+            licenseStatus: "redistributable",
+            redistributionAllowed: true,
+            updateFrequency: "daily",
+            updatedAt: "2026-07-07T00:00:00.000Z",
+            fields: ["stations"],
+            coverageScope: {
+              regionIds: ["seoul"],
+              operatorIds: ["seoulmetro"],
+              sourceDomains: ["station_map"],
+            },
+          },
+        ],
+        regionalQualityMetrics: {
+          stationCount: 100,
+          edgeCount: 200,
+          facilityCoverageRatio: 0.5,
+          requiredFacilityEvidenceCoverageRatio: 0.5,
+          strictRouteEligibleFacilityRatio: 0.5,
+          operationalKnownRatio: 1.0,
+          freshnessValidRatio: 0.8,
+          fieldVerifiedPathwayRatio: 0.3,
+          unknownAccessibilityRatio: 0.2,
+          unknownEdgeRatioByProfile: { wheelchair: 0.1, stroller: 0.1, lowMobility: 0.1 },
+        },
+        representativeRouteRegressions: [],
+        representativeRouteRegressionSignature: {
+          algorithm: "rsa-sha256-route-regression-v1",
+          value: _rolloutSign("rollout-regression-payload"),
+        },
+        requiredTables: ["stations"],
+        minimumTableRows: {
+          stations: 1,
+          station_lines: 1,
+          network_edges: 1,
+          facilities: 1,
+          station_facility_evidence: 1,
+        },
+      },
+    ],
+    ...overrides,
+  };
+  const { signature: _dropSig, ...unsigned } = base;
+  base.signature = {
+    algorithm: "rsa-sha256-manifest-v2",
+    value: _rolloutSign(_rolloutCanonicalJson(unsigned)),
+  };
+  return base;
+}
+
+async function startRolloutTestStorage(seed) {
+  const objects = new Map(seed);
+  const server = createServer((req, res) => {
+    const key = decodeURIComponent(req.url.replace(/^\//, ""));
+    if (req.method === "PUT") {
+      const chunks = [];
+      req.on("data", (c) => chunks.push(c));
+      req.on("end", () => {
+        objects.set(key, { body: Buffer.concat(chunks) });
+        res.statusCode = 200;
+        res.end();
+      });
+      return;
+    }
+    const found = objects.get(key);
+    if (!found) { res.statusCode = 404; res.end(); return; }
+    res.setHeader("content-length", String(found.body.length));
+    res.statusCode = 200;
+    res.end(req.method === "HEAD" ? undefined : found.body);
+  });
+  return new Promise((r) => server.listen(0, "127.0.0.1", () => r({ server, objects, port: server.address().port })));
+}
+
+const rolloutTestEnv = {
+  ...process.env,
+  EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: testPublicKeyPem,
+  EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: testPrivateKeyPem,
+};
+
+async function runPublishRollout(args, baseUrl) {
+  return execFileAsync(
+    "node",
+    [path.join(root, "tools/datapack/publish-rollout.mjs"), "--base-url", baseUrl, ...args],
+    { env: rolloutTestEnv },
+  );
+}
+
+test("publish-rollout (①): --percentage 30 → current.json에 rollout{30,seed hex32}+서명 유효+참조 pack sha 검증 통과", async () => {
+  const manifest = buildRolloutTestReleasesManifest();
+  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  const oldCurrentBytes = Buffer.from(JSON.stringify({ ...manifest, rollout: { percentage: 10, seed: "c".repeat(32) } }));
+
+  const storage = await startRolloutTestStorage([
+    ["catalog/releases/10.json", { body: manifestBytes }],
+    ["catalog/capital-v1.sqlite.gz", { body: ROLLOUT_PACK_BYTES }],
+    ["catalog/current.json", { body: oldCurrentBytes }],
+  ]);
+  const baseUrl = `http://127.0.0.1:${storage.port}`;
+  try {
+    const { stdout } = await runPublishRollout(
+      ["--target-sequence", "10", "--percentage", "30"],
+      baseUrl,
+    );
+    const report = JSON.parse(stdout);
+    assert.equal(report.targetSequence, 10);
+    assert.equal(report.percentage, 30);
+    assert.equal(report.channel, "production");
+
+    // PUT된 current.json 검증
+    const currentBytes = storage.objects.get("catalog/current.json").body;
+    const current = JSON.parse(currentBytes.toString("utf8"));
+    assert.ok(current.rollout, "rollout 필드 있어야 함");
+    assert.equal(current.rollout.percentage, 30);
+    assert.match(current.rollout.seed, /^[a-f0-9]{32}$/, "seed hex32 이어야 함");
+
+    // 서명 재검증 — 재서명된 manifest 서명이 공개키로 검증되어야 한다
+    const { verifyRsaSha256Signature, canonicalJson, withoutSignature } = await import("./lib/manifest-validation.mjs");
+    assert.ok(
+      verifyRsaSha256Signature(testPublicKeyPem, canonicalJson(withoutSignature(current)), current.signature.value),
+      "재서명이 공개키로 검증되어야 함",
+    );
+
+    // 리포트 newCurrentSha256이 저장된 bytes와 일치
+    const storedSha = createHash("sha256").update(currentBytes).digest("hex");
+    assert.equal(report.newCurrentSha256, storedSha);
+  } finally {
+    storage.server.close();
+  }
+});
+
+test("publish-rollout (②): 참조 팩 sha256 불일치 → PUT 없이 throw (fail-closed)", async () => {
+  const manifest = buildRolloutTestReleasesManifest();
+  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  // current.json에는 releases와 동일한 매니페스트를 넣어 buildRolloutManifest가 통과하도록 한다.
+  // 팩 sha256 불일치만이 fail-closed의 트리거가 되어야 한다.
+  const originalCurrentBytes = Buffer.from(JSON.stringify(manifest));
+
+  const storage = await startRolloutTestStorage([
+    ["catalog/releases/10.json", { body: manifestBytes }],
+    // 훼손된 팩 바이트 — sha256 불일치
+    ["catalog/capital-v1.sqlite.gz", { body: Buffer.from("tampered-pack-bytes") }],
+    ["catalog/current.json", { body: originalCurrentBytes }],
+  ]);
+  const baseUrl = `http://127.0.0.1:${storage.port}`;
+  try {
+    await assert.rejects(
+      runPublishRollout(["--target-sequence", "10", "--percentage", "30"], baseUrl),
+      /sha256 mismatch/,
+    );
+    // fail-closed: current.json은 원본 그대로 보존되어야 한다
+    assert.deepEqual(storage.objects.get("catalog/current.json").body, originalCurrentBytes);
+  } finally {
+    storage.server.close();
+  }
+});
+
+test("publish-rollout (③): --dry-run → current.json 수정 없이 exit 0 + 리포트 반환", async () => {
+  const manifest = buildRolloutTestReleasesManifest();
+  const manifestBytes = Buffer.from(JSON.stringify(manifest));
+  const originalCurrentBytes = Buffer.from(JSON.stringify(manifest));
+
+  const storage = await startRolloutTestStorage([
+    ["catalog/releases/10.json", { body: manifestBytes }],
+    ["catalog/capital-v1.sqlite.gz", { body: ROLLOUT_PACK_BYTES }],
+    ["catalog/current.json", { body: originalCurrentBytes }],
+  ]);
+  const baseUrl = `http://127.0.0.1:${storage.port}`;
+  try {
+    const { stdout } = await runPublishRollout(
+      ["--dry-run", "--target-sequence", "10", "--percentage", "50"],
+      baseUrl,
+    );
+    const report = JSON.parse(stdout);
+    assert.equal(report.percentage, 50);
+    // current.json은 원본 그대로 (PUT 미수행)
+    assert.deepEqual(storage.objects.get("catalog/current.json").body, originalCurrentBytes);
+  } finally {
+    storage.server.close();
+  }
+});
