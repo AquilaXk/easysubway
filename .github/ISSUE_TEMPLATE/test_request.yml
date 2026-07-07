@@ -1,5 +1,5 @@
 name: "테스트"
-description: "테스트 추가, 회귀 검증, 품질 게이트 보강 작업을 정리합니다."
+description: "테스트 추가, 회귀 검증, 품질 게이트 보강 작업을 정리합니다. A등급 제품/운영 위험 작업만 새 issue가 필수입니다. B/C등급은 기존 umbrella issue 재사용 또는 issue 생략을 우선 검토하세요."
 labels: ["enhancement"]
 body:
   - type: markdown
