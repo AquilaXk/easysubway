@@ -7877,6 +7877,8 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_DATAPACK_WORKFLOW_TOKEN$/m);
   // #1694 Part B: backend→GitHub Actions workflow_dispatch용 PAT(미설정 시 자동 dispatch dormant = 안전 기본값).
   assert.match(backendEnvAllowlist, /^EASYSUBWAY_GITHUB_ACTIONS_DISPATCH_TOKEN$/m);
+  // #1694 Part C: 데이터팩 콜백 HMAC 키(webhook 서명 검증용, 안전 기본값 = 미설정 시 전면 거부).
+  assert.match(backendEnvAllowlist, /^EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY$/m);
   assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_REVISION "\$\{DEPLOY_SHA\}"/);
   assert.match(deployBackendScript, /ensure_backend_env_value EASYSUBWAY_ADMIN_MASTER_DATA_VERSION "\$\{DEPLOY_SHA\}"/);
 
