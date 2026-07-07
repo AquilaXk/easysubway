@@ -7,6 +7,7 @@ import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
+import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
 import 'package:easysubway_mobile/main.dart' as app;
 import 'package:easysubway_mobile/route_search.dart';
@@ -184,6 +185,52 @@ void main() {
       ),
       throwsA(isA<FacilityReportException>()),
     );
+  });
+
+  test('userDatabase가 있으면 운행 공지 조회 의존성이 배선된다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      reportRepository: const UnavailableFacilityReportRepository(),
+      apiBaseUri: () => Uri.parse('https://example.test'),
+      enablePushNotifications: false,
+    );
+
+    expect(dependencies.noticeRepository, isA<NoticeRepository>());
+  });
+
+  test('운행 공지 의존성은 resolve 시점에 API 주소를 읽지 않고, 주소가 없으면 빈 결과로 동작한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    var apiBaseReads = 0;
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+      reportRepository: const UnavailableFacilityReportRepository(),
+      apiBaseUri: () {
+        apiBaseReads++;
+        return null;
+      },
+      enablePushNotifications: false,
+    );
+
+    // 앱 시작 중에는 공개 공지 base URL을 강제 평가하지 않는다(선택 기능).
+    expect(apiBaseReads, 0);
+
+    final result = await dependencies.noticeRepository!.activeNotices();
+
+    expect(result.notices, isEmpty);
+    expect(result.stale, isFalse);
   });
 
   test('로컬 데이터베이스가 없으면 API 주소 없는 원격 fallback을 만들지 않는다', () {
