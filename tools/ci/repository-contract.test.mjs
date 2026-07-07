@@ -11710,11 +11710,23 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
   const androidManifest = read(mergedManifestPath);
   const permissions = androidManifestPermissions(androidManifest);
 
+  // 하차 알림(#1766)이 flutter_local_notifications를 도입하며 알림 표시용
+  // POST_NOTIFICATIONS·VIBRATE와 시간표 기반 정확 예약용 SCHEDULE_EXACT_ALARM이
+  // release 매니페스트에 병합된다. 셋 다 위치·저장소·미디어 같은 개인정보 침해
+  // 권한이 아니며 알림 기능에 직접 필요하다. 백그라운드 위치·부팅 완료 수신 등은
+  // 병합되지 않음을 아래 doesNotMatch로 계속 강제한다.
   assert.deepEqual(permissions, [
     "android.permission.ACCESS_COARSE_LOCATION",
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.INTERNET",
+    "android.permission.POST_NOTIFICATIONS",
+    "android.permission.SCHEDULE_EXACT_ALARM",
+    "android.permission.VIBRATE",
   ]);
+  // 무추적 불변: 알람·캘린더 앱 전용인 USE_EXACT_ALARM과 부팅 재예약용
+  // RECEIVE_BOOT_COMPLETED는 도입하지 않는다(#1766 강등 사다리·비범위).
+  assert.doesNotMatch(androidManifest, /android\.permission\.USE_EXACT_ALARM/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.RECEIVE_BOOT_COMPLETED/);
   assert.doesNotMatch(androidManifest, /android\.permission\.ACCESS_BACKGROUND_LOCATION/);
   assert.doesNotMatch(androidManifest, /android\.permission\.CAMERA/);
   assert.doesNotMatch(androidManifest, /android\.permission\.READ_EXTERNAL_STORAGE/);
@@ -11999,3 +12011,43 @@ async function classifyChangedFiles(files) {
   });
   return Object.fromEntries(stdout.trim().split("\n").map((line) => line.split("=")));
 }
+
+test("get-off-alarm policy contract pins the no-location, degrade-ladder invariants", () => {
+  const policyPath = "apps/mobile/release/get-off-alarm-policy.json";
+  assert.equal(existsSync(path.join(root, policyPath)), true, "get-off-alarm policy must exist");
+
+  const policy = readJson(policyPath);
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.applicationId, "easysubway");
+  assert.equal(policy.androidApplicationId, "com.easysubway.app");
+  assert.equal(policy.policyName, "get-off-alarm-policy");
+  assert.equal(policy.issue, 1766);
+  assert.equal(policy.parentTracker, 1762);
+
+  // 위치 미사용 불변(area:privacy — 위치 추적으로 절대 회귀 금지).
+  assert.equal(policy.locationTrackingUsed, false);
+
+  // 리드타임 기본값은 Dart 스케줄러의 단일 진실 원본.
+  assert.equal(policy.leadTime.defaultLeadSeconds, 120);
+  assert.equal(policy.leadTime.transferAlarmDefaultOn, true);
+  assert.ok(policy.leadTime.minLeadSeconds < policy.leadTime.defaultLeadSeconds);
+  assert.ok(policy.leadTime.maxLeadSeconds > policy.leadTime.defaultLeadSeconds);
+
+  // 단일 경로 활성 알림(동시 다중 경로는 v1 비범위).
+  assert.equal(policy.activeAlarm.maxConcurrentRoutes, 1);
+  assert.equal(policy.activeAlarm.cancelOnRouteEnd, true);
+  assert.equal(policy.activeAlarm.cancelOnNewSearch, true);
+
+  // 정확 알람 강등 사다리: SCHEDULE_EXACT_ALARM 요청, USE_EXACT_ALARM 금지,
+  // 거부 시 고지 문구와 함께 부정확으로 강등 — 무음 실패 금지.
+  assert.equal(policy.exactAlarm.permissionName, "SCHEDULE_EXACT_ALARM");
+  assert.equal(policy.exactAlarm.forbiddenPermission, "USE_EXACT_ALARM");
+  assert.equal(policy.exactAlarm.degradeToInexactOnDeny, true);
+  assert.equal(policy.exactAlarm.silentFailureAllowed, false);
+  assert.ok(policy.exactAlarm.inexactNoticeKo.length > 0);
+
+  // 실시간 보정은 온라인 전용 overlay 재사용; 오프라인은 PLANNED 유지.
+  assert.equal(policy.realtimeCorrection.recomputeOnForeground, true);
+  assert.equal(policy.realtimeCorrection.offlineEtaSource, "PLANNED");
+  assert.equal(policy.realtimeCorrection.correctionOverlayIssue, 1416);
+});
