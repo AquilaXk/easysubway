@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../mobile_error_reporter.dart';
@@ -59,12 +60,30 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
       );
 
   List<int> _activeIds = const [];
+  bool _initialized = false;
+
+  /// 첫 예약 전에 플러그인·타임존을 1회 초기화한다. 앱 시작 경로를 무겁게 하지
+  /// 않도록 지연 초기화한다.
+  Future<void> _ensureInitialized() async {
+    if (_initialized) {
+      return;
+    }
+    tz_data.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
+    await _plugin.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      ),
+    );
+    _initialized = true;
+  }
 
   @override
   Future<void> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   }) async {
+    await _ensureInitialized();
     await cancelAll();
     final scheduleMode = androidScheduleModeFor(mode);
     final assignedIds = <int>[];

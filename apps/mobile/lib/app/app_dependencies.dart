@@ -4,7 +4,13 @@ import '../core/database/user/user_database.dart';
 import '../core/network/api_client.dart';
 import '../facility_report.dart';
 import '../favorite_facility.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
 import '../features/favorites/data/drift_favorite_repositories.dart';
+import '../features/get_off_alarm/data/get_off_alarm_state_repository.dart';
+import '../features/get_off_alarm/exact_alarm_permission.dart';
+import '../features/get_off_alarm/get_off_alarm_controller.dart';
+import '../features/get_off_alarm/get_off_alarm_notifier.dart';
 import '../features/network_map/data/drift_network_map_viewport_repository.dart';
 import '../features/preferences/data/drift_notification_settings_repository.dart';
 import '../features/realtime/realtime_repository.dart';
@@ -43,6 +49,7 @@ class AppDependencies {
     required this.notificationPermissionProvider,
     required this.locationProvider,
     required this.userDataDeletionRepository,
+    this.getOffAlarmController,
   });
 
   factory AppDependencies.resolve({
@@ -232,6 +239,7 @@ class AppDependencies {
             authProvider: null,
             userDatabase: userDatabase,
           ),
+      getOffAlarmController: _resolveGetOffAlarmController(userDatabase),
     );
   }
 
@@ -251,6 +259,7 @@ class AppDependencies {
   final NotificationPermissionProvider? notificationPermissionProvider;
   final CurrentLocationProvider locationProvider;
   final UserDataDeletionRepository? userDataDeletionRepository;
+  final GetOffAlarmController? getOffAlarmController;
 }
 
 RealtimeRepository _defaultRealtimeRepository({
@@ -305,6 +314,18 @@ class _UnavailableNetworkMapRepository implements NetworkMapRepository {
       positionSources: const [],
     );
   }
+}
+
+GetOffAlarmController? _resolveGetOffAlarmController(UserDatabase? userDatabase) {
+  if (userDatabase == null) {
+    return null;
+  }
+  final plugin = FlutterLocalNotificationsPlugin();
+  return GetOffAlarmController(
+    notifier: LocalGetOffAlarmNotifier(plugin),
+    permissionGate: PluginExactAlarmPermissionGate(plugin),
+    repository: DriftGetOffAlarmStateRepository(userDatabase: userDatabase),
+  );
 }
 
 FacilityReportRepository _defaultFacilityReportRepository({
