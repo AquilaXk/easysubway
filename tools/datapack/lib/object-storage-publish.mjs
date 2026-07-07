@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
 
+const REQUEST_TIMEOUT_MS = 30_000;
+
 // ─── 기본 HTTP 요청 ────────────────────────────────────────────────────────────
 
 export function request(url, method, body = Buffer.alloc(0), headers = {}) {
@@ -12,6 +14,10 @@ export function request(url, method, body = Buffer.alloc(0), headers = {}) {
     const req = transport.request(url, { method, headers }, (res) => {
       res.on("data", (c) => chunks.push(c));
       res.on("end", () => { res.body = Buffer.concat(chunks); resolve(res); });
+      res.on("error", reject);
+    });
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`request timeout after ${REQUEST_TIMEOUT_MS}ms`));
     });
     req.on("error", reject);
     if (body.length > 0) req.write(body);
@@ -43,11 +49,11 @@ export async function verifyReferencedPacks(baseUrl, manifest) {
       : `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
     const packResponse = await request(objectUrl(baseUrl, packKey), "GET");
     if (packResponse.statusCode !== 200) {
-      throw new Error(`rollback target references missing pack ${packKey} (HTTP ${packResponse.statusCode})`);
+      throw new Error(`referenced pack ${packKey} not found (HTTP ${packResponse.statusCode})`);
     }
     const storedSha256 = sha256(packResponse.body);
     if (storedSha256 !== pack.sha256) {
-      throw new Error(`rollback target pack ${packKey} sha256 mismatch: stored=${storedSha256} manifest=${pack.sha256}`);
+      throw new Error(`referenced pack ${packKey} sha256 mismatch: stored=${storedSha256} manifest=${pack.sha256}`);
     }
   }
 }

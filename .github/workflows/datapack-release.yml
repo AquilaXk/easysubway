@@ -682,6 +682,7 @@ jobs:
             --target-sequence "${ROLLOUT_TARGET_SEQUENCE}" \
             --percentage "${ROLLOUT_PERCENTAGE}" \
             --channel production
+          echo "EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_RESULT=success" >> "${GITHUB_ENV}"
 
       - name: Data Pack Release / Write observability metadata
         if: ${{ always() }}

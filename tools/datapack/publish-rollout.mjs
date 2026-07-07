@@ -38,7 +38,7 @@ async function main() {
     throw new Error(`rollout target ${releaseKey} not found (HTTP ${releaseResponse.statusCode})`);
   }
   const manifest = JSON.parse(releaseResponse.body.toString("utf8"));
-  validateManifest(manifest, { requireProduction: channel === "production" });
+  validateManifest(manifest, { requireProduction: channel === "production", releasesTarget: true });
 
   // (2) current.json GET (seed 계승 + previousSha 기록용)
   const currentUrl = objectUrl(baseUrl, "catalog/current.json");

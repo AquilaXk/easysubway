@@ -2,6 +2,7 @@
 // #1692: releases/<N>.json에 rollout 주입·재서명해 current.json 게시본 객체를 만든다(순수).
 import { readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import { manifestSignatureValue } from "./lib/manifest-signing.mjs";
 import { validateManifest } from "./lib/manifest-validation.mjs";
 
@@ -29,7 +30,7 @@ export function buildRolloutManifest({ releases, current, targetSequence, percen
 
 // 얇은 CLI(standalone 산출)
 function arg(n) { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : undefined; }
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const releases = JSON.parse(readFileSync(arg("--releases-manifest"), "utf8"));
   const cp = arg("--current-manifest");
   const current = cp ? JSON.parse(readFileSync(cp, "utf8")) : null;
