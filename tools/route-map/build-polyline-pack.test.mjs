@@ -500,6 +500,31 @@ test("[CR-1] --region이 defs.region과 동일하면 통과", () => {
   }
 });
 
+test("[CR-1] defs가 null이면 TypeError 아닌 검증 에러", () => {
+  const { dir, packPath } = buildFixturePack();
+  try {
+    assert.throws(
+      () =>
+        buildPolylinePack({
+          defs: null,
+          basePackPath: packPath,
+          outPath: path.join(dir, "spike-null.sqlite.gz"),
+          region: "수도권",
+        }),
+      (err) => {
+        assert.ok(
+          !(err instanceof TypeError),
+          `TypeError가 발생했습니다(defs 검증 전 접근 버그): ${err}`,
+        );
+        assert.ok(/객체가 아닙/.test(err.message), `예상 메시지 없음: ${err.message}`);
+        return true;
+      },
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 // ── [CR-2] --min-gap / --target-gap 숫자 검증 ────────────────────────────
 
 test("[CR-2] NaN minGap → 양의 유한수 에러(planLine 직접 호출)", () => {

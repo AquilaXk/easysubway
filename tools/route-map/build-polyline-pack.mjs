@@ -620,13 +620,6 @@ export function buildPolylinePack({
   targetGap = DEFAULT_TARGET_GAP,
   check = false,
 }) {
-  // --region 오버라이드 불일치 검증: defs.region이 있고 CLI region이 다르면 즉시 에러.
-  if (region !== null && region !== undefined && defs.region && region !== defs.region) {
-    throw new Error(
-      `--region "${region}"이(가) 정의 파일의 region "${defs.region}"과(와) 불일치합니다. ` +
-        `정의를 수정하거나 --region을 생략하세요.`,
-    );
-  }
   // minGap / targetGap 숫자 검증: NaN·0·음수이면 세그먼트 예산 검증이 조용히 무력화됨.
   if (!Number.isFinite(minGap) || minGap <= 0) {
     throw new Error(`minGap은 양의 유한수여야 합니다(현재값: ${minGap}).`);
@@ -634,7 +627,15 @@ export function buildPolylinePack({
   if (!Number.isFinite(targetGap) || targetGap <= 0) {
     throw new Error(`targetGap은 양의 유한수여야 합니다(현재값: ${targetGap}).`);
   }
+  // defs 구조 검증을 먼저 수행해 null/비객체 시 TypeError 대신 의도된 에러를 돌려준다.
   const model = loadAndValidateDefs(defs);
+  // --region 오버라이드 불일치 검증: model.region이 있고 CLI region이 다르면 즉시 에러.
+  if (region !== null && region !== undefined && model.region && region !== model.region) {
+    throw new Error(
+      `--region "${region}"이(가) 정의 파일의 region "${model.region}"과(와) 불일치합니다. ` +
+        `정의를 수정하거나 --region을 생략하세요.`,
+    );
+  }
   const targetRegion = region ?? model.region;
   if (!targetRegion) {
     throw new Error(
