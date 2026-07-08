@@ -65,7 +65,7 @@
 //          [--region 수도권] [--min-gap 26] [--target-gap 50] [--check]
 //   (--check 지정 시 --out은 무시되며 파일을 쓰지 않고 통계만 출력한다)
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -146,7 +146,7 @@ export function equidistantInterior(vertices, count) {
 function resolveVertexCoord(vertex, anchors, lineName, index) {
   let coord = null;
   if (vertex.anchor !== undefined) {
-    if (!Object.prototype.hasOwnProperty.call(anchors, vertex.anchor)) {
+    if (!Object.hasOwn(anchors, vertex.anchor)) {
       throw new Error(
         `앵커 "${vertex.anchor}"를 anchors 사전에서 찾을 수 없습니다 ` +
           `(노선 "${lineName}" 정점 ${index}).`,
@@ -188,6 +188,90 @@ function assertOctolinear(vertices, closed, label) {
   }
 }
 
+/** 정의의 한 노선을 검증·정규화한다(본선·지선 정점 해석 + 8선형 검증). */
+function normalizeLine(line, anchors) {
+  if (!line.name) throw new Error("노선에 name이 없습니다.");
+  if (!Array.isArray(line.vertices) || line.vertices.length < 2) {
+    throw new Error(`노선 "${line.name}"에 정점이 2개 미만입니다.`);
+  }
+  const mainVerts = line.vertices.map((v, i) =>
+    resolveVertexCoord(v, anchors, line.name, i),
+  );
+  assertOctolinear(mainVerts, Boolean(line.loop), `노선 "${line.name}"`);
+
+  const spurs = (line.spurs ?? []).map((spur, si) => {
+    if (!Array.isArray(spur.vertices) || spur.vertices.length < 2) {
+      throw new Error(`노선 "${line.name}" 지선 ${si}에 정점이 2개 미만입니다.`);
+    }
+    const verts = spur.vertices.map((v, i) =>
+      resolveVertexCoord(v, anchors, `${line.name} 지선 ${si}`, i),
+    );
+    assertOctolinear(verts, false, `노선 "${line.name}" 지선 ${si}`);
+    return { vertices: verts };
+  });
+
+  return { name: line.name, loop: Boolean(line.loop), vertices: mainVerts, spurs };
+}
+
+/** corridor 한 멤버의 선언 구간 정점 시퀀스를 잘라 돌려준다. */
+function corridorMemberSeq(member, corridorName, linesByName) {
+  const line = linesByName.get(member.line);
+  if (!line) {
+    throw new Error(
+      `corridor "${corridorName}"가 없는 노선 "${member.line}"를 참조합니다.`,
+    );
+  }
+  const [lo, hi] = member.range ?? [];
+  if (lo == null || hi == null || lo < 0 || hi >= line.vertices.length) {
+    throw new Error(
+      `corridor "${corridorName}" 노선 "${member.line}" 구간 [${lo},${hi}]가 ` +
+        `정점 범위를 벗어납니다(0~${line.vertices.length - 1}).`,
+    );
+  }
+  const step = lo <= hi ? 1 : -1;
+  const out = [];
+  for (let i = lo; step > 0 ? i <= hi : i >= hi; i += step) {
+    out.push(line.vertices[i]);
+  }
+  return { line: member.line, verts: out };
+}
+
+/** 한 corridor의 멤버 시퀀스들이 정점 좌표까지 일치하는지 검증한다. */
+function assertCorridorMatch(corridorName, seqs) {
+  const ref = seqs[0];
+  for (let k = 1; k < seqs.length; k += 1) {
+    const cur = seqs[k];
+    if (cur.verts.length !== ref.verts.length) {
+      throw new Error(
+        `corridor "${corridorName}" 구간 길이가 노선 "${ref.line}"(${ref.verts.length})와 ` +
+          `"${cur.line}"(${cur.verts.length})에서 다릅니다.`,
+      );
+    }
+    for (let i = 0; i < ref.verts.length; i += 1) {
+      if (ref.verts[i].x !== cur.verts[i].x || ref.verts[i].y !== cur.verts[i].y) {
+        throw new Error(
+          `corridor "${corridorName}" 정점 ${i}가 노선 "${ref.line}"` +
+            `(${ref.verts[i].x},${ref.verts[i].y})와 "${cur.line}"` +
+            `(${cur.verts[i].x},${cur.verts[i].y})에서 일치하지 않습니다.`,
+        );
+      }
+    }
+  }
+}
+
+/** 정의 corridor 목록 전체의 정점 시퀀스 일치를 검증한다. */
+function validateCorridors(corridors, linesByName) {
+  for (const corridor of corridors) {
+    const members = corridor.members ?? [];
+    const corridorName = corridor.name ?? "?";
+    if (members.length < 2) {
+      throw new Error(`corridor "${corridorName}"는 멤버 노선이 2개 미만입니다.`);
+    }
+    const seqs = members.map((m) => corridorMemberSeq(m, corridorName, linesByName));
+    assertCorridorMatch(corridorName, seqs);
+  }
+}
+
 /**
  * 정의 JSON을 검증·정규화한다. anchor 참조 무결성·8선형·corridor 일치를 확인하고,
  * 노선별 해석된 정점(본선/지선)을 돌려준다. 위반은 정점 index를 짚어 한국어 throw.
@@ -205,88 +289,13 @@ export function loadAndValidateDefs(defs) {
   const lines = [];
   const linesByName = new Map();
   for (const line of defs.lines) {
-    if (!line.name) throw new Error("노선에 name이 없습니다.");
-    if (!Array.isArray(line.vertices) || line.vertices.length < 2) {
-      throw new Error(`노선 "${line.name}"에 정점이 2개 미만입니다.`);
-    }
-    const mainVerts = line.vertices.map((v, i) =>
-      resolveVertexCoord(v, anchors, line.name, i),
-    );
-    assertOctolinear(mainVerts, Boolean(line.loop), `노선 "${line.name}"`);
-
-    const spurs = (line.spurs ?? []).map((spur, si) => {
-      if (!Array.isArray(spur.vertices) || spur.vertices.length < 2) {
-        throw new Error(`노선 "${line.name}" 지선 ${si}에 정점이 2개 미만입니다.`);
-      }
-      const verts = spur.vertices.map((v, i) =>
-        resolveVertexCoord(v, anchors, `${line.name} 지선 ${si}`, i),
-      );
-      assertOctolinear(verts, false, `노선 "${line.name}" 지선 ${si}`);
-      return { vertices: verts };
-    });
-
-    const normalized = {
-      name: line.name,
-      loop: Boolean(line.loop),
-      vertices: mainVerts,
-      spurs,
-    };
+    const normalized = normalizeLine(line, anchors);
     lines.push(normalized);
-    linesByName.set(line.name, normalized);
+    linesByName.set(normalized.name, normalized);
   }
 
   // corridor 일치 검증: 선언 구간의 정점 좌표 시퀀스가 멤버 노선에서 실제 일치.
-  for (const corridor of defs.corridors ?? []) {
-    const members = corridor.members ?? [];
-    if (members.length < 2) {
-      throw new Error(
-        `corridor "${corridor.name ?? "?"}"는 멤버 노선이 2개 미만입니다.`,
-      );
-    }
-    const seqs = members.map((m) => {
-      const line = linesByName.get(m.line);
-      if (!line) {
-        throw new Error(
-          `corridor "${corridor.name ?? "?"}"가 없는 노선 "${m.line}"를 참조합니다.`,
-        );
-      }
-      const [lo, hi] = m.range ?? [];
-      if (lo == null || hi == null || lo < 0 || hi >= line.vertices.length) {
-        throw new Error(
-          `corridor "${corridor.name ?? "?"}" 노선 "${m.line}" 구간 [${lo},${hi}]가 ` +
-            `정점 범위를 벗어납니다(0~${line.vertices.length - 1}).`,
-        );
-      }
-      const step = lo <= hi ? 1 : -1;
-      const out = [];
-      for (let i = lo; step > 0 ? i <= hi : i >= hi; i += step) {
-        out.push(line.vertices[i]);
-      }
-      return { line: m.line, verts: out };
-    });
-    const ref = seqs[0];
-    for (let k = 1; k < seqs.length; k += 1) {
-      const cur = seqs[k];
-      if (cur.verts.length !== ref.verts.length) {
-        throw new Error(
-          `corridor "${corridor.name ?? "?"}" 구간 길이가 노선 "${ref.line}"(${ref.verts.length})와 ` +
-            `"${cur.line}"(${cur.verts.length})에서 다릅니다.`,
-        );
-      }
-      for (let i = 0; i < ref.verts.length; i += 1) {
-        if (
-          ref.verts[i].x !== cur.verts[i].x ||
-          ref.verts[i].y !== cur.verts[i].y
-        ) {
-          throw new Error(
-            `corridor "${corridor.name ?? "?"}" 정점 ${i}가 노선 "${ref.line}"` +
-              `(${ref.verts[i].x},${ref.verts[i].y})와 "${cur.line}"` +
-              `(${cur.verts[i].x},${cur.verts[i].y})에서 일치하지 않습니다.`,
-          );
-        }
-      }
-    }
-  }
+  validateCorridors(defs.corridors ?? [], linesByName);
 
   return { region: defs.region ?? null, anchors, lines, guides: defs.guides ?? [] };
 }
@@ -299,6 +308,64 @@ function subPolyline(vertices, startIdx, endIdx, closed) {
     return vertices.slice(startIdx, endIdx + 1);
   }
   return vertices.slice(startIdx).concat(vertices.slice(0, endIdx + 1));
+}
+
+/** piece 정점 중 sequence에 있는 고정 정점을 {vIndex, station, seqPos}로 수집. */
+function collectFixedVertices(verts, seqIndex) {
+  const fixedV = [];
+  verts.forEach((v, i) => {
+    if (v.station !== undefined && seqIndex.has(v.station)) {
+      fixedV.push({ vIndex: i, station: v.station, seqPos: seqIndex.get(v.station) });
+    }
+  });
+  return fixedV;
+}
+
+/** 고정 정점 순서가 line_sequence 전진 방향(단조 증가)인지 검증. 위반 시 throw. */
+function assertForwardSequence(fixedV, closed, pieceLabel) {
+  // 루프면 최소 seqPos 위치로 회전한 뒤 단조 증가를 확인한다.
+  let ordered = fixedV;
+  let loopNote = "";
+  if (closed) {
+    const minIdx = fixedV.reduce(
+      (mi, v, i) => (v.seqPos < fixedV[mi].seqPos ? i : mi),
+      0,
+    );
+    ordered = [...fixedV.slice(minIdx), ...fixedV.slice(0, minIdx)];
+    loopNote = "(루프)";
+  }
+  for (let i = 1; i < ordered.length; i += 1) {
+    if (ordered[i].seqPos <= ordered[i - 1].seqPos) {
+      throw new Error(
+        `${pieceLabel}: 폴리라인 정점 순서가 line_sequence 전진 방향과 반대입니다${loopNote}. ` +
+          `정점 ${ordered[i - 1].vIndex}(seqPos=${ordered[i - 1].seqPos}) → ` +
+          `정점 ${ordered[i].vIndex}(seqPos=${ordered[i].seqPos}): seqPos가 감소합니다.`,
+      );
+    }
+  }
+}
+
+/** 고정 정점 배열을 인접 arc [a,b] 쌍으로 만든다(closed면 마지막→첫 정점 추가). */
+function buildArcs(fixedV, closed) {
+  const arcs = [];
+  for (let i = 0; i + 1 < fixedV.length; i += 1) arcs.push([fixedV[i], fixedV[i + 1]]);
+  if (closed) arcs.push([fixedV.at(-1), fixedV[0]]);
+  return arcs;
+}
+
+/** arc a→b 사이의 중간역 station_id를 seq 순서로 수집(고정·기배치 역 제외). */
+function collectArcMiddles(a, b, { sequence, total, closed, fixedStations, claimed }) {
+  const middles = [];
+  let p = a.seqPos;
+  for (let step = 0; step < total; step += 1) {
+    p = closed ? (p + 1) % total : p + 1;
+    if (!closed && p >= total) break;
+    if (p === b.seqPos) break;
+    const sid = sequence[p];
+    if (fixedStations.has(sid) || claimed.has(sid)) continue;
+    middles.push(sid);
+  }
+  return middles;
 }
 
 /**
@@ -347,60 +414,23 @@ export function planLine({ line, sequence, minGap = DEFAULT_MIN_GAP }) {
   const total = sequence.length;
   const placePiece = (verts, closed, pieceLabel) => {
     // piece의 고정 정점(정점 index + seq 위치)을 정점 순서로 수집.
-    const fixedV = [];
-    verts.forEach((v, i) => {
-      if (v.station !== undefined && seqIndex.has(v.station)) {
-        fixedV.push({ vIndex: i, station: v.station, seqPos: seqIndex.get(v.station) });
-      }
-    });
+    const fixedV = collectFixedVertices(verts, seqIndex);
     if (fixedV.length < 2) return; // 고정 정점 부족 — 중간역 배치 없음.
 
     // seqPos 방향성 검증: 폴리라인 정점 순서가 line_sequence 전진 방향이어야 함.
-    if (!closed) {
-      for (let i = 1; i < fixedV.length; i += 1) {
-        if (fixedV[i].seqPos <= fixedV[i - 1].seqPos) {
-          throw new Error(
-            `${pieceLabel}: 폴리라인 정점 순서가 line_sequence 전진 방향과 반대입니다. ` +
-              `정점 ${fixedV[i - 1].vIndex}(seqPos=${fixedV[i - 1].seqPos}) → ` +
-              `정점 ${fixedV[i].vIndex}(seqPos=${fixedV[i].seqPos}): seqPos가 감소합니다.`,
-          );
-        }
-      }
-    } else {
-      // 루프: 최소 seqPos 위치로 회전 후 단조 증가 확인.
-      const minIdx = fixedV.reduce(
-        (mi, v, i) => (v.seqPos < fixedV[mi].seqPos ? i : mi),
-        0,
-      );
-      const rotated = [...fixedV.slice(minIdx), ...fixedV.slice(0, minIdx)];
-      for (let i = 1; i < rotated.length; i += 1) {
-        if (rotated[i].seqPos <= rotated[i - 1].seqPos) {
-          throw new Error(
-            `${pieceLabel}: 폴리라인 정점 순서가 line_sequence 전진 방향과 반대입니다(루프). ` +
-              `정점 ${rotated[i - 1].vIndex}(seqPos=${rotated[i - 1].seqPos}) → ` +
-              `정점 ${rotated[i].vIndex}(seqPos=${rotated[i].seqPos}): seqPos가 감소합니다.`,
-          );
-        }
-      }
-    }
+    assertForwardSequence(fixedV, closed, pieceLabel);
 
-    const arcs = [];
-    for (let i = 0; i + 1 < fixedV.length; i += 1) arcs.push([fixedV[i], fixedV[i + 1]]);
-    if (closed) arcs.push([fixedV[fixedV.length - 1], fixedV[0]]);
-
+    const arcs = buildArcs(fixedV, closed);
     for (const [a, b] of arcs) {
       // 중간역: seq를 a.seqPos+1부터 전진(closed면 wrap)해 b.seqPos 전까지,
       // 고정도 아니고 이미 배치되지 않은 역만 순서대로 수집.
-      const middles = [];
-      let p = a.seqPos;
-      for (let step = 0; step < total; step += 1) {
-        p = closed ? (p + 1) % total : p + 1;
-        if (!closed && p >= total) break;
-        if (p === b.seqPos) break;
-        const sid = sequence[p];
-        if (fixedStations.has(sid) || claimed.has(sid)) continue;
-        middles.push(sid);
-      }
+      const middles = collectArcMiddles(a, b, {
+        sequence,
+        total,
+        closed,
+        fixedStations,
+        claimed,
+      });
       const sub = subPolyline(verts, a.vIndex, b.vIndex, closed);
       const arcLen = polylineLength(sub);
       const needed = (middles.length + 1) * minGap;
@@ -480,6 +510,102 @@ function writeSpikePack(sqlitePath, outPath) {
   return { byteSize: gz.length, sha256: sha256(gz) };
 }
 
+/** 각 정의 노선의 line_id·line_sequence를 팩에서 조회하고 planLine으로 계획한다. */
+function planAllLines(db, lines, targetRegion, minGap) {
+  const plans = [];
+  for (const line of lines) {
+    const lineRow = db.prepare("SELECT id FROM lines WHERE name_ko = ?").get(line.name);
+    if (!lineRow) {
+      throw new Error(`팩 lines에 없는 노선명: "${line.name}".`);
+    }
+    const lineId = lineRow.id;
+    // 순서는 station_lines.line_sequence, 대상은 baseline이 이 region에 가진
+    // 역만(station_lines는 region 비의존이라 타 region 역 유입을 막는다).
+    const seq = db
+      .prepare(
+        `SELECT sl.station_id
+         FROM station_lines sl
+         JOIN route_map_positions rmp
+           ON rmp.station_id = sl.station_id AND rmp.line_id = sl.line_id
+         WHERE sl.line_id = ? AND rmp.region = ?
+         ORDER BY sl.line_sequence`,
+      )
+      .all(lineId, targetRegion)
+      .map((r) => r.station_id);
+    const plan = planLine({ line, sequence: seq, minGap });
+    // 라이선스 메타는 baseline positions에서 승계(교체 전 확보).
+    const meta = db
+      .prepare(
+        `SELECT source_id, source_name, source_url, license, license_status,
+                commercial_use_allowed, attribution_required
+         FROM route_map_positions WHERE region = ? AND line_id = ? LIMIT 1`,
+      )
+      .get(targetRegion, lineId);
+    plans.push({ line, lineId, plan, meta });
+  }
+  return plans;
+}
+
+/** 계획된 한 노선의 track/position 행을 준비된 INSERT 문으로 기록한다. */
+function insertPlanRows({ lineId, plan, meta }, { db, insTrack, insPos, targetRegion, now }) {
+  if (!meta) {
+    db.exec("ROLLBACK");
+    throw new Error(`라이선스 메타를 찾지 못했습니다(line_id ${lineId}).`);
+  }
+  for (const t of plan.tracks) {
+    insTrack.run(
+      targetRegion, lineId, t.trackIndex, t.path, "",
+      meta.source_id, meta.source_name, meta.source_url, meta.license,
+      meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
+    );
+  }
+  for (const p of plan.positions) {
+    const rx = Math.round(p.x);
+    const ry = Math.round(p.y);
+    if (rx < 0 || ry < 0) {
+      db.exec("ROLLBACK");
+      throw new Error(
+        `역 "${p.stationId}" 좌표(${rx}, ${ry})가 음수입니다. ` +
+          `폴리라인 정의의 좌표 범위를 확인하세요.`,
+      );
+    }
+    insPos.run(
+      p.stationId, lineId, targetRegion, rx, ry,
+      meta.source_id, meta.source_name, meta.source_url, meta.license,
+      meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
+    );
+  }
+}
+
+/** 대상 region의 tracks/positions를 지우고 계획된 노선분을 트랜잭션으로 재기록한다. */
+function writePlansToPack(db, plans, targetRegion) {
+  db.exec("BEGIN");
+  db.prepare("DELETE FROM route_map_line_tracks WHERE region = ?").run(targetRegion);
+  db.prepare("DELETE FROM route_map_positions WHERE region = ?").run(targetRegion);
+  const now = Math.floor(Date.now() / 1000);
+
+  const insTrack = db.prepare(
+    `INSERT INTO route_map_line_tracks
+      (region, line_id, track_index, path, svg_color, source_id, source_name,
+       source_url, license, license_status, commercial_use_allowed,
+       attribution_required, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  );
+  const insPos = db.prepare(
+    `INSERT INTO route_map_positions
+      (station_id, line_id, region, x, y, label_dx, label_dy, up_path, down_path,
+       source_id, source_name, source_url, license, license_status,
+       commercial_use_allowed, attribution_required, updated_at, label_polygon)
+     VALUES (?,?,?,?,?,0,0,'','',?,?,?,?,?,?,?,?,'')`,
+  );
+
+  for (const plan of plans) {
+    insertPlanRows(plan, { db, insTrack, insPos, targetRegion, now });
+  }
+  db.exec("COMMIT");
+  db.exec("VACUUM");
+}
+
 /**
  * 파이프라인 진입점. 정의를 로드·검증하고 baseline을 복사한 스파이크 팩의
  * (region) route_map_line_tracks / route_map_positions를 정의된 노선분으로 교체한다.
@@ -522,37 +648,7 @@ export function buildPolylinePack({
     let allStats;
     try {
       // 노선명 → line_id, line_sequence 조회 + 계획.
-      const plans = [];
-      for (const line of model.lines) {
-        const lineRow = db.prepare("SELECT id FROM lines WHERE name_ko = ?").get(line.name);
-        if (!lineRow) {
-          throw new Error(`팩 lines에 없는 노선명: "${line.name}".`);
-        }
-        const lineId = lineRow.id;
-        // 순서는 station_lines.line_sequence, 대상은 baseline이 이 region에 가진
-        // 역만(station_lines는 region 비의존이라 타 region 역 유입을 막는다).
-        const seq = db
-          .prepare(
-            `SELECT sl.station_id
-             FROM station_lines sl
-             JOIN route_map_positions rmp
-               ON rmp.station_id = sl.station_id AND rmp.line_id = sl.line_id
-             WHERE sl.line_id = ? AND rmp.region = ?
-             ORDER BY sl.line_sequence`,
-          )
-          .all(lineId, targetRegion)
-          .map((r) => r.station_id);
-        const plan = planLine({ line, sequence: seq, minGap });
-        // 라이선스 메타는 baseline positions에서 승계(교체 전 확보).
-        const meta = db
-          .prepare(
-            `SELECT source_id, source_name, source_url, license, license_status,
-                    commercial_use_allowed, attribution_required
-             FROM route_map_positions WHERE region = ? AND line_id = ? LIMIT 1`,
-          )
-          .get(targetRegion, lineId);
-        plans.push({ line, lineId, plan, meta });
-      }
+      const plans = planAllLines(db, model.lines, targetRegion, minGap);
 
       allStats = plans.map((p) => ({
         line: p.line.name,
@@ -567,57 +663,7 @@ export function buildPolylinePack({
       }
 
       // 대상 region의 tracks/positions를 전부 지우고 정의 노선분만 재기록.
-      db.exec("BEGIN");
-      db.prepare("DELETE FROM route_map_line_tracks WHERE region = ?").run(targetRegion);
-      db.prepare("DELETE FROM route_map_positions WHERE region = ?").run(targetRegion);
-      const now = Math.floor(Date.now() / 1000);
-
-      const insTrack = db.prepare(
-        `INSERT INTO route_map_line_tracks
-          (region, line_id, track_index, path, svg_color, source_id, source_name,
-           source_url, license, license_status, commercial_use_allowed,
-           attribution_required, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      );
-      const insPos = db.prepare(
-        `INSERT INTO route_map_positions
-          (station_id, line_id, region, x, y, label_dx, label_dy, up_path, down_path,
-           source_id, source_name, source_url, license, license_status,
-           commercial_use_allowed, attribution_required, updated_at, label_polygon)
-         VALUES (?,?,?,?,?,0,0,'','',?,?,?,?,?,?,?,?,'')`,
-      );
-
-      for (const { lineId, plan, meta } of plans) {
-        if (!meta) {
-          db.exec("ROLLBACK");
-          throw new Error(`라이선스 메타를 찾지 못했습니다(line_id ${lineId}).`);
-        }
-        for (const t of plan.tracks) {
-          insTrack.run(
-            targetRegion, lineId, t.trackIndex, t.path, "",
-            meta.source_id, meta.source_name, meta.source_url, meta.license,
-            meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
-          );
-        }
-        for (const p of plan.positions) {
-          const rx = Math.round(p.x);
-          const ry = Math.round(p.y);
-          if (rx < 0 || ry < 0) {
-            db.exec("ROLLBACK");
-            throw new Error(
-              `역 "${p.stationId}" 좌표(${rx}, ${ry})가 음수입니다. ` +
-                `폴리라인 정의의 좌표 범위를 확인하세요.`,
-            );
-          }
-          insPos.run(
-            p.stationId, lineId, targetRegion, rx, ry,
-            meta.source_id, meta.source_name, meta.source_url, meta.license,
-            meta.license_status, meta.commercial_use_allowed, meta.attribution_required, now,
-          );
-        }
-      }
-      db.exec("COMMIT");
-      db.exec("VACUUM");
+      writePlansToPack(db, plans, targetRegion);
     } finally {
       // 예외·정상 경로 모두 db 닫힘 보장.
       db.close();
@@ -694,7 +740,7 @@ function main() {
   for (const line of result.stats) {
     const gaps = line.arcs.map((a) => a.gap).sort((x, y) => x - y);
     const min = gaps[0] ?? 0;
-    const max = gaps[gaps.length - 1] ?? 0;
+    const max = gaps.at(-1) ?? 0;
     const median = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
     console.log(
       `[${result.region}] ${line.line}: 정점 ${line.vertices} · 지선 ${line.spurs} · ` +
@@ -719,10 +765,7 @@ function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  try {
-    main();
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
+  // 실패는 Node 기본 예외 처리로 표준 에러에 노출하고 비정상 종료(코드 1)한다.
+  // 정의 파일 내용을 직접 로그로 재출력하지 않는다.
+  main();
 }
