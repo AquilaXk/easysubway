@@ -14,15 +14,26 @@ class CapitalRouteMapFixture {
     required this.map,
     required this.labelTextByStationId,
     required this.badgeLabelByLineId,
+    required this.lineColorHexById,
   });
 
   final StructuredRouteMap map;
   final Map<String, String> labelTextByStationId;
   final Map<String, String> badgeLabelByLineId;
+
+  /// line_id → hex 색(`lines.color`). 렌더링(golden) 테스트가 프로덕션과 같은
+  /// 노선색으로 그리도록 노출한다.
+  final Map<String, String> lineColorHexById;
 }
 
-CapitalRouteMapFixture loadCapitalRouteMapFixture({String region = '수도권'}) {
-  final gzBytes = File('assets/datapacks/capital.sqlite.gz').readAsBytesSync();
+/// [packAssetPath]는 flutter test CWD(apps/mobile) 기준 상대 경로다. 기본값은
+/// 커밋된 capital 팩이고, S0 스파이크 golden은 route-map-defs의 스파이크 팩을
+/// 리포 루트 상대(`../../tools/...`)로 넘겨 재사용한다.
+CapitalRouteMapFixture loadCapitalRouteMapFixture({
+  String region = '수도권',
+  String packAssetPath = 'assets/datapacks/capital.sqlite.gz',
+}) {
+  final gzBytes = File(packAssetPath).readAsBytesSync();
   final dir = Directory.systemTemp.createTempSync('capital-pack-');
   try {
     final sqliteFile = File('${dir.path}/pack.sqlite')
@@ -46,7 +57,7 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({String region = '수도권'})
         'WHERE region = ? ORDER BY line_id, track_index',
         [region],
       );
-      final lineRows = db.select('SELECT id, name_ko FROM lines');
+      final lineRows = db.select('SELECT id, name_ko, color FROM lines');
 
       final labelText = <String, String>{};
       final inputs = <StructuredRouteMapStationInput>[];
@@ -87,10 +98,17 @@ CapitalRouteMapFixture loadCapitalRouteMapFixture({String region = '수도권'})
               row['name_ko'] as String,
             ),
       };
+      final lineColorHex = <String, String>{
+        for (final row in lineRows)
+          if (lineIdsInMap.contains(row['id'] as String) &&
+              row['color'] != null)
+            row['id'] as String: row['color'] as String,
+      };
       return CapitalRouteMapFixture(
         map: map,
         labelTextByStationId: labelText,
         badgeLabelByLineId: badgeLabel,
+        lineColorHexById: lineColorHex,
       );
     } finally {
       db.close();
