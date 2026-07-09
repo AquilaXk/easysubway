@@ -10182,8 +10182,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     "copyCoordinate",
   ]);
   assert.equal(externalMapDeeplinkPolicy.providers[0].appScheme, "kakaomap");
-  assert.match(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=foot/);
-  assert.doesNotMatch(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=FOOT/);
+  assert.match(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=FOOT/);
+  assert.doesNotMatch(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=foot/);
   assert.equal(
     externalMapDeeplinkPolicy.providers[0].webFallbackHost,
     "map.kakao.com",

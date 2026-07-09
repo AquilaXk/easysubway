@@ -33,3 +33,9 @@ test("admin accessibility QA script fails on serious and critical axe violations
   assert.match(source, /impact === "serious"/);
   assert.match(source, /throw new Error\(`blocking axe violations/);
 });
+
+test("admin accessibility QA script fails non-success page responses", () => {
+  assert.match(source, /response\.status\(\)/);
+  assert.match(source, /status < 200 \|\| status >= 300/);
+  assert.match(source, /returned HTTP \$\{status\}/);
+});

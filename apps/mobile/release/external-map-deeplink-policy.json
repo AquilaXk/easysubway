@@ -15,7 +15,7 @@
       "embeddedSdkAllowed": false,
       "appScheme": "kakaomap",
       "appLookUriPattern": "kakaomap://look?p={latitude},{longitude}",
-      "appWalkingRouteUriPattern": "kakaomap://route?sp={startLatitude},{startLongitude}&ep={endLatitude},{endLongitude}&by=foot",
+      "appWalkingRouteUriPattern": "kakaomap://route?sp={startLatitude},{startLongitude}&ep={endLatitude},{endLongitude}&by=FOOT",
       "webFallbackHost": "map.kakao.com",
       "copyFallback": true
     }

@@ -31,7 +31,7 @@ void main() {
 
     expect(
       kakaoMapWalkingRouteAppUri(route).toString(),
-      'kakaomap://route?sp=37.303,126.867&ep=37.3021,126.8661&by=foot',
+      'kakaomap://route?sp=37.303,126.867&ep=37.3021,126.8661&by=FOOT',
     );
     expect(
       kakaoMapWalkingRouteWebUri(route).toString(),

@@ -110,7 +110,7 @@ Uri kakaoMapWalkingRouteAppUri(KakaoWalkingRouteTarget target) {
   return Uri.parse(
     'kakaomap://route?sp=${_coordinate(target.start.latitude)},'
     '${_coordinate(target.start.longitude)}&ep=${_coordinate(target.end.latitude)},'
-    '${_coordinate(target.end.longitude)}&by=foot',
+    '${_coordinate(target.end.longitude)}&by=FOOT',
   );
 }
 

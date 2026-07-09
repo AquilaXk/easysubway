@@ -136,8 +136,8 @@ async function runNoJsPass(browser, baseUrl, outputDir, adminUser, adminPassword
   const page = await context.newPage();
   await login(page, baseUrl, "/admin/login", adminUser, adminPassword);
   for (const [url, name] of ADMIN_PAGES) {
-    await page.goto(`${baseUrl}${url}`, { waitUntil: "domcontentloaded" });
-    await assertOk(page, url);
+    const response = await page.goto(`${baseUrl}${url}`, { waitUntil: "domcontentloaded" });
+    await assertOk(page, url, response);
     const screenshot = path.join(outputDir, `no-js-${name}.png`);
     await page.screenshot({ path: screenshot, fullPage: true });
     report.noJs.push({ url, screenshot });
@@ -148,8 +148,8 @@ async function runNoJsPass(browser, baseUrl, outputDir, adminUser, adminPassword
   const operatorPage = await operatorContext.newPage();
   await login(operatorPage, baseUrl, "/operator/login", operatorUser, operatorPassword);
   for (const [url, name] of OPERATOR_PAGES) {
-    await operatorPage.goto(`${baseUrl}${url}`, { waitUntil: "domcontentloaded" });
-    await assertOk(operatorPage, url);
+    const response = await operatorPage.goto(`${baseUrl}${url}`, { waitUntil: "domcontentloaded" });
+    await assertOk(operatorPage, url, response);
     const screenshot = path.join(outputDir, `no-js-${name}.png`);
     await operatorPage.screenshot({ path: screenshot, fullPage: true });
     report.noJs.push({ url, screenshot });
@@ -158,8 +158,8 @@ async function runNoJsPass(browser, baseUrl, outputDir, adminUser, adminPassword
 }
 
 async function auditPage(page, baseUrl, outputDir, url, name, report) {
-  await page.goto(`${baseUrl}${url}`, { waitUntil: "networkidle" });
-  await assertOk(page, url);
+  const response = await page.goto(`${baseUrl}${url}`, { waitUntil: "networkidle" });
+  await assertOk(page, url, response);
   const screenshot = path.join(outputDir, `${name}.png`);
   await page.screenshot({ path: screenshot, fullPage: true });
   report.screenshots.push({ url, screenshot });
@@ -186,7 +186,8 @@ async function auditPage(page, baseUrl, outputDir, url, name, report) {
 }
 
 async function keyboardSmoke(page, baseUrl, report) {
-  await page.goto(`${baseUrl}/admin/dashboard/page`, { waitUntil: "networkidle" });
+  const response = await page.goto(`${baseUrl}/admin/dashboard/page`, { waitUntil: "networkidle" });
+  await assertOk(page, "/admin/dashboard/page", response);
   await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
   await page.waitForSelector(".command-palette-overlay[style*=\"display: none\"]", { state: "detached", timeout: 1000 }).catch(() => {});
   const paletteOpen = await page.locator(".command-palette-overlay").isVisible();
@@ -223,7 +224,14 @@ async function login(page, baseUrl, loginPath, username, password) {
   await page.waitForLoadState("networkidle");
 }
 
-async function assertOk(page, url) {
+async function assertOk(page, url, response) {
+  if (!response) {
+    throw new Error(`${url} did not return a page response`);
+  }
+  const status = response.status();
+  if (status < 200 || status >= 300) {
+    throw new Error(`${url} returned HTTP ${status}`);
+  }
   const title = await page.title();
   if (page.url().includes("/login") || title.includes("로그인")) {
     throw new Error(`${url} redirected to login`);
