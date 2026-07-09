@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "datapack-update-policy",
+  "manifestCheckOnResumeMinIntervalSeconds": 21600,
+  "autoDownloadNetwork": "unmetered-only",
+  "meteredDownloadRequiresConsent": true,
+  "retryBackoffSeconds": [60, 480, 3600],
+  "retryMaxAttemptsPerSession": 3,
+  "expiryUrgentWindowDays": 7,
+  "expiryUrgentIgnoresMinInterval": true
+}

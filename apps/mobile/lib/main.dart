@@ -10,6 +10,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
+import 'core/datapack/data_pack_metered_consent_gate.dart';
+import 'core/datapack/data_pack_update_state.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
@@ -84,6 +86,7 @@ Future<void> main() async {
   runApp(
     AppBootstrapLifecycle(
       close: bootstrap.close,
+      resumeDataPackUpdate: bootstrap.resumeDataPackUpdate,
       child: EasySubwayApp(
         dependencies: bootstrap.dependencies,
         onboardingStore: const SecureOnboardingResultStore(),
@@ -91,6 +94,11 @@ Future<void> main() async {
             const SecureFacilityReportDraftTargetStore(),
         facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
         legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
+        dataPackUpdateStateRepository: DataPackUpdateStateRepository(
+          userDatabase: bootstrap.userDatabase,
+        ),
+        onDataPackMeteredConsent: bootstrap.acceptMeteredDataPackUpdate,
+        dataPackUpdate: bootstrap.dataPackUpdate,
       ),
     ),
   );
@@ -275,6 +283,9 @@ class EasySubwayApp extends StatelessWidget {
         const SupportAccessInfo.fromEnvironment(),
     SupportAccessLauncher supportAccessLauncher =
         const UrlLauncherSupportAccessLauncher(),
+    DataPackUpdateStateRepository? dataPackUpdateStateRepository,
+    Future<void> Function()? onDataPackMeteredConsent,
+    Future<void>? dataPackUpdate,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
@@ -310,6 +321,9 @@ class EasySubwayApp extends StatelessWidget {
            isReleaseMode: kReleaseMode,
          ),
          supportAccessLauncher: supportAccessLauncher,
+         dataPackUpdateStateRepository: dataPackUpdateStateRepository,
+         onDataPackMeteredConsent: onDataPackMeteredConsent,
+         dataPackUpdate: dataPackUpdate,
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
@@ -327,6 +341,9 @@ class EasySubwayApp extends StatelessWidget {
     required this.legacyCredentialCleaner,
     required this.supportAccessInfo,
     required this.supportAccessLauncher,
+    required this.dataPackUpdateStateRepository,
+    required this.onDataPackMeteredConsent,
+    required this.dataPackUpdate,
     required this.recentRoutesFuture,
     super.key,
   }) : repository = dependencies.repository,
@@ -374,6 +391,9 @@ class EasySubwayApp extends StatelessWidget {
   final LegacyCredentialCleaner legacyCredentialCleaner;
   final SupportAccessInfo supportAccessInfo;
   final SupportAccessLauncher supportAccessLauncher;
+  final DataPackUpdateStateRepository? dataPackUpdateStateRepository;
+  final Future<void> Function()? onDataPackMeteredConsent;
+  final Future<void>? dataPackUpdate;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -430,33 +450,38 @@ class EasySubwayApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: _EasySubwayHome(
-        repository: repository,
-        reportRepository: reportRepository,
-        routeRepository: routeRepository,
-        routeFeedbackRepository: routeFeedbackRepository,
-        getOffAlarmController: getOffAlarmController,
-        favoriteRepository: favoriteRepository,
-        favoriteFacilityRepository: favoriteFacilityRepository,
-        favoriteRouteRepository: favoriteRouteRepository,
-        searchHistoryRepository: searchHistoryRepository,
-        internalRouteRepository: internalRouteRepository,
-        networkMapRepository: networkMapRepository,
-        networkMapViewportRepository: networkMapViewportRepository,
-        realtimeRepository: realtimeRepository,
-        notificationRepository: notificationRepository,
-        notificationPermissionProvider: notificationPermissionProvider,
-        locationProvider: locationProvider,
-        initialOnboardingState: initialOnboardingState,
-        onboardingStore: onboardingStore,
-        facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-        facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
-        legacyCredentialCleaner: legacyCredentialCleaner,
-        supportAccessInfo: supportAccessInfo,
-        supportAccessLauncher: supportAccessLauncher,
-        userDataDeletionRepository: userDataDeletionRepository,
-        noticeRepository: noticeRepository,
-        recentRoutesFuture: recentRoutesFuture,
+      home: DataPackMeteredConsentGate(
+        stateRepository: dataPackUpdateStateRepository,
+        onAccept: onDataPackMeteredConsent,
+        recheckAfter: dataPackUpdate,
+        child: _EasySubwayHome(
+          repository: repository,
+          reportRepository: reportRepository,
+          routeRepository: routeRepository,
+          routeFeedbackRepository: routeFeedbackRepository,
+          getOffAlarmController: getOffAlarmController,
+          favoriteRepository: favoriteRepository,
+          favoriteFacilityRepository: favoriteFacilityRepository,
+          favoriteRouteRepository: favoriteRouteRepository,
+          searchHistoryRepository: searchHistoryRepository,
+          internalRouteRepository: internalRouteRepository,
+          networkMapRepository: networkMapRepository,
+          networkMapViewportRepository: networkMapViewportRepository,
+          realtimeRepository: realtimeRepository,
+          notificationRepository: notificationRepository,
+          notificationPermissionProvider: notificationPermissionProvider,
+          locationProvider: locationProvider,
+          initialOnboardingState: initialOnboardingState,
+          onboardingStore: onboardingStore,
+          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+          facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+          legacyCredentialCleaner: legacyCredentialCleaner,
+          supportAccessInfo: supportAccessInfo,
+          supportAccessLauncher: supportAccessLauncher,
+          userDataDeletionRepository: userDataDeletionRepository,
+          noticeRepository: noticeRepository,
+          recentRoutesFuture: recentRoutesFuture,
+        ),
       ),
     );
   }
