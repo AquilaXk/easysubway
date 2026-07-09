@@ -10172,6 +10172,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     "copyCoordinate",
   ]);
   assert.equal(externalMapDeeplinkPolicy.providers[0].appScheme, "kakaomap");
+  assert.match(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=foot/);
+  assert.doesNotMatch(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=FOOT/);
   assert.equal(
     externalMapDeeplinkPolicy.providers[0].webFallbackHost,
     "map.kakao.com",
@@ -11003,6 +11005,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("접근성"));
   assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("로그인 없음"));
   assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("위치 권한은 선택적 사용"));
+  assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("카카오맵 앱/웹 공유는 사용자가 지도 또는 도보 길안내를 누를 때만 실행"));
   assert.equal(playStoreContent.crashAnrProviderDecision.separateCrashProvider, false);
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));

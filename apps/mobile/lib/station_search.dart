@@ -4207,10 +4207,11 @@ class _StationExitCardState extends State<_StationExitCard> {
               Semantics(
                 container: true,
                 button: true,
+                enabled: !_isLoadingLocation,
                 label: mapTarget.usesStationFallback
                     ? '${exit.name} 역 위치 기준 직선거리 보기'
                     : '${exit.name}까지 직선거리 보기',
-                onTap: _loadCurrentLocationForExit,
+                onTap: _isLoadingLocation ? null : _loadCurrentLocationForExit,
                 child: SizedBox(
                   width: double.infinity,
                   child: ExcludeSemantics(
@@ -4243,10 +4244,13 @@ class _StationExitCardState extends State<_StationExitCard> {
               Semantics(
                 container: true,
                 button: true,
+                enabled: !_isOpeningWalkingRoute,
                 label: mapTarget.usesStationFallback
                     ? '${exit.name} 역 위치 기준 카카오맵 도보 길안내, 현재 위치와 역 좌표만 사용합니다'
                     : '${exit.name}까지 카카오맵 도보 길안내, 현재 위치와 출구 좌표만 사용합니다',
-                onTap: () => _openWalkingRoute(context),
+                onTap: _isOpeningWalkingRoute
+                    ? null
+                    : () => _openWalkingRoute(context),
                 child: SizedBox(
                   width: double.infinity,
                   child: ExcludeSemantics(
