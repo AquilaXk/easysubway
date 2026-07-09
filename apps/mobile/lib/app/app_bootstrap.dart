@@ -18,6 +18,7 @@ import '../core/datapack/data_pack_installer.dart';
 import '../core/datapack/data_pack_update_state.dart';
 import '../core/datapack/data_pack_updater.dart';
 import '../core/datapack/emergency_override_repository.dart';
+import '../core/datapack/network_condition_source.dart';
 import '../user_data_deletion.dart';
 import '../core/database/catalog/catalog_database.dart';
 import '../core/database/catalog/catalog_database_opener.dart';
@@ -30,6 +31,7 @@ typedef DataPackUpdateRunner =
     Future<void> Function({
       required Directory supportDirectory,
       required UserDatabase userDatabase,
+      required UpdateTrigger trigger,
     });
 
 class AppBootstrap {
@@ -38,12 +40,16 @@ class AppBootstrap {
     required this.catalogDatabase,
     required this.userDatabase,
     required this.dataPackUpdate,
+    required this.resumeDataPackUpdate,
+    required this.acceptMeteredDataPackUpdate,
   });
 
   final AppDependencies dependencies;
   final CatalogDatabase catalogDatabase;
   final UserDatabase userDatabase;
   final Future<void> dataPackUpdate;
+  final Future<void> Function() resumeDataPackUpdate;
+  final Future<void> Function() acceptMeteredDataPackUpdate;
 
   static Future<AppBootstrap> initialize({
     Directory? databaseDirectory,
@@ -80,10 +86,12 @@ class AppBootstrap {
         assetBundle: assetBundle ?? rootBundle,
         emergencyOverrideRepository: emergencyOverrideRepository,
       ).open();
+      final runner = dataPackUpdateRunner ?? _defaultDataPackUpdateRunner;
       dataPackUpdate = _runDataPackUpdateSafely(
         supportDirectory: supportDirectory,
         userDatabase: userDatabase,
-        runner: dataPackUpdateRunner ?? _defaultDataPackUpdateRunner,
+        runner: runner,
+        trigger: UpdateTrigger.appStart,
       );
 
       final dependencies = AppDependencies.resolve(
@@ -110,6 +118,18 @@ class AppBootstrap {
         catalogDatabase: catalogDatabase,
         userDatabase: userDatabase,
         dataPackUpdate: dataPackUpdate,
+        resumeDataPackUpdate: () => _runDataPackUpdateSafely(
+          supportDirectory: supportDirectory,
+          userDatabase: userDatabase,
+          runner: runner,
+          trigger: UpdateTrigger.foregroundResume,
+        ),
+        acceptMeteredDataPackUpdate: () => _runDataPackUpdateSafely(
+          supportDirectory: supportDirectory,
+          userDatabase: userDatabase,
+          runner: runner,
+          trigger: UpdateTrigger.userConsent,
+        ),
       );
     } catch (error, stackTrace) {
       await dataPackUpdate;
@@ -129,11 +149,13 @@ Future<void> _runDataPackUpdateSafely({
   required Directory supportDirectory,
   required UserDatabase userDatabase,
   required DataPackUpdateRunner runner,
+  required UpdateTrigger trigger,
 }) async {
   try {
     await runner(
       supportDirectory: supportDirectory,
       userDatabase: userDatabase,
+      trigger: trigger,
     );
   } catch (error, stackTrace) {
     reportMobileError(
@@ -147,6 +169,7 @@ Future<void> _runDataPackUpdateSafely({
 Future<void> _defaultDataPackUpdateRunner({
   required Directory supportDirectory,
   required UserDatabase userDatabase,
+  required UpdateTrigger trigger,
 }) async {
   final endpoints = AppEndpoints.fromEnvironment();
   final manifestUri = endpoints.dataPackManifestUri;
@@ -171,26 +194,47 @@ Future<void> _defaultDataPackUpdateRunner({
     emergencyOverrideRepository: EmergencyOverrideRepository(
       userDatabase: userDatabase,
     ),
-  ).checkForUpdates();
+    networkConditionSource: ConnectivityNetworkConditionSource(),
+  ).checkForUpdates(trigger: trigger);
 }
 
 class AppBootstrapLifecycle extends StatefulWidget {
   const AppBootstrapLifecycle({
     required this.close,
     required this.child,
+    this.resumeDataPackUpdate,
     super.key,
   });
 
   final Future<void> Function() close;
+  final Future<void> Function()? resumeDataPackUpdate;
   final Widget child;
 
   @override
   State<AppBootstrapLifecycle> createState() => _AppBootstrapLifecycleState();
 }
 
-class _AppBootstrapLifecycleState extends State<AppBootstrapLifecycle> {
+class _AppBootstrapLifecycleState extends State<AppBootstrapLifecycle>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final resumeDataPackUpdate = widget.resumeDataPackUpdate;
+      if (resumeDataPackUpdate != null) {
+        unawaited(resumeDataPackUpdate());
+      }
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(widget.close());
     super.dispose();
   }
