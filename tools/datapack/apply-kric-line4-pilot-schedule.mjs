@@ -12,6 +12,8 @@ const EXPECTED_REQUEST_COUNT = 153;
 const EXPECTED_INTERMEDIATE_ROW_COUNT = 33062;
 const EXPECTED_TRANSIT_TRIP_COUNT = 895;
 const EXPECTED_TRANSIT_STOP_TIME_COUNT = 33062;
+const EXPECTED_PILOT_TRANSIT_TRIP_COUNT = 466;
+const EXPECTED_PILOT_TRANSIT_STOP_TIME_COUNT = 932;
 const STATION_MAP = {
   "station-seoul-4-433": { stationId: "station-sadang", stationCode: "433", nameKo: "사당" },
   "station-seoul-4-448": { stationId: "station-sangnoksu", stationCode: "448", nameKo: "상록수" },
@@ -74,6 +76,8 @@ export function applySchedule(input, artifact, artifactBytes = Buffer.from(JSON.
   if (transitTrips.length === 0) {
     throw new Error("KRIC pilot schedule has no paired Sangnoksu-Sadang trips");
   }
+  requireEqual(transitTrips.length, EXPECTED_PILOT_TRANSIT_TRIP_COUNT, "pairedTransitTripCount");
+  requireEqual(transitStopTimes.length, EXPECTED_PILOT_TRANSIT_STOP_TIME_COUNT, "pairedTransitStopTimeCount");
 
   const serviceCalendars = [...new Set(transitTrips.map((trip) => trip.serviceId))]
     .sort((left, right) => left.localeCompare(right))

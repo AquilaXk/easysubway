@@ -867,7 +867,7 @@
           "status": "SUPPORTED",
           "productionUseAllowed": true,
           "coverageStatus": "TRIP_STOP_SEQUENCE_VALIDATED_LINE4_PILOT",
-          "updateFrequency": "provider documented; production cadence not admitted",
+          "updateFrequency": "provider documented; production cadence admitted for capital line 4 pilot",
           "unsupportedNotes": "production use is limited to the capital line 4 Sangnoksu-Sadang pilot schedule slice until nationwide coverage evidence is closed"
         },
         "realtime": {

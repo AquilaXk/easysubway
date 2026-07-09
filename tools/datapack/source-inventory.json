@@ -1543,6 +1543,7 @@
           "capital"
         ],
         "operatorIds": [
+          "korail",
           "seoul-metro"
         ],
         "sourceDomains": [

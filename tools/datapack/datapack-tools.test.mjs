@@ -8680,6 +8680,39 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
   const outputPath = path.join(outputDir, "production-input.json");
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
+  const fixtureTrips = Array.from({ length: 466 }, (_, index) => {
+    const isUp = index % 2 === 0;
+    return {
+      id: `route-seoul-4-${isUp ? "up" : "down"}-fixture-${index}`,
+      routeId: isUp ? "route-seoul-4-up" : "route-seoul-4-down",
+      serviceId: index < 250 ? "weekday-kric" : "holiday-kric",
+      tripHeadsign: isUp ? "station-seoul-4-448" : "station-seoul-4-433",
+      directionId: isUp ? "up" : "down",
+      servicePattern: "LOCAL",
+    };
+  });
+  const fixtureStopTimes = fixtureTrips.flatMap((trip, index) => {
+    const isUp = trip.directionId === "up";
+    const firstArrivalSeconds = 18000 + index * 60;
+    return [
+      {
+        tripId: trip.id,
+        stopSequence: 1,
+        stationId: isUp ? "station-seoul-4-433" : "station-seoul-4-448",
+        lineId: "seoul-4",
+        arrivalSeconds: firstArrivalSeconds,
+        departureSeconds: firstArrivalSeconds,
+      },
+      {
+        tripId: trip.id,
+        stopSequence: 2,
+        stationId: isUp ? "station-seoul-4-448" : "station-seoul-4-433",
+        lineId: "seoul-4",
+        arrivalSeconds: firstArrivalSeconds + 2400,
+        departureSeconds: firstArrivalSeconds + 2400,
+      },
+    ];
+  });
   await writeFile(
     artifactPath,
     `${JSON.stringify({
@@ -8692,58 +8725,8 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
       intermediateRowCount: 33062,
       transitTripCount: 895,
       transitStopTimeCount: 33062,
-      transitTrips: [
-        {
-          id: "route-seoul-4-up-T1-8",
-          routeId: "route-seoul-4-up",
-          serviceId: "weekday-kric",
-          tripHeadsign: "station-seoul-4-448",
-          directionId: "up",
-          servicePattern: "LOCAL",
-        },
-        {
-          id: "route-seoul-4-down-T2-8",
-          routeId: "route-seoul-4-down",
-          serviceId: "weekday-kric",
-          tripHeadsign: "station-seoul-4-433",
-          directionId: "down",
-          servicePattern: "LOCAL",
-        },
-      ],
-      transitStopTimes: [
-        {
-          tripId: "route-seoul-4-up-T1-8",
-          stopSequence: 1,
-          stationId: "station-seoul-4-433",
-          lineId: "seoul-4",
-          arrivalSeconds: 30000,
-          departureSeconds: 30000,
-        },
-        {
-          tripId: "route-seoul-4-up-T1-8",
-          stopSequence: 2,
-          stationId: "station-seoul-4-448",
-          lineId: "seoul-4",
-          arrivalSeconds: 32400,
-          departureSeconds: 32400,
-        },
-        {
-          tripId: "route-seoul-4-down-T2-8",
-          stopSequence: 1,
-          stationId: "station-seoul-4-448",
-          lineId: "seoul-4",
-          arrivalSeconds: 33000,
-          departureSeconds: 33000,
-        },
-        {
-          tripId: "route-seoul-4-down-T2-8",
-          stopSequence: 2,
-          stationId: "station-seoul-4-433",
-          lineId: "seoul-4",
-          arrivalSeconds: 35400,
-          departureSeconds: 35400,
-        },
-      ],
+      transitTrips: fixtureTrips,
+      transitStopTimes: fixtureStopTimes,
     }, null, 2)}\n`,
   );
 
@@ -8763,11 +8746,19 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
 
   const transformed = JSON.parse(await readFile(outputPath, "utf8"));
   assert.ok(transformed.sourceIds.includes("kric-subway-timetable"));
-  assert.equal(transformed.transitTrips.length, 2);
-  assert.equal(transformed.transitStopTimes.length, 4);
+  assert.equal(transformed.transitTrips.length, 466);
+  assert.equal(transformed.transitStopTimes.length, 932);
   assert.deepEqual(
-    transformed.transitStopTimes.map((row) => row.stationId),
-    ["station-sangnoksu", "station-sadang", "station-sadang", "station-sangnoksu"],
+    transformed.transitStopTimes
+      .filter((row) => row.tripId === "route-seoul-4-up-fixture-0")
+      .map((row) => row.stationId),
+    ["station-sadang", "station-sangnoksu"],
+  );
+  assert.deepEqual(
+    transformed.transitStopTimes
+      .filter((row) => row.tripId === "route-seoul-4-down-fixture-1")
+      .map((row) => row.stationId),
+    ["station-sangnoksu", "station-sadang"],
   );
   assert.deepEqual(transformed.transitFeedInfo, [{ feedEndDate: "20261231" }]);
   assert.equal(transformed.scheduleProvenance.sourceId, "kric-subway-timetable");
