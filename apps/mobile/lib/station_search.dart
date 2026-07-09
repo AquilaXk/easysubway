@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
 import 'adaptive_layout.dart';
+import 'core/external/kakao_map_launcher.dart';
 import 'facility_status.dart';
 import 'facility_report.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -586,6 +587,7 @@ class StationExitInfo {
     required this.dataConfidence,
     this.dataSourceType = '',
     this.fieldValidationStatus = 'UNKNOWN',
+    this.lastVerifiedAt = '',
   });
 
   factory StationExitInfo.fromJson(Map<String, Object?> json) {
@@ -605,6 +607,7 @@ class StationExitInfo {
         'fieldValidationStatus',
         'UNKNOWN',
       ),
+      lastVerifiedAt: _stringOrEmpty(json, 'lastVerifiedAt'),
     );
   }
 
@@ -619,6 +622,9 @@ class StationExitInfo {
   final String dataConfidence;
   final String dataSourceType;
   final String fieldValidationStatus;
+  final String lastVerifiedAt;
+
+  bool get hasCoordinate => latitude != null && longitude != null;
 
   String get elevatorConnectionLabel {
     return hasElevatorConnection ? '엘리베이터 연결' : '엘리베이터 연결을 확인하고 있어요';
@@ -2859,6 +2865,7 @@ class StationDetailScreen extends StatefulWidget {
     this.internalRouteRequest,
     this.internalRouteMobilityType = 'SENIOR',
     this.routeDraftController,
+    this.mapLauncher = const UrlLauncherKakaoMapLauncher(),
     super.key,
   });
 
@@ -2874,6 +2881,7 @@ class StationDetailScreen extends StatefulWidget {
   final InternalRouteRequest? internalRouteRequest;
   final String internalRouteMobilityType;
   final RouteDraftController? routeDraftController;
+  final KakaoMapLauncher mapLauncher;
 
   @override
   State<StationDetailScreen> createState() => _StationDetailScreenState();
@@ -2951,6 +2959,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                 favoriteController: _favoriteController,
                 routeDraftController: widget.routeDraftController,
                 locationProvider: widget.locationProvider,
+                mapLauncher: widget.mapLauncher,
                 facilityReportDraftTargetStore:
                     widget.facilityReportDraftTargetStore,
               );
@@ -2971,6 +2980,7 @@ class _StationDetailBody extends StatelessWidget {
     required this.favoriteController,
     required this.routeDraftController,
     required this.locationProvider,
+    required this.mapLauncher,
     required this.facilityReportDraftTargetStore,
   });
 
@@ -2981,6 +2991,7 @@ class _StationDetailBody extends StatelessWidget {
   final StationFavoriteToggleController? favoriteController;
   final RouteDraftController? routeDraftController;
   final CurrentLocationProvider? locationProvider;
+  final KakaoMapLauncher mapLauncher;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
@@ -3010,6 +3021,7 @@ class _StationDetailBody extends StatelessWidget {
         favoriteController: favoriteController,
         routeDraftController: routeDraftController,
         locationProvider: locationProvider,
+        mapLauncher: mapLauncher,
         facilityReportDraftTargetStore: facilityReportDraftTargetStore,
       ),
     };
@@ -3032,6 +3044,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.favoriteController,
     required this.routeDraftController,
     required this.locationProvider,
+    required this.mapLauncher,
     required this.facilityReportDraftTargetStore,
   });
 
@@ -3049,6 +3062,7 @@ class _StationDetailContent extends StatelessWidget {
   final StationFavoriteToggleController? favoriteController;
   final RouteDraftController? routeDraftController;
   final CurrentLocationProvider? locationProvider;
+  final KakaoMapLauncher mapLauncher;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
 
   @override
@@ -3105,7 +3119,12 @@ class _StationDetailContent extends StatelessWidget {
       if (exits.isEmpty)
         const _StationDetailEmptyMessage(message: '출구 안내를 준비 중이에요.')
       else
-        for (final exit in exits) _StationExitCard(exit: exit),
+        for (final exit in exits)
+          _StationExitCard(
+            station: detail,
+            exit: exit,
+            mapLauncher: mapLauncher,
+          ),
       const SizedBox(height: 24),
       const _StationDetailSectionTitle(title: '시설'),
       const SizedBox(height: 12),
@@ -4037,58 +4056,119 @@ class _StationDetailEmptyMessage extends StatelessWidget {
 }
 
 class _StationExitCard extends StatelessWidget {
-  const _StationExitCard({required this.exit});
+  const _StationExitCard({
+    required this.station,
+    required this.exit,
+    required this.mapLauncher,
+  });
 
+  final StationDetail station;
   final StationExitInfo exit;
+  final KakaoMapLauncher mapLauncher;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final hasCoordinate = exit.hasCoordinate;
 
-    return MergeSemantics(
-      child: Semantics(
-        label: exit.semanticLabel,
-        child: ExcludeSemantics(
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            color: Colors.white,
-            elevation: 0,
-            shape: const RoundedRectangleBorder(
-              borderRadius: _stationDetailInfoCardRadius,
-              side: BorderSide(color: EasySubwayAccessibleColors.line),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    exit.name,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w800,
-                      height: 1.25,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Colors.white,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: _stationDetailInfoCardRadius,
+        side: BorderSide(color: EasySubwayAccessibleColors.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(
+              container: true,
+              label: exit.semanticLabel,
+              child: ExcludeSemantics(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exit.name,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: EasySubwayAccessibleColors.text,
+                        fontWeight: FontWeight.w800,
+                        height: 1.25,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  _StationDetailStatusPill(
-                    icon: Icons.elevator,
-                    text: exit.elevatorConnectionLabel,
-                    positive: exit.hasElevatorConnection,
-                  ),
-                  const SizedBox(height: 8),
-                  _StationDetailStatusPill(
-                    icon: Icons.stairs_outlined,
-                    text: exit.stairPathLabel,
-                    positive: !exit.hasStairOnlyPath,
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    _StationDetailStatusPill(
+                      icon: Icons.elevator,
+                      text: exit.elevatorConnectionLabel,
+                      positive: exit.hasElevatorConnection,
+                    ),
+                    const SizedBox(height: 8),
+                    _StationDetailStatusPill(
+                      icon: Icons.stairs_outlined,
+                      text: exit.stairPathLabel,
+                      positive: !exit.hasStairOnlyPath,
+                    ),
+                    if (exit.lastVerifiedAt.trim().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _StationDetailInfoRow(
+                        icon: Icons.verified_outlined,
+                        text:
+                            '최근 확인 ${stationVerifiedRelativeLabel(exit.lastVerifiedAt)}',
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
+            if (hasCoordinate) ...[
+              const SizedBox(height: 12),
+              Semantics(
+                container: true,
+                button: true,
+                label: '${exit.name} 카카오맵에서 보기, 새 앱이 열립니다',
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    key: Key('stationExitMapButton-${exit.id}'),
+                    icon: const Icon(Icons.map_outlined),
+                    label: const Text('카카오맵에서 보기'),
+                    onPressed: () => _openExitMap(context),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
+  }
+
+  Future<void> _openExitMap(BuildContext context) async {
+    final latitude = exit.latitude;
+    final longitude = exit.longitude;
+    if (latitude == null || longitude == null) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await mapLauncher.openLook(
+      KakaoMapTarget(
+        label: '${station.nameKo}역 ${exit.name}',
+        latitude: latitude,
+        longitude: longitude,
+      ),
+    );
+    if (!context.mounted) {
+      return;
+    }
+    final message = switch (result) {
+      KakaoMapLaunchResult.app || KakaoMapLaunchResult.web => '카카오맵을 열었습니다.',
+      KakaoMapLaunchResult.copied => '좌표를 복사했습니다. 지도 앱에서 붙여넣어 주세요.',
+      KakaoMapLaunchResult.failed => '지도 앱을 열지 못했어요. 잠시 후 다시 시도해 주세요.',
+    };
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

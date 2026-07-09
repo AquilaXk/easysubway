@@ -427,6 +427,20 @@ class StationExits extends Table {
   TextColumn get stationId => text().named('station_id')();
   TextColumn get exitNumber => text().named('exit_number')();
   TextColumn get description => text().withDefault(const Constant(''))();
+  RealColumn get latitude => real().nullable()();
+  RealColumn get longitude => real().nullable()();
+  BoolColumn get hasElevatorConnection => boolean()
+      .named('has_elevator_connection')
+      .withDefault(const Constant(false))();
+  TextColumn get sourceId =>
+      text().named('source_id').withDefault(const Constant(''))();
+  TextColumn get sourceSnapshotId =>
+      text().named('source_snapshot_id').withDefault(const Constant(''))();
+  TextColumn get dataSourceType => text()
+      .named('data_source_type')
+      .withDefault(const Constant('OFFICIAL_FILE'))();
+  DateTimeColumn get lastVerifiedAt =>
+      dateTime().named('last_verified_at').nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

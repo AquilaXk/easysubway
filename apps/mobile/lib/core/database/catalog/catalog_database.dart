@@ -57,7 +57,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration {
@@ -124,6 +124,9 @@ class CatalogDatabase extends _$CatalogDatabase {
           await migrator.createTable(fareDiscounts);
           await migrator.createTable(stationFareZones);
         }
+        if (from < 15) {
+          await _addStationExitMapColumns();
+        }
       },
       beforeOpen: (_) async {
         await customStatement('PRAGMA foreign_keys = ON');
@@ -139,7 +142,9 @@ class CatalogDatabase extends _$CatalogDatabase {
       await _backfillBaselineAccessEdges();
       await _backfillBaselineNetworkEdgeEvidence();
       await _backfillBaselineRouteMapPositions();
+      await _createFareTablesIfMissing();
       await _backfillBaselineFareRules();
+      await _backfillBaselineStationExitMapData();
       return;
     }
 
@@ -376,6 +381,15 @@ class CatalogDatabase extends _$CatalogDatabase {
             stationId: 'station-sangnoksu',
             exitNumber: '1',
             description: const Value('상록수역 1번 출구'),
+            latitude: const Value(37.3021),
+            longitude: const Value(126.8661),
+            hasElevatorConnection: const Value(true),
+            sourceId: const Value('baseline-exit-source-capital'),
+            sourceSnapshotId: const Value(
+              'baseline-exit-source-capital-20260619',
+            ),
+            dataSourceType: const Value('OFFICIAL_FILE'),
+            lastVerifiedAt: Value(DateTime.utc(2026, 6, 19)),
           ),
         ]);
         batch.insertAllOnConflictUpdate(facilities, [
@@ -461,6 +475,24 @@ class CatalogDatabase extends _$CatalogDatabase {
     await transaction(_seedBaselineRouteMapPositions);
   }
 
+  Future<void> _backfillBaselineStationExitMapData() async {
+    if (!await _isBaselineFixtureCatalog()) {
+      return;
+    }
+    await _addStationExitMapColumns();
+    await customStatement('''
+      UPDATE station_exits
+      SET latitude = 37.3021,
+          longitude = 126.8661,
+          has_elevator_connection = 1,
+          source_id = 'baseline-exit-source-capital',
+          source_snapshot_id = 'baseline-exit-source-capital-20260619',
+          data_source_type = 'OFFICIAL_FILE',
+          last_verified_at = 1781827200
+      WHERE id = 'exit-sangnoksu-1'
+      ''');
+  }
+
   Future<void> _backfillBaselineFareRules() async {
     if (!await _shouldBackfillBaselineFareRules()) {
       return;
@@ -520,6 +552,57 @@ class CatalogDatabase extends _$CatalogDatabase {
         FROM station_lines
       ''');
     });
+  }
+
+  Future<void> _createFareTablesIfMissing() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS fare_zones (
+        id TEXT NOT NULL PRIMARY KEY,
+        name_ko TEXT NOT NULL,
+        region TEXT NOT NULL,
+        currency_code TEXT NOT NULL DEFAULT 'KRW',
+        source_id TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS fare_rules (
+        id TEXT NOT NULL PRIMARY KEY,
+        zone_id TEXT NOT NULL,
+        base_card_fare INTEGER NOT NULL,
+        base_cash_fare INTEGER NOT NULL,
+        base_distance_meters INTEGER NOT NULL,
+        additional_steps_json TEXT NOT NULL DEFAULT '[]',
+        FOREIGN KEY (zone_id) REFERENCES fare_zones(id),
+        CHECK (base_card_fare >= 0),
+        CHECK (base_cash_fare >= 0),
+        CHECK (base_distance_meters >= 0)
+      )
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS fare_discounts (
+        id TEXT NOT NULL PRIMARY KEY,
+        zone_id TEXT NOT NULL,
+        rider_type TEXT NOT NULL,
+        card_fare INTEGER,
+        cash_fare INTEGER,
+        free_ride INTEGER NOT NULL DEFAULT 0 CHECK (free_ride IN (0, 1)),
+        description_ko TEXT NOT NULL DEFAULT '',
+        FOREIGN KEY (zone_id) REFERENCES fare_zones(id),
+        CHECK (card_fare IS NULL OR card_fare >= 0),
+        CHECK (cash_fare IS NULL OR cash_fare >= 0)
+      )
+    ''');
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS station_fare_zones (
+        station_id TEXT NOT NULL,
+        line_id TEXT NOT NULL,
+        zone_id TEXT NOT NULL,
+        PRIMARY KEY (station_id, line_id),
+        FOREIGN KEY (station_id, line_id)
+          REFERENCES station_lines(station_id, line_id),
+        FOREIGN KEY (zone_id) REFERENCES fare_zones(id)
+      )
+    ''');
   }
 
   Future<bool> _shouldBackfillBaselineFareRules() async {
@@ -770,7 +853,7 @@ class CatalogDatabase extends _$CatalogDatabase {
         stationCount == 6 &&
         stationLineCount == 9 &&
         networkEdgeCount >= 15 &&
-        networkEdgeCount <= 19;
+        networkEdgeCount <= 20;
     return localSeedBaseline || bundledFixture;
   }
 
@@ -1025,6 +1108,32 @@ class CatalogDatabase extends _$CatalogDatabase {
       'name_sub',
       "TEXT NOT NULL DEFAULT ''",
     );
+  }
+
+  Future<void> _addStationExitMapColumns() async {
+    await _addColumnIfMissing('station_exits', 'latitude', 'REAL');
+    await _addColumnIfMissing('station_exits', 'longitude', 'REAL');
+    await _addColumnIfMissing(
+      'station_exits',
+      'has_elevator_connection',
+      'INTEGER NOT NULL DEFAULT 0',
+    );
+    await _addColumnIfMissing(
+      'station_exits',
+      'source_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'station_exits',
+      'source_snapshot_id',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      'station_exits',
+      'data_source_type',
+      "TEXT NOT NULL DEFAULT 'OFFICIAL_FILE'",
+    );
+    await _addColumnIfMissing('station_exits', 'last_verified_at', 'INTEGER');
   }
 
   Future<void> _addRelease100ProvenanceColumns() async {
