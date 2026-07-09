@@ -9416,12 +9416,14 @@ void main() {
   testWidgets('foreground 복귀는 활성 하차 알림을 현재 경로 시간으로 재예약한다', (tester) async {
     final notifier = _RecordingGetOffAlarmNotifier();
     final now = DateTime.parse('2026-07-06T09:00:00+09:00');
+    final transferArrivalAt = DateTime.parse('2026-07-06T09:20:00+09:00');
     final arrivalAt = DateTime.parse('2026-07-06T09:37:30+09:00');
     final fireAt = DateTime.parse('2026-07-06T09:35:30+09:00');
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
     final controller = GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubExactAlarmPermissionGate(),
-      repository: _MemoryGetOffAlarmStateRepository(),
+      repository: stateRepository,
       now: () => now,
     );
     addTearDown(controller.dispose);
@@ -9431,14 +9433,29 @@ void main() {
           RouteSearchStep(
             sequence: 1,
             stepType: 'ride',
-            title: '상록수에서 사당까지 이동',
+            title: '상록수에서 금정까지 이동',
             description: '열차를 이용해 이동합니다.',
             lineId: 'seoul-4',
             lineName: '수도권 4호선',
             fromStationId: 'station-sangnoksu',
+            toStationId: 'station-geumjeong',
+            estimatedMinutes: 15,
+            distanceMeters: 6300,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+            plannedArrivalTimeIso: '2026-07-06T09:20:00+09:00',
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'ride',
+            title: '금정에서 사당까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-geumjeong',
             toStationId: 'station-sadang',
-            estimatedMinutes: 32,
-            distanceMeters: 13500,
+            estimatedMinutes: 17,
+            distanceMeters: 7200,
             includesStairs: false,
             requiresAccessibilityCheck: true,
             plannedArrivalTimeIso: '2026-07-06T09:37:30+09:00',
@@ -9455,14 +9472,29 @@ void main() {
           RouteSearchStep(
             sequence: 1,
             stepType: 'ride',
-            title: '수도권 4호선으로 사당역까지 이동',
+            title: '수도권 4호선으로 금정역까지 이동',
             description: '열차를 이용해 이동합니다.',
             lineId: 'seoul-4',
             lineName: '수도권 4호선',
             fromStationId: 'station-sangnoksu',
+            toStationId: 'station-geumjeong',
+            estimatedMinutes: 15,
+            distanceMeters: 6300,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+            plannedArrivalTimeIso: '2026-07-06T09:20:00+09:00',
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'ride',
+            title: '수도권 4호선으로 사당역까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-geumjeong',
             toStationId: 'station-sadang',
-            estimatedMinutes: 30,
-            distanceMeters: 13500,
+            estimatedMinutes: 17,
+            distanceMeters: 7200,
             includesStairs: false,
             requiresAccessibilityCheck: true,
           ),
@@ -9502,13 +9534,19 @@ void main() {
       routeId: 'route-1',
       stops: [
         GetOffAlarmStop(
+          stationId: 'station-geumjeong',
+          stationName: '금정',
+          arrivalAt: transferArrivalAt,
+          kind: GetOffAlarmKind.transfer,
+        ),
+        GetOffAlarmStop(
           stationId: 'station-sadang',
           stationName: '사당',
           arrivalAt: arrivalAt,
           kind: GetOffAlarmKind.destination,
         ),
       ],
-      transferAlarmEnabled: true,
+      transferAlarmEnabled: false,
     );
     notifier.reset();
 
@@ -9520,10 +9558,12 @@ void main() {
     expect(repository.refreshRouteSearchIds, ['route-1']);
     expect(notifier.scheduleCalls, 1);
     expect(notifier.scheduledMode, GetOffAlarmScheduleMode.exact);
+    expect(notifier.scheduledAlarms.single.stationId, 'station-sadang');
     expect(
       notifier.scheduledAlarms.single.fireAt.isAtSameMomentAs(fireAt),
       isTrue,
     );
+    expect((await stateRepository.loadActive())?.transferAlarmEnabled, isFalse);
   });
 
   testWidgets('추천 경로 항목은 스크린리더에서 상세 진입 버튼으로 남는다', (tester) async {

@@ -2455,6 +2455,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
 
   Future<void> _refreshCurrentRouteAndAlarm() async {
     await _controller.refreshCurrentRoute();
+    if (!mounted) {
+      return;
+    }
     final getOffAlarmController = widget.getOffAlarmController;
     final result = _controller.state.result;
     if (getOffAlarmController == null || result == null) {
@@ -2465,12 +2468,17 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       return;
     }
     try {
+      final activeSubscription = await getOffAlarmController.repository
+          .loadActive();
+      if (!mounted) {
+        return;
+      }
       await getOffAlarmController.refresh(
         stops: getOffAlarmStopsFromRideLegs(
           rideLegs: rideLegs,
           stationName: (id) => id,
         ),
-        transferAlarmEnabled: true,
+        transferAlarmEnabled: activeSubscription?.transferAlarmEnabled ?? true,
       );
       if (kDebugMode && getOffAlarmController.state.enabled) {
         debugPrint(
@@ -4164,8 +4172,7 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
   required RouteSearchResult next,
   required RouteSearchResult previous,
 }) {
-  if (_rideLegArrivalsFromResult(next).isNotEmpty ||
-      _rideLegArrivalsFromResult(previous).isEmpty) {
+  if (_rideLegArrivalsFromResult(previous).isEmpty) {
     return next;
   }
   final previousRideSteps = previous.steps
@@ -4174,7 +4181,7 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
             step.stepType == 'ride' && step.plannedArrivalTimeIso.isNotEmpty,
       )
       .toList(growable: false);
-  var rideIndex = 0;
+  var changed = false;
   final steps = next.steps
       .map((step) {
         if (step.stepType != 'ride' || step.plannedArrivalTimeIso.isNotEmpty) {
@@ -4183,12 +4190,11 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
         final matched = _matchingPreviousRideStep(
           step: step,
           previousRideSteps: previousRideSteps,
-          fallbackIndex: rideIndex,
         );
-        rideIndex += 1;
         if (matched == null) {
           return step;
         }
+        changed = true;
         return step.withDisplayLabels(
           title: step.title,
           lineName: step.lineName,
@@ -4198,13 +4204,15 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
         );
       })
       .toList(growable: false);
+  if (!changed) {
+    return next;
+  }
   return next.withDisplayLabels(steps: steps);
 }
 
 RouteSearchStep? _matchingPreviousRideStep({
   required RouteSearchStep step,
   required List<RouteSearchStep> previousRideSteps,
-  required int fallbackIndex,
 }) {
   for (final previousStep in previousRideSteps) {
     if (previousStep.fromStationId == step.fromStationId &&
@@ -4212,9 +4220,6 @@ RouteSearchStep? _matchingPreviousRideStep({
         previousStep.lineId == step.lineId) {
       return previousStep;
     }
-  }
-  if (fallbackIndex < previousRideSteps.length) {
-    return previousRideSteps[fallbackIndex];
   }
   return null;
 }
