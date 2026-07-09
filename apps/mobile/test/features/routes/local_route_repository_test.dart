@@ -103,6 +103,14 @@ void main() {
       expect(result.steps.first.actionTitle, isEmpty);
       expect(result.steps.first.actionDetail, '상록수 승강장 접근 동선을 확인합니다.');
       expect(result.steps.last.title, isNot(contains('station-')));
+      expect(
+        result.steps.last.plannedArrivalTimeIso,
+        '2026-07-01T09:15:00+09:00',
+      );
+      expect(
+        result.steps.last.realtimeArrivalTimeIso,
+        '2026-07-01T09:13:00+09:00',
+      );
       expect(result.etaSource, 'REALTIME');
       expect(result.isLocalResult, isFalse);
 
