@@ -2,7 +2,7 @@
   "schema": "easysubway.external_map_deeplink_policy.v1",
   "ownerIssue": "#1770",
   "approvedAt": "2026-07-09",
-  "status": "approved",
+  "status": "SATISFIED",
   "scope": "station_exit_ground_walk_guidance",
   "providerOrder": [
     "kakao-map"
