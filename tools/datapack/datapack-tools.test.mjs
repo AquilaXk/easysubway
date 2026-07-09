@@ -8687,11 +8687,11 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
       sourceId: "kric-subway-timetable",
       lineId: "seoul-4",
       capturedAt: "2026-07-09",
-      requestCount: 2,
+      requestCount: 153,
       failedRequestCount: 0,
-      intermediateRowCount: 4,
-      transitTripCount: 2,
-      transitStopTimeCount: 4,
+      intermediateRowCount: 33062,
+      transitTripCount: 895,
+      transitStopTimeCount: 33062,
       transitTrips: [
         {
           id: "route-seoul-4-up-T1-8",
@@ -8772,6 +8772,47 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
   assert.deepEqual(transformed.transitFeedInfo, [{ feedEndDate: "20261231" }]);
   assert.equal(transformed.scheduleProvenance.sourceId, "kric-subway-timetable");
   assert.match(transformed.scheduleProvenance.providerRecordHash, /^[a-f0-9]{64}$/);
+});
+
+test("KRIC 4호선 pilot 시간표 transformer는 부분 수집 artifact를 production input으로 승격하지 않는다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-kric-line4-partial-schedule-${Date.now()}`);
+  const artifactPath = path.join(outputDir, "kric-artifact.json");
+  const outputPath = path.join(outputDir, "production-input.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(
+    artifactPath,
+    `${JSON.stringify({
+      artifactKind: "kric-line4-timetable-collection",
+      sourceId: "kric-subway-timetable",
+      lineId: "seoul-4",
+      capturedAt: "2026-07-09",
+      requestCount: 153,
+      failedRequestCount: 1,
+      intermediateRowCount: 33062,
+      transitTripCount: 895,
+      transitStopTimeCount: 33062,
+      transitTrips: [],
+      transitStopTimes: [],
+    }, null, 2)}\n`,
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/apply-kric-line4-pilot-schedule.mjs",
+        "--input",
+        "tools/datapack/inputs/capital-pilot-production-source-input.json",
+        "--artifact",
+        artifactPath,
+        "--output",
+        outputPath,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /KRIC pilot artifact failedRequestCount mismatch: 1 !== 0/,
+  );
 });
 
 test("공식 source ingest adapter는 명시한 lineSequence 경계 wrap만 허용한다", async () => {

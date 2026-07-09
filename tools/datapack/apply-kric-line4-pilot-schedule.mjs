@@ -4,9 +4,14 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const SOURCE_ID = "kric-subway-timetable";
+const SOURCE_ARTIFACT_IDS = new Set([SOURCE_ID, "kric-subway-route-info"]);
 const LINE_ID = "seoul-4";
 const START_DATE = "20260101";
 const END_DATE = "20261231";
+const EXPECTED_REQUEST_COUNT = 153;
+const EXPECTED_INTERMEDIATE_ROW_COUNT = 33062;
+const EXPECTED_TRANSIT_TRIP_COUNT = 895;
+const EXPECTED_TRANSIT_STOP_TIME_COUNT = 33062;
 const STATION_MAP = {
   "station-seoul-4-433": { stationId: "station-sadang", stationCode: "433", nameKo: "사당" },
   "station-seoul-4-448": { stationId: "station-sangnoksu", stationCode: "448", nameKo: "상록수" },
@@ -30,6 +35,7 @@ async function main() {
 }
 
 export function applySchedule(input, artifact, artifactBytes = Buffer.from(JSON.stringify(artifact))) {
+  validateArtifact(artifact);
   const tripsById = new Map((artifact.transitTrips ?? []).map((trip) => [trip.id, trip]));
   const stopTimesByTrip = new Map();
   for (const stopTime of artifact.transitStopTimes ?? []) {
@@ -171,6 +177,31 @@ function uniqueBy(rows, keyFn) {
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function validateArtifact(artifact) {
+  if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
+    throw new Error("KRIC pilot artifact must be an object");
+  }
+  requireEqual(artifact.artifactKind, "kric-line4-timetable-collection", "artifactKind");
+  if (artifact.sourceId && !SOURCE_ARTIFACT_IDS.has(artifact.sourceId)) {
+    throw new Error(`KRIC pilot artifact sourceId mismatch: ${artifact.sourceId}`);
+  }
+  requireEqual(artifact.lineId, LINE_ID, "lineId");
+  requireEqual(artifact.requestCount, EXPECTED_REQUEST_COUNT, "requestCount");
+  requireEqual(artifact.failedRequestCount, 0, "failedRequestCount");
+  requireEqual(artifact.intermediateRowCount, EXPECTED_INTERMEDIATE_ROW_COUNT, "intermediateRowCount");
+  requireEqual(artifact.transitTripCount, EXPECTED_TRANSIT_TRIP_COUNT, "transitTripCount");
+  requireEqual(artifact.transitStopTimeCount, EXPECTED_TRANSIT_STOP_TIME_COUNT, "transitStopTimeCount");
+  if (!Array.isArray(artifact.transitTrips) || !Array.isArray(artifact.transitStopTimes)) {
+    throw new Error("KRIC pilot artifact missing transit rows");
+  }
+}
+
+function requireEqual(actual, expected, field) {
+  if (actual !== expected) {
+    throw new Error(`KRIC pilot artifact ${field} mismatch: ${actual} !== ${expected}`);
+  }
 }
 
 function parseArgs(argv) {
