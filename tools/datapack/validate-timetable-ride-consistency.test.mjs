@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { checkTimetableRideConsistency } from "./validate-timetable-ride-consistency.mjs";
 
@@ -114,11 +115,19 @@ test("음수·0 구간(도착≤출발)은 표본에서 제외된다", () => {
 test("번들 수도권 pack의 KRIC pilot stop_times는 직접 RIDE edge와 정합한다", () => {
   const tempDir = mkdtempSync(path.join(tmpdir(), "capital-pack-"));
   const sqlitePath = path.join(tempDir, "capital.sqlite");
+  const repoRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../..",
+  );
+  const capitalPackPath = path.join(
+    repoRoot,
+    "apps/mobile/assets/datapacks/capital.sqlite.gz",
+  );
   let database;
   try {
     writeFileSync(
       sqlitePath,
-      gunzipSync(readFileSync("apps/mobile/assets/datapacks/capital.sqlite.gz")),
+      gunzipSync(readFileSync(capitalPackPath)),
     );
     database = new DatabaseSync(sqlitePath, { readOnly: true });
     const transitStopTimes = database
