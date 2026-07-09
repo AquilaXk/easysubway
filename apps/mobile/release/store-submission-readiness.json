@@ -36,7 +36,7 @@
       "category": "app-content",
       "titleKo": "Play Data safety 설문",
       "decisionOwnerKo": "개인정보/백엔드 담당",
-      "readyWhenKo": "스토어 개인정보 인벤토리의 각 데이터 타입별 collected, collection type, optional/required, purpose, linked to user, encrypted in transit, deletion support 값과 제3자 공유 없음, tracking 없음 값이 Play Console Data safety 답변과 일치한다.",
+      "readyWhenKo": "스토어 개인정보 인벤토리의 각 데이터 타입별 collected, collection type, optional/required, purpose, linked to user, encrypted in transit, deletion support 값과 외부 지도 길안내 제3자 공유 범위, tracking 없음 값이 Play Console Data safety 답변과 일치한다.",
       "evidence": ["play-console-data-safety-preview", "privacy-inventory-review"],
       "linkedArtifacts": ["apps/mobile/release/store-privacy-inventory.json", "apps/mobile/release/play-store-submission-content.json", "apps/mobile/lib/main.dart"],
       "configurationSources": ["EASYSUBWAY_PRIVACY_POLICY_URL", "EASYSUBWAY_DATA_DELETION_EMAIL"]
@@ -47,7 +47,7 @@
       "category": "store-listing",
       "titleKo": "Play 개인정보처리방침 URL",
       "decisionOwnerKo": "운영/개인정보 담당",
-      "readyWhenKo": "인증 없이 열리는 public HTTPS 개인정보처리방침 URL이 Play store listing, 앱 도움말, 공개 정책 페이지에 같은 값으로 공개되고 수집 항목, 목적, 보관, 삭제, 연락처, 제3자 공유 없음, tracking 없음, 사진/위치 선택 사용 조건을 포함한다.",
+      "readyWhenKo": "인증 없이 열리는 public HTTPS 개인정보처리방침 URL이 Play store listing, 앱 도움말, 공개 정책 페이지에 같은 값으로 공개되고 수집 항목, 목적, 보관, 삭제, 연락처, 외부 지도 길안내 제3자 공유 범위, tracking 없음, 사진/위치 선택 사용 조건을 포함한다.",
       "evidence": ["store-listing-url", "app-help-screen-url"],
       "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/release/store-privacy-inventory.json"],
       "configurationSources": ["EASYSUBWAY_PRIVACY_POLICY_URL"]
@@ -135,7 +135,7 @@
       "category": "app-content",
       "titleKo": "Play 권한 선언",
       "decisionOwnerKo": "모바일/개인정보 담당",
-      "readyWhenKo": "위치 권한은 현재 위치 기반 주변 역 탐색과 시설 신고 위치 확인 목적만 설명하고, 고위험 권한 추가가 없음을 릴리즈 매니페스트로 확인한다.",
+      "readyWhenKo": "위치 권한은 현재 위치 기반 주변 역 탐색, 시설 신고 위치 확인, 출구 도보 길안내 목적만 설명하고, 고위험 권한 추가가 없음을 릴리즈 매니페스트로 확인한다.",
       "evidence": ["release-merged-manifest", "permission-purpose-review"],
       "linkedArtifacts": ["apps/mobile/android/app/src/main/AndroidManifest.xml", "apps/mobile/lib/station_search.dart", "apps/mobile/lib/facility_report.dart"],
       "configurationSources": ["Android release manifest"]
