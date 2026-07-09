@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { promisify } from "node:util";
-import { inflateSync } from "node:zlib";
+import { gunzipSync, inflateSync } from "node:zlib";
 import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
 
 const root = process.cwd();
@@ -4843,6 +4844,33 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(realtimeArrivalSource.capabilities.realtime.status, "CANDIDATE");
   assert.equal(realtimeArrivalSource.capabilities.realtime.liveEtaEligible, false);
   assert.equal(realtimeArrivalSource.capabilities.realtime.rateLimitStatus, "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA");
+});
+
+test("앱 bundled KRIC timetable 출처 표시는 bundled capital 시간표 row와 같이 간다", async () => {
+  const inventory = readJson("apps/mobile/assets/datapacks/source-inventory.json");
+  if (!inventory.sources.some((source) => source.id === "kric-subway-timetable")) {
+    return;
+  }
+
+  const index = readJson("apps/mobile/assets/datapacks/index.json");
+  const capital = index.packs.find((pack) => pack.id === "capital");
+  assert.ok(capital, "capital bundled datapack must exist");
+  const sqliteBytes = gunzipSync(readFileSync(path.join(root, "apps/mobile", capital.asset)));
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-bundled-kric-schedule-"));
+  const sqlitePath = path.join(outputDir, "capital.sqlite");
+  await writeFile(sqlitePath, sqliteBytes);
+
+  const database = new DatabaseSync(sqlitePath, { readOnly: true });
+  try {
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendars").get().count, 2);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_routes").get().count, 2);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_trips").get().count, 466);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_stop_times").get().count, 932);
+    assert.equal(database.prepare("SELECT feed_end_date FROM transit_feed_info").get().feed_end_date, "20261231");
+  } finally {
+    database.close();
+    await rm(outputDir, { recursive: true, force: true });
+  }
 });
 
 test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준을 고정한다", () => {

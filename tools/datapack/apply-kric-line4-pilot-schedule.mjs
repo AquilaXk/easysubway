@@ -200,6 +200,8 @@ function validateArtifact(artifact) {
   if (!Array.isArray(artifact.transitTrips) || !Array.isArray(artifact.transitStopTimes)) {
     throw new Error("KRIC pilot artifact missing transit rows");
   }
+  requireEqual(artifact.transitTrips.length, EXPECTED_TRANSIT_TRIP_COUNT, "transitTrips.length");
+  requireEqual(artifact.transitStopTimes.length, EXPECTED_TRANSIT_STOP_TIME_COUNT, "transitStopTimes.length");
 }
 
 function requireEqual(actual, expected, field) {
