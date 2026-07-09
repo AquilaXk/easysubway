@@ -207,7 +207,8 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
         ...database
           .prepare(
             `
-            SELECT latitude, longitude, has_elevator_connection, data_source_type, last_verified_at
+            SELECT latitude, longitude, has_elevator_connection, data_source_type, last_verified_at,
+                   source_id, source_snapshot_id
             FROM station_exits
             WHERE id = 'exit-sangnoksu-1'
             `,
@@ -220,6 +221,8 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
         has_elevator_connection: 1,
         data_source_type: "OFFICIAL_FILE",
         last_verified_at: 1781827200,
+        source_id: "fixture-capital-catalog",
+        source_snapshot_id: "fixture-capital-catalog-20260619",
       },
     );
     assert.deepEqual(

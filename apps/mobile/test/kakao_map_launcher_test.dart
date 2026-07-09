@@ -63,6 +63,30 @@ void main() {
     expect(copiedTexts, ['상록수역 1번 출구 37.3021, 126.8661']);
   });
 
+  test('앱 URI 실패 후 웹 URI 성공 시 web 결과를 반환한다', () async {
+    final openedUris = <Uri>[];
+    final copiedTexts = <String>[];
+    final launcher = UrlLauncherKakaoMapLauncher(
+      openExternal: (uri) async {
+        openedUris.add(uri);
+        return uri.scheme == 'https';
+      },
+      copyText: (text) async => copiedTexts.add(text),
+    );
+
+    final result = await launcher.openLook(
+      const KakaoMapTarget(
+        label: '상록수역 1번 출구',
+        latitude: 37.3021,
+        longitude: 126.8661,
+      ),
+    );
+
+    expect(result, KakaoMapLaunchResult.web);
+    expect(openedUris.map((uri) => uri.scheme), ['kakaomap', 'https']);
+    expect(copiedTexts, isEmpty);
+  });
+
   test('지도 열기 예외도 좌표 복사 fallback으로 처리한다', () async {
     final copiedTexts = <String>[];
     final launcher = UrlLauncherKakaoMapLauncher(

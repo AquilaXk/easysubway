@@ -645,7 +645,12 @@ class StationExitInfo {
       _fieldVerificationStatusLabel(fieldValidationStatus);
 
   String get semanticLabel {
-    return '$name, $elevatorConnectionLabel, $stairPathLabel';
+    final parts = <String>[name, elevatorConnectionLabel, stairPathLabel];
+    final verifiedAt = lastVerifiedAt.trim();
+    if (verifiedAt.isNotEmpty) {
+      parts.add('최근 확인 ${stationVerifiedRelativeLabel(verifiedAt)}');
+    }
+    return parts.join(', ');
   }
 }
 
@@ -4129,13 +4134,16 @@ class _StationExitCard extends StatelessWidget {
                 container: true,
                 button: true,
                 label: '${exit.name} 카카오맵에서 보기, 새 앱이 열립니다',
+                onTap: () => _openExitMap(context),
                 child: SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
-                    key: Key('stationExitMapButton-${exit.id}'),
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('카카오맵에서 보기'),
-                    onPressed: () => _openExitMap(context),
+                  child: ExcludeSemantics(
+                    child: OutlinedButton.icon(
+                      key: Key('stationExitMapButton-${exit.id}'),
+                      icon: const Icon(Icons.map_outlined),
+                      label: const Text('카카오맵에서 보기'),
+                      onPressed: () => _openExitMap(context),
+                    ),
                   ),
                 ),
               ),
