@@ -198,7 +198,7 @@ function validateArtifact(artifact) {
   requireEqual(artifact.transitTripCount, EXPECTED_TRANSIT_TRIP_COUNT, "transitTripCount");
   requireEqual(artifact.transitStopTimeCount, EXPECTED_TRANSIT_STOP_TIME_COUNT, "transitStopTimeCount");
   if (!Array.isArray(artifact.transitTrips) || !Array.isArray(artifact.transitStopTimes)) {
-    throw new Error("KRIC pilot artifact missing transit rows");
+    throw new TypeError("KRIC pilot artifact missing transit rows");
   }
   requireEqual(artifact.transitTrips.length, EXPECTED_TRANSIT_TRIP_COUNT, "transitTrips.length");
   requireEqual(artifact.transitStopTimes.length, EXPECTED_TRANSIT_STOP_TIME_COUNT, "transitStopTimes.length");

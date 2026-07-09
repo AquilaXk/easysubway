@@ -435,7 +435,9 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
       tripOperatorIds.get(frequency.tripId) ?? [],
     );
   }
-  const scheduleOperatorIds = [...new Set([...transitRouteOperatorIds.values()].flat())].sort();
+  const scheduleOperatorIds = [...new Set([...transitRouteOperatorIds.values()].flat())].sort((left, right) =>
+    left.localeCompare(right),
+  );
   for (const feedInfo of pack.transitFeedInfo ?? []) {
     addRecord(feedInfo, "transit_feed_info", "feed_info", "feed_info", scheduleOperatorIds);
   }
