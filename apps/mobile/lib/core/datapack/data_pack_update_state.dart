@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
@@ -19,6 +20,7 @@ class DataPackUpdateStateRepository {
   static const _acceptedHashPrefix = 'datapack_manifest_accepted_hash_';
   static const _acceptedAtPrefix = 'datapack_manifest_accepted_at_ms_';
   static const _rolloutSaltKey = 'datapack_rollout_salt';
+  static const _policyStateKey = 'datapack_update_policy_state';
 
   final user_db.UserDatabase userDatabase;
   final DateTime Function() _now;
@@ -221,6 +223,26 @@ class DataPackUpdateStateRepository {
     return salt;
   }
 
+  Future<DataPackUpdatePolicyState> readPolicyState() async {
+    final raw = await _readValue(_policyStateKey);
+    if (raw == null || raw.isEmpty) {
+      return const DataPackUpdatePolicyState();
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, Object?>) {
+        return DataPackUpdatePolicyState.fromJson(decoded);
+      }
+    } on FormatException {
+      // Corrupt local policy state should not block offline data use.
+    }
+    return const DataPackUpdatePolicyState();
+  }
+
+  Future<void> savePolicyState(DataPackUpdatePolicyState state) async {
+    await _put(_policyStateKey, jsonEncode(state.toJson()), _now());
+  }
+
   Future<void> _put(String key, String value, DateTime updatedAt) async {
     await userDatabase
         .into(userDatabase.dataPackUpdateState)
@@ -271,6 +293,67 @@ class DataPackAcceptedManifestState {
   final DateTime acceptedAt;
 }
 
+class DataPackUpdatePolicyState {
+  const DataPackUpdatePolicyState({
+    this.lastCheckAt,
+    this.backoffUntil,
+    this.backoffAttempts = 0,
+    this.pendingConsentBytes,
+    this.lastFailureReason,
+  });
+
+  factory DataPackUpdatePolicyState.fromJson(Map<String, Object?> json) {
+    return DataPackUpdatePolicyState(
+      lastCheckAt: _dateFromMs(json['lastCheckAtMs']),
+      backoffUntil: _dateFromMs(json['backoffUntilMs']),
+      backoffAttempts: _nonNegativeInt(json['backoffAttempts']),
+      pendingConsentBytes: _positiveIntOrNull(json['pendingConsentBytes']),
+      lastFailureReason: _stringOrNull(json['lastFailureReason']),
+    );
+  }
+
+  final DateTime? lastCheckAt;
+  final DateTime? backoffUntil;
+  final int backoffAttempts;
+  final int? pendingConsentBytes;
+  final String? lastFailureReason;
+
+  Map<String, Object?> toJson() => {
+    if (lastCheckAt != null)
+      'lastCheckAtMs': lastCheckAt!.toUtc().millisecondsSinceEpoch,
+    if (backoffUntil != null)
+      'backoffUntilMs': backoffUntil!.toUtc().millisecondsSinceEpoch,
+    'backoffAttempts': backoffAttempts,
+    if (pendingConsentBytes != null) 'pendingConsentBytes': pendingConsentBytes,
+    if (lastFailureReason != null) 'lastFailureReason': lastFailureReason,
+  };
+
+  DataPackUpdatePolicyState copyWith({
+    DateTime? lastCheckAt,
+    DateTime? backoffUntil,
+    int? backoffAttempts,
+    int? pendingConsentBytes,
+    String? lastFailureReason,
+    bool clearBackoff = false,
+    bool clearPendingConsent = false,
+    bool clearLastFailure = false,
+  }) {
+    return DataPackUpdatePolicyState(
+      lastCheckAt: lastCheckAt ?? this.lastCheckAt,
+      backoffUntil: clearBackoff ? null : backoffUntil ?? this.backoffUntil,
+      backoffAttempts: clearBackoff
+          ? 0
+          : backoffAttempts ?? this.backoffAttempts,
+      pendingConsentBytes: clearPendingConsent
+          ? null
+          : pendingConsentBytes ?? this.pendingConsentBytes,
+      lastFailureReason: clearLastFailure
+          ? null
+          : lastFailureReason ?? this.lastFailureReason,
+    );
+  }
+}
+
 class DataPackManifestReplayException implements Exception {
   const DataPackManifestReplayException(this.message);
 
@@ -278,4 +361,24 @@ class DataPackManifestReplayException implements Exception {
 
   @override
   String toString() => message;
+}
+
+DateTime? _dateFromMs(Object? value) {
+  if (value is! int) return null;
+  return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+}
+
+int _nonNegativeInt(Object? value) {
+  if (value is int && value > 0) return value;
+  return 0;
+}
+
+int? _positiveIntOrNull(Object? value) {
+  if (value is int && value > 0) return value;
+  return null;
+}
+
+String? _stringOrNull(Object? value) {
+  if (value is String && value.isNotEmpty) return value;
+  return null;
 }

@@ -9,6 +9,7 @@ import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
+import 'package:easysubway_mobile/core/datapack/data_pack_updater.dart';
 import 'package:easysubway_mobile/core/datapack/emergency_override_repository.dart';
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
@@ -37,6 +38,27 @@ void main() {
 
     await closeCalled.future;
     expect(closeCalled.isCompleted, isTrue);
+  });
+
+  testWidgets('앱 lifecycle은 resumed에서 데이터팩 foreground update를 요청한다', (
+    tester,
+  ) async {
+    final resumeCalled = Completer<void>();
+
+    await tester.pumpWidget(
+      AppBootstrapLifecycle(
+        close: () => Future<void>.value(),
+        resumeDataPackUpdate: () {
+          resumeCalled.complete();
+          return Future<void>.value();
+        },
+        child: const SizedBox.shrink(),
+      ),
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+    await resumeCalled.future.timeout(const Duration(seconds: 5));
+    expect(resumeCalled.isCompleted, isTrue);
   });
 
   test('catalog DB는 앱 시작에 필요한 schema와 index를 만든다', () async {
@@ -827,7 +849,11 @@ void main() {
       databaseDirectory: directory,
       assetBundle: rootBundle,
       dataPackUpdateRunner:
-          ({required supportDirectory, required userDatabase}) async {
+          ({
+            required supportDirectory,
+            required userDatabase,
+            required trigger,
+          }) async {
             updateStarted.complete();
             await finishUpdate.future;
             await File('${catalogDirectory.path}/current.json').writeAsString(
@@ -853,6 +879,34 @@ void main() {
 
     expect(metadata.read<String>('value'), '1');
     finishUpdate.complete();
+  });
+
+  test('앱 부트스트랩은 시작과 resume 데이터팩 update trigger를 구분한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-bootstrap-update-trigger-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final triggers = <UpdateTrigger>[];
+
+    AppBootstrap? bootstrap;
+    addTearDown(() => bootstrap?.close());
+    bootstrap = await AppBootstrap.initialize(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      dataPackUpdateRunner:
+          ({
+            required supportDirectory,
+            required userDatabase,
+            required trigger,
+          }) async {
+            triggers.add(trigger);
+          },
+      enablePushNotifications: false,
+    );
+    await bootstrap.dataPackUpdate;
+    await bootstrap.resumeDataPackUpdate();
+
+    expect(triggers, [UpdateTrigger.appStart, UpdateTrigger.foregroundResume]);
   });
 
   test(
@@ -1127,7 +1181,11 @@ void main() {
         databaseDirectory: directory,
         assetBundle: rootBundle,
         dataPackUpdateRunner:
-            ({required supportDirectory, required userDatabase}) async {
+            ({
+              required supportDirectory,
+              required userDatabase,
+              required trigger,
+            }) async {
               throw const SocketException('manifest unavailable');
             },
         enablePushNotifications: false,
