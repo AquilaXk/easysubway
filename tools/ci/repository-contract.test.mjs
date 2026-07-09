@@ -3982,15 +3982,28 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(executorDryRunIndex > preflightIndex, "workflow must validate publish executor after plan creation");
   assert.ok(remotePublishIndex > executorDryRunIndex, "workflow must publish remotely after dry-run validation");
   const requireProductionIndex = workflow.indexOf("--require-production", remotePublishIndex);
+  const publicCatalogUserVersionGateIndex = workflow.indexOf(
+    "--max-public-catalog-user-version 14",
+    remotePublishIndex,
+  );
   const publishObjectStorageIndex = workflow.indexOf("publish-object-storage.mjs", remotePublishIndex);
   assert.notStrictEqual(
     requireProductionIndex,
     -1,
     "workflow must enable --require-production in the remote publish block",
   );
+  assert.notStrictEqual(
+    publicCatalogUserVersionGateIndex,
+    -1,
+    "workflow must enforce public catalog user_version compatibility before remote publish",
+  );
   assert.ok(
     requireProductionIndex < publishObjectStorageIndex,
     "workflow must reject fixture packs before remote publish",
+  );
+  assert.ok(
+    publicCatalogUserVersionGateIndex < publishObjectStorageIndex,
+    "workflow must reject incompatible catalog user_version before remote publish",
   );
   assert.ok(artifactIndex > remotePublishIndex, "workflow must keep artifact upload after remote publish attempt");
   assert.match(workflow, /name: easysubway-datapacks-\$\{\{ github\.sha \}\}/);
@@ -4462,7 +4475,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 14/);
+  assert.match(schema, /PRAGMA user_version = 15/);
   assert.match(schema, /CREATE TABLE stations/);
   assert.match(schema, /CREATE TABLE transit_feed_info/);
   assert.match(schema, /CREATE TABLE station_facility_evidence/);
@@ -5344,7 +5357,8 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class FareZones extends Table/);
   assert.match(mobileTables, /class StationFareZones extends Table/);
   assert.match(mobileTables, /class FacilityStatusSnapshots extends Table/);
-  assert.match(mobileDatabase, /int get schemaVersion => 14/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 15/);
+  assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
   assert.match(mobileDatabase, /_createStationPathwayIndexes/);
   assert.match(mobileDatabase, /_createFacilityStatusSnapshotIndexes/);
@@ -5359,7 +5373,8 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /int get schemaVersion => 14/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 15/);
+  assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /FacilityStatusSnapshots/);
   assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);

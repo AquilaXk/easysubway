@@ -8911,12 +8911,104 @@ class $StationExitsTable extends StationExits
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _latitudeMeta = const VerificationMeta(
+    'latitude',
+  );
+  @override
+  late final GeneratedColumn<double> latitude = GeneratedColumn<double>(
+    'latitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _longitudeMeta = const VerificationMeta(
+    'longitude',
+  );
+  @override
+  late final GeneratedColumn<double> longitude = GeneratedColumn<double>(
+    'longitude',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hasElevatorConnectionMeta =
+      const VerificationMeta('hasElevatorConnection');
+  @override
+  late final GeneratedColumn<bool> hasElevatorConnection =
+      GeneratedColumn<bool>(
+        'has_elevator_connection',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("has_elevator_connection" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _dataSourceTypeMeta = const VerificationMeta(
+    'dataSourceType',
+  );
+  @override
+  late final GeneratedColumn<String> dataSourceType = GeneratedColumn<String>(
+    'data_source_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('OFFICIAL_FILE'),
+  );
+  static const VerificationMeta _lastVerifiedAtMeta = const VerificationMeta(
+    'lastVerifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastVerifiedAt =
+      GeneratedColumn<DateTime>(
+        'last_verified_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     stationId,
     exitNumber,
     description,
+    latitude,
+    longitude,
+    hasElevatorConnection,
+    sourceId,
+    sourceSnapshotId,
+    dataSourceType,
+    lastVerifiedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -8960,6 +9052,60 @@ class $StationExitsTable extends StationExits
         ),
       );
     }
+    if (data.containsKey('latitude')) {
+      context.handle(
+        _latitudeMeta,
+        latitude.isAcceptableOrUnknown(data['latitude']!, _latitudeMeta),
+      );
+    }
+    if (data.containsKey('longitude')) {
+      context.handle(
+        _longitudeMeta,
+        longitude.isAcceptableOrUnknown(data['longitude']!, _longitudeMeta),
+      );
+    }
+    if (data.containsKey('has_elevator_connection')) {
+      context.handle(
+        _hasElevatorConnectionMeta,
+        hasElevatorConnection.isAcceptableOrUnknown(
+          data['has_elevator_connection']!,
+          _hasElevatorConnectionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('data_source_type')) {
+      context.handle(
+        _dataSourceTypeMeta,
+        dataSourceType.isAcceptableOrUnknown(
+          data['data_source_type']!,
+          _dataSourceTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_verified_at')) {
+      context.handle(
+        _lastVerifiedAtMeta,
+        lastVerifiedAt.isAcceptableOrUnknown(
+          data['last_verified_at']!,
+          _lastVerifiedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -8985,6 +9131,34 @@ class $StationExitsTable extends StationExits
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       )!,
+      latitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}latitude'],
+      ),
+      longitude: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}longitude'],
+      ),
+      hasElevatorConnection: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_elevator_connection'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
+      dataSourceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}data_source_type'],
+      )!,
+      lastVerifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_verified_at'],
+      ),
     );
   }
 
@@ -8999,11 +9173,25 @@ class StationExit extends DataClass implements Insertable<StationExit> {
   final String stationId;
   final String exitNumber;
   final String description;
+  final double? latitude;
+  final double? longitude;
+  final bool hasElevatorConnection;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String dataSourceType;
+  final DateTime? lastVerifiedAt;
   const StationExit({
     required this.id,
     required this.stationId,
     required this.exitNumber,
     required this.description,
+    this.latitude,
+    this.longitude,
+    required this.hasElevatorConnection,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.dataSourceType,
+    this.lastVerifiedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -9012,6 +9200,19 @@ class StationExit extends DataClass implements Insertable<StationExit> {
     map['station_id'] = Variable<String>(stationId);
     map['exit_number'] = Variable<String>(exitNumber);
     map['description'] = Variable<String>(description);
+    if (!nullToAbsent || latitude != null) {
+      map['latitude'] = Variable<double>(latitude);
+    }
+    if (!nullToAbsent || longitude != null) {
+      map['longitude'] = Variable<double>(longitude);
+    }
+    map['has_elevator_connection'] = Variable<bool>(hasElevatorConnection);
+    map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
+    map['data_source_type'] = Variable<String>(dataSourceType);
+    if (!nullToAbsent || lastVerifiedAt != null) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
+    }
     return map;
   }
 
@@ -9021,6 +9222,19 @@ class StationExit extends DataClass implements Insertable<StationExit> {
       stationId: Value(stationId),
       exitNumber: Value(exitNumber),
       description: Value(description),
+      latitude: latitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(latitude),
+      longitude: longitude == null && nullToAbsent
+          ? const Value.absent()
+          : Value(longitude),
+      hasElevatorConnection: Value(hasElevatorConnection),
+      sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
+      dataSourceType: Value(dataSourceType),
+      lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastVerifiedAt),
     );
   }
 
@@ -9034,6 +9248,15 @@ class StationExit extends DataClass implements Insertable<StationExit> {
       stationId: serializer.fromJson<String>(json['stationId']),
       exitNumber: serializer.fromJson<String>(json['exitNumber']),
       description: serializer.fromJson<String>(json['description']),
+      latitude: serializer.fromJson<double?>(json['latitude']),
+      longitude: serializer.fromJson<double?>(json['longitude']),
+      hasElevatorConnection: serializer.fromJson<bool>(
+        json['hasElevatorConnection'],
+      ),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
+      dataSourceType: serializer.fromJson<String>(json['dataSourceType']),
+      lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
     );
   }
   @override
@@ -9044,6 +9267,13 @@ class StationExit extends DataClass implements Insertable<StationExit> {
       'stationId': serializer.toJson<String>(stationId),
       'exitNumber': serializer.toJson<String>(exitNumber),
       'description': serializer.toJson<String>(description),
+      'latitude': serializer.toJson<double?>(latitude),
+      'longitude': serializer.toJson<double?>(longitude),
+      'hasElevatorConnection': serializer.toJson<bool>(hasElevatorConnection),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
+      'dataSourceType': serializer.toJson<String>(dataSourceType),
+      'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
     };
   }
 
@@ -9052,11 +9282,27 @@ class StationExit extends DataClass implements Insertable<StationExit> {
     String? stationId,
     String? exitNumber,
     String? description,
+    Value<double?> latitude = const Value.absent(),
+    Value<double?> longitude = const Value.absent(),
+    bool? hasElevatorConnection,
+    String? sourceId,
+    String? sourceSnapshotId,
+    String? dataSourceType,
+    Value<DateTime?> lastVerifiedAt = const Value.absent(),
   }) => StationExit(
     id: id ?? this.id,
     stationId: stationId ?? this.stationId,
     exitNumber: exitNumber ?? this.exitNumber,
     description: description ?? this.description,
+    latitude: latitude.present ? latitude.value : this.latitude,
+    longitude: longitude.present ? longitude.value : this.longitude,
+    hasElevatorConnection: hasElevatorConnection ?? this.hasElevatorConnection,
+    sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+    dataSourceType: dataSourceType ?? this.dataSourceType,
+    lastVerifiedAt: lastVerifiedAt.present
+        ? lastVerifiedAt.value
+        : this.lastVerifiedAt,
   );
   StationExit copyWithCompanion(StationExitsCompanion data) {
     return StationExit(
@@ -9068,6 +9314,21 @@ class StationExit extends DataClass implements Insertable<StationExit> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      latitude: data.latitude.present ? data.latitude.value : this.latitude,
+      longitude: data.longitude.present ? data.longitude.value : this.longitude,
+      hasElevatorConnection: data.hasElevatorConnection.present
+          ? data.hasElevatorConnection.value
+          : this.hasElevatorConnection,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
+      dataSourceType: data.dataSourceType.present
+          ? data.dataSourceType.value
+          : this.dataSourceType,
+      lastVerifiedAt: data.lastVerifiedAt.present
+          ? data.lastVerifiedAt.value
+          : this.lastVerifiedAt,
     );
   }
 
@@ -9077,13 +9338,32 @@ class StationExit extends DataClass implements Insertable<StationExit> {
           ..write('id: $id, ')
           ..write('stationId: $stationId, ')
           ..write('exitNumber: $exitNumber, ')
-          ..write('description: $description')
+          ..write('description: $description, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('hasElevatorConnection: $hasElevatorConnection, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('dataSourceType: $dataSourceType, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, stationId, exitNumber, description);
+  int get hashCode => Object.hash(
+    id,
+    stationId,
+    exitNumber,
+    description,
+    latitude,
+    longitude,
+    hasElevatorConnection,
+    sourceId,
+    sourceSnapshotId,
+    dataSourceType,
+    lastVerifiedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -9091,7 +9371,14 @@ class StationExit extends DataClass implements Insertable<StationExit> {
           other.id == this.id &&
           other.stationId == this.stationId &&
           other.exitNumber == this.exitNumber &&
-          other.description == this.description);
+          other.description == this.description &&
+          other.latitude == this.latitude &&
+          other.longitude == this.longitude &&
+          other.hasElevatorConnection == this.hasElevatorConnection &&
+          other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
+          other.dataSourceType == this.dataSourceType &&
+          other.lastVerifiedAt == this.lastVerifiedAt);
 }
 
 class StationExitsCompanion extends UpdateCompanion<StationExit> {
@@ -9099,12 +9386,26 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
   final Value<String> stationId;
   final Value<String> exitNumber;
   final Value<String> description;
+  final Value<double?> latitude;
+  final Value<double?> longitude;
+  final Value<bool> hasElevatorConnection;
+  final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
+  final Value<String> dataSourceType;
+  final Value<DateTime?> lastVerifiedAt;
   final Value<int> rowid;
   const StationExitsCompanion({
     this.id = const Value.absent(),
     this.stationId = const Value.absent(),
     this.exitNumber = const Value.absent(),
     this.description = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
+    this.hasElevatorConnection = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.dataSourceType = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   StationExitsCompanion.insert({
@@ -9112,6 +9413,13 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
     required String stationId,
     required String exitNumber,
     this.description = const Value.absent(),
+    this.latitude = const Value.absent(),
+    this.longitude = const Value.absent(),
+    this.hasElevatorConnection = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.dataSourceType = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        stationId = Value(stationId),
@@ -9121,6 +9429,13 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
     Expression<String>? stationId,
     Expression<String>? exitNumber,
     Expression<String>? description,
+    Expression<double>? latitude,
+    Expression<double>? longitude,
+    Expression<bool>? hasElevatorConnection,
+    Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
+    Expression<String>? dataSourceType,
+    Expression<DateTime>? lastVerifiedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -9128,6 +9443,14 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
       if (stationId != null) 'station_id': stationId,
       if (exitNumber != null) 'exit_number': exitNumber,
       if (description != null) 'description': description,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
+      if (hasElevatorConnection != null)
+        'has_elevator_connection': hasElevatorConnection,
+      if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
+      if (dataSourceType != null) 'data_source_type': dataSourceType,
+      if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -9137,6 +9460,13 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
     Value<String>? stationId,
     Value<String>? exitNumber,
     Value<String>? description,
+    Value<double?>? latitude,
+    Value<double?>? longitude,
+    Value<bool>? hasElevatorConnection,
+    Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
+    Value<String>? dataSourceType,
+    Value<DateTime?>? lastVerifiedAt,
     Value<int>? rowid,
   }) {
     return StationExitsCompanion(
@@ -9144,6 +9474,14 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
       stationId: stationId ?? this.stationId,
       exitNumber: exitNumber ?? this.exitNumber,
       description: description ?? this.description,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      hasElevatorConnection:
+          hasElevatorConnection ?? this.hasElevatorConnection,
+      sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+      dataSourceType: dataSourceType ?? this.dataSourceType,
+      lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -9163,6 +9501,29 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (latitude.present) {
+      map['latitude'] = Variable<double>(latitude.value);
+    }
+    if (longitude.present) {
+      map['longitude'] = Variable<double>(longitude.value);
+    }
+    if (hasElevatorConnection.present) {
+      map['has_elevator_connection'] = Variable<bool>(
+        hasElevatorConnection.value,
+      );
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
+    if (dataSourceType.present) {
+      map['data_source_type'] = Variable<String>(dataSourceType.value);
+    }
+    if (lastVerifiedAt.present) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -9176,6 +9537,13 @@ class StationExitsCompanion extends UpdateCompanion<StationExit> {
           ..write('stationId: $stationId, ')
           ..write('exitNumber: $exitNumber, ')
           ..write('description: $description, ')
+          ..write('latitude: $latitude, ')
+          ..write('longitude: $longitude, ')
+          ..write('hasElevatorConnection: $hasElevatorConnection, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('dataSourceType: $dataSourceType, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -21915,6 +22283,13 @@ typedef $$StationExitsTableCreateCompanionBuilder =
       required String stationId,
       required String exitNumber,
       Value<String> description,
+      Value<double?> latitude,
+      Value<double?> longitude,
+      Value<bool> hasElevatorConnection,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> dataSourceType,
+      Value<DateTime?> lastVerifiedAt,
       Value<int> rowid,
     });
 typedef $$StationExitsTableUpdateCompanionBuilder =
@@ -21923,6 +22298,13 @@ typedef $$StationExitsTableUpdateCompanionBuilder =
       Value<String> stationId,
       Value<String> exitNumber,
       Value<String> description,
+      Value<double?> latitude,
+      Value<double?> longitude,
+      Value<bool> hasElevatorConnection,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> dataSourceType,
+      Value<DateTime?> lastVerifiedAt,
       Value<int> rowid,
     });
 
@@ -21952,6 +22334,41 @@ class $$StationExitsTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasElevatorConnection => $composableBuilder(
+    column: $table.hasElevatorConnection,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dataSourceType => $composableBuilder(
+    column: $table.dataSourceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -21984,6 +22401,41 @@ class $$StationExitsTableOrderingComposer
     column: $table.description,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get latitude => $composableBuilder(
+    column: $table.latitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get longitude => $composableBuilder(
+    column: $table.longitude,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get hasElevatorConnection => $composableBuilder(
+    column: $table.hasElevatorConnection,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dataSourceType => $composableBuilder(
+    column: $table.dataSourceType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$StationExitsTableAnnotationComposer
@@ -22008,6 +22460,35 @@ class $$StationExitsTableAnnotationComposer
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get latitude =>
+      $composableBuilder(column: $table.latitude, builder: (column) => column);
+
+  GeneratedColumn<double> get longitude =>
+      $composableBuilder(column: $table.longitude, builder: (column) => column);
+
+  GeneratedColumn<bool> get hasElevatorConnection => $composableBuilder(
+    column: $table.hasElevatorConnection,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get dataSourceType => $composableBuilder(
+    column: $table.dataSourceType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
     builder: (column) => column,
   );
 }
@@ -22049,12 +22530,26 @@ class $$StationExitsTableTableManager
                 Value<String> stationId = const Value.absent(),
                 Value<String> exitNumber = const Value.absent(),
                 Value<String> description = const Value.absent(),
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
+                Value<bool> hasElevatorConnection = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> dataSourceType = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StationExitsCompanion(
                 id: id,
                 stationId: stationId,
                 exitNumber: exitNumber,
                 description: description,
+                latitude: latitude,
+                longitude: longitude,
+                hasElevatorConnection: hasElevatorConnection,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                dataSourceType: dataSourceType,
+                lastVerifiedAt: lastVerifiedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -22063,12 +22558,26 @@ class $$StationExitsTableTableManager
                 required String stationId,
                 required String exitNumber,
                 Value<String> description = const Value.absent(),
+                Value<double?> latitude = const Value.absent(),
+                Value<double?> longitude = const Value.absent(),
+                Value<bool> hasElevatorConnection = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> dataSourceType = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StationExitsCompanion.insert(
                 id: id,
                 stationId: stationId,
                 exitNumber: exitNumber,
                 description: description,
+                latitude: latitude,
+                longitude: longitude,
+                hasElevatorConnection: hasElevatorConnection,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                dataSourceType: dataSourceType,
+                lastVerifiedAt: lastVerifiedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

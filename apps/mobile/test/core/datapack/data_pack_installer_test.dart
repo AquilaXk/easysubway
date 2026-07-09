@@ -210,6 +210,44 @@ void main() {
     );
   });
 
+  test('installer는 앱 catalog schema보다 높은 user_version pack을 거부한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-future-user-version-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final sqliteBytes = await _legacySchema1CatalogSqliteBytes(
+      directory,
+      userVersion: catalogDatabaseSchemaVersion + 1,
+    );
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final installer = DataPackInstaller(
+      catalogDirectory: Directory('${directory.path}/catalog'),
+      userDatabase: userDatabase,
+    );
+
+    final result = await installer.install(
+      pack: _pack(
+        version: '21',
+        sha256: sha256.convert(compressedBytes).toString(),
+        sqliteSha256: sha256.convert(sqliteBytes).toString(),
+        sizeBytes: compressedBytes.length,
+      ),
+      compressedBytes: compressedBytes,
+    );
+
+    expect(result.status, DataPackInstallStatus.rejected);
+    expect(
+      result.reason,
+      DataPackInstallRejectionReason.unsupportedCatalogUserVersion,
+    );
+    expect(
+      await File('${directory.path}/catalog/capital-v21.sqlite').exists(),
+      isFalse,
+    );
+  });
+
   test('installer는 legacy manifest에 sizeBytes가 없으면 길이 검사를 건너뛴다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-datapack-legacy-size-',
@@ -495,11 +533,14 @@ Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {
   return file.readAsBytes();
 }
 
-Future<List<int>> _legacySchema1CatalogSqliteBytes(Directory directory) async {
+Future<List<int>> _legacySchema1CatalogSqliteBytes(
+  Directory directory, {
+  int userVersion = 1,
+}) async {
   final file = File('${directory.path}/legacy-v1.sqlite');
   final database = sqlite.sqlite3.open(file.path);
   try {
-    database.execute('PRAGMA user_version = 1');
+    database.execute('PRAGMA user_version = $userVersion');
     database.execute('''
       CREATE TABLE catalog_metadata (
         key TEXT PRIMARY KEY,

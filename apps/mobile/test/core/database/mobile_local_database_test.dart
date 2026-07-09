@@ -134,7 +134,8 @@ void main() {
           ORDER BY alias
           ''').get();
     final exits = await database.customSelect('''
-          SELECT exit_number
+          SELECT exit_number, latitude, longitude, has_elevator_connection,
+                 data_source_type, last_verified_at
           FROM station_exits
           WHERE station_id = 'station-sangnoksu'
           ''').get();
@@ -216,6 +217,11 @@ void main() {
       '상록수역',
     ]);
     expect(exits.single.read<String>('exit_number'), '1');
+    expect(exits.single.read<double>('latitude'), closeTo(37.3021, 0.0001));
+    expect(exits.single.read<double>('longitude'), closeTo(126.8661, 0.0001));
+    expect(exits.single.read<int>('has_elevator_connection'), 1);
+    expect(exits.single.read<String>('data_source_type'), 'OFFICIAL_FILE');
+    expect(exits.single.read<int>('last_verified_at'), 1781827200);
     expect(facilities.map((row) => row.read<String>('type')).toSet(), {
       'ACCESSIBLE_TOILET',
       'ELEVATOR',

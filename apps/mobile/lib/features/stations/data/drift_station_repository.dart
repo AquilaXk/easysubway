@@ -141,7 +141,10 @@ class DriftStationRepository
             e.station_id,
             e.exit_number,
             e.description,
-            s.data_source_type,
+            e.latitude,
+            e.longitude,
+            e.data_source_type,
+            CAST(e.last_verified_at AS INTEGER) AS exit_last_verified_at,
             (
               SELECT q.quality_level
               FROM data_quality_records q
@@ -158,14 +161,17 @@ class DriftStationRepository
               ORDER BY q.checked_at IS NULL, q.checked_at DESC, q.id DESC
               LIMIT 1
             ) AS field_checked_at_value,
-            EXISTS(
-              SELECT 1
-              FROM facilities f
-              WHERE f.exit_id = e.id
-                AND UPPER(f.type) = 'ELEVATOR'
-            ) AS has_elevator_connection
+            CASE
+              WHEN e.has_elevator_connection = 1 OR EXISTS(
+                SELECT 1
+                FROM facilities f
+                WHERE f.exit_id = e.id
+                  AND UPPER(f.type) = 'ELEVATOR'
+              )
+              THEN 1
+              ELSE 0
+            END AS has_elevator_connection
           FROM station_exits e
-          JOIN stations s ON s.id = e.station_id
           WHERE e.station_id = ?
           ORDER BY CAST(e.exit_number AS INTEGER), e.exit_number
           ''',
@@ -180,6 +186,8 @@ class DriftStationRepository
             stationId: row.read<String>('station_id'),
             exitNumber: row.read<String>('exit_number'),
             name: '${row.read<String>('exit_number')}번 출구',
+            latitude: row.read<double?>('latitude'),
+            longitude: row.read<double?>('longitude'),
             hasElevatorConnection:
                 row.read<int>('has_elevator_connection') == 1,
             hasStairOnlyPath: false,
@@ -191,6 +199,9 @@ class DriftStationRepository
             fieldValidationStatus: _fieldValidationStatus(
               row.read<String?>('field_quality_level'),
               row.read<int?>('field_checked_at_value'),
+            ),
+            lastVerifiedAt: _dateLabelFromEpoch(
+              row.read<int?>('exit_last_verified_at'),
             ),
           ),
         )
