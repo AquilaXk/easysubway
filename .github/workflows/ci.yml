@@ -139,6 +139,7 @@ jobs:
     name: Admin QA Gates
     runs-on: ubuntu-latest
     needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
     permissions:
       contents: read
 

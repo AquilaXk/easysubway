@@ -633,6 +633,7 @@ test("지속적 통합은 README 외 Markdown과 로컬 에이전트 문서 추�
 test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수 있게 표시된다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const releaseGateJob = jobBlock(workflow, "release-gate-consistency", "repository-contracts");
+  const adminQaJob = jobBlock(workflow, "admin-qa-gates", "repository-contracts");
 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /pull_request:[\s\S]*types:[\s\S]*- edited/);
@@ -643,6 +644,7 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.match(workflow, /Use '\[Type\] 한국어 작업 요약' format\./);
   assert.match(workflow, /name: Repository CI/);
   assert.match(workflow, /name: Admin QA Gates/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.docs_only != 'true'/);
   assert.match(workflow, /name: Backend CI/);
   assert.match(workflow, /name: Mobile App CI/);
   assert.match(workflow, /name: Android CI/);

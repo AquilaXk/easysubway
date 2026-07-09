@@ -16,7 +16,7 @@ export function checkAdminVendorIntegrity(root = defaultRoot) {
   ];
   const failures = [];
   const vendorFiles = vendorManifestFiles(vendorRoot);
-  const scriptRefs = scriptReferences(templateRoots);
+  const scriptRefs = templateReferences(templateRoots);
   const refsBySrc = new Map();
   for (const ref of scriptRefs) {
     const refs = refsBySrc.get(ref.src) ?? [];
@@ -105,7 +105,7 @@ function vendorManifestFiles(vendorRoot) {
   return files;
 }
 
-function scriptReferences(templateRoots) {
+function templateReferences(templateRoots) {
   const refs = [];
   for (const templatePath of htmlFiles(templateRoots)) {
     const source = readFileSync(templatePath, "utf8");
@@ -116,6 +116,27 @@ function scriptReferences(templateRoots) {
         continue;
       }
       const normalized = normalizeTemplateSrc(src);
+      refs.push({
+        templatePath,
+        src: normalized,
+        integrity: attr(tag, "integrity"),
+        crossorigin: attr(tag, "crossorigin"),
+      });
+    }
+    for (const match of source.matchAll(/<link\b[^>]*>/gi)) {
+      const tag = match[0];
+      const rel = attr(tag, "rel");
+      if (!rel || !rel.split(/\s+/).some((value) => value.toLowerCase() === "stylesheet")) {
+        continue;
+      }
+      const href = attr(tag, "th:href") ?? attr(tag, "href");
+      if (!href) {
+        continue;
+      }
+      const normalized = normalizeTemplateSrc(href);
+      if (!normalized.startsWith("/vendor/")) {
+        continue;
+      }
       refs.push({
         templatePath,
         src: normalized,

@@ -217,9 +217,10 @@ async function login(page, baseUrl, loginPath, username, password) {
   await page.fill("input[name=\"username\"]", username);
   await page.fill("input[name=\"password\"]", password);
   await Promise.all([
-    page.waitForNavigation({ waitUntil: "networkidle" }),
+    page.waitForURL((url) => url.pathname !== loginPath, { waitUntil: "domcontentloaded" }),
     page.click("button[type=\"submit\"]"),
   ]);
+  await page.waitForLoadState("networkidle");
 }
 
 async function assertOk(page, url) {

@@ -33,8 +33,8 @@ class AdminPhase3QualityGateTest {
 		new FragmentEndpoint("/admin/facilities/page", "id=\"facility-results\""),
 		new FragmentEndpoint("/admin/stations/page", "id=\"station-results\""),
 		new FragmentEndpoint("/admin/stations/station-sangnoksu/page?tab=reports", "id=\"station-hub\""),
-		new FragmentEndpoint("/admin/dashboard/trends", "dashboard-trends-section"),
-		new FragmentEndpoint("/admin/alerts", "admin-alert-panel"),
+		new FragmentEndpoint("/admin/dashboard/trends", "class=\"dashboard-trends-section\""),
+		new FragmentEndpoint("/admin/alerts", "class=\"admin-alert-panel\""),
 		new FragmentEndpoint("/admin/batches/page/live", "id=\"batch-live\""),
 		new FragmentEndpoint("/admin/data-collections/page/live", "id=\"collection-live\""),
 		new FragmentEndpoint("/admin/incidents/page/live", "id=\"incident-live\"")

@@ -30,6 +30,26 @@ test("admin vendor integrity check fails when one duplicate vendor ref has stale
   );
 });
 
+test("admin vendor integrity check passes stylesheet vendor refs", async () => {
+  const root = await stylesheetFixtureRoot("body { color: #111; }");
+  assert.deepEqual(checkAdminVendorIntegrity(root), {
+    checkedVendorFiles: 1,
+    checkedTemplateScripts: 1,
+  });
+});
+
+test("admin vendor integrity check blocks inline scripts", async () => {
+  const root = await fixtureRoot("console.log('ok');");
+  await writeFile(
+    path.join(root, "backend/src/main/resources/templates/admin/inline-script.html"),
+    "<script>alert(1)</script>",
+  );
+  assert.throws(
+    () => checkAdminVendorIntegrity(root),
+    /inline <script> is not allowed/,
+  );
+});
+
 test("admin vendor integrity check blocks inline handlers", async () => {
   const root = await fixtureRoot("console.log('ok');");
   await writeFile(
@@ -58,6 +78,26 @@ async function fixtureRoot(vendorSource, integrityOverride) {
   await writeFile(
     path.join(adminTemplates, "page.html"),
     `<script th:src="@{/vendor/example-1.0.0/example.js}" integrity="${integrityOverride ?? `sha384-${sha384}`}" crossorigin="anonymous" defer></script>`,
+  );
+  return root;
+}
+
+async function stylesheetFixtureRoot(vendorSource) {
+  const root = await mkdtemp(path.join(tmpdir(), "admin-vendor-"));
+  const vendorDir = path.join(root, "backend/src/main/resources/static/vendor/example-1.0.0");
+  const adminTemplates = path.join(root, "backend/src/main/resources/templates/admin");
+  const operatorTemplates = path.join(root, "backend/src/main/resources/templates/operator");
+  await mkdir(vendorDir, { recursive: true });
+  await mkdir(adminTemplates, { recursive: true });
+  await mkdir(operatorTemplates, { recursive: true });
+  const vendorFile = path.join(vendorDir, "example.css");
+  await writeFile(vendorFile, vendorSource);
+  const sha256 = createHash("sha256").update(vendorSource).digest("hex");
+  const sha384 = createHash("sha384").update(vendorSource).digest("base64");
+  await writeFile(path.join(vendorDir, "SHA256SUMS.txt"), `${sha256}  example.css\n`);
+  await writeFile(
+    path.join(adminTemplates, "page.html"),
+    `<link rel="stylesheet" th:href="@{/vendor/example-1.0.0/example.css}" integrity="sha384-${sha384}" crossorigin="anonymous">`,
   );
   return root;
 }
