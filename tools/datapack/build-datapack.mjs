@@ -391,8 +391,20 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
     }
   }
   const transitRouteLineIds = new Map((pack.transitRoutes ?? []).map((route) => [route.id, route.lineId]));
+  const serviceOperatorIds = new Map();
+  for (const trip of pack.transitTrips ?? []) {
+    const lineId = transitRouteLineIds.get(trip.routeId);
+    const operatorId = lineOperatorIds.get(lineId);
+    if (operatorId) {
+      const operatorIds = serviceOperatorIds.get(trip.serviceId) ?? new Set();
+      operatorIds.add(operatorId);
+      serviceOperatorIds.set(trip.serviceId, operatorIds);
+    }
+  }
   for (const calendar of pack.serviceCalendars ?? []) {
-    addRecord(calendar, "service_calendar", calendar.serviceId, "service_calendar");
+    addRecord(calendar, "service_calendar", calendar.serviceId, "service_calendar", [
+      ...(serviceOperatorIds.get(calendar.serviceId) ?? []),
+    ]);
   }
   for (const trip of pack.transitTrips ?? []) {
     const lineId = transitRouteLineIds.get(trip.routeId);

@@ -9427,6 +9427,35 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
       },
     ],
   );
+  const scheduleScopeFixture = JSON.parse(JSON.stringify(importedFixture));
+  scheduleScopeFixture.packs[0].sourceInventory.find(
+    (source) => source.id === "kric-subway-timetable",
+  ).coverageScope.operatorIds = ["seoul-metro", "korail"];
+  const scheduleScopeFixturePath = path.join(outputDir, "schedule-scope-fixture.json");
+  const scheduleScopePackDir = path.join(outputDir, "schedule-scope-pack");
+  await writeFile(scheduleScopeFixturePath, `${JSON.stringify(scheduleScopeFixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      scheduleScopeFixturePath,
+      "--output",
+      scheduleScopePackDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  const scheduleScopeProvenance = JSON.parse(
+    await readFile(path.join(scheduleScopePackDir, "current.provenance.json"), "utf8"),
+  );
+  const serviceCalendarRecord = scheduleScopeProvenance.packs[0].records.find(
+    (record) =>
+      record.sourceId === "kric-subway-timetable" &&
+      record.entityType === "service_calendar" &&
+      record.field === "service_calendar",
+  );
+  assert.ok(serviceCalendarRecord);
+  assert.deepEqual(serviceCalendarRecord.coverageScope.operatorIds, ["seoul-metro"]);
   for (const testCase of [
     {
       name: "string-label-dx",
