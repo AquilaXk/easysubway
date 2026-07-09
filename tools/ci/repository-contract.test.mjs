@@ -3620,6 +3620,11 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "security-matcher-contract-test-output",
     ),
   );
+  const adRepository = read("backend/src/main/java/com/easysubway/ads/adapter/out/persistence/JdbcAdRepository.java");
+  assert.match(
+    adRepository,
+    /ON CONFLICT \(event_date, placement_id, creative_id, event_type\)[\s\S]*DO UPDATE SET event_count/,
+  );
   assert.equal(operationsEvidence.backendControlPlane.adminAuthTransition.basicAuthDefaultInProd, "disabled");
   assert.equal(operationsEvidence.backendControlPlane.adminAuthTransition.oidcMfaSsoDeferredExceptionRequired, true);
   assert.deepEqual(
