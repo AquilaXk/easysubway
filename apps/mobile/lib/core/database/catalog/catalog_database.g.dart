@@ -4957,6 +4957,1535 @@ class TransitFrequenciesCompanion extends UpdateCompanion<TransitFrequency> {
   }
 }
 
+class $FareZonesTable extends FareZones
+    with TableInfo<$FareZonesTable, FareZone> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FareZonesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameKoMeta = const VerificationMeta('nameKo');
+  @override
+  late final GeneratedColumn<String> nameKo = GeneratedColumn<String>(
+    'name_ko',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _regionMeta = const VerificationMeta('region');
+  @override
+  late final GeneratedColumn<String> region = GeneratedColumn<String>(
+    'region',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _currencyCodeMeta = const VerificationMeta(
+    'currencyCode',
+  );
+  @override
+  late final GeneratedColumn<String> currencyCode = GeneratedColumn<String>(
+    'currency_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('KRW'),
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    nameKo,
+    region,
+    currencyCode,
+    sourceId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fare_zones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FareZone> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name_ko')) {
+      context.handle(
+        _nameKoMeta,
+        nameKo.isAcceptableOrUnknown(data['name_ko']!, _nameKoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameKoMeta);
+    }
+    if (data.containsKey('region')) {
+      context.handle(
+        _regionMeta,
+        region.isAcceptableOrUnknown(data['region']!, _regionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_regionMeta);
+    }
+    if (data.containsKey('currency_code')) {
+      context.handle(
+        _currencyCodeMeta,
+        currencyCode.isAcceptableOrUnknown(
+          data['currency_code']!,
+          _currencyCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FareZone map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FareZone(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      nameKo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_ko'],
+      )!,
+      region: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}region'],
+      )!,
+      currencyCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}currency_code'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+    );
+  }
+
+  @override
+  $FareZonesTable createAlias(String alias) {
+    return $FareZonesTable(attachedDatabase, alias);
+  }
+}
+
+class FareZone extends DataClass implements Insertable<FareZone> {
+  final String id;
+  final String nameKo;
+  final String region;
+  final String currencyCode;
+  final String sourceId;
+  const FareZone({
+    required this.id,
+    required this.nameKo,
+    required this.region,
+    required this.currencyCode,
+    required this.sourceId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name_ko'] = Variable<String>(nameKo);
+    map['region'] = Variable<String>(region);
+    map['currency_code'] = Variable<String>(currencyCode);
+    map['source_id'] = Variable<String>(sourceId);
+    return map;
+  }
+
+  FareZonesCompanion toCompanion(bool nullToAbsent) {
+    return FareZonesCompanion(
+      id: Value(id),
+      nameKo: Value(nameKo),
+      region: Value(region),
+      currencyCode: Value(currencyCode),
+      sourceId: Value(sourceId),
+    );
+  }
+
+  factory FareZone.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FareZone(
+      id: serializer.fromJson<String>(json['id']),
+      nameKo: serializer.fromJson<String>(json['nameKo']),
+      region: serializer.fromJson<String>(json['region']),
+      currencyCode: serializer.fromJson<String>(json['currencyCode']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'nameKo': serializer.toJson<String>(nameKo),
+      'region': serializer.toJson<String>(region),
+      'currencyCode': serializer.toJson<String>(currencyCode),
+      'sourceId': serializer.toJson<String>(sourceId),
+    };
+  }
+
+  FareZone copyWith({
+    String? id,
+    String? nameKo,
+    String? region,
+    String? currencyCode,
+    String? sourceId,
+  }) => FareZone(
+    id: id ?? this.id,
+    nameKo: nameKo ?? this.nameKo,
+    region: region ?? this.region,
+    currencyCode: currencyCode ?? this.currencyCode,
+    sourceId: sourceId ?? this.sourceId,
+  );
+  FareZone copyWithCompanion(FareZonesCompanion data) {
+    return FareZone(
+      id: data.id.present ? data.id.value : this.id,
+      nameKo: data.nameKo.present ? data.nameKo.value : this.nameKo,
+      region: data.region.present ? data.region.value : this.region,
+      currencyCode: data.currencyCode.present
+          ? data.currencyCode.value
+          : this.currencyCode,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FareZone(')
+          ..write('id: $id, ')
+          ..write('nameKo: $nameKo, ')
+          ..write('region: $region, ')
+          ..write('currencyCode: $currencyCode, ')
+          ..write('sourceId: $sourceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, nameKo, region, currencyCode, sourceId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FareZone &&
+          other.id == this.id &&
+          other.nameKo == this.nameKo &&
+          other.region == this.region &&
+          other.currencyCode == this.currencyCode &&
+          other.sourceId == this.sourceId);
+}
+
+class FareZonesCompanion extends UpdateCompanion<FareZone> {
+  final Value<String> id;
+  final Value<String> nameKo;
+  final Value<String> region;
+  final Value<String> currencyCode;
+  final Value<String> sourceId;
+  final Value<int> rowid;
+  const FareZonesCompanion({
+    this.id = const Value.absent(),
+    this.nameKo = const Value.absent(),
+    this.region = const Value.absent(),
+    this.currencyCode = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FareZonesCompanion.insert({
+    required String id,
+    required String nameKo,
+    required String region,
+    this.currencyCode = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       nameKo = Value(nameKo),
+       region = Value(region);
+  static Insertable<FareZone> custom({
+    Expression<String>? id,
+    Expression<String>? nameKo,
+    Expression<String>? region,
+    Expression<String>? currencyCode,
+    Expression<String>? sourceId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (nameKo != null) 'name_ko': nameKo,
+      if (region != null) 'region': region,
+      if (currencyCode != null) 'currency_code': currencyCode,
+      if (sourceId != null) 'source_id': sourceId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FareZonesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? nameKo,
+    Value<String>? region,
+    Value<String>? currencyCode,
+    Value<String>? sourceId,
+    Value<int>? rowid,
+  }) {
+    return FareZonesCompanion(
+      id: id ?? this.id,
+      nameKo: nameKo ?? this.nameKo,
+      region: region ?? this.region,
+      currencyCode: currencyCode ?? this.currencyCode,
+      sourceId: sourceId ?? this.sourceId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (nameKo.present) {
+      map['name_ko'] = Variable<String>(nameKo.value);
+    }
+    if (region.present) {
+      map['region'] = Variable<String>(region.value);
+    }
+    if (currencyCode.present) {
+      map['currency_code'] = Variable<String>(currencyCode.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FareZonesCompanion(')
+          ..write('id: $id, ')
+          ..write('nameKo: $nameKo, ')
+          ..write('region: $region, ')
+          ..write('currencyCode: $currencyCode, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FareRulesTable extends FareRules
+    with TableInfo<$FareRulesTable, FareRule> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FareRulesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _zoneIdMeta = const VerificationMeta('zoneId');
+  @override
+  late final GeneratedColumn<String> zoneId = GeneratedColumn<String>(
+    'zone_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _baseCardFareMeta = const VerificationMeta(
+    'baseCardFare',
+  );
+  @override
+  late final GeneratedColumn<int> baseCardFare = GeneratedColumn<int>(
+    'base_card_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _baseCashFareMeta = const VerificationMeta(
+    'baseCashFare',
+  );
+  @override
+  late final GeneratedColumn<int> baseCashFare = GeneratedColumn<int>(
+    'base_cash_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _baseDistanceMetersMeta =
+      const VerificationMeta('baseDistanceMeters');
+  @override
+  late final GeneratedColumn<int> baseDistanceMeters = GeneratedColumn<int>(
+    'base_distance_meters',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _additionalStepsJsonMeta =
+      const VerificationMeta('additionalStepsJson');
+  @override
+  late final GeneratedColumn<String> additionalStepsJson =
+      GeneratedColumn<String>(
+        'additional_steps_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    zoneId,
+    baseCardFare,
+    baseCashFare,
+    baseDistanceMeters,
+    additionalStepsJson,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fare_rules';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FareRule> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('zone_id')) {
+      context.handle(
+        _zoneIdMeta,
+        zoneId.isAcceptableOrUnknown(data['zone_id']!, _zoneIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_zoneIdMeta);
+    }
+    if (data.containsKey('base_card_fare')) {
+      context.handle(
+        _baseCardFareMeta,
+        baseCardFare.isAcceptableOrUnknown(
+          data['base_card_fare']!,
+          _baseCardFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_baseCardFareMeta);
+    }
+    if (data.containsKey('base_cash_fare')) {
+      context.handle(
+        _baseCashFareMeta,
+        baseCashFare.isAcceptableOrUnknown(
+          data['base_cash_fare']!,
+          _baseCashFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_baseCashFareMeta);
+    }
+    if (data.containsKey('base_distance_meters')) {
+      context.handle(
+        _baseDistanceMetersMeta,
+        baseDistanceMeters.isAcceptableOrUnknown(
+          data['base_distance_meters']!,
+          _baseDistanceMetersMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_baseDistanceMetersMeta);
+    }
+    if (data.containsKey('additional_steps_json')) {
+      context.handle(
+        _additionalStepsJsonMeta,
+        additionalStepsJson.isAcceptableOrUnknown(
+          data['additional_steps_json']!,
+          _additionalStepsJsonMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FareRule map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FareRule(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      zoneId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}zone_id'],
+      )!,
+      baseCardFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}base_card_fare'],
+      )!,
+      baseCashFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}base_cash_fare'],
+      )!,
+      baseDistanceMeters: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}base_distance_meters'],
+      )!,
+      additionalStepsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}additional_steps_json'],
+      )!,
+    );
+  }
+
+  @override
+  $FareRulesTable createAlias(String alias) {
+    return $FareRulesTable(attachedDatabase, alias);
+  }
+}
+
+class FareRule extends DataClass implements Insertable<FareRule> {
+  final String id;
+  final String zoneId;
+  final int baseCardFare;
+  final int baseCashFare;
+  final int baseDistanceMeters;
+  final String additionalStepsJson;
+  const FareRule({
+    required this.id,
+    required this.zoneId,
+    required this.baseCardFare,
+    required this.baseCashFare,
+    required this.baseDistanceMeters,
+    required this.additionalStepsJson,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['zone_id'] = Variable<String>(zoneId);
+    map['base_card_fare'] = Variable<int>(baseCardFare);
+    map['base_cash_fare'] = Variable<int>(baseCashFare);
+    map['base_distance_meters'] = Variable<int>(baseDistanceMeters);
+    map['additional_steps_json'] = Variable<String>(additionalStepsJson);
+    return map;
+  }
+
+  FareRulesCompanion toCompanion(bool nullToAbsent) {
+    return FareRulesCompanion(
+      id: Value(id),
+      zoneId: Value(zoneId),
+      baseCardFare: Value(baseCardFare),
+      baseCashFare: Value(baseCashFare),
+      baseDistanceMeters: Value(baseDistanceMeters),
+      additionalStepsJson: Value(additionalStepsJson),
+    );
+  }
+
+  factory FareRule.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FareRule(
+      id: serializer.fromJson<String>(json['id']),
+      zoneId: serializer.fromJson<String>(json['zoneId']),
+      baseCardFare: serializer.fromJson<int>(json['baseCardFare']),
+      baseCashFare: serializer.fromJson<int>(json['baseCashFare']),
+      baseDistanceMeters: serializer.fromJson<int>(json['baseDistanceMeters']),
+      additionalStepsJson: serializer.fromJson<String>(
+        json['additionalStepsJson'],
+      ),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'zoneId': serializer.toJson<String>(zoneId),
+      'baseCardFare': serializer.toJson<int>(baseCardFare),
+      'baseCashFare': serializer.toJson<int>(baseCashFare),
+      'baseDistanceMeters': serializer.toJson<int>(baseDistanceMeters),
+      'additionalStepsJson': serializer.toJson<String>(additionalStepsJson),
+    };
+  }
+
+  FareRule copyWith({
+    String? id,
+    String? zoneId,
+    int? baseCardFare,
+    int? baseCashFare,
+    int? baseDistanceMeters,
+    String? additionalStepsJson,
+  }) => FareRule(
+    id: id ?? this.id,
+    zoneId: zoneId ?? this.zoneId,
+    baseCardFare: baseCardFare ?? this.baseCardFare,
+    baseCashFare: baseCashFare ?? this.baseCashFare,
+    baseDistanceMeters: baseDistanceMeters ?? this.baseDistanceMeters,
+    additionalStepsJson: additionalStepsJson ?? this.additionalStepsJson,
+  );
+  FareRule copyWithCompanion(FareRulesCompanion data) {
+    return FareRule(
+      id: data.id.present ? data.id.value : this.id,
+      zoneId: data.zoneId.present ? data.zoneId.value : this.zoneId,
+      baseCardFare: data.baseCardFare.present
+          ? data.baseCardFare.value
+          : this.baseCardFare,
+      baseCashFare: data.baseCashFare.present
+          ? data.baseCashFare.value
+          : this.baseCashFare,
+      baseDistanceMeters: data.baseDistanceMeters.present
+          ? data.baseDistanceMeters.value
+          : this.baseDistanceMeters,
+      additionalStepsJson: data.additionalStepsJson.present
+          ? data.additionalStepsJson.value
+          : this.additionalStepsJson,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FareRule(')
+          ..write('id: $id, ')
+          ..write('zoneId: $zoneId, ')
+          ..write('baseCardFare: $baseCardFare, ')
+          ..write('baseCashFare: $baseCashFare, ')
+          ..write('baseDistanceMeters: $baseDistanceMeters, ')
+          ..write('additionalStepsJson: $additionalStepsJson')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    zoneId,
+    baseCardFare,
+    baseCashFare,
+    baseDistanceMeters,
+    additionalStepsJson,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FareRule &&
+          other.id == this.id &&
+          other.zoneId == this.zoneId &&
+          other.baseCardFare == this.baseCardFare &&
+          other.baseCashFare == this.baseCashFare &&
+          other.baseDistanceMeters == this.baseDistanceMeters &&
+          other.additionalStepsJson == this.additionalStepsJson);
+}
+
+class FareRulesCompanion extends UpdateCompanion<FareRule> {
+  final Value<String> id;
+  final Value<String> zoneId;
+  final Value<int> baseCardFare;
+  final Value<int> baseCashFare;
+  final Value<int> baseDistanceMeters;
+  final Value<String> additionalStepsJson;
+  final Value<int> rowid;
+  const FareRulesCompanion({
+    this.id = const Value.absent(),
+    this.zoneId = const Value.absent(),
+    this.baseCardFare = const Value.absent(),
+    this.baseCashFare = const Value.absent(),
+    this.baseDistanceMeters = const Value.absent(),
+    this.additionalStepsJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FareRulesCompanion.insert({
+    required String id,
+    required String zoneId,
+    required int baseCardFare,
+    required int baseCashFare,
+    required int baseDistanceMeters,
+    this.additionalStepsJson = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       zoneId = Value(zoneId),
+       baseCardFare = Value(baseCardFare),
+       baseCashFare = Value(baseCashFare),
+       baseDistanceMeters = Value(baseDistanceMeters);
+  static Insertable<FareRule> custom({
+    Expression<String>? id,
+    Expression<String>? zoneId,
+    Expression<int>? baseCardFare,
+    Expression<int>? baseCashFare,
+    Expression<int>? baseDistanceMeters,
+    Expression<String>? additionalStepsJson,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (zoneId != null) 'zone_id': zoneId,
+      if (baseCardFare != null) 'base_card_fare': baseCardFare,
+      if (baseCashFare != null) 'base_cash_fare': baseCashFare,
+      if (baseDistanceMeters != null)
+        'base_distance_meters': baseDistanceMeters,
+      if (additionalStepsJson != null)
+        'additional_steps_json': additionalStepsJson,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FareRulesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? zoneId,
+    Value<int>? baseCardFare,
+    Value<int>? baseCashFare,
+    Value<int>? baseDistanceMeters,
+    Value<String>? additionalStepsJson,
+    Value<int>? rowid,
+  }) {
+    return FareRulesCompanion(
+      id: id ?? this.id,
+      zoneId: zoneId ?? this.zoneId,
+      baseCardFare: baseCardFare ?? this.baseCardFare,
+      baseCashFare: baseCashFare ?? this.baseCashFare,
+      baseDistanceMeters: baseDistanceMeters ?? this.baseDistanceMeters,
+      additionalStepsJson: additionalStepsJson ?? this.additionalStepsJson,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (zoneId.present) {
+      map['zone_id'] = Variable<String>(zoneId.value);
+    }
+    if (baseCardFare.present) {
+      map['base_card_fare'] = Variable<int>(baseCardFare.value);
+    }
+    if (baseCashFare.present) {
+      map['base_cash_fare'] = Variable<int>(baseCashFare.value);
+    }
+    if (baseDistanceMeters.present) {
+      map['base_distance_meters'] = Variable<int>(baseDistanceMeters.value);
+    }
+    if (additionalStepsJson.present) {
+      map['additional_steps_json'] = Variable<String>(
+        additionalStepsJson.value,
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FareRulesCompanion(')
+          ..write('id: $id, ')
+          ..write('zoneId: $zoneId, ')
+          ..write('baseCardFare: $baseCardFare, ')
+          ..write('baseCashFare: $baseCashFare, ')
+          ..write('baseDistanceMeters: $baseDistanceMeters, ')
+          ..write('additionalStepsJson: $additionalStepsJson, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FareDiscountsTable extends FareDiscounts
+    with TableInfo<$FareDiscountsTable, FareDiscount> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FareDiscountsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _zoneIdMeta = const VerificationMeta('zoneId');
+  @override
+  late final GeneratedColumn<String> zoneId = GeneratedColumn<String>(
+    'zone_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _riderTypeMeta = const VerificationMeta(
+    'riderType',
+  );
+  @override
+  late final GeneratedColumn<String> riderType = GeneratedColumn<String>(
+    'rider_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cardFareMeta = const VerificationMeta(
+    'cardFare',
+  );
+  @override
+  late final GeneratedColumn<int> cardFare = GeneratedColumn<int>(
+    'card_fare',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cashFareMeta = const VerificationMeta(
+    'cashFare',
+  );
+  @override
+  late final GeneratedColumn<int> cashFare = GeneratedColumn<int>(
+    'cash_fare',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _freeRideMeta = const VerificationMeta(
+    'freeRide',
+  );
+  @override
+  late final GeneratedColumn<bool> freeRide = GeneratedColumn<bool>(
+    'free_ride',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("free_ride" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _descriptionKoMeta = const VerificationMeta(
+    'descriptionKo',
+  );
+  @override
+  late final GeneratedColumn<String> descriptionKo = GeneratedColumn<String>(
+    'description_ko',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    zoneId,
+    riderType,
+    cardFare,
+    cashFare,
+    freeRide,
+    descriptionKo,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fare_discounts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FareDiscount> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('zone_id')) {
+      context.handle(
+        _zoneIdMeta,
+        zoneId.isAcceptableOrUnknown(data['zone_id']!, _zoneIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_zoneIdMeta);
+    }
+    if (data.containsKey('rider_type')) {
+      context.handle(
+        _riderTypeMeta,
+        riderType.isAcceptableOrUnknown(data['rider_type']!, _riderTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_riderTypeMeta);
+    }
+    if (data.containsKey('card_fare')) {
+      context.handle(
+        _cardFareMeta,
+        cardFare.isAcceptableOrUnknown(data['card_fare']!, _cardFareMeta),
+      );
+    }
+    if (data.containsKey('cash_fare')) {
+      context.handle(
+        _cashFareMeta,
+        cashFare.isAcceptableOrUnknown(data['cash_fare']!, _cashFareMeta),
+      );
+    }
+    if (data.containsKey('free_ride')) {
+      context.handle(
+        _freeRideMeta,
+        freeRide.isAcceptableOrUnknown(data['free_ride']!, _freeRideMeta),
+      );
+    }
+    if (data.containsKey('description_ko')) {
+      context.handle(
+        _descriptionKoMeta,
+        descriptionKo.isAcceptableOrUnknown(
+          data['description_ko']!,
+          _descriptionKoMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FareDiscount map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FareDiscount(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      zoneId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}zone_id'],
+      )!,
+      riderType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rider_type'],
+      )!,
+      cardFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}card_fare'],
+      ),
+      cashFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cash_fare'],
+      ),
+      freeRide: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}free_ride'],
+      )!,
+      descriptionKo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description_ko'],
+      )!,
+    );
+  }
+
+  @override
+  $FareDiscountsTable createAlias(String alias) {
+    return $FareDiscountsTable(attachedDatabase, alias);
+  }
+}
+
+class FareDiscount extends DataClass implements Insertable<FareDiscount> {
+  final String id;
+  final String zoneId;
+  final String riderType;
+  final int? cardFare;
+  final int? cashFare;
+  final bool freeRide;
+  final String descriptionKo;
+  const FareDiscount({
+    required this.id,
+    required this.zoneId,
+    required this.riderType,
+    this.cardFare,
+    this.cashFare,
+    required this.freeRide,
+    required this.descriptionKo,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['zone_id'] = Variable<String>(zoneId);
+    map['rider_type'] = Variable<String>(riderType);
+    if (!nullToAbsent || cardFare != null) {
+      map['card_fare'] = Variable<int>(cardFare);
+    }
+    if (!nullToAbsent || cashFare != null) {
+      map['cash_fare'] = Variable<int>(cashFare);
+    }
+    map['free_ride'] = Variable<bool>(freeRide);
+    map['description_ko'] = Variable<String>(descriptionKo);
+    return map;
+  }
+
+  FareDiscountsCompanion toCompanion(bool nullToAbsent) {
+    return FareDiscountsCompanion(
+      id: Value(id),
+      zoneId: Value(zoneId),
+      riderType: Value(riderType),
+      cardFare: cardFare == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cardFare),
+      cashFare: cashFare == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashFare),
+      freeRide: Value(freeRide),
+      descriptionKo: Value(descriptionKo),
+    );
+  }
+
+  factory FareDiscount.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FareDiscount(
+      id: serializer.fromJson<String>(json['id']),
+      zoneId: serializer.fromJson<String>(json['zoneId']),
+      riderType: serializer.fromJson<String>(json['riderType']),
+      cardFare: serializer.fromJson<int?>(json['cardFare']),
+      cashFare: serializer.fromJson<int?>(json['cashFare']),
+      freeRide: serializer.fromJson<bool>(json['freeRide']),
+      descriptionKo: serializer.fromJson<String>(json['descriptionKo']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'zoneId': serializer.toJson<String>(zoneId),
+      'riderType': serializer.toJson<String>(riderType),
+      'cardFare': serializer.toJson<int?>(cardFare),
+      'cashFare': serializer.toJson<int?>(cashFare),
+      'freeRide': serializer.toJson<bool>(freeRide),
+      'descriptionKo': serializer.toJson<String>(descriptionKo),
+    };
+  }
+
+  FareDiscount copyWith({
+    String? id,
+    String? zoneId,
+    String? riderType,
+    Value<int?> cardFare = const Value.absent(),
+    Value<int?> cashFare = const Value.absent(),
+    bool? freeRide,
+    String? descriptionKo,
+  }) => FareDiscount(
+    id: id ?? this.id,
+    zoneId: zoneId ?? this.zoneId,
+    riderType: riderType ?? this.riderType,
+    cardFare: cardFare.present ? cardFare.value : this.cardFare,
+    cashFare: cashFare.present ? cashFare.value : this.cashFare,
+    freeRide: freeRide ?? this.freeRide,
+    descriptionKo: descriptionKo ?? this.descriptionKo,
+  );
+  FareDiscount copyWithCompanion(FareDiscountsCompanion data) {
+    return FareDiscount(
+      id: data.id.present ? data.id.value : this.id,
+      zoneId: data.zoneId.present ? data.zoneId.value : this.zoneId,
+      riderType: data.riderType.present ? data.riderType.value : this.riderType,
+      cardFare: data.cardFare.present ? data.cardFare.value : this.cardFare,
+      cashFare: data.cashFare.present ? data.cashFare.value : this.cashFare,
+      freeRide: data.freeRide.present ? data.freeRide.value : this.freeRide,
+      descriptionKo: data.descriptionKo.present
+          ? data.descriptionKo.value
+          : this.descriptionKo,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FareDiscount(')
+          ..write('id: $id, ')
+          ..write('zoneId: $zoneId, ')
+          ..write('riderType: $riderType, ')
+          ..write('cardFare: $cardFare, ')
+          ..write('cashFare: $cashFare, ')
+          ..write('freeRide: $freeRide, ')
+          ..write('descriptionKo: $descriptionKo')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    zoneId,
+    riderType,
+    cardFare,
+    cashFare,
+    freeRide,
+    descriptionKo,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FareDiscount &&
+          other.id == this.id &&
+          other.zoneId == this.zoneId &&
+          other.riderType == this.riderType &&
+          other.cardFare == this.cardFare &&
+          other.cashFare == this.cashFare &&
+          other.freeRide == this.freeRide &&
+          other.descriptionKo == this.descriptionKo);
+}
+
+class FareDiscountsCompanion extends UpdateCompanion<FareDiscount> {
+  final Value<String> id;
+  final Value<String> zoneId;
+  final Value<String> riderType;
+  final Value<int?> cardFare;
+  final Value<int?> cashFare;
+  final Value<bool> freeRide;
+  final Value<String> descriptionKo;
+  final Value<int> rowid;
+  const FareDiscountsCompanion({
+    this.id = const Value.absent(),
+    this.zoneId = const Value.absent(),
+    this.riderType = const Value.absent(),
+    this.cardFare = const Value.absent(),
+    this.cashFare = const Value.absent(),
+    this.freeRide = const Value.absent(),
+    this.descriptionKo = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FareDiscountsCompanion.insert({
+    required String id,
+    required String zoneId,
+    required String riderType,
+    this.cardFare = const Value.absent(),
+    this.cashFare = const Value.absent(),
+    this.freeRide = const Value.absent(),
+    this.descriptionKo = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       zoneId = Value(zoneId),
+       riderType = Value(riderType);
+  static Insertable<FareDiscount> custom({
+    Expression<String>? id,
+    Expression<String>? zoneId,
+    Expression<String>? riderType,
+    Expression<int>? cardFare,
+    Expression<int>? cashFare,
+    Expression<bool>? freeRide,
+    Expression<String>? descriptionKo,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (zoneId != null) 'zone_id': zoneId,
+      if (riderType != null) 'rider_type': riderType,
+      if (cardFare != null) 'card_fare': cardFare,
+      if (cashFare != null) 'cash_fare': cashFare,
+      if (freeRide != null) 'free_ride': freeRide,
+      if (descriptionKo != null) 'description_ko': descriptionKo,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FareDiscountsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? zoneId,
+    Value<String>? riderType,
+    Value<int?>? cardFare,
+    Value<int?>? cashFare,
+    Value<bool>? freeRide,
+    Value<String>? descriptionKo,
+    Value<int>? rowid,
+  }) {
+    return FareDiscountsCompanion(
+      id: id ?? this.id,
+      zoneId: zoneId ?? this.zoneId,
+      riderType: riderType ?? this.riderType,
+      cardFare: cardFare ?? this.cardFare,
+      cashFare: cashFare ?? this.cashFare,
+      freeRide: freeRide ?? this.freeRide,
+      descriptionKo: descriptionKo ?? this.descriptionKo,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (zoneId.present) {
+      map['zone_id'] = Variable<String>(zoneId.value);
+    }
+    if (riderType.present) {
+      map['rider_type'] = Variable<String>(riderType.value);
+    }
+    if (cardFare.present) {
+      map['card_fare'] = Variable<int>(cardFare.value);
+    }
+    if (cashFare.present) {
+      map['cash_fare'] = Variable<int>(cashFare.value);
+    }
+    if (freeRide.present) {
+      map['free_ride'] = Variable<bool>(freeRide.value);
+    }
+    if (descriptionKo.present) {
+      map['description_ko'] = Variable<String>(descriptionKo.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FareDiscountsCompanion(')
+          ..write('id: $id, ')
+          ..write('zoneId: $zoneId, ')
+          ..write('riderType: $riderType, ')
+          ..write('cardFare: $cardFare, ')
+          ..write('cashFare: $cashFare, ')
+          ..write('freeRide: $freeRide, ')
+          ..write('descriptionKo: $descriptionKo, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $StationFareZonesTable extends StationFareZones
+    with TableInfo<$StationFareZonesTable, StationFareZone> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StationFareZonesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _stationIdMeta = const VerificationMeta(
+    'stationId',
+  );
+  @override
+  late final GeneratedColumn<String> stationId = GeneratedColumn<String>(
+    'station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _zoneIdMeta = const VerificationMeta('zoneId');
+  @override
+  late final GeneratedColumn<String> zoneId = GeneratedColumn<String>(
+    'zone_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [stationId, lineId, zoneId];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'station_fare_zones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StationFareZone> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('station_id')) {
+      context.handle(
+        _stationIdMeta,
+        stationId.isAcceptableOrUnknown(data['station_id']!, _stationIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stationIdMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineIdMeta);
+    }
+    if (data.containsKey('zone_id')) {
+      context.handle(
+        _zoneIdMeta,
+        zoneId.isAcceptableOrUnknown(data['zone_id']!, _zoneIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_zoneIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {stationId, lineId};
+  @override
+  StationFareZone map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StationFareZone(
+      stationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      )!,
+      zoneId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}zone_id'],
+      )!,
+    );
+  }
+
+  @override
+  $StationFareZonesTable createAlias(String alias) {
+    return $StationFareZonesTable(attachedDatabase, alias);
+  }
+}
+
+class StationFareZone extends DataClass implements Insertable<StationFareZone> {
+  final String stationId;
+  final String lineId;
+  final String zoneId;
+  const StationFareZone({
+    required this.stationId,
+    required this.lineId,
+    required this.zoneId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['station_id'] = Variable<String>(stationId);
+    map['line_id'] = Variable<String>(lineId);
+    map['zone_id'] = Variable<String>(zoneId);
+    return map;
+  }
+
+  StationFareZonesCompanion toCompanion(bool nullToAbsent) {
+    return StationFareZonesCompanion(
+      stationId: Value(stationId),
+      lineId: Value(lineId),
+      zoneId: Value(zoneId),
+    );
+  }
+
+  factory StationFareZone.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StationFareZone(
+      stationId: serializer.fromJson<String>(json['stationId']),
+      lineId: serializer.fromJson<String>(json['lineId']),
+      zoneId: serializer.fromJson<String>(json['zoneId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'stationId': serializer.toJson<String>(stationId),
+      'lineId': serializer.toJson<String>(lineId),
+      'zoneId': serializer.toJson<String>(zoneId),
+    };
+  }
+
+  StationFareZone copyWith({
+    String? stationId,
+    String? lineId,
+    String? zoneId,
+  }) => StationFareZone(
+    stationId: stationId ?? this.stationId,
+    lineId: lineId ?? this.lineId,
+    zoneId: zoneId ?? this.zoneId,
+  );
+  StationFareZone copyWithCompanion(StationFareZonesCompanion data) {
+    return StationFareZone(
+      stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      zoneId: data.zoneId.present ? data.zoneId.value : this.zoneId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationFareZone(')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('zoneId: $zoneId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(stationId, lineId, zoneId);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StationFareZone &&
+          other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
+          other.zoneId == this.zoneId);
+}
+
+class StationFareZonesCompanion extends UpdateCompanion<StationFareZone> {
+  final Value<String> stationId;
+  final Value<String> lineId;
+  final Value<String> zoneId;
+  final Value<int> rowid;
+  const StationFareZonesCompanion({
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.zoneId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StationFareZonesCompanion.insert({
+    required String stationId,
+    required String lineId,
+    required String zoneId,
+    this.rowid = const Value.absent(),
+  }) : stationId = Value(stationId),
+       lineId = Value(lineId),
+       zoneId = Value(zoneId);
+  static Insertable<StationFareZone> custom({
+    Expression<String>? stationId,
+    Expression<String>? lineId,
+    Expression<String>? zoneId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
+      if (zoneId != null) 'zone_id': zoneId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StationFareZonesCompanion copyWith({
+    Value<String>? stationId,
+    Value<String>? lineId,
+    Value<String>? zoneId,
+    Value<int>? rowid,
+  }) {
+    return StationFareZonesCompanion(
+      stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
+      zoneId: zoneId ?? this.zoneId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (stationId.present) {
+      map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (zoneId.present) {
+      map['zone_id'] = Variable<String>(zoneId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationFareZonesCompanion(')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('zoneId: $zoneId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RealtimeProviderLineMappingsTable extends RealtimeProviderLineMappings
     with
         TableInfo<
@@ -15640,6 +17169,12 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   );
   late final $TransitFrequenciesTable transitFrequencies =
       $TransitFrequenciesTable(this);
+  late final $FareZonesTable fareZones = $FareZonesTable(this);
+  late final $FareRulesTable fareRules = $FareRulesTable(this);
+  late final $FareDiscountsTable fareDiscounts = $FareDiscountsTable(this);
+  late final $StationFareZonesTable stationFareZones = $StationFareZonesTable(
+    this,
+  );
   late final $RealtimeProviderLineMappingsTable realtimeProviderLineMappings =
       $RealtimeProviderLineMappingsTable(this);
   late final $RealtimeProviderStationMappingsTable
@@ -15681,6 +17216,10 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     transitTrips,
     transitStopTimes,
     transitFrequencies,
+    fareZones,
+    fareRules,
+    fareDiscounts,
+    stationFareZones,
     realtimeProviderLineMappings,
     realtimeProviderStationMappings,
     networkEdges,
@@ -18398,6 +19937,847 @@ typedef $$TransitFrequenciesTableProcessedTableManager =
         >,
       ),
       TransitFrequency,
+      PrefetchHooks Function()
+    >;
+typedef $$FareZonesTableCreateCompanionBuilder =
+    FareZonesCompanion Function({
+      required String id,
+      required String nameKo,
+      required String region,
+      Value<String> currencyCode,
+      Value<String> sourceId,
+      Value<int> rowid,
+    });
+typedef $$FareZonesTableUpdateCompanionBuilder =
+    FareZonesCompanion Function({
+      Value<String> id,
+      Value<String> nameKo,
+      Value<String> region,
+      Value<String> currencyCode,
+      Value<String> sourceId,
+      Value<int> rowid,
+    });
+
+class $$FareZonesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $FareZonesTable> {
+  $$FareZonesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameKo => $composableBuilder(
+    column: $table.nameKo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get region => $composableBuilder(
+    column: $table.region,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get currencyCode => $composableBuilder(
+    column: $table.currencyCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FareZonesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $FareZonesTable> {
+  $$FareZonesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get nameKo => $composableBuilder(
+    column: $table.nameKo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get region => $composableBuilder(
+    column: $table.region,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get currencyCode => $composableBuilder(
+    column: $table.currencyCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FareZonesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $FareZonesTable> {
+  $$FareZonesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get nameKo =>
+      $composableBuilder(column: $table.nameKo, builder: (column) => column);
+
+  GeneratedColumn<String> get region =>
+      $composableBuilder(column: $table.region, builder: (column) => column);
+
+  GeneratedColumn<String> get currencyCode => $composableBuilder(
+    column: $table.currencyCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+}
+
+class $$FareZonesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $FareZonesTable,
+          FareZone,
+          $$FareZonesTableFilterComposer,
+          $$FareZonesTableOrderingComposer,
+          $$FareZonesTableAnnotationComposer,
+          $$FareZonesTableCreateCompanionBuilder,
+          $$FareZonesTableUpdateCompanionBuilder,
+          (
+            FareZone,
+            BaseReferences<_$CatalogDatabase, $FareZonesTable, FareZone>,
+          ),
+          FareZone,
+          PrefetchHooks Function()
+        > {
+  $$FareZonesTableTableManager(_$CatalogDatabase db, $FareZonesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FareZonesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FareZonesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FareZonesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> nameKo = const Value.absent(),
+                Value<String> region = const Value.absent(),
+                Value<String> currencyCode = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FareZonesCompanion(
+                id: id,
+                nameKo: nameKo,
+                region: region,
+                currencyCode: currencyCode,
+                sourceId: sourceId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String nameKo,
+                required String region,
+                Value<String> currencyCode = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FareZonesCompanion.insert(
+                id: id,
+                nameKo: nameKo,
+                region: region,
+                currencyCode: currencyCode,
+                sourceId: sourceId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FareZonesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $FareZonesTable,
+      FareZone,
+      $$FareZonesTableFilterComposer,
+      $$FareZonesTableOrderingComposer,
+      $$FareZonesTableAnnotationComposer,
+      $$FareZonesTableCreateCompanionBuilder,
+      $$FareZonesTableUpdateCompanionBuilder,
+      (FareZone, BaseReferences<_$CatalogDatabase, $FareZonesTable, FareZone>),
+      FareZone,
+      PrefetchHooks Function()
+    >;
+typedef $$FareRulesTableCreateCompanionBuilder =
+    FareRulesCompanion Function({
+      required String id,
+      required String zoneId,
+      required int baseCardFare,
+      required int baseCashFare,
+      required int baseDistanceMeters,
+      Value<String> additionalStepsJson,
+      Value<int> rowid,
+    });
+typedef $$FareRulesTableUpdateCompanionBuilder =
+    FareRulesCompanion Function({
+      Value<String> id,
+      Value<String> zoneId,
+      Value<int> baseCardFare,
+      Value<int> baseCashFare,
+      Value<int> baseDistanceMeters,
+      Value<String> additionalStepsJson,
+      Value<int> rowid,
+    });
+
+class $$FareRulesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $FareRulesTable> {
+  $$FareRulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get baseCardFare => $composableBuilder(
+    column: $table.baseCardFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get baseCashFare => $composableBuilder(
+    column: $table.baseCashFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get baseDistanceMeters => $composableBuilder(
+    column: $table.baseDistanceMeters,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get additionalStepsJson => $composableBuilder(
+    column: $table.additionalStepsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FareRulesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $FareRulesTable> {
+  $$FareRulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get baseCardFare => $composableBuilder(
+    column: $table.baseCardFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get baseCashFare => $composableBuilder(
+    column: $table.baseCashFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get baseDistanceMeters => $composableBuilder(
+    column: $table.baseDistanceMeters,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get additionalStepsJson => $composableBuilder(
+    column: $table.additionalStepsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FareRulesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $FareRulesTable> {
+  $$FareRulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get zoneId =>
+      $composableBuilder(column: $table.zoneId, builder: (column) => column);
+
+  GeneratedColumn<int> get baseCardFare => $composableBuilder(
+    column: $table.baseCardFare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get baseCashFare => $composableBuilder(
+    column: $table.baseCashFare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get baseDistanceMeters => $composableBuilder(
+    column: $table.baseDistanceMeters,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get additionalStepsJson => $composableBuilder(
+    column: $table.additionalStepsJson,
+    builder: (column) => column,
+  );
+}
+
+class $$FareRulesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $FareRulesTable,
+          FareRule,
+          $$FareRulesTableFilterComposer,
+          $$FareRulesTableOrderingComposer,
+          $$FareRulesTableAnnotationComposer,
+          $$FareRulesTableCreateCompanionBuilder,
+          $$FareRulesTableUpdateCompanionBuilder,
+          (
+            FareRule,
+            BaseReferences<_$CatalogDatabase, $FareRulesTable, FareRule>,
+          ),
+          FareRule,
+          PrefetchHooks Function()
+        > {
+  $$FareRulesTableTableManager(_$CatalogDatabase db, $FareRulesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FareRulesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FareRulesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FareRulesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> zoneId = const Value.absent(),
+                Value<int> baseCardFare = const Value.absent(),
+                Value<int> baseCashFare = const Value.absent(),
+                Value<int> baseDistanceMeters = const Value.absent(),
+                Value<String> additionalStepsJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FareRulesCompanion(
+                id: id,
+                zoneId: zoneId,
+                baseCardFare: baseCardFare,
+                baseCashFare: baseCashFare,
+                baseDistanceMeters: baseDistanceMeters,
+                additionalStepsJson: additionalStepsJson,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String zoneId,
+                required int baseCardFare,
+                required int baseCashFare,
+                required int baseDistanceMeters,
+                Value<String> additionalStepsJson = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FareRulesCompanion.insert(
+                id: id,
+                zoneId: zoneId,
+                baseCardFare: baseCardFare,
+                baseCashFare: baseCashFare,
+                baseDistanceMeters: baseDistanceMeters,
+                additionalStepsJson: additionalStepsJson,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FareRulesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $FareRulesTable,
+      FareRule,
+      $$FareRulesTableFilterComposer,
+      $$FareRulesTableOrderingComposer,
+      $$FareRulesTableAnnotationComposer,
+      $$FareRulesTableCreateCompanionBuilder,
+      $$FareRulesTableUpdateCompanionBuilder,
+      (FareRule, BaseReferences<_$CatalogDatabase, $FareRulesTable, FareRule>),
+      FareRule,
+      PrefetchHooks Function()
+    >;
+typedef $$FareDiscountsTableCreateCompanionBuilder =
+    FareDiscountsCompanion Function({
+      required String id,
+      required String zoneId,
+      required String riderType,
+      Value<int?> cardFare,
+      Value<int?> cashFare,
+      Value<bool> freeRide,
+      Value<String> descriptionKo,
+      Value<int> rowid,
+    });
+typedef $$FareDiscountsTableUpdateCompanionBuilder =
+    FareDiscountsCompanion Function({
+      Value<String> id,
+      Value<String> zoneId,
+      Value<String> riderType,
+      Value<int?> cardFare,
+      Value<int?> cashFare,
+      Value<bool> freeRide,
+      Value<String> descriptionKo,
+      Value<int> rowid,
+    });
+
+class $$FareDiscountsTableFilterComposer
+    extends Composer<_$CatalogDatabase, $FareDiscountsTable> {
+  $$FareDiscountsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get riderType => $composableBuilder(
+    column: $table.riderType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get cardFare => $composableBuilder(
+    column: $table.cardFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get cashFare => $composableBuilder(
+    column: $table.cashFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get freeRide => $composableBuilder(
+    column: $table.freeRide,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get descriptionKo => $composableBuilder(
+    column: $table.descriptionKo,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FareDiscountsTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $FareDiscountsTable> {
+  $$FareDiscountsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get riderType => $composableBuilder(
+    column: $table.riderType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get cardFare => $composableBuilder(
+    column: $table.cardFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get cashFare => $composableBuilder(
+    column: $table.cashFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get freeRide => $composableBuilder(
+    column: $table.freeRide,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get descriptionKo => $composableBuilder(
+    column: $table.descriptionKo,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FareDiscountsTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $FareDiscountsTable> {
+  $$FareDiscountsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get zoneId =>
+      $composableBuilder(column: $table.zoneId, builder: (column) => column);
+
+  GeneratedColumn<String> get riderType =>
+      $composableBuilder(column: $table.riderType, builder: (column) => column);
+
+  GeneratedColumn<int> get cardFare =>
+      $composableBuilder(column: $table.cardFare, builder: (column) => column);
+
+  GeneratedColumn<int> get cashFare =>
+      $composableBuilder(column: $table.cashFare, builder: (column) => column);
+
+  GeneratedColumn<bool> get freeRide =>
+      $composableBuilder(column: $table.freeRide, builder: (column) => column);
+
+  GeneratedColumn<String> get descriptionKo => $composableBuilder(
+    column: $table.descriptionKo,
+    builder: (column) => column,
+  );
+}
+
+class $$FareDiscountsTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $FareDiscountsTable,
+          FareDiscount,
+          $$FareDiscountsTableFilterComposer,
+          $$FareDiscountsTableOrderingComposer,
+          $$FareDiscountsTableAnnotationComposer,
+          $$FareDiscountsTableCreateCompanionBuilder,
+          $$FareDiscountsTableUpdateCompanionBuilder,
+          (
+            FareDiscount,
+            BaseReferences<
+              _$CatalogDatabase,
+              $FareDiscountsTable,
+              FareDiscount
+            >,
+          ),
+          FareDiscount,
+          PrefetchHooks Function()
+        > {
+  $$FareDiscountsTableTableManager(
+    _$CatalogDatabase db,
+    $FareDiscountsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FareDiscountsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FareDiscountsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FareDiscountsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> zoneId = const Value.absent(),
+                Value<String> riderType = const Value.absent(),
+                Value<int?> cardFare = const Value.absent(),
+                Value<int?> cashFare = const Value.absent(),
+                Value<bool> freeRide = const Value.absent(),
+                Value<String> descriptionKo = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FareDiscountsCompanion(
+                id: id,
+                zoneId: zoneId,
+                riderType: riderType,
+                cardFare: cardFare,
+                cashFare: cashFare,
+                freeRide: freeRide,
+                descriptionKo: descriptionKo,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String zoneId,
+                required String riderType,
+                Value<int?> cardFare = const Value.absent(),
+                Value<int?> cashFare = const Value.absent(),
+                Value<bool> freeRide = const Value.absent(),
+                Value<String> descriptionKo = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FareDiscountsCompanion.insert(
+                id: id,
+                zoneId: zoneId,
+                riderType: riderType,
+                cardFare: cardFare,
+                cashFare: cashFare,
+                freeRide: freeRide,
+                descriptionKo: descriptionKo,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FareDiscountsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $FareDiscountsTable,
+      FareDiscount,
+      $$FareDiscountsTableFilterComposer,
+      $$FareDiscountsTableOrderingComposer,
+      $$FareDiscountsTableAnnotationComposer,
+      $$FareDiscountsTableCreateCompanionBuilder,
+      $$FareDiscountsTableUpdateCompanionBuilder,
+      (
+        FareDiscount,
+        BaseReferences<_$CatalogDatabase, $FareDiscountsTable, FareDiscount>,
+      ),
+      FareDiscount,
+      PrefetchHooks Function()
+    >;
+typedef $$StationFareZonesTableCreateCompanionBuilder =
+    StationFareZonesCompanion Function({
+      required String stationId,
+      required String lineId,
+      required String zoneId,
+      Value<int> rowid,
+    });
+typedef $$StationFareZonesTableUpdateCompanionBuilder =
+    StationFareZonesCompanion Function({
+      Value<String> stationId,
+      Value<String> lineId,
+      Value<String> zoneId,
+      Value<int> rowid,
+    });
+
+class $$StationFareZonesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $StationFareZonesTable> {
+  $$StationFareZonesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StationFareZonesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $StationFareZonesTable> {
+  $$StationFareZonesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get zoneId => $composableBuilder(
+    column: $table.zoneId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StationFareZonesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $StationFareZonesTable> {
+  $$StationFareZonesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get stationId =>
+      $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get zoneId =>
+      $composableBuilder(column: $table.zoneId, builder: (column) => column);
+}
+
+class $$StationFareZonesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $StationFareZonesTable,
+          StationFareZone,
+          $$StationFareZonesTableFilterComposer,
+          $$StationFareZonesTableOrderingComposer,
+          $$StationFareZonesTableAnnotationComposer,
+          $$StationFareZonesTableCreateCompanionBuilder,
+          $$StationFareZonesTableUpdateCompanionBuilder,
+          (
+            StationFareZone,
+            BaseReferences<
+              _$CatalogDatabase,
+              $StationFareZonesTable,
+              StationFareZone
+            >,
+          ),
+          StationFareZone,
+          PrefetchHooks Function()
+        > {
+  $$StationFareZonesTableTableManager(
+    _$CatalogDatabase db,
+    $StationFareZonesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StationFareZonesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StationFareZonesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StationFareZonesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> stationId = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
+                Value<String> zoneId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationFareZonesCompanion(
+                stationId: stationId,
+                lineId: lineId,
+                zoneId: zoneId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String stationId,
+                required String lineId,
+                required String zoneId,
+                Value<int> rowid = const Value.absent(),
+              }) => StationFareZonesCompanion.insert(
+                stationId: stationId,
+                lineId: lineId,
+                zoneId: zoneId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StationFareZonesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $StationFareZonesTable,
+      StationFareZone,
+      $$StationFareZonesTableFilterComposer,
+      $$StationFareZonesTableOrderingComposer,
+      $$StationFareZonesTableAnnotationComposer,
+      $$StationFareZonesTableCreateCompanionBuilder,
+      $$StationFareZonesTableUpdateCompanionBuilder,
+      (
+        StationFareZone,
+        BaseReferences<
+          _$CatalogDatabase,
+          $StationFareZonesTable,
+          StationFareZone
+        >,
+      ),
+      StationFareZone,
       PrefetchHooks Function()
     >;
 typedef $$RealtimeProviderLineMappingsTableCreateCompanionBuilder =
@@ -23588,6 +25968,14 @@ class $CatalogDatabaseManager {
       $$TransitStopTimesTableTableManager(_db, _db.transitStopTimes);
   $$TransitFrequenciesTableTableManager get transitFrequencies =>
       $$TransitFrequenciesTableTableManager(_db, _db.transitFrequencies);
+  $$FareZonesTableTableManager get fareZones =>
+      $$FareZonesTableTableManager(_db, _db.fareZones);
+  $$FareRulesTableTableManager get fareRules =>
+      $$FareRulesTableTableManager(_db, _db.fareRules);
+  $$FareDiscountsTableTableManager get fareDiscounts =>
+      $$FareDiscountsTableTableManager(_db, _db.fareDiscounts);
+  $$StationFareZonesTableTableManager get stationFareZones =>
+      $$StationFareZonesTableTableManager(_db, _db.stationFareZones);
   $$RealtimeProviderLineMappingsTableTableManager
   get realtimeProviderLineMappings =>
       $$RealtimeProviderLineMappingsTableTableManager(

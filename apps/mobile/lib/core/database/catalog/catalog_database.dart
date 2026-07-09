@@ -21,6 +21,10 @@ part 'catalog_database.g.dart';
     TransitTrips,
     TransitStopTimes,
     TransitFrequencies,
+    FareZones,
+    FareRules,
+    FareDiscounts,
+    StationFareZones,
     RealtimeProviderLineMappings,
     RealtimeProviderStationMappings,
     NetworkEdges,
@@ -53,7 +57,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration {
@@ -114,6 +118,12 @@ class CatalogDatabase extends _$CatalogDatabase {
         if (from < 13) {
           await _addStationNameSubColumn();
         }
+        if (from < 14) {
+          await migrator.createTable(fareZones);
+          await migrator.createTable(fareRules);
+          await migrator.createTable(fareDiscounts);
+          await migrator.createTable(stationFareZones);
+        }
       },
       beforeOpen: (_) async {
         await customStatement('PRAGMA foreign_keys = ON');
@@ -129,6 +139,7 @@ class CatalogDatabase extends _$CatalogDatabase {
       await _backfillBaselineAccessEdges();
       await _backfillBaselineNetworkEdgeEvidence();
       await _backfillBaselineRouteMapPositions();
+      await _backfillBaselineFareRules();
       return;
     }
 
@@ -243,6 +254,69 @@ class CatalogDatabase extends _$CatalogDatabase {
             stationCode: const Value('433'),
             lineSequence: 28,
             platformInfo: const Value('당고개 방면 / 오이도 방면'),
+          ),
+        ]);
+        batch.insertAllOnConflictUpdate(fareZones, [
+          FareZonesCompanion.insert(
+            id: 'capital-integrated',
+            nameKo: '수도권 통합요금',
+            region: '수도권',
+            currencyCode: const Value('KRW'),
+            sourceId: const Value('baseline-fixture'),
+          ),
+        ]);
+        batch.insertAllOnConflictUpdate(fareRules, [
+          FareRulesCompanion.insert(
+            id: 'capital-integrated-standard',
+            zoneId: 'capital-integrated',
+            baseCardFare: 1550,
+            baseCashFare: 1650,
+            baseDistanceMeters: 10000,
+            additionalStepsJson: const Value(
+              '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]',
+            ),
+          ),
+        ]);
+        batch.insertAllOnConflictUpdate(fareDiscounts, [
+          FareDiscountsCompanion.insert(
+            id: 'capital-integrated-youth',
+            zoneId: 'capital-integrated',
+            riderType: 'YOUTH',
+            cardFare: const Value(900),
+            cashFare: const Value(1000),
+            descriptionKo: const Value('청소년 기준 요금'),
+          ),
+          FareDiscountsCompanion.insert(
+            id: 'capital-integrated-child',
+            zoneId: 'capital-integrated',
+            riderType: 'CHILD',
+            cardFare: const Value(550),
+            cashFare: const Value(550),
+            descriptionKo: const Value('어린이 기준 요금'),
+          ),
+          FareDiscountsCompanion.insert(
+            id: 'capital-integrated-concession',
+            zoneId: 'capital-integrated',
+            riderType: 'CONCESSION',
+            freeRide: const Value(true),
+            descriptionKo: const Value('만 65세 이상·장애인·국가유공자 우대 무임'),
+          ),
+        ]);
+        batch.insertAllOnConflictUpdate(stationFareZones, [
+          StationFareZonesCompanion.insert(
+            stationId: 'station-sangnoksu',
+            lineId: 'seoul-4',
+            zoneId: 'capital-integrated',
+          ),
+          StationFareZonesCompanion.insert(
+            stationId: 'station-sadang',
+            lineId: 'seoul-2',
+            zoneId: 'capital-integrated',
+          ),
+          StationFareZonesCompanion.insert(
+            stationId: 'station-sadang',
+            lineId: 'seoul-4',
+            zoneId: 'capital-integrated',
           ),
         ]);
         batch.insertAllOnConflictUpdate(networkEdges, [
@@ -385,6 +459,102 @@ class CatalogDatabase extends _$CatalogDatabase {
       return;
     }
     await transaction(_seedBaselineRouteMapPositions);
+  }
+
+  Future<void> _backfillBaselineFareRules() async {
+    if (!await _shouldBackfillBaselineFareRules()) {
+      return;
+    }
+    await transaction(() async {
+      await into(fareZones).insertOnConflictUpdate(
+        FareZonesCompanion.insert(
+          id: 'capital-integrated',
+          nameKo: '수도권 통합요금',
+          region: '수도권',
+          currencyCode: const Value('KRW'),
+          sourceId: const Value('baseline-fixture'),
+        ),
+      );
+      await into(fareRules).insertOnConflictUpdate(
+        FareRulesCompanion.insert(
+          id: 'capital-integrated-standard',
+          zoneId: 'capital-integrated',
+          baseCardFare: 1550,
+          baseCashFare: 1650,
+          baseDistanceMeters: 10000,
+          additionalStepsJson: const Value(
+            '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]',
+          ),
+        ),
+      );
+      await batch((batch) {
+        batch.insertAllOnConflictUpdate(fareDiscounts, [
+          FareDiscountsCompanion.insert(
+            id: 'capital-integrated-youth',
+            zoneId: 'capital-integrated',
+            riderType: 'YOUTH',
+            cardFare: const Value(900),
+            cashFare: const Value(1000),
+            descriptionKo: const Value('청소년 기준 요금'),
+          ),
+          FareDiscountsCompanion.insert(
+            id: 'capital-integrated-child',
+            zoneId: 'capital-integrated',
+            riderType: 'CHILD',
+            cardFare: const Value(550),
+            cashFare: const Value(550),
+            descriptionKo: const Value('어린이 기준 요금'),
+          ),
+          FareDiscountsCompanion.insert(
+            id: 'capital-integrated-concession',
+            zoneId: 'capital-integrated',
+            riderType: 'CONCESSION',
+            freeRide: const Value(true),
+            descriptionKo: const Value('만 65세 이상·장애인·국가유공자 우대 무임'),
+          ),
+        ]);
+      });
+      await customStatement('''
+        INSERT OR IGNORE INTO station_fare_zones (station_id, line_id, zone_id)
+        SELECT station_id, line_id, 'capital-integrated'
+        FROM station_lines
+      ''');
+    });
+  }
+
+  Future<bool> _shouldBackfillBaselineFareRules() async {
+    final rows = await customSelect('''
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name IN (
+          'fare_zones',
+          'fare_rules',
+          'fare_discounts',
+          'station_fare_zones'
+        )
+    ''').get();
+    final names = {for (final row in rows) row.read<String>('name')};
+    final hasFareTables = names.containsAll({
+      'fare_zones',
+      'fare_rules',
+      'fare_discounts',
+      'station_fare_zones',
+    });
+    if (!hasFareTables) {
+      return false;
+    }
+    final row = await customSelect('''
+      SELECT
+        (SELECT value
+         FROM catalog_metadata
+         WHERE key = 'activePack') AS active_pack,
+        (SELECT COUNT(*) FROM station_lines) AS station_line_count,
+        (SELECT COUNT(*) FROM fare_rules) AS fare_rule_count
+    ''').getSingle();
+    return row.readNullable<String>('active_pack') == 'capital' &&
+        row.read<int>('station_line_count') > 0 &&
+        row.read<int>('fare_rule_count') == 0;
   }
 
   Future<void> _seedBaselineRouteMapPositions() async {
