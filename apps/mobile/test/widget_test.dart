@@ -7679,7 +7679,9 @@ void main() {
   });
 
   testWidgets('역 상세는 출구 좌표가 없으면 역 좌표 기준으로 직선거리와 도보 길안내를 강등한다', (tester) async {
-    final mapLauncher = _FakeKakaoMapLauncher();
+    final mapLauncher = _FakeKakaoMapLauncher(
+      routeResult: KakaoMapLaunchResult.copied,
+    );
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
       needsPermissionRequest: false,
@@ -7740,6 +7742,7 @@ void main() {
     expect(mapLauncher.routeTargets.single.end.label, '상록수역');
     expect(mapLauncher.routeTargets.single.end.latitude, 37.3024);
     expect(mapLauncher.routeTargets.single.end.longitude, 126.8662);
+    expect(find.text('역 좌표를 복사했습니다. 지도 앱에서 붙여넣어 주세요.'), findsOneWidget);
   });
 
   testWidgets('역 상세는 현재 위치 확인 실패 시 도보 길안내를 열지 않고 쉬운 문구로 안내한다', (tester) async {
@@ -12332,8 +12335,11 @@ class ControlledStationSearchRepository implements StationSearchRepository {
 }
 
 class _FakeKakaoMapLauncher implements KakaoMapLauncher {
+  _FakeKakaoMapLauncher({this.routeResult = KakaoMapLaunchResult.app});
+
   final lookTargets = <KakaoMapTarget>[];
   final routeTargets = <KakaoWalkingRouteTarget>[];
+  final KakaoMapLaunchResult routeResult;
 
   @override
   Future<KakaoMapLaunchResult> openLook(KakaoMapTarget target) async {
@@ -12346,7 +12352,7 @@ class _FakeKakaoMapLauncher implements KakaoMapLauncher {
     KakaoWalkingRouteTarget target,
   ) async {
     routeTargets.add(target);
-    return KakaoMapLaunchResult.app;
+    return routeResult;
   }
 }
 

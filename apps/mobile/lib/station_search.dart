@@ -4405,7 +4405,10 @@ class _StationExitCardState extends State<_StationExitCard> {
       final message = switch (result) {
         KakaoMapLaunchResult.app ||
         KakaoMapLaunchResult.web => '카카오맵 도보 길안내를 열었습니다.',
-        KakaoMapLaunchResult.copied => '출구 좌표를 복사했습니다. 지도 앱에서 붙여넣어 주세요.',
+        KakaoMapLaunchResult.copied =>
+          mapTarget.usesStationFallback
+              ? '역 좌표를 복사했습니다. 지도 앱에서 붙여넣어 주세요.'
+              : '출구 좌표를 복사했습니다. 지도 앱에서 붙여넣어 주세요.',
         KakaoMapLaunchResult.failed => '도보 길안내를 열지 못했어요. 잠시 후 다시 시도해 주세요.',
       };
       messenger.showSnackBar(SnackBar(content: Text(message)));

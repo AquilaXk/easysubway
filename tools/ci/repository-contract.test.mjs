@@ -1957,7 +1957,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(playStoreSubmissionContent.appContentDeclarations.accountCreation, false);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.backgroundLocation, false);
   assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.tracking, false);
-  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.sharesDataWithThirdParties, false);
+  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.sharesDataWithThirdParties, true);
+  assert.match(playStoreSubmissionContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /카카오맵 앱\/웹/);
   assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.dataEncryptedInTransit, true);
   assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.dataDeletionRequestSupported, true);
   assert.ok(playStoreSubmissionContent.dataSafetyDeclarations.requiredCollectedDataTypes.includes("Location"));
@@ -3143,7 +3144,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.equal(privacyInventory.userDataDeletionSupported, true);
   assert.equal(privacyInventory.encryptionInTransitRequired, true);
   assert.equal(privacyInventory.tracking, false);
-  assert.equal(privacyInventory.sharesDataWithThirdParties, false);
+  assert.equal(privacyInventory.sharesDataWithThirdParties, true);
   assert.deepEqual(privacyInventory.googlePlayDataSafetyRequiredFields, [
     "collected",
     "collectionType",
@@ -10994,7 +10995,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     "app help",
     "public policy page",
   ]);
-  assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("제3자 공유 없음"));
+  assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("외부 지도 길안내 제3자 공유 범위"));
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("tracking 없음"));
   assert.equal(playStoreContent.storeMetadataRequirements.publicContactEmailMustMatchAppSupportEmail, true);
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("대중교통"));
@@ -11507,7 +11508,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.applicationId, "easysubway");
   assert.equal(inventory.tracking, false);
-  assert.equal(inventory.sharesDataWithThirdParties, false);
+  assert.equal(inventory.sharesDataWithThirdParties, true);
   assert.equal(inventory.encryptionInTransitRequired, true);
   assert.equal(inventory.userDataDeletionSupported, true);
   assert.match(inventory.privacyPolicyUrlSource, /EASYSUBWAY_PRIVACY_POLICY_URL/);
@@ -11581,8 +11582,24 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    assert.equal(item.lastVerifiedAt, "2026-06-19", `${id} verification date must be current`);
-    assert.equal(item.sharedWithThirdParties, false, `${id} must not be shared with third parties`);
+    const expectedLastVerifiedAt = id === "precise_location" ? "2026-07-09" : "2026-06-19";
+    assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
+    const expectedThirdPartySharing = id === "precise_location";
+    assert.equal(
+      item.sharedWithThirdParties,
+      expectedThirdPartySharing,
+      `${id} third-party sharing flag must match the approved disclosure scope`,
+    );
+    if (expectedThirdPartySharing) {
+      assert.match(item.thirdPartySharingKo, /카카오맵 앱\/웹/, `${id} must explain the external map disclosure`);
+      assert.match(item.thirdPartySharingKo, /서버로 전송하거나 앱에 저장하지 않고/, `${id} must keep the no-persistence boundary`);
+      assert.ok(
+        item.evidence.includes("apps/mobile/release/external-map-deeplink-policy.json"),
+        `${id} must link the external map deeplink policy`,
+      );
+    } else {
+      assert.equal(item.thirdPartySharingKo, undefined, `${id} must not declare third-party sharing copy`);
+    }
     assert.equal(item.usedForTracking, false, `${id} must not be used for tracking`);
     assert.ok(item.googlePlayDataSafety?.dataType, `${id} must map to Play Data safety`);
     assert.equal(typeof item.googlePlayDataSafety.collected, "boolean", `${id} must declare Play collection`);
