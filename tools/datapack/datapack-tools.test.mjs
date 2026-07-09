@@ -8770,7 +8770,7 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
       wednesday: false,
       thursday: false,
       friday: false,
-      saturday: false,
+      saturday: true,
       sunday: true,
       startDate: "20260101",
       endDate: "20261231",
