@@ -44,6 +44,11 @@ class ServiceNoticeServiceTest {
 		}
 
 		@Override
+		public List<ServiceNotice> findRecent(int limit) {
+			return stored.stream().limit(limit).toList();
+		}
+
+		@Override
 		public void deleteById(String id) {
 			stored.removeIf(n -> n.id().equals(id));
 		}
