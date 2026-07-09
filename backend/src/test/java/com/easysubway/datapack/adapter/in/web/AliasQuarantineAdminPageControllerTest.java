@@ -63,7 +63,8 @@ class AliasQuarantineAdminPageControllerTest {
 			.getContentAsString();
 
 		assertThat(html)
-			.contains("Alias / Quarantine")
+			.contains("별칭·격리 검토")
+			.contains("별칭·격리 검색")
 			.contains("alias-station-1")
 			.contains("provider-station-code-243")
 			.contains("station-sangnoksu")

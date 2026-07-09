@@ -98,7 +98,8 @@ class DataSourceSnapshotAdminPageControllerTest {
 			.getContentAsString();
 
 		assertThat(html)
-			.contains("Source Snapshots")
+			.contains("원천 스냅샷")
+			.contains("원천 스냅샷 검색")
 			.contains("kric-station-elevator")
 			.contains("국가철도공단")
 			.contains("12345")

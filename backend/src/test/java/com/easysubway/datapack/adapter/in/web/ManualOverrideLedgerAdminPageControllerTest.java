@@ -63,7 +63,8 @@ class ManualOverrideLedgerAdminPageControllerTest {
 			.getContentAsString();
 
 		assertThat(html)
-			.contains("Manual Overrides")
+			.contains("수동 오버라이드")
+			.contains("수동 오버라이드 검색")
 			.contains("override-approved-1")
 			.contains("FACILITY")
 			.contains("operational_status")
