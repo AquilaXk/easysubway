@@ -39,6 +39,7 @@
       "kric-station-elevator",
       "kric-station-elevator-movement",
       "kric-station-escalator",
+      "kric-subway-timetable",
       "kric-wheelchair-lift-location",
       "kric-wheelchair-lift-movement"
     ],
