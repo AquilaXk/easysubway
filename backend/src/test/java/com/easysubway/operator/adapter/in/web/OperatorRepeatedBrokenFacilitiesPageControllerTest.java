@@ -50,6 +50,13 @@ class OperatorRepeatedBrokenFacilitiesPageControllerTest {
 		assertThat(html)
 			.contains("반복 고장 시설")
 			.contains("운영기관 포털")
+			.contains("method=\"get\"")
+			.contains("name=\"q\"")
+			.contains("name=\"from\"")
+			.contains("name=\"to\"")
+			.contains("aria-sort=")
+			.contains("data-operator-chart=\"bar\"")
+			.contains("차트 데이터 표")
 			.contains("반복 고장 시설")
 			.contains("시설별 반복 신고")
 			.contains("역")
@@ -68,7 +75,6 @@ class OperatorRepeatedBrokenFacilitiesPageControllerTest {
 			.doesNotContain("두 번째 엘리베이터 고장 신고")
 			.doesNotContain("에스컬레이터 단일 고장 신고")
 			.doesNotContain("name=\"_csrf\"")
-			.doesNotContain("<form")
 			.doesNotContain("/admin/reports");
 	}
 

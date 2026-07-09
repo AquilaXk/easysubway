@@ -7,6 +7,7 @@ import com.easysubway.collection.domain.DataCollectionStatus;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,10 @@ class OperatorDataCollectionFailuresAssembler {
 	}
 
 	OperatorDataCollectionFailuresView assemble() {
+		return assemble(OperatorReportQuery.empty());
+	}
+
+	OperatorDataCollectionFailuresView assemble(OperatorReportQuery query) {
 		List<DataCollectionRun> runs = dataCollectionUseCase.listRecentRuns(DEFAULT_RECENT_RUN_LIMIT);
 		long failedRunCount = runs.stream()
 			.filter(run -> run.status() == DataCollectionStatus.FAILED)
@@ -45,6 +50,14 @@ class OperatorDataCollectionFailuresAssembler {
 			.count();
 		List<OperatorDataCollectionFailuresView.DataCollectionRunRow> rows = runs.stream()
 			.map(OperatorDataCollectionFailuresAssembler::row)
+			.filter(row -> query.matches(
+				row.sourceLabel(),
+				row.statusLabel(),
+				row.failureMessage(),
+				row.operatorAction()
+			))
+			.filter(row -> query.includesDateLabel(row.startedAtLabel()))
+			.sorted(dataCollectionComparator(query))
 			.toList();
 		Optional<LocalDateTime> latestCompletedAt = dataCollectionUseCase
 			.getLatestCompletedRun(DataCollectionSource.TRANSIT_MASTER)
@@ -57,8 +70,37 @@ class OperatorDataCollectionFailuresAssembler {
 			freshnessAlertLabel(latestCompletedAt),
 			freshnessAlertDescription(latestCompletedAt),
 			freshnessAlertClass(latestCompletedAt),
+			statusRows(runs),
 			rows
 		);
+	}
+
+	private static List<OperatorDataCollectionFailuresView.StatusCountRow> statusRows(List<DataCollectionRun> runs) {
+		return List.of(
+			new OperatorDataCollectionFailuresView.StatusCountRow("완료", countStatus(runs, DataCollectionStatus.COMPLETED)),
+			new OperatorDataCollectionFailuresView.StatusCountRow("실패", countStatus(runs, DataCollectionStatus.FAILED)),
+			new OperatorDataCollectionFailuresView.StatusCountRow("실행 중", countStatus(runs, DataCollectionStatus.RUNNING))
+		);
+	}
+
+	private static long countStatus(List<DataCollectionRun> runs, DataCollectionStatus status) {
+		return runs.stream()
+			.filter(run -> run.status() == status)
+			.count();
+	}
+
+	private static Comparator<OperatorDataCollectionFailuresView.DataCollectionRunRow> dataCollectionComparator(
+		OperatorReportQuery query
+	) {
+		Comparator<OperatorDataCollectionFailuresView.DataCollectionRunRow> comparator = switch (query.sort()) {
+			case "source" -> Comparator.comparing(OperatorDataCollectionFailuresView.DataCollectionRunRow::sourceLabel);
+			case "status" -> Comparator.comparing(OperatorDataCollectionFailuresView.DataCollectionRunRow::statusLabel);
+			case "collectedCount" -> Comparator.comparingInt(
+				OperatorDataCollectionFailuresView.DataCollectionRunRow::collectedCount
+			);
+			default -> Comparator.comparing(OperatorDataCollectionFailuresView.DataCollectionRunRow::startedAtLabel);
+		};
+		return query.sort().isBlank() || "desc".equals(query.direction()) ? comparator.reversed() : comparator;
 	}
 
 	private String freshnessAlertLabel(Optional<LocalDateTime> latestCompletedAt) {
