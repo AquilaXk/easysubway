@@ -10846,8 +10846,9 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.ok(items.get("play_data_safety").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
   assert.ok(items.get("play_data_safety").linkedArtifacts.includes("apps/mobile/release/play-store-submission-content.json"));
   assert.match(items.get("play_data_safety").readyWhenKo, /collected|collection type|optional\/required|linked to user|deletion support/i);
+  assert.match(items.get("play_data_safety").readyWhenKo, /외부 지도 길안내 제3자 공유 범위|tracking 없음/);
   assert.match(items.get("play_privacy_policy_url").configurationSources.join("\n"), /EASYSUBWAY_PRIVACY_POLICY_URL/);
-  assert.match(items.get("play_privacy_policy_url").readyWhenKo, /public HTTPS|인증 없이|수집 항목|삭제|제3자 공유 없음|tracking 없음/);
+  assert.match(items.get("play_privacy_policy_url").readyWhenKo, /public HTTPS|인증 없이|수집 항목|삭제|외부 지도 길안내 제3자 공유 범위|tracking 없음/);
   assert.match(items.get("play_app_access").readyWhenKo, /로그인 없음|제한 접근|심사 계정/);
   assert.ok(items.get("play_production_access_closed_test").linkedArtifacts.includes("apps/mobile/release/play-production-access-gate.json"));
   assert.match(items.get("play_production_access_closed_test").readyWhenKo, /12명 이상|14일 연속|production access/);
@@ -11720,7 +11721,7 @@ test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
   const infoPlist = read("apps/mobile/ios/Runner/Info.plist");
 
   assert.match(infoPlist, /<key>NSLocationWhenInUseUsageDescription<\/key>/);
-  assert.match(infoPlist, /앱을 사용하는 동안 가까운 역을 찾고 시설 신고 위치를 확인하는 데 사용합니다\./);
+  assert.match(infoPlist, /앱을 사용하는 동안 가까운 역 찾기, 시설 신고 위치 확인, 출구 도보 길안내에 사용합니다\./);
   assert.doesNotMatch(infoPlist, /NSLocationAlways/);
   assert.doesNotMatch(infoPlist, /UIBackgroundModes/);
 });

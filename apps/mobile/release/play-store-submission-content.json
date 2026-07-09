@@ -41,11 +41,11 @@
     "publicUserSignIn": false,
     "accountCreation": false,
     "backgroundLocation": false,
-    "preciseLocation": "optional_user_triggered_nearby_station_and_report_location_only",
+    "preciseLocation": "optional_user_triggered_nearby_station_report_location_and_exit_walk_route",
     "cameraOrPhoto": "optional_user_triggered_report_attachment_only",
     "restrictedContent": false,
     "targetAudience": "all_users_not_child_directed",
-    "reviewerAccessNotesKo": "로그인 없는 앱입니다. 위치 권한은 주변 역 찾기와 신고 위치 확인에서만 선택적으로 사용합니다."
+    "reviewerAccessNotesKo": "로그인 없는 앱입니다. 위치 권한은 주변 역 찾기, 신고 위치 확인, 출구 도보 길안내에서만 선택적으로 사용합니다."
   },
   "requiredScreenshotSet": [
     {
