@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -3129,6 +3130,7 @@ class _StationDetailContent extends StatelessWidget {
             station: detail,
             exit: exit,
             mapLauncher: mapLauncher,
+            locationProvider: locationProvider,
           ),
       const SizedBox(height: 24),
       const _StationDetailSectionTitle(title: '시설'),
@@ -4060,21 +4062,44 @@ class _StationDetailEmptyMessage extends StatelessWidget {
   }
 }
 
-class _StationExitCard extends StatelessWidget {
+class _StationExitCard extends StatefulWidget {
   const _StationExitCard({
     required this.station,
     required this.exit,
     required this.mapLauncher,
+    required this.locationProvider,
   });
 
   final StationDetail station;
   final StationExitInfo exit;
   final KakaoMapLauncher mapLauncher;
+  final CurrentLocationProvider? locationProvider;
+
+  @override
+  State<_StationExitCard> createState() => _StationExitCardState();
+}
+
+class _StationExitCardState extends State<_StationExitCard> {
+  CurrentLocation? _walkingRouteStart;
+  String _locationMessage = '';
+  bool _isLoadingLocation = false;
+  bool _isOpeningWalkingRoute = false;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final hasCoordinate = exit.hasCoordinate;
+    final station = widget.station;
+    final exit = widget.exit;
+    final mapTarget = _stationExitMapTarget(station: station, exit: exit);
+    final walkingRouteStart = _walkingRouteStart;
+    final distanceMeters = walkingRouteStart == null || mapTarget == null
+        ? null
+        : _coordinateDistanceMeters(
+            fromLatitude: walkingRouteStart.latitude,
+            fromLongitude: walkingRouteStart.longitude,
+            toLatitude: mapTarget.target.latitude,
+            toLongitude: mapTarget.target.longitude,
+          );
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -4128,12 +4153,41 @@ class _StationExitCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (hasCoordinate) ...[
+            if (mapTarget?.usesStationFallback ?? false) ...[
+              const SizedBox(height: 8),
+              const _StationDetailInfoRow(
+                icon: Icons.info_outline,
+                text: '출구 좌표가 없어 역 위치 기준으로 안내합니다.',
+              ),
+            ],
+            if (distanceMeters != null) ...[
+              const SizedBox(height: 8),
+              _StationDetailInfoRow(
+                icon: Icons.straighten,
+                text: _exitDistanceLabel(
+                  distanceMeters,
+                  usesStationFallback: mapTarget!.usesStationFallback,
+                ),
+              ),
+            ],
+            if (_locationMessage.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Semantics(
+                liveRegion: true,
+                child: _StationDetailInfoRow(
+                  icon: Icons.info_outline,
+                  text: _locationMessage,
+                ),
+              ),
+            ],
+            if (mapTarget != null) ...[
               const SizedBox(height: 12),
               Semantics(
                 container: true,
                 button: true,
-                label: '${exit.name} 카카오맵에서 보기, 새 앱이 열립니다',
+                label: mapTarget.usesStationFallback
+                    ? '${exit.name} 카카오맵에서 보기, 출구 좌표가 없어 역 위치 기준으로 새 앱이 열립니다'
+                    : '${exit.name} 카카오맵에서 보기, 새 앱이 열립니다',
                 onTap: () => _openExitMap(context),
                 child: SizedBox(
                   width: double.infinity,
@@ -4148,26 +4202,150 @@ class _StationExitCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (mapTarget != null && widget.locationProvider != null) ...[
+              const SizedBox(height: 8),
+              Semantics(
+                container: true,
+                button: true,
+                label: mapTarget.usesStationFallback
+                    ? '${exit.name} 역 위치 기준 직선거리 보기'
+                    : '${exit.name}까지 직선거리 보기',
+                onTap: _loadCurrentLocationForExit,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ExcludeSemantics(
+                    child: OutlinedButton.icon(
+                      key: Key('stationExitDistanceButton-${exit.id}'),
+                      icon: _isLoadingLocation
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.near_me_outlined),
+                      label: Text(
+                        _isLoadingLocation
+                            ? '현재 위치 확인 중'
+                            : mapTarget.usesStationFallback
+                            ? '역까지 거리 보기'
+                            : '출구까지 거리 보기',
+                      ),
+                      onPressed: _isLoadingLocation
+                          ? null
+                          : _loadCurrentLocationForExit,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            if (mapTarget != null && walkingRouteStart != null) ...[
+              const SizedBox(height: 8),
+              Semantics(
+                container: true,
+                button: true,
+                label: mapTarget.usesStationFallback
+                    ? '${exit.name} 역 위치 기준 카카오맵 도보 길안내, 현재 위치와 역 좌표만 사용합니다'
+                    : '${exit.name}까지 카카오맵 도보 길안내, 현재 위치와 출구 좌표만 사용합니다',
+                onTap: () => _openWalkingRoute(context),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ExcludeSemantics(
+                    child: FilledButton.icon(
+                      key: Key('stationExitWalkingRouteButton-${exit.id}'),
+                      icon: _isOpeningWalkingRoute
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.directions_walk),
+                      label: Text(
+                        _isOpeningWalkingRoute ? '길안내 여는 중' : '도보 길안내',
+                      ),
+                      onPressed: _isOpeningWalkingRoute
+                          ? null
+                          : () => _openWalkingRoute(context),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Future<void> _loadCurrentLocationForExit() async {
+    if (_isLoadingLocation) {
+      return;
+    }
+    final provider = widget.locationProvider;
+    if (provider == null) {
+      return;
+    }
+    setState(() {
+      _isLoadingLocation = true;
+      _locationMessage = '';
+    });
+    try {
+      final location = await provider.currentLocation();
+      final blockedMessage = location.nearbySearchBlockedMessage();
+      if (!mounted) {
+        return;
+      }
+      if (blockedMessage != null) {
+        setState(() {
+          _walkingRouteStart = null;
+          _locationMessage = blockedMessage;
+        });
+        return;
+      }
+      setState(() {
+        _walkingRouteStart = location;
+        _locationMessage = '';
+      });
+    } on CurrentLocationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _walkingRouteStart = null;
+        _locationMessage = error.message;
+      });
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '출구 도보 길안내 현재 위치 확인 중 예외가 발생했습니다.',
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _walkingRouteStart = null;
+        _locationMessage = '현재 위치를 확인하지 못했어요.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
+    }
+  }
+
   Future<void> _openExitMap(BuildContext context) async {
-    final latitude = exit.latitude;
-    final longitude = exit.longitude;
-    if (latitude == null || longitude == null) {
+    final mapTarget = _stationExitMapTarget(
+      station: widget.station,
+      exit: widget.exit,
+    );
+    if (mapTarget == null) {
       return;
     }
     final messenger = ScaffoldMessenger.of(context);
-    final result = await mapLauncher.openLook(
-      KakaoMapTarget(
-        label: '${station.nameKo}역 ${exit.name}',
-        latitude: latitude,
-        longitude: longitude,
-      ),
-    );
+    final result = await widget.mapLauncher.openLook(mapTarget.target);
     if (!context.mounted) {
       return;
     }
@@ -4178,7 +4356,126 @@ class _StationExitCard extends StatelessWidget {
     };
     messenger.showSnackBar(SnackBar(content: Text(message)));
   }
+
+  Future<void> _openWalkingRoute(BuildContext context) async {
+    if (_isOpeningWalkingRoute) {
+      return;
+    }
+    final start = _walkingRouteStart;
+    final mapTarget = _stationExitMapTarget(
+      station: widget.station,
+      exit: widget.exit,
+    );
+    if (start == null || mapTarget == null) {
+      return;
+    }
+    setState(() => _isOpeningWalkingRoute = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final result = await widget.mapLauncher.openWalkingRoute(
+        KakaoWalkingRouteTarget(
+          start: KakaoMapPoint(
+            latitude: start.latitude,
+            longitude: start.longitude,
+          ),
+          end: mapTarget.target,
+        ),
+      );
+      if (!mounted) {
+        return;
+      }
+      final message = switch (result) {
+        KakaoMapLaunchResult.app ||
+        KakaoMapLaunchResult.web => '카카오맵 도보 길안내를 열었습니다.',
+        KakaoMapLaunchResult.copied => '출구 좌표를 복사했습니다. 지도 앱에서 붙여넣어 주세요.',
+        KakaoMapLaunchResult.failed => '도보 길안내를 열지 못했어요. 잠시 후 다시 시도해 주세요.',
+      };
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => _isOpeningWalkingRoute = false);
+      }
+    }
+  }
 }
+
+class _StationExitMapTarget {
+  const _StationExitMapTarget({
+    required this.target,
+    required this.usesStationFallback,
+  });
+
+  final KakaoMapTarget target;
+  final bool usesStationFallback;
+}
+
+_StationExitMapTarget? _stationExitMapTarget({
+  required StationDetail station,
+  required StationExitInfo exit,
+}) {
+  final exitLatitude = exit.latitude;
+  final exitLongitude = exit.longitude;
+  if (exitLatitude != null && exitLongitude != null) {
+    return _StationExitMapTarget(
+      target: KakaoMapTarget(
+        label: '${station.nameKo}역 ${exit.name}',
+        latitude: exitLatitude,
+        longitude: exitLongitude,
+      ),
+      usesStationFallback: false,
+    );
+  }
+
+  final stationLatitude = station.latitude;
+  final stationLongitude = station.longitude;
+  if (stationLatitude == null || stationLongitude == null) {
+    return null;
+  }
+  return _StationExitMapTarget(
+    target: KakaoMapTarget(
+      label: '${station.nameKo}역',
+      latitude: stationLatitude,
+      longitude: stationLongitude,
+    ),
+    usesStationFallback: true,
+  );
+}
+
+String _exitDistanceLabel(
+  int distanceMeters, {
+  required bool usesStationFallback,
+}) {
+  final target = usesStationFallback ? '역까지 ' : '';
+  if (distanceMeters < 1000) {
+    return '현재 위치에서 $target직선 ${distanceMeters}m';
+  }
+  return '현재 위치에서 $target직선 ${(distanceMeters / 1000).toStringAsFixed(1)}km';
+}
+
+int _coordinateDistanceMeters({
+  required double fromLatitude,
+  required double fromLongitude,
+  required double toLatitude,
+  required double toLongitude,
+}) {
+  const earthRadiusMeters = 6371000.0;
+  final fromLatRadians = _degreesToRadians(fromLatitude);
+  final toLatRadians = _degreesToRadians(toLatitude);
+  final deltaLat = _degreesToRadians(toLatitude - fromLatitude);
+  final deltaLon = _degreesToRadians(toLongitude - fromLongitude);
+  final haversine =
+      math.sin(deltaLat / 2) * math.sin(deltaLat / 2) +
+      math.cos(fromLatRadians) *
+          math.cos(toLatRadians) *
+          math.sin(deltaLon / 2) *
+          math.sin(deltaLon / 2);
+  return (earthRadiusMeters *
+          2 *
+          math.atan2(math.sqrt(haversine), math.sqrt(1 - haversine)))
+      .round();
+}
+
+double _degreesToRadians(double degrees) => degrees * math.pi / 180;
 
 class _StationFacilityCard extends StatelessWidget {
   const _StationFacilityCard({

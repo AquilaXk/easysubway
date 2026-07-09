@@ -1,0 +1,39 @@
+{
+  "schema": "easysubway.external_map_deeplink_policy.v1",
+  "ownerIssue": "#1770",
+  "approvedAt": "2026-07-09",
+  "status": "approved",
+  "scope": "station_exit_ground_walk_guidance",
+  "providerOrder": [
+    "kakao-map"
+  ],
+  "providers": [
+    {
+      "id": "kakao-map",
+      "displayName": "카카오맵",
+      "requiresSdkKey": false,
+      "embeddedSdkAllowed": false,
+      "appScheme": "kakaomap",
+      "appLookUriPattern": "kakaomap://look?p={latitude},{longitude}",
+      "appWalkingRouteUriPattern": "kakaomap://route?sp={startLatitude},{startLongitude}&ep={endLatitude},{endLongitude}&by=FOOT",
+      "webFallbackHost": "map.kakao.com",
+      "copyFallback": true
+    }
+  ],
+  "fallbackOrder": [
+    "appScheme",
+    "webFallback",
+    "copyCoordinate"
+  ],
+  "privacyContract": {
+    "currentLocationRequest": "explicit_user_tap_only",
+    "serverTransmissionAllowed": false,
+    "locationPersistenceAllowed": false,
+    "externalAppReceivesLocationAfterUserTap": true
+  },
+  "copyContract": {
+    "distanceLabel": "직선거리로만 표시한다.",
+    "missingExitCoordinateFallback": "출구 좌표가 없으면 역 좌표 기준임을 표시한다.",
+    "turnByTurnRouting": "외부 지도 앱에 위임한다."
+  }
+}
