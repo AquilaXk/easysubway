@@ -11915,5 +11915,147 @@
     {
       "feedEndDate": "20261231"
     }
+  ],
+  "serviceCalendarDates": [
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260101",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260101",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260216",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260216",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260217",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260217",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260218",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260218",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260302",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260302",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260505",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260505",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260525",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260525",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260603",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260603",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260817",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260817",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260924",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260924",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20260925",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20260925",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20261005",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20261005",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20261009",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20261009",
+      "exceptionType": 2
+    },
+    {
+      "serviceId": "holiday-kric",
+      "date": "20261225",
+      "exceptionType": 1
+    },
+    {
+      "serviceId": "weekday-kric",
+      "date": "20261225",
+      "exceptionType": 2
+    }
   ]
 }

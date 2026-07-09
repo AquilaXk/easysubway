@@ -8794,6 +8794,14 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
   );
   assert.equal(transformed.scheduleProvenance.sourceId, "kric-subway-timetable");
   assert.match(transformed.scheduleProvenance.providerRecordHash, /^[a-f0-9]{64}$/);
+  assert.equal(transformed.serviceCalendarDates.length, 28);
+  assert.deepEqual(
+    transformed.serviceCalendarDates.filter((row) => row.date === "20261225"),
+    [
+      { serviceId: "holiday-kric", date: "20261225", exceptionType: 1 },
+      { serviceId: "weekday-kric", date: "20261225", exceptionType: 2 },
+    ],
+  );
 });
 
 test("KRIC 4호선 pilot 시간표 transformer는 summary counter만 복사된 부분 artifact를 거부한다", async () => {
@@ -9977,6 +9985,7 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
       ],
     );
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendars").get().count, 2);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendar_dates").get().count, 28);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_trips").get().count, 466);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_stop_times").get().count, 932);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_feed_info").get().count, 1);
@@ -10001,7 +10010,7 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
         .filter((record) => record.sourceId === "kric-subway-timetable")
         .map((record) => record.field),
     )].sort(),
-    ["feed_info", "route", "service_calendar", "stop_time", "trip"],
+    ["calendar_date", "feed_info", "route", "service_calendar", "stop_time", "trip"],
   );
 
   const coverageGapReportPath = path.join(outputDir, "coverage-gap-report.json");

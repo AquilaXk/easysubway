@@ -4863,6 +4863,7 @@ test("앱 bundled KRIC timetable 출처 표시는 bundled capital 시간표 row�
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendars").get().count, 2);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendar_dates").get().count, 28);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_routes").get().count, 2);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_trips").get().count, 466);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_stop_times").get().count, 932);

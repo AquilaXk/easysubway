@@ -23,6 +23,22 @@ const CALENDAR_DAYS = {
   "saturday-kric": { monday: false, tuesday: false, wednesday: false, thursday: false, friday: false, saturday: true, sunday: false },
   "holiday-kric": { monday: false, tuesday: false, wednesday: false, thursday: false, friday: false, saturday: true, sunday: true },
 };
+const WEEKDAY_HOLIDAY_DATES_2026 = [
+  "20260101",
+  "20260216",
+  "20260217",
+  "20260218",
+  "20260302",
+  "20260505",
+  "20260525",
+  "20260603",
+  "20260817",
+  "20260924",
+  "20260925",
+  "20261005",
+  "20261009",
+  "20261225",
+];
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -133,6 +149,7 @@ export function applySchedule(input, artifact, artifactBytes = Buffer.from(JSON.
       retrievedAt: `${artifact.capturedAt ?? "2026-07-09"}T00:00:00.000Z`,
     },
     serviceCalendars,
+    serviceCalendarDates: holidayExceptionDates(),
     transitRoutes: [
       {
         id: "route-seoul-4-up",
@@ -153,6 +170,13 @@ export function applySchedule(input, artifact, artifactBytes = Buffer.from(JSON.
     transitStopTimes,
     transitFeedInfo: [{ feedEndDate: END_DATE }],
   };
+}
+
+function holidayExceptionDates() {
+  return WEEKDAY_HOLIDAY_DATES_2026.flatMap((date) => [
+    { serviceId: "holiday-kric", date, exceptionType: 1 },
+    { serviceId: "weekday-kric", date, exceptionType: 2 },
+  ]);
 }
 
 function stationLineTemplate(input, stationCode) {
