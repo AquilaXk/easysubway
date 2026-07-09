@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/tools/qa"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:23"
+      timezone: "Asia/Seoul"
+    open-pull-requests-limit: 3

@@ -24,6 +24,7 @@ export const MAIN_RULESET_ID = "17584352";
 export const REQUIRED_STATUS_CHECK_CONTEXTS = [
   "Changes",
   "Repository CI",
+  "Admin QA Gates",
   "Backend CI",
   "Mobile App CI",
   "Android CI",

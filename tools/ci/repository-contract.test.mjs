@@ -633,6 +633,7 @@ test("지속적 통합은 README 외 Markdown과 로컬 에이전트 문서 추�
 test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수 있게 표시된다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const releaseGateJob = jobBlock(workflow, "release-gate-consistency", "repository-contracts");
+  const adminQaJob = jobBlock(workflow, "admin-qa-gates", "repository-contracts");
 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /pull_request:[\s\S]*types:[\s\S]*- edited/);
@@ -642,6 +643,8 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.ok(workflow.includes("^\\[(Feat|Fix|Test|Chore|Docs|Build|CI|Style|Refactor|Backend|Mobile)\\]\\ .+"));
   assert.match(workflow, /Use '\[Type\] 한국어 작업 요약' format\./);
   assert.match(workflow, /name: Repository CI/);
+  assert.match(workflow, /name: Admin QA Gates/);
+  assert.match(adminQaJob, /needs\.changes\.outputs\.docs_only != 'true'/);
   assert.match(workflow, /name: Backend CI/);
   assert.match(workflow, /name: Mobile App CI/);
   assert.match(workflow, /name: Android CI/);
@@ -649,6 +652,10 @@ test("지속적 통합 작업과 스텝 이름은 실패 영역을 구분할 수
   assert.doesNotMatch(releaseGateJob, /name: iOS CI/);
   assert.doesNotMatch(releaseGateJob, /runs-on: macos-latest/);
   assert.match(workflow, /Repository CI \/ Run contract tests/);
+  assert.match(workflow, /Admin QA Gates \/ Install pinned QA tools/);
+  assert.match(workflow, /Admin QA Gates \/ Run static QA gates/);
+  assert.match(workflow, /node tools\/ci\/check-admin-vendor-integrity\.mjs/);
+  assert.match(workflow, /npm test --prefix tools\/qa/);
   assert.match(workflow, /Repository CI \/ Set up Chrome for route map tests/);
   assert.match(workflow, /CHROME_PATH: \$\{\{ steps\.setup-chrome\.outputs\.chrome-path \}\}/);
   assert.match(workflow, /ROUTE_MAP_CHROME_NO_SANDBOX: "1"/);
@@ -683,6 +690,7 @@ test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터
   // Release Gate Consistency and PR Title are the two checks #1685 promotes to
   // required, so they must be part of the canonical set.
   assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("Release Gate Consistency"));
+  assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("Admin QA Gates"));
   assert.ok(REQUIRED_STATUS_CHECK_CONTEXTS.includes("PR Title"));
 
   // The automerge coordinator derives the list from the ruleset at runtime, and
@@ -1158,6 +1166,7 @@ test("스케줄 취약점 스캔은 PR 스캔과 동일 SHA·동일 lockfile로 
     "--lockfile=apps/mobile/pubspec.lock",
     "--lockfile=apps/mobile/android/app/gradle.lockfile",
     "--lockfile=backend/gradle.lockfile",
+    "--lockfile=tools/qa/package-lock.json",
   ]) {
     assert.ok(scheduled.includes(lockfile), `scheduled scan must include ${lockfile}`);
   }
@@ -1711,6 +1720,7 @@ test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한�
   assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/pubspec\.lock/);
   assert.match(dependencyScanJob, /--lockfile=apps\/mobile\/android\/app\/gradle\.lockfile/);
   assert.match(dependencyScanJob, /--lockfile=backend\/gradle\.lockfile/);
+  assert.match(dependencyScanJob, /--lockfile=tools\/qa\/package-lock\.json/);
   assert.doesNotMatch(dependencyScanJob, /--config=/);
   assert.doesNotMatch(dependencyScanJob, /-r \.\/|--recursive/);
 });

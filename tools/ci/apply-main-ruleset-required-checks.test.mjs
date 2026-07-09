@@ -35,10 +35,20 @@ function baselineRuleset() {
 
 test("adds only the missing contexts and reports them", () => {
   const { ruleset, added } = ensureRequiredChecks(baselineRuleset(), REQUIRED_STATUS_CHECK_CONTEXTS);
-  assert.deepEqual(added, ["Release Gate Consistency", "PR Title"]);
+  assert.deepEqual(added, ["Admin QA Gates", "Release Gate Consistency", "PR Title"]);
   const rule = ruleset.rules.find((entry) => entry.type === "required_status_checks");
   const contexts = rule.parameters.required_status_checks.map((check) => check.context);
-  assert.deepEqual(contexts, REQUIRED_STATUS_CHECK_CONTEXTS);
+  assert.deepEqual(contexts, [
+    "Changes",
+    "Repository CI",
+    "Backend CI",
+    "Mobile App CI",
+    "Android CI",
+    "Admin QA Gates",
+    "Release Gate Consistency",
+    "PR Title",
+  ]);
+  assert.deepEqual(new Set(contexts), new Set(REQUIRED_STATUS_CHECK_CONTEXTS));
   // Strict policy and other rules are preserved.
   assert.equal(rule.parameters.strict_required_status_checks_policy, true);
   assert.ok(ruleset.rules.some((entry) => entry.type === "deletion"));
@@ -91,11 +101,12 @@ test("toWritableRuleset keeps only the PUT-writable fields and drops read-only e
   assert.deepEqual(writable.rules, [{ type: "deletion" }]);
 });
 
-test("targets the documented main ruleset id and the seven gate contexts", () => {
+test("targets the documented main ruleset id and the eight gate contexts", () => {
   assert.equal(MAIN_RULESET_ID, "17584352");
   assert.deepEqual(REQUIRED_STATUS_CHECK_CONTEXTS, [
     "Changes",
     "Repository CI",
+    "Admin QA Gates",
     "Backend CI",
     "Mobile App CI",
     "Android CI",
