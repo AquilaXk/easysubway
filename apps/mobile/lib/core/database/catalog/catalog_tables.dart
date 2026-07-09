@@ -225,6 +225,84 @@ class TransitFrequencies extends Table {
   ];
 }
 
+class FareZones extends Table {
+  @override
+  String get tableName => 'fare_zones';
+
+  TextColumn get id => text()();
+  TextColumn get nameKo => text().named('name_ko')();
+  TextColumn get region => text()();
+  TextColumn get currencyCode =>
+      text().named('currency_code').withDefault(const Constant('KRW'))();
+  TextColumn get sourceId =>
+      text().named('source_id').withDefault(const Constant(''))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class FareRules extends Table {
+  @override
+  String get tableName => 'fare_rules';
+
+  TextColumn get id => text()();
+  TextColumn get zoneId => text().named('zone_id')();
+  IntColumn get baseCardFare => integer().named('base_card_fare')();
+  IntColumn get baseCashFare => integer().named('base_cash_fare')();
+  IntColumn get baseDistanceMeters => integer().named('base_distance_meters')();
+  TextColumn get additionalStepsJson =>
+      text().named('additional_steps_json').withDefault(const Constant('[]'))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (zone_id) REFERENCES fare_zones(id)',
+  ];
+}
+
+class FareDiscounts extends Table {
+  @override
+  String get tableName => 'fare_discounts';
+
+  TextColumn get id => text()();
+  TextColumn get zoneId => text().named('zone_id')();
+  TextColumn get riderType => text().named('rider_type')();
+  IntColumn get cardFare => integer().named('card_fare').nullable()();
+  IntColumn get cashFare => integer().named('cash_fare').nullable()();
+  BoolColumn get freeRide =>
+      boolean().named('free_ride').withDefault(const Constant(false))();
+  TextColumn get descriptionKo =>
+      text().named('description_ko').withDefault(const Constant(''))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (zone_id) REFERENCES fare_zones(id)',
+  ];
+}
+
+class StationFareZones extends Table {
+  @override
+  String get tableName => 'station_fare_zones';
+
+  TextColumn get stationId => text().named('station_id')();
+  TextColumn get lineId => text().named('line_id')();
+  TextColumn get zoneId => text().named('zone_id')();
+
+  @override
+  Set<Column> get primaryKey => {stationId, lineId};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)',
+    'FOREIGN KEY (zone_id) REFERENCES fare_zones(id)',
+  ];
+}
+
 class RealtimeProviderLineMappings extends Table {
   @override
   String get tableName => 'realtime_provider_line_mappings';
