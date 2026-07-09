@@ -9,11 +9,13 @@ class DataPackMeteredConsentGate extends StatefulWidget {
     required this.stateRepository,
     required this.child,
     this.onAccept,
+    this.recheckAfter,
     super.key,
   });
 
   final DataPackUpdateStateRepository? stateRepository;
   final Future<void> Function()? onAccept;
+  final Future<void>? recheckAfter;
   final Widget child;
 
   @override
@@ -25,11 +27,14 @@ class _DataPackMeteredConsentGateState
     extends State<DataPackMeteredConsentGate> {
   bool _shown = false;
   bool _checking = false;
+  bool _checkAgainAfterCurrent = false;
+  Future<void>? _watchedRecheckAfter;
 
   @override
   void initState() {
     super.initState();
     _scheduleCheck();
+    _watchRecheckAfter();
   }
 
   @override
@@ -38,6 +43,9 @@ class _DataPackMeteredConsentGateState
     if (oldWidget.stateRepository != widget.stateRepository) {
       _shown = false;
       _scheduleCheck();
+    }
+    if (oldWidget.recheckAfter != widget.recheckAfter) {
+      _watchRecheckAfter();
     }
   }
 
@@ -52,8 +60,27 @@ class _DataPackMeteredConsentGateState
     });
   }
 
+  void _watchRecheckAfter() {
+    final recheckAfter = widget.recheckAfter;
+    _watchedRecheckAfter = recheckAfter;
+    if (recheckAfter == null) {
+      return;
+    }
+    unawaited(
+      recheckAfter.whenComplete(() {
+        if (mounted && identical(_watchedRecheckAfter, recheckAfter)) {
+          unawaited(_showIfNeeded());
+        }
+      }),
+    );
+  }
+
   Future<void> _showIfNeeded() async {
-    if (_shown || _checking) {
+    if (_shown) {
+      return;
+    }
+    if (_checking) {
+      _checkAgainAfterCurrent = true;
       return;
     }
     final repository = widget.stateRepository;
@@ -61,8 +88,16 @@ class _DataPackMeteredConsentGateState
       return;
     }
     _checking = true;
-    final state = await repository.readPolicyState();
-    _checking = false;
+    final DataPackUpdatePolicyState state;
+    try {
+      state = await repository.readPolicyState();
+    } finally {
+      _checking = false;
+    }
+    if (_checkAgainAfterCurrent) {
+      _checkAgainAfterCurrent = false;
+      _scheduleCheck();
+    }
     if (!mounted || _shown) {
       return;
     }

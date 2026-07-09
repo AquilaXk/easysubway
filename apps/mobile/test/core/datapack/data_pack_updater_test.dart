@@ -576,6 +576,94 @@ void main() {
     expect(requestCount, 0);
   });
 
+  test('updater는 pending consent가 있으면 unmetered resume에서 하한을 무시한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-datapack-updater-pending-unmetered-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(userDatabase.close);
+    final now = DateTime.utc(2026, 7, 9, 1);
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    final sqliteBytes = await _validCatalogSqliteBytes(directory);
+    final compressedBytes = gzip.encode(sqliteBytes);
+    final requestedPaths = <String>[];
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) {
+      requestedPaths.add(request.uri.path);
+      switch (request.uri.path) {
+        case '/datapacks/catalog/current.json':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..headers.contentType = ContentType.json
+            ..write(
+              jsonEncode({
+                'ttlSeconds': 60,
+                'packs': [
+                  _packJson(
+                    version: '18',
+                    url: 'catalog/capital-v18.sqlite.gz',
+                    compressedBytes: compressedBytes,
+                    sqliteBytes: sqliteBytes,
+                  ),
+                ],
+              }),
+            )
+            ..close();
+        case '/datapacks/catalog/capital-v18.sqlite.gz':
+          request.response
+            ..statusCode = HttpStatus.ok
+            ..add(compressedBytes)
+            ..close();
+        default:
+          request.response
+            ..statusCode = HttpStatus.notFound
+            ..close();
+      }
+    });
+    final stateRepository = DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+      now: () => now,
+    );
+    await stateRepository.savePolicyState(
+      DataPackUpdatePolicyState(
+        lastCheckAt: now.subtract(const Duration(hours: 1)),
+        pendingConsentBytes: compressedBytes.length,
+      ),
+    );
+    final installer = DataPackInstaller(
+      catalogDirectory: catalogDirectory,
+      userDatabase: userDatabase,
+    );
+    final updater = DataPackUpdater(
+      client: DataPackClient(
+        manifestUri: Uri.parse(
+          'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+        ),
+        stateRepository: stateRepository,
+      ),
+      installer: installer,
+      networkConditionSource: const FixedNetworkConditionSource(
+        NetworkCondition.unmetered,
+      ),
+      now: () => now,
+    );
+
+    final results = await updater.checkForUpdates(
+      trigger: UpdateTrigger.foregroundResume,
+    );
+    final policyState = await stateRepository.readPolicyState();
+
+    expect(results.single.status, DataPackInstallStatus.installed);
+    expect(requestedPaths, [
+      '/datapacks/catalog/current.json',
+      '/datapacks/catalog/capital-v18.sqlite.gz',
+    ]);
+    expect(policyState.pendingConsentBytes, isNull);
+    expect((await installer.readCurrentPointer())?.version, '18');
+  });
+
   test('updater는 만료 임박이면 foreground resume 하한을 무시한다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);

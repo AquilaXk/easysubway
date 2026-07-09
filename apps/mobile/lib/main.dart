@@ -98,6 +98,7 @@ Future<void> main() async {
           userDatabase: bootstrap.userDatabase,
         ),
         onDataPackMeteredConsent: bootstrap.acceptMeteredDataPackUpdate,
+        dataPackUpdate: bootstrap.dataPackUpdate,
       ),
     ),
   );
@@ -284,6 +285,7 @@ class EasySubwayApp extends StatelessWidget {
         const UrlLauncherSupportAccessLauncher(),
     DataPackUpdateStateRepository? dataPackUpdateStateRepository,
     Future<void> Function()? onDataPackMeteredConsent,
+    Future<void>? dataPackUpdate,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     Key? key,
@@ -321,6 +323,7 @@ class EasySubwayApp extends StatelessWidget {
          supportAccessLauncher: supportAccessLauncher,
          dataPackUpdateStateRepository: dataPackUpdateStateRepository,
          onDataPackMeteredConsent: onDataPackMeteredConsent,
+         dataPackUpdate: dataPackUpdate,
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
@@ -340,6 +343,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.supportAccessLauncher,
     required this.dataPackUpdateStateRepository,
     required this.onDataPackMeteredConsent,
+    required this.dataPackUpdate,
     required this.recentRoutesFuture,
     super.key,
   }) : repository = dependencies.repository,
@@ -389,6 +393,7 @@ class EasySubwayApp extends StatelessWidget {
   final SupportAccessLauncher supportAccessLauncher;
   final DataPackUpdateStateRepository? dataPackUpdateStateRepository;
   final Future<void> Function()? onDataPackMeteredConsent;
+  final Future<void>? dataPackUpdate;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
 
   @override
@@ -445,38 +450,38 @@ class EasySubwayApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      builder: (context, child) => DataPackMeteredConsentGate(
+      home: DataPackMeteredConsentGate(
         stateRepository: dataPackUpdateStateRepository,
         onAccept: onDataPackMeteredConsent,
-        child: child ?? const SizedBox.shrink(),
-      ),
-      home: _EasySubwayHome(
-        repository: repository,
-        reportRepository: reportRepository,
-        routeRepository: routeRepository,
-        routeFeedbackRepository: routeFeedbackRepository,
-        getOffAlarmController: getOffAlarmController,
-        favoriteRepository: favoriteRepository,
-        favoriteFacilityRepository: favoriteFacilityRepository,
-        favoriteRouteRepository: favoriteRouteRepository,
-        searchHistoryRepository: searchHistoryRepository,
-        internalRouteRepository: internalRouteRepository,
-        networkMapRepository: networkMapRepository,
-        networkMapViewportRepository: networkMapViewportRepository,
-        realtimeRepository: realtimeRepository,
-        notificationRepository: notificationRepository,
-        notificationPermissionProvider: notificationPermissionProvider,
-        locationProvider: locationProvider,
-        initialOnboardingState: initialOnboardingState,
-        onboardingStore: onboardingStore,
-        facilityReportDraftTargetStore: facilityReportDraftTargetStore,
-        facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
-        legacyCredentialCleaner: legacyCredentialCleaner,
-        supportAccessInfo: supportAccessInfo,
-        supportAccessLauncher: supportAccessLauncher,
-        userDataDeletionRepository: userDataDeletionRepository,
-        noticeRepository: noticeRepository,
-        recentRoutesFuture: recentRoutesFuture,
+        recheckAfter: dataPackUpdate,
+        child: _EasySubwayHome(
+          repository: repository,
+          reportRepository: reportRepository,
+          routeRepository: routeRepository,
+          routeFeedbackRepository: routeFeedbackRepository,
+          getOffAlarmController: getOffAlarmController,
+          favoriteRepository: favoriteRepository,
+          favoriteFacilityRepository: favoriteFacilityRepository,
+          favoriteRouteRepository: favoriteRouteRepository,
+          searchHistoryRepository: searchHistoryRepository,
+          internalRouteRepository: internalRouteRepository,
+          networkMapRepository: networkMapRepository,
+          networkMapViewportRepository: networkMapViewportRepository,
+          realtimeRepository: realtimeRepository,
+          notificationRepository: notificationRepository,
+          notificationPermissionProvider: notificationPermissionProvider,
+          locationProvider: locationProvider,
+          initialOnboardingState: initialOnboardingState,
+          onboardingStore: onboardingStore,
+          facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+          facilityReportLostPhotoRestorer: facilityReportLostPhotoRestorer,
+          legacyCredentialCleaner: legacyCredentialCleaner,
+          supportAccessInfo: supportAccessInfo,
+          supportAccessLauncher: supportAccessLauncher,
+          userDataDeletionRepository: userDataDeletionRepository,
+          noticeRepository: noticeRepository,
+          recentRoutesFuture: recentRoutesFuture,
+        ),
       ),
     );
   }

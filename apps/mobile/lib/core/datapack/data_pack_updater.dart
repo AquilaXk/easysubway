@@ -231,6 +231,9 @@ class DataPackUpdater {
     if (trigger != UpdateTrigger.foregroundResume) {
       return false;
     }
+    if (policyState.pendingConsentBytes != null) {
+      return false;
+    }
     if (policy.expiryUrgentIgnoresMinInterval) {
       final cache = await client.stateRepository.readManifestCache();
       final expiresAt = cache?.expiresAt;
