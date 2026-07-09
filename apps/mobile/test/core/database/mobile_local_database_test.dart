@@ -61,6 +61,10 @@ void main() {
         'stations',
         'station_aliases',
         'station_lines',
+        'fare_zones',
+        'fare_rules',
+        'fare_discounts',
+        'station_fare_zones',
         'network_edges',
         'station_exits',
         'facilities',
@@ -152,6 +156,25 @@ void main() {
           FROM route_map_positions
           WHERE station_id = 'station-sangnoksu'
             AND line_id = 'seoul-4'
+          ''').getSingle();
+    final fareRule = await database.customSelect('''
+          SELECT zone_id, base_card_fare, base_cash_fare,
+                 base_distance_meters, additional_steps_json
+          FROM fare_rules
+          WHERE id = 'capital-integrated-standard'
+          ''').getSingle();
+    final fareDiscounts = await database.customSelect('''
+          SELECT rider_type
+          FROM fare_discounts
+          WHERE zone_id = 'capital-integrated'
+          ORDER BY rider_type
+          ''').get();
+    final stationFareZoneCoverage = await database.customSelect('''
+          SELECT
+            (SELECT COUNT(*) FROM station_lines) AS station_line_count,
+            (SELECT COUNT(*)
+             FROM station_fare_zones
+             WHERE zone_id = 'capital-integrated') AS fare_zone_count
           ''').getSingle();
 
     expect(metadata.read<String>('value'), '1');
@@ -288,6 +311,23 @@ void main() {
     expect(displayedSourceValues, isNot(contains('fixture')));
     expect(displayedSourceValues, isNot(contains('easysubway.local')));
     expect(displayedSourceValues, isNot(contains('review-required')));
+    expect(fareRule.read<String>('zone_id'), 'capital-integrated');
+    expect(fareRule.read<int>('base_card_fare'), 1550);
+    expect(fareRule.read<int>('base_cash_fare'), 1650);
+    expect(fareRule.read<int>('base_distance_meters'), 10000);
+    expect(
+      fareRule.read<String>('additional_steps_json'),
+      '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]',
+    );
+    expect(fareDiscounts.map((row) => row.read<String>('rider_type')), [
+      'CHILD',
+      'CONCESSION',
+      'YOUTH',
+    ]);
+    expect(
+      stationFareZoneCoverage.read<int>('fare_zone_count'),
+      stationFareZoneCoverage.read<int>('station_line_count'),
+    );
     expect(
       File('${directory.path}/datapacks/core.sqlite').existsSync(),
       isTrue,
