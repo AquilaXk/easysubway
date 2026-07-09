@@ -686,10 +686,10 @@
       "serviceId": "holiday-kric",
       "monday": false,
       "tuesday": false,
-      "thursday": false,
       "wednesday": false,
+      "thursday": false,
       "friday": false,
-      "saturday": true,
+      "saturday": false,
       "sunday": true,
       "startDate": "20260101",
       "endDate": "20261231"

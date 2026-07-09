@@ -4699,7 +4699,12 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(targets.roadmapEvidenceLedger.goNoGoSummaryIssue, 1020);
   assert.match(targets.roadmapEvidenceLedger.goNoGoSummaryReferencePolicyKo, /#1020/);
   assert.equal(targets.roadmapEvidenceLedger.targetComparison.nationwideTargets.requiredSourceDomainCount, 7);
-  assert.equal(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.requiredSourceDomainCount, 2);
+  assert.equal(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.requiredSourceDomainCount, 3);
+  assert.deepEqual(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.requiredSourceDomains, [
+    "station_line_membership",
+    "accessibility_facilities",
+    "schedule_timetable",
+  ]);
   assert.deepEqual(targets.roadmapEvidenceLedger.targetComparison.capitalPilotTargets.deferredSourceDomains, [
     "route_graph_topology",
     "realtime_arrivals",

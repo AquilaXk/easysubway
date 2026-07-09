@@ -8761,6 +8761,21 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
     ["station-sangnoksu", "station-sadang"],
   );
   assert.deepEqual(transformed.transitFeedInfo, [{ feedEndDate: "20261231" }]);
+  assert.deepEqual(
+    transformed.serviceCalendars.find((calendar) => calendar.serviceId === "holiday-kric"),
+    {
+      serviceId: "holiday-kric",
+      monday: false,
+      tuesday: false,
+      wednesday: false,
+      thursday: false,
+      friday: false,
+      saturday: false,
+      sunday: true,
+      startDate: "20260101",
+      endDate: "20261231",
+    },
+  );
   assert.equal(transformed.scheduleProvenance.sourceId, "kric-subway-timetable");
   assert.match(transformed.scheduleProvenance.providerRecordHash, /^[a-f0-9]{64}$/);
 });
@@ -9488,6 +9503,71 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
   );
   assert.ok(serviceCalendarRecord);
   assert.deepEqual(serviceCalendarRecord.coverageScope.operatorIds, ["seoul-metro"]);
+
+  const scheduleExtrasInput = JSON.parse(JSON.stringify(adjacencySafeInput));
+  scheduleExtrasInput.serviceCalendarDates = [
+    {
+      serviceId: "holiday-kric",
+      date: "20260101",
+      exceptionType: 1,
+    },
+  ];
+  scheduleExtrasInput.transitFrequencies = [
+    {
+      tripId: scheduleExtrasInput.transitTrips[0].id,
+      startTimeSeconds: 18000,
+      endTimeSeconds: 21600,
+      headwaySeconds: 600,
+      exactTimes: false,
+    },
+  ];
+  const scheduleExtrasInputPath = path.join(outputDir, "schedule-extras-input.json");
+  const scheduleExtrasFixturePath = path.join(outputDir, "schedule-extras-fixture.json");
+  const scheduleExtrasPackDir = path.join(outputDir, "schedule-extras-pack");
+  await writeFile(scheduleExtrasInputPath, `${JSON.stringify(scheduleExtrasInput, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/import-official-sources.mjs",
+      "--inventory",
+      "tools/datapack/source-inventory.json",
+      "--input",
+      scheduleExtrasInputPath,
+      "--output",
+      scheduleExtrasFixturePath,
+    ],
+    { cwd: root },
+  );
+  const scheduleExtrasFixture = JSON.parse(await readFile(scheduleExtrasFixturePath, "utf8"));
+  assert.equal(scheduleExtrasFixture.packs[0].serviceCalendarDates[0].sourceId, "kric-subway-timetable");
+  assert.equal(scheduleExtrasFixture.packs[0].transitFrequencies[0].sourceId, "kric-subway-timetable");
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      scheduleExtrasFixturePath,
+      "--output",
+      scheduleExtrasPackDir,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+  const scheduleExtrasProvenance = JSON.parse(
+    await readFile(path.join(scheduleExtrasPackDir, "current.provenance.json"), "utf8"),
+  );
+  const scheduleExtraKricRecords = scheduleExtrasProvenance.packs[0].records.filter(
+    (record) => record.sourceId === "kric-subway-timetable",
+  );
+  assert.ok(
+    scheduleExtraKricRecords.some(
+      (record) => record.entityType === "service_calendar_date" && record.field === "calendar_date",
+    ),
+  );
+  assert.ok(
+    scheduleExtraKricRecords.some(
+      (record) => record.entityType === "transit_frequency" && record.field === "frequency",
+    ),
+  );
   for (const testCase of [
     {
       name: "string-label-dx",
@@ -9864,7 +9944,7 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
         .filter((record) => record.sourceId === "kric-subway-timetable")
         .map((record) => record.field),
     )].sort(),
-    ["service_calendar", "stop_time", "trip"],
+    ["feed_info", "route", "service_calendar", "stop_time", "trip"],
   );
 
   const coverageGapReportPath = path.join(outputDir, "coverage-gap-report.json");

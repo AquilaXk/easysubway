@@ -1042,8 +1042,12 @@ function transitScheduleRowsWithProvenance(rows, provenance) {
   return {
     ...rows,
     serviceCalendars: rows.serviceCalendars.map((row) => scheduleRowWithProvenance(row, provenance)),
+    serviceCalendarDates: rows.serviceCalendarDates.map((row) => scheduleRowWithProvenance(row, provenance)),
+    transitRoutes: rows.transitRoutes.map((row) => scheduleRowWithProvenance(row, provenance)),
     transitTrips: rows.transitTrips.map((row) => scheduleRowWithProvenance(row, provenance)),
     transitStopTimes: rows.transitStopTimes.map((row) => scheduleRowWithProvenance(row, provenance)),
+    transitFrequencies: rows.transitFrequencies.map((row) => scheduleRowWithProvenance(row, provenance)),
+    transitFeedInfo: rows.transitFeedInfo.map((row) => scheduleRowWithProvenance(row, provenance)),
   };
 }
 

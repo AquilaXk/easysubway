@@ -21,7 +21,7 @@ const STATION_MAP = {
 const CALENDAR_DAYS = {
   "weekday-kric": { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false },
   "saturday-kric": { monday: false, tuesday: false, wednesday: false, thursday: false, friday: false, saturday: true, sunday: false },
-  "holiday-kric": { monday: false, tuesday: false, thursday: false, wednesday: false, friday: false, saturday: true, sunday: true },
+  "holiday-kric": { monday: false, tuesday: false, wednesday: false, thursday: false, friday: false, saturday: false, sunday: true },
 };
 
 async function main() {

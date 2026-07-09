@@ -288,8 +288,8 @@
         ]
       },
       "capitalPilotTargets": {
-        "requiredSourceDomainCount": 2,
-        "requiredSourceDomains": ["station_line_membership", "accessibility_facilities"],
+        "requiredSourceDomainCount": 3,
+        "requiredSourceDomains": ["station_line_membership", "accessibility_facilities", "schedule_timetable"],
         "deferredSourceDomains": [
           "route_graph_topology",
           "realtime_arrivals",
