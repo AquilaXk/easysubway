@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -45,7 +46,10 @@ class ServiceNoticeServiceTest {
 
 		@Override
 		public List<ServiceNotice> findRecent(int limit) {
-			return stored.stream().limit(limit).toList();
+			return stored.stream()
+				.sorted(Comparator.comparing(ServiceNotice::publishedAt).reversed())
+				.limit(limit)
+				.toList();
 		}
 
 		@Override

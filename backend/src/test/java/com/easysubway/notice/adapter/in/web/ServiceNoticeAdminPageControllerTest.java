@@ -108,6 +108,36 @@ class ServiceNoticeAdminPageControllerTest {
 			.andExpect(status().isForbidden());
 	}
 
+	@Test
+	@DisplayName("잘못된 발행 입력은 400으로 거부된다")
+	void invalidPublishFormRejectedAsBadRequest() throws Exception {
+		mockMvc.perform(post("/admin/notices/page")
+				.with(csrf())
+				.with(commandToken())
+				.with(operationsManager())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED)
+				.param("scope", "ALL")
+				.param("severity", "WARN")
+				.param("title", "잘못된 공지")
+				.param("body", "본문"))
+			.andExpect(status().isBadRequest());
+
+		assertThat(repository.findActiveAt(LocalDateTime.now(ZoneOffset.UTC))).isEmpty();
+	}
+
+	@Test
+	@DisplayName("없는 공지 내리기는 성공 audit 없이 404로 닫는다")
+	void missingUnpublishRejectedAsNotFound() throws Exception {
+		mockMvc.perform(post("/admin/notices/missing/unpublish/page")
+				.with(csrf())
+				.with(commandToken())
+				.with(operationsManager())
+				.contentType(MediaType.APPLICATION_FORM_URLENCODED))
+			.andExpect(status().isNotFound());
+
+		assertThat(auditRecorded("UNPUBLISH_NOTICE", "missing")).isFalse();
+	}
+
 	private RequestPostProcessor operationsManager() {
 		return user("operator").authorities(new SimpleGrantedAuthority("admin.operations.manage"));
 	}
