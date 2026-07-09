@@ -7605,8 +7605,14 @@ void main() {
 
   testWidgets('역 상세는 현재 위치 기준 출구 직선거리와 카카오맵 도보 길안내를 보여준다', (tester) async {
     final mapLauncher = _FakeKakaoMapLauncher();
+    var locationRequestCount = 0;
     final locationProvider = FakeCurrentLocationProvider(
-      location: _freshCurrentLocation(),
+      locationLoader: () async {
+        locationRequestCount++;
+        return locationRequestCount == 1
+            ? _freshCurrentLocation(latitude: 37.3028, longitude: 126.8665)
+            : _freshCurrentLocation(latitude: 37.3032, longitude: 126.8671);
+      },
       needsPermissionRequest: false,
     );
     final stationRepository = FakeStationSearchRepository(
@@ -7662,9 +7668,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(locationProvider.requestCount, 2);
     expect(mapLauncher.routeTargets, hasLength(1));
-    expect(mapLauncher.routeTargets.single.start.latitude, 37.3028);
-    expect(mapLauncher.routeTargets.single.start.longitude, 126.8665);
+    expect(mapLauncher.routeTargets.single.start.latitude, 37.3032);
+    expect(mapLauncher.routeTargets.single.start.longitude, 126.8671);
     expect(mapLauncher.routeTargets.single.end.label, '상록수역 1번 출구');
     expect(mapLauncher.routeTargets.single.end.latitude, 37.3021);
     expect(mapLauncher.routeTargets.single.end.longitude, 126.8661);
@@ -7783,6 +7790,72 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
+    expect(
+      find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
+      findsNothing,
+    );
+    expect(mapLauncher.routeTargets, isEmpty);
+  });
+
+  testWidgets('역 상세는 오래된 위치를 출구 안내용 문구로 막는다', (tester) async {
+    final mapLauncher = _FakeKakaoMapLauncher();
+    final locationProvider = FakeCurrentLocationProvider(
+      location: CurrentLocation(
+        latitude: 37.3028,
+        longitude: 126.8665,
+        accuracyMeters: 25,
+        measuredAt: DateTime.now().subtract(const Duration(minutes: 20)),
+        provider: 'gps',
+        permissionPrecision: LocationPermissionPrecision.precise,
+      ),
+      needsPermissionRequest: false,
+    );
+    final stationRepository = FakeStationSearchRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationExits: const [
+        StationExitInfo(
+          id: 'exit-sangnoksu-1',
+          stationId: 'station-sangnoksu',
+          exitNumber: '1',
+          name: '1번 출구',
+          latitude: 37.3021,
+          longitude: 126.8661,
+          hasElevatorConnection: true,
+          hasStairOnlyPath: false,
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationDetailScreen(
+          repository: stationRepository,
+          reportRepository: FakeFacilityReportRepository(),
+          stationId: 'station-sangnoksu',
+          locationProvider: locationProvider,
+          mapLauncher: mapLauncher,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('stationExitDistanceButton-exit-sangnoksu-1')),
+      500,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationExitDistanceButton-exit-sangnoksu-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('현재 위치가 오래되어 출구까지 안내하기 어려워요. 다시 확인해 주세요.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('출발역을 직접 선택'), findsNothing);
     expect(
       find.byKey(const Key('stationExitWalkingRouteButton-exit-sangnoksu-1')),
       findsNothing,

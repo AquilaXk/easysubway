@@ -4292,29 +4292,44 @@ class _StationExitCardState extends State<_StationExitCard> {
       _locationMessage = '';
     });
     try {
+      await _loadUsableCurrentLocationForExit();
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
+    }
+  }
+
+  Future<CurrentLocation?> _loadUsableCurrentLocationForExit() async {
+    final provider = widget.locationProvider;
+    if (provider == null) {
+      return null;
+    }
+    try {
       final location = await provider.currentLocation();
-      final blockedMessage = location.nearbySearchBlockedMessage();
+      final blockedMessage = _exitWalkingLocationBlockedMessage(location);
       if (!mounted) {
-        return;
+        return null;
       }
       if (blockedMessage != null) {
         setState(() {
           _walkingRouteStart = null;
           _locationMessage = blockedMessage;
         });
-        return;
+        return null;
       }
       setState(() {
         _walkingRouteStart = location;
         _locationMessage = '';
       });
+      return location;
     } on CurrentLocationException catch (error) {
       if (!mounted) {
-        return;
+        return null;
       }
       setState(() {
         _walkingRouteStart = null;
-        _locationMessage = error.message;
+        _locationMessage = _exitWalkingLocationExceptionMessage(error);
       });
     } catch (error, stackTrace) {
       reportMobileError(
@@ -4323,17 +4338,14 @@ class _StationExitCardState extends State<_StationExitCard> {
         context: '출구 도보 길안내 현재 위치 확인 중 예외가 발생했습니다.',
       );
       if (!mounted) {
-        return;
+        return null;
       }
       setState(() {
         _walkingRouteStart = null;
         _locationMessage = '현재 위치를 확인하지 못했어요.';
       });
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingLocation = false);
-      }
     }
+    return null;
   }
 
   Future<void> _openExitMap(BuildContext context) async {
@@ -4358,20 +4370,26 @@ class _StationExitCardState extends State<_StationExitCard> {
   }
 
   Future<void> _openWalkingRoute(BuildContext context) async {
-    if (_isOpeningWalkingRoute) {
+    if (_isOpeningWalkingRoute || _isLoadingLocation) {
       return;
     }
-    final start = _walkingRouteStart;
     final mapTarget = _stationExitMapTarget(
       station: widget.station,
       exit: widget.exit,
     );
-    if (start == null || mapTarget == null) {
+    if (mapTarget == null) {
       return;
     }
-    setState(() => _isOpeningWalkingRoute = true);
+    setState(() {
+      _isOpeningWalkingRoute = true;
+      _locationMessage = '';
+    });
     final messenger = ScaffoldMessenger.of(context);
     try {
+      final start = await _loadUsableCurrentLocationForExit();
+      if (!mounted || start == null) {
+        return;
+      }
       final result = await widget.mapLauncher.openWalkingRoute(
         KakaoWalkingRouteTarget(
           start: KakaoMapPoint(
@@ -4397,6 +4415,26 @@ class _StationExitCardState extends State<_StationExitCard> {
       }
     }
   }
+}
+
+String? _exitWalkingLocationBlockedMessage(CurrentLocation location) {
+  return switch (location.qualityStatus()) {
+    CurrentLocationQualityStatus.freshPrecise => null,
+    CurrentLocationQualityStatus.unavailable =>
+      '현재 위치 정확도 정보를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    CurrentLocationQualityStatus.stale =>
+      '현재 위치가 오래되어 출구까지 안내하기 어려워요. 다시 확인해 주세요.',
+    CurrentLocationQualityStatus.coarse =>
+      '현재 위치 정확도가 낮아 출구까지 안내하기 어려워요. 정확한 위치 권한을 허용해 주세요.',
+    CurrentLocationQualityStatus.mocked => '모의 위치는 출구 도보 길안내에 사용할 수 없어요.',
+  };
+}
+
+String _exitWalkingLocationExceptionMessage(CurrentLocationException error) {
+  if (error.message == _currentLocationDisabledMessage) {
+    return '휴대전화의 위치 기능을 켜 주세요. 출구까지 안내하는 데 필요합니다.';
+  }
+  return error.message;
 }
 
 class _StationExitMapTarget {
