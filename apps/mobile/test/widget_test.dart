@@ -8,6 +8,7 @@ import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
+import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
@@ -7517,6 +7518,91 @@ void main() {
     }
   });
 
+  testWidgets('역 상세는 좌표 있는 출구에만 카카오맵 버튼을 보여준다', (tester) async {
+    debugStationVerifiedClock = () => DateTime(2026, 7, 9);
+    final semanticsHandle = tester.ensureSemantics();
+    final mapLauncher = _FakeKakaoMapLauncher();
+    final stationRepository = FakeStationSearchRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      stationExits: const [
+        StationExitInfo(
+          id: 'exit-sangnoksu-1',
+          stationId: 'station-sangnoksu',
+          exitNumber: '1',
+          name: '1번 출구',
+          latitude: 37.3021,
+          longitude: 126.8661,
+          hasElevatorConnection: true,
+          hasStairOnlyPath: false,
+          dataConfidence: 'HIGH',
+          dataSourceType: 'OFFICIAL_FILE',
+          lastVerifiedAt: '2026-06-19',
+        ),
+        StationExitInfo(
+          id: 'exit-sangnoksu-2',
+          stationId: 'station-sangnoksu',
+          exitNumber: '2',
+          name: '2번 출구',
+          hasElevatorConnection: false,
+          hasStairOnlyPath: true,
+          dataConfidence: 'LOW',
+          dataSourceType: 'OFFICIAL_FILE',
+        ),
+      ],
+    );
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationDetailScreen(
+            repository: stationRepository,
+            reportRepository: FakeFacilityReportRepository(),
+            stationId: 'station-sangnoksu',
+            mapLauncher: mapLauncher,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('stationExitMapButton-exit-sangnoksu-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('stationExitMapButton-exit-sangnoksu-2')),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 최근 확인 2주 전'),
+        findsOneWidget,
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationExitMapButton-exit-sangnoksu-1')),
+        500,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsLabel('1번 출구 카카오맵에서 보기, 새 앱이 열립니다'),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel('카카오맵에서 보기'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const Key('stationExitMapButton-exit-sangnoksu-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(mapLauncher.lookTargets, hasLength(1));
+      expect(mapLauncher.lookTargets.single.label, '상록수역 1번 출구');
+      expect(mapLauncher.lookTargets.single.latitude, 37.3021);
+      expect(mapLauncher.lookTargets.single.longitude, 126.8661);
+      expect(find.text('카카오맵을 열었습니다.'), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('역 상세는 주입된 내부 이동 경로를 쉬운 단계 안내로 보여준다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
@@ -11982,6 +12068,25 @@ class ControlledStationSearchRepository implements StationSearchRepository {
 
   void complete(List<StationSearchResult> results) {
     _completer.complete(results);
+  }
+}
+
+class _FakeKakaoMapLauncher implements KakaoMapLauncher {
+  final lookTargets = <KakaoMapTarget>[];
+  final routeTargets = <KakaoWalkingRouteTarget>[];
+
+  @override
+  Future<KakaoMapLaunchResult> openLook(KakaoMapTarget target) async {
+    lookTargets.add(target);
+    return KakaoMapLaunchResult.app;
+  }
+
+  @override
+  Future<KakaoMapLaunchResult> openWalkingRoute(
+    KakaoWalkingRouteTarget target,
+  ) async {
+    routeTargets.add(target);
+    return KakaoMapLaunchResult.app;
   }
 }
 

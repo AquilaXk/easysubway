@@ -147,7 +147,10 @@ void main() {
     expect(detail.dataQualityLevel, 'LEVEL_2');
     expect(detail.lastVerifiedAt, '2026-06-19');
     expect(exits.single.name, '1번 출구');
+    expect(exits.single.latitude, closeTo(37.3021, 0.0001));
+    expect(exits.single.longitude, closeTo(126.8661, 0.0001));
     expect(exits.single.hasElevatorConnection, isTrue);
+    expect(exits.single.lastVerifiedAt, '2026-06-19');
     final elevator = facilities.singleWhere(
       (facility) => facility.id == 'facility-sangnoksu-elevator-1',
     );
@@ -256,7 +259,10 @@ void main() {
     );
     final repository = DriftStationRepository(database: database);
 
-    final map = await repository.getNetworkMap(region: '수도권', lineId: 'seoul-4');
+    final map = await repository.getNetworkMap(
+      region: '수도권',
+      lineId: 'seoul-4',
+    );
     final track = map.lineTracks.singleWhere(
       (track) => track.lineId == 'seoul-4',
     );
