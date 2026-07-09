@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
@@ -1945,6 +1946,8 @@ class RouteSearchStep {
     required String title,
     required String lineName,
     required String actionDetail,
+    String? plannedArrivalTimeIso,
+    String? realtimeArrivalTimeIso,
   }) {
     return RouteSearchStep(
       sequence: sequence,
@@ -1967,6 +1970,10 @@ class RouteSearchStep {
       timeSource: timeSource,
       distanceSource: distanceSource,
       confidenceLabel: confidenceLabel,
+      plannedArrivalTimeIso:
+          plannedArrivalTimeIso ?? this.plannedArrivalTimeIso,
+      realtimeArrivalTimeIso:
+          realtimeArrivalTimeIso ?? this.realtimeArrivalTimeIso,
     );
   }
 
@@ -2304,10 +2311,14 @@ class RouteSearchController extends ChangeNotifier {
       if (staleRefresh()) {
         return;
       }
+      final refreshedResult = _preserveGetOffAlarmArrivalTimes(
+        next: refreshed.result,
+        previous: currentResult,
+      );
       _emitState(
         RouteSearchState(
           status: RouteSearchViewStatus.success,
-          result: refreshed.result,
+          result: refreshedResult,
           refreshMessage: refreshed.userMessage,
         ),
       );
@@ -2438,7 +2449,50 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _controller.refreshCurrentRoute();
+      unawaited(_refreshCurrentRouteAndAlarm());
+    }
+  }
+
+  Future<void> _refreshCurrentRouteAndAlarm() async {
+    await _controller.refreshCurrentRoute();
+    if (!mounted) {
+      return;
+    }
+    final getOffAlarmController = widget.getOffAlarmController;
+    final result = _controller.state.result;
+    if (getOffAlarmController == null || result == null) {
+      return;
+    }
+    final rideLegs = _rideLegArrivalsFromResult(result);
+    if (rideLegs.isEmpty) {
+      return;
+    }
+    try {
+      final activeSubscription = await getOffAlarmController.repository
+          .loadActive();
+      if (!mounted) {
+        return;
+      }
+      await getOffAlarmController.refresh(
+        stops: getOffAlarmStopsFromRideLegs(
+          rideLegs: rideLegs,
+          stationName: (id) => id,
+        ),
+        transferAlarmEnabled: activeSubscription?.transferAlarmEnabled ?? true,
+      );
+      if (kDebugMode && getOffAlarmController.state.enabled) {
+        debugPrint(
+          'get_off_alarm foreground_refresh '
+          'scheduled_count=${getOffAlarmController.state.scheduledCount} '
+          'mode=${getOffAlarmController.state.scheduleMode?.name ?? 'unknown'}',
+        );
+      }
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '하차 알림 foreground 재예약 중 예외가 발생했습니다.',
+      );
     }
   }
 
@@ -4082,18 +4136,7 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rideLegs = <RideLegArrival>[];
-    for (final step in result.steps) {
-      if (step.stepType == 'ride' && step.plannedArrivalTimeIso.isNotEmpty) {
-        rideLegs.add(
-          RideLegArrival(
-            toStationId: step.toStationId,
-            plannedArrivalIso: step.plannedArrivalTimeIso,
-            realtimeArrivalIso: step.realtimeArrivalTimeIso,
-          ),
-        );
-      }
-    }
+    final rideLegs = _rideLegArrivalsFromResult(result);
     if (rideLegs.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -4107,6 +4150,78 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
       ),
     );
   }
+}
+
+List<RideLegArrival> _rideLegArrivalsFromResult(RouteSearchResult result) {
+  final rideLegs = <RideLegArrival>[];
+  for (final step in result.steps) {
+    if (step.stepType == 'ride' && step.plannedArrivalTimeIso.isNotEmpty) {
+      rideLegs.add(
+        RideLegArrival(
+          toStationId: step.toStationId,
+          plannedArrivalIso: step.plannedArrivalTimeIso,
+          realtimeArrivalIso: step.realtimeArrivalTimeIso,
+        ),
+      );
+    }
+  }
+  return rideLegs;
+}
+
+RouteSearchResult _preserveGetOffAlarmArrivalTimes({
+  required RouteSearchResult next,
+  required RouteSearchResult previous,
+}) {
+  if (_rideLegArrivalsFromResult(previous).isEmpty) {
+    return next;
+  }
+  final previousRideSteps = previous.steps
+      .where(
+        (step) =>
+            step.stepType == 'ride' && step.plannedArrivalTimeIso.isNotEmpty,
+      )
+      .toList(growable: false);
+  var changed = false;
+  final steps = next.steps
+      .map((step) {
+        if (step.stepType != 'ride' || step.plannedArrivalTimeIso.isNotEmpty) {
+          return step;
+        }
+        final matched = _matchingPreviousRideStep(
+          step: step,
+          previousRideSteps: previousRideSteps,
+        );
+        if (matched == null) {
+          return step;
+        }
+        changed = true;
+        return step.withDisplayLabels(
+          title: step.title,
+          lineName: step.lineName,
+          actionDetail: step.actionDetail,
+          plannedArrivalTimeIso: matched.plannedArrivalTimeIso,
+          realtimeArrivalTimeIso: matched.realtimeArrivalTimeIso,
+        );
+      })
+      .toList(growable: false);
+  if (!changed) {
+    return next;
+  }
+  return next.withDisplayLabels(steps: steps);
+}
+
+RouteSearchStep? _matchingPreviousRideStep({
+  required RouteSearchStep step,
+  required List<RouteSearchStep> previousRideSteps,
+}) {
+  for (final previousStep in previousRideSteps) {
+    if (previousStep.fromStationId == step.fromStationId &&
+        previousStep.toStationId == step.toStationId &&
+        previousStep.lineId == step.lineId) {
+      return previousStep;
+    }
+  }
+  return null;
 }
 
 class _RouteResultsListView extends StatelessWidget {

@@ -9,6 +9,13 @@ import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controller.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_notifier.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_mode.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
@@ -9333,6 +9340,232 @@ void main() {
     expect(find.textContaining('시간표'), findsNothing);
   });
 
+  testWidgets('planned 승차 시간이 있는 경로 결과는 하차 알림 토글을 보여준다', (tester) async {
+    final controller = GetOffAlarmController(
+      notifier: _RecordingGetOffAlarmNotifier(),
+      permissionGate: _StubExactAlarmPermissionGate(),
+      repository: _MemoryGetOffAlarmStateRepository(),
+      now: () => DateTime(2026, 7, 6, 9, 0),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              steps: const [
+                RouteSearchStep(
+                  sequence: 1,
+                  stepType: 'entry',
+                  title: '상록수 승강장 접근',
+                  description: '승강장까지 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sangnoksu',
+                  toStationId: 'station-sangnoksu',
+                  estimatedMinutes: 6,
+                  distanceMeters: 180,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
+                ),
+                RouteSearchStep(
+                  sequence: 2,
+                  stepType: 'ride',
+                  title: '상록수에서 사당까지 이동',
+                  description: '열차를 이용해 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sangnoksu',
+                  toStationId: 'station-sadang',
+                  estimatedMinutes: 32,
+                  distanceMeters: 13500,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
+                  plannedArrivalTimeIso: '2026-07-06T09:37:30+09:00',
+                ),
+              ],
+              etaSource: 'STATIC_BACKEND_ESTIMATE',
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          getOffAlarmController: controller,
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 6),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('하차 알림'), findsOneWidget);
+    expect(find.text('폰을 보지 않아도 내릴 때 알려드려요.'), findsOneWidget);
+  });
+
+  testWidgets('foreground 복귀는 활성 하차 알림을 현재 경로 시간으로 재예약한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final now = DateTime.parse('2026-07-06T09:00:00+09:00');
+    final transferArrivalAt = DateTime.parse('2026-07-06T09:20:00+09:00');
+    final arrivalAt = DateTime.parse('2026-07-06T09:37:30+09:00');
+    final fireAt = DateTime.parse('2026-07-06T09:35:30+09:00');
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      repository: stateRepository,
+      now: () => now,
+    );
+    addTearDown(controller.dispose);
+    final repository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'ride',
+            title: '상록수에서 금정까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-geumjeong',
+            estimatedMinutes: 15,
+            distanceMeters: 6300,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+            plannedArrivalTimeIso: '2026-07-06T09:20:00+09:00',
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'ride',
+            title: '금정에서 사당까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-geumjeong',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 17,
+            distanceMeters: 7200,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+            plannedArrivalTimeIso: '2026-07-06T09:37:30+09:00',
+          ),
+        ],
+        etaSource: 'STATIC_BACKEND_ESTIMATE',
+      ),
+    );
+    repository.refreshResult = RouteRefreshResult(
+      routeSearchId: 'route-1',
+      status: 'UNCHANGED',
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'ride',
+            title: '수도권 4호선으로 금정역까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-geumjeong',
+            estimatedMinutes: 15,
+            distanceMeters: 6300,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+            plannedArrivalTimeIso: '2026-07-06T09:20:00+09:00',
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'ride',
+            title: '수도권 4호선으로 사당역까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-geumjeong',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 17,
+            distanceMeters: 7200,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+          ),
+        ],
+        etaSource: 'STATIC_BACKEND_ESTIMATE',
+      ),
+      refreshedAt: '2026-07-06T09:01:00+09:00',
+      etaSource: 'STATIC_BACKEND_ESTIMATE',
+      etaConfidence: 'LOW',
+      sourceLabel: '상수 추정 기준',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: repository,
+          stationRepository: FakeStationSearchRepository(),
+          getOffAlarmController: controller,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 6),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await controller.enable(
+      routeId: 'route-1',
+      stops: [
+        GetOffAlarmStop(
+          stationId: 'station-geumjeong',
+          stationName: '금정',
+          arrivalAt: transferArrivalAt,
+          kind: GetOffAlarmKind.transfer,
+        ),
+        GetOffAlarmStop(
+          stationId: 'station-sadang',
+          stationName: '사당',
+          arrivalAt: arrivalAt,
+          kind: GetOffAlarmKind.destination,
+        ),
+      ],
+      transferAlarmEnabled: false,
+    );
+    notifier.reset();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(repository.refreshRouteSearchIds, ['route-1']);
+    expect(notifier.scheduleCalls, 1);
+    expect(notifier.scheduledMode, GetOffAlarmScheduleMode.exact);
+    expect(notifier.scheduledAlarms.single.stationId, 'station-sadang');
+    expect(
+      notifier.scheduledAlarms.single.fireAt.isAtSameMomentAs(fireAt),
+      isTrue,
+    );
+    expect((await stateRepository.loadActive())?.transferAlarmEnabled, isFalse);
+  });
+
   testWidgets('추천 경로 항목은 스크린리더에서 상세 진입 버튼으로 남는다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
@@ -12363,6 +12596,8 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
   final RouteSearchResult result;
   final Object? error;
   final requests = <RouteSearchRequest>[];
+  final refreshRouteSearchIds = <String>[];
+  RouteRefreshResult? refreshResult;
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
@@ -12376,15 +12611,65 @@ class FakeRouteSearchRepository implements RouteSearchRepository {
 
   @override
   Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
-    return RouteRefreshResult(
-      routeSearchId: routeSearchId,
-      status: 'UNCHANGED',
-      result: result,
-      refreshedAt: '2026-07-01T15:30:00',
-      etaSource: 'PLANNED',
-      etaConfidence: 'MEDIUM',
-      sourceLabel: '계획 시간 기준',
-    );
+    refreshRouteSearchIds.add(routeSearchId);
+    return refreshResult ??
+        RouteRefreshResult(
+          routeSearchId: routeSearchId,
+          status: 'UNCHANGED',
+          result: result,
+          refreshedAt: '2026-07-01T15:30:00',
+          etaSource: 'PLANNED',
+          etaConfidence: 'MEDIUM',
+          sourceLabel: '계획 시간 기준',
+        );
+  }
+}
+
+class _RecordingGetOffAlarmNotifier implements GetOffAlarmNotifier {
+  int scheduleCalls = 0;
+  List<ScheduledGetOffAlarm> scheduledAlarms = const [];
+  GetOffAlarmScheduleMode? scheduledMode;
+
+  void reset() {
+    scheduleCalls = 0;
+    scheduledAlarms = const [];
+    scheduledMode = null;
+  }
+
+  @override
+  Future<void> cancelAll() async {}
+
+  @override
+  Future<void> scheduleAlarms(
+    List<ScheduledGetOffAlarm> alarms, {
+    required GetOffAlarmScheduleMode mode,
+  }) async {
+    scheduleCalls += 1;
+    scheduledAlarms = alarms;
+    scheduledMode = mode;
+  }
+}
+
+class _StubExactAlarmPermissionGate implements ExactAlarmPermissionGate {
+  @override
+  Future<bool> isExactAlarmPermitted() async => true;
+
+  @override
+  Future<bool> requestExactAlarmPermission() async => true;
+}
+
+class _MemoryGetOffAlarmStateRepository implements GetOffAlarmStateRepository {
+  GetOffAlarmSubscription? _active;
+
+  @override
+  Future<void> clearActive() async => _active = null;
+
+  @override
+  Future<GetOffAlarmSubscription?> loadActive() async => _active;
+
+  @override
+  Future<void> saveActive(GetOffAlarmSubscription subscription) async {
+    _active = subscription;
   }
 }
 
