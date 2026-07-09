@@ -38,4 +38,5 @@ test("admin accessibility QA script fails non-success page responses", () => {
   assert.match(source, /response\.status\(\)/);
   assert.match(source, /status < 200 \|\| status >= 300/);
   assert.match(source, /returned HTTP \$\{status\}/);
+  assert.match(source, /did not return a page response/);
 });
