@@ -3579,6 +3579,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/realtime/arrivals",
       "/api/v1/realtime/train-positions",
       "/api/notices/active",
+      "/api/ads/active",
+      "/api/ads/events",
     ],
   );
   assert.deepEqual(
@@ -3592,12 +3594,14 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/routes/search",
       "/api/v2/routes/search",
       "/api/v2/routes/*/refresh",
+      "/api/ads/events",
       "/api/health",
       "/actuator/health",
       "/actuator/health/liveness",
       "/actuator/health/readiness",
       "/api/v1/realtime/**",
       "/api/notices/active",
+      "/api/ads/active",
     ],
   );
   const publicApiMatcherScope = securityConfig.match(
@@ -3615,6 +3619,11 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     operationsEvidence.backendControlPlane.publicApiSurface.requiredEvidence.includes(
       "security-matcher-contract-test-output",
     ),
+  );
+  const adRepository = read("backend/src/main/java/com/easysubway/ads/adapter/out/persistence/JdbcAdRepository.java");
+  assert.match(
+    adRepository,
+    /ON CONFLICT \(event_date, placement_id, creative_id, event_type\)[\s\S]*DO UPDATE SET event_count/,
   );
   assert.equal(operationsEvidence.backendControlPlane.adminAuthTransition.basicAuthDefaultInProd, "disabled");
   assert.equal(operationsEvidence.backendControlPlane.adminAuthTransition.oidcMfaSsoDeferredExceptionRequired, true);
@@ -4453,7 +4462,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 13/);
+  assert.match(schema, /PRAGMA user_version = 14/);
   assert.match(schema, /CREATE TABLE stations/);
   assert.match(schema, /CREATE TABLE transit_feed_info/);
   assert.match(schema, /CREATE TABLE station_facility_evidence/);
@@ -5312,22 +5321,30 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(schema, /CREATE TABLE facility_status_snapshots \([\s\S]+facility_id TEXT NOT NULL[\s\S]+expires_at INTEGER/);
   assert.match(schema, /CREATE TABLE station_facility_evidence \([\s\S]+provider_record_hash TEXT NOT NULL[\s\S]+strict_route_eligible INTEGER NOT NULL DEFAULT 0/);
   assert.match(schema, /CREATE TABLE transit_stop_times \([\s\S]+arrival_seconds INTEGER NOT NULL[\s\S]+departure_seconds INTEGER NOT NULL/);
+  assert.match(schema, /CREATE TABLE fare_zones \(/);
+  assert.match(schema, /CREATE TABLE fare_rules \([\s\S]+additional_steps_json TEXT NOT NULL DEFAULT '\[\]'/);
+  assert.match(schema, /CREATE TABLE station_fare_zones \([\s\S]+FOREIGN KEY \(station_id, line_id\) REFERENCES station_lines/);
   assert.match(schema, /CREATE TABLE station_pathway_edges \([\s\S]+requires_facility_id TEXT[\s\S]+legacy_internal_route_edge_id TEXT NOT NULL DEFAULT ''/);
   assert.match(schema, /CREATE TABLE internal_route_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
   assert.match(builder, /"station_facility_evidence"/);
   assert.match(builder, /"transit_stop_times"/);
+  assert.match(builder, /"fare_zones"/);
+  assert.match(builder, /"station_fare_zones"/);
   assert.match(builder, /"source_snapshot_id"/);
   assert.match(builder, /"provider_record_hash"/);
   assert.match(validator, /validateProductionStationFacilityEvidence/);
   assert.match(validator, /validateTransitSchedule/);
+  assert.match(validator, /validateFareTables/);
   assert.match(validator, /validateStationPathways/);
   assert.match(validator, /"source_snapshot_id"/);
   assert.match(validator, /"provider_record_hash"/);
   assert.match(mobileTables, /class TransitStopTimes extends Table/);
   assert.match(mobileTables, /class StationPathwayEdges extends Table/);
   assert.match(mobileTables, /class TransferRules extends Table/);
+  assert.match(mobileTables, /class FareZones extends Table/);
+  assert.match(mobileTables, /class StationFareZones extends Table/);
   assert.match(mobileTables, /class FacilityStatusSnapshots extends Table/);
-  assert.match(mobileDatabase, /int get schemaVersion => 13/);
+  assert.match(mobileDatabase, /int get schemaVersion => 14/);
   assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
   assert.match(mobileDatabase, /_createStationPathwayIndexes/);
   assert.match(mobileDatabase, /_createFacilityStatusSnapshotIndexes/);
@@ -5342,7 +5359,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /int get schemaVersion => 13/);
+  assert.match(mobileDatabase, /int get schemaVersion => 14/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /FacilityStatusSnapshots/);
   assert.match(mobileDatabase, /_addSourceEvidenceProvenanceColumns/);

@@ -121,7 +121,9 @@
         "/api/v2/routes/{routeSearchId}/refresh",
         "/api/v1/realtime/arrivals",
         "/api/v1/realtime/train-positions",
-        "/api/notices/active"
+        "/api/notices/active",
+        "/api/ads/active",
+        "/api/ads/events"
       ],
       "allowedPublicSecurityMatchers": [
         "/api/v1/report-uploads",
@@ -132,12 +134,14 @@
         "/api/v1/routes/search",
         "/api/v2/routes/search",
         "/api/v2/routes/*/refresh",
+        "/api/ads/events",
         "/api/health",
         "/actuator/health",
         "/actuator/health/liveness",
         "/actuator/health/readiness",
         "/api/v1/realtime/**",
-        "/api/notices/active"
+        "/api/notices/active",
+        "/api/ads/active"
       ],
       "requiredEvidence": [
         "backend-public-api-surface-inventory",
