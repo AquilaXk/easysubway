@@ -1957,7 +1957,8 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(playStoreSubmissionContent.appContentDeclarations.accountCreation, false);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.backgroundLocation, false);
   assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.tracking, false);
-  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.sharesDataWithThirdParties, false);
+  assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.sharesDataWithThirdParties, true);
+  assert.match(playStoreSubmissionContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /카카오맵 앱\/웹/);
   assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.dataEncryptedInTransit, true);
   assert.equal(playStoreSubmissionContent.dataSafetyDeclarations.dataDeletionRequestSupported, true);
   assert.ok(playStoreSubmissionContent.dataSafetyDeclarations.requiredCollectedDataTypes.includes("Location"));
@@ -3143,7 +3144,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.equal(privacyInventory.userDataDeletionSupported, true);
   assert.equal(privacyInventory.encryptionInTransitRequired, true);
   assert.equal(privacyInventory.tracking, false);
-  assert.equal(privacyInventory.sharesDataWithThirdParties, false);
+  assert.equal(privacyInventory.sharesDataWithThirdParties, true);
   assert.deepEqual(privacyInventory.googlePlayDataSafetyRequiredFields, [
     "collected",
     "collectionType",
@@ -9950,6 +9951,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     "apps/mobile/lib/features/stations/data/station_api_repository.dart",
   );
   const mapAdapter = read("apps/mobile/lib/map_adapter.dart");
+  const externalMapDeeplinkPolicy = readJson(
+    "apps/mobile/release/external-map-deeplink-policy.json",
+  );
   const mapAdapterTest = read("apps/mobile/test/map_adapter_test.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
   const facilityReportTest = read("apps/mobile/test/facility_report_test.dart");
@@ -10156,6 +10160,42 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(mapAdapter, /_coordinateFrom\(station\.latitude, station\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(exit\.latitude, exit\.longitude\)/);
   assert.match(mapAdapter, /_coordinateFrom\(facility\.latitude, facility\.longitude\)/);
+  assert.equal(
+    externalMapDeeplinkPolicy.schema,
+    "easysubway.external_map_deeplink_policy.v1",
+  );
+  assert.equal(externalMapDeeplinkPolicy.ownerIssue, "#1770");
+  assert.deepEqual(externalMapDeeplinkPolicy.providerOrder, ["kakao-map"]);
+  assert.deepEqual(externalMapDeeplinkPolicy.fallbackOrder, [
+    "appScheme",
+    "webFallback",
+    "copyCoordinate",
+  ]);
+  assert.equal(externalMapDeeplinkPolicy.providers[0].appScheme, "kakaomap");
+  assert.match(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=foot/);
+  assert.doesNotMatch(externalMapDeeplinkPolicy.providers[0].appWalkingRouteUriPattern, /by=FOOT/);
+  assert.equal(
+    externalMapDeeplinkPolicy.providers[0].webFallbackHost,
+    "map.kakao.com",
+  );
+  assert.equal(externalMapDeeplinkPolicy.providers[0].requiresSdkKey, false);
+  assert.equal(externalMapDeeplinkPolicy.providers[0].embeddedSdkAllowed, false);
+  assert.equal(
+    externalMapDeeplinkPolicy.privacyContract.currentLocationRequest,
+    "explicit_user_tap_only",
+  );
+  assert.equal(
+    externalMapDeeplinkPolicy.privacyContract.serverTransmissionAllowed,
+    false,
+  );
+  assert.equal(
+    externalMapDeeplinkPolicy.privacyContract.locationPersistenceAllowed,
+    false,
+  );
+  assert.match(stationSearch, /openWalkingRoute/);
+  assert.match(stationSearch, /_coordinateDistanceMeters/);
+  assert.match(stationSearch, /현재 위치와 출구 좌표만 사용합니다/);
+  assert.match(widgetTest, /출구 좌표가 없어 역 위치 기준으로 안내합니다/);
   assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
   assert.doesNotMatch(stationSearch, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\./);
@@ -10808,8 +10848,9 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.ok(items.get("play_data_safety").linkedArtifacts.includes("apps/mobile/release/store-privacy-inventory.json"));
   assert.ok(items.get("play_data_safety").linkedArtifacts.includes("apps/mobile/release/play-store-submission-content.json"));
   assert.match(items.get("play_data_safety").readyWhenKo, /collected|collection type|optional\/required|linked to user|deletion support/i);
+  assert.match(items.get("play_data_safety").readyWhenKo, /외부 지도 길안내 제3자 공유 범위|tracking 없음/);
   assert.match(items.get("play_privacy_policy_url").configurationSources.join("\n"), /EASYSUBWAY_PRIVACY_POLICY_URL/);
-  assert.match(items.get("play_privacy_policy_url").readyWhenKo, /public HTTPS|인증 없이|수집 항목|삭제|제3자 공유 없음|tracking 없음/);
+  assert.match(items.get("play_privacy_policy_url").readyWhenKo, /public HTTPS|인증 없이|수집 항목|삭제|외부 지도 길안내 제3자 공유 범위|tracking 없음/);
   assert.match(items.get("play_app_access").readyWhenKo, /로그인 없음|제한 접근|심사 계정/);
   assert.ok(items.get("play_production_access_closed_test").linkedArtifacts.includes("apps/mobile/release/play-production-access-gate.json"));
   assert.match(items.get("play_production_access_closed_test").readyWhenKo, /12명 이상|14일 연속|production access/);
@@ -10957,13 +10998,14 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     "app help",
     "public policy page",
   ]);
-  assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("제3자 공유 없음"));
+  assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("외부 지도 길안내 제3자 공유 범위"));
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("tracking 없음"));
   assert.equal(playStoreContent.storeMetadataRequirements.publicContactEmailMustMatchAppSupportEmail, true);
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("대중교통"));
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("접근성"));
   assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("로그인 없음"));
   assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("위치 권한은 선택적 사용"));
+  assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("카카오맵 앱/웹 공유는 사용자가 지도 또는 도보 길안내를 누를 때만 실행"));
   assert.equal(playStoreContent.crashAnrProviderDecision.separateCrashProvider, false);
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
@@ -11470,7 +11512,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.applicationId, "easysubway");
   assert.equal(inventory.tracking, false);
-  assert.equal(inventory.sharesDataWithThirdParties, false);
+  assert.equal(inventory.sharesDataWithThirdParties, true);
   assert.equal(inventory.encryptionInTransitRequired, true);
   assert.equal(inventory.userDataDeletionSupported, true);
   assert.match(inventory.privacyPolicyUrlSource, /EASYSUBWAY_PRIVACY_POLICY_URL/);
@@ -11544,8 +11586,24 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    assert.equal(item.lastVerifiedAt, "2026-06-19", `${id} verification date must be current`);
-    assert.equal(item.sharedWithThirdParties, false, `${id} must not be shared with third parties`);
+    const expectedLastVerifiedAt = id === "precise_location" ? "2026-07-09" : "2026-06-19";
+    assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
+    const expectedThirdPartySharing = id === "precise_location";
+    assert.equal(
+      item.sharedWithThirdParties,
+      expectedThirdPartySharing,
+      `${id} third-party sharing flag must match the approved disclosure scope`,
+    );
+    if (expectedThirdPartySharing) {
+      assert.match(item.thirdPartySharingKo, /카카오맵 앱\/웹/, `${id} must explain the external map disclosure`);
+      assert.match(item.thirdPartySharingKo, /서버로 전송하거나 앱에 저장하지 않고/, `${id} must keep the no-persistence boundary`);
+      assert.ok(
+        item.evidence.includes("apps/mobile/release/external-map-deeplink-policy.json"),
+        `${id} must link the external map deeplink policy`,
+      );
+    } else {
+      assert.equal(item.thirdPartySharingKo, undefined, `${id} must not declare third-party sharing copy`);
+    }
     assert.equal(item.usedForTracking, false, `${id} must not be used for tracking`);
     assert.ok(item.googlePlayDataSafety?.dataType, `${id} must map to Play Data safety`);
     assert.equal(typeof item.googlePlayDataSafety.collected, "boolean", `${id} must declare Play collection`);
@@ -11666,7 +11724,7 @@ test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
   const infoPlist = read("apps/mobile/ios/Runner/Info.plist");
 
   assert.match(infoPlist, /<key>NSLocationWhenInUseUsageDescription<\/key>/);
-  assert.match(infoPlist, /앱을 사용하는 동안 가까운 역을 찾고 시설 신고 위치를 확인하는 데 사용합니다\./);
+  assert.match(infoPlist, /앱을 사용하는 동안 가까운 역 찾기, 시설 신고 위치 확인, 출구 도보 길안내에 사용합니다\./);
   assert.doesNotMatch(infoPlist, /NSLocationAlways/);
   assert.doesNotMatch(infoPlist, /UIBackgroundModes/);
 });
