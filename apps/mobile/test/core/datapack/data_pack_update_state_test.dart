@@ -437,6 +437,30 @@ void main() {
     expect(s2, s1); // 안정
   });
 
+  test('update policy state는 확인·백오프·동의 보류·실패 사유를 저장한다', () async {
+    final db = user_db.UserDatabase.memory();
+    addTearDown(db.close);
+    final repo = DataPackUpdateStateRepository(userDatabase: db);
+
+    await repo.savePolicyState(
+      DataPackUpdatePolicyState(
+        lastCheckAt: DateTime.utc(2026, 7, 9, 1),
+        backoffUntil: DateTime.utc(2026, 7, 9, 1, 8),
+        backoffAttempts: 2,
+        pendingConsentBytes: 12 * 1024 * 1024,
+        lastFailureReason: 'download',
+      ),
+    );
+
+    final state = await repo.readPolicyState();
+
+    expect(state.lastCheckAt, DateTime.utc(2026, 7, 9, 1));
+    expect(state.backoffUntil, DateTime.utc(2026, 7, 9, 1, 8));
+    expect(state.backoffAttempts, 2);
+    expect(state.pendingConsentBytes, 12 * 1024 * 1024);
+    expect(state.lastFailureReason, 'download');
+  });
+
   test('update state는 v2 manifest downgrade와 equivocation을 거부한다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);

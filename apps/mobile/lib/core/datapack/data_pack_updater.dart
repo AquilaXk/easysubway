@@ -9,7 +9,10 @@ import 'package:meta/meta.dart';
 import 'data_pack_client.dart';
 import 'data_pack_installer.dart';
 import 'data_pack_manifest.dart';
+import 'data_pack_update_policy.dart';
+import 'data_pack_update_state.dart';
 import 'emergency_override_repository.dart';
+import 'network_condition_source.dart';
 
 const _dataPackDownloadTimeout = Duration(seconds: 20);
 const _maxDataPackDownloadBytes = 250 * 1024 * 1024;
@@ -20,18 +23,70 @@ class DataPackUpdater {
     required this.installer,
     this.emergencyOverrideRepository,
     this.activePackId = 'capital',
+    this.networkConditionSource = const FixedNetworkConditionSource(
+      NetworkCondition.unmetered,
+    ),
+    this.policy = DataPackUpdatePolicyDefaults.policy,
     HttpClient? httpClient,
-  }) : _httpClient = httpClient ?? HttpClient();
+    DateTime Function()? now,
+  }) : _httpClient = httpClient ?? HttpClient(),
+       _now = now ?? DateTime.now;
 
   final DataPackClient client;
   final DataPackInstaller installer;
   final EmergencyOverrideRepository? emergencyOverrideRepository;
   final String activePackId;
+  final NetworkConditionSource networkConditionSource;
+  final DataPackUpdatePolicy policy;
   final HttpClient _httpClient;
+  final DateTime Function() _now;
+  Future<List<DataPackInstallResult>>? _inFlight;
 
-  Future<List<DataPackInstallResult>> checkForUpdates() async {
+  Future<List<DataPackInstallResult>> checkForUpdates({
+    UpdateTrigger trigger = UpdateTrigger.appStart,
+  }) {
+    final inFlight = _inFlight;
+    if (inFlight != null) {
+      return inFlight;
+    }
+    final next = _checkForUpdates(trigger: trigger);
+    _inFlight = next.whenComplete(() {
+      _inFlight = null;
+    });
+    return _inFlight!;
+  }
+
+  Future<List<DataPackInstallResult>> _checkForUpdates({
+    required UpdateTrigger trigger,
+  }) async {
     await installer.recoverInstallJournal();
-    final manifestResult = await client.fetchManifestIfNeeded();
+    var policyState = await client.stateRepository.readPolicyState();
+    final now = _now().toUtc();
+    if (await _shouldSkipCheck(
+      trigger: trigger,
+      policyState: policyState,
+      now: now,
+    )) {
+      return const [];
+    }
+    final backoffUntil = policyState.backoffUntil;
+    if (backoffUntil != null && now.isBefore(backoffUntil)) {
+      return const [];
+    }
+    final networkCondition = await networkConditionSource.current();
+    if (networkCondition == NetworkCondition.offline) {
+      return const [];
+    }
+    policyState = policyState.copyWith(lastCheckAt: now);
+    await client.stateRepository.savePolicyState(policyState);
+
+    final DataPackManifestFetchResult manifestResult;
+    try {
+      manifestResult = await client.fetchManifestIfNeeded();
+    } on Object catch (error) {
+      await _saveFailure(policyState, now, error);
+      rethrow;
+    }
     final manifest = manifestResult.manifest;
     if (manifest == null) {
       return const [];
@@ -71,19 +126,37 @@ class DataPackUpdater {
 
     final packBaseUri = _packBaseUriForManifest(client.manifestUri);
     final packs = _packsToInstall(manifest, rolloutApplies: isRolloutApplied);
-    final results = <DataPackInstallResult>[];
-    for (final pack in packs) {
-      final uri = packBaseUri.resolve(pack.url.toString());
-      final compressedFile = await _downloadToTemporaryFile(uri, pack);
-      results.add(
-        await installer.installFromCompressedFile(
-          pack: pack,
-          compressedFile: compressedFile,
-          protectedVersions:
-              protectedVersionsByPackId[pack.id] ?? const <String>{},
-          activateCurrent: false,
-        ),
+    if (packs.isNotEmpty &&
+        networkCondition == NetworkCondition.metered &&
+        trigger != UpdateTrigger.userConsent) {
+      await client.stateRepository.savePolicyState(
+        policyState.copyWith(pendingConsentBytes: _totalSizeBytes(packs)),
       );
+      return const [];
+    }
+    final results = <DataPackInstallResult>[];
+    try {
+      for (final pack in packs) {
+        final uri = packBaseUri.resolve(pack.url.toString());
+        final compressedFile = await _downloadToTemporaryFile(uri, pack);
+        results.add(
+          await installer.installFromCompressedFile(
+            pack: pack,
+            compressedFile: compressedFile,
+            protectedVersions:
+                protectedVersionsByPackId[pack.id] ?? const <String>{},
+            activateCurrent: false,
+          ),
+        );
+      }
+    } on Object catch (error) {
+      await _saveFailure(policyState, now, error);
+      rethrow;
+    }
+    if (results.any(
+      (result) => result.status != DataPackInstallStatus.installed,
+    )) {
+      await _saveFailure(policyState, now, 'install');
     }
     if (results.every(
       (result) => result.status == DataPackInstallStatus.installed,
@@ -139,8 +212,73 @@ class DataPackUpdater {
         await emergencyOverrideRepository?.clearOverride();
       }
       await client.saveManifestCache(manifestResult);
+      await client.stateRepository.savePolicyState(
+        policyState.copyWith(
+          clearBackoff: true,
+          clearPendingConsent: true,
+          clearLastFailure: true,
+        ),
+      );
     }
     return results;
+  }
+
+  Future<bool> _shouldSkipCheck({
+    required UpdateTrigger trigger,
+    required DataPackUpdatePolicyState policyState,
+    required DateTime now,
+  }) async {
+    if (trigger != UpdateTrigger.foregroundResume) {
+      return false;
+    }
+    if (policyState.pendingConsentBytes != null) {
+      return false;
+    }
+    if (policy.expiryUrgentIgnoresMinInterval) {
+      final cache = await client.stateRepository.readManifestCache();
+      final expiresAt = cache?.expiresAt;
+      if (expiresAt != null &&
+          !expiresAt.isAfter(now.add(policy.expiryUrgentWindow))) {
+        return false;
+      }
+    }
+    final lastCheckAt = policyState.lastCheckAt;
+    if (lastCheckAt == null) {
+      return false;
+    }
+    return now.isBefore(
+      lastCheckAt.add(policy.manifestCheckOnResumeMinInterval),
+    );
+  }
+
+  Future<void> _saveFailure(
+    DataPackUpdatePolicyState state,
+    DateTime now,
+    Object error,
+  ) async {
+    final attempts = (state.backoffAttempts + 1).clamp(
+      1,
+      policy.retryMaxAttemptsPerSession,
+    );
+    await client.stateRepository.savePolicyState(
+      state.copyWith(
+        lastCheckAt: now,
+        backoffAttempts: attempts,
+        backoffUntil: now.add(policy.backoffForAttempt(attempts)),
+        lastFailureReason: _failureReason(error),
+      ),
+    );
+  }
+
+  int _totalSizeBytes(List<DataPackManifestEntry> packs) {
+    return packs.fold<int>(0, (total, pack) => total + (pack.sizeBytes ?? 0));
+  }
+
+  String _failureReason(Object error) {
+    if (error is DataPackClientException) {
+      return error.message;
+    }
+    return error.toString();
   }
 
   Future<InstalledDataPackPointer?> _readCurrentPointerSafely() async {
@@ -288,6 +426,8 @@ class DataPackUpdater {
     }
   }
 }
+
+enum UpdateTrigger { appStart, foregroundResume, userConsent }
 
 Future<void> _deleteIfExists(File file) async {
   if (await file.exists()) {
