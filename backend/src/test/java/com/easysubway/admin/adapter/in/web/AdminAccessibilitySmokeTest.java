@@ -5,6 +5,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrlPattern;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import jakarta.servlet.http.HttpSession;
@@ -67,6 +69,24 @@ class AdminAccessibilitySmokeTest {
 		assertAdminShell("/admin/facilities/page", "시설 상태판", admin);
 		assertAdminShell("/admin/batches/page", "배치 운영", admin);
 		assertAdminShell("/admin/audits/privacy/page", "개인정보 조회 로그", admin);
+	}
+
+	@Test
+	@DisplayName("htmx 세션 만료는 fragment swap 대신 전체 새로고침 로그인으로 보낸다")
+	void htmxExpiredSessionRequestsRefreshTheWholePage() throws Exception {
+		mockMvc.perform(get("/admin/search")
+				.header("HX-Request", "true")
+				.header("Accept", MediaType.TEXT_HTML_VALUE))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("HX-Refresh", "true"))
+			.andExpect(redirectedUrlPattern("**/admin/login"));
+
+		mockMvc.perform(get("/operator/accessibility-report/page")
+				.header("HX-Request", "true")
+				.header("Accept", MediaType.TEXT_HTML_VALUE))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().string("HX-Refresh", "true"))
+			.andExpect(redirectedUrlPattern("**/operator/login"));
 	}
 
 	@Test
