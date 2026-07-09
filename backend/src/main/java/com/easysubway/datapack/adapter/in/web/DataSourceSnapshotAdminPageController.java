@@ -81,8 +81,12 @@ class DataSourceSnapshotAdminPageController {
 			.filter(row -> snapshotStatusMatches(row, filter.statusValue()))
 			.sorted(snapshotSort(filter.sortValue()))
 			.toList();
-		EgovPaginationView pageView = EgovPaginationView.fromSlice(pageRequest.page(), pageRequest.size(), rows.size());
-		model.addAttribute("snapshots", pageView.visibleItems(rows));
+		EgovPaginationView pageView = EgovPaginationView.fromSlice(
+			pageRequest.page(),
+			pageRequest.size(),
+			fetchedCountForPage(rows.size(), pageRequest)
+		);
+		model.addAttribute("snapshots", pageView.pageItems(rows));
 		model.addAttribute("page", pageView);
 		model.addAttribute("filter", filter);
 		model.addAttribute(
@@ -285,5 +289,10 @@ class DataSourceSnapshotAdminPageController {
 			case "retrieved_asc" -> Comparator.comparing(SourceSnapshotRow::retrievedAt).thenComparing(SourceSnapshotRow::snapshotId);
 			default -> Comparator.comparing(SourceSnapshotRow::retrievedAt).reversed().thenComparing(SourceSnapshotRow::snapshotId);
 		};
+	}
+
+	private static int fetchedCountForPage(int rowCount, AdminPageRequest pageRequest) {
+		int remainingFromOffset = Math.max(rowCount - pageRequest.offset(), 0);
+		return Math.min(pageRequest.limitForHasNext(), remainingFromOffset);
 	}
 }

@@ -83,6 +83,8 @@ class ManualOverrideLedgerAdminPageControllerTest {
 			.contains("승인 저장")
 			.contains("만료 저장")
 			.doesNotContain("serviceKey");
+		assertThat(html.indexOf("override-conflict-1")).isLessThan(html.indexOf("override-approved-1"));
+		assertThat(html.indexOf("override-expired-1")).isLessThan(html.indexOf("override-approved-1"));
 	}
 
 	@Test

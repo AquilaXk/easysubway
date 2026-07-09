@@ -91,7 +91,15 @@ public record DatapackAdminListQuery(
 	}
 
 	public boolean matchesSourceSnapshot(String value) {
-		return !hasSourceSnapshot() || same(sourceSnapshotId, value);
+		if (!hasSourceSnapshot()) {
+			return true;
+		}
+		for (String snapshotId : sourceSnapshotId.split(",")) {
+			if (same(clean(snapshotId), value)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public boolean matchesText(String... values) {

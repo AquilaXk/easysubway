@@ -109,10 +109,15 @@ class ManualOverrideLedgerAdminPageController {
 				.thenComparing(ManualOverrideView::fieldName);
 			case "created" -> Comparator.comparing(ManualOverrideView::effectiveFrom).reversed()
 				.thenComparing(ManualOverrideView::id);
-			default -> Comparator.comparing(ManualOverrideView::productionStatus)
+			default -> Comparator.comparing(ManualOverrideLedgerAdminPageController::productionReady)
+				.thenComparing(ManualOverrideView::productionStatus)
 				.thenComparing(ManualOverrideView::entityType)
 				.thenComparing(ManualOverrideView::entityId);
 		};
+	}
+
+	private static boolean productionReady(ManualOverrideView row) {
+		return "candidate 가능".equals(row.productionStatus());
 	}
 
 	@PostMapping("/admin/datapack/manual-overrides/{overrideId}/approve")

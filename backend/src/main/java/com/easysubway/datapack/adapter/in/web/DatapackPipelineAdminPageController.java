@@ -69,7 +69,7 @@ class DatapackPipelineAdminPageController {
 		static PipelineView from(DatapackReleaseBlockerSummary summary, CandidateContext candidateContext) {
 			boolean hasCandidate = !"-".equals(summary.candidateId());
 			String candidateId = hasCandidate ? summary.candidateId() : null;
-			String sourceSnapshotId = candidateContext.firstSourceSnapshotId();
+			String sourceSnapshotId = candidateContext.sourceSnapshotFilter();
 			String candidateDrill = hasCandidate
 				? "/admin/datapack/candidates/" + summary.candidateId() + "/page"
 				: "/admin/datapack/candidates/page";
@@ -192,6 +192,10 @@ class DatapackPipelineAdminPageController {
 					firstCsv(input.sourceSnapshotIds())
 				))
 				.orElse(new CandidateContext("-", null));
+		}
+
+		String sourceSnapshotFilter() {
+			return "-".equals(sourceSnapshotIds) ? null : sourceSnapshotIds;
 		}
 	}
 
