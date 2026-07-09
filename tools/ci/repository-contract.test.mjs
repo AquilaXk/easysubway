@@ -8262,7 +8262,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorReportController, /ApiResponse<OperatorAccessibilityReportView>/);
   assert.match(operatorReportController, /reportAssembler\.assemble\(\)/);
   assert.match(operatorReportPageController, /@GetMapping\("\/operator\/accessibility-report\/page"\)/);
-  assert.match(operatorReportPageController, /reportAssembler\.assemble\(\)/);
+  assert.match(operatorReportPageController, /OperatorReportQuery\.of/);
+  assert.match(operatorReportPageController, /reportAssembler\.assemble\(query\)/);
   assert.match(operatorReportPageController, /return "operator\/accessibility-report"/);
   assert.match(operatorReportAssembler, /DataQualityUseCase/);
   assert.match(operatorReportAssembler, /TransitMasterQueryUseCase/);
@@ -8279,7 +8280,8 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     /@GetMapping\("\/operator\/repeated-broken-facilities\/page"\)/,
   );
   assert.match(operatorRepeatedBrokenFacilitiesPageController, /OperatorRepeatedBrokenFacilitiesAssembler/);
-  assert.match(operatorRepeatedBrokenFacilitiesPageController, /repeatedBrokenFacilitiesAssembler\.assemble\(\)/);
+  assert.match(operatorRepeatedBrokenFacilitiesPageController, /OperatorReportQuery\.of/);
+  assert.match(operatorRepeatedBrokenFacilitiesPageController, /repeatedBrokenFacilitiesAssembler\.assemble\(query\)/);
   assert.match(operatorRepeatedBrokenFacilitiesPageController, /return "operator\/repeated-broken-facilities"/);
   assert.match(operatorRepeatedBrokenFacilitiesAssembler, /FacilityReportUseCase/);
   assert.match(operatorRepeatedBrokenFacilitiesAssembler, /TransitMasterQueryUseCase/);
@@ -8300,12 +8302,15 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
     /@GetMapping\("\/operator\/data-collection-failures\/page"\)/,
   );
   assert.match(operatorDataCollectionFailuresPageController, /OperatorDataCollectionFailuresAssembler/);
-  assert.match(operatorDataCollectionFailuresPageController, /dataCollectionFailuresAssembler\.assemble\(\)/);
+  assert.match(operatorDataCollectionFailuresPageController, /OperatorReportQuery\.of/);
+  assert.match(operatorDataCollectionFailuresPageController, /dataCollectionFailuresAssembler\.assemble\(query\)/);
   assert.match(operatorDataCollectionFailuresPageController, /return "operator\/data-collection-failures"/);
   assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionUseCase/);
   assert.match(operatorDataCollectionFailuresAssembler, /listRecentRuns/);
   assert.match(operatorDataCollectionFailuresAssembler, /getLatestCompletedRun\(DataCollectionSource\.TRANSIT_MASTER\)/);
-  assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionStatus\.FAILED/);
+  assert.match(operatorDataCollectionFailuresAssembler, /filter\(row -> "실패"\.equals\(row\.statusLabel\(\)\)\)/);
+  assert.match(operatorDataCollectionFailuresAssembler, /statusRows\(rows\)/);
+  assert.match(operatorDataCollectionFailuresAssembler, /case FAILED -> "실패"/);
   assert.match(operatorDataCollectionFailuresAssembler, /Duration\.ofHours\(24\)/);
   assert.match(operatorDataCollectionFailuresView, /record OperatorDataCollectionFailuresView/);
   assert.match(operatorDataCollectionFailuresView, /int totalRunCount/);
@@ -8321,15 +8326,22 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorReportTemplate, /읽기 전용 리포트/);
   assert.match(operatorReportTemplate, /역별 접근성 점수/);
   assert.match(operatorReportTemplate, /접근성 개선 우선순위/);
-  assert.doesNotMatch(operatorReportTemplate, /<form/);
+  assert.match(operatorReportTemplate, /method="get"/);
+  assert.match(operatorReportTemplate, /name="q"/);
+  assert.match(operatorReportTemplate, /aria-sort/);
+  assert.match(operatorReportTemplate, /data-operator-chart="bar"/);
   assert.match(operatorRepeatedBrokenFacilitiesTemplate, /운영기관 반복 고장 시설 통계/);
   assert.match(operatorRepeatedBrokenFacilitiesTemplate, /읽기 전용 리포트/);
   assert.match(operatorRepeatedBrokenFacilitiesTemplate, /반복 고장 시설/);
   assert.match(operatorRepeatedBrokenFacilitiesTemplate, /시설별 반복 신고/);
   assert.doesNotMatch(
     operatorRepeatedBrokenFacilitiesTemplate,
-    /<form|_csrf|stationId|facilityId|userId|description|\/admin\/reports/,
+    /_csrf|stationId|facilityId|userId|description|\/admin\/reports/,
   );
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /method="get"/);
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /name="q"/);
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /aria-sort/);
+  assert.match(operatorRepeatedBrokenFacilitiesTemplate, /data-operator-chart="bar"/);
   assert.match(operatorDataCollectionFailuresTemplate, /운영기관 데이터 수집 실패 현황/);
   assert.match(operatorDataCollectionFailuresTemplate, /읽기 전용 리포트/);
   assert.match(operatorDataCollectionFailuresTemplate, /전체 수집 실행/);
@@ -8342,8 +8354,12 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorDataCollectionFailuresTemplate, /최근 수집 실행/);
   assert.doesNotMatch(
     operatorDataCollectionFailuresTemplate,
-    /<form|_csrf|runId|requestedBy|\/admin\/collections/,
+    /_csrf|runId|requestedBy|\/admin\/collections/,
   );
+  assert.match(operatorDataCollectionFailuresTemplate, /method="get"/);
+  assert.match(operatorDataCollectionFailuresTemplate, /name="q"/);
+  assert.match(operatorDataCollectionFailuresTemplate, /aria-sort/);
+  assert.match(operatorDataCollectionFailuresTemplate, /data-operator-chart="bar"/);
 });
 
 test("신고 조회와 경로 피드백 권한 경계는 인증 사용자 기준이다", () => {
@@ -8425,22 +8441,29 @@ test("운영기관 제휴 제안 export는 접근성 리포트 CSV를 제공한�
   const controllerTest = read(
     "backend/src/test/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportControllerTest.java",
   );
+  const reportCsv = read(
+    "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorReportCsv.java",
+  );
 
   assert.match(operatorReportController, /@GetMapping\("\/operator\/api\/accessibility-report\/proposal\.csv"\)/);
   assert.match(operatorReportController, /TEXT_CSV_UTF8/);
   assert.match(operatorReportController, /HttpHeaders\.CONTENT_DISPOSITION/);
   assert.match(operatorReportController, /easysubway-operator-accessibility-proposal\.csv/);
-  assert.match(operatorReportController, /section,metric,value,detail\\n/);
+  assert.match(operatorReportController, /OperatorReportCsv\.document/);
+  assert.match(operatorReportController, /"section", "metric", "value", "detail"/);
   assert.match(operatorReportController, /"summary", "totalStations"/);
   assert.match(operatorReportController, /"summary", "totalFacilities"/);
   assert.match(operatorReportController, /"summary", "needsVerificationFacilityCount"/);
   assert.match(operatorReportController, /"summary", "delayedFacilityStatusCount"/);
   assert.match(operatorReportController, /stationScore/);
   assert.match(operatorReportController, /priority/);
-  assert.match(operatorReportController, /csvValue/);
+  // CSV 직렬화는 공용 도우미가 UTF-8 BOM·수식 인젝션 방어를 보장한다.
+  assert.match(reportCsv, /UTF8_BOM/);
+  assert.match(reportCsv, /first == '='.*first == '@'/s);
   assert.match(operatorReportView, /reasonText\(\)/);
   assert.match(controllerTest, /proposal\.csv/);
   assert.match(controllerTest, /text\/csv;charset=UTF-8/);
+  assert.match(controllerTest, /﻿section,metric,value,detail/);
   assert.match(controllerTest, /stationScore,상록수/);
   assert.match(controllerTest, /priority,상록수,장애인 화장실,\\"60 - 확인 필요 상태/);
   assert.match(controllerTest, /admin-user/);
@@ -9756,7 +9779,8 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorRouteFeedbackReportController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
   assert.match(operatorRouteFeedbackReportPageController, /@GetMapping\("\/operator\/route-feedback-report\/page"\)/);
   assert.match(operatorRouteFeedbackReportPageController, /RouteFeedbackDashboardAssembler/);
-  assert.match(operatorRouteFeedbackReportPageController, /routeFeedbackDashboardAssembler\.assemble\(\)/);
+  assert.match(operatorRouteFeedbackReportPageController, /OperatorReportQuery\.of/);
+  assert.match(operatorRouteFeedbackReportPageController, /filtered\(routeFeedbackDashboardAssembler\.assemble\(\), query\)/);
   assert.match(operatorRouteFeedbackReportPageController, /return "operator\/route-feedback-report"/);
   assert.match(feedbackDashboardTemplate, /경로 피드백 현황/);
   assert.match(feedbackDashboardTemplate, /전체 피드백/);
@@ -9772,7 +9796,11 @@ test("백엔드 경로 검색은 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorRouteFeedbackReportTemplate, /읽기 전용 리포트/);
   assert.match(operatorRouteFeedbackReportTemplate, /평점별 피드백/);
   assert.match(operatorRouteFeedbackReportTemplate, /최근 현장 차단 신고/);
-  assert.doesNotMatch(operatorRouteFeedbackReportTemplate, /<form|_csrf|routeSearchId|userId|comment|\/admin\/reports/);
+  assert.doesNotMatch(operatorRouteFeedbackReportTemplate, /_csrf|routeSearchId|userId|comment|\/admin\/reports/);
+  assert.match(operatorRouteFeedbackReportTemplate, /method="get"/);
+  assert.match(operatorRouteFeedbackReportTemplate, /name="q"/);
+  assert.match(operatorRouteFeedbackReportTemplate, /aria-sort/);
+  assert.match(operatorRouteFeedbackReportTemplate, /data-operator-chart="bar"/);
 });
 
 test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 전달한다", () => {
