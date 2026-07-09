@@ -70,7 +70,7 @@ class ServiceNoticeAdminPageControllerTest {
 				.param("severity", "DISRUPTION")
 				.param("title", "2호선 지연")
 				.param("body", "강남-역삼 상행 지연입니다.")
-				.param("expiresAt", "2026-07-09T18:30"))
+				.param("expiresAt", LocalDateTime.now(ZoneOffset.UTC).plusHours(1).toString()))
 			.andExpect(status().is3xxRedirection())
 			.andExpect(redirectedUrl("/admin/notices/page"));
 
