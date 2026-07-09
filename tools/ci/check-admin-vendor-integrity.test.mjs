@@ -22,6 +22,14 @@ test("admin vendor integrity check fails stale SRI", async () => {
   );
 });
 
+test("admin vendor integrity check fails when one duplicate vendor ref has stale SRI", async () => {
+  const root = await duplicateVendorRefFixtureRoot("console.log('ok');");
+  assert.throws(
+    () => checkAdminVendorIntegrity(root),
+    /integrity mismatch/,
+  );
+});
+
 test("admin vendor integrity check blocks inline handlers", async () => {
   const root = await fixtureRoot("console.log('ok');");
   await writeFile(
@@ -50,6 +58,30 @@ async function fixtureRoot(vendorSource, integrityOverride) {
   await writeFile(
     path.join(adminTemplates, "page.html"),
     `<script th:src="@{/vendor/example-1.0.0/example.js}" integrity="${integrityOverride ?? `sha384-${sha384}`}" crossorigin="anonymous" defer></script>`,
+  );
+  return root;
+}
+
+async function duplicateVendorRefFixtureRoot(vendorSource) {
+  const root = await mkdtemp(path.join(tmpdir(), "admin-vendor-"));
+  const vendorDir = path.join(root, "backend/src/main/resources/static/vendor/example-1.0.0");
+  const adminTemplates = path.join(root, "backend/src/main/resources/templates/admin");
+  const operatorTemplates = path.join(root, "backend/src/main/resources/templates/operator");
+  await mkdir(vendorDir, { recursive: true });
+  await mkdir(adminTemplates, { recursive: true });
+  await mkdir(operatorTemplates, { recursive: true });
+  const vendorFile = path.join(vendorDir, "example.js");
+  await writeFile(vendorFile, vendorSource);
+  const sha256 = createHash("sha256").update(vendorSource).digest("hex");
+  const sha384 = createHash("sha384").update(vendorSource).digest("base64");
+  await writeFile(path.join(vendorDir, "SHA256SUMS.txt"), `${sha256}  example.js\n`);
+  await writeFile(
+    path.join(adminTemplates, "page.html"),
+    `<script th:src="@{/vendor/example-1.0.0/example.js}" integrity="sha384-stale" crossorigin="anonymous" defer></script>`,
+  );
+  await writeFile(
+    path.join(operatorTemplates, "page.html"),
+    `<script th:src="@{/vendor/example-1.0.0/example.js}" integrity="sha384-${sha384}" crossorigin="anonymous" defer></script>`,
   );
   return root;
 }

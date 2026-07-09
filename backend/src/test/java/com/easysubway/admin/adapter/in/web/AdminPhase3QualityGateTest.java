@@ -117,7 +117,7 @@ class AdminPhase3QualityGateTest {
 			mockMvc.perform(get(endpoint.path())
 					.header("HX-Request", "true")
 					.header("Accept", "text/html"))
-				.andExpect(status().is3xxRedirection())
+				.andExpect(status().isNoContent())
 				.andExpect(header().string("HX-Refresh", "true"));
 		}
 	}

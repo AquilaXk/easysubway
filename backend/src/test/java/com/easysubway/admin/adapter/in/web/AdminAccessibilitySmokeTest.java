@@ -77,15 +77,29 @@ class AdminAccessibilitySmokeTest {
 		mockMvc.perform(get("/admin/search")
 				.header("HX-Request", "true")
 				.header("Accept", MediaType.TEXT_HTML_VALUE))
-			.andExpect(status().is3xxRedirection())
-			.andExpect(header().string("HX-Refresh", "true"))
-			.andExpect(redirectedUrlPattern("**/admin/login"));
+			.andExpect(status().isNoContent())
+			.andExpect(header().string("HX-Refresh", "true"));
 
 		mockMvc.perform(get("/operator/accessibility-report/page")
 				.header("HX-Request", "true")
 				.header("Accept", MediaType.TEXT_HTML_VALUE))
+			.andExpect(status().isNoContent())
+			.andExpect(header().string("HX-Refresh", "true"));
+	}
+
+	@Test
+	@DisplayName("일반 세션 만료 요청은 기존 로그인 redirect만 사용한다")
+	void normalExpiredSessionRequestsStillRedirectToLogin() throws Exception {
+		mockMvc.perform(get("/admin/search")
+				.header("Accept", MediaType.TEXT_HTML_VALUE))
 			.andExpect(status().is3xxRedirection())
-			.andExpect(header().string("HX-Refresh", "true"))
+			.andExpect(header().doesNotExist("HX-Refresh"))
+			.andExpect(redirectedUrlPattern("**/admin/login"));
+
+		mockMvc.perform(get("/operator/accessibility-report/page")
+				.header("Accept", MediaType.TEXT_HTML_VALUE))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(header().doesNotExist("HX-Refresh"))
 			.andExpect(redirectedUrlPattern("**/operator/login"));
 	}
 

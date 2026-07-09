@@ -200,7 +200,7 @@ public class SecurityConfig {
 			.exceptionHandling(exception -> exception
 				.accessDeniedHandler(adminHtmlAccessDeniedHandler)
 				.defaultAuthenticationEntryPointFor(
-					new HtmxRefreshAuthenticationEntryPoint("/admin/login"),
+					new HtmxRefreshAuthenticationEntryPoint(),
 					HtmxRefreshAuthenticationEntryPoint::matches
 				)
 				.defaultAuthenticationEntryPointFor(
@@ -249,7 +249,7 @@ public class SecurityConfig {
 			)
 			.exceptionHandling(exception -> exception
 				.defaultAuthenticationEntryPointFor(
-					new HtmxRefreshAuthenticationEntryPoint("/operator/login"),
+					new HtmxRefreshAuthenticationEntryPoint(),
 					HtmxRefreshAuthenticationEntryPoint::matches
 				)
 				.defaultAuthenticationEntryPointFor(

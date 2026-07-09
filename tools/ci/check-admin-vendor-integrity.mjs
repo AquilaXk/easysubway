@@ -17,7 +17,12 @@ export function checkAdminVendorIntegrity(root = defaultRoot) {
   const failures = [];
   const vendorFiles = vendorManifestFiles(vendorRoot);
   const scriptRefs = scriptReferences(templateRoots);
-  const refsBySrc = new Map(scriptRefs.map((ref) => [ref.src, ref]));
+  const refsBySrc = new Map();
+  for (const ref of scriptRefs) {
+    const refs = refsBySrc.get(ref.src) ?? [];
+    refs.push(ref);
+    refsBySrc.set(ref.src, refs);
+  }
 
   for (const vendorFile of vendorFiles) {
     const relativeSrc = `/vendor/${vendorFile.relativePath}`;
@@ -29,16 +34,18 @@ export function checkAdminVendorIntegrity(root = defaultRoot) {
       continue;
     }
     const sri = `sha384-${hashFile(vendorFile.absolutePath, "sha384", "base64")}`;
-    const ref = refsBySrc.get(relativeSrc);
-    if (!ref) {
+    const refs = refsBySrc.get(relativeSrc);
+    if (!refs || refs.length === 0) {
       failures.push(`${relativeSrc} is not referenced by an admin/operator template`);
       continue;
     }
-    if (ref.integrity !== sri) {
-      failures.push(`${ref.templatePath}: ${relativeSrc} integrity mismatch`);
-    }
-    if (ref.crossorigin !== "anonymous") {
-      failures.push(`${ref.templatePath}: ${relativeSrc} must use crossorigin="anonymous"`);
+    for (const ref of refs) {
+      if (ref.integrity !== sri) {
+        failures.push(`${ref.templatePath}: ${relativeSrc} integrity mismatch`);
+      }
+      if (ref.crossorigin !== "anonymous") {
+        failures.push(`${ref.templatePath}: ${relativeSrc} must use crossorigin="anonymous"`);
+      }
     }
   }
 
