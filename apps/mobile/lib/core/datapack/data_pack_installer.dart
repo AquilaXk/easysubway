@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import '../database/catalog/catalog_database.dart';
 import '../database/user/user_database.dart' as user_db;
 import 'data_pack_manifest.dart';
 
@@ -286,6 +287,12 @@ class DataPackInstaller {
           schemaVersion.first['value'] != pack.schemaVersion) {
         return DataPackInstallRejectionReason.schemaVersionMismatch;
       }
+      final userVersion = database.select('PRAGMA user_version').first;
+      final catalogUserVersion = userVersion['user_version'];
+      if (catalogUserVersion is! int ||
+          catalogUserVersion > catalogDatabaseSchemaVersion) {
+        return DataPackInstallRejectionReason.unsupportedCatalogUserVersion;
+      }
       for (final table in pack.requiredTables) {
         final rows = database.select(
           "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
@@ -434,6 +441,7 @@ enum DataPackInstallRejectionReason {
   invalidSqliteHeader,
   quickCheckFailed,
   schemaVersionMismatch,
+  unsupportedCatalogUserVersion,
   requiredTableMissing,
   minimumRowsMissing,
 }

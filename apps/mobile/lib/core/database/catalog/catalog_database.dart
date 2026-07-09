@@ -7,6 +7,8 @@ import 'catalog_tables.dart';
 
 part 'catalog_database.g.dart';
 
+const catalogDatabaseSchemaVersion = 15;
+
 @DriftDatabase(
   tables: [
     CatalogMetadata,
@@ -57,7 +59,7 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => catalogDatabaseSchemaVersion;
 
   @override
   MigrationStrategy get migration {
