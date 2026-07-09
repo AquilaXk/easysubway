@@ -8674,6 +8674,106 @@ test("공식 source ingest adapter는 production schedule pass-through를 거부
   );
 });
 
+test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를 production input에 주입한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-kric-line4-pilot-schedule-${Date.now()}`);
+  const artifactPath = path.join(outputDir, "kric-artifact.json");
+  const outputPath = path.join(outputDir, "production-input.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(
+    artifactPath,
+    `${JSON.stringify({
+      artifactKind: "kric-line4-timetable-collection",
+      sourceId: "kric-subway-timetable",
+      lineId: "seoul-4",
+      capturedAt: "2026-07-09",
+      requestCount: 2,
+      failedRequestCount: 0,
+      intermediateRowCount: 4,
+      transitTripCount: 2,
+      transitStopTimeCount: 4,
+      transitTrips: [
+        {
+          id: "route-seoul-4-up-T1-8",
+          routeId: "route-seoul-4-up",
+          serviceId: "weekday-kric",
+          tripHeadsign: "station-seoul-4-448",
+          directionId: "up",
+          servicePattern: "LOCAL",
+        },
+        {
+          id: "route-seoul-4-down-T2-8",
+          routeId: "route-seoul-4-down",
+          serviceId: "weekday-kric",
+          tripHeadsign: "station-seoul-4-433",
+          directionId: "down",
+          servicePattern: "LOCAL",
+        },
+      ],
+      transitStopTimes: [
+        {
+          tripId: "route-seoul-4-up-T1-8",
+          stopSequence: 1,
+          stationId: "station-seoul-4-433",
+          lineId: "seoul-4",
+          arrivalSeconds: 30000,
+          departureSeconds: 30000,
+        },
+        {
+          tripId: "route-seoul-4-up-T1-8",
+          stopSequence: 2,
+          stationId: "station-seoul-4-448",
+          lineId: "seoul-4",
+          arrivalSeconds: 32400,
+          departureSeconds: 32400,
+        },
+        {
+          tripId: "route-seoul-4-down-T2-8",
+          stopSequence: 1,
+          stationId: "station-seoul-4-448",
+          lineId: "seoul-4",
+          arrivalSeconds: 33000,
+          departureSeconds: 33000,
+        },
+        {
+          tripId: "route-seoul-4-down-T2-8",
+          stopSequence: 2,
+          stationId: "station-seoul-4-433",
+          lineId: "seoul-4",
+          arrivalSeconds: 35400,
+          departureSeconds: 35400,
+        },
+      ],
+    }, null, 2)}\n`,
+  );
+
+  await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/apply-kric-line4-pilot-schedule.mjs",
+      "--input",
+      "tools/datapack/inputs/capital-pilot-production-source-input.json",
+      "--artifact",
+      artifactPath,
+      "--output",
+      outputPath,
+    ],
+    { cwd: root, env: productionEnv },
+  );
+
+  const transformed = JSON.parse(await readFile(outputPath, "utf8"));
+  assert.ok(transformed.sourceIds.includes("kric-subway-timetable"));
+  assert.equal(transformed.transitTrips.length, 2);
+  assert.equal(transformed.transitStopTimes.length, 4);
+  assert.deepEqual(
+    transformed.transitStopTimes.map((row) => row.stationId),
+    ["station-sangnoksu", "station-sadang", "station-sadang", "station-sangnoksu"],
+  );
+  assert.deepEqual(transformed.transitFeedInfo, [{ feedEndDate: "20261231" }]);
+  assert.equal(transformed.scheduleProvenance.sourceId, "kric-subway-timetable");
+  assert.match(transformed.scheduleProvenance.providerRecordHash, /^[a-f0-9]{64}$/);
+});
+
 test("공식 source ingest adapter는 명시한 lineSequence 경계 wrap만 허용한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-stop-times-wrap-${Date.now()}`);
   const input = sourceIngestInput();
@@ -9625,13 +9725,15 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
     { cwd: root },
   );
   const coverageReport = JSON.parse(await readFile(coverageReportPath, "utf8"));
-  assert.equal(coverageReport.summary.coverageComplete, false);
-  assert.equal(coverageReport.summary.missingRequirements, 1);
-  assert.equal(coverageReport.summary.coverageRatio, 0.6667);
-  assert.deepEqual(
-    coverageReport.requirements.find((requirement) => requirement.sourceDomain === "schedule_timetable").missingFields,
-    ["service_calendar", "trip", "stop_time"],
+  assert.equal(coverageReport.summary.coverageComplete, true);
+  assert.equal(coverageReport.summary.missingRequirements, 0);
+  assert.equal(coverageReport.summary.coverageRatio, 1);
+  const scheduleCoverage = coverageReport.requirements.find(
+    (requirement) => requirement.sourceDomain === "schedule_timetable",
   );
+  assert.equal(scheduleCoverage.status, "covered");
+  assert.deepEqual(scheduleCoverage.sourceIds, ["kric-subway-timetable"]);
+  assert.deepEqual(scheduleCoverage.missingFields, []);
 
   const manifest = JSON.parse(await readFile(path.join(packOutputDir, "current.json"), "utf8"));
   assert.equal(manifest.manifestVersion, 2);
@@ -9676,6 +9778,10 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
         },
       ],
     );
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendars").get().count, 2);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_trips").get().count, 466);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_stop_times").get().count, 932);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_feed_info").get().count, 1);
   } finally {
     database.close();
   }
@@ -9690,6 +9796,14 @@ test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 
       (record) => record.entityType === "facility" && record.field === "status",
     ).length,
     6,
+  );
+  assert.deepEqual(
+    [...new Set(
+      provenance.packs[0].records
+        .filter((record) => record.sourceId === "kric-subway-timetable")
+        .map((record) => record.field),
+    )].sort(),
+    ["service_calendar", "stop_time", "trip"],
   );
 
   const coverageGapReportPath = path.join(outputDir, "coverage-gap-report.json");

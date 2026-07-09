@@ -390,6 +390,19 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
       addRecord(position, "route_map_position", entityId, "route_map_label_polygon", operatorIds);
     }
   }
+  const transitRouteLineIds = new Map((pack.transitRoutes ?? []).map((route) => [route.id, route.lineId]));
+  for (const calendar of pack.serviceCalendars ?? []) {
+    addRecord(calendar, "service_calendar", calendar.serviceId, "service_calendar");
+  }
+  for (const trip of pack.transitTrips ?? []) {
+    const lineId = transitRouteLineIds.get(trip.routeId);
+    const operatorIds = [lineOperatorIds.get(lineId)].filter(Boolean);
+    addRecord(trip, "transit_trip", trip.id, "trip", operatorIds);
+  }
+  for (const stopTime of pack.transitStopTimes ?? []) {
+    const operatorIds = [lineOperatorIds.get(stopTime.lineId)].filter(Boolean);
+    addRecord(stopTime, "transit_stop_time", `${stopTime.tripId}:${stopTime.stopSequence}`, "stop_time", operatorIds);
+  }
   for (const facility of pack.facilities ?? []) {
     const operatorIds = [...(stationOperatorIds.get(facility.stationId) ?? [])];
     const field = facilityField(facility.type);
