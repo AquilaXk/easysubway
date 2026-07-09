@@ -49,7 +49,7 @@
       "decisionOwnerKo": "운영/개인정보 담당",
       "readyWhenKo": "인증 없이 열리는 public HTTPS 개인정보처리방침 URL이 Play store listing, 앱 도움말, 공개 정책 페이지에 같은 값으로 공개되고 수집 항목, 목적, 보관, 삭제, 연락처, 외부 지도 길안내 제3자 공유 범위, tracking 없음, 사진/위치 선택 사용 조건을 포함한다.",
       "evidence": ["store-listing-url", "app-help-screen-url"],
-      "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/release/store-privacy-inventory.json"],
+      "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/release/store-privacy-inventory.json", "backend/src/main/resources/templates/legal/privacy.html"],
       "configurationSources": ["EASYSUBWAY_PRIVACY_POLICY_URL"]
     },
     {
