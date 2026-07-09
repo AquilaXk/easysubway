@@ -82,16 +82,16 @@ class DatapackPipelineAdminPageController {
 					url("/admin/datapack/candidates/page", candidateId, null, "BLOCKER"),
 					"후보 팩"),
 				stage(4, "별칭·격리", summary.aliasBlockers() + summary.quarantineBlockers(),
-					url("/admin/datapack/alias-quarantine/page", candidateId, sourceSnapshotId, "BLOCKER"),
+					url("/admin/datapack/alias-quarantine/page", null, null, "BLOCKER"),
 					"별칭·격리 검토"),
 				stage(5, "시설 근거", summary.facilityBlockers(),
-					url("/admin/datapack/facility-evidence/page", candidateId, sourceSnapshotId, "BLOCKER"),
+					url("/admin/datapack/facility-evidence/page", null, null, "BLOCKER"),
 					"시설 근거 검토"),
 				stage(6, "경로 게이트", summary.routeGateBlockers(),
-					url("/admin/datapack/route-gates/page", candidateId, sourceSnapshotId, "BLOCKER"),
+					url("/admin/datapack/route-gates/page", null, null, "BLOCKER"),
 					"경로 게이트"),
 				stage(7, "수동 오버라이드", summary.manualOverrideBlockers(),
-					url("/admin/datapack/manual-overrides/page", candidateId, null, "BLOCKER"),
+					url("/admin/datapack/manual-overrides/page", null, null, "BLOCKER"),
 					"수동 오버라이드"),
 				stage(8, "매니페스트 서명", summary.manifestBlockers(), candidateDrill, "후보 상세"),
 				stage(9, "채널 승격", 0,
@@ -149,7 +149,7 @@ class DatapackPipelineAdminPageController {
 			if (status != null && !status.isBlank()) {
 				builder.queryParam("status", status);
 			}
-			return builder.build().toUriString();
+			return builder.build().encode().toUriString();
 		}
 	}
 

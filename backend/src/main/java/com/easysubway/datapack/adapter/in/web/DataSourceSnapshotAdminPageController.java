@@ -12,7 +12,6 @@ import com.easysubway.datapack.application.service.DatapackSourceSnapshotCommand
 import com.easysubway.datapack.domain.DataSourceSnapshot;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
-import java.util.Comparator;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,8 +27,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 class DataSourceSnapshotAdminPageController {
-
-	private static final int SNAPSHOT_FILTER_LIMIT = 500;
 
 	private final JdbcDataSourceSnapshotRepository snapshotRepository;
 	private final DatapackSourceSnapshotCommandService snapshotCommandService;
@@ -62,31 +59,20 @@ class DataSourceSnapshotAdminPageController {
 	) {
 		AdminPageRequest pageRequest = AdminPageRequest.of(page, size);
 		DatapackAdminListQuery filter = DatapackAdminListQuery.of(query, status, candidateId, sourceSnapshotId, sort);
-		int limit = Math.max(SNAPSHOT_FILTER_LIMIT, pageRequest.offset() + pageRequest.limitForHasNext());
 		List<SourceSnapshotRow> rows = snapshotRepository
-			.listRecentSnapshots(limit, 0)
+			.listSnapshotsForAdmin(
+				filter.queryValue(),
+				filter.statusValue(),
+				filter.sourceSnapshotIds(),
+				filter.sortValue(),
+				pageRequest.limitForHasNext(),
+				pageRequest.offset()
+			)
 			.stream()
 			.map(SourceSnapshotRow::from)
-			.filter(row -> filter.matchesSourceSnapshot(row.snapshotId()))
-			.filter(row -> filter.matchesText(
-				row.snapshotId(),
-				row.sourceId(),
-				row.provider(),
-				row.snapshotStatus(),
-				row.schemaStatus(),
-				row.licenseStatus(),
-				row.fetchStatus(),
-				row.diffSummary()
-			))
-			.filter(row -> snapshotStatusMatches(row, filter.statusValue()))
-			.sorted(snapshotSort(filter.sortValue()))
 			.toList();
-		EgovPaginationView pageView = EgovPaginationView.fromSlice(
-			pageRequest.page(),
-			pageRequest.size(),
-			fetchedCountForPage(rows.size(), pageRequest)
-		);
-		model.addAttribute("snapshots", pageView.pageItems(rows));
+		EgovPaginationView pageView = EgovPaginationView.fromSlice(pageRequest.page(), pageRequest.size(), rows.size());
+		model.addAttribute("snapshots", pageView.visibleItems(rows));
 		model.addAttribute("page", pageView);
 		model.addAttribute("filter", filter);
 		model.addAttribute(
@@ -263,36 +249,4 @@ class DataSourceSnapshotAdminPageController {
 		}
 	}
 
-	private static boolean snapshotStatusMatches(SourceSnapshotRow row, String status) {
-		return switch (status) {
-			case "ALL" -> true;
-			case "BLOCKER" -> !snapshotReady(row);
-			default -> status.equals(row.snapshotStatus())
-				|| status.equals(row.schemaStatus())
-				|| status.equals(row.licenseStatus())
-				|| status.equals(row.fetchStatus());
-		};
-	}
-
-	private static boolean snapshotReady(SourceSnapshotRow row) {
-		return "LOCKED".equals(row.snapshotStatus())
-			&& "PASS".equals(row.schemaStatus())
-			&& "PASS".equals(row.licenseStatus())
-			&& "SUCCESS".equals(row.fetchStatus())
-			&& row.redistributionAllowed()
-			&& row.credentialRedacted();
-	}
-
-	private static Comparator<SourceSnapshotRow> snapshotSort(String sort) {
-		return switch (sort) {
-			case "source" -> Comparator.comparing(SourceSnapshotRow::sourceId).thenComparing(SourceSnapshotRow::retrievedAt).reversed();
-			case "retrieved_asc" -> Comparator.comparing(SourceSnapshotRow::retrievedAt).thenComparing(SourceSnapshotRow::snapshotId);
-			default -> Comparator.comparing(SourceSnapshotRow::retrievedAt).reversed().thenComparing(SourceSnapshotRow::snapshotId);
-		};
-	}
-
-	private static int fetchedCountForPage(int rowCount, AdminPageRequest pageRequest) {
-		int remainingFromOffset = Math.max(rowCount - pageRequest.offset(), 0);
-		return Math.min(pageRequest.limitForHasNext(), remainingFromOffset);
-	}
 }

@@ -1,6 +1,8 @@
 package com.easysubway.datapack.adapter.in.web;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -21,7 +23,7 @@ public record DatapackAdminListQuery(
 	) {
 		return new DatapackAdminListQuery(
 			clean(query),
-			clean(status),
+			cleanStatus(status),
 			clean(candidateId),
 			clean(sourceSnapshotId),
 			clean(sort)
@@ -94,12 +96,26 @@ public record DatapackAdminListQuery(
 		if (!hasSourceSnapshot()) {
 			return true;
 		}
-		for (String snapshotId : sourceSnapshotId.split(",")) {
-			if (same(clean(snapshotId), value)) {
+		for (String snapshotId : sourceSnapshotIds()) {
+			if (same(snapshotId, value)) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	public List<String> sourceSnapshotIds() {
+		if (!hasSourceSnapshot()) {
+			return List.of();
+		}
+		List<String> snapshotIds = new ArrayList<>();
+		for (String snapshotId : sourceSnapshotId.split(",")) {
+			String cleaned = clean(snapshotId);
+			if (cleaned != null) {
+				snapshotIds.add(cleaned);
+			}
+		}
+		return snapshotIds;
 	}
 
 	public boolean matchesText(String... values) {
@@ -118,7 +134,9 @@ public record DatapackAdminListQuery(
 	public Map<String, String> params() {
 		Map<String, String> params = new LinkedHashMap<>();
 		put(params, "query", query);
-		put(params, "status", status);
+		if (hasStatus()) {
+			put(params, "status", status);
+		}
 		put(params, "candidateId", candidateId);
 		put(params, "sourceSnapshotId", sourceSnapshotId);
 		put(params, "sort", sort);
@@ -157,6 +175,11 @@ public record DatapackAdminListQuery(
 			return null;
 		}
 		return value.trim();
+	}
+
+	private static String cleanStatus(String value) {
+		String cleaned = clean(value);
+		return cleaned == null ? null : cleaned.toUpperCase(Locale.ROOT);
 	}
 
 	private static String valueOrEmpty(String value) {

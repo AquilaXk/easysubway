@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 class AliasQuarantineAdminPageController {
 
 	private static final int QUEUE_LIMIT = 16;
+	private static final int QUEUE_FILTER_LIMIT = 500;
 
 	private final JdbcAliasQuarantineQueueRepository queueRepository;
 	private final DatapackAliasQuarantineCommandService commandService;
@@ -50,7 +51,8 @@ class AliasQuarantineAdminPageController {
 		Model model
 	) {
 		DatapackAdminListQuery filter = DatapackAdminListQuery.of(query, status, candidateId, sourceSnapshotId, null);
-		model.addAttribute("aliasApprovals", queueRepository.listRecentAliasApprovals(QUEUE_LIMIT).stream()
+		int fetchLimit = filter.active() ? QUEUE_FILTER_LIMIT : QUEUE_LIMIT;
+		model.addAttribute("aliasApprovals", queueRepository.listRecentAliasApprovals(fetchLimit).stream()
 			.map(AliasApprovalView::from)
 			.filter(alias -> filter.matchesSourceSnapshot(alias.sourceSnapshotId()))
 			.filter(alias -> filter.matchesText(
@@ -63,8 +65,9 @@ class AliasQuarantineAdminPageController {
 				alias.approvalStatus()
 			))
 			.filter(alias -> aliasStatusMatches(alias, filter.statusValue()))
+			.limit(QUEUE_LIMIT)
 			.toList());
-		model.addAttribute("quarantineRecords", queueRepository.listRecentQuarantineRecords(QUEUE_LIMIT).stream()
+		model.addAttribute("quarantineRecords", queueRepository.listRecentQuarantineRecords(fetchLimit).stream()
 			.map(QuarantineView::from)
 			.filter(record -> filter.matchesSourceSnapshot(record.sourceSnapshotId()))
 			.filter(record -> filter.matchesText(
@@ -79,6 +82,7 @@ class AliasQuarantineAdminPageController {
 				record.latestCanonicalEntity()
 			))
 			.filter(record -> quarantineStatusMatches(record, filter.statusValue()))
+			.limit(QUEUE_LIMIT)
 			.toList());
 		model.addAttribute("filter", filter);
 		return "admin/datapack/alias-quarantine/list";

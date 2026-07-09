@@ -119,6 +119,7 @@ class DataSourceSnapshotAdminPageControllerTest {
 		String html = mockMvc.perform(get("/admin/datapack/source-snapshots/page")
 				.param("page", "1")
 				.param("size", "1")
+				.param("query", "kric-station-elevator")
 				.with(user("datapack-viewer").authorities(new SimpleGrantedAuthority("admin.datapack.read"))))
 			.andExpect(status().isOk())
 			.andReturn()

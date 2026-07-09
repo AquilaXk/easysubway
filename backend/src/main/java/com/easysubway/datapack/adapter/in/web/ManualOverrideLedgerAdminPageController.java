@@ -96,7 +96,7 @@ class ManualOverrideLedgerAdminPageController {
 	private static boolean manualStatusMatches(ManualOverrideView row, String status) {
 		return switch (status) {
 			case "ALL" -> true;
-			case "BLOCKER" -> !"candidate 가능".equals(row.productionStatus());
+			case "BLOCKER" -> !productionReady(row);
 			case "STRICT" -> row.strictRouteEligible();
 			default -> status.equals(row.approvalStatus()) || status.equals(row.conflictStatus());
 		};

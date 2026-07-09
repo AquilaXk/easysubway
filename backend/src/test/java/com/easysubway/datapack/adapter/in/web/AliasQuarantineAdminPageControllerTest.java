@@ -101,6 +101,28 @@ class AliasQuarantineAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("alias/quarantine 검색은 표시 한도 밖의 alias도 필터 후 찾는다")
+	void aliasQuarantineSearchesBeforeDisplayLimit() throws Exception {
+		for (int index = 2; index <= 25; index++) {
+			insertAliasApproval("alias-station-" + index, "provider-noise-" + index);
+		}
+		insertAliasApproval("alias-target-hidden", "provider-target-hidden");
+
+		String html = mockMvc.perform(get("/admin/datapack/alias-quarantine/page")
+				.param("query", "provider-target-hidden")
+				.with(user("datapack-viewer").authorities(new SimpleGrantedAuthority("admin.datapack.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("alias-target-hidden")
+			.contains("provider-target-hidden")
+			.doesNotContain("provider-noise-2");
+	}
+
+	@Test
 	@DisplayName("alias review 권한 관리자는 pending alias를 승인한다")
 	void aliasReviewerApprovesPendingAlias() throws Exception {
 		mockMvc.perform(post("/admin/datapack/alias-approvals/alias-station-1/approve")
