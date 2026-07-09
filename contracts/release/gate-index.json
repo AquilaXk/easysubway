@@ -10,6 +10,7 @@
     { "file": "datapack-freshness-sla.json", "scope": "product", "area": "datapack" },
     { "file": "datapack-release-readiness-gate.json", "scope": "product", "area": "datapack" },
     { "file": "datapack-update-policy.json", "scope": "mobile", "area": "datapack" },
+    { "file": "external-map-deeplink-policy.json", "scope": "mobile", "area": "mobile-feature" },
     { "file": "forbidden-release-claims.json", "scope": "product", "area": "governance" },
     { "file": "get-off-alarm-policy.json", "scope": "mobile", "area": "mobile-feature" },
     { "file": "issue-1075-async-state-audit.json", "scope": "mobile", "area": "mobile-qa" },
