@@ -1,7 +1,5 @@
 package com.easysubway.operator.adapter.in.web;
 
-import java.time.LocalDate;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,13 +17,11 @@ class OperatorAccessibilityReportPageController {
 	@GetMapping("/operator/accessibility-report/page")
 	String accessibilityReportPage(
 		@RequestParam(required = false) String q,
-		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 		@RequestParam(required = false) String sort,
 		@RequestParam(required = false) String direction,
 		Model model
 	) {
-		OperatorReportQuery query = OperatorReportQuery.of(q, from, to, sort, direction);
+		OperatorReportQuery query = OperatorReportQuery.of(q, null, null, sort, direction);
 		model.addAttribute("query", query);
 		model.addAttribute("report", reportAssembler.assemble(query));
 		return "operator/accessibility-report";

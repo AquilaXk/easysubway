@@ -8308,7 +8308,9 @@ test("백엔드 시설 신고는 헥사고날 API 경계를 따른다", () => {
   assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionUseCase/);
   assert.match(operatorDataCollectionFailuresAssembler, /listRecentRuns/);
   assert.match(operatorDataCollectionFailuresAssembler, /getLatestCompletedRun\(DataCollectionSource\.TRANSIT_MASTER\)/);
-  assert.match(operatorDataCollectionFailuresAssembler, /DataCollectionStatus\.FAILED/);
+  assert.match(operatorDataCollectionFailuresAssembler, /filter\(row -> "실패"\.equals\(row\.statusLabel\(\)\)\)/);
+  assert.match(operatorDataCollectionFailuresAssembler, /statusRows\(rows\)/);
+  assert.match(operatorDataCollectionFailuresAssembler, /case FAILED -> "실패"/);
   assert.match(operatorDataCollectionFailuresAssembler, /Duration\.ofHours\(24\)/);
   assert.match(operatorDataCollectionFailuresView, /record OperatorDataCollectionFailuresView/);
   assert.match(operatorDataCollectionFailuresView, /int totalRunCount/);

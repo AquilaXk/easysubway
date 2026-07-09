@@ -41,7 +41,8 @@ final class OperatorReportCsv {
 		}
 		String guarded = value;
 		char first = value.charAt(0);
-		if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+		if (first == '=' || first == '+' || first == '-' || first == '@'
+			|| first == '\t' || first == '\r' || first == '\n') {
 			guarded = "'" + value;
 		}
 		if (guarded.indexOf(',') >= 0

@@ -39,14 +39,6 @@
 					<span>검색</span>
 					<input type="search" name="q" th:value="${query.q}" placeholder="역·시설·상태">
 				</label>
-				<label>
-					<span>시작일</span>
-					<input type="date" name="from" th:value="${query.from}">
-				</label>
-				<label>
-					<span>종료일</span>
-					<input type="date" name="to" th:value="${query.to}">
-				</label>
 				<input type="hidden" name="sort" th:value="${query.sort}">
 				<input type="hidden" name="direction" th:value="${query.direction}">
 				<button type="submit">필터 적용</button>
@@ -97,16 +89,16 @@
 					<thead>
 					<tr>
 						<th scope="col" th:attr="aria-sort=${query.ariaSort('station')}">
-							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},from=${query.from},to=${query.to},sort='station',direction=${query.nextDirection('station')})}">역</a>
+							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},sort='station',direction=${query.nextDirection('station')})}">역</a>
 						</th>
 						<th scope="col" th:attr="aria-sort=${query.ariaSort('facility')}">
-							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},from=${query.from},to=${query.to},sort='facility',direction=${query.nextDirection('facility')})}">시설</a>
+							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},sort='facility',direction=${query.nextDirection('facility')})}">시설</a>
 						</th>
 						<th scope="col" th:attr="aria-sort=${query.ariaSort('status')}">
-							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},from=${query.from},to=${query.to},sort='status',direction=${query.nextDirection('status')})}">현재 상태</a>
+							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},sort='status',direction=${query.nextDirection('status')})}">현재 상태</a>
 						</th>
 						<th scope="col" th:attr="aria-sort=${query.ariaSort('reportCount')}">
-							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},from=${query.from},to=${query.to},sort='reportCount',direction=${query.nextDirection('reportCount')})}">신고 건수</a>
+							<a th:href="@{/operator/repeated-broken-facilities/page(q=${query.q},sort='reportCount',direction=${query.nextDirection('reportCount')})}">신고 건수</a>
 						</th>
 					</tr>
 					</thead>

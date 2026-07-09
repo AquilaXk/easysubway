@@ -45,5 +45,6 @@ class OperatorReportCsvTest {
 		assertThat(OperatorReportCsv.field("+1")).isEqualTo("'+1");
 		assertThat(OperatorReportCsv.field("-cmd")).isEqualTo("'-cmd");
 		assertThat(OperatorReportCsv.field("@ref")).isEqualTo("'@ref");
+		assertThat(OperatorReportCsv.field("\n=SUM(A1)")).isEqualTo("\"'\n=SUM(A1)\"");
 	}
 }
