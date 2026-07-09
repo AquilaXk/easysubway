@@ -14,14 +14,22 @@ class FareCalculator {
     var cardFare = rule.baseCardFare;
     var cashFare = rule.baseCashFare;
     var remainingDistance = extraDistance;
-    for (final step in rule.additionalSteps) {
+    for (var index = 0; index < rule.additionalSteps.length; index += 1) {
       if (remainingDistance <= 0) {
         break;
       }
-      final units = (remainingDistance / step.distanceMeters).ceil();
+      final step = rule.additionalSteps[index];
+      if (step.distanceMeters <= 0) {
+        return const FareEstimate.unavailable();
+      }
+      final isLastStep = index == rule.additionalSteps.length - 1;
+      final chargedDistance = isLastStep
+          ? remainingDistance
+          : math.min(remainingDistance, step.distanceMeters);
+      final units = (chargedDistance / step.distanceMeters).ceil();
       cardFare += units * step.cardFare;
       cashFare += units * step.cashFare;
-      remainingDistance = 0;
+      remainingDistance -= chargedDistance;
     }
     return FareEstimate.available(cardFare: cardFare, cashFare: cashFare);
   }

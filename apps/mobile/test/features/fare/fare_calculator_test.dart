@@ -38,6 +38,37 @@ void main() {
       expect(fare.disclaimer, '성인 교통카드 기준 요금입니다.');
     });
 
+    test('다단계 추가거리 요금은 이후 step까지 적용한다', () {
+      const multiStepRule = FareRule(
+        id: 'capital-integrated-standard',
+        zoneId: 'capital-integrated',
+        baseCardFare: 1550,
+        baseCashFare: 1650,
+        baseDistanceMeters: 10000,
+        additionalSteps: [
+          FareAdditionalStep(
+            distanceMeters: 5000,
+            cardFare: 100,
+            cashFare: 100,
+          ),
+          FareAdditionalStep(
+            distanceMeters: 8000,
+            cardFare: 200,
+            cashFare: 200,
+          ),
+        ],
+      );
+
+      final fare = const FareCalculator().calculate(
+        distanceMeters: 19000,
+        rule: multiStepRule,
+      );
+
+      expect(fare.status, FareStatus.available);
+      expect(fare.cardFare, 1850);
+      expect(fare.cashFare, 1950);
+    });
+
     test('거리나 규칙이 없으면 값을 만들지 않고 강등한다', () {
       final missingDistance = const FareCalculator().calculate(
         distanceMeters: null,
