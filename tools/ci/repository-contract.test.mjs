@@ -11000,6 +11000,10 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   ]);
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("외부 지도 길안내 제3자 공유 범위"));
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("tracking 없음"));
+  const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
+  assert.match(publicPrivacyPolicy, /외부 지도 도보 길안내/);
+  assert.match(publicPrivacyPolicy, /출구 도보 길안내/);
+  assert.match(publicPrivacyPolicy, /카카오맵 앱\/웹/);
   assert.equal(playStoreContent.storeMetadataRequirements.publicContactEmailMustMatchAppSupportEmail, true);
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("대중교통"));
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("접근성"));
