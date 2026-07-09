@@ -9415,11 +9415,14 @@ void main() {
 
   testWidgets('foreground 복귀는 활성 하차 알림을 현재 경로 시간으로 재예약한다', (tester) async {
     final notifier = _RecordingGetOffAlarmNotifier();
+    final now = DateTime.parse('2026-07-06T09:00:00+09:00');
+    final arrivalAt = DateTime.parse('2026-07-06T09:37:30+09:00');
+    final fireAt = DateTime.parse('2026-07-06T09:35:30+09:00');
     final controller = GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubExactAlarmPermissionGate(),
       repository: _MemoryGetOffAlarmStateRepository(),
-      now: () => DateTime(2026, 7, 6, 9, 0),
+      now: () => now,
     );
     addTearDown(controller.dispose);
     final repository = FakeRouteSearchRepository(
@@ -9501,7 +9504,7 @@ void main() {
         GetOffAlarmStop(
           stationId: 'station-sadang',
           stationName: '사당',
-          arrivalAt: DateTime(2026, 7, 6, 9, 37, 30),
+          arrivalAt: arrivalAt,
           kind: GetOffAlarmKind.destination,
         ),
       ],
@@ -9518,8 +9521,8 @@ void main() {
     expect(notifier.scheduleCalls, 1);
     expect(notifier.scheduledMode, GetOffAlarmScheduleMode.exact);
     expect(
-      notifier.scheduledAlarms.single.fireAt.toIso8601String(),
-      contains('2026-07-06T09:35:30'),
+      notifier.scheduledAlarms.single.fireAt.isAtSameMomentAs(fireAt),
+      isTrue,
     );
   });
 
