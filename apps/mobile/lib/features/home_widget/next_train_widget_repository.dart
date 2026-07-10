@@ -1,0 +1,324 @@
+import 'package:drift/drift.dart';
+
+import '../../core/database/catalog/catalog_database.dart';
+import '../../core/database/user/user_database.dart';
+
+enum NextTrainWidgetStatus { available, serviceEnded, timetableUnavailable }
+
+class WidgetStationSelection {
+  const WidgetStationSelection({
+    required this.stationId,
+    required this.lineId,
+    required this.stationName,
+    required this.lineName,
+  });
+
+  final String stationId;
+  final String lineId;
+  final String stationName;
+  final String lineName;
+}
+
+class NextTrainDirection {
+  const NextTrainDirection({required this.name, required this.departureAt});
+
+  final String name;
+  final DateTime departureAt;
+
+  String get departureLabel => _timeLabel(departureAt);
+}
+
+class NextTrainWidgetData {
+  const NextTrainWidgetData({
+    required this.selection,
+    required this.status,
+    required this.directions,
+    required this.statusLabel,
+    required this.updatedAt,
+  });
+
+  factory NextTrainWidgetData.unavailable(
+    WidgetStationSelection selection,
+    DateTime updatedAt,
+  ) {
+    return NextTrainWidgetData(
+      selection: selection,
+      status: NextTrainWidgetStatus.timetableUnavailable,
+      directions: const [],
+      statusLabel: '시간표를 확인할 수 없어요.',
+      updatedAt: updatedAt,
+    );
+  }
+
+  final WidgetStationSelection selection;
+  final NextTrainWidgetStatus status;
+  final List<NextTrainDirection> directions;
+  final String statusLabel;
+  final DateTime updatedAt;
+}
+
+class NextTrainWidgetRepository {
+  const NextTrainWidgetRepository({
+    required this.catalogDatabase,
+    required this.userDatabase,
+  });
+
+  final CatalogDatabase catalogDatabase;
+  final UserDatabase userDatabase;
+
+  Future<List<WidgetStationSelection>> availableSelections() async {
+    final favorites = await userDatabase
+        .customSelect('SELECT station_id FROM favorite_stations')
+        .get();
+    if (favorites.isEmpty) {
+      return const [];
+    }
+    final stationIds = favorites
+        .map((row) => row.read<String>('station_id'))
+        .toList(growable: false);
+    final placeholders = List.filled(stationIds.length, '?').join(',');
+    final rows = await catalogDatabase.customSelect('''
+          SELECT DISTINCT
+            s.id AS station_id,
+            sl.line_id,
+            s.name_ko AS station_name,
+            l.name_ko AS line_name
+          FROM stations s
+          JOIN station_lines sl ON sl.station_id = s.id
+          JOIN lines l ON l.id = sl.line_id
+          WHERE s.id IN ($placeholders)
+            AND EXISTS (
+              SELECT 1
+              FROM transit_stop_times st
+              WHERE st.station_id = sl.station_id
+                AND st.line_id = sl.line_id
+            )
+          ORDER BY s.name_ko, l.name_ko
+          ''', variables: stationIds.map(Variable.withString).toList()).get();
+    return rows
+        .map(
+          (row) => WidgetStationSelection(
+            stationId: row.read<String>('station_id'),
+            lineId: row.read<String>('line_id'),
+            stationName: row.read<String>('station_name'),
+            lineName: row.read<String>('line_name'),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<NextTrainWidgetData> load(
+    WidgetStationSelection selection,
+    DateTime now,
+  ) async {
+    // ponytail: the catalog is Asia/Seoul-only; add timezone conversion when
+    // multi-timezone packs become a real requirement.
+    final localNow = now.toLocal();
+    if (!await _feedIsCurrent(localNow)) {
+      return NextTrainWidgetData.unavailable(selection, localNow);
+    }
+
+    final midnight = DateTime(localNow.year, localNow.month, localNow.day);
+    final nowSeconds = localNow.difference(midnight).inSeconds;
+    final candidates = <_Departure>[];
+    for (var dayOffset = -1; dayOffset <= 7; dayOffset += 1) {
+      final serviceDate = midnight.add(Duration(days: dayOffset));
+      final serviceIds = await _activeServiceIds(serviceDate);
+      if (serviceIds.isEmpty) {
+        continue;
+      }
+      final departures = await _departures(
+        selection: selection,
+        serviceIds: serviceIds,
+      );
+      for (final departure in departures) {
+        final relativeSeconds =
+            (dayOffset * Duration.secondsPerDay) + departure.seconds;
+        if (relativeSeconds < nowSeconds) {
+          continue;
+        }
+        candidates.add(
+          _Departure(
+            directionName: departure.directionName,
+            seconds: departure.seconds,
+            departureAt: serviceDate.add(Duration(seconds: departure.seconds)),
+          ),
+        );
+      }
+    }
+    candidates.sort(
+      (left, right) => left.departureAt.compareTo(right.departureAt),
+    );
+
+    final nextByDirection = <String, NextTrainDirection>{};
+    for (final candidate in candidates) {
+      nextByDirection.putIfAbsent(
+        candidate.directionName,
+        () => NextTrainDirection(
+          name: candidate.directionName,
+          departureAt: candidate.departureAt,
+        ),
+      );
+    }
+    final directions = nextByDirection.values.toList(growable: false)
+      ..sort((left, right) => left.departureAt.compareTo(right.departureAt));
+    if (directions.length < 2) {
+      return NextTrainWidgetData.unavailable(selection, localNow);
+    }
+
+    final hasDepartureToday = directions.any(
+      (direction) => _isSameDate(direction.departureAt, localNow),
+    );
+    final status = hasDepartureToday
+        ? NextTrainWidgetStatus.available
+        : NextTrainWidgetStatus.serviceEnded;
+    return NextTrainWidgetData(
+      selection: selection,
+      status: status,
+      directions: directions,
+      statusLabel: status == NextTrainWidgetStatus.serviceEnded
+          ? '오늘 운행 종료 · 첫차 ${directions.first.departureLabel}'
+          : '시간표 기준',
+      updatedAt: localNow,
+    );
+  }
+
+  Future<bool> _feedIsCurrent(DateTime now) async {
+    final row = await catalogDatabase
+        .customSelect('SELECT feed_end_date FROM transit_feed_info LIMIT 1')
+        .getSingleOrNull();
+    if (row == null) {
+      return false;
+    }
+    final endDate = _parseServiceDate(row.read<String>('feed_end_date'));
+    final today = DateTime(now.year, now.month, now.day);
+    return endDate != null && !today.isAfter(endDate);
+  }
+
+  Future<Set<String>> _activeServiceIds(DateTime date) async {
+    final dateKey = _dateKey(date);
+    final calendarRows = await catalogDatabase
+        .customSelect(
+          '''
+          SELECT *
+          FROM service_calendars
+          WHERE start_date <= ? AND end_date >= ?
+          ''',
+          variables: [
+            Variable.withString(dateKey),
+            Variable.withString(dateKey),
+          ],
+        )
+        .get();
+    final weekdayColumn = switch (date.weekday) {
+      DateTime.monday => 'monday',
+      DateTime.tuesday => 'tuesday',
+      DateTime.wednesday => 'wednesday',
+      DateTime.thursday => 'thursday',
+      DateTime.friday => 'friday',
+      DateTime.saturday => 'saturday',
+      _ => 'sunday',
+    };
+    final active = <String>{
+      for (final row in calendarRows)
+        if (_isEnabled(row.data[weekdayColumn])) row.read<String>('service_id'),
+    };
+    final exceptionRows = await catalogDatabase
+        .customSelect(
+          '''
+          SELECT service_id, exception_type
+          FROM service_calendar_dates
+          WHERE date = ?
+          ''',
+          variables: [Variable.withString(dateKey)],
+        )
+        .get();
+    for (final row in exceptionRows) {
+      final serviceId = row.read<String>('service_id');
+      if (row.read<int>('exception_type') == 1) {
+        active.add(serviceId);
+      } else {
+        active.remove(serviceId);
+      }
+    }
+    return active;
+  }
+
+  Future<List<_Departure>> _departures({
+    required WidgetStationSelection selection,
+    required Set<String> serviceIds,
+  }) async {
+    final placeholders = List.filled(serviceIds.length, '?').join(',');
+    final rows = await catalogDatabase
+        .customSelect(
+          '''
+          SELECT r.direction_name, st.departure_seconds
+          FROM transit_stop_times st
+          JOIN transit_trips t ON t.id = st.trip_id
+          JOIN transit_routes r ON r.id = t.route_id
+          WHERE st.station_id = ?
+            AND st.line_id = ?
+            AND st.pickup_type = 0
+            AND t.service_id IN ($placeholders)
+          ORDER BY st.departure_seconds
+          ''',
+          variables: [
+            Variable.withString(selection.stationId),
+            Variable.withString(selection.lineId),
+            ...serviceIds.map(Variable.withString),
+          ],
+        )
+        .get();
+    return rows
+        .map(
+          (row) => _Departure(
+            directionName: row.read<String>('direction_name'),
+            seconds: row.read<int>('departure_seconds'),
+            departureAt: DateTime.fromMillisecondsSinceEpoch(0),
+          ),
+        )
+        .toList(growable: false);
+  }
+}
+
+class _Departure {
+  const _Departure({
+    required this.directionName,
+    required this.seconds,
+    required this.departureAt,
+  });
+
+  final String directionName;
+  final int seconds;
+  final DateTime departureAt;
+}
+
+bool _isEnabled(Object? value) => value == true || value == 1;
+
+bool _isSameDate(DateTime left, DateTime right) {
+  return left.year == right.year &&
+      left.month == right.month &&
+      left.day == right.day;
+}
+
+String _dateKey(DateTime date) {
+  return '${date.year.toString().padLeft(4, '0')}'
+      '${date.month.toString().padLeft(2, '0')}'
+      '${date.day.toString().padLeft(2, '0')}';
+}
+
+DateTime? _parseServiceDate(String value) {
+  if (!RegExp(r'^\d{8}$').hasMatch(value)) {
+    return null;
+  }
+  return DateTime(
+    int.parse(value.substring(0, 4)),
+    int.parse(value.substring(4, 6)),
+    int.parse(value.substring(6, 8)),
+  );
+}
+
+String _timeLabel(DateTime value) {
+  return '${value.hour.toString().padLeft(2, '0')}:'
+      '${value.minute.toString().padLeft(2, '0')}';
+}
