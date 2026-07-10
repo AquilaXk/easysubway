@@ -5591,97 +5591,298 @@ class _RouteStepSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        for (final step in steps) _RouteStepTile(step: step),
+        for (var index = 0; index < steps.length; index += 1)
+          _RouteStepTile(step: steps[index], isLast: index == steps.length - 1),
       ],
     );
   }
 }
 
+/// 세로 타임라인 좌측 레일 폭(시각 칸 + 노선색 배지가 정렬되는 고정폭).
+const double _routeTimelineRailWidth = 64;
+
+/// 노선색 배지 지름 · 연결선 두께 · 최소 터치 타깃(#1704 접근성 48).
+const double _routeTimelineBadgeSize = 40;
+const double _routeTimelineConnectorWidth = 4;
+const double _routeTimelineMinTouchTarget = 48;
+
+/// 세로 타임라인 한 스텝. 좌측(시각·노선색 배지·연결선) + 우측(역명·구간 요약).
+///
+/// 데이터 경계(#1704): 노선색·역명·구간 요약·(있을 때만) 시각만 그린다.
+/// 빠른 환승 칸번호·내리는 문·빠른 하차는 모델에 필드가 없어 줄 자체를 그리지 않는다.
 class _RouteStepTile extends StatelessWidget {
-  const _RouteStepTile({required this.step});
+  const _RouteStepTile({required this.step, this.isLast = false});
 
   final RouteSearchStep step;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final textTheme = Theme.of(context).textTheme;
+    final isWalking = step.isWalkingStep;
+    // 노선색은 우리 데이터로 가능한 유일한 유채색(#1915). 도보/환승 구간은 노선색이
+    // 없으므로 중립 회색 점선으로 강등한다.
+    final lineColor = isWalking
+        ? EasySubwayAccessibleColors.line
+        : stationLineColor(_routeLineColor(step.lineName));
+    final badgeText = _routeTimelineBadgeText(step);
+    final clockLabel = _routeStepClockLabel(step);
+
+    final rail = SizedBox(
+      width: _routeTimelineRailWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            key: Key('routeStepNumber-${step.sequence}'),
-            radius: 22,
-            backgroundColor: EasySubwayAccessibleColors.primary,
-            child: Text(
-              '${step.sequence}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
+          if (clockLabel.isNotEmpty) ...[
+            Text(
+              clockLabel,
+              key: Key('routeStepTime-${step.sequence}'),
+              textAlign: TextAlign.center,
+              style: textTheme.bodySmall?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
                 fontWeight: FontWeight.w700,
+                height: 1.2,
               ),
             ),
+            const SizedBox(height: 4),
+          ],
+          _RouteTimelineBadge(
+            badgeKey: Key('routeStepNumber-${step.sequence}'),
+            label: badgeText,
+            color: isWalking
+                ? EasySubwayAccessibleColors.scaffoldSurface
+                : lineColor,
+            isWalking: isWalking,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (step.userActionTitle.isNotEmpty) ...[
-                  Text(
-                    step.userActionTitle,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.primary,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                Text(
+          if (!isLast)
+            Expanded(
+              child: _RouteTimelineConnector(
+                color: lineColor,
+                dashed: isWalking,
+              ),
+            ),
+        ],
+      ),
+    );
+
+    final content = Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 역명(굵게) + ">" 어포던스: 참고 앱 타임라인의 역명 행.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
                   step.userTitle,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  style: textTheme.bodyLarge?.copyWith(
                     color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w700,
                     height: 1.3,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  step.burdenLabel,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.secondaryText,
-                    fontWeight: FontWeight.w700,
-                    height: 1.3,
-                  ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 6, top: 2),
+                child: Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: EasySubwayAccessibleColors.mutedText,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  step.userDescription,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: EasySubwayAccessibleColors.secondaryText,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-                ),
-                if (step.userReason.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    step.userReason,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: EasySubwayAccessibleColors.secondaryText,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ],
+              ),
+            ],
+          ),
+          if (step.userActionTitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              step.userActionTitle,
+              style: textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.secondaryText,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+          ],
+          const SizedBox(height: 4),
+          // 구간 요약: "약 M분 · 거리 · 계단" (기존 burdenLabel 재사용).
+          Text(
+            step.burdenLabel,
+            style: textTheme.bodyMedium?.copyWith(
+              color: EasySubwayAccessibleColors.secondaryText,
+              fontWeight: FontWeight.w700,
+              height: 1.3,
             ),
           ),
+          const SizedBox(height: 4),
+          Text(
+            step.userDescription,
+            style: textTheme.bodyLarge?.copyWith(
+              color: EasySubwayAccessibleColors.secondaryText,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
+          ),
+          if (step.userReason.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              step.userReason,
+              style: textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.secondaryText,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          rail,
+          const SizedBox(width: 12),
+          Expanded(child: content),
         ],
       ),
     );
   }
+}
+
+/// 타임라인 노선색 원형 배지. 승차는 노선색+노선번호, 도보/환승은 중립 걷기 아이콘.
+class _RouteTimelineBadge extends StatelessWidget {
+  const _RouteTimelineBadge({
+    required this.badgeKey,
+    required this.label,
+    required this.color,
+    required this.isWalking,
+  });
+
+  final Key badgeKey;
+  final String label;
+  final Color color;
+  final bool isWalking;
+
+  @override
+  Widget build(BuildContext context) {
+    // 터치 타깃 48 보장: 시각적 배지는 40이지만 최소 48 박스로 감싼다.
+    return SizedBox(
+      width: _routeTimelineMinTouchTarget,
+      height: _routeTimelineMinTouchTarget,
+      child: Center(
+        child: Container(
+          key: badgeKey,
+          width: _routeTimelineBadgeSize,
+          height: _routeTimelineBadgeSize,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: isWalking
+                ? Border.all(color: EasySubwayAccessibleColors.line)
+                : null,
+          ),
+          child: isWalking
+              ? const Icon(
+                  Icons.directions_walk,
+                  size: 20,
+                  color: EasySubwayAccessibleColors.mutedText,
+                )
+              : Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.clip,
+                  style: TextStyle(
+                    color: stationLineTextColor(color),
+                    fontSize: label.length > 2 ? 12 : 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.0,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 타임라인 세로 연결선. 승차 구간은 노선색 실선, 도보/환승 구간은 회색 점선.
+class _RouteTimelineConnector extends StatelessWidget {
+  const _RouteTimelineConnector({required this.color, required this.dashed});
+
+  final Color color;
+  final bool dashed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!dashed) {
+      return Center(
+        child: Container(width: _routeTimelineConnectorWidth, color: color),
+      );
+    }
+    return Center(
+      child: SizedBox(
+        width: _routeTimelineConnectorWidth,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const dashHeight = 4.0;
+            const gap = 4.0;
+            final count = (constraints.maxHeight / (dashHeight + gap))
+                .floor()
+                .clamp(0, 400);
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                for (var i = 0; i < count; i += 1) ...[
+                  Container(
+                    width: _routeTimelineConnectorWidth,
+                    height: dashHeight,
+                    color: color,
+                  ),
+                  const SizedBox(height: gap),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// 노선색 배지에 얹을 라벨. 노선번호(예: "4")·짧은 노선명·없으면 스텝 순번.
+String _routeTimelineBadgeText(RouteSearchStep step) {
+  final lineName = step.lineName.trim();
+  if (lineName.isNotEmpty) {
+    final badge = stationLineBadgeText(lineName).trim();
+    if (badge.isNotEmpty) {
+      return badge;
+    }
+  }
+  return '${step.sequence}';
+}
+
+/// 스텝의 절대 시각(ISO)을 "오전 5:19" 형태로. 실시간 우선, 없으면 PLANNED,
+/// 둘 다 없거나 파싱 불가면 빈 문자열(→ 시각 칸 자체를 그리지 않는다, #1704 경계).
+String _routeStepClockLabel(RouteSearchStep step) {
+  final iso = step.realtimeArrivalTimeIso.trim().isNotEmpty
+      ? step.realtimeArrivalTimeIso.trim()
+      : step.plannedArrivalTimeIso.trim();
+  if (iso.isEmpty) {
+    return '';
+  }
+  final parsed = DateTime.tryParse(iso);
+  if (parsed == null) {
+    return '';
+  }
+  final local = parsed.toLocal();
+  final isMorning = local.hour < 12;
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '${isMorning ? '오전' : '오후'} $hour12:$minute';
 }
 
 class _RouteFeedbackButtons extends StatefulWidget {
