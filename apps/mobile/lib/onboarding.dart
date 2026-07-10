@@ -223,7 +223,7 @@ class StartScreen extends StatelessWidget {
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 44,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w800,
                                 height: 1.12,
                               ),
                             ),
@@ -239,7 +239,7 @@ class StartScreen extends StatelessWidget {
                                 foregroundColor: const Color(0xFF0B3B42),
                                 minimumSize: const Size.fromHeight(60),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
                               ),
                               child: const Row(
@@ -293,7 +293,7 @@ class OnboardingIntroScreen extends StatelessWidget {
                 '계단 없는 길을\n먼저 찾습니다',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   height: 1.2,
                 ),
               ),
@@ -349,7 +349,7 @@ class _IntroCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: EasySubwayAccessibleColors.line),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
@@ -391,7 +391,7 @@ class _OnboardingStepIndicator extends StatelessWidget {
                     color: step <= currentStep
                         ? EasySubwayAccessibleColors.primary
                         : EasySubwayAccessibleColors.line,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const SizedBox(height: 5),
                 ),
@@ -628,7 +628,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       '어떤 도움이 필요한가요?',
                       style: textTheme.headlineSmall?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         height: 1.25,
                       ),
                     ),
@@ -656,7 +656,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           : '위치는 나중에도 켤 수 있어요',
                       style: textTheme.headlineSmall?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         height: 1.25,
                       ),
                     ),
@@ -848,12 +848,12 @@ class _OnboardingProfileCard extends StatelessWidget {
           child: Material(
             color: backgroundColor,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(17),
+              borderRadius: BorderRadius.circular(16),
               side: BorderSide(color: borderColor, width: selected ? 2 : 1),
             ),
             child: InkWell(
               key: Key('onboardingProfileCard-${profile.id}'),
-              borderRadius: BorderRadius.circular(17),
+              borderRadius: BorderRadius.circular(16),
               onTap: onTap,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 78),

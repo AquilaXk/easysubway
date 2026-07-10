@@ -83,11 +83,7 @@ void main() {
 
   test('FontWeight.w900 ratchet — 전면 제거 대상', () {
     final actual = countPerFile(RegExp(r'FontWeight\.w900'));
-    expectRatchet(actual, {
-      'lib/onboarding.dart': 4,
-      'lib/mobility_profile.dart': 1,
-      'lib/features/stations/presentation/station_line_badges.dart': 2,
-    }, rule: 'w900');
+    expectRatchet(actual, const {}, rule: 'w900');
   });
 
   test('FontWeight.w800 ratchet — 화면 타이틀 한정', () {
@@ -96,12 +92,12 @@ void main() {
       exclude: {'accessible_design.dart', 'design_tokens.dart'},
     );
     expectRatchet(actual, {
+      // 의도 잔존: 기준 화면(노선도 홈·좌측 메뉴) — 룩 불변 원칙
       'lib/network_map.dart': 8,
-      'lib/facility_report.dart': 16,
-      'lib/onboarding.dart': 2,
-      'lib/notification_settings.dart': 2,
-      'lib/features/service_notice/presentation/service_notice_list_screen.dart':
-          1,
+      // 의도 잔존: 온보딩 스플래시·페이지 타이틀 (w900은 w800로 강등)
+      'lib/onboarding.dart': 6,
+      // 의도 잔존: 노선 배지 번호 — 색 배지 위 시인성 (w900은 w800로 강등)
+      'lib/features/stations/presentation/station_line_badges.dart': 2,
     }, rule: 'w800');
   });
 
@@ -114,8 +110,7 @@ void main() {
       // 의도 잔존: 시설 상태 카드 blocked/caution — 상태 의미 틴트 (v4 허용 예외)
       'lib/main.dart': 2,
       'lib/station_search.dart': 1,
-      'lib/mobility_profile.dart': 1,
-      'lib/facility_report.dart': 1,
+      // 의도 잔존: 운행 공지 배너 — 운행 중단 상태 의미 (v4 허용 예외)
       'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
     }, rule: '장식 Soft 틴트');
   });
