@@ -2463,6 +2463,12 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   late String _selectedConstraintMode;
   String _validationMessage = '';
 
+  /// #1933 C: 출발·도착이 모두 채워진 draft로 진입하면 별도 "길찾기" 버튼을 누르지
+  /// 않아도 자동으로 결과 타임라인까지 연결한다. 같은 draft로 중복 검색이 돌지
+  /// 않도록 마지막으로 자동 검색한 조합의 서명을 기억한다. 사용자가 역을 바꾸거나
+  /// 되돌아와 다시 완성하면 서명이 달라져 새로 자동 검색한다.
+  String? _autoSearchedSignature;
+
   @override
   void initState() {
     super.initState();
@@ -2474,6 +2480,56 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
       _selectedMobilityType,
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeAutoSearchFromDraft();
+    });
+  }
+
+  @override
+  void didUpdateWidget(RouteSearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 노선도 오버레이에서 출발·도착을 새로 완성해 다시 진입하면(같은 탭 재빌드)
+    // 갱신된 draft로 자동 검색을 이어간다.
+    if (!identical(widget.initialDraft, oldWidget.initialDraft)) {
+      final draft = widget.initialDraft;
+      _originStation = _stationFromDraft(draft?.origin);
+      _destinationStation = _stationFromDraft(draft?.destination);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeAutoSearchFromDraft();
+      });
+    }
+  }
+
+  /// draft에 출발·도착이 모두 있으면 현재 이동 조건·계단 토글 상태로 자동 검색한다.
+  /// 이미 같은 조합을 자동 검색했다면(로딩·성공 상태 유지 중) 다시 돌리지 않는다.
+  String? _draftSignature() {
+    final origin = _originStation;
+    final destination = _destinationStation;
+    if (origin == null || destination == null) {
+      return null;
+    }
+    return '${origin.id} ${destination.id} '
+        '$_selectedMobilityType $_selectedConstraintMode';
+  }
+
+  void _maybeAutoSearchFromDraft() {
+    if (!mounted) {
+      return;
+    }
+    final signature = _draftSignature();
+    if (signature == null || signature == _autoSearchedSignature) {
+      return;
+    }
+    if (_controller.state.status == RouteSearchViewStatus.loading) {
+      return;
+    }
+    // 하차 알림이 켜진 채로는 자동 검색이 진행 중인 이동을 조용히 취소해 버릴 수
+    // 있으므로, 이때는 자동 검색하지 않고 사용자가 직접 "길찾기"를 누르게 둔다.
+    if (widget.getOffAlarmController?.state.enabled ?? false) {
+      return;
+    }
+    _autoSearchedSignature = signature;
+    unawaited(_submit());
   }
 
   @override

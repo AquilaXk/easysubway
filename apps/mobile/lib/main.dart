@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1383,11 +1384,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late Future<bool> _hasNotificationItemsFuture;
   NoticeController? _noticeController;
 
+  /// #1933 C: 출발·도착이 모두 채워진 draft 조합의 서명. 노선도 위 오버레이(지도 탭·
+  /// 역 검색 어느 경로든)에서 둘 다 채워지면 별도 버튼 없이 결과 타임라인으로 자동
+  /// 연결한다. 같은 조합으로는 한 번만 자동 전환하고, 사용자가 한쪽을 지우거나 바꿔
+  /// 다시 완성하면 서명이 달라져 새로 전환한다.
+  String? _autoRoutedDraftSignature;
+  Timer? _autoRouteDebounce;
+
   @override
   void initState() {
     super.initState();
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
+    _routeDraftController.addListener(_handleRouteDraftChanged);
     final facilitiesFuture = _loadNotificationFacilities();
     _favoriteFacilitiesFuture = facilitiesFuture;
     _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
@@ -1416,8 +1425,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
       _noticeController!.dispose();
     }
+    _autoRouteDebounce?.cancel();
+    _routeDraftController.removeListener(_handleRouteDraftChanged);
     _routeDraftController.dispose();
     super.dispose();
+  }
+
+  /// draft가 바뀔 때마다 호출된다. 출발·도착이 모두 채워지면 결과 탭으로 자동
+  /// 전환한다. 지도 탭·역 검색이 draft를 여러 번 갱신할 수 있으므로 짧게 debounce해
+  /// 마지막 상태로만 전환하고, 같은 조합으로는 중복 전환하지 않는다.
+  void _handleRouteDraftChanged() {
+    final draft = _routeDraftController.draft;
+    final origin = draft.origin;
+    final destination = draft.destination;
+    if (origin == null || destination == null) {
+      // 한쪽이라도 비면 서명을 초기화해, 다시 완성했을 때 재전환되게 한다.
+      _autoRoutedDraftSignature = null;
+      _autoRouteDebounce?.cancel();
+      return;
+    }
+    final signature = '${origin.id} ${destination.id}';
+    if (signature == _autoRoutedDraftSignature) {
+      return;
+    }
+    _autoRoutedDraftSignature = signature;
+    _autoRouteDebounce?.cancel();
+    _autoRouteDebounce = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted) {
+        return;
+      }
+      // 이미 결과 탭이면 setState만으로도 화면이 최신 draft로 다시 빌드되며
+      // RouteSearchScreen이 자동 검색을 이어간다.
+      if (_selectedTabIndex != 2) {
+        setState(() {
+          _routeTabMobilityType = _mobilityType;
+          _selectedTabIndex = 2;
+        });
+      } else {
+        setState(() {});
+      }
+      // 자동 전환을 화면 낭독기에 알린다(포커스는 옮기지 않는다).
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        '출발과 도착이 정해져 경로 결과를 보여드려요.',
+        Directionality.of(context),
+      );
+    });
   }
 
   @override

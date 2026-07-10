@@ -1129,10 +1129,11 @@ void main() {
 
     expect(find.byKey(const Key('routeSearchScreen')), findsOneWidget);
     expect(find.byKey(const Key('homeBottomNavigationBar')), findsNothing);
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 C: 저장된 조합(출발·도착 확정)으로 진입하면 저장된 이동 조건 그대로
+    // 자동 검색까지 이어진다.
     await tester.pumpAndSettle();
 
-    expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
+    expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('노선도 메뉴 길찾기는 길찾기 화면으로 전환한다', (tester) async {
@@ -6202,16 +6203,67 @@ void main() {
       ),
     );
 
+    // #1933 C: 출발·도착이 이미 채워진 draft로 진입하면 자동 검색이 한 번 돈다.
+    // 계단 토글을 켜고 다시 "길찾기"를 누르면 STRICT_STEP_FREE로 재검색한다.
     await tester.tap(find.byKey(const Key('routeStrictStepFreeSwitch')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(routeRepository.requests.single.mobilityType, 'SENIOR');
+    expect(routeRepository.requests.last.mobilityType, 'SENIOR');
     expect(
-      routeRepository.requests.single.effectiveConstraintMode,
+      routeRepository.requests.last.effectiveConstraintMode,
       'STRICT_STEP_FREE',
     );
+  });
+
+  testWidgets('#1933 C 출발·도착이 모두 채워진 draft는 버튼 없이 자동 검색으로 결과 타임라인을 연다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 10),
+          ),
+        ),
+      ),
+    );
+
+    // "길찾기" 버튼을 누르지 않았는데도 자동 검색이 돌아 결과가 온다.
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.originStationId,
+      'station-sangnoksu',
+    );
+    expect(
+      routeRepository.requests.single.destinationStationId,
+      'station-sadang',
+    );
+    expect(routeRepository.requests.single.mobilityType, 'SENIOR');
+    // 이동 조건 기본값(계단 없는 길 선호)이 자동 검색에도 그대로 승계된다.
+    expect(
+      routeRepository.requests.single.effectiveConstraintMode,
+      'PREFER_STEP_FREE',
+    );
+    // 결과 목록(세로 타임라인, #1704)이 렌더된다.
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
   });
 
   testWidgets('경로 검색 최근 도착지 실패는 빈 화면으로 숨기지 않는다', (tester) async {
