@@ -34,6 +34,9 @@ abstract class DeviceRegistrationRepository {
 
 abstract class NotificationPermissionProvider {
   Future<NotificationPermissionStatus> requestNotificationPermission();
+
+  /// 시스템 설정의 현재 알림 권한만 읽고 프롬프트를 띄우지 않는다.
+  Future<NotificationPermissionStatus> notificationPermissionStatus();
 }
 
 enum NotificationPermissionStatus { granted, denied }
@@ -49,15 +52,22 @@ class MethodChannelNotificationPermissionProvider
 
   @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async {
+    return _readStatus('requestNotificationPermission');
+  }
+
+  @override
+  Future<NotificationPermissionStatus> notificationPermissionStatus() async {
+    return _readStatus('notificationPermissionStatus');
+  }
+
+  Future<NotificationPermissionStatus> _readStatus(String method) async {
     try {
-      final granted =
-          await _channel.invokeMethod<bool>('requestNotificationPermission') ??
-          false;
+      final granted = await _channel.invokeMethod<bool>(method) ?? false;
       return granted
           ? NotificationPermissionStatus.granted
           : NotificationPermissionStatus.denied;
     } on PlatformException catch (error, stackTrace) {
-      reportMobileError(error, stackTrace, context: '알림 켜기 요청 중 예외가 발생했습니다.');
+      reportMobileError(error, stackTrace, context: '알림 권한 확인 중 예외가 발생했습니다.');
       throw const NotificationSettingsException(
         _notificationPermissionErrorMessage,
       );

@@ -7,6 +7,8 @@ import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/routes/application/network_graph.dart'
     as graph;
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_mapping.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -420,6 +422,48 @@ void main() {
     final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
     expect(ride.plannedArrivalTimeIso, '2026-07-10T08:12:00+09:00');
     expect(result.etaSource, 'STATIC_LOCAL');
+  });
+
+  test('연속된 동일 노선·패턴 ride는 양 끝을 포함하는 한 trip과 도착 알림 하나로 묶는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedConsecutiveRideRoute(database);
+    await _seedConsecutiveRideTimetable(database);
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final rides = result.steps
+        .where((step) => step.stepType == 'ride')
+        .toList(growable: false);
+    expect(rides, hasLength(1));
+    expect(rides.single.fromStationId, 'station-a');
+    expect(rides.single.toStationId, 'station-c');
+    expect(rides.single.plannedArrivalTimeIso, '2026-07-10T08:12:00+09:00');
+
+    final alarmStops = getOffAlarmStopsFromRideLegs(
+      rideLegs: [
+        for (final ride in rides)
+          RideLegArrival(
+            toStationId: ride.toStationId,
+            plannedArrivalIso: ride.plannedArrivalTimeIso,
+          ),
+      ],
+      stationName: (stationId) => stationId,
+      source: GetOffAlarmTimeSource.planned,
+    );
+    expect(alarmStops, hasLength(1));
+    expect(alarmStops.single.stationId, 'station-c');
+    expect(alarmStops.single.kind, GetOffAlarmKind.destination);
   });
 
   test('출발 초보다 500ms 늦은 cursor는 이미 출발한 trip을 건너뛴다', () async {
@@ -4052,6 +4096,7 @@ Future<void> _insertVerifiedNetworkEdge(
   required String toNodeId,
   required String edgeType,
   required int durationSeconds,
+  String servicePattern = '',
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
   int lastVerifiedAtSeconds = 1781827200,
@@ -4062,11 +4107,11 @@ Future<void> _insertVerifiedNetworkEdge(
     '''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        stair_access_state, accessibility_status, reliability_score,
+        service_pattern, stair_access_state, accessibility_status, reliability_score,
         source_id, source_snapshot_id, provider_record_hash, provenance_kind,
         verification_status, last_verified_at, evidence_hash
       )
-      VALUES (?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
+      VALUES (?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
         'test-source-snapshot',
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         ?, ?, ?, ?)
@@ -4077,6 +4122,7 @@ Future<void> _insertVerifiedNetworkEdge(
       toNodeId,
       durationSeconds,
       edgeType,
+      servicePattern,
       provenanceKind,
       verificationStatus,
       lastVerifiedAtSeconds,
@@ -4292,6 +4338,56 @@ Future<void> _seedTwoLegRoute(CatalogDatabase database) async {
     edgeType: 'RIDE',
     durationSeconds: 120,
   );
+}
+
+Future<void> _seedConsecutiveRideRoute(CatalogDatabase database) async {
+  await _seedLineWithoutNetworkEdges(database);
+  await _insertVerifiedNetworkEdge(
+    database,
+    id: 'ride-a-b-local',
+    fromNodeId: 'station-a:line-test:LOCAL',
+    toNodeId: 'station-b:line-test:LOCAL',
+    edgeType: 'RIDE',
+    durationSeconds: 300,
+    servicePattern: 'LOCAL',
+  );
+  await _insertVerifiedNetworkEdge(
+    database,
+    id: 'ride-b-c-local',
+    fromNodeId: 'station-b:line-test:LOCAL',
+    toNodeId: 'station-c:line-test:LOCAL',
+    edgeType: 'RIDE',
+    durationSeconds: 300,
+    servicePattern: 'LOCAL',
+  );
+}
+
+Future<void> _seedConsecutiveRideTimetable(CatalogDatabase database) async {
+  await database.customStatement('''
+    INSERT INTO service_calendars (
+      service_id, monday, tuesday, wednesday, thursday, friday,
+      saturday, sunday, start_date, end_date
+    )
+    VALUES ('weekday-consecutive', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_routes (id, line_id, route_short_name)
+    VALUES ('route-consecutive', 'line-test', 'T')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_trips (id, route_id, service_id, service_pattern)
+    VALUES ('trip-consecutive', 'route-consecutive', 'weekday-consecutive', 'LOCAL')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_stop_times (
+      trip_id, stop_sequence, station_id, line_id,
+      arrival_seconds, departure_seconds
+    )
+    VALUES
+      ('trip-consecutive', 1, 'station-a', 'line-test', 28770, 28800),
+      ('trip-consecutive', 2, 'station-b', 'line-test', 29100, 29130),
+      ('trip-consecutive', 3, 'station-c', 'line-test', 29520, 29550)
+  ''');
 }
 
 Future<void> _seedTwoLegTimetable(CatalogDatabase database) async {

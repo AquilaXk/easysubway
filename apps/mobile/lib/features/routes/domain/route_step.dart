@@ -25,6 +25,7 @@ class RouteStep {
     required this.durationSeconds,
     this.distanceMeters = 0,
     this.lineId = '',
+    this.servicePattern = '',
     this.transferStationId = '',
     this.includesStairs = false,
     this.stairAccessState = 'unknown',
@@ -43,6 +44,7 @@ class RouteStep {
   final int durationSeconds;
   final int distanceMeters;
   final String lineId;
+  final String servicePattern;
   final String transferStationId;
   final bool includesStairs;
   final String stairAccessState;

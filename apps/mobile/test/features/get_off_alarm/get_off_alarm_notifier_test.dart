@@ -34,6 +34,24 @@ void main() {
   });
 
   group('LocalGetOffAlarmNotifier', () {
+    test('대기 건수는 전용 ID 범위만 세고 다른 알림을 취소하지 않는다', () async {
+      final canceledIds = <int>[];
+      final first = LocalGetOffAlarmNotifier.baseNotificationId;
+      final last = first + LocalGetOffAlarmNotifier.notificationCapacity - 1;
+      final notifier = LocalGetOffAlarmNotifier(
+        FlutterLocalNotificationsPlugin(),
+        isAndroid: true,
+        initializePlugin: () async {},
+        pendingIds: () async => [first - 1, first, last, last + 1],
+        cancelId: (id) async => canceledIds.add(id),
+      );
+
+      final count = await notifier.pendingAlarmCount();
+
+      expect(count, 2);
+      expect(canceledIds, isEmpty);
+    });
+
     test('재시작 후 pending 목록에서 전용 ID 범위만 취소한다', () async {
       final canceledIds = <int>[];
       final first = LocalGetOffAlarmNotifier.baseNotificationId;

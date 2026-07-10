@@ -450,6 +450,10 @@ class _FakeNotificationPermissionProvider
   int requestCount = 0;
 
   @override
+  Future<NotificationPermissionStatus> notificationPermissionStatus() async =>
+      NotificationPermissionStatus.granted;
+
+  @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async {
     requestCount++;
     final error = this.error;

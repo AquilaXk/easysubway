@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../mobile_error_reporter.dart';
 import '../../notification_settings.dart';
 import 'data/get_off_alarm_state_repository.dart';
 import 'exact_alarm_permission.dart';
@@ -67,9 +68,12 @@ class GetOffAlarmController extends ChangeNotifier {
 
   GetOffAlarmState get state => _state;
 
-  /// 앱 시작 시 영속된 활성 구독을 켜진 상태로 복원한다. OS가 이미 알람을
-  /// 들고 있으므로 재예약하지 않고 상태만 반영한다.
+  /// 앱 시작 시 영속 구독과 OS 알림 상태를 프롬프트 없이 다시 맞춘다.
   Future<void> restore() => _enqueueMutation(_restore);
+
+  /// 포그라운드 복귀 시 설정에서 변경된 권한·정확도와 OS pending을
+  /// 현재 영속 구독에 재조정한다.
+  Future<void> reconcile() => _enqueueMutation(_restore);
 
   Future<void> _restore() async {
     final subscription = await repository.loadActive();
@@ -77,15 +81,40 @@ class GetOffAlarmController extends ChangeNotifier {
       await _turnOff();
       return;
     }
-    _emit(
-      GetOffAlarmState(
-        enabled: true,
-        activeRouteId: subscription.routeId,
-        scheduleMode: subscription.scheduleMode,
-        inexactNotice: subscription.inexactNotice,
-        scheduledCount: subscription.scheduledCount,
-      ),
+    final notificationPermission = await notificationPermissionProvider
+        .notificationPermissionStatus();
+    if (notificationPermission != NotificationPermissionStatus.granted) {
+      await _turnOff(permissionNotice: notificationPermissionDeniedNotice);
+      return;
+    }
+    final pendingCount = await notifier.pendingAlarmCount();
+    if (pendingCount == 0) {
+      await _turnOff();
+      return;
+    }
+    final permitted = await permissionGate.isExactAlarmPermitted();
+    final resolution = resolveGetOffAlarmScheduleMode(
+      exactAlarmPermitted: permitted,
     );
+    final maxExpectedCount =
+        1 +
+        (subscription.transferAlarmEnabled ? subscription.transfers.length : 0);
+    if (resolution.mode != subscription.scheduleMode ||
+        pendingCount > maxExpectedCount) {
+      await _schedule(
+        routeId: subscription.routeId,
+        stops: _stopsFrom(subscription),
+        transferAlarmEnabled: subscription.transferAlarmEnabled,
+        resolution: resolution,
+      );
+      return;
+    }
+    var reconciled = subscription;
+    if (pendingCount != subscription.scheduledCount) {
+      reconciled = _subscriptionWithScheduledCount(subscription, pendingCount);
+      await repository.saveActive(reconciled);
+    }
+    _emitSubscription(reconciled);
   }
 
   /// 하차 알림을 켠다: 정확 알람 권한을 확인해 강등 여부를 정하고, 알림을
@@ -150,6 +179,12 @@ class GetOffAlarmController extends ChangeNotifier {
     if (!_state.enabled || routeId == null) {
       return;
     }
+    final notificationPermission = await notificationPermissionProvider
+        .notificationPermissionStatus();
+    if (notificationPermission != NotificationPermissionStatus.granted) {
+      await _turnOff(permissionNotice: notificationPermissionDeniedNotice);
+      return;
+    }
     final permitted = await permissionGate.isExactAlarmPermitted();
     final resolution = resolveGetOffAlarmScheduleMode(
       exactAlarmPermitted: permitted,
@@ -186,26 +221,22 @@ class GetOffAlarmController extends ChangeNotifier {
       _emit(GetOffAlarmState.off);
       return;
     }
-    await repository.saveActive(
-      _subscriptionFrom(
-        routeId: routeId,
-        stops: stops,
-        transferAlarmEnabled: transferAlarmEnabled,
-        scheduledCount: delivery.scheduledCount,
-        scheduleMode: resolution.mode,
-        inexactNotice: resolution.inexactNotice,
-      ),
+    final subscription = _subscriptionFrom(
+      routeId: routeId,
+      stops: stops,
+      transferAlarmEnabled: transferAlarmEnabled,
+      scheduledCount: delivery.scheduledCount,
+      scheduleMode: resolution.mode,
+      inexactNotice: resolution.inexactNotice,
     );
+    try {
+      await repository.saveActive(subscription);
+    } catch (error, stackTrace) {
+      await _compensateFailedSave();
+      Error.throwWithStackTrace(error, stackTrace);
+    }
 
-    _emit(
-      GetOffAlarmState(
-        enabled: true,
-        activeRouteId: routeId,
-        scheduleMode: resolution.mode,
-        inexactNotice: resolution.inexactNotice,
-        scheduledCount: delivery.scheduledCount,
-      ),
-    );
+    _emitSubscription(subscription);
   }
 
   /// 하차 알림을 끈다: 예약을 취소하고 영속 상태를 지운다. 경로 안내 종료·새
@@ -225,6 +256,28 @@ class GetOffAlarmController extends ChangeNotifier {
     await notifier.cancelAll();
     await repository.clearActive();
     _emit(GetOffAlarmState(permissionNotice: permissionNotice));
+  }
+
+  Future<void> _compensateFailedSave() async {
+    try {
+      await notifier.cancelAll();
+    } catch (error, stackTrace) {
+      _reportCompensationError(error, stackTrace);
+    }
+    try {
+      await repository.clearActive();
+    } catch (error, stackTrace) {
+      _reportCompensationError(error, stackTrace);
+    }
+    _emit(GetOffAlarmState.off);
+  }
+
+  void _reportCompensationError(Object error, StackTrace stackTrace) {
+    reportMobileError(
+      error,
+      stackTrace,
+      context: '하차 알림 저장 실패 보상 정리 중 예외가 발생했습니다.',
+    );
   }
 
   GetOffAlarmSubscription _subscriptionFrom({
@@ -260,6 +313,51 @@ class GetOffAlarmController extends ChangeNotifier {
         arrivalAt: destination.arrivalAt,
       ),
       transfers: transfers,
+    );
+  }
+
+  List<GetOffAlarmStop> _stopsFrom(GetOffAlarmSubscription subscription) {
+    return [
+      for (final transfer in subscription.transfers)
+        GetOffAlarmStop(
+          stationId: transfer.stationId,
+          stationName: transfer.stationName,
+          arrivalAt: transfer.arrivalAt,
+          kind: GetOffAlarmKind.transfer,
+        ),
+      GetOffAlarmStop(
+        stationId: subscription.destination.stationId,
+        stationName: subscription.destination.stationName,
+        arrivalAt: subscription.destination.arrivalAt,
+        kind: GetOffAlarmKind.destination,
+      ),
+    ];
+  }
+
+  GetOffAlarmSubscription _subscriptionWithScheduledCount(
+    GetOffAlarmSubscription subscription,
+    int scheduledCount,
+  ) {
+    return GetOffAlarmSubscription(
+      routeId: subscription.routeId,
+      transferAlarmEnabled: subscription.transferAlarmEnabled,
+      scheduledCount: scheduledCount,
+      scheduleMode: subscription.scheduleMode,
+      inexactNotice: subscription.inexactNotice,
+      destination: subscription.destination,
+      transfers: subscription.transfers,
+    );
+  }
+
+  void _emitSubscription(GetOffAlarmSubscription subscription) {
+    _emit(
+      GetOffAlarmState(
+        enabled: true,
+        activeRouteId: subscription.routeId,
+        scheduleMode: subscription.scheduleMode,
+        inexactNotice: subscription.inexactNotice,
+        scheduledCount: subscription.scheduledCount,
+      ),
     );
   }
 

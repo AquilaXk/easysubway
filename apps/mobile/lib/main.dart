@@ -88,6 +88,9 @@ Future<void> main() async {
     AppBootstrapLifecycle(
       close: bootstrap.close,
       resumeDataPackUpdate: bootstrap.resumeDataPackUpdate,
+      resumeGetOffAlarmState: () => reconcileGetOffAlarmState(
+        bootstrap.dependencies.getOffAlarmController,
+      ),
       child: EasySubwayApp(
         dependencies: bootstrap.dependencies,
         onboardingStore: const SecureOnboardingResultStore(),
@@ -114,6 +117,21 @@ Future<void> restoreGetOffAlarmState(GetOffAlarmController? controller) async {
       error,
       stackTrace,
       context: '하차 알림 시작 상태 복원 중 예외가 발생했습니다.',
+    );
+  }
+}
+
+@visibleForTesting
+Future<void> reconcileGetOffAlarmState(
+  GetOffAlarmController? controller,
+) async {
+  try {
+    await controller?.reconcile();
+  } catch (error, stackTrace) {
+    reportMobileError(
+      error,
+      stackTrace,
+      context: '하차 알림 foreground 상태 재조정 중 예외가 발생했습니다.',
     );
   }
 }

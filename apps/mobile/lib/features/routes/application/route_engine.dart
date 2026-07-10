@@ -435,6 +435,7 @@ class RouteAssembler {
           durationSeconds: edge.durationSeconds,
           distanceMeters: edge.distanceMeters,
           lineId: edge.lineId,
+          servicePattern: edge.servicePattern,
           transferStationId: _transferStationId(edge),
           includesStairs: edge.includesStairs,
           stairAccessState: edge.stairAccessState.name,

@@ -23,6 +23,9 @@ abstract class GetOffAlarmNotifier {
 
   /// 활성 하차 알림을 모두 취소한다.
   Future<void> cancelAll();
+
+  /// 하차 알림 전용 ID 범위에 남은 OS 대기 알림 건수만 반환한다.
+  Future<int> pendingAlarmCount();
 }
 
 /// 플랫폼에 전달한 하차 알림 예약의 실제 결과.
@@ -193,6 +196,16 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
         await _cancelId(id);
       }
     }
+  }
+
+  @override
+  Future<int> pendingAlarmCount() async {
+    if (!_isAndroid) {
+      return 0;
+    }
+    await _ensureInitialized();
+    final pendingIds = await _pendingIds();
+    return pendingIds.where(_isOwnedNotificationId).length;
   }
 
   bool _isOwnedNotificationId(int id) {

@@ -13188,6 +13188,9 @@ class _RecordingGetOffAlarmNotifier implements GetOffAlarmNotifier {
   }
 
   @override
+  Future<int> pendingAlarmCount() async => scheduledAlarms.length;
+
+  @override
   Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
@@ -13389,6 +13392,15 @@ class FakeNotificationPermissionProvider
   int requestCount = 0;
 
   @override
+  Future<NotificationPermissionStatus> notificationPermissionStatus() async {
+    final currentError = error;
+    if (currentError != null) {
+      throw currentError;
+    }
+    return nextStatus;
+  }
+
+  @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async {
     requestCount++;
     final currentError = error;
@@ -13404,6 +13416,10 @@ class _BlockingNotificationPermissionProvider
   final started = Completer<void>();
   final result = Completer<NotificationPermissionStatus>();
   int requestCount = 0;
+
+  @override
+  Future<NotificationPermissionStatus> notificationPermissionStatus() async =>
+      NotificationPermissionStatus.granted;
 
   @override
   Future<NotificationPermissionStatus> requestNotificationPermission() {

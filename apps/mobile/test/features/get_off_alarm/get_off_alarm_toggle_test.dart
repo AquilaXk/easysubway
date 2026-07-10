@@ -31,6 +31,9 @@ class _RecordingNotifier implements GetOffAlarmNotifier {
   Future<void> cancelAll() async {
     cancelCount++;
   }
+
+  @override
+  Future<int> pendingAlarmCount() async => scheduled?.length ?? 0;
 }
 
 class _StubGate implements ExactAlarmPermissionGate {
@@ -49,6 +52,10 @@ class _StubNotificationPermissionProvider
   ]);
 
   final NotificationPermissionStatus status;
+
+  @override
+  Future<NotificationPermissionStatus> notificationPermissionStatus() async =>
+      status;
 
   @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async =>

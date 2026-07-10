@@ -177,8 +177,10 @@ class LocalRouteRepository implements RouteSearchRepository {
     _RouteCatalogSnapshot catalog, {
     required Map<int, String> plannedArrivals,
   }) {
-    return result.steps
-        .map((step) {
+    return _collapseConsecutiveRideSteps(result.steps)
+        .indexed
+        .map((entry) {
+          final (index, step) = entry;
           final fromStationId = catalog.stationIdForNode(step.fromNodeId);
           final toStationId = catalog.stationIdForNode(step.toNodeId);
           final fromName = catalog.stationName(fromStationId);
@@ -186,7 +188,7 @@ class LocalRouteRepository implements RouteSearchRepository {
           final lineName = catalog.lineName(step.lineId);
 
           return RouteSearchStep(
-            sequence: step.sequence,
+            sequence: index + 1,
             stepType: step.type.name,
             title: _stepTitle(step.type.name, fromName, toName, lineName),
             description: _stepDescription(step.type.name, fromName, toName),
@@ -227,7 +229,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     }
     final arrivals = <int, String>{};
     var cursor = now().toUtc();
-    for (final step in result.steps) {
+    for (final step in _collapseConsecutiveRideSteps(result.steps)) {
       if (step.type != route_step.RouteStepType.ride) {
         cursor = cursor.add(Duration(seconds: step.durationSeconds));
         continue;
@@ -236,6 +238,7 @@ class LocalRouteRepository implements RouteSearchRepository {
         fromStationId: catalog.stationIdForNode(step.fromNodeId),
         toStationId: catalog.stationIdForNode(step.toNodeId),
         lineId: step.lineId,
+        servicePattern: step.servicePattern,
         cursor: cursor,
       );
       if (arrival == null) {
@@ -251,6 +254,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     required String fromStationId,
     required String toStationId,
     required String lineId,
+    required String servicePattern,
     required DateTime cursor,
   }) async {
     final koreaNow = cursor.toUtc().add(const Duration(hours: 9));
@@ -274,6 +278,9 @@ class LocalRouteRepository implements RouteSearchRepository {
           ? 0
           : (startMicroseconds + Duration.microsecondsPerSecond - 1) ~/
                 Duration.microsecondsPerSecond;
+      final servicePatternSql = servicePattern.isEmpty
+          ? ''
+          : 'AND trip.service_pattern = ?';
       final row = await catalogDatabase
           .customSelect(
             '''
@@ -306,6 +313,7 @@ class LocalRouteRepository implements RouteSearchRepository {
               AND removed.exception_type = 2
           )
           AND route.line_id = ?
+          $servicePatternSql
           AND board.station_id = ?
           AND board.line_id = ?
           AND board.pickup_type != 1
@@ -323,6 +331,8 @@ class LocalRouteRepository implements RouteSearchRepository {
               Variable.withString(dateKey),
               Variable.withString(dateKey),
               Variable.withString(lineId),
+              if (servicePattern.isNotEmpty)
+                Variable.withString(servicePattern),
               Variable.withString(fromStationId),
               Variable.withString(lineId),
               Variable.withString(toStationId),
@@ -543,6 +553,57 @@ class LocalRouteRepository implements RouteSearchRepository {
       _ => throw const RouteSearchException('지원하지 않는 이동 제약 조건입니다.'),
     };
   }
+}
+
+List<route_step.RouteStep> _collapseConsecutiveRideSteps(
+  List<route_step.RouteStep> steps,
+) {
+  final collapsed = <route_step.RouteStep>[];
+  for (final step in steps) {
+    final previous = collapsed.isEmpty ? null : collapsed.last;
+    final canMerge =
+        previous != null &&
+        previous.type == route_step.RouteStepType.ride &&
+        step.type == route_step.RouteStepType.ride &&
+        previous.toNodeId == step.fromNodeId &&
+        previous.lineId == step.lineId &&
+        previous.servicePattern.isNotEmpty &&
+        previous.servicePattern == step.servicePattern;
+    if (!canMerge) {
+      collapsed.add(step);
+      continue;
+    }
+    collapsed[collapsed.length - 1] = route_step.RouteStep(
+      sequence: previous.sequence,
+      edgeId: previous.edgeId,
+      fromNodeId: previous.fromNodeId,
+      toNodeId: step.toNodeId,
+      type: route_step.RouteStepType.ride,
+      cost: previous.cost + step.cost,
+      durationSeconds: previous.durationSeconds + step.durationSeconds,
+      distanceMeters: previous.distanceMeters + step.distanceMeters,
+      lineId: previous.lineId,
+      servicePattern: previous.servicePattern,
+      includesStairs: previous.includesStairs || step.includesStairs,
+      stairAccessState: previous.stairAccessState == step.stairAccessState
+          ? previous.stairAccessState
+          : 'unknown',
+      evidenceSources: {
+        ...previous.evidenceSources,
+        ...step.evidenceSources,
+      }.toList(growable: false),
+      timeSource: previous.timeSource == step.timeSource
+          ? previous.timeSource
+          : 'UNKNOWN',
+      distanceSource: previous.distanceSource == step.distanceSource
+          ? previous.distanceSource
+          : 'UNKNOWN',
+      confidenceLabel: previous.confidenceLabel == step.confidenceLabel
+          ? previous.confidenceLabel
+          : '안내를 준비 중이에요',
+    );
+  }
+  return collapsed;
 }
 
 class RouteCapabilityMetadata {
@@ -1596,6 +1657,7 @@ graph.RouteEdge _toGraphRouteEdge(
         ? 0
         : networkEdge.durationSeconds,
     lineId: _lineIdForNode(effectiveFromNodeId),
+    servicePattern: networkEdge.servicePattern,
     distanceMeters: networkEdge.distanceMeters,
     includesStairs:
         routeEdgeType == graph.RouteEdgeType.stair ||
