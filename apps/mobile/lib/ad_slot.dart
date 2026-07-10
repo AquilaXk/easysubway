@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
-import 'design_tokens.dart';
 
 /// 표준 배너 규격(아이콘 + 제목/부제 + CTA) 기준 슬롯 높이 (#1931).
 const double kAdBannerSlotStandardHeight = 96;
@@ -67,8 +66,8 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: EasySubwaySpacing.lg,
-        vertical: EasySubwaySpacing.sm,
+        horizontal: 16,
+        vertical: 8,
       ),
       child: Row(
         children: [
@@ -78,7 +77,7 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
             height: 64,
             decoration: BoxDecoration(
               color: EasySubwayAccessibleColors.line,
-              borderRadius: BorderRadius.circular(EasySubwayRadius.control),
+              borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
             child: const Icon(
@@ -86,7 +85,7 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
               color: EasySubwayAccessibleColors.mutedText,
             ),
           ),
-          const SizedBox(width: EasySubwaySpacing.md),
+          const SizedBox(width: 12),
           // 제목/부제 플레이스홀더. 시스템 글자 크기가 커도 슬롯 높이를 넘지 않도록
           // 각 줄을 FittedBox로 축소한다(장식용 자리표시 텍스트, 실제 정보 없음).
           const Expanded(
@@ -107,7 +106,7 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
                     maxLines: 1,
                   ),
                 ),
-                SizedBox(height: EasySubwaySpacing.xs),
+                SizedBox(height: 4),
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
@@ -123,14 +122,14 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: EasySubwaySpacing.md),
+          const SizedBox(width: 12),
           // CTA 버튼 영역 플레이스홀더.
           Container(
             width: 64,
             height: 32,
             decoration: BoxDecoration(
               color: EasySubwayAccessibleColors.line,
-              borderRadius: BorderRadius.circular(EasySubwayRadius.control),
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ],
