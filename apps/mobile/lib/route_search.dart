@@ -48,7 +48,7 @@ const _routePointRailWidth = 30.0;
 const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
 const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
 const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
-const _routePointSelectorPadding = EdgeInsets.fromLTRB(8, 8, 58, 8);
+const _routePointSelectorPadding = EdgeInsets.fromLTRB(4, 4, 12, 4);
 const _routeResultSectionPadding = EdgeInsets.fromLTRB(1, 0, 1, 11);
 
 String _mobilityLabelFor(String mobilityType) {
@@ -3142,47 +3142,40 @@ class _RoutePointPickerCard extends StatelessWidget {
         destinationChild,
       ],
     );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: EasySubwayAccessibleColors.line),
-        borderRadius: _routeSearchPickerRadius,
-        // 최소 그림자 원칙: 보더 중심으로 낮춘다.
-        boxShadow: const [
-          BoxShadow(
-            color: EasySubwayAccessibleColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 3),
+    // v4 경량화(#1930): 큰 박스 카드·큰 원형 스왑 버튼 대신 옅은 채움 위에
+    // 얇은 2줄 필드 + 좌측의 작은 스왑 아이콘(두 줄 사이 세로 중앙)으로 둔다.
+    final swapButton = Semantics(
+      button: true,
+      label: '출발 도착 바꾸기',
+      onTap: onSwap,
+      child: ExcludeSemantics(
+        child: IconButton(
+          key: const Key('routeSwapStationsButton'),
+          onPressed: onSwap,
+          icon: const Icon(Icons.swap_vert, size: 20),
+          color: EasySubwayAccessibleColors.text,
+          style: IconButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            backgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
           ),
-        ],
+        ),
       ),
-      child: Stack(
-        alignment: Alignment.centerRight,
-        children: [
-          Padding(padding: _routePointSelectorPadding, child: rows),
-          Padding(
-            padding: const EdgeInsets.only(right: 9),
-            child: Semantics(
-              button: true,
-              label: '출발 도착 바꾸기',
-              onTap: onSwap,
-              child: ExcludeSemantics(
-                child: IconButton.outlined(
-                  key: const Key('routeSwapStationsButton'),
-                  onPressed: onSwap,
-                  icon: const Icon(Icons.swap_vert),
-                  color: EasySubwayAccessibleColors.text,
-                  style: IconButton.styleFrom(
-                    fixedSize: const Size(48, 48),
-                    side: const BorderSide(
-                      color: EasySubwayAccessibleColors.line,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+    );
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: EasySubwayAccessibleColors.scaffoldSurface,
+        borderRadius: _routeSearchPickerRadius,
+      ),
+      child: Padding(
+        padding: _routePointSelectorPadding,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            swapButton,
+            const SizedBox(width: 4),
+            Expanded(child: rows),
+          ],
+        ),
       ),
     );
   }
