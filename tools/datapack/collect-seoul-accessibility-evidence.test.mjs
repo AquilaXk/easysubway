@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -338,6 +338,7 @@ test("invalid provider evidence never reaches the output write", async () => {
           endpoint: "https://apis.data.go.kr/example",
           serviceKey: "secret",
           output,
+          outputRoot: outputDir,
           fetchImpl,
           retrievedAt: "2026-07-10T00:00:00.000Z",
         }),
@@ -346,6 +347,87 @@ test("invalid provider evidence never reaches the output write", async () => {
     }
   } finally {
     await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("writer rejects output outside the allowed root before fetching", async () => {
+  const outputRoot = await mkdtemp(join(tmpdir(), "easysubway-accessibility-output-root-"));
+  let fetched = false;
+  try {
+    await assert.rejects(
+      writeSeoulAccessibilityEvidence({
+        endpoint: "https://apis.data.go.kr/example",
+        serviceKey: "secret",
+        output: join(outputRoot, "..", "escaped-accessibility.json"),
+        outputRoot,
+        fetchImpl: async () => {
+          fetched = true;
+          throw new Error("must not fetch");
+        },
+      }),
+      /output path must stay within allowed root/,
+    );
+    assert.equal(fetched, false);
+  } finally {
+    await rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("writer rejects an output path that escapes through a symlink", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "easysubway-accessibility-output-symlink-"));
+  const outputRoot = join(workDir, "allowed");
+  const outsideRoot = join(workDir, "outside");
+  await mkdir(outputRoot);
+  await mkdir(outsideRoot);
+  await symlink(outsideRoot, join(outputRoot, "escape"));
+  let fetched = false;
+  try {
+    await assert.rejects(
+      writeSeoulAccessibilityEvidence({
+        endpoint: "https://apis.data.go.kr/example",
+        serviceKey: "secret",
+        output: join(outputRoot, "escape", "evidence.json"),
+        outputRoot,
+        fetchImpl: async () => {
+          fetched = true;
+          throw new Error("must not fetch");
+        },
+      }),
+      /output path must stay within allowed root/,
+    );
+    assert.equal(fetched, false);
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+test("writer rejects an existing output file symlink before fetching", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "easysubway-accessibility-output-file-symlink-"));
+  const outputRoot = join(workDir, "allowed");
+  const outsideFile = join(workDir, "outside.json");
+  const output = join(outputRoot, "evidence.json");
+  await mkdir(outputRoot);
+  await writeFile(outsideFile, "keep");
+  await symlink(outsideFile, output);
+  let fetched = false;
+  try {
+    await assert.rejects(
+      writeSeoulAccessibilityEvidence({
+        endpoint: "https://apis.data.go.kr/example",
+        serviceKey: "secret",
+        output,
+        outputRoot,
+        fetchImpl: async () => {
+          fetched = true;
+          throw new Error("must not fetch");
+        },
+      }),
+      /output path must stay within allowed root/,
+    );
+    assert.equal(fetched, false);
+    assert.equal(await readFile(outsideFile, "utf8"), "keep");
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
   }
 });
 
