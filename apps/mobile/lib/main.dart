@@ -12,6 +12,7 @@ import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
 import 'core/datapack/data_pack_metered_consent_gate.dart';
 import 'core/datapack/data_pack_update_state.dart';
+import 'design_tokens.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'facility_report.dart';
 import 'facility_status.dart';
@@ -437,6 +438,10 @@ class EasySubwayApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: EasySubwayAccessibleColors.primary,
+        ),
+        extensions: const [EasySubwayTokens.light],
+        textTheme: easySubwayTextTheme(
+          ThemeData(useMaterial3: true).textTheme,
         ),
         scaffoldBackgroundColor: _mainScaffoldBackgroundColor,
         appBarTheme: const AppBarTheme(
