@@ -225,13 +225,47 @@ void main() {
     expect(stored, isEmpty);
   });
 
+  test('available이어도 한 방향뿐이면 configure는 저장하거나 갱신하지 않는다', () async {
+    var saveCount = 0;
+    var updateCount = 0;
+    final service = NextTrainWidgetService(
+      load: (_, _) async => NextTrainWidgetData(
+        selection: _selection,
+        status: NextTrainWidgetStatus.available,
+        directions: [_availableData.directions.first],
+        statusLabel: '시간표 기준',
+        updatedAt: DateTime(2026, 7, 10, 9),
+      ),
+      saveValue: (_, _) async => saveCount += 1,
+      updateWidget: () async => updateCount += 1,
+    );
+
+    await expectLater(
+      service.configure(
+        appWidgetId: 42,
+        selection: _selection,
+        now: DateTime(2026, 7, 10, 9),
+      ),
+      throwsA(isA<StateError>()),
+    );
+    expect(saveCount, 0);
+    expect(updateCount, 0);
+  });
+
   test('기존 widget refresh는 unavailable 상태를 정직하게 저장한다', () async {
-    final stored = <String, Object?>{};
+    final stored = <String, Object?>{
+      'widget_42_direction_1': '상록수 방면',
+      'widget_42_departure_1': '09:12',
+      'widget_42_direction_2': '사당 방면',
+      'widget_42_departure_2': '09:18',
+      'widget_42_status': 'available',
+    };
+    var updateCount = 0;
     final service = NextTrainWidgetService(
       load: (selection, now) async =>
           NextTrainWidgetData.unavailable(selection, now),
       saveValue: (key, value) async => stored[key] = value,
-      updateWidget: () async {},
+      updateWidget: () async => updateCount += 1,
     );
 
     await service.refresh(
@@ -244,6 +278,9 @@ void main() {
     expect(stored['widget_42_status_label'], '시간표를 확인할 수 없어요.');
     expect(stored['widget_42_direction_1'], '');
     expect(stored['widget_42_departure_1'], '');
+    expect(stored['widget_42_direction_2'], '');
+    expect(stored['widget_42_departure_2'], '');
+    expect(updateCount, 1);
   });
 
   test('설치 widget 중 완전한 station-line 선택만 갱신한다', () async {
@@ -274,7 +311,92 @@ void main() {
     expect(loaded.single.stationId, 'station-sadang');
     expect(updateCount, 1);
   });
+
+  test('한 widget 설정 읽기 실패 뒤에도 나머지를 갱신하고 전체 작업은 실패한다', () async {
+    final values = _twoWidgetValues();
+    final loaded = <String>[];
+    final service = NextTrainWidgetService(
+      load: (selection, _) async {
+        loaded.add(selection.stationId);
+        return _availableData;
+      },
+      saveValue: (_, _) async {},
+      updateWidget: () async {},
+    );
+
+    await expectLater(
+      refreshInstalledNextTrainWidgets(
+        widgetIds: const [42, 43],
+        readValue: (key) async {
+          if (key == 'widget_42_station_id') {
+            throw StateError('read failed');
+          }
+          return values[key];
+        },
+        service: service,
+        now: DateTime(2026, 7, 10, 9),
+      ),
+      throwsA(
+        isA<StateError>()
+            .having((error) => error.toString(), 'context', contains('42'))
+            .having(
+              (error) => error.toString(),
+              'cause',
+              contains('read failed'),
+            ),
+      ),
+    );
+    expect(loaded, ['station-b']);
+  });
+
+  test('한 widget refresh 실패 뒤에도 나머지를 갱신하고 전체 작업은 실패한다', () async {
+    final values = _twoWidgetValues();
+    final loaded = <String>[];
+    var updateCount = 0;
+    final service = NextTrainWidgetService(
+      load: (selection, _) async {
+        loaded.add(selection.stationId);
+        if (selection.stationId == 'station-a') {
+          throw StateError('refresh failed');
+        }
+        return _availableData;
+      },
+      saveValue: (_, _) async {},
+      updateWidget: () async => updateCount += 1,
+    );
+
+    await expectLater(
+      refreshInstalledNextTrainWidgets(
+        widgetIds: const [42, 43],
+        readValue: (key) async => values[key],
+        service: service,
+        now: DateTime(2026, 7, 10, 9),
+      ),
+      throwsA(
+        isA<StateError>()
+            .having((error) => error.toString(), 'context', contains('42'))
+            .having(
+              (error) => error.toString(),
+              'cause',
+              contains('refresh failed'),
+            ),
+      ),
+    );
+    expect(loaded, ['station-a', 'station-b']);
+    expect(updateCount, 1);
+  });
 }
+
+Map<String, String> _twoWidgetValues() => {
+  'widget_42_station_id': 'station-a',
+  'widget_42_line_id': 'line-a',
+  'widget_42_station_name': 'A역',
+  'widget_42_line_name': 'A선',
+  'widget_43_station_id': 'station-b',
+  'widget_43_line_id': 'line-b',
+  'widget_43_station_name': 'B역',
+  'widget_43_line_name': 'B선',
+};
 
 const _selection = WidgetStationSelection(
   stationId: 'station-sadang',

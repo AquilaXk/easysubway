@@ -127,29 +127,42 @@ Future<void> refreshInstalledNextTrainWidgets({
   required NextTrainWidgetService service,
   required DateTime now,
 }) async {
+  final failures = <String>[];
+  StackTrace? firstFailureStackTrace;
   for (final widgetId in widgetIds) {
-    final prefix = 'widget_${widgetId}_';
-    final stationId = await readValue('${prefix}station_id');
-    final lineId = await readValue('${prefix}line_id');
-    final stationName = await readValue('${prefix}station_name');
-    final lineName = await readValue('${prefix}line_name');
-    if ([
-      stationId,
-      lineId,
-      stationName,
-      lineName,
-    ].any((value) => value == null || value.trim().isEmpty)) {
-      continue;
+    try {
+      final prefix = 'widget_${widgetId}_';
+      final stationId = await readValue('${prefix}station_id');
+      final lineId = await readValue('${prefix}line_id');
+      final stationName = await readValue('${prefix}station_name');
+      final lineName = await readValue('${prefix}line_name');
+      if ([
+        stationId,
+        lineId,
+        stationName,
+        lineName,
+      ].any((value) => value == null || value.trim().isEmpty)) {
+        continue;
+      }
+      await service.refresh(
+        appWidgetId: widgetId,
+        selection: WidgetStationSelection(
+          stationId: stationId!,
+          lineId: lineId!,
+          stationName: stationName!,
+          lineName: lineName!,
+        ),
+        now: now,
+      );
+    } on Object catch (error, stackTrace) {
+      failures.add('widget $widgetId: $error');
+      firstFailureStackTrace ??= stackTrace;
     }
-    await service.refresh(
-      appWidgetId: widgetId,
-      selection: WidgetStationSelection(
-        stationId: stationId!,
-        lineId: lineId!,
-        stationName: stationName!,
-        lineName: lineName!,
-      ),
-      now: now,
+  }
+  if (failures.isNotEmpty) {
+    Error.throwWithStackTrace(
+      StateError('Android widget 갱신 실패: ${failures.join('; ')}'),
+      firstFailureStackTrace!,
     );
   }
 }

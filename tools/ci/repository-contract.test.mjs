@@ -10907,7 +10907,16 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(items.get("play_app_category").readyWhenKo, /대중교통|접근성|지하철|경로 안내/);
   assert.match(items.get("play_store_contact").readyWhenKo, /공개 연락처 이메일|고객지원 메일|같은 운영 수신함/);
   const playPermissionsDeclaration = items.get("play_permissions_declaration");
-  assert.match(playPermissionsDeclaration.readyWhenKo, /위치|권한/);
+  for (const locationPurpose of [
+    "현재 위치 기반 주변 역 탐색",
+    "시설 신고 위치 확인",
+    "출구 도보 길안내",
+  ]) {
+    assert.ok(
+      playPermissionsDeclaration.readyWhenKo.includes(locationPurpose),
+      `play_permissions_declaration must include location purpose: ${locationPurpose}`,
+    );
+  }
   assert.match(playPermissionsDeclaration.readyWhenKo, /WAKE_LOCK.*worker 실행/);
   assert.match(playPermissionsDeclaration.readyWhenKo, /RECEIVE_BOOT_COMPLETED.*재부팅.*복원/);
   assert.match(playPermissionsDeclaration.readyWhenKo, /normal.*프롬프트 없음.*데이터 수집 없음/);

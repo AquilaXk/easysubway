@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:sqlite3/common.dart' show SqliteException;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -203,9 +204,18 @@ class NextTrainWidgetRepository {
   }
 
   Future<tz.TZDateTime?> _feedEndDate() async {
-    final row = await catalogDatabase
-        .customSelect('SELECT feed_end_date FROM transit_feed_info LIMIT 1')
-        .getSingleOrNull();
+    late final QueryRow? row;
+    try {
+      row = await catalogDatabase
+          .customSelect('SELECT feed_end_date FROM transit_feed_info LIMIT 1')
+          .getSingleOrNull();
+    } on SqliteException catch (error) {
+      if (error.message != 'no such table: transit_feed_info' &&
+          error.message != 'no such column: feed_end_date') {
+        rethrow;
+      }
+      return null;
+    }
     if (row == null) {
       return null;
     }

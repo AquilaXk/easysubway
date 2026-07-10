@@ -91,6 +91,30 @@ void main() {
 
     expect(find.text('station-sadang'), findsOneWidget);
   });
+
+  testWidgets('cold start async initial URI는 첫 station 상세를 연다', (tester) async {
+    final navigatorKey = GlobalKey<NavigatorState>();
+    final initialUri = Future<Uri?>.value(
+      Uri.parse(
+        'easysubway://station/detail?stationId=station-sadang&lineId=seoul-4',
+      ),
+    );
+
+    await tester.pumpWidget(
+      HomeWidgetLinkHandler(
+        clicks: initialUri.asStream(),
+        navigatorKey: navigatorKey,
+        stationDetailBuilder: (stationId) => Scaffold(body: Text(stationId)),
+        child: MaterialApp(
+          navigatorKey: navigatorKey,
+          home: const Scaffold(body: Text('홈')),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('station-sadang'), findsOneWidget);
+  });
 }
 
 const _selection = WidgetStationSelection(

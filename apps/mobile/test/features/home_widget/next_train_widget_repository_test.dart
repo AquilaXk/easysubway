@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/features/home_widget/next_train_widget_repository.dart';
+import 'package:sqlite3/common.dart' show SqliteException;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -49,7 +50,10 @@ void main() {
   test('공휴일 exception은 평일 calendar보다 우선한다', () async {
     await _seedSchedule(catalogDatabase, holidayDate: '20260817');
 
-    final data = await repository.load(_sadangLine4, DateTime(2026, 8, 17, 9));
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 8, 17, 9),
+    );
 
     expect(data.status, NextTrainWidgetStatus.available);
     expect(data.directions.map((item) => item.departureLabel), [
@@ -129,7 +133,10 @@ void main() {
   test('feed 유효기간이 지났으면 시간을 만들지 않는다', () async {
     await _seedSchedule(catalogDatabase, feedEndDate: '20261231');
 
-    final data = await repository.load(_sadangLine4, DateTime(2027, 1, 1, 9));
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2027, 1, 1, 9),
+    );
 
     expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
     expect(data.directions, isEmpty);
@@ -140,11 +147,76 @@ void main() {
 
     final data = await repository.load(
       _sadangLine4,
-      DateTime(2026, 7, 9, 23, 59),
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 9, 23, 59),
     );
 
     expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
     expect(data.directions, isEmpty);
+  });
+
+  test('legacy catalog에 transit_feed_info table이 없으면 unavailable이다', () async {
+    await _seedSchedule(catalogDatabase);
+    await catalogDatabase.customStatement('DROP TABLE transit_feed_info');
+
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 10, 9),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
+    expect(data.directions, isEmpty);
+  });
+
+  test('legacy catalog에 feed_end_date column이 없으면 unavailable이다', () async {
+    await _seedSchedule(catalogDatabase);
+    await catalogDatabase.customStatement('DROP TABLE transit_feed_info');
+    await catalogDatabase.customStatement('''
+      CREATE TABLE transit_feed_info (id INTEGER PRIMARY KEY)
+    ''');
+
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 10, 9),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
+    expect(data.directions, isEmpty);
+  });
+
+  test('transit_feed_info row가 없으면 unavailable이다', () async {
+    await _seedSchedule(catalogDatabase);
+    await catalogDatabase.customStatement('DELETE FROM transit_feed_info');
+
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 10, 9),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
+    expect(data.directions, isEmpty);
+  });
+
+  test('legacy feed schema 이외의 SQLite 오류는 전파한다', () async {
+    await _seedSchedule(catalogDatabase);
+    await catalogDatabase.customStatement('DROP TABLE transit_feed_info');
+    await catalogDatabase.customStatement('''
+      CREATE VIEW transit_feed_info AS
+      SELECT feed_end_date FROM missing_feed_source
+    ''');
+
+    await expectLater(
+      repository.load(
+        _sadangLine4,
+        tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 10, 9),
+      ),
+      throwsA(
+        isA<SqliteException>().having(
+          (error) => error.message,
+          'message',
+          contains('missing_feed_source'),
+        ),
+      ),
+    );
   });
 
   test('하차 전용 stop_times만 있는 station-line은 선택에서 제외한다', () async {
