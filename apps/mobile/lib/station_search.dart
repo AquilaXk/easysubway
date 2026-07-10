@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'accessible_design.dart';
 import 'adaptive_layout.dart';
 import 'core/external/kakao_map_launcher.dart';
+import 'design_tokens.dart';
 import 'facility_status.dart';
 import 'facility_report.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -42,8 +43,9 @@ const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어�
 const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
-const _stationSearchInputRadius = BorderRadius.all(Radius.circular(12));
-const _stationCompactCardRadius = BorderRadius.all(Radius.circular(12));
+const _stationSearchInputRadius = BorderRadius.all(
+  Radius.circular(EasySubwayRadius.control),
+);
 const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
@@ -1802,7 +1804,10 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             decoration: InputDecoration(
               hintText: '역 이름을 입력해 주세요',
               floatingLabelBehavior: FloatingLabelBehavior.always,
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: EasySubwayAccessibleColors.iconMuted,
+              ),
               suffixIcon: _hasSearchQuery
                   ? IconButton(
                       tooltip: '검색어 지우기',
@@ -1811,18 +1816,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                     )
                   : null,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: EasySubwayAccessibleColors.scaffoldSurface,
               border: OutlineInputBorder(
                 borderRadius: _stationSearchInputRadius,
-                borderSide: const BorderSide(
-                  color: EasySubwayAccessibleColors.line,
-                ),
+                borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: _stationSearchInputRadius,
-                borderSide: const BorderSide(
-                  color: EasySubwayAccessibleColors.line,
-                ),
+                borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: _stationSearchInputRadius,
@@ -1868,8 +1869,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 _controller.state.status == StationSearchStatus.loading;
             final isNearbyDisabled = isSearching || _isNearbySearchRunning;
             if (showNearbyRetryButton) {
-              return OutlinedButton.icon(
+              return TextButton.icon(
                 key: const Key('nearbyStationSearchButton'),
+                style: TextButton.styleFrom(
+                  foregroundColor: EasySubwayAccessibleColors.text,
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size.fromHeight(56),
+                ),
                 onPressed: isNearbyDisabled ? null : _searchNearby,
                 icon: const Icon(Icons.my_location),
                 label: const Text('내 주변 역 다시 찾기'),
@@ -1879,8 +1885,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               // 즉시(디바운스) 검색으로 통일했으므로 별도 검색 버튼을 두지 않는다.
               return const SizedBox.shrink();
             }
-            return OutlinedButton.icon(
+            return TextButton.icon(
               key: const Key('nearbyStationSearchButton'),
+              style: TextButton.styleFrom(
+                foregroundColor: EasySubwayAccessibleColors.text,
+                alignment: Alignment.centerLeft,
+                minimumSize: const Size.fromHeight(56),
+              ),
               onPressed: isNearbyDisabled ? null : _searchNearby,
               icon: const Icon(Icons.my_location),
               label: const Text('내 주변 역 찾기'),
@@ -2148,16 +2159,27 @@ class _StationRecentSearchSection extends StatelessWidget {
             ),
             TextButton.icon(
               key: const Key('stationRecentSearchClearAllButton'),
+              style: TextButton.styleFrom(
+                foregroundColor: EasySubwayAccessibleColors.mutedText,
+              ),
               onPressed: enabled ? onClearAll : null,
-              icon: const Icon(Icons.delete_sweep_outlined),
+              icon: const Icon(Icons.delete_sweep_outlined, size: 18),
               label: const Text('전체 삭제'),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const Divider(
+          height: EasySubwaySpacing.lg,
+          color: EasySubwayAccessibleColors.line,
+        ),
         Column(
           children: [
-            for (final entry in queries.indexed)
+            for (final entry in queries.indexed) ...[
+              if (entry.$1 > 0)
+                const Divider(
+                  height: 1,
+                  color: EasySubwayAccessibleColors.line,
+                ),
               _StationRecentSearchItem(
                 query: entry.$2,
                 order: entry.$1 + 1,
@@ -2165,6 +2187,7 @@ class _StationRecentSearchSection extends StatelessWidget {
                 onQuerySelected: onQuerySelected,
                 onQueryRemoved: onQueryRemoved,
               ),
+            ],
           ],
         ),
       ],
@@ -2189,86 +2212,69 @@ class _StationRecentSearchItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: _stationCompactCardRadius,
-          side: const BorderSide(color: EasySubwayAccessibleColors.line),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Semantics(
-                  label: '최근 검색어 $query 검색, 최근 사용 $order번째',
-                  button: true,
-                  enabled: enabled,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              label: '최근 검색어 $query 검색, 최근 사용 $order번째',
+              button: true,
+              enabled: enabled,
+              onTap: enabled ? () => onQuerySelected(query) : null,
+              child: ExcludeSemantics(
+                child: InkWell(
+                  key: Key('stationRecentSearchQuery-$query'),
                   onTap: enabled ? () => onQuerySelected(query) : null,
-                  child: ExcludeSemantics(
-                    child: InkWell(
-                      key: Key('stationRecentSearchQuery-$query'),
-                      borderRadius: _stationCompactCardRadius,
-                      onTap: enabled ? () => onQuerySelected(query) : null,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.history,
-                              color: EasySubwayAccessibleColors.brand,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    query,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color:
-                                              EasySubwayAccessibleColors.text,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1.25,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    '최근 사용 $order번째',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: EasySubwayAccessibleColors
-                                              .mutedText,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1.3,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: EasySubwaySpacing.md,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.history,
+                          color: EasySubwayAccessibleColors.iconMuted,
                         ),
-                      ),
+                        const SizedBox(width: EasySubwaySpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                query,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: EasySubwayAccessibleColors.text,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.25,
+                                    ),
+                              ),
+                              Text(
+                                '최근 사용 $order번째',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: EasySubwayAccessibleColors.caption,
+                                      height: 1.3,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              IconButton(
-                key: Key('stationRecentSearchRemove-$query'),
-                tooltip: '$query 최근 검색 삭제',
-                onPressed: enabled ? () => onQueryRemoved(query) : null,
-                icon: const Icon(Icons.close),
-              ),
-            ],
+            ),
           ),
-        ),
+          IconButton(
+            key: Key('stationRecentSearchRemove-$query'),
+            tooltip: '$query 최근 검색 삭제',
+            onPressed: enabled ? () => onQueryRemoved(query) : null,
+            icon: const Icon(Icons.close),
+          ),
+        ],
       ),
     );
   }
