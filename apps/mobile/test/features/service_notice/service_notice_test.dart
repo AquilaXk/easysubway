@@ -45,6 +45,22 @@ void main() {
       expect(notice.isDisruption, isFalse);
     });
 
+    test('offset 없는 UTC 시각은 DST 결손 구간에서도 원문 시각을 보존한다', () {
+      final payload = json()..['publishedAt'] = '2026-03-08T02:30:00';
+
+      final notice = ServiceNotice.fromJson(payload)!;
+
+      expect(notice.publishedAt, DateTime.utc(2026, 3, 8, 2, 30));
+    });
+
+    test('명시적 offset 시각은 같은 UTC instant로 파싱한다', () {
+      final payload = json()..['publishedAt'] = '2026-07-06T09:00:00+09:00';
+
+      final notice = ServiceNotice.fromJson(payload)!;
+
+      expect(notice.publishedAt, DateTime.utc(2026, 7, 6));
+    });
+
     test('알 수 없는 severity/scope는 null을 돌려준다(무음 실패 대신 제외)', () {
       expect(ServiceNotice.fromJson(json(severity: 'WARN')), isNull);
       expect(ServiceNotice.fromJson(json(scope: 'CITY')), isNull);

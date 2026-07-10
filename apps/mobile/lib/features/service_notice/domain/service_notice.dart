@@ -126,22 +126,12 @@ class ServiceNotice {
     if (value is! String || value.isEmpty) {
       return null;
     }
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null || parsed.isUtc) {
-      return parsed;
-    }
+    final hasOffset = RegExp(
+      r'(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$',
+    ).hasMatch(value);
 
-    // Backend는 UTC Clock의 LocalDateTime을 offset 없이 직렬화한다. Dart는
-    // offset 없는 값을 기기 로컬 시각으로 해석하므로 API 계약에 맞춰 UTC로 고정한다.
-    return DateTime.utc(
-      parsed.year,
-      parsed.month,
-      parsed.day,
-      parsed.hour,
-      parsed.minute,
-      parsed.second,
-      parsed.millisecond,
-      parsed.microsecond,
-    );
+    // Backend는 UTC Clock의 LocalDateTime을 offset 없이 직렬화한다. 기기 로컬
+    // 시각으로 먼저 해석하면 DST 결손 구간이 보정되므로 처음부터 UTC로 파싱한다.
+    return DateTime.tryParse(hasOffset ? value : '${value}Z');
   }
 }
