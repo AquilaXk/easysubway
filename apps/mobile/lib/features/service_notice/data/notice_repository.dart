@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../mobile_error_reporter.dart';
 import '../domain/service_notice.dart';
 
 /// 활성 공지 조회 결과. [stale]이면 오프라인/오류로 마지막 수신본을 준 것이고,
@@ -77,7 +78,16 @@ class ApiNoticeRepository implements NoticeRepository {
 
   @override
   Future<ActiveNoticesResult> activeNotices() async {
-    final cached = await cacheStore.load();
+    NoticeCacheEntry? cached;
+    try {
+      cached = await cacheStore.load();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '운행 공지 캐시를 읽는 중 예외가 발생했습니다.',
+      );
+    }
     try {
       final response = await apiClient.getActiveNotices(
         ifNoneMatch: cached?.etag,
@@ -85,15 +95,16 @@ class ApiNoticeRepository implements NoticeRepository {
 
       if (response.isNotModified && cached != null) {
         final fetchedAt = now();
-        await cacheStore.save(
+        final notices = _activeAt(cached.notices, fetchedAt);
+        await _saveCache(
           NoticeCacheEntry(
             etag: cached.etag,
-            notices: cached.notices,
+            notices: notices,
             fetchedAt: fetchedAt,
           ),
         );
         return ActiveNoticesResult(
-          notices: cached.notices,
+          notices: notices,
           stale: false,
           asOf: fetchedAt,
         );
@@ -101,9 +112,12 @@ class ApiNoticeRepository implements NoticeRepository {
 
       if (response.isOk && response.jsonBody is Map<String, Object?>) {
         final data = (response.jsonBody as Map<String, Object?>)['data'];
-        final notices = ServiceNotice.listFromApiData(data);
         final fetchedAt = now();
-        await cacheStore.save(
+        final notices = _activeAt(
+          ServiceNotice.listFromApiData(data),
+          fetchedAt,
+        );
+        await _saveCache(
           NoticeCacheEntry(
             etag: response.etag,
             notices: notices,
@@ -122,11 +136,38 @@ class ApiNoticeRepository implements NoticeRepository {
 
     if (cached != null) {
       return ActiveNoticesResult(
-        notices: cached.notices,
+        notices: _activeAt(cached.notices, now()),
         stale: true,
         asOf: cached.fetchedAt,
       );
     }
     return const ActiveNoticesResult(notices: [], stale: false);
+  }
+
+  Future<void> _saveCache(NoticeCacheEntry entry) async {
+    try {
+      await cacheStore.save(entry);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '운행 공지 캐시를 저장하는 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  List<ServiceNotice> _activeAt(
+    Iterable<ServiceNotice> notices,
+    DateTime instant,
+  ) {
+    return notices
+        .where((notice) {
+          if (notice.publishedAt.isAfter(instant)) {
+            return false;
+          }
+          final expiresAt = notice.expiresAt;
+          return expiresAt == null || expiresAt.isAfter(instant);
+        })
+        .toList(growable: false);
   }
 }
