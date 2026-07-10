@@ -7,6 +7,8 @@ enum NoticeScope { all, region, line }
 /// 앱이 소비하는 운행 공지 한 건. 공개 API(`GET /api/notices/active`)의 활성
 /// 공지를 표현한다.
 class ServiceNotice {
+  static final _offsetRegExp = RegExp(r'(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$');
+
   const ServiceNotice({
     required this.id,
     required this.scope,
@@ -130,9 +132,7 @@ class ServiceNotice {
     if (timeIndex == -1) {
       return DateTime.tryParse('${value}T00:00:00Z');
     }
-    final hasOffset = RegExp(
-      r'(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$',
-    ).hasMatch(value.substring(timeIndex));
+    final hasOffset = _offsetRegExp.hasMatch(value.substring(timeIndex));
 
     // Backend는 UTC Clock의 LocalDateTime을 offset 없이 직렬화한다. 기기 로컬
     // 시각으로 먼저 해석하면 DST 결손 구간이 보정되므로 처음부터 UTC로 파싱한다.
