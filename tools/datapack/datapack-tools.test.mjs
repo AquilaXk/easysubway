@@ -9546,6 +9546,72 @@ test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line ope
   );
 });
 
+test("데이터팩 검증기는 AVAILABLE accessibility edge의 승인된 이동 경로 누락을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-validator-pathway-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  makeProductionSourceFixtureStrictCoverageValid(fixture);
+  fixture.packs[0].stationPathwayNodes = [];
+  fixture.packs[0].stationPathwayEdges = [];
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutputDir],
+    { cwd: root, env: productionEnv },
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(packOutputDir, "current.json"),
+        "--root",
+        packOutputDir,
+        "--require-production",
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /AVAILABLE ENTRY\/EXIT edge requires approved movement pathway/,
+  );
+});
+
+test("데이터팩 검증기는 STAIR pathway를 승인된 접근성 이동 경로로 인정하지 않는다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-validator-stair-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  makeProductionSourceFixtureStrictCoverageValid(fixture);
+  for (const edge of fixture.packs[0].stationPathwayEdges) {
+    edge.edgeType = "STAIR";
+    edge.includesStairs = false;
+  }
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutputDir],
+    { cwd: root, env: productionEnv },
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(packOutputDir, "current.json"),
+        "--root",
+        packOutputDir,
+        "--require-production",
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /AVAILABLE ENTRY\/EXIT edge requires approved movement pathway/,
+  );
+});
+
 test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 노출한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-capital-pilot-production-source-${Date.now()}`);
   const inputPath = "tools/datapack/inputs/capital-pilot-production-source-input.json";
@@ -12414,6 +12480,11 @@ function markFixturePackProduction(fixture) {
     coveredStationLines.add(key);
   }
   addMissingProductionAccessEdges(pack);
+  addApprovedMovementPathwayEvidence(pack, {
+    sourceId: "capital-official-stations",
+    sourceSnapshotId: "capital-official-stations-snapshot-20260619",
+    verifiedAt: "2026-06-19T00:00:00Z",
+  });
   pack.minimumTableRows = {
     ...pack.minimumTableRows,
     stations: 6,
@@ -12499,6 +12570,52 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
     evidence.statusMeaning = "OPERATOR_CONFIRMED";
     evidence.strictRouteEligible = true;
     evidence.strictRouteEligibleReason = "FACILITY_OPERATION_VERIFIED";
+  }
+  addApprovedMovementPathwayEvidence(pack, {
+    sourceId: "kric-station-elevator-movement",
+    sourceSnapshotId: "kric-station-elevator-movement-snapshot-20260622",
+    verifiedAt: "2026-06-22T00:00:00.000Z",
+  });
+}
+
+function addApprovedMovementPathwayEvidence(pack, { sourceId, sourceSnapshotId, verifiedAt }) {
+  pack.stationPathwayNodes ??= [];
+  pack.stationPathwayEdges ??= [];
+  for (const { stationId, lineId } of pack.stationLines) {
+    const surfaceNodeId = `test-approved-path-node-${stationId}-${lineId}-surface`;
+    const platformNodeId = `test-approved-path-node-${stationId}-${lineId}-platform`;
+    const pathwayEdgeId = `test-approved-path-edge-${stationId}-${lineId}`;
+    pack.stationPathwayNodes.push(
+      {
+        id: surfaceNodeId,
+        stationId,
+        nodeType: "ENTRANCE",
+        label: `${stationId} 출입구`,
+      },
+      {
+        id: platformNodeId,
+        stationId,
+        lineId,
+        nodeType: "PLATFORM",
+        label: `${stationId} ${lineId} 승강장`,
+      },
+    );
+    pack.stationPathwayEdges.push({
+      id: pathwayEdgeId,
+      fromNodeId: surfaceNodeId,
+      toNodeId: platformNodeId,
+      edgeType: "WALK",
+      bidirectional: true,
+      accessibilityStatus: "AVAILABLE",
+      reliabilityScore: 90,
+      sourceId,
+      sourceSnapshotId,
+      providerRecordHash: sha256(`provider:${pathwayEdgeId}:${sourceId}`),
+      provenanceKind: "OFFICIAL_SOURCE",
+      verificationStatus: "VERIFIED",
+      lastVerifiedAt: verifiedAt,
+      evidenceHash: sha256(`evidence:${pathwayEdgeId}:${sourceId}:${verifiedAt}`),
+    });
   }
 }
 
