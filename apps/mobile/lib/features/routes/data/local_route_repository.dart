@@ -267,7 +267,13 @@ class LocalRouteRepository implements RouteSearchRepository {
       final serviceMidnight = serviceDate.subtract(const Duration(hours: 9));
       final dateKey = _compactDate(serviceDate);
       final weekdayColumn = _weekdayColumn(serviceDate.weekday);
-      final startSeconds = cursor.difference(serviceMidnight).inSeconds;
+      final startMicroseconds = cursor
+          .difference(serviceMidnight)
+          .inMicroseconds;
+      final startSeconds = startMicroseconds <= 0
+          ? 0
+          : (startMicroseconds + Duration.microsecondsPerSecond - 1) ~/
+                Duration.microsecondsPerSecond;
       final row = await catalogDatabase
           .customSelect(
             '''

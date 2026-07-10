@@ -422,6 +422,39 @@ void main() {
     expect(result.etaSource, 'STATIC_LOCAL');
   });
 
+  test('출발 초보다 500ms 늦은 cursor는 이미 출발한 trip을 건너뛴다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    await database.customStatement('''
+      UPDATE network_edges
+      SET duration_seconds = 0
+      WHERE id = 'entry-sangnoksu-seoul-4'
+    ''');
+    await _insertBaselineTrip(
+      database,
+      tripId: 'trip-after-fractional-cursor',
+      departureSeconds: 28980,
+      arrivalSeconds: 29700,
+    );
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T08:00:30.500+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, '2026-07-10T08:15:00+09:00');
+  });
+
   test('운행 제외일은 건너뛰고 7일 범위의 다음 활성 서비스를 선택한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
