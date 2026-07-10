@@ -179,6 +179,12 @@ class GetOffAlarmController extends ChangeNotifier {
     if (!_state.enabled || routeId == null) {
       return;
     }
+    final hasDestination = stops.any(
+      (stop) => stop.kind == GetOffAlarmKind.destination,
+    );
+    if (!hasDestination) {
+      return;
+    }
     final notificationPermission = await notificationPermissionProvider
         .notificationPermissionStatus();
     if (notificationPermission != NotificationPermissionStatus.granted) {

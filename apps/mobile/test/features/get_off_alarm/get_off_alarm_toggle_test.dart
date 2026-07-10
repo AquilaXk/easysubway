@@ -158,6 +158,7 @@ void main() {
   });
 
   testWidgets('exact 권한 거부 시 오차 고지 문구를 노출한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final controller = GetOffAlarmController(
       notifier: _RecordingNotifier(),
       permissionGate: _StubGate(false),
@@ -189,10 +190,17 @@ void main() {
     await tester.tap(find.byType(Switch));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('오차'), findsOneWidget);
+    final noticeFinder = find.textContaining('오차');
+    expect(noticeFinder, findsOneWidget);
+    expect(
+      tester.getSemantics(noticeFinder),
+      isSemantics(label: '정확 알람 권한이 없어 ±수 분 오차가 있을 수 있어요.', isLiveRegion: true),
+    );
+    semanticsHandle.dispose();
   });
 
   testWidgets('알림 권한 거부는 off 상태에서 휴대전화 알림 권한 안내를 보여준다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
     final controller = GetOffAlarmController(
       notifier: _RecordingNotifier(),
       permissionGate: _StubGate(true),
@@ -226,7 +234,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.state.enabled, isFalse);
-    expect(find.text('휴대전화 알림 권한을 허용해 주세요.'), findsOneWidget);
+    final noticeFinder = find.text('휴대전화 알림 권한을 허용해 주세요.');
+    expect(noticeFinder, findsOneWidget);
+    expect(
+      tester.getSemantics(noticeFinder),
+      isSemantics(label: '휴대전화 알림 권한을 허용해 주세요.', isLiveRegion: true),
+    );
     expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+    semanticsHandle.dispose();
   });
 }

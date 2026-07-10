@@ -426,6 +426,44 @@ void main() {
     expect(await repository.loadActive(), isNull);
   });
 
+  test('refresh에 destination이 없으면 기존 예약과 활성 구독을 유지한다', () async {
+    final stateRepository = _RecordingStateRepository();
+    final gate = _StubExactAlarmGate(true);
+    final c = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: gate,
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => now,
+    );
+    addTearDown(c.dispose);
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+    final stateBeforeRefresh = c.state;
+    final subscriptionBeforeRefresh = stateRepository.active;
+    final scheduleCallsBeforeRefresh = notifier.scheduleCalls;
+    final cancelCallsBeforeRefresh = notifier.cancelAllCount;
+
+    await c.refresh(
+      stops: [
+        GetOffAlarmStop(
+          stationId: 'transfer',
+          stationName: '동작',
+          arrivalAt: DateTime(2026, 7, 6, 9, 15, 0),
+          kind: GetOffAlarmKind.transfer,
+        ),
+      ],
+      transferAlarmEnabled: true,
+    );
+
+    expect(notifier.scheduleCalls, scheduleCallsBeforeRefresh);
+    expect(notifier.cancelAllCount, cancelCallsBeforeRefresh);
+    expect(c.state, same(stateBeforeRefresh));
+    expect(stateRepository.active, same(subscriptionBeforeRefresh));
+    expect(gate.isPermittedCalls, 0);
+  });
+
   test('예약 성공이 0건이면 enabled와 활성 구독을 저장하지 않는다', () async {
     notifier.result = const ScheduleDeliveryResult(
       scheduledCount: 0,

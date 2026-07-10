@@ -111,12 +111,17 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
           ),
         ),
         if (notice != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              notice,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
+          Semantics(
+            key: const Key('getOffAlarmNotice'),
+            container: true,
+            liveRegion: true,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                notice,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ),
           ),
