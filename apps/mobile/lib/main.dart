@@ -47,20 +47,8 @@ const _mainPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
-const _mainScaffoldBackgroundColor = EasySubwayAccessibleColors.scaffoldSurface;
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(12));
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
-const _appCardShadowColor = EasySubwayAccessibleColors.cardShadow;
-const _highContrastTextColor = EasySubwayAccessibleColors.highContrastText;
-const _highContrastPrimaryColor =
-    EasySubwayAccessibleColors.highContrastPrimary;
-const _highContrastSecondaryColor =
-    EasySubwayAccessibleColors.highContrastSecondary;
-const _homeFacilityCautionBorderColor = Color(0xFFF1D49A);
-const _settingsSwitchActiveTrackColor =
-    EasySubwayAccessibleColors.switchActiveTrack;
-const _settingsSwitchInactiveTrackColor =
-    EasySubwayAccessibleColors.switchInactiveTrack;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -441,7 +429,7 @@ class EasySubwayApp extends StatelessWidget {
         ),
         extensions: const [EasySubwayTokens.light],
         textTheme: easySubwayTextTheme(ThemeData(useMaterial3: true).textTheme),
-        scaffoldBackgroundColor: _mainScaffoldBackgroundColor,
+        scaffoldBackgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           toolbarHeight: 64,
@@ -637,7 +625,7 @@ class _StartupLoadingScreen extends StatelessWidget {
                     '쉬운 지하철',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -1207,13 +1195,13 @@ ThemeData _themeForPreferences(
   }
 
   final colorScheme = baseTheme.colorScheme.copyWith(
-    primary: _highContrastPrimaryColor,
+    primary: EasySubwayAccessibleColors.highContrastPrimary,
     onPrimary: Colors.white,
-    secondary: _highContrastSecondaryColor,
+    secondary: EasySubwayAccessibleColors.highContrastSecondary,
     onSecondary: Colors.white,
     surface: Colors.white,
-    onSurface: _highContrastTextColor,
-    outline: _highContrastTextColor,
+    onSurface: EasySubwayAccessibleColors.highContrastText,
+    outline: EasySubwayAccessibleColors.highContrastText,
   );
 
   return baseTheme.copyWith(
@@ -1221,19 +1209,22 @@ ThemeData _themeForPreferences(
     scaffoldBackgroundColor: Colors.white,
     appBarTheme: baseTheme.appBarTheme.copyWith(
       backgroundColor: Colors.white,
-      foregroundColor: _highContrastTextColor,
+      foregroundColor: EasySubwayAccessibleColors.highContrastText,
       titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
-        color: _highContrastTextColor,
+        color: EasySubwayAccessibleColors.highContrastText,
       ),
     ),
     // 보조 버튼이 중립 보더로 바뀌었으므로 고대비에서 보더·텍스트 대비를 보정.
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: baseTheme.outlinedButtonTheme.style?.copyWith(
         foregroundColor: const WidgetStatePropertyAll(
-          _highContrastPrimaryColor,
+          EasySubwayAccessibleColors.highContrastPrimary,
         ),
         side: const WidgetStatePropertyAll(
-          BorderSide(color: _highContrastTextColor, width: 1.5),
+          BorderSide(
+            color: EasySubwayAccessibleColors.highContrastText,
+            width: 1.5,
+          ),
         ),
       ),
     ),
@@ -2279,7 +2270,7 @@ class _AppSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           height: 1.2,
         ),
       ),
@@ -2310,7 +2301,7 @@ _FacilitySeverityAccent _facilitySeverityAccent(
     ),
     FacilityStatusSeverity.caution => const _FacilitySeverityAccent(
       backgroundColor: EasySubwayAccessibleColors.amberSoft,
-      borderColor: _homeFacilityCautionBorderColor,
+      borderColor: EasySubwayAccessibleColors.amberBorder,
       iconColor: EasySubwayAccessibleColors.amber,
     ),
     FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
@@ -2422,7 +2413,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
                       style: const TextStyle(
                         color: EasySubwayAccessibleColors.text,
                         fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.25,
                       ),
                     ),
@@ -2518,7 +2509,7 @@ class _AppCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       color: backgroundColor,
       elevation: 0,
-      shadowColor: _appCardShadowColor,
+      shadowColor: EasySubwayAccessibleColors.cardShadow,
       shape: RoundedRectangleBorder(
         side: showBorder ? BorderSide(color: borderColor) : BorderSide.none,
         borderRadius: BorderRadius.circular(20),
@@ -2800,7 +2791,7 @@ class _AppSettingsSection extends StatelessWidget {
               title,
               style: textTheme.titleMedium?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 height: 1.25,
               ),
             ),
@@ -2845,7 +2836,7 @@ class _AppSettingsActionTile extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.25,
             ),
           ),
@@ -2904,7 +2895,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.25,
             ),
           ),
@@ -2922,7 +2913,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                 value,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(width: 8),
@@ -2930,9 +2921,10 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                 value: enabled,
                 onChanged: onChanged,
                 activeThumbColor: Colors.white,
-                activeTrackColor: _settingsSwitchActiveTrackColor,
+                activeTrackColor: EasySubwayAccessibleColors.switchActiveTrack,
                 inactiveThumbColor: Colors.white,
-                inactiveTrackColor: _settingsSwitchInactiveTrackColor,
+                inactiveTrackColor:
+                    EasySubwayAccessibleColors.switchInactiveTrack,
                 materialTapTargetSize: MaterialTapTargetSize.padded,
               ),
             ],
@@ -3288,7 +3280,7 @@ class _FavoriteHomeStationRow extends StatelessWidget {
                         style: const TextStyle(
                           color: EasySubwayAccessibleColors.text,
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
                       ),
@@ -3348,7 +3340,7 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
                   style: const TextStyle(
                     color: EasySubwayAccessibleColors.text,
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     height: 1.25,
                   ),
                 ),
@@ -3510,7 +3502,7 @@ class _SupportSectionTitle extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             height: 1.25,
           ),
         ),
@@ -3806,7 +3798,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
                 '삭제 전에 확인해 주세요',
                 style: textTheme.headlineSmall?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
               ),
@@ -3824,7 +3816,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
               _UserDataDeletionCopy.irreversibleLine,
               style: textTheme.bodyLarge?.copyWith(
                 color: EasySubwayAccessibleColors.red,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 height: 1.4,
               ),
             ),
@@ -3938,8 +3930,8 @@ class UserDataDeletionResultScreen extends StatelessWidget {
           padding: _mainPagePadding,
           children: [
             _AppCard(
-              backgroundColor: EasySubwayAccessibleColors.mintSoft,
-              borderColor: EasySubwayAccessibleColors.mintBorder,
+              backgroundColor: EasySubwayAccessibleColors.surface,
+              borderColor: EasySubwayAccessibleColors.line,
               child: Column(
                 children: [
                   const Icon(
@@ -3952,7 +3944,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                     '내 정보가 삭제됐어요',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -4020,7 +4012,7 @@ class _SecurityContactNotice extends StatelessWidget {
                         _title,
                         style: textTheme.titleMedium?.copyWith(
                           color: EasySubwayAccessibleColors.text,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
                       ),
@@ -4116,7 +4108,7 @@ class _SafetyDataNotice extends StatelessWidget {
                         _title,
                         style: textTheme.titleMedium?.copyWith(
                           color: EasySubwayAccessibleColors.text,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
                       ),
@@ -4386,7 +4378,7 @@ class _AttributionCard extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
               ),
@@ -4395,7 +4387,7 @@ class _AttributionCard extends StatelessWidget {
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: EasySubwayAccessibleColors.mutedText,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
               ),
@@ -4459,7 +4451,7 @@ class _AttributionRow extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.25,
             ),
           ),
@@ -4661,7 +4653,7 @@ class FeatureTile extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.35,
                       ),
                     ),

@@ -84,7 +84,6 @@ void main() {
   test('FontWeight.w900 ratchet — 전면 제거 대상', () {
     final actual = countPerFile(RegExp(r'FontWeight\.w900'));
     expectRatchet(actual, {
-      'lib/main.dart': 1,
       'lib/onboarding.dart': 4,
       'lib/mobility_profile.dart': 1,
       'lib/features/stations/presentation/station_line_badges.dart': 2,
@@ -97,7 +96,6 @@ void main() {
       exclude: {'accessible_design.dart', 'design_tokens.dart'},
     );
     expectRatchet(actual, {
-      'lib/main.dart': 18,
       'lib/network_map.dart': 8,
       'lib/facility_report.dart': 16,
       'lib/onboarding.dart': 2,
@@ -113,7 +111,8 @@ void main() {
       exclude: {'accessible_design.dart', 'design_tokens.dart'},
     );
     expectRatchet(actual, {
-      'lib/main.dart': 3,
+      // 의도 잔존: 시설 상태 카드 blocked/caution — 상태 의미 틴트 (v4 허용 예외)
+      'lib/main.dart': 2,
       'lib/station_search.dart': 1,
       'lib/mobility_profile.dart': 1,
       'lib/facility_report.dart': 1,

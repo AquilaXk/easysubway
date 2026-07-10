@@ -73,6 +73,9 @@ class EasySubwayAccessibleColors {
   /// 주의 상태 배경 틴트.
   static const amberSoft = Color(0xFFFFF0D1);
 
+  /// 주의 상태 테두리.
+  static const amberBorder = Color(0xFFF1D49A);
+
   // --- 상태색: 고장·오류 (danger) ---
   /// 고장·오류 상태 텍스트/아이콘.
   static const red = Color(0xFFB42318);
