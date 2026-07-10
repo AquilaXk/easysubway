@@ -1337,6 +1337,78 @@ void main() {
     expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
   });
 
+  testWidgets('상단 오버레이 출발칸 검색 선택은 지도 탭과 같은 draft로 수렴한다(G4)', (tester) async {
+    final routeDraftController = RouteDraftController();
+    final pickedSlots = <RouteDraftSlot>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenRouteSearch: () async {},
+          onOpenStationSearch: () {},
+          // main.dart의 openStationSearchForSlot 대역: 실제 앱에서는 역 검색을 열어
+          // 결과 탭 시 같은 controller에 slot을 설정한다. 여기선 그 계약(어떤 slot을
+          // 채우려 열렸는지 + 같은 controller로 수렴)만 검증한다.
+          onPickStationForSlot: (slot) {
+            pickedSlots.add(slot);
+            switch (slot) {
+              case RouteDraftSlot.origin:
+                routeDraftController.setOrigin(
+                  const RouteDraftStation(id: 'gangnam', nameKo: '강남'),
+                );
+              case RouteDraftSlot.destination:
+                routeDraftController.setDestination(
+                  const RouteDraftStation(id: 'jamsil', nameKo: '잠실'),
+                );
+            }
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 먼저 지도 탭 경로로 출발역을 넣는다 → 오버레이가 뜬다.
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('출발'));
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.origin?.nameKo, '상록수');
+
+    // 도착 칸(검색 진입 버튼)을 탭하면 도착 slot으로 검색이 열린다.
+    await tester.tap(
+      find.byKey(const Key('networkMapRouteDraftPickDestination')),
+    );
+    await tester.pumpAndSettle();
+
+    // 텍스트 검색으로 넣은 도착이 지도 탭 출발과 같은 오버레이 상태로 수렴한다.
+    expect(pickedSlots, [RouteDraftSlot.destination]);
+    expect(routeDraftController.draft.origin?.nameKo, '상록수');
+    expect(routeDraftController.draft.destination?.nameKo, '잠실');
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftDestinationRow')),
+        matching: find.text('잠실역'),
+      ),
+      findsOneWidget,
+    );
+
+    // 반대로 출발 칸도 검색으로 교체 가능(같은 controller로 수렴).
+    await tester.tap(find.byKey(const Key('networkMapRouteDraftPickOrigin')));
+    await tester.pumpAndSettle();
+    expect(pickedSlots, [RouteDraftSlot.destination, RouteDraftSlot.origin]);
+    expect(routeDraftController.draft.origin?.nameKo, '강남');
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.text('강남역'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('노선도는 노선별 보기 우회 sheet를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(

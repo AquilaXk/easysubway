@@ -360,6 +360,7 @@ class NetworkMapScreen extends StatefulWidget {
     required this.routeDraftController,
     required this.onOpenRouteSearch,
     required this.onOpenStationSearch,
+    this.onPickStationForSlot,
     this.stationSearchRepository,
     this.locationProvider,
     this.viewportRepository,
@@ -379,6 +380,11 @@ class NetworkMapScreen extends StatefulWidget {
   final RouteDraftController routeDraftController;
   final Future<void> Function() onOpenRouteSearch;
   final VoidCallback onOpenStationSearch;
+
+  /// 상단 draft 오버레이의 출발/도착 칸을 탭했을 때, 그 칸을 채우려고 기존 역 검색을
+  /// 여는 콜백. 지도 탭과 같은 [routeDraftController]로 수렴한다. null이면 오버레이
+  /// 칸은 탭할 수 없다(둘러보기 검색만 메뉴로 제공).
+  final void Function(RouteDraftSlot slot)? onPickStationForSlot;
   final StationSearchRepository? stationSearchRepository;
   final CurrentLocationProvider? locationProvider;
   final NetworkMapViewportRepository? viewportRepository;
@@ -517,6 +523,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
+              onPickOrigin: widget.onPickStationForSlot == null
+                  ? null
+                  : _pickOriginStation,
+              onPickDestination: widget.onPickStationForSlot == null
+                  ? null
+                  : _pickDestinationStation,
               child: const Center(child: CircularProgressIndicator()),
             );
           }
@@ -545,6 +557,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
+              onPickOrigin: widget.onPickStationForSlot == null
+                  ? null
+                  : _pickOriginStation,
+              onPickDestination: widget.onPickStationForSlot == null
+                  ? null
+                  : _pickDestinationStation,
               child: _NetworkMapLoadFailure(onRetry: () => _reload()),
             );
           }
@@ -581,6 +599,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             routeDraftController: widget.routeDraftController,
             onClearOrigin: _clearOriginStation,
             onClearDestination: _clearDestinationStation,
+            onPickOrigin: widget.onPickStationForSlot == null
+                ? null
+                : _pickOriginStation,
+            onPickDestination: widget.onPickStationForSlot == null
+                ? null
+                : _pickDestinationStation,
             child: _NetworkMapCanvas(
               data: visibleData,
               initialViewport: loadResult.initialViewport,
@@ -817,6 +841,17 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onOpenRouteSearch();
   }
 
+  /// G4: 상단 오버레이 출발 칸 탭 → 기존 역 검색을 "출발역 채우기" 모드로 연다.
+  /// 지도 탭 경로와 같은 [routeDraftController]로 수렴한다.
+  void _pickOriginStation() {
+    widget.onPickStationForSlot?.call(RouteDraftSlot.origin);
+  }
+
+  /// G4: 상단 오버레이 도착 칸 탭 → 기존 역 검색을 "도착역 채우기" 모드로 연다.
+  void _pickDestinationStation() {
+    widget.onPickStationForSlot?.call(RouteDraftSlot.destination);
+  }
+
   _NetworkMapAdjacentStations _adjacentStationsFor(NetworkMapData data) {
     final selectedStationId = _nearbySelectedStationId;
     if (selectedStationId == null) {
@@ -907,6 +942,8 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.routeDraftController,
     required this.onClearOrigin,
     required this.onClearDestination,
+    this.onPickOrigin,
+    this.onPickDestination,
     required this.child,
   });
 
@@ -931,6 +968,10 @@ class _NetworkMapChrome extends StatelessWidget {
   final RouteDraftController routeDraftController;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
+
+  /// 상단 draft 오버레이 출발/도착 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
+  final VoidCallback? onPickOrigin;
+  final VoidCallback? onPickDestination;
   final Widget child;
 
   @override
@@ -969,6 +1010,8 @@ class _NetworkMapChrome extends StatelessWidget {
                 controller: routeDraftController,
                 onClearOrigin: onClearOrigin,
                 onClearDestination: onClearDestination,
+                onPickOrigin: onPickOrigin,
+                onPickDestination: onPickDestination,
               ),
             ],
           ),
@@ -3826,11 +3869,17 @@ class _NetworkMapRouteDraftOverlay extends StatelessWidget {
     required this.controller,
     required this.onClearOrigin,
     required this.onClearDestination,
+    this.onPickOrigin,
+    this.onPickDestination,
   });
 
   final RouteDraftController controller;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
+
+  /// G4: 각 칸 탭 → 역 검색 열기(같은 draft로 수렴). null이면 칸을 탭할 수 없다.
+  final VoidCallback? onPickOrigin;
+  final VoidCallback? onPickDestination;
 
   @override
   Widget build(BuildContext context) {
@@ -3860,6 +3909,7 @@ class _NetworkMapRouteDraftOverlay extends StatelessWidget {
                     station: draft.origin,
                     fallback: '출발역을 탭하거나 검색',
                     onClear: onClearOrigin,
+                    onPick: onPickOrigin,
                   ),
                   const Divider(
                     height: 1,
@@ -3872,6 +3922,7 @@ class _NetworkMapRouteDraftOverlay extends StatelessWidget {
                     station: draft.destination,
                     fallback: '도착역을 탭하거나 검색',
                     onClear: onClearDestination,
+                    onPick: onPickDestination,
                   ),
                 ],
               ),
@@ -3891,6 +3942,7 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
     required this.station,
     required this.fallback,
     required this.onClear,
+    this.onPick,
     super.key,
   });
 
@@ -3899,76 +3951,104 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
   final String fallback;
   final VoidCallback onClear;
 
+  /// G4: 이 칸(역명/플레이스홀더 영역)을 탭하면 역 검색을 연다. null이면 탭 불가.
+  final VoidCallback? onPick;
+
   @override
   Widget build(BuildContext context) {
     final label = isOrigin ? '출발' : '도착';
     final filled = station != null;
     final stationName = filled ? station!.displayName : fallback;
-    final semanticsLabel = filled
-        ? '$label $stationName'
-        : '$label, $stationName';
-    return Semantics(
-      label: semanticsLabel,
-      child: ExcludeSemantics(
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _NetworkMapRouteDraftNodeColumn(isOrigin: isOrigin),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: EasySubwayAccessibleColors.mutedText,
-                  ),
-                ),
+    // 접근성: 검색 진입 라벨을 "출발역 검색"/"도착역 검색"으로 명확히 낭독한다.
+    final searchLabel = isOrigin ? '출발역 검색' : '도착역 검색';
+    final pickSemanticsLabel = filled
+        ? '$label $stationName, $searchLabel'
+        : '$label, $stationName, $searchLabel';
+    final rowBody = IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _NetworkMapRouteDraftNodeColumn(isOrigin: isOrigin),
+          const SizedBox(width: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Text(
-                    stationName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: filled
-                          ? EasySubwayAccessibleColors.text
-                          : EasySubwayAccessibleColors.mutedText,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-              if (filled)
-                Semantics(
-                  button: true,
-                  label: '$label역 지우기',
-                  onTap: onClear,
-                  child: ExcludeSemantics(
-                    child: IconButton(
-                      key: Key(
-                        isOrigin
-                            ? 'networkMapRouteDraftClearOrigin'
-                            : 'networkMapRouteDraftClearDestination',
-                      ),
-                      onPressed: onClear,
-                      icon: const Icon(Icons.close, size: 18),
-                      color: EasySubwayAccessibleColors.mutedText,
-                      constraints: const BoxConstraints(
-                        minWidth: 48,
-                        minHeight: 48,
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                stationName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: filled
+                      ? EasySubwayAccessibleColors.text
+                      : EasySubwayAccessibleColors.mutedText,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+    // 역명/플레이스홀더 영역: onPick이 있으면 검색을 여는 버튼. 없으면 정보 표시만.
+    final Widget pickArea = onPick == null
+        ? Semantics(
+            label: filled ? '$label $stationName' : '$label, $stationName',
+            child: ExcludeSemantics(child: rowBody),
+          )
+        : Semantics(
+            button: true,
+            label: pickSemanticsLabel,
+            onTap: onPick,
+            child: ExcludeSemantics(
+              child: InkWell(
+                key: Key(
+                  isOrigin
+                      ? 'networkMapRouteDraftPickOrigin'
+                      : 'networkMapRouteDraftPickDestination',
+                ),
+                onTap: onPick,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: rowBody,
+                ),
+              ),
+            ),
+          );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(child: pickArea),
+        if (filled)
+          Semantics(
+            button: true,
+            label: '$label역 지우기',
+            onTap: onClear,
+            child: ExcludeSemantics(
+              child: IconButton(
+                key: Key(
+                  isOrigin
+                      ? 'networkMapRouteDraftClearOrigin'
+                      : 'networkMapRouteDraftClearDestination',
+                ),
+                onPressed: onClear,
+                icon: const Icon(Icons.close, size: 18),
+                color: EasySubwayAccessibleColors.mutedText,
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                padding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

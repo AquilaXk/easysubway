@@ -1694,6 +1694,7 @@ class StationSearchScreen extends StatefulWidget {
     this.internalRouteMobilityType = 'SENIOR',
     this.routeDraftController,
     this.entryMode = StationSearchEntryMode.search,
+    this.pickSlot,
     this.onOpenRouteSearch,
     this.bottomNavigationBar,
     super.key,
@@ -1710,6 +1711,12 @@ class StationSearchScreen extends StatefulWidget {
   final String internalRouteMobilityType;
   final RouteDraftController? routeDraftController;
   final StationSearchEntryMode entryMode;
+
+  /// 특정 칸(출발/도착)을 채우려고 검색을 연 경우의 대상 칸. 지정되면 결과를 한 번
+  /// 탭하는 즉시 [routeDraftController]의 해당 칸을 설정하고 이 화면을 닫는다. 지도
+  /// 탭 경로와 완전히 같은 draft 상태로 수렴시키기 위한 "칸 채우기" 모드다. null이면
+  /// 기존 둘러보기(출발/도착 버튼이 각 결과에 딸린 형태) 그대로 동작한다.
+  final RouteDraftSlot? pickSlot;
   final Future<void> Function()? onOpenRouteSearch;
   final Widget? bottomNavigationBar;
 
@@ -1901,16 +1908,20 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         const SizedBox(height: 20),
       ],
     );
+    final isPicking = widget.pickSlot != null;
     final resultSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
         return _StationSearchBody(
           state: _controller.state,
-          onResultTap: _openStationDetail,
-          onSetOrigin: widget.routeDraftController == null
+          // 칸 채우기 모드에서는 결과 한 번 탭 = 해당 칸 설정 후 닫기. 지도 탭과 동일
+          // 하게 "출발역 선택 → 도착역 선택" UX로 수렴시킨다. 둘러보기 모드에서는
+          // 종전대로 역 상세로 이동한다.
+          onResultTap: isPicking ? _pickStation : _openStationDetail,
+          onSetOrigin: isPicking || widget.routeDraftController == null
               ? null
               : _setRouteOrigin,
-          onSetDestination: widget.routeDraftController == null
+          onSetDestination: isPicking || widget.routeDraftController == null
               ? null
               : _setRouteDestination,
           isOpeningLocationSettings: _isOpeningLocationSettings,
@@ -1920,9 +1931,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     );
     return Scaffold(
       appBar: AppBar(
-        title: Text(switch (widget.entryMode) {
-          StationSearchEntryMode.nearby => '가까운 역',
-          StationSearchEntryMode.search => '역 검색',
+        title: Text(switch (widget.pickSlot) {
+          RouteDraftSlot.origin => '출발역 검색',
+          RouteDraftSlot.destination => '도착역 검색',
+          null => switch (widget.entryMode) {
+            StationSearchEntryMode.nearby => '가까운 역',
+            StationSearchEntryMode.search => '역 검색',
+          },
         }),
         actions: [
           if (!isNearbyEntry)
@@ -2045,6 +2060,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
     }
+  }
+
+  /// 칸 채우기 모드: 결과를 탭하면 지정된 칸을 [routeDraftController]에 설정하고
+  /// 화면을 닫으면서 선택한 역을 반환한다. 지도 탭 경로와 같은 컨트롤러·같은 draft로
+  /// 수렴한다.
+  void _pickStation(StationSearchResult result) {
+    final slot = widget.pickSlot;
+    if (slot == null) {
+      return;
+    }
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    switch (slot) {
+      case RouteDraftSlot.origin:
+        widget.routeDraftController?.setOrigin(station);
+      case RouteDraftSlot.destination:
+        widget.routeDraftController?.setDestination(station);
+    }
+    Navigator.of(context).pop(station);
   }
 
   void _setRouteOrigin(StationSearchResult result) {

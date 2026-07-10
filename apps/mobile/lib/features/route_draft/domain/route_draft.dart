@@ -1,3 +1,7 @@
+/// 길찾기 draft에서 채우려는 칸(출발/도착). 지도 탭·텍스트 검색 어느 경로든
+/// 같은 칸을 지정해 동일한 [RouteDraft] 상태로 수렴시키기 위해 쓴다.
+enum RouteDraftSlot { origin, destination }
+
 class RouteDraftStation {
   const RouteDraftStation({required this.id, required this.nameKo});
 

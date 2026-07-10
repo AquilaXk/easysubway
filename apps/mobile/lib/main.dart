@@ -1603,6 +1603,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await refreshHomeState();
     }
 
+    // G4: 노선도 상단 오버레이의 출발/도착 칸 탭 → 기존 역 검색을 "칸 채우기" 모드로
+    // 연다. 결과 한 번 탭 = 지도 탭과 같은 _routeDraftController로 수렴한 뒤 닫힌다.
+    Future<void> openStationSearchForSlot(RouteDraftSlot slot) async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<RouteDraftStation>(
+          builder: (_) => StationSearchScreen(
+            repository: repository,
+            reportRepository: reportRepository,
+            favoriteRepository: favoriteRepository,
+            searchHistoryRepository: searchHistoryRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            internalRouteMobilityType: initialMobilityType,
+            realtimeRepository: realtimeRepository,
+            routeDraftController: _routeDraftController,
+            pickSlot: slot,
+          ),
+        ),
+      );
+      if (!context.mounted) {
+        return;
+      }
+      await refreshHomeState();
+    }
+
     void openDataSources() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -1643,6 +1669,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           routeDraftController: _routeDraftController,
           onOpenRouteSearch: () async => openRouteTab(),
           onOpenStationSearch: () => unawaited(openStationSearch()),
+          onPickStationForSlot: (slot) =>
+              unawaited(openStationSearchForSlot(slot)),
           stationSearchRepository: repository,
           locationProvider: locationProvider,
           viewportRepository: widget.networkMapViewportRepository,
