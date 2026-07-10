@@ -20,7 +20,7 @@ import 'station_search.dart';
 
 const _networkMapTopBarHeight = 60.0;
 const _networkMapPillRadius = BorderRadius.all(Radius.circular(28));
-const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(12));
+const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(999));
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -3894,10 +3894,12 @@ class _NetworkMapRouteDraftOverlay extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           child: Material(
             key: const Key('networkMapRouteDraftOverlay'),
-            color: EasySubwayAccessibleColors.scaffoldSurface,
-            elevation: 3,
-            shadowColor: const Color(0x22000000),
-            borderRadius: BorderRadius.circular(12),
+            color: EasySubwayAccessibleColors.surface,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: EasySubwayAccessibleColors.line),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: Column(

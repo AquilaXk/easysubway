@@ -1834,10 +1834,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: _stationSearchInputRadius,
-                borderSide: const BorderSide(
-                  color: EasySubwayAccessibleColors.primary,
-                  width: 2,
-                ),
+                borderSide: BorderSide.none,
               ),
             ),
             onSubmitted: _submit,
