@@ -671,6 +671,7 @@
         ],
         "usePermissionRange": "이용허락범위 제한 없음",
         "outputFields": [
+          "lineNm",
           "stnNm",
           "oprtngSitu",
           "dtlPstn"

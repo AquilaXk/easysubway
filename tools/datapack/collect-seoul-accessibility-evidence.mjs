@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PILOT_STATIONS = ["상록수", "사당"];
+const PILOT_LINE_NAME = "4호선";
 const DEFAULT_ENDPOINT = "https://apis.data.go.kr/B553766/wksn/getWksnElvtr";
 const INVALID_RESPONSE = "Seoul accessibility API response invalid";
 
@@ -15,19 +16,21 @@ export function normalizeAccessibilityRows(rows) {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
       throw new Error(INVALID_RESPONSE);
     }
-    const { stnNm, oprYn, instlPstn, oprtngSitu, dtlPstn } = row;
+    const { lineNm, stnNm, oprYn, instlPstn, oprtngSitu, dtlPstn } = row;
     const status = oprYn ?? oprtngSitu;
     const pathDescription = instlPstn ?? dtlPstn;
     if (
       typeof stnNm !== "string" ||
       stnNm.trim() === "" ||
+      typeof lineNm !== "string" ||
+      lineNm.trim() === "" ||
       typeof pathDescription !== "string" ||
       pathDescription.trim() === "" ||
       status !== "Y"
     ) {
       throw new Error(INVALID_RESPONSE);
     }
-    return { stationName: stnNm, operational: true, pathDescription };
+    return { stationName: stnNm, lineName: lineNm, operational: true, pathDescription };
   });
 }
 
@@ -39,6 +42,8 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
         !row ||
         typeof row.stationName !== "string" ||
         row.stationName.trim() === "" ||
+        typeof row.lineName !== "string" ||
+        row.lineName.trim() === "" ||
         typeof row.operational !== "boolean" ||
         typeof row.pathDescription !== "string" ||
         row.pathDescription.trim() === "",
@@ -48,8 +53,9 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
   }
   const stations = PILOT_STATIONS.map((stationName) => ({
     stationName,
+    lineName: PILOT_LINE_NAME,
     facilities: rows
-      .filter((row) => row.stationName === stationName)
+      .filter((row) => row.stationName === stationName && row.lineName === PILOT_LINE_NAME)
       .map(({ operational, pathDescription }) => ({ operational, pathDescription })),
   }));
   const missing = stations.find(({ facilities }) => facilities.length === 0);
@@ -60,37 +66,52 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
 }
 
 export async function collectSeoulAccessibility({ endpoint, serviceKey, fetchImpl = fetch }) {
-  const url = new URL(endpoint);
-  if (url.protocol !== "https:") {
+  const endpointUrl = new URL(endpoint);
+  if (endpointUrl.protocol !== "https:") {
     throw new Error("HTTPS endpoint is required");
   }
-  url.searchParams.set("serviceKey", serviceKey);
-  url.searchParams.set("pageNo", "1");
-  url.searchParams.set("numOfRows", "1000");
-  url.searchParams.set("dataType", "JSON");
-  let response;
-  try {
-    response = await fetchImpl(url);
-  } catch {
-    throw new Error("Seoul accessibility API request failed");
+  const collected = [];
+  for (const stationName of PILOT_STATIONS) {
+    const url = new URL(endpointUrl);
+    url.searchParams.set("serviceKey", serviceKey);
+    url.searchParams.set("pageNo", "1");
+    url.searchParams.set("numOfRows", "1000");
+    url.searchParams.set("dataType", "JSON");
+    url.searchParams.set("lineNm", PILOT_LINE_NAME);
+    url.searchParams.set("stnNm", stationName);
+    let response;
+    try {
+      response = await fetchImpl(url);
+    } catch {
+      throw new Error("Seoul accessibility API request failed");
+    }
+    if (!response.ok) {
+      throw new Error(`Seoul accessibility API HTTP ${response.status}`);
+    }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      throw new Error(INVALID_RESPONSE);
+    }
+    if (payload?.response?.header?.resultCode !== "00") {
+      throw new Error(INVALID_RESPONSE);
+    }
+    const rows = payload.response?.body?.items?.item;
+    if (!Array.isArray(rows)) {
+      throw new Error(INVALID_RESPONSE);
+    }
+    const normalizedRows = normalizeAccessibilityRows(rows);
+    if (
+      normalizedRows.some(
+        (row) => row.stationName !== stationName || row.lineName !== PILOT_LINE_NAME,
+      )
+    ) {
+      throw new Error(INVALID_RESPONSE);
+    }
+    collected.push(...normalizedRows);
   }
-  if (!response.ok) {
-    throw new Error(`Seoul accessibility API HTTP ${response.status}`);
-  }
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new Error(INVALID_RESPONSE);
-  }
-  if (payload?.response?.header?.resultCode !== "00") {
-    throw new Error(INVALID_RESPONSE);
-  }
-  const rows = payload.response?.body?.items?.item;
-  if (!Array.isArray(rows)) {
-    throw new Error(INVALID_RESPONSE);
-  }
-  return normalizeAccessibilityRows(rows);
+  return collected;
 }
 
 export async function writeSeoulAccessibilityEvidence({

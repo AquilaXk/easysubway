@@ -131,54 +131,103 @@ test("collector rejects malformed items with a fixed credential-free error", asy
 });
 
 test("collector accepts only the documented success schema", async () => {
+  const requestUrls = [];
   const rows = await collectSeoulAccessibility({
     endpoint: "https://apis.data.go.kr/example",
     serviceKey: "secret",
-    fetchImpl: async () => ({
-      ok: true,
-      json: async () => ({
-        response: {
-          header: { resultCode: "00" },
-          body: {
-            items: {
-              item: [
-                { stnNm: "상록수", oprYn: "Y", instlPstn: "1번 출구-대합실" },
-                { stnNm: "사당", oprYn: "Y", instlPstn: "대합실-승강장" },
-              ],
+    fetchImpl: async (url) => {
+      requestUrls.push(new URL(url));
+      const stationName = new URL(url).searchParams.get("stnNm");
+      return {
+        ok: true,
+        json: async () => ({
+          response: {
+            header: { resultCode: "00" },
+            body: {
+              items: {
+                item: [
+                  {
+                    lineNm: "4호선",
+                    stnNm: stationName,
+                    oprtngSitu: "Y",
+                    dtlPstn: stationName === "상록수" ? "1번 출구-대합실" : "대합실-승강장",
+                  },
+                ],
+              },
             },
           },
-        },
-      }),
-    }),
+        }),
+      };
+    },
   });
 
   assert.deepEqual(rows, [
-    { stationName: "상록수", operational: true, pathDescription: "1번 출구-대합실" },
-    { stationName: "사당", operational: true, pathDescription: "대합실-승강장" },
+    { stationName: "상록수", lineName: "4호선", operational: true, pathDescription: "1번 출구-대합실" },
+    { stationName: "사당", lineName: "4호선", operational: true, pathDescription: "대합실-승강장" },
   ]);
+  assert.deepEqual(
+    requestUrls.map((url) => ({
+      lineName: url.searchParams.get("lineNm"),
+      stationName: url.searchParams.get("stnNm"),
+      pageNo: url.searchParams.get("pageNo"),
+      numOfRows: url.searchParams.get("numOfRows"),
+    })),
+    [
+      { lineName: "4호선", stationName: "상록수", pageNo: "1", numOfRows: "1000" },
+      { lineName: "4호선", stationName: "사당", pageNo: "1", numOfRows: "1000" },
+    ],
+  );
 });
 
 test("collector keeps only station, location and operation evidence", () => {
   const snapshot = normalizeAccessibilityRows([
-    { stnNm: "사당", oprYn: "Y", instlPstn: "대합실-승강장" },
+    { lineNm: "4호선", stnNm: "사당", oprtngSitu: "Y", dtlPstn: "대합실-승강장" },
   ]);
   assert.deepEqual(snapshot, [
-    { stationName: "사당", operational: true, pathDescription: "대합실-승강장" },
+    { stationName: "사당", lineName: "4호선", operational: true, pathDescription: "대합실-승강장" },
   ]);
   assert.doesNotMatch(JSON.stringify(snapshot), /serviceKey/);
 });
 
+test("collector rejects rows outside the requested pilot station-line", async () => {
+  await assert.rejects(
+    collectSeoulAccessibility({
+      endpoint: "https://apis.data.go.kr/example",
+      serviceKey: "secret",
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          response: {
+            header: { resultCode: "00" },
+            body: {
+              items: {
+                item: [{ lineNm: "2호선", stnNm: "상록수", oprtngSitu: "Y", dtlPstn: "출입구-대합실" }],
+              },
+            },
+          },
+        }),
+      }),
+    }),
+    /Seoul accessibility API response invalid/,
+  );
+});
+
 test("normalizer rejects undocumented operation codes", () => {
   assert.throws(
-    () => normalizeAccessibilityRows([{ stnNm: "상록수", oprtngSitu: "M", dtlPstn: "1번 출구-대합실" }]),
+    () =>
+      normalizeAccessibilityRows([
+        { lineNm: "4호선", stnNm: "상록수", oprtngSitu: "M", dtlPstn: "1번 출구-대합실" },
+      ]),
     /Seoul accessibility API response invalid/,
   );
 });
 
 test("normalizer rejects malformed and incomplete evidence rows", () => {
-  const valid = { stnNm: "사당", oprYn: "Y", instlPstn: "대합실-승강장" };
+  const valid = { lineNm: "4호선", stnNm: "사당", oprYn: "Y", instlPstn: "대합실-승강장" };
   for (const row of [
     null,
+    { ...valid, lineNm: undefined },
+    { ...valid, lineNm: 4 },
     { ...valid, stnNm: undefined },
     { ...valid, stnNm: 123 },
     { ...valid, instlPstn: undefined },
@@ -193,8 +242,8 @@ test("normalizer rejects malformed and incomplete evidence rows", () => {
 test("snapshot contains sanitized evidence for both pilot stations", () => {
   const snapshot = buildAccessibilitySnapshot(
     [
-      { stationName: "사당", operational: true, pathDescription: "대합실-승강장" },
-      { stationName: "상록수", operational: false, pathDescription: "1번 출구-대합실" },
+      { stationName: "사당", lineName: "4호선", operational: true, pathDescription: "대합실-승강장" },
+      { stationName: "상록수", lineName: "4호선", operational: false, pathDescription: "1번 출구-대합실" },
     ],
     "2026-07-10T00:00:00.000Z",
   );
@@ -205,10 +254,12 @@ test("snapshot contains sanitized evidence for both pilot stations", () => {
     stations: [
       {
         stationName: "상록수",
+        lineName: "4호선",
         facilities: [{ operational: false, pathDescription: "1번 출구-대합실" }],
       },
       {
         stationName: "사당",
+        lineName: "4호선",
         facilities: [{ operational: true, pathDescription: "대합실-승강장" }],
       },
     ],
@@ -220,7 +271,7 @@ test("snapshot rejects missing pilot station evidence", () => {
   assert.throws(
     () =>
       buildAccessibilitySnapshot(
-        [{ stationName: "사당", operational: true, pathDescription: "대합실-승강장" }],
+        [{ stationName: "사당", lineName: "4호선", operational: true, pathDescription: "대합실-승강장" }],
         "2026-07-10T00:00:00.000Z",
       ),
     /accessibility evidence missing for 상록수/,
@@ -228,12 +279,18 @@ test("snapshot rejects missing pilot station evidence", () => {
 });
 
 test("snapshot rejects pilot facilities without a boolean status and path", () => {
-  const validSadang = { stationName: "사당", operational: true, pathDescription: "대합실-승강장" };
+  const validSadang = {
+    stationName: "사당",
+    lineName: "4호선",
+    operational: true,
+    pathDescription: "대합실-승강장",
+  };
   for (const sangnoksu of [
-    { stationName: "상록수", pathDescription: "1번 출구-대합실" },
-    { stationName: "상록수", operational: "Y", pathDescription: "1번 출구-대합실" },
-    { stationName: "상록수", operational: true },
-    { stationName: "상록수", operational: true, pathDescription: 123 },
+    { stationName: "상록수", lineName: "4호선", pathDescription: "1번 출구-대합실" },
+    { stationName: "상록수", lineName: "4호선", operational: "Y", pathDescription: "1번 출구-대합실" },
+    { stationName: "상록수", lineName: "4호선", operational: true },
+    { stationName: "상록수", lineName: "4호선", operational: true, pathDescription: 123 },
+    { stationName: "상록수", operational: true, pathDescription: "1번 출구-대합실" },
   ]) {
     assert.throws(
       () => buildAccessibilitySnapshot([sangnoksu, validSadang], "2026-07-10T00:00:00.000Z"),
@@ -244,7 +301,7 @@ test("snapshot rejects pilot facilities without a boolean status and path", () =
 
 test("invalid provider evidence never reaches the output write", async () => {
   const outputDir = await mkdtemp(join(tmpdir(), "easysubway-accessibility-"));
-  const valid = { stnNm: "사당", oprYn: "Y", instlPstn: "대합실-승강장" };
+  const valid = { lineNm: "4호선", stnNm: "사당", oprYn: "Y", instlPstn: "대합실-승강장" };
   const jsonResponse = (item, resultCode = "00") => async () => ({
     ok: true,
     json: async () => ({ response: { header: { resultCode }, body: { items: { item } } } }),
@@ -261,6 +318,8 @@ test("invalid provider evidence never reaches the output write", async () => {
     jsonResponse({ reflected: "serviceKey=secret" }),
     ...[
       null,
+      { ...valid, lineNm: undefined },
+      { ...valid, lineNm: 4 },
       { ...valid, stnNm: undefined },
       { ...valid, stnNm: 123 },
       { ...valid, instlPstn: undefined },
@@ -341,5 +400,8 @@ test("official endpoints remain pending candidates until admission evidence exis
     inventory.sources.filter(({ id }) => ids.includes(id)),
     [],
   );
-  assert.match(await readFile(new URL("../../.env.example", import.meta.url), "utf8"), /^DATA_GO_KR_SERVICE_KEY=$/m);
+  assert.doesNotMatch(
+    await readFile(new URL("../../.env.example", import.meta.url), "utf8"),
+    /^DATA_GO_KR_SERVICE_KEY=/m,
+  );
 });
