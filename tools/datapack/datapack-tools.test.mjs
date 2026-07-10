@@ -3374,6 +3374,7 @@ test("데이터팩 검증기는 현장·운영기관 확인 시설 AVAILABLE 근
   await mkdir(outputDir, { recursive: true });
 
   const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  makeProductionSourceFixtureStrictCoverageValid(fixture);
   for (const [index, statusMeaning] of ["FIELD_SURVEY", "OPERATOR_CONFIRMED"].entries()) {
     fixture.packs[0].facilities[index].status = "NORMAL";
     fixture.packs[0].facilities[index].operationalStatus = "AVAILABLE";
@@ -3414,6 +3415,7 @@ test("데이터팩 검증기는 근거 없는 시설 operationalStatus AVAILABLE
   await mkdir(outputDir, { recursive: true });
 
   const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  makeProductionSourceFixtureStrictCoverageValid(fixture);
   fixture.packs[0].facilities[0].status = "UNKNOWN";
   fixture.packs[0].facilities[0].operationalStatus = "AVAILABLE";
   fixture.packs[0].facilities[0].statusMeaning = "OFFICIAL_SOURCE";
@@ -3454,6 +3456,9 @@ test("데이터팩 검증기는 UNKNOWN 운행상태 시설의 strict route elig
   await mkdir(outputDir, { recursive: true });
 
   const fixture = await importOfficialSourceInput(outputDir, productionSourceIngestInput());
+  makeProductionSourceFixtureStrictCoverageValid(fixture);
+  fixture.packs[0].stationFacilityEvidence[0].operationalStatus = "UNKNOWN";
+  fixture.packs[0].stationFacilityEvidence[0].statusMeaning = "STATIC_LOCATION";
   fixture.packs[0].stationFacilityEvidence[0].strictRouteEligible = true;
   fixture.packs[0].stationFacilityEvidence[0].strictRouteEligibleReason = "FACILITY_EXISTS_AND_PROVENANCE_VERIFIED";
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
@@ -8398,6 +8403,8 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
   );
 
   const generated = JSON.parse(await readFile(outputPath, "utf8"));
+  makeProductionSourceFixtureStrictCoverageValid(generated);
+  await writeFile(outputPath, `${JSON.stringify(generated, null, 2)}\n`);
   assert.equal(generated.packs[0].artifactKind, "production");
   assert.deepEqual(
     generated.packs[0].sourceInventory.map((source) => ({
@@ -9434,6 +9441,111 @@ test("공식 source ingest adapter는 stationLineRows 없는 facility evidence m
   );
 });
 
+test("AVAILABLE ENTRY edge rejects station-line source provenance", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-station-source-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  input.routeEdges.find((edge) => edge.id === "edge-entry-sadang-seoul-4").accessibilityStatus = "AVAILABLE";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /AVAILABLE ENTRY\/EXIT edge requires accessibility_facilities source/,
+  );
+});
+
+test("AVAILABLE ENTRY edge rejects missing strict operational facility evidence", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-facility-evidence-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  useAccessibilitySourceForAvailableEdge(input, "edge-entry-sadang-seoul-4");
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /AVAILABLE ENTRY\/EXIT edge requires strict-eligible operational facility evidence/,
+  );
+});
+
+test("AVAILABLE ENTRY edge rejects missing approved movement pathway", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-approved-pathway-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  useAccessibilitySourceForAvailableEdge(input, "edge-entry-sadang-seoul-4");
+  const facility = input.facilityRows.find((row) => row.id === "facility-sadang-elevator-kric-1");
+  facility.status = "NORMAL";
+  facility.operationalStatus = "AVAILABLE";
+  facility.statusMeaning = "OPERATOR_CONFIRMED";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /AVAILABLE ENTRY\/EXIT edge requires approved movement pathway/,
+  );
+});
+
+test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line source 우회를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-validator-source-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  fixture.packs[0].networkEdges.find(
+    (edge) => edge.id === "edge-entry-sadang-seoul-4",
+  ).accessibilityStatus = "AVAILABLE";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutputDir],
+    { cwd: root, env: productionEnv },
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(packOutputDir, "current.json"),
+        "--root",
+        packOutputDir,
+        "--require-production",
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /AVAILABLE ENTRY\/EXIT edge requires accessibility_facilities source/,
+  );
+});
+
+test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line operational evidence 누락을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-validator-facility-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  const edge = fixture.packs[0].networkEdges.find((row) => row.id === "edge-entry-sadang-seoul-4");
+  edge.accessibilityStatus = "AVAILABLE";
+  edge.sourceId = "kric-station-elevator";
+  edge.sourceSnapshotId = "kric-station-elevator-snapshot-20260622";
+  edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-elevator`);
+  edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-elevator:2026-06-22T00:00:00.000Z`);
+  edge.lastVerifiedAt = "2026-06-22T00:00:00.000Z";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutputDir],
+    { cwd: root, env: productionEnv },
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest",
+        path.join(packOutputDir, "current.json"),
+        "--root",
+        packOutputDir,
+        "--require-production",
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /AVAILABLE ENTRY\/EXIT edge requires strict-eligible operational facility evidence/,
+  );
+});
+
 test("수도권 pilot production source input은 UNKNOWN strict coverage gap을 노출한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-capital-pilot-production-source-${Date.now()}`);
   const inputPath = "tools/datapack/inputs/capital-pilot-production-source-input.json";
@@ -10111,6 +10223,8 @@ test("관리자 검수 NORMAL override는 production 시설 provenance와 valida
   assert.equal(reviewedFacility.operationalStatus, "AVAILABLE");
   assert.equal(reviewedFacility.verifiedAt, "2026-06-22T00:30:00.000Z");
   assert.equal(reviewedFacility.retrievedAt, "2026-06-22T01:00:00.000Z");
+  makeProductionSourceFixtureStrictCoverageValid(reviewedFixture);
+  await writeFile(reviewedFixturePath, `${JSON.stringify(reviewedFixture, null, 2)}\n`);
 
   await execFileAsync(
     process.execPath,
@@ -11912,6 +12026,22 @@ async function importOfficialSourceInput(outputDir, input, inventoryPath = "tool
   return JSON.parse(await readFile(outputPath, "utf8"));
 }
 
+async function capitalPilotProductionSourceInput() {
+  return JSON.parse(
+    await readFile(path.join(root, "tools/datapack/inputs/capital-pilot-production-source-input.json"), "utf8"),
+  );
+}
+
+function useAccessibilitySourceForAvailableEdge(input, edgeId) {
+  const edge = input.routeEdges.find((row) => row.id === edgeId);
+  edge.accessibilityStatus = "AVAILABLE";
+  edge.sourceId = "kric-station-elevator";
+  edge.sourceSnapshotId = "kric-station-elevator-snapshot-20260622";
+  edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-elevator`);
+  edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-elevator:2026-06-22T00:00:00.000Z`);
+  edge.lastVerifiedAt = "2026-06-22T00:00:00.000Z";
+}
+
 function addSeoul2ProductionScope(input) {
   input.lines.push({
     ...input.lines[0],
@@ -11991,7 +12121,7 @@ function productionSourceAccessRouteEdge({ id, sourceStationCode, edgeType, stat
     servicePattern: "",
     includesStairs: false,
     stairAccessState: "STEP_FREE",
-    accessibilityStatus: "AVAILABLE",
+    accessibilityStatus: "UNKNOWN",
     reliabilityScore: 90,
     provenanceKind: "OFFICIAL_SOURCE",
     verificationStatus: "VERIFIED",
@@ -12265,6 +12395,24 @@ function markFixturePackProduction(fixture) {
     strictRouteEligible: true,
     strictRouteEligibleReason: "FACILITY_EXISTS_AND_PROVENANCE_VERIFIED",
   }));
+  const coveredStationLines = new Set(
+    pack.stationFacilityEvidence.map((row) => `${row.stationId}:${row.lineId}`),
+  );
+  const evidenceTemplate = pack.stationFacilityEvidence[0];
+  for (const stationLine of pack.stationLines) {
+    const key = `${stationLine.stationId}:${stationLine.lineId}`;
+    if (coveredStationLines.has(key)) {
+      continue;
+    }
+    pack.stationFacilityEvidence.push({
+      ...evidenceTemplate,
+      stationId: stationLine.stationId,
+      lineId: stationLine.lineId,
+      providerRecordHash: sha256(`provider:${key}:capital-official-stations`),
+      evidenceHash: sha256(`evidence:${key}:capital-official-stations:2026-06-19T00:00:00Z`),
+    });
+    coveredStationLines.add(key);
+  }
   addMissingProductionAccessEdges(pack);
   pack.minimumTableRows = {
     ...pack.minimumTableRows,
@@ -12332,8 +12480,26 @@ function productionSourceCoverageScope() {
   return {
     regionIds: ["capital"],
     operatorIds: ["seoul-metro"],
-    sourceDomains: ["station_line_membership"],
+    sourceDomains: ["station_line_membership", "accessibility_facilities"],
   };
+}
+
+function makeProductionSourceFixtureStrictCoverageValid(fixture) {
+  const pack = fixture.packs[0];
+  for (const edge of pack.networkEdges.filter((row) => ["ENTRY", "EXIT"].includes(row.edgeType))) {
+    edge.accessibilityStatus = "AVAILABLE";
+    edge.sourceId = "kric-station-elevator";
+    edge.sourceSnapshotId = "kric-station-elevator-snapshot-20260622";
+    edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-elevator`);
+    edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-elevator:2026-06-22T00:00:00.000Z`);
+    edge.lastVerifiedAt = "2026-06-22T00:00:00.000Z";
+  }
+  for (const evidence of pack.stationFacilityEvidence) {
+    evidence.operationalStatus = "AVAILABLE";
+    evidence.statusMeaning = "OPERATOR_CONFIRMED";
+    evidence.strictRouteEligible = true;
+    evidence.strictRouteEligibleReason = "FACILITY_OPERATION_VERIFIED";
+  }
 }
 
 function packSignaturePayload(pack) {
