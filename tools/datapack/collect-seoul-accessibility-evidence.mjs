@@ -5,16 +5,47 @@ import { fileURLToPath } from "node:url";
 
 const PILOT_STATIONS = ["상록수", "사당"];
 const DEFAULT_ENDPOINT = "https://apis.data.go.kr/B553766/wksn/getWksnElvtr";
+const INVALID_RESPONSE = "Seoul accessibility API response invalid";
 
 export function normalizeAccessibilityRows(rows) {
-  return rows.map(({ stnNm, oprYn, instlPstn, oprtngSitu, dtlPstn }) => ({
-    stationName: stnNm,
-    operational: ["Y", "M"].includes(oprYn ?? oprtngSitu),
-    pathDescription: instlPstn ?? dtlPstn,
-  }));
+  if (!Array.isArray(rows)) {
+    throw new Error(INVALID_RESPONSE);
+  }
+  return rows.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error(INVALID_RESPONSE);
+    }
+    const { stnNm, oprYn, instlPstn, oprtngSitu, dtlPstn } = row;
+    const status = oprYn ?? oprtngSitu;
+    const pathDescription = instlPstn ?? dtlPstn;
+    if (
+      typeof stnNm !== "string" ||
+      stnNm.trim() === "" ||
+      typeof pathDescription !== "string" ||
+      pathDescription.trim() === "" ||
+      status !== "Y"
+    ) {
+      throw new Error(INVALID_RESPONSE);
+    }
+    return { stationName: stnNm, operational: true, pathDescription };
+  });
 }
 
 export function buildAccessibilitySnapshot(rows, retrievedAt) {
+  if (
+    !Array.isArray(rows) ||
+    rows.some(
+      (row) =>
+        !row ||
+        typeof row.stationName !== "string" ||
+        row.stationName.trim() === "" ||
+        typeof row.operational !== "boolean" ||
+        typeof row.pathDescription !== "string" ||
+        row.pathDescription.trim() === "",
+    )
+  ) {
+    throw new Error(INVALID_RESPONSE);
+  }
   const stations = PILOT_STATIONS.map((stationName) => ({
     stationName,
     facilities: rows
@@ -46,7 +77,35 @@ export async function collectSeoulAccessibility({ endpoint, serviceKey, fetchImp
   if (!response.ok) {
     throw new Error(`Seoul accessibility API HTTP ${response.status}`);
   }
-  return normalizeAccessibilityRows((await response.json()).response.body.items.item);
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error(INVALID_RESPONSE);
+  }
+  if (payload?.response?.header?.resultCode !== "00") {
+    throw new Error(INVALID_RESPONSE);
+  }
+  const rows = payload.response?.body?.items?.item;
+  if (!Array.isArray(rows)) {
+    throw new Error(INVALID_RESPONSE);
+  }
+  return normalizeAccessibilityRows(rows);
+}
+
+export async function writeSeoulAccessibilityEvidence({
+  endpoint,
+  serviceKey,
+  output,
+  fetchImpl = fetch,
+  retrievedAt = new Date().toISOString(),
+}) {
+  const rows = await collectSeoulAccessibility({ endpoint, serviceKey, fetchImpl });
+  const snapshot = buildAccessibilitySnapshot(rows, retrievedAt);
+  const outputPath = resolve(output);
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+  return snapshot;
 }
 
 async function main() {
@@ -57,11 +116,7 @@ async function main() {
   if (!serviceKey) {
     throw new Error("DATA_GO_KR_SERVICE_KEY env is required");
   }
-  const rows = await collectSeoulAccessibility({ endpoint: DEFAULT_ENDPOINT, serviceKey });
-  const snapshot = buildAccessibilitySnapshot(rows, new Date().toISOString());
-  const output = resolve(process.argv[3]);
-  await mkdir(dirname(output), { recursive: true });
-  await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`);
+  await writeSeoulAccessibilityEvidence({ endpoint: DEFAULT_ENDPOINT, serviceKey, output: process.argv[3] });
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
