@@ -82,7 +82,7 @@ Future<void> main() async {
         ? _DemoSearchHistoryRepository()
         : null,
   );
-  await bootstrap.dependencies.getOffAlarmController?.restore();
+  await restoreGetOffAlarmState(bootstrap.dependencies.getOffAlarmController);
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
   runApp(
     AppBootstrapLifecycle(
@@ -103,6 +103,19 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+@visibleForTesting
+Future<void> restoreGetOffAlarmState(GetOffAlarmController? controller) async {
+  try {
+    await controller?.restore();
+  } catch (error, stackTrace) {
+    reportMobileError(
+      error,
+      stackTrace,
+      context: '하차 알림 시작 상태 복원 중 예외가 발생했습니다.',
+    );
+  }
 }
 
 void validateReleaseBuildFlags({

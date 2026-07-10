@@ -121,14 +121,47 @@ void main() {
     expect(await repository.loadActive(), isNull);
   });
 
-  test('scheduledCount 없는 legacy 구독은 구독 최대 예약 수로 복원한다', () async {
-    final legacy = subscription.toJson()..remove('scheduledCount');
-    await writeRaw(legacy);
+  test('scheduledCount 없는 current schema 구독은 최대 예약 수로 복원한다', () async {
+    final currentSchema = subscription.toJson()..remove('scheduledCount');
+    await writeRaw(currentSchema);
 
     final loaded = await repository.loadActive();
 
     expect(loaded, isNotNull);
     expect(loaded!.scheduledCount, 2);
+  });
+
+  test('scheduleMode 없는 실제 legacy 구독은 positive restore하지 않는다', () async {
+    await writeRaw({
+      'routeId': 'legacy-route',
+      'transferAlarmEnabled': true,
+      'destination': {
+        'stationId': 'dest',
+        'stationName': '사당',
+        'arrivalAtEpochMs': DateTime.utc(
+          2026,
+          7,
+          6,
+          9,
+          30,
+        ).millisecondsSinceEpoch,
+      },
+      'transfers': [
+        {
+          'stationId': 'transfer',
+          'stationName': '동작',
+          'arrivalAtEpochMs': DateTime.utc(
+            2026,
+            7,
+            6,
+            9,
+            15,
+          ).millisecondsSinceEpoch,
+        },
+      ],
+    });
+
+    expect(await repository.loadActive(), isNull);
   });
 
   test('scheduledCount 문자열은 손상 구독으로 폐기한다', () async {

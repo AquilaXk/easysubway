@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
@@ -5,7 +7,11 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controlle
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_notifier.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_mode.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
+import 'package:easysubway_mobile/main.dart' as app;
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _RecordingNotifier implements GetOffAlarmNotifier {
@@ -13,6 +19,8 @@ class _RecordingNotifier implements GetOffAlarmNotifier {
   GetOffAlarmScheduleMode? scheduledMode;
   ScheduleDeliveryResult? result;
   int cancelAllCount = 0;
+  Completer<void>? cancelBarrier;
+  Object? cancelErrorOnce;
 
   @override
   Future<ScheduleDeliveryResult> scheduleAlarms(
@@ -28,6 +36,40 @@ class _RecordingNotifier implements GetOffAlarmNotifier {
   @override
   Future<void> cancelAll() async {
     cancelAllCount++;
+    final error = cancelErrorOnce;
+    cancelErrorOnce = null;
+    if (error != null) {
+      throw error;
+    }
+    await cancelBarrier?.future;
+  }
+}
+
+class _RecordingStateRepository implements GetOffAlarmStateRepository {
+  _RecordingStateRepository({this.loadError});
+
+  GetOffAlarmSubscription? active;
+  Object? loadError;
+  int clearCount = 0;
+
+  @override
+  Future<void> clearActive() async {
+    clearCount += 1;
+    active = null;
+  }
+
+  @override
+  Future<GetOffAlarmSubscription?> loadActive() async {
+    final error = loadError;
+    if (error != null) {
+      throw error;
+    }
+    return active;
+  }
+
+  @override
+  Future<void> saveActive(GetOffAlarmSubscription subscription) async {
+    active = subscription;
   }
 }
 
@@ -49,6 +91,24 @@ class _StubExactAlarmGate implements ExactAlarmPermissionGate {
     requestCalls += 1;
     return permitted;
   }
+}
+
+class _BlockingRefreshExactAlarmGate implements ExactAlarmPermissionGate {
+  final isPermittedStarted = Completer<void>();
+  final permitted = Completer<bool>();
+  int isPermittedCalls = 0;
+
+  @override
+  Future<bool> isExactAlarmPermitted() {
+    isPermittedCalls += 1;
+    if (!isPermittedStarted.isCompleted) {
+      isPermittedStarted.complete();
+    }
+    return permitted.future;
+  }
+
+  @override
+  Future<bool> requestExactAlarmPermission() async => true;
 }
 
 class _StubNotificationPermissionProvider
@@ -281,5 +341,127 @@ void main() {
 
     expect(restored.state.enabled, isTrue);
     expect(restored.state.activeRouteId, 'r1');
+  });
+
+  test('startup restore 예외는 앱 시작 경계 밖으로 전파하지 않는다', () async {
+    final error = StateError('database unavailable');
+    final startupController = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: _RecordingStateRepository(loadError: error),
+      now: () => now,
+    );
+    addTearDown(startupController.dispose);
+    final reports = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(
+      reports.add,
+      () => app.restoreGetOffAlarmState(startupController),
+    );
+
+    expect(reports, hasLength(1));
+    expect(reports.single.exception, same(error));
+    expect(reports.single.context.toString(), isNot(contains('route')));
+  });
+
+  test('restore에서 active가 없으면 pending 알림과 저장값을 정리한다', () async {
+    final stateRepository = _RecordingStateRepository();
+    final restored = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => now,
+    );
+    addTearDown(restored.dispose);
+
+    await restored.restore();
+
+    expect(notifier.cancelAllCount, 1);
+    expect(stateRepository.clearCount, 1);
+    expect(restored.state.enabled, isFalse);
+  });
+
+  test('진행 중 refresh 뒤 disable은 마지막 cancel clear off 상태를 보장한다', () async {
+    final gate = _BlockingRefreshExactAlarmGate();
+    final stateRepository = _RecordingStateRepository();
+    final c = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: gate,
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => now,
+    );
+    addTearDown(c.dispose);
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+
+    final refresh = c.refresh(stops: stops(), transferAlarmEnabled: true);
+    await gate.isPermittedStarted.future;
+    final disable = c.disable();
+    gate.permitted.complete(true);
+    await Future.wait([refresh, disable]);
+
+    expect(notifier.cancelAllCount, 1);
+    expect(stateRepository.active, isNull);
+    expect(c.state.enabled, isFalse);
+    expect(c.state.activeRouteId, isNull);
+  });
+
+  test('disable 뒤 queued refresh는 off 상태를 재확인하고 no-op 한다', () async {
+    final gate = _StubExactAlarmGate(true);
+    final stateRepository = _RecordingStateRepository();
+    final c = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: gate,
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => now,
+    );
+    addTearDown(c.dispose);
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+    notifier.cancelBarrier = Completer<void>();
+
+    final disable = c.disable();
+    await Future<void>.delayed(Duration.zero);
+    final refresh = c.refresh(stops: stops(), transferAlarmEnabled: true);
+    await Future<void>.delayed(Duration.zero);
+    notifier.cancelBarrier!.complete();
+    await Future.wait([disable, refresh]);
+
+    expect(gate.isPermittedCalls, 0);
+    expect(stateRepository.active, isNull);
+    expect(c.state.enabled, isFalse);
+  });
+
+  test('앞선 mutation 오류가 다음 disable queue를 poison하지 않는다', () async {
+    final stateRepository = _RecordingStateRepository();
+    final c = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmGate(true),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => now,
+    );
+    addTearDown(c.dispose);
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+    notifier.cancelErrorOnce = StateError('cancel failed');
+
+    await expectLater(c.disable(), throwsStateError);
+    await c.disable();
+
+    expect(notifier.cancelAllCount, 2);
+    expect(stateRepository.active, isNull);
+    expect(c.state.enabled, isFalse);
   });
 }

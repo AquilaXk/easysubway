@@ -62,16 +62,19 @@ class GetOffAlarmController extends ChangeNotifier {
   final DateTime Function() now;
 
   GetOffAlarmState _state = GetOffAlarmState.off;
+  Future<void> _mutationTail = Future<void>.value();
   bool _disposed = false;
 
   GetOffAlarmState get state => _state;
 
   /// 앱 시작 시 영속된 활성 구독을 켜진 상태로 복원한다. OS가 이미 알람을
   /// 들고 있으므로 재예약하지 않고 상태만 반영한다.
-  Future<void> restore() async {
+  Future<void> restore() => _enqueueMutation(_restore);
+
+  Future<void> _restore() async {
     final subscription = await repository.loadActive();
     if (subscription == null) {
-      _emit(GetOffAlarmState.off);
+      await _turnOff();
       return;
     }
     _emit(
@@ -88,6 +91,18 @@ class GetOffAlarmController extends ChangeNotifier {
   /// 하차 알림을 켠다: 정확 알람 권한을 확인해 강등 여부를 정하고, 알림을
   /// 계산·예약한 뒤 활성 구독을 영속 저장한다.
   Future<void> enable({
+    required String routeId,
+    required List<GetOffAlarmStop> stops,
+    required bool transferAlarmEnabled,
+  }) => _enqueueMutation(
+    () => _enable(
+      routeId: routeId,
+      stops: stops,
+      transferAlarmEnabled: transferAlarmEnabled,
+    ),
+  );
+
+  Future<void> _enable({
     required String routeId,
     required List<GetOffAlarmStop> stops,
     required bool transferAlarmEnabled,
@@ -121,6 +136,13 @@ class GetOffAlarmController extends ChangeNotifier {
 
   /// 실시간 보정(#1416)·포그라운드 복귀 시 갱신된 도착 시각으로 재예약한다.
   Future<void> refresh({
+    required List<GetOffAlarmStop> stops,
+    required bool transferAlarmEnabled,
+  }) => _enqueueMutation(
+    () => _refresh(stops: stops, transferAlarmEnabled: transferAlarmEnabled),
+  );
+
+  Future<void> _refresh({
     required List<GetOffAlarmStop> stops,
     required bool transferAlarmEnabled,
   }) async {
@@ -188,8 +210,15 @@ class GetOffAlarmController extends ChangeNotifier {
 
   /// 하차 알림을 끈다: 예약을 취소하고 영속 상태를 지운다. 경로 안내 종료·새
   /// 경로 탐색 시 호출한다.
-  Future<void> disable() async {
-    await _turnOff();
+  Future<void> disable() => _enqueueMutation(_turnOff);
+
+  Future<void> _enqueueMutation(Future<void> Function() mutation) {
+    final result = _mutationTail.then((_) => mutation());
+    _mutationTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
   }
 
   Future<void> _turnOff({String? permissionNotice}) async {

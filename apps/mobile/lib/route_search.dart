@@ -2220,10 +2220,15 @@ class RouteSearchState {
 }
 
 class RouteRefreshOutcome {
-  const RouteRefreshOutcome({required this.result, required this.refreshed});
+  const RouteRefreshOutcome({
+    required this.result,
+    required this.refreshed,
+    required this.alarmRefreshRequired,
+  });
 
   final RouteSearchResult? result;
   final bool refreshed;
+  final bool alarmRefreshRequired;
 }
 
 class RouteSearchController extends ChangeNotifier {
@@ -2295,14 +2300,22 @@ class RouteSearchController extends ChangeNotifier {
 
   Future<RouteRefreshOutcome> refreshCurrentRoute() async {
     if (_disposed) {
-      return RouteRefreshOutcome(result: _state.result, refreshed: false);
+      return RouteRefreshOutcome(
+        result: _state.result,
+        refreshed: false,
+        alarmRefreshRequired: false,
+      );
     }
     final currentResult = _state.result;
     if (_state.status != RouteSearchViewStatus.success ||
         currentResult == null ||
         currentResult.isLocalResult ||
         _state.isRefreshing) {
-      return RouteRefreshOutcome(result: currentResult, refreshed: false);
+      return RouteRefreshOutcome(
+        result: currentResult,
+        refreshed: false,
+        alarmRefreshRequired: false,
+      );
     }
 
     final refreshRequestId = _searchRequestId;
@@ -2316,7 +2329,11 @@ class RouteSearchController extends ChangeNotifier {
     try {
       final refreshed = await repository.refreshRoute(refreshRouteSearchId);
       if (staleRefresh()) {
-        return RouteRefreshOutcome(result: _state.result, refreshed: false);
+        return RouteRefreshOutcome(
+          result: _state.result,
+          refreshed: false,
+          alarmRefreshRequired: false,
+        );
       }
       final refreshedResult = _preserveGetOffAlarmArrivalTimes(
         next: refreshed.result,
@@ -2329,15 +2346,27 @@ class RouteSearchController extends ChangeNotifier {
           refreshMessage: refreshed.userMessage,
         ),
       );
-      return RouteRefreshOutcome(result: refreshedResult, refreshed: true);
+      return RouteRefreshOutcome(
+        result: refreshedResult,
+        refreshed: true,
+        alarmRefreshRequired: true,
+      );
     } on RouteSearchException catch (error) {
       if (staleRefresh()) {
-        return RouteRefreshOutcome(result: _state.result, refreshed: false);
+        return RouteRefreshOutcome(
+          result: _state.result,
+          refreshed: false,
+          alarmRefreshRequired: false,
+        );
       }
       _emitState(
         _state.copyWith(isRefreshing: false, refreshMessage: error.message),
       );
-      return RouteRefreshOutcome(result: _state.result, refreshed: false);
+      return RouteRefreshOutcome(
+        result: _state.result,
+        refreshed: false,
+        alarmRefreshRequired: true,
+      );
     } catch (error, stackTrace) {
       reportMobileError(
         error,
@@ -2345,7 +2374,11 @@ class RouteSearchController extends ChangeNotifier {
         context: '경로 ETA refresh 처리 중 예외가 발생했습니다.',
       );
       if (staleRefresh()) {
-        return RouteRefreshOutcome(result: _state.result, refreshed: false);
+        return RouteRefreshOutcome(
+          result: _state.result,
+          refreshed: false,
+          alarmRefreshRequired: false,
+        );
       }
       _emitState(
         _state.copyWith(
@@ -2353,7 +2386,11 @@ class RouteSearchController extends ChangeNotifier {
           refreshMessage: _routeRefreshErrorMessage,
         ),
       );
-      return RouteRefreshOutcome(result: _state.result, refreshed: false);
+      return RouteRefreshOutcome(
+        result: _state.result,
+        refreshed: false,
+        alarmRefreshRequired: true,
+      );
     }
   }
 
@@ -2466,6 +2503,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   Future<void> _refreshCurrentRouteAndAlarm() async {
     final outcome = await _controller.refreshCurrentRoute();
     if (!mounted) {
+      return;
+    }
+    if (!outcome.alarmRefreshRequired) {
       return;
     }
     final getOffAlarmController = widget.getOffAlarmController;
