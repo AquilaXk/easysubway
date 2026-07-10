@@ -46,6 +46,7 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "requestNotificationPermission" -> requestNotificationPermission(result)
+                    "notificationPermissionStatus" -> result.success(hasNotificationPermission() && areAppNotificationsEnabled())
                     else -> result.notImplemented()
                 }
             }

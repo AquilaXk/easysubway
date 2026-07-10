@@ -12223,3 +12223,28 @@ test("get-off-alarm policy contract pins the no-location, degrade-ladder invaria
   assert.equal(policy.realtimeCorrection.offlineEtaSource, "PLANNED");
   assert.equal(policy.realtimeCorrection.correctionOverlayIssue, 1416);
 });
+
+test("하차 알림 Android manifest는 예약 receiver만 선언한다", () => {
+  const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+
+  assert.match(
+    androidManifest,
+    /<receiver\s+android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationReceiver"\s+android:exported="false"\s*\/>/,
+  );
+  assert.doesNotMatch(androidManifest, /ScheduledNotificationBootReceiver/);
+  assert.doesNotMatch(
+    androidManifest,
+    /android\.permission\.RECEIVE_BOOT_COMPLETED/,
+  );
+});
+
+test("하차 알림 Android 권한 상태 조회는 프롬프트 없이 OS 상태를 결합한다", () => {
+  const mainActivity = read(
+    "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/MainActivity.kt",
+  );
+
+  assert.match(
+    mainActivity,
+    /"notificationPermissionStatus"\s*->\s*result\.success\(hasNotificationPermission\(\)\s*&&\s*areAppNotificationsEnabled\(\)\)/,
+  );
+});

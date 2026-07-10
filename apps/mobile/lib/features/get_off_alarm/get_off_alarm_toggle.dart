@@ -19,7 +19,7 @@ class GetOffAlarmToggle extends StatefulWidget {
   final GetOffAlarmController controller;
   final String routeId;
   final List<RideLegArrival> rideLegs;
-  final String Function(String stationId) stationName;
+  final Future<String?> Function(String stationId) stationName;
 
   @override
   State<GetOffAlarmToggle> createState() => _GetOffAlarmToggleState();
@@ -27,6 +27,7 @@ class GetOffAlarmToggle extends StatefulWidget {
 
 class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
   bool _busy = false;
+  int _operationGeneration = 0;
 
   @override
   void initState() {
@@ -40,7 +41,23 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant GetOffAlarmToggle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      widget.controller.addListener(_onControllerChanged);
+      _operationGeneration += 1;
+      return;
+    }
+    if (oldWidget.routeId != widget.routeId ||
+        !_sameRideLegs(oldWidget.rideLegs, widget.rideLegs)) {
+      _operationGeneration += 1;
+    }
+  }
+
   void _onControllerChanged() {
+    _operationGeneration += 1;
     if (mounted) {
       setState(() {});
     }
@@ -55,15 +72,32 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
     if (_busy) {
       return;
     }
+    final operationGeneration = ++_operationGeneration;
+    final routeId = widget.routeId;
+    final rideLegs = List<RideLegArrival>.unmodifiable(widget.rideLegs);
+    final stationName = widget.stationName;
     setState(() => _busy = true);
     try {
       if (enabled) {
+        final stationNames = await _resolveStationNames(
+          rideLegs: rideLegs,
+          resolveStationName: stationName,
+        );
+        if (!mounted ||
+            operationGeneration != _operationGeneration ||
+            widget.routeId != routeId) {
+          return;
+        }
         final stops = getOffAlarmStopsFromRideLegs(
-          rideLegs: widget.rideLegs,
-          stationName: widget.stationName,
+          rideLegs: rideLegs,
+          stationName: (stationId) => stationNames[stationId]!,
+          source:
+              rideLegs.any((leg) => leg.realtimeArrivalIso?.isNotEmpty ?? false)
+              ? GetOffAlarmTimeSource.realtime
+              : GetOffAlarmTimeSource.planned,
         );
         await widget.controller.enable(
-          routeId: widget.routeId,
+          routeId: routeId,
           stops: stops,
           transferAlarmEnabled: true,
         );
@@ -84,11 +118,50 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
     }
   }
 
+  Future<Map<String, String>> _resolveStationNames({
+    required List<RideLegArrival> rideLegs,
+    required Future<String?> Function(String stationId) resolveStationName,
+  }) async {
+    final stationNames = <String, String>{};
+    for (final leg in rideLegs) {
+      final stationId = leg.toStationId;
+      if (stationNames.containsKey(stationId)) {
+        continue;
+      }
+      final rawName = await resolveStationName(stationId);
+      final resolvedStationName = rawName?.trim();
+      if (resolvedStationName == null ||
+          resolvedStationName.isEmpty ||
+          resolvedStationName == stationId) {
+        throw StateError('하차 알림 역명을 확인하지 못했습니다.');
+      }
+      stationNames[stationId] = resolvedStationName;
+    }
+    return stationNames;
+  }
+
+  bool _sameRideLegs(List<RideLegArrival> before, List<RideLegArrival> after) {
+    if (before.length != after.length) {
+      return false;
+    }
+    for (var index = 0; index < before.length; index++) {
+      final previous = before[index];
+      final current = after[index];
+      if (previous.toStationId != current.toStationId ||
+          previous.plannedArrivalIso != current.plannedArrivalIso ||
+          previous.realtimeArrivalIso != current.realtimeArrivalIso) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final on = _isOnForThisRoute;
-    final notice = on ? widget.controller.state.inexactNotice : null;
+    final state = widget.controller.state;
+    final notice = on ? state.inexactNotice : state.permissionNotice;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -104,12 +177,17 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
           ),
         ),
         if (notice != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              notice,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
+          Semantics(
+            key: const Key('getOffAlarmNotice'),
+            container: true,
+            liveRegion: true,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                notice,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
               ),
             ),
           ),

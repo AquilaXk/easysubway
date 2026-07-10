@@ -109,6 +109,7 @@ class RouteEdge {
     int? durationSeconds,
     this.distanceMeters = 0,
     this.lineId = '',
+    this.servicePattern = '',
     this.transferStationId = '',
     bool? includesStairs,
     RouteStairAccessState? stairAccessState,
@@ -150,6 +151,7 @@ class RouteEdge {
   final int durationSeconds;
   final int distanceMeters;
   final String lineId;
+  final String servicePattern;
   final String transferStationId;
   final bool includesStairs;
   final RouteStairAccessState stairAccessState;

@@ -203,11 +203,13 @@ class AppBootstrapLifecycle extends StatefulWidget {
     required this.close,
     required this.child,
     this.resumeDataPackUpdate,
+    this.resumeGetOffAlarmState,
     super.key,
   });
 
   final Future<void> Function() close;
   final Future<void> Function()? resumeDataPackUpdate;
+  final Future<void> Function()? resumeGetOffAlarmState;
   final Widget child;
 
   @override
@@ -228,6 +230,10 @@ class _AppBootstrapLifecycleState extends State<AppBootstrapLifecycle>
       final resumeDataPackUpdate = widget.resumeDataPackUpdate;
       if (resumeDataPackUpdate != null) {
         unawaited(resumeDataPackUpdate());
+      }
+      final resumeGetOffAlarmState = widget.resumeGetOffAlarmState;
+      if (resumeGetOffAlarmState != null) {
+        unawaited(resumeGetOffAlarmState());
       }
     }
   }

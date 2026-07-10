@@ -345,6 +345,11 @@ class _DefaultNotificationPermissionProvider
   const _DefaultNotificationPermissionProvider();
 
   @override
+  Future<NotificationPermissionStatus> notificationPermissionStatus() async {
+    return NotificationPermissionStatus.granted;
+  }
+
+  @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async {
     return NotificationPermissionStatus.granted;
   }
