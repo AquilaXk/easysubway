@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controller.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_notifier.dart';
@@ -299,6 +301,51 @@ void main() {
     expect(notifier.scheduled, isNull);
     expect(await repository.loadActive(), isNull);
     expect(controller.state.enabled, isFalse);
+  });
+
+  testWidgets('역명 조회 중 외부 disable이 완료되면 오래된 enable을 실행하지 않는다', (tester) async {
+    final notifier = _RecordingNotifier();
+    final repository = _FakeRepo();
+    final stationName = Completer<String?>();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubGate(true),
+      notificationPermissionProvider:
+          const _StubNotificationPermissionProvider(),
+      repository: repository,
+      now: () => DateTime(2026, 7, 6, 9, 0, 0),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GetOffAlarmToggle(
+            controller: controller,
+            routeId: 'r1',
+            rideLegs: const [
+              RideLegArrival(
+                toStationId: 'sadang',
+                plannedArrivalIso: '2026-07-06T09:30:00',
+              ),
+            ],
+            stationName: (_) => stationName.future,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    await controller.disable();
+
+    stationName.complete('사당');
+    await tester.pumpAndSettle();
+
+    expect(controller.state.enabled, isFalse);
+    expect(await repository.loadActive(), isNull);
+    expect(notifier.scheduled, isNull);
+    expect(notifier.cancelCount, 1);
   });
 
   testWidgets('exact 권한 거부 시 오차 고지 문구를 노출한다', (tester) async {
