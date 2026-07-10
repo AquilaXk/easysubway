@@ -514,6 +514,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onCurrentLocationTap: _showNearbyPanel,
               onOpenNearbyStations: widget.onOpenNearbyStations,
               onCloseNearbyPanel: _hideNearbyPanel,
+              routeDraftController: widget.routeDraftController,
+              onClearOrigin: _clearOriginStation,
+              onClearDestination: _clearDestinationStation,
               child: const Center(child: CircularProgressIndicator()),
             );
           }
@@ -539,6 +542,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onCurrentLocationTap: _showNearbyPanel,
               onOpenNearbyStations: widget.onOpenNearbyStations,
               onCloseNearbyPanel: _hideNearbyPanel,
+              routeDraftController: widget.routeDraftController,
+              onClearOrigin: _clearOriginStation,
+              onClearDestination: _clearDestinationStation,
               child: _NetworkMapLoadFailure(onRetry: () => _reload()),
             );
           }
@@ -572,6 +578,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             onCurrentLocationTap: _showNearbyPanel,
             onOpenNearbyStations: widget.onOpenNearbyStations,
             onCloseNearbyPanel: _hideNearbyPanel,
+            routeDraftController: widget.routeDraftController,
+            onClearOrigin: _clearOriginStation,
+            onClearDestination: _clearDestinationStation,
             child: _NetworkMapCanvas(
               data: visibleData,
               initialViewport: loadResult.initialViewport,
@@ -796,6 +805,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     );
   }
 
+  void _clearOriginStation() {
+    widget.routeDraftController.clearOrigin();
+  }
+
+  void _clearDestinationStation() {
+    widget.routeDraftController.clearDestination();
+  }
+
   void _openRouteSearchFromMap(NetworkMapStation station) {
     widget.onOpenRouteSearch();
   }
@@ -887,6 +904,9 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.onCurrentLocationTap,
     required this.onOpenNearbyStations,
     required this.onCloseNearbyPanel,
+    required this.routeDraftController,
+    required this.onClearOrigin,
+    required this.onClearDestination,
     required this.child,
   });
 
@@ -908,6 +928,9 @@ class _NetworkMapChrome extends StatelessWidget {
   final VoidCallback onCurrentLocationTap;
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback onCloseNearbyPanel;
+  final RouteDraftController routeDraftController;
+  final VoidCallback onClearOrigin;
+  final VoidCallback onClearDestination;
   final Widget child;
 
   @override
@@ -932,13 +955,24 @@ class _NetworkMapChrome extends StatelessWidget {
             onRegionSelected: onRegionSelected,
           ),
         ),
-        if (disruptionBanner != null)
-          Positioned(
-            left: 0,
-            right: 0,
-            top: topPadding + _networkMapTopBarHeight,
-            child: disruptionBanner!,
+        Positioned(
+          left: 0,
+          right: 0,
+          top: topPadding + _networkMapTopBarHeight,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ?disruptionBanner,
+              // G1: 팝오버 "출발"/"도착" 선택 결과를 노선도 위 얇은 오버레이로
+              // 즉시 피드백한다. draft가 비어 있으면 스스로 사라진다.
+              _NetworkMapRouteDraftOverlay(
+                controller: routeDraftController,
+                onClearOrigin: onClearOrigin,
+                onClearDestination: onClearDestination,
+              ),
+            ],
           ),
+        ),
         if (showServicePatternToggle)
           Positioned(
             left: 16,
@@ -3778,6 +3812,205 @@ class _StationHitTarget extends StatelessWidget {
         excludeFromSemantics: true,
         onTap: onTap,
         child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+/// G1: 노선도 역 탭 팝오버에서 "출발"/"도착"을 선택하면 [RouteDraftController]에
+/// 저장되는데, 그 결과를 노선도 상단에 얇은 2줄 오버레이로 즉시 피드백한다.
+/// draft가 비어 있으면 스스로 사라진다(빈 위젯). 지도 제스처는 오버레이 바깥에서만
+/// 일어나므로 이 오버레이는 자기 영역만 히트한다.
+class _NetworkMapRouteDraftOverlay extends StatelessWidget {
+  const _NetworkMapRouteDraftOverlay({
+    required this.controller,
+    required this.onClearOrigin,
+    required this.onClearDestination,
+  });
+
+  final RouteDraftController controller;
+  final VoidCallback onClearOrigin;
+  final VoidCallback onClearDestination;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final draft = controller.draft;
+        if (draft.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Material(
+            key: const Key('networkMapRouteDraftOverlay'),
+            color: EasySubwayAccessibleColors.scaffoldSurface,
+            elevation: 3,
+            shadowColor: const Color(0x22000000),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _NetworkMapRouteDraftRow(
+                    key: const Key('networkMapRouteDraftOriginRow'),
+                    isOrigin: true,
+                    station: draft.origin,
+                    fallback: '출발역을 탭하거나 검색',
+                    onClear: onClearOrigin,
+                  ),
+                  const Divider(
+                    height: 1,
+                    indent: 22,
+                    color: EasySubwayAccessibleColors.line,
+                  ),
+                  _NetworkMapRouteDraftRow(
+                    key: const Key('networkMapRouteDraftDestinationRow'),
+                    isOrigin: false,
+                    station: draft.destination,
+                    fallback: '도착역을 탭하거나 검색',
+                    onClear: onClearDestination,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 상단 draft 오버레이의 한 줄(출발 또는 도착). 노드 점 + 연결선 + 역명 +
+/// 채워졌을 때만 보이는 지우기(✕) 버튼. 무채색 잉크만 쓴다.
+class _NetworkMapRouteDraftRow extends StatelessWidget {
+  const _NetworkMapRouteDraftRow({
+    required this.isOrigin,
+    required this.station,
+    required this.fallback,
+    required this.onClear,
+    super.key,
+  });
+
+  final bool isOrigin;
+  final RouteDraftStation? station;
+  final String fallback;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = isOrigin ? '출발' : '도착';
+    final filled = station != null;
+    final stationName = filled ? station!.displayName : fallback;
+    final semanticsLabel = filled
+        ? '$label $stationName'
+        : '$label, $stationName';
+    return Semantics(
+      label: semanticsLabel,
+      child: ExcludeSemantics(
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _NetworkMapRouteDraftNodeColumn(isOrigin: isOrigin),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: EasySubwayAccessibleColors.mutedText,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Text(
+                    stationName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: filled
+                          ? EasySubwayAccessibleColors.text
+                          : EasySubwayAccessibleColors.mutedText,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              if (filled)
+                Semantics(
+                  button: true,
+                  label: '$label역 지우기',
+                  onTap: onClear,
+                  child: ExcludeSemantics(
+                    child: IconButton(
+                      key: Key(
+                        isOrigin
+                            ? 'networkMapRouteDraftClearOrigin'
+                            : 'networkMapRouteDraftClearDestination',
+                      ),
+                      onPressed: onClear,
+                      icon: const Icon(Icons.close, size: 18),
+                      color: EasySubwayAccessibleColors.mutedText,
+                      constraints: const BoxConstraints(
+                        minWidth: 48,
+                        minHeight: 48,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkMapRouteDraftNodeColumn extends StatelessWidget {
+  const _NetworkMapRouteDraftNodeColumn({required this.isOrigin});
+
+  final bool isOrigin;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget connector() => Center(
+      child: Container(width: 2, color: EasySubwayAccessibleColors.line),
+    );
+    return SizedBox(
+      width: 14,
+      child: Column(
+        children: [
+          Expanded(child: isOrigin ? const SizedBox.shrink() : connector()),
+          _NetworkMapRouteDraftNode(filled: !isOrigin),
+          Expanded(child: isOrigin ? connector() : const SizedBox.shrink()),
+        ],
+      ),
+    );
+  }
+}
+
+class _NetworkMapRouteDraftNode extends StatelessWidget {
+  const _NetworkMapRouteDraftNode({required this.filled});
+
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = EasySubwayAccessibleColors.primary;
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: filled ? color : Colors.white,
+        shape: BoxShape.circle,
+        border: Border.all(color: color, width: 3),
       ),
     );
   }

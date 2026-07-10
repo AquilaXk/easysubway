@@ -25,6 +25,30 @@ class RouteDraftController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void clearOrigin() {
+    if (_draft.origin == null) {
+      return;
+    }
+    _draft = RouteDraft(
+      origin: null,
+      destination: _draft.destination,
+      lastModifiedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  void clearDestination() {
+    if (_draft.destination == null) {
+      return;
+    }
+    _draft = RouteDraft(
+      origin: _draft.origin,
+      destination: null,
+      lastModifiedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
   void clear() {
     if (_draft.isEmpty) {
       return;

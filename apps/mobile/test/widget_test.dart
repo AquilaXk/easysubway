@@ -1290,6 +1290,53 @@ void main() {
     expect(find.text('도착'), findsOneWidget);
   });
 
+  testWidgets('노선도 팝오버 출발 선택은 상단 오버레이에 역명을 띄우고 지우기로 사라진다', (tester) async {
+    final routeDraftController = RouteDraftController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenRouteSearch: () async {},
+          onOpenStationSearch: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // draft가 비어 있으면 상단 오버레이는 뜨지 않는다.
+    expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
+
+    // 역 탭 → 팝오버 → "출발" 선택 → 상단 오버레이에 출발역명이 즉시 뜬다(G1).
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('출발'));
+    await tester.pumpAndSettle();
+
+    expect(routeDraftController.draft.origin?.nameKo, '상록수');
+    expect(
+      find.byKey(const Key('networkMapRouteDraftOverlay')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.text('상록수역'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('도착역을 탭하거나 검색'), findsOneWidget);
+
+    // 출발칸 지우기(✕) → draft에서 출발이 지워지고, 도착도 없으니 오버레이가 사라진다.
+    await tester.tap(find.byKey(const Key('networkMapRouteDraftClearOrigin')));
+    await tester.pumpAndSettle();
+
+    expect(routeDraftController.draft.origin, isNull);
+    expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
+  });
+
   testWidgets('노선도는 노선별 보기 우회 sheet를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
