@@ -12248,3 +12248,60 @@ test("하차 알림 Android 권한 상태 조회는 프롬프트 없이 OS 상�
     /"notificationPermissionStatus"\s*->\s*result\.success\(hasNotificationPermission\(\)\s*&&\s*areAppNotificationsEnabled\(\)\)/,
   );
 });
+
+test("Android 다음 열차 위젯은 로컬 snapshot과 명시적 구성만 사용한다", () => {
+  const manifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const main = read("apps/mobile/lib/main.dart");
+  const provider = read(
+    "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/NextTrainWidgetProvider.kt",
+  );
+  const configurationActivity = read(
+    "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/WidgetConfigurationActivity.kt",
+  );
+  const metadata = read(
+    "apps/mobile/android/app/src/main/res/xml/next_train_widget_info.xml",
+  );
+  const pubspec = read("apps/mobile/pubspec.yaml");
+  const pubspecLock = read("apps/mobile/pubspec.lock");
+  const runtime = read(
+    "apps/mobile/lib/features/home_widget/next_train_widget_runtime.dart",
+  );
+
+  assert.match(manifest, /\.NextTrainWidgetProvider/);
+  assert.match(manifest, /\.WidgetConfigurationActivity/);
+  assert.match(
+    configurationActivity,
+    /getDartEntrypointFunctionName\(\): String = "configureMain"/,
+  );
+  assert.match(
+    main,
+    /@pragma\('vm:entry-point'\)\s+Future<void> configureMain\(\)\s*=>\s*next_train_widget_runtime\.configureMain\(\)/,
+  );
+  assert.match(metadata, /android:updatePeriodMillis="0"/);
+  assert.match(metadata, /android:widgetFeatures="reconfigurable"/);
+  assert.match(pubspec, /\n  workmanager_android: \^0\.9\.0\+2\n/);
+  assert.match(pubspec, /\n  workmanager_platform_interface: \^0\.9\.1\+1\n/);
+  assert.doesNotMatch(pubspec, /\n  workmanager:/);
+  assert.doesNotMatch(pubspecLock, /\n  workmanager_apple:/);
+  assert.match(
+    runtime,
+    /class NextTrainWidgetWorkmanagerApi extends WorkmanagerFlutterApi/,
+  );
+  assert.match(runtime, /ponytail:.*official Android-only facade/s);
+  assert.match(provider, /widget_\$\{widgetId\}_station_name/);
+  assert.match(provider, /HomeWidgetLaunchIntent\.getActivity/);
+  assert.match(provider, /easysubway:\/\/station\/detail/);
+  assert.doesNotMatch(manifest, /android\.permission\.RECEIVE_BOOT_COMPLETED/);
+});
+
+test("home_widget 호환 iOS deployment target은 모든 configuration에서 14.0이다", () => {
+  const project = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
+  const frameworkInfo = read("apps/mobile/ios/Flutter/AppFrameworkInfo.plist");
+  const deploymentTargets = [
+    ...project.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);/g),
+  ].map((match) => match[1]);
+
+  assert.deepEqual(deploymentTargets, ["14.0", "14.0", "14.0"]);
+  assert.doesNotMatch(project, /IPHONEOS_DEPLOYMENT_TARGET = 13\.0/);
+  assert.doesNotMatch(frameworkInfo, /<string>13\.0<\/string>/);
+});

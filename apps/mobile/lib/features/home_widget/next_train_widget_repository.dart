@@ -114,7 +114,8 @@ class NextTrainWidgetRepository {
     // ponytail: the catalog is Asia/Seoul-only; add timezone conversion when
     // multi-timezone packs become a real requirement.
     final localNow = now.toLocal();
-    if (!await _feedIsCurrent(localNow)) {
+    final feedEndDate = await _currentFeedEndDate(localNow);
+    if (feedEndDate == null) {
       return NextTrainWidgetData.unavailable(selection, localNow);
     }
 
@@ -123,6 +124,9 @@ class NextTrainWidgetRepository {
     final candidates = <_Departure>[];
     for (var dayOffset = -1; dayOffset <= 7; dayOffset += 1) {
       final serviceDate = midnight.add(Duration(days: dayOffset));
+      if (serviceDate.isAfter(feedEndDate)) {
+        break;
+      }
       final serviceIds = await _activeServiceIds(serviceDate);
       if (serviceIds.isEmpty) {
         continue;
@@ -183,16 +187,16 @@ class NextTrainWidgetRepository {
     );
   }
 
-  Future<bool> _feedIsCurrent(DateTime now) async {
+  Future<DateTime?> _currentFeedEndDate(DateTime now) async {
     final row = await catalogDatabase
         .customSelect('SELECT feed_end_date FROM transit_feed_info LIMIT 1')
         .getSingleOrNull();
     if (row == null) {
-      return false;
+      return null;
     }
     final endDate = _parseServiceDate(row.read<String>('feed_end_date'));
     final today = DateTime(now.year, now.month, now.day);
-    return endDate != null && !today.isAfter(endDate);
+    return endDate != null && !today.isAfter(endDate) ? endDate : null;
   }
 
   Future<Set<String>> _activeServiceIds(DateTime date) async {

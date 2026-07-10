@@ -74,6 +74,18 @@ void main() {
     expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
     expect(data.directions, isEmpty);
   });
+
+  test('feed 종료 뒤 service day 열차를 만들지 않는다', () async {
+    await _seedSchedule(catalogDatabase, feedEndDate: '20260709');
+
+    final data = await repository.load(
+      _sadangLine4,
+      DateTime(2026, 7, 9, 23, 59),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
+    expect(data.directions, isEmpty);
+  });
 }
 
 const _sadangLine4 = WidgetStationSelection(
