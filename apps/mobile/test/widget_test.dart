@@ -1100,7 +1100,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
-    expect(find.text('이동 순서'), findsNothing);
+    // #1933 D: 결과 목록은 이동 순서 타임라인을 인라인으로 유지한다.
+    expect(find.text('이동 순서'), findsOneWidget);
     expect(find.byKey(const Key('homeBottomNavigationBar')), findsNothing);
   });
 
@@ -6165,14 +6166,15 @@ void main() {
       expect(find.text('켜면 경로가 줄거나 없을 수 있어요.'), findsNothing);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
 
-      await tester.drag(find.byType(ListView), const Offset(0, -260));
+      // #1933 D: 완성된 draft는 자동 검색이 돌아 결과-우선 화면으로 바뀐다.
+      // 입력 폼(이동 조건 헤더·계단 토글·하단 길찾기 버튼)과 최근 도착지는 사라지고,
+      // 조용한 이동 조건 칩과 이동 순서 타임라인이 그 자리에 나타난다.
       await tester.pumpAndSettle();
-      expect(find.text('최근 도착지'), findsOneWidget);
-      expect(find.text('사당역'), findsWidgets);
-      expect(
-        find.byKey(const Key('routeRecentLineMark-line-4')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('routeConditionChips')), findsOneWidget);
+      expect(find.text('최근 도착지'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '길찾기'), findsNothing);
+      expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+      expect(find.text('이동 순서'), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -6203,11 +6205,12 @@ void main() {
       ),
     );
 
-    // #1933 C: 출발·도착이 이미 채워진 draft로 진입하면 자동 검색이 한 번 돈다.
-    // 계단 토글을 켜고 다시 "길찾기"를 누르면 STRICT_STEP_FREE로 재검색한다.
-    await tester.tap(find.byKey(const Key('routeStrictStepFreeSwitch')));
+    // #1933 C/D: 출발·도착이 이미 채워진 draft로 진입하면 자동 검색이 한 번 돈다.
+    // 결과-우선 화면에서는 하단 "길찾기" 버튼이 없고, 계단 없는 길만 칩을 켜면
+    // 그 자리에서 STRICT_STEP_FREE로 바로 재검색한다.
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    expect(find.byKey(const Key('routeSearchSubmitButton')), findsNothing);
+    await tester.tap(find.byKey(const Key('routeConditionStepFreeChip')));
     await tester.pumpAndSettle();
 
     expect(routeRepository.requests.last.mobilityType, 'SENIOR');
@@ -6264,6 +6267,95 @@ void main() {
     );
     // 결과 목록(세로 타임라인, #1704)이 렌더된다.
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+  });
+
+  testWidgets('#1933 D 자동 검색된 결과 화면은 결과-우선으로 정리된다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'entry',
+            title: '상록수 승강장 접근',
+            description: '승강장까지 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sangnoksu',
+            estimatedMinutes: 6,
+            distanceMeters: 180,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'ride',
+            title: '상록수에서 사당까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 32,
+            distanceMeters: 13500,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(
+            favorites: [_favoriteRoute()],
+          ),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 11),
+          ),
+        ),
+      ),
+    );
+
+    // 출발·도착이 채워진 draft는 버튼 없이 자동 검색으로 결과-우선 화면에 도달한다.
+    await tester.pumpAndSettle();
+
+    // 1) 하단 중복 "길찾기" 버튼이 없다(자동 검색이 이미 돌았으므로).
+    expect(find.byKey(const Key('routeSearchSubmitButton')), findsNothing);
+    expect(find.widgetWithText(FilledButton, '길찾기'), findsNothing);
+
+    // 2) 이동 조건·계단 토글은 조용한 칩으로 강등된다(폼 헤더·드롭다운·스위치 없음).
+    expect(find.byKey(const Key('routeConditionChips')), findsOneWidget);
+    expect(find.byKey(const Key('routeConditionMobilityChip')), findsOneWidget);
+    expect(find.byKey(const Key('routeConditionStepFreeChip')), findsOneWidget);
+    expect(find.byKey(const Key('routeMobilityTypeInput')), findsNothing);
+    expect(find.byKey(const Key('routeStrictStepFreeSwitch')), findsNothing);
+    expect(find.text('최근 도착지'), findsNothing);
+
+    // 3) 이동 순서 타임라인(#1704)이 카드 탭 없이 인라인으로 펼쳐진다.
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+    expect(find.text('이동 순서'), findsOneWidget);
+    expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
+    expect(find.byKey(const Key('routeStepNumber-2')), findsOneWidget);
+
+    // 4) 상단 얇은 출발·도착은 그대로 남아 탭해서 편집(→ 재검색)할 수 있다.
+    expect(find.byKey(const Key('routeOriginPointButton')), findsOneWidget);
+    expect(
+      find.byKey(const Key('routeDestinationPointButton')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('경로 검색 최근 도착지 실패는 빈 화면으로 숨기지 않는다', (tester) async {
@@ -8678,8 +8770,10 @@ void main() {
       expect(find.text('계단 없는 출구를 확인했어요'), findsNothing);
       expect(find.text('천천히 이동하기 쉬운 동선을 확인했어요'), findsNothing);
       expect(find.text('경로 상세'), findsNothing);
-      expect(find.text('도착 안내'), findsNothing);
-      expect(find.text('이동 순서'), findsNothing);
+      // #1933 D: 결과-우선 화면은 이동 순서 타임라인(#1704)을 카드 탭 없이 인라인으로
+      // 편다. 도착 안내도 결과 목록에 함께 인라인으로 노출된다.
+      expect(find.text('도착 안내'), findsOneWidget);
+      expect(find.text('이동 순서'), findsOneWidget);
 
       await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
       await tester.pumpAndSettle();
@@ -8788,11 +8882,12 @@ void main() {
         ),
       ),
     );
+    // #1933 D: 완성된 draft는 자동 검색이 돌아 결과-우선 화면이 뜬다(하단 버튼 없음).
     await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('routeSearchSubmitButton')), findsNothing);
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+    // 이동 순서 타임라인이 결과 목록에 인라인으로 이미 노출된다.
+    expect(find.text('이동 순서'), findsOneWidget);
 
     await _tapFirstRouteResultListItem(tester);
     await tester.pumpAndSettle();
@@ -8801,7 +8896,8 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
-    expect(find.text('이동 순서'), findsNothing);
+    // 상세를 닫아도 결과 목록의 인라인 타임라인은 그대로 있다.
+    expect(find.text('이동 순서'), findsOneWidget);
 
     await _tapFirstRouteResultListItem(tester);
     await tester.pumpAndSettle();
@@ -9621,7 +9717,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 D: 완성된 draft는 자동 검색으로 결과-우선 화면에 도달한다(하단 버튼 없음).
     await tester.pumpAndSettle();
 
     expect(find.text('하차 알림'), findsOneWidget);
@@ -10159,7 +10255,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 D: 완성된 draft는 자동 검색으로 결과-우선 화면에 도달한다(하단 버튼 없음).
     await tester.pumpAndSettle();
     await controller.enable(
       routeId: 'route-1',
@@ -10175,7 +10271,9 @@ void main() {
     );
     notifier.reset();
 
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // 결과-우선 화면에서 이동 조건 칩(계단 없는 길만)을 켜면 그 자리에서 재검색이
+    // 돌아 활성 하차 알림을 취소한다.
+    await tester.tap(find.byKey(const Key('routeConditionStepFreeChip')));
     await tester.pumpAndSettle();
 
     expect(notifier.cancelCalls, 1);
@@ -10215,7 +10313,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 D: 완성된 draft는 자동 검색으로 결과-우선 화면에 도달한다(하단 버튼 없음).
     await tester.pumpAndSettle();
     await controller.enable(
       routeId: 'route-1',
@@ -10250,31 +10348,37 @@ void main() {
       now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
     );
     addTearDown(controller.dispose);
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleGetOffAlarmRouteResult(),
+    );
     await _pumpGetOffAlarmRouteScreen(
       tester,
-      repository: FakeRouteSearchRepository(
-        result: _sampleGetOffAlarmRouteResult(),
-      ),
+      repository: routeRepository,
       controller: controller,
       simpleViewEnabled: false,
     );
     await _enableSampleGetOffAlarm(controller);
     notifier.reset();
 
-    await tester.tap(find.byType(DropdownButton<String>));
+    // #1933 D: 결과-우선 화면에서 이동 조건 칩으로 조건을 바꾸면 활성 하차 알림을
+    // 취소하고 그 자리에서 새 조건으로 재검색한다(결과는 비우지 않고 갱신).
+    await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('휠체어 이용').last);
+    final wheelchairOption = find.byKey(
+      const Key('routeMobilityOption-WHEELCHAIR'),
+      skipOffstage: false,
+    );
+    await tester.ensureVisible(wheelchairOption);
+    await tester.pumpAndSettle();
+    await tester.tap(wheelchairOption);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
     await tester.pumpAndSettle();
 
     expect(notifier.cancelCalls, 1);
     expect(controller.state.enabled, isFalse);
-    expect(find.byKey(const Key('routeResultListItem')), findsNothing);
-    expect(
-      tester
-          .widget<DropdownButton<String>>(find.byType(DropdownButton<String>))
-          .value,
-      'WHEELCHAIR',
-    );
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+    expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('계단 없는 길 조건 변경은 활성 하차 알림과 이전 경로 결과를 정리한다', (tester) async {
@@ -10289,33 +10393,32 @@ void main() {
       now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
     );
     addTearDown(controller.dispose);
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleGetOffAlarmRouteResult(),
+    );
     await _pumpGetOffAlarmRouteScreen(
       tester,
-      repository: FakeRouteSearchRepository(
-        result: _sampleGetOffAlarmRouteResult(),
-      ),
+      repository: routeRepository,
       controller: controller,
     );
     await _enableSampleGetOffAlarm(controller);
     notifier.reset();
 
+    // #1933 D: 결과-우선 화면에서 계단 없는 길만 칩을 켜면 활성 하차 알림을 취소하고
+    // STRICT_STEP_FREE로 재검색한다(결과는 비우지 않고 갱신).
     await tester.ensureVisible(
-      find.byKey(const Key('routeStrictStepFreeSwitch')),
+      find.byKey(const Key('routeConditionStepFreeChip')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeStrictStepFreeSwitch')));
+    await tester.tap(find.byKey(const Key('routeConditionStepFreeChip')));
     await tester.pumpAndSettle();
 
     expect(notifier.cancelCalls, 1);
     expect(controller.state.enabled, isFalse);
-    expect(find.byKey(const Key('routeResultListItem')), findsNothing);
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
     expect(
-      tester
-          .widget<SwitchListTile>(
-            find.byKey(const Key('routeStrictStepFreeSwitch')),
-          )
-          .value,
-      isTrue,
+      routeRepository.requests.last.effectiveConstraintMode,
+      'STRICT_STEP_FREE',
     );
   });
 
@@ -10345,10 +10448,20 @@ void main() {
     notifier.cancelError = cancelError;
     final reports = <FlutterErrorDetails>[];
 
+    // #1933 D: 결과-우선 화면에서 이동 조건 칩으로 조건을 바꾸려다 하차 알림 취소가
+    // 실패하면 조건 변경·재검색을 하지 않고 기존 조건·경로·알림을 유지한다.
     await runWithMobileErrorReporter(reports.add, () async {
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('휠체어 이용').last);
+      final wheelchairOption = find.byKey(
+        const Key('routeMobilityOption-WHEELCHAIR'),
+        skipOffstage: false,
+      );
+      await tester.ensureVisible(wheelchairOption);
+      await tester.pumpAndSettle();
+      await tester.tap(wheelchairOption);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
       await tester.pumpAndSettle();
     });
 
@@ -10356,11 +10469,13 @@ void main() {
     expect(find.text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
     expect(controller.state.enabled, isTrue);
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+    // 조건은 SENIOR(천천히 이동) 그대로다 — 이동 조건 칩 라벨로 확인한다.
     expect(
-      tester
-          .widget<DropdownButton<String>>(find.byType(DropdownButton<String>))
-          .value,
-      'SENIOR',
+      find.descendant(
+        of: find.byKey(const Key('routeConditionMobilityChip')),
+        matching: find.text('천천히 이동'),
+      ),
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });
@@ -10387,7 +10502,9 @@ void main() {
     await _enableSampleGetOffAlarm(controller);
     notifier.reset();
 
-    await tester.tap(find.byKey(const Key('routeSimpleMobilityTypeButton')));
+    // #1933 D: 결과-우선 화면에서 이동 조건 칩을 열어 같은 조건을 다시 적용하면
+    // 조건이 바뀌지 않아 재검색·알림 취소 없이 활성 알림과 경로를 유지한다.
+    await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
     await tester.pumpAndSettle();
@@ -11113,7 +11230,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 D: 완성된 draft는 자동 검색으로 결과-우선 화면에 도달한다(하단 버튼 없음).
     await tester.pumpAndSettle();
 
     expect(find.text('환승 1회 · 걷기 300m'), findsOneWidget);
@@ -14092,7 +14209,7 @@ Future<void> _pumpGetOffAlarmRouteScreen(
       ),
     ),
   );
-  await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+  // #1933 D: 완성된 draft는 자동 검색으로 결과-우선 화면에 도달한다(하단 버튼 없음).
   await tester.pumpAndSettle();
 }
 
