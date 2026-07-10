@@ -126,9 +126,13 @@ class ServiceNotice {
     if (value is! String || value.isEmpty) {
       return null;
     }
+    final timeIndex = value.indexOf('T');
+    if (timeIndex == -1) {
+      return DateTime.tryParse('${value}T00:00:00Z');
+    }
     final hasOffset = RegExp(
       r'(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$',
-    ).hasMatch(value);
+    ).hasMatch(value.substring(timeIndex));
 
     // Backend는 UTC Clock의 LocalDateTime을 offset 없이 직렬화한다. 기기 로컬
     // 시각으로 먼저 해석하면 DST 결손 구간이 보정되므로 처음부터 UTC로 파싱한다.

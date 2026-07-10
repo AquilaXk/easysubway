@@ -222,7 +222,7 @@ void main() {
     expect(result.asOf, fetchedAt);
   });
 
-  test('304 검증 캐시도 현재 시각 기준 활성 공지만 돌려준다', () async {
+  test('304 검증 캐시는 원본을 보존하고 현재 활성 공지만 돌려준다', () async {
     final cache = _InMemoryCache()
       ..entry = NoticeCacheEntry(
         etag: '"e1"',
@@ -240,10 +240,14 @@ void main() {
     final result = await repo(client, cache).activeNotices();
 
     expect(result.notices.map((entry) => entry.id), ['active']);
-    expect(cache.entry!.notices.map((entry) => entry.id), ['active']);
+    expect(cache.entry!.notices.map((entry) => entry.id), [
+      'active',
+      'expired',
+      'future',
+    ]);
   });
 
-  test('200 응답도 현재 시각 기준 활성 공지만 결과와 캐시에 저장한다', () async {
+  test('200 응답은 원본을 캐시하고 현재 활성 공지만 결과로 돌려준다', () async {
     final client = _FakeApiClient(
       okResponse([
         noticeJson('active', 'DISRUPTION', expiresAt: '2026-07-06T12:01:00'),
@@ -256,6 +260,10 @@ void main() {
     final result = await repo(client, cache).activeNotices();
 
     expect(result.notices.map((entry) => entry.id), ['active']);
-    expect(cache.entry!.notices.map((entry) => entry.id), ['active']);
+    expect(cache.entry!.notices.map((entry) => entry.id), [
+      'active',
+      'expired',
+      'future',
+    ]);
   });
 }

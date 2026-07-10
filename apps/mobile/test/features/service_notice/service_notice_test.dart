@@ -61,6 +61,15 @@ void main() {
       expect(notice.publishedAt, DateTime.utc(2026, 7, 6));
     });
 
+    test('date-only 시각도 숫자 offset으로 오인하지 않고 UTC로 파싱한다', () {
+      final payload = json()..['publishedAt'] = '2026-07-06';
+
+      final notice = ServiceNotice.fromJson(payload)!;
+
+      expect(notice.publishedAt, DateTime.utc(2026, 7, 6));
+      expect(notice.publishedAt.isUtc, isTrue);
+    });
+
     test('알 수 없는 severity/scope는 null을 돌려준다(무음 실패 대신 제외)', () {
       expect(ServiceNotice.fromJson(json(severity: 'WARN')), isNull);
       expect(ServiceNotice.fromJson(json(scope: 'CITY')), isNull);

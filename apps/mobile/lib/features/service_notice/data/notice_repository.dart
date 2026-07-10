@@ -99,7 +99,7 @@ class ApiNoticeRepository implements NoticeRepository {
         await _saveCache(
           NoticeCacheEntry(
             etag: cached.etag,
-            notices: notices,
+            notices: cached.notices,
             fetchedAt: fetchedAt,
           ),
         );
@@ -113,14 +113,12 @@ class ApiNoticeRepository implements NoticeRepository {
       if (response.isOk && response.jsonBody is Map<String, Object?>) {
         final data = (response.jsonBody as Map<String, Object?>)['data'];
         final fetchedAt = now();
-        final notices = _activeAt(
-          ServiceNotice.listFromApiData(data),
-          fetchedAt,
-        );
+        final sourceNotices = ServiceNotice.listFromApiData(data);
+        final notices = _activeAt(sourceNotices, fetchedAt);
         await _saveCache(
           NoticeCacheEntry(
             etag: response.etag,
-            notices: notices,
+            notices: sourceNotices,
             fetchedAt: fetchedAt,
           ),
         );
