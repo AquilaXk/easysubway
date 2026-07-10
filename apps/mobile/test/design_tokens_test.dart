@@ -83,4 +83,43 @@ void main() {
       expect(EasySubwayRadius.sheet, 16.0);
     });
   });
+
+  group('EasySubwayTokens.dark (#1917 기반)', () {
+    test('다크 토큰은 라이트와 전 필드가 다르되 지도 선택 톤은 유지한다', () {
+      const light = EasySubwayTokens.light;
+      const dark = EasySubwayTokens.dark;
+      expect(dark.ink, isNot(light.ink));
+      expect(dark.surface, isNot(light.surface));
+      expect(dark.scaffold, isNot(light.scaffold));
+      expect(dark.line, isNot(light.line));
+      expect(dark.accent, isNot(light.accent));
+      // 지도 오버레이 선택 톤은 다크 지도 위에서도 동일 시인성 유지.
+      expect(dark.mapSelectionAccent, light.mapSelectionAccent);
+    });
+
+    test('다크 잉크/표면은 어두운 배경 위 밝은 텍스트 구성이다', () {
+      const dark = EasySubwayTokens.dark;
+      expect(dark.scaffold.computeLuminance(), lessThan(0.1));
+      expect(dark.surface.computeLuminance(), lessThan(0.15));
+      expect(dark.ink.computeLuminance(), greaterThan(0.6));
+    });
+
+    testWidgets('darkTheme에 다크 토큰이 등록된다', (tester) async {
+      late EasySubwayTokens tokens;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(useMaterial3: true),
+          darkTheme: easySubwayDarkTheme(),
+          themeMode: ThemeMode.dark,
+          home: Builder(
+            builder: (context) {
+              tokens = EasySubwayTokens.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      expect(identical(tokens, EasySubwayTokens.dark), isTrue);
+    });
+  });
 }

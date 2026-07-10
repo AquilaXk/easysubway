@@ -57,6 +57,27 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
     mapRegionAccent: EasySubwayAccessibleColors.mapRegionAccent,
   );
 
+  /// #1917 다크 세트. 명도 위계는 라이트를 반전하되 채도를 낮춰 눈부심을 줄인다.
+  /// 지도 오버레이 선택 톤은 다크 지도 배경에서도 동일 시인성이라 유지한다.
+  ///
+  /// 주의: 화면들이 아직 정적 팔레트(EasySubwayAccessibleColors)를 직접 참조하는
+  /// 동안에는 시스템 추종(ThemeMode.system)을 켜지 않는다 — 혼합 렌더링(밝은
+  /// 위젯 + 어두운 배경)이 생기기 때문. 전환 조건은 #1917 참조.
+  static const dark = EasySubwayTokens(
+    ink: Color(0xFFE6EDEE),
+    inkSecondary: Color(0xFFB8C7C9),
+    inkMuted: Color(0xFF8FA5A8),
+    line: Color(0xFF2A3B3D),
+    surface: Color(0xFF162223),
+    scaffold: Color(0xFF0F1A1B),
+    accent: Color(0xFFD6DADC),
+    good: Color(0xFF5BC8A8),
+    warn: Color(0xFFE0A54E),
+    danger: Color(0xFFF28B82),
+    mapSelectionAccent: EasySubwayAccessibleColors.mapSelectionAccent,
+    mapRegionAccent: Color(0xFF4D9FE8),
+  );
+
   /// 본문 텍스트.
   final Color ink;
 
@@ -175,5 +196,21 @@ TextTheme easySubwayTextTheme(TextTheme base) {
       height: 1.4,
     ),
     labelLarge: base.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+  );
+}
+
+/// #1917 다크 테마 기반. 시스템 추종 전환 전까지 darkTheme 등록만 해 둔다.
+ThemeData easySubwayDarkTheme() {
+  final base = ThemeData(
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: EasySubwayAccessibleColors.primary,
+      brightness: Brightness.dark,
+    ),
+    useMaterial3: true,
+  );
+  return base.copyWith(
+    extensions: const [EasySubwayTokens.dark],
+    scaffoldBackgroundColor: EasySubwayTokens.dark.scaffold,
+    textTheme: easySubwayTextTheme(base.textTheme),
   );
 }

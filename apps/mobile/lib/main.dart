@@ -487,6 +487,11 @@ class EasySubwayApp extends StatelessWidget {
       title: 'EasySubway',
       debugShowCheckedModeBanner: false,
       scrollBehavior: const EasySubwayScrollBehavior(),
+      // #1917: 다크 토큰·테마는 준비됐지만 화면들의 정적 팔레트 참조가 남아
+      // 있는 동안 시스템 추종을 켜면 혼합 렌더링이 생긴다. 마이그레이션과
+      // 실기기 대비 검증 완료 전까지 light 고정 (성공 위장 금지 원칙).
+      darkTheme: easySubwayDarkTheme(),
+      themeMode: ThemeMode.light,
       theme: ThemeData(
         // fromSeed는 시드의 미세한 hue를 M3 톤 팔레트로 증폭해 액센트를 채도
         // 있는 색으로 만든다(무채색 시드도 청록끼로 샌다). 무채색 잉크 원칙을
