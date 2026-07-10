@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const PILOT_STATIONS = ["상록수", "사당"];
 const PILOT_LINE_NAME = "4호선";
 const DEFAULT_ENDPOINT = "https://apis.data.go.kr/B553766/wksn/getWksnElvtr";
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const INVALID_RESPONSE = "Seoul accessibility API response invalid";
 const INVALID_OUTPUT_PATH = "output path must stay within allowed root";
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -68,7 +69,12 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
   return { sourceId: "seoul-metro-accessibility", retrievedAt, stations };
 }
 
-export async function collectSeoulAccessibility({ endpoint, serviceKey, fetchImpl = fetch }) {
+export async function collectSeoulAccessibility({
+  endpoint,
+  serviceKey,
+  fetchImpl = fetch,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+}) {
   const endpointUrl = new URL(endpoint);
   if (endpointUrl.protocol !== "https:") {
     throw new Error("HTTPS endpoint is required");
@@ -84,7 +90,7 @@ export async function collectSeoulAccessibility({ endpoint, serviceKey, fetchImp
     url.searchParams.set("stnNm", stationName);
     let response;
     try {
-      response = await fetchImpl(url);
+      response = await fetchImpl(url, { signal: AbortSignal.timeout(requestTimeoutMs) });
     } catch {
       throw new Error("Seoul accessibility API request failed");
     }

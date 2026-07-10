@@ -40,6 +40,29 @@ test("collector redacts request details from network failures", async () => {
   );
 });
 
+test("collector aborts stalled provider requests after the configured timeout", async () => {
+  let observedAbortSignal = false;
+  await assert.rejects(
+    collectSeoulAccessibility({
+      endpoint: "https://apis.data.go.kr/example",
+      serviceKey: "secret",
+      requestTimeoutMs: 1,
+      fetchImpl: async (_url, options) => {
+        const signal = options?.signal;
+        observedAbortSignal = signal instanceof AbortSignal;
+        if (!signal) {
+          throw new Error("missing abort signal");
+        }
+        await new Promise((resolve, reject) => {
+          signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        });
+      },
+    }),
+    /Seoul accessibility API request failed/,
+  );
+  assert.equal(observedAbortSignal, true);
+});
+
 test("collector rejects HTTP 403 before reading the response body", async () => {
   let bodyRead = false;
   await assert.rejects(

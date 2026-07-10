@@ -1569,6 +1569,17 @@ function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
   const stationLineRows = database
     .prepare("SELECT station_id, line_id FROM station_lines ORDER BY station_id, line_id")
     .all();
+  const requiredPairs = requiredAccessibilityCoveragePairs(stationLineRows);
+  const verifiedPairs = verifiedAccessibilityCoveragePairs(edgeRows, accessibilityEvidence);
+
+  return {
+    entry: coverageItem(requiredPairs.entry, verifiedPairs.entry),
+    exit: coverageItem(requiredPairs.exit, verifiedPairs.exit),
+    transfer: coverageItem(requiredPairs.transfer, verifiedPairs.transfer),
+  };
+}
+
+function requiredAccessibilityCoveragePairs(stationLineRows) {
   const requiredEntryPairs = new Set();
   const requiredExitPairs = new Set();
   const requiredTransferPairs = new Set();
@@ -1590,7 +1601,10 @@ function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
       }
     }
   }
+  return { entry: requiredEntryPairs, exit: requiredExitPairs, transfer: requiredTransferPairs };
+}
 
+function verifiedAccessibilityCoveragePairs(edgeRows, accessibilityEvidence) {
   const verifiedEntryPairs = new Set();
   const verifiedExitPairs = new Set();
   const verifiedTransferPairs = new Set();
@@ -1610,12 +1624,7 @@ function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
       verifiedTransferPairs.add(edgePairKey(toNodeId, fromNodeId));
     }
   }
-
-  return {
-    entry: coverageItem(requiredEntryPairs, verifiedEntryPairs),
-    exit: coverageItem(requiredExitPairs, verifiedExitPairs),
-    transfer: coverageItem(requiredTransferPairs, verifiedTransferPairs),
-  };
+  return { entry: verifiedEntryPairs, exit: verifiedExitPairs, transfer: verifiedTransferPairs };
 }
 
 function coverageItem(requiredPairs, verifiedPairs) {
