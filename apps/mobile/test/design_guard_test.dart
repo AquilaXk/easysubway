@@ -75,7 +75,6 @@ void main() {
     );
     expectRatchet(actual, {
       'lib/main.dart': 8,
-      'lib/network_map.dart': 9,
       'lib/route_search.dart': 29,
       'lib/station_search.dart': 8,
       'lib/features/stations/domain/station_line.dart': 1,

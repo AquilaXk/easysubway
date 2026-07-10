@@ -53,8 +53,8 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
     danger: EasySubwayAccessibleColors.red,
     // 지도 오버레이 전용 — 지도 배경 시인성 때문에 accent로 수렴하지 않는다
     // (network_map의 기존 설계 의도 승계).
-    mapSelectionAccent: Color(0xFF13B8D6),
-    mapRegionAccent: Color(0xFF006FD6),
+    mapSelectionAccent: EasySubwayAccessibleColors.mapSelectionAccent,
+    mapRegionAccent: EasySubwayAccessibleColors.mapRegionAccent,
   );
 
   /// 본문 텍스트.

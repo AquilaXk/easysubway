@@ -22,21 +22,6 @@ const _networkMapTopBarHeight = 60.0;
 const _networkMapBottomAdHeight = 52.0;
 const _networkMapPillRadius = BorderRadius.all(Radius.circular(28));
 const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(12));
-const _networkMapSearchFieldBorderColor = Color(0xFFDBE3E9);
-const _networkMapSearchFieldHintColor = Color(0xFF466467);
-const _networkMapSearchFieldIconColor = Color(0xFF8A9AA0);
-const _networkMapMenuIconColor = Color(0xFF466467);
-const _networkMapMenuLabelColor = Color(0xFF1E3234);
-const _networkMapMenuSectionColor = Color(0xFF7C949A);
-const _networkMapMenuChevronColor = Color(0xFFB0BEC5);
-
-// 지도(웹뷰) 위에 겹쳐 그리는 오버레이 액센트는 지도 배경과의 시인성 때문에
-// 브랜드 액센트(primary teal)로 수렴하지 않고 network_map 전용 밝은 톤을 유지한다.
-/// 지도 위 선택 역 말풍선 배경(밝은 시안).
-const _networkMapSelectedStationAccent = Color(0xFF13B8D6);
-
-/// 지도 위 지역 선택 칩의 선택 배경(밝은 블루).
-const _networkMapRegionSelectedColor = Color(0xFF006FD6);
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -1219,7 +1204,7 @@ class _NetworkMapSearchField extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: EasySubwayAccessibleColors.surface,
                       border: Border.all(
-                        color: _networkMapSearchFieldBorderColor,
+                        color: EasySubwayAccessibleColors.line,
                         width: 1.5,
                       ),
                       borderRadius: _networkMapSearchFieldRadius,
@@ -1232,7 +1217,7 @@ class _NetworkMapSearchField extends StatelessWidget {
                               Icon(
                                 Icons.search,
                                 size: 18,
-                                color: _networkMapSearchFieldIconColor,
+                                color: EasySubwayAccessibleColors.iconMuted,
                               ),
                               SizedBox(width: 8),
                               Expanded(
@@ -1241,7 +1226,7 @@ class _NetworkMapSearchField extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: _networkMapSearchFieldHintColor,
+                                    color: EasySubwayAccessibleColors.mutedText,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -1544,7 +1529,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
           child: Container(
             height: 26,
             decoration: BoxDecoration(
-              color: _networkMapSelectedStationAccent,
+              color: EasySubwayAccessibleColors.mapSelectionAccent,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
@@ -1571,7 +1556,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: _networkMapSelectedStationAccent,
+                      color: EasySubwayAccessibleColors.mapSelectionAccent,
                       width: 3,
                     ),
                   ),
@@ -1893,7 +1878,7 @@ class _NetworkMapToggleSegment extends StatelessWidget {
         width: 50,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? _networkMapRegionSelectedColor : Colors.transparent,
+          color: selected ? EasySubwayAccessibleColors.mapRegionAccent : Colors.transparent,
           borderRadius: _networkMapPillRadius,
         ),
         child: Text(
@@ -2079,7 +2064,7 @@ class _NetworkMapMenuHeader extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: _networkMapMenuLabelColor,
+              color: EasySubwayAccessibleColors.listRowText,
               fontSize: 21,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.2,
@@ -2105,7 +2090,7 @@ class _NetworkMapMenuSectionLabel extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
-          color: _networkMapMenuSectionColor,
+          color: EasySubwayAccessibleColors.caption,
           fontSize: 13,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.2,
@@ -2144,7 +2129,7 @@ class _NetworkMapMenuTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  Icon(icon, size: 22, color: _networkMapMenuIconColor),
+                  Icon(icon, size: 22, color: EasySubwayAccessibleColors.mutedText),
                   const SizedBox(width: 18),
                   Expanded(
                     child: Text(
@@ -2152,7 +2137,7 @@ class _NetworkMapMenuTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: _networkMapMenuLabelColor,
+                        color: EasySubwayAccessibleColors.listRowText,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2161,7 +2146,7 @@ class _NetworkMapMenuTile extends StatelessWidget {
                   const Icon(
                     Icons.chevron_right,
                     size: 20,
-                    color: _networkMapMenuChevronColor,
+                    color: EasySubwayAccessibleColors.disclosure,
                   ),
                 ],
               ),
