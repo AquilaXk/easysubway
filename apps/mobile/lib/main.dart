@@ -13,6 +13,10 @@ import 'app/app_dependencies.dart';
 import 'core/datapack/data_pack_metered_consent_gate.dart';
 import 'core/datapack/data_pack_update_state.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
+import 'features/home_widget/home_widget_link_handler.dart';
+import 'features/home_widget/next_train_widget_repository.dart';
+import 'features/home_widget/next_train_widget_runtime.dart'
+    as next_train_widget_runtime;
 import 'facility_report.dart';
 import 'facility_status.dart';
 import 'favorite_facility.dart';
@@ -83,30 +87,78 @@ Future<void> main() async {
         : null,
   );
   await restoreGetOffAlarmState(bootstrap.dependencies.getOffAlarmController);
+  final nextTrainWidgetRepository = NextTrainWidgetRepository(
+    catalogDatabase: bootstrap.catalogDatabase,
+    userDatabase: bootstrap.userDatabase,
+  );
+  await next_train_widget_runtime.runNextTrainWidgetStartup(
+    installedWidgetIds: next_train_widget_runtime.installedNextTrainWidgetIds,
+    registerRefresh: next_train_widget_runtime.initializeNextTrainWidgetRefresh,
+    cancelRefresh: next_train_widget_runtime.cancelNextTrainWidgetRefresh,
+    refresh: (widgetIds) => next_train_widget_runtime.refreshNextTrainWidgets(
+      nextTrainWidgetRepository,
+      widgetIds: widgetIds,
+    ),
+    reportError: (error, stackTrace) =>
+        reportMobileError(error, stackTrace, context: '홈 위젯 초기화 중 예외가 발생했습니다.'),
+  );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
+  final navigatorKey = GlobalKey<NavigatorState>();
+  final onboardingStore = const SecureOnboardingResultStore();
+  final draftTargetStore = const SecureFacilityReportDraftTargetStore();
   runApp(
     AppBootstrapLifecycle(
       close: bootstrap.close,
-      resumeDataPackUpdate: bootstrap.resumeDataPackUpdate,
+      resumeDataPackUpdate: () async {
+        await bootstrap.resumeDataPackUpdate();
+        await next_train_widget_runtime.runNextTrainWidgetOperationSafely(
+          operation: () => next_train_widget_runtime.refreshNextTrainWidgets(
+            nextTrainWidgetRepository,
+          ),
+          reportError: (error, stackTrace) => reportMobileError(
+            error,
+            stackTrace,
+            context: '홈 위젯 갱신 중 예외가 발생했습니다.',
+          ),
+        );
+      },
       resumeGetOffAlarmState: () => reconcileGetOffAlarmState(
         bootstrap.dependencies.getOffAlarmController,
       ),
-      child: EasySubwayApp(
-        dependencies: bootstrap.dependencies,
-        onboardingStore: const SecureOnboardingResultStore(),
-        facilityReportDraftTargetStore:
-            const SecureFacilityReportDraftTargetStore(),
-        facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
-        legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
-        dataPackUpdateStateRepository: DataPackUpdateStateRepository(
-          userDatabase: bootstrap.userDatabase,
+      child: HomeWidgetLinkHandler(
+        clicks: next_train_widget_runtime.homeWidgetClicks(),
+        navigatorKey: navigatorKey,
+        stationDetailBuilder: (stationId) => StationDetailScreen(
+          repository: bootstrap.dependencies.repository,
+          reportRepository: bootstrap.dependencies.reportRepository,
+          favoriteRepository: bootstrap.dependencies.favoriteRepository,
+          realtimeRepository: bootstrap.dependencies.realtimeRepository,
+          locationProvider: bootstrap.dependencies.locationProvider,
+          stationId: stationId,
+          facilityReportDraftTargetStore: draftTargetStore,
+          internalRouteRepository:
+              bootstrap.dependencies.internalRouteRepository,
         ),
-        onDataPackMeteredConsent: bootstrap.acceptMeteredDataPackUpdate,
-        dataPackUpdate: bootstrap.dataPackUpdate,
+        child: EasySubwayApp(
+          navigatorKey: navigatorKey,
+          dependencies: bootstrap.dependencies,
+          onboardingStore: onboardingStore,
+          facilityReportDraftTargetStore: draftTargetStore,
+          facilityReportLostPhotoRestorer: photoPicker.retrieveLostPhoto,
+          legacyCredentialCleaner: const SecureLegacyCredentialCleaner(),
+          dataPackUpdateStateRepository: DataPackUpdateStateRepository(
+            userDatabase: bootstrap.userDatabase,
+          ),
+          onDataPackMeteredConsent: bootstrap.acceptMeteredDataPackUpdate,
+          dataPackUpdate: bootstrap.dataPackUpdate,
+        ),
       ),
     ),
   );
 }
+
+@pragma('vm:entry-point')
+Future<void> configureMain() => next_train_widget_runtime.configureMain();
 
 @visibleForTesting
 Future<void> restoreGetOffAlarmState(GetOffAlarmController? controller) async {
@@ -320,6 +372,7 @@ class EasySubwayApp extends StatelessWidget {
     Future<void>? dataPackUpdate,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
+    GlobalKey<NavigatorState>? navigatorKey,
     Key? key,
   }) : this._(
          dependencies:
@@ -361,6 +414,7 @@ class EasySubwayApp extends StatelessWidget {
              (defaultDemoHomeDataEnabled
                  ? const _DemoFavoriteRouteRepository().listFavoriteRoutes()
                  : null),
+         navigatorKey: navigatorKey,
          key: key,
        );
 
@@ -377,6 +431,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.onDataPackMeteredConsent,
     required this.dataPackUpdate,
     required this.recentRoutesFuture,
+    this.navigatorKey,
     super.key,
   }) : repository = dependencies.repository,
        reportRepository = dependencies.reportRepository,
@@ -427,10 +482,12 @@ class EasySubwayApp extends StatelessWidget {
   final Future<void> Function()? onDataPackMeteredConsent;
   final Future<void>? dataPackUpdate;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
+  final GlobalKey<NavigatorState>? navigatorKey;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'EasySubway',
       debugShowCheckedModeBanner: false,
       scrollBehavior: const EasySubwayScrollBehavior(),

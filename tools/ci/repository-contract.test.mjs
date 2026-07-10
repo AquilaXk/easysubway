@@ -10906,7 +10906,27 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.match(items.get("play_target_audience").readyWhenKo, /전체 사용자|어린이 대상 아님/);
   assert.match(items.get("play_app_category").readyWhenKo, /대중교통|접근성|지하철|경로 안내/);
   assert.match(items.get("play_store_contact").readyWhenKo, /공개 연락처 이메일|고객지원 메일|같은 운영 수신함/);
-  assert.match(items.get("play_permissions_declaration").readyWhenKo, /위치|권한/);
+  const playPermissionsDeclaration = items.get("play_permissions_declaration");
+  for (const locationPurpose of [
+    "현재 위치 기반 주변 역 탐색",
+    "시설 신고 위치 확인",
+    "출구 도보 길안내",
+  ]) {
+    assert.ok(
+      playPermissionsDeclaration.readyWhenKo.includes(locationPurpose),
+      `play_permissions_declaration must include location purpose: ${locationPurpose}`,
+    );
+  }
+  assert.match(playPermissionsDeclaration.readyWhenKo, /WAKE_LOCK.*worker 실행/);
+  assert.match(playPermissionsDeclaration.readyWhenKo, /RECEIVE_BOOT_COMPLETED.*재부팅.*복원/);
+  assert.match(playPermissionsDeclaration.readyWhenKo, /normal.*프롬프트 없음.*데이터 수집 없음/);
+  assert.match(playPermissionsDeclaration.readyWhenKo, /FOREGROUND_SERVICE.*제거/);
+  assert.ok(playPermissionsDeclaration.evidence.includes("release-merged-manifest"));
+  assert.ok(
+    playPermissionsDeclaration.linkedArtifacts.includes(
+      "apps/mobile/lib/features/home_widget/next_train_widget_runtime.dart",
+    ),
+  );
   assert.ok(items.get("play_listing_assets_truthfulness").linkedArtifacts.includes("apps/mobile/release/play-store-submission-content.json"));
   assert.match(items.get("play_listing_assets_truthfulness").readyWhenKo, /고정 스크린샷 세트/);
   const playListingAssetsTruthfulnessReadyWhenKo = items.get("play_listing_assets_truthfulness").readyWhenKo;
@@ -11829,21 +11849,24 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
   // POST_NOTIFICATIONS·VIBRATE와 시간표 기반 정확 예약용 SCHEDULE_EXACT_ALARM이
   // release 매니페스트에 병합된다. 데이터팩 자동 업데이트(#1693)는 unmetered
   // 판별용 ACCESS_NETWORK_STATE를 병합한다. 모두 위치·저장소·미디어 같은
-  // 개인정보 침해 권한이 아니며 앱 기능에 직접 필요하다. 백그라운드 위치·부팅
-  // 완료 수신 등은 병합되지 않음을 아래 doesNotMatch로 계속 강제한다.
+  // 개인정보 침해 권한이 아니며 앱 기능에 직접 필요하다. 다음 열차 위젯(#1768)의
+  // WorkManager는 worker 실행용 WAKE_LOCK과 재부팅 periodic 복원용
+  // RECEIVE_BOOT_COMPLETED를 사용한다. 둘 다 normal/no-prompt 권한이다.
   assert.deepEqual(permissions, [
     "android.permission.ACCESS_COARSE_LOCATION",
     "android.permission.ACCESS_FINE_LOCATION",
     "android.permission.ACCESS_NETWORK_STATE",
     "android.permission.INTERNET",
     "android.permission.POST_NOTIFICATIONS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.SCHEDULE_EXACT_ALARM",
     "android.permission.VIBRATE",
+    "android.permission.WAKE_LOCK",
   ]);
-  // 무추적 불변: 알람·캘린더 앱 전용인 USE_EXACT_ALARM과 부팅 재예약용
-  // RECEIVE_BOOT_COMPLETED는 도입하지 않는다(#1766 강등 사다리·비범위).
+  // regular periodic worker는 foreground promotion을 사용하지 않으므로 FGS 권한은
+  // 제거한다. 향후 long-running worker 도입 시 별도 Play/permission 검토가 필요하다.
   assert.doesNotMatch(androidManifest, /android\.permission\.USE_EXACT_ALARM/);
-  assert.doesNotMatch(androidManifest, /android\.permission\.RECEIVE_BOOT_COMPLETED/);
+  assert.doesNotMatch(androidManifest, /android\.permission\.FOREGROUND_SERVICE/);
   assert.doesNotMatch(androidManifest, /android\.permission\.ACCESS_BACKGROUND_LOCATION/);
   assert.doesNotMatch(androidManifest, /android\.permission\.CAMERA/);
   assert.doesNotMatch(androidManifest, /android\.permission\.READ_EXTERNAL_STORAGE/);
@@ -12224,7 +12247,7 @@ test("get-off-alarm policy contract pins the no-location, degrade-ladder invaria
   assert.equal(policy.realtimeCorrection.correctionOverlayIssue, 1416);
 });
 
-test("하차 알림 Android manifest는 예약 receiver만 선언한다", () => {
+test("하차 알림 Android source manifest는 boot receiver 없이 예약 receiver만 선언한다", () => {
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
 
   assert.match(
@@ -12232,6 +12255,8 @@ test("하차 알림 Android manifest는 예약 receiver만 선언한다", () => 
     /<receiver\s+android:name="com\.dexterous\.flutterlocalnotifications\.ScheduledNotificationReceiver"\s+android:exported="false"\s*\/>/,
   );
   assert.doesNotMatch(androidManifest, /ScheduledNotificationBootReceiver/);
+  // BOOT permission은 #1768 WorkManager의 release merge가 소유하며,
+  // 하차 알림 source manifest가 직접 선언하지 않는다.
   assert.doesNotMatch(
     androidManifest,
     /android\.permission\.RECEIVE_BOOT_COMPLETED/,
@@ -12246,5 +12271,54 @@ test("하차 알림 Android 권한 상태 조회는 프롬프트 없이 OS 상�
   assert.match(
     mainActivity,
     /"notificationPermissionStatus"\s*->\s*result\.success\(hasNotificationPermission\(\)\s*&&\s*areAppNotificationsEnabled\(\)\)/,
+  );
+});
+
+test("Android 다음 열차 위젯은 로컬 snapshot과 명시적 구성만 사용한다", () => {
+  const manifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const main = read("apps/mobile/lib/main.dart");
+  const runtime = read(
+    "apps/mobile/lib/features/home_widget/next_train_widget_runtime.dart",
+  );
+  const provider = read(
+    "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/NextTrainWidgetProvider.kt",
+  );
+  const configurationActivity = read(
+    "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/WidgetConfigurationActivity.kt",
+  );
+  const metadata = read(
+    "apps/mobile/android/app/src/main/res/xml/next_train_widget_info.xml",
+  );
+  assert.match(manifest, /\.NextTrainWidgetProvider/);
+  assert.match(manifest, /\.WidgetConfigurationActivity/);
+  assert.match(
+    configurationActivity,
+    /getDartEntrypointFunctionName\(\): String = "configureMain"/,
+  );
+  assert.match(
+    main,
+    /@pragma\('vm:entry-point'\)\s+Future<void> configureMain\(\)\s*=>\s*next_train_widget_runtime\.configureMain\(\)/,
+  );
+  assert.match(metadata, /android:updatePeriodMillis="0"/);
+  assert.match(metadata, /android:widgetFeatures="reconfigurable"/);
+  assert.match(
+    manifest,
+    /<uses-permission\s+android:name="android\.permission\.FOREGROUND_SERVICE"\s+tools:node="remove"\s*\/>/,
+  );
+  assert.doesNotMatch(runtime, /setForeground(?:Async)?\s*\(/);
+  assert.match(provider, /widget_\$\{widgetId\}_station_name/);
+  assert.match(provider, /HomeWidgetLaunchIntent\.getActivity/);
+  assert.match(provider, /easysubway:\/\/station\/detail/);
+});
+
+test("home_widget 호환 iOS deployment target은 모든 configuration에서 14.0 이상이다", () => {
+  const project = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
+  const deploymentTargets = [
+    ...project.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);/g),
+  ].map((match) => match[1]);
+
+  assert.ok(deploymentTargets.length > 0);
+  assert.ok(
+    deploymentTargets.every((target) => Number.parseFloat(target) >= 14),
   );
 });

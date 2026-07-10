@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="next_train_widget_background">#24231F</color>
+    <color name="next_train_widget_border">#4A4841</color>
+    <color name="next_train_widget_text">#F4F1E8</color>
+    <color name="next_train_widget_muted">#C8C4BA</color>
+</resources>

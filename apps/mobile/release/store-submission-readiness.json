@@ -135,9 +135,9 @@
       "category": "app-content",
       "titleKo": "Play 권한 선언",
       "decisionOwnerKo": "모바일/개인정보 담당",
-      "readyWhenKo": "위치 권한은 현재 위치 기반 주변 역 탐색, 시설 신고 위치 확인, 출구 도보 길안내 목적만 설명하고, 고위험 권한 추가가 없음을 릴리즈 매니페스트로 확인한다.",
+      "readyWhenKo": "위치 권한은 현재 위치 기반 주변 역 탐색, 시설 신고 위치 확인, 출구 도보 길안내 목적만 설명한다. WAKE_LOCK은 WorkManager worker 실행, RECEIVE_BOOT_COMPLETED는 다음 열차 위젯 periodic work의 재부팅 후 복원에만 사용한다. 둘 다 normal 권한으로 프롬프트 없음·데이터 수집 없음이며 FOREGROUND_SERVICE는 regular periodic worker 범위에서 제거됨을 릴리즈 매니페스트로 확인한다.",
       "evidence": ["release-merged-manifest", "permission-purpose-review"],
-      "linkedArtifacts": ["apps/mobile/android/app/src/main/AndroidManifest.xml", "apps/mobile/lib/station_search.dart", "apps/mobile/lib/facility_report.dart"],
+      "linkedArtifacts": ["apps/mobile/android/app/src/main/AndroidManifest.xml", "apps/mobile/lib/features/home_widget/next_train_widget_runtime.dart", "apps/mobile/lib/station_search.dart", "apps/mobile/lib/facility_report.dart"],
       "configurationSources": ["Android release manifest"]
     },
     {
