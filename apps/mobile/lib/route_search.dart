@@ -2710,8 +2710,18 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     key: const Key('routeMobilityTypeInput'),
                     decoration: const InputDecoration(
                       labelText: '이동 조건',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      isDense: true,
+                      filled: true,
+                      fillColor: EasySubwayAccessibleColors.scaffoldSurface,
+                      border: UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: EasySubwayAccessibleColors.line,
+                        ),
+                      ),
+                      enabledBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: EasySubwayAccessibleColors.line,
+                        ),
                       ),
                     ),
                     child: DropdownButtonHideUnderline(
@@ -2734,14 +2744,23 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                       ),
                     ),
                   ),
-                SwitchListTile(
-                  key: const Key('routeStrictStepFreeSwitch'),
-                  contentPadding: EdgeInsets.zero,
-                  // 켜기 전에 부정적 결과를 먼저 경고하지 않는다. 경로가 없을 때는
-                  // 결과 화면에서 안내한다(#1568).
-                  title: const Text('계단 없는 길만'),
-                  value: _selectedConstraintMode == 'STRICT_STEP_FREE',
-                  onChanged: _updateConstraintMode,
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: EasySubwayAccessibleColors.line,
+                      ),
+                    ),
+                  ),
+                  child: SwitchListTile(
+                    key: const Key('routeStrictStepFreeSwitch'),
+                    contentPadding: EdgeInsets.zero,
+                    // 켜기 전에 부정적 결과를 먼저 경고하지 않는다. 경로가 없을 때는
+                    // 결과 화면에서 안내한다(#1568).
+                    title: const Text('계단 없는 길만'),
+                    value: _selectedConstraintMode == 'STRICT_STEP_FREE',
+                    onChanged: _updateConstraintMode,
+                  ),
                 ),
                 _RouteRecentDestinationList(
                   repository: widget.favoriteRouteRepository,
@@ -2861,6 +2880,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   Widget _buildRouteStationPicker(_RouteStationRole role) {
     final isOrigin = role == _RouteStationRole.origin;
     return _RouteStationPicker(
+      isOrigin: isOrigin,
       labelText: isOrigin ? '출발역' : '도착역',
       inputKey: isOrigin
           ? const Key('routeOriginStationInput')
@@ -3708,6 +3728,7 @@ String _routeMobilityOptionSemanticsLabel(
 
 class _RouteStationPicker extends StatefulWidget {
   const _RouteStationPicker({
+    required this.isOrigin,
     required this.labelText,
     required this.inputKey,
     required this.searchButtonKey,
@@ -3717,6 +3738,7 @@ class _RouteStationPicker extends StatefulWidget {
     required this.onSelected,
   });
 
+  final bool isOrigin;
   final String labelText;
   final Key inputKey;
   final Key searchButtonKey;
@@ -3762,43 +3784,73 @@ class _RouteStationPickerState extends State<_RouteStationPicker> {
     final labelText = selectedStation == null
         ? widget.labelText
         : '${widget.labelText.replaceAll('역', '')} ${_routeStationDisplayName(selectedStation)}';
+    // v4 전면 재설계(#1930): 활성 입력도 비활성 요약 행(_RoutePointRow)과 같은
+    // 얇은 필드 언어(옅은 채움·테두리 없음)를 쓴다. 노드 열도 그대로 두어
+    // 활성/비활성 전환 때 높이·정렬이 튀지 않게 한다.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Semantics(
-          label: selectedStation == null
-              ? '${widget.labelText} 입력'
-              : '${widget.labelText} 선택됨, ${selectedStation.nameKo}',
-          textField: true,
-          liveRegion: selectedStation != null,
-          child: TextField(
-            key: widget.inputKey,
-            controller: _textController,
-            minLines: 1,
-            textInputAction: TextInputAction.search,
-            style: const TextStyle(fontSize: 20, height: 1.35),
-            decoration: InputDecoration(
-              labelText: labelText,
-              hintText: '역 이름을 입력해 주세요',
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(8)),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _RoutePointNodeColumn(isOrigin: widget.isOrigin),
+              Expanded(
+                child: Semantics(
+                  label: selectedStation == null
+                      ? '${widget.labelText} 입력'
+                      : '${widget.labelText} 선택됨, ${selectedStation.nameKo}',
+                  textField: true,
+                  liveRegion: selectedStation != null,
+                  child: TextField(
+                    key: widget.inputKey,
+                    controller: _textController,
+                    minLines: 1,
+                    textInputAction: TextInputAction.search,
+                    style: const TextStyle(fontSize: 20, height: 1.35),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                      labelText: labelText,
+                      hintText: '역 이름을 입력해 주세요',
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                      filled: true,
+                      fillColor: EasySubwayAccessibleColors.scaffoldSurface,
+                      border: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: EasySubwayAccessibleColors.line,
+                        ),
+                      ),
+                      enabledBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: EasySubwayAccessibleColors.line,
+                        ),
+                      ),
+                      focusedBorder: const UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: EasySubwayAccessibleColors.primary,
+                        ),
+                      ),
+                      suffixIcon: AnimatedBuilder(
+                        animation: _controller,
+                        builder: (context, _) {
+                          final isLoading =
+                              _controller.state.status ==
+                              StationSearchStatus.loading;
+                          return IconButton(
+                            key: widget.searchButtonKey,
+                            tooltip: '${widget.labelText} 검색',
+                            onPressed: isLoading ? null : _search,
+                            icon: const Icon(Icons.search),
+                          );
+                        },
+                      ),
+                    ),
+                    onSubmitted: (_) => _search(),
+                  ),
+                ),
               ),
-              suffixIcon: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, _) {
-                  final isLoading =
-                      _controller.state.status == StationSearchStatus.loading;
-                  return IconButton(
-                    key: widget.searchButtonKey,
-                    tooltip: '${widget.labelText} 검색',
-                    onPressed: isLoading ? null : _search,
-                    icon: const Icon(Icons.search),
-                  );
-                },
-              ),
-            ),
-            onSubmitted: (_) => _search(),
+            ],
           ),
         ),
         const SizedBox(height: 8),
@@ -3898,13 +3950,16 @@ class _RouteStationSearchBody extends StatelessWidget {
             liveRegion: true,
             child: const SizedBox.shrink(),
           ),
-          for (final result in state.results)
+          for (final entry in state.results.indexed) ...[
+            if (entry.$1 > 0)
+              const Divider(height: 1, color: EasySubwayAccessibleColors.line),
             _RouteStationOptionTile(
-              key: Key('$optionKeyPrefix-${result.id}'),
+              key: Key('$optionKeyPrefix-${entry.$2.id}'),
               labelText: labelText,
-              result: result,
+              result: entry.$2,
               onSelected: onSelected,
             ),
+          ],
         ],
       ),
     };
@@ -3927,25 +3982,20 @@ class _RouteStationOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
+    // v4 전면 재설계(#1930): 박스 카드 대신 역검색(#1929)과 같은 박스 없는
+    // 행 + 구분선 언어로 통일한다.
     return MergeSemantics(
       child: Semantics(
         label: '$labelText 선택, ${result.semanticLabel}',
         button: true,
         onTap: () => onSelected(result),
         child: ExcludeSemantics(
-          child: Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            color: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: _routeSearchSmallRadius,
-              side: const BorderSide(color: EasySubwayAccessibleColors.line),
-            ),
-            child: InkWell(
-              onTap: () => onSelected(result),
-              borderRadius: _routeSearchSmallRadius,
+          child: InkWell(
+            onTap: () => onSelected(result),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 48),
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
