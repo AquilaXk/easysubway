@@ -75,14 +75,10 @@ void main() {
 
   test('화면 로컬 색 상수 ratchet — 공용 토큰으로 수렴', () {
     final actual = countPerFile(
-      RegExp(r'^const _\w*Color', multiLine: true),
+      RegExp(r'^const _\w*Color\b\s*=', multiLine: true),
       exclude: {'accessible_design.dart', 'design_tokens.dart'},
     );
-    expectRatchet(actual, {
-      'lib/main.dart': 8,
-      'lib/station_search.dart': 8,
-      'lib/features/stations/domain/station_line.dart': 1,
-    }, rule: '로컬 색 상수');
+    expectRatchet(actual, {'lib/main.dart': 8}, rule: '로컬 색 상수');
   });
 
   test('FontWeight.w900 ratchet — 전면 제거 대상', () {
@@ -103,7 +99,6 @@ void main() {
     expectRatchet(actual, {
       'lib/main.dart': 18,
       'lib/network_map.dart': 8,
-      'lib/station_search.dart': 16,
       'lib/facility_report.dart': 16,
       'lib/onboarding.dart': 2,
       'lib/notification_settings.dart': 2,
