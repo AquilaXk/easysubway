@@ -79,7 +79,7 @@ ServiceNotice notice(
 )!;
 
 void main() {
-  final now = DateTime(2026, 7, 6, 12, 0, 0);
+  final now = DateTime.utc(2026, 7, 6, 12, 0, 0);
 
   ApiNoticeRepository repo(_FakeApiClient client, _InMemoryCache cache) =>
       ApiNoticeRepository(apiClient: client, cacheStore: cache, now: () => now);
@@ -236,6 +236,22 @@ void main() {
     final client = _FakeApiClient(
       ApiResponse(statusCode: 304, jsonBody: null, etag: '"e1"'),
     );
+
+    final result = await repo(client, cache).activeNotices();
+
+    expect(result.notices.map((entry) => entry.id), ['active']);
+    expect(cache.entry!.notices.map((entry) => entry.id), ['active']);
+  });
+
+  test('200 응답도 현재 시각 기준 활성 공지만 결과와 캐시에 저장한다', () async {
+    final client = _FakeApiClient(
+      okResponse([
+        noticeJson('active', 'DISRUPTION', expiresAt: '2026-07-06T12:01:00'),
+        noticeJson('expired', 'DISRUPTION', expiresAt: '2026-07-06T12:00:00'),
+        noticeJson('future', 'DISRUPTION', publishedAt: '2026-07-06T12:01:00'),
+      ]),
+    );
+    final cache = _InMemoryCache();
 
     final result = await repo(client, cache).activeNotices();
 

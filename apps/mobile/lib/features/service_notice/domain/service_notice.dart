@@ -126,6 +126,22 @@ class ServiceNotice {
     if (value is! String || value.isEmpty) {
       return null;
     }
-    return DateTime.tryParse(value);
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null || parsed.isUtc) {
+      return parsed;
+    }
+
+    // Backend는 UTC Clock의 LocalDateTime을 offset 없이 직렬화한다. Dart는
+    // offset 없는 값을 기기 로컬 시각으로 해석하므로 API 계약에 맞춰 UTC로 고정한다.
+    return DateTime.utc(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    );
   }
 }

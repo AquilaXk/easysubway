@@ -28,8 +28,10 @@ void main() {
       expect(notice.scopeValue, '2');
       expect(notice.severity, NoticeSeverity.disruption);
       expect(notice.isDisruption, isTrue);
-      expect(notice.publishedAt, DateTime.parse('2026-07-06T09:00:00'));
-      expect(notice.expiresAt, DateTime.parse('2026-07-06T18:00:00'));
+      expect(notice.publishedAt, DateTime.utc(2026, 7, 6, 9));
+      expect(notice.expiresAt, DateTime.utc(2026, 7, 6, 18));
+      expect(notice.publishedAt.isUtc, isTrue);
+      expect(notice.expiresAt!.isUtc, isTrue);
     });
 
     test('INFO 심각도·ALL 대상·만료 없음도 파싱한다', () {
