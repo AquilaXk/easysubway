@@ -84,5 +84,16 @@ void main() {
       expect(missingDistance.cardFare, isNull);
       expect(missingRule.cardFare, isNull);
     });
+
+    test('이동 거리 0m는 결측값으로 보고 요금을 만들지 않는다', () {
+      final fare = const FareCalculator().calculate(
+        distanceMeters: 0,
+        rule: rule,
+      );
+
+      expect(fare.status, FareStatus.unavailable);
+      expect(fare.cardFare, isNull);
+      expect(fare.cashFare, isNull);
+    });
   });
 }

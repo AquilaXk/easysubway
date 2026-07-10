@@ -199,24 +199,14 @@ void main() {
           WHERE station_id = 'station-sangnoksu'
             AND line_id = 'seoul-4'
           ''').getSingle();
-    final fareRule = await database.customSelect('''
-          SELECT zone_id, base_card_fare, base_cash_fare,
-                 base_distance_meters, additional_steps_json
-          FROM fare_rules
-          WHERE id = 'capital-integrated-standard'
-          ''').getSingle();
-    final fareDiscounts = await database.customSelect('''
-          SELECT rider_type
-          FROM fare_discounts
-          WHERE zone_id = 'capital-integrated'
-          ORDER BY rider_type
-          ''').get();
-    final stationFareZoneCoverage = await database.customSelect('''
+    final fareTableCounts = await database.customSelect('''
           SELECT
-            (SELECT COUNT(*) FROM station_lines) AS station_line_count,
+            (SELECT COUNT(*) FROM fare_zones) AS fare_zone_count,
+            (SELECT COUNT(*) FROM fare_rules) AS fare_rule_count,
+            (SELECT COUNT(*) FROM fare_discounts) AS fare_discount_count,
             (SELECT COUNT(*)
              FROM station_fare_zones
-             WHERE zone_id = 'capital-integrated') AS fare_zone_count
+             WHERE zone_id = 'capital-integrated') AS station_fare_zone_count
           ''').getSingle();
 
     expect(metadata.read<String>('value'), '1');
@@ -358,23 +348,10 @@ void main() {
     expect(displayedSourceValues, isNot(contains('fixture')));
     expect(displayedSourceValues, isNot(contains('easysubway.local')));
     expect(displayedSourceValues, isNot(contains('review-required')));
-    expect(fareRule.read<String>('zone_id'), 'capital-integrated');
-    expect(fareRule.read<int>('base_card_fare'), 1550);
-    expect(fareRule.read<int>('base_cash_fare'), 1650);
-    expect(fareRule.read<int>('base_distance_meters'), 10000);
-    expect(
-      fareRule.read<String>('additional_steps_json'),
-      '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]',
-    );
-    expect(fareDiscounts.map((row) => row.read<String>('rider_type')), [
-      'CHILD',
-      'CONCESSION',
-      'YOUTH',
-    ]);
-    expect(
-      stationFareZoneCoverage.read<int>('fare_zone_count'),
-      stationFareZoneCoverage.read<int>('station_line_count'),
-    );
+    expect(fareTableCounts.read<int>('fare_zone_count'), 0);
+    expect(fareTableCounts.read<int>('fare_rule_count'), 0);
+    expect(fareTableCounts.read<int>('fare_discount_count'), 0);
+    expect(fareTableCounts.read<int>('station_fare_zone_count'), 0);
     expect(
       File('${directory.path}/datapacks/core.sqlite').existsSync(),
       isTrue,
@@ -425,6 +402,27 @@ void main() {
     expect(displayedSourceValues, isNot(contains('fixture')));
     expect(displayedSourceValues, isNot(contains('easysubway.local')));
     expect(displayedSourceValues, isNot(contains('review-required')));
+  });
+
+  test('기존 baseline의 청소년 현금요금 1000원을 공식 1650원으로 보정한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      UPDATE fare_discounts
+      SET cash_fare = 1000
+      WHERE id = 'capital-integrated-youth'
+    ''');
+
+    await database.seedBaselineIfEmpty();
+
+    final youthFare = await database.customSelect('''
+      SELECT cash_fare
+      FROM fare_discounts
+      WHERE id = 'capital-integrated-youth'
+    ''').getSingle();
+    expect(youthFare.read<int>('cash_fare'), 1650);
   });
 
   test('내장 데이터팩은 로컬 역 검색 repository에서 역 번호 검색을 제공한다', () async {
@@ -636,7 +634,7 @@ void main() {
   });
 
   test(
-    'catalog opener는 baseline보다 큰 current pack에 access edge를 주입하지 않는다',
+    'catalog opener는 baseline보다 큰 current pack에 baseline access edge와 fare를 주입하지 않는다',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'easysubway-catalog-current-access-backfill-skip-',
@@ -660,6 +658,7 @@ void main() {
               normalizedName: '추가역',
             ),
           );
+      await updatedDatabase.customStatement('DELETE FROM fare_rules');
       await updatedDatabase.close();
       await File('${catalogDirectory.path}/current.json').writeAsString(
         jsonEncode({
@@ -675,6 +674,7 @@ void main() {
         assetBundle: rootBundle,
       ).open();
       addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
       final accessEdgeCount = await database.customSelect('''
       SELECT COUNT(*) AS count
       FROM network_edges
@@ -685,6 +685,10 @@ void main() {
         'exit-sadang-seoul-4'
       )
     ''').getSingle();
+      final fareRuleCount = await database.customSelect('''
+        SELECT COUNT(*) AS count
+        FROM fare_rules
+      ''').getSingle();
       final route = await LocalRouteRepository(catalogDatabase: database)
           .searchRoute(
             const RouteSearchRequest(
@@ -695,6 +699,7 @@ void main() {
           );
 
       expect(accessEdgeCount.read<int>('count'), 0);
+      expect(fareRuleCount.read<int>('count'), 0);
       expect(route.status, 'UNKNOWN');
     },
   );
