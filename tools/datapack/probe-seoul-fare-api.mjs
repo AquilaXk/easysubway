@@ -43,14 +43,14 @@ function decodedServiceKey(value) {
 
 export function validateFareSample(sample) {
   if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
-    throw new Error("fare API sample must be an object");
+    throw new TypeError("fare API sample must be an object");
   }
   for (const [field, expected] of Object.entries(EXPECTED_SAMPLE)) {
     if (!(field in sample)) {
       throw new Error(`fare API field missing: ${field}`);
     }
     if (typeof sample[field] !== typeof expected) {
-      throw new Error(`fare API field type invalid: ${field}`);
+      throw new TypeError(`fare API field type invalid: ${field}`);
     }
     if (sample[field] !== expected) {
       throw new Error(`fare API field value changed: ${field}`);
@@ -90,7 +90,12 @@ async function main() {
   const resultCode = String(envelope?.header?.resultCode ?? "");
   const body = envelope?.body;
   const rawItems = body?.items?.item ?? body?.items ?? body?.item;
-  const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+  let items = [];
+  if (Array.isArray(rawItems)) {
+    items = rawItems;
+  } else if (rawItems) {
+    items = [rawItems];
+  }
   if (resultCode !== "00" || items.length === 0 || !items[0] || typeof items[0] !== "object") {
     throw new Error(`fare API response rejected: resultCode=${resultCode || "missing"}`);
   }
@@ -102,7 +107,7 @@ async function main() {
     request: { dptreStnCd: "0150", dptreStnNm: "서울역", arvlStnCd: "0151", arvlStnNm: "시청" },
     resultCode,
     totalCount: Number(body?.totalCount ?? items.length),
-    fieldNames: Object.keys(sample).sort(),
+    fieldNames: Object.keys(sample).sort((left, right) => left.localeCompare(right)),
     sample: Object.fromEntries(
       Object.entries(sample).filter(
         ([key, value]) => SAFE_REPORT_FIELDS.has(key) && ["string", "number", "boolean"].includes(typeof value),
