@@ -425,8 +425,16 @@ class EasySubwayApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       scrollBehavior: const EasySubwayScrollBehavior(),
       theme: ThemeData(
+        // fromSeed는 시드의 미세한 hue를 M3 톤 팔레트로 증폭해 액센트를 채도
+        // 있는 색으로 만든다(무채색 시드도 청록끼로 샌다). 무채색 잉크 원칙을
+        // 지키려 primary/secondary 계열을 명시적 무채색으로 덮어쓴다.
         colorScheme: ColorScheme.fromSeed(
           seedColor: EasySubwayAccessibleColors.primary,
+        ).copyWith(
+          primary: EasySubwayAccessibleColors.primary,
+          onPrimary: Colors.white,
+          secondary: EasySubwayAccessibleColors.primary,
+          onSecondary: Colors.white,
         ),
         extensions: const [EasySubwayTokens.light],
         textTheme: easySubwayTextTheme(ThemeData(useMaterial3: true).textTheme),
