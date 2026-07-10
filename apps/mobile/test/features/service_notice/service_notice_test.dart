@@ -51,6 +51,7 @@ void main() {
       final notice = ServiceNotice.fromJson(payload)!;
 
       expect(notice.publishedAt, DateTime.utc(2026, 3, 8, 2, 30));
+      expect(notice.publishedAt.isUtc, isTrue);
     });
 
     test('명시적 offset 시각은 같은 UTC instant로 파싱한다', () {
@@ -59,6 +60,7 @@ void main() {
       final notice = ServiceNotice.fromJson(payload)!;
 
       expect(notice.publishedAt, DateTime.utc(2026, 7, 6));
+      expect(notice.publishedAt.isUtc, isTrue);
     });
 
     test('date-only 시각도 숫자 offset으로 오인하지 않고 UTC로 파싱한다', () {

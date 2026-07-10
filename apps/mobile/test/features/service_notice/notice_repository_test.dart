@@ -162,10 +162,16 @@ void main() {
 
   test('200 응답 캐시 저장 실패는 보고하되 fresh 응답을 유지한다', () async {
     final errors = <Object>[];
+    final originalFetchedAt = now.subtract(const Duration(hours: 2));
     final client = _FakeApiClient(
       okResponse([noticeJson('n1', 'DISRUPTION')], etag: '"e1"'),
     );
-    final cache = _InMemoryCache(saveError: StateError('cache save failed'));
+    final cache = _InMemoryCache(saveError: StateError('cache save failed'))
+      ..entry = NoticeCacheEntry(
+        etag: '"old"',
+        notices: [notice('old')],
+        fetchedAt: originalFetchedAt,
+      );
 
     final result = await runWithMobileErrorReporter(
       errors.add,
@@ -176,15 +182,19 @@ void main() {
     expect(result.stale, isFalse);
     expect(result.asOf, now);
     expect(errors, hasLength(1));
+    expect(cache.entry!.etag, '"old"');
+    expect(cache.entry!.notices.single.id, 'old');
+    expect(cache.entry!.fetchedAt, originalFetchedAt);
   });
 
   test('304 응답 캐시 저장 실패도 검증된 캐시를 fresh로 유지한다', () async {
     final errors = <Object>[];
+    final originalFetchedAt = now.subtract(const Duration(hours: 1));
     final cache = _InMemoryCache(saveError: StateError('cache save failed'))
       ..entry = NoticeCacheEntry(
         etag: '"e1"',
         notices: [notice('n1')],
-        fetchedAt: now.subtract(const Duration(hours: 1)),
+        fetchedAt: originalFetchedAt,
       );
     final client = _FakeApiClient(
       ApiResponse(statusCode: 304, jsonBody: null, etag: '"e1"'),
@@ -199,6 +209,9 @@ void main() {
     expect(result.stale, isFalse);
     expect(result.asOf, now);
     expect(errors, hasLength(1));
+    expect(cache.entry!.etag, '"e1"');
+    expect(cache.entry!.notices.single.id, 'n1');
+    expect(cache.entry!.fetchedAt, originalFetchedAt);
   });
 
   test('오프라인 캐시는 만료 공지와 미래 게시 공지를 노출하지 않는다', () async {
