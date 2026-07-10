@@ -4263,17 +4263,22 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
 }
 
 List<RideLegArrival> _rideLegArrivalsFromResult(RouteSearchResult result) {
+  final rideSteps = result.steps
+      .where((step) => step.stepType == 'ride')
+      .toList(growable: false);
+  if (rideSteps.isEmpty ||
+      rideSteps.any((step) => step.plannedArrivalTimeIso.isEmpty)) {
+    return const [];
+  }
   final rideLegs = <RideLegArrival>[];
-  for (final step in result.steps) {
-    if (step.stepType == 'ride' && step.plannedArrivalTimeIso.isNotEmpty) {
-      rideLegs.add(
-        RideLegArrival(
-          toStationId: step.toStationId,
-          plannedArrivalIso: step.plannedArrivalTimeIso,
-          realtimeArrivalIso: step.realtimeArrivalTimeIso,
-        ),
-      );
-    }
+  for (final step in rideSteps) {
+    rideLegs.add(
+      RideLegArrival(
+        toStationId: step.toStationId,
+        plannedArrivalIso: step.plannedArrivalTimeIso,
+        realtimeArrivalIso: step.realtimeArrivalTimeIso,
+      ),
+    );
   }
   return rideLegs;
 }

@@ -9416,6 +9416,80 @@ void main() {
     expect(find.text('폰을 보지 않아도 내릴 때 알려드려요.'), findsOneWidget);
   });
 
+  testWidgets('ride 중 하나의 공식 도착이 없으면 부분 하차 알림을 보이지 않는다', (tester) async {
+    final controller = GetOffAlarmController(
+      notifier: _RecordingGetOffAlarmNotifier(),
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: _MemoryGetOffAlarmStateRepository(),
+      now: () => DateTime(2026, 7, 6, 9),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              steps: const [
+                RouteSearchStep(
+                  sequence: 1,
+                  stepType: 'ride',
+                  title: '상록수에서 금정까지 이동',
+                  description: '열차를 이용해 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sangnoksu',
+                  toStationId: 'station-geumjeong',
+                  estimatedMinutes: 15,
+                  distanceMeters: 6300,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
+                  plannedArrivalTimeIso: '2026-07-06T09:20:00+09:00',
+                ),
+                RouteSearchStep(
+                  sequence: 2,
+                  stepType: 'ride',
+                  title: '금정에서 사당까지 이동',
+                  description: '열차를 이용해 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-geumjeong',
+                  toStationId: 'station-sadang',
+                  estimatedMinutes: 17,
+                  distanceMeters: 7200,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
+                ),
+              ],
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          getOffAlarmController: controller,
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 6),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('하차 알림'), findsNothing);
+  });
+
   testWidgets('foreground 복귀는 활성 하차 알림을 현재 경로 시간으로 재예약한다', (tester) async {
     final notifier = _RecordingGetOffAlarmNotifier();
     final now = DateTime.parse('2026-07-06T09:00:00+09:00');

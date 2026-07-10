@@ -1,3 +1,5 @@
+import 'package:drift/drift.dart' show Variable;
+
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
@@ -8,9 +10,13 @@ import '../domain/route_result.dart' as local;
 import '../domain/route_step.dart' as route_step;
 
 class LocalRouteRepository implements RouteSearchRepository {
-  LocalRouteRepository({required this.catalogDatabase});
+  LocalRouteRepository({
+    required this.catalogDatabase,
+    DateTime Function()? now,
+  }) : now = now ?? DateTime.now;
 
   final CatalogDatabase catalogDatabase;
+  final DateTime Function() now;
 
   Future<RouteCapabilityMetadata> routeCapability(
     RouteSearchRequest request,
@@ -91,7 +97,13 @@ class LocalRouteRepository implements RouteSearchRepository {
             ),
           );
 
-    return _toRouteSearchResult(request, result, catalog);
+    final plannedArrivals = await _plannedRideArrivals(result, catalog);
+    return _toRouteSearchResult(
+      request,
+      result,
+      catalog,
+      plannedArrivals: plannedArrivals,
+    );
   }
 
   @override
@@ -102,14 +114,15 @@ class LocalRouteRepository implements RouteSearchRepository {
   RouteSearchResult _toRouteSearchResult(
     RouteSearchRequest request,
     local.LocalRouteResult result,
-    _RouteCatalogSnapshot catalog,
-  ) {
+    _RouteCatalogSnapshot catalog, {
+    required Map<int, String> plannedArrivals,
+  }) {
     final originName = catalog.stationName(request.originStationId);
     final destinationName = catalog.stationName(request.destinationStationId);
     final lineIds = result.lineIds;
     final primaryLineId = lineIds.isEmpty ? '' : lineIds.first;
     final primaryLineName = catalog.lineName(primaryLineId);
-    final steps = _toSteps(result, catalog);
+    final steps = _toSteps(result, catalog, plannedArrivals: plannedArrivals);
 
     return RouteSearchResult(
       routeSearchId:
@@ -161,8 +174,9 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   List<RouteSearchStep> _toSteps(
     local.LocalRouteResult result,
-    _RouteCatalogSnapshot catalog,
-  ) {
+    _RouteCatalogSnapshot catalog, {
+    required Map<int, String> plannedArrivals,
+  }) {
     return result.steps
         .map((step) {
           final fromStationId = catalog.stationIdForNode(step.fromNodeId);
@@ -198,9 +212,126 @@ class LocalRouteRepository implements RouteSearchRepository {
             timeSource: step.timeSource,
             distanceSource: step.distanceSource,
             confidenceLabel: step.confidenceLabel,
+            plannedArrivalTimeIso: plannedArrivals[step.sequence] ?? '',
           );
         })
         .toList(growable: false);
+  }
+
+  Future<Map<int, String>> _plannedRideArrivals(
+    local.LocalRouteResult result,
+    _RouteCatalogSnapshot catalog,
+  ) async {
+    if (result.status != local.RouteStatus.found) {
+      return const {};
+    }
+    final arrivals = <int, String>{};
+    var cursor = now().toUtc();
+    for (final step in result.steps) {
+      if (step.type != route_step.RouteStepType.ride) {
+        cursor = cursor.add(Duration(seconds: step.durationSeconds));
+        continue;
+      }
+      final arrival = await _nextTimetableArrival(
+        fromStationId: catalog.stationIdForNode(step.fromNodeId),
+        toStationId: catalog.stationIdForNode(step.toNodeId),
+        lineId: step.lineId,
+        cursor: cursor,
+      );
+      if (arrival == null) {
+        return const {};
+      }
+      arrivals[step.sequence] = _koreaIso(arrival);
+      cursor = arrival;
+    }
+    return arrivals;
+  }
+
+  Future<DateTime?> _nextTimetableArrival({
+    required String fromStationId,
+    required String toStationId,
+    required String lineId,
+    required DateTime cursor,
+  }) async {
+    final koreaNow = cursor.toUtc().add(const Duration(hours: 9));
+    var firstServiceDate = DateTime.utc(
+      koreaNow.year,
+      koreaNow.month,
+      koreaNow.day,
+    );
+    if (koreaNow.hour < 3) {
+      firstServiceDate = firstServiceDate.subtract(const Duration(days: 1));
+    }
+    for (var dayOffset = 0; dayOffset <= 7; dayOffset += 1) {
+      final serviceDate = firstServiceDate.add(Duration(days: dayOffset));
+      final serviceMidnight = serviceDate.subtract(const Duration(hours: 9));
+      final dateKey = _compactDate(serviceDate);
+      final weekdayColumn = _weekdayColumn(serviceDate.weekday);
+      final startSeconds = cursor.difference(serviceMidnight).inSeconds;
+      final row = await catalogDatabase
+          .customSelect(
+            '''
+        SELECT board.departure_seconds, alight.arrival_seconds
+        FROM transit_trips trip
+        INNER JOIN transit_routes route ON route.id = trip.route_id
+        INNER JOIN service_calendars calendar
+          ON calendar.service_id = trip.service_id
+        INNER JOIN transit_stop_times board ON board.trip_id = trip.id
+        INNER JOIN transit_stop_times alight ON alight.trip_id = trip.id
+        WHERE (
+            (
+              calendar.start_date <= ?
+              AND calendar.end_date >= ?
+              AND calendar.$weekdayColumn != 0
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM service_calendar_dates added
+              WHERE added.service_id = trip.service_id
+                AND added.date = ?
+                AND added.exception_type = 1
+            )
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM service_calendar_dates removed
+            WHERE removed.service_id = trip.service_id
+              AND removed.date = ?
+              AND removed.exception_type = 2
+          )
+          AND route.line_id = ?
+          AND board.station_id = ?
+          AND board.line_id = ?
+          AND board.pickup_type != 1
+          AND alight.station_id = ?
+          AND alight.line_id = ?
+          AND alight.drop_off_type != 1
+          AND alight.stop_sequence > board.stop_sequence
+          AND board.departure_seconds >= ?
+        ORDER BY board.departure_seconds, alight.arrival_seconds, trip.id
+        LIMIT 1
+      ''',
+            variables: [
+              Variable.withString(dateKey),
+              Variable.withString(dateKey),
+              Variable.withString(dateKey),
+              Variable.withString(dateKey),
+              Variable.withString(lineId),
+              Variable.withString(fromStationId),
+              Variable.withString(lineId),
+              Variable.withString(toStationId),
+              Variable.withString(lineId),
+              Variable.withInt(startSeconds),
+            ],
+          )
+          .getSingleOrNull();
+      if (row != null) {
+        return serviceMidnight.add(
+          Duration(seconds: row.read<int>('arrival_seconds')),
+        );
+      }
+    }
+    return null;
   }
 
   int _estimatedDurationSeconds(List<RouteSearchStep> steps) {
@@ -1478,6 +1609,33 @@ int _estimatedMinutesFor(int durationSeconds) {
     return 0;
   }
   return (durationSeconds / 60).ceil().clamp(1, 999);
+}
+
+String _compactDate(DateTime date) {
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  return '${date.year}${twoDigits(date.month)}${twoDigits(date.day)}';
+}
+
+String _weekdayColumn(int weekday) {
+  return switch (weekday) {
+    DateTime.monday => 'monday',
+    DateTime.tuesday => 'tuesday',
+    DateTime.wednesday => 'wednesday',
+    DateTime.thursday => 'thursday',
+    DateTime.friday => 'friday',
+    DateTime.saturday => 'saturday',
+    DateTime.sunday => 'sunday',
+    _ => throw ArgumentError.value(weekday, 'weekday'),
+  };
+}
+
+String _koreaIso(DateTime instant) {
+  final local = instant.toUtc().add(const Duration(hours: 9));
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${twoDigits(local.month)}-${twoDigits(local.day)}T'
+      '${twoDigits(local.hour)}:${twoDigits(local.minute)}:'
+      '${twoDigits(local.second)}+09:00';
 }
 
 String _lineIdForNode(String nodeId) {
