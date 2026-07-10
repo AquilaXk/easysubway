@@ -27,6 +27,32 @@ void main() {
     expect(calls.single.method, 'requestNotificationPermission');
   });
 
+  test('알림 권한 상태 조회는 프롬프트 없는 네이티브 메서드만 호출한다', () async {
+    const channel = MethodChannel('test/notification-permission-status');
+    final calls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          calls.add(call);
+          return false;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+    final provider = MethodChannelNotificationPermissionProvider(
+      channel: channel,
+    );
+
+    final result = await provider.notificationPermissionStatus();
+
+    expect(result, NotificationPermissionStatus.denied);
+    expect(calls.single.method, 'notificationPermissionStatus');
+    expect(
+      calls.where((call) => call.method == 'requestNotificationPermission'),
+      isEmpty,
+    );
+  });
+
   test('알림 권한 제공자는 권한 거부를 쉬운 상태로 바꾼다', () async {
     const channel = MethodChannel('test/notification-permission-denied');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

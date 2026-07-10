@@ -23,6 +23,8 @@ const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
 const _routeOnlineSearchErrorMessage = '실시간/서버 경로를 확인하지 못했어요.';
 const _routeRefreshErrorMessage = '도착 시간을 새로 확인하지 못했어요.';
+const _getOffAlarmRefreshRollbackMessage = '하차 알림을 갱신하지 못해 이전 경로를 유지해요.';
+const _getOffAlarmRefreshFailureMessage = '하차 알림을 새로 맞추지 못했어요. 이전 경로를 유지해요.';
 const _routeFeedbackErrorMessage = '의견을 보내지 못했어요.';
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 바꾸지 못했어요.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했어요.';
@@ -2219,6 +2221,18 @@ class RouteSearchState {
   }
 }
 
+class RouteRefreshOutcome {
+  const RouteRefreshOutcome({
+    required this.result,
+    required this.refreshed,
+    required this.alarmRefreshRequired,
+  });
+
+  final RouteSearchResult? result;
+  final bool refreshed;
+  final bool alarmRefreshRequired;
+}
+
 class RouteSearchController extends ChangeNotifier {
   RouteSearchController({required this.repository});
 
@@ -2286,16 +2300,24 @@ class RouteSearchController extends ChangeNotifier {
     }
   }
 
-  Future<void> refreshCurrentRoute() async {
+  Future<RouteRefreshOutcome> refreshCurrentRoute() async {
     if (_disposed) {
-      return;
+      return RouteRefreshOutcome(
+        result: _state.result,
+        refreshed: false,
+        alarmRefreshRequired: false,
+      );
     }
     final currentResult = _state.result;
     if (_state.status != RouteSearchViewStatus.success ||
         currentResult == null ||
         currentResult.isLocalResult ||
         _state.isRefreshing) {
-      return;
+      return RouteRefreshOutcome(
+        result: currentResult,
+        refreshed: false,
+        alarmRefreshRequired: false,
+      );
     }
 
     final refreshRequestId = _searchRequestId;
@@ -2309,7 +2331,11 @@ class RouteSearchController extends ChangeNotifier {
     try {
       final refreshed = await repository.refreshRoute(refreshRouteSearchId);
       if (staleRefresh()) {
-        return;
+        return RouteRefreshOutcome(
+          result: _state.result,
+          refreshed: false,
+          alarmRefreshRequired: false,
+        );
       }
       final refreshedResult = _preserveGetOffAlarmArrivalTimes(
         next: refreshed.result,
@@ -2322,12 +2348,26 @@ class RouteSearchController extends ChangeNotifier {
           refreshMessage: refreshed.userMessage,
         ),
       );
+      return RouteRefreshOutcome(
+        result: refreshedResult,
+        refreshed: true,
+        alarmRefreshRequired: true,
+      );
     } on RouteSearchException catch (error) {
       if (staleRefresh()) {
-        return;
+        return RouteRefreshOutcome(
+          result: _state.result,
+          refreshed: false,
+          alarmRefreshRequired: false,
+        );
       }
       _emitState(
         _state.copyWith(isRefreshing: false, refreshMessage: error.message),
+      );
+      return RouteRefreshOutcome(
+        result: _state.result,
+        refreshed: false,
+        alarmRefreshRequired: true,
       );
     } catch (error, stackTrace) {
       reportMobileError(
@@ -2336,7 +2376,11 @@ class RouteSearchController extends ChangeNotifier {
         context: '경로 ETA refresh 처리 중 예외가 발생했습니다.',
       );
       if (staleRefresh()) {
-        return;
+        return RouteRefreshOutcome(
+          result: _state.result,
+          refreshed: false,
+          alarmRefreshRequired: false,
+        );
       }
       _emitState(
         _state.copyWith(
@@ -2344,7 +2388,29 @@ class RouteSearchController extends ChangeNotifier {
           refreshMessage: _routeRefreshErrorMessage,
         ),
       );
+      return RouteRefreshOutcome(
+        result: _state.result,
+        refreshed: false,
+        alarmRefreshRequired: true,
+      );
     }
+  }
+
+  bool rollbackRefreshAfterAlarmFailure({
+    required RouteSearchState previousState,
+    required RouteSearchResult expectedCurrentResult,
+    required String refreshMessage,
+  }) {
+    if (_disposed || !identical(_state.result, expectedCurrentResult)) {
+      return false;
+    }
+    _emitState(
+      previousState.copyWith(
+        isRefreshing: false,
+        refreshMessage: refreshMessage,
+      ),
+    );
+    return true;
   }
 
   void reset() {
@@ -2454,46 +2520,127 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 
   Future<void> _refreshCurrentRouteAndAlarm() async {
-    await _controller.refreshCurrentRoute();
+    final previousState = _controller.state;
+    final outcome = await _controller.refreshCurrentRoute();
     if (!mounted) {
       return;
     }
+    if (!outcome.alarmRefreshRequired) {
+      return;
+    }
     final getOffAlarmController = widget.getOffAlarmController;
-    final result = _controller.state.result;
-    if (getOffAlarmController == null || result == null) {
+    final result = outcome.result;
+    if (getOffAlarmController == null ||
+        !getOffAlarmController.state.enabled ||
+        result == null) {
       return;
     }
     final rideLegs = _rideLegArrivalsFromResult(result);
     if (rideLegs.isEmpty) {
+      if (outcome.refreshed) {
+        final disabled = await _disableActiveGetOffAlarm();
+        if (!disabled) {
+          _rollbackRouteAfterAlarmFailure(
+            previousState: previousState,
+            expectedCurrentResult: result,
+          );
+        }
+      }
       return;
     }
+    final source =
+        outcome.refreshed &&
+            rideLegs.any((leg) => leg.realtimeArrivalIso?.isNotEmpty ?? false)
+        ? GetOffAlarmTimeSource.realtime
+        : GetOffAlarmTimeSource.planned;
     try {
       final activeSubscription = await getOffAlarmController.repository
           .loadActive();
       if (!mounted) {
         return;
       }
+      final activeStationNames = <String, String>{
+        if (activeSubscription != null)
+          for (final transfer in activeSubscription.transfers)
+            transfer.stationId: transfer.stationName,
+        if (activeSubscription != null)
+          activeSubscription.destination.stationId:
+              activeSubscription.destination.stationName,
+      };
+      final stationNames = <String, String>{};
+      for (final leg in rideLegs) {
+        final stationId = leg.toStationId;
+        if (stationNames.containsKey(stationId)) {
+          continue;
+        }
+        final stationName = await _resolveGetOffAlarmStationName(
+          stationId: stationId,
+          result: result,
+          stationRepository: widget.stationRepository,
+          preferredStationNames: activeStationNames,
+        );
+        if (stationName == null) {
+          throw StateError('하차 알림 역명을 확인하지 못했습니다.');
+        }
+        stationNames[stationId] = stationName;
+      }
+      if (!mounted ||
+          !identical(_controller.state.result, result) ||
+          !getOffAlarmController.state.enabled) {
+        return;
+      }
+      final stops = getOffAlarmStopsFromRideLegs(
+        rideLegs: rideLegs,
+        stationName: (id) => stationNames[id]!,
+        source: source,
+      );
+      final destination = stops.last;
+      final previousArrivalAt = activeSubscription?.destination.arrivalAt;
+      final deltaSeconds = previousArrivalAt == null
+          ? 0
+          : destination.arrivalAt.difference(previousArrivalAt).inSeconds;
+      final changed = previousArrivalAt != null && deltaSeconds != 0;
       await getOffAlarmController.refresh(
-        stops: getOffAlarmStopsFromRideLegs(
-          rideLegs: rideLegs,
-          stationName: (id) => id,
-        ),
+        stops: stops,
         transferAlarmEnabled: activeSubscription?.transferAlarmEnabled ?? true,
       );
       if (kDebugMode && getOffAlarmController.state.enabled) {
         debugPrint(
-          'get_off_alarm foreground_refresh '
-          'scheduled_count=${getOffAlarmController.state.scheduledCount} '
-          'mode=${getOffAlarmController.state.scheduleMode?.name ?? 'unknown'}',
+          'get_off_alarm foreground_refresh changed=$changed '
+          'delta_seconds=$deltaSeconds source=${source.name} '
+          'mode=${getOffAlarmController.state.scheduleMode?.name} '
+          'scheduled_count=${getOffAlarmController.state.scheduledCount}',
         );
       }
     } catch (error, stackTrace) {
+      final rolledBack =
+          outcome.refreshed &&
+          _rollbackRouteAfterAlarmFailure(
+            previousState: previousState,
+            expectedCurrentResult: result,
+          );
       reportMobileError(
         error,
         stackTrace,
         context: '하차 알림 foreground 재예약 중 예외가 발생했습니다.',
       );
+      if (mounted && rolledBack) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text(_getOffAlarmRefreshFailureMessage)),
+        );
+      }
     }
+  }
+
+  bool _rollbackRouteAfterAlarmFailure({
+    required RouteSearchState previousState,
+    required RouteSearchResult expectedCurrentResult,
+  }) {
+    return _controller.rollbackRefreshAfterAlarmFailure(
+      previousState: previousState,
+      expectedCurrentResult: expectedCurrentResult,
+      refreshMessage: _getOffAlarmRefreshRollbackMessage,
+    );
   }
 
   @override
@@ -2547,7 +2694,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         child: SafeArea(
           child: RefreshIndicator(
             key: const Key('routeResultRefreshIndicator'),
-            onRefresh: _controller.refreshCurrentRoute,
+            onRefresh: _refreshCurrentRouteAndAlarm,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: _routeSearchPagePadding,
@@ -2607,17 +2754,11 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                               child: Text(option.title),
                             ),
                         ],
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           if (value == null) {
                             return;
                           }
-                          setState(() {
-                            _selectedMobilityType = value;
-                            _selectedConstraintMode =
-                                RouteSearchRequest._defaultConstraintMode(
-                                  value,
-                                );
-                          });
+                          await _updateMobilityType(value);
                         },
                       ),
                     ),
@@ -2629,13 +2770,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                   // 결과 화면에서 안내한다(#1568).
                   title: const Text('계단 없는 길만'),
                   value: _selectedConstraintMode == 'STRICT_STEP_FREE',
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedConstraintMode = value
-                          ? 'STRICT_STEP_FREE'
-                          : 'PREFER_STEP_FREE';
-                    });
-                  },
+                  onChanged: _updateConstraintMode,
                 ),
                 _RouteRecentDestinationList(
                   repository: widget.favoriteRouteRepository,
@@ -2647,8 +2782,11 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     state: _controller.state,
                     routeFeedbackRepository: widget.routeFeedbackRepository,
                     favoriteRouteRepository: widget.favoriteRouteRepository,
-                    onShellBackToHome: widget.onShellBackToHome,
+                    onShellBackToHome: widget.onShellBackToHome == null
+                        ? null
+                        : _endRoute,
                     getOffAlarmController: widget.getOffAlarmController,
+                    stationRepository: widget.stationRepository,
                   ),
                 ),
               ],
@@ -2670,9 +2808,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         }
         return PopScope(
           canPop: false,
-          onPopInvokedWithResult: (didPop, _) {
+          onPopInvokedWithResult: (didPop, _) async {
             if (!didPop) {
-              onShellBackToHome();
+              await _endRoute();
             }
           },
           child: child!,
@@ -2681,11 +2819,47 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
   }
 
-  void _submit() {
+  Future<bool> _disableActiveGetOffAlarm() async {
+    final getOffAlarmController = widget.getOffAlarmController;
+    if (getOffAlarmController == null) {
+      return true;
+    }
+    try {
+      await getOffAlarmController.disable();
+      return true;
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '하차 알림 취소 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.')),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<void> _endRoute() async {
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    _controller.reset();
+    widget.onShellBackToHome?.call();
+  }
+
+  Future<void> _submit() async {
     if (_controller.state.status == RouteSearchViewStatus.loading) {
       return;
     }
     if (_originStation == null || _destinationStation == null) {
+      if (!await _disableActiveGetOffAlarm()) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
       _controller.reset();
       setState(() {
         _validationMessage = '출발역과 도착역을 검색 결과에서 선택해 주세요.';
@@ -2695,9 +2869,15 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     setState(() {
       _validationMessage = '';
     });
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
 
     // 화면에는 역 이름을 보여주지만 API에는 안정적인 station id만 전달한다.
-    _controller.search(
+    await _controller.search(
       RouteSearchRequest(
         originStationId: _originStation!.id,
         destinationStationId: _destinationStation!.id,
@@ -2726,7 +2906,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
   }
 
-  void _updateOriginStation(StationSearchResult? station) {
+  Future<void> _updateOriginStation(StationSearchResult? station) async {
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _originStation = station;
       if (station != null) {
@@ -2737,7 +2923,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _controller.reset();
   }
 
-  void _updateDestinationStation(StationSearchResult? station) {
+  Future<void> _updateDestinationStation(StationSearchResult? station) async {
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _destinationStation = station;
       if (station != null) {
@@ -2755,7 +2947,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     });
   }
 
-  void _swapStations() {
+  Future<void> _swapStations() async {
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
     setState(() {
       final origin = _originStation;
       _originStation = _destinationStation;
@@ -2763,6 +2961,38 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       _activeStationPicker = null;
       _validationMessage = '';
     });
+    _controller.reset();
+  }
+
+  Future<void> _updateMobilityType(String mobilityType) async {
+    if (mobilityType == _selectedMobilityType ||
+        !await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedMobilityType = mobilityType;
+      _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
+        mobilityType,
+      );
+    });
+    _controller.reset();
+  }
+
+  Future<void> _updateConstraintMode(bool strictStepFree) async {
+    final constraintMode = strictStepFree
+        ? 'STRICT_STEP_FREE'
+        : 'PREFER_STEP_FREE';
+    if (constraintMode == _selectedConstraintMode ||
+        !await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() => _selectedConstraintMode = constraintMode);
     _controller.reset();
   }
 
@@ -2850,6 +3080,15 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
 
     if (!mounted || selectedMobilityType == null) {
+      return;
+    }
+    if (selectedMobilityType == _selectedMobilityType) {
+      return;
+    }
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
       return;
     }
     setState(() {
@@ -3794,13 +4033,15 @@ class _RouteSearchBody extends StatelessWidget {
     required this.favoriteRouteRepository,
     required this.onShellBackToHome,
     required this.getOffAlarmController,
+    required this.stationRepository,
   });
 
   final RouteSearchState state;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
-  final VoidCallback? onShellBackToHome;
+  final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
+  final StationSearchRepository stationRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -3827,6 +4068,7 @@ class _RouteSearchBody extends StatelessWidget {
         favoriteRouteRepository: favoriteRouteRepository,
         onShellBackToHome: onShellBackToHome,
         getOffAlarmController: getOffAlarmController,
+        stationRepository: stationRepository,
       ),
     };
   }
@@ -3969,6 +4211,7 @@ class _RouteSearchResultCard extends StatefulWidget {
     required this.favoriteRouteRepository,
     required this.onShellBackToHome,
     required this.getOffAlarmController,
+    required this.stationRepository,
   });
 
   final RouteSearchResult result;
@@ -3976,8 +4219,9 @@ class _RouteSearchResultCard extends StatefulWidget {
   final bool isRefreshing;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
-  final VoidCallback? onShellBackToHome;
+  final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
+  final StationSearchRepository stationRepository;
 
   @override
   State<_RouteSearchResultCard> createState() => _RouteSearchResultCardState();
@@ -4009,6 +4253,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
             _GetOffAlarmEntryPoint(
               controller: widget.getOffAlarmController!,
               result: result,
+              stationRepository: widget.stationRepository,
             ),
         ],
       ),
@@ -4032,9 +4277,9 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
     }
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
+      onPopInvokedWithResult: (didPop, _) async {
         if (!didPop) {
-          onShellBackToHome();
+          await onShellBackToHome();
         }
       },
       child: content,
@@ -4129,10 +4374,12 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
   const _GetOffAlarmEntryPoint({
     required this.controller,
     required this.result,
+    required this.stationRepository,
   });
 
   final GetOffAlarmController controller;
   final RouteSearchResult result;
+  final StationSearchRepository stationRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -4146,24 +4393,67 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
         controller: controller,
         routeId: result.routeSearchId,
         rideLegs: rideLegs,
-        stationName: (id) => id,
+        stationName: (id) => _resolveGetOffAlarmStationName(
+          stationId: id,
+          result: result,
+          stationRepository: stationRepository,
+        ),
       ),
     );
   }
 }
 
+Future<String?> _resolveGetOffAlarmStationName({
+  required String stationId,
+  required RouteSearchResult result,
+  required StationSearchRepository stationRepository,
+  Map<String, String> preferredStationNames = const {},
+}) async {
+  final preferredName = _usableGetOffAlarmStationName(
+    preferredStationNames[stationId],
+    stationId,
+  );
+  if (preferredName != null) {
+    return preferredName;
+  }
+  if (stationId == result.destinationStationId) {
+    return _usableGetOffAlarmStationName(
+      result.destinationStationName,
+      stationId,
+    );
+  }
+  final detail = await stationRepository.getStationDetail(stationId);
+  if (detail.id != stationId) {
+    return null;
+  }
+  return _usableGetOffAlarmStationName(detail.nameKo, stationId);
+}
+
+String? _usableGetOffAlarmStationName(String? rawName, String stationId) {
+  final stationName = rawName?.trim();
+  if (stationName == null || stationName.isEmpty || stationName == stationId) {
+    return null;
+  }
+  return stationName;
+}
+
 List<RideLegArrival> _rideLegArrivalsFromResult(RouteSearchResult result) {
+  final rideSteps = result.steps
+      .where((step) => step.stepType == 'ride')
+      .toList(growable: false);
+  if (rideSteps.isEmpty ||
+      rideSteps.any((step) => step.plannedArrivalTimeIso.isEmpty)) {
+    return const [];
+  }
   final rideLegs = <RideLegArrival>[];
-  for (final step in result.steps) {
-    if (step.stepType == 'ride' && step.plannedArrivalTimeIso.isNotEmpty) {
-      rideLegs.add(
-        RideLegArrival(
-          toStationId: step.toStationId,
-          plannedArrivalIso: step.plannedArrivalTimeIso,
-          realtimeArrivalIso: step.realtimeArrivalTimeIso,
-        ),
-      );
-    }
+  for (final step in rideSteps) {
+    rideLegs.add(
+      RideLegArrival(
+        toStationId: step.toStationId,
+        plannedArrivalIso: step.plannedArrivalTimeIso,
+        realtimeArrivalIso: step.realtimeArrivalTimeIso,
+      ),
+    );
   }
   return rideLegs;
 }
@@ -4200,7 +4490,7 @@ RouteSearchResult _preserveGetOffAlarmArrivalTimes({
           lineName: step.lineName,
           actionDetail: step.actionDetail,
           plannedArrivalTimeIso: matched.plannedArrivalTimeIso,
-          realtimeArrivalTimeIso: matched.realtimeArrivalTimeIso,
+          realtimeArrivalTimeIso: step.realtimeArrivalTimeIso,
         );
       })
       .toList(growable: false);

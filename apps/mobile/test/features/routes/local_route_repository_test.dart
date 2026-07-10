@@ -7,6 +7,8 @@ import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/routes/application/network_graph.dart'
     as graph;
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_mapping.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -397,6 +399,309 @@ void main() {
       {'seoul-4'},
     );
     expect(result.blockedReasons, isEmpty);
+  });
+
+  test('로컬 경로는 현재 이후 공식 시간표의 ride 도착시각을 노출한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, '2026-07-10T08:12:00+09:00');
+    expect(result.etaSource, 'STATIC_LOCAL');
+  });
+
+  test('연속된 동일 노선·패턴 ride는 양 끝을 포함하는 한 trip과 도착 알림 하나로 묶는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedConsecutiveRideRoute(database);
+    await _seedConsecutiveRideTimetable(database);
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final rides = result.steps
+        .where((step) => step.stepType == 'ride')
+        .toList(growable: false);
+    expect(rides, hasLength(1));
+    expect(rides.single.fromStationId, 'station-a');
+    expect(rides.single.toStationId, 'station-c');
+    expect(rides.single.plannedArrivalTimeIso, '2026-07-10T08:12:00+09:00');
+
+    final alarmStops = getOffAlarmStopsFromRideLegs(
+      rideLegs: [
+        for (final ride in rides)
+          RideLegArrival(
+            toStationId: ride.toStationId,
+            plannedArrivalIso: ride.plannedArrivalTimeIso,
+          ),
+      ],
+      stationName: (stationId) => stationId,
+      source: GetOffAlarmTimeSource.planned,
+    );
+    expect(alarmStops, hasLength(1));
+    expect(alarmStops.single.stationId, 'station-c');
+    expect(alarmStops.single.kind, GetOffAlarmKind.destination);
+  });
+
+  test('출발 초보다 500ms 늦은 cursor는 이미 출발한 trip을 건너뛴다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    await database.customStatement('''
+      UPDATE network_edges
+      SET duration_seconds = 0
+      WHERE id = 'entry-sangnoksu-seoul-4'
+    ''');
+    await _insertBaselineTrip(
+      database,
+      tripId: 'trip-after-fractional-cursor',
+      departureSeconds: 28980,
+      arrivalSeconds: 29700,
+    );
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T08:00:30.500+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, '2026-07-10T08:15:00+09:00');
+  });
+
+  test('운행 제외일은 건너뛰고 7일 범위의 다음 활성 서비스를 선택한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    await database.customStatement('''
+      INSERT INTO service_calendar_dates (service_id, date, exception_type)
+      VALUES ('weekday-service', '20260710', 2)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, '2026-07-13T08:12:00+09:00');
+  });
+
+  test('주말에 추가된 예외 서비스를 활성 운행으로 선택한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    await database.customStatement('''
+      INSERT INTO service_calendar_dates (service_id, date, exception_type)
+      VALUES ('weekday-service', '20260711', 1)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-11T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, '2026-07-11T08:12:00+09:00');
+  });
+
+  test('03:00 이전은 전일 service day의 24시간 초과 시간표를 사용한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    await database.customStatement('''
+      UPDATE transit_stop_times
+      SET arrival_seconds = CASE stop_sequence WHEN 1 THEN 93600 ELSE 94320 END,
+          departure_seconds = CASE stop_sequence WHEN 1 THEN 93630 ELSE 94350 END
+      WHERE trip_id = 'trip-seoul-4-sangnoksu-sadang'
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-11T01:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, '2026-07-11T02:12:00+09:00');
+  });
+
+  test('pickup·drop-off 금지 trip을 건너뛰고 다음 승하차 가능 trip을 선택한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedBaselineTimetable(database);
+    await database.customStatement('''
+      UPDATE transit_stop_times
+      SET pickup_type = 1
+      WHERE trip_id = 'trip-seoul-4-sangnoksu-sadang' AND stop_sequence = 1
+    ''');
+    await _insertBaselineTrip(
+      database,
+      tripId: 'trip-drop-off-blocked',
+      departureSeconds: 28950,
+      arrivalSeconds: 29640,
+      dropOffType: 1,
+    );
+    await _insertBaselineTrip(
+      database,
+      tripId: 'trip-boardable',
+      departureSeconds: 29070,
+      arrivalSeconds: 29760,
+    );
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, '2026-07-10T08:16:00+09:00');
+  });
+
+  test('다중 ride는 이전 도착과 환승 시간 이후의 다음 trip을 순차 선택한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedTwoLegRoute(database);
+    await _seedTwoLegTimetable(database);
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final rides = result.steps
+        .where((step) => step.stepType == 'ride')
+        .toList(growable: false);
+    expect(rides.map((ride) => ride.plannedArrivalTimeIso), [
+      '2026-07-10T08:10:00+09:00',
+      '2026-07-10T08:22:00+09:00',
+    ]);
+  });
+
+  test('다중 ride 중 하나라도 공식 도착이 없으면 전체 알림 투영을 빈다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedTwoLegRoute(database);
+    await _seedTwoLegTimetable(database);
+    await database.customStatement('''
+      DELETE FROM transit_stop_times
+      WHERE trip_id IN (SELECT id FROM transit_trips WHERE route_id = 'route-alt')
+    ''');
+    await database.customStatement(
+      "DELETE FROM transit_trips WHERE route_id = 'route-alt'",
+    );
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final rides = result.steps.where((step) => step.stepType == 'ride');
+    expect(rides, isNotEmpty);
+    expect(
+      rides,
+      everyElement(
+        predicate<RouteSearchStep>(
+          (ride) => ride.plannedArrivalTimeIso.isEmpty,
+        ),
+      ),
+    );
+  });
+
+  test('공식 시간표가 없으면 static 소요시간으로 절대 도착을 합성하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.plannedArrivalTimeIso, isEmpty);
   });
 
   test('로컬 capability는 station 존재와 realtime 지원을 분리한다', () async {
@@ -3791,6 +4096,7 @@ Future<void> _insertVerifiedNetworkEdge(
   required String toNodeId,
   required String edgeType,
   required int durationSeconds,
+  String servicePattern = '',
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
   int lastVerifiedAtSeconds = 1781827200,
@@ -3801,11 +4107,11 @@ Future<void> _insertVerifiedNetworkEdge(
     '''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, edge_type,
-        stair_access_state, accessibility_status, reliability_score,
+        service_pattern, stair_access_state, accessibility_status, reliability_score,
         source_id, source_snapshot_id, provider_record_hash, provenance_kind,
         verification_status, last_verified_at, evidence_hash
       )
-      VALUES (?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
+      VALUES (?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
         'test-source-snapshot',
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         ?, ?, ?, ?)
@@ -3816,6 +4122,7 @@ Future<void> _insertVerifiedNetworkEdge(
       toNodeId,
       durationSeconds,
       edgeType,
+      servicePattern,
       provenanceKind,
       verificationStatus,
       lastVerifiedAtSeconds,
@@ -3998,6 +4305,125 @@ Future<void> _seedAvailableFacilityRoute(CatalogDatabase database) async {
   await _addEligibleStationFacilityEvidence(database);
 }
 
+Future<void> _seedTwoLegRoute(CatalogDatabase database) async {
+  await _seedLineWithoutNetworkEdges(database);
+  await _addSecondLineForTransferFixture(database);
+  await database.customStatement('''
+    INSERT INTO station_lines (
+      station_id, line_id, station_code, line_sequence, platform_info
+    )
+    VALUES ('station-b', 'line-alt', 'B2', 2, '')
+  ''');
+  await _insertVerifiedNetworkEdge(
+    database,
+    id: 'ride-a-b-test',
+    fromNodeId: 'station-a:line-test',
+    toNodeId: 'station-b:line-test',
+    edgeType: 'RIDE',
+    durationSeconds: 120,
+  );
+  await _insertVerifiedNetworkEdge(
+    database,
+    id: 'transfer-b-test-alt',
+    fromNodeId: 'station-b:line-test',
+    toNodeId: 'station-b:line-alt',
+    edgeType: 'TRANSFER',
+    durationSeconds: 60,
+  );
+  await _insertVerifiedNetworkEdge(
+    database,
+    id: 'ride-b-c-alt',
+    fromNodeId: 'station-b:line-alt',
+    toNodeId: 'station-c:line-alt',
+    edgeType: 'RIDE',
+    durationSeconds: 120,
+  );
+}
+
+Future<void> _seedConsecutiveRideRoute(CatalogDatabase database) async {
+  await _seedLineWithoutNetworkEdges(database);
+  await _insertVerifiedNetworkEdge(
+    database,
+    id: 'ride-a-b-local',
+    fromNodeId: 'station-a:line-test:LOCAL',
+    toNodeId: 'station-b:line-test:LOCAL',
+    edgeType: 'RIDE',
+    durationSeconds: 300,
+    servicePattern: 'LOCAL',
+  );
+  await _insertVerifiedNetworkEdge(
+    database,
+    id: 'ride-b-c-local',
+    fromNodeId: 'station-b:line-test:LOCAL',
+    toNodeId: 'station-c:line-test:LOCAL',
+    edgeType: 'RIDE',
+    durationSeconds: 300,
+    servicePattern: 'LOCAL',
+  );
+}
+
+Future<void> _seedConsecutiveRideTimetable(CatalogDatabase database) async {
+  await database.customStatement('''
+    INSERT INTO service_calendars (
+      service_id, monday, tuesday, wednesday, thursday, friday,
+      saturday, sunday, start_date, end_date
+    )
+    VALUES ('weekday-consecutive', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_routes (id, line_id, route_short_name)
+    VALUES ('route-consecutive', 'line-test', 'T')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_trips (id, route_id, service_id, service_pattern)
+    VALUES ('trip-consecutive', 'route-consecutive', 'weekday-consecutive', 'LOCAL')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_stop_times (
+      trip_id, stop_sequence, station_id, line_id,
+      arrival_seconds, departure_seconds
+    )
+    VALUES
+      ('trip-consecutive', 1, 'station-a', 'line-test', 28770, 28800),
+      ('trip-consecutive', 2, 'station-b', 'line-test', 29100, 29130),
+      ('trip-consecutive', 3, 'station-c', 'line-test', 29520, 29550)
+  ''');
+}
+
+Future<void> _seedTwoLegTimetable(CatalogDatabase database) async {
+  await database.customStatement('''
+    INSERT INTO service_calendars (
+      service_id, monday, tuesday, wednesday, thursday, friday,
+      saturday, sunday, start_date, end_date
+    )
+    VALUES ('weekday-two-leg', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_routes (id, line_id, route_short_name)
+    VALUES ('route-test', 'line-test', 'T'), ('route-alt', 'line-alt', 'A')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_trips (id, route_id, service_id)
+    VALUES
+      ('trip-first', 'route-test', 'weekday-two-leg'),
+      ('trip-alt-too-early', 'route-alt', 'weekday-two-leg'),
+      ('trip-alt-boardable', 'route-alt', 'weekday-two-leg')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_stop_times (
+      trip_id, stop_sequence, station_id, line_id,
+      arrival_seconds, departure_seconds
+    )
+    VALUES
+      ('trip-first', 1, 'station-a', 'line-test', 28770, 28800),
+      ('trip-first', 2, 'station-b', 'line-test', 29400, 29430),
+      ('trip-alt-too-early', 1, 'station-b', 'line-alt', 29070, 29100),
+      ('trip-alt-too-early', 2, 'station-c', 'line-alt', 29700, 29730),
+      ('trip-alt-boardable', 1, 'station-b', 'line-alt', 29490, 29520),
+      ('trip-alt-boardable', 2, 'station-c', 'line-alt', 30120, 30150)
+  ''');
+}
+
 Future<void> _seedBaselineTimetable(CatalogDatabase database) async {
   await database.customStatement('''
       INSERT INTO service_calendars (
@@ -4052,6 +4478,46 @@ Future<void> _seedBaselineTimetable(CatalogDatabase database) async {
           29550
         )
     ''');
+}
+
+Future<void> _insertBaselineTrip(
+  CatalogDatabase database, {
+  required String tripId,
+  required int departureSeconds,
+  required int arrivalSeconds,
+  int pickupType = 0,
+  int dropOffType = 0,
+}) async {
+  await database.customStatement(
+    '''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, trip_headsign, direction_id, service_pattern
+      )
+      VALUES (?, 'route-seoul-4-down', 'weekday-service', '사당', 'UP', 'LOCAL')
+    ''',
+    [tripId],
+  );
+  await database.customStatement(
+    '''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id, arrival_seconds,
+        departure_seconds, pickup_type, drop_off_type
+      )
+      VALUES
+        (?, 1, 'station-sangnoksu', 'seoul-4', ?, ?, ?, 0),
+        (?, 2, 'station-sadang', 'seoul-4', ?, ?, 0, ?)
+    ''',
+    [
+      tripId,
+      departureSeconds - 30,
+      departureSeconds,
+      pickupType,
+      tripId,
+      arrivalSeconds,
+      arrivalSeconds + 30,
+      dropOffType,
+    ],
+  );
 }
 
 Future<void> _seedRealtimeMapping(

@@ -61,6 +61,25 @@ void main() {
     expect(resumeCalled.isCompleted, isTrue);
   });
 
+  testWidgets('앱 lifecycle은 resumed에서 하차 알림 상태를 재조정한다', (tester) async {
+    final reconcileCalled = Completer<void>();
+
+    await tester.pumpWidget(
+      AppBootstrapLifecycle(
+        close: () => Future<void>.value(),
+        resumeGetOffAlarmState: () {
+          reconcileCalled.complete();
+          return Future<void>.value();
+        },
+        child: const SizedBox.shrink(),
+      ),
+    );
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+
+    await reconcileCalled.future.timeout(const Duration(seconds: 5));
+    expect(reconcileCalled.isCompleted, isTrue);
+  });
+
   test('catalog DB는 앱 시작에 필요한 schema와 index를 만든다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

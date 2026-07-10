@@ -15,14 +15,28 @@ import 'get_off_alarm_scheduler.dart';
 /// 플랫폼 예약만 담당한다. 테스트에서는 이 인터페이스를 가짜로 대체한다.
 abstract class GetOffAlarmNotifier {
   /// [alarms]를 [mode]에 맞춰 예약한다. 기존 활성 알림은 먼저 모두 취소한다
-  /// (단일 경로 원칙).
-  Future<void> scheduleAlarms(
+  /// (단일 경로 원칙). 반환값은 실제 예약 성공·실패 건수다.
+  Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   });
 
   /// 활성 하차 알림을 모두 취소한다.
   Future<void> cancelAll();
+
+  /// 하차 알림 전용 ID 범위에 남은 OS 대기 알림 건수만 반환한다.
+  Future<int> pendingAlarmCount();
+}
+
+/// 플랫폼에 전달한 하차 알림 예약의 실제 결과.
+class ScheduleDeliveryResult {
+  const ScheduleDeliveryResult({
+    required this.scheduledCount,
+    required this.failedCount,
+  });
+
+  final int scheduledCount;
+  final int failedCount;
 }
 
 /// [GetOffAlarmScheduleMode]를 flutter_local_notifications의
@@ -39,13 +53,66 @@ AndroidScheduleMode androidScheduleModeFor(GetOffAlarmScheduleMode mode) {
 
 /// flutter_local_notifications 기반 실제 구현.
 class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
-  LocalGetOffAlarmNotifier(this._plugin);
+  LocalGetOffAlarmNotifier(
+    FlutterLocalNotificationsPlugin plugin, {
+    bool? isAndroid,
+    Future<void> Function()? initializePlugin,
+    Future<List<int>> Function()? pendingIds,
+    Future<void> Function(int id)? cancelId,
+    Future<void> Function(
+      int id,
+      String title,
+      String body,
+      DateTime fireAt,
+      AndroidScheduleMode mode,
+    )?
+    scheduleAlarm,
+  }) : _isAndroid = isAndroid ?? Platform.isAndroid,
+       _initializePlugin =
+           initializePlugin ??
+           (() async {
+             await plugin.initialize(
+               settings: const InitializationSettings(
+                 android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+               ),
+             );
+           }),
+       _pendingIds =
+           pendingIds ??
+           (() async {
+             final pending = await plugin.pendingNotificationRequests();
+             return pending.map((request) => request.id).toList();
+           }),
+       _cancelId = cancelId ?? ((id) => plugin.cancel(id: id)),
+       _scheduleAlarm =
+           scheduleAlarm ??
+           ((id, title, body, fireAt, mode) => plugin.zonedSchedule(
+             id: id,
+             title: title,
+             body: body,
+             scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
+             notificationDetails: const NotificationDetails(
+               android: _androidDetails,
+             ),
+             androidScheduleMode: mode,
+           ));
 
-  final FlutterLocalNotificationsPlugin _plugin;
+  final bool _isAndroid;
+  final Future<void> Function() _initializePlugin;
+  final Future<List<int>> Function() _pendingIds;
+  final Future<void> Function(int id) _cancelId;
+  final Future<void> Function(
+    int id,
+    String title,
+    String body,
+    DateTime fireAt,
+    AndroidScheduleMode mode,
+  )
+  _scheduleAlarm;
 
-  /// 하차 알림에 할당하는 알림 ID 기준값. 단일 경로에서 알림 수는 적으므로
-  /// 이 기준값부터 순차 부여하고 취소 시 전부 지운다.
-  static const int _baseNotificationId = 47660;
+  /// 하차 알림 전용 ID 범위 `[baseNotificationId, base + capacity)`.
+  static const int baseNotificationId = 47660;
+  static const int notificationCapacity = 64;
 
   static const String _channelId = 'get_off_alarm';
   static const String _channelName = '하차 알림';
@@ -61,7 +128,6 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
         category: AndroidNotificationCategory.navigation,
       );
 
-  List<int> _activeIds = const [];
   Future<void>? _initialization;
 
   /// 첫 예약 전에 플러그인·타임존을 1회 초기화한다. 진행 중인 초기화 Future를
@@ -74,61 +140,77 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
   Future<void> _initialize() async {
     tz_data.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation('Asia/Seoul'));
-    // Android 전용 초기화(iOS는 #571 DEFERRED). iOS 진입은 아래 Platform 가드가 막는다.
-    await _plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      ),
-    );
+    // Android 전용 초기화(iOS는 #571 DEFERRED). iOS 진입은 아래 platform 가드가 막는다.
+    await _initializePlugin();
   }
 
   @override
-  Future<void> scheduleAlarms(
+  Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   }) async {
-    if (!Platform.isAndroid) {
-      return;
+    if (!_isAndroid) {
+      return ScheduleDeliveryResult(
+        scheduledCount: 0,
+        failedCount: alarms.length,
+      );
     }
     await _ensureInitialized();
     await cancelAll();
     final scheduleMode = androidScheduleModeFor(mode);
-    final assignedIds = <int>[];
-    for (var index = 0; index < alarms.length; index++) {
+    var scheduledCount = 0;
+    final attemptCount = alarms.length < notificationCapacity
+        ? alarms.length
+        : notificationCapacity;
+    for (var index = 0; index < attemptCount; index++) {
       final alarm = alarms[index];
-      final id = _baseNotificationId + index;
+      final id = baseNotificationId + index;
       try {
-        await _plugin.zonedSchedule(
-          id: id,
-          title: _titleFor(alarm),
-          body: _bodyFor(alarm),
-          scheduledDate: tz.TZDateTime.from(alarm.fireAt, tz.local),
-          notificationDetails: const NotificationDetails(
-            android: _androidDetails,
-          ),
-          androidScheduleMode: scheduleMode,
+        await _scheduleAlarm(
+          id,
+          _titleFor(alarm),
+          _bodyFor(alarm),
+          alarm.fireAt,
+          scheduleMode,
         );
-        assignedIds.add(id);
+        scheduledCount += 1;
       } on Exception catch (error, stackTrace) {
         reportMobileError(error, stackTrace, context: '하차 알림 예약 중 예외가 발생했습니다.');
       }
     }
-    _activeIds = assignedIds;
+    return ScheduleDeliveryResult(
+      scheduledCount: scheduledCount,
+      failedCount: alarms.length - scheduledCount,
+    );
   }
 
   @override
   Future<void> cancelAll() async {
-    if (!Platform.isAndroid) {
+    if (!_isAndroid) {
       return;
     }
-    for (final id in _activeIds) {
-      try {
-        await _plugin.cancel(id: id);
-      } on Exception catch (error, stackTrace) {
-        reportMobileError(error, stackTrace, context: '하차 알림 취소 중 예외가 발생했습니다.');
+    await _ensureInitialized();
+    final pendingIds = await _pendingIds();
+    for (final id in pendingIds) {
+      if (_isOwnedNotificationId(id)) {
+        await _cancelId(id);
       }
     }
-    _activeIds = const [];
+  }
+
+  @override
+  Future<int> pendingAlarmCount() async {
+    if (!_isAndroid) {
+      return 0;
+    }
+    await _ensureInitialized();
+    final pendingIds = await _pendingIds();
+    return pendingIds.where(_isOwnedNotificationId).length;
+  }
+
+  bool _isOwnedNotificationId(int id) {
+    return id >= baseNotificationId &&
+        id < baseNotificationId + notificationCapacity;
   }
 
   String _titleFor(ScheduledGetOffAlarm alarm) {
