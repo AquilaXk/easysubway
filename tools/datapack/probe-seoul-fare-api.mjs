@@ -1,7 +1,20 @@
 #!/usr/bin/env node
 import { writeFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
 const ENDPOINT = "https://apis.data.go.kr/B553766/fare2/getRltmFare2";
+const EXPECTED_SAMPLE = {
+  dptreStnCd: "0150",
+  dptreStnNm: "서울역",
+  arvlStnCd: "0151",
+  arvlStnNm: "시청",
+  gnrlCardFare: 1550,
+  gnrlCashFare: 1650,
+  yungCardFare: 900,
+  yungCashFare: 1650,
+  childCardFare: 550,
+  childCashFare: 550,
+};
 const SAFE_REPORT_FIELDS = new Set([
   "dptreStnCd",
   "dptreStnNm",
@@ -25,6 +38,23 @@ function decodedServiceKey(value) {
     return decodeURIComponent(value);
   } catch {
     return value;
+  }
+}
+
+export function validateFareSample(sample) {
+  if (!sample || typeof sample !== "object" || Array.isArray(sample)) {
+    throw new Error("fare API sample must be an object");
+  }
+  for (const [field, expected] of Object.entries(EXPECTED_SAMPLE)) {
+    if (!(field in sample)) {
+      throw new Error(`fare API field missing: ${field}`);
+    }
+    if (typeof sample[field] !== typeof expected) {
+      throw new Error(`fare API field type invalid: ${field}`);
+    }
+    if (sample[field] !== expected) {
+      throw new Error(`fare API field value changed: ${field}`);
+    }
   }
 }
 
@@ -66,6 +96,7 @@ async function main() {
   }
 
   const sample = items[0];
+  validateFareSample(sample);
   const report = {
     endpoint: ENDPOINT,
     request: { dptreStnCd: "0150", dptreStnNm: "서울역", arvlStnCd: "0151", arvlStnNm: "시청" },
@@ -82,9 +113,11 @@ async function main() {
   process.stdout.write(`${JSON.stringify(report)}\n`);
 }
 
-try {
-  await main();
-} catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.message : "fare API probe failed"}\n`);
-  process.exitCode = 1;
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : "fare API probe failed"}\n`);
+    process.exitCode = 1;
+  }
 }

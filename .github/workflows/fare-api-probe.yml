@@ -1,12 +1,11 @@
 name: Seoul Fare API Probe
 
 on:
-  push:
-    branches:
-      - feat/1769-official-fare-api
-    paths:
-      - .github/workflows/fare-api-probe.yml
-      - tools/datapack/probe-seoul-fare-api.mjs
+  workflow_dispatch:
+
+concurrency:
+  group: seoul-fare-api-probe-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   probe:
