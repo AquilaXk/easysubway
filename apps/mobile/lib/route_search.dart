@@ -2753,8 +2753,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
 
   Future<void> _disableActiveGetOffAlarm() async {
     final getOffAlarmController = widget.getOffAlarmController;
-    if (getOffAlarmController?.state.enabled ?? false) {
-      await getOffAlarmController!.disable();
+    if (getOffAlarmController != null) {
+      await getOffAlarmController.disable();
     }
   }
 

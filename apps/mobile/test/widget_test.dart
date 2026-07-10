@@ -9706,6 +9706,92 @@ void main() {
   });
 
   testWidgets(
+    'pending enable 중 shell route exit는 disable 완료 뒤 경로와 하차 알림을 끝낸다',
+    (tester) async {
+      final notifier = _RecordingGetOffAlarmNotifier();
+      final stateRepository = _MemoryGetOffAlarmStateRepository();
+      final permissionProvider = _BlockingNotificationPermissionProvider();
+      final controller = GetOffAlarmController(
+        notifier: notifier,
+        permissionGate: _StubExactAlarmPermissionGate(),
+        notificationPermissionProvider: permissionProvider,
+        repository: stateRepository,
+        now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+      );
+      addTearDown(controller.dispose);
+      var exitCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(
+              result: _sampleRouteSearchResult(
+                steps: const [
+                  RouteSearchStep(
+                    sequence: 1,
+                    stepType: 'ride',
+                    title: '상록수에서 사당까지 이동',
+                    description: '열차를 이용해 이동합니다.',
+                    lineId: 'seoul-4',
+                    lineName: '수도권 4호선',
+                    fromStationId: 'station-sangnoksu',
+                    toStationId: 'station-sadang',
+                    estimatedMinutes: 32,
+                    distanceMeters: 13500,
+                    includesStairs: false,
+                    requiresAccessibilityCheck: true,
+                    plannedArrivalTimeIso: '2026-07-06T09:37:30+09:00',
+                  ),
+                ],
+              ),
+            ),
+            stationRepository: FakeStationSearchRepository(),
+            getOffAlarmController: controller,
+            onShellBackToHome: () => exitCount += 1,
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 6),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('하차 알림'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('하차 알림'));
+      await tester.pump();
+      await permissionProvider.started.future;
+
+      expect(controller.state.enabled, isFalse);
+      expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(exitCount, 0);
+      expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+
+      permissionProvider.result.complete(NotificationPermissionStatus.granted);
+      await tester.pumpAndSettle();
+
+      expect(permissionProvider.requestCount, 1);
+      expect(notifier.cancelCalls, greaterThanOrEqualTo(1));
+      expect(controller.state.enabled, isFalse);
+      expect(await stateRepository.loadActive(), isNull);
+      expect(exitCount, 1);
+      expect(find.byKey(const Key('routeResultListItem')), findsNothing);
+    },
+  );
+
+  testWidgets(
     'offline foreground refresh는 stale realtime 대신 PLANNED 하차 알림을 사용한다',
     (tester) async {
       final previousDebugPrint = debugPrint;
@@ -13236,6 +13322,22 @@ class FakeNotificationPermissionProvider
       throw currentError;
     }
     return nextStatus;
+  }
+}
+
+class _BlockingNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  final started = Completer<void>();
+  final result = Completer<NotificationPermissionStatus>();
+  int requestCount = 0;
+
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() {
+    requestCount += 1;
+    if (!started.isCompleted) {
+      started.complete();
+    }
+    return result.future;
   }
 }
 
