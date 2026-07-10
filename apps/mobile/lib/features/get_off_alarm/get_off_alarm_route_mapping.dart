@@ -1,5 +1,7 @@
 import 'get_off_alarm_scheduler.dart';
 
+enum GetOffAlarmTimeSource { planned, realtime }
+
 /// 경로 결과의 승차(RIDE) leg 하나를 하차 알림 관점으로 투영한 값.
 ///
 /// route_search의 무거운 leg 모델에 결합하지 않도록, UI 어댑터가 RIDE leg를
@@ -24,13 +26,16 @@ class RideLegArrival {
 List<GetOffAlarmStop> getOffAlarmStopsFromRideLegs({
   required List<RideLegArrival> rideLegs,
   required String Function(String stationId) stationName,
+  required GetOffAlarmTimeSource source,
 }) {
   final stops = <GetOffAlarmStop>[];
   for (var index = 0; index < rideLegs.length; index++) {
     final leg = rideLegs[index];
     final isDestination = index == rideLegs.length - 1;
     final arrivalIso =
-        (leg.realtimeArrivalIso != null && leg.realtimeArrivalIso!.isNotEmpty)
+        (source == GetOffAlarmTimeSource.realtime &&
+            leg.realtimeArrivalIso != null &&
+            leg.realtimeArrivalIso!.isNotEmpty)
         ? leg.realtimeArrivalIso!
         : leg.plannedArrivalIso;
     stops.add(

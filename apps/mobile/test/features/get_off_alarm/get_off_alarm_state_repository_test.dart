@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
+import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_mode.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -22,6 +23,8 @@ void main() {
     routeId: 'route-1',
     transferAlarmEnabled: true,
     scheduledCount: 2,
+    scheduleMode: GetOffAlarmScheduleMode.inexact,
+    inexactNotice: '정확 알람 권한이 없어 오차가 있을 수 있어요.',
     destination: GetOffAlarmStopRef(
       stationId: 'dest',
       stationName: '사당',
@@ -48,6 +51,8 @@ void main() {
     expect(loaded!.routeId, 'route-1');
     expect(loaded.transferAlarmEnabled, isTrue);
     expect(loaded.scheduledCount, 2);
+    expect(loaded.scheduleMode, GetOffAlarmScheduleMode.inexact);
+    expect(loaded.inexactNotice, contains('오차'));
     expect(loaded.destination.stationName, '사당');
     expect(loaded.destination.arrivalAt, DateTime.utc(2026, 7, 6, 9, 30));
     expect(loaded.transfers, hasLength(1));
@@ -61,6 +66,8 @@ void main() {
         routeId: 'route-2',
         transferAlarmEnabled: false,
         scheduledCount: 1,
+        scheduleMode: GetOffAlarmScheduleMode.exact,
+        inexactNotice: null,
         destination: GetOffAlarmStopRef(
           stationId: 'd2',
           stationName: '서울역',
@@ -88,6 +95,31 @@ void main() {
           ),
         );
   }
+
+  test('scheduleMode와 inexactNotice를 복원한다', () async {
+    await writeRaw({
+      ...subscription.toJson(),
+      'scheduleMode': 'inexact',
+      'inexactNotice': '정확 알람 권한이 없어 오차가 있을 수 있어요.',
+    });
+
+    final loaded = await repository.loadActive();
+
+    expect(loaded, isNotNull);
+    expect(loaded!.scheduleMode, GetOffAlarmScheduleMode.inexact);
+    expect(loaded.inexactNotice, '정확 알람 권한이 없어 오차가 있을 수 있어요.');
+  });
+
+  test('non-list transfers 손상값은 active subscription을 폐기한다', () async {
+    await writeRaw({
+      ...subscription.toJson(),
+      'transferAlarmEnabled': false,
+      'scheduledCount': 1,
+      'transfers': <String, Object?>{},
+    });
+
+    expect(await repository.loadActive(), isNull);
+  });
 
   test('scheduledCount 없는 legacy 구독은 구독 최대 예약 수로 복원한다', () async {
     final legacy = subscription.toJson()..remove('scheduledCount');

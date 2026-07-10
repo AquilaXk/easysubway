@@ -78,6 +78,8 @@ class GetOffAlarmController extends ChangeNotifier {
       GetOffAlarmState(
         enabled: true,
         activeRouteId: subscription.routeId,
+        scheduleMode: subscription.scheduleMode,
+        inexactNotice: subscription.inexactNotice,
         scheduledCount: subscription.scheduledCount,
       ),
     );
@@ -109,6 +111,41 @@ class GetOffAlarmController extends ChangeNotifier {
     final resolution = resolveGetOffAlarmScheduleMode(
       exactAlarmPermitted: permitted,
     );
+    await _schedule(
+      routeId: routeId,
+      stops: stops,
+      transferAlarmEnabled: transferAlarmEnabled,
+      resolution: resolution,
+    );
+  }
+
+  /// 실시간 보정(#1416)·포그라운드 복귀 시 갱신된 도착 시각으로 재예약한다.
+  Future<void> refresh({
+    required List<GetOffAlarmStop> stops,
+    required bool transferAlarmEnabled,
+  }) async {
+    final routeId = _state.activeRouteId;
+    if (!_state.enabled || routeId == null) {
+      return;
+    }
+    final permitted = await permissionGate.isExactAlarmPermitted();
+    final resolution = resolveGetOffAlarmScheduleMode(
+      exactAlarmPermitted: permitted,
+    );
+    await _schedule(
+      routeId: routeId,
+      stops: stops,
+      transferAlarmEnabled: transferAlarmEnabled,
+      resolution: resolution,
+    );
+  }
+
+  Future<void> _schedule({
+    required String routeId,
+    required List<GetOffAlarmStop> stops,
+    required bool transferAlarmEnabled,
+    required GetOffAlarmScheduleResolution resolution,
+  }) async {
     final effectivePolicy = policy.copyWith(
       transferAlarmEnabled: transferAlarmEnabled,
     );
@@ -133,6 +170,8 @@ class GetOffAlarmController extends ChangeNotifier {
         stops: stops,
         transferAlarmEnabled: transferAlarmEnabled,
         scheduledCount: delivery.scheduledCount,
+        scheduleMode: resolution.mode,
+        inexactNotice: resolution.inexactNotice,
       ),
     );
 
@@ -144,22 +183,6 @@ class GetOffAlarmController extends ChangeNotifier {
         inexactNotice: resolution.inexactNotice,
         scheduledCount: delivery.scheduledCount,
       ),
-    );
-  }
-
-  /// 실시간 보정(#1416)·포그라운드 복귀 시 갱신된 도착 시각으로 재예약한다.
-  Future<void> refresh({
-    required List<GetOffAlarmStop> stops,
-    required bool transferAlarmEnabled,
-  }) async {
-    final routeId = _state.activeRouteId;
-    if (!_state.enabled || routeId == null) {
-      return;
-    }
-    await enable(
-      routeId: routeId,
-      stops: stops,
-      transferAlarmEnabled: transferAlarmEnabled,
     );
   }
 
@@ -180,6 +203,8 @@ class GetOffAlarmController extends ChangeNotifier {
     required List<GetOffAlarmStop> stops,
     required bool transferAlarmEnabled,
     required int scheduledCount,
+    required GetOffAlarmScheduleMode scheduleMode,
+    required String? inexactNotice,
   }) {
     final destination = stops.firstWhere(
       (stop) => stop.kind == GetOffAlarmKind.destination,
@@ -198,6 +223,8 @@ class GetOffAlarmController extends ChangeNotifier {
       routeId: routeId,
       transferAlarmEnabled: transferAlarmEnabled,
       scheduledCount: scheduledCount,
+      scheduleMode: scheduleMode,
+      inexactNotice: inexactNotice,
       destination: GetOffAlarmStopRef(
         stationId: destination.stationId,
         stationName: destination.stationName,

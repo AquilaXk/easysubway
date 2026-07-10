@@ -61,6 +61,12 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
         final stops = getOffAlarmStopsFromRideLegs(
           rideLegs: widget.rideLegs,
           stationName: widget.stationName,
+          source:
+              widget.rideLegs.any(
+                (leg) => leg.realtimeArrivalIso?.isNotEmpty ?? false,
+              )
+              ? GetOffAlarmTimeSource.realtime
+              : GetOffAlarmTimeSource.planned,
         );
         await widget.controller.enable(
           routeId: widget.routeId,

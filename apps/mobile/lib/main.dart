@@ -82,6 +82,7 @@ Future<void> main() async {
         ? _DemoSearchHistoryRepository()
         : null,
   );
+  await bootstrap.dependencies.getOffAlarmController?.restore();
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
   runApp(
     AppBootstrapLifecycle(

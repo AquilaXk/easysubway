@@ -15,6 +15,7 @@ void main() {
           ),
         ],
         stationName: (id) => id == 'sadang' ? '사당' : id,
+        source: GetOffAlarmTimeSource.planned,
       );
 
       expect(stops, hasLength(1));
@@ -37,6 +38,7 @@ void main() {
           ),
         ],
         stationName: upper,
+        source: GetOffAlarmTimeSource.planned,
       );
 
       expect(stops.map((s) => s.kind), [
@@ -56,6 +58,7 @@ void main() {
           ),
         ],
         stationName: (id) => id,
+        source: GetOffAlarmTimeSource.realtime,
       );
 
       expect(stops.single.arrivalAt, DateTime.parse('2026-07-06T09:33:00'));
@@ -71,6 +74,7 @@ void main() {
           ),
         ],
         stationName: (id) => id,
+        source: GetOffAlarmTimeSource.realtime,
       );
 
       expect(stops.single.arrivalAt, DateTime.parse('2026-07-06T09:30:00'));

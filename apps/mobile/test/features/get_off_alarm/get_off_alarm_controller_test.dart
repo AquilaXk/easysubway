@@ -34,13 +34,21 @@ class _RecordingNotifier implements GetOffAlarmNotifier {
 class _StubExactAlarmGate implements ExactAlarmPermissionGate {
   _StubExactAlarmGate(this.permitted);
 
-  final bool permitted;
+  bool permitted;
+  int isPermittedCalls = 0;
+  int requestCalls = 0;
 
   @override
-  Future<bool> isExactAlarmPermitted() async => permitted;
+  Future<bool> isExactAlarmPermitted() async {
+    isPermittedCalls += 1;
+    return permitted;
+  }
 
   @override
-  Future<bool> requestExactAlarmPermission() async => permitted;
+  Future<bool> requestExactAlarmPermission() async {
+    requestCalls += 1;
+    return permitted;
+  }
 }
 
 class _StubNotificationPermissionProvider
@@ -75,6 +83,7 @@ void main() {
   late UserDatabase db;
   late DriftGetOffAlarmStateRepository repository;
   late _RecordingNotifier notifier;
+  late _StubExactAlarmGate exactAlarmGate;
 
   setUp(() {
     db = UserDatabase.memory();
@@ -90,9 +99,10 @@ void main() {
     required bool exactPermitted,
     bool notificationPermitted = true,
   }) {
+    exactAlarmGate = _StubExactAlarmGate(exactPermitted);
     return GetOffAlarmController(
       notifier: notifier,
-      permissionGate: _StubExactAlarmGate(exactPermitted),
+      permissionGate: exactAlarmGate,
       notificationPermissionProvider: _StubNotificationPermissionProvider(
         notificationPermitted
             ? NotificationPermissionStatus.granted
@@ -178,6 +188,37 @@ void main() {
 
     expect(restored.state.enabled, isTrue);
     expect(restored.state.scheduledCount, 1);
+  });
+
+  test('restore는 저장된 inexact 강등 상태와 고지를 복원한다', () async {
+    final first = controller(exactPermitted: false);
+    await first.enable(
+      routeId: 'r1',
+      stops: stops(),
+      transferAlarmEnabled: true,
+    );
+
+    final restored = controller(exactPermitted: true);
+    await restored.restore();
+
+    expect(restored.state.enabled, isTrue);
+    expect(restored.state.scheduleMode, GetOffAlarmScheduleMode.inexact);
+    expect(restored.state.inexactNotice, contains('오차'));
+  });
+
+  test('refresh는 exact 권한 상태만 확인하고 권한을 다시 요청하지 않는다', () async {
+    final c = controller(exactPermitted: true);
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+    expect(exactAlarmGate.requestCalls, 1);
+    expect(exactAlarmGate.isPermittedCalls, 0);
+
+    exactAlarmGate.permitted = false;
+    await c.refresh(stops: stops(), transferAlarmEnabled: true);
+
+    expect(exactAlarmGate.requestCalls, 1);
+    expect(exactAlarmGate.isPermittedCalls, 1);
+    expect(c.state.scheduleMode, GetOffAlarmScheduleMode.inexact);
+    expect(c.state.inexactNotice, contains('오차'));
   });
 
   test('예약 성공이 0건이면 enabled와 활성 구독을 저장하지 않는다', () async {
