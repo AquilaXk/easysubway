@@ -9,8 +9,10 @@ void main() {
     var refreshed = false;
 
     await runNextTrainWidgetStartup(
-      initialize: () async => throw StateError('plugin unavailable'),
-      refresh: () async => refreshed = true,
+      installedWidgetIds: () async => const [42],
+      registerRefresh: () async => throw StateError('plugin unavailable'),
+      cancelRefresh: () async {},
+      refresh: (_) async => refreshed = true,
       reportError: (error, _) => errors.add(error),
     );
 
@@ -18,17 +20,94 @@ void main() {
     expect(refreshed, isTrue);
   });
 
-  test('direct configuration은 periodic 등록 뒤 구성하고 완료한다', () async {
+  test('설치 widget이 없으면 startup은 periodic을 취소하고 등록하지 않는다', () async {
+    var registerCount = 0;
+    var cancelCount = 0;
+    var refreshCount = 0;
+
+    await runNextTrainWidgetStartup(
+      installedWidgetIds: () async => const [],
+      registerRefresh: () async => registerCount += 1,
+      cancelRefresh: () async => cancelCount += 1,
+      refresh: (_) async => refreshCount += 1,
+      reportError: (_, _) {},
+    );
+
+    expect(registerCount, 0);
+    expect(cancelCount, 1);
+    expect(refreshCount, 0);
+  });
+
+  test('설치 widget이 있으면 startup은 periodic을 등록하고 해당 ID를 갱신한다', () async {
+    var registerCount = 0;
+    var cancelCount = 0;
+    List<int>? refreshedWidgetIds;
+
+    await runNextTrainWidgetStartup(
+      installedWidgetIds: () async => const [42],
+      registerRefresh: () async => registerCount += 1,
+      cancelRefresh: () async => cancelCount += 1,
+      refresh: (widgetIds) async => refreshedWidgetIds = widgetIds,
+      reportError: (_, _) {},
+    );
+
+    expect(registerCount, 1);
+    expect(cancelCount, 0);
+    expect(refreshedWidgetIds, [42]);
+  });
+
+  test('direct configuration 성공은 구성 뒤 periodic을 등록하고 완료한다', () async {
     final events = <String>[];
 
     await configureNextTrainWidgetSelection(
       selection: _selection,
-      initializeRefresh: () async => events.add('initialize'),
       configure: (_) async => events.add('configure'),
+      registerRefresh: () async => events.add('register'),
       finish: () async => events.add('finish'),
+      cancelRefresh: () async => events.add('cancel'),
     );
 
-    expect(events, ['initialize', 'configure', 'finish']);
+    expect(events, ['configure', 'register', 'finish']);
+  });
+
+  test('direct configuration 구성 실패는 periodic을 등록하거나 취소하지 않는다', () async {
+    var registerCount = 0;
+    var cancelCount = 0;
+    var finishCount = 0;
+
+    await expectLater(
+      configureNextTrainWidgetSelection(
+        selection: _selection,
+        configure: (_) async => throw StateError('configure failed'),
+        registerRefresh: () async => registerCount += 1,
+        finish: () async => finishCount += 1,
+        cancelRefresh: () async => cancelCount += 1,
+      ),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(registerCount, 0);
+    expect(cancelCount, 0);
+    expect(finishCount, 0);
+  });
+
+  test('direct configuration 완료 실패는 등록한 periodic을 취소한다', () async {
+    var registerCount = 0;
+    var cancelCount = 0;
+
+    await expectLater(
+      configureNextTrainWidgetSelection(
+        selection: _selection,
+        configure: (_) async {},
+        registerRefresh: () async => registerCount += 1,
+        finish: () async => throw StateError('finish failed'),
+        cancelRefresh: () async => cancelCount += 1,
+      ),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(registerCount, 1);
+    expect(cancelCount, 1);
   });
 
   test('configuration operation 오류에서도 resource를 한 번 닫는다', () async {

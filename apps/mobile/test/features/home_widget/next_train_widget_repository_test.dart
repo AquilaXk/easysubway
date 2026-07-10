@@ -60,10 +60,11 @@ void main() {
 
   test('23:59 뒤 같은 service day의 24시대 양방향 열차를 표시한다', () async {
     await _seedSchedule(catalogDatabase, lateNight: true);
+    final seoul = tz.getLocation('Asia/Seoul');
 
     final data = await repository.load(
       _sadangLine4,
-      DateTime(2026, 7, 9, 23, 59),
+      tz.TZDateTime(seoul, 2026, 7, 9, 23, 59),
     );
 
     expect(data.status, NextTrainWidgetStatus.available);
@@ -71,6 +72,10 @@ void main() {
     expect(data.directions.map((item) => item.departureLabel), [
       '00:25',
       '00:30',
+    ]);
+    expect(data.directions.map((item) => item.departureAt), [
+      tz.TZDateTime(seoul, 2026, 7, 10, 0, 25),
+      tz.TZDateTime(seoul, 2026, 7, 10, 0, 30),
     ]);
   });
 
@@ -110,10 +115,11 @@ void main() {
 
   test('오늘 운행이 끝났으면 다음 service day 첫차를 표시한다', () async {
     await _seedSchedule(catalogDatabase);
+    final seoul = tz.getLocation('Asia/Seoul');
 
     final data = await repository.load(
       _sadangLine4,
-      DateTime(2026, 7, 9, 23, 59),
+      tz.TZDateTime(seoul, 2026, 7, 9, 23, 59),
     );
 
     expect(data.status, NextTrainWidgetStatus.serviceEnded);

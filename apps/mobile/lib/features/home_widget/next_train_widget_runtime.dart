@@ -28,16 +28,32 @@ typedef ReportNextTrainWidgetError =
     void Function(Object error, StackTrace stackTrace);
 
 Future<void> runNextTrainWidgetStartup({
-  required Future<void> Function() initialize,
-  required Future<void> Function() refresh,
+  required Future<List<int>> Function() installedWidgetIds,
+  required Future<void> Function() registerRefresh,
+  required Future<void> Function() cancelRefresh,
+  required Future<void> Function(List<int> widgetIds) refresh,
   required ReportNextTrainWidgetError reportError,
 }) async {
+  late final List<int> widgetIds;
+  try {
+    widgetIds = await installedWidgetIds();
+  } on Object catch (error, stackTrace) {
+    reportError(error, stackTrace);
+    return;
+  }
+  if (widgetIds.isEmpty) {
+    await runNextTrainWidgetOperationSafely(
+      operation: cancelRefresh,
+      reportError: reportError,
+    );
+    return;
+  }
   await runNextTrainWidgetOperationSafely(
-    operation: initialize,
+    operation: registerRefresh,
     reportError: reportError,
   );
   await runNextTrainWidgetOperationSafely(
-    operation: refresh,
+    operation: () => refresh(widgetIds),
     reportError: reportError,
   );
 }
@@ -68,13 +84,19 @@ Future<T> runNextTrainWidgetConfigurationOperation<T>({
 @visibleForTesting
 Future<void> configureNextTrainWidgetSelection({
   required WidgetStationSelection selection,
-  required Future<void> Function() initializeRefresh,
   required ConfigureWidget configure,
+  required Future<void> Function() registerRefresh,
   required Future<void> Function() finish,
+  required Future<void> Function() cancelRefresh,
 }) async {
-  await initializeRefresh();
   await configure(selection);
-  await finish();
+  await registerRefresh();
+  try {
+    await finish();
+  } on Object {
+    await cancelRefresh();
+    rethrow;
+  }
 }
 
 @visibleForTesting
@@ -137,15 +159,21 @@ Future<void> initializeNextTrainWidgetRefresh() async {
   );
 }
 
-Future<void> refreshNextTrainWidgets(
-  NextTrainWidgetRepository repository, {
-  DateTime? now,
-}) async {
+Future<void> cancelNextTrainWidgetRefresh() async {
   if (!Platform.isAndroid) {
     return;
   }
+  await WorkmanagerAndroid().cancelByUniqueName(
+    nextTrainWidgetRefreshUniqueName,
+  );
+}
+
+Future<List<int>> installedNextTrainWidgetIds() async {
+  if (!Platform.isAndroid) {
+    return const [];
+  }
   final widgets = await HomeWidget.getInstalledWidgets();
-  final widgetIds = widgets
+  return widgets
       .where(
         (widget) =>
             widget.androidClassName?.endsWith('NextTrainWidgetProvider') ??
@@ -154,13 +182,24 @@ Future<void> refreshNextTrainWidgets(
       .map((widget) => widget.androidWidgetId)
       .whereType<int>()
       .toList(growable: false);
+}
+
+Future<void> refreshNextTrainWidgets(
+  NextTrainWidgetRepository repository, {
+  DateTime? now,
+  List<int>? widgetIds,
+}) async {
+  if (!Platform.isAndroid) {
+    return;
+  }
+  final installedWidgetIds = widgetIds ?? await installedNextTrainWidgetIds();
   final service = NextTrainWidgetService(
     load: repository.load,
     saveValue: _saveWidgetValue,
     updateWidget: _updateNativeWidget,
   );
   await refreshInstalledNextTrainWidgets(
-    widgetIds: widgetIds,
+    widgetIds: installedWidgetIds,
     readValue: _readWidgetValue,
     service: service,
     now: now ?? DateTime.now(),
@@ -232,7 +271,6 @@ Future<void> configureMain() async {
             ),
             configure: (selection) => configureNextTrainWidgetSelection(
               selection: selection,
-              initializeRefresh: initializeNextTrainWidgetRefresh,
               configure: (selection) => _withConfigurationDatabases(
                 (databases) =>
                     NextTrainWidgetService(
@@ -248,7 +286,13 @@ Future<void> configureMain() async {
                       now: DateTime.now(),
                     ),
               ),
+              registerRefresh: initializeNextTrainWidgetRefresh,
               finish: HomeWidget.finishHomeWidgetConfigure,
+              cancelRefresh: () async {
+                if ((await installedNextTrainWidgetIds()).isEmpty) {
+                  await cancelNextTrainWidgetRefresh();
+                }
+              },
             ),
           ),
         ),

@@ -92,9 +92,12 @@ Future<void> main() async {
     userDatabase: bootstrap.userDatabase,
   );
   await next_train_widget_runtime.runNextTrainWidgetStartup(
-    initialize: next_train_widget_runtime.initializeNextTrainWidgetRefresh,
-    refresh: () => next_train_widget_runtime.refreshNextTrainWidgets(
+    installedWidgetIds: next_train_widget_runtime.installedNextTrainWidgetIds,
+    registerRefresh: next_train_widget_runtime.initializeNextTrainWidgetRefresh,
+    cancelRefresh: next_train_widget_runtime.cancelNextTrainWidgetRefresh,
+    refresh: (widgetIds) => next_train_widget_runtime.refreshNextTrainWidgets(
       nextTrainWidgetRepository,
+      widgetIds: widgetIds,
     ),
     reportError: (error, stackTrace) =>
         reportMobileError(error, stackTrace, context: '홈 위젯 초기화 중 예외가 발생했습니다.'),
