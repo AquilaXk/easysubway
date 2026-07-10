@@ -1,0 +1,43 @@
+name: Seoul Fare API Probe
+
+on:
+  push:
+    branches:
+      - feat/1769-official-fare-api
+    paths:
+      - .github/workflows/fare-api-probe.yml
+      - tools/datapack/probe-seoul-fare-api.mjs
+
+jobs:
+  probe:
+    name: Seoul Fare API Probe
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Seoul Fare API Probe / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Seoul Fare API Probe / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Seoul Fare API Probe / Call official endpoint
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          FARE_API_PROBE_OUTPUT: ${{ runner.temp }}/seoul-fare-api-probe.json
+        run: |
+          set -euo pipefail
+          test -n "${DATA_GO_KR_SERVICE_KEY}"
+          node tools/datapack/probe-seoul-fare-api.mjs
+
+      - name: Seoul Fare API Probe / Upload sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: seoul-fare-api-probe
+          path: ${{ runner.temp }}/seoul-fare-api-probe.json
+          if-no-files-found: error
+          retention-days: 14
