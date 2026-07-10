@@ -23,6 +23,8 @@ const _routeSearchTimeout = Duration(seconds: 8);
 const _routeSearchErrorMessage = '경로 정보를 불러오지 못했어요.';
 const _routeOnlineSearchErrorMessage = '실시간/서버 경로를 확인하지 못했어요.';
 const _routeRefreshErrorMessage = '도착 시간을 새로 확인하지 못했어요.';
+const _getOffAlarmRefreshRollbackMessage = '하차 알림을 갱신하지 못해 이전 경로를 유지해요.';
+const _getOffAlarmRefreshFailureMessage = '하차 알림을 새로 맞추지 못했어요. 이전 경로를 유지해요.';
 const _routeFeedbackErrorMessage = '의견을 보내지 못했어요.';
 const _favoriteRouteErrorMessage = '즐겨찾기 경로를 바꾸지 못했어요.';
 const _favoriteRouteLoadErrorMessage = '즐겨찾기 경로를 불러오지 못했어요.';
@@ -2394,6 +2396,23 @@ class RouteSearchController extends ChangeNotifier {
     }
   }
 
+  bool rollbackRefreshAfterAlarmFailure({
+    required RouteSearchState previousState,
+    required RouteSearchResult expectedCurrentResult,
+    required String refreshMessage,
+  }) {
+    if (_disposed || !identical(_state.result, expectedCurrentResult)) {
+      return false;
+    }
+    _emitState(
+      previousState.copyWith(
+        isRefreshing: false,
+        refreshMessage: refreshMessage,
+      ),
+    );
+    return true;
+  }
+
   void reset() {
     if (_disposed) {
       return;
@@ -2501,6 +2520,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 
   Future<void> _refreshCurrentRouteAndAlarm() async {
+    final previousState = _controller.state;
     final outcome = await _controller.refreshCurrentRoute();
     if (!mounted) {
       return;
@@ -2518,7 +2538,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     final rideLegs = _rideLegArrivalsFromResult(result);
     if (rideLegs.isEmpty) {
       if (outcome.refreshed) {
-        await _disableActiveGetOffAlarm();
+        final disabled = await _disableActiveGetOffAlarm();
+        if (!disabled) {
+          _rollbackRouteAfterAlarmFailure(
+            previousState: previousState,
+            expectedCurrentResult: result,
+          );
+        }
       }
       return;
     }
@@ -2541,13 +2567,31 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
           activeSubscription.destination.stationId:
               activeSubscription.destination.stationName,
       };
+      final stationNames = <String, String>{};
+      for (final leg in rideLegs) {
+        final stationId = leg.toStationId;
+        if (stationNames.containsKey(stationId)) {
+          continue;
+        }
+        final stationName = await _resolveGetOffAlarmStationName(
+          stationId: stationId,
+          result: result,
+          stationRepository: widget.stationRepository,
+          preferredStationNames: activeStationNames,
+        );
+        if (stationName == null) {
+          throw StateError('하차 알림 역명을 확인하지 못했습니다.');
+        }
+        stationNames[stationId] = stationName;
+      }
+      if (!mounted ||
+          !identical(_controller.state.result, result) ||
+          !getOffAlarmController.state.enabled) {
+        return;
+      }
       final stops = getOffAlarmStopsFromRideLegs(
         rideLegs: rideLegs,
-        stationName: (id) =>
-            activeStationNames[id] ??
-            (id == result.destinationStationId
-                ? result.destinationStationName
-                : id),
+        stationName: (id) => stationNames[id]!,
         source: source,
       );
       final destination = stops.last;
@@ -2569,12 +2613,34 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         );
       }
     } catch (error, stackTrace) {
+      final rolledBack =
+          outcome.refreshed &&
+          _rollbackRouteAfterAlarmFailure(
+            previousState: previousState,
+            expectedCurrentResult: result,
+          );
       reportMobileError(
         error,
         stackTrace,
         context: '하차 알림 foreground 재예약 중 예외가 발생했습니다.',
       );
+      if (mounted && rolledBack) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text(_getOffAlarmRefreshFailureMessage)),
+        );
+      }
     }
+  }
+
+  bool _rollbackRouteAfterAlarmFailure({
+    required RouteSearchState previousState,
+    required RouteSearchResult expectedCurrentResult,
+  }) {
+    return _controller.rollbackRefreshAfterAlarmFailure(
+      previousState: previousState,
+      expectedCurrentResult: expectedCurrentResult,
+      refreshMessage: _getOffAlarmRefreshRollbackMessage,
+    );
   }
 
   @override
@@ -2720,6 +2786,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                         ? null
                         : _endRoute,
                     getOffAlarmController: widget.getOffAlarmController,
+                    stationRepository: widget.stationRepository,
                   ),
                 ),
               ],
@@ -3013,6 +3080,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
 
     if (!mounted || selectedMobilityType == null) {
+      return;
+    }
+    if (selectedMobilityType == _selectedMobilityType) {
       return;
     }
     if (!await _disableActiveGetOffAlarm()) {
@@ -3963,6 +4033,7 @@ class _RouteSearchBody extends StatelessWidget {
     required this.favoriteRouteRepository,
     required this.onShellBackToHome,
     required this.getOffAlarmController,
+    required this.stationRepository,
   });
 
   final RouteSearchState state;
@@ -3970,6 +4041,7 @@ class _RouteSearchBody extends StatelessWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
+  final StationSearchRepository stationRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -3996,6 +4068,7 @@ class _RouteSearchBody extends StatelessWidget {
         favoriteRouteRepository: favoriteRouteRepository,
         onShellBackToHome: onShellBackToHome,
         getOffAlarmController: getOffAlarmController,
+        stationRepository: stationRepository,
       ),
     };
   }
@@ -4138,6 +4211,7 @@ class _RouteSearchResultCard extends StatefulWidget {
     required this.favoriteRouteRepository,
     required this.onShellBackToHome,
     required this.getOffAlarmController,
+    required this.stationRepository,
   });
 
   final RouteSearchResult result;
@@ -4147,6 +4221,7 @@ class _RouteSearchResultCard extends StatefulWidget {
   final FavoriteRouteRepository? favoriteRouteRepository;
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
+  final StationSearchRepository stationRepository;
 
   @override
   State<_RouteSearchResultCard> createState() => _RouteSearchResultCardState();
@@ -4178,6 +4253,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
             _GetOffAlarmEntryPoint(
               controller: widget.getOffAlarmController!,
               result: result,
+              stationRepository: widget.stationRepository,
             ),
         ],
       ),
@@ -4298,10 +4374,12 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
   const _GetOffAlarmEntryPoint({
     required this.controller,
     required this.result,
+    required this.stationRepository,
   });
 
   final GetOffAlarmController controller;
   final RouteSearchResult result;
+  final StationSearchRepository stationRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -4315,12 +4393,48 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
         controller: controller,
         routeId: result.routeSearchId,
         rideLegs: rideLegs,
-        stationName: (id) => id == result.destinationStationId
-            ? result.destinationStationName
-            : id,
+        stationName: (id) => _resolveGetOffAlarmStationName(
+          stationId: id,
+          result: result,
+          stationRepository: stationRepository,
+        ),
       ),
     );
   }
+}
+
+Future<String?> _resolveGetOffAlarmStationName({
+  required String stationId,
+  required RouteSearchResult result,
+  required StationSearchRepository stationRepository,
+  Map<String, String> preferredStationNames = const {},
+}) async {
+  final preferredName = _usableGetOffAlarmStationName(
+    preferredStationNames[stationId],
+    stationId,
+  );
+  if (preferredName != null) {
+    return preferredName;
+  }
+  if (stationId == result.destinationStationId) {
+    return _usableGetOffAlarmStationName(
+      result.destinationStationName,
+      stationId,
+    );
+  }
+  final detail = await stationRepository.getStationDetail(stationId);
+  if (detail.id != stationId) {
+    return null;
+  }
+  return _usableGetOffAlarmStationName(detail.nameKo, stationId);
+}
+
+String? _usableGetOffAlarmStationName(String? rawName, String stationId) {
+  final stationName = rawName?.trim();
+  if (stationName == null || stationName.isEmpty || stationName == stationId) {
+    return null;
+  }
+  return stationName;
 }
 
 List<RideLegArrival> _rideLegArrivalsFromResult(RouteSearchResult result) {

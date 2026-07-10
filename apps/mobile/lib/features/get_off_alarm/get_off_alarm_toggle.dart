@@ -19,7 +19,7 @@ class GetOffAlarmToggle extends StatefulWidget {
   final GetOffAlarmController controller;
   final String routeId;
   final List<RideLegArrival> rideLegs;
-  final String Function(String stationId) stationName;
+  final Future<String?> Function(String stationId) stationName;
 
   @override
   State<GetOffAlarmToggle> createState() => _GetOffAlarmToggleState();
@@ -58,9 +58,10 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
     setState(() => _busy = true);
     try {
       if (enabled) {
+        final stationNames = await _resolveStationNames();
         final stops = getOffAlarmStopsFromRideLegs(
           rideLegs: widget.rideLegs,
-          stationName: widget.stationName,
+          stationName: (stationId) => stationNames[stationId]!,
           source:
               widget.rideLegs.any(
                 (leg) => leg.realtimeArrivalIso?.isNotEmpty ?? false,
@@ -88,6 +89,25 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
         setState(() => _busy = false);
       }
     }
+  }
+
+  Future<Map<String, String>> _resolveStationNames() async {
+    final stationNames = <String, String>{};
+    for (final leg in widget.rideLegs) {
+      final stationId = leg.toStationId;
+      if (stationNames.containsKey(stationId)) {
+        continue;
+      }
+      final rawName = await widget.stationName(stationId);
+      final stationName = rawName?.trim();
+      if (stationName == null ||
+          stationName.isEmpty ||
+          stationName == stationId) {
+        throw StateError('하차 알림 역명을 확인하지 못했습니다.');
+      }
+      stationNames[stationId] = stationName;
+    }
+    return stationNames;
   }
 
   @override

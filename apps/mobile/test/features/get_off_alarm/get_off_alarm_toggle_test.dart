@@ -7,6 +7,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_toggle.dart';
+import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,7 +99,7 @@ void main() {
                 plannedArrivalIso: '2026-07-06T09:30:00',
               ),
             ],
-            stationName: (id) => id == 'sadang' ? '사당' : id,
+            stationName: (id) async => id == 'sadang' ? '사당' : null,
           ),
         ),
       ),
@@ -140,7 +141,7 @@ void main() {
                 plannedArrivalIso: '2026-07-06T09:30:00',
               ),
             ],
-            stationName: (id) => id,
+            stationName: (_) async => '사당',
           ),
         ),
       ),
@@ -155,6 +156,149 @@ void main() {
 
     expect(controller.state.enabled, isFalse);
     expect(notifier.cancelCount, greaterThanOrEqualTo(1));
+  });
+
+  testWidgets('토글은 여러 승차 구간의 역명을 비동기로 해소해 예약과 구독에 저장한다', (tester) async {
+    final notifier = _RecordingNotifier();
+    final repository = _FakeRepo();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubGate(true),
+      notificationPermissionProvider:
+          const _StubNotificationPermissionProvider(),
+      repository: repository,
+      now: () => DateTime(2026, 7, 6, 9, 0),
+    );
+    addTearDown(controller.dispose);
+    final resolvedStationIds = <String>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GetOffAlarmToggle(
+            controller: controller,
+            routeId: 'r1',
+            rideLegs: const [
+              RideLegArrival(
+                toStationId: 'geumjeong',
+                plannedArrivalIso: '2026-07-06T09:15:00',
+              ),
+              RideLegArrival(
+                toStationId: 'sadang',
+                plannedArrivalIso: '2026-07-06T09:30:00',
+              ),
+            ],
+            stationName: (id) async {
+              resolvedStationIds.add(id);
+              return switch (id) {
+                'geumjeong' => ' 금정 ',
+                'sadang' => '사당',
+                _ => null,
+              };
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(resolvedStationIds, ['geumjeong', 'sadang']);
+    expect(notifier.scheduled?.map((alarm) => alarm.stationName), ['금정', '사당']);
+    final active = await repository.loadActive();
+    expect(active?.transfers.map((stop) => stop.stationName), ['금정']);
+    expect(active?.destination.stationName, '사당');
+  });
+
+  testWidgets('역명이 비어 있으면 하차 알림을 예약하거나 저장하지 않는다', (tester) async {
+    final notifier = _RecordingNotifier();
+    final repository = _FakeRepo();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubGate(true),
+      notificationPermissionProvider:
+          const _StubNotificationPermissionProvider(),
+      repository: repository,
+      now: () => DateTime(2026, 7, 6, 9, 0),
+    );
+    addTearDown(controller.dispose);
+    final reports = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(reports.add, () async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GetOffAlarmToggle(
+              controller: controller,
+              routeId: 'r1',
+              rideLegs: const [
+                RideLegArrival(
+                  toStationId: 'sadang',
+                  plannedArrivalIso: '2026-07-06T09:30:00',
+                ),
+              ],
+              stationName: (_) async => '   ',
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+    });
+
+    expect(reports, hasLength(1));
+    expect(find.text('하차 알림을 바꾸지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+    expect(notifier.scheduled, isNull);
+    expect(await repository.loadActive(), isNull);
+    expect(controller.state.enabled, isFalse);
+  });
+
+  testWidgets('역명 해소가 실패하면 하차 알림을 예약하거나 저장하지 않는다', (tester) async {
+    final notifier = _RecordingNotifier();
+    final repository = _FakeRepo();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubGate(true),
+      notificationPermissionProvider:
+          const _StubNotificationPermissionProvider(),
+      repository: repository,
+      now: () => DateTime(2026, 7, 6, 9, 0),
+    );
+    addTearDown(controller.dispose);
+    final reports = <FlutterErrorDetails>[];
+    final lookupError = StateError('lookup failed');
+
+    await runWithMobileErrorReporter(reports.add, () async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GetOffAlarmToggle(
+              controller: controller,
+              routeId: 'r1',
+              rideLegs: const [
+                RideLegArrival(
+                  toStationId: 'sadang',
+                  plannedArrivalIso: '2026-07-06T09:30:00',
+                ),
+              ],
+              stationName: (_) async => throw lookupError,
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+    });
+
+    expect(reports, hasLength(1));
+    expect(reports.single.exception, same(lookupError));
+    expect(find.text('하차 알림을 바꾸지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+    expect(notifier.scheduled, isNull);
+    expect(await repository.loadActive(), isNull);
+    expect(controller.state.enabled, isFalse);
   });
 
   testWidgets('exact 권한 거부 시 오차 고지 문구를 노출한다', (tester) async {
@@ -181,7 +325,7 @@ void main() {
                 plannedArrivalIso: '2026-07-06T09:30:00',
               ),
             ],
-            stationName: (id) => id,
+            stationName: (_) async => '사당',
           ),
         ),
       ),
@@ -224,7 +368,7 @@ void main() {
                 plannedArrivalIso: '2026-07-06T09:30:00',
               ),
             ],
-            stationName: (id) => id,
+            stationName: (_) async => '사당',
           ),
         ),
       ),
