@@ -9341,13 +9341,15 @@ void main() {
   });
 
   testWidgets('planned 승차 시간이 있는 경로 결과는 하차 알림 토글을 보여준다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
     final controller = GetOffAlarmController(
-      notifier: _RecordingGetOffAlarmNotifier(),
+      notifier: notifier,
       permissionGate: _StubExactAlarmPermissionGate(),
       notificationPermissionProvider: FakeNotificationPermissionProvider(
         nextStatus: NotificationPermissionStatus.granted,
       ),
-      repository: _MemoryGetOffAlarmStateRepository(),
+      repository: stateRepository,
       now: () => DateTime(2026, 7, 6, 9, 0),
     );
     addTearDown(controller.dispose);
@@ -9414,6 +9416,14 @@ void main() {
 
     expect(find.text('하차 알림'), findsOneWidget);
     expect(find.text('폰을 보지 않아도 내릴 때 알려드려요.'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('하차 알림'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('하차 알림'));
+    await tester.pumpAndSettle();
+
+    expect(notifier.scheduledAlarms.single.stationName, '사당');
+    expect((await stateRepository.loadActive())?.destination.stationName, '사당');
   });
 
   testWidgets('ride 중 하나의 공식 도착이 없으면 부분 하차 알림을 보이지 않는다', (tester) async {
@@ -9640,11 +9650,67 @@ void main() {
     expect(notifier.scheduleCalls, 1);
     expect(notifier.scheduledMode, GetOffAlarmScheduleMode.exact);
     expect(notifier.scheduledAlarms.single.stationId, 'station-sadang');
+    expect(notifier.scheduledAlarms.single.stationName, '사당');
     expect(
       notifier.scheduledAlarms.single.fireAt.isAtSameMomentAs(fireAt),
       isTrue,
     );
     expect((await stateRepository.loadActive())?.transferAlarmEnabled, isFalse);
+    expect((await stateRepository.loadActive())?.destination.stationName, '사당');
+  });
+
+  testWidgets('pull-to-refresh는 활성 하차 알림을 새 ETA로 재예약한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    final repository =
+        FakeRouteSearchRepository(result: _sampleGetOffAlarmRouteResult())
+          ..refreshResult = RouteRefreshResult(
+            routeSearchId: 'route-1',
+            status: 'UPDATED_ETA',
+            result: _sampleGetOffAlarmRouteResult(
+              realtimeArrivalTimeIso: '2026-07-06T09:40:00+09:00',
+            ),
+            refreshedAt: '2026-07-06T09:01:00+09:00',
+            etaSource: 'REALTIME',
+            etaConfidence: 'HIGH',
+            sourceLabel: '실시간 도착 정보 기준',
+          );
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: repository,
+      controller: controller,
+    );
+    await _enableSampleGetOffAlarm(controller);
+    notifier.reset();
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, 500));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(repository.refreshRouteSearchIds, ['route-1']);
+    expect(notifier.scheduleCalls, 1);
+    expect(
+      notifier.scheduledAlarms.single.arrivalAt.isAtSameMomentAs(
+        DateTime.parse('2026-07-06T09:40:00+09:00'),
+      ),
+      isTrue,
+    );
+    expect(
+      notifier.scheduledAlarms.single.fireAt.isAtSameMomentAs(
+        DateTime.parse('2026-07-06T09:38:00+09:00'),
+      ),
+      isTrue,
+    );
   });
 
   testWidgets('새 경로 검색은 활성 하차 알림을 취소한다', (tester) async {
@@ -9779,6 +9845,133 @@ void main() {
     expect(controller.state.enabled, isFalse);
   });
 
+  testWidgets('일반 보기 이동 조건 변경은 활성 하차 알림과 이전 경로 결과를 정리한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: _MemoryGetOffAlarmStateRepository(),
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: FakeRouteSearchRepository(
+        result: _sampleGetOffAlarmRouteResult(),
+      ),
+      controller: controller,
+      simpleViewEnabled: false,
+    );
+    await _enableSampleGetOffAlarm(controller);
+    notifier.reset();
+
+    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('휠체어 이용').last);
+    await tester.pumpAndSettle();
+
+    expect(notifier.cancelCalls, 1);
+    expect(controller.state.enabled, isFalse);
+    expect(find.byKey(const Key('routeResultListItem')), findsNothing);
+    expect(
+      tester
+          .widget<DropdownButton<String>>(find.byType(DropdownButton<String>))
+          .value,
+      'WHEELCHAIR',
+    );
+  });
+
+  testWidgets('계단 없는 길 조건 변경은 활성 하차 알림과 이전 경로 결과를 정리한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: _MemoryGetOffAlarmStateRepository(),
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: FakeRouteSearchRepository(
+        result: _sampleGetOffAlarmRouteResult(),
+      ),
+      controller: controller,
+    );
+    await _enableSampleGetOffAlarm(controller);
+    notifier.reset();
+
+    await tester.ensureVisible(
+      find.byKey(const Key('routeStrictStepFreeSwitch')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeStrictStepFreeSwitch')));
+    await tester.pumpAndSettle();
+
+    expect(notifier.cancelCalls, 1);
+    expect(controller.state.enabled, isFalse);
+    expect(find.byKey(const Key('routeResultListItem')), findsNothing);
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.byKey(const Key('routeStrictStepFreeSwitch')),
+          )
+          .value,
+      isTrue,
+    );
+  });
+
+  testWidgets('일반 보기 이동 조건 변경은 하차 알림 취소 실패 시 기존 조건과 경로를 유지한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: _MemoryGetOffAlarmStateRepository(),
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: FakeRouteSearchRepository(
+        result: _sampleGetOffAlarmRouteResult(),
+      ),
+      controller: controller,
+      simpleViewEnabled: false,
+    );
+    await _enableSampleGetOffAlarm(controller);
+    notifier.reset();
+    final cancelError = StateError('cancel failed');
+    notifier.cancelError = cancelError;
+    final reports = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(reports.add, () async {
+      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('휠체어 이용').last);
+      await tester.pumpAndSettle();
+    });
+
+    expect(reports.single.exception, same(cancelError));
+    expect(find.text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+    expect(controller.state.enabled, isTrue);
+    expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
+    expect(
+      tester
+          .widget<DropdownButton<String>>(find.byType(DropdownButton<String>))
+          .value,
+      'SENIOR',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'pending enable 중 shell route exit는 disable 완료 뒤 경로와 하차 알림을 끝낸다',
     (tester) async {
@@ -9864,6 +10057,76 @@ void main() {
       expect(find.byKey(const Key('routeResultListItem')), findsNothing);
     },
   );
+
+  testWidgets('shell route exit는 하차 알림 취소 실패를 보고하고 현재 화면을 유지한다', (
+    tester,
+  ) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    await controller.enable(
+      routeId: 'route-1',
+      stops: [
+        GetOffAlarmStop(
+          stationId: 'station-sadang',
+          stationName: '사당',
+          arrivalAt: DateTime.parse('2026-07-06T09:37:30+09:00'),
+          kind: GetOffAlarmKind.destination,
+        ),
+      ],
+      transferAlarmEnabled: false,
+    );
+    notifier.reset();
+    final cancelError = StateError('cancel failed');
+    notifier.cancelError = cancelError;
+    final reports = <FlutterErrorDetails>[];
+    var exitCount = 0;
+
+    await runWithMobileErrorReporter(reports.add, () async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(),
+            getOffAlarmController: controller,
+            onShellBackToHome: () => exitCount += 1,
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 7, 6),
+            ),
+          ),
+        ),
+      );
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+    });
+
+    expect(reports.single.exception, same(cancelError));
+    expect(reports.single.context.toString(), '하차 알림 취소 중 예외가 발생했습니다.');
+    expect(find.text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
+    expect(exitCount, 0);
+    expect(find.byKey(const Key('routeSearchScreen')), findsOneWidget);
+    expect(controller.state.enabled, isTrue);
+    expect(await stateRepository.loadActive(), isNotNull);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'offline foreground refresh는 stale realtime 대신 PLANNED 하차 알림을 사용한다',
@@ -9971,6 +10234,100 @@ void main() {
       );
     },
   );
+
+  testWidgets('성공한 foreground refresh에 usable ride가 없으면 활성 하차 알림을 취소한다', (
+    tester,
+  ) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    final repository =
+        FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              steps: const [
+                RouteSearchStep(
+                  sequence: 1,
+                  stepType: 'ride',
+                  title: '상록수에서 사당까지 이동',
+                  description: '열차를 이용해 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sangnoksu',
+                  toStationId: 'station-sadang',
+                  estimatedMinutes: 32,
+                  distanceMeters: 13500,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
+                  plannedArrivalTimeIso: '2026-07-06T09:37:30+09:00',
+                ),
+              ],
+            ),
+          )
+          ..refreshResult = RouteRefreshResult(
+            routeSearchId: 'route-1',
+            status: 'UPDATED_ROUTE',
+            result: _sampleRouteSearchResult(steps: const []),
+            refreshedAt: '2026-07-06T09:01:00+09:00',
+            etaSource: 'PLANNED',
+            etaConfidence: 'MEDIUM',
+            sourceLabel: '계획 시간 기준',
+          );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: repository,
+          stationRepository: FakeStationSearchRepository(),
+          getOffAlarmController: controller,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 6),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    await tester.pumpAndSettle();
+    await controller.enable(
+      routeId: 'route-1',
+      stops: [
+        GetOffAlarmStop(
+          stationId: 'station-sadang',
+          stationName: '사당',
+          arrivalAt: DateTime.parse('2026-07-06T09:37:30+09:00'),
+          kind: GetOffAlarmKind.destination,
+        ),
+      ],
+      transferAlarmEnabled: false,
+    );
+    notifier.reset();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(repository.refreshRouteSearchIds, ['route-1']);
+    expect(notifier.cancelCalls, 1);
+    expect(controller.state.enabled, isFalse);
+    expect(await stateRepository.loadActive(), isNull);
+  });
 
   testWidgets('중복 foreground 하차 알림 refresh는 진행 중 예약을 건너뛴다', (tester) async {
     final notifier = _RecordingGetOffAlarmNotifier();
@@ -13123,6 +13480,78 @@ class _FakeKakaoMapLauncher implements KakaoMapLauncher {
   }
 }
 
+RouteSearchResult _sampleGetOffAlarmRouteResult({
+  String plannedArrivalTimeIso = '2026-07-06T09:37:30+09:00',
+  String realtimeArrivalTimeIso = '',
+}) {
+  return _sampleRouteSearchResult(
+    steps: [
+      RouteSearchStep(
+        sequence: 1,
+        stepType: 'ride',
+        title: '상록수에서 사당까지 이동',
+        description: '열차를 이용해 이동합니다.',
+        lineId: 'seoul-4',
+        lineName: '수도권 4호선',
+        fromStationId: 'station-sangnoksu',
+        toStationId: 'station-sadang',
+        estimatedMinutes: 32,
+        distanceMeters: 13500,
+        includesStairs: false,
+        requiresAccessibilityCheck: true,
+        plannedArrivalTimeIso: plannedArrivalTimeIso,
+        realtimeArrivalTimeIso: realtimeArrivalTimeIso,
+      ),
+    ],
+  );
+}
+
+Future<void> _pumpGetOffAlarmRouteScreen(
+  WidgetTester tester, {
+  required FakeRouteSearchRepository repository,
+  required GetOffAlarmController controller,
+  bool simpleViewEnabled = true,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: RouteSearchScreen(
+        repository: repository,
+        stationRepository: FakeStationSearchRepository(),
+        getOffAlarmController: controller,
+        simpleViewEnabled: simpleViewEnabled,
+        initialDraft: RouteDraft(
+          origin: const RouteDraftStation(
+            id: 'station-sangnoksu',
+            nameKo: '상록수',
+          ),
+          destination: const RouteDraftStation(
+            id: 'station-sadang',
+            nameKo: '사당',
+          ),
+          lastModifiedAt: DateTime(2026, 7, 6),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _enableSampleGetOffAlarm(GetOffAlarmController controller) {
+  return controller.enable(
+    routeId: 'route-1',
+    stops: [
+      GetOffAlarmStop(
+        stationId: 'station-sadang',
+        stationName: '사당',
+        arrivalAt: DateTime.parse('2026-07-06T09:37:30+09:00'),
+        kind: GetOffAlarmKind.destination,
+      ),
+    ],
+    transferAlarmEnabled: false,
+  );
+}
+
 class FakeRouteSearchRepository implements RouteSearchRepository {
   FakeRouteSearchRepository({RouteSearchResult? result, this.error})
     : result = result ?? _sampleRouteSearchResult();
@@ -13174,6 +13603,7 @@ class _RecordingGetOffAlarmNotifier implements GetOffAlarmNotifier {
   int cancelCalls = 0;
   List<ScheduledGetOffAlarm> scheduledAlarms = const [];
   GetOffAlarmScheduleMode? scheduledMode;
+  Object? cancelError;
 
   void reset() {
     scheduleCalls = 0;
@@ -13185,6 +13615,10 @@ class _RecordingGetOffAlarmNotifier implements GetOffAlarmNotifier {
   @override
   Future<void> cancelAll() async {
     cancelCalls += 1;
+    final error = cancelError;
+    if (error != null) {
+      throw error;
+    }
   }
 
   @override

@@ -2517,6 +2517,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     }
     final rideLegs = _rideLegArrivalsFromResult(result);
     if (rideLegs.isEmpty) {
+      if (outcome.refreshed) {
+        await _disableActiveGetOffAlarm();
+      }
       return;
     }
     final source =
@@ -2530,9 +2533,21 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       if (!mounted) {
         return;
       }
+      final activeStationNames = <String, String>{
+        if (activeSubscription != null)
+          for (final transfer in activeSubscription.transfers)
+            transfer.stationId: transfer.stationName,
+        if (activeSubscription != null)
+          activeSubscription.destination.stationId:
+              activeSubscription.destination.stationName,
+      };
       final stops = getOffAlarmStopsFromRideLegs(
         rideLegs: rideLegs,
-        stationName: (id) => id,
+        stationName: (id) =>
+            activeStationNames[id] ??
+            (id == result.destinationStationId
+                ? result.destinationStationName
+                : id),
         source: source,
       );
       final destination = stops.last;
@@ -2613,9 +2628,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         child: SafeArea(
           child: RefreshIndicator(
             key: const Key('routeResultRefreshIndicator'),
-            onRefresh: () async {
-              await _controller.refreshCurrentRoute();
-            },
+            onRefresh: _refreshCurrentRouteAndAlarm,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: _routeSearchPagePadding,
@@ -2675,17 +2688,11 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                               child: Text(option.title),
                             ),
                         ],
-                        onChanged: (value) {
+                        onChanged: (value) async {
                           if (value == null) {
                             return;
                           }
-                          setState(() {
-                            _selectedMobilityType = value;
-                            _selectedConstraintMode =
-                                RouteSearchRequest._defaultConstraintMode(
-                                  value,
-                                );
-                          });
+                          await _updateMobilityType(value);
                         },
                       ),
                     ),
@@ -2697,13 +2704,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                   // 결과 화면에서 안내한다(#1568).
                   title: const Text('계단 없는 길만'),
                   value: _selectedConstraintMode == 'STRICT_STEP_FREE',
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedConstraintMode = value
-                          ? 'STRICT_STEP_FREE'
-                          : 'PREFER_STEP_FREE';
-                    });
-                  },
+                  onChanged: _updateConstraintMode,
                 ),
                 _RouteRecentDestinationList(
                   repository: widget.favoriteRouteRepository,
@@ -2740,9 +2741,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         }
         return PopScope(
           canPop: false,
-          onPopInvokedWithResult: (didPop, _) {
+          onPopInvokedWithResult: (didPop, _) async {
             if (!didPop) {
-              unawaited(_endRoute());
+              await _endRoute();
             }
           },
           child: child!,
@@ -2751,15 +2752,29 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
   }
 
-  Future<void> _disableActiveGetOffAlarm() async {
+  Future<bool> _disableActiveGetOffAlarm() async {
     final getOffAlarmController = widget.getOffAlarmController;
-    if (getOffAlarmController != null) {
+    if (getOffAlarmController == null) {
+      return true;
+    }
+    try {
       await getOffAlarmController.disable();
+      return true;
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '하차 알림 취소 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.')),
+        );
+      }
+      return false;
     }
   }
 
   Future<void> _endRoute() async {
-    await _disableActiveGetOffAlarm();
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -2772,7 +2787,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       return;
     }
     if (_originStation == null || _destinationStation == null) {
-      await _disableActiveGetOffAlarm();
+      if (!await _disableActiveGetOffAlarm()) {
+        return;
+      }
       if (!mounted) {
         return;
       }
@@ -2785,7 +2802,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     setState(() {
       _validationMessage = '';
     });
-    await _disableActiveGetOffAlarm();
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -2821,7 +2840,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 
   Future<void> _updateOriginStation(StationSearchResult? station) async {
-    await _disableActiveGetOffAlarm();
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -2836,7 +2857,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 
   Future<void> _updateDestinationStation(StationSearchResult? station) async {
-    await _disableActiveGetOffAlarm();
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -2858,7 +2881,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   }
 
   Future<void> _swapStations() async {
-    await _disableActiveGetOffAlarm();
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -2869,6 +2894,38 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       _activeStationPicker = null;
       _validationMessage = '';
     });
+    _controller.reset();
+  }
+
+  Future<void> _updateMobilityType(String mobilityType) async {
+    if (mobilityType == _selectedMobilityType ||
+        !await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedMobilityType = mobilityType;
+      _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
+        mobilityType,
+      );
+    });
+    _controller.reset();
+  }
+
+  Future<void> _updateConstraintMode(bool strictStepFree) async {
+    final constraintMode = strictStepFree
+        ? 'STRICT_STEP_FREE'
+        : 'PREFER_STEP_FREE';
+    if (constraintMode == _selectedConstraintMode ||
+        !await _disableActiveGetOffAlarm()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() => _selectedConstraintMode = constraintMode);
     _controller.reset();
   }
 
@@ -2958,7 +3015,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     if (!mounted || selectedMobilityType == null) {
       return;
     }
-    await _disableActiveGetOffAlarm();
+    if (!await _disableActiveGetOffAlarm()) {
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -3909,7 +3968,7 @@ class _RouteSearchBody extends StatelessWidget {
   final RouteSearchState state;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
-  final VoidCallback? onShellBackToHome;
+  final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
 
   @override
@@ -4086,7 +4145,7 @@ class _RouteSearchResultCard extends StatefulWidget {
   final bool isRefreshing;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
-  final VoidCallback? onShellBackToHome;
+  final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
 
   @override
@@ -4142,9 +4201,9 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
     }
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
+      onPopInvokedWithResult: (didPop, _) async {
         if (!didPop) {
-          onShellBackToHome();
+          await onShellBackToHome();
         }
       },
       child: content,
@@ -4256,7 +4315,9 @@ class _GetOffAlarmEntryPoint extends StatelessWidget {
         controller: controller,
         routeId: result.routeSearchId,
         rideLegs: rideLegs,
-        stationName: (id) => id,
+        stationName: (id) => id == result.destinationStationId
+            ? result.destinationStationName
+            : id,
       ),
     );
   }
