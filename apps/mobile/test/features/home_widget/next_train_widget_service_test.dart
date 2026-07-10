@@ -110,6 +110,36 @@ void main() {
     expect(cancelCount, 1);
   });
 
+  test('완료 실패에서 current pending widget만 있으면 periodic을 취소한다', () {
+    expect(
+      shouldCancelNextTrainWidgetRefreshAfterFailedConfiguration(
+        installedWidgetIds: const [42],
+        configuringWidgetId: 42,
+      ),
+      isTrue,
+    );
+  });
+
+  test('완료 실패에서 installed widget이 없으면 periodic을 취소한다', () {
+    expect(
+      shouldCancelNextTrainWidgetRefreshAfterFailedConfiguration(
+        installedWidgetIds: const [],
+        configuringWidgetId: 42,
+      ),
+      isTrue,
+    );
+  });
+
+  test('완료 실패에서 다른 정상 widget이 있으면 periodic을 유지한다', () {
+    expect(
+      shouldCancelNextTrainWidgetRefreshAfterFailedConfiguration(
+        installedWidgetIds: const [7, 42],
+        configuringWidgetId: 42,
+      ),
+      isFalse,
+    );
+  });
+
   test('configuration operation 오류에서도 resource를 한 번 닫는다', () async {
     var closeCount = 0;
 

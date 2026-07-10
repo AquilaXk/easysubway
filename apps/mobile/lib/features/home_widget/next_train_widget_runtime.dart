@@ -100,6 +100,16 @@ Future<void> configureNextTrainWidgetSelection({
 }
 
 @visibleForTesting
+bool shouldCancelNextTrainWidgetRefreshAfterFailedConfiguration({
+  required List<int> installedWidgetIds,
+  required int configuringWidgetId,
+}) {
+  return installedWidgetIds.every(
+    (widgetId) => widgetId == configuringWidgetId,
+  );
+}
+
+@visibleForTesting
 Future<void> launchNextTrainWidgetConfiguration({
   required Future<String?> Function() readWidgetId,
   required Future<void> Function(int widgetId) launch,
@@ -289,7 +299,11 @@ Future<void> configureMain() async {
               registerRefresh: initializeNextTrainWidgetRefresh,
               finish: HomeWidget.finishHomeWidgetConfigure,
               cancelRefresh: () async {
-                if ((await installedNextTrainWidgetIds()).isEmpty) {
+                final installedWidgetIds = await installedNextTrainWidgetIds();
+                if (shouldCancelNextTrainWidgetRefreshAfterFailedConfiguration(
+                  installedWidgetIds: installedWidgetIds,
+                  configuringWidgetId: appWidgetId,
+                )) {
                   await cancelNextTrainWidgetRefresh();
                 }
               },
