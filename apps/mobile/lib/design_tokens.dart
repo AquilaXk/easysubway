@@ -144,7 +144,10 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
       good: lerpColor(good, other.good),
       warn: lerpColor(warn, other.warn),
       danger: lerpColor(danger, other.danger),
-      mapSelectionAccent: lerpColor(mapSelectionAccent, other.mapSelectionAccent),
+      mapSelectionAccent: lerpColor(
+        mapSelectionAccent,
+        other.mapSelectionAccent,
+      ),
       mapRegionAccent: lerpColor(mapRegionAccent, other.mapRegionAccent),
     );
   }

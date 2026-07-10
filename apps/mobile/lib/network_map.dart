@@ -1878,7 +1878,9 @@ class _NetworkMapToggleSegment extends StatelessWidget {
         width: 50,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: selected ? EasySubwayAccessibleColors.mapRegionAccent : Colors.transparent,
+          color: selected
+              ? EasySubwayAccessibleColors.mapRegionAccent
+              : Colors.transparent,
           borderRadius: _networkMapPillRadius,
         ),
         child: Text(
@@ -2129,7 +2131,11 @@ class _NetworkMapMenuTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  Icon(icon, size: 22, color: EasySubwayAccessibleColors.mutedText),
+                  Icon(
+                    icon,
+                    size: 22,
+                    color: EasySubwayAccessibleColors.mutedText,
+                  ),
                   const SizedBox(width: 18),
                   Expanded(
                     child: Text(

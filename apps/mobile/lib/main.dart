@@ -440,9 +440,7 @@ class EasySubwayApp extends StatelessWidget {
           seedColor: EasySubwayAccessibleColors.primary,
         ),
         extensions: const [EasySubwayTokens.light],
-        textTheme: easySubwayTextTheme(
-          ThemeData(useMaterial3: true).textTheme,
-        ),
+        textTheme: easySubwayTextTheme(ThemeData(useMaterial3: true).textTheme),
         scaffoldBackgroundColor: _mainScaffoldBackgroundColor,
         appBarTheme: const AppBarTheme(
           centerTitle: false,

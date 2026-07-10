@@ -24,7 +24,10 @@ void main() {
   int countIn(String source, Pattern pattern) =>
       pattern.allMatches(source).length;
 
-  Map<String, int> countPerFile(Pattern pattern, {Set<String> exclude = const {}}) {
+  Map<String, int> countPerFile(
+    Pattern pattern, {
+    Set<String> exclude = const {},
+  }) {
     final counts = <String, int>{};
     sources.forEach((path, source) {
       if (exclude.any(path.endsWith)) {
@@ -60,7 +63,9 @@ void main() {
   }
 
   test('그라데이션 하드 밴 — 0건 유지', () {
-    final offenders = countPerFile(RegExp(r'\bLinearGradient\b|\bRadialGradient\b|\bSweepGradient\b'));
+    final offenders = countPerFile(
+      RegExp(r'\bLinearGradient\b|\bRadialGradient\b|\bSweepGradient\b'),
+    );
     expect(
       offenders,
       isEmpty,
@@ -75,7 +80,6 @@ void main() {
     );
     expectRatchet(actual, {
       'lib/main.dart': 8,
-      'lib/route_search.dart': 29,
       'lib/station_search.dart': 8,
       'lib/features/stations/domain/station_line.dart': 1,
     }, rule: '로컬 색 상수');
@@ -99,12 +103,12 @@ void main() {
     expectRatchet(actual, {
       'lib/main.dart': 18,
       'lib/network_map.dart': 8,
-      'lib/route_search.dart': 28,
       'lib/station_search.dart': 16,
       'lib/facility_report.dart': 16,
       'lib/onboarding.dart': 2,
       'lib/notification_settings.dart': 2,
-      'lib/features/service_notice/presentation/service_notice_list_screen.dart': 1,
+      'lib/features/service_notice/presentation/service_notice_list_screen.dart':
+          1,
     }, rule: 'w800');
   });
 
@@ -115,7 +119,6 @@ void main() {
     );
     expectRatchet(actual, {
       'lib/main.dart': 3,
-      'lib/route_search.dart': 2,
       'lib/station_search.dart': 1,
       'lib/mobility_profile.dart': 1,
       'lib/facility_report.dart': 1,

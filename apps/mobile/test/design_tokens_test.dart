@@ -59,7 +59,9 @@ void main() {
 
   group('easySubwayTextTheme', () {
     test('타이포 위계 — 타이틀만 w800, 본문 w500, 라벨 w600', () {
-      final theme = easySubwayTextTheme(ThemeData(useMaterial3: true).textTheme);
+      final theme = easySubwayTextTheme(
+        ThemeData(useMaterial3: true).textTheme,
+      );
       expect(theme.titleLarge?.fontWeight, FontWeight.w800);
       expect(theme.titleMedium?.fontWeight, FontWeight.w700);
       expect(theme.bodyLarge?.fontWeight, FontWeight.w500);
