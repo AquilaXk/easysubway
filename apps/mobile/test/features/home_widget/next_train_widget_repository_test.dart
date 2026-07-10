@@ -2,11 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/features/home_widget/next_train_widget_repository.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 void main() {
   late CatalogDatabase catalogDatabase;
   late UserDatabase userDatabase;
   late NextTrainWidgetRepository repository;
+
+  setUpAll(tz_data.initializeTimeZones);
 
   setUp(() async {
     catalogDatabase = CatalogDatabase.memory();
@@ -54,6 +58,56 @@ void main() {
     ]);
   });
 
+  test('23:59 뒤 같은 service day의 24시대 양방향 열차를 표시한다', () async {
+    await _seedSchedule(catalogDatabase, lateNight: true);
+
+    final data = await repository.load(
+      _sadangLine4,
+      DateTime(2026, 7, 9, 23, 59),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.available);
+    expect(data.statusLabel, '시간표 기준');
+    expect(data.directions.map((item) => item.departureLabel), [
+      '00:25',
+      '00:30',
+    ]);
+  });
+
+  test('feed 마지막 service date 다음 날 00시대 열차를 표시한다', () async {
+    await _seedSchedule(
+      catalogDatabase,
+      feedEndDate: '20260709',
+      lateNight: true,
+    );
+
+    final data = await repository.load(
+      _sadangLine4,
+      DateTime.utc(2026, 7, 9, 15, 10),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.available);
+    expect(data.directions.map((item) => item.departureLabel), [
+      '00:25',
+      '00:30',
+    ]);
+  });
+
+  test('기기 timezone과 무관하게 Asia/Seoul service clock을 사용한다', () async {
+    await _seedSchedule(catalogDatabase, holidayDate: '20260817');
+    final newYork = tz.getLocation('America/New_York');
+
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(newYork, 2026, 8, 16, 20),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.available);
+    expect(data.directions.first.departureLabel, '09:12');
+    expect(data.updatedAt, isA<tz.TZDateTime>());
+    expect((data.updatedAt as tz.TZDateTime).location.name, 'Asia/Seoul');
+  });
+
   test('오늘 운행이 끝났으면 다음 service day 첫차를 표시한다', () async {
     await _seedSchedule(catalogDatabase);
 
@@ -85,6 +139,20 @@ void main() {
 
     expect(data.status, NextTrainWidgetStatus.timetableUnavailable);
     expect(data.directions, isEmpty);
+  });
+
+  test('하차 전용 stop_times만 있는 station-line은 선택에서 제외한다', () async {
+    await _favorite(userDatabase, 'station-sadang');
+    await _seedSchedule(catalogDatabase, pickupType: 1);
+
+    expect(await repository.availableSelections(), isEmpty);
+  });
+
+  test('한 방향 stop_times만 있는 station-line은 선택에서 제외한다', () async {
+    await _favorite(userDatabase, 'station-sadang');
+    await _seedSchedule(catalogDatabase, includeDownDirection: false);
+
+    expect(await repository.availableSelections(), isEmpty);
   });
 }
 
@@ -133,6 +201,9 @@ Future<void> _seedSchedule(
   CatalogDatabase database, {
   String feedEndDate = '20261231',
   String? holidayDate,
+  bool lateNight = false,
+  int pickupType = 0,
+  bool includeDownDirection = true,
 }) async {
   await database.customStatement('''
     INSERT INTO service_calendars (
@@ -168,16 +239,25 @@ Future<void> _seedSchedule(
       ('holiday-up', 'line4-up', 'holiday', '상록수', 'up', 'LOCAL', 0),
       ('holiday-down', 'line4-down', 'holiday', '사당', 'down', 'LOCAL', 0)
   ''');
-  await database.customStatement('''
-    INSERT INTO transit_stop_times (
-      trip_id, stop_sequence, station_id, line_id,
-      arrival_seconds, departure_seconds, pickup_type, drop_off_type
-    ) VALUES
-      ('weekday-up', 1, 'station-sadang', 'seoul-4', 19200, 19200, 0, 0),
-      ('weekday-down', 1, 'station-sadang', 'seoul-4', 19500, 19500, 0, 0),
-      ('holiday-up', 1, 'station-sadang', 'seoul-4', 33120, 33120, 0, 0),
-      ('holiday-down', 1, 'station-sadang', 'seoul-4', 33480, 33480, 0, 0)
-  ''');
+  final weekdayUp = lateNight ? 87900 : 19200;
+  final weekdayDown = lateNight ? 88200 : 19500;
+  final stopTimes = <(String, int)>[
+    ('weekday-up', weekdayUp),
+    if (includeDownDirection) ('weekday-down', weekdayDown),
+    ('holiday-up', 33120),
+    if (includeDownDirection) ('holiday-down', 33480),
+  ];
+  for (final (tripId, seconds) in stopTimes) {
+    await database.customStatement(
+      '''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds, pickup_type, drop_off_type
+      ) VALUES (?, 1, 'station-sadang', 'seoul-4', ?, ?, ?, 0)
+      ''',
+      [tripId, seconds, seconds, pickupType],
+    );
+  }
   await database.customStatement(
     'INSERT INTO transit_feed_info (id, feed_end_date) VALUES (1, ?)',
     [feedEndDate],

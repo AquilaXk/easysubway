@@ -1,4 +1,6 @@
 import 'package:drift/drift.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/database/catalog/catalog_database.dart';
 import '../../core/database/user/user_database.dart';
@@ -87,15 +89,9 @@ class NextTrainWidgetRepository {
           JOIN station_lines sl ON sl.station_id = s.id
           JOIN lines l ON l.id = sl.line_id
           WHERE s.id IN ($placeholders)
-            AND EXISTS (
-              SELECT 1
-              FROM transit_stop_times st
-              WHERE st.station_id = sl.station_id
-                AND st.line_id = sl.line_id
-            )
           ORDER BY s.name_ko, l.name_ko
           ''', variables: stationIds.map(Variable.withString).toList()).get();
-    return rows
+    final selections = rows
         .map(
           (row) => WidgetStationSelection(
             stationId: row.read<String>('station_id'),
@@ -105,22 +101,34 @@ class NextTrainWidgetRepository {
           ),
         )
         .toList(growable: false);
+    final available = <WidgetStationSelection>[];
+    for (final selection in selections) {
+      final directions = (await _departures(
+        selection: selection,
+      )).map((departure) => departure.directionName).toSet();
+      if (directions.length >= 2) {
+        available.add(selection);
+      }
+    }
+    return available;
   }
 
   Future<NextTrainWidgetData> load(
     WidgetStationSelection selection,
     DateTime now,
   ) async {
-    // ponytail: the catalog is Asia/Seoul-only; add timezone conversion when
-    // multi-timezone packs become a real requirement.
-    final localNow = now.toLocal();
-    final feedEndDate = await _currentFeedEndDate(localNow);
+    final serviceNow = tz.TZDateTime.from(now, _seoulLocation);
+    final feedEndDate = await _feedEndDate();
     if (feedEndDate == null) {
-      return NextTrainWidgetData.unavailable(selection, localNow);
+      return NextTrainWidgetData.unavailable(selection, serviceNow);
     }
 
-    final midnight = DateTime(localNow.year, localNow.month, localNow.day);
-    final nowSeconds = localNow.difference(midnight).inSeconds;
+    final midnight = tz.TZDateTime(
+      _seoulLocation,
+      serviceNow.year,
+      serviceNow.month,
+      serviceNow.day,
+    );
     final candidates = <_Departure>[];
     for (var dayOffset = -1; dayOffset <= 7; dayOffset += 1) {
       final serviceDate = midnight.add(Duration(days: dayOffset));
@@ -136,16 +144,17 @@ class NextTrainWidgetRepository {
         serviceIds: serviceIds,
       );
       for (final departure in departures) {
-        final relativeSeconds =
-            (dayOffset * Duration.secondsPerDay) + departure.seconds;
-        if (relativeSeconds < nowSeconds) {
+        final departureAt = serviceDate.add(
+          Duration(seconds: departure.seconds),
+        );
+        if (departureAt.isBefore(serviceNow)) {
           continue;
         }
         candidates.add(
           _Departure(
             directionName: departure.directionName,
-            seconds: departure.seconds,
-            departureAt: serviceDate.add(Duration(seconds: departure.seconds)),
+            serviceDate: serviceDate,
+            departureAt: departureAt,
           ),
         );
       }
@@ -154,26 +163,32 @@ class NextTrainWidgetRepository {
       (left, right) => left.departureAt.compareTo(right.departureAt),
     );
 
-    final nextByDirection = <String, NextTrainDirection>{};
+    final nextByDirection = <String, _Departure>{};
     for (final candidate in candidates) {
-      nextByDirection.putIfAbsent(
-        candidate.directionName,
-        () => NextTrainDirection(
-          name: candidate.directionName,
-          departureAt: candidate.departureAt,
-        ),
-      );
+      nextByDirection.putIfAbsent(candidate.directionName, () => candidate);
     }
-    final directions = nextByDirection.values.toList(growable: false)
+    final nextDepartures = nextByDirection.values.toList(growable: false)
       ..sort((left, right) => left.departureAt.compareTo(right.departureAt));
+    final directions =
+        nextDepartures
+            .map(
+              (departure) => NextTrainDirection(
+                name: departure.directionName,
+                departureAt: departure.departureAt,
+              ),
+            )
+            .toList(growable: false)
+          ..sort(
+            (left, right) => left.departureAt.compareTo(right.departureAt),
+          );
     if (directions.length < 2) {
-      return NextTrainWidgetData.unavailable(selection, localNow);
+      return NextTrainWidgetData.unavailable(selection, serviceNow);
     }
 
-    final hasDepartureToday = directions.any(
-      (direction) => _isSameDate(direction.departureAt, localNow),
+    final hasCurrentServiceDayDeparture = nextDepartures.any(
+      (departure) => !departure.serviceDate.isAfter(midnight),
     );
-    final status = hasDepartureToday
+    final status = hasCurrentServiceDayDeparture
         ? NextTrainWidgetStatus.available
         : NextTrainWidgetStatus.serviceEnded;
     return NextTrainWidgetData(
@@ -183,20 +198,18 @@ class NextTrainWidgetRepository {
       statusLabel: status == NextTrainWidgetStatus.serviceEnded
           ? '오늘 운행 종료 · 첫차 ${directions.first.departureLabel}'
           : '시간표 기준',
-      updatedAt: localNow,
+      updatedAt: serviceNow,
     );
   }
 
-  Future<DateTime?> _currentFeedEndDate(DateTime now) async {
+  Future<tz.TZDateTime?> _feedEndDate() async {
     final row = await catalogDatabase
         .customSelect('SELECT feed_end_date FROM transit_feed_info LIMIT 1')
         .getSingleOrNull();
     if (row == null) {
       return null;
     }
-    final endDate = _parseServiceDate(row.read<String>('feed_end_date'));
-    final today = DateTime(now.year, now.month, now.day);
-    return endDate != null && !today.isAfter(endDate) ? endDate : null;
+    return _parseServiceDate(row.read<String>('feed_end_date'));
   }
 
   Future<Set<String>> _activeServiceIds(DateTime date) async {
@@ -248,11 +261,13 @@ class NextTrainWidgetRepository {
     return active;
   }
 
-  Future<List<_Departure>> _departures({
+  Future<List<_StopTimeDeparture>> _departures({
     required WidgetStationSelection selection,
-    required Set<String> serviceIds,
+    Set<String>? serviceIds,
   }) async {
-    final placeholders = List.filled(serviceIds.length, '?').join(',');
+    final serviceFilter = serviceIds == null
+        ? ''
+        : 'AND t.service_id IN (${List.filled(serviceIds.length, '?').join(',')})';
     final rows = await catalogDatabase
         .customSelect(
           '''
@@ -263,47 +278,52 @@ class NextTrainWidgetRepository {
           WHERE st.station_id = ?
             AND st.line_id = ?
             AND st.pickup_type = 0
-            AND t.service_id IN ($placeholders)
+            AND r.line_id = st.line_id
+            AND TRIM(r.direction_name) <> ''
+            $serviceFilter
           ORDER BY st.departure_seconds
           ''',
           variables: [
             Variable.withString(selection.stationId),
             Variable.withString(selection.lineId),
-            ...serviceIds.map(Variable.withString),
+            ...?serviceIds?.map(Variable.withString),
           ],
         )
         .get();
     return rows
         .map(
-          (row) => _Departure(
+          (row) => _StopTimeDeparture(
             directionName: row.read<String>('direction_name'),
             seconds: row.read<int>('departure_seconds'),
-            departureAt: DateTime.fromMillisecondsSinceEpoch(0),
           ),
         )
         .toList(growable: false);
   }
 }
 
-class _Departure {
-  const _Departure({
+class _StopTimeDeparture {
+  const _StopTimeDeparture({
     required this.directionName,
     required this.seconds,
-    required this.departureAt,
   });
 
   final String directionName;
   final int seconds;
+}
+
+class _Departure {
+  const _Departure({
+    required this.directionName,
+    required this.serviceDate,
+    required this.departureAt,
+  });
+
+  final String directionName;
+  final DateTime serviceDate;
   final DateTime departureAt;
 }
 
 bool _isEnabled(Object? value) => value == true || value == 1;
-
-bool _isSameDate(DateTime left, DateTime right) {
-  return left.year == right.year &&
-      left.month == right.month &&
-      left.day == right.day;
-}
 
 String _dateKey(DateTime date) {
   return '${date.year.toString().padLeft(4, '0')}'
@@ -311,15 +331,23 @@ String _dateKey(DateTime date) {
       '${date.day.toString().padLeft(2, '0')}';
 }
 
-DateTime? _parseServiceDate(String value) {
+tz.TZDateTime? _parseServiceDate(String value) {
   if (!RegExp(r'^\d{8}$').hasMatch(value)) {
     return null;
   }
-  return DateTime(
+  return tz.TZDateTime(
+    _seoulLocation,
     int.parse(value.substring(0, 4)),
     int.parse(value.substring(4, 6)),
     int.parse(value.substring(6, 8)),
   );
+}
+
+final tz.Location _seoulLocation = _loadSeoulLocation();
+
+tz.Location _loadSeoulLocation() {
+  tz_data.initializeTimeZones();
+  return tz.getLocation('Asia/Seoul');
 }
 
 String _timeLabel(DateTime value) {

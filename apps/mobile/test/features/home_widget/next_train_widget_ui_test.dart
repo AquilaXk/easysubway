@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:easysubway_mobile/features/home_widget/home_widget_link_handler.dart';
 import 'package:easysubway_mobile/features/home_widget/next_train_widget_configuration_screen.dart';
 import 'package:easysubway_mobile/features/home_widget/next_train_widget_repository.dart';
+import 'package:easysubway_mobile/features/home_widget/next_train_widget_runtime.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -37,6 +38,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('시간표가 있는 즐겨찾기 역이 없어요.'), findsOneWidget);
+  });
+
+  testWidgets('configuration 화면 dispose 뒤 load가 끝나도 resource를 한 번 닫는다', (
+    tester,
+  ) async {
+    final selections = Completer<List<WidgetStationSelection>>();
+    var closeCount = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NextTrainWidgetConfigurationScreen(
+          loadSelections: () => runNextTrainWidgetConfigurationOperation(
+            operation: () => selections.future,
+            close: () async => closeCount += 1,
+          ),
+          configure: (_) async {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox());
+    selections.complete(const []);
+    await tester.pump();
+
+    expect(closeCount, 1);
   });
 
   testWidgets('widget deep link는 같은 station 상세를 연다', (tester) async {

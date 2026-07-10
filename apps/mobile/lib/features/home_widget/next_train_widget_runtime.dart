@@ -24,6 +24,70 @@ const nextTrainWidgetRefreshTask = 'nextTrainWidgetRefresh';
 const nextTrainWidgetRefreshUniqueName = 'next-train-widget-refresh';
 
 typedef ReadWidgetValue = Future<String?> Function(String key);
+typedef ReportNextTrainWidgetError =
+    void Function(Object error, StackTrace stackTrace);
+
+Future<void> runNextTrainWidgetStartup({
+  required Future<void> Function() initialize,
+  required Future<void> Function() refresh,
+  required ReportNextTrainWidgetError reportError,
+}) async {
+  await runNextTrainWidgetOperationSafely(
+    operation: initialize,
+    reportError: reportError,
+  );
+  await runNextTrainWidgetOperationSafely(
+    operation: refresh,
+    reportError: reportError,
+  );
+}
+
+Future<void> runNextTrainWidgetOperationSafely({
+  required Future<void> Function() operation,
+  required ReportNextTrainWidgetError reportError,
+}) async {
+  try {
+    await operation();
+  } on Object catch (error, stackTrace) {
+    reportError(error, stackTrace);
+  }
+}
+
+@visibleForTesting
+Future<T> runNextTrainWidgetConfigurationOperation<T>({
+  required Future<T> Function() operation,
+  required Future<void> Function() close,
+}) async {
+  try {
+    return await operation();
+  } finally {
+    await close();
+  }
+}
+
+@visibleForTesting
+Future<void> configureNextTrainWidgetSelection({
+  required WidgetStationSelection selection,
+  required Future<void> Function() initializeRefresh,
+  required ConfigureWidget configure,
+  required Future<void> Function() finish,
+}) async {
+  await initializeRefresh();
+  await configure(selection);
+  await finish();
+}
+
+@visibleForTesting
+Future<void> launchNextTrainWidgetConfiguration({
+  required Future<String?> Function() readWidgetId,
+  required Future<void> Function(int widgetId) launch,
+}) async {
+  final widgetId = int.tryParse(await readWidgetId() ?? '');
+  if (widgetId == null) {
+    throw StateError('Android widget id가 없습니다.');
+  }
+  await launch(widgetId);
+}
 
 Future<void> refreshInstalledNextTrainWidgets({
   required List<int> widgetIds,
@@ -153,37 +217,43 @@ class NextTrainWidgetWorkmanagerApi extends WorkmanagerFlutterApi {
 Future<void> configureMain() async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
-  final appWidgetId = int.tryParse(
-    await HomeWidget.initiallyLaunchedFromHomeWidgetConfigure() ?? '',
-  );
-  final databases = await _openWidgetDatabases();
-  final repository = NextTrainWidgetRepository(
-    catalogDatabase: databases.catalog,
-    userDatabase: databases.user,
-  );
-  runApp(
-    MaterialApp(
-      title: '쉬운 지하철 위젯',
-      home: NextTrainWidgetConfigurationScreen(
-        loadSelections: repository.availableSelections,
-        configure: (selection) async {
-          if (appWidgetId == null) {
-            throw StateError('Android widget id가 없습니다.');
-          }
-          await NextTrainWidgetService(
-            load: repository.load,
-            saveValue: _saveWidgetValue,
-            updateWidget: _updateNativeWidget,
-          ).configure(
-            appWidgetId: appWidgetId,
-            selection: selection,
-            now: DateTime.now(),
-          );
-          await databases.close();
-          await HomeWidget.finishHomeWidgetConfigure();
-        },
-      ),
-    ),
+  await launchNextTrainWidgetConfiguration(
+    readWidgetId: HomeWidget.initiallyLaunchedFromHomeWidgetConfigure,
+    launch: (appWidgetId) async {
+      runApp(
+        MaterialApp(
+          title: '쉬운 지하철 위젯',
+          home: NextTrainWidgetConfigurationScreen(
+            loadSelections: () => _withConfigurationDatabases(
+              (databases) => NextTrainWidgetRepository(
+                catalogDatabase: databases.catalog,
+                userDatabase: databases.user,
+              ).availableSelections(),
+            ),
+            configure: (selection) => configureNextTrainWidgetSelection(
+              selection: selection,
+              initializeRefresh: initializeNextTrainWidgetRefresh,
+              configure: (selection) => _withConfigurationDatabases(
+                (databases) =>
+                    NextTrainWidgetService(
+                      load: NextTrainWidgetRepository(
+                        catalogDatabase: databases.catalog,
+                        userDatabase: databases.user,
+                      ).load,
+                      saveValue: _saveWidgetValue,
+                      updateWidget: _updateNativeWidget,
+                    ).configure(
+                      appWidgetId: appWidgetId,
+                      selection: selection,
+                      now: DateTime.now(),
+                    ),
+              ),
+              finish: HomeWidget.finishHomeWidgetConfigure,
+            ),
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -221,6 +291,16 @@ Future<_WidgetDatabases> _openWidgetDatabases() async {
   }
 }
 
+Future<T> _withConfigurationDatabases<T>(
+  Future<T> Function(_WidgetDatabases databases) operation,
+) async {
+  final databases = await _openWidgetDatabases();
+  return runNextTrainWidgetConfigurationOperation(
+    operation: () => operation(databases),
+    close: databases.close,
+  );
+}
+
 class _WidgetDatabases {
   const _WidgetDatabases({required this.catalog, required this.user});
 
@@ -228,7 +308,10 @@ class _WidgetDatabases {
   final UserDatabase user;
 
   Future<void> close() async {
-    await catalog.close();
-    await user.close();
+    try {
+      await catalog.close();
+    } finally {
+      await user.close();
+    }
   }
 }

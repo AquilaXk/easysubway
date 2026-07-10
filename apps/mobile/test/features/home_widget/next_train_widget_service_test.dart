@@ -4,6 +4,61 @@ import 'package:easysubway_mobile/features/home_widget/next_train_widget_service
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('위젯 startup plugin 실패를 보고하고 core startup은 계속한다', () async {
+    final errors = <Object>[];
+    var refreshed = false;
+
+    await runNextTrainWidgetStartup(
+      initialize: () async => throw StateError('plugin unavailable'),
+      refresh: () async => refreshed = true,
+      reportError: (error, _) => errors.add(error),
+    );
+
+    expect(errors.single, isA<StateError>());
+    expect(refreshed, isTrue);
+  });
+
+  test('direct configuration은 periodic 등록 뒤 구성하고 완료한다', () async {
+    final events = <String>[];
+
+    await configureNextTrainWidgetSelection(
+      selection: _selection,
+      initializeRefresh: () async => events.add('initialize'),
+      configure: (_) async => events.add('configure'),
+      finish: () async => events.add('finish'),
+    );
+
+    expect(events, ['initialize', 'configure', 'finish']);
+  });
+
+  test('configuration operation 오류에서도 resource를 한 번 닫는다', () async {
+    var closeCount = 0;
+
+    await expectLater(
+      runNextTrainWidgetConfigurationOperation<void>(
+        operation: () async => throw StateError('configure failed'),
+        close: () async => closeCount += 1,
+      ),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(closeCount, 1);
+  });
+
+  test('widget id가 없으면 configuration을 열지 않는다', () async {
+    var launched = false;
+
+    await expectLater(
+      launchNextTrainWidgetConfiguration(
+        readWidgetId: () async => null,
+        launch: (_) async => launched = true,
+      ),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(launched, isFalse);
+  });
+
   test('알 수 없는 WorkManager task는 성공으로 무시한다', () async {
     final worker = NextTrainWidgetWorkmanagerApi();
 

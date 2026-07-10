@@ -91,9 +91,13 @@ Future<void> main() async {
     catalogDatabase: bootstrap.catalogDatabase,
     userDatabase: bootstrap.userDatabase,
   );
-  await next_train_widget_runtime.initializeNextTrainWidgetRefresh();
-  await next_train_widget_runtime.refreshNextTrainWidgets(
-    nextTrainWidgetRepository,
+  await next_train_widget_runtime.runNextTrainWidgetStartup(
+    initialize: next_train_widget_runtime.initializeNextTrainWidgetRefresh,
+    refresh: () => next_train_widget_runtime.refreshNextTrainWidgets(
+      nextTrainWidgetRepository,
+    ),
+    reportError: (error, stackTrace) =>
+        reportMobileError(error, stackTrace, context: '홈 위젯 초기화 중 예외가 발생했습니다.'),
   );
   final photoPicker = ImagePickerFacilityReportPhotoPicker();
   final navigatorKey = GlobalKey<NavigatorState>();
@@ -104,8 +108,15 @@ Future<void> main() async {
       close: bootstrap.close,
       resumeDataPackUpdate: () async {
         await bootstrap.resumeDataPackUpdate();
-        await next_train_widget_runtime.refreshNextTrainWidgets(
-          nextTrainWidgetRepository,
+        await next_train_widget_runtime.runNextTrainWidgetOperationSafely(
+          operation: () => next_train_widget_runtime.refreshNextTrainWidgets(
+            nextTrainWidgetRepository,
+          ),
+          reportError: (error, stackTrace) => reportMobileError(
+            error,
+            stackTrace,
+            context: '홈 위젯 갱신 중 예외가 발생했습니다.',
+          ),
         );
       },
       resumeGetOffAlarmState: () => reconcileGetOffAlarmState(
