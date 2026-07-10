@@ -290,7 +290,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             zoneId: 'capital-integrated',
             riderType: 'YOUTH',
             cardFare: const Value(900),
-            cashFare: const Value(1000),
+            cashFare: const Value(1650),
             descriptionKo: const Value('청소년 기준 요금'),
           ),
           FareDiscountsCompanion.insert(
@@ -496,7 +496,8 @@ class CatalogDatabase extends _$CatalogDatabase {
   }
 
   Future<void> _backfillBaselineFareRules() async {
-    if (!await _shouldBackfillBaselineFareRules()) {
+    if (!await _isBaselineFixtureCatalog() ||
+        !await _shouldBackfillBaselineFareRules()) {
       return;
     }
     await transaction(() async {
@@ -528,7 +529,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             zoneId: 'capital-integrated',
             riderType: 'YOUTH',
             cardFare: const Value(900),
-            cashFare: const Value(1000),
+            cashFare: const Value(1650),
             descriptionKo: const Value('청소년 기준 요금'),
           ),
           FareDiscountsCompanion.insert(
@@ -635,11 +636,15 @@ class CatalogDatabase extends _$CatalogDatabase {
          FROM catalog_metadata
          WHERE key = 'activePack') AS active_pack,
         (SELECT COUNT(*) FROM station_lines) AS station_line_count,
-        (SELECT COUNT(*) FROM fare_rules) AS fare_rule_count
+        (SELECT COUNT(*) FROM fare_rules) AS fare_rule_count,
+        (SELECT cash_fare
+         FROM fare_discounts
+         WHERE id = 'capital-integrated-youth') AS youth_cash_fare
     ''').getSingle();
     return row.readNullable<String>('active_pack') == 'capital' &&
         row.read<int>('station_line_count') > 0 &&
-        row.read<int>('fare_rule_count') == 0;
+        (row.read<int>('fare_rule_count') == 0 ||
+            row.readNullable<int>('youth_cash_fare') == 1000);
   }
 
   Future<void> _seedBaselineRouteMapPositions() async {

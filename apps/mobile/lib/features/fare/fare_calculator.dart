@@ -7,7 +7,7 @@ class FareCalculator {
     required int? distanceMeters,
     required FareRule? rule,
   }) {
-    if (distanceMeters == null || distanceMeters < 0 || rule == null) {
+    if (distanceMeters == null || distanceMeters <= 0 || rule == null) {
       return const FareEstimate.unavailable();
     }
     final extraDistance = math.max(0, distanceMeters - rule.baseDistanceMeters);
