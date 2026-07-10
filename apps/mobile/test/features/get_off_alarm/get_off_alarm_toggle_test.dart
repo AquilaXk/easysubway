@@ -42,11 +42,17 @@ class _StubGate implements ExactAlarmPermissionGate {
   Future<bool> requestExactAlarmPermission() async => permitted;
 }
 
-class _GrantedNotificationPermissionProvider
+class _StubNotificationPermissionProvider
     implements NotificationPermissionProvider {
+  const _StubNotificationPermissionProvider([
+    this.status = NotificationPermissionStatus.granted,
+  ]);
+
+  final NotificationPermissionStatus status;
+
   @override
   Future<NotificationPermissionStatus> requestNotificationPermission() async =>
-      NotificationPermissionStatus.granted;
+      status;
 }
 
 class _FakeRepo implements GetOffAlarmStateRepository {
@@ -66,7 +72,8 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubGate(true),
-      notificationPermissionProvider: _GrantedNotificationPermissionProvider(),
+      notificationPermissionProvider:
+          const _StubNotificationPermissionProvider(),
       repository: _FakeRepo(),
       now: () => DateTime(2026, 7, 6, 9, 0, 0),
     );
@@ -107,7 +114,8 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubGate(true),
-      notificationPermissionProvider: _GrantedNotificationPermissionProvider(),
+      notificationPermissionProvider:
+          const _StubNotificationPermissionProvider(),
       repository: _FakeRepo(),
       now: () => DateTime(2026, 7, 6, 9, 0, 0),
     );
@@ -146,7 +154,8 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: _RecordingNotifier(),
       permissionGate: _StubGate(false),
-      notificationPermissionProvider: _GrantedNotificationPermissionProvider(),
+      notificationPermissionProvider:
+          const _StubNotificationPermissionProvider(),
       repository: _FakeRepo(),
       now: () => DateTime(2026, 7, 6, 9, 0, 0),
     );
@@ -174,5 +183,43 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('오차'), findsOneWidget);
+  });
+
+  testWidgets('알림 권한 거부는 off 상태에서 휴대전화 알림 권한 안내를 보여준다', (tester) async {
+    final controller = GetOffAlarmController(
+      notifier: _RecordingNotifier(),
+      permissionGate: _StubGate(true),
+      notificationPermissionProvider: const _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.denied,
+      ),
+      repository: _FakeRepo(),
+      now: () => DateTime(2026, 7, 6, 9, 0, 0),
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: GetOffAlarmToggle(
+            controller: controller,
+            routeId: 'r1',
+            rideLegs: const [
+              RideLegArrival(
+                toStationId: 'sadang',
+                plannedArrivalIso: '2026-07-06T09:30:00',
+              ),
+            ],
+            stationName: (id) => id,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Switch));
+    await tester.pumpAndSettle();
+
+    expect(controller.state.enabled, isFalse);
+    expect(find.text('휴대전화 알림 권한을 허용해 주세요.'), findsOneWidget);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
   });
 }

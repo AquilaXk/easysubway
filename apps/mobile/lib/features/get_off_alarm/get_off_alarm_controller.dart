@@ -17,6 +17,7 @@ class GetOffAlarmState {
     this.activeRouteId,
     this.scheduleMode,
     this.inexactNotice,
+    this.permissionNotice,
     this.scheduledCount = 0,
   });
 
@@ -26,6 +27,9 @@ class GetOffAlarmState {
 
   /// 부정확 예약으로 강등됐을 때의 오차 고지 문구(없으면 null).
   final String? inexactNotice;
+
+  /// 휴대전화 알림 권한이 거부됐을 때의 사용자 안내 문구(없으면 null).
+  final String? permissionNotice;
   final int scheduledCount;
 
   static const GetOffAlarmState off = GetOffAlarmState();
@@ -38,6 +42,9 @@ class GetOffAlarmState {
 /// 조합만 한다. 결과 화면의 진입점(#1704 타임라인)이 [enable]/[disable]을
 /// 호출하고, 포그라운드 복귀 시 [refresh]로 실시간 보정 재예약을 트리거한다.
 class GetOffAlarmController extends ChangeNotifier {
+  static const String notificationPermissionDeniedNotice =
+      '휴대전화 알림 권한을 허용해 주세요.';
+
   GetOffAlarmController({
     required this.notifier,
     required this.permissionGate,
@@ -71,11 +78,7 @@ class GetOffAlarmController extends ChangeNotifier {
       GetOffAlarmState(
         enabled: true,
         activeRouteId: subscription.routeId,
-        scheduledCount:
-            1 +
-            (subscription.transferAlarmEnabled
-                ? subscription.transfers.length
-                : 0),
+        scheduledCount: subscription.scheduledCount,
       ),
     );
   }
@@ -99,7 +102,7 @@ class GetOffAlarmController extends ChangeNotifier {
     final notificationPermission = await notificationPermissionProvider
         .requestNotificationPermission();
     if (notificationPermission != NotificationPermissionStatus.granted) {
-      await _turnOff();
+      await _turnOff(permissionNotice: notificationPermissionDeniedNotice);
       return;
     }
     final permitted = await permissionGate.requestExactAlarmPermission();
@@ -129,6 +132,7 @@ class GetOffAlarmController extends ChangeNotifier {
         routeId: routeId,
         stops: stops,
         transferAlarmEnabled: transferAlarmEnabled,
+        scheduledCount: delivery.scheduledCount,
       ),
     );
 
@@ -165,16 +169,17 @@ class GetOffAlarmController extends ChangeNotifier {
     await _turnOff();
   }
 
-  Future<void> _turnOff() async {
+  Future<void> _turnOff({String? permissionNotice}) async {
     await notifier.cancelAll();
     await repository.clearActive();
-    _emit(GetOffAlarmState.off);
+    _emit(GetOffAlarmState(permissionNotice: permissionNotice));
   }
 
   GetOffAlarmSubscription _subscriptionFrom({
     required String routeId,
     required List<GetOffAlarmStop> stops,
     required bool transferAlarmEnabled,
+    required int scheduledCount,
   }) {
     final destination = stops.firstWhere(
       (stop) => stop.kind == GetOffAlarmKind.destination,
@@ -192,6 +197,7 @@ class GetOffAlarmController extends ChangeNotifier {
     return GetOffAlarmSubscription(
       routeId: routeId,
       transferAlarmEnabled: transferAlarmEnabled,
+      scheduledCount: scheduledCount,
       destination: GetOffAlarmStopRef(
         stationId: destination.stationId,
         stationName: destination.stationName,

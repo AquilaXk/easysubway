@@ -6,12 +6,14 @@ class GetOffAlarmSubscription {
   const GetOffAlarmSubscription({
     required this.routeId,
     required this.transferAlarmEnabled,
+    required this.scheduledCount,
     required this.destination,
     required this.transfers,
   });
 
   final String routeId;
   final bool transferAlarmEnabled;
+  final int scheduledCount;
   final GetOffAlarmStopRef destination;
   final List<GetOffAlarmStopRef> transfers;
 
@@ -19,6 +21,7 @@ class GetOffAlarmSubscription {
     return {
       'routeId': routeId,
       'transferAlarmEnabled': transferAlarmEnabled,
+      'scheduledCount': scheduledCount,
       'destination': destination.toJson(),
       'transfers': transfers.map((stop) => stop.toJson()).toList(),
     };
@@ -45,9 +48,20 @@ class GetOffAlarmSubscription {
         transfers.add(stop);
       }
     }
+    final transferAlarmEnabled = json['transferAlarmEnabled'] == true;
+    final maxScheduledCount = 1 + (transferAlarmEnabled ? transfers.length : 0);
+    final scheduledCount = json.containsKey('scheduledCount')
+        ? json['scheduledCount']
+        : maxScheduledCount;
+    if (scheduledCount is! int ||
+        scheduledCount <= 0 ||
+        scheduledCount > maxScheduledCount) {
+      return null;
+    }
     return GetOffAlarmSubscription(
       routeId: routeId,
-      transferAlarmEnabled: json['transferAlarmEnabled'] == true,
+      transferAlarmEnabled: transferAlarmEnabled,
+      scheduledCount: scheduledCount,
       destination: destination,
       transfers: transfers,
     );

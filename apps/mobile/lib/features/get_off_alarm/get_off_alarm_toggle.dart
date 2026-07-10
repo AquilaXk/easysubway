@@ -88,7 +88,8 @@ class _GetOffAlarmToggleState extends State<GetOffAlarmToggle> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final on = _isOnForThisRoute;
-    final notice = on ? widget.controller.state.inexactNotice : null;
+    final state = widget.controller.state;
+    final notice = on ? state.inexactNotice : state.permissionNotice;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

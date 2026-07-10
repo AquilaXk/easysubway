@@ -143,6 +143,7 @@ void main() {
 
     expect(notifier.scheduledAlarms, isNull);
     expect(c.state.enabled, isFalse);
+    expect(c.state.permissionNotice, '휴대전화 알림 권한을 허용해 주세요.');
     expect(await repository.loadActive(), isNull);
   });
 
@@ -157,7 +158,26 @@ void main() {
 
     expect(c.state.enabled, isTrue);
     expect(c.state.scheduledCount, 1);
-    expect(await repository.loadActive(), isNotNull);
+    expect((await repository.loadActive())!.scheduledCount, 1);
+  });
+
+  test('부분 예약 성공 수는 저장되고 restore에서도 그대로 복원된다', () async {
+    notifier.result = const ScheduleDeliveryResult(
+      scheduledCount: 1,
+      failedCount: 1,
+    );
+    final first = controller(exactPermitted: true);
+    await first.enable(
+      routeId: 'r1',
+      stops: stops(),
+      transferAlarmEnabled: true,
+    );
+
+    final restored = controller(exactPermitted: true);
+    await restored.restore();
+
+    expect(restored.state.enabled, isTrue);
+    expect(restored.state.scheduledCount, 1);
   });
 
   test('예약 성공이 0건이면 enabled와 활성 구독을 저장하지 않는다', () async {

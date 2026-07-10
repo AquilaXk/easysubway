@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
@@ -19,6 +21,7 @@ void main() {
   final subscription = GetOffAlarmSubscription(
     routeId: 'route-1',
     transferAlarmEnabled: true,
+    scheduledCount: 2,
     destination: GetOffAlarmStopRef(
       stationId: 'dest',
       stationName: '사당',
@@ -44,6 +47,7 @@ void main() {
     expect(loaded, isNotNull);
     expect(loaded!.routeId, 'route-1');
     expect(loaded.transferAlarmEnabled, isTrue);
+    expect(loaded.scheduledCount, 2);
     expect(loaded.destination.stationName, '사당');
     expect(loaded.destination.arrivalAt, DateTime.utc(2026, 7, 6, 9, 30));
     expect(loaded.transfers, hasLength(1));
@@ -56,6 +60,7 @@ void main() {
       GetOffAlarmSubscription(
         routeId: 'route-2',
         transferAlarmEnabled: false,
+        scheduledCount: 1,
         destination: GetOffAlarmStopRef(
           stationId: 'd2',
           stationName: '서울역',
@@ -68,7 +73,54 @@ void main() {
     final loaded = await repository.loadActive();
     expect(loaded!.routeId, 'route-2');
     expect(loaded.transferAlarmEnabled, isFalse);
+    expect(loaded.scheduledCount, 1);
     expect(loaded.transfers, isEmpty);
+  });
+
+  Future<void> writeRaw(Map<String, Object?> value) async {
+    await db
+        .into(db.appPreferences)
+        .insertOnConflictUpdate(
+          AppPreferencesCompanion.insert(
+            key: 'get_off_alarm_active',
+            value: jsonEncode(value),
+            updatedAt: DateTime.utc(2026, 7, 10),
+          ),
+        );
+  }
+
+  test('scheduledCount 없는 legacy 구독은 구독 최대 예약 수로 복원한다', () async {
+    final legacy = subscription.toJson()..remove('scheduledCount');
+    await writeRaw(legacy);
+
+    final loaded = await repository.loadActive();
+
+    expect(loaded, isNotNull);
+    expect(loaded!.scheduledCount, 2);
+  });
+
+  test('scheduledCount 문자열은 손상 구독으로 폐기한다', () async {
+    await writeRaw({...subscription.toJson(), 'scheduledCount': '1'});
+
+    expect(await repository.loadActive(), isNull);
+  });
+
+  test('scheduledCount null은 legacy 누락으로 보지 않고 폐기한다', () async {
+    await writeRaw({...subscription.toJson(), 'scheduledCount': null});
+
+    expect(await repository.loadActive(), isNull);
+  });
+
+  test('scheduledCount 0은 비활성 구독으로 폐기한다', () async {
+    await writeRaw({...subscription.toJson(), 'scheduledCount': 0});
+
+    expect(await repository.loadActive(), isNull);
+  });
+
+  test('scheduledCount가 구독 최대 예약 수를 넘으면 폐기한다', () async {
+    await writeRaw({...subscription.toJson(), 'scheduledCount': 3});
+
+    expect(await repository.loadActive(), isNull);
   });
 
   test('clearActive 후에는 활성 구독이 없다', () async {
