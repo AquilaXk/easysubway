@@ -9350,7 +9350,7 @@ void main() {
         nextStatus: NotificationPermissionStatus.granted,
       ),
       repository: stateRepository,
-      now: () => DateTime(2026, 7, 6, 9, 0),
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
     );
     addTearDown(controller.dispose);
 
