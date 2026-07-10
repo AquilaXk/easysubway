@@ -15,14 +15,25 @@ import 'get_off_alarm_scheduler.dart';
 /// 플랫폼 예약만 담당한다. 테스트에서는 이 인터페이스를 가짜로 대체한다.
 abstract class GetOffAlarmNotifier {
   /// [alarms]를 [mode]에 맞춰 예약한다. 기존 활성 알림은 먼저 모두 취소한다
-  /// (단일 경로 원칙).
-  Future<void> scheduleAlarms(
+  /// (단일 경로 원칙). 반환값은 실제 예약 성공·실패 건수다.
+  Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   });
 
   /// 활성 하차 알림을 모두 취소한다.
   Future<void> cancelAll();
+}
+
+/// 플랫폼에 전달한 하차 알림 예약의 실제 결과.
+class ScheduleDeliveryResult {
+  const ScheduleDeliveryResult({
+    required this.scheduledCount,
+    required this.failedCount,
+  });
+
+  final int scheduledCount;
+  final int failedCount;
 }
 
 /// [GetOffAlarmScheduleMode]를 flutter_local_notifications의
@@ -83,12 +94,15 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
   }
 
   @override
-  Future<void> scheduleAlarms(
+  Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   }) async {
     if (!Platform.isAndroid) {
-      return;
+      return ScheduleDeliveryResult(
+        scheduledCount: 0,
+        failedCount: alarms.length,
+      );
     }
     await _ensureInitialized();
     await cancelAll();
@@ -114,6 +128,10 @@ class LocalGetOffAlarmNotifier implements GetOffAlarmNotifier {
       }
     }
     _activeIds = assignedIds;
+    return ScheduleDeliveryResult(
+      scheduledCount: assignedIds.length,
+      failedCount: alarms.length - assignedIds.length,
+    );
   }
 
   @override

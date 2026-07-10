@@ -9344,6 +9344,9 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: _RecordingGetOffAlarmNotifier(),
       permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
       repository: _MemoryGetOffAlarmStateRepository(),
       now: () => DateTime(2026, 7, 6, 9, 0),
     );
@@ -9423,6 +9426,9 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
       repository: stateRepository,
       now: () => now,
     );
@@ -12640,13 +12646,17 @@ class _RecordingGetOffAlarmNotifier implements GetOffAlarmNotifier {
   Future<void> cancelAll() async {}
 
   @override
-  Future<void> scheduleAlarms(
+  Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   }) async {
     scheduleCalls += 1;
     scheduledAlarms = alarms;
     scheduledMode = mode;
+    return ScheduleDeliveryResult(
+      scheduledCount: alarms.length,
+      failedCount: 0,
+    );
   }
 }
 

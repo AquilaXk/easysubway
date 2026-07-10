@@ -7,6 +7,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_toggle.dart';
+import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,11 +16,15 @@ class _RecordingNotifier implements GetOffAlarmNotifier {
   int cancelCount = 0;
 
   @override
-  Future<void> scheduleAlarms(
+  Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   }) async {
     scheduled = alarms;
+    return ScheduleDeliveryResult(
+      scheduledCount: alarms.length,
+      failedCount: 0,
+    );
   }
 
   @override
@@ -35,6 +40,13 @@ class _StubGate implements ExactAlarmPermissionGate {
   Future<bool> isExactAlarmPermitted() async => permitted;
   @override
   Future<bool> requestExactAlarmPermission() async => permitted;
+}
+
+class _GrantedNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() async =>
+      NotificationPermissionStatus.granted;
 }
 
 class _FakeRepo implements GetOffAlarmStateRepository {
@@ -54,6 +66,7 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubGate(true),
+      notificationPermissionProvider: _GrantedNotificationPermissionProvider(),
       repository: _FakeRepo(),
       now: () => DateTime(2026, 7, 6, 9, 0, 0),
     );
@@ -94,6 +107,7 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubGate(true),
+      notificationPermissionProvider: _GrantedNotificationPermissionProvider(),
       repository: _FakeRepo(),
       now: () => DateTime(2026, 7, 6, 9, 0, 0),
     );
@@ -132,6 +146,7 @@ void main() {
     final controller = GetOffAlarmController(
       notifier: _RecordingNotifier(),
       permissionGate: _StubGate(false),
+      notificationPermissionProvider: _GrantedNotificationPermissionProvider(),
       repository: _FakeRepo(),
       now: () => DateTime(2026, 7, 6, 9, 0, 0),
     );

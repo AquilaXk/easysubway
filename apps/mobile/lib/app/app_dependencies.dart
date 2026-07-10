@@ -243,7 +243,10 @@ class AppDependencies {
             authProvider: null,
             userDatabase: userDatabase,
           ),
-      getOffAlarmController: _resolveGetOffAlarmController(userDatabase),
+      getOffAlarmController: _resolveGetOffAlarmController(
+        userDatabase,
+        resolvedNotificationPermissionProvider,
+      ),
       noticeRepository:
           noticeRepository ??
           (userDatabase == null
@@ -368,6 +371,7 @@ class _UnavailableNetworkMapRepository implements NetworkMapRepository {
 
 GetOffAlarmController? _resolveGetOffAlarmController(
   UserDatabase? userDatabase,
+  NotificationPermissionProvider? notificationPermissionProvider,
 ) {
   if (userDatabase == null) {
     return null;
@@ -376,6 +380,9 @@ GetOffAlarmController? _resolveGetOffAlarmController(
   return GetOffAlarmController(
     notifier: LocalGetOffAlarmNotifier(plugin),
     permissionGate: PluginExactAlarmPermissionGate(plugin),
+    notificationPermissionProvider:
+        notificationPermissionProvider ??
+        MethodChannelNotificationPermissionProvider(),
     repository: DriftGetOffAlarmStateRepository(userDatabase: userDatabase),
   );
 }

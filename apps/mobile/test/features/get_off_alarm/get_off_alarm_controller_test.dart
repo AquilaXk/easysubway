@@ -5,20 +5,24 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controlle
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_notifier.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_mode.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
+import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _RecordingNotifier implements GetOffAlarmNotifier {
   List<ScheduledGetOffAlarm>? scheduledAlarms;
   GetOffAlarmScheduleMode? scheduledMode;
+  ScheduleDeliveryResult? result;
   int cancelAllCount = 0;
 
   @override
-  Future<void> scheduleAlarms(
+  Future<ScheduleDeliveryResult> scheduleAlarms(
     List<ScheduledGetOffAlarm> alarms, {
     required GetOffAlarmScheduleMode mode,
   }) async {
     scheduledAlarms = alarms;
     scheduledMode = mode;
+    return result ??
+        ScheduleDeliveryResult(scheduledCount: alarms.length, failedCount: 0);
   }
 
   @override
@@ -37,6 +41,17 @@ class _StubExactAlarmGate implements ExactAlarmPermissionGate {
 
   @override
   Future<bool> requestExactAlarmPermission() async => permitted;
+}
+
+class _StubNotificationPermissionProvider
+    implements NotificationPermissionProvider {
+  _StubNotificationPermissionProvider(this.status);
+
+  final NotificationPermissionStatus status;
+
+  @override
+  Future<NotificationPermissionStatus> requestNotificationPermission() async =>
+      status;
 }
 
 void main() {
@@ -71,10 +86,18 @@ void main() {
     await db.close();
   });
 
-  GetOffAlarmController controller({required bool exactPermitted}) {
+  GetOffAlarmController controller({
+    required bool exactPermitted,
+    bool notificationPermitted = true,
+  }) {
     return GetOffAlarmController(
       notifier: notifier,
       permissionGate: _StubExactAlarmGate(exactPermitted),
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        notificationPermitted
+            ? NotificationPermissionStatus.granted
+            : NotificationPermissionStatus.denied,
+      ),
       repository: repository,
       now: () => now,
     );
@@ -111,6 +134,44 @@ void main() {
 
     expect(notifier.scheduledAlarms, hasLength(1));
     expect(notifier.scheduledAlarms!.single.kind, GetOffAlarmKind.destination);
+  });
+
+  test('POST_NOTIFICATIONS 거부는 예약과 enabled 저장을 막는다', () async {
+    final c = controller(exactPermitted: true, notificationPermitted: false);
+
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+
+    expect(notifier.scheduledAlarms, isNull);
+    expect(c.state.enabled, isFalse);
+    expect(await repository.loadActive(), isNull);
+  });
+
+  test('부분 예약 실패는 실제 성공 수만 상태에 반영한다', () async {
+    notifier.result = const ScheduleDeliveryResult(
+      scheduledCount: 1,
+      failedCount: 1,
+    );
+    final c = controller(exactPermitted: true);
+
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+
+    expect(c.state.enabled, isTrue);
+    expect(c.state.scheduledCount, 1);
+    expect(await repository.loadActive(), isNotNull);
+  });
+
+  test('예약 성공이 0건이면 enabled와 활성 구독을 저장하지 않는다', () async {
+    notifier.result = const ScheduleDeliveryResult(
+      scheduledCount: 0,
+      failedCount: 2,
+    );
+    final c = controller(exactPermitted: true);
+
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+
+    expect(c.state.enabled, isFalse);
+    expect(c.state.scheduledCount, 0);
+    expect(await repository.loadActive(), isNull);
   });
 
   test('disable은 알림을 취소하고 영속 상태를 지우며 상태를 끈다', () async {

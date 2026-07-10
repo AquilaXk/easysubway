@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../notification_settings.dart';
 import 'data/get_off_alarm_state_repository.dart';
 import 'exact_alarm_permission.dart';
 import 'get_off_alarm_notifier.dart';
@@ -40,6 +41,7 @@ class GetOffAlarmController extends ChangeNotifier {
   GetOffAlarmController({
     required this.notifier,
     required this.permissionGate,
+    required this.notificationPermissionProvider,
     required this.repository,
     this.policy = GetOffAlarmPolicyDefaults.policy,
     this.now = DateTime.now,
@@ -47,6 +49,7 @@ class GetOffAlarmController extends ChangeNotifier {
 
   final GetOffAlarmNotifier notifier;
   final ExactAlarmPermissionGate permissionGate;
+  final NotificationPermissionProvider notificationPermissionProvider;
   final GetOffAlarmStateRepository repository;
   final GetOffAlarmPolicy policy;
   final DateTime Function() now;
@@ -93,6 +96,12 @@ class GetOffAlarmController extends ChangeNotifier {
     if (!hasDestination) {
       return;
     }
+    final notificationPermission = await notificationPermissionProvider
+        .requestNotificationPermission();
+    if (notificationPermission != NotificationPermissionStatus.granted) {
+      await _turnOff();
+      return;
+    }
     final permitted = await permissionGate.requestExactAlarmPermission();
     final resolution = resolveGetOffAlarmScheduleMode(
       exactAlarmPermitted: permitted,
@@ -106,7 +115,15 @@ class GetOffAlarmController extends ChangeNotifier {
       now: now(),
     );
 
-    await notifier.scheduleAlarms(alarms, mode: resolution.mode);
+    final delivery = await notifier.scheduleAlarms(
+      alarms,
+      mode: resolution.mode,
+    );
+    if (delivery.scheduledCount == 0) {
+      await repository.clearActive();
+      _emit(GetOffAlarmState.off);
+      return;
+    }
     await repository.saveActive(
       _subscriptionFrom(
         routeId: routeId,
@@ -121,7 +138,7 @@ class GetOffAlarmController extends ChangeNotifier {
         activeRouteId: routeId,
         scheduleMode: resolution.mode,
         inexactNotice: resolution.inexactNotice,
-        scheduledCount: alarms.length,
+        scheduledCount: delivery.scheduledCount,
       ),
     );
   }
@@ -145,6 +162,10 @@ class GetOffAlarmController extends ChangeNotifier {
   /// 하차 알림을 끈다: 예약을 취소하고 영속 상태를 지운다. 경로 안내 종료·새
   /// 경로 탐색 시 호출한다.
   Future<void> disable() async {
+    await _turnOff();
+  }
+
+  Future<void> _turnOff() async {
     await notifier.cancelAll();
     await repository.clearActive();
     _emit(GetOffAlarmState.off);
