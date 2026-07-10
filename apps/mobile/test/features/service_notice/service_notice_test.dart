@@ -28,8 +28,10 @@ void main() {
       expect(notice.scopeValue, '2');
       expect(notice.severity, NoticeSeverity.disruption);
       expect(notice.isDisruption, isTrue);
-      expect(notice.publishedAt, DateTime.parse('2026-07-06T09:00:00'));
-      expect(notice.expiresAt, DateTime.parse('2026-07-06T18:00:00'));
+      expect(notice.publishedAt, DateTime.utc(2026, 7, 6, 9));
+      expect(notice.expiresAt, DateTime.utc(2026, 7, 6, 18));
+      expect(notice.publishedAt.isUtc, isTrue);
+      expect(notice.expiresAt!.isUtc, isTrue);
     });
 
     test('INFO 심각도·ALL 대상·만료 없음도 파싱한다', () {
@@ -41,6 +43,33 @@ void main() {
       expect(notice.scopeValue, isNull);
       expect(notice.expiresAt, isNull);
       expect(notice.isDisruption, isFalse);
+    });
+
+    test('offset 없는 UTC 시각은 DST 결손 구간에서도 원문 시각을 보존한다', () {
+      final payload = json()..['publishedAt'] = '2026-03-08T02:30:00';
+
+      final notice = ServiceNotice.fromJson(payload)!;
+
+      expect(notice.publishedAt, DateTime.utc(2026, 3, 8, 2, 30));
+      expect(notice.publishedAt.isUtc, isTrue);
+    });
+
+    test('명시적 offset 시각은 같은 UTC instant로 파싱한다', () {
+      final payload = json()..['publishedAt'] = '2026-07-06T09:00:00+09:00';
+
+      final notice = ServiceNotice.fromJson(payload)!;
+
+      expect(notice.publishedAt, DateTime.utc(2026, 7, 6));
+      expect(notice.publishedAt.isUtc, isTrue);
+    });
+
+    test('date-only 시각도 숫자 offset으로 오인하지 않고 UTC로 파싱한다', () {
+      final payload = json()..['publishedAt'] = '2026-07-06';
+
+      final notice = ServiceNotice.fromJson(payload)!;
+
+      expect(notice.publishedAt, DateTime.utc(2026, 7, 6));
+      expect(notice.publishedAt.isUtc, isTrue);
     });
 
     test('알 수 없는 severity/scope는 null을 돌려준다(무음 실패 대신 제외)', () {
