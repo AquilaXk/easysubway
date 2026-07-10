@@ -433,6 +433,12 @@ class EasySubwayApp extends StatelessWidget {
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           toolbarHeight: 64,
+          // 평평한 상단바: Material3 surfaceTint(액센트 기반 청록 스크림)와
+          // 스크롤 elevation 그림자를 끈다. 경계는 화면별 얇은 구분선으로만.
+          backgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
+          surfaceTintColor: Colors.transparent,
+          scrolledUnderElevation: 0,
+          elevation: 0,
           titleTextStyle: TextStyle(
             color: EasySubwayAccessibleColors.text,
             fontSize: 22,

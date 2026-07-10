@@ -638,7 +638,7 @@ void main() {
     final homeContext = tester.element(find.byType(HomeScreen));
 
     expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
-    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
+    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF1A1D1E));
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('이동 프로필'), findsNothing);
     expect(find.text('시설 정보'), findsNothing);

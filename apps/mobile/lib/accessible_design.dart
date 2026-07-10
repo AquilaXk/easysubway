@@ -43,9 +43,10 @@ class EasySubwayAccessibleColors {
   /// 셰브런·디스클로저·비활성 아이콘.
   static const disclosure = Color(0xFFB0BEC5);
 
-  // --- 브랜드 액센트 (1계열) ---
-  /// 앱 전체 단일 브랜드 액센트.
-  static const primary = Color(0xFF006D77);
+  // --- 브랜드 액센트 (무채색 잉크 1계열) ---
+  /// 앱 전체 단일 브랜드 액센트. 초록(teal) 대신 무채색 차콜 잉크로 통일한다.
+  /// 화면의 유채색은 노선 색(데이터)뿐이며, 액센트는 CTA·선택·링크에만 쓴다.
+  static const primary = Color(0xFF2A2F31);
 
   /// 과거 navy 액센트. 단일 브랜드 액센트로 통일했다. 신규 코드는 [primary] 사용.
   static const brand = primary;
@@ -113,8 +114,8 @@ class EasySubwayAccessibleColors {
 
   // --- 고대비 모드 ---
   static const highContrastText = Color(0xFF000000);
-  static const highContrastPrimary = Color(0xFF003D40);
-  static const highContrastSecondary = Color(0xFF005E68);
+  static const highContrastPrimary = Color(0xFF1A1D1E);
+  static const highContrastSecondary = Color(0xFF3A4143);
 }
 
 class EasySubwayTouchTarget {

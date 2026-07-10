@@ -1042,93 +1042,101 @@ class _NetworkMapTopBar extends StatelessWidget {
         : regions;
     return Material(
       color: EasySubwayAccessibleColors.surface,
-      elevation: 4,
-      shadowColor: const Color(0x26000000),
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: _networkMapTopBarHeight,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-            child: Row(
-              children: [
-                IconButton(
-                  key: const Key('networkMapMenuButton'),
-                  tooltip: '메뉴',
-                  onPressed: onMenuTap,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size.square(
-                      EasySubwayTouchTarget.general,
+      elevation: 0,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: SizedBox(
+            height: _networkMapTopBarHeight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+              child: Row(
+                children: [
+                  IconButton(
+                    key: const Key('networkMapMenuButton'),
+                    tooltip: '메뉴',
+                    onPressed: onMenuTap,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size.square(
+                        EasySubwayTouchTarget.general,
+                      ),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: EdgeInsets.zero,
                     ),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: EdgeInsets.zero,
+                    icon: const Icon(
+                      Icons.menu,
+                      size: 22,
+                      color: Color(0xFF4B4B4B),
+                    ),
                   ),
-                  icon: const Icon(
-                    Icons.menu,
-                    size: 22,
-                    color: Color(0xFF4B4B4B),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: _NetworkMapSearchField(onSearchTap: onSearchTap),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: _NetworkMapSearchField(onSearchTap: onSearchTap),
-                ),
-                const SizedBox(width: 8),
-                Builder(
-                  builder: (regionContext) => Semantics(
-                    key: const Key('mapRegionTabs'),
-                    container: true,
-                    button: true,
-                    label: '지역: $currentRegion, 지역 변경',
-                    // 시맨틱 활성화 액션을 제공해 스크린리더로도 지역 메뉴를 연다
-                    // (형제 검색 필드와 동일한 패턴).
-                    onTap: () =>
-                        _showRegionMenu(regionContext, availableRegions),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 148),
-                      child: ExcludeSemantics(
-                        // 트리거의 ▾ 캐럿과 반응 위치를 맞춘다: 트리거 바로 아래
-                        // 앵커된 드롭다운 메뉴로 지역을 표시한다(하단 시트 대신).
-                        child: InkWell(
-                          key: const Key('networkMapRegionDropdown'),
-                          onTap: () =>
-                              _showRegionMenu(regionContext, availableRegions),
-                          child: SizedBox(
-                            height: EasySubwayTouchTarget.general,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    currentRegion,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF606060),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
+                  const SizedBox(width: 8),
+                  Builder(
+                    builder: (regionContext) => Semantics(
+                      key: const Key('mapRegionTabs'),
+                      container: true,
+                      button: true,
+                      label: '지역: $currentRegion, 지역 변경',
+                      // 시맨틱 활성화 액션을 제공해 스크린리더로도 지역 메뉴를 연다
+                      // (형제 검색 필드와 동일한 패턴).
+                      onTap: () =>
+                          _showRegionMenu(regionContext, availableRegions),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 148),
+                        child: ExcludeSemantics(
+                          // 트리거의 ▾ 캐럿과 반응 위치를 맞춘다: 트리거 바로 아래
+                          // 앵커된 드롭다운 메뉴로 지역을 표시한다(하단 시트 대신).
+                          child: InkWell(
+                            key: const Key('networkMapRegionDropdown'),
+                            onTap: () => _showRegionMenu(
+                              regionContext,
+                              availableRegions,
+                            ),
+                            child: SizedBox(
+                              height: EasySubwayTouchTarget.general,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      currentRegion,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Color(0xFF606060),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 2),
-                                const Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: Color(0xFF606060),
-                                  size: 18,
-                                ),
-                              ],
+                                  const SizedBox(width: 2),
+                                  const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: Color(0xFF606060),
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                if (notificationAction != null) ...[
-                  const SizedBox(width: 8),
-                  notificationAction!,
+                  if (notificationAction != null) ...[
+                    const SizedBox(width: 8),
+                    notificationAction!,
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
