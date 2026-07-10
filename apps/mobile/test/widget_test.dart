@@ -8774,6 +8774,10 @@ void main() {
       // 편다. 도착 안내도 결과 목록에 함께 인라인으로 노출된다.
       expect(find.text('도착 안내'), findsOneWidget);
       expect(find.text('이동 순서'), findsOneWidget);
+      // #1933 E: 요약 카드의 환승·걷기 칩은 바로 위 메타 줄과 겹쳐 걷어냈다.
+      // 메타 줄('환승 없이 이동 · 걷기 300m')은 한 번만 남고, 걷기만 담은
+      // 별도 칩('걷기 300m')은 더 이상 그리지 않는다. 요약 한 번 → 타임라인.
+      expect(find.text('걷기 300m'), findsNothing);
 
       await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
       await tester.pumpAndSettle();
@@ -9602,7 +9606,11 @@ void main() {
     await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('예상 소요시간: 저장된 데이터 기준 · 최근 확인 2026-06-19'), findsOneWidget);
+    // #1933 E: 결과-우선 헤더는 긴 두 줄 문장 대신 짧은 캡션 한 줄로 축약한다.
+    // 강등 사다리의 정직함(저장된 데이터 기준·실시간/시간표 미표기)은 유지한다.
+    expect(find.text('예상 소요시간: 저장된 데이터 기준 · 최근 확인 2026-06-19'), findsNothing);
+    // 짧은 캡션(그리고 안내 배지)에 '저장된 데이터 기준'만 남는다.
+    expect(find.text('저장된 데이터 기준'), findsWidgets);
     expect(find.textContaining('실시간'), findsNothing);
     expect(find.textContaining('시간표'), findsNothing);
   });

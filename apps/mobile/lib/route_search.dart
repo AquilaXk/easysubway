@@ -1393,6 +1393,11 @@ class RouteSearchResult {
     return '예상 소요시간: ${routeEtaSourceLabel(etaSource)}';
   }
 
+  /// #1933 E: 결과-우선 헤더용 짧은 안내. 강등 사다리의 정직함(저장된 데이터
+  /// 기준·실시간/시간표 미표기)은 그대로 두되, "예상 소요시간:" 접두와 긴 날짜
+  /// 문장을 떼어 작은 캡션 한 줄로 만든다. 시맨틱·기타 문맥은 `sourceNotice` 유지.
+  String get sourceNoticeCaption => routeEtaSourceLabel(etaSource);
+
   String get etaBadgeLabel => routeEtaSourceLabel(etaSource);
 
   String get accessibilityBadgeLabel {
@@ -2817,6 +2822,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                   children: [
                     _RoutePointPickerCard(
                       key: const Key('routePointPickerCard'),
+                      // #1933 E: 결과-우선 상태에서만 얇은 헤더로 축소한다.
+                      compact: hasResult,
                       originStation: _originStation,
                       destinationStation: _destinationStation,
                       originPicker:
@@ -3236,6 +3243,7 @@ class _RoutePointPickerCard extends StatelessWidget {
     required this.onOriginTap,
     required this.onDestinationTap,
     required this.onSwap,
+    this.compact = false,
     super.key,
   });
 
@@ -3246,6 +3254,10 @@ class _RoutePointPickerCard extends StatelessWidget {
   final VoidCallback onOriginTap;
   final VoidCallback onDestinationTap;
   final VoidCallback onSwap;
+
+  /// #1933 E: 결과-우선 화면에서는 이 카드를 얇은 헤더로 강등한다(역명 작게·세로
+  /// 패딩 축소). 입력 상태에서는 기존 큰 피커 크기를 그대로 둔다(false 기본).
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -3259,6 +3271,7 @@ class _RoutePointPickerCard extends StatelessWidget {
           station: originStation,
           fallback: '출발역 선택',
           onTap: onOriginTap,
+          compact: compact,
         );
     final destinationChild =
         destinationPicker ??
@@ -3268,6 +3281,7 @@ class _RoutePointPickerCard extends StatelessWidget {
           station: destinationStation,
           fallback: '도착역 선택',
           onTap: onDestinationTap,
+          compact: compact,
         );
     final rows = Column(
       children: [
@@ -3371,6 +3385,7 @@ class _RoutePointRow extends StatelessWidget {
     required this.station,
     required this.fallback,
     required this.onTap,
+    this.compact = false,
     super.key,
   });
 
@@ -3378,6 +3393,10 @@ class _RoutePointRow extends StatelessWidget {
   final StationSearchResult? station;
   final String fallback;
   final VoidCallback onTap;
+
+  /// #1933 E: 결과-우선 헤더에서는 역명을 작게·세로 패딩을 좁혀 얇은 줄로 만든다.
+  /// 노드/연결선/지도 편집 어포던스·키·시맨틱·탭 편집은 그대로 둔다.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -3388,6 +3407,9 @@ class _RoutePointRow extends StatelessWidget {
     final semanticsLabel = station == null
         ? stationName
         : '$label $stationName';
+    // 얇은 헤더에서도 편집 탭 타깃은 최소 44 이상을 유지한다(접근성).
+    final verticalPadding = compact ? 10.0 : 14.0;
+    final nameFontSize = compact ? 17.0 : 22.0;
     return Semantics(
       button: true,
       label: semanticsLabel,
@@ -3396,34 +3418,38 @@ class _RoutePointRow extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: _routeSearchMediumRadius,
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _RoutePointNodeColumn(isOrigin: isOrigin),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    child: Text(
-                      stationName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: station == null
-                            ? EasySubwayAccessibleColors.mutedText
-                            : EasySubwayAccessibleColors.text,
-                        fontSize: 22,
-                        height: 1.2,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _RoutePointNodeColumn(isOrigin: isOrigin),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: verticalPadding),
+                      child: Text(
+                        stationName,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: station == null
+                                  ? EasySubwayAccessibleColors.mutedText
+                                  : EasySubwayAccessibleColors.text,
+                              fontSize: nameFontSize,
+                              height: 1.2,
+                            ),
                       ),
                     ),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                  child: Icon(
-                    Icons.map_outlined,
-                    color: EasySubwayAccessibleColors.mutedText,
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: verticalPadding),
+                    child: const Icon(
+                      Icons.map_outlined,
+                      color: EasySubwayAccessibleColors.mutedText,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -4686,8 +4712,21 @@ class _RouteResultsListView extends StatelessWidget {
             ),
           ),
         ),
-        if (result.sourceNotice.isNotEmpty) ...[
-          _RouteSearchMessage(message: result.sourceNotice),
+        // #1933 E: 긴 두 줄 문장("예상 소요시간: 저장된 데이터 기준 · 최근 확인 …")
+        // 대신 작은 캡션 한 줄("저장된 데이터 기준")로 축약한다. 강등 사다리의
+        // 정직함은 라벨 로직(routeEtaSourceLabel) 그대로 유지된다.
+        if (result.sourceNoticeCaption.isNotEmpty) ...[
+          // 상세 안내는 상단 Semantics(semanticLabel)에 이미 sourceNotice로
+          // 담겨 있으므로 시각 캡션은 시맨틱에서 제외해 이중 안내를 막는다.
+          ExcludeSemantics(
+            child: Text(
+              result.sourceNoticeCaption,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                height: 1.3,
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
         ],
         _RouteResultListButton(result: result, onPressed: onOpenDetail),
@@ -5253,18 +5292,14 @@ class _RouteResultListButton extends StatelessWidget {
                     const SizedBox(height: 12),
                     const _RouteLinePath(),
                     const SizedBox(height: 12),
+                    // #1933 E: 총 소요시간 아래 메타 줄(환승·걷기)과 상단 이동조건
+                    // 칩이 이미 같은 신호를 전하므로, 카드에서 환승·걷기 칩을
+                    // 걷어내 "요약 한 번 → 타임라인"의 위계를 만든다. 타임라인·
+                    // 상단 칩에 없는 신호(이동 조건 경고·계단·정직한 안내 배지)만 남긴다.
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        _RouteStatusChip(
-                          label: _routeTransferLabel(result),
-                          icon: Icons.route_outlined,
-                        ),
-                        _RouteStatusChip(
-                          label: '걷기 ${_routeWalkingDistanceLabel(result)}',
-                          icon: Icons.directions_walk,
-                        ),
                         _RouteStatusChip(
                           key: const Key('routeGuidanceMobilityChip'),
                           label: result.mobilityLabel == '이동 조건을 다시 선택해 주세요'
