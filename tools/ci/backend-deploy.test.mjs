@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { afterEach } from "node:test";
 import { promisify } from "node:util";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
 const ASSET_ORIGIN = "https://ads-assets.fixture.test-only.dev";
 const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
+const deploymentTempDirs = new Set();
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
@@ -19,6 +20,13 @@ function read(relativePath) {
 function fixtureEnv() {
   return read("tools/ci/fixtures/deployment-prod-valid.env");
 }
+
+afterEach(async () => {
+  await Promise.all(
+    [...deploymentTempDirs].map((dir) => rm(dir, { recursive: true, force: true })),
+  );
+  deploymentTempDirs.clear();
+});
 
 function withAssetOrigin(origin) {
   return fixtureEnv().replace(
@@ -43,17 +51,28 @@ async function assertInvalidAssetOrigin(origin) {
 
 async function prepare(source) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-deploy-env-"));
-  const sourceFile = path.join(dir, "source.env");
-  const outputDir = path.join(dir, "prepared");
-  await writeFile(sourceFile, source);
-  await execFileAsync("bash", [
-    "tools/deploy/prepare-deployment-env.sh",
-    sourceFile,
-    "tools/deploy/compose-server-env.allowlist",
-    "tools/deploy/backend-app-env.allowlist",
-    outputDir,
-  ], { cwd: root });
-  return outputDir;
+  deploymentTempDirs.add(dir);
+  try {
+    const sourceFile = path.join(dir, "source.env");
+    const outputDir = path.join(dir, "prepared");
+    await writeFile(sourceFile, source);
+    await execFileAsync("bash", [
+      "tools/deploy/prepare-deployment-env.sh",
+      sourceFile,
+      "tools/deploy/compose-server-env.allowlist",
+      "tools/deploy/backend-app-env.allowlist",
+      outputDir,
+    ], { cwd: root });
+    return outputDir;
+  } catch (error) {
+    try {
+      await rm(dir, { recursive: true, force: true });
+      deploymentTempDirs.delete(dir);
+    } catch {
+      // Preserve the original prepare error; afterEach retries registered dirs.
+    }
+    throw error;
+  }
 }
 
 test("광고 asset origin은 backend env에만 변형 없이 전달한다", async () => {
