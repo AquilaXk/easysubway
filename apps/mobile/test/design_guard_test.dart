@@ -166,30 +166,41 @@ void main() {
   });
 
   test('노선도 그림자/elevation 재유입 금지 가드 (#1933)', () {
-    final networkMap = sources['lib/network_map.dart'];
-    expect(networkMap, isNotNull, reason: 'lib/network_map.dart 를 찾을 수 없다');
+    final filesToCheck = ['lib/network_map.dart', 'lib/route_search.dart'];
+    final violations = <String, List<String>>{};
 
-    // elevation: 뒤에 0(단어 경계)이 아닌 숫자가 오면 위반.
-    final nonZeroElevation = RegExp(
-      r'elevation:\s*(?!0\b)\d',
-    ).allMatches(networkMap!).length;
-    final shadow = RegExp(
-      r'shadowColor|BoxShadow|boxShadow',
-    ).allMatches(networkMap).length;
+    for (final filePath in filesToCheck) {
+      final source = sources[filePath];
+      expect(source, isNotNull, reason: '$filePath 를 찾을 수 없다');
+
+      // elevation: 뒤에 0(단어 경계)이 아닌 숫자가 오면 위반.
+      final nonZeroElevation = RegExp(
+        r'elevation:\s*(?!0\b)\d',
+      ).allMatches(source!).length;
+      final shadow = RegExp(
+        r'shadowColor|BoxShadow|boxShadow',
+      ).allMatches(source).length;
+
+      final fileViolations = <String>[];
+      if (nonZeroElevation > 0) {
+        fileViolations.add('0 초과 elevation: $nonZeroElevation건');
+      }
+      if (shadow > 0) {
+        fileViolations.add('shadowColor/BoxShadow: $shadow건');
+      }
+
+      if (fileViolations.isNotEmpty) {
+        violations[filePath] = fileViolations;
+      }
+    }
 
     expect(
-      nonZeroElevation,
-      0,
+      violations,
+      isEmpty,
       reason:
-          '노선도에 그림자/elevation 재유입 금지 — border나 배경색으로만 '
-          'depth를 표현하라 #1933 (0 초과 elevation: $nonZeroElevation건)',
-    );
-    expect(
-      shadow,
-      0,
-      reason:
-          '노선도에 그림자/elevation 재유입 금지 — border나 배경색으로만 '
-          'depth를 표현하라 #1933 (shadowColor/BoxShadow: $shadow건)',
+          '그림자/elevation 재유입 금지 — border나 배경색으로만 '
+          'depth를 표현하라 #1933\n'
+          '${violations.entries.map((e) => '${e.key}: ${e.value.join(", ")}').join('\n')}',
     );
   });
 
@@ -198,10 +209,7 @@ void main() {
     // 완전한 원이 필요하면 CircleBorder 를 쓴다. 상한은 내리기만 한다.
     // TODO: 아래 잔존을 RoundedRectangleBorder(radius <= 8)로 전환 후 하드 밴으로.
     final actual = countPerFile(RegExp(r'\bStadiumBorder\b'));
-    expectRatchet(actual, {
-      // 의도 잔존: 정보 Chip 의 stadium 테두리 1곳 — pill 정리 대상 (#1915)
-      'lib/main.dart': 1,
-    }, rule: 'StadiumBorder(pill)');
+    expectRatchet(actual, const {}, rule: 'StadiumBorder(pill)');
   });
 
   test('BorderRadius.circular(999) 등 캡슐형 큰 radius ratchet — 0으로 수렴', () {
@@ -224,10 +232,7 @@ void main() {
         actual[path] = count;
       }
     });
-    expectRatchet(actual, {
-      // 의도 잔존: _routeSearchPillRadius = circular(999) 1곳 — 명백한 pill, 정리 대상
-      'lib/route_search.dart': 1,
-    }, rule: '캡슐형 초대형 radius(>= 100)');
+    expectRatchet(actual, const {}, rule: '캡슐형 초대형 radius(>= 100)');
   });
 
   test('과한 라운딩 ratchet — radius <= 8 로 수렴 (pill 금지)', () {
@@ -241,8 +246,6 @@ void main() {
     expectRatchet(actual, {
       // 의도 잔존: 역 상세 정보/도움/시설 카드·액션 버튼 radius (16/12) — 무박스 전환 진행 중
       'lib/station_search.dart': 4,
-      // 의도 잔존: 경로 검색 카드/픽커 radius(12x2·16x2)·pill(999) — 무박스/각진 사각형 전환 대상
-      'lib/route_search.dart': 5,
       // 의도 잔존: _AppCard(20)·역 정보 컨테이너(16)·입력 필드(12x2) — v4 정리 대상
       'lib/main.dart': 4,
       // 의도 잔존: 노선 선택 헤더 캡슐(13)·역명 배지(24) — 노선도 룩 불변, 완전 원 아님

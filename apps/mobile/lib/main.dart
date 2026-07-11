@@ -2549,7 +2549,9 @@ class _HomeMiniBadge extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       backgroundColor: EasySubwayAccessibleColors.surface,
       side: const BorderSide(color: EasySubwayAccessibleColors.line),
-      shape: const StadiumBorder(),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
       labelStyle: const TextStyle(
         color: EasySubwayAccessibleColors.secondaryText,
         fontSize: 11,

@@ -606,17 +606,28 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             onPickDestination: widget.onPickStationForSlot == null
                 ? null
                 : _pickDestinationStation,
-            child: _NetworkMapCanvas(
-              data: visibleData,
-              initialViewport: loadResult.initialViewport,
-              focusedStationId: _nearbySelectedStationId,
-              selectedStationId: _nearbyPanelVisible
-                  ? _nearbySelectedStationId
-                  : null,
-              onSetOrigin: _setOriginStation,
-              onSetDestination: _setDestinationStation,
-              onViewportChanged: (viewport) {
-                _saveRecentViewport(data.selectedRegion, viewport);
+            // #1933: _setOriginStation은 routeDraftController만 갱신하고 이
+            // State에서 setState를 호출하지 않으므로, canvas를 좁게
+            // ListenableBuilder로 감싸 draft 변경 시 hasOrigin이 다시
+            // 계산되게 한다(그래야 다음 팝오버의 [도착] 강조가 즉시 반영됨).
+            child: ListenableBuilder(
+              listenable: widget.routeDraftController,
+              builder: (context, _) {
+                return _NetworkMapCanvas(
+                  data: visibleData,
+                  initialViewport: loadResult.initialViewport,
+                  focusedStationId: _nearbySelectedStationId,
+                  selectedStationId: _nearbyPanelVisible
+                      ? _nearbySelectedStationId
+                      : null,
+                  hasOrigin:
+                      widget.routeDraftController.draft.origin != null,
+                  onSetOrigin: _setOriginStation,
+                  onSetDestination: _setDestinationStation,
+                  onViewportChanged: (viewport) {
+                    _saveRecentViewport(data.selectedRegion, viewport);
+                  },
+                );
               },
             ),
           );
@@ -2366,6 +2377,7 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.initialViewport,
     required this.focusedStationId,
     required this.selectedStationId,
+    required this.hasOrigin,
     required this.onSetOrigin,
     required this.onSetDestination,
     required this.onViewportChanged,
@@ -2375,6 +2387,9 @@ class _NetworkMapCanvas extends StatefulWidget {
   final Rect? initialViewport;
   final String? focusedStationId;
   final String? selectedStationId;
+
+  /// #1933-3: 출발이 이미 정해졌으면 다음 역 팝오버는 [도착]을 강조한다.
+  final bool hasOrigin;
   final ValueChanged<NetworkMapStation> onSetOrigin;
   final ValueChanged<NetworkMapStation> onSetDestination;
   final ValueChanged<Rect> onViewportChanged;
@@ -2597,11 +2612,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   station: selectedStation,
                   geometry: geometry,
                   camera: camera,
+                  emphasizeDestination: widget.hasOrigin,
                   onSetOrigin: () {
                     widget.onSetOrigin(selectedStation);
+                    setState(() => _selectedStation = null);
                   },
                   onSetDestination: () {
                     widget.onSetDestination(selectedStation);
+                    setState(() => _selectedStation = null);
                   },
                   onClose: () => setState(() => _selectedStation = null),
                 ),
@@ -3906,7 +3924,7 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   Widget build(BuildContext context) {
     final canSwap = draft.origin != null || draft.destination != null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 4, 10, 6),
+      padding: const EdgeInsets.fromLTRB(4, 2, 10, 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -4015,7 +4033,7 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
           _NetworkMapRouteDraftNodeColumn(isOrigin: isOrigin),
           const SizedBox(width: 8),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -4026,12 +4044,12 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: Text(
                 stationName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: filled
                       ? EasySubwayAccessibleColors.text
                       : EasySubwayAccessibleColors.mutedText,
@@ -4151,6 +4169,7 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
     required this.onSetOrigin,
     required this.onSetDestination,
     required this.onClose,
+    this.emphasizeDestination = false,
   });
 
   final NetworkMapStation station;
@@ -4159,6 +4178,9 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
   final VoidCallback onSetOrigin;
   final VoidCallback onSetDestination;
   final VoidCallback onClose;
+
+  /// #1933-3: 출발이 이미 있으면 다음 역 팝오버는 [도착] 탭을 우선 강조한다.
+  final bool emphasizeDestination;
 
   @override
   Widget build(BuildContext context) {
@@ -4199,6 +4221,7 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
                     icon: Icons.south_east,
                     label: '도착',
                     onTap: onSetDestination,
+                    emphasized: emphasizeDestination,
                   ),
                   _NetworkMapActionDivider(),
                   _NetworkMapStationActionTab(
@@ -4242,42 +4265,66 @@ class _NetworkMapStationActionTab extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.emphasized = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
+  /// #1933-3: true면 흰 바탕 칩으로 우선순위를 드러낸다(무채색, 그림자 없음).
+  final bool emphasized;
+
   @override
   Widget build(BuildContext context) {
+    // 팝오버 배경(0xE8404445)은 이미 짙은 무채색이라 primary(0xFF2A2F31) 같은
+    // 어두운 잉크로 채우면 배경과 구분되지 않는다. 대비를 위해 강조 시에는
+    // 흰 배경 + 짙은 잉크(text)로 반전한다.
+    final iconColor = emphasized
+        ? EasySubwayAccessibleColors.text
+        : Colors.white;
+    final textColor = emphasized
+        ? EasySubwayAccessibleColors.text
+        : Colors.white;
+    final content = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: iconColor, size: 16),
+        const SizedBox(height: 1),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
     return Expanded(
       child: InkWell(
         onTap: onTap,
         splashFactory: NoSplash.splashFactory,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 16),
-            const SizedBox(height: 1),
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                  ),
+        child: emphasized
+            ? Container(
+                margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                decoration: BoxDecoration(
+                  color: EasySubwayAccessibleColors.surface,
+                  borderRadius: BorderRadius.circular(4),
                 ),
-              ),
-            ),
-          ],
-        ),
+                child: content,
+              )
+            : content,
       ),
     );
   }

@@ -2256,6 +2256,53 @@ void main() {
     expect(find.text('닫기'), findsOneWidget);
   });
 
+  testWidgets('노선도에서 출발을 지정한 뒤 다른 역을 누르면 도착 액션이 강조된다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const Key('networkMapStationSheet')),
+        matching: find.text('출발'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sadang-seoul-2')),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    // #1933 요구 3: 출발이 이미 정해진 상태에서 다음 역 팝오버를 열면 [도착]
+    // 액션이 강조(흰 배경 칩 + 어두운 텍스트)되어야 한다.
+    final destinationIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const Key('networkMapStationSheet')),
+        matching: find.byIcon(Icons.south_east),
+      ),
+    );
+    expect(destinationIcon.color, EasySubwayAccessibleColors.text);
+  });
+
   testWidgets('노선도 역은 스크린리더 tap으로도 설정 sheet를 연다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {

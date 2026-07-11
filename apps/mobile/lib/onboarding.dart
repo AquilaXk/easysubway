@@ -557,7 +557,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // 알림 기능 가용 여부의 단일 소스: 알림 권한 provider가 주입됐는지(#1579).
     // 더보기 알림 섹션(notificationRepository)과 함께 켜지고 꺼진다.
     final notificationAvailable = widget.notificationPermissionProvider != null;
-    final listBottomPadding = _currentStep == 1 ? 32.0 : 104.0;
     final profileOptions = [
       mobilityProfileOptions.firstWhere((profile) => profile.id == 'elderly'),
       mobilityProfileOptions.firstWhere(
@@ -612,15 +611,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
       body: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            EasySubwaySpacing.xl,
-            EasySubwaySpacing.lg,
-            EasySubwaySpacing.xl,
-            listBottomPadding,
-          ),
-          children: _currentStep == 0
-              ? [
+        child: _currentStep == 0
+            ? ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  EasySubwaySpacing.xl,
+                  EasySubwaySpacing.lg,
+                  EasySubwaySpacing.xl,
+                  104,
+                ),
+                children: [
                   const _OnboardingStepDots(currentStep: 1, totalSteps: 2),
                   const SizedBox(height: EasySubwaySpacing.xl),
                   Semantics(
@@ -654,95 +653,143 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       },
                     ),
                   ],
-                ]
-              : [
-                  const _OnboardingStepDots(currentStep: 2, totalSteps: 2),
-                  const SizedBox(height: EasySubwaySpacing.xl),
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      notificationAvailable
-                          ? '위치와 알림은 나중에도 켤 수 있어요'
-                          : '위치는 나중에도 켤 수 있어요',
-                      // 프로필 질문과 같은 타이포 위계(titleLarge)로 통일(#1936 일관성).
-                      style: textTheme.titleLarge?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 26,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: EasySubwaySpacing.xl),
-                  _PermissionInfoList(
-                    locationSelected: _locationPermissionSelected,
-                    notificationSelected: _notificationPermissionSelected,
-                    onLocationChanged: (value) =>
-                        setState(() => _locationPermissionSelected = value),
-                    onNotificationChanged: (value) =>
-                        setState(() => _notificationPermissionSelected = value),
-                    notificationAvailable: notificationAvailable,
-                  ),
-                  if (_showNotificationPermissionFailureNextAction) ...[
-                    const SizedBox(height: 12),
-                    Semantics(
-                      key: const Key('onboardingNotificationFailureNextAction'),
-                      container: true,
-                      excludeSemantics: true,
-                      liveRegion: true,
-                      label: '도움말, $_onboardingNotificationFailureNextAction',
-                      child: Text(
-                        _onboardingNotificationFailureNextAction,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.mutedText,
-                          fontWeight: FontWeight.w700,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: EasySubwaySpacing.xl),
-                  FilledButton(
-                    key: const Key('onboardingPermissionAllowButton'),
-                    onPressed:
-                        _locationPermissionSelected ||
-                            _notificationPermissionSelected
-                        ? _handlePermissionAllow
-                        : null,
-                    style: FilledButton.styleFrom(
-                      // 시작·프로필 CTA와 같은 무채색 잉크 fill + 각진(≤8)로 통일.
-                      backgroundColor: EasySubwayAccessibleColors.primary,
-                      foregroundColor: EasySubwayAccessibleColors.surface,
-                      minimumSize: const Size.fromHeight(58),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          EasySubwayRadius.control,
-                        ),
-                      ),
-                    ),
-                    child: const Text('시작하기'),
-                  ),
-                  const SizedBox(height: EasySubwaySpacing.sm),
-                  OutlinedButton(
-                    key: const Key('onboardingPermissionSkipButton'),
-                    onPressed: _completeOnboarding,
-                    style: OutlinedButton.styleFrom(
-                      // "나중에" skip — 무채색 잉크 텍스트 + 얇은 라인 테두리(각진).
-                      foregroundColor: EasySubwayAccessibleColors.text,
-                      side: const BorderSide(
-                        color: EasySubwayAccessibleColors.line,
-                      ),
-                      minimumSize: const Size.fromHeight(58),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          EasySubwayRadius.control,
-                        ),
-                      ),
-                    ),
-                    child: const Text('나중에 설정'),
-                  ),
                 ],
-        ),
+              )
+            // #1936(원칙 #1933): 시작 화면과 같은 리듬 — 콘텐츠 위, CTA는 Spacer로
+            // 하단 고정. 큰 글씨/작은 화면에서도 스크롤 가능하게 LayoutBuilder +
+            // SingleChildScrollView + ConstrainedBox(minHeight) + IntrinsicHeight를 쓴다.
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final bottomGap =
+                      EasySubwaySpacing.xxl +
+                      MediaQuery.viewPaddingOf(context).bottom;
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            EasySubwaySpacing.xl,
+                            EasySubwaySpacing.lg,
+                            EasySubwaySpacing.xl,
+                            bottomGap,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _OnboardingStepDots(
+                                currentStep: 2,
+                                totalSteps: 2,
+                              ),
+                              const SizedBox(height: EasySubwaySpacing.xl),
+                              Semantics(
+                                header: true,
+                                child: Text(
+                                  notificationAvailable
+                                      ? '위치와 알림은 나중에도 켤 수 있어요'
+                                      : '위치는 나중에도 켤 수 있어요',
+                                  // 프로필 질문과 같은 타이포 위계(titleLarge)로 통일(#1936 일관성).
+                                  style: textTheme.titleLarge?.copyWith(
+                                    color: EasySubwayAccessibleColors.text,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 26,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: EasySubwaySpacing.xl),
+                              _PermissionInfoList(
+                                locationSelected: _locationPermissionSelected,
+                                notificationSelected:
+                                    _notificationPermissionSelected,
+                                onLocationChanged: (value) => setState(
+                                  () => _locationPermissionSelected = value,
+                                ),
+                                onNotificationChanged: (value) => setState(
+                                  () => _notificationPermissionSelected = value,
+                                ),
+                                notificationAvailable: notificationAvailable,
+                              ),
+                              if (_showNotificationPermissionFailureNextAction) ...[
+                                const SizedBox(height: 12),
+                                Semantics(
+                                  key: const Key(
+                                    'onboardingNotificationFailureNextAction',
+                                  ),
+                                  container: true,
+                                  excludeSemantics: true,
+                                  liveRegion: true,
+                                  label:
+                                      '도움말, $_onboardingNotificationFailureNextAction',
+                                  child: Text(
+                                    _onboardingNotificationFailureNextAction,
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color:
+                                          EasySubwayAccessibleColors.mutedText,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              const SizedBox(height: EasySubwaySpacing.xl),
+                              FilledButton(
+                                key: const Key(
+                                  'onboardingPermissionAllowButton',
+                                ),
+                                onPressed:
+                                    _locationPermissionSelected ||
+                                        _notificationPermissionSelected
+                                    ? _handlePermissionAllow
+                                    : null,
+                                style: FilledButton.styleFrom(
+                                  // 시작·프로필 CTA와 같은 무채색 잉크 fill + 각진(≤8)로 통일.
+                                  backgroundColor:
+                                      EasySubwayAccessibleColors.primary,
+                                  foregroundColor:
+                                      EasySubwayAccessibleColors.surface,
+                                  minimumSize: const Size.fromHeight(58),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      EasySubwayRadius.control,
+                                    ),
+                                  ),
+                                ),
+                                child: const Text('시작하기'),
+                              ),
+                              const SizedBox(height: EasySubwaySpacing.sm),
+                              OutlinedButton(
+                                key: const Key(
+                                  'onboardingPermissionSkipButton',
+                                ),
+                                onPressed: _completeOnboarding,
+                                style: OutlinedButton.styleFrom(
+                                  // "나중에" skip — 무채색 잉크 텍스트 + 얇은 라인 테두리(각진).
+                                  foregroundColor:
+                                      EasySubwayAccessibleColors.text,
+                                  side: const BorderSide(
+                                    color: EasySubwayAccessibleColors.line,
+                                  ),
+                                  minimumSize: const Size.fromHeight(58),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      EasySubwayRadius.control,
+                                    ),
+                                  ),
+                                ),
+                                child: const Text('나중에 설정'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
       ),
     );
   }

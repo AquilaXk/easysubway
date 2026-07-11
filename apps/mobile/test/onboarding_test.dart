@@ -1,4 +1,5 @@
 import 'package:easysubway_mobile/accessible_design.dart';
+import 'package:easysubway_mobile/design_tokens.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
@@ -433,7 +434,7 @@ void main() {
     expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
   });
 
-  testWidgets('온보딩 고정 CTA 단계는 하단 스크롤 여백을 확보한다', (tester) async {
+  testWidgets('온보딩 단계별로 하단 CTA 고정과 스크롤 여백을 확보한다', (tester) async {
     tester.view.viewPadding = const FakeViewPadding(bottom: 34);
     addTearDown(tester.view.resetViewPadding);
 
@@ -449,9 +450,35 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    // 권한 단계는 하단 고정 버튼이 없어 여백이 32로 줄어든다(#1563).
-    final secondStepList = tester.widget<ListView>(find.byType(ListView));
-    expect(secondStepList.padding?.resolve(TextDirection.ltr).bottom, 32);
+    // #1936: 권한 단계는 시작 화면과 같은 하단 고정 CTA 리듬을 쓴다 —
+    // ListView 대신 스크롤 가능한 Column + Spacer로 두 CTA를 하단에 고정한다.
+    expect(find.byType(ListView), findsNothing);
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(
+      find.byKey(const Key('onboardingPermissionAllowButton')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('onboardingPermissionSkipButton')),
+      findsOneWidget,
+    );
+
+    // 하단 여백은 시작 화면과 같은 토큰(xxl + 시스템 하단 인셋)을 쓴다.
+    final scrollPadding = tester.widget<Padding>(
+      find
+          .descendant(
+            of: find.byType(IntrinsicHeight),
+            matching: find.byType(Padding),
+          )
+          .first,
+    );
+    final expectedBottomGap =
+        EasySubwaySpacing.xxl +
+        tester.view.viewPadding.bottom / tester.view.devicePixelRatio;
+    expect(
+      scrollPadding.padding.resolve(TextDirection.ltr).bottom,
+      moreOrLessEquals(expectedBottomGap),
+    );
   });
 
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
