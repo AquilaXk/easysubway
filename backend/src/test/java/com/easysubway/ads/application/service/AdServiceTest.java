@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
@@ -110,6 +111,47 @@ class AdServiceTest {
 			invalid("creative-1", PLACEMENT, IMAGE, LANDING, ADVERTISER, "x".repeat(501), T0, T0.plusDays(1)),
 			invalid("creative-1", PLACEMENT, IMAGE, LANDING, ADVERTISER, ALT, null, T0.plusDays(1)),
 			invalid("creative-1", PLACEMENT, IMAGE, LANDING, ADVERTISER, ALT, T0, T0));
+	}
+
+	@ParameterizedTest
+	@MethodSource("routeUnsafeCreativeIds")
+	@DisplayName("creative id는 단일 route segment에 안전하지 않은 문자를 거부한다")
+	void rejectsRouteUnsafeCreativeIds(String id) {
+		AdCreative payload = new AdCreative(
+			id, PLACEMENT, IMAGE, LANDING, ADVERTISER, ALT, T0, T0.plusDays(1), false);
+
+		assertThatThrownBy(() -> service.saveCreative(payload))
+			.isInstanceOf(InvalidRequestException.class)
+			.hasMessageContaining("creative id");
+		assertThatThrownBy(() -> service.setCreativeEnabled(id, true))
+			.isInstanceOf(InvalidRequestException.class)
+			.hasMessageContaining("creative id");
+		verify(repository, never()).insert(any());
+		verify(repository, never()).setEnabled(id, true);
+	}
+
+	private static Stream<String> routeUnsafeCreativeIds() {
+		return Stream.of(
+			"summer/banner",
+			"summer%2Fbanner",
+			"summer%banner",
+			"summer?banner",
+			"summer#banner",
+			"summer banner",
+			"summer\tbanner",
+			"summer\nbanner");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"A", "A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-"})
+	@DisplayName("creative id는 route-safe 문자의 1자와 64자 경계를 허용한다")
+	void acceptsRouteSafeCreativeIdBoundaries(String id) {
+		AdCreative payload = creative(id, false);
+		when(repository.findByIdForUpdate(id)).thenReturn(Optional.empty());
+		when(repository.findById(id)).thenReturn(Optional.empty());
+
+		assertThat(service.saveCreative(payload)).isEqualTo(AdService.SaveResult.CREATED);
+		verify(repository).insert(payload);
 	}
 
 	private static Arguments invalid(

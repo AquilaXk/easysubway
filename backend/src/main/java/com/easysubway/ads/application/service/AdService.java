@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
@@ -27,6 +28,7 @@ public class AdService {
 	}
 
 	private static final List<String> PLACEMENTS = List.of("route-result-bottom", "station-detail-bottom");
+	private static final Pattern CREATIVE_ID = Pattern.compile("[A-Za-z0-9._-]{1,64}");
 
 	private final AdRepository repository;
 	private final Clock clock;
@@ -84,7 +86,7 @@ public class AdService {
 
 	@Transactional
 	public void setCreativeEnabled(String creativeId, boolean enabled) {
-		String normalizedId = requireText(creativeId, 64, "creative id");
+		String normalizedId = creativeId(creativeId);
 		lockPlacements();
 		AdCreative creative = repository.findByIdForUpdate(normalizedId)
 			.orElseThrow(() -> new ResourceNotFoundException("광고 소재를 찾을 수 없습니다: " + normalizedId));
@@ -102,7 +104,7 @@ public class AdService {
 		if (creative == null) {
 			throw new InvalidRequestException("광고 소재가 필요합니다.");
 		}
-		String id = requireText(creative.id(), 64, "creative id");
+		String id = creativeId(creative.id());
 		String placementId = requireText(creative.placementId(), 64, "placement id");
 		if (!PLACEMENTS.contains(placementId)) {
 			throw new InvalidRequestException("지원하지 않는 광고 placement입니다.");
@@ -191,6 +193,13 @@ public class AdService {
 
 	private InvalidRequestException duplicateCreative() {
 		return new InvalidRequestException("이미 존재하는 광고 creative id입니다.");
+	}
+
+	private String creativeId(String value) {
+		if (value == null || !CREATIVE_ID.matcher(value).matches()) {
+			throw new InvalidRequestException("creative id는 영문자, 숫자, 점, 밑줄, 하이픈 1~64자여야 합니다.");
+		}
+		return value;
 	}
 
 	private String requireText(String value, int maxLength, String field) {

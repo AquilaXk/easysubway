@@ -95,6 +95,7 @@ class AdminAdsPageControllerTest {
 		assertThat(html)
 			.contains("<h1>광고 소재</h1>")
 			.contains("for=\"creative-id\"")
+			.contains("pattern=\"[A-Za-z0-9._-]{1,64}\"")
 			.contains("for=\"placement-id\"")
 			.contains("for=\"advertiser-name\"")
 			.contains("for=\"image-url\"")
@@ -209,21 +210,24 @@ class AdminAdsPageControllerTest {
 	@DisplayName("admin create·enable 소재는 public ETag 응답 후 disable 시 204로 사라진다")
 	void adminLifecycleControlsPublicCreative() throws Exception {
 		MockHttpSession session = new MockHttpSession();
+		String id = "route.A_1-";
 		postCreative(
-			session, "creative-1", "광고주", "공개 광고 등록",
+			session, id, "광고주", "공개 광고 등록",
 			"2000-01-01T00:00:00Z", "")
 			.andExpect(status().is3xxRedirection());
-		AdCreative created = repository.findById("creative-1").orElseThrow();
+		AdCreative created = repository.findById(id).orElseThrow();
 		assertThat(created.startsAt()).isEqualTo(LocalDateTime.parse("2000-01-01T00:00:00"));
 		assertThat(created.endsAt()).isNull();
-		postState(session, "enable", "공개 시작")
+		String enableAction = "/admin/ads/" + id + "/enable";
+		assertThat(getAdsHtml(session)).contains("action=\"" + enableAction + "\"");
+		postState(session, enableAction, "공개 시작")
 			.andExpect(status().is3xxRedirection());
 
 		mockMvc.perform(get("/api/ads/active").param("placement", "route-result-bottom"))
 			.andExpect(status().isOk())
 			.andExpect(header().exists("ETag"));
 
-		postState(session, "disable", "공개 종료")
+		postState(session, "/admin/ads/" + id + "/disable", "공개 종료")
 			.andExpect(status().is3xxRedirection());
 		mockMvc.perform(get("/api/ads/active").param("placement", "route-result-bottom"))
 			.andExpect(status().isNoContent());
@@ -278,7 +282,8 @@ class AdminAdsPageControllerTest {
 		String action,
 		String reason
 	) throws Exception {
-		return mockMvc.perform(post("/admin/ads/creative-1/" + action)
+		String path = action.startsWith("/") ? action : "/admin/ads/creative-1/" + action;
+		return mockMvc.perform(post(path)
 			.session(session)
 			.with(csrf())
 			.with(commandToken(session))
