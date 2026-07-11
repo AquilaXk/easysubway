@@ -257,6 +257,7 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
       kRouteMapDesignLabelGapPx,
       kRouteMapDesignLabelGapPx + 6,
       kRouteMapDesignLabelGapPx + 12,
+      kRouteMapDesignLabelGapPx + 18,
     ]) {
       for (final anchor in order) {
         final rect = routeMapLabelRect(
