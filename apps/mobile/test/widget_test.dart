@@ -986,6 +986,27 @@ void main() {
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
 
+    // 입력한 편집 텍스트도 hint와 마찬가지로 시각 박스 수직 중앙에 놓여야 한다
+    // (박스 상단에 붙는 회귀 방지). 편집 텍스트의 세로 중심이 38px 박스 중심과
+    // 일치하는지 확인한다.
+    expect(
+      tester.getCenter(find.text('상록수')).dy,
+      moreOrLessEquals(
+        tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
+        epsilon: 1.0,
+      ),
+    );
+
+    // 세로 중앙 정렬은 레이아웃(Center)으로 달성한다. 편집 텍스트가 여러 줄
+    // 필드로 렌더되면 실기기에서 입력 텍스트와 IME 조합 밑줄이 박스 상단에
+    // 붙는 회귀가 발생하므로, 단일 줄 필드(maxLines == 1, expands == false)를
+    // 계약으로 고정한다.
+    final searchField = tester.widget<TextField>(
+      find.byKey(const Key('stationSearchInput')),
+    );
+    expect(searchField.maxLines, 1);
+    expect(searchField.expands, isFalse);
+
     final clearButtonSize = tester.getSize(
       find.widgetWithIcon(IconButton, Icons.close),
     );
@@ -995,6 +1016,55 @@ void main() {
       tester.getSize(find.byKey(const Key('heroStationSearchInputBox'))).height,
       38.0,
     );
+  });
+
+  testWidgets('노선도 검색 중 타이핑은 지도 chrome을 재빌드하지 않는다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 검색 모드로 진입한다(모드 전환은 부모 setState로 chrome이 한 번
+    // 재빌드되므로, 진입 직후를 기준선으로 삼는다).
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+
+    final baseline = debugNetworkMapChromeBuildCount;
+
+    // 한 글자씩 타이핑하며 매 키 입력마다 pump한다. 지도 chrome(상단바+지도
+    // canvas를 감싸는 서브트리)은 키 입력 때문에 재빌드되면 안 된다. 키 입력
+    // 회귀 격리(#1915): 재빌드가 검색 필드+결과 서브트리로 국한돼야 한다.
+    for (final text in const ['ㅅ', '사', '상', '상ㄹ', '상록', '상록수']) {
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        text,
+      );
+      await tester.pump();
+    }
+
+    expect(
+      debugNetworkMapChromeBuildCount,
+      baseline,
+      reason: '키 입력마다 지도 chrome이 재빌드되면 입력 지연이 발생한다.',
+    );
+
+    // 디바운스가 흘러 결과가 뜨는지도 확인해 회귀 격리가 기능을 깨지 않았음을
+    // 보장한다.
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    expect(find.text('상록수역'), findsOneWidget);
   });
 
   testWidgets('알림함 시설 상태는 쉬운 안내와 할 일을 함께 보여준다', (tester) async {

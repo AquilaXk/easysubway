@@ -5,7 +5,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
@@ -459,68 +458,37 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   int _nearbyRealtimeToken = 0;
   late Future<_NetworkMapLoadResult> _future = _loadMap();
 
-  // #1933 홈 노선도 위 in-place 역 검색 모드 상태.
+  // #1933/#1915 홈 노선도 위 in-place 역 검색 모드. 모드 플래그만 이 화면에
+  // 남는다. 검색 컨트롤러·디바운스·최근 검색어·결과 본문 등 키 입력마다 바뀌는
+  // 상태는 [_NetworkMapSearchSession]으로 격리해 타이핑이 지도 canvas/chrome을
+  // 재빌드하지 않게 한다.
   bool _searchMode = false;
-  StationSearchController? _searchController;
+
+  /// 상단바 편집 필드는 이 화면이 소유하는 컨트롤러/포커스로 그린다(키 입력은
+  /// setState를 일으키지 않고 필드가 컨트롤러를 직접 구독해 갱신된다). 검색
+  /// 로직은 세션이 소유하므로, 필드 제출은 이 키로 세션에 위임한다.
   final TextEditingController _searchQueryController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  List<String> _searchRecentQueries = const [];
-  Timer? _searchDebounce;
-  bool _searchOpeningLocationSettings = false;
+  final GlobalKey<_NetworkMapSearchSessionState> _searchSessionKey =
+      GlobalKey<_NetworkMapSearchSessionState>();
 
   @override
   void initState() {
     super.initState();
-    final searchRepository = widget.stationSearchRepository;
-    if (searchRepository != null) {
-      _searchController = StationSearchController(
-        repository: searchRepository,
-        searchHistoryRepository: widget.searchHistoryRepository,
-      )..addListener(_handleSearchControllerChanged);
-    }
-    _searchQueryController.addListener(_handleSearchQueryChanged);
     widget.routeDraftController.addListener(_handleDraftChangedForSearch);
   }
 
-  bool get _hasSearchQuery => _searchQueryController.text.trim().isNotEmpty;
-
-  void _handleSearchControllerChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
   /// 검색 모드 중 draft가 채워지면(출발/도착 설정 등) OD 상단바가 이겨야 하므로
-  /// 검색 모드를 자동 종료한다(co-existence).
+  /// 검색 모드를 자동 종료한다(co-existence). draft 변경은 키 입력이 아니므로
+  /// 이 리스너는 이 화면에 남아도 입력 지연에 영향을 주지 않는다.
   void _handleDraftChangedForSearch() {
     if (_searchMode && !widget.routeDraftController.draft.isEmpty) {
       _exitSearchMode();
     }
   }
 
-  void _handleSearchQueryChanged() {
-    if (!mounted) {
-      return;
-    }
-    _searchDebounce?.cancel();
-    final controller = _searchController;
-    if (!_hasSearchQuery) {
-      if (controller != null &&
-          controller.state.status != StationSearchStatus.idle) {
-        controller.search('');
-      }
-    } else {
-      final query = _searchQueryController.text;
-      _searchDebounce = Timer(
-        const Duration(milliseconds: 300),
-        () => unawaited(_runInPlaceSearch(query, recordHistory: false)),
-      );
-    }
-    setState(() {});
-  }
-
   void _enterSearchMode() {
-    if (widget.stationSearchRepository == null || _searchController == null) {
+    if (widget.stationSearchRepository == null) {
       return;
     }
     if (!widget.routeDraftController.draft.isEmpty) {
@@ -532,16 +500,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         FocusScope.of(context).requestFocus(_searchFocusNode);
       }
     });
-    unawaited(_loadSearchRecentQueries());
   }
 
   void _exitSearchMode() {
-    _searchDebounce?.cancel();
-    final controller = _searchController;
-    if (controller != null &&
-        controller.state.status != StationSearchStatus.idle) {
-      controller.search('');
-    }
     _searchQueryController.clear();
     if (mounted) {
       setState(() => _searchMode = false);
@@ -551,196 +512,35 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onStationSearchClosed?.call();
   }
 
-  Future<void> _runInPlaceSearch(
-    String query, {
-    bool recordHistory = true,
-  }) async {
-    final controller = _searchController;
-    if (controller == null) {
-      return;
-    }
-    await controller.search(query, recordHistory: recordHistory);
-    if (recordHistory) {
-      await _loadSearchRecentQueries();
-    }
-  }
-
+  /// 상단바 편집 필드의 제출(엔터/검색 액션)을 검색 세션으로 위임한다.
   void _submitSearch(String query) {
-    _searchDebounce?.cancel();
-    final controller = _searchController;
-    if (controller == null ||
-        controller.state.status == StationSearchStatus.loading) {
-      return;
-    }
-    unawaited(_runInPlaceSearch(query));
+    _searchSessionKey.currentState?.submitSearch(query);
   }
 
-  Future<void> _loadSearchRecentQueries() async {
-    final repository = widget.searchHistoryRepository;
-    if (repository == null) {
-      return;
+  /// 검색 모드일 때만 세션을 만든다. 세션이 검색 상태를 소유하므로 모드 진입
+  /// 시 mount·모드 이탈 시 unmount되며, 세션의 initState가 최근 검색어 로드와
+  /// 디바운스 구독을 처리한다.
+  Widget? _buildSearchBody() {
+    if (!_searchMode) {
+      return null;
     }
-    try {
-      final queries = await repository.listRecentQueries();
-      if (!mounted) {
-        return;
-      }
-      setState(() => _searchRecentQueries = queries);
-    } catch (error, stackTrace) {
-      reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
-    }
-  }
-
-  void _searchRecentQuerySelected(String query) {
-    _searchQueryController.value = TextEditingValue(
-      text: query,
-      selection: TextSelection.collapsed(offset: query.length),
-    );
-    _submitSearch(query);
-  }
-
-  Future<void> _removeSearchRecentQuery(String query) async {
-    final repository = widget.searchHistoryRepository;
-    if (repository == null) {
-      return;
-    }
-    try {
-      await repository.removeSearch(query);
-      await _loadSearchRecentQueries();
-    } catch (error, stackTrace) {
-      reportMobileError(error, stackTrace, context: '최근 검색어 삭제 중 예외가 발생했습니다.');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
-      }
-    }
-  }
-
-  Future<void> _clearSearchRecentQueries() async {
-    final repository = widget.searchHistoryRepository;
-    if (repository == null) {
-      return;
-    }
-    try {
-      await repository.clearSearches();
-      await _loadSearchRecentQueries();
-    } catch (error, stackTrace) {
-      reportMobileError(
-        error,
-        stackTrace,
-        context: '최근 검색어 전체 삭제 중 예외가 발생했습니다.',
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
-      }
-    }
-  }
-
-  void _openStationDetailInPlace(StationSearchResult result) {
     final searchRepository = widget.stationSearchRepository;
-    final reportRepository = widget.reportRepository;
-    if (searchRepository == null || reportRepository == null) {
-      return;
+    if (searchRepository == null) {
+      return null;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => StationDetailScreen(
-          repository: searchRepository,
-          reportRepository: reportRepository,
-          favoriteRepository: widget.favoriteRepository,
-          realtimeRepository: widget.realtimeRepository,
-          locationProvider: widget.locationProvider,
-          stationId: result.id,
-          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
-          internalRouteRepository: widget.internalRouteRepository,
-          internalRouteMobilityType: widget.internalRouteMobilityType,
-          routeDraftController: widget.routeDraftController,
-        ),
-      ),
-    );
-  }
-
-  void _setSearchOrigin(StationSearchResult result) {
-    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
-    widget.routeDraftController.setOrigin(station);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${station.displayName}을 출발역으로 설정했습니다')),
-    );
-  }
-
-  void _setSearchDestination(StationSearchResult result) {
-    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
-    widget.routeDraftController.setDestination(station);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${station.displayName}을 도착역으로 설정했습니다')),
-    );
-  }
-
-  Future<void> _openSearchLocationSettings() async {
-    final locationProvider = widget.locationProvider;
-    if (_searchOpeningLocationSettings || locationProvider == null) {
-      return;
-    }
-    setState(() => _searchOpeningLocationSettings = true);
-    try {
-      await locationProvider.openLocationSettings();
-    } finally {
-      if (mounted) {
-        setState(() => _searchOpeningLocationSettings = false);
-      }
-    }
-  }
-
-  Widget _buildSearchBody() {
-    final controller = _searchController;
-    return ColoredBox(
-      color: EasySubwayAccessibleColors.scaffoldSurface,
-      child: SafeArea(
-        top: false,
-        child: Semantics(
-          container: true,
-          child: AnimatedBuilder(
-            animation: controller ?? _searchQueryController,
-            builder: (context, _) {
-              final state =
-                  controller?.state ?? const StationSearchState.idle();
-              final showRecent =
-                  !_hasSearchQuery && _searchRecentQueries.isNotEmpty;
-              final isSearching = state.status == StationSearchStatus.loading;
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                children: [
-                  if (showRecent)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: StationRecentSearchSection(
-                        queries: _searchRecentQueries,
-                        enabled: !isSearching,
-                        onQuerySelected: _searchRecentQuerySelected,
-                        onQueryRemoved: (query) =>
-                            unawaited(_removeSearchRecentQuery(query)),
-                        onClearAll: () =>
-                            unawaited(_clearSearchRecentQueries()),
-                      ),
-                    ),
-                  StationSearchBody(
-                    state: state,
-                    onResultTap: _openStationDetailInPlace,
-                    onSetOrigin: _setSearchOrigin,
-                    onSetDestination: _setSearchDestination,
-                    isOpeningLocationSettings: _searchOpeningLocationSettings,
-                    onOpenLocationSettings: () =>
-                        unawaited(_openSearchLocationSettings()),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
+    return _NetworkMapSearchSession(
+      key: _searchSessionKey,
+      searchQueryController: _searchQueryController,
+      stationSearchRepository: searchRepository,
+      searchHistoryRepository: widget.searchHistoryRepository,
+      reportRepository: widget.reportRepository,
+      favoriteRepository: widget.favoriteRepository,
+      realtimeRepository: widget.realtimeRepository,
+      locationProvider: widget.locationProvider,
+      facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+      internalRouteRepository: widget.internalRouteRepository,
+      internalRouteMobilityType: widget.internalRouteMobilityType,
+      routeDraftController: widget.routeDraftController,
     );
   }
 
@@ -790,15 +590,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   @override
   void dispose() {
     _nearbyLookupMessageTimer?.cancel();
-    _searchDebounce?.cancel();
     widget.routeDraftController.removeListener(_handleDraftChangedForSearch);
-    _searchQueryController
-      ..removeListener(_handleSearchQueryChanged)
-      ..dispose();
+    _searchQueryController.dispose();
     _searchFocusNode.dispose();
-    _searchController
-      ?..removeListener(_handleSearchControllerChanged)
-      ..dispose();
     super.dispose();
   }
 
@@ -849,7 +643,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onMenuTap: _openMapMenu,
                 onSearchTap: _enterSearchMode,
                 searchMode: _searchMode,
-                searchBody: _searchMode ? _buildSearchBody() : null,
+                searchBody: _buildSearchBody(),
                 onSearchBack: _exitSearchMode,
                 searchQueryController: _searchQueryController,
                 searchFocusNode: _searchFocusNode,
@@ -891,7 +685,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onMenuTap: _openMapMenu,
                 onSearchTap: _enterSearchMode,
                 searchMode: _searchMode,
-                searchBody: _searchMode ? _buildSearchBody() : null,
+                searchBody: _buildSearchBody(),
                 onSearchBack: _exitSearchMode,
                 searchQueryController: _searchQueryController,
                 searchFocusNode: _searchFocusNode,
@@ -941,7 +735,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onMenuTap: _openMapMenu,
               onSearchTap: _enterSearchMode,
               searchMode: _searchMode,
-              searchBody: _searchMode ? _buildSearchBody() : null,
+              searchBody: _buildSearchBody(),
               onSearchBack: _exitSearchMode,
               searchQueryController: _searchQueryController,
               searchFocusNode: _searchFocusNode,
@@ -1292,6 +1086,12 @@ bool _sameMapStation(NetworkMapStation? a, NetworkMapStation b) {
   return a != null && a.id == b.id && a.lineId == b.lineId;
 }
 
+/// 테스트 전용: [_NetworkMapChrome]가 build될 때마다 증가한다. 검색 중 키
+/// 입력이 지도 chrome(상단바+지도 canvas를 감싸는 서브트리) 전체를 재빌드하지
+/// 않는지(입력 지연 회귀 방지 #1915) 검증하는 회귀 테스트에서만 읽는다.
+@visibleForTesting
+int debugNetworkMapChromeBuildCount = 0;
+
 class _NetworkMapChrome extends StatelessWidget {
   const _NetworkMapChrome({
     required this.regions,
@@ -1369,6 +1169,7 @@ class _NetworkMapChrome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugNetworkMapChromeBuildCount++;
     final topPadding = MediaQuery.paddingOf(context).top;
     final inSearchMode = searchMode && searchBody != null;
     return Stack(
@@ -1952,8 +1753,6 @@ class _NetworkMapSearchInputField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final editController = controller;
-    final hasQuery =
-        editController != null && editController.text.trim().isNotEmpty;
     return SizedBox(
       // 터치 타겟(≥48, 실제로는 56)을 만족시키기 위해 필드 자체가 전체 높이를
       // 차지한다. 시각적 박스(38px)는 배경 레이어 Container가 idle 필드와
@@ -1993,74 +1792,369 @@ class _NetworkMapSearchInputField extends StatelessWidget {
                   ),
                   const SizedBox(width: _searchFieldIconGap),
                   Expanded(
-                    // TextField가 바깥 터치타겟 높이(≥48) 전체를 채워 히트/
-                    // semantics 영역이 48px 게이트를 넘는다. expands가 없으면
-                    // isCollapsed 데코레이터가 텍스트 줄 높이(~18px)로
-                    // 쪼그라들어 hint가 박스 상단에 붙으므로, expands: true +
-                    // textAlignVertical.center로 필드를 세로로 채우고 텍스트/
-                    // hint를 시각 박스 중앙(=idle 텍스트 위치)에 정렬한다.
-                    // expands는 maxLines: null을 요구하므로 단일 줄 입력은
-                    // singleLineFormatter로 보장한다.
+                    // 바깥 SizedBox가 터치타겟 높이(≥48, 실제 56)를 차지하고,
+                    // 단일 줄 TextField가 세로 대칭 contentPadding으로 그 높이를
+                    // 채워 히트/semantics 영역이 48px 게이트를 넘는다. 텍스트는
+                    // textAlignVertical.center + 대칭 패딩으로 필드(그리고 38px
+                    // 시각 박스)의 중앙선(=idle 텍스트 위치)에 놓인다. 여러 줄
+                    // (expands) 트릭을 쓰면 실기기에서 입력 텍스트와 IME 조합
+                    // 밑줄이 첫 줄로 렌더돼 박스 상단에 붙는 회귀가 있어, 단일 줄
+                    // 필드를 유지하고 세로 중앙 정렬은 레이아웃(대칭 패딩)으로만
+                    // 달성한다.
                     child: SizedBox(
                       height: EasySubwayTouchTarget.general,
-                      child: TextField(
-                        key: const Key('stationSearchInput'),
-                        controller: editController,
-                        focusNode: focusNode,
-                        autofocus: true,
-                        expands: true,
-                        minLines: null,
-                        maxLines: null,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.singleLineFormatter,
-                        ],
-                        textAlignVertical: TextAlignVertical.center,
-                        textInputAction: TextInputAction.search,
-                        style: const TextStyle(fontSize: 15, height: 1.2),
-                        // placeholder는 부유 라벨이 아니라 hintText로 박스
-                        // 내부 수직 중앙(idle의 '지하철역 검색'과 같은 위치·
-                        // 스타일)에 렌더돼야 한다. floatingLabelBehavior를
-                        // 지정하면 실기기에서 hint가 라벨처럼 박스 상단
-                        // 테두리 위로 떠오르는 회귀가 확인돼 지정하지 않는다.
-                        // #1933
-                        decoration: const InputDecoration(
-                          hintText: '역 이름을 입력해 주세요',
-                          hintStyle: _searchFieldTextStyle,
-                          isDense: true,
-                          isCollapsed: true,
-                          contentPadding: EdgeInsets.zero,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
+                      child: Center(
+                        child: TextField(
+                          key: const Key('stationSearchInput'),
+                          controller: editController,
+                          focusNode: focusNode,
+                          autofocus: true,
+                          maxLines: 1,
+                          textAlignVertical: TextAlignVertical.center,
+                          textInputAction: TextInputAction.search,
+                          style: const TextStyle(fontSize: 15, height: 1.2),
+                          // placeholder는 부유 라벨이 아니라 hintText로 박스
+                          // 내부 수직 중앙(idle의 '지하철역 검색'과 같은 위치·
+                          // 스타일)에 렌더돼야 한다. 세로 대칭 contentPadding으로
+                          // 필드 자체가 최소 탭 타깃(≥48)을 확보하고, 그 안에서
+                          // 텍스트 줄은 중앙(=38px 시각 박스 중앙선)에 놓인다.
+                          // isCollapsed는 필드를 텍스트 줄 높이로 쪼그라뜨려 탭
+                          // 타깃을 깨므로 쓰지 않는다. floatingLabelBehavior를
+                          // 지정하면 실기기에서 hint가 라벨처럼 박스 상단 테두리
+                          // 위로 떠오르는 회귀가 확인돼 지정하지 않는다. #1933
+                          decoration: const InputDecoration(
+                            hintText: '역 이름을 입력해 주세요',
+                            hintStyle: _searchFieldTextStyle,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 15),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                          ),
+                          onSubmitted: onSubmitted,
                         ),
-                        onSubmitted: onSubmitted,
                       ),
                     ),
                   ),
-                  if (hasQuery)
-                    // 시각 아이콘은 18px이지만 탭 타깃은 독립적으로 48x48을
-                    // 확보한다(top bar IconButton 패턴과 동일). 히트 영역은
-                    // 38px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
-                    // 머물러 시각 박스 높이를 밀어 올리지 않는다.
-                    IconButton(
-                      tooltip: '검색어 지우기',
-                      onPressed: onClear ?? editController.clear,
-                      style: IconButton.styleFrom(
-                        minimumSize: const Size.square(48),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: EdgeInsets.zero,
-                      ),
-                      icon: const Icon(
-                        Icons.close,
-                        size: _searchFieldIconSize,
-                        color: EasySubwayAccessibleColors.iconMuted,
-                      ),
+                  // 지우기 버튼은 입력 유무에 따라 나타난다. 컨트롤러를 직접
+                  // 구독해(ListenableBuilder) 키 입력 시 이 작은 서브트리만
+                  // 재빌드되게 한다 — 상위 화면/지도 chrome은 재빌드되지 않아
+                  // 입력 지연을 막는다(#1915).
+                  if (editController != null)
+                    ListenableBuilder(
+                      listenable: editController,
+                      builder: (context, _) {
+                        final hasQuery = editController.text.trim().isNotEmpty;
+                        if (!hasQuery) {
+                          return const SizedBox.shrink();
+                        }
+                        // 시각 아이콘은 18px이지만 탭 타깃은 독립적으로 48x48을
+                        // 확보한다(top bar IconButton 패턴과 동일). 히트 영역은
+                        // 38px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
+                        // 머물러 시각 박스 높이를 밀어 올리지 않는다.
+                        return IconButton(
+                          tooltip: '검색어 지우기',
+                          onPressed: onClear ?? editController.clear,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size.square(48),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: EdgeInsets.zero,
+                          ),
+                          icon: const Icon(
+                            Icons.close,
+                            size: _searchFieldIconSize,
+                            color: EasySubwayAccessibleColors.iconMuted,
+                          ),
+                        );
+                      },
                     ),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// #1915 홈 노선도 in-place 역 검색의 "세션" — 검색 컨트롤러·디바운스·최근
+/// 검색어·결과 본문 등 키 입력마다 바뀌는 상태를 이 서브트리로 격리한다.
+/// 검색 모드로 진입/이탈하는 모드 플래그만 상위 [_NetworkMapScreenState]에
+/// 남고, 타이핑으로 인한 재빌드는 이 세션(검색 필드 지우기 버튼·결과 본문)에
+/// 국한된다. 그래야 지도 canvas·chrome 서브트리가 키 입력마다 재빌드되지
+/// 않아 입력 지연이 사라진다.
+///
+/// 상단바의 편집 필드는 [_NetworkMapChrome]의 별도 Stack 자식이라 이 세션이
+/// 직접 렌더하지 않는다. 대신 필드의 컨트롤러([searchQueryController])를 상위와
+/// 공유하고, 세션은 그 컨트롤러를 구독해 디바운스 검색을 돌린다. 필드의 지우기
+/// 버튼과 결과 본문은 각각 컨트롤러를 직접 구독(ListenableBuilder/
+/// AnimatedBuilder)하므로 상위 setState 없이 자체 갱신된다. 제출(엔터/검색
+/// 액션)은 상위가 [GlobalKey]로 [submitSearch]를 호출해 세션 로직으로 넘긴다.
+class _NetworkMapSearchSession extends StatefulWidget {
+  const _NetworkMapSearchSession({
+    super.key,
+    required this.searchQueryController,
+    required this.stationSearchRepository,
+    required this.searchHistoryRepository,
+    required this.reportRepository,
+    required this.favoriteRepository,
+    required this.realtimeRepository,
+    required this.locationProvider,
+    required this.facilityReportDraftTargetStore,
+    required this.internalRouteRepository,
+    required this.internalRouteMobilityType,
+    required this.routeDraftController,
+  });
+
+  final TextEditingController searchQueryController;
+  final StationSearchRepository stationSearchRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
+  final FacilityReportRepository? reportRepository;
+  final FavoriteStationRepository? favoriteRepository;
+  final RealtimeRepository? realtimeRepository;
+  final CurrentLocationProvider? locationProvider;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
+  final RouteDraftController routeDraftController;
+
+  @override
+  State<_NetworkMapSearchSession> createState() =>
+      _NetworkMapSearchSessionState();
+}
+
+class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
+  late final StationSearchController _searchController;
+  Timer? _searchDebounce;
+  List<String> _searchRecentQueries = const [];
+  bool _searchOpeningLocationSettings = false;
+
+  TextEditingController get _queryController => widget.searchQueryController;
+
+  bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = StationSearchController(
+      repository: widget.stationSearchRepository,
+      searchHistoryRepository: widget.searchHistoryRepository,
+    );
+    _queryController.addListener(_handleSearchQueryChanged);
+    unawaited(_loadSearchRecentQueries());
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _queryController.removeListener(_handleSearchQueryChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleSearchQueryChanged() {
+    if (!mounted) {
+      return;
+    }
+    _searchDebounce?.cancel();
+    if (!_hasSearchQuery) {
+      if (_searchController.state.status != StationSearchStatus.idle) {
+        unawaited(_searchController.search(''));
+      }
+      return;
+    }
+    final query = _queryController.text;
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 300),
+      () => unawaited(_runInPlaceSearch(query, recordHistory: false)),
+    );
+  }
+
+  Future<void> _runInPlaceSearch(
+    String query, {
+    bool recordHistory = true,
+  }) async {
+    await _searchController.search(query, recordHistory: recordHistory);
+    if (recordHistory) {
+      await _loadSearchRecentQueries();
+    }
+  }
+
+  /// 상위 화면이 상단바 편집 필드의 제출(엔터/검색 액션)에서 [GlobalKey]로
+  /// 호출한다. 세션이 검색 로직을 소유하므로 제출도 세션에서 처리한다.
+  void submitSearch(String query) {
+    _searchDebounce?.cancel();
+    if (_searchController.state.status == StationSearchStatus.loading) {
+      return;
+    }
+    unawaited(_runInPlaceSearch(query));
+  }
+
+  Future<void> _loadSearchRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      final queries = await repository.listRecentQueries();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _searchRecentQueries = queries);
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
+    }
+  }
+
+  void _searchRecentQuerySelected(String query) {
+    _queryController.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    submitSearch(query);
+  }
+
+  Future<void> _removeSearchRecentQuery(String query) async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.removeSearch(query);
+      await _loadSearchRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 삭제 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
+      }
+    }
+  }
+
+  Future<void> _clearSearchRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.clearSearches();
+      await _loadSearchRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 검색어 전체 삭제 중 예외가 발생했습니다.',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
+      }
+    }
+  }
+
+  void _openStationDetailInPlace(StationSearchResult result) {
+    final reportRepository = widget.reportRepository;
+    if (reportRepository == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StationDetailScreen(
+          repository: widget.stationSearchRepository,
+          reportRepository: reportRepository,
+          favoriteRepository: widget.favoriteRepository,
+          realtimeRepository: widget.realtimeRepository,
+          locationProvider: widget.locationProvider,
+          stationId: result.id,
+          facilityReportDraftTargetStore:
+              widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
+          routeDraftController: widget.routeDraftController,
+        ),
+      ),
+    );
+  }
+
+  void _setSearchOrigin(StationSearchResult result) {
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    widget.routeDraftController.setOrigin(station);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${station.displayName}을 출발역으로 설정했습니다')),
+    );
+  }
+
+  void _setSearchDestination(StationSearchResult result) {
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    widget.routeDraftController.setDestination(station);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${station.displayName}을 도착역으로 설정했습니다')),
+    );
+  }
+
+  Future<void> _openSearchLocationSettings() async {
+    final locationProvider = widget.locationProvider;
+    if (_searchOpeningLocationSettings || locationProvider == null) {
+      return;
+    }
+    setState(() => _searchOpeningLocationSettings = true);
+    try {
+      await locationProvider.openLocationSettings();
+    } finally {
+      if (mounted) {
+        setState(() => _searchOpeningLocationSettings = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: EasySubwayAccessibleColors.scaffoldSurface,
+      child: SafeArea(
+        top: false,
+        child: Semantics(
+          container: true,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_searchController, _queryController]),
+            builder: (context, _) {
+              final state = _searchController.state;
+              final showRecent =
+                  !_hasSearchQuery && _searchRecentQueries.isNotEmpty;
+              final isSearching = state.status == StationSearchStatus.loading;
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                children: [
+                  if (showRecent)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: StationRecentSearchSection(
+                        queries: _searchRecentQueries,
+                        enabled: !isSearching,
+                        onQuerySelected: _searchRecentQuerySelected,
+                        onQueryRemoved: (query) =>
+                            unawaited(_removeSearchRecentQuery(query)),
+                        onClearAll: () =>
+                            unawaited(_clearSearchRecentQueries()),
+                      ),
+                    ),
+                  StationSearchBody(
+                    state: state,
+                    onResultTap: _openStationDetailInPlace,
+                    onSetOrigin: _setSearchOrigin,
+                    onSetDestination: _setSearchDestination,
+                    isOpeningLocationSettings: _searchOpeningLocationSettings,
+                    onOpenLocationSettings: () =>
+                        unawaited(_openSearchLocationSettings()),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
       ),
     );
   }
