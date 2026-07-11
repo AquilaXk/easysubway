@@ -136,6 +136,37 @@ require_nonempty EASYSUBWAY_DATASOURCE_PASSWORD
 require_nonempty EASYSUBWAY_REPORT_UPLOAD_BUCKET
 require_nonempty EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY
 require_nonempty EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY
+require_nonempty EASYSUBWAY_ADS_ASSET_ORIGIN
+
+ads_asset_origin="$(value EASYSUBWAY_ADS_ASSET_ORIGIN)"
+ads_asset_authority="${ads_asset_origin#https://}"
+ads_asset_authority="${ads_asset_authority%/}"
+ads_asset_host="${ads_asset_authority%%:*}"
+ads_asset_port=""
+if [[ "${ads_asset_authority}" == *:* ]]; then
+	ads_asset_port="${ads_asset_authority##*:}"
+fi
+ads_asset_host_normalized="$(printf '%s' "${ads_asset_host}" | tr '[:upper:]' '[:lower:]')"
+ads_asset_origin_invalid=0
+
+if [[ ! "${ads_asset_origin}" =~ ^https://([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(:[1-9][0-9]{0,4})?/?$ ]]; then
+	ads_asset_origin_invalid=1
+fi
+if [[ "${ads_asset_host}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+	ads_asset_origin_invalid=1
+fi
+if [[ "${ads_asset_port}" =~ ^[0-9]+$ && "${ads_asset_port}" -gt 65535 ]]; then
+	ads_asset_origin_invalid=1
+fi
+case ".${ads_asset_host_normalized}." in
+	*.localhost.*|*.local.|*.internal.|*.placeholder.*|*.change-me.*|*.changeme.*|*.todo.*|*.tbd.*)
+		ads_asset_origin_invalid=1
+		;;
+esac
+if [[ "${ads_asset_origin_invalid}" -ne 0 ]]; then
+	printf 'invalid public HTTPS origin: %s\n' EASYSUBWAY_ADS_ASSET_ORIGIN >&2
+	exit 1
+fi
 
 receipt_pepper="$(value EASYSUBWAY_REPORT_RECEIPT_PEPPER)"
 legacy_pepper="$(value EASYSUBWAY_REPORT_RECEIPT_TOKEN_PEPPER)"

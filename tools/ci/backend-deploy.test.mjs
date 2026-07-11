@@ -20,6 +20,30 @@ function fixtureEnv() {
   return read("tools/ci/fixtures/deployment-prod-valid.env");
 }
 
+function withAssetOrigin(origin) {
+  return fixtureEnv().replace(
+    ASSET_ORIGIN_LINE,
+    `EASYSUBWAY_ADS_ASSET_ORIGIN=${origin}`,
+  );
+}
+
+async function assertInvalidAssetOrigin(origin) {
+  await assert.rejects(
+    prepare(withAssetOrigin(origin)),
+    (error) => {
+      const stderr = String(error.stderr ?? "");
+      assert.match(
+        stderr,
+        /invalid public HTTPS origin: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+      );
+      if (origin.trim()) {
+        assert.equal(stderr.includes(origin), false, "stderr must not contain the origin value");
+      }
+      return true;
+    },
+  );
+}
+
 async function prepare(source) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-deploy-env-"));
   const sourceFile = path.join(dir, "source.env");
@@ -48,6 +72,55 @@ test("광고 asset origin은 backend env에만 변형 없이 전달한다", asyn
     !composeEnv.split("\n").includes(ASSET_ORIGIN_LINE),
     "compose.env must not contain the asset origin line",
   );
+});
+
+test("광고 asset origin production preflight는 unsafe 값을 차단한다", async () => {
+  await assert.rejects(
+    prepare(fixtureEnv().replace(`${ASSET_ORIGIN_LINE}\n`, "")),
+    /required deployment env is empty: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+  );
+  await assert.rejects(
+    prepare(withAssetOrigin("")),
+    /required deployment env is empty: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+  );
+  await assert.rejects(
+    prepare(`${fixtureEnv()}${ASSET_ORIGIN_LINE}\n`),
+    /duplicate dotenv key: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+  );
+
+  for (const origin of [
+    " ",
+    "http://ads-assets.fixture.easysubway.example",
+    "https://user@ads-assets.fixture.easysubway.example",
+    "https://ads-assets.fixture.easysubway.example/ads",
+    "https://ads-assets.fixture.easysubway.example?revision=1",
+    "https://ads-assets.fixture.easysubway.example#creative",
+    "https://localhost",
+    "https://127.0.0.1",
+    "https://[::1]",
+    "https://10.0.0.1",
+    "https://object-storage",
+    "https://assets.internal",
+    "https://placeholder.example.com",
+    "https://todo.example.com",
+    "https://-assets.example.com",
+    "https://assets.example.com:0",
+    "https://assets.example.com:65536",
+  ]) {
+    await assertInvalidAssetOrigin(origin);
+  }
+
+  for (const origin of [
+    `${ASSET_ORIGIN}/`,
+    "https://ads-assets.fixture.easysubway.example:8443",
+  ]) {
+    const outputDir = await prepare(withAssetOrigin(origin));
+    const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+    assert.ok(
+      backendEnv.split("\n").includes(`EASYSUBWAY_ADS_ASSET_ORIGIN=${origin}`),
+      "backend.env must preserve an allowed origin exactly",
+    );
+  }
 });
 
 test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다", async () => {
