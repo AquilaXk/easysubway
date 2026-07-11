@@ -898,7 +898,7 @@ function auditPack(pack, reviewedAmbiguities, options = {}) {
       continue;
     }
     const first = group[0];
-    const stationIds = [...uniqueStationIds].sort();
+    const stationIds = [...uniqueStationIds].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     const ambiguityKey = duplicateCoordinateKeyFor({
       region: first.region,
       lineId: first.lineId,

@@ -36,7 +36,9 @@ function buildCoverageGapReport(targets, inventory, provenance = null) {
         const denominator = fieldCoverage.length;
         const threshold = domain.blockingThreshold?.minimumOfficialFieldCoverageRatio ?? 1;
         const coverageRatio = denominator === 0 ? 0 : Number((coveredFields / denominator).toFixed(4));
-        const sourceIds = [...new Set(fieldCoverage.flatMap((entry) => entry.sourceIds))].sort();
+        const sourceIds = [...new Set(fieldCoverage.flatMap((entry) => entry.sourceIds))].sort((a, b) =>
+          a < b ? -1 : a > b ? 1 : 0,
+        );
         requirements.push({
           regionId: region.id,
           regionName: region.displayName,

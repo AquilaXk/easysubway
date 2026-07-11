@@ -164,7 +164,9 @@ function stationLabelsByKey(geometry, ignoredSourceElementKeys) {
 }
 
 function sortedUnique(values) {
-  return [...new Set(values.map(normalizedText).filter(Boolean))].sort();
+  return [...new Set(values.map(normalizedText).filter(Boolean))].sort((a, b) =>
+    a < b ? -1 : a > b ? 1 : 0,
+  );
 }
 
 function applyLabelPolygon(position, label, geometry) {
