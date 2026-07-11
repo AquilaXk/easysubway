@@ -1980,10 +1980,10 @@ class RouteSearchStep {
   String get semanticGuidanceLabel {
     final safeReason = _routeStepReasonLabel(reason);
     final labels = <String>[
-      '$sequence번 ${userActionTitle.isEmpty ? userTitle : userActionTitle}',
+      '$sequence번 ${stepType == 'waypoint' ? userTitle : (userActionTitle.isEmpty ? userTitle : userActionTitle)}',
       _routeStepDetailLabel(stepType: stepType),
       if (safeReason.isNotEmpty) safeReason,
-      burdenLabel,
+      if (stepType != 'waypoint') burdenLabel,
       if (confidenceLabel.isNotEmpty) confidenceLabel,
       if (hasMetricSourceMetadata) metricSourceLabel,
     ];
@@ -2117,6 +2117,7 @@ String _routeStepDetailLabel({required String stepType}) {
     'escalator' => '에스컬레이터를 이용해 이동합니다.',
     'facilityConnector' => '역 시설 연결 동선을 따라 이동합니다.',
     'ride' => '열차를 이용해 이동합니다.',
+    'waypoint' => '내리지 않고 이 역을 지나가요',
     _ => '안내된 순서대로 이동합니다.',
   };
 }
@@ -5748,7 +5749,7 @@ class _RouteStepTile extends StatelessWidget {
               ),
             ],
           ),
-          if (step.userActionTitle.isNotEmpty) ...[
+          if (!isWaypoint && step.userActionTitle.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               step.userActionTitle,
@@ -5759,16 +5760,20 @@ class _RouteStepTile extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 4),
-          // 구간 요약: "약 M분 · 거리 · 계단" (기존 burdenLabel 재사용).
-          Text(
-            step.burdenLabel,
-            style: textTheme.bodyMedium?.copyWith(
-              color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
+          // 경유(waypoint) 마커는 시간·거리가 0이라 placeholder만 나오므로
+          // 구간 요약 줄 자체를 그리지 않는다(#1948).
+          if (!isWaypoint) ...[
+            const SizedBox(height: 4),
+            // 구간 요약: "약 M분 · 거리 · 계단" (기존 burdenLabel 재사용).
+            Text(
+              step.burdenLabel,
+              style: textTheme.bodyMedium?.copyWith(
+                color: EasySubwayAccessibleColors.secondaryText,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 4),
           Text(
             step.userDescription,

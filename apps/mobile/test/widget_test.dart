@@ -7117,6 +7117,7 @@ void main() {
             stepType: 'waypoint',
             title: '선릉 경유',
             description: '내리지 않고 이 역을 지나가요',
+            actionTitle: '경유',
             lineId: '',
             lineName: '',
             fromStationId: 'station-seolleung',
@@ -7193,6 +7194,18 @@ void main() {
     // 승차 스텝은 노선색 배지(노선번호)로 남아 회귀가 없다.
     expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
     expect(find.byKey(const Key('routeStepNumber-3')), findsOneWidget);
+
+    // #1948: 경유 스텝은 0값 placeholder burdenLabel을 렌더하지 않는다.
+    expect(
+      find.text('시간을 확인하고 있어요 · 거리를 확인하고 있어요'),
+      findsNothing,
+    );
+    expect(find.textContaining('시간을 확인하고 있어요'), findsNothing);
+    // #1948: 경유 스텝은 보일러플레이트 기본 안내 문장 대신 간결 카피를 쓴다.
+    expect(find.text('안내된 순서대로 이동합니다.'), findsNothing);
+    expect(find.text('내리지 않고 이 역을 지나가요'), findsOneWidget);
+    // #1948: 경유 스텝은 "경유" 서브라벨(2줄)을 별도로 그리지 않는다(제목에 이미 포함).
+    expect(find.text('경유'), findsNothing);
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
