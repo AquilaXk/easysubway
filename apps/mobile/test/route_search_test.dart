@@ -1244,6 +1244,33 @@ void main() {
     expect(semanticLabel, isNot(contains('측정값')));
   });
 
+  test('경유 스텝 음성 안내는 신뢰도·측정 출처 문구를 읽지 않는다 (#1975)', () {
+    // 경유 마커가 route_step 기본값(confidenceLabel='안내를 준비 중이에요',
+    // timeSource/distanceSource 비어있지 않음)을 상속해도 경유 스텝에서는
+    // 신뢰도·측정 출처 문구가 음성 안내에 새어 나오지 않아야 한다.
+    const waypointStep = RouteSearchStep(
+      sequence: 2,
+      stepType: 'waypoint',
+      title: '선릉 경유',
+      description: '내리지 않고 이 역을 지나가요',
+      lineId: '',
+      lineName: '',
+      fromStationId: 'station-seolleung',
+      toStationId: 'station-seolleung',
+      estimatedMinutes: 0,
+      distanceMeters: 0,
+      includesStairs: false,
+      requiresAccessibilityCheck: false,
+      timeSource: 'UNKNOWN',
+      distanceSource: 'UNKNOWN',
+      confidenceLabel: '안내를 준비 중이에요',
+    );
+
+    final label = waypointStep.semanticGuidanceLabel;
+    expect(label, isNot(contains('안내를 준비 중이에요')));
+    expect(label, isNot(contains('확인하고 있어요')));
+  });
+
   test('경로 단계 이동 부담은 긴 거리를 킬로미터로 표시한다', () {
     const step = RouteSearchStep(
       sequence: 2,

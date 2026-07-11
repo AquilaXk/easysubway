@@ -676,6 +676,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
+                onClearWaypoint: _clearWaypointStation,
                 onSwapDraft: _swapDraftStations,
                 onPickOrigin: widget.onPickStationForSlot == null
                     ? null
@@ -683,6 +684,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onPickDestination: widget.onPickStationForSlot == null
                     ? null
                     : _pickDestinationStation,
+                onPickWaypoint: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickWaypointStation,
                 child: const Center(child: CircularProgressIndicator()),
               );
             }
@@ -718,6 +722,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
+                onClearWaypoint: _clearWaypointStation,
                 onSwapDraft: _swapDraftStations,
                 onPickOrigin: widget.onPickStationForSlot == null
                     ? null
@@ -725,6 +730,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onPickDestination: widget.onPickStationForSlot == null
                     ? null
                     : _pickDestinationStation,
+                onPickWaypoint: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickWaypointStation,
                 child: _NetworkMapLoadFailure(onRetry: () => _reload()),
               );
             }
@@ -768,6 +776,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
+              onClearWaypoint: _clearWaypointStation,
               onSwapDraft: _swapDraftStations,
               onPickOrigin: widget.onPickStationForSlot == null
                   ? null
@@ -775,6 +784,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onPickDestination: widget.onPickStationForSlot == null
                   ? null
                   : _pickDestinationStation,
+              onPickWaypoint: widget.onPickStationForSlot == null
+                  ? null
+                  : _pickWaypointStation,
               // #1933: _setOriginStation은 routeDraftController만 갱신하고 이
               // State에서 setState를 호출하지 않으므로, canvas를 좁게
               // ListenableBuilder로 감싸 draft 변경 시 hasOrigin이 다시
@@ -790,7 +802,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                         ? _nearbySelectedStationId
                         : null,
                     hasOrigin: widget.routeDraftController.draft.origin != null,
+                    originStationId:
+                        widget.routeDraftController.draft.origin?.id,
+                    waypointStationId:
+                        widget.routeDraftController.draft.waypoint?.id,
+                    destinationStationId:
+                        widget.routeDraftController.draft.destination?.id,
                     onSetOrigin: _setOriginStation,
+                    onSetWaypoint: _setWaypointStation,
                     onSetDestination: _setDestinationStation,
                     onViewportChanged: (viewport) {
                       _saveRecentViewport(data.selectedRegion, viewport);
@@ -1008,12 +1027,22 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     );
   }
 
+  void _setWaypointStation(NetworkMapStation station) {
+    widget.routeDraftController.setWaypoint(
+      RouteDraftStation(id: station.id, nameKo: station.nameKo),
+    );
+  }
+
   void _clearOriginStation() {
     widget.routeDraftController.clearOrigin();
   }
 
   void _clearDestinationStation() {
     widget.routeDraftController.clearDestination();
+  }
+
+  void _clearWaypointStation() {
+    widget.routeDraftController.clearWaypoint();
   }
 
   void _swapDraftStations() {
@@ -1029,6 +1058,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   /// G4: 상단 오버레이 도착 칸 탭 → 기존 역 검색을 "도착역 채우기" 모드로 연다.
   void _pickDestinationStation() {
     widget.onPickStationForSlot?.call(RouteDraftSlot.destination);
+  }
+
+  /// #1948: 상단 오버레이 경유 행·추가 진입점 탭 → 역 검색을 "경유역 채우기" 모드로 연다.
+  void _pickWaypointStation() {
+    widget.onPickStationForSlot?.call(RouteDraftSlot.waypoint);
   }
 
   _NetworkMapAdjacentStations _adjacentStationsFor(NetworkMapData data) {
@@ -1127,9 +1161,11 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.routeDraftController,
     required this.onClearOrigin,
     required this.onClearDestination,
+    required this.onClearWaypoint,
     required this.onSwapDraft,
     this.onPickOrigin,
     this.onPickDestination,
+    this.onPickWaypoint,
     this.searchMode = false,
     this.searchBody,
     this.onSearchBack,
@@ -1161,11 +1197,13 @@ class _NetworkMapChrome extends StatelessWidget {
   final RouteDraftController routeDraftController;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
+  final VoidCallback onClearWaypoint;
   final VoidCallback onSwapDraft;
 
-  /// 상단바 출발/도착 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
+  /// 상단바 출발/도착/경유 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
+  final VoidCallback? onPickWaypoint;
 
   /// #1933 홈 노선도 in-place 역 검색 모드. true면 body를 [searchBody]로 바꾸고
   /// 상단바 좌측 ≡를 ←로, 검색 필드를 실제 TextField로 전환한다. 지역 선택기는
@@ -1213,9 +1251,11 @@ class _NetworkMapChrome extends StatelessWidget {
             routeDraftController: routeDraftController,
             onClearOrigin: onClearOrigin,
             onClearDestination: onClearDestination,
+            onClearWaypoint: onClearWaypoint,
             onSwapDraft: onSwapDraft,
             onPickOrigin: onPickOrigin,
             onPickDestination: onPickDestination,
+            onPickWaypoint: onPickWaypoint,
           ),
         ),
         if (disruptionBanner != null && !inSearchMode)
@@ -1318,9 +1358,11 @@ class _NetworkMapTopBar extends StatelessWidget {
     required this.routeDraftController,
     required this.onClearOrigin,
     required this.onClearDestination,
+    required this.onClearWaypoint,
     required this.onSwapDraft,
     this.onPickOrigin,
     this.onPickDestination,
+    this.onPickWaypoint,
   });
 
   final List<NetworkMapRegion> regions;
@@ -1338,9 +1380,11 @@ class _NetworkMapTopBar extends StatelessWidget {
   final RouteDraftController routeDraftController;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
+  final VoidCallback onClearWaypoint;
   final VoidCallback onSwapDraft;
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
+  final VoidCallback? onPickWaypoint;
 
   @override
   Widget build(BuildContext context) {
@@ -1369,9 +1413,11 @@ class _NetworkMapTopBar extends StatelessWidget {
                 draft: draft,
                 onClearOrigin: onClearOrigin,
                 onClearDestination: onClearDestination,
+                onClearWaypoint: onClearWaypoint,
                 onSwapDraft: onSwapDraft,
                 onPickOrigin: onPickOrigin,
                 onPickDestination: onPickDestination,
+                onPickWaypoint: onPickWaypoint,
               );
             },
           ),
@@ -1594,8 +1640,9 @@ class _NetworkMapRegionMenuOverlay extends StatelessWidget {
                         style: TextStyle(
                           color: EasySubwayAccessibleColors.listRowText,
                           fontSize: 16,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                         ),
                       ),
                     ),
@@ -3187,8 +3234,12 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.selectedStationId,
     required this.hasOrigin,
     required this.onSetOrigin,
+    required this.onSetWaypoint,
     required this.onSetDestination,
     required this.onViewportChanged,
+    this.originStationId,
+    this.waypointStationId,
+    this.destinationStationId,
   });
 
   final NetworkMapData data;
@@ -3196,9 +3247,15 @@ class _NetworkMapCanvas extends StatefulWidget {
   final String? focusedStationId;
   final String? selectedStationId;
 
+  /// #1948: draft 핀을 그릴 지정 역 id (없으면 null).
+  final String? originStationId;
+  final String? waypointStationId;
+  final String? destinationStationId;
+
   /// #1933-3: 출발이 이미 정해졌으면 다음 역 팝오버는 [도착]을 강조한다.
   final bool hasOrigin;
   final ValueChanged<NetworkMapStation> onSetOrigin;
+  final ValueChanged<NetworkMapStation> onSetWaypoint;
   final ValueChanged<NetworkMapStation> onSetDestination;
   final ValueChanged<Rect> onViewportChanged;
 
@@ -3353,6 +3410,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           final selectedStation =
               _stationByIdentity(widget.data.stations, _selectedStation) ??
               _stationById(widget.data.stations, widget.selectedStationId);
+          final originStation = _stationById(
+            widget.data.stations,
+            widget.originStationId,
+          );
+          final waypointStation = _stationById(
+            widget.data.stations,
+            widget.waypointStationId,
+          );
+          final destinationStation = _stationById(
+            widget.data.stations,
+            widget.destinationStationId,
+          );
           final focusedStation = widget.focusedStationId == null
               ? null
               : _stationById(widget.data.stations, widget.focusedStationId);
@@ -3443,14 +3512,51 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                       onTap: () => _selectStation(station),
                     ),
                   ),
+              if (!_gestureActive && originStation != null)
+                _NetworkMapDraftPin(
+                  key: const Key('networkMapDraftPin-origin'),
+                  station: originStation,
+                  geometry: geometry,
+                  camera: camera,
+                  label: '출발',
+                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  semanticSuffix: '출발 지정됨',
+                ),
+              if (!_gestureActive && waypointStation != null)
+                _NetworkMapDraftPin(
+                  key: const Key('networkMapDraftPin-waypoint'),
+                  station: waypointStation,
+                  geometry: geometry,
+                  camera: camera,
+                  label: '경유',
+                  surfaceColor: const Color(0xE8404445),
+                  semanticSuffix: '경유 지정됨',
+                ),
+              if (!_gestureActive && destinationStation != null)
+                _NetworkMapDraftPin(
+                  key: const Key('networkMapDraftPin-destination'),
+                  station: destinationStation,
+                  geometry: geometry,
+                  camera: camera,
+                  label: '도착',
+                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  semanticSuffix: '도착 지정됨',
+                ),
               if (!_gestureActive && selectedStation != null)
                 _NetworkMapStationActionOverlay(
                   station: selectedStation,
                   geometry: geometry,
                   camera: camera,
                   emphasizeDestination: widget.hasOrigin,
+                  originStationId: widget.originStationId,
+                  waypointStationId: widget.waypointStationId,
+                  destinationStationId: widget.destinationStationId,
                   onSetOrigin: () {
                     widget.onSetOrigin(selectedStation);
+                    setState(() => _selectedStation = null);
+                  },
+                  onSetWaypoint: () {
+                    widget.onSetWaypoint(selectedStation);
                     setState(() => _selectedStation = null);
                   },
                   onSetDestination: () {
@@ -4746,6 +4852,10 @@ class _StationHitTarget extends StatelessWidget {
   }
 }
 
+/// #1948: 상단바 draft 필드의 종류. 출발/도착에 더해 경유(2단계 경유역)를
+/// 같은 무채색 채움 필드 리듬으로 표시한다.
+enum _RouteDraftFieldKind { origin, waypoint, destination }
+
 /// #1933 요구 2: 출발/도착이 하나라도 차면 상단바 "자체"가 참고 앱 OD 입력
 /// 구조(출발/도착 각각을 무채색 채움 필드 2개로 표시)로 변신한다. 아래 별도
 /// 카드를 띄우지 않는다 — 그림자/elevation 0, 라운딩은 8 이하, splash 없이
@@ -4755,20 +4865,26 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
     required this.draft,
     required this.onClearOrigin,
     required this.onClearDestination,
+    required this.onClearWaypoint,
     required this.onSwapDraft,
     this.onPickOrigin,
     this.onPickDestination,
+    this.onPickWaypoint,
     super.key,
   });
 
   final RouteDraft draft;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
+  final VoidCallback onClearWaypoint;
   final VoidCallback onSwapDraft;
 
   /// G4: 각 칸 탭 → 역 검색 열기(같은 draft로 수렴). null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
+
+  /// #1948: 경유역 채우기(경유 행 탭·경유 추가 진입점). null이면 경유를 추가할 수 없다.
+  final VoidCallback? onPickWaypoint;
 
   @override
   Widget build(BuildContext context) {
@@ -4777,18 +4893,34 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
     // 행 리스트로 렌더해 중간 행 확장이 구조 변경 없이 가능하다.
     final fields = <Widget>[
       _NetworkMapRouteDraftField(
-        isOrigin: true,
+        kind: _RouteDraftFieldKind.origin,
         station: draft.origin,
         onClear: onClearOrigin,
         onPick: onPickOrigin,
       ),
+      // #1948: 경유가 있으면 출발과 도착 사이에 경유 행을 삽입한다.
+      if (draft.waypoint != null)
+        _NetworkMapRouteDraftField(
+          kind: _RouteDraftFieldKind.waypoint,
+          station: draft.waypoint,
+          onClear: onClearWaypoint,
+          onPick: onPickWaypoint,
+        ),
       _NetworkMapRouteDraftField(
-        isOrigin: false,
+        kind: _RouteDraftFieldKind.destination,
         station: draft.destination,
         onClear: onClearDestination,
         onPick: onPickDestination,
       ),
     ];
+    // #1948: 경유는 출발·도착 한 쌍이 정해진 뒤에 더하는 옵션이다. 출발/도착이
+    // 모두 차 있고 아직 경유가 없으며 추가가 가능할 때만 '경유 추가' 어포던스를
+    // 필드 아래 둔다(출발만 정한 중간 상태에서는 노출하지 않는다).
+    final showAddWaypoint =
+        draft.origin != null &&
+        draft.destination != null &&
+        draft.waypoint == null &&
+        onPickWaypoint != null;
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 10, 4),
       child: Row(
@@ -4821,10 +4953,63 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
                   if (i > 0) const SizedBox(height: 6),
                   fields[i],
                 ],
+                if (showAddWaypoint) ...[
+                  const SizedBox(height: 6),
+                  _NetworkMapRouteDraftAddWaypoint(onTap: onPickWaypoint!),
+                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// #1948: 경유가 없을 때 노출되는 '경유 추가' 어포던스. 무채색·radius 8·splash
+/// 없음·터치 타깃 48. 탭 시 경유역 검색을 연다.
+class _NetworkMapRouteDraftAddWaypoint extends StatelessWidget {
+  const _NetworkMapRouteDraftAddWaypoint({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '경유역 추가',
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          key: const Key('networkMapRouteDraftAddWaypoint'),
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            decoration: BoxDecoration(
+              color: EasySubwayAccessibleColors.scaffoldSurface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.add,
+                  size: 18,
+                  color: EasySubwayAccessibleColors.mutedText,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '경유 추가',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: EasySubwayAccessibleColors.mutedText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -4835,26 +5020,56 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
 /// 때만 지우기(✕) 버튼을 보인다.
 class _NetworkMapRouteDraftField extends StatelessWidget {
   const _NetworkMapRouteDraftField({
-    required this.isOrigin,
+    required this.kind,
     required this.station,
     required this.onClear,
     this.onPick,
   });
 
-  final bool isOrigin;
+  final _RouteDraftFieldKind kind;
   final RouteDraftStation? station;
   final VoidCallback onClear;
 
   /// G4: 이 칸(역명/플레이스홀더 영역)을 탭하면 역 검색을 연다. null이면 탭 불가.
   final VoidCallback? onPick;
 
+  String get _label => switch (kind) {
+    _RouteDraftFieldKind.origin => '출발',
+    _RouteDraftFieldKind.waypoint => '경유',
+    _RouteDraftFieldKind.destination => '도착',
+  };
+
+  String get _searchLabel => switch (kind) {
+    _RouteDraftFieldKind.origin => '출발역 검색',
+    _RouteDraftFieldKind.waypoint => '경유역 검색',
+    _RouteDraftFieldKind.destination => '도착역 검색',
+  };
+
+  String get _rowKey => switch (kind) {
+    _RouteDraftFieldKind.origin => 'networkMapRouteDraftOriginRow',
+    _RouteDraftFieldKind.waypoint => 'networkMapRouteDraftWaypointRow',
+    _RouteDraftFieldKind.destination => 'networkMapRouteDraftDestinationRow',
+  };
+
+  String get _pickKey => switch (kind) {
+    _RouteDraftFieldKind.origin => 'networkMapRouteDraftPickOrigin',
+    _RouteDraftFieldKind.waypoint => 'networkMapRouteDraftPickWaypoint',
+    _RouteDraftFieldKind.destination => 'networkMapRouteDraftPickDestination',
+  };
+
+  String get _clearKey => switch (kind) {
+    _RouteDraftFieldKind.origin => 'networkMapRouteDraftClearOrigin',
+    _RouteDraftFieldKind.waypoint => 'networkMapRouteDraftClearWaypoint',
+    _RouteDraftFieldKind.destination => 'networkMapRouteDraftClearDestination',
+  };
+
   @override
   Widget build(BuildContext context) {
-    final label = isOrigin ? '출발' : '도착';
+    final label = _label;
     final filled = station != null;
     final stationName = filled ? station!.displayName : label;
-    // 접근성: 검색 진입 라벨을 "출발역 검색"/"도착역 검색"으로 명확히 낭독한다.
-    final searchLabel = isOrigin ? '출발역 검색' : '도착역 검색';
+    // 접근성: 검색 진입 라벨을 "출발역 검색"/"경유역 검색"/"도착역 검색"으로 낭독한다.
+    final searchLabel = _searchLabel;
     final pickSemanticsLabel = filled
         ? '$label $stationName, $searchLabel'
         : '$label, $searchLabel';
@@ -4889,11 +5104,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
               // 탭 시 요란한 splash/highlight 사각형을 남기지 않는다(#1933 원칙).
               // 입력 필드처럼 보이되 조용히 역 검색으로 전환.
               child: GestureDetector(
-                key: Key(
-                  isOrigin
-                      ? 'networkMapRouteDraftPickOrigin'
-                      : 'networkMapRouteDraftPickDestination',
-                ),
+                key: Key(_pickKey),
                 behavior: HitTestBehavior.opaque,
                 onTap: onPick,
                 child: ConstrainedBox(
@@ -4904,11 +5115,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
             ),
           );
     return Container(
-      key: Key(
-        isOrigin
-            ? 'networkMapRouteDraftOriginRow'
-            : 'networkMapRouteDraftDestinationRow',
-      ),
+      key: Key(_rowKey),
       constraints: const BoxConstraints(minHeight: 54),
       decoration: BoxDecoration(
         color: EasySubwayAccessibleColors.scaffoldSurface,
@@ -4927,11 +5134,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
                 onTap: onClear,
                 child: ExcludeSemantics(
                   child: IconButton(
-                    key: Key(
-                      isOrigin
-                          ? 'networkMapRouteDraftClearOrigin'
-                          : 'networkMapRouteDraftClearDestination',
-                    ),
+                    key: Key(_clearKey),
                     onPressed: onClear,
                     // 작은 원형 배지형 지우기(✕) — 무채색. 탭 시 요란한
                     // splash/highlight 사각형을 남기지 않는다(#1933 원칙).
@@ -4976,27 +5179,38 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
     required this.geometry,
     required this.camera,
     required this.onSetOrigin,
+    required this.onSetWaypoint,
     required this.onSetDestination,
     required this.onClose,
     this.emphasizeDestination = false,
+    this.originStationId,
+    this.waypointStationId,
+    this.destinationStationId,
   });
 
   final NetworkMapStation station;
   final _MapGeometry geometry;
   final MapCameraState camera;
   final VoidCallback onSetOrigin;
+  final VoidCallback onSetWaypoint;
   final VoidCallback onSetDestination;
   final VoidCallback onClose;
 
   /// #1933-3: 출발이 이미 있으면 다음 역 팝오버는 [도착] 탭을 우선 강조한다.
   final bool emphasizeDestination;
 
+  /// #1975: 현재 draft 슬롯에 지정된 역 id. 같은 역이 다른 슬롯에 이미 있으면
+  /// 그 탭을 비활성화한다(자기 슬롯 재지정은 허용).
+  final String? originStationId;
+  final String? waypointStationId;
+  final String? destinationStationId;
+
   @override
   Widget build(BuildContext context) {
     final stationPoint = camera.sourceToViewportPoint(
       Offset(geometry.x(station), geometry.y(station)),
     );
-    const width = 160.0;
+    const width = 200.0;
     const height = 44.0;
     final viewportWidth = camera.viewportSize.width;
     final left = (stationPoint.dx - width / 2)
@@ -5004,6 +5218,14 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
         .toDouble();
     final top = math.max(12.0, stationPoint.dy - height - 14);
     final arrowLeft = (stationPoint.dx - left - 8).clamp(18.0, width - 34);
+    // #1975: 이 역이 다른 슬롯에 이미 있으면 그 탭을 비활성화한다. 자기 슬롯에
+    // 이미 있는 경우는 재지정 허용이므로 enabled를 유지한다.
+    final originEnabled =
+        station.id != waypointStationId && station.id != destinationStationId;
+    final waypointEnabled =
+        station.id != originStationId && station.id != destinationStationId;
+    final destinationEnabled =
+        station.id != originStationId && station.id != waypointStationId;
     return Positioned(
       key: const Key('networkMapStationSheet'),
       left: left,
@@ -5024,6 +5246,14 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
                     icon: Icons.north_east,
                     label: '출발',
                     onTap: onSetOrigin,
+                    enabled: originEnabled,
+                  ),
+                  _NetworkMapActionDivider(),
+                  _NetworkMapStationActionTab(
+                    icon: Icons.more_horiz,
+                    label: '경유',
+                    onTap: onSetWaypoint,
+                    enabled: waypointEnabled,
                   ),
                   _NetworkMapActionDivider(),
                   _NetworkMapStationActionTab(
@@ -5031,6 +5261,7 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
                     label: '도착',
                     onTap: onSetDestination,
                     emphasized: emphasizeDestination,
+                    enabled: destinationEnabled,
                   ),
                   _NetworkMapActionDivider(),
                   _NetworkMapStationActionTab(
@@ -5059,6 +5290,88 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
   }
 }
 
+/// #1948: 출발/경유/도착으로 지정된 역 위에 말풍선형 draft 핀을 표시한다.
+class _NetworkMapDraftPin extends StatelessWidget {
+  const _NetworkMapDraftPin({
+    super.key,
+    required this.station,
+    required this.geometry,
+    required this.camera,
+    required this.label,
+    required this.surfaceColor,
+    required this.semanticSuffix,
+  });
+
+  final NetworkMapStation station;
+  final _MapGeometry geometry;
+  final MapCameraState camera;
+  final String label;
+  final Color surfaceColor;
+  final String semanticSuffix;
+
+  @override
+  Widget build(BuildContext context) {
+    final stationPoint = camera.sourceToViewportPoint(
+      Offset(geometry.x(station), geometry.y(station)),
+    );
+    const width = 72.0;
+    const height = 40.0;
+    final viewportWidth = camera.viewportSize.width;
+    final left = (stationPoint.dx - width / 2)
+        .clamp(12.0, math.max(12.0, viewportWidth - width - 12))
+        .toDouble();
+    final top = math.max(12.0, stationPoint.dy - height - 14);
+    final arrowLeft = (stationPoint.dx - left - 11).clamp(4.0, width - 26);
+    return Positioned(
+      left: left,
+      top: top,
+      width: width,
+      child: Semantics(
+        container: true,
+        label: '${station.displayName}, $semanticSuffix',
+        child: ExcludeSemantics(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Material(
+                color: surfaceColor,
+                elevation: 0,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: arrowLeft),
+                  child: Icon(
+                    Icons.arrow_drop_down,
+                    size: 22,
+                    color: surfaceColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NetworkMapActionDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -5075,6 +5388,7 @@ class _NetworkMapStationActionTab extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.emphasized = false,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -5084,17 +5398,20 @@ class _NetworkMapStationActionTab extends StatelessWidget {
   /// #1933-3: true면 흰 바탕 칩으로 우선순위를 드러낸다(무채색, 그림자 없음).
   final bool emphasized;
 
+  /// #1975: 같은 역이 다른 슬롯에 이미 지정돼 있으면 false로 비활성화한다.
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     // 팝오버 배경(0xE8404445)은 이미 짙은 무채색이라 primary(0xFF2A2F31) 같은
     // 어두운 잉크로 채우면 배경과 구분되지 않는다. 대비를 위해 강조 시에는
     // 흰 배경 + 짙은 잉크(text)로 반전한다.
-    final iconColor = emphasized
-        ? EasySubwayAccessibleColors.text
-        : Colors.white;
-    final textColor = emphasized
-        ? EasySubwayAccessibleColors.text
-        : Colors.white;
+    final iconColor = !enabled
+        ? EasySubwayAccessibleColors.mutedText
+        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
+    final textColor = !enabled
+        ? EasySubwayAccessibleColors.mutedText
+        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
     final content = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -5119,7 +5436,7 @@ class _NetworkMapStationActionTab extends StatelessWidget {
     );
     return Expanded(
       child: InkWell(
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         splashFactory: NoSplash.splashFactory,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
