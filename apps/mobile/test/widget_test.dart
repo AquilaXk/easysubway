@@ -1311,9 +1311,24 @@ void main() {
       const Key('networkMapRegionMenuDivider'),
     );
     expect(dividerFinder, findsOneWidget);
-    final divider = tester.widget<Container>(dividerFinder);
-    expect(divider.color, EasySubwayAccessibleColors.line);
-    expect(tester.getSize(dividerFinder).height, 1);
+    // 인셋 구분선: 색은 line, 두께 1, 좌우 16 인셋(full-width 절단형 아님).
+    final dividerLine = tester.widget<ColoredBox>(
+      find.descendant(
+        of: dividerFinder,
+        matching: find.byType(ColoredBox),
+      ),
+    );
+    expect(dividerLine.color, EasySubwayAccessibleColors.line);
+    final dividerLineSize = tester.getSize(
+      find.descendant(
+        of: dividerFinder,
+        matching: find.byType(ColoredBox),
+      ),
+    );
+    expect(dividerLineSize.height, 1);
+    final dividerBoxWidth = tester.getSize(dividerFinder).width;
+    // 인셋(좌16+우16=32)만큼 컬러 라인이 구분선 박스보다 좁아야 한다.
+    expect(dividerLineSize.width, closeTo(dividerBoxWidth - 32, 0.5));
 
     // 메뉴 패널의 Material은 '부산' 텍스트의 조상 중 실제로 color/elevation/shape가
     // 세팅된 것(내부 wrapper Material은 color가 null이라 구분해야 함).
@@ -1351,12 +1366,55 @@ void main() {
     );
     expect((shape.side.color), EasySubwayAccessibleColors.line);
 
-    // 행 높이 48 이상 + 메뉴 최소 폭 180 이상.
+    // 행 높이 48 이상 + 콘텐츠 자연폭(강제 최소폭 없이 극단 협폭만 방지).
     final rowSize = tester.getSize(
       find.byKey(const ValueKey('networkMapRegionMenuRow_부산')),
     );
     expect(rowSize.height, greaterThanOrEqualTo(48));
-    expect(menuRect.width, greaterThanOrEqualTo(180));
+    expect(menuRect.width, greaterThanOrEqualTo(120));
+
+    // 딤 스크림: barrierColor가 투명이 아니라 앱 다이얼로그 관례값과 동일한
+    // 딤이어야 한다(참고 07에서 차용하는 것은 주변을 어둡게 하는 스크림뿐).
+    final dimBarrier = find.byWidgetPredicate(
+      (w) => w is ModalBarrier && w.color == const Color(0x99000000),
+    );
+    expect(dimBarrier, findsOneWidget);
+
+    // 타이포: 기본 행은 16sp·w500, 선택 행(초기 선택=테스트권)만 w600.
+    // 메뉴 행 텍스트로 스코프한다(트리거 라벨과 구분).
+    final selectedRow = find.byKey(
+      const ValueKey('networkMapRegionMenuRow_테스트권'),
+    );
+    final busanRow = find.byKey(
+      const ValueKey('networkMapRegionMenuRow_부산'),
+    );
+    final selectedText = tester.widget<Text>(
+      find.descendant(of: selectedRow, matching: find.text('테스트권')),
+    );
+    expect(selectedText.style?.fontSize, 16);
+    expect(selectedText.style?.fontWeight, FontWeight.w600);
+    final busanText = tester.widget<Text>(
+      find.descendant(of: busanRow, matching: find.text('부산')),
+    );
+    expect(busanText.style?.fontSize, 16);
+    expect(busanText.style?.fontWeight, FontWeight.w500);
+
+    // ✓ 트레일링: 선택 행에만 체크가 있고, 라벨 오른쪽(트레일링)에 위치한다.
+    final checkFinder = find.descendant(
+      of: selectedRow,
+      matching: find.byIcon(Icons.check),
+    );
+    expect(checkFinder, findsOneWidget);
+    expect(
+      find.descendant(of: busanRow, matching: find.byIcon(Icons.check)),
+      findsNothing,
+    );
+    // 체크는 라벨보다 오른쪽에 있어야 한다(트레일링 배치).
+    final labelRight = tester.getRect(
+      find.descendant(of: selectedRow, matching: find.text('테스트권')),
+    ).right;
+    final checkLeft = tester.getRect(checkFinder).left;
+    expect(checkLeft, greaterThanOrEqualTo(labelRight));
 
     await tester.tap(find.text('부산'));
     await tester.pumpAndSettle();

@@ -1704,7 +1704,11 @@ class _NetworkMapTopBar extends StatelessWidget {
       context: triggerContext,
       barrierDismissible: true,
       barrierLabel: '지역 메뉴 닫기',
-      barrierColor: Colors.transparent,
+      // 참고 07에서 차용하는 것은 모달 구조가 아니라 주변을 어둡게 해
+      // 노선도 색 소음을 죽이는 딤 스크림뿐이다. 앱 다이얼로그 관례값
+      // (Color(0x99000000))과 동일하게 맞춰 메뉴 뒤를 어둡게 한다. 메뉴는
+      // 현행대로 트리거 바로 아래·화면 우측 밀착 위치를 유지한다.
+      barrierColor: const Color(0x99000000),
       pageBuilder: (context, animation, secondaryAnimation) {
         return Stack(
           children: [
@@ -1763,30 +1767,35 @@ class _NetworkMapRegionMenuOverlay extends StatelessWidget {
             child: Semantics(
               button: true,
               selected: isSelected,
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 20,
-                    child: isSelected
-                        ? const Icon(
-                            Icons.check,
-                            color: EasySubwayAccessibleColors.mutedText,
-                            size: 20,
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      region.displayName,
-                      style: const TextStyle(
-                        color: EasySubwayAccessibleColors.listRowText,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    // 라벨은 좌측 기준(좌패딩 16), ✓는 행 오른쪽 끝(우패딩 16)에
+                    // 트레일링으로 둔다(참고 07과 동일 배치). 비선택 행은
+                    // 트레일링 자리를 비운다 — 라벨이 좌측 기준이라 정렬용
+                    // 고정 폭은 불필요하다.
+                    Expanded(
+                      child: Text(
+                        region.displayName,
+                        style: TextStyle(
+                          color: EasySubwayAccessibleColors.listRowText,
+                          fontSize: 16,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    if (isSelected) ...[
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.check,
+                        color: EasySubwayAccessibleColors.mutedText,
+                        size: 20,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -1797,7 +1806,9 @@ class _NetworkMapRegionMenuOverlay extends StatelessWidget {
       }
     }
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 180),
+      // 콘텐츠 자연폭을 따르되(IntrinsicWidth), 극단 협폭만 방지할 정도의
+      // 하한만 둔다. 폭을 강제로 넓히지 않는다.
+      constraints: const BoxConstraints(minWidth: 120),
       child: IntrinsicWidth(
         child: Material(
           elevation: 0,
@@ -1824,10 +1835,15 @@ class _NetworkMapRegionMenuDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      key: const Key('networkMapRegionMenuDivider'),
-      height: 1,
-      color: EasySubwayAccessibleColors.line,
+    // full-width 절단형은 행을 과하게 분리해 보이게 하므로, 텍스트 시작선
+    // (좌 16)부터 우 16 전까지의 인셋 구분선으로 둔다. 색·두께는 유지.
+    return const Padding(
+      key: Key('networkMapRegionMenuDivider'),
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 1,
+        child: ColoredBox(color: EasySubwayAccessibleColors.line),
+      ),
     );
   }
 }
