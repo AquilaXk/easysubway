@@ -12684,6 +12684,7 @@ test("노선도 Android evidence analyzer는 profile frame, memory, 렌더러 �
   assert.equal(output.runs[0].buildMode, "profile");
   assert.equal(output.runs[0].measurementScope, "gesture_after_route_map_settle");
   assert.equal(output.runs[0].gfxinfoResetAfterRouteMapSettle, true);
+  assert.equal(output.runs[0].gfxinfo.measurementStatus, "captured");
   assert.equal(output.runs[0].gfxinfo.jankyPercent, 5.36);
   assert.equal(output.runs[0].gfxinfo.p99Ms, 33);
   assert.equal(output.runs[0].meminfo.totalPssKb, 591090);
@@ -12697,6 +12698,162 @@ test("노선도 Android evidence analyzer는 profile frame, memory, 렌더러 �
   assert.equal(output.aggregate.maxP95FrameMs, 25);
   assert.equal(output.aggregate.maxFrameJankyPercent, 25);
   assert.equal(output.aggregate.noCrashesInAllRuns, true);
+});
+
+test("노선도 Android evidence analyzer는 Flutter canvas gfxinfo 미캡처(totalFrames=0)를 측정 불가로 명시하고 FrameTiming 정본만 집계한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-route-map-evidence-nocap-"));
+  const artifactDir = path.join(dir, "run-1");
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    path.join(artifactDir, "metadata.env"),
+    [
+      "serial=RFKYA01VMQY",
+      "package=com.easysubway.app",
+      "width=1080",
+      "height=2340",
+      "build_mode=profile",
+      "pan_count=5",
+      "measurement_scope=gesture_after_route_map_settle",
+      "gfxinfoResetAfterRouteMapSettle=true",
+      "captured_at_utc=2026-07-11T17:06:48Z",
+    ].join("\n"),
+  );
+  // Flutter는 자체 canvas 렌더 파이프라인이라 dumpsys gfxinfo(HWUI)가 노선도
+  // 프레임을 못 잡는다. totalFrames=0이면 percentile 4950ms는 histogram
+  // 최상단 버킷 잔재(측정 불가)이지 실제 프레임 지연이 아니다.
+  await writeFile(
+    path.join(artifactDir, "gfxinfo.txt"),
+    [
+      "Total frames rendered: 0",
+      "Janky frames: 0 (0.00%)",
+      "50th percentile: 4950ms",
+      "90th percentile: 4950ms",
+      "95th percentile: 4950ms",
+      "99th percentile: 4950ms",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "meminfo.txt"),
+    [
+      "Java Heap:    12368",
+      "Native Heap:    48796",
+      "Graphics:    47569",
+      "TOTAL PSS:   199903            TOTAL RSS:   318821       TOTAL SWAP PSS:      0",
+    ].join("\n"),
+  );
+  await writeFile(path.join(artifactDir, "renderer-crashes.log"), "");
+  // FrameTiming 정본: 4 프레임 중 1개(build 18.3ms)가 1 vsync 초과 = 25% janky.
+  await writeFile(
+    path.join(artifactDir, "route-map-frames.log"),
+    [
+      "routeMapFrame buildMs=4.20 rasterMs=6.10 totalMs=12.50",
+      "routeMapFrame buildMs=5.00 rasterMs=8.00 totalMs=14.00",
+      "routeMapFrame buildMs=18.30 rasterMs=9.00 totalMs=22.10",
+      "routeMapFrame buildMs=6.00 rasterMs=7.50 totalMs=13.00",
+    ].join("\n"),
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/mobile/analyze-route-map-android-evidence.mjs",
+      "--artifact-dir",
+      artifactDir,
+      "--format",
+      "json",
+    ],
+    { cwd: root },
+  );
+  const output = JSON.parse(stdout);
+
+  // gfxinfo(HWUI)는 측정 불가로 명시 — percentile/jankyPercent는 null.
+  assert.equal(output.runs[0].gfxinfo.totalFrames, 0);
+  assert.equal(
+    output.runs[0].gfxinfo.measurementStatus,
+    "not_captured_flutter_canvas",
+  );
+  assert.equal(output.runs[0].gfxinfo.jankyPercent, null);
+  assert.equal(output.runs[0].gfxinfo.p95Ms, null);
+  assert.equal(output.runs[0].gfxinfo.p99Ms, null);
+
+  // 4950ms 잔재가 프레임 게이트를 오염시키지 않는다 — captured run이 없으면 null.
+  assert.equal(output.aggregate.maxJankyPercent, null);
+  assert.equal(output.aggregate.maxP95FrameMs, null);
+  assert.equal(output.aggregate.maxP99FrameMs, null);
+
+  // FrameTiming 정본은 여전히 산출된다.
+  assert.equal(output.runs[0].frameTiming.frameSampleCount, 4);
+  assert.equal(output.aggregate.maxFrameJankyPercent, 25);
+  assert.equal(output.aggregate.maxBuildP90Ms, 18.3);
+  assert.equal(output.aggregate.noCrashesInAllRuns, true);
+});
+
+test("노선도 Android evidence analyzer는 captured run이 있어도 gfxinfo 지표가 전부 null이면 집계를 null로 전파한다(0 폴백 금지)", async () => {
+  const dir = await mkdtemp(
+    path.join(tmpdir(), "easysubway-route-map-evidence-capnull-"),
+  );
+  const artifactDir = path.join(dir, "run-1");
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    path.join(artifactDir, "metadata.env"),
+    [
+      "serial=RFKYA01VMQY",
+      "package=com.easysubway.app",
+      "width=1080",
+      "height=2340",
+      "build_mode=profile",
+      "pan_count=5",
+      "measurement_scope=gesture_after_route_map_settle",
+      "gfxinfoResetAfterRouteMapSettle=true",
+      "captured_at_utc=2026-07-11T17:06:48Z",
+    ].join("\n"),
+  );
+  // totalFrames>0이라 measurementStatus는 "captured"지만, dumpsys 출력에
+  // Janky/percentile 라인이 없어 jankyPercent/p95/p99가 전부 null이다. 이때
+  // Math.max(0) 폴백이 "0ms 측정됨"으로 둔갑하면 안 되고 집계는 null이어야 한다.
+  await writeFile(
+    path.join(artifactDir, "gfxinfo.txt"),
+    ["Total frames rendered: 120"].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "meminfo.txt"),
+    [
+      "Java Heap:    12368",
+      "Native Heap:    48796",
+      "Graphics:    47569",
+      "TOTAL PSS:   199903            TOTAL RSS:   318821       TOTAL SWAP PSS:      0",
+    ].join("\n"),
+  );
+  await writeFile(path.join(artifactDir, "renderer-crashes.log"), "");
+  await writeFile(
+    path.join(artifactDir, "route-map-frames.log"),
+    [
+      "routeMapFrame buildMs=4.20 rasterMs=6.10 totalMs=12.50",
+      "routeMapFrame buildMs=5.00 rasterMs=8.00 totalMs=14.00",
+    ].join("\n"),
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/mobile/analyze-route-map-android-evidence.mjs",
+      "--artifact-dir",
+      artifactDir,
+      "--format",
+      "json",
+    ],
+    { cwd: root },
+  );
+  const output = JSON.parse(stdout);
+
+  // captured로 집계 대상에는 들지만 지표 자체가 측정 불가라 null 전파.
+  assert.equal(output.runs[0].gfxinfo.measurementStatus, "captured");
+  assert.equal(output.runs[0].gfxinfo.jankyPercent, null);
+  assert.equal(output.runs[0].gfxinfo.p95Ms, null);
+  assert.equal(output.runs[0].gfxinfo.p99Ms, null);
+  assert.equal(output.aggregate.maxJankyPercent, null);
+  assert.equal(output.aggregate.maxP95FrameMs, null);
+  assert.equal(output.aggregate.maxP99FrameMs, null);
 });
 
 test("데이터팩 게시 도구는 releases 불변 경로와 Cache-Control 정책을 고정한다", () => {
