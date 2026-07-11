@@ -1,0 +1,220 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../ad_slot.dart';
+import 'ad_repository.dart';
+
+typedef AdImageLoader =
+    Future<ImageProvider<Object>> Function(Uri uri, BuildContext context);
+typedef AdLauncher = Future<bool> Function(Uri uri, {required LaunchMode mode});
+
+class ActiveAdBanner extends StatefulWidget {
+  const ActiveAdBanner({
+    required this.repository,
+    required this.placement,
+    this.imageLoader = _loadNetworkImage,
+    this.launcher = _launchExternal,
+    super.key,
+  });
+
+  final AdRepository repository;
+  final AdPlacement placement;
+  final AdImageLoader imageLoader;
+  final AdLauncher launcher;
+
+  @override
+  State<ActiveAdBanner> createState() => _ActiveAdBannerState();
+}
+
+class _ActiveAdBannerState extends State<ActiveAdBanner> {
+  AdCreative? _creative;
+  ImageProvider<Object>? _image;
+  bool _started = false;
+  int _generation = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) {
+      return;
+    }
+    _started = true;
+    _reload();
+  }
+
+  @override
+  void didUpdateWidget(ActiveAdBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.repository != oldWidget.repository ||
+        widget.placement != oldWidget.placement ||
+        widget.imageLoader != oldWidget.imageLoader) {
+      _creative = null;
+      _image = null;
+      _reload();
+    }
+  }
+
+  void _reload() {
+    final generation = ++_generation;
+    unawaited(
+      _load(
+        generation,
+        widget.repository,
+        widget.placement,
+        widget.imageLoader,
+      ),
+    );
+  }
+
+  Future<void> _load(
+    int generation,
+    AdRepository repository,
+    AdPlacement placement,
+    AdImageLoader imageLoader,
+  ) async {
+    try {
+      final creative = await repository.fetchActive(placement);
+      if (!mounted || generation != _generation || creative == null) {
+        return;
+      }
+      final image = await imageLoader(creative.imageUrl, context);
+      if (!mounted || generation != _generation) {
+        return;
+      }
+      setState(() {
+        _creative = creative;
+        _image = image;
+      });
+    } on Exception {
+      // ponytail: 조회·decode 실패는 사용자에게 빈 슬롯을 남기지 않고 닫는다.
+    }
+  }
+
+  Future<void> _openLanding() async {
+    final landingUrl = _creative?.landingUrl;
+    if (landingUrl == null) {
+      return;
+    }
+    try {
+      await widget.launcher(landingUrl, mode: LaunchMode.externalApplication);
+    } on Exception {
+      // 외부 브라우저 실패 시 내부 이동이나 다른 URL로 fallback하지 않는다.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final creative = _creative;
+    final image = _image;
+    if (creative == null || image == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Semantics(
+      key: const Key('activeAdBannerTapTarget'),
+      label: '광고, ${creative.altText}',
+      button: true,
+      onTap: _openLanding,
+      excludeSemantics: true,
+      child: AdBannerSlot(
+        slotKey: const Key('activeAdBannerSlot'),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _openLanding,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image(
+                      image: image,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      excludeFromSemantics: true,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              '광고',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                creative.advertiserName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          creative.altText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const SizedBox(
+                    key: Key('activeAdBannerExternalCta'),
+                    width: 48,
+                    height: 48,
+                    child: Icon(Icons.open_in_new),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<ImageProvider<Object>> _loadNetworkImage(
+  Uri uri,
+  BuildContext context,
+) async {
+  final provider = NetworkImage(uri.toString());
+  Object? failure;
+  StackTrace? failureStack;
+  await precacheImage(
+    provider,
+    context,
+    onError: (error, stackTrace) {
+      failure = error;
+      failureStack = stackTrace;
+    },
+  );
+  if (failure != null) {
+    Error.throwWithStackTrace(failure!, failureStack ?? StackTrace.current);
+  }
+  return provider;
+}
+
+Future<bool> _launchExternal(Uri uri, {required LaunchMode mode}) {
+  return launchUrl(uri, mode: mode);
+}

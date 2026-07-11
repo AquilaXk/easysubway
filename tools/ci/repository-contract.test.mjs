@@ -1745,13 +1745,53 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
 });
 
-test("release dart-define guard는 demo home data flag를 차단한다", async () => {
+test("release dart-define guard는 public API URL과 demo flag를 검증한다", async () => {
+  const guard = read("tools/mobile/validate-release-dart-defines.sh");
+  assert.match(guard, /case "\$\{host\}" in[\s\S]*?\n  \*\) ;;\nesac/);
   await execFileAsync("bash", ["-n", "tools/mobile/validate-release-dart-defines.sh"], { cwd: root });
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
     "--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
   ], { cwd: root });
+  await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:443",
+  ], { cwd: root });
+  const injectionDir = await mkdtemp(path.join(tmpdir(), "release-dart-define-"));
+  const injectionMarker = path.join(injectionDir, "executed");
+  try {
+    await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      `--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app/$(touch\${IFS}${injectionMarker})`,
+    ], { cwd: root });
+    assert.equal(existsSync(injectionMarker), false);
+  } finally {
+    await rm(injectionDir, { recursive: true, force: true });
+  }
+  const rejectedArgs = [
+    [],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL="],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=http://api.easysubway.app"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https:///api"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://localhost"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://127.0.0.1"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://10.0.0.1"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://8.8.8.8"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://[::1]"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:0"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:0443"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:65536"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:99999"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://backend.local"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.example.com"],
+  ];
+  for (const args of rejectedArgs) {
+    await assert.rejects(
+      execFileAsync("tools/mobile/validate-release-dart-defines.sh", args, { cwd: root }),
+      /EASYSUBWAY_API_BASE_URL/,
+    );
+  }
   await assert.rejects(
     execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
       "--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true",
     ], { cwd: root }),
     /EASYSUBWAY_DEMO_HOME_DATA is not allowed in release/,
@@ -1803,8 +1843,18 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
 	  assert.match(workflow, /Android Release Artifact \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"[\s\S]*Android Release Artifact \/ Audit bundled datapacks/);
 	  assert.match(workflow, /node tools\/ci\/audit-mobile-datapack-assets\.mjs --index apps\/mobile\/assets\/datapacks\/index\.json --root apps\/mobile/);
-	  assert.match(workflow, /tools\/mobile\/validate-release-dart-defines\.sh/);
+  assert.match(workflow, /tools\/mobile\/validate-release-dart-defines\.sh/);
 	  assert.match(workflow, /flutter build appbundle --release/);
+  assert.equal(
+    (workflow.match(/DEPLOY_PUBLIC_API_BASE_URL: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/g) ?? []).length,
+    2,
+  );
+  assert.equal(
+    (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL="\$\{DEPLOY_PUBLIC_API_BASE_URL\}"/g) ?? []).length,
+    4,
+  );
+  assert.doesNotMatch(workflow, /secrets\.DEPLOY_PUBLIC_API_BASE_URL/);
+  assert.doesNotMatch(workflow, /--dart-define=EASYSUBWAY_API_BASE_URL=https?:\/\//);
   assert.equal(
     (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/\S+\.local/g) ?? []).length,
     0,

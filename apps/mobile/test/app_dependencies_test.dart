@@ -5,7 +5,9 @@ import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
+import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
@@ -14,6 +16,53 @@ import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    '광고 repository 주입 identity를 유지하고 기본값은 fetch 전 base URI를 읽지 않는다',
+    () async {
+      final catalogDatabase = CatalogDatabase.memory();
+      final userDatabase = user_db.UserDatabase.memory();
+      final injected = AdRepository(
+        ApiClient(baseUri: Uri.parse('https://ads.example.test')),
+      );
+      var apiBaseReads = 0;
+      addTearDown(catalogDatabase.close);
+      addTearDown(userDatabase.close);
+
+      final injectedDependencies = AppDependencies.resolve(
+        catalogDatabase: catalogDatabase,
+        userDatabase: userDatabase,
+        adRepository: injected,
+        apiBaseUri: () {
+          apiBaseReads++;
+          return null;
+        },
+        enablePushNotifications: false,
+      );
+
+      expect(injectedDependencies.adRepository, same(injected));
+      expect(apiBaseReads, 0);
+
+      final defaultDependencies = AppDependencies.resolve(
+        catalogDatabase: catalogDatabase,
+        userDatabase: userDatabase,
+        apiBaseUri: () {
+          apiBaseReads++;
+          return null;
+        },
+        enablePushNotifications: false,
+      );
+
+      expect(apiBaseReads, 0);
+      expect(
+        await defaultDependencies.adRepository!.fetchActive(
+          AdPlacement.routeResultBottom,
+        ),
+        isNull,
+      );
+      expect(apiBaseReads, 1);
+    },
+  );
+
   test('release build는 demo home data flag를 허용하지 않는다', () {
     expect(
       () => app.validateReleaseBuildFlags(
