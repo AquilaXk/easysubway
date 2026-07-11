@@ -12726,3 +12726,72 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
     assertActionsEnvSecretPolicy(file, source);
   }
 });
+
+test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized artifact 경계를 유지한다", () => {
+  const workflowPath = ".github/workflows/kric-source-candidate-evidence.yml";
+  assert.ok(existsSync(path.join(root, workflowPath)), "KRIC evidence workflow must exist");
+
+  const workflow = read(workflowPath);
+  const triggerBlock = workflow.match(/^on:\s*\n([\s\S]*?)^jobs:/m)?.[1] ?? "";
+  const triggers = [...triggerBlock.matchAll(/^ {2}([a-z_]+): *$/gm)].map((match) => match[1]);
+  const inputBlock = triggerBlock.match(/workflow_dispatch:\s*\n\s+inputs:\s*\n([\s\S]*)/)?.[1] ?? "";
+  const inputNames = [...inputBlock.matchAll(/^ {6}([A-Za-z][A-Za-z0-9_-]*): *$/gm)]
+    .map((match) => match[1]);
+  const candidateBlock = inputBlock.match(/^ {6}candidate: *\n([\s\S]*)/m)?.[1] ?? "";
+  const optionsBlock = candidateBlock.match(/^ {8}options: *\n((?:^ {10}- [^\n]+\n?)+)/m)?.[1] ?? "";
+  const candidateOptions = [...optionsBlock.matchAll(/^ {10}- ([a-z0-9-]+) *$/gm)]
+    .map((match) => match[1]);
+
+  assert.deepEqual(triggers, ["workflow_dispatch"]);
+  assert.deepEqual(inputNames, ["candidate"]);
+  assert.match(candidateBlock, /^ {8}type: choice$/m);
+  assert.deepEqual(candidateOptions, [
+    "kric-subway-route-info",
+    "kric-station-info",
+    "kric-train-operation-organ",
+    "kric-station-transfer-info",
+    "kric-station-platform",
+    "kric-station-movement-standard",
+    "kric-station-movement-detailed",
+    "kric-transfer-movement-standard",
+    "kric-transfer-movement-detailed",
+    "kric-station-convenience-standard",
+  ]);
+  const permissions = workflow.match(/^ {4}permissions: *\n((?:^ {6}[^\n]+\n?)+)/m)?.[1]
+    .trim()
+    .split("\n")
+    .map((line) => line.trim());
+  assert.deepEqual(permissions, ["contents: read"]);
+
+  const secretNames = [...workflow.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]);
+  assert.deepEqual([...new Set(secretNames)], ["KRIC_SERVICE_KEY"]);
+  assert.match(
+    workflow,
+    /if: \$\{\{ github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}/,
+  );
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.equal((workflow.match(/\$\{\{ inputs\.candidate \}\}/g) ?? []).length, 1);
+  assert.match(workflow, /KRIC_CANDIDATE_ID: \$\{\{ inputs\.candidate \}\}/);
+  assert.match(workflow, /collect-kric-source-candidate-evidence\.mjs/);
+  const collector = read("tools/datapack/collect-kric-source-candidate-evidence.mjs");
+  assert.match(collector, /build-source-candidate-sample-evidence\.mjs/);
+  assert.match(collector, /validate-source-candidate-sample\.mjs/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.match(workflow, /include-hidden-files: false/);
+  assert.match(workflow, /if-no-files-found: error/);
+
+  const referenceWorkflow = read(".github/workflows/tago-schedule-collection.yml");
+  for (const action of ["actions/checkout", "actions/setup-node", "actions/upload-artifact"]) {
+    const pinnedSha = referenceWorkflow.match(new RegExp(`${action}@([0-9a-f]{40})`))?.[1];
+    assert.ok(pinnedSha, `${action} reference pin must exist`);
+    assert.match(workflow, new RegExp(`${action}@${pinnedSha}`));
+  }
+
+  const uploadBlock = workflow.match(/uses: actions\/upload-artifact@[0-9a-f]{40}[\s\S]*$/)?.[0] ?? "";
+  assert.match(uploadBlock, /sample\.json/);
+  assert.match(uploadBlock, /report\.txt/);
+  assert.match(uploadBlock, /hashes\.json/);
+  assert.doesNotMatch(uploadBlock, /\braw\b|response|\.env|dotenv/i);
+  assert.doesNotMatch(workflow, /github\.event\.inputs\.(?:url|host|ref|command|output|path)/i);
+});
