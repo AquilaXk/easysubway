@@ -106,13 +106,13 @@ echo "== [4] 성능 재측정 (profile, pan=$PAN_COUNT) =="
 "$SCRIPT_DIR/run-route-map-android-evidence.sh" \
   --serial "$SERIAL" --artifact-dir "$ARTIFACT_ROOT/perf" \
   --build-mode profile --pan-count "$PAN_COUNT" --measure-after-route-map-settle \
-  "${ADB_ARGS[@]}"
+  ${ADB_ARGS[@]+"${ADB_ARGS[@]}"}
 node "$SCRIPT_DIR/analyze-route-map-android-evidence.mjs" --artifact-dir "$ARTIFACT_ROOT/perf"
 
 echo "== [4b] 신규 측정: cold start 첫 표시 · 지역 전환 =="
 "$SCRIPT_DIR/run-route-map-launch-region-evidence.sh" \
   --serial "$SERIAL" --artifact-dir "$ARTIFACT_ROOT/launch-region" \
-  --cold-start-iterations 3 --region-target 부산 "${ADB_ARGS[@]}"
+  --cold-start-iterations 3 --region-target 부산 ${ADB_ARGS[@]+"${ADB_ARGS[@]}"}
 
 echo
 echo "완료. 판정은 각 산출 summary 를 열어 P90<16.7ms·jank<5%·crash 0 및"

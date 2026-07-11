@@ -106,8 +106,11 @@ device_epoch_ns() {
 # logcat epoch 버퍼에서 첫 routeMapFrame 라인의 epoch(초.밀리)를 반환. 호출 직전에
 # logcat -c 로 버퍼를 비운 뒤 사용한다(그 이후 첫 프레임 = 측정 대상).
 first_route_map_frame_epoch() {
+  # awk 로 첫 매치만 출력하되 exit 하지 않고 입력을 끝까지 읽는다. exit 로 조기
+  # 종료하면 set -o pipefail 하에서 앞단 logcat 이 SIGPIPE(141)로 죽어 매치가
+  # 있어도 파이프라인이 실패로 처리된다(첫 프레임 판정 오탐).
   adb_device logcat -d -v epoch \
-    | awk '/routeMapFrame/ { print $1; exit }' \
+    | awk '/routeMapFrame/ && !seen { print $1; seen = 1 }' \
     | tr -d '\r'
 }
 
@@ -153,7 +156,10 @@ robust_tap() {
 dismiss_onboarding() {
   local completed_ns=""
   for _ in 1 2 3; do
-    if adb_device logcat -d | grep -q routeMapFrame; then
+    # grep -q 는 첫 매치에서 종료해 pipefail 하 logcat 을 SIGPIPE 로 죽인다 —
+    # grep -c 로 입력을 끝까지 읽어 매치 수를 세고, 0 초과면 프레임이 이미 떴다고
+    # 판정한다(로그 존재 시 온보딩 단계 종료).
+    if [[ "$(adb_device logcat -d | grep -c routeMapFrame)" -gt 0 ]]; then
       break
     fi
     adb_device shell uiautomator dump /sdcard/ob.xml >/dev/null 2>&1 || true
@@ -274,7 +280,7 @@ require_non_empty "$MENU_XML"
 target_bounds="$(grep -o "text=\"$REGION_TARGET\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" "$MENU_XML" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1 || true)"
 if [[ -z "$target_bounds" ]]; then
   # content-desc 로도 시도.
-  target_bounds="$(grep -o "content-desc=\"[^\"]*$REGION_TARGET[^\"]*\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" "$MENU_XML" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1 || true)"
+  target_bounds="$(grep -o "content-desc=\"[^\"]*${REGION_TARGET}[^\"]*\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" "$MENU_XML" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1 || true)"
 fi
 if [[ -z "$target_bounds" ]]; then
   echo "권역 메뉴에서 '$REGION_TARGET' 셀을 찾지 못했다." >&2
