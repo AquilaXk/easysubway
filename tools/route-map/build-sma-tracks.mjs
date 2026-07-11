@@ -10,9 +10,8 @@
 // Usage: node tools/route-map/build-sma-tracks.mjs --geometry <geom.json>
 //          --pack <capital.sqlite.gz> --region 수도권 --out tracks.json
 //          [--stitch-tolerance 6] [--content-min-y 340] [--content-max-y 1720]
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
-import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";

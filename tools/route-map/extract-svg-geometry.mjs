@@ -59,6 +59,11 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+// 로케일 비의존 결정적 정렬용 코드 유닛 비교. localeCompare(ICU/로케일 의존) 대체.
+function codeUnitCompare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function findBrowser(explicitBrowser) {
   if (explicitBrowser) {
     if (!existsSync(explicitBrowser)) throw new Error(`Browser not found: ${explicitBrowser}`);
@@ -625,13 +630,14 @@ async function extractSvgGeometry({ svgFile, region, browser }) {
         const { descriptor: _descriptor, ...publicStroke } = stroke;
         return { ...publicStroke, strokeIndex, sourceElementKey };
       }),
-      // 결정적 출력: (data-line, data-station, id) 사전순으로 안정 정렬한다.
+      // 결정적 출력: (data-line, data-station, id)로 코드 유닛 비교 안정 정렬한다.
+      // localeCompare는 ICU/로케일 의존이라 환경별로 순서가 흔들리므로 쓰지 않는다.
       stationNodes: (extracted.stationNodes ?? [])
         .slice()
         .sort((a, b) =>
-          a.dataLine.localeCompare(b.dataLine) ||
-          a.dataStation.localeCompare(b.dataStation) ||
-          a.id.localeCompare(b.id),
+          codeUnitCompare(a.dataLine, b.dataLine) ||
+          codeUnitCompare(a.dataStation, b.dataStation) ||
+          codeUnitCompare(a.id, b.id),
         )
         .map((node, nodeIndex) => {
           const sourceElementKey = sha256(

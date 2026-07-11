@@ -31,8 +31,8 @@ node tools/route-map/apply-sma-svg-positions.mjs --extraction "$GEOM" --pack "$P
 
 echo "[3/7] 서해선(fill-only, stroke 없음) track = 역 dot 8선형화 결과에서 추출"
 node tools/route-map/octolinearize-line-tracks.mjs --region 수도권 --line "수도권 서해선" --pack "$PACK"
-SEOHAE_LINE_ID=$(node -e "const{gunzipSync}=require('node:zlib');const fs=require('node:fs');const{DatabaseSync}=require('node:sqlite');const t=fs.mkdtempSync('/tmp/sma-');fs.writeFileSync(t+'/p.sqlite',gunzipSync(fs.readFileSync('$PACK')));const db=new DatabaseSync(t+'/p.sqlite');console.log(db.prepare('SELECT id FROM lines WHERE name_ko=?').get('수도권 서해선').id);db.close();")
-node -e "const{gunzipSync}=require('node:zlib');const fs=require('node:fs');const{DatabaseSync}=require('node:sqlite');const t=fs.mkdtempSync('/tmp/sma-');fs.writeFileSync(t+'/p.sqlite',gunzipSync(fs.readFileSync('$PACK')));const db=new DatabaseSync(t+'/p.sqlite');const r=db.prepare('SELECT path FROM route_map_line_tracks WHERE region=? AND line_id=?').all('수도권','$SEOHAE_LINE_ID');fs.writeFileSync('$SEOHAE',JSON.stringify(r.map(x=>x.path)));db.close();"
+SEOHAE_LINE_ID=$(node -e "const os=require('node:os');const path=require('node:path');const{gunzipSync}=require('node:zlib');const fs=require('node:fs');const{DatabaseSync}=require('node:sqlite');const t=fs.mkdtempSync(path.join(os.tmpdir(),'sma-'));try{fs.writeFileSync(t+'/p.sqlite',gunzipSync(fs.readFileSync('$PACK')));const db=new DatabaseSync(t+'/p.sqlite');console.log(db.prepare('SELECT id FROM lines WHERE name_ko=?').get('수도권 서해선').id);db.close();}finally{fs.rmSync(t,{recursive:true,force:true});}")
+node -e "const os=require('node:os');const path=require('node:path');const{gunzipSync}=require('node:zlib');const fs=require('node:fs');const{DatabaseSync}=require('node:sqlite');const t=fs.mkdtempSync(path.join(os.tmpdir(),'sma-'));try{fs.writeFileSync(t+'/p.sqlite',gunzipSync(fs.readFileSync('$PACK')));const db=new DatabaseSync(t+'/p.sqlite');const r=db.prepare('SELECT path FROM route_map_line_tracks WHERE region=? AND line_id=?').all('수도권','$SEOHAE_LINE_ID');fs.writeFileSync('$SEOHAE',JSON.stringify(r.map(x=>x.path)));db.close();}finally{fs.rmSync(t,{recursive:true,force:true});}"
 
 echo "[4/7] 노선 track 생성(SVG 색→슬러그→line_id 결정적 배정 + 8선형 stitch) + 서해선 주입"
 node tools/route-map/build-sma-tracks.mjs --geometry "$GEOM" --pack "$PACK" --region 수도권 --out "$TRACKS" --stitch-tolerance 40
@@ -43,7 +43,8 @@ node tools/route-map/apply-route-map-line-tracks.mjs --pack "$PACK" --index "$IN
 node tools/route-map/project-nodes-to-tracks.mjs --region 수도권 --pack "$PACK" --index "$INDEX"
 
 echo "[6/7] 재간격 → 8선형 잔차 스냅 → 분기 spur track 재생성 → enrich"
-node tools/route-map/respace-route-map.mjs --region 수도권 --pack "$PACK" --index "$INDEX" | head -1
+respace_out="$(node tools/route-map/respace-route-map.mjs --region 수도권 --pack "$PACK" --index "$INDEX")"
+printf '%s\n' "$respace_out" | head -1
 node tools/route-map/snap-tracks-octolinear.mjs --region 수도권 --pack "$PACK" --index "$INDEX"
 # 분기(지선) 노선을 마지막에 재생성한다: 원본 line_sequence가 지선을 본선과 선형
 # 오직결하므로 branch 정본(line-branches.json)으로 본선/spur track을 분리하고, spur
@@ -55,8 +56,10 @@ node tools/route-map/octolinearize-line-tracks.mjs --region 수도권 --branches
 node tools/route-map/enrich-capital-route-map-layer.mjs --pack "$PACK" --index "$INDEX" --region 수도권 >/dev/null
 
 echo "[7/7] 게이트 실측"
-node tools/route-map/audit-station-spacing.mjs | head -2
-node tools/route-map/audit-transfer-groups.mjs | head -2
+spacing_out="$(node tools/route-map/audit-station-spacing.mjs)"
+printf '%s\n' "$spacing_out" | head -2
+transfer_out="$(node tools/route-map/audit-transfer-groups.mjs)"
+printf '%s\n' "$transfer_out" | head -2
 
 if [[ -n "$PREV_GEOM" ]]; then
   echo "[diff] v(N)↔v(N+1) 변경 리포트"

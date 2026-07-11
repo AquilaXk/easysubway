@@ -88,3 +88,30 @@ test("diffExtractions: 역 추가/삭제/이동/노선 변화 요약", () => {
   // 노선 노드 수 변화: 1호선 2→1, 2호선 0→1.
   assert.ok(report.lineNodeCountChanges.some((c) => c.line === "1" && c.before === 2 && c.after === 1));
 });
+
+test("diffExtractions: moveThreshold 초과 이동을 moved로 감지", () => {
+  const old = {
+    sourceSvgSha256: "a",
+    stationNodes: [
+      { dataStation: "가", dataLine: "1", x: 0, y: 0 }, // 이동 없음
+      { dataStation: "나", dataLine: "1", x: 10, y: 0 }, // 임계 초과 이동
+    ],
+  };
+  const next = {
+    sourceSvgSha256: "b",
+    stationNodes: [
+      { dataStation: "가", dataLine: "1", x: 0, y: 0 }, // 동일
+      { dataStation: "나", dataLine: "1", x: 20, y: 0 }, // dist 10 > threshold 4
+    ],
+  };
+  const report = diffExtractions(old, next, { moveThreshold: 4 });
+  assert.equal(report.addedCount, 0);
+  assert.equal(report.removedCount, 0);
+  assert.equal(report.movedCount, 1);
+  assert.equal(report.moved[0].station, "나");
+  assert.equal(report.moved[0].distance, 10);
+  assert.deepEqual(report.moved[0].from, { x: 10, y: 0 });
+  assert.deepEqual(report.moved[0].to, { x: 20, y: 0 });
+  // 임계 이하 이동(가: dist 0)은 moved에 포함되지 않는다.
+  assert.ok(!report.moved.some((m) => m.station === "가"));
+});

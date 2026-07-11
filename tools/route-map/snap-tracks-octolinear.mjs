@@ -4,6 +4,7 @@
 // respace가 라벨 겹침을 낮추면서 남긴 폴리싱 잔차(≈10 세그먼트)를 정리하는 마무리 단계.
 //
 // Usage: node tools/route-map/snap-tracks-octolinear.mjs --region 수도권 [--pack ..] [--index ..]
+import { pathToFileURL } from "node:url";
 import { mutatePack, parsePackArgs } from "./station-surgery.mjs";
 import { octolinearizeChain } from "./build-sma-tracks.mjs";
 
@@ -59,6 +60,6 @@ function main() {
   } });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }

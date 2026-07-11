@@ -85,7 +85,15 @@ function parseArgs(argv) {
     switch (argv[i]) {
       case "--old": o.old = argv[++i]; break;
       case "--new": o.new = argv[++i]; break;
-      case "--move-threshold": o.moveThreshold = Number(argv[++i]); break;
+      case "--move-threshold": {
+        const raw = argv[++i];
+        const v = Number(raw);
+        if (!Number.isFinite(v)) {
+          throw new Error(`--move-threshold must be a finite number, got: ${String(raw)}`);
+        }
+        o.moveThreshold = v;
+        break;
+      }
       case "--out": o.out = argv[++i]; break;
     }
   }
