@@ -60,6 +60,7 @@ test("광고 asset origin은 backend env에만 변형 없이 전달한다", asyn
   const outputDir = await prepare(fixtureEnv());
   const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
   const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+  const assetOriginPrefix = "EASYSUBWAY_ADS_ASSET_ORIGIN=";
 
   assert.ok(
     backendEnv.split("\n").includes(ASSET_ORIGIN_LINE),
@@ -68,6 +69,16 @@ test("광고 asset origin은 backend env에만 변형 없이 전달한다", asyn
   assert.ok(
     !composeEnv.split("\n").includes(ASSET_ORIGIN_LINE),
     "compose.env must not contain the asset origin line",
+  );
+  assert.equal(
+    backendEnv.split("\n").filter((line) => line.startsWith(assetOriginPrefix)).length,
+    1,
+    "backend.env must contain exactly one asset origin key",
+  );
+  assert.equal(
+    composeEnv.split("\n").filter((line) => line.startsWith(assetOriginPrefix)).length,
+    0,
+    "compose.env must not contain an asset origin key",
   );
 });
 
