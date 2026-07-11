@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
+import 'facility_report.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
@@ -15,6 +16,7 @@ import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
 import 'station_search.dart';
 
@@ -359,8 +361,15 @@ class NetworkMapScreen extends StatefulWidget {
     required this.repository,
     required this.routeDraftController,
     required this.onOpenStationSearch,
+    this.onStationSearchClosed,
     this.onPickStationForSlot,
     this.stationSearchRepository,
+    this.reportRepository,
+    this.favoriteRepository,
+    this.searchHistoryRepository,
+    this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     this.locationProvider,
     this.viewportRepository,
     this.realtimeRepository,
@@ -379,11 +388,26 @@ class NetworkMapScreen extends StatefulWidget {
   final RouteDraftController routeDraftController;
   final VoidCallback onOpenStationSearch;
 
+  /// #1933 홈 in-place 역 검색 모드를 빠져나올 때(← 또는 시스템 back) 호출된다.
+  /// 셸이 알림/신고 상태를 다시 불러오도록 하기 위한 훅이다. 라우트 기반 검색이
+  /// 반환 후 하던 refreshHomeState와 같은 역할을 in-place 종료에도 유지한다.
+  final VoidCallback? onStationSearchClosed;
+
   /// 상단 draft 오버레이의 출발/도착 칸을 탭했을 때, 그 칸을 채우려고 기존 역 검색을
   /// 여는 콜백. 지도 탭과 같은 [routeDraftController]로 수렴한다. null이면 오버레이
   /// 칸은 탭할 수 없다(둘러보기 검색만 메뉴로 제공).
   final void Function(RouteDraftSlot slot)? onPickStationForSlot;
   final StationSearchRepository? stationSearchRepository;
+
+  /// #1933 홈 노선도 위에서 역 검색을 in-place로 열 때, 결과 탭 → 역 상세로
+  /// 이동하려면 필요한 저장소들. 검색 모드는 [stationSearchRepository]가 있을 때만
+  /// 진입 가능하다.
+  final FacilityReportRepository? reportRepository;
+  final FavoriteStationRepository? favoriteRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
   final CurrentLocationProvider? locationProvider;
   final NetworkMapViewportRepository? viewportRepository;
   final RealtimeRepository? realtimeRepository;
@@ -417,6 +441,291 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   RealtimeSnapshot _nearbyRealtime = const RealtimeSnapshot.loading();
   int _nearbyRealtimeToken = 0;
   late Future<_NetworkMapLoadResult> _future = _loadMap();
+
+  // #1933 홈 노선도 위 in-place 역 검색 모드 상태.
+  bool _searchMode = false;
+  StationSearchController? _searchController;
+  final TextEditingController _searchQueryController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<String> _searchRecentQueries = const [];
+  Timer? _searchDebounce;
+  bool _searchOpeningLocationSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final searchRepository = widget.stationSearchRepository;
+    if (searchRepository != null) {
+      _searchController = StationSearchController(
+        repository: searchRepository,
+        searchHistoryRepository: widget.searchHistoryRepository,
+      )..addListener(_handleSearchControllerChanged);
+    }
+    _searchQueryController.addListener(_handleSearchQueryChanged);
+    widget.routeDraftController.addListener(_handleDraftChangedForSearch);
+  }
+
+  bool get _hasSearchQuery => _searchQueryController.text.trim().isNotEmpty;
+
+  void _handleSearchControllerChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  /// 검색 모드 중 draft가 채워지면(출발/도착 설정 등) OD 상단바가 이겨야 하므로
+  /// 검색 모드를 자동 종료한다(co-existence).
+  void _handleDraftChangedForSearch() {
+    if (_searchMode && !widget.routeDraftController.draft.isEmpty) {
+      _exitSearchMode();
+    }
+  }
+
+  void _handleSearchQueryChanged() {
+    if (!mounted) {
+      return;
+    }
+    _searchDebounce?.cancel();
+    final controller = _searchController;
+    if (!_hasSearchQuery) {
+      if (controller != null &&
+          controller.state.status != StationSearchStatus.idle) {
+        controller.search('');
+      }
+    } else {
+      final query = _searchQueryController.text;
+      _searchDebounce = Timer(
+        const Duration(milliseconds: 300),
+        () => unawaited(_runInPlaceSearch(query, recordHistory: false)),
+      );
+    }
+    setState(() {});
+  }
+
+  void _enterSearchMode() {
+    if (widget.stationSearchRepository == null || _searchController == null) {
+      return;
+    }
+    if (!widget.routeDraftController.draft.isEmpty) {
+      return;
+    }
+    setState(() => _searchMode = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _searchMode) {
+        FocusScope.of(context).requestFocus(_searchFocusNode);
+      }
+    });
+    unawaited(_loadSearchRecentQueries());
+  }
+
+  void _exitSearchMode() {
+    _searchDebounce?.cancel();
+    final controller = _searchController;
+    if (controller != null &&
+        controller.state.status != StationSearchStatus.idle) {
+      controller.search('');
+    }
+    _searchQueryController.clear();
+    if (mounted) {
+      setState(() => _searchMode = false);
+    } else {
+      _searchMode = false;
+    }
+    widget.onStationSearchClosed?.call();
+  }
+
+  Future<void> _runInPlaceSearch(
+    String query, {
+    bool recordHistory = true,
+  }) async {
+    final controller = _searchController;
+    if (controller == null) {
+      return;
+    }
+    await controller.search(query, recordHistory: recordHistory);
+    if (recordHistory) {
+      await _loadSearchRecentQueries();
+    }
+  }
+
+  void _submitSearch(String query) {
+    _searchDebounce?.cancel();
+    final controller = _searchController;
+    if (controller == null ||
+        controller.state.status == StationSearchStatus.loading) {
+      return;
+    }
+    unawaited(_runInPlaceSearch(query));
+  }
+
+  Future<void> _loadSearchRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      final queries = await repository.listRecentQueries();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _searchRecentQueries = queries);
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
+    }
+  }
+
+  void _searchRecentQuerySelected(String query) {
+    _searchQueryController.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    _submitSearch(query);
+  }
+
+  Future<void> _removeSearchRecentQuery(String query) async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.removeSearch(query);
+      await _loadSearchRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 삭제 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
+      }
+    }
+  }
+
+  Future<void> _clearSearchRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.clearSearches();
+      await _loadSearchRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 검색어 전체 삭제 중 예외가 발생했습니다.',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
+      }
+    }
+  }
+
+  void _openStationDetailInPlace(StationSearchResult result) {
+    final searchRepository = widget.stationSearchRepository;
+    final reportRepository = widget.reportRepository;
+    if (searchRepository == null || reportRepository == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StationDetailScreen(
+          repository: searchRepository,
+          reportRepository: reportRepository,
+          favoriteRepository: widget.favoriteRepository,
+          realtimeRepository: widget.realtimeRepository,
+          locationProvider: widget.locationProvider,
+          stationId: result.id,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
+          routeDraftController: widget.routeDraftController,
+        ),
+      ),
+    );
+  }
+
+  void _setSearchOrigin(StationSearchResult result) {
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    widget.routeDraftController.setOrigin(station);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${station.displayName}을 출발역으로 설정했습니다')),
+    );
+  }
+
+  void _setSearchDestination(StationSearchResult result) {
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    widget.routeDraftController.setDestination(station);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${station.displayName}을 도착역으로 설정했습니다')),
+    );
+  }
+
+  Future<void> _openSearchLocationSettings() async {
+    final locationProvider = widget.locationProvider;
+    if (_searchOpeningLocationSettings || locationProvider == null) {
+      return;
+    }
+    setState(() => _searchOpeningLocationSettings = true);
+    try {
+      await locationProvider.openLocationSettings();
+    } finally {
+      if (mounted) {
+        setState(() => _searchOpeningLocationSettings = false);
+      }
+    }
+  }
+
+  Widget _buildSearchBody() {
+    final controller = _searchController;
+    return ColoredBox(
+      color: EasySubwayAccessibleColors.scaffoldSurface,
+      child: SafeArea(
+        top: false,
+        child: Semantics(
+          container: true,
+          child: AnimatedBuilder(
+            animation: controller ?? _searchQueryController,
+            builder: (context, _) {
+              final state =
+                  controller?.state ?? const StationSearchState.idle();
+              final showRecent =
+                  !_hasSearchQuery && _searchRecentQueries.isNotEmpty;
+              final isSearching = state.status == StationSearchStatus.loading;
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                children: [
+                  if (showRecent)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: StationRecentSearchSection(
+                        queries: _searchRecentQueries,
+                        enabled: !isSearching,
+                        onQuerySelected: _searchRecentQuerySelected,
+                        onQueryRemoved: (query) =>
+                            unawaited(_removeSearchRecentQuery(query)),
+                        onClearAll: () =>
+                            unawaited(_clearSearchRecentQueries()),
+                      ),
+                    ),
+                  StationSearchBody(
+                    state: state,
+                    onResultTap: _openStationDetailInPlace,
+                    onSetOrigin: _setSearchOrigin,
+                    onSetDestination: _setSearchDestination,
+                    isOpeningLocationSettings: _searchOpeningLocationSettings,
+                    onOpenLocationSettings: () =>
+                        unawaited(_openSearchLocationSettings()),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _loadNearbyRealtime(StationSearchResult station) async {
     final repository = widget.realtimeRepository;
@@ -464,6 +773,15 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   @override
   void dispose() {
     _nearbyLookupMessageTimer?.cancel();
+    _searchDebounce?.cancel();
+    widget.routeDraftController.removeListener(_handleDraftChangedForSearch);
+    _searchQueryController
+      ..removeListener(_handleSearchQueryChanged)
+      ..dispose();
+    _searchFocusNode.dispose();
+    _searchController
+      ?..removeListener(_handleSearchControllerChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -490,22 +808,128 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: const Key('networkMapScreen'),
-      backgroundColor: const Color(0xFFFFFAFD),
-      body: FutureBuilder<_NetworkMapLoadResult>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
+    return PopScope(
+      canPop: !_searchMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _searchMode) {
+          _exitSearchMode();
+        }
+      },
+      child: Scaffold(
+        key: const Key('networkMapScreen'),
+        backgroundColor: const Color(0xFFFFFAFD),
+        body: FutureBuilder<_NetworkMapLoadResult>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return _NetworkMapChrome(
+                regions: const [NetworkMapRegion(name: '수도권')],
+                selectedRegion: _selectedRegion ?? '수도권',
+                expressView: _expressView,
+                showServicePatternToggle: true,
+                notificationAction: widget.notificationAction,
+                disruptionBanner: widget.disruptionBanner,
+                onMenuTap: _openMapMenu,
+                onSearchTap: _enterSearchMode,
+                searchMode: _searchMode,
+                searchBody: _searchMode ? _buildSearchBody() : null,
+                onSearchBack: _exitSearchMode,
+                searchQueryController: _searchQueryController,
+                searchFocusNode: _searchFocusNode,
+                onSearchSubmitted: _submitSearch,
+                onSearchClear: _searchQueryController.clear,
+                onRegionSelected: (region) => _reload(region: region),
+                onExpressViewChanged: (value) {
+                  setState(() => _expressView = value);
+                },
+                nearbyPanelVisible: _nearbyPanelVisible,
+                nearbyPanelData: _nearbyPanelData,
+                realtime: _nearbyRealtime,
+                nearbyLookupMessage: _nearbyLookupMessage,
+                adjacentStations: const _NetworkMapAdjacentStations(),
+                onCurrentLocationTap: _showNearbyPanel,
+                onOpenNearbyStations: widget.onOpenNearbyStations,
+                onCloseNearbyPanel: _hideNearbyPanel,
+                routeDraftController: widget.routeDraftController,
+                onClearOrigin: _clearOriginStation,
+                onClearDestination: _clearDestinationStation,
+                onSwapDraft: _swapDraftStations,
+                onPickOrigin: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickOriginStation,
+                onPickDestination: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickDestinationStation,
+                child: const Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return _NetworkMapChrome(
+                regions: const [NetworkMapRegion(name: '수도권')],
+                selectedRegion: _selectedRegion ?? '수도권',
+                expressView: _expressView,
+                showServicePatternToggle: true,
+                notificationAction: widget.notificationAction,
+                disruptionBanner: widget.disruptionBanner,
+                onMenuTap: _openMapMenu,
+                onSearchTap: _enterSearchMode,
+                searchMode: _searchMode,
+                searchBody: _searchMode ? _buildSearchBody() : null,
+                onSearchBack: _exitSearchMode,
+                searchQueryController: _searchQueryController,
+                searchFocusNode: _searchFocusNode,
+                onSearchSubmitted: _submitSearch,
+                onSearchClear: _searchQueryController.clear,
+                onRegionSelected: (region) => _reload(region: region),
+                onExpressViewChanged: (value) {
+                  setState(() => _expressView = value);
+                },
+                nearbyPanelVisible: _nearbyPanelVisible,
+                nearbyPanelData: _nearbyPanelData,
+                realtime: _nearbyRealtime,
+                nearbyLookupMessage: _nearbyLookupMessage,
+                adjacentStations: const _NetworkMapAdjacentStations(),
+                onCurrentLocationTap: _showNearbyPanel,
+                onOpenNearbyStations: widget.onOpenNearbyStations,
+                onCloseNearbyPanel: _hideNearbyPanel,
+                routeDraftController: widget.routeDraftController,
+                onClearOrigin: _clearOriginStation,
+                onClearDestination: _clearDestinationStation,
+                onSwapDraft: _swapDraftStations,
+                onPickOrigin: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickOriginStation,
+                onPickDestination: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickDestinationStation,
+                child: _NetworkMapLoadFailure(onRetry: () => _reload()),
+              );
+            }
+            final loadResult = snapshot.data!;
+            final data = loadResult.data;
+            final hasExpressLines = _expressLineIds(data).isNotEmpty;
+            // #1641: 모든 지역이 구조화 canvas로 렌더되므로 express 필터·서비스 패턴
+            // 토글이 전 지역에 균일 적용된다(과거 SVG 지역 예외 제거).
+            final visibleData = hasExpressLines && _expressView
+                ? _expressOnlyMapData(data)
+                : data;
+            _startInitialNearbyFocus();
             return _NetworkMapChrome(
-              regions: const [NetworkMapRegion(name: '수도권')],
-              selectedRegion: _selectedRegion ?? '수도권',
+              regions: data.regions,
+              selectedRegion: data.selectedRegion,
               expressView: _expressView,
               showServicePatternToggle: true,
               notificationAction: widget.notificationAction,
               disruptionBanner: widget.disruptionBanner,
               onMenuTap: _openMapMenu,
-              onSearchTap: widget.onOpenStationSearch,
+              onSearchTap: _enterSearchMode,
+              searchMode: _searchMode,
+              searchBody: _searchMode ? _buildSearchBody() : null,
+              onSearchBack: _exitSearchMode,
+              searchQueryController: _searchQueryController,
+              searchFocusNode: _searchFocusNode,
+              onSearchSubmitted: _submitSearch,
+              onSearchClear: _searchQueryController.clear,
               onRegionSelected: (region) => _reload(region: region),
               onExpressViewChanged: (value) {
                 setState(() => _expressView = value);
@@ -514,7 +938,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               nearbyPanelData: _nearbyPanelData,
               realtime: _nearbyRealtime,
               nearbyLookupMessage: _nearbyLookupMessage,
-              adjacentStations: const _NetworkMapAdjacentStations(),
+              adjacentStations: _adjacentStationsFor(data),
               onCurrentLocationTap: _showNearbyPanel,
               onOpenNearbyStations: widget.onOpenNearbyStations,
               onCloseNearbyPanel: _hideNearbyPanel,
@@ -528,114 +952,36 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onPickDestination: widget.onPickStationForSlot == null
                   ? null
                   : _pickDestinationStation,
-              child: const Center(child: CircularProgressIndicator()),
+              // #1933: _setOriginStation은 routeDraftController만 갱신하고 이
+              // State에서 setState를 호출하지 않으므로, canvas를 좁게
+              // ListenableBuilder로 감싸 draft 변경 시 hasOrigin이 다시
+              // 계산되게 한다(그래야 다음 팝오버의 [도착] 강조가 즉시 반영됨).
+              child: ListenableBuilder(
+                listenable: widget.routeDraftController,
+                builder: (context, _) {
+                  return _NetworkMapCanvas(
+                    data: visibleData,
+                    initialViewport: loadResult.initialViewport,
+                    focusedStationId: _nearbySelectedStationId,
+                    selectedStationId: _nearbyPanelVisible
+                        ? _nearbySelectedStationId
+                        : null,
+                    hasOrigin: widget.routeDraftController.draft.origin != null,
+                    onSetOrigin: _setOriginStation,
+                    onSetDestination: _setDestinationStation,
+                    onViewportChanged: (viewport) {
+                      _saveRecentViewport(data.selectedRegion, viewport);
+                    },
+                  );
+                },
+              ),
             );
-          }
-          if (snapshot.hasError || !snapshot.hasData) {
-            return _NetworkMapChrome(
-              regions: const [NetworkMapRegion(name: '수도권')],
-              selectedRegion: _selectedRegion ?? '수도권',
-              expressView: _expressView,
-              showServicePatternToggle: true,
-              notificationAction: widget.notificationAction,
-              disruptionBanner: widget.disruptionBanner,
-              onMenuTap: _openMapMenu,
-              onSearchTap: widget.onOpenStationSearch,
-              onRegionSelected: (region) => _reload(region: region),
-              onExpressViewChanged: (value) {
-                setState(() => _expressView = value);
-              },
-              nearbyPanelVisible: _nearbyPanelVisible,
-              nearbyPanelData: _nearbyPanelData,
-              realtime: _nearbyRealtime,
-              nearbyLookupMessage: _nearbyLookupMessage,
-              adjacentStations: const _NetworkMapAdjacentStations(),
-              onCurrentLocationTap: _showNearbyPanel,
-              onOpenNearbyStations: widget.onOpenNearbyStations,
-              onCloseNearbyPanel: _hideNearbyPanel,
-              routeDraftController: widget.routeDraftController,
-              onClearOrigin: _clearOriginStation,
-              onClearDestination: _clearDestinationStation,
-              onSwapDraft: _swapDraftStations,
-              onPickOrigin: widget.onPickStationForSlot == null
-                  ? null
-                  : _pickOriginStation,
-              onPickDestination: widget.onPickStationForSlot == null
-                  ? null
-                  : _pickDestinationStation,
-              child: _NetworkMapLoadFailure(onRetry: () => _reload()),
-            );
-          }
-          final loadResult = snapshot.data!;
-          final data = loadResult.data;
-          final hasExpressLines = _expressLineIds(data).isNotEmpty;
-          // #1641: 모든 지역이 구조화 canvas로 렌더되므로 express 필터·서비스 패턴
-          // 토글이 전 지역에 균일 적용된다(과거 SVG 지역 예외 제거).
-          final visibleData = hasExpressLines && _expressView
-              ? _expressOnlyMapData(data)
-              : data;
-          _startInitialNearbyFocus();
-          return _NetworkMapChrome(
-            regions: data.regions,
-            selectedRegion: data.selectedRegion,
-            expressView: _expressView,
-            showServicePatternToggle: true,
-            notificationAction: widget.notificationAction,
-            disruptionBanner: widget.disruptionBanner,
-            onMenuTap: _openMapMenu,
-            onSearchTap: widget.onOpenStationSearch,
-            onRegionSelected: (region) => _reload(region: region),
-            onExpressViewChanged: (value) {
-              setState(() => _expressView = value);
-            },
-            nearbyPanelVisible: _nearbyPanelVisible,
-            nearbyPanelData: _nearbyPanelData,
-            realtime: _nearbyRealtime,
-            nearbyLookupMessage: _nearbyLookupMessage,
-            adjacentStations: _adjacentStationsFor(data),
-            onCurrentLocationTap: _showNearbyPanel,
-            onOpenNearbyStations: widget.onOpenNearbyStations,
-            onCloseNearbyPanel: _hideNearbyPanel,
-            routeDraftController: widget.routeDraftController,
-            onClearOrigin: _clearOriginStation,
-            onClearDestination: _clearDestinationStation,
-            onSwapDraft: _swapDraftStations,
-            onPickOrigin: widget.onPickStationForSlot == null
-                ? null
-                : _pickOriginStation,
-            onPickDestination: widget.onPickStationForSlot == null
-                ? null
-                : _pickDestinationStation,
-            // #1933: _setOriginStation은 routeDraftController만 갱신하고 이
-            // State에서 setState를 호출하지 않으므로, canvas를 좁게
-            // ListenableBuilder로 감싸 draft 변경 시 hasOrigin이 다시
-            // 계산되게 한다(그래야 다음 팝오버의 [도착] 강조가 즉시 반영됨).
-            child: ListenableBuilder(
-              listenable: widget.routeDraftController,
-              builder: (context, _) {
-                return _NetworkMapCanvas(
-                  data: visibleData,
-                  initialViewport: loadResult.initialViewport,
-                  focusedStationId: _nearbySelectedStationId,
-                  selectedStationId: _nearbyPanelVisible
-                      ? _nearbySelectedStationId
-                      : null,
-                  hasOrigin:
-                      widget.routeDraftController.draft.origin != null,
-                  onSetOrigin: _setOriginStation,
-                  onSetDestination: _setDestinationStation,
-                  onViewportChanged: (viewport) {
-                    _saveRecentViewport(data.selectedRegion, viewport);
-                  },
-                );
-              },
-            ),
-          );
-        },
+          },
+        ),
+        bottomNavigationBar: _searchMode || _nearbyPanelVisible
+            ? null
+            : const _NetworkMapBottomAdBanner(),
       ),
-      bottomNavigationBar: _nearbyPanelVisible
-          ? null
-          : const _NetworkMapBottomAdBanner(),
     );
   }
 
@@ -955,6 +1301,13 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.onSwapDraft,
     this.onPickOrigin,
     this.onPickDestination,
+    this.searchMode = false,
+    this.searchBody,
+    this.onSearchBack,
+    this.searchQueryController,
+    this.searchFocusNode,
+    this.onSearchSubmitted,
+    this.onSearchClear,
     required this.child,
   });
 
@@ -984,16 +1337,28 @@ class _NetworkMapChrome extends StatelessWidget {
   /// 상단바 출발/도착 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
+
+  /// #1933 홈 노선도 in-place 역 검색 모드. true면 body를 [searchBody]로 바꾸고
+  /// 상단바 좌측 ≡를 ←로, 검색 필드를 실제 TextField로 전환한다. 지역 선택기는
+  /// 두 모드에서 모두 유지된다.
+  final bool searchMode;
+  final Widget? searchBody;
+  final VoidCallback? onSearchBack;
+  final TextEditingController? searchQueryController;
+  final FocusNode? searchFocusNode;
+  final ValueChanged<String>? onSearchSubmitted;
+  final VoidCallback? onSearchClear;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
+    final inSearchMode = searchMode && searchBody != null;
     return Stack(
       children: [
         Positioned.fill(
           top: topPadding + _networkMapTopBarHeight,
-          child: ClipRect(child: child),
+          child: ClipRect(child: inSearchMode ? searchBody! : child),
         ),
         Positioned(
           left: 0,
@@ -1005,6 +1370,12 @@ class _NetworkMapChrome extends StatelessWidget {
             notificationAction: notificationAction,
             onMenuTap: onMenuTap,
             onSearchTap: onSearchTap,
+            searchMode: inSearchMode,
+            onSearchBack: onSearchBack,
+            searchQueryController: searchQueryController,
+            searchFocusNode: searchFocusNode,
+            onSearchSubmitted: onSearchSubmitted,
+            onSearchClear: onSearchClear,
             onRegionSelected: onRegionSelected,
             // #1933 요구 2: 출발/도착이 하나라도 차면 상단바 자체가 출발/도착
             // 2줄 입력으로 "변신"한다(아래 별도 카드 없음). 지도 탭·검색 어느
@@ -1017,14 +1388,14 @@ class _NetworkMapChrome extends StatelessWidget {
             onPickDestination: onPickDestination,
           ),
         ),
-        if (disruptionBanner != null)
+        if (disruptionBanner != null && !inSearchMode)
           Positioned(
             left: 0,
             right: 0,
             top: topPadding + _networkMapTopBarHeight,
             child: disruptionBanner!,
           ),
-        if (showServicePatternToggle)
+        if (showServicePatternToggle && !inSearchMode)
           Positioned(
             left: 16,
             bottom: 26,
@@ -1033,7 +1404,7 @@ class _NetworkMapChrome extends StatelessWidget {
               onChanged: onExpressViewChanged,
             ),
           ),
-        if (nearbyPanelVisible)
+        if (nearbyPanelVisible && !inSearchMode)
           Positioned(
             left: 0,
             right: 0,
@@ -1046,14 +1417,14 @@ class _NetworkMapChrome extends StatelessWidget {
               onRetry: onCurrentLocationTap,
             ),
           ),
-        if (nearbyLookupMessage != null)
+        if (nearbyLookupMessage != null && !inSearchMode)
           Positioned(
             left: 24,
             right: 24,
             bottom: nearbyPanelVisible ? 318 : 132,
             child: _NetworkMapLookupToast(message: nearbyLookupMessage!),
           ),
-        if (onOpenNearbyStations != null)
+        if (onOpenNearbyStations != null && !inSearchMode)
           Positioned(
             right: 16,
             bottom: nearbyPanelVisible ? 280 : 26,
@@ -1107,6 +1478,12 @@ class _NetworkMapTopBar extends StatelessWidget {
     required this.notificationAction,
     required this.onMenuTap,
     required this.onSearchTap,
+    this.searchMode = false,
+    this.onSearchBack,
+    this.searchQueryController,
+    this.searchFocusNode,
+    this.onSearchSubmitted,
+    this.onSearchClear,
     required this.onRegionSelected,
     required this.routeDraftController,
     required this.onClearOrigin,
@@ -1121,6 +1498,12 @@ class _NetworkMapTopBar extends StatelessWidget {
   final Widget? notificationAction;
   final VoidCallback onMenuTap;
   final VoidCallback onSearchTap;
+  final bool searchMode;
+  final VoidCallback? onSearchBack;
+  final TextEditingController? searchQueryController;
+  final FocusNode? searchFocusNode;
+  final ValueChanged<String>? onSearchSubmitted;
+  final VoidCallback? onSearchClear;
   final ValueChanged<String> onRegionSelected;
   final RouteDraftController routeDraftController;
   final VoidCallback onClearOrigin;
@@ -1178,19 +1561,49 @@ class _NetworkMapTopBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
         child: Row(
           children: [
-            IconButton(
-              key: const Key('networkMapMenuButton'),
-              tooltip: '메뉴',
-              onPressed: onMenuTap,
-              style: IconButton.styleFrom(
-                minimumSize: const Size.square(EasySubwayTouchTarget.general),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: EdgeInsets.zero,
+            if (searchMode)
+              IconButton(
+                key: const Key('networkMapSearchBackButton'),
+                tooltip: '뒤로',
+                onPressed: onSearchBack,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(EasySubwayTouchTarget.general),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  size: 22,
+                  color: Color(0xFF4B4B4B),
+                ),
+              )
+            else
+              IconButton(
+                key: const Key('networkMapMenuButton'),
+                tooltip: '메뉴',
+                onPressed: onMenuTap,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(EasySubwayTouchTarget.general),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: const Icon(
+                  Icons.menu,
+                  size: 22,
+                  color: Color(0xFF4B4B4B),
+                ),
               ),
-              icon: const Icon(Icons.menu, size: 22, color: Color(0xFF4B4B4B)),
-            ),
             const SizedBox(width: 4),
-            Expanded(child: _NetworkMapSearchField(onSearchTap: onSearchTap)),
+            Expanded(
+              child: searchMode
+                  ? _NetworkMapSearchInputField(
+                      controller: searchQueryController,
+                      focusNode: searchFocusNode,
+                      onSubmitted: onSearchSubmitted,
+                      onClear: onSearchClear,
+                    )
+                  : _NetworkMapSearchField(onSearchTap: onSearchTap),
+            ),
             const SizedBox(width: 8),
             Builder(
               builder: (regionContext) => Semantics(
@@ -1360,6 +1773,98 @@ class _NetworkMapSearchField extends StatelessWidget {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// #1933 홈 노선도 in-place 검색 모드에서 idle 검색 필드 자리에 나타나는 실제
+/// 편집 가능한 TextField. 48 터치타겟을 채우고 radius 8 · line 테두리로 idle
+/// 필드와 같은 결을 유지한다.
+class _NetworkMapSearchInputField extends StatelessWidget {
+  const _NetworkMapSearchInputField({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+    required this.onClear,
+  });
+
+  final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final editController = controller;
+    final hasQuery =
+        editController != null && editController.text.trim().isNotEmpty;
+    return SizedBox(
+      // 터치 타겟(≥48)을 만족시키기 위해 필드 자체가 전체 높이를 차지한다.
+      // 시각적 박스는 radius 8 + line 테두리로 idle 필드(높이 38)와 같은 결을
+      // 유지한다.
+      height: EasySubwayTouchTarget.general,
+      child: Center(
+        child: TextField(
+          key: const Key('stationSearchInput'),
+          controller: editController,
+          focusNode: focusNode,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 1,
+          textInputAction: TextInputAction.search,
+          style: const TextStyle(fontSize: 15, height: 1.2),
+          decoration: InputDecoration(
+            hintText: '역 이름을 입력해 주세요',
+            floatingLabelBehavior: FloatingLabelBehavior.always,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 13),
+            prefixIcon: const Icon(
+              Icons.search,
+              size: 18,
+              color: EasySubwayAccessibleColors.iconMuted,
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 36,
+              minHeight: 36,
+            ),
+            suffixIcon: hasQuery
+                ? IconButton(
+                    tooltip: '검색어 지우기',
+                    onPressed: onClear ?? editController.clear,
+                    icon: const Icon(Icons.close, size: 18),
+                  )
+                : null,
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 36,
+              minHeight: 36,
+            ),
+            filled: true,
+            fillColor: EasySubwayAccessibleColors.surface,
+            border: const OutlineInputBorder(
+              borderRadius: _networkMapSearchFieldRadius,
+              borderSide: BorderSide(
+                color: EasySubwayAccessibleColors.line,
+                width: 1.5,
+              ),
+            ),
+            enabledBorder: const OutlineInputBorder(
+              borderRadius: _networkMapSearchFieldRadius,
+              borderSide: BorderSide(
+                color: EasySubwayAccessibleColors.line,
+                width: 1.5,
+              ),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: _networkMapSearchFieldRadius,
+              borderSide: BorderSide(
+                color: EasySubwayAccessibleColors.line,
+                width: 1.5,
+              ),
+            ),
+          ),
+          onSubmitted: onSubmitted,
         ),
       ),
     );

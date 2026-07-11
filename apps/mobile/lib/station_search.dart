@@ -1869,7 +1869,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         }
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: _StationRecentSearchSection(
+          child: StationRecentSearchSection(
             queries: _recentQueries,
             enabled: !isSearching && !_isNearbySearchRunning,
             onQuerySelected: _searchRecentQuery,
@@ -1925,7 +1925,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     final resultSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        return _StationSearchBody(
+        return StationSearchBody(
           state: _controller.state,
           // 칸 채우기 모드에서는 결과 한 번 탭 = 해당 칸 설정 후 닫기. 지도 탭과 동일
           // 하게 "출발역 선택 → 도착역 선택" UX로 수렴시킨다. 둘러보기 모드에서는
@@ -1946,10 +1946,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       // 큰 타이틀 화면(예: "역 검색")을 없애고 입력 필드 자체가 헤더가 된다. 열리는
       // 즉시 입력 모드로 들어가 탭 두 번을 요구하던 랜딩 단계를 지운다. 뒤로가기는
       // AppBar 기본 leading을 그대로 쓴다(자동 back 버튼 → 입력 필드 순서 유지).
-      appBar: AppBar(
-        titleSpacing: 0,
-        title: searchInputField,
-      ),
+      appBar: AppBar(titleSpacing: 0, title: searchInputField),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: Semantics(
         container: true,
@@ -2152,8 +2149,9 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 }
 
-class _StationRecentSearchSection extends StatelessWidget {
-  const _StationRecentSearchSection({
+class StationRecentSearchSection extends StatelessWidget {
+  const StationRecentSearchSection({
+    super.key,
     required this.queries,
     required this.enabled,
     required this.onQuerySelected,
@@ -2363,8 +2361,9 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
   }
 }
 
-class _StationSearchBody extends StatelessWidget {
-  const _StationSearchBody({
+class StationSearchBody extends StatelessWidget {
+  const StationSearchBody({
+    super.key,
     required this.state,
     required this.onResultTap,
     required this.isOpeningLocationSettings,

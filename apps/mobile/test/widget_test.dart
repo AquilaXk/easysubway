@@ -1334,7 +1334,10 @@ void main() {
     // 무채색 채움 필드만 남는다.
     expect(find.text('출발역을 탭하거나 검색'), findsNothing);
     expect(find.text('도착역을 탭하거나 검색'), findsNothing);
-    expect(find.byKey(const Key('networkMapRouteDraftOriginRow')), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapRouteDraftOriginRow')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const Key('networkMapRouteDraftDestinationRow')),
       findsOneWidget,
@@ -2298,9 +2301,7 @@ void main() {
     expect(find.text('닫기'), findsOneWidget);
   });
 
-  testWidgets('노선도에서 출발을 지정한 뒤 다른 역을 누르면 도착 액션이 강조된다', (
-    tester,
-  ) async {
+  testWidgets('노선도에서 출발을 지정한 뒤 다른 역을 누르면 도착 액션이 강조된다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -5929,17 +5930,22 @@ void main() {
         FloatingLabelBehavior.always,
       );
       expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
+      // #1933: 홈 in-place 검색 모드에는 주변 역 버튼이 없다(둘러보기 주변 역은
+      // 좌측 메뉴로 연다). ≡는 ←로 바뀌고 지역 선택기는 유지된다.
+      expect(find.byKey(const Key('nearbyStationSearchButton')), findsNothing);
       expect(
-        find.byKey(const Key('nearbyStationSearchButton')),
+        find.byKey(const Key('networkMapSearchBackButton')),
         findsOneWidget,
       );
+      expect(find.byKey(const Key('networkMapMenuButton')), findsNothing);
+      expect(find.byKey(const Key('mapRegionTabs')), findsOneWidget);
 
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
       );
       await tester.pump();
-      // 검색 버튼은 제거됐고, 입력이 있으면 주변 역 버튼도 감춘다.
+      // 검색 버튼은 제거됐고, in-place 모드에는 주변 역 버튼이 없다.
       expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
       expect(find.byKey(const Key('nearbyStationSearchButton')), findsNothing);
       await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -5995,10 +6001,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
-      expect(
-        find.byKey(const Key('nearbyStationSearchButton')),
-        findsOneWidget,
-      );
+      // in-place 모드에는 주변 역 버튼이 없다. 비우면 결과만 사라진다.
+      expect(find.byKey(const Key('nearbyStationSearchButton')), findsNothing);
       expect(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
         findsNothing,
@@ -6116,27 +6120,39 @@ void main() {
           .hasAction(SemanticsAction.tap),
       isTrue,
     );
+    // #1933: 홈 노선도 in-place 검색에서 출발역 역할을 지정하면 draft가 채워지고,
+    // 검색 모드가 자동 종료되어 상단바가 출발/도착 입력(OD) 모드로 전환된다.
     await tester.tap(
       find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
 
+    // in-place 검색 모드가 종료되어 홈 노선도로 돌아왔고 OD 상단바가 나타난다.
+    expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapRouteDraftOverlay')),
+      findsOneWidget,
+    );
+
+    // 도착 칸을 탭하면 "도착역 채우기" 검색이 열린다(칸 채우기 모드는 종전대로
+    // StationSearchScreen 경로로 유지된다).
+    await tester.tap(
+      find.byKey(const Key('networkMapRouteDraftPickDestination')),
+    );
+    await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationRoleDestination-station-sadang')),
+      find.byKey(const Key('stationSearchResult-station-sadang')),
     );
     await tester.pumpAndSettle();
 
     // #1933 요구 3: 별도 길찾기 폼 페이지·"길찾기 보기" 스낵바 액션을 없앴다. 역
-    // 검색으로 출발·도착을 모두 채우면 홈 셸이 자동으로 결과 탭으로 전환하므로,
-    // 검색 화면을 닫고 돌아오면 곧바로 결과 타임라인이 보인다.
+    // 검색으로 출발·도착을 모두 채우면 홈 셸이 자동으로 결과 탭으로 전환한다.
     expect(find.widgetWithText(SnackBarAction, '길찾기 보기'), findsNothing);
     await tester.pump(const Duration(milliseconds: 200));
-    await tester.pumpAndSettle();
-    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
     expect(
@@ -6613,6 +6629,118 @@ void main() {
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
   });
 
+  testWidgets('#1933 홈 검색바 탭은 같은 화면에서 in-place 검색 모드로 전환한다', (tester) async {
+    final repository = FakeStationSearchRepository();
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+
+    // 별도 StationSearchScreen 라우트를 밀지 않고 같은 노선도 화면에 머문다.
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    expect(find.byType(StationSearchScreen), findsNothing);
+    // ≡ 메뉴 버튼이 ← 뒤로 버튼으로 바뀌고, 지역 선택기는 유지되며, 실제 입력
+    // 필드가 나타난다.
+    expect(find.byKey(const Key('networkMapMenuButton')), findsNothing);
+    expect(find.byKey(const Key('networkMapSearchBackButton')), findsOneWidget);
+    expect(find.byKey(const Key('mapRegionTabs')), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+  });
+
+  testWidgets('#1933 in-place 검색 입력은 디바운스 후 자동완성 결과를 보여준다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    // 버튼 탭·키보드 액션 없이 디바운스(300ms)만 지나면 검색된다.
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedQueries, ['상록수']);
+    expect(find.text('상록수역'), findsOneWidget);
+    // in-place 결과 목록에서도 별도 라우트를 밀지 않는다.
+    expect(find.byType(StationSearchScreen), findsNothing);
+  });
+
+  testWidgets('#1933 in-place 검색은 ← 또는 시스템 back으로 종료하고 지도로 복귀한다', (
+    tester,
+  ) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 진입 → 타이핑으로 검색 상태를 만든 뒤 ← 버튼으로 종료한다.
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapSearchBackButton')));
+    await tester.pumpAndSettle();
+
+    // ≡ 복귀, ← 소멸, 입력 필드 소멸, idle 검색 필드 복귀.
+    expect(find.byKey(const Key('networkMapMenuButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapSearchBackButton')), findsNothing);
+    expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.byType(StationSearchScreen), findsNothing);
+
+    // 다시 진입 → 시스템 back(handlePopRoute)으로도 종료된다.
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapMenuButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapSearchBackButton')), findsNothing);
+    expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+  });
+
   testWidgets('역 검색은 현재 위치 주변 역을 큰 버튼으로 찾고 거리를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     final locationProvider = FakeCurrentLocationProvider(
@@ -6641,9 +6769,11 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      // #1933: 홈 노선도 검색바 탭은 in-place 검색 모드라 주변 역 버튼이 없다.
+      // 둘러보기 "주변 역"은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
+      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+      await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
       await tester.pumpAndSettle();
 
       expect(find.text('현재 위치 사용'), findsNothing);
@@ -6704,9 +6834,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
     await tester.pumpAndSettle();
 
     final primaryCard = find.byKey(const Key('nearbyStationPrimaryCard'));
@@ -6759,9 +6890,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
     await tester.pumpAndSettle();
 
     // 사전 rationale 다이얼로그(제목·본문·계속/취소) 없이 곧바로 위치를 요청한다.
@@ -6800,8 +6932,16 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
+    // nearby 진입 시 위치 조회가 한 번 자동 시작되고(위치는 completer로 지연),
+    // 조회가 진행 중이면 재시도 버튼 중복 탭은 무시된다.
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+    // 메뉴 다이얼로그 해제 + StationSearchScreen 라우트 전환을 진행시킨다(위치
+    // completer가 열려 있어 pumpAndSettle은 사용할 수 없다).
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
     await tester.pump();
@@ -6841,10 +6981,13 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+    // 메뉴 해제 + 라우트 전환 진행(위치 completer가 열려 있어 settle 불가).
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상');
     await tester.pump();
@@ -6879,9 +7022,10 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
+      // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
+      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+      await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
       await tester.pumpAndSettle();
 
       expect(locationProvider.requestCount, 1);
@@ -6958,9 +7102,10 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    // #1933: 둘러보기 주변 역은 좌측 메뉴로 StationSearchScreen(nearby)을 연다.
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('nearbyStationSearchButton')));
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.'), findsOneWidget);
