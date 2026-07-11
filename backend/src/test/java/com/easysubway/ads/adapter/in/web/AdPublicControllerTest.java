@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -21,6 +22,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.util.DigestUtils;
 
 @SpringBootTest(properties = {
 	"easysubway.admin.username=admin-user",
@@ -122,6 +124,35 @@ class AdPublicControllerTest {
 			.andExpect(header().string("ETag", org.hamcrest.Matchers.not(first.getResponse().getHeader("ETag"))))
 			.andExpect(jsonPath("$.data.endsAt")
 				.value(now.plusHours(2).toInstant(ZoneOffset.UTC).toString()));
+	}
+
+	@Test
+	@DisplayName("이전 표현 ETag는 endsAt이 추가된 응답을 304로 만들지 않는다")
+	void changesEtagWhenActiveResponseRepresentationChanges() throws Exception {
+		LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC).withNano(0);
+		LocalDateTime startsAt = now.minusHours(1);
+		LocalDateTime endsAt = now.plusHours(1);
+		insertPlacement("route-result-bottom");
+		insertCreative("active", "route-result-bottom", startsAt, endsAt, true);
+		String legacyFingerprint = String.join("@",
+			"route-result-bottom",
+			"active",
+			"https://cdn.easysubway.example/ads/active.png",
+			"https://partner.example/active",
+			"상록수 제휴",
+			"상록수 제휴 광고",
+			String.valueOf(startsAt),
+			String.valueOf(endsAt));
+		String legacyEtag = "\""
+			+ DigestUtils.md5DigestAsHex(legacyFingerprint.getBytes(StandardCharsets.UTF_8))
+			+ "\"";
+
+		mockMvc.perform(get("/api/ads/active")
+				.param("placement", "route-result-bottom")
+				.header("If-None-Match", legacyEtag))
+			.andExpect(status().isOk())
+			.andExpect(header().string("ETag", org.hamcrest.Matchers.not(legacyEtag)))
+			.andExpect(jsonPath("$.data.endsAt").value(endsAt.toInstant(ZoneOffset.UTC).toString()));
 	}
 
 	@Test

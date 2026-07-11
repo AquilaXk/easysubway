@@ -26,6 +26,7 @@ class AdPublicController {
 
 	private static final CacheControl AD_CACHE = CacheControl.maxAge(300, TimeUnit.SECONDS).cachePublic();
 	private static final CacheControl NO_AD_CACHE = CacheControl.noStore();
+	private static final String ACTIVE_RESPONSE_ETAG_SCHEMA = "active-ad-response-v2";
 
 	private final AdService service;
 
@@ -67,6 +68,7 @@ class AdPublicController {
 
 	private static String etagFor(AdResponse response, AdCreative creative) {
 		String fingerprint = String.join("@",
+			ACTIVE_RESPONSE_ETAG_SCHEMA,
 			response.placement(),
 			response.creativeId(),
 			response.imageUrl(),

@@ -6,17 +6,12 @@ import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _StubApiClient extends ApiClient {
-  _StubApiClient(
-    this.response, {
-    this.error,
-    this.postError,
-    this.postResponse = const ApiResponse(statusCode: 204, jsonBody: null),
-  }) : super(baseUri: Uri.parse('https://api.easysubway.example'));
+  _StubApiClient(this.response, {this.error, this.postError})
+    : super(baseUri: Uri.parse('https://api.easysubway.example'));
 
   final ApiResponse response;
   final Object? error;
   final Object? postError;
-  final ApiResponse postResponse;
   final paths = <String>[];
   final postPaths = <String>[];
   final postBodies = <Map<String, Object?>>[];
@@ -44,7 +39,7 @@ class _StubApiClient extends ApiClient {
     if (postError != null) {
       throw postError!;
     }
-    return postResponse;
+    return const ApiResponse(statusCode: 204, jsonBody: null);
   }
 }
 
@@ -223,6 +218,44 @@ void main() {
       '2026-07-12T12:34:56',
       1,
       true,
+    ]) {
+      final creative = await AdRepository(
+        _StubApiClient(_response(200, data: _creativeData(endsAt: invalid))),
+      ).fetchActive(AdPlacement.routeResultBottom);
+      expect(creative, isNull, reason: 'endsAt=$invalid');
+    }
+  });
+
+  test('endsAt key 누락은 null과 구분해 소재 전체를 숨긴다', () async {
+    final data = _creativeData()..remove('endsAt');
+
+    final creative = await AdRepository(
+      _StubApiClient(_response(200, data: data)),
+    ).fetchActive(AdPlacement.routeResultBottom);
+
+    expect(creative, isNull);
+  });
+
+  test('endsAt은 uppercase Z RFC3339와 유효한 날짜 및 시간만 허용한다', () async {
+    for (final valid in [
+      '2026-07-12T12:34:56Z',
+      '2026-07-12T12:34:56.1Z',
+      '2026-07-12T12:34:56.123456Z',
+    ]) {
+      final creative = await AdRepository(
+        _StubApiClient(_response(200, data: _creativeData(endsAt: valid))),
+      ).fetchActive(AdPlacement.routeResultBottom);
+      expect(creative, isNotNull, reason: 'endsAt=$valid');
+      expect(creative?.endsAt?.isUtc, isTrue, reason: 'endsAt=$valid');
+    }
+
+    for (final invalid in [
+      '2026-07-12T12:34:56+09:00',
+      '2026-07-12T12:34:56z',
+      '2026-02-30T12:34:56Z',
+      '2026-07-12T24:00:00Z',
+      '2026-07-12T12:60:00Z',
+      '2026-07-12T12:34:60Z',
     ]) {
       final creative = await AdRepository(
         _StubApiClient(_response(200, data: _creativeData(endsAt: invalid))),

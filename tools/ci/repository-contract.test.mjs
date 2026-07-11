@@ -43,6 +43,8 @@ function collapseQuotedStringConcatenations(source) {
 }
 
 function containsAdEventEndpoint(source) {
+  // ponytail: literal/quoted-concat endpoint만 탐지한다. 새 interpolation/variable 광고 endpoint를
+  // 허용해야 할 때는 regex를 넓히지 말고 Dart AST 기반 검사로 교체한다.
   return /\/api\/ads\/events\b/.test(collapseQuotedStringConcatenations(source));
 }
 

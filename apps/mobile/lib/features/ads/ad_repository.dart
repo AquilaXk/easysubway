@@ -81,6 +81,9 @@ final class AdRepository {
     final landingUrl = _httpsUri(_text(data, 'landingUrl'));
     final advertiserName = _text(data, 'advertiserName');
     final altText = _text(data, 'altText');
+    if (!data.containsKey('endsAt')) {
+      return null;
+    }
     final endsAtValue = data['endsAt'];
     final endsAt = _utcDateTime(endsAtValue);
     if (endsAtValue != null && endsAt == null) {
@@ -116,7 +119,7 @@ final class AdRepository {
       return;
     }
     try {
-      final response = await resolvedClient.postJson(
+      await resolvedClient.postJson(
         '/api/ads/events',
         body: {
           'placement': placement.id,
@@ -124,9 +127,6 @@ final class AdRepository {
           'eventType': eventType.wireValue,
         },
       );
-      if (response.statusCode != 204) {
-        return;
-      }
     } on ApiException {
       return;
     }
@@ -157,12 +157,25 @@ Uri? _httpsUri(String? value) {
 }
 
 DateTime? _utcDateTime(Object? value) {
-  if (value == null) {
-    return null;
-  }
   if (value is! String) {
     return null;
   }
+  final match = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$',
+  ).firstMatch(value);
+  if (match == null) {
+    return null;
+  }
   final parsed = DateTime.tryParse(value);
-  return parsed != null && parsed.isUtc ? parsed : null;
+  if (parsed == null ||
+      !parsed.isUtc ||
+      parsed.year != int.parse(match[1]!) ||
+      parsed.month != int.parse(match[2]!) ||
+      parsed.day != int.parse(match[3]!) ||
+      parsed.hour != int.parse(match[4]!) ||
+      parsed.minute != int.parse(match[5]!) ||
+      parsed.second != int.parse(match[6]!)) {
+    return null;
+  }
+  return parsed;
 }
