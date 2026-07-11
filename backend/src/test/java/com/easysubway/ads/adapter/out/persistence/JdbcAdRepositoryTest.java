@@ -33,8 +33,6 @@ class JdbcAdRepositoryTest {
 			.load()
 			.migrate();
 		repository = new JdbcAdRepository(jdbcTemplate);
-		insertPlacement("route-result-bottom");
-		insertPlacement("station-detail-bottom");
 	}
 
 	@Test
@@ -100,10 +98,6 @@ class JdbcAdRepositoryTest {
 			startsAt,
 			endsAt,
 			enabled);
-	}
-
-	private void insertPlacement(String id) {
-		jdbcTemplate.update("INSERT INTO ad_placements (id, display_name, enabled) VALUES (?, ?, TRUE)", id, id);
 	}
 
 }

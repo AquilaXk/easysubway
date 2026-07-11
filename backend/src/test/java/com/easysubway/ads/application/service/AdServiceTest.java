@@ -1,5 +1,6 @@
 package com.easysubway.ads.application.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -58,7 +59,7 @@ class AdServiceTest {
 		when(repository.findByIdForUpdate(payload.id())).thenReturn(Optional.empty());
 		when(repository.findById(payload.id())).thenReturn(Optional.empty());
 
-		service.saveCreative(payload);
+		assertThat(service.saveCreative(payload)).isEqualTo(AdService.SaveResult.CREATED);
 
 		verify(repository).insert(expected);
 		verify(repository, never()).hasEnabledOverlap(any(), any(), any(), any());
@@ -74,7 +75,7 @@ class AdServiceTest {
 		AdCreative expected = withEnabled(payload, true);
 		when(repository.findByIdForUpdate(payload.id())).thenReturn(Optional.of(current));
 
-		service.saveCreative(payload);
+		assertThat(service.saveCreative(payload)).isEqualTo(AdService.SaveResult.UPDATED);
 
 		verify(repository).hasEnabledOverlap(
 			expected.placementId(), expected.id(), expected.startsAt(), expected.endsAt());

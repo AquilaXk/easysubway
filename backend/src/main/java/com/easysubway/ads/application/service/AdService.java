@@ -21,6 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AdService {
 
+	public enum SaveResult {
+		CREATED,
+		UPDATED
+	}
+
 	private static final List<String> PLACEMENTS = List.of("route-result-bottom", "station-detail-bottom");
 
 	private final AdRepository repository;
@@ -50,7 +55,7 @@ public class AdService {
 	}
 
 	@Transactional
-	public void saveCreative(AdCreative creative) {
+	public SaveResult saveCreative(AdCreative creative) {
 		AdCreative payload = validate(creative);
 		lockPlacements();
 		Optional<AdCreative> current = repository.findByIdForUpdate(payload.id());
@@ -74,6 +79,7 @@ public class AdService {
 		} catch (DuplicateKeyException exception) {
 			throw new InvalidRequestException("이미 존재하는 광고 creative id입니다.", exception);
 		}
+		return created ? SaveResult.CREATED : SaveResult.UPDATED;
 	}
 
 	@Transactional
