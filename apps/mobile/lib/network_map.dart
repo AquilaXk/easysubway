@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
@@ -1867,10 +1868,14 @@ class _NetworkMapSearchInputField extends StatelessWidget {
                   ),
                   const SizedBox(width: _searchFieldIconGap),
                   Expanded(
-                    // TextField가 바깥 터치타겟 높이(56) 전체를 채워 히트/
-                    // semantics 영역이 48px 게이트를 넘는다. 텍스트는
-                    // isCollapsed 기본 정렬(center)로 시각 박스 중앙(=idle
-                    // 텍스트 위치)에 놓인다.
+                    // TextField가 바깥 터치타겟 높이(≥48) 전체를 채워 히트/
+                    // semantics 영역이 48px 게이트를 넘는다. expands가 없으면
+                    // isCollapsed 데코레이터가 텍스트 줄 높이(~18px)로
+                    // 쪼그라들어 hint가 박스 상단에 붙으므로, expands: true +
+                    // textAlignVertical.center로 필드를 세로로 채우고 텍스트/
+                    // hint를 시각 박스 중앙(=idle 텍스트 위치)에 정렬한다.
+                    // expands는 maxLines: null을 요구하므로 단일 줄 입력은
+                    // singleLineFormatter로 보장한다.
                     child: SizedBox(
                       height: EasySubwayTouchTarget.general,
                       child: TextField(
@@ -1878,20 +1883,24 @@ class _NetworkMapSearchInputField extends StatelessWidget {
                         controller: editController,
                         focusNode: focusNode,
                         autofocus: true,
-                        minLines: 1,
-                        maxLines: 1,
+                        expands: true,
+                        minLines: null,
+                        maxLines: null,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.singleLineFormatter,
+                        ],
                         textAlignVertical: TextAlignVertical.center,
                         textInputAction: TextInputAction.search,
                         style: const TextStyle(fontSize: 15, height: 1.2),
+                        // placeholder는 부유 라벨이 아니라 hintText로 박스
+                        // 내부 수직 중앙(idle의 '지하철역 검색'과 같은 위치·
+                        // 스타일)에 렌더돼야 한다. floatingLabelBehavior를
+                        // 지정하면 실기기에서 hint가 라벨처럼 박스 상단
+                        // 테두리 위로 떠오르는 회귀가 확인돼 지정하지 않는다.
+                        // #1933
                         decoration: const InputDecoration(
                           hintText: '역 이름을 입력해 주세요',
                           hintStyle: _searchFieldTextStyle,
-                          // labelText/label을 쓰지 않으므로
-                          // floatingLabelBehavior는 레이아웃에 영향이 없는
-                          // no-op이지만, 기존 위젯 테스트(`역 검색은 접근성
-                          // 표시가 포함된 백엔드 결과를 보여준다`)가 이 값을
-                          // 계약으로 단언하고 있어 그대로 유지한다.
-                          floatingLabelBehavior: FloatingLabelBehavior.always,
                           isDense: true,
                           isCollapsed: true,
                           contentPadding: EdgeInsets.zero,

@@ -969,6 +969,17 @@ void main() {
     expect(activeHeight, 38.0);
     expect(find.text('역 이름을 입력해 주세요'), findsOneWidget);
 
+    // hint는 부유 라벨이 아니라 박스 내부 수직 중앙에 렌더돼야 한다
+    // (idle의 '지하철역 검색' 텍스트와 같은 위치). 박스 상단 테두리 위로
+    // 떠오르는 부유 라벨 회귀를 막는다.
+    expect(
+      tester.getCenter(find.text('역 이름을 입력해 주세요')).dy,
+      moreOrLessEquals(
+        tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
+        epsilon: 1.0,
+      ),
+    );
+
     // 검색어를 입력하면 지우기 버튼이 나타나고, 시각 박스(38px)와 별개로
     // 실제 렌더 크기가 접근성 최소 탭 타깃(48x48) 이상이어야 한다. 버튼이
     // 나타나도 시각 박스 높이는 38px 그대로 유지돼야 한다.
@@ -5970,9 +5981,18 @@ void main() {
       expect(find.text('역 이름을 입력해 주세요.'), findsNothing);
       expect(find.bySemanticsLabel('역 이름을 입력해 주세요'), findsOneWidget);
       expect(find.bySemanticsLabel('역 이름 입력'), findsNothing);
+      // #1933 placeholder는 부유 라벨이 아니라 박스 내부 수직 중앙의
+      // hintText다. floatingLabelBehavior를 지정하면 실기기에서 hint가
+      // 박스 상단 테두리 위로 떠오르는 회귀가 있어 미지정이 계약이다.
+      expect(searchInput.decoration?.floatingLabelBehavior, isNull);
       expect(
-        searchInput.decoration?.floatingLabelBehavior,
-        FloatingLabelBehavior.always,
+        tester.getCenter(find.text('역 이름을 입력해 주세요')).dy,
+        moreOrLessEquals(
+          tester
+              .getCenter(find.byKey(const Key('heroStationSearchInputBox')))
+              .dy,
+          epsilon: 1.0,
+        ),
       );
       expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
       // #1933: 홈 in-place 검색 모드에는 주변 역 버튼이 없다(둘러보기 주변 역은
