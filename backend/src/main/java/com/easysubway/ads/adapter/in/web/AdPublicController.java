@@ -5,6 +5,8 @@ import com.easysubway.ads.domain.AdCreative;
 import com.easysubway.ads.domain.AdEventType;
 import com.easysubway.common.web.ApiResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.concurrent.TimeUnit;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -82,7 +84,8 @@ class AdPublicController {
 		String imageUrl,
 		String landingUrl,
 		String advertiserName,
-		String altText
+		String altText,
+		Instant endsAt
 	) {
 		static AdResponse from(AdCreative creative) {
 			return new AdResponse(
@@ -91,7 +94,10 @@ class AdPublicController {
 				creative.imageUrl(),
 				creative.landingUrl(),
 				creative.advertiserName(),
-				creative.altText());
+				creative.altText(),
+				creative.endsAt() == null
+					? null
+					: creative.endsAt().toInstant(ZoneOffset.UTC));
 		}
 	}
 
