@@ -1533,7 +1533,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _autoRouteDebounce?.cancel();
       return;
     }
-    final signature = '${origin.id} ${destination.id}';
+    final waypoint = draft.waypoint;
+    final signature = waypoint == null
+        ? '${origin.id} ${destination.id}'
+        : '${origin.id} ${waypoint.id} ${destination.id}';
     if (signature == _autoRoutedDraftSignature) {
       return;
     }

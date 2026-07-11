@@ -765,12 +765,14 @@ class RouteSearchRequest {
     required this.destinationStationId,
     required this.mobilityType,
     this.constraintMode,
+    this.waypointStationId,
   });
 
   final String originStationId;
   final String destinationStationId;
   final String mobilityType;
   final String? constraintMode;
+  final String? waypointStationId;
 
   String get effectiveConstraintMode =>
       constraintMode ?? _defaultConstraintMode(mobilityType);
@@ -781,6 +783,7 @@ class RouteSearchRequest {
       destinationStationId: destinationStationId.trim(),
       mobilityType: mobilityType,
       constraintMode: constraintMode?.trim(),
+      waypointStationId: waypointStationId?.trim(),
     );
   }
 
@@ -2466,6 +2469,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   late final RouteSearchController _controller;
   StationSearchResult? _originStation;
   StationSearchResult? _destinationStation;
+  StationSearchResult? _waypointStation;
   _RouteStationRole? _activeStationPicker;
   late String _selectedMobilityType;
   late String _selectedConstraintMode;
@@ -2506,6 +2510,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _controller = RouteSearchController(repository: widget.repository);
     _originStation = _stationFromDraft(widget.initialDraft?.origin);
     _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
+    _waypointStation = _stationFromDraft(widget.initialDraft?.waypoint);
     _selectedMobilityType = widget.initialMobilityType;
     _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
       _selectedMobilityType,
@@ -2524,6 +2529,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       final draft = widget.initialDraft;
       _originStation = _stationFromDraft(draft?.origin);
       _destinationStation = _stationFromDraft(draft?.destination);
+      _waypointStation = _stationFromDraft(draft?.waypoint);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _maybeAutoSearchFromDraft();
       });
@@ -2538,7 +2544,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     if (origin == null || destination == null) {
       return null;
     }
-    return '${origin.id} ${destination.id} '
+    final waypoint = _waypointStation;
+    final waypointSegment = waypoint == null ? '' : '${waypoint.id} ';
+    return '${origin.id} $waypointSegment${destination.id} '
         '$_selectedMobilityType $_selectedConstraintMode';
   }
 
@@ -2906,6 +2914,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         destinationStationId: _destinationStation!.id,
         mobilityType: _selectedMobilityType,
         constraintMode: _selectedConstraintMode,
+        waypointStationId: _waypointStation?.id,
       ),
     );
   }
