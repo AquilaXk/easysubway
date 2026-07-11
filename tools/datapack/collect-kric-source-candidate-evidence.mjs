@@ -124,143 +124,170 @@ function safeContentType(response) {
   return contentType && ALLOWED_CONTENT_TYPES.has(contentType) ? contentType : SAFE_PLACEHOLDER;
 }
 
-function scanXmlStructure(raw) {
-  const tags = [];
-  const seen = new Set();
-  const openTags = [];
-  let overflowDepth = 0;
-  let itemCount = 0;
-  let resultCode = null;
-  let resultMessage = null;
-  let scalar = null;
+function xmlScanDepth(state) {
+  return state.openTags.length + state.overflowDepth;
+}
 
-  const depth = () => openTags.length + overflowDepth;
-  const skipSection = (start, terminator) => {
-    const end = raw.indexOf(terminator, start);
-    return end === -1 ? raw.length : end + terminator.length;
-  };
-  const tagEnd = (start) => {
-    let quote = null;
-    for (let index = start; index < raw.length; index += 1) {
-      const character = raw[index];
-      if (quote) {
-        if (character === quote) quote = null;
-      } else if (character === "\"" || character === "'") {
-        quote = character;
-      } else if (character === ">") {
-        return index;
-      }
+function skipXmlSection(raw, start, terminator) {
+  const end = raw.indexOf(terminator, start);
+  return end === -1 ? raw.length : end + terminator.length;
+}
+
+function findXmlTagEnd(raw, start) {
+  let quote = null;
+  for (let index = start; index < raw.length; index += 1) {
+    const character = raw[index];
+    if (quote) {
+      if (character === quote) quote = null;
+    } else if (character === "\"" || character === "'") {
+      quote = character;
+    } else if (character === ">") {
+      return index;
     }
-    return raw.length - 1;
+  }
+  return raw.length - 1;
+}
+
+function skipXmlSpecialSection(raw, index) {
+  if (raw.startsWith("<!--", index)) return skipXmlSection(raw, index + 4, "-->");
+  if (raw.startsWith("<![CDATA[", index)) return skipXmlSection(raw, index + 9, "]]>");
+  if (raw.startsWith("<?", index)) return skipXmlSection(raw, index + 2, "?>");
+  if (raw.startsWith("<!", index)) return findXmlTagEnd(raw, index + 2) + 1;
+  return null;
+}
+
+function readXmlTagToken(raw, index) {
+  let cursor = index + 1;
+  const closing = raw[cursor] === "/";
+  if (closing) cursor += 1;
+  while (/\s/.test(raw[cursor] ?? "")) cursor += 1;
+  const nameStart = cursor;
+  while (cursor < raw.length && !/[\s/>]/.test(raw[cursor])) cursor += 1;
+  const nameLength = cursor - nameStart;
+  if (nameLength === 0) return null;
+
+  const name = nameLength <= MAX_XML_TAG_LENGTH ? raw.slice(nameStart, nameStart + nameLength) : null;
+  const end = findXmlTagEnd(raw, cursor);
+  let beforeEnd = end - 1;
+  while (beforeEnd > cursor && /\s/.test(raw[beforeEnd])) beforeEnd -= 1;
+  return {
+    closing,
+    name,
+    nextIndex: end + 1,
+    normalizedName: name?.toLowerCase() ?? SAFE_PLACEHOLDER,
+    selfClosing: raw[beforeEnd] === "/",
   };
-  const finishScalar = () => {
-    const value = scalar.text.trim();
-    if (scalar.name === "resultcode") resultCode = value;
-    if (scalar.name === "resultmsg") resultMessage = value;
-    scalar = null;
+}
+
+function appendXmlScalarText(raw, index, state) {
+  const nextTag = raw.indexOf("<", index);
+  const textEnd = nextTag === -1 ? raw.length : nextTag;
+  if (state.scalar?.text.length < MAX_XML_SCALAR_LENGTH && xmlScanDepth(state) === state.scalar.depth) {
+    const remaining = MAX_XML_SCALAR_LENGTH - state.scalar.text.length;
+    state.scalar.text += raw.slice(index, Math.min(textEnd, index + remaining));
+  }
+  return textEnd;
+}
+
+function finishXmlScalar(state) {
+  const value = state.scalar.text.trim();
+  if (state.scalar.name === "resultcode") state.resultCode = value;
+  if (state.scalar.name === "resultmsg") state.resultMessage = value;
+  state.scalar = null;
+}
+
+function closeXmlTag(state, token) {
+  if (state.scalar && token.normalizedName === state.scalar.name && xmlScanDepth(state) === state.scalar.depth) {
+    finishXmlScalar(state);
+  }
+  if (state.overflowDepth > 0) {
+    state.overflowDepth -= 1;
+  } else if (state.openTags.at(-1) === token.normalizedName) {
+    state.openTags.pop();
+  }
+}
+
+function safeXmlTagName(name) {
+  if (name && SAFE_XML_TAG.test(name) && !SENSITIVE_XML_TAG.test(name)) return name;
+  return SAFE_PLACEHOLDER;
+}
+
+function recordXmlOpening(state, token) {
+  if (state.scalar) return;
+  const safeName = safeXmlTagName(token.name);
+  if (!state.seen.has(safeName) && state.tags.length < 16) {
+    state.seen.add(safeName);
+    state.tags.push(safeName);
+  }
+  if (token.normalizedName === "item") state.itemCount += 1;
+}
+
+function isEnvelopeScalar(state, normalizedName) {
+  if (state.scalar || state.openTags.length !== 2 || state.overflowDepth !== 0) return false;
+  if (state.openTags[0] !== "root" || state.openTags[1] !== "header") return false;
+  if (normalizedName === "resultcode") return state.resultCode == null;
+  if (normalizedName === "resultmsg") return state.resultMessage == null;
+  return false;
+}
+
+function openXmlTag(state, token) {
+  recordXmlOpening(state, token);
+  const capturesEnvelopeScalar = isEnvelopeScalar(state, token.normalizedName);
+  if (token.selfClosing) {
+    if (capturesEnvelopeScalar) {
+      state.scalar = { name: token.normalizedName, depth: xmlScanDepth(state), text: "" };
+      finishXmlScalar(state);
+    }
+    return;
+  }
+
+  if (state.openTags.length < MAX_XML_DEPTH) {
+    state.openTags.push(token.normalizedName);
+  } else {
+    state.overflowDepth += 1;
+  }
+  if (capturesEnvelopeScalar) {
+    state.scalar = { name: token.normalizedName, depth: xmlScanDepth(state), text: "" };
+  }
+}
+
+function scanXmlStructure(raw) {
+  const state = {
+    tags: [],
+    seen: new Set(),
+    openTags: [],
+    overflowDepth: 0,
+    itemCount: 0,
+    resultCode: null,
+    resultMessage: null,
+    scalar: null,
   };
 
   for (let index = 0; index < raw.length;) {
     if (raw[index] !== "<") {
-      const nextTag = raw.indexOf("<", index);
-      const textEnd = nextTag === -1 ? raw.length : nextTag;
-      if (scalar && depth() === scalar.depth && scalar.text.length < MAX_XML_SCALAR_LENGTH) {
-        const remaining = MAX_XML_SCALAR_LENGTH - scalar.text.length;
-        scalar.text += raw.slice(index, Math.min(textEnd, index + remaining));
-      }
-      index = textEnd;
+      index = appendXmlScalarText(raw, index, state);
       continue;
     }
-    if (raw.startsWith("<!--", index)) {
-      index = skipSection(index + 4, "-->");
+    const specialSectionEnd = skipXmlSpecialSection(raw, index);
+    if (specialSectionEnd != null) {
+      index = specialSectionEnd;
       continue;
     }
-    if (raw.startsWith("<![CDATA[", index)) {
-      index = skipSection(index + 9, "]]>");
-      continue;
-    }
-    if (raw.startsWith("<?", index)) {
-      index = skipSection(index + 2, "?>");
-      continue;
-    }
-    if (raw.startsWith("<!", index)) {
-      index = tagEnd(index + 2) + 1;
-      continue;
-    }
-
-    let cursor = index + 1;
-    let closing = false;
-    if (raw[cursor] === "/") {
-      closing = true;
-      cursor += 1;
-    }
-    while (/\s/.test(raw[cursor] ?? "")) cursor += 1;
-    const nameStart = cursor;
-    while (cursor < raw.length && !/[\s/>]/.test(raw[cursor])) cursor += 1;
-    const nameLength = cursor - nameStart;
-    if (nameLength === 0) {
+    const token = readXmlTagToken(raw, index);
+    if (!token) {
       index += 1;
       continue;
     }
-    const name = nameLength <= MAX_XML_TAG_LENGTH ? raw.slice(nameStart, nameStart + nameLength) : null;
-    const end = tagEnd(cursor);
-    let beforeEnd = end - 1;
-    while (beforeEnd > cursor && /\s/.test(raw[beforeEnd])) beforeEnd -= 1;
-    const selfClosing = raw[beforeEnd] === "/";
-    const normalizedName = name?.toLowerCase() ?? SAFE_PLACEHOLDER;
-
-    if (closing) {
-      if (scalar && normalizedName === scalar.name && depth() === scalar.depth) {
-        finishScalar();
-      }
-      if (overflowDepth > 0) {
-        overflowDepth -= 1;
-      } else if (openTags.at(-1) === normalizedName) {
-        openTags.pop();
-      }
-      index = end + 1;
-      continue;
-    }
-
-    if (!scalar) {
-      const safeName = name && SAFE_XML_TAG.test(name) && !SENSITIVE_XML_TAG.test(name)
-        ? name
-        : SAFE_PLACEHOLDER;
-      if (!seen.has(safeName) && tags.length < 16) {
-        seen.add(safeName);
-        tags.push(safeName);
-      }
-      if (normalizedName === "item") itemCount += 1;
-    }
-
-    const isEnvelopeScalar = !scalar
-      && openTags.length === 2
-      && overflowDepth === 0
-      && openTags[0] === "root"
-      && openTags[1] === "header"
-      && ((normalizedName === "resultcode" && resultCode == null)
-        || (normalizedName === "resultmsg" && resultMessage == null));
-    if (!selfClosing) {
-      if (openTags.length < MAX_XML_DEPTH) {
-        openTags.push(normalizedName);
-      } else {
-        overflowDepth += 1;
-      }
-      if (isEnvelopeScalar) {
-        scalar = { name: normalizedName, depth: depth(), text: "" };
-      }
-    } else if (isEnvelopeScalar) {
-      scalar = { name: normalizedName, depth: depth(), text: "" };
-      finishScalar();
-    }
-    index = end + 1;
+    if (token.closing) closeXmlTag(state, token);
+    else openXmlTag(state, token);
+    index = token.nextIndex;
   }
 
   return {
-    itemCount,
-    resultCode,
-    resultMessage,
-    tagSummary: tags.length > 0 ? tags.join(",") : MISSING_PLACEHOLDER,
+    itemCount: state.itemCount,
+    resultCode: state.resultCode,
+    resultMessage: state.resultMessage,
+    tagSummary: state.tags.length > 0 ? state.tags.join(",") : MISSING_PLACEHOLDER,
   };
 }
 
@@ -283,9 +310,12 @@ function classifyXmlFailure({ itemCount, resultCode, resultMessage }) {
 
 function kricXmlDiagnostic(response, requestedFormat, raw) {
   const { itemCount, resultCode, resultMessage, tagSummary } = scanXmlStructure(raw);
-  const safeResultCode = resultCode == null
-    ? MISSING_PLACEHOLDER
-    : SAFE_RESULT_CODE.test(resultCode) ? resultCode : SAFE_PLACEHOLDER;
+  let safeResultCode = MISSING_PLACEHOLDER;
+  if (resultCode != null && SAFE_RESULT_CODE.test(resultCode)) {
+    safeResultCode = resultCode;
+  } else if (resultCode != null) {
+    safeResultCode = SAFE_PLACEHOLDER;
+  }
   const httpStatus = Number.isInteger(response.status) && response.status >= 100 && response.status <= 599
     ? response.status
     : SAFE_PLACEHOLDER;
