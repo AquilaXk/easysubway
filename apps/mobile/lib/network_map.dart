@@ -2413,16 +2413,14 @@ Map<String, String> parseNetworkMapAttributionByRegion(String manifestJson) {
 }
 
 // manifest는 프로세스 생애주기 동안 바뀌지 않는 번들 asset이라, 노선도 canvas가
-// 새로 마운트될 때마다(지역 전환 등) 매번 asset을 다시 읽지 않도록 1회만 로드해
-// 공유한다. cache:false로 rootBundle의 키 캐시를 우회하는 이유는 DataSourceAttribution
-// Screen도 같은 asset 키를 독립적으로 로드하기 때문에(#1951), rootBundle의 공유 캐시
-// Future를 함께 쓰면 두 로더가 서로 다른 시점에 얽혀 불필요하게 결합되는 것을 피하기
-// 위함이다 — 대신 이 파일 안에서만 쓰는 자체 캐시를 둔다.
+// 새로 마운트될 때마다(지역 전환 등) 매번 asset을 다시 읽지 않도록 모듈 캐시
+// (_sharedAttributionTextByRegionFuture)로 1회만 로드해 공유한다. 로드 실패
+// 시에는 캐시를 비워 다음 마운트에서 재시도한다(#1951).
 Future<Map<String, String>>? _sharedAttributionTextByRegionFuture;
 
 Future<Map<String, String>> _loadNetworkMapAttributionTextByRegion() {
   return _sharedAttributionTextByRegionFuture ??= rootBundle
-      .loadString(_mapManifestAssetPath, cache: false)
+      .loadString(_mapManifestAssetPath)
       .then(parseNetworkMapAttributionByRegion);
 }
 
@@ -2535,8 +2533,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       }
       setState(() => _attributionTextByRegion = byRegion);
     } catch (error, stackTrace) {
-      // asset 로드/파싱 실패는 attribution 미표기로 폴백한다(#1951) — 화면은
-      // 죽지 않되, 원인 파악을 위해 예외는 리포터로 남긴다.
+      // asset 로드/파싱 실패는 attribution 미표기로 폴백한다(#1951). 일시 오류가
+      // 영구 미표기로 고정되지 않도록 실패한 Future는 캐시에서 비워 다음 마운트
+      // 때 재시도되게 한다 — 화면은 죽지 않되, 원인 파악을 위해 예외는 리포터로
+      // 남긴다.
+      _sharedAttributionTextByRegionFuture = null;
       reportMobileError(
         error,
         stackTrace,
