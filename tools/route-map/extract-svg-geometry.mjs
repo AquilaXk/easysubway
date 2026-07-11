@@ -11,7 +11,12 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 // v2: <text> 라벨에 더해 노선 track geometry(line/polyline/polygon/path)를
 // root 좌표 정점 목록 + 확정 stroke 색(getComputedStyle)으로 함께 추출한다.
-const extractorVersion = "route-map-svg-geometry-v2";
+// v3(#1950): 오너 자작 8선형 도식(easy-subway-sma-v*)의 역 노드
+// (data-station/data-line/data-node-role를 가진 circle/g/path)를 조상 transform
+// 체인을 브라우저 CTM으로 정규화한 root 좌표 중심으로 함께 추출한다. transfer/edge
+// 역의 그룹 로컬 transform(rotate/translate/matrix)까지 정확히 합성되도록
+// getScreenCTM+getBBox를 쓴다(결정적: 폰트 무관, CTM 산술은 정확).
+const extractorVersion = "route-map-svg-geometry-v3";
 
 // 이 길이(root 좌표) 미만인 stroke는 노선이 아니라 역 마커 틱/장식으로 보고 버린다.
 // seoul SVG의 <line class="SDI">(≈20px 대각선 장식)를 걸러내는 하한이다.
@@ -308,7 +313,59 @@ function browserExtractorExpression(svg) {
       });
     }
 
-    return { sourceViewBox: sourceViewBox(root), labels, strokes };
+    // 역 노드: data-station + data-node-role를 가진 요소(circle/g/path)의 root 좌표
+    // 중심을 조상 transform 체인(scaled-layer + 그룹 로컬 rotate/translate/matrix)까지
+    // 합성해 산출한다. circle은 cx/cy를, 그 외는 getBBox 중심을 로컬 기준점으로 쓴다.
+    // 상위 요소가 이미 data-station을 들고 있으면 자식은 건너뛴다(그룹 대표 1노드).
+    function nodeCenterLocal(element) {
+      const tag = element.tagName.toLowerCase();
+      if (tag === "circle") {
+        return {
+          x: Number.parseFloat(element.getAttribute("cx") || "0"),
+          y: Number.parseFloat(element.getAttribute("cy") || "0"),
+        };
+      }
+      let bbox;
+      try {
+        bbox = element.getBBox();
+      } catch {
+        return null;
+      }
+      if (!(bbox.width >= 0) || !(bbox.height >= 0)) return null;
+      return { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
+    }
+    const stationNodes = [];
+    for (const element of root.querySelectorAll("[data-node-role][data-station]")) {
+      if (element.closest("defs")) continue;
+      // 조상 중 이미 data-station 노드가 있으면(예: transfer-symbol g 내부의 circle)
+      // 대표는 최상위 그 하나뿐 — 자식 중복은 배제한다.
+      const owner = element.parentElement?.closest("[data-node-role][data-station]");
+      if (owner) continue;
+      const local = nodeCenterLocal(element);
+      if (!local) continue;
+      const elementMatrix = element.getScreenCTM();
+      if (!elementMatrix) continue;
+      const matrix = rootInverse.multiply(elementMatrix);
+      const center = matrixPoint(matrix, local.x, local.y);
+      const dataStation = element.getAttribute("data-station") || "";
+      const dataName = element.getAttribute("data-name") || dataStation;
+      stationNodes.push({
+        dataStation,
+        dataName,
+        dataStationName: element.getAttribute("data-station-name") || dataName,
+        dataLine: element.getAttribute("data-line") || "",
+        dataLineName: element.getAttribute("data-line-name") || "",
+        dataLineColor: element.getAttribute("data-line-color") || "",
+        nodeRole: element.getAttribute("data-node-role") || "",
+        transferLines: element.getAttribute("data-transfer-lines") || "",
+        tag: element.tagName.toLowerCase(),
+        id: element.id || "",
+        x: center.x,
+        y: center.y,
+      });
+    }
+
+    return { sourceViewBox: sourceViewBox(root), labels, strokes, stationNodes };
   }})(${JSON.stringify(svgBase64)}, ${JSON.stringify({
     minStrokeLength: MIN_STROKE_LENGTH,
     pathSampleSpacing: PATH_SAMPLE_SPACING,
@@ -465,6 +522,20 @@ async function extractSvgGeometry({ svgFile, region, browser }) {
         const { descriptor: _descriptor, ...publicStroke } = stroke;
         return { ...publicStroke, strokeIndex, sourceElementKey };
       }),
+      // 결정적 출력: (data-line, data-station, id) 사전순으로 안정 정렬한다.
+      stationNodes: (extracted.stationNodes ?? [])
+        .slice()
+        .sort((a, b) =>
+          a.dataLine.localeCompare(b.dataLine) ||
+          a.dataStation.localeCompare(b.dataStation) ||
+          a.id.localeCompare(b.id),
+        )
+        .map((node, nodeIndex) => {
+          const sourceElementKey = sha256(
+            JSON.stringify({ id: node.id, dataStation: node.dataStation, dataLine: node.dataLine, sourceSvgSha256 }),
+          );
+          return { ...node, nodeIndex, sourceElementKey };
+        }),
     };
   } finally {
     await rm(tempDir, { recursive: true, force: true });
