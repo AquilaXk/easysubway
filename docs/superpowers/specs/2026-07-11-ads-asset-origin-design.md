@@ -102,7 +102,7 @@ landing URL은 기존 정책대로 absolute HTTPS만 요구하며 asset origin�
 node --test tools/ci/backend-deploy.test.mjs tools/ci/check-contracts.test.mjs
 node tools/ci/check-contracts.mjs
 node --test tools/ci/repository-contract.test.mjs
-backend/gradlew test --tests com.easysubway.ads.application.service.AdServiceTest --no-daemon
+backend/gradlew -p backend test --tests com.easysubway.ads.application.service.AdServiceTest --no-daemon
 bash -n tools/deploy/prepare-deployment-env.sh
 git diff --check
 ```
