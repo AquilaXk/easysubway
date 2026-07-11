@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import test from "node:test";
+import test, { afterEach } from "node:test";
 import { promisify } from "node:util";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
+const ASSET_ORIGIN = "https://ads-assets.fixture.test-only.dev";
+const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
+const deploymentTempDirs = new Set();
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
@@ -18,20 +21,155 @@ function fixtureEnv() {
   return read("tools/ci/fixtures/deployment-prod-valid.env");
 }
 
+afterEach(async () => {
+  await Promise.all(
+    [...deploymentTempDirs].map((dir) => rm(dir, { recursive: true, force: true })),
+  );
+  deploymentTempDirs.clear();
+});
+
+function withAssetOrigin(origin) {
+  return fixtureEnv().replace(
+    ASSET_ORIGIN_LINE,
+    `EASYSUBWAY_ADS_ASSET_ORIGIN=${origin}`,
+  );
+}
+
+async function assertInvalidAssetOrigin(origin) {
+  await assert.rejects(
+    prepare(withAssetOrigin(origin)),
+    (error) => {
+      const stderr = String(error.stderr ?? "");
+      assert.equal(
+        stderr,
+        "invalid public HTTPS origin: EASYSUBWAY_ADS_ASSET_ORIGIN\n",
+      );
+      return true;
+    },
+  );
+}
+
 async function prepare(source) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-deploy-env-"));
-  const sourceFile = path.join(dir, "source.env");
-  const outputDir = path.join(dir, "prepared");
-  await writeFile(sourceFile, source);
-  await execFileAsync("bash", [
-    "tools/deploy/prepare-deployment-env.sh",
-    sourceFile,
-    "tools/deploy/compose-server-env.allowlist",
-    "tools/deploy/backend-app-env.allowlist",
-    outputDir,
-  ], { cwd: root });
-  return outputDir;
+  deploymentTempDirs.add(dir);
+  try {
+    const sourceFile = path.join(dir, "source.env");
+    const outputDir = path.join(dir, "prepared");
+    await writeFile(sourceFile, source);
+    await execFileAsync("bash", [
+      "tools/deploy/prepare-deployment-env.sh",
+      sourceFile,
+      "tools/deploy/compose-server-env.allowlist",
+      "tools/deploy/backend-app-env.allowlist",
+      outputDir,
+    ], { cwd: root });
+    return outputDir;
+  } catch (error) {
+    try {
+      await rm(dir, { recursive: true, force: true });
+      deploymentTempDirs.delete(dir);
+    } catch {
+      // Preserve the original prepare error; afterEach retries registered dirs.
+    }
+    throw error;
+  }
 }
+
+test("광고 asset origin은 backend env에만 변형 없이 전달한다", async () => {
+  const outputDir = await prepare(fixtureEnv());
+  const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+  const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+  const assetOriginPrefix = "EASYSUBWAY_ADS_ASSET_ORIGIN=";
+
+  assert.ok(
+    backendEnv.split("\n").includes(ASSET_ORIGIN_LINE),
+    "backend.env must contain the exact asset origin line",
+  );
+  assert.ok(
+    !composeEnv.split("\n").includes(ASSET_ORIGIN_LINE),
+    "compose.env must not contain the asset origin line",
+  );
+  assert.equal(
+    backendEnv.split("\n").filter((line) => line.startsWith(assetOriginPrefix)).length,
+    1,
+    "backend.env must contain exactly one asset origin key",
+  );
+  assert.equal(
+    composeEnv.split("\n").filter((line) => line.startsWith(assetOriginPrefix)).length,
+    0,
+    "compose.env must not contain an asset origin key",
+  );
+});
+
+test("광고 asset origin production preflight는 unsafe 값을 차단한다", async () => {
+  await assert.rejects(
+    prepare(fixtureEnv().replace(`${ASSET_ORIGIN_LINE}\n`, "")),
+    /required deployment env is empty: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+  );
+  await assert.rejects(
+    prepare(withAssetOrigin("")),
+    /required deployment env is empty: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+  );
+  await assert.rejects(
+    prepare(`${fixtureEnv()}${ASSET_ORIGIN_LINE}\n`),
+    /duplicate dotenv key: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+  );
+
+  for (const origin of [
+    " ",
+    "http://ads-assets.fixture.easysubway.example",
+    "https://user@ads-assets.fixture.easysubway.example",
+    "https://ads-assets.fixture.easysubway.example/ads",
+    "https://ads-assets.fixture.easysubway.example?revision=1",
+    "https://ads-assets.fixture.easysubway.example#creative",
+    "https://localhost",
+    "https://127.0.0.1",
+    `https://${"a".repeat(64)}.example`,
+    `https://${["a", "b", "c", "d"].map((label) => label.repeat(63)).join(".")}`,
+    "https://127.1",
+    "https://0x7f.1",
+    "https://[::1]",
+    "https://10.0.0.1",
+    "https://object-storage",
+    "https://assets.internal",
+    "https://assets.home.arpa",
+    "https://1.0.0.127.in-addr.arpa",
+    "https://b.a.9.8.7.6.5.0.ip6.arpa",
+    "https://resolver.arpa",
+    "https://assets.onion",
+    "https://assets.alt",
+    "https://assets.easysubway.example",
+    "https://assets.easysubway.invalid",
+    "https://assets.easysubway.test",
+    "https://example.com",
+    "https://assets.example.com",
+    "https://example.net",
+    "https://assets.example.net",
+    "https://example.org",
+    "https://assets.example.org",
+    "https://assets.placeholder.test-only.dev",
+    "https://assets.todo.test-only.dev",
+    "https://-assets.test-only.dev",
+    "https://assets.test-only.dev:0",
+    "https://assets.test-only.dev:08",
+    "https://assets.test-only.dev:65536",
+  ]) {
+    await assertInvalidAssetOrigin(origin);
+  }
+
+  for (const origin of [
+    `${ASSET_ORIGIN}/`,
+    "https://ads-assets.fixture.test-only.dev:8443",
+    `https://${"a".repeat(63)}.127.test-only.dev`,
+  ]) {
+    const outputDir = await prepare(withAssetOrigin(origin));
+    const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+    assert.ok(
+      backendEnv.split("\n").includes(`EASYSUBWAY_ADS_ASSET_ORIGIN=${origin}`),
+      "backend.env must preserve an allowed origin exactly",
+    );
+  }
+});
 
 test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다", async () => {
   const outputDir = await prepare(fixtureEnv());
