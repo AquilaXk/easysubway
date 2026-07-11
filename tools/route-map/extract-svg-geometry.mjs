@@ -23,8 +23,6 @@ const extractorVersion = "route-map-svg-geometry-v3";
 const MIN_STROKE_LENGTH = 24;
 // path는 정점 정보가 d 안에 있어 직접 못 읽으므로 등간격으로 재샘플한다(root 좌표 px).
 const PATH_SAMPLE_SPACING = 8;
-// route path 코너 곡선 근사에서 생기는 짧은 비축 세그먼트(≈코너 반경) 병합 상한(root px).
-const CORNER_MERGE_PX = 12;
 
 function usage() {
   return `Usage: node tools/route-map/extract-svg-geometry.mjs <svg-file> --region <name> [--browser <path>] [--pretty]
@@ -244,9 +242,9 @@ function browserExtractorExpression(svg) {
       return out;
     }
     // 폴리라인을 8선형으로 정리한다. 각 세그먼트 방향을 최근접 8방향으로 양자화하고,
-    // 짧은(<=mergePx) 세그먼트는 코너 곡선 근사로 보고 제거한다(직전 8방향 run을 다음
-    // 정점까지 연장). 인접 두 run 방향이 다르면 그 교점을 코너 정점으로 둔다.
-    function octolinearizePolyline(points, mergePx) {
+    // 각 세그먼트 방향을 최근접 8방향으로 양자화하고, 같은 방향 run은 이전 정점을
+    // 투영점으로 연장 병합한다. 인접 두 run 방향이 다르면 그 교점을 코너 정점으로 둔다.
+    function octolinearizePolyline(points) {
       if (points.length < 3) return points;
       const DIRS = [
         { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }, { x: -1, y: 1 },
@@ -278,18 +276,11 @@ function browserExtractorExpression(svg) {
           prev.y = number(prev.y + dir.y * t);
           continue;
         }
-        // 방향 전환: 축 투영 길이만큼 새 정점 추가.
+        // 방향 전환: 축 투영 길이만큼 새 run 정점을 추가한다. 짧은 코너 브리지든
+        // 아니든 동일 처리 — 다음 정점이 같은 방향이면 위 분기가 이 정점을 흡수한다.
         const t = dx * dir.x + dy * dir.y;
-        const nx = number(prev.x + dir.x * t);
-        const ny = number(prev.y + dir.y * t);
-        if (len <= mergePx && curDir) {
-          // 짧은 코너 브리지: 새 run으로 취급하되 다음 정점에서 다시 흡수되도록.
-          out.push({ x: nx, y: ny });
-          curDir = dir;
-        } else {
-          out.push({ x: nx, y: ny });
-          curDir = dir;
-        }
+        out.push({ x: number(prev.x + dir.x * t), y: number(prev.y + dir.y * t) });
+        curDir = dir;
       }
       return out;
     }
@@ -405,7 +396,7 @@ function browserExtractorExpression(svg) {
       // 8선형 정리: 코너 곡선 끝점이 만드는 짧은 비축 세그먼트를 인접 8방향 run에
       // 흡수시켜 track 세그먼트를 0/45/90/135°로 정렬한다(오너 도식은 직선 run이
       // 이미 8선형이고, 어긋남은 곡선 근사에서만 온다). path stroke에만 적용.
-      if (tag === "path") points = octolinearizePolyline(points, config.cornerMergePx);
+      if (tag === "path") points = octolinearizePolyline(points);
       let length = 0;
       for (let index = 1; index < points.length; index += 1) {
         length += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
@@ -481,7 +472,6 @@ function browserExtractorExpression(svg) {
   }})(${JSON.stringify(svgBase64)}, ${JSON.stringify({
     minStrokeLength: MIN_STROKE_LENGTH,
     pathSampleSpacing: PATH_SAMPLE_SPACING,
-    cornerMergePx: CORNER_MERGE_PX,
   })})`;
 }
 
