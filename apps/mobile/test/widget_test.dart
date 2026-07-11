@@ -114,10 +114,37 @@ Future<void> _openFavoriteList(
   // 즐겨찾기 홈은 단일 리스트라 카테고리 진입 탭이 없다. 항목이 바로 보인다(#1569).
 }
 
-Future<void> _openRouteSearchScreen(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+/// #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 노선도 홈에서 결과 화면에 이르는
+/// 정당한 흐름은 "역 탭 팝오버로 출발·도착 지정 → 자동 결과"뿐이다. 이 헬퍼는 기본
+/// 노선도(상록수/사당)에서 그 흐름을 그대로 태워 결과 탭까지 데려간다.
+Future<void> _openRouteSearchScreen(
+  WidgetTester tester, {
+  String originStationKey = 'networkMapStation-sangnoksu-seoul-4',
+  String destinationStationKey = 'networkMapStation-sadang-seoul-2',
+}) async {
+  // 노선도(지도·역)가 렌더될 때까지 기다린 뒤 역을 탭한다.
   await tester.pumpAndSettle();
-  await tester.tap(find.byKey(const Key('networkMapMenuRouteSearchButton')));
+  await tester.tap(find.byKey(Key(originStationKey)));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(
+      of: find.byKey(const Key('networkMapStationSheet')),
+      matching: find.text('출발'),
+    ),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(Key(destinationStationKey)));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.descendant(
+      of: find.byKey(const Key('networkMapStationSheet')),
+      matching: find.text('도착'),
+    ),
+  );
+  // 출발·도착이 모두 차면 셸이 자동으로 결과 타임라인 탭으로 전환한다. 전환은
+  // 120ms 디바운스 Timer로 예약되므로 프레임만 도는 pumpAndSettle 전에 Timer를
+  // 흘려보낸다.
+  await tester.pump(const Duration(milliseconds: 200));
   await tester.pumpAndSettle();
 }
 
@@ -246,20 +273,6 @@ Future<void> _openRouteOriginStationInput(WidgetTester tester) async {
   }
   await tester.ensureVisible(find.byKey(const Key('routeOriginPointButton')));
   await tester.tap(find.byKey(const Key('routeOriginPointButton')));
-  await tester.pumpAndSettle();
-}
-
-Future<void> _openRouteDestinationStationInput(WidgetTester tester) async {
-  if (find
-      .byKey(const Key('routeDestinationStationInput'))
-      .evaluate()
-      .isNotEmpty) {
-    return;
-  }
-  await tester.ensureVisible(
-    find.byKey(const Key('routeDestinationPointButton')),
-  );
-  await tester.tap(find.byKey(const Key('routeDestinationPointButton')));
   await tester.pumpAndSettle();
 }
 
@@ -538,42 +551,9 @@ void main() {
       ),
     );
 
+    // #1933 요구 3: 노선도 팝오버로 출발·도착을 정하면 온보딩에서 고른 이동 조건
+    // (휠체어)이 자동 검색에 그대로 반영된다.
     await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
 
     expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
   });
@@ -756,8 +736,14 @@ void main() {
 
       await tester.tap(find.byKey(const Key('networkMapMenuButton')));
       await tester.pumpAndSettle();
+      // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴으므로 좌측 메뉴 "길찾기" 항목은
+      // 제거됐다. 역 검색은 그대로 남는다.
       expect(
         find.byKey(const Key('networkMapMenuRouteSearchButton')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('networkMapMenuStationSearchButton')),
         findsOneWidget,
       );
       expect(find.text('최근 경로'), findsNothing);
@@ -1066,33 +1052,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // #1933 요구 3: 노선도 역 탭(팝오버 출발/도착)으로 출발·도착을 정하면 자동으로
+    // 결과 타임라인 화면에 도달한다(별도 폼·제출 버튼 없음).
     await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
     await _openFirstRouteResultDetail(tester);
     expect(find.text('이동 순서'), findsOneWidget);
 
@@ -1137,7 +1099,7 @@ void main() {
     expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
   });
 
-  testWidgets('노선도 메뉴 길찾기는 길찾기 화면으로 전환한다', (tester) async {
+  testWidgets('노선도에서 출발·도착을 정하면 길찾기 결과 화면으로 전환한다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
         repository: FakeStationSearchRepository(),
@@ -1247,7 +1209,6 @@ void main() {
             networkMapError: StateError('map failed'),
           ),
           routeDraftController: RouteDraftController(),
-          onOpenRouteSearch: () async {},
           onOpenStationSearch: () {},
         ),
       ),
@@ -1305,7 +1266,6 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenRouteSearch: () async {},
           onOpenStationSearch: () {},
         ),
       ),
@@ -1360,7 +1320,6 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenRouteSearch: () async {},
           onOpenStationSearch: () {},
           // main.dart의 openStationSearchForSlot 대역: 실제 앱에서는 역 검색을 열어
           // 결과 탭 시 같은 controller에 slot을 설정한다. 여기선 그 계약(어떤 slot을
@@ -2287,13 +2246,16 @@ void main() {
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(find.text('출발'), findsOneWidget);
     expect(find.text('도착'), findsOneWidget);
+    // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴으므로 팝오버의 "길찾기" 액션도
+    // 제거했다. 출발/도착 지정이 곧 흐름이며, 둘 다 차면 자동으로 결과가 열린다.
     expect(
       find.descendant(
         of: find.byKey(const Key('networkMapStationSheet')),
         matching: find.text('길찾기'),
       ),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.text('닫기'), findsOneWidget);
   });
 
   testWidgets('노선도 역은 스크린리더 tap으로도 설정 sheet를 연다', (tester) async {
@@ -6081,8 +6043,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(SnackBarAction, '길찾기 보기'), findsOneWidget);
-    await tester.tap(find.widgetWithText(SnackBarAction, '길찾기 보기'));
+    // #1933 요구 3: 별도 길찾기 폼 페이지·"길찾기 보기" 스낵바 액션을 없앴다. 역
+    // 검색으로 출발·도착을 모두 채우면 홈 셸이 자동으로 결과 탭으로 전환하므로,
+    // 검색 화면을 닫고 돌아오면 곧바로 결과 타임라인이 보인다.
+    expect(find.widgetWithText(SnackBarAction, '길찾기 보기'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
     expect(
@@ -6178,18 +6145,13 @@ void main() {
         findsOneWidget,
       );
       expect(find.bySemanticsLabel('출발 도착 바꾸기'), findsOneWidget);
-      expect(find.text('이동 조건'), findsOneWidget);
-      // 폼 요약은 조건명만 남기고 중복 조건 요약 부제·협박형 캡션을 제거했다(#1568).
-      expect(find.text('천천히 이동'), findsWidgets);
-      expect(find.text('계단 피하기 · 환승 줄이기'), findsNothing);
-      expect(find.text('계단 없는 길만'), findsOneWidget);
-      expect(find.text('켜면 경로가 줄거나 없을 수 있어요.'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '길찾기'), findsOneWidget);
 
-      // #1933 D: 완성된 draft는 자동 검색이 돌아 결과-우선 화면으로 바뀐다.
-      // 입력 폼(이동 조건 헤더·계단 토글·하단 길찾기 버튼)과 최근 도착지는 사라지고,
-      // 조용한 이동 조건 칩과 이동 순서 타임라인이 그 자리에 나타난다.
+      // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 완성된 draft로 진입하면 입력
+      // 폼(이동 조건 헤더·계단 토글 스위치·하단 "길찾기" 버튼·최근 도착지) 대신 곧바로
+      // 자동 검색이 돌아 결과-우선 화면(조용한 조건 칩 + 이동 순서 타임라인)이 뜬다.
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('routeMobilityTypeInput')), findsNothing);
+      expect(find.byKey(const Key('routeStrictStepFreeSwitch')), findsNothing);
       expect(find.byKey(const Key('routeConditionChips')), findsOneWidget);
       expect(find.text('최근 도착지'), findsNothing);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsNothing);
@@ -6376,171 +6338,6 @@ void main() {
       find.byKey(const Key('routeDestinationPointButton')),
       findsOneWidget,
     );
-  });
-
-  testWidgets('경로 검색 최근 도착지 실패는 빈 화면으로 숨기지 않는다', (tester) async {
-    final favoriteRouteRepository = FakeFavoriteRouteRepository(
-      favorites: [_favoriteRoute()],
-    )..error = Exception('network');
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: RouteSearchScreen(
-          repository: FakeRouteSearchRepository(),
-          stationRepository: FakeStationSearchRepository(),
-          favoriteRouteRepository: favoriteRouteRepository,
-          initialMobilityType: 'SENIOR',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('최근 도착지를 불러오지 못했어요.'), findsOneWidget);
-    expect(
-      find.byKey(const Key('routeRecentDestinationRetryButton')),
-      findsOneWidget,
-    );
-
-    favoriteRouteRepository.error = null;
-    await tester.tap(
-      find.byKey(const Key('routeRecentDestinationRetryButton')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('최근 도착지를 불러오지 못했어요.'), findsNothing);
-    expect(find.text('최근 도착지'), findsOneWidget);
-  });
-
-  testWidgets('경로 검색은 출발 도착 선택 전 CTA 사유와 입력창 검색 아이콘을 보여준다', (tester) async {
-    final semanticsHandle = tester.ensureSemantics();
-    try {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: RouteSearchScreen(
-            repository: FakeRouteSearchRepository(),
-            stationRepository: FakeStationSearchRepository(),
-            favoriteRouteRepository: FakeFavoriteRouteRepository(),
-            initialMobilityType: 'SENIOR',
-          ),
-        ),
-      );
-
-      final submitButton = tester.widget<FilledButton>(
-        find.byKey(const Key('routeSearchSubmitButton')),
-      );
-      expect(submitButton.onPressed, isNull);
-      expect(
-        find.bySemanticsLabel('길찾기, 출발역과 도착역을 먼저 선택해 주세요'),
-        findsOneWidget,
-      );
-
-      await _openRouteOriginStationInput(tester);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('routePointPickerCard')),
-          matching: find.byKey(const Key('routeOriginStationInput')),
-        ),
-        findsOneWidget,
-      );
-      final originInput = tester.widget<TextField>(
-        find.byKey(const Key('routeOriginStationInput')),
-      );
-      expect(originInput.decoration?.suffixIcon, isNotNull);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('routePointPickerCard')),
-          matching: find.byKey(const Key('routeOriginStationSearchButton')),
-        ),
-        findsOneWidget,
-      );
-    } finally {
-      semanticsHandle.dispose();
-    }
-  });
-
-  testWidgets('길찾기 하단 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetViewPadding);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: RouteSearchScreen(
-          repository: FakeRouteSearchRepository(),
-          stationRepository: FakeStationSearchRepository(),
-          initialMobilityType: 'SENIOR',
-        ),
-      ),
-    );
-
-    final screenBottom =
-        tester.view.physicalSize.height / tester.view.devicePixelRatio;
-    final buttonRect = tester.getRect(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-
-    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
-  });
-
-  testWidgets('길찾기 하단 버튼은 가로 safe-area 안쪽에 배치된다', (tester) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    tester.view.viewPadding = const FakeViewPadding(
-      left: 44,
-      right: 56,
-      bottom: 34,
-    );
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetViewPadding);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: RouteSearchScreen(
-          repository: FakeRouteSearchRepository(),
-          stationRepository: FakeStationSearchRepository(),
-          initialMobilityType: 'SENIOR',
-        ),
-      ),
-    );
-
-    final buttonRect = tester.getRect(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-
-    expect(buttonRect.left, greaterThanOrEqualTo(44));
-    expect(390 - buttonRect.right, greaterThanOrEqualTo(56));
-  });
-
-  testWidgets('길찾기 하단 버튼은 키보드가 열려도 가려지지 않는다', (tester) async {
-    tester.view.physicalSize = const Size(390, 844);
-    tester.view.devicePixelRatio = 1;
-    tester.view.viewPadding = const FakeViewPadding(bottom: 34);
-    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    addTearDown(tester.view.resetViewPadding);
-    addTearDown(tester.view.resetViewInsets);
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: RouteSearchScreen(
-          repository: FakeRouteSearchRepository(),
-          stationRepository: FakeStationSearchRepository(),
-          initialMobilityType: 'SENIOR',
-        ),
-      ),
-    );
-
-    final visibleBottom =
-        tester.view.physicalSize.height / tester.view.devicePixelRatio -
-        tester.view.viewInsets.bottom;
-    final buttonRect = tester.getRect(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-
-    expect(visibleBottom - buttonRect.bottom, greaterThanOrEqualTo(20));
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
@@ -8633,37 +8430,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // #1933 요구 3: 노선도 팝오버로 출발·도착을 정하면 현재 이동 프로필(휠체어)로
+    // 자동 검색이 돌아 결과가 온다. 폼·제출 버튼 경로는 제거됐다.
     await _openRouteSearchScreen(tester);
-    expect(find.text('휠체어 이용'), findsOneWidget);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
 
     expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
   });
@@ -8689,60 +8458,15 @@ void main() {
         ),
       );
 
+      // #1933 요구 3: 노선도 팝오버로 출발·도착을 정하면 자동 검색이 돌아 결과-우선
+      // 화면에 도달한다(폼·제출 버튼 없음).
       await _openRouteSearchScreen(tester);
 
       expect(
         find.descendant(of: find.byType(AppBar), matching: find.text('길찾기')),
         findsOneWidget,
       );
-      expect(find.text('출발역 선택'), findsOneWidget);
-      expect(find.text('도착역 선택'), findsOneWidget);
-      expect(find.text('출발역 ID'), findsNothing);
-      expect(find.text('도착역 ID'), findsNothing);
-      expect(find.text('적용 중인 조건'), findsNothing);
-      expect(find.text('천천히 이동'), findsOneWidget);
-      expect(
-        find.byKey(const Key('routeSimpleMobilityTypeButton')),
-        findsOneWidget,
-      );
       expect(find.byType(DropdownButton<String>), findsNothing);
-
-      await _openRouteOriginStationInput(tester);
-      final originInput = tester.widget<TextField>(
-        find.byKey(const Key('routeOriginStationInput')),
-      );
-      expect(originInput.decoration?.hintText, '역 이름을 입력해 주세요');
-      await tester.enterText(
-        find.byKey(const Key('routeOriginStationInput')),
-        '상록수',
-      );
-      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-      await tester.pumpAndSettle();
-      expect(
-        tester.getSemantics(find.bySemanticsLabel('출발역 선택, 상록수, 수도권 2호선, 수도권')),
-        isSemantics(
-          label: '출발역 선택, 상록수, 수도권 2호선, 수도권',
-          isButton: true,
-          hasTapAction: true,
-        ),
-      );
-      await tester.tap(
-        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      await _openRouteDestinationStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeDestinationStationInput')),
-        '사당',
-      );
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationSearchButton')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-      );
-      await tester.pumpAndSettle();
 
       final originButtonLeft = tester.getTopLeft(
         find.byKey(const Key('routeOriginPointButton')),
@@ -8750,12 +8474,6 @@ void main() {
       final originTextLeft = tester.getTopLeft(find.text('상록수역'));
       expect(originTextLeft.dx - originButtonLeft.dx, greaterThanOrEqualTo(24));
 
-      await tester.drag(find.byType(ListView), const Offset(0, -360));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-      await tester.pumpAndSettle();
-
-      expect(stationRepository.requestedQueries, ['상록수', '사당']);
       expect(routeRepository.requests, hasLength(1));
       expect(
         routeRepository.requests.single.originStationId,
@@ -9000,46 +8718,31 @@ void main() {
       ),
     );
 
+    // #1933 요구 3: 별도 폼(이동 조건 드롭다운)을 없앴다. 노선도 팝오버로 출발·도착을
+    // 정해 결과에 도달한 뒤, 결과-우선 화면의 조용한 이동 조건 칩으로 조건을 바꾸면
+    // 그 자리에서 바로 재검색한다.
     await _openRouteSearchScreen(tester);
 
-    expect(find.text('이동 조건'), findsOneWidget);
-    expect(find.byType(DropdownButton<String>), findsOneWidget);
+    expect(find.byType(DropdownButton<String>), findsNothing);
+    expect(find.byKey(const Key('routeConditionMobilityChip')), findsOneWidget);
 
-    await tester.tap(find.byType(DropdownButton<String>));
+    await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('휠체어 이용').last);
-    await tester.pumpAndSettle();
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('routeMobilityOption-WHEELCHAIR')),
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('routeMobilityOptionsList')),
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
+    await tester.tap(find.byKey(const Key('routeMobilityOption-WHEELCHAIR')));
     await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
+    await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
-
-    expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
+    expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('경로 검색 단순 보기에서도 이동 조건을 바꿀 수 있다', (tester) async {
@@ -9061,12 +8764,14 @@ void main() {
       ),
     );
 
+    // #1933 요구 3: 노선도 팝오버로 출발·도착을 정해 결과에 도달한 뒤, 결과-우선
+    // 화면의 이동 조건 칩(→ 이동 조건 시트)으로 조건을 바꾼다. 폼·제출 버튼은 없다.
     await _openRouteSearchScreen(tester);
 
     expect(find.byType(DropdownButton<String>), findsNothing);
-    expect(find.text('천천히 이동'), findsOneWidget);
+    expect(find.byKey(const Key('routeConditionMobilityChip')), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('routeSimpleMobilityTypeButton')));
+    await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('routeMobilityOptionsList')), findsOneWidget);
@@ -9100,40 +8805,7 @@ void main() {
     await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
     await tester.pumpAndSettle();
 
-    // 폼 요약은 조건명만 남기고 조건 요약 부제는 제거했다(#1568).
-    expect(find.text('휠체어 이용'), findsOneWidget);
-    expect(find.text('계단 피하기 · 엘리베이터 이동'), findsNothing);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
-
-    expect(routeRepository.requests.single.mobilityType, 'WHEELCHAIR');
+    expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
   });
 
   testWidgets('경로 검색 단순 보기 이동 조건은 스크린리더로도 바꿀 수 있다', (tester) async {
@@ -9150,9 +8822,10 @@ void main() {
         ),
       );
 
+      // #1933 요구 3: 폼의 이동 조건 요약 대신, 결과-우선 화면의 조용한 이동 조건
+      // 칩이 스크린리더에서 "이동 조건 바꾸기" 버튼으로 남는다.
       await _openRouteSearchScreen(tester);
 
-      expect(find.bySemanticsLabel('현재 이동 조건 천천히 이동'), findsOneWidget);
       expect(
         tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 천천히 이동')),
         isSemantics(
@@ -9187,35 +8860,8 @@ void main() {
     );
 
     await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
+    // #1933 요구 3: 출발·도착은 노선도 팝오버로 이미 정해졌고 자동 검색이 결과를
+    // 만들었다(폼·제출 버튼 없음).
 
     await _openFirstRouteResultDetail(tester);
 
@@ -9258,7 +8904,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
     await tester.pumpAndSettle();
     await _openFirstRouteResultDetail(tester);
 
@@ -9292,7 +8938,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
     await tester.pumpAndSettle();
     await _openFirstRouteResultDetail(tester);
 
@@ -9328,35 +8974,8 @@ void main() {
       );
 
       await _openRouteSearchScreen(tester);
-      await _openRouteOriginStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeOriginStationInput')),
-        '상록수',
-      );
-      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      await _openRouteDestinationStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeDestinationStationInput')),
-        '사당',
-      );
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationSearchButton')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.drag(find.byType(ListView), const Offset(0, -360));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-      await tester.pumpAndSettle();
+      // #1933 요구 3: 출발·도착은 노선도 팝오버로 이미 정해졌고 자동 검색이 결과를
+      // 만들었다(폼·제출 버튼 없음).
 
       await _openFirstRouteResultDetail(tester);
 
@@ -9413,35 +9032,8 @@ void main() {
     );
 
     await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
+    // #1933 요구 3: 출발·도착은 노선도 팝오버로 이미 정해졌고 자동 검색이 결과를
+    // 만들었다(폼·제출 버튼 없음).
 
     await _openFirstRouteResultDetail(tester);
     await tester.ensureVisible(
@@ -9500,6 +9092,9 @@ void main() {
         ),
       ),
     );
+    // #1933 요구 3: 완성된 draft는 자동 검색으로 결과-우선 화면에 도달한다. 그 화면의
+    // 얇은 출발 헤더를 탭하면 인라인 역 검색 입력이 열려 편집(→ 재검색)할 수 있다.
+    await tester.pumpAndSettle();
 
     await _openRouteOriginStationInput(tester);
     await tester.enterText(
@@ -9544,35 +9139,8 @@ void main() {
     );
 
     await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
+    // #1933 요구 3: 출발·도착은 노선도 팝오버로 이미 정해졌고 자동 검색이 결과를
+    // 만들었다(폼·제출 버튼 없음).
 
     await _openFirstRouteResultDetail(tester);
 
@@ -9623,7 +9191,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
     await tester.pumpAndSettle();
 
     // #1933 E: 결과-우선 헤더는 긴 두 줄 문장 대신 짧은 캡션 한 줄로 축약한다.
@@ -9907,7 +9475,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 요구 3: 완성된 draft는 자동 검색으로 결과에 도달한다(폼·제출 버튼 없음).
     await tester.pumpAndSettle();
 
     expect(find.text('하차 알림'), findsNothing);
@@ -10032,7 +9600,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
     await tester.pumpAndSettle();
     await controller.enable(
       routeId: 'route-1',
@@ -10599,7 +10167,7 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('하차 알림'));
       await tester.pumpAndSettle();
@@ -10765,7 +10333,7 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
       await tester.pumpAndSettle();
       await controller.enable(
         routeId: 'route-1',
@@ -10872,7 +10440,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
     await tester.pumpAndSettle();
     await controller.enable(
       routeId: 'route-1',
@@ -11081,7 +10649,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+    // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
     await tester.pumpAndSettle();
     await controller.enable(
       routeId: 'route-1',
@@ -11175,7 +10743,7 @@ void main() {
           ),
         ),
       );
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
+      // #1933 요구 3: 완성된 draft가 자동 검색을 이미 돌렸다(제출 버튼 없음).
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
@@ -11285,35 +10853,8 @@ void main() {
     );
 
     await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
+    // #1933 요구 3: 출발·도착은 노선도 팝오버로 이미 정해졌고 자동 검색이 결과를
+    // 만들었다(폼·제출 버튼 없음).
 
     await _openFirstRouteResultDetail(tester);
     await tester.ensureVisible(
@@ -11356,35 +10897,8 @@ void main() {
       );
 
       await _openRouteSearchScreen(tester);
-      await _openRouteOriginStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeOriginStationInput')),
-        '상록수',
-      );
-      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      await _openRouteDestinationStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeDestinationStationInput')),
-        '사당',
-      );
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationSearchButton')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.drag(find.byType(ListView), const Offset(0, -360));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-      await tester.pumpAndSettle();
+      // #1933 요구 3: 출발·도착은 노선도 팝오버로 이미 정해졌고 자동 검색이 결과를
+      // 만들었다(폼·제출 버튼 없음).
 
       await _openFirstRouteResultDetail(tester);
       await tester.ensureVisible(
@@ -11456,37 +10970,21 @@ void main() {
           repository: routeRepository,
           stationRepository: stationRepository,
           initialMobilityType: 'SENIOR',
+          // #1933 요구 3: 완성된 draft로 진입하면 자동 검색이 결과를 만든다(폼 없음).
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 23),
+          ),
         ),
       ),
     );
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -11499,42 +10997,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('routeStartGuidanceButton')), findsNothing);
-  });
-
-  testWidgets('경로 검색은 입력만 하고 선택하지 않은 역을 쉬운 문구로 안내한다', (tester) async {
-    final routeRepository = FakeRouteSearchRepository();
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: routeRepository,
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
-
-    expect(routeRepository.requests, isEmpty);
-    final submitButton = tester.widget<FilledButton>(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-    expect(submitButton.onPressed, isNull);
-    expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsNothing);
-    expect(find.text('역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'), findsNothing);
   });
 
   testWidgets('경로 검색 실패는 도움말을 쉬운 문구로 안내한다', (tester) async {
@@ -11562,35 +11024,8 @@ void main() {
       );
 
       await _openRouteSearchScreen(tester);
-      await _openRouteOriginStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeOriginStationInput')),
-        '상록수',
-      );
-      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      await _openRouteDestinationStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeDestinationStationInput')),
-        '사당',
-      );
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationSearchButton')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.drag(find.byType(ListView), const Offset(0, -360));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-      await tester.pumpAndSettle();
+      // #1933 요구 3: 출발·도착은 노선도 팝오버로 이미 정해졌고 자동 검색이 결과를
+      // 만들었다(폼·제출 버튼 없음).
 
       expect(routeRepository.requests, hasLength(1));
       expect(find.text('경로 정보를 불러오지 못했어요.'), findsOneWidget);
@@ -11635,39 +11070,13 @@ void main() {
       ),
     );
 
+    // #1933 요구 3: 노선도 팝오버로 출발·도착을 정하면 자동 검색이 결과를 만든다.
     await _openRouteSearchScreen(tester);
-    await _openRouteOriginStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeOriginStationInput')),
-      '상록수',
-    );
-    await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    await _openRouteDestinationStationInput(tester);
-    await tester.enterText(
-      find.byKey(const Key('routeDestinationStationInput')),
-      '사당',
-    );
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationSearchButton')),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('routeDestinationStationOption-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
-    await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
 
+    // 얇은 출발 헤더를 탭해 편집을 시작하고 역명을 지우면(선택이 바뀌면), 이전 결과는
+    // 곧바로 숨는다. 별도 폼·제출 버튼 없이 인라인 편집으로만 재검색으로 이어진다.
     await tester.drag(find.byType(ListView), const Offset(0, 700));
     await tester.pumpAndSettle();
     await _openRouteOriginStationInput(tester);
@@ -11676,80 +11085,44 @@ void main() {
       '상록',
     );
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView), const Offset(0, -360));
-    await tester.pumpAndSettle();
 
     expect(routeRepository.requests, hasLength(1));
-    final submitButton = tester.widget<FilledButton>(
-      find.byKey(const Key('routeSearchSubmitButton')),
-    );
-    expect(submitButton.onPressed, isNull);
     expect(find.text('출발역과 도착역을 검색 결과에서 선택해 주세요.'), findsNothing);
-
-    await tester.drag(find.byType(ListView), const Offset(0, -500));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('routeResultListItem')), findsNothing);
   });
 
-  testWidgets('경로 검색 중에는 버튼을 비활성화하고 안내 불가 이유를 보여준다', (tester) async {
+  testWidgets('자동 검색 중에는 결과 목록을 감추고 완료 후 안내 불가 이유를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
-    final stationRepository = FakeStationSearchRepository(
-      queryResults: {
-        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
-        '없는역': [_stationResult(id: 'station-nowhere', name: '없는역')],
-      },
-    );
     final routeRepository = ControlledRouteSearchRepository();
 
     try {
+      // #1933 요구 3: 완성된 draft로 진입하면 폼·제출 버튼 없이 자동 검색이 돈다.
+      // 검색 중에는 결과 목록이 없고, 완료되면 blocked 안내가 인라인으로 뜬다.
       await tester.pumpWidget(
-        EasySubwayApp(
-          repository: stationRepository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: routeRepository,
-          favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingState(),
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            initialMobilityType: 'SENIOR',
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-nowhere',
+                nameKo: '없는역',
+              ),
+              lastModifiedAt: DateTime(2026, 6, 23),
+            ),
+          ),
         ),
       );
-
-      await _openRouteSearchScreen(tester);
-      await _openRouteOriginStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeOriginStationInput')),
-        '상록수',
-      );
-      await tester.tap(find.byKey(const Key('routeOriginStationSearchButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeOriginStationOption-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      await _openRouteDestinationStationInput(tester);
-      await tester.enterText(
-        find.byKey(const Key('routeDestinationStationInput')),
-        '없는역',
-      );
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationSearchButton')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('routeDestinationStationOption-station-nowhere')),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.drag(find.byType(ListView), const Offset(0, -360));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('routeSearchSubmitButton')));
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
       expect(routeRepository.requests, hasLength(1));
-      expect(find.widgetWithText(FilledButton, '경로 검색 중'), findsOneWidget);
-      final loadingButton = tester.widget<FilledButton>(
-        find.byKey(const Key('routeSearchSubmitButton')),
-      );
-      expect(loadingButton.onPressed, isNull);
+      expect(find.byKey(const Key('routeResultListItem')), findsNothing);
 
       routeRepository.complete(_blockedRouteSearchResult());
       await tester.pumpAndSettle();
@@ -11772,10 +11145,6 @@ void main() {
         find.bySemanticsLabel('도움말, 역을 다시 선택하거나 이동 조건을 바꾼 뒤 경로를 다시 찾아보세요.'),
         findsOneWidget,
       );
-      final completedButton = tester.widget<FilledButton>(
-        find.byKey(const Key('routeSearchSubmitButton')),
-      );
-      expect(completedButton.onPressed, isNotNull);
     } finally {
       semanticsHandle.dispose();
     }

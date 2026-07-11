@@ -358,7 +358,6 @@ class NetworkMapScreen extends StatefulWidget {
   const NetworkMapScreen({
     required this.repository,
     required this.routeDraftController,
-    required this.onOpenRouteSearch,
     required this.onOpenStationSearch,
     this.onPickStationForSlot,
     this.stationSearchRepository,
@@ -378,7 +377,6 @@ class NetworkMapScreen extends StatefulWidget {
 
   final NetworkMapRepository repository;
   final RouteDraftController routeDraftController;
-  final Future<void> Function() onOpenRouteSearch;
   final VoidCallback onOpenStationSearch;
 
   /// 상단 draft 오버레이의 출발/도착 칸을 탭했을 때, 그 칸을 채우려고 기존 역 검색을
@@ -617,7 +615,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                   : null,
               onSetOrigin: _setOriginStation,
               onSetDestination: _setDestinationStation,
-              onOpenRouteSearch: _openRouteSearchFromMap,
               onViewportChanged: (viewport) {
                 _saveRecentViewport(data.selectedRegion, viewport);
               },
@@ -800,7 +797,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       pageBuilder: (context, animation, secondaryAnimation) {
         return _NetworkMapMenuPanel(
           onOpenStationSearch: widget.onOpenStationSearch,
-          onOpenRouteSearch: widget.onOpenRouteSearch,
           onOpenSavedItems: widget.onOpenSavedItems,
           onOpenNearbyStations: widget.onOpenNearbyStations,
           onOpenServiceNotices: widget.onOpenServiceNotices,
@@ -842,10 +838,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   void _swapDraftStations() {
     widget.routeDraftController.swapOriginDestination();
-  }
-
-  void _openRouteSearchFromMap(NetworkMapStation station) {
-    widget.onOpenRouteSearch();
   }
 
   /// G4: 상단 오버레이 출발 칸 탭 → 기존 역 검색을 "출발역 채우기" 모드로 연다.
@@ -2035,7 +2027,6 @@ class _NetworkMapBottomAdBanner extends StatelessWidget {
 class _NetworkMapMenuPanel extends StatelessWidget {
   const _NetworkMapMenuPanel({
     required this.onOpenStationSearch,
-    required this.onOpenRouteSearch,
     required this.onOpenSavedItems,
     required this.onOpenNearbyStations,
     required this.onOpenServiceNotices,
@@ -2044,7 +2035,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   });
 
   final VoidCallback onOpenStationSearch;
-  final Future<void> Function() onOpenRouteSearch;
   final VoidCallback? onOpenSavedItems;
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback? onOpenServiceNotices;
@@ -2059,11 +2049,6 @@ class _NetworkMapMenuPanel extends StatelessWidget {
   void _runActionAfterMenuClose(BuildContext context, VoidCallback action) {
     Navigator.of(context).pop();
     Future<void>.delayed(const Duration(milliseconds: 180), action);
-  }
-
-  void _runFutureAction(BuildContext context, Future<void> Function() action) {
-    Navigator.of(context).pop();
-    unawaited(action());
   }
 
   @override
@@ -2094,13 +2079,9 @@ class _NetworkMapMenuPanel extends StatelessWidget {
                         label: '역 검색',
                         onTap: () => _runAction(context, onOpenStationSearch),
                       ),
-                      _NetworkMapMenuTile(
-                        key: const Key('networkMapMenuRouteSearchButton'),
-                        icon: Icons.route_outlined,
-                        label: '길찾기',
-                        onTap: () =>
-                            _runFutureAction(context, onOpenRouteSearch),
-                      ),
+                      // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 길찾기 진입은
+                      // 노선도 역 탭(팝오버 출발/도착)·상단바 변신으로만 하므로,
+                      // 폼으로 보내던 좌측 메뉴 "길찾기" 항목을 제거한다.
                       if (onOpenNearbyStations != null)
                         _NetworkMapMenuTile(
                           key: const Key('networkMapMenuNearbyButton'),
@@ -2387,7 +2368,6 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.selectedStationId,
     required this.onSetOrigin,
     required this.onSetDestination,
-    required this.onOpenRouteSearch,
     required this.onViewportChanged,
   });
 
@@ -2397,7 +2377,6 @@ class _NetworkMapCanvas extends StatefulWidget {
   final String? selectedStationId;
   final ValueChanged<NetworkMapStation> onSetOrigin;
   final ValueChanged<NetworkMapStation> onSetDestination;
-  final ValueChanged<NetworkMapStation> onOpenRouteSearch;
   final ValueChanged<Rect> onViewportChanged;
 
   @override
@@ -2623,9 +2602,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   },
                   onSetDestination: () {
                     widget.onSetDestination(selectedStation);
-                  },
-                  onOpenRouteSearch: () {
-                    widget.onOpenRouteSearch(selectedStation);
                   },
                   onClose: () => setState(() => _selectedStation = null),
                 ),
@@ -4174,7 +4150,6 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
     required this.camera,
     required this.onSetOrigin,
     required this.onSetDestination,
-    required this.onOpenRouteSearch,
     required this.onClose,
   });
 
@@ -4183,7 +4158,6 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
   final MapCameraState camera;
   final VoidCallback onSetOrigin;
   final VoidCallback onSetDestination;
-  final VoidCallback onOpenRouteSearch;
   final VoidCallback onClose;
 
   @override
@@ -4191,7 +4165,7 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
     final stationPoint = camera.sourceToViewportPoint(
       Offset(geometry.x(station), geometry.y(station)),
     );
-    const width = 200.0;
+    const width = 160.0;
     const height = 44.0;
     final viewportWidth = camera.viewportSize.width;
     final left = (stationPoint.dx - width / 2)
@@ -4225,12 +4199,6 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
                     icon: Icons.south_east,
                     label: '도착',
                     onTap: onSetDestination,
-                  ),
-                  _NetworkMapActionDivider(),
-                  _NetworkMapStationActionTab(
-                    icon: Icons.route_outlined,
-                    label: '길찾기',
-                    onTap: onOpenRouteSearch,
                   ),
                   _NetworkMapActionDivider(),
                   _NetworkMapStationActionTab(

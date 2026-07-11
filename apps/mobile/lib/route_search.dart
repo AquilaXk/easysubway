@@ -2487,6 +2487,15 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         !state.result!.isBlocked;
   }
 
+  /// #1933 요구 3: 노선도가 유일한 허브다. 별도 길찾기 폼 페이지는 없앴으므로,
+  /// 이 화면에 도달하는 정당한 경로는 출발·도착이 모두 채워진 draft(자동 검색)뿐이다.
+  bool get _hasCompleteDraft =>
+      _originStation != null && _destinationStation != null;
+
+  /// 완성된 draft 없이(=출발·도착 미완) 이 화면에 들어온 경우, 폼을 보여주지 않고
+  /// 곧바로 노선도로 되돌린다. 리다이렉트를 한 번만 예약하기 위한 플래그.
+  bool _redirectToMapScheduled = false;
+
   @override
   void initState() {
     super.initState();
@@ -2688,128 +2697,53 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     );
   }
 
-  /// 결과가 아직 없는 입력 상태의 이동 조건 폼 섹션(헤더 + 이동 조건 + 계단 토글).
-  /// 결과-우선 상태에서는 이 폼 대신 상단 조용한 칩(`_RouteConditionChips`)을 쓴다.
-  List<Widget> _buildConditionForm() {
-    return [
-      _RouteSectionHeader(title: widget.simpleViewEnabled ? '이동 조건' : '검색 조건'),
-      const SizedBox(height: 8),
-      // 단순 보기에서는 드롭다운 대신 현재 조건을 크게 보여주고, 필요할 때만 바꿀 수 있게 한다.
-      if (widget.simpleViewEnabled)
-        _RouteMobilityTypeSummary(
-          mobilityType: _selectedMobilityType,
-          onChangeRequested: _showMobilityTypePicker,
-        )
-      else
-        InputDecorator(
-          key: const Key('routeMobilityTypeInput'),
-          decoration: const InputDecoration(
-            labelText: '이동 조건',
-            isDense: true,
-            filled: true,
-            fillColor: EasySubwayAccessibleColors.scaffoldSurface,
-            border: UnderlineInputBorder(
-              borderSide: BorderSide(color: EasySubwayAccessibleColors.line),
-            ),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: EasySubwayAccessibleColors.line),
-            ),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedMobilityType,
-              isExpanded: true,
-              items: [
-                for (final option in mobilityProfileOptions)
-                  DropdownMenuItem<String>(
-                    value: option.mobilityType,
-                    child: Text(option.title),
-                  ),
-              ],
-              onChanged: (value) async {
-                if (value == null) {
-                  return;
-                }
-                await _updateMobilityType(value);
-              },
-            ),
-          ),
-        ),
-      DecoratedBox(
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: EasySubwayAccessibleColors.line),
-          ),
-        ),
-        child: SwitchListTile(
-          key: const Key('routeStrictStepFreeSwitch'),
-          contentPadding: EdgeInsets.zero,
-          // 켜기 전에 부정적 결과를 먼저 경고하지 않는다. 경로가 없을 때는
-          // 결과 화면에서 안내한다(#1568).
-          title: const Text('계단 없는 길만'),
-          value: _selectedConstraintMode == 'STRICT_STEP_FREE',
-          onChanged: _updateConstraintMode,
-        ),
-      ),
-    ];
+  /// #1933 요구 3: 완성된 draft 없이 이 화면에 도달하면(폼 페이지가 사라졌으므로)
+  /// 노선도로 되돌린다. 되돌릴 셸 콜백이 없으면(직접 임베드된 경우) 폼 대신
+  /// 최소한의 안내만 보여 준다.
+  void _maybeRedirectToMap() {
+    // 사용자가 얇은 헤더에서 출발/도착을 편집(인라인 역 검색)하는 중이면 되돌리지
+    // 않는다. 잠시 한쪽이 비어도 새 역을 고르면 다시 완성되는 정상 편집 흐름이다.
+    if (_hasResult ||
+        _hasCompleteDraft ||
+        _activeStationPicker != null ||
+        _redirectToMapScheduled) {
+      return;
+    }
+    final onShellBackToHome = widget.onShellBackToHome;
+    if (onShellBackToHome == null) {
+      return;
+    }
+    _redirectToMapScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      onShellBackToHome();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final submitButton = Padding(
-      padding: easySubwayBottomActionInsets(context),
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final isLoading =
-              _controller.state.status == RouteSearchViewStatus.loading;
-          final canSubmit =
-              _originStation != null && _destinationStation != null;
-          final submitLabel = isLoading
-              ? '경로 검색 중'
-              : canSubmit
-              ? '길찾기'
-              : '길찾기, 출발역과 도착역을 먼저 선택해 주세요';
-          return Semantics(
-            button: true,
-            enabled: canSubmit && !isLoading,
-            label: submitLabel,
-            child: ExcludeSemantics(
-              child: FilledButton(
-                key: const Key('routeSearchSubmitButton'),
-                onPressed: canSubmit && !isLoading ? _submit : null,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(60),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: _routeSearchSmallRadius,
-                  ),
-                ),
-                child: Text(isLoading ? '경로 검색 중' : '길찾기'),
-              ),
-            ),
-          );
-        },
-      ),
-    );
     final scaffold = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        // #1933 D: 검색이 성공하면 결과-우선 화면으로 재구성한다. 하단 중복 "길찾기"
-        // 버튼을 없애고(자동 검색이 이미 돌았으므로), 이동 조건·계단 토글을 상단의
-        // 조용한 칩으로 강등하며, 이동 순서 타임라인을 결과 안에 인라인으로 편다.
+        // #1933 D: 검색이 성공하면 결과-우선 화면으로 재구성한다. 이동 조건·계단 토글을
+        // 상단의 조용한 칩으로 강등하고, 이동 순서 타임라인을 결과 안에 인라인으로 편다.
         final hasResult = _hasResult;
-        final bottomBar = hasResult
-            ? widget.shellNavigationBar
-            : (widget.shellNavigationBar == null
-                  ? submitButton
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [submitButton, widget.shellNavigationBar!],
-                    ));
+        // #1933 요구 3: 별도 길찾기 폼 페이지는 제거됐다. 완성된 draft 없이(=출발·도착
+        // 미완) 이 화면에 들어오면 폼을 보여 주지 않고 노선도로 되돌린다.
+        _maybeRedirectToMap();
+        // 편집 중(인라인 역 검색 열림)이면 얇은 헤더 화면을 유지해 새 역을 고르게
+        // 한다. 그 외에 결과도 완성된 draft도 없으면 폼 대신 안내만 보여 준다.
+        if (!hasResult && !_hasCompleteDraft && _activeStationPicker == null) {
+          return _RouteSearchEmptyRedirect(
+            shellNavigationBar: widget.shellNavigationBar,
+          );
+        }
         return Scaffold(
           key: const Key('routeSearchScreen'),
           appBar: AppBar(title: const Text('길찾기')),
-          bottomNavigationBar: bottomBar,
+          bottomNavigationBar: widget.shellNavigationBar,
           body: Semantics(
             container: true,
             child: SafeArea(
@@ -2822,8 +2756,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                   children: [
                     _RoutePointPickerCard(
                       key: const Key('routePointPickerCard'),
-                      // #1933 E: 결과-우선 상태에서만 얇은 헤더로 축소한다.
-                      compact: hasResult,
+                      // #1933 요구 3: 폼이 사라졌으므로 항상 얇은 헤더로 축소한다.
+                      // 역명 탭 → 인라인 역 검색으로 편집(→ 재검색)만 남긴다.
+                      compact: true,
                       originStation: _originStation,
                       destinationStation: _destinationStation,
                       originPicker:
@@ -2850,23 +2785,15 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                       ),
                       const SizedBox(height: 16),
                     ],
-                    if (hasResult)
-                      // 결과-우선: 이동 조건·계단 토글을 조용한 칩 한 줄로 강등한다.
-                      // 바꾸면 그 자리에서 바로 재검색한다(별도 버튼 없음).
-                      _RouteConditionChips(
-                        mobilityType: _selectedMobilityType,
-                        strictStepFree:
-                            _selectedConstraintMode == 'STRICT_STEP_FREE',
-                        onChangeMobility: _showMobilityTypePicker,
-                        onToggleStepFree: _updateConstraintMode,
-                      )
-                    else
-                      ..._buildConditionForm(),
-                    if (!hasResult)
-                      _RouteRecentDestinationList(
-                        repository: widget.favoriteRouteRepository,
-                        onSelected: _updateDestinationStation,
-                      ),
+                    // 이동 조건·계단 토글은 언제나 조용한 칩 한 줄로만 노출한다.
+                    // 바꾸면 그 자리에서 바로 재검색한다(별도 폼·버튼 없음).
+                    _RouteConditionChips(
+                      mobilityType: _selectedMobilityType,
+                      strictStepFree:
+                          _selectedConstraintMode == 'STRICT_STEP_FREE',
+                      onChangeMobility: _showMobilityTypePicker,
+                      onToggleStepFree: _updateConstraintMode,
+                    ),
                     _RouteSearchBody(
                       state: _controller.state,
                       routeFeedbackRepository: widget.routeFeedbackRepository,
@@ -3055,23 +2982,6 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
       _validationMessage = '';
     });
     _controller.reset();
-  }
-
-  Future<void> _updateMobilityType(String mobilityType) async {
-    if (mobilityType == _selectedMobilityType ||
-        !await _disableActiveGetOffAlarm()) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _selectedMobilityType = mobilityType;
-      _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
-        mobilityType,
-      );
-    });
-    await _rerunOrResetAfterConditionChange();
   }
 
   Future<void> _updateConstraintMode(bool strictStepFree) async {
@@ -3458,6 +3368,41 @@ class _RoutePointRow extends StatelessWidget {
   }
 }
 
+/// #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 완성된 draft(출발·도착) 없이 이
+/// 화면에 도달하면 셸이 노선도로 되돌리는 게 정상 흐름이고, 그 사이(또는 되돌릴
+/// 셸이 없을 때)는 폼 대신 최소한의 안내만 보여 준다.
+class _RouteSearchEmptyRedirect extends StatelessWidget {
+  const _RouteSearchEmptyRedirect({this.shellNavigationBar});
+
+  final Widget? shellNavigationBar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      key: const Key('routeSearchScreen'),
+      appBar: AppBar(title: const Text('길찾기')),
+      bottomNavigationBar: shellNavigationBar,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              '지도에서 출발·도착을 정해 주세요.',
+              key: const Key('routeSearchEmptyRedirectMessage'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: EasySubwayAccessibleColors.mutedText,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RouteSectionHeader extends StatelessWidget {
   const _RouteSectionHeader({required this.title});
 
@@ -3482,149 +3427,6 @@ class _RouteSectionHeader extends StatelessWidget {
   }
 }
 
-class _RouteRecentDestinationList extends StatefulWidget {
-  const _RouteRecentDestinationList({
-    required this.repository,
-    required this.onSelected,
-  });
-
-  final FavoriteRouteRepository? repository;
-  final ValueChanged<StationSearchResult> onSelected;
-
-  @override
-  State<_RouteRecentDestinationList> createState() =>
-      _RouteRecentDestinationListState();
-}
-
-class _RouteRecentDestinationListState
-    extends State<_RouteRecentDestinationList> {
-  Future<List<FavoriteRoute>>? _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFavorites();
-  }
-
-  @override
-  void didUpdateWidget(_RouteRecentDestinationList oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.repository != widget.repository) {
-      _loadFavorites();
-    }
-  }
-
-  void _loadFavorites() {
-    _future = widget.repository?.listFavoriteRoutes();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final future = _future;
-    if (future == null) {
-      return const SizedBox.shrink();
-    }
-    return FutureBuilder<List<FavoriteRoute>>(
-      future: future,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const _RouteSearchMessage(
-                message: '최근 도착지를 불러오지 못했어요.',
-                liveRegion: true,
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const Key('routeRecentDestinationRetryButton'),
-                onPressed: () => setState(_loadFavorites),
-                icon: const Icon(Icons.refresh),
-                label: const Text('다시 불러오기'),
-              ),
-              const SizedBox(height: 18),
-            ],
-          );
-        }
-        final routes = snapshot.data ?? const <FavoriteRoute>[];
-        final destinations = _routeRecentDestinations(routes);
-        if (destinations.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _RouteSectionHeader(title: '최근 도착지'),
-            const SizedBox(height: 8),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: EasySubwayAccessibleColors.line),
-                borderRadius: _routeSearchMediumRadius,
-              ),
-              child: Column(
-                children: [
-                  for (final entry in destinations.indexed) ...[
-                    if (entry.$1 > 0)
-                      const Divider(
-                        height: 1,
-                        color: EasySubwayAccessibleColors.line,
-                      ),
-                    _RouteRecentDestinationRow(
-                      route: entry.$2,
-                      onSelected: () => widget.onSelected(
-                        _stationFromFavoriteDestination(entry.$2),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 18),
-          ],
-        );
-      },
-    );
-  }
-}
-
-List<FavoriteRoute> _routeRecentDestinations(List<FavoriteRoute> routes) {
-  final seen = <String>{};
-  final destinations = <FavoriteRoute>[];
-  for (final route in routes) {
-    if (seen.add(route.destinationStationId)) {
-      destinations.add(route);
-    }
-    if (destinations.length == 2) {
-      break;
-    }
-  }
-  return destinations;
-}
-
-StationSearchResult _stationFromFavoriteDestination(FavoriteRoute route) {
-  final lineName = route.lineName;
-  return StationSearchResult(
-    id: route.destinationStationId,
-    nameKo: route.destinationStationName,
-    nameEn: '',
-    region: '',
-    dataQualityLevel: '',
-    lastVerifiedAt: '',
-    lines: lineName.isEmpty ? const [] : [_routeRecentLine(lineName)],
-  );
-}
-
-StationSearchLine _routeRecentLine(String name) {
-  final id = 'line-${stationLineBadgeText(name)}';
-  return StationSearchLine(
-    id: id,
-    name: name,
-    color: _routeLineColor(name),
-    stationCode: '',
-  );
-}
-
 String _routeLineColor(String name) => fallbackLineColorHex(lineName: name);
 
 /// 기본 레벨(LEVEL_1)·미확정 품질 필러는 목록에서 감춘다(#1477과 동일 규칙).
@@ -3632,153 +3434,6 @@ bool _showsRouteDataQualityLabel(String dataQualityLevel) {
   return dataQualityLevel == 'LEVEL_2' ||
       dataQualityLevel == 'LEVEL_3' ||
       dataQualityLevel == 'LEVEL_4';
-}
-
-class _RouteRecentDestinationRow extends StatelessWidget {
-  const _RouteRecentDestinationRow({
-    required this.route,
-    required this.onSelected,
-  });
-
-  final FavoriteRoute route;
-  final VoidCallback onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final title = _routeStationNameDisplay(route.destinationStationName);
-    final lines = route.lineName.isEmpty
-        ? const <StationSearchLine>[]
-        : [_routeRecentLine(route.lineName)];
-    final lineLabel = lines.isEmpty
-        ? route.lineLabel
-        : lines.map((line) => line.name).join(', ');
-    return Semantics(
-      button: true,
-      label: '$title, $lineLabel, 선택',
-      onTap: onSelected,
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: onSelected,
-          borderRadius: _routeSearchMediumRadius,
-          child: ListTile(
-            leading: const Icon(
-              Icons.train_outlined,
-              color: EasySubwayAccessibleColors.primary,
-            ),
-            title: Text(
-              title,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: lines.isEmpty
-                  ? Text(lineLabel)
-                  : Wrap(
-                      spacing: 10,
-                      runSpacing: 6,
-                      children: [
-                        for (final line in lines) _RouteRecentLine(line: line),
-                      ],
-                    ),
-            ),
-            trailing: const Text('선택'),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RouteRecentLine extends StatelessWidget {
-  const _RouteRecentLine({required this.line});
-
-  final StationSearchLine line;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          key: Key('routeRecentLineMark-${line.id}'),
-          child: StationLineBadge(line: line, size: 16),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          line.name,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: EasySubwayAccessibleColors.mutedText,
-            fontSize: 16,
-            height: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RouteMobilityTypeSummary extends StatelessWidget {
-  const _RouteMobilityTypeSummary({
-    required this.mobilityType,
-    required this.onChangeRequested,
-  });
-
-  final String mobilityType;
-  final VoidCallback onChangeRequested;
-
-  @override
-  Widget build(BuildContext context) {
-    final option = _mobilityOptionFor(mobilityType);
-    // 장식 틴트 카드 대신 얇은 구분선 위의 플랫 행으로 둔다. 조건 요약 부제는
-    // 이동 조건 화면과 중복이라 제거하고 현재 조건명 + '변경'만 남긴다(#1568).
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      label: '현재 이동 조건 ${option.title}',
-      liveRegion: true,
-      child: Container(
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: EasySubwayAccessibleColors.line),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: ExcludeSemantics(
-                child: Text(
-                  option.title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.text,
-                    fontWeight: FontWeight.w700,
-                    height: 1.25,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Semantics(
-              button: true,
-              label: '이동 조건 바꾸기, 현재 ${option.title}',
-              onTap: onChangeRequested,
-              child: ExcludeSemantics(
-                child: TextButton(
-                  key: const Key('routeSimpleMobilityTypeButton'),
-                  onPressed: onChangeRequested,
-                  style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
-                  child: const Text('변경'),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _RouteMobilityTypeOptionButton extends StatelessWidget {

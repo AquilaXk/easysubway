@@ -1695,7 +1695,6 @@ class StationSearchScreen extends StatefulWidget {
     this.routeDraftController,
     this.entryMode = StationSearchEntryMode.search,
     this.pickSlot,
-    this.onOpenRouteSearch,
     this.bottomNavigationBar,
     super.key,
   });
@@ -1717,7 +1716,6 @@ class StationSearchScreen extends StatefulWidget {
   /// 탭 경로와 완전히 같은 draft 상태로 수렴시키기 위한 "칸 채우기" 모드다. null이면
   /// 기존 둘러보기(출발/도착 버튼이 각 결과에 딸린 형태) 그대로 동작한다.
   final RouteDraftSlot? pickSlot;
-  final Future<void> Function()? onOpenRouteSearch;
   final Widget? bottomNavigationBar;
 
   @override
@@ -2090,17 +2088,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _showRouteDraftSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        action: widget.onOpenRouteSearch == null
-            ? null
-            : SnackBarAction(
-                label: '길찾기 보기',
-                onPressed: () => unawaited(widget.onOpenRouteSearch!()),
-              ),
-      ),
-    );
+    // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 출발·도착을 설정하면 draft로
+    // 수렴하고, 둘 다 채워지면 셸이 자동으로 결과 타임라인을 연다. 폼으로 보내던
+    // "길찾기 보기" 스낵바 액션은 더 이상 두지 않는다.
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _searchNearby() async {
