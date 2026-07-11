@@ -6660,6 +6660,126 @@ test("source candidate sample 검증기는 endpoint mismatch를 거부한다", a
   );
 });
 
+async function writeFieldDiagnosticFixture(outputDir, { outputFields, fields }) {
+  const candidatesPath = path.join(outputDir, "source-candidates.json");
+  const samplePath = path.join(outputDir, "sample.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(candidatesPath, `${JSON.stringify({
+    candidates: [{
+      id: "field-diagnostic-test",
+      evidence: {
+        endpoint: "https://provider.invalid/field-diagnostic",
+        formats: ["JSON"],
+        outputFields,
+      },
+    }],
+  }, null, 2)}\n`);
+  await writeFile(samplePath, `${JSON.stringify({
+    candidateId: "field-diagnostic-test",
+    endpoint: "https://provider.invalid/field-diagnostic",
+    format: "json",
+    fields,
+  }, null, 2)}\n`);
+  return { candidatesPath, samplePath };
+}
+
+test("source candidate sample 검증기는 control과 delimiter field name을 한 줄 JSON string으로 escape한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-field-control-${Date.now()}`);
+  const { candidatesPath, samplePath } = await writeFieldDiagnosticFixture(outputDir, {
+    outputFields: ["expected"],
+    fields: ["line\nbreak", "\u001b[31mred\u001b[0m", "nul\u0000field", "comma,name;next"],
+  });
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-candidate-sample.mjs",
+        "--candidates",
+        candidatesPath,
+        "--candidate",
+        "field-diagnostic-test",
+        "--sample",
+        samplePath,
+      ],
+      { cwd: root },
+    ),
+    (error) => {
+      const diagnostic = error.stderr.trimEnd();
+      assert.equal(
+        diagnostic,
+        "output field missing: \"expected\"; available fields: \"\\u001b[31mred\\u001b[0m\", \"comma,name;next\", \"line\\nbreak\", \"nul\\u0000field\"",
+      );
+      assert.equal(diagnostic.split("\n").length, 1);
+      assert.doesNotMatch(diagnostic, /\u001b|\u0000/);
+      return true;
+    },
+  );
+});
+
+test("source candidate sample 검증기는 credential-like field name을 generic 오류로 차단한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-field-credential-${Date.now()}`);
+  const credentialLikeField = "https://provider.invalid/sample?serviceKey=credential-like-field-secret";
+  const { candidatesPath, samplePath } = await writeFieldDiagnosticFixture(outputDir, {
+    outputFields: ["expected"],
+    fields: ["safeField", credentialLikeField],
+  });
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-candidate-sample.mjs",
+        "--candidates",
+        candidatesPath,
+        "--candidate",
+        "field-diagnostic-test",
+        "--sample",
+        samplePath,
+      ],
+      { cwd: root },
+    ),
+    (error) => {
+      assert.equal(error.stderr.trim(), "sample field names must not contain credentials");
+      assert.doesNotMatch(error.stderr, /credential-like-field-secret/);
+      assert.equal(error.stderr.includes(credentialLikeField), false);
+      return true;
+    },
+  );
+});
+
+test("source candidate sample 검증기는 ambiguous 첫 field에서 missing 진단을 즉시 확정한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-field-ambiguous-${Date.now()}`);
+  const { candidatesPath, samplePath } = await writeFieldDiagnosticFixture(outputDir, {
+    outputFields: ["foo", "bar"],
+    fields: ["FOO", "Foo", "BAR"],
+  });
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-candidate-sample.mjs",
+        "--candidates",
+        candidatesPath,
+        "--candidate",
+        "field-diagnostic-test",
+        "--sample",
+        samplePath,
+      ],
+      { cwd: root },
+    ),
+    (error) => {
+      assert.equal(
+        error.stderr.trim(),
+        "output field missing: \"foo\"; available fields: \"BAR\", \"FOO\", \"Foo\"",
+      );
+      return true;
+    },
+  );
+});
+
 test("source candidate sample 검증기는 output field 대소문자 불일치를 field name만으로 진단한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-candidate-field-${Date.now()}`);
   const samplePath = path.join(outputDir, "sample.json");
@@ -6710,7 +6830,7 @@ test("source candidate sample 검증기는 output field 대소문자 불일치�
     (error) => {
       assert.equal(
         error.stderr.trim(),
-        "output field case mismatch: expected updnDvcd; actual updnDvCd",
+        "output field case mismatch: expected \"updnDvcd\"; actual \"updnDvCd\"",
       );
       assert.doesNotMatch(error.stderr, /SENTINEL_SAMPLE_VALUE/);
       assert.doesNotMatch(error.stderr, /credential-like-secret/);
@@ -6770,7 +6890,7 @@ test("source candidate sample 검증기는 true missing field를 sorted field na
     (error) => {
       assert.equal(
         error.stderr.trim(),
-        "output field missing: updnDvcd; available fields: aProviderField, grndDvCd, lnCd, plfCplFlg, plfNo, plfTpCd, plfTpNm, railOprIsttCd, runDirTmnStinCd, scrCharExt, sfFotExt, stinCd, stinFlor, zProviderField",
+        "output field missing: \"updnDvcd\"; available fields: \"aProviderField\", \"grndDvCd\", \"lnCd\", \"plfCplFlg\", \"plfNo\", \"plfTpCd\", \"plfTpNm\", \"railOprIsttCd\", \"runDirTmnStinCd\", \"scrCharExt\", \"sfFotExt\", \"stinCd\", \"stinFlor\", \"zProviderField\"",
       );
       assert.doesNotMatch(error.stderr, /SENTINEL_SAMPLE_VALUE/);
       assert.doesNotMatch(error.stderr, /credential-like-secret/);
