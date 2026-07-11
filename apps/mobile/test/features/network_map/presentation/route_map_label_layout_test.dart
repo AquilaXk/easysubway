@@ -104,9 +104,11 @@ void main() {
   });
 
   test('전부 충돌이어도 숨기지 않고 최소 겹침 배치 + unresolved 집계', () {
-    // 같은 좌표에 역 5개 → 물리적으로 겹침 불가피.
+    // 같은 좌표에 역 30개 → gap 사다리 슬롯(방향 8 × gap 4 = 32)을 채워도 물리적
+    // 으로 겹침 불가피. (라벨당 slot 하나를 잡아도 후반부는 남는 자리가 겹친다.)
+    const n = 30;
     final stations = [
-      for (var i = 0; i < 5; i += 1)
+      for (var i = 0; i < n; i += 1)
         RouteMapStructuredStation(
           stationId: 'x$i',
           lineId: 'L$i',
@@ -129,7 +131,7 @@ void main() {
       measureLabel: _measureLabel,
       measureBadge: _measureBadge,
     );
-    expect(layout.labels.length, 5); // 숨김 금지.
+    expect(layout.labels.length, n); // 숨김 금지.
     expect(layout.unresolvedOverlapCount, greaterThan(0));
   });
 
