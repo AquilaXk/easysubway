@@ -81,13 +81,16 @@ class LocalRouteRepository implements RouteSearchRepository {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
     final mobilityType = _mobilityType(request.mobilityType);
     final constraintMode = _constraintMode(request.effectiveConstraintMode);
-    final blocksStrict =
-        mobilityType.blocksStairOnlyAccess(constraintMode) &&
-        !catalog.strictEvidenceSupported;
+    // #1975: 경유 요청의 strict 강등 판정은 전역 strict 지원이 아니라 두 구간을
+    // 각각 본다(한 구간만 미지원이어도 강등). 경유 없는 단일 구간은 엔진이 이미
+    // 구간별 strict 근거를 강제하고 구체 사유를 내므로 전역 pre-filter를 유지한다.
+    final blocksStairOnly = mobilityType.blocksStairOnlyAccess(constraintMode);
+    final blocksStrictGlobally =
+        blocksStairOnly && !catalog.strictEvidenceSupported;
     final waypointStationId = request.waypointStationId?.trim();
     final local.LocalRouteResult result;
     if (waypointStationId == null || waypointStationId.isEmpty) {
-      result = blocksStrict
+      result = blocksStrictGlobally
           ? local.LocalRouteResult.unknown(const [
               'STRICT_EVIDENCE_UNSUPPORTED',
             ])
@@ -102,7 +105,15 @@ class LocalRouteRepository implements RouteSearchRepository {
                     .stationToStationWithOutOfStationTransfers,
               ),
             );
-    } else if (blocksStrict) {
+    } else if (blocksStairOnly &&
+        !(catalog.strictEvidenceSupportedFor(
+              request.originStationId,
+              waypointStationId,
+            ) &&
+            catalog.strictEvidenceSupportedFor(
+              waypointStationId,
+              request.destinationStationId,
+            ))) {
       result = local.LocalRouteResult.unknown(const [
         'STRICT_EVIDENCE_UNSUPPORTED',
       ]);
@@ -422,21 +433,22 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 
   List<String> _evidenceSummary(local.LocalRouteResult result) {
-    if (result.steps.isEmpty) {
+    // #1975: 경유 경계 마커(waypoint)는 실제 이동이 아닌 표식이므로 요약 집계에서
+    // 제외한다. 마커의 0/기본값 메타가 실제 이동 근거를 강등하지 못하게 한다.
+    final steps = result.steps
+        .where((step) => step.type.name != 'waypoint')
+        .toList(growable: false);
+    if (steps.isEmpty) {
       return const [];
     }
-    final requiresAccessibilityCheck = result.steps.any(
+    final requiresAccessibilityCheck = steps.any(
       (step) =>
           step.type.name == 'entry' ||
           step.type.name == 'exit' ||
           step.stairAccessState == 'unknown',
     );
-    final hasDurationEstimate = result.steps.every(
-      (step) => step.durationSeconds > 0,
-    );
-    final hasDistanceMeasure = result.steps.every(
-      (step) => step.distanceMeters > 0,
-    );
+    final hasDurationEstimate = steps.every((step) => step.durationSeconds > 0);
+    final hasDistanceMeasure = steps.every((step) => step.distanceMeters > 0);
     return [
       requiresAccessibilityCheck
           ? 'ACCESSIBILITY_CHECK_REQUIRED'
@@ -633,13 +645,25 @@ local.LocalRouteResult mergeWaypointRouteResults(
   }
 
   // 중간 경유는 개찰구를 나가지 않는 지점이므로, 1구간 꼬리의 도착 하차 후
-  // 동선과 2구간 머리의 출발 진입 동선을 경계에서 제거한다.
+  // 동선과 2구간 머리의 출발 진입 동선을 경계에서 제거하는 것이 기본이다.
   final firstTrimmed = _trimBoundaryAccessSteps(first.steps, fromTail: true);
   final secondTrimmed = _trimBoundaryAccessSteps(second.steps, fromTail: false);
 
-  final boundaryNodeId = firstTrimmed.isNotEmpty
-      ? firstTrimmed.last.toNodeId
-      : (secondTrimmed.isNotEmpty ? secondTrimmed.first.fromNodeId : '');
+  // #1975: trim 후 1구간 꼬리와 2구간 머리의 경계 노드가 일치할 때만(같은 승강장
+  // 무하차 연결) 접근 동선을 제거한다. 경유역에서 노선이 바뀌어 경계 노드가
+  // 어긋나면(개찰구 내 환승/연결 이동이 실제로 필요) 접근 동선을 보존해 총시간
+  // 과소계상을 막는다.
+  final trimmedBoundaryMatches =
+      firstTrimmed.isNotEmpty &&
+      secondTrimmed.isNotEmpty &&
+      firstTrimmed.last.toNodeId == secondTrimmed.first.fromNodeId;
+
+  final firstSteps = trimmedBoundaryMatches ? firstTrimmed : first.steps;
+  final secondSteps = trimmedBoundaryMatches ? secondTrimmed : second.steps;
+
+  final boundaryNodeId = firstSteps.isNotEmpty
+      ? firstSteps.last.toNodeId
+      : (secondSteps.isNotEmpty ? secondSteps.first.fromNodeId : '');
   final boundary = route_step.RouteStep(
     sequence: 0,
     edgeId: 'waypoint-boundary',
@@ -649,12 +673,19 @@ local.LocalRouteResult mergeWaypointRouteResults(
     cost: 0,
     durationSeconds: 0,
     distanceMeters: 0,
+    // #1975: 경계 마커는 실제 이동이 아닌 표식이므로 요약을 왜곡하지 않도록
+    // 무해한 메타를 명시한다(기본값 'unknown'/'UNKNOWN'/기본 안내 문구 상속 차단).
+    stairAccessState: 'stepFree',
+    timeSource: '',
+    distanceSource: '',
+    confidenceLabel: '',
+    evidenceSources: const [],
   );
 
   final flat = <route_step.RouteStep>[
-    ...firstTrimmed,
+    ...firstSteps,
     boundary,
-    ...secondTrimmed,
+    ...secondSteps,
   ];
   final renumbered = <route_step.RouteStep>[];
   for (var index = 0; index < flat.length; index += 1) {

@@ -69,5 +69,39 @@ void main() {
 
       expect(controller.draft.isEmpty, isFalse);
     });
+
+    test('이미 다른 슬롯에 있는 역은 그 슬롯 지정을 거부한다 (#1975)', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      // 출발과 같은 역을 경유/도착으로 지정하려 하면 무시된다.
+      controller.setWaypoint(origin);
+      expect(controller.draft.waypoint, isNull);
+      controller.setDestination(origin);
+      expect(controller.draft.destination, isNull);
+      expect(notifications, 0);
+
+      // 경유가 채워진 뒤 출발/도착을 경유와 같은 역으로 지정해도 무시된다.
+      controller.setWaypoint(waypoint);
+      notifications = 0;
+      controller.setOrigin(waypoint);
+      expect(controller.draft.origin?.id, 'gangnam');
+      controller.setDestination(waypoint);
+      expect(controller.draft.destination, isNull);
+      expect(notifications, 0);
+    });
+
+    test('같은 슬롯에 같은 역 재지정(덮어쓰기)은 허용한다 (#1975)', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.setOrigin(origin);
+      expect(controller.draft.origin?.id, 'gangnam');
+      expect(notifications, 1);
+    });
   });
 }

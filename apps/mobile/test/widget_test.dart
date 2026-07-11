@@ -7206,6 +7206,12 @@ void main() {
     expect(find.text('내리지 않고 이 역을 지나가요'), findsOneWidget);
     // #1948: 경유 스텝은 "경유" 서브라벨(2줄)을 별도로 그리지 않는다(제목에 이미 포함).
     expect(find.text('경유'), findsNothing);
+
+    // #1975: 경유 노드 원의 시각 반경은 8 이하(직경 16 이하)여야 한다.
+    // badgeKey가 붙은 내부 Container 크기로 검증한다.
+    final waypointNode = tester.getSize(waypointBadge);
+    expect(waypointNode.width, lessThanOrEqualTo(16));
+    expect(waypointNode.height, lessThanOrEqualTo(16));
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {

@@ -1984,8 +1984,8 @@ class RouteSearchStep {
       _routeStepDetailLabel(stepType: stepType),
       if (safeReason.isNotEmpty) safeReason,
       if (stepType != 'waypoint') burdenLabel,
-      if (confidenceLabel.isNotEmpty) confidenceLabel,
-      if (hasMetricSourceMetadata) metricSourceLabel,
+      if (stepType != 'waypoint' && confidenceLabel.isNotEmpty) confidenceLabel,
+      if (stepType != 'waypoint' && hasMetricSourceMetadata) metricSourceLabel,
     ];
     return labels.join(', ');
   }
@@ -5659,6 +5659,10 @@ const double _routeTimelineBadgeSize = 40;
 const double _routeTimelineConnectorWidth = 4;
 const double _routeTimelineMinTouchTarget = 48;
 
+/// #1975: 경유 노드는 승차 배지가 아니므로 시각 반경 ≤8(직경 16)으로 축소한다.
+/// 터치 타깃은 여전히 48을 유지한다.
+const double _routeTimelineWaypointNodeSize = 16;
+
 /// 세로 타임라인 한 스텝. 좌측(시각·노선색 배지·연결선) + 우측(역명·구간 요약).
 ///
 /// 데이터 경계(#1704): 노선색·역명·구간 요약·(있을 때만) 시각만 그린다.
@@ -5839,8 +5843,8 @@ class _RouteTimelineBadge extends StatelessWidget {
         child: Center(
           child: Container(
             key: badgeKey,
-            width: _routeTimelineBadgeSize,
-            height: _routeTimelineBadgeSize,
+            width: _routeTimelineWaypointNodeSize,
+            height: _routeTimelineWaypointNodeSize,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
               color: EasySubwayAccessibleColors.mutedText,
@@ -5848,7 +5852,7 @@ class _RouteTimelineBadge extends StatelessWidget {
             ),
             child: const Icon(
               Icons.more_horiz,
-              size: 20,
+              size: 12,
               color: Colors.white,
             ),
           ),

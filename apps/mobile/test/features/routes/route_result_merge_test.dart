@@ -111,7 +111,9 @@ void main() {
       expect(rideCount, 2);
     });
 
-    test('규칙1b: 경계에서 도착 하차 동선(exit)과 출발 진입 동선(entry)을 제거한다 (#1948)', () {
+    test('규칙1b: 경계 노드가 일치하면 도착 하차·출발 진입 동선을 제거한다 (#1948)', () {
+      // trim 후 남는 1구간 마지막 ride(a→b)와 2구간 첫 ride(b→d)가 같은 승강장
+      // 노드('b')를 공유해 경계가 일치한다 → 접근 동선을 안전하게 제거한다.
       final first = _found(
         steps: [
           _ride(sequence: 1, fromNodeId: 'a', toNodeId: 'b'),
@@ -128,11 +130,11 @@ void main() {
         steps: [
           _entry(
             sequence: 1,
-            fromNodeId: 'c',
-            toNodeId: 'c',
+            fromNodeId: 'b',
+            toNodeId: 'b',
             durationSeconds: 60,
           ),
-          _ride(sequence: 2, fromNodeId: 'c', toNodeId: 'd'),
+          _ride(sequence: 2, fromNodeId: 'b', toNodeId: 'd'),
         ],
         totalCost: 150,
       );
@@ -158,7 +160,7 @@ void main() {
       expect(merged.steps[markerIndex - 1].type, RouteStepType.ride);
       expect(merged.steps[markerIndex + 1].type, RouteStepType.ride);
 
-      // 마커는 trim 후 first 마지막 toNodeId('b')를 가리킨다.
+      // 마커는 trim 후 공유 노드('b')를 가리킨다.
       final marker = merged.steps[markerIndex];
       expect(marker.fromNodeId, 'b');
       expect(marker.toNodeId, 'b');
@@ -169,6 +171,96 @@ void main() {
         (sum, step) => sum + step.durationSeconds,
       );
       expect(totalDuration, 120);
+    });
+
+    test('규칙1c: 경계 노드가 불일치하면 접근·연결 동선을 보존한다 (#1975)', () {
+      // 경유역에서 노선이 바뀌어 1구간 꼬리 ride(a→b)와 2구간 머리 ride(c→d)의
+      // 승강장 노드가 다르다. exit은 공유 bare 노드('W')로 끝나고 entry는 그
+      // 'W'에서 시작한다. trim하면 경계 노드가 b/c로 어긋나므로(개찰구 내 연결
+      // 이동이 실제로 필요) 접근 동선을 제거하지 않고 보존한다.
+      final first = _found(
+        steps: [
+          _ride(sequence: 1, fromNodeId: 'a', toNodeId: 'b'),
+          _exit(
+            sequence: 2,
+            fromNodeId: 'b',
+            toNodeId: 'W',
+            durationSeconds: 120,
+          ),
+        ],
+        totalCost: 150,
+      );
+      final second = _found(
+        steps: [
+          _entry(
+            sequence: 1,
+            fromNodeId: 'W',
+            toNodeId: 'c',
+            durationSeconds: 60,
+          ),
+          _ride(sequence: 2, fromNodeId: 'c', toNodeId: 'd'),
+        ],
+        totalCost: 150,
+      );
+
+      final merged = mergeWaypointRouteResults(first, second);
+
+      // (a) 연결 접근 동선(exit/entry)이 보존된다.
+      expect(
+        merged.steps.any((step) => step.type == RouteStepType.exit),
+        isTrue,
+      );
+      expect(
+        merged.steps.any((step) => step.type == RouteStepType.entry),
+        isTrue,
+      );
+
+      // ride 2 + exit 1 + entry 1 + 마커 1 = 5스텝.
+      expect(merged.steps.length, 5);
+
+      // (c) 마커는 공유 bare 노드('W', exit의 도착 노드)에 놓인다.
+      final marker = merged.steps.firstWhere(
+        (step) => step.type == RouteStepType.waypoint,
+      );
+      expect(marker.fromNodeId, 'W');
+      expect(marker.toNodeId, 'W');
+      // 마커는 exit 뒤·entry 앞에 삽입된다.
+      final markerIndex = merged.steps.indexWhere(
+        (step) => step.type == RouteStepType.waypoint,
+      );
+      expect(merged.steps[markerIndex - 1].type, RouteStepType.exit);
+      expect(merged.steps[markerIndex + 1].type, RouteStepType.entry);
+
+      // (b) 총 소요시간에 접근 시간(exit 120 + entry 60)이 포함된다.
+      final totalDuration = merged.steps.fold<int>(
+        0,
+        (sum, step) => sum + step.durationSeconds,
+      );
+      // ride 60 + exit 120 + entry 60 + ride 60 = 300.
+      expect(totalDuration, 300);
+    });
+
+    test('경계 마커는 요약을 왜곡하지 않는 무해한 메타를 가진다 (#1975)', () {
+      final first = _found(
+        steps: [_ride(sequence: 1, fromNodeId: 'a', toNodeId: 'b')],
+        totalCost: 100,
+      );
+      final second = _found(
+        steps: [_ride(sequence: 1, fromNodeId: 'b', toNodeId: 'c')],
+        totalCost: 100,
+      );
+
+      final merged = mergeWaypointRouteResults(first, second);
+      final marker = merged.steps.firstWhere(
+        (step) => step.type == RouteStepType.waypoint,
+      );
+
+      // 기본값('unknown'/'UNKNOWN'/기본 안내 문구)을 상속하지 않는다.
+      expect(marker.stairAccessState, isNot('unknown'));
+      expect(marker.timeSource, '');
+      expect(marker.distanceSource, '');
+      expect(marker.confidenceLabel, '');
+      expect(marker.evidenceSources, isEmpty);
     });
 
     test('규칙2: found+found는 found & 비용 합산', () {

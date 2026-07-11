@@ -3545,6 +3545,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   geometry: geometry,
                   camera: camera,
                   emphasizeDestination: widget.hasOrigin,
+                  originStationId: widget.originStationId,
+                  waypointStationId: widget.waypointStationId,
+                  destinationStationId: widget.destinationStationId,
                   onSetOrigin: () {
                     widget.onSetOrigin(selectedStation);
                     setState(() => _selectedStation = null);
@@ -5162,6 +5165,9 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
     required this.onSetDestination,
     required this.onClose,
     this.emphasizeDestination = false,
+    this.originStationId,
+    this.waypointStationId,
+    this.destinationStationId,
   });
 
   final NetworkMapStation station;
@@ -5174,6 +5180,12 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
 
   /// #1933-3: 출발이 이미 있으면 다음 역 팝오버는 [도착] 탭을 우선 강조한다.
   final bool emphasizeDestination;
+
+  /// #1975: 현재 draft 슬롯에 지정된 역 id. 같은 역이 다른 슬롯에 이미 있으면
+  /// 그 탭을 비활성화한다(자기 슬롯 재지정은 허용).
+  final String? originStationId;
+  final String? waypointStationId;
+  final String? destinationStationId;
 
   @override
   Widget build(BuildContext context) {
@@ -5188,6 +5200,14 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
         .toDouble();
     final top = math.max(12.0, stationPoint.dy - height - 14);
     final arrowLeft = (stationPoint.dx - left - 8).clamp(18.0, width - 34);
+    // #1975: 이 역이 다른 슬롯에 이미 있으면 그 탭을 비활성화한다. 자기 슬롯에
+    // 이미 있는 경우는 재지정 허용이므로 enabled를 유지한다.
+    final originEnabled =
+        station.id != waypointStationId && station.id != destinationStationId;
+    final waypointEnabled =
+        station.id != originStationId && station.id != destinationStationId;
+    final destinationEnabled =
+        station.id != originStationId && station.id != waypointStationId;
     return Positioned(
       key: const Key('networkMapStationSheet'),
       left: left,
@@ -5208,12 +5228,14 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
                     icon: Icons.north_east,
                     label: '출발',
                     onTap: onSetOrigin,
+                    enabled: originEnabled,
                   ),
                   _NetworkMapActionDivider(),
                   _NetworkMapStationActionTab(
                     icon: Icons.more_horiz,
                     label: '경유',
                     onTap: onSetWaypoint,
+                    enabled: waypointEnabled,
                   ),
                   _NetworkMapActionDivider(),
                   _NetworkMapStationActionTab(
@@ -5221,6 +5243,7 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
                     label: '도착',
                     onTap: onSetDestination,
                     emphasized: emphasizeDestination,
+                    enabled: destinationEnabled,
                   ),
                   _NetworkMapActionDivider(),
                   _NetworkMapStationActionTab(
@@ -5347,6 +5370,7 @@ class _NetworkMapStationActionTab extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.emphasized = false,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -5356,17 +5380,20 @@ class _NetworkMapStationActionTab extends StatelessWidget {
   /// #1933-3: true면 흰 바탕 칩으로 우선순위를 드러낸다(무채색, 그림자 없음).
   final bool emphasized;
 
+  /// #1975: 같은 역이 다른 슬롯에 이미 지정돼 있으면 false로 비활성화한다.
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     // 팝오버 배경(0xE8404445)은 이미 짙은 무채색이라 primary(0xFF2A2F31) 같은
     // 어두운 잉크로 채우면 배경과 구분되지 않는다. 대비를 위해 강조 시에는
     // 흰 배경 + 짙은 잉크(text)로 반전한다.
-    final iconColor = emphasized
-        ? EasySubwayAccessibleColors.text
-        : Colors.white;
-    final textColor = emphasized
-        ? EasySubwayAccessibleColors.text
-        : Colors.white;
+    final iconColor = !enabled
+        ? EasySubwayAccessibleColors.mutedText
+        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
+    final textColor = !enabled
+        ? EasySubwayAccessibleColors.mutedText
+        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
     final content = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -5391,7 +5418,7 @@ class _NetworkMapStationActionTab extends StatelessWidget {
     );
     return Expanded(
       child: InkWell(
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
         splashFactory: NoSplash.splashFactory,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,

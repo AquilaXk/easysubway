@@ -823,6 +823,109 @@ void main() {
     expect(capability.strictEvidenceSupported, isFalse);
   });
 
+  test('전역 strict 지원이어도 경유 구간 중 하나가 미지원이면 강등한다 (#1975)', () async {
+    // 전역 strict 지원(strictEvidenceSupported=true)이지만, 경유 구간 b→c의
+    // 근거가 검증되지 않아 해당 구간만 strict 미지원인 상황. 구간별 판정이면
+    // 경유 요청은 STRICT_EVIDENCE_UNSUPPORTED로 강등되어야 한다.
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    // a→b: 검증된 strict 근거(전역 strict 지원을 성립시킨다).
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-strict',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+    );
+    // b→c: 검증되지 않은 근거 → 해당 구간만 strict 미지원.
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-b-c-unverified',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      verificationStatus: 'UNVERIFIED',
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    // 경유 없는 a→b는 strict FOUND(전역 지원 성립 확인).
+    final directResult = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+    expect(directResult.status, 'FOUND');
+
+    // b 경유 a→c는 b→c 구간이 strict 미지원이므로 강등된다.
+    final waypointResult = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        waypointStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+    expect(waypointResult.status, 'UNKNOWN');
+    // 구간별 판정이면 strict 근거 부족을 명시하는 STRICT_EVIDENCE_UNSUPPORTED
+    // 사유로 강등된다(전역 bool만 보던 기존 경로는 이 사유를 내지 못한다).
+    expect(
+      waypointResult.blockedReasons,
+      contains('검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.'),
+    );
+  });
+
+  test('경유 병합 결과 요약은 경계 마커 때문에 강등되지 않는다 (#1975)', () async {
+    // access edge 없이 거리·시간을 가진 순수 ride만으로 a→b→c 경로를 구성한다.
+    // 유일하게 0/unknown 메타를 가질 수 있는 스텝은 경계 마커뿐이므로, 마커가
+    // 요약(_evidenceSummary)을 왜곡하는지 격리 검증할 수 있다.
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-summary',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 500,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-b-c-summary',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 500,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        waypointStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    expect(result.status, 'FOUND');
+    // 실제 이동 스텝(entry/ride/exit)은 모두 소요시간이 양수다. 유일하게 0분인
+    // 스텝은 경계 마커뿐이므로, 마커가 요약에서 제외되지 않으면 DURATION_UNKNOWN으로
+    // 강등된다. 마커 격리가 되면 DURATION_ESTIMATED가 유지되어야 한다.
+    expect(result.evidenceSummary, contains('DURATION_ESTIMATED'));
+    expect(result.evidenceSummary, isNot(contains('DURATION_UNKNOWN')));
+  });
+
   test('기존 baseline catalog도 명시 access edge를 보강해 휠체어 경로를 유지한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -4096,6 +4199,7 @@ Future<void> _insertVerifiedNetworkEdge(
   required String toNodeId,
   required String edgeType,
   required int durationSeconds,
+  int distanceMeters = 0,
   String servicePattern = '',
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
@@ -4106,12 +4210,12 @@ Future<void> _insertVerifiedNetworkEdge(
   await database.customStatement(
     '''
       INSERT INTO network_edges (
-        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        id, from_node_id, to_node_id, duration_seconds, distance_meters, edge_type,
         service_pattern, stair_access_state, accessibility_status, reliability_score,
         source_id, source_snapshot_id, provider_record_hash, provenance_kind,
         verification_status, last_verified_at, evidence_hash
       )
-      VALUES (?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
         'test-source-snapshot',
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         ?, ?, ?, ?)
@@ -4121,6 +4225,7 @@ Future<void> _insertVerifiedNetworkEdge(
       fromNodeId,
       toNodeId,
       durationSeconds,
+      distanceMeters,
       edgeType,
       servicePattern,
       provenanceKind,
