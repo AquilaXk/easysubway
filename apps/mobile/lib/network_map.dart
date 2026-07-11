@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
+import 'design_tokens.dart';
 import 'facility_report.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
@@ -1687,35 +1688,82 @@ class _NetworkMapTopBar extends StatelessWidget {
     BuildContext triggerContext,
     List<NetworkMapRegion> availableRegions,
   ) async {
-    final trigger = triggerContext.findRenderObject();
-    final overlay = Overlay.of(triggerContext).context.findRenderObject();
-    if (trigger is! RenderBox || overlay is! RenderBox) {
+    final RenderBox? triggerBox =
+        triggerContext.findRenderObject() as RenderBox?;
+    final RenderBox? overlayBox =
+        Overlay.of(triggerContext).context.findRenderObject() as RenderBox?;
+    if (triggerBox == null || overlayBox == null) {
       return;
     }
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        trigger.localToGlobal(
-          trigger.size.bottomLeft(Offset.zero),
-          ancestor: overlay,
-        ),
-        trigger.localToGlobal(
-          trigger.size.bottomRight(Offset.zero),
-          ancestor: overlay,
-        ),
-      ),
-      Offset.zero & overlay.size,
+    final topRight = triggerBox.localToGlobal(
+      triggerBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
     );
+    final position = RelativeRect.fromLTRB(
+      topRight.dx,
+      topRight.dy,
+      overlayBox.size.width - topRight.dx,
+      0,
+    );
+    final items = <PopupMenuEntry<String>>[];
+    for (var i = 0; i < availableRegions.length; i++) {
+      final region = availableRegions[i];
+      final isSelected = region.name == selectedRegion;
+      items.add(
+        PopupMenuItem<String>(
+          value: region.name,
+          height: 48,
+          child: Semantics(
+            selected: isSelected,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  child: isSelected
+                      ? const Icon(
+                          Icons.check,
+                          color: EasySubwayAccessibleColors.primary,
+                          size: 20,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    region.displayName,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.listRowText,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (i != availableRegions.length - 1) {
+        items.add(
+          const PopupMenuDivider(
+            height: 1,
+            color: EasySubwayAccessibleColors.line,
+          ),
+        );
+      }
+    }
     final selected = await showMenu<String>(
       context: triggerContext,
       position: position,
-      items: [
-        for (final region in availableRegions)
-          CheckedPopupMenuItem<String>(
-            value: region.name,
-            checked: region.name == selectedRegion,
-            child: Text(region.displayName),
-          ),
-      ],
+      color: EasySubwayAccessibleColors.surface,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(EasySubwayRadius.control),
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
+      ),
+      constraints: const BoxConstraints(minWidth: 180),
+      items: items,
     );
     if (selected != null) {
       onRegionSelected(selected);

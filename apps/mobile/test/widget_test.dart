@@ -1288,6 +1288,71 @@ void main() {
     expect(find.text('부산'), findsOneWidget);
   });
 
+  testWidgets('노선도 지역 메뉴는 흰 표면·구분선·트리거 우측 정렬로 뜬다 (#1933)', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['테스트권', '부산'],
+    );
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('테스트권'));
+    await tester.pumpAndSettle();
+
+    // 구분선: 지역 2개 → 행 사이 구분선은 정확히 1개(마지막 행 뒤에는 없음).
+    final dividerFinder = find.byType(PopupMenuDivider);
+    expect(dividerFinder, findsOneWidget);
+    final divider = tester.widget<PopupMenuDivider>(dividerFinder);
+    expect(divider.color, EasySubwayAccessibleColors.line);
+    expect(divider.height, 1);
+
+    // 메뉴 패널의 Material은 '부산' 텍스트의 조상 중 실제로 color/elevation/shape가
+    // 세팅된 것(내부 wrapper Material은 color가 null이라 구분해야 함).
+    final menuMaterials = find.ancestor(
+      of: find.text('부산'),
+      matching: find.byType(Material),
+    );
+    final menuMaterialWidgets = tester
+        .widgetList<Material>(menuMaterials)
+        .toList();
+    final menuMaterialIndex = menuMaterialWidgets.indexWhere(
+      (material) => material.color != null,
+    );
+    final menuMaterialElement = menuMaterialWidgets[menuMaterialIndex];
+    final menuRect = tester.getRect(menuMaterials.at(menuMaterialIndex));
+    final triggerRect = tester.getRect(find.byKey(const Key('mapRegionTabs')));
+
+    // 트리거 우측 정렬로 패널과 화면 우측 사이 틈(노선도 삐짐)을 없앤다 —
+    // 상단바 자체 패딩만 남는다.
+    // (화면 우측 자체까지의 틈은 트리거~화면 우측 여백에 따라 달라져 불안정하므로
+    // 트리거 정렬만 검증한다.)
+    expect((menuRect.right - triggerRect.right).abs(), lessThanOrEqualTo(1));
+
+    // 표면 스타일: 흰 표면, elevation 0, 라운드 8 + line 색 테두리.
+    expect(menuMaterialElement.elevation, 0);
+    expect(menuMaterialElement.color, EasySubwayAccessibleColors.surface);
+    final shape = menuMaterialElement.shape as RoundedRectangleBorder;
+    expect(shape.borderRadius, BorderRadius.circular(8));
+    expect((shape.side.color), EasySubwayAccessibleColors.line);
+
+    // 행 높이 48 이상 + 메뉴 최소 폭 180 이상.
+    final rowSize = tester.getSize(
+      find.widgetWithText(PopupMenuItem<String>, '부산'),
+    );
+    expect(rowSize.height, greaterThanOrEqualTo(48));
+    expect(menuRect.width, greaterThanOrEqualTo(180));
+
+    await tester.tap(find.text('부산'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('노선도 로드 실패는 재시도만 보여준다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

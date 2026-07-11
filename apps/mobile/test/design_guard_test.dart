@@ -204,6 +204,41 @@ void main() {
     );
   });
 
+  test('showMenu/PopupMenuButton elevation: 0 강제 가드 (#1933)', () {
+    // showMenu(...)·PopupMenuButton(...) 호출은 매번 elevation: 0 을 명시해야
+    // 한다. 그렇지 않으면 Flutter 기본 elevation(그림자)이 조용히 재유입된다.
+    // 호출 건수 <= elevation: 0 표기 건수 여야 통과.
+    final filesToCheck = ['lib/network_map.dart', 'lib/route_search.dart'];
+    final callPattern = RegExp(r'\bshowMenu\(|\bPopupMenuButton\(');
+    final elevationZeroPattern = RegExp(r'elevation:\s*0\b');
+
+    final violations = <String>[];
+    for (final filePath in filesToCheck) {
+      final source = sources[filePath];
+      expect(source, isNotNull, reason: '$filePath 를 찾을 수 없다');
+
+      final callCount = countIn(source!, callPattern);
+      final elevationZeroCount = countIn(source, elevationZeroPattern);
+
+      if (callCount > elevationZeroCount) {
+        violations.add(
+          '$filePath: showMenu/PopupMenuButton 호출 $callCount건, '
+          'elevation: 0 명시 $elevationZeroCount건',
+        );
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason:
+          'showMenu(...)·PopupMenuButton(...) 호출은 매번 elevation: 0 을 명시해야 '
+          '한다 — 그렇지 않으면 Flutter 기본 elevation으로 그림자가 조용히 '
+          '재유입된다 (#1933).\n'
+          '${violations.join('\n')}',
+    );
+  });
+
   test('StadiumBorder ratchet — pill 형태 제거 대상 (0으로 수렴)', () {
     // pill(stadium) 형태는 각진 사각형(radius <= 8) 원칙 위반이다.
     // 완전한 원이 필요하면 CircleBorder 를 쓴다. 상한은 내리기만 한다.
