@@ -203,10 +203,16 @@ function aggregate(runs) {
   const capturedRuns = runs.filter(
     (run) => run.gfxinfo.measurementStatus === "captured",
   );
-  const maxCapturedGfxinfo = (selector) =>
-    capturedRuns.length === 0
-      ? null
-      : Math.max(...capturedRuns.map((run) => selector(run.gfxinfo) ?? 0));
+  // captured run이 있어도 특정 지표가 모든 run에서 측정되지 않으면(예: gfxinfo.txt에
+  // 해당 percentile/Janky 라인이 없어 null) 그 지표는 "측정 불가"다. null을 0으로
+  // 폴백하면 Math.max(0)=0이 "0ms 측정됨"으로 둔갑하므로, null을 걸러낸 유효값만
+  // 집계하고 유효값이 하나도 없으면 null을 전파한다.
+  const maxCapturedGfxinfo = (selector) => {
+    const values = capturedRuns
+      .map((run) => selector(run.gfxinfo))
+      .filter((value) => value != null);
+    return values.length === 0 ? null : Math.max(...values);
+  };
   return {
     runCount: runs.length,
     measurementScopes: [...new Set(runs.map((run) => run.measurementScope))],

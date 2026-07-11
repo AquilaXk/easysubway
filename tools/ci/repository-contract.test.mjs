@@ -12788,6 +12788,74 @@ test("노선도 Android evidence analyzer는 Flutter canvas gfxinfo 미캡처(to
   assert.equal(output.aggregate.noCrashesInAllRuns, true);
 });
 
+test("노선도 Android evidence analyzer는 captured run이 있어도 gfxinfo 지표가 전부 null이면 집계를 null로 전파한다(0 폴백 금지)", async () => {
+  const dir = await mkdtemp(
+    path.join(tmpdir(), "easysubway-route-map-evidence-capnull-"),
+  );
+  const artifactDir = path.join(dir, "run-1");
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    path.join(artifactDir, "metadata.env"),
+    [
+      "serial=RFKYA01VMQY",
+      "package=com.easysubway.app",
+      "width=1080",
+      "height=2340",
+      "build_mode=profile",
+      "pan_count=5",
+      "measurement_scope=gesture_after_route_map_settle",
+      "gfxinfoResetAfterRouteMapSettle=true",
+      "captured_at_utc=2026-07-11T17:06:48Z",
+    ].join("\n"),
+  );
+  // totalFrames>0이라 measurementStatus는 "captured"지만, dumpsys 출력에
+  // Janky/percentile 라인이 없어 jankyPercent/p95/p99가 전부 null이다. 이때
+  // Math.max(0) 폴백이 "0ms 측정됨"으로 둔갑하면 안 되고 집계는 null이어야 한다.
+  await writeFile(
+    path.join(artifactDir, "gfxinfo.txt"),
+    ["Total frames rendered: 120"].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "meminfo.txt"),
+    [
+      "Java Heap:    12368",
+      "Native Heap:    48796",
+      "Graphics:    47569",
+      "TOTAL PSS:   199903            TOTAL RSS:   318821       TOTAL SWAP PSS:      0",
+    ].join("\n"),
+  );
+  await writeFile(path.join(artifactDir, "renderer-crashes.log"), "");
+  await writeFile(
+    path.join(artifactDir, "route-map-frames.log"),
+    [
+      "routeMapFrame buildMs=4.20 rasterMs=6.10 totalMs=12.50",
+      "routeMapFrame buildMs=5.00 rasterMs=8.00 totalMs=14.00",
+    ].join("\n"),
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/mobile/analyze-route-map-android-evidence.mjs",
+      "--artifact-dir",
+      artifactDir,
+      "--format",
+      "json",
+    ],
+    { cwd: root },
+  );
+  const output = JSON.parse(stdout);
+
+  // captured로 집계 대상에는 들지만 지표 자체가 측정 불가라 null 전파.
+  assert.equal(output.runs[0].gfxinfo.measurementStatus, "captured");
+  assert.equal(output.runs[0].gfxinfo.jankyPercent, null);
+  assert.equal(output.runs[0].gfxinfo.p95Ms, null);
+  assert.equal(output.runs[0].gfxinfo.p99Ms, null);
+  assert.equal(output.aggregate.maxJankyPercent, null);
+  assert.equal(output.aggregate.maxP95FrameMs, null);
+  assert.equal(output.aggregate.maxP99FrameMs, null);
+});
+
 test("데이터팩 게시 도구는 releases 불변 경로와 Cache-Control 정책을 고정한다", () => {
   const createPlan = read("tools/datapack/create-publish-plan.mjs");
   const publish = read("tools/datapack/publish-object-storage.mjs");
