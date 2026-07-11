@@ -29,6 +29,24 @@ class _StubApiClient extends ApiClient {
   }
 }
 
+class _SequencedApiClient extends ApiClient {
+  _SequencedApiClient(this.responses)
+    : super(baseUri: Uri.parse('https://api.easysubway.example'));
+
+  final List<Future<ApiResponse>> responses;
+  var calls = 0;
+
+  @override
+  Future<ApiResponse> getJson(
+    String path, {
+    Map<String, String> headers = const {},
+  }) {
+    return responses[calls++];
+  }
+}
+
+enum _ReloadDependency { repository, placement, imageLoader }
+
 ApiResponse _creativeResponse({
   String placement = 'route-result-bottom',
   String imageUrl = 'https://cdn.easysubway.app/banner.png',
@@ -61,7 +79,7 @@ Future<bool> _launchSuccess(Uri uri, {required LaunchMode mode}) async => true;
 
 Future<void> _pumpBanner(
   WidgetTester tester, {
-  required Future<ApiResponse> response,
+  Future<ApiResponse>? response,
   required AdImageLoader imageLoader,
   AdLauncher? launcher,
   Object? apiError,
@@ -85,7 +103,7 @@ Future<void> _pumpBanner(
               key: bannerKey,
               repository:
                   repository ??
-                  AdRepository(_StubApiClient(response, error: apiError)),
+                  AdRepository(_StubApiClient(response!, error: apiError)),
               placement: placement,
               imageLoader: imageLoader,
               launcher: launcher ?? _launchSuccess,
@@ -224,9 +242,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('repository와 placement 교체 뒤 늦은 이전 응답과 decode를 무시한다', (
-    tester,
-  ) async {
+  testWidgets('이전 decode 대기 중 widget 교체 뒤 늦은 이미지 완료를 무시한다', (tester) async {
     const bannerKey = ValueKey('mutable-ad-banner');
     final routeResponse = Completer<ApiResponse>();
     final stationResponse = Completer<ApiResponse>();
@@ -236,7 +252,9 @@ void main() {
     final stationRepository = AdRepository(
       _StubApiClient(stationResponse.future),
     );
+    final requestedImages = <Uri>[];
     Future<ImageProvider<Object>> imageLoader(Uri uri, BuildContext context) {
+      requestedImages.add(uri);
       return uri.path.endsWith('route.png')
           ? routeImage.future
           : stationImage.future;
@@ -250,6 +268,20 @@ void main() {
       bannerKey: bannerKey,
       imageLoader: imageLoader,
     );
+
+    routeResponse.complete(
+      _creativeResponse(
+        imageUrl: 'https://cdn.easysubway.app/route.png',
+        advertiserName: '이전 경로 광고',
+      ),
+    );
+    await tester.pump();
+
+    expect(requestedImages, [
+      Uri.parse('https://cdn.easysubway.app/route.png'),
+    ]);
+    expect(find.byType(AdBannerSlot), findsNothing);
+
     await _pumpBanner(
       tester,
       response: stationResponse.future,
@@ -259,13 +291,6 @@ void main() {
       imageLoader: imageLoader,
     );
 
-    routeResponse.complete(
-      _creativeResponse(
-        imageUrl: 'https://cdn.easysubway.app/route.png',
-        advertiserName: '이전 경로 광고',
-      ),
-    );
-    await tester.pump();
     routeImage.complete(_image);
     await tester.pump();
     await tester.pump();
@@ -288,6 +313,140 @@ void main() {
     expect(find.text('현재 역 광고'), findsOneWidget);
     expect(find.text('이전 경로 광고'), findsNothing);
   });
+
+  testWidgets('dispose 뒤 늦은 조회와 decode 완료가 setState를 호출하지 않는다', (tester) async {
+    final fetch = Completer<ApiResponse>();
+    final fetchRepository = AdRepository(_StubApiClient(fetch.future));
+
+    await _pumpBanner(
+      tester,
+      bannerKey: const ValueKey('late-fetch-banner'),
+      repository: fetchRepository,
+      placement: AdPlacement.routeResultBottom,
+      imageLoader: (_, _) async => _image,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    fetch.complete(_creativeResponse());
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+
+    final decode = Completer<ImageProvider<Object>>();
+    var decodeStarted = false;
+    await _pumpBanner(
+      tester,
+      bannerKey: const ValueKey('late-decode-banner'),
+      repository: AdRepository(
+        _StubApiClient(Future.value(_creativeResponse())),
+      ),
+      placement: AdPlacement.routeResultBottom,
+      imageLoader: (_, _) {
+        decodeStarted = true;
+        return decode.future;
+      },
+    );
+    await tester.pump();
+    expect(decodeStarted, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    decode.complete(_image);
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final dependency in _ReloadDependency.values) {
+    testWidgets('${dependency.name}만 교체하면 기존 배너를 지우고 다시 조회한다', (tester) async {
+      const bannerKey = ValueKey('single-dependency-banner');
+      final nextResponse = Completer<ApiResponse>();
+      final initialClient = _SequencedApiClient([
+        Future.value(
+          _creativeResponse(
+            imageUrl: 'https://cdn.easysubway.app/first.png',
+            advertiserName: '기존 광고',
+          ),
+        ),
+        if (dependency != _ReloadDependency.repository) nextResponse.future,
+      ]);
+      final replacementClient = dependency == _ReloadDependency.repository
+          ? _SequencedApiClient([nextResponse.future])
+          : initialClient;
+      final initialRepository = AdRepository(initialClient);
+      final replacementRepository = dependency == _ReloadDependency.repository
+          ? AdRepository(replacementClient)
+          : initialRepository;
+      final replacementPlacement = dependency == _ReloadDependency.placement
+          ? AdPlacement.stationDetailBottom
+          : AdPlacement.routeResultBottom;
+      var initialLoaderCalls = 0;
+      var replacementLoaderCalls = 0;
+      Future<ImageProvider<Object>> initialLoader(
+        Uri uri,
+        BuildContext context,
+      ) async {
+        initialLoaderCalls++;
+        return _image;
+      }
+
+      Future<ImageProvider<Object>> replacementLoader(
+        Uri uri,
+        BuildContext context,
+      ) async {
+        replacementLoaderCalls++;
+        return _image;
+      }
+
+      await _pumpBanner(
+        tester,
+        bannerKey: bannerKey,
+        repository: initialRepository,
+        placement: AdPlacement.routeResultBottom,
+        imageLoader: initialLoader,
+      );
+      await tester.pump();
+
+      expect(find.text('기존 광고'), findsOneWidget);
+      expect(initialLoaderCalls, 1);
+
+      await _pumpBanner(
+        tester,
+        bannerKey: bannerKey,
+        repository: replacementRepository,
+        placement: replacementPlacement,
+        imageLoader: dependency == _ReloadDependency.imageLoader
+            ? replacementLoader
+            : initialLoader,
+      );
+
+      expect(find.byType(AdBannerSlot), findsNothing);
+      expect(find.text('기존 광고'), findsNothing);
+
+      nextResponse.complete(
+        _creativeResponse(
+          placement: replacementPlacement.id,
+          imageUrl: 'https://cdn.easysubway.app/current.png',
+          advertiserName: '현재 광고',
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('현재 광고'), findsOneWidget);
+      expect(find.text('기존 광고'), findsNothing);
+      expect(
+        initialClient.calls +
+            (identical(initialClient, replacementClient)
+                ? 0
+                : replacementClient.calls),
+        2,
+      );
+      expect(
+        replacementLoaderCalls,
+        dependency == _ReloadDependency.imageLoader ? 1 : 0,
+      );
+    });
+  }
 
   testWidgets('외부 브라우저 실패나 예외에 fallback을 만들지 않는다', (tester) async {
     var calls = 0;
