@@ -103,6 +103,73 @@ void main() {
     picture.dispose();
   });
 
+  test('painter는 attribution 텍스트·painter 무효화 분기에서 repaint', () {
+    final map = _map();
+    final design = routeMapDesignSpaceFor(map);
+    final layout = solveRouteMapLabelLayout(
+      map: map,
+      design: design,
+      labelTextByStationId: const {},
+      badgeLabelByLineId: const {},
+      measureLabel: (text, {required bool bold}) => const Size(10, 13),
+      measureBadge: (text) => const Size(10, 18),
+    );
+    final picture = recordRouteMapPicture(
+      map: map,
+      design: design,
+      layout: layout,
+      lineColors: const {},
+      lineOffsets: const {},
+    );
+    const camera = MapCameraState(
+      sourceBounds: Rect.fromLTWH(0, 0, 48, 48),
+      viewportSize: Size(400, 800),
+      center: Offset(24, 24),
+      scale: 8,
+      minScale: 8,
+      maxScale: 20,
+      revision: 1,
+      initialScale: 8,
+    );
+    final attributionPainter = TextPainter(
+      text: const TextSpan(text: '© 출처'),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final otherPainter = TextPainter(
+      text: const TextSpan(text: '© 출처'),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    StructuredRouteMapPainter painterWith({
+      String? attributionText = '© 출처',
+      TextPainter? withPainter,
+    }) => StructuredRouteMapPainter(
+      picture: picture,
+      designScale: design.designScale,
+      camera: camera,
+      attributionText: attributionText,
+      attributionPainter: withPainter ?? attributionPainter,
+    );
+
+    final base = painterWith();
+    // 동일 attribution → repaint 없음(기존 무효화 조건 유지 확인).
+    expect(base.shouldRepaint(painterWith()), isFalse);
+    // attributionText 값이 다르면 repaint.
+    expect(
+      base.shouldRepaint(painterWith(attributionText: '© 다른 출처')),
+      isTrue,
+    );
+    // attributionPainter identity만 달라도 repaint.
+    expect(
+      base.shouldRepaint(painterWith(withPainter: otherPainter)),
+      isTrue,
+    );
+
+    attributionPainter.dispose();
+    otherPainter.dispose();
+    picture.dispose();
+  });
+
   test('routeMapStationLabel은 괄호 부역명을 축약한다', () {
     expect(routeMapStationLabel('굴봉산(제이드가든)'), '굴봉산');
     expect(routeMapStationLabel('신금호'), '신금호');
