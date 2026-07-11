@@ -5096,6 +5096,10 @@ test("데이터팩 update policy는 자동 갱신 네트워크와 재시도 계�
   assert.equal(policy.retryMaxAttemptsPerSession, 3);
   assert.equal(policy.expiryUrgentWindowDays, 7);
   assert.equal(policy.expiryUrgentIgnoresMinInterval, true);
+  // #1910: 사용자가 명시적으로 수락한 다운로드(userConsent)는 재시도 backoff 창을 무시한다.
+  assert.equal(policy.userConsentIgnoresRetryBackoff, true);
+  const updaterSource = read("apps/mobile/lib/core/datapack/data_pack_updater.dart");
+  assert.match(updaterSource, /trigger != UpdateTrigger\.userConsent &&\s*backoffUntil != null/);
 });
 
 test("official source importer는 production placeholder evidence hash를 거부한다", async () => {
