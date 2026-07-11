@@ -42,10 +42,12 @@ function collapseQuotedStringConcatenations(source) {
   return collapsed;
 }
 
+const adEventEndpointOccurrence = /\/api\/ads\/events(?=["']|\?|$)/g;
+
 function containsAdEventEndpoint(source) {
   // ponytail: literal/quoted-concat endpoint만 탐지한다. 새 interpolation/variable 광고 endpoint를
   // 허용해야 할 때는 regex를 넓히지 말고 Dart AST 기반 검사로 교체한다.
-  return /(["'])\/api\/ads\/events\1/.test(collapseQuotedStringConcatenations(source));
+  return (collapseQuotedStringConcatenations(source).match(adEventEndpointOccurrence) ?? []).length > 0;
 }
 
 function mobileAdEventSenderFiles(
@@ -62,7 +64,7 @@ function mobileAdEventSenderFiles(
 
 function assertAnonymousAdEventPostCall(source) {
   const normalizedSource = collapseQuotedStringConcatenations(source);
-  const endpointCount = (normalizedSource.match(/(["'])\/api\/ads\/events\1/g) ?? []).length;
+  const endpointCount = (normalizedSource.match(adEventEndpointOccurrence) ?? []).length;
   assert.equal(endpointCount, 1, "ad event repository must contain exactly one endpoint");
 
   const adEventCall = normalizedSource.match(
@@ -2842,17 +2844,25 @@ test("광고 event sender detector는 직접 endpoint와 quoted-string 연결을
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/events')"), true);
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/' + 'events')"), true);
   assert.equal(containsAdEventEndpoint('postJson("/api/ads/" + "events")'), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events?deviceId=device-1')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('https://tracker.example/api/ads/events')"), true);
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/events-v2')"), false);
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/events/summary')"), false);
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/active')"), false);
   const sources = new Map([
     ["apps/mobile/lib/manual.dart", "postJson('/api/ads/events')"],
     ["apps/mobile/lib/generated.g.dart", "postJson('/api/ads/' + 'events')"],
+    ["apps/mobile/lib/query.dart", "postJson('/api/ads/events?deviceId=device-1')"],
+    ["apps/mobile/lib/absolute.dart", "postJson('https://tracker.example/api/ads/events')"],
+    ["apps/mobile/lib/v2.dart", "postJson('/api/ads/events-v2')"],
+    ["apps/mobile/lib/summary.dart", "postJson('/api/ads/events/summary')"],
     ["apps/mobile/lib/generated.g.txt", "postJson('/api/ads/events')"],
   ]);
   assert.deepEqual(mobileAdEventSenderFiles([...sources.keys()], (file) => sources.get(file)), [
     "apps/mobile/lib/manual.dart",
     "apps/mobile/lib/generated.g.dart",
+    "apps/mobile/lib/query.dart",
+    "apps/mobile/lib/absolute.dart",
   ]);
 });
 
