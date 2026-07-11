@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
@@ -3160,6 +3161,63 @@ class _NetworkMapLoadFailure extends StatelessWidget {
   }
 }
 
+// 지도 datapack manifest(assets/datapacks/metro_map_pack/manifest.json)의
+// license 블록에서 지역별 attribution 표기 문자열을 만든다(#1951). 하드코딩
+// 지역 분기 대신 manifest의 `attributionRequired`를 정본으로 삼는다 —
+// attributionRequired가 false면 해당 지역은 맵에서 제외한다.
+const _mapManifestAssetPath = 'assets/datapacks/metro_map_pack/manifest.json';
+
+@visibleForTesting
+Map<String, String> parseNetworkMapAttributionByRegion(String manifestJson) {
+  final manifest = jsonDecode(manifestJson) as Map<String, Object?>;
+  final maps = (manifest['maps'] as List? ?? const [])
+      .cast<Map<String, Object?>>();
+  final result = <String, String>{};
+  for (final map in maps) {
+    final appRegion = map['app_region'] as String?;
+    final license = map['license'] as Map<String, Object?>?;
+    if (appRegion == null || license == null) {
+      continue;
+    }
+    if (license['attributionRequired'] != true) {
+      continue;
+    }
+    final authors = (license['authors'] as List? ?? const [])
+        .whereType<Object>()
+        .map((author) => '$author')
+        .join(', ');
+    final spdx = (license['spdx'] as String?)?.replaceAll('-', ' ').trim();
+    final licenseLabel = (spdx != null && spdx.isNotEmpty)
+        ? spdx
+        : (license['name'] as String? ?? '');
+    final text = [
+      if (authors.isNotEmpty) authors,
+      if (licenseLabel.isNotEmpty) licenseLabel,
+    ].join(', ');
+    if (text.isNotEmpty) {
+      result[appRegion] = text;
+    }
+  }
+  return result;
+}
+
+// manifest는 프로세스 생애주기 동안 바뀌지 않는 번들 asset이라, 노선도 canvas가
+// 새로 마운트될 때마다(지역 전환 등) 매번 asset을 다시 읽지 않도록 모듈 캐시
+// (_sharedAttributionTextByRegionFuture)로 1회만 로드해 공유한다. 로드 실패
+// 시에는 캐시를 비워 다음 마운트에서 재시도한다(#1951).
+Future<Map<String, String>>? _sharedAttributionTextByRegionFuture;
+
+Future<Map<String, String>> _loadNetworkMapAttributionTextByRegion() {
+  return _sharedAttributionTextByRegionFuture ??= rootBundle
+      .loadString(_mapManifestAssetPath)
+      .then(parseNetworkMapAttributionByRegion);
+}
+
+@visibleForTesting
+void resetNetworkMapAttributionCacheForTest() {
+  _sharedAttributionTextByRegionFuture = null;
+}
+
 class _NetworkMapCanvas extends StatefulWidget {
   const _NetworkMapCanvas({
     required this.data,
@@ -3239,6 +3297,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Map<String, String>? _structuredLabelTextCache;
   Map<String, String>? _structuredLineBadgeLabelCache;
   NetworkMapStation? _selectedStation;
+  // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
+  // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
+  Map<String, String>? _attributionTextByRegion;
 
   @override
   void initState() {
@@ -3249,6 +3310,28 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     // 프레임이 잡히지 않으므로 FrameTiming으로 계측한다. release에는 넣지 않는다.
     if (!kReleaseMode) {
       SchedulerBinding.instance.addTimingsCallback(_logRouteMapFrameTimings);
+    }
+    _loadAttributionText();
+  }
+
+  Future<void> _loadAttributionText() async {
+    try {
+      final byRegion = await _loadNetworkMapAttributionTextByRegion();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _attributionTextByRegion = byRegion);
+    } catch (error, stackTrace) {
+      // asset 로드/파싱 실패는 attribution 미표기로 폴백한다(#1951). 일시 오류가
+      // 영구 미표기로 고정되지 않도록 실패한 Future는 캐시에서 비워 다음 마운트
+      // 때 재시도되게 한다 — 화면은 죽지 않되, 원인 파악을 위해 예외는 리포터로
+      // 남긴다.
+      _sharedAttributionTextByRegionFuture = null;
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '지도 datapack manifest에서 attribution 정보를 불러오는 중 예외가 발생했습니다.',
+      );
     }
   }
 
@@ -3613,6 +3696,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       lineColors: _structuredLineColorsCache!,
       labelTextByStationId: _structuredLabelTextCache!,
       lineBadgeLabelByLineId: _structuredLineBadgeLabelCache!,
+      attributionText: _attributionTextByRegion?[widget.data.selectedRegion],
     );
   }
 

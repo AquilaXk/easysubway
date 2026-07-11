@@ -1,0 +1,68 @@
+name: KRIC Source Candidate Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: KRIC source candidate to collect
+        required: true
+        type: choice
+        options:
+          - kric-subway-route-info
+          - kric-station-info
+          - kric-train-operation-organ
+          - kric-station-transfer-info
+          - kric-station-platform
+          - kric-station-movement-standard
+          - kric-station-movement-detailed
+          - kric-transfer-movement-standard
+          - kric-transfer-movement-detailed
+          - kric-station-convenience-standard
+
+jobs:
+  collect:
+    name: KRIC Source Candidate Evidence
+    if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      KRIC_CANDIDATE_ID: ${{ inputs.candidate }}
+
+    steps:
+      - name: KRIC Source Candidate Evidence / Checkout default branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: KRIC Source Candidate Evidence / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: KRIC Source Candidate Evidence / Collect and validate sanitized evidence
+        env:
+          KRIC_SERVICE_KEY: ${{ secrets.KRIC_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${KRIC_SERVICE_KEY}"
+          node tools/datapack/collect-kric-source-candidate-evidence.mjs \
+            --candidate "${KRIC_CANDIDATE_ID}"
+          test -s "${RUNNER_TEMP}/kric-source-candidate-evidence/${KRIC_CANDIDATE_ID}.sample.json"
+          test -s "${RUNNER_TEMP}/kric-source-candidate-evidence/${KRIC_CANDIDATE_ID}.report.txt"
+          test -s "${RUNNER_TEMP}/kric-source-candidate-evidence/${KRIC_CANDIDATE_ID}.hashes.json"
+
+      - name: KRIC Source Candidate Evidence / Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: kric-source-candidate-evidence
+          path: |
+            ${{ runner.temp }}/kric-source-candidate-evidence/*.sample.json
+            ${{ runner.temp }}/kric-source-candidate-evidence/*.report.txt
+            ${{ runner.temp }}/kric-source-candidate-evidence/*.hashes.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14

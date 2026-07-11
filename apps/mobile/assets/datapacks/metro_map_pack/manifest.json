@@ -79,9 +79,9 @@
         "attributionRequired": false,
         "commercialUseAllowed": true,
         "derivativeWorkAllowed": false,
-        "redistributionAllowed": false,
-        "reviewStatus": "permission-required",
-        "changes": "File stored unchanged as a bundled offline route-map asset. Bundle redistribution and commercial use remain blocked until operator permission is recorded."
+        "redistributionAllowed": true,
+        "reviewStatus": "self-drawn-fact-based",
+        "changes": "App rendering uses a self-drawn schematic built from factual station coordinates and line topology, not a derivative of the bundled SVG's expressive content. The original SVG is retained only as a coordinate-review reference and is not distributed as the render source."
       }
     },
     {
@@ -154,9 +154,9 @@
         "attributionRequired": false,
         "commercialUseAllowed": true,
         "derivativeWorkAllowed": false,
-        "redistributionAllowed": false,
-        "reviewStatus": "permission-required",
-        "changes": "File stored unchanged as a bundled offline route-map asset. Bundle redistribution and commercial use remain blocked until operator permission is recorded."
+        "redistributionAllowed": true,
+        "reviewStatus": "self-drawn-fact-based",
+        "changes": "App rendering uses a self-drawn schematic built from factual station coordinates and line topology, not a derivative of the bundled SVG's expressive content. The original SVG is retained only as a coordinate-review reference and is not distributed as the render source."
       }
     },
     {
@@ -191,9 +191,9 @@
         "attributionRequired": false,
         "commercialUseAllowed": true,
         "derivativeWorkAllowed": false,
-        "redistributionAllowed": false,
-        "reviewStatus": "permission-required",
-        "changes": "File stored unchanged as a bundled offline route-map asset. Bundle redistribution and commercial use remain blocked until operator permission is recorded."
+        "redistributionAllowed": true,
+        "reviewStatus": "self-drawn-fact-based",
+        "changes": "App rendering uses a self-drawn schematic built from factual station coordinates and line topology, not a derivative of the bundled SVG's expressive content. The original SVG is retained only as a coordinate-review reference and is not distributed as the render source."
       }
     }
   ]

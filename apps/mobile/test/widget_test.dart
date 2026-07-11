@@ -9,6 +9,9 @@ import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
+import 'package:easysubway_mobile/core/network/api_client.dart';
+import 'package:easysubway_mobile/features/ads/active_ad_banner.dart';
+import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controller.dart';
@@ -36,6 +39,7 @@ import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_secure_key_value_storage.dart';
@@ -73,6 +77,22 @@ class _FakeNoticeRepository implements NoticeRepository {
 
   @override
   Future<ActiveNoticesResult> activeNotices() async => _result;
+}
+
+class _NoInventoryAdApiClient extends ApiClient {
+  _NoInventoryAdApiClient()
+    : super(baseUri: Uri.parse('https://api.easysubway.example'));
+
+  final paths = <String>[];
+
+  @override
+  Future<ApiResponse> getJson(
+    String path, {
+    Map<String, String> headers = const {},
+  }) async {
+    paths.add(path);
+    return const ApiResponse(statusCode: 204, jsonBody: null);
+  }
 }
 
 Future<void> _openFavoriteList(
@@ -307,6 +327,16 @@ void main() {
   // 상대 확인 시점을 쓰는 테스트가 기준 시각을 고정한 뒤 항상 원래대로 되돌린다.
   tearDown(() {
     debugStationVerifiedClock = DateTime.now;
+  });
+
+  // #1951: 노선도 canvas와 데이터 출처 화면이 같은 datapack manifest asset을 각각
+  // rootBundle로 로드한다. rootBundle의 문자열 캐시는 테스트 간에 유지되므로, 앞선
+  // 테스트에서 manifest가 캐시에 적재되면 뒤 테스트의 FutureBuilder 완료 스케줄이
+  // 바뀌어(캐시 히트 시 microtask로 즉시 완료) 순서 의존 회귀가 생긴다. 각 테스트가
+  // cold 캐시에서 시작하도록 rootBundle과 모듈 attribution 캐시를 초기화한다.
+  tearDown(() {
+    rootBundle.clear();
+    resetNetworkMapAttributionCacheForTest();
   });
 
   testWidgets('홈에서 내 신고 화면으로 이동한다', (tester) async {
@@ -8101,6 +8131,35 @@ void main() {
     }
   });
 
+  testWidgets('역 상세 광고는 성공 content 최하단에 station placement로 배선된다', (
+    tester,
+  ) async {
+    final adRepository = AdRepository(_NoInventoryAdApiClient());
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationDetailScreen(
+          repository: FakeStationSearchRepository(
+            stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          adRepository: adRepository,
+          stationId: 'station-sangnoksu',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final list = tester.widget<ListView>(
+      find.byKey(const Key('stationDetailList')),
+    );
+    final children =
+        (list.childrenDelegate as SliverChildListDelegate).children;
+    final banner = children.last as ActiveAdBanner;
+
+    expect(banner.repository, same(adRepository));
+    expect(banner.placement, AdPlacement.stationDetailBottom);
+  });
+
   testWidgets('역 상세는 좌표 있는 출구에만 카카오맵 버튼을 보여준다', (tester) async {
     debugStationVerifiedClock = () => DateTime(2026, 7, 9);
     final semanticsHandle = tester.ensureSemantics();
@@ -9092,6 +9151,62 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('광고 repository는 경로 결과와 상세에만 같은 placement로 배선된다', (tester) async {
+    final apiClient = _NoInventoryAdApiClient();
+    final adRepository = AdRepository(apiClient);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(),
+          stationRepository: FakeStationSearchRepository(),
+          adRepository: adRepository,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 11),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    var banner = tester.widget<ActiveAdBanner>(
+      find.byKey(const Key('routeResultListAdBanner')),
+    );
+    expect(banner.repository, same(adRepository));
+    expect(banner.placement, AdPlacement.routeResultBottom);
+
+    await tester.ensureVisible(find.byKey(const Key('routeResultListItem')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('routeResultListItem')));
+    await tester.pumpAndSettle();
+
+    banner = tester.widget<ActiveAdBanner>(
+      find.byKey(const Key('routeDetailAdBanner')),
+    );
+    expect(banner.repository, same(adRepository));
+    expect(banner.placement, AdPlacement.routeResultBottom);
+
+    await tester.ensureVisible(
+      find.byKey(const Key('routeStartGuidanceButton')),
+    );
+    await tester.tap(find.byKey(const Key('routeStartGuidanceButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ActiveAdBanner), findsNothing);
+    expect(apiClient.paths, [
+      '/api/ads/active?placement=route-result-bottom',
+      '/api/ads/active?placement=route-result-bottom',
+    ]);
   });
 
   testWidgets('경로 결과 단계는 시스템 뒤로가기를 화면 내 뒤로가기와 맞춘다', (tester) async {

@@ -29,6 +29,72 @@ function mobileProductionDartFiles() {
   }).trim().split("\n").filter((file) => file.endsWith(".dart") && !file.endsWith(".g.dart"));
 }
 
+function assertNoNativeAdIdentityOrMeasurement({
+  dependencySources = [],
+  nativeSources = [],
+  mergedManifest,
+}) {
+  const normalizeDependency = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const deniedDependencies = new Set([
+    "com.google.android.gms:play-services-ads",
+    "com.google.android.gms:play-services-ads-lite",
+    "Google-Mobile-Ads-SDK",
+    "GoogleMobileAds",
+    "GADMobileAds",
+    "com.applovin:applovin-sdk",
+    "AppLovinSDK",
+    "com.unity3d.ads:unity-ads",
+    "UnityAds",
+    "com.chartboost:chartboost-sdk",
+    "ChartboostSDK",
+    "com.vungle:vungle-ads",
+    "VungleAds",
+    "com.facebook.android:audience-network-sdk",
+    "FBAudienceNetwork",
+    "com.ironsource.sdk:mediationsdk",
+    "IronSource",
+    "IronSourceSDK",
+    "com.amazon.android:aps-sdk",
+    "AmazonPublisherServices",
+    "AmazonPublisherServicesSDK",
+  ].map((dependency) => {
+    const [group, name] = dependency.split(":");
+    return name
+      ? `${normalizeDependency(group)}:${normalizeDependency(name)}`
+      : normalizeDependency(group);
+  }));
+  for (const [file, source] of dependencySources) {
+    for (const token of source.match(/[A-Za-z0-9._-]+(?::[A-Za-z0-9._-]+){0,2}/g) ?? []) {
+      const [group, name] = token.split(":");
+      const dependency = name
+        ? `${normalizeDependency(group)}:${normalizeDependency(name)}`
+        : normalizeDependency(group);
+      assert.ok(!deniedDependencies.has(dependency), `${file} must not add a native ad SDK`);
+    }
+  }
+  for (const [file, source] of nativeSources) {
+    let collapsed = source;
+    let previous;
+    do {
+      previous = collapsed;
+      collapsed = collapsed.replace(
+        /(["'])([^"'\\]*)\1\s*\+\s*(["'])([^"'\\]*)\3/g,
+        (_match, _leftQuote, left, _rightQuote, right) => `"${left}${right}"`,
+      );
+    } while (collapsed !== previous);
+    const hasAdEventEndpoint = /\/api\/ads\/events\b/.test(collapsed);
+    const hasPostRequest = /\.post\s*\(|\.(?:method)\s*\(\s*["']POST["']|\b(?:httpMethod|method)\s*[:=]\s*(?:["']POST["']|\.?HttpMethod\.POST|\.post\b)/i.test(collapsed);
+    assert.ok(!(hasAdEventEndpoint && hasPostRequest), `${file} must not post native ad events`);
+  }
+  if (mergedManifest) {
+    assert.doesNotMatch(
+      mergedManifest[1],
+      /android\.permission\.AD_ID/,
+      `${mergedManifest[0]} must not contain AD_ID`,
+    );
+  }
+}
+
 function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
@@ -1544,9 +1610,7 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.doesNotMatch(main, /homeBottomNavigationBar/);
   assert.match(widgetTest, /기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다/);
   assert.match(widgetTest, /노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다/);
-  // #1933: 별도 길찾기 폼 페이지를 없애며 "노선도 메뉴 길찾기는 길찾기 화면으로 전환한다"
-  // 테스트가 사라졌다. 노선도 홈에서 출발·도착 지정 시 길찾기 화면으로 전환되는
-  // 현행 테스트로 앵커를 갱신해 계약(길찾기 화면 전환 보증)을 유지한다.
+  // #1933: 폼 페이지 제거로 대체된 현행 전환 테스트 앵커
   assert.match(widgetTest, /노선도에서 출발·도착을 정하면 길찾기 결과 화면으로 전환한다/);
   assert.match(widgetTest, /find\.byKey\(const Key\('homeBottomNavigationBar'\)\), findsNothing/);
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavHome'\)\), findsNothing/);
@@ -1747,13 +1811,53 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
 });
 
-test("release dart-define guard는 demo home data flag를 차단한다", async () => {
+test("release dart-define guard는 public API URL과 demo flag를 검증한다", async () => {
+  const guard = read("tools/mobile/validate-release-dart-defines.sh");
+  assert.match(guard, /case "\$\{host\}" in[\s\S]*?\n  \*\) ;;\nesac/);
   await execFileAsync("bash", ["-n", "tools/mobile/validate-release-dart-defines.sh"], { cwd: root });
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
     "--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
   ], { cwd: root });
+  await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:443",
+  ], { cwd: root });
+  const injectionDir = await mkdtemp(path.join(tmpdir(), "release-dart-define-"));
+  const injectionMarker = path.join(injectionDir, "executed");
+  try {
+    await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      `--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app/$(touch\${IFS}${injectionMarker})`,
+    ], { cwd: root });
+    assert.equal(existsSync(injectionMarker), false);
+  } finally {
+    await rm(injectionDir, { recursive: true, force: true });
+  }
+  const rejectedArgs = [
+    [],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL="],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=http://api.easysubway.app"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https:///api"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://localhost"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://127.0.0.1"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://10.0.0.1"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://8.8.8.8"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://[::1]"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:0"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:0443"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:65536"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:99999"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://backend.local"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.example.com"],
+  ];
+  for (const args of rejectedArgs) {
+    await assert.rejects(
+      execFileAsync("tools/mobile/validate-release-dart-defines.sh", args, { cwd: root }),
+      /EASYSUBWAY_API_BASE_URL/,
+    );
+  }
   await assert.rejects(
     execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
       "--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true",
     ], { cwd: root }),
     /EASYSUBWAY_DEMO_HOME_DATA is not allowed in release/,
@@ -1805,8 +1909,18 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-password/);
 	  assert.match(workflow, /Android Release Artifact \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"[\s\S]*Android Release Artifact \/ Audit bundled datapacks/);
 	  assert.match(workflow, /node tools\/ci\/audit-mobile-datapack-assets\.mjs --index apps\/mobile\/assets\/datapacks\/index\.json --root apps\/mobile/);
-	  assert.match(workflow, /tools\/mobile\/validate-release-dart-defines\.sh/);
+  assert.match(workflow, /tools\/mobile\/validate-release-dart-defines\.sh/);
 	  assert.match(workflow, /flutter build appbundle --release/);
+  assert.equal(
+    (workflow.match(/DEPLOY_PUBLIC_API_BASE_URL: \$\{\{ vars\.DEPLOY_PUBLIC_API_BASE_URL \}\}/g) ?? []).length,
+    2,
+  );
+  assert.equal(
+    (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL="\$\{DEPLOY_PUBLIC_API_BASE_URL\}"/g) ?? []).length,
+    4,
+  );
+  assert.doesNotMatch(workflow, /secrets\.DEPLOY_PUBLIC_API_BASE_URL/);
+  assert.doesNotMatch(workflow, /--dart-define=EASYSUBWAY_API_BASE_URL=https?:\/\//);
   assert.equal(
     (workflow.match(/--dart-define=EASYSUBWAY_API_BASE_URL=https:\/\/\S+\.local/g) ?? []).length,
     0,
@@ -1966,7 +2080,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(playStoreSubmissionContent.issue, 1018);
   assert.equal(playStoreSubmissionContent.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(playStoreSubmissionContent.storePrivacyInventory, "apps/mobile/release/store-privacy-inventory.json");
-  assert.equal(playStoreSubmissionContent.appContentDeclarations.ads, false);
+  assert.equal(playStoreSubmissionContent.appContentDeclarations.ads, true);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.publicUserSignIn, false);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.accountCreation, false);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.backgroundLocation, false);
@@ -2660,6 +2774,188 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
   assert.doesNotMatch(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/ios\/signed-release-artifact-gate\.json/);
 
+});
+
+test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측 경계를 함께 고정한다", () => {
+  const readiness = readJson("apps/mobile/release/store-submission-readiness.json");
+  const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
+  const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
+  const androidMainManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+
+  assert.equal(playStoreContent.appContentDeclarations.ads, true);
+  assert.equal(privacyInventory.advertising.included, true);
+  assert.equal(privacyInventory.advertising.servingModel, "first-party-self-served");
+  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking", "measurementEvents"]) {
+    assert.equal(privacyInventory.advertising[field], false, `advertising.${field} must remain false`);
+  }
+  assert.deepEqual(privacyInventory.advertising.collectedDataTypeIds, []);
+  assert.equal(privacyInventory.tracking, false);
+  assert.ok(privacyInventory.dataTypes.every((item) => item.usedForTracking === false));
+  assert.ok(
+    privacyInventory.dataTypes.every(
+      (item) => !/Advertising|Marketing/.test(item.googlePlayDataSafety.purpose),
+    ),
+  );
+
+  const readinessItems = new Map(readiness.items.map((item) => [item.id, item]));
+  const adDisclosure = readinessItems.get("play_ads_declaration");
+  for (const id of ["play_content_rating", "appstore_age_rating"]) {
+    const item = readinessItems.get(id);
+    assert.ok(item.evidence.includes("ad-request-contract-test"), `${id} must link ad request contract evidence`);
+    assert.ok(
+      item.linkedArtifacts.includes("apps/mobile/lib/features/ads/active_ad_banner.dart"),
+      `${id} must link the rendered ad slot`,
+    );
+    assert.ok(
+      item.linkedArtifacts.includes("apps/mobile/lib/features/ads/ad_repository.dart"),
+      `${id} must link the ad request boundary`,
+    );
+    assert.match(item.readyWhenKo, /자체 서빙 비개인화 광고/);
+    assert.match(item.readyWhenKo, /명시적으로 누를 때만.*외부/);
+  }
+  for (const copy of [
+    adDisclosure.readyWhenKo,
+    readinessItems.get("play_content_rating").readyWhenKo,
+    readinessItems.get("appstore_age_rating").readyWhenKo,
+    playStoreContent.storeMetadataRequirements.contentRatingBasisKo,
+  ]) {
+    assert.doesNotMatch(copy, /광고 없음|광고 지면이 없|외부 웹 열람 없음/);
+  }
+  const contentRatingBasis = playStoreContent.storeMetadataRequirements.contentRatingBasisKo;
+  assert.match(
+    contentRatingBasis,
+    /외부 지도 앱\/웹은 사용자가 지도 또는 길안내를 명시적으로 누를 때만 열/,
+  );
+  assert.match(
+    contentRatingBasis,
+    /광고 landing은 사용자가 광고를 명시적으로 누를 때만 외부 브라우저로 열/,
+  );
+  assert.match(adDisclosure.readyWhenKo, /자체 서빙/);
+  assert.match(adDisclosure.readyWhenKo, /비개인화/);
+  assert.match(adDisclosure.readyWhenKo, /명시적으로 누를 때만.*외부 브라우저/);
+
+  for (const dependencyPath of ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock"]) {
+    assert.doesNotMatch(
+      read(dependencyPath),
+      /google_mobile_ads|play-services-ads|com\.google\.android\.gms\.ads/i,
+      `${dependencyPath} must not add a third-party ad SDK`,
+    );
+  }
+  assert.doesNotMatch(androidMainManifest, /android\.permission\.AD_ID/);
+  for (const sourcePath of mobileProductionDartFiles()) {
+    assert.doesNotMatch(
+      read(sourcePath),
+      /\/api\/ads\/events/,
+      `${sourcePath} must not send ad measurement events`,
+    );
+  }
+});
+
+test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release 산출물까지 차단한다", () => {
+  const dependencyPaths = execFileSync("git", [
+    "ls-files",
+    "apps/mobile/android/**/*.gradle",
+    "apps/mobile/android/**/*.gradle.kts",
+    "apps/mobile/android/**/gradle.lockfile",
+    "apps/mobile/android/**/libs.versions.toml",
+    "apps/mobile/ios/Podfile.lock",
+    "apps/mobile/ios/**/*.pbxproj",
+    "apps/mobile/ios/**/Package.resolved",
+  ], { cwd: root, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  const nativeSourcePaths = execFileSync("git", [
+    "ls-files",
+    "apps/mobile/android/app/src/main/**/*.kt",
+    "apps/mobile/android/app/src/main/**/*.java",
+    "apps/mobile/ios/Runner/**/*.swift",
+    "apps/mobile/ios/Runner/**/*.m",
+    "apps/mobile/ios/Runner/**/*.mm",
+    "apps/mobile/ios/Runner/**/*.h",
+  ], { cwd: root, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+
+  assertNoNativeAdIdentityOrMeasurement({
+    dependencySources: dependencyPaths.map((file) => [file, read(file)]),
+    nativeSources: nativeSourcePaths.map((file) => [file, read(file)]),
+  });
+
+  for (const [name, dependency] of [
+    ["google-android", "com.google.android.gms:play-services-ads:24.0.0"],
+    ["google-ios", "Google-Mobile-Ads-SDK"],
+    ["applovin-android", "com.applovin:applovin-sdk:13.0.0"],
+    ["applovin-ios", "AppLovinSDK"],
+    ["unity-android", "com.unity3d.ads:unity-ads:4.0.0"],
+    ["unity-ios", "UnityAds"],
+    ["chartboost-android", "com.chartboost:chartboost-sdk:9.0.0"],
+    ["chartboost-ios", "ChartboostSDK"],
+    ["vungle-android", "com.vungle:vungle-ads:7.0.0"],
+    ["vungle-ios", "VungleAds"],
+    ["meta-android", "com.facebook.android:audience-network-sdk:6.0.0"],
+    ["meta-ios", "FBAudienceNetwork"],
+    ["ironsource-android", "com.ironsource.sdk:mediationsdk:8.0.0"],
+    ["ironsource-ios", "IronSourceSDK"],
+    ["amazon-android", "com.amazon.android:aps-sdk:9.0.0"],
+    ["amazon-ios", "AmazonPublisherServicesSDK"],
+  ]) {
+    assert.throws(
+      () => assertNoNativeAdIdentityOrMeasurement({
+        dependencySources: [[`native-sdk-${name}`, dependency]],
+      }),
+      new RegExp(`native-sdk-${name}`),
+    );
+  }
+  for (const dependency of [
+    "com.google.android.gms:play-services-base:18.0.0",
+    "com.example:ads-reporting:1.0.0",
+    "GoogleUtilities",
+  ]) {
+    assert.doesNotThrow(() => assertNoNativeAdIdentityOrMeasurement({
+      dependencySources: [["harmless-native-dependency", dependency]],
+    }));
+  }
+  assert.throws(
+    () => assertNoNativeAdIdentityOrMeasurement({
+      mergedManifest: ["merged-manifest-sentinel", '<uses-permission android:name="android.permission.AD_ID" />'],
+    }),
+    /merged-manifest-sentinel/,
+  );
+  for (const source of [
+    'client.post("/api/ads/events")',
+    'client.post("/api/" + "ads/events")',
+    'request.httpMethod = "POST"\nrequest.url = URL(string: "/api/ads/events")',
+    'Request.Builder().url("/api/ads/events").post(body)',
+  ]) {
+    assert.throws(
+      () => assertNoNativeAdIdentityOrMeasurement({
+        nativeSources: [["native-event-sentinel.swift", source]],
+      }),
+      /native-event-sentinel\.swift/,
+    );
+  }
+  for (const source of [
+    "func postAdEvent() {}",
+    'client.get("/api/ads/events")',
+  ]) {
+    assert.doesNotThrow(() => assertNoNativeAdIdentityOrMeasurement({
+      nativeSources: [["harmless-native-source.swift", source]],
+    }));
+  }
+
+  const repositoryContract = read("tools/ci/repository-contract.test.mjs");
+  const mobileJob = jobBlock(read(".github/workflows/ci.yml"), "mobile-app", "android");
+  assert.match(mobileJob, /Mobile App CI \/ Generate Android release merged manifest/);
+  assert.match(mobileJob, /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon/);
+  assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
+  assert.match(mobileJob, /test-name-pattern "[^"]*Android 릴리즈 권한/);
+  assert.match(
+    repositoryContract,
+    /test\("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다"[\s\S]*assertNoNativeAdIdentityOrMeasurement\(\{[\s\S]*mergedManifest:/,
+  );
+
+  const adRepositoryTest = read("apps/mobile/test/features/ads/ad_repository_test.dart");
+  assert.match(adRepositoryTest, /test\('GET active 요청의 method, path, query가 정확하고 event 요청은 없다'/);
+  assert.match(adRepositoryTest, /AdPlacement\.routeResultBottom[\s\S]*AdPlacement\.stationDetailBottom/);
+  assert.match(adRepositoryTest, /expect\(requests, hasLength\(2\)\)/);
+  assert.match(adRepositoryTest, /requests\.map\(\(request\) => request\.method\), everyElement\('GET'\)/);
+  assert.match(adRepositoryTest, /request\.uri\.path == '\/api\/ads\/events'[\s\S]*isEmpty/);
 });
 
 test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성한다", async () => {
@@ -10140,9 +10436,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboarding, /class OnboardingResult/);
   assert.match(onboarding, /class OnboardingState/);
   assert.match(onboarding, /class OnboardingScreen extends StatefulWidget/);
-  // #1936: 온보딩 전면 재설계로 "먼저 이동 조건을 골라 주세요" 설명 문구가 삭제되고
-  // 질문형 헤더 카피로 대체되었다. 현행 canonical 카피로 앵커를 갱신해 계약(이동
-  // 조건 선택 안내 카피 존재 보증)을 유지한다.
+  // #1936: 온보딩 재설계로 대체된 현행 이동 조건 선택 안내 카피
   assert.match(onboarding, /어떻게 이동하세요\?/);
   assert.doesNotMatch(onboarding, /큰 글자/);
   assert.match(onboarding, /고대비/);
@@ -10152,9 +10446,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /final bool simpleViewEnabled/);
   assert.match(routeSearch, /_resolveInitialMobilityType/);
   assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
-  // #1933 D: 결과-우선 정리로 이동 조건 요약 위젯(_RouteMobilityTypeSummary)과
-  // 간편 보기 버튼 키(routeSimpleMobilityTypeButton)가 조건 칩(_RouteConditionChips)
-  // 구조로 대체됐다. 이동 조건 변경 진입점 보증 계약을 현행 앵커로 유지한다.
+  // #1933: 결과-우선 정리로 대체된 현행 이동 조건 변경 진입점
   assert.match(routeSearch, /_RouteConditionChips\([\s\S]*mobilityType: _selectedMobilityType[\s\S]*onChangeMobility: _showMobilityTypePicker/);
   assert.match(routeSearch, /routeConditionMobilityChip/);
   assert.match(routeSearch, /routeMobilityOption-\$\{option\.mobilityType\}/);
@@ -11886,6 +12178,9 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
 
   const androidManifest = read(mergedManifestPath);
   const permissions = androidManifestPermissions(androidManifest);
+  assertNoNativeAdIdentityOrMeasurement({
+    mergedManifest: [mergedManifestPath, androidManifest],
+  });
 
   // 하차 알림(#1766)이 flutter_local_notifications를 도입하며 알림 표시용
   // POST_NOTIFICATIONS·VIBRATE와 시간표 기반 정확 예약용 SCHEDULE_EXACT_ALARM이
@@ -12400,7 +12695,7 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.doesNotMatch(workflow, /SIGNING_(PRIVATE|PUBLIC)_KEY/);
 
   // manifest 다운로드와 스크립트 호출부.
-  assert.match(workflow, /curl -fsS "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
+  assert.match(workflow, /curl -fsS --connect-timeout 10 --max-time 30 "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
   assert.match(workflow, /node tools\/datapack\/check-datapack-expiry-alert\.mjs/);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);
@@ -12430,4 +12725,73 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
     const source = read(file);
     assertActionsEnvSecretPolicy(file, source);
   }
+});
+
+test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized artifact 경계를 유지한다", () => {
+  const workflowPath = ".github/workflows/kric-source-candidate-evidence.yml";
+  assert.ok(existsSync(path.join(root, workflowPath)), "KRIC evidence workflow must exist");
+
+  const workflow = read(workflowPath);
+  const triggerBlock = workflow.match(/^on:\s*\n([\s\S]*?)^jobs:/m)?.[1] ?? "";
+  const triggers = [...triggerBlock.matchAll(/^ {2}([a-z_]+): *$/gm)].map((match) => match[1]);
+  const inputBlock = triggerBlock.match(/workflow_dispatch:\s*\n\s+inputs:\s*\n([\s\S]*)/)?.[1] ?? "";
+  const inputNames = [...inputBlock.matchAll(/^ {6}([A-Za-z][A-Za-z0-9_-]*): *$/gm)]
+    .map((match) => match[1]);
+  const candidateBlock = inputBlock.match(/^ {6}candidate: *\n([\s\S]*)/m)?.[1] ?? "";
+  const optionsBlock = candidateBlock.match(/^ {8}options: *\n((?:^ {10}- [^\n]+\n?)+)/m)?.[1] ?? "";
+  const candidateOptions = [...optionsBlock.matchAll(/^ {10}- ([a-z0-9-]+) *$/gm)]
+    .map((match) => match[1]);
+
+  assert.deepEqual(triggers, ["workflow_dispatch"]);
+  assert.deepEqual(inputNames, ["candidate"]);
+  assert.match(candidateBlock, /^ {8}type: choice$/m);
+  assert.deepEqual(candidateOptions, [
+    "kric-subway-route-info",
+    "kric-station-info",
+    "kric-train-operation-organ",
+    "kric-station-transfer-info",
+    "kric-station-platform",
+    "kric-station-movement-standard",
+    "kric-station-movement-detailed",
+    "kric-transfer-movement-standard",
+    "kric-transfer-movement-detailed",
+    "kric-station-convenience-standard",
+  ]);
+  const permissions = workflow.match(/^ {4}permissions: *\n((?:^ {6}[^\n]+\n?)+)/m)?.[1]
+    .trim()
+    .split("\n")
+    .map((line) => line.trim());
+  assert.deepEqual(permissions, ["contents: read"]);
+
+  const secretNames = [...workflow.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]);
+  assert.deepEqual([...new Set(secretNames)], ["KRIC_SERVICE_KEY"]);
+  assert.match(
+    workflow,
+    /if: \$\{\{ github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}/,
+  );
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.equal((workflow.match(/\$\{\{ inputs\.candidate \}\}/g) ?? []).length, 1);
+  assert.match(workflow, /KRIC_CANDIDATE_ID: \$\{\{ inputs\.candidate \}\}/);
+  assert.match(workflow, /collect-kric-source-candidate-evidence\.mjs/);
+  const collector = read("tools/datapack/collect-kric-source-candidate-evidence.mjs");
+  assert.match(collector, /build-source-candidate-sample-evidence\.mjs/);
+  assert.match(collector, /validate-source-candidate-sample\.mjs/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.match(workflow, /include-hidden-files: false/);
+  assert.match(workflow, /if-no-files-found: error/);
+
+  const referenceWorkflow = read(".github/workflows/tago-schedule-collection.yml");
+  for (const action of ["actions/checkout", "actions/setup-node", "actions/upload-artifact"]) {
+    const pinnedSha = referenceWorkflow.match(new RegExp(`${action}@([0-9a-f]{40})`))?.[1];
+    assert.ok(pinnedSha, `${action} reference pin must exist`);
+    assert.match(workflow, new RegExp(`${action}@${pinnedSha}`));
+  }
+
+  const uploadBlock = workflow.match(/uses: actions\/upload-artifact@[0-9a-f]{40}[\s\S]*$/)?.[0] ?? "";
+  assert.match(uploadBlock, /sample\.json/);
+  assert.match(uploadBlock, /report\.txt/);
+  assert.match(uploadBlock, /hashes\.json/);
+  assert.doesNotMatch(uploadBlock, /\braw\b|response|\.env|dotenv/i);
+  assert.doesNotMatch(workflow, /github\.event\.inputs\.(?:url|host|ref|command|output|path)/i);
 });
