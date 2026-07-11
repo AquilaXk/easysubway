@@ -23,14 +23,16 @@ Size _measureBadge(String text) => Size(
 const int kCapitalUnresolvedBaseline = 2;
 
 // 2026-07-06 실기기 클러터 게이트 확장 — 라벨-라벨 외 라벨-선·뱃지 겹침도 측정해
-// "게이트=실기기 체감" 정합. baseline은 현재 실측값(악화 금지); 후속 #2·#3 수정이 낮춘다.
+// "게이트=실기기 체감" 정합. baseline은 현재 실측값(악화 금지); 후속 수정이 낮춘다.
 // [2026-07-11 #1950] 정본을 오너 자작 8선형 도식으로 교체하며 신 레이아웃 실측으로
-// baseline 재설정: 라벨-라벨 겹침은 0 유지(핵심 게이트 통과), 라벨-선 17→14(개선),
-// 뱃지-선 0 유지, 뱃지-라벨은 우이신설 뱃지가 성수지선 spur 라벨(용두)과 코너 ~3px
-// 접촉해 0→1(신 레이아웃 특성, 라벨-라벨 무겹침은 유지). 후속 QA에서 뱃지 간격 조정.
-const int kCapitalLabelLineOverlapBaseline = 17;
-const int kCapitalBadgeLineOverlapBaseline = 1;
-const int kCapitalBadgeLabelOverlapBaseline = 1;
+// baseline 재설정: 라벨-라벨 겹침 0 유지(핵심 게이트 통과), 뱃지-선 0.
+// [2026-07-11 #1965 리뷰 후속] 우이신설 뱃지 ↔ 성수지선 spur 라벨(용두) 코너 ~3px
+// 접촉을 라벨 배치 gap 사다리 확장(+18 단 추가)으로 해소 — 뱃지-라벨 1→0 복귀,
+// 라벨-선도 부수 개선(14→9). 라벨-라벨 0·unresolved 0은 유지(다른 게이트 무영향).
+// 실측값(악화 금지): 라벨-선 9, 뱃지-선 0, 뱃지-라벨 0.
+const int kCapitalLabelLineOverlapBaseline = 9;
+const int kCapitalBadgeLineOverlapBaseline = 0;
+const int kCapitalBadgeLabelOverlapBaseline = 0;
 
 void main() {
   test('수도권 실데이터: 전 라벨 표시 + 겹침 악화 금지 게이트', () {
