@@ -7,6 +7,7 @@ import '../favorite_facility.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../features/favorites/data/drift_favorite_repositories.dart';
+import '../features/ads/ad_repository.dart';
 import '../features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import '../features/get_off_alarm/exact_alarm_permission.dart';
 import '../features/get_off_alarm/get_off_alarm_controller.dart';
@@ -53,6 +54,7 @@ class AppDependencies {
     required this.userDataDeletionRepository,
     this.getOffAlarmController,
     required this.noticeRepository,
+    this.adRepository,
   });
 
   factory AppDependencies.resolve({
@@ -73,6 +75,7 @@ class AppDependencies {
     CurrentLocationProvider? locationProvider,
     UserDataDeletionRepository? userDataDeletionRepository,
     NoticeRepository? noticeRepository,
+    AdRepository? adRepository,
     CatalogDatabase? catalogDatabase,
     UserDatabase? userDatabase,
     Uri? Function() apiBaseUri = defaultOptionalStationApiBaseUri,
@@ -252,6 +255,7 @@ class AppDependencies {
           (userDatabase == null
               ? null
               : _LazyDefaultNoticeRepository(optionalBaseUri, userDatabase)),
+      adRepository: adRepository ?? AdRepository.lazy(optionalBaseUri),
     );
   }
 
@@ -273,6 +277,7 @@ class AppDependencies {
   final UserDataDeletionRepository? userDataDeletionRepository;
   final GetOffAlarmController? getOffAlarmController;
   final NoticeRepository? noticeRepository;
+  final AdRepository? adRepository;
 }
 
 /// 공개 공지 API는 선택 기능이라 앱 시작 중 base URL을 강제 평가하지 않는다.
