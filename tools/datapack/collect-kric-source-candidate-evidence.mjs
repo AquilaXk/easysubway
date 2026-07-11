@@ -29,6 +29,8 @@ const ALLOWED_CONTENT_TYPES = new Set(["application/xml", "text/xml"]);
 const SAFE_XML_TAG = /^[A-Za-z_][A-Za-z0-9_.-]{0,39}$/;
 const SENSITIVE_XML_TAG = /(?:authorization|credential|password|secret|servicekey|token)/i;
 const SAFE_RESULT_CODE = /^[A-Za-z0-9._-]{1,32}$/;
+const MAX_XML_DEPTH = 32;
+const MAX_XML_SCALAR_LENGTH = 512;
 
 function requiredText(value, label) {
   if (typeof value !== "string" || value.length === 0) {
@@ -104,15 +106,16 @@ function parseCli(argv) {
 
 function sanitizeErrorMessage(error, serviceKey) {
   let message = error instanceof Error ? error.message : String(error);
-  for (const value of [serviceKey, encodeURIComponent(serviceKey)]) {
+  const formEncodedServiceKey = new URLSearchParams({ serviceKey }).toString().slice("serviceKey=".length);
+  for (const value of [serviceKey, encodeURIComponent(serviceKey), formEncodedServiceKey]) {
     if (value) {
       message = message.replaceAll(value, "[REDACTED]");
     }
   }
   return message
-    .replace(/([?&]serviceKey=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/(^|[?&])(serviceKey=)[^&\s]+/gi, "$1$2[REDACTED]")
     .replace(/https?:\/\/[^\s]+/gi, "[REDACTED_URL]")
-    .replace(/[\u0000-\u001f\u007f]/g, " ");
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ");
 }
 
 function safeContentType(response) {
@@ -120,28 +123,142 @@ function safeContentType(response) {
   return contentType && ALLOWED_CONTENT_TYPES.has(contentType) ? contentType : SAFE_PLACEHOLDER;
 }
 
-function xmlScalar(raw, tagName) {
-  const match = raw.match(new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\/${tagName}\\s*>`, "i"));
-  return match?.[1].trim() ?? null;
-}
-
-function safeXmlTagSummary(raw) {
+function scanXmlStructure(raw) {
   const tags = [];
   const seen = new Set();
-  for (const match of raw.matchAll(/<\/?\s*([^!?][^\s/>]*)/g)) {
-    const name = match[1];
-    const safeName = SAFE_XML_TAG.test(name) && !SENSITIVE_XML_TAG.test(name)
-      ? name
-      : SAFE_PLACEHOLDER;
-    if (!seen.has(safeName)) {
-      seen.add(safeName);
-      tags.push(safeName);
+  const openTags = [];
+  let overflowDepth = 0;
+  let itemCount = 0;
+  let resultCode = null;
+  let resultMessage = null;
+  let scalar = null;
+
+  const depth = () => openTags.length + overflowDepth;
+  const skipSection = (start, terminator) => {
+    const end = raw.indexOf(terminator, start);
+    return end === -1 ? raw.length : end + terminator.length;
+  };
+  const tagEnd = (start) => {
+    let quote = null;
+    for (let index = start; index < raw.length; index += 1) {
+      const character = raw[index];
+      if (quote) {
+        if (character === quote) quote = null;
+      } else if (character === "\"" || character === "'") {
+        quote = character;
+      } else if (character === ">") {
+        return index;
+      }
     }
-    if (tags.length === 16) {
-      break;
+    return raw.length - 1;
+  };
+  const finishScalar = () => {
+    const value = scalar.text.trim();
+    if (scalar.name === "resultcode") resultCode = value;
+    if (scalar.name === "resultmsg") resultMessage = value;
+    scalar = null;
+  };
+
+  for (let index = 0; index < raw.length;) {
+    if (raw[index] !== "<") {
+      const nextTag = raw.indexOf("<", index);
+      const textEnd = nextTag === -1 ? raw.length : nextTag;
+      if (scalar && depth() === scalar.depth && scalar.text.length < MAX_XML_SCALAR_LENGTH) {
+        scalar.text += raw.slice(index, textEnd).slice(0, MAX_XML_SCALAR_LENGTH - scalar.text.length);
+      }
+      index = textEnd;
+      continue;
     }
+    if (raw.startsWith("<!--", index)) {
+      index = skipSection(index + 4, "-->");
+      continue;
+    }
+    if (raw.startsWith("<![CDATA[", index)) {
+      index = skipSection(index + 9, "]]>");
+      continue;
+    }
+    if (raw.startsWith("<?", index)) {
+      index = skipSection(index + 2, "?>");
+      continue;
+    }
+    if (raw.startsWith("<!", index)) {
+      index = tagEnd(index + 2) + 1;
+      continue;
+    }
+
+    let cursor = index + 1;
+    let closing = false;
+    if (raw[cursor] === "/") {
+      closing = true;
+      cursor += 1;
+    }
+    while (/\s/.test(raw[cursor] ?? "")) cursor += 1;
+    const nameStart = cursor;
+    while (cursor < raw.length && !/[\s/>]/.test(raw[cursor])) cursor += 1;
+    const name = raw.slice(nameStart, cursor);
+    if (!name) {
+      index += 1;
+      continue;
+    }
+    const end = tagEnd(cursor);
+    let beforeEnd = end - 1;
+    while (beforeEnd > cursor && /\s/.test(raw[beforeEnd])) beforeEnd -= 1;
+    const selfClosing = raw[beforeEnd] === "/";
+    const normalizedName = name.toLowerCase();
+
+    if (closing) {
+      if (scalar && normalizedName === scalar.name && depth() === scalar.depth) {
+        finishScalar();
+      }
+      if (overflowDepth > 0) {
+        overflowDepth -= 1;
+      } else if (openTags.at(-1) === normalizedName) {
+        openTags.pop();
+      }
+      index = end + 1;
+      continue;
+    }
+
+    if (!scalar) {
+      const safeName = SAFE_XML_TAG.test(name) && !SENSITIVE_XML_TAG.test(name)
+        ? name
+        : SAFE_PLACEHOLDER;
+      if (!seen.has(safeName) && tags.length < 16) {
+        seen.add(safeName);
+        tags.push(safeName);
+      }
+      if (normalizedName === "item") itemCount += 1;
+    }
+
+    const isEnvelopeScalar = !scalar
+      && openTags.length === 2
+      && overflowDepth === 0
+      && openTags[0] === "root"
+      && openTags[1] === "header"
+      && ((normalizedName === "resultcode" && resultCode == null)
+        || (normalizedName === "resultmsg" && resultMessage == null));
+    if (!selfClosing) {
+      if (openTags.length < MAX_XML_DEPTH) {
+        openTags.push(normalizedName);
+      } else {
+        overflowDepth += 1;
+      }
+      if (isEnvelopeScalar) {
+        scalar = { name: normalizedName, depth: depth(), text: "" };
+      }
+    } else if (isEnvelopeScalar) {
+      scalar = { name: normalizedName, depth: depth(), text: "" };
+      finishScalar();
+    }
+    index = end + 1;
   }
-  return tags.length > 0 ? tags.join(",") : MISSING_PLACEHOLDER;
+
+  return {
+    itemCount,
+    resultCode,
+    resultMessage,
+    tagSummary: tags.length > 0 ? tags.join(",") : MISSING_PLACEHOLDER,
+  };
 }
 
 function classifyXmlFailure({ itemCount, resultCode, resultMessage }) {
@@ -162,9 +279,7 @@ function classifyXmlFailure({ itemCount, resultCode, resultMessage }) {
 }
 
 function kricXmlDiagnostic(response, requestedFormat, raw) {
-  const itemCount = [...raw.matchAll(/<item(?:\s|>)/gi)].length;
-  const resultCode = xmlScalar(raw, "resultCode");
-  const resultMessage = xmlScalar(raw, "resultMsg");
+  const { itemCount, resultCode, resultMessage, tagSummary } = scanXmlStructure(raw);
   const safeResultCode = resultCode == null
     ? MISSING_PLACEHOLDER
     : SAFE_RESULT_CODE.test(resultCode) ? resultCode : SAFE_PLACEHOLDER;
@@ -177,7 +292,7 @@ function kricXmlDiagnostic(response, requestedFormat, raw) {
     `httpStatus=${httpStatus}`,
     `contentType=${safeContentType(response)}`,
     `requestedFormat=${requestedFormat}`,
-    `xmlTags=${safeXmlTagSummary(raw)}`,
+    `xmlTags=${tagSummary}`,
     `itemCount=${itemCount}`,
     `resultCode=${safeResultCode}`,
     `classification=${classification}`,

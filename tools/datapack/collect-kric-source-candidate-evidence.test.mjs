@@ -176,6 +176,35 @@ test("KRIC evidence collector는 실패 단계와 무관하게 raw와 uploadable
   }
 });
 
+test("KRIC evidence collector는 URLSearchParams form key와 string-start parameter 및 C1 control을 숨긴다", async () => {
+  const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-form-redaction-"));
+  const serviceKey = "test/key+with space~";
+  const formEncodedKey = new URLSearchParams({ serviceKey }).toString().slice("serviceKey=".length);
+  try {
+    await assert.rejects(
+      collectKricSourceCandidateEvidence({
+        candidateId: candidate.id,
+        candidatesDocument: { candidates: [candidate] },
+        runnerTemp,
+        serviceKey,
+        fetchImpl: async () => {
+          throw new Error(`serviceKey=${formEncodedKey}\u0085\u009f`);
+        },
+      }),
+      (error) => {
+        assert.match(error.message, /^serviceKey=\[REDACTED\]/);
+        assert.doesNotMatch(error.message, new RegExp(serviceKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+        assert.doesNotMatch(error.message, new RegExp(formEncodedKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+        assert.doesNotMatch(error.message, /[\u0000-\u001f\u007f-\u009f]/);
+        return true;
+      },
+    );
+    await assertCollectorCleanup(runnerTemp);
+  } finally {
+    await rm(runnerTemp, { recursive: true, force: true });
+  }
+});
+
 test("KRIC evidence collector는 HTTP 200 XML application error를 고정된 안전 진단으로 분류한다", async () => {
   const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-envelope-"));
   const serviceKey = "credential-sentinel-application-error";
@@ -242,6 +271,58 @@ test("KRIC evidence collector는 HTTP 200 XML zero-item envelope를 application 
   }
 });
 
+test("KRIC evidence collector는 CDATA/comment/PI의 XML 모양 text를 구조 진단에서 제외한다", async () => {
+  const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-structural-xml-"));
+  const structuralSecret = "credential-sentinel-non-structural-markup";
+  const raw = [
+    "<?xml version=\"1.0\"?>",
+    "<?probe <item><nested><piSafeTag>hidden</piSafeTag></nested></item>?>",
+    "<!DOCTYPE ROOT [<!ENTITY fake \"<item><nested><declarationSafeTag>hidden</declarationSafeTag></nested></item>\">]>",
+    "<ROOT>",
+    `<metadata><![CDATA[<resultCode>AUTHCDATA</resultCode><item><nested><cdataSafeTag>${structuralSecret}</cdataSafeTag></nested></item>]]></metadata>`,
+    "<!-- <resultCode>AUTHCOMMENT</resultCode><item><nested><commentSafeTag>hidden</commentSafeTag></nested></item> -->",
+    `<header><resultCode>00</resultCode><resultMsg><![CDATA[<item><nested><messageSafeTag>${structuralSecret}</messageSafeTag></nested></item>]]></resultMsg></header>`,
+    "<body><items></items></body>",
+    "</ROOT>",
+  ].join("");
+  try {
+    await assert.rejects(
+      collectKricSourceCandidateEvidence({
+        candidateId: xmlCandidate.id,
+        candidatesDocument: { candidates: [xmlCandidate] },
+        runnerTemp,
+        serviceKey: "credential-sentinel-structural-service-key",
+        fetchImpl: async () => new Response(raw, {
+          status: 200,
+          headers: { "content-type": "application/xml" },
+        }),
+      }),
+      (error) => {
+        assert.match(error.message, /xmlTags=ROOT,metadata,header,resultCode,resultMsg,body,items/);
+        assert.match(error.message, /itemCount=0/);
+        assert.match(error.message, /resultCode=00/);
+        assert.match(error.message, /classification=no-data/);
+        for (const nonStructuralValue of [
+          structuralSecret,
+          "AUTHCDATA",
+          "AUTHCOMMENT",
+          "piSafeTag",
+          "cdataSafeTag",
+          "commentSafeTag",
+          "declarationSafeTag",
+          "messageSafeTag",
+        ]) {
+          assert.doesNotMatch(error.message, new RegExp(nonStructuralValue));
+        }
+        return true;
+      },
+    );
+    await assertCollectorCleanup(runnerTemp);
+  } finally {
+    await rm(runnerTemp, { recursive: true, force: true });
+  }
+});
+
 test("KRIC evidence collector는 item이 있지만 leaf row가 없는 XML을 parser-shape drift로 분류한다", async () => {
   const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-parser-shape-"));
   try {
@@ -299,6 +380,36 @@ test("KRIC evidence collector는 unsafe XML code/message/tag와 credential senti
       },
     );
     await assertCollectorCleanup(runnerTemp);
+  } finally {
+    await rm(runnerTemp, { recursive: true, force: true });
+  }
+});
+
+test("KRIC evidence collector는 malformed 반복 item을 scalar count하고 cleanup한다", async () => {
+  const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-repeated-item-"));
+  const repeatedItemCount = 128;
+  try {
+    await assert.rejects(
+      collectKricSourceCandidateEvidence({
+        candidateId: xmlCandidate.id,
+        candidatesDocument: { candidates: [xmlCandidate] },
+        runnerTemp,
+        serviceKey: "credential-sentinel-repeated-item",
+        fetchImpl: async () => new Response(
+          `<ROOT><body><items>${"<item>".repeat(repeatedItemCount)}</items></body></ROOT>`,
+          { status: 200, headers: { "content-type": "application/xml" } },
+        ),
+      }),
+      (error) => {
+        assert.match(error.message, new RegExp(`itemCount=${repeatedItemCount}(?:\\s|$)`));
+        assert.match(error.message, /classification=parser-shape/);
+        return true;
+      },
+    );
+    await assertCollectorCleanup(runnerTemp);
+
+    const collectorSource = await readFile(new URL("./collect-kric-source-candidate-evidence.mjs", import.meta.url), "utf8");
+    assert.doesNotMatch(collectorSource, /\[\s*\.\.\.[^\]]*matchAll/);
   } finally {
     await rm(runnerTemp, { recursive: true, force: true });
   }
