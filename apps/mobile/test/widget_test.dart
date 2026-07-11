@@ -1614,7 +1614,8 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('도착'), findsOneWidget);
+    // #1985: draft 빈 행 placeholder는 '출발역'/'경유역'/'도착역'으로 낭독·표시한다.
+    expect(find.text('도착역'), findsOneWidget);
     // owner spec: 라벨 프리픽스 텍스트와 노드 점 커넥터 컬럼은 제거되고, 두 개의
     // 무채색 채움 필드만 남는다.
     expect(find.text('출발역을 탭하거나 검색'), findsNothing);
@@ -1872,6 +1873,189 @@ void main() {
     );
     expect(
       find.byKey(const Key('networkMapRouteDraftAddWaypoint')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('#1985 2행 출발→도착 드래그는 두 값을 맞바꾼다', (tester) async {
+    final routeDraftController = RouteDraftController()
+      ..setOrigin(const RouteDraftStation(id: 'gangnam', nameKo: '강남'))
+      ..setDestination(const RouteDraftStation(id: 'jamsil', nameKo: '잠실'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final originRow = find.byKey(
+      const Key('networkMapRouteDraftOriginRow'),
+    );
+    final destinationRow = find.byKey(
+      const Key('networkMapRouteDraftDestinationRow'),
+    );
+    final gesture = await tester.startGesture(tester.getCenter(originRow));
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveTo(tester.getCenter(destinationRow));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(routeDraftController.draft.origin?.id, 'jamsil');
+    expect(routeDraftController.draft.destination?.id, 'gangnam');
+  });
+
+  testWidgets('#1985 3행 경유→출발 드래그는 두 값을 맞바꾸고 도착을 보존한다', (tester) async {
+    final routeDraftController = RouteDraftController()
+      ..setOrigin(const RouteDraftStation(id: 'gangnam', nameKo: '강남'))
+      ..setDestination(const RouteDraftStation(id: 'jamsil', nameKo: '잠실'))
+      ..setWaypoint(const RouteDraftStation(id: 'seolleung', nameKo: '선릉'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final originRow = find.byKey(
+      const Key('networkMapRouteDraftOriginRow'),
+    );
+    final waypointRow = find.byKey(
+      const Key('networkMapRouteDraftWaypointRow'),
+    );
+    final gesture = await tester.startGesture(tester.getCenter(waypointRow));
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveTo(tester.getCenter(originRow));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(routeDraftController.draft.origin?.id, 'seolleung');
+    expect(routeDraftController.draft.waypoint?.id, 'gangnam');
+    expect(routeDraftController.draft.destination?.id, 'jamsil');
+  });
+
+  testWidgets('#1985 채워진 행을 빈 행으로 드래그하면 이동한다', (tester) async {
+    final routeDraftController = RouteDraftController()
+      ..setOrigin(const RouteDraftStation(id: 'gangnam', nameKo: '강남'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final originRow = find.byKey(
+      const Key('networkMapRouteDraftOriginRow'),
+    );
+    final destinationRow = find.byKey(
+      const Key('networkMapRouteDraftDestinationRow'),
+    );
+    final gesture = await tester.startGesture(tester.getCenter(originRow));
+    await tester.pump(const Duration(milliseconds: 600));
+    await gesture.moveTo(tester.getCenter(destinationRow));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    expect(routeDraftController.draft.origin, isNull);
+    expect(routeDraftController.draft.destination?.id, 'gangnam');
+  });
+
+  testWidgets('#1985 빈 행은 드래그를 시작할 수 없고 채워진 행만 드래그 가능하다', (tester) async {
+    final routeDraftController = RouteDraftController()
+      ..setOrigin(const RouteDraftStation(id: 'gangnam', nameKo: '강남'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 빈 도착 행 하위에는 드래그 소스가 없다.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftDestinationRow')),
+        matching: find.byType(LongPressDraggable<RouteDraftSlot>),
+      ),
+      findsNothing,
+    );
+    // 채워진 출발 행 하위에는 드래그 소스가 있다.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.byType(LongPressDraggable<RouteDraftSlot>),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('#1985 채워진 출발 행은 도착역으로 이동 시맨틱 액션을 제공한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    final routeDraftController = RouteDraftController()
+      ..setOrigin(const RouteDraftStation(id: 'gangnam', nameKo: '강남'))
+      ..setDestination(const RouteDraftStation(id: 'jamsil', nameKo: '잠실'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final node = tester.getSemantics(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.byType(Semantics),
+      ).first,
+    );
+    final labels = node
+        .getSemanticsData()
+        .customSemanticsActionIds!
+        .map((id) => CustomSemanticsAction.getAction(id)?.label)
+        .toList();
+    expect(labels, contains('도착역으로 이동'));
+    semanticsHandle.dispose();
+  });
+
+  testWidgets('#1985 빈 출발 행 placeholder는 출발역으로 표시된다', (tester) async {
+    final routeDraftController = RouteDraftController()
+      ..setDestination(const RouteDraftStation(id: 'jamsil', nameKo: '잠실'));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+        matching: find.text('출발역'),
+      ),
       findsOneWidget,
     );
   });

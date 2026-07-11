@@ -57,3 +57,13 @@ class RouteDraft {
     return station == null ? '경유 미정' : '경유 ${station.displayName}';
   }
 }
+
+/// #1991: 슬롯 표시 라벨('출발역'/'경유역'/'도착역') 단일 출처.
+/// exhaustive switch라 슬롯 추가 시 컴파일 에러로 누락을 잡는다.
+extension RouteDraftSlotLabel on RouteDraftSlot {
+  String get displayLabel => switch (this) {
+    RouteDraftSlot.origin => '출발역',
+    RouteDraftSlot.waypoint => '경유역',
+    RouteDraftSlot.destination => '도착역',
+  };
+}
