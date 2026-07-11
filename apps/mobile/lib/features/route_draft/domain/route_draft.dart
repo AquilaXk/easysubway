@@ -1,6 +1,6 @@
 /// 길찾기 draft에서 채우려는 칸(출발/도착). 지도 탭·텍스트 검색 어느 경로든
 /// 같은 칸을 지정해 동일한 [RouteDraft] 상태로 수렴시키기 위해 쓴다.
-enum RouteDraftSlot { origin, destination }
+enum RouteDraftSlot { origin, destination, waypoint }
 
 class RouteDraftStation {
   const RouteDraftStation({required this.id, required this.nameKo});
@@ -22,21 +22,25 @@ class RouteDraft {
     required this.origin,
     required this.destination,
     required this.lastModifiedAt,
+    this.waypoint,
     this.invalidatedReason,
   });
 
   const RouteDraft.empty()
     : origin = null,
       destination = null,
+      waypoint = null,
       lastModifiedAt = null,
       invalidatedReason = null;
 
   final RouteDraftStation? origin;
   final RouteDraftStation? destination;
+  final RouteDraftStation? waypoint;
   final DateTime? lastModifiedAt;
   final String? invalidatedReason;
 
-  bool get isEmpty => origin == null && destination == null;
+  bool get isEmpty =>
+      origin == null && destination == null && waypoint == null;
 
   String get originLabel {
     final station = origin;
@@ -46,5 +50,10 @@ class RouteDraft {
   String get destinationLabel {
     final station = destination;
     return station == null ? '도착 미정' : '도착 ${station.displayName}';
+  }
+
+  String get waypointLabel {
+    final station = waypoint;
+    return station == null ? '경유 미정' : '경유 ${station.displayName}';
   }
 }

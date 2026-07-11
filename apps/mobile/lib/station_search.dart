@@ -1807,6 +1807,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   String get _searchInputHint => switch (widget.pickSlot) {
     RouteDraftSlot.origin => '출발역 이름을 입력해 주세요',
     RouteDraftSlot.destination => '도착역 이름을 입력해 주세요',
+    RouteDraftSlot.waypoint => '경유역 이름을 입력해 주세요',
     null => '역 이름을 입력해 주세요',
   };
 
@@ -2086,6 +2087,8 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         widget.routeDraftController?.setOrigin(station);
       case RouteDraftSlot.destination:
         widget.routeDraftController?.setDestination(station);
+      case RouteDraftSlot.waypoint:
+        widget.routeDraftController?.setWaypoint(station);
     }
     Navigator.of(context).pop(station);
   }

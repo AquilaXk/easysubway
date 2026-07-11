@@ -11,6 +11,7 @@ class RouteDraftController extends ChangeNotifier {
     _draft = RouteDraft(
       origin: station,
       destination: _draft.destination,
+      waypoint: _draft.waypoint,
       lastModifiedAt: DateTime.now(),
     );
     notifyListeners();
@@ -20,6 +21,17 @@ class RouteDraftController extends ChangeNotifier {
     _draft = RouteDraft(
       origin: _draft.origin,
       destination: station,
+      waypoint: _draft.waypoint,
+      lastModifiedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  void setWaypoint(RouteDraftStation station) {
+    _draft = RouteDraft(
+      origin: _draft.origin,
+      destination: _draft.destination,
+      waypoint: station,
       lastModifiedAt: DateTime.now(),
     );
     notifyListeners();
@@ -32,6 +44,7 @@ class RouteDraftController extends ChangeNotifier {
     _draft = RouteDraft(
       origin: null,
       destination: _draft.destination,
+      waypoint: _draft.waypoint,
       lastModifiedAt: DateTime.now(),
     );
     notifyListeners();
@@ -44,6 +57,20 @@ class RouteDraftController extends ChangeNotifier {
     _draft = RouteDraft(
       origin: _draft.origin,
       destination: null,
+      waypoint: _draft.waypoint,
+      lastModifiedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  void clearWaypoint() {
+    if (_draft.waypoint == null) {
+      return;
+    }
+    _draft = RouteDraft(
+      origin: _draft.origin,
+      destination: _draft.destination,
+      waypoint: null,
       lastModifiedAt: DateTime.now(),
     );
     notifyListeners();
@@ -58,6 +85,7 @@ class RouteDraftController extends ChangeNotifier {
     _draft = RouteDraft(
       origin: _draft.destination,
       destination: _draft.origin,
+      waypoint: _draft.waypoint,
       lastModifiedAt: DateTime.now(),
     );
     notifyListeners();

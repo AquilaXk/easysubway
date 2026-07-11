@@ -1678,6 +1678,10 @@ void main() {
                 routeDraftController.setDestination(
                   const RouteDraftStation(id: 'jamsil', nameKo: '잠실'),
                 );
+              case RouteDraftSlot.waypoint:
+                routeDraftController.setWaypoint(
+                  const RouteDraftStation(id: 'seolleung', nameKo: '선릉'),
+                );
             }
           },
         ),
@@ -6703,6 +6707,141 @@ void main() {
     // 결과 목록(세로 타임라인, #1704)이 렌더된다.
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
   });
+
+  testWidgets('#1948 경유역이 있는 draft는 자동 검색 요청에 waypointStationId를 전달한다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            waypoint: const RouteDraftStation(
+              id: 'station-seolleung',
+              nameKo: '선릉',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 10),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.waypointStationId,
+      'station-seolleung',
+    );
+  });
+
+  testWidgets('#1948 경유역 없는 draft의 자동 검색 요청은 waypointStationId가 없다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 10),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(routeRepository.requests.single.waypointStationId, isNull);
+  });
+
+  testWidgets(
+    '#1948 같은 출발·도착에 경유역만 추가하면 서명이 바뀌어 자동 검색이 다시 돈다',
+    (tester) async {
+      final routeRepository = FakeRouteSearchRepository();
+      const origin = RouteDraftStation(
+        id: 'station-sangnoksu',
+        nameKo: '상록수',
+      );
+      const destination = RouteDraftStation(
+        id: 'station-sadang',
+        nameKo: '사당',
+      );
+
+      Widget buildScreen(RouteDraft draft) {
+        return MaterialApp(
+          home: RouteSearchScreen(
+            repository: routeRepository,
+            stationRepository: FakeStationSearchRepository(),
+            favoriteRouteRepository: FakeFavoriteRouteRepository(),
+            initialMobilityType: 'SENIOR',
+            initialDraft: draft,
+          ),
+        );
+      }
+
+      await tester.pumpWidget(
+        buildScreen(
+          RouteDraft(
+            origin: origin,
+            destination: destination,
+            lastModifiedAt: DateTime(2026, 7, 10),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(routeRepository.requests, hasLength(1));
+
+      // 같은 출발·도착에 경유역만 추가한 새 draft로 갱신하면 서명이 달라져 재검색.
+      await tester.pumpWidget(
+        buildScreen(
+          RouteDraft(
+            origin: origin,
+            destination: destination,
+            waypoint: const RouteDraftStation(
+              id: 'station-seolleung',
+              nameKo: '선릉',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 11),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(routeRepository.requests, hasLength(2));
+      expect(routeRepository.requests.first.waypointStationId, isNull);
+      expect(
+        routeRepository.requests.last.waypointStationId,
+        'station-seolleung',
+      );
+    },
+  );
 
   testWidgets('#1933 D 자동 검색된 결과 화면은 결과-우선으로 정리된다', (tester) async {
     final routeRepository = FakeRouteSearchRepository(
