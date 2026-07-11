@@ -19,7 +19,6 @@ import 'mobile_error_reporter.dart';
 import 'station_search.dart';
 
 const _networkMapTopBarHeight = 60.0;
-const _networkMapBottomAdHeight = 52.0;
 const _networkMapPillRadius = BorderRadius.all(Radius.circular(28));
 const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(12));
 const _networkMapSearchFieldBorderColor = Color(0xFFDBE3E9);
@@ -1917,10 +1916,7 @@ class _NetworkMapBottomAdBanner extends StatelessWidget {
     // 실광고 미연동: release에서는 "광고" 플레이스홀더를 노출하지 않고 슬롯을 숨긴다.
     return const SafeArea(
       top: false,
-      child: AdBannerSlot(
-        slotKey: Key('networkMapBottomAdBanner'),
-        height: _networkMapBottomAdHeight,
-      ),
+      child: AdBannerSlot(slotKey: Key('networkMapBottomAdBanner')),
     );
   }
 }
@@ -2051,10 +2047,7 @@ class _NetworkMapMenuPanel extends StatelessWidget {
               // 패널 최하단 고정 광고 슬롯(항목 스크롤과 분리, release는 collapse).
               const SafeArea(
                 top: false,
-                child: AdBannerSlot(
-                  slotKey: Key('networkMapMenuAdBanner'),
-                  height: 56,
-                ),
+                child: AdBannerSlot(slotKey: Key('networkMapMenuAdBanner')),
               ),
             ],
           ),
