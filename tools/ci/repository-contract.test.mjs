@@ -6720,6 +6720,25 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  const sampleUrl = new URL(candidate.evidence.sampleUrl);
+  assert.equal(sampleUrl.searchParams.get("railOprIsttCd"), "S1");
+  assert.equal(sampleUrl.searchParams.get("lnCd"), "3");
+  assert.equal(sampleUrl.searchParams.get("stinCd"), "331");
+  assert.equal(sampleUrl.searchParams.get("prevStinCd"), "132");
+  assert.equal(sampleUrl.searchParams.get("chthTgtLn"), "4");
+  assert.equal(sampleUrl.searchParams.get("chtnNextStinCd"), "425");
+  assert.match(candidate.evidence.liveSampleNote, /prevStinCd=422/);
+  assert.match(candidate.evidence.liveSampleNote, /chtnNextStinCd=424/);
+  assert.match(candidate.evidence.liveSampleNote, /29155976812/);
+  assert.match(candidate.evidence.liveSampleNote, /3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f/);
+  assert.match(candidate.evidence.liveSampleNote, /2026-07-11/);
+  assert.match(candidate.evidence.liveSampleNote, /HTTP 200/);
+  assert.match(candidate.evidence.liveSampleNote, /application\/xml/);
+  assert.match(candidate.evidence.liveSampleNote, /resultCode=03/);
+  assert.match(candidate.evidence.liveSampleNote, /classification=no-data/);
+  assert.match(candidate.evidence.liveSampleNote, /itemCount=0/);
+  assert.match(candidate.evidence.liveSampleNote, /sampleResponse evidence가 아님/);
+  assert.match(candidate.evidence.liveSampleNote, /공식 요청변수 표에서 가져온 미검증 tuple/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), [
     "chtnMvTpOrdr",
@@ -6733,6 +6752,17 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   ]);
   assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
+  assert.equal(candidate.capabilities.schedule.status, "UNSUPPORTED");
+  assert.equal(candidate.capabilities.schedule.productionUseAllowed, false);
+  assert.equal(candidate.capabilities.realtime.status, "UNSUPPORTED");
+  assert.equal(candidate.capabilities.realtime.productionUseAllowed, false);
+  assert.equal(candidate.capabilities.facility.status, "CANDIDATE");
+  assert.equal(candidate.capabilities.facility.productionUseAllowed, false);
+  assert.equal(candidate.capabilities.facility.coverageStatus, "SAMPLE_EVIDENCE_REQUIRED");
+  assert.match(candidate.nextAction, /row-bearing evidence/);
+  assert.match(candidate.nextAction, /distance and duration evidence/);
+  assert.match(candidate.nextAction, /admin review/);
+  assert.match(candidate.nextAction, /automatic route graph edge/);
 });
 
 test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
