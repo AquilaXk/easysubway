@@ -6920,6 +6920,7 @@ test("source candidate sample 검증기는 KRIC 이동동선 route graph 자동 
           "mvContDtl",
           "mvPathMgNo",
           "stMovePath",
+          "https://provider.invalid/sample?serviceKey=route-graph-secret",
         ],
         routeGraphEdgeAdmission: "allowed",
       },
@@ -6940,7 +6941,14 @@ test("source candidate sample 검증기는 KRIC 이동동선 route graph 자동 
       ],
       { cwd: root },
     ),
-    /route graph edge admission requires confirmed fields: distanceMeters, durationSeconds/,
+    (error) => {
+      assert.equal(
+        error.stderr.trim(),
+        "route graph edge admission requires confirmed fields: distanceMeters, durationSeconds",
+      );
+      assert.doesNotMatch(error.stderr, /route-graph-secret/);
+      return true;
+    },
   );
 });
 

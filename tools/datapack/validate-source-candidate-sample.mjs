@@ -94,13 +94,13 @@ function validateSample({ candidate, candidateId, sample }) {
   if (!Array.isArray(sample.fields)) {
     throw new Error("fields must be an array");
   }
-  if (findCredentialLeak(sample.fields)) {
-    throw new Error("sample field names must not contain credentials");
-  }
 
   const sampleFields = new Set(sample.fields);
   const missingFields = candidate.evidence.outputFields.filter((field) => !sampleFields.has(field));
   if (missingFields.length > 0) {
+    if (findCredentialLeak(sample.fields)) {
+      throw new Error("sample field names must not contain credentials");
+    }
     const availableFields = [...sampleFields]
       .filter((field) => typeof field === "string")
       .sort((left, right) => left < right ? -1 : Number(left !== right));
