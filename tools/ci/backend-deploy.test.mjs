@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
-const ASSET_ORIGIN = "https://ads-assets.fixture.easysubway.example";
+const ASSET_ORIGIN = "https://ads-assets.fixture.test-only.dev";
 const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
 
 function read(relativePath) {
@@ -113,6 +113,9 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
     "https://10.0.0.1",
     "https://object-storage",
     "https://assets.internal",
+    "https://assets.easysubway.example",
+    "https://assets.easysubway.invalid",
+    "https://assets.easysubway.test",
     "https://placeholder.example.com",
     "https://todo.example.com",
     "https://-assets.example.com",
@@ -125,8 +128,8 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
 
   for (const origin of [
     `${ASSET_ORIGIN}/`,
-    "https://ads-assets.fixture.easysubway.example:8443",
-    `https://${"a".repeat(63)}.127.example`,
+    "https://ads-assets.fixture.test-only.dev:8443",
+    `https://${"a".repeat(63)}.127.test-only.dev`,
   ]) {
     const outputDir = await prepare(withAssetOrigin(origin));
     const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
