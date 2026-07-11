@@ -1800,11 +1800,16 @@ void main() {
       maps.map((map) => map['app_region']),
       containsAll(['수도권', '부산', '광주', '대구', '대전']),
     );
+    // [2026-07-11 #1950] 수도권 정본이 오너 자작(self-drawn)으로 전환되어 공개 URL이
+    // 없다 — provenance는 리포 내부 경로(internal:) 스킴으로 표기한다. 공식 출처가 있는
+    // 지역은 https를 유지한다. 두 스킴 모두 허용한다.
+    bool validSourceScheme(String value) =>
+        value.startsWith('https://') || value.startsWith('internal:');
     for (final map in maps) {
       final offline = map['offline'] as Map<String, Object?>;
       final path = offline['path'] as String;
       expect(map['source_url'], isA<String>());
-      expect(map['source_url'] as String, startsWith('https://'));
+      expect(validSourceScheme(map['source_url'] as String), isTrue);
       // #1641: SVG 이미지는 더 이상 번들하지 않는다(canvas 렌더). 소스 경로와
       // 라이선스 속성표기만 유지된다(광주 CC-BY-SA 등).
       expect(offline['included'], isFalse);
@@ -1815,8 +1820,8 @@ void main() {
       final license = map['license'] as Map<String, Object?>;
       expect(license['name'], isA<String>());
       expect(license['spdx'], isA<String>());
-      expect(license['url'], startsWith('https://'));
-      expect(license['source_page'], startsWith('https://'));
+      expect(validSourceScheme(license['url'] as String), isTrue);
+      expect(validSourceScheme(license['source_page'] as String), isTrue);
       expect(license['authors'], isA<List<Object?>>());
       expect(license['changes'], isA<String>());
       expect(license['attributionRequired'], isA<bool>());
