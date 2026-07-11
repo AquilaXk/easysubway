@@ -2229,6 +2229,10 @@ test("route map audit gates 부산·대구·광주·대전 4권역 at BLOCKER/HI
       .then((result) => ({ ...result, code: 0 }))
       .catch((error) => ({ stdout: error.stdout ?? "", code: error.code ?? 1 }));
 
+    assert.ok(
+      stdout.trim().length > 0,
+      `audit 출력이 비어 있음(비정상 종료 의심): code=${code}`,
+    );
     const audit = JSON.parse(stdout);
     // --fail-on BLOCKER,HIGH가 걸려 있으므로 4권역 중 하나라도 위반이면 exit 1.
     assert.equal(code, 0, "4권역 audit이 BLOCKER/HIGH 없이 통과해야 함(exit 0)");
