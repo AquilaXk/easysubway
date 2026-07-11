@@ -179,11 +179,12 @@ class OnboardingState {
   bool get isCompleted => result != null;
 }
 
-/// 화면 1 — 시작. 핵심 가치 한 줄(큰 타이틀) + 단일 CTA.
+/// 화면 1 — 시작. 상단 브랜드 심볼(무채색 라인) + 핵심 가치 큰 타이틀 + 단일 CTA.
 ///
-/// #1936: 부연 설명 문장은 전면 삭제한다. 상단을 크게 비우고, 가치 카피를
-/// titleLarge 급 다크 잉크로 두 줄만 두고, 하단에 각진(radius 8) 무채색 CTA를
-/// 고정한다. 블록·그림자·pill 없음.
+/// #1936(프리미엄 다듬기): 텍스트+버튼만이라 밋밋하다는 판정에 대응해, 상단에
+/// 무채색 라인 아트 브랜드 심볼/워드마크를 둔다. 색·그림자·블록 없이 심볼만으로
+/// 브랜딩을 세우고, 심볼–타이틀–여백–CTA의 세로 리듬을 균형 있게 구성한다.
+/// 상단 여백을 크게 비운 뒤 심볼→타이틀, Spacer로 CTA를 하단에 고정한다.
 class StartScreen extends StatelessWidget {
   const StartScreen({required this.onStart, super.key});
 
@@ -196,8 +197,9 @@ class StartScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // 상단 ~35%를 비워 애플식 여백을 만든다.
-            final topGap = (constraints.maxHeight * 0.35).clamp(96.0, 240.0);
+            // 상단 여백을 비워 심볼이 화면 상단 1/4 지점에서 시작하게 한다.
+            // 이전(~35%)보다 살짝 줄여 심볼–타이틀 묶음이 화면 중앙 위로 앉는다.
+            final topGap = (constraints.maxHeight * 0.22).clamp(64.0, 168.0);
             final bottomGap =
                 EasySubwaySpacing.xxl +
                 MediaQuery.viewPaddingOf(context).bottom;
@@ -216,6 +218,9 @@ class StartScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(height: topGap),
+                        // 브랜드 심볼(무채색 라인 아트) + 워드마크. 밋밋함 해소(#1936).
+                        const _BrandMark(),
+                        const SizedBox(height: EasySubwaySpacing.xxl),
                         Semantics(
                           header: true,
                           child: const Text(
@@ -264,34 +269,90 @@ class StartScreen extends StatelessWidget {
   }
 }
 
-class _IntroCard extends StatelessWidget {
-  const _IntroCard({required this.child});
-
-  final Widget child;
+/// #1936: 미니멀 무채색 브랜드 심볼 + 워드마크.
+///
+/// 심볼은 노선·경로를 은유하는 라인 아트(두 정거장을 잇는 route 글리프)로,
+/// 색·그림자·블록 없이 잉크 라인과 점만으로 그린다. 워드마크는 앱 이름을
+/// 무채색 잉크로 둔다(w800은 화면 타이틀 예산 밖으로 두어 w700 + 자간). 브랜드
+/// 부재로 인한 "텍스트+버튼만" 밋밋함을 해소하는 시각 앵커다.
+class _BrandMark extends StatelessWidget {
+  const _BrandMark();
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: EasySubwayAccessibleColors.line),
-        borderRadius: BorderRadius.circular(EasySubwayRadius.sheet),
+    return Semantics(
+      label: '쉬운 지하철',
+      image: true,
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CustomPaint(
+              size: const Size(40, 40),
+              painter: _RouteGlyphPainter(
+                color: EasySubwayAccessibleColors.text,
+              ),
+            ),
+            const SizedBox(width: EasySubwaySpacing.md),
+            Text(
+              '쉬운 지하철',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: EasySubwayAccessibleColors.text,
+                fontWeight: FontWeight.w700,
+                fontSize: 19,
+                letterSpacing: -0.2,
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
   }
 }
 
-class _IntroDivider extends StatelessWidget {
-  const _IntroDivider();
+/// 노선/경로 글리프 — 두 정거장을 잇는 무채색 라인 아트.
+///
+/// 굵은 라인 1개 + 양끝 정거장 노드(속이 빈 원)로 "이동 경로"를 은유한다.
+/// 색 없이 잉크 선만 쓰고, 그림자·채움 블록은 두지 않는다(#1936 제약).
+class _RouteGlyphPainter extends CustomPainter {
+  const _RouteGlyphPainter({required this.color});
+
+  final Color color;
 
   @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 13),
-      child: Divider(height: 1, color: EasySubwayAccessibleColors.line),
+  void paint(Canvas canvas, Size size) {
+    final stroke = size.width * 0.11;
+    final cy = size.height * 0.5;
+    final line = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round;
+
+    final nodeRadius = size.width * 0.17;
+    final left = Offset(nodeRadius + stroke * 0.5, cy);
+    final right = Offset(size.width - nodeRadius - stroke * 0.5, cy);
+
+    // 두 정거장을 잇는 경로 라인.
+    canvas.drawLine(
+      Offset(left.dx + nodeRadius, cy),
+      Offset(right.dx - nodeRadius, cy),
+      line,
     );
+
+    // 양끝 정거장 노드(속 빈 원 = 라인 아트).
+    final node = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke;
+    canvas.drawCircle(left, nodeRadius, node);
+    canvas.drawCircle(right, nodeRadius, node);
   }
+
+  @override
+  bool shouldRepaint(_RouteGlyphPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 /// 진행 인디케이터 — 아주 작은 점 2개(애플식). 블록/박스 아님(#1936).
@@ -327,8 +388,13 @@ class _OnboardingStepDots extends StatelessWidget {
   }
 }
 
-class _PermissionInfoCard extends StatelessWidget {
-  const _PermissionInfoCard({
+/// #1936(전체 워크플로우 일관성): 권한 항목 목록 — 박스(Card) 금지 → 행 + Divider.
+///
+/// 프로필 프리셋 리스트와 같은 디자인 언어(무채색 라인 아이콘 + 라벨 + 짧은 한 줄)
+/// 를 쓰되, 우측은 켜기 스위치다. DecoratedBox/Border(박스) 없이 행과 구분선만으로
+/// 그룹을 만든다.
+class _PermissionInfoList extends StatelessWidget {
+  const _PermissionInfoList({
     required this.locationSelected,
     required this.notificationSelected,
     required this.onLocationChanged,
@@ -345,32 +411,38 @@ class _PermissionInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _IntroCard(
-      child: Column(
-        children: [
-          _PermissionInfoRow(
-            icon: Icons.location_on_outlined,
-            title: '현재 위치',
-            subtitle: '가까운 역 찾기',
-            value: locationSelected,
-            onChanged: onLocationChanged,
+    return Column(
+      children: [
+        _PermissionInfoRow(
+          icon: Icons.location_on_outlined,
+          title: '현재 위치',
+          subtitle: '가까운 역 찾기',
+          value: locationSelected,
+          onChanged: onLocationChanged,
+        ),
+        if (notificationAvailable) ...[
+          const Divider(
+            height: 1,
+            thickness: 1,
+            color: EasySubwayAccessibleColors.line,
           ),
-          if (notificationAvailable) ...[
-            const _IntroDivider(),
-            _PermissionInfoRow(
-              icon: Icons.notifications_none,
-              title: '알림',
-              subtitle: '시설 고장·복구 알림',
-              value: notificationSelected,
-              onChanged: onNotificationChanged,
-            ),
-          ],
+          _PermissionInfoRow(
+            icon: Icons.notifications_none,
+            title: '알림',
+            subtitle: '시설 고장·복구 알림',
+            value: notificationSelected,
+            onChanged: onNotificationChanged,
+          ),
         ],
-      ),
+      ],
     );
   }
 }
 
+/// 권한 행 — 무채색 라인 아이콘 + 라벨 + 짧은 한 줄 + 우측 켜기 스위치.
+///
+/// 프로필 프리셋 행과 같은 톤: 좌측 아이콘은 잉크(무채색), 라벨은 bodyLarge,
+/// 보조 한 줄은 mutedText. 박스 없음, 높이는 접근성 터치 기준(≥56)을 지킨다.
 class _PermissionInfoRow extends StatelessWidget {
   const _PermissionInfoRow({
     required this.icon,
@@ -388,59 +460,64 @@ class _PermissionInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 43,
-          height: 43,
-          child: Icon(
-            icon,
-            color: EasySubwayAccessibleColors.primary,
-            size: 26,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
-                ),
+    final textTheme = Theme.of(context).textTheme;
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 60),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            // 무채색 라인 아이콘 — 프로필 리스트와 같은 시각 리듬(색 없음).
+            Icon(icon, color: EasySubwayAccessibleColors.mutedText, size: 24),
+            const SizedBox(width: EasySubwaySpacing.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: EasySubwayAccessibleColors.text,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: EasySubwayAccessibleColors.mutedText,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
-                  fontWeight: FontWeight.w700,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Semantics(
-          label: '$title ${value ? '켜짐' : '꺼짐'}',
-          toggled: value,
-          onTap: () => onChanged(!value),
-          child: ExcludeSemantics(
-            child: Switch(
-              value: value,
-              onChanged: onChanged,
-              activeThumbColor: Colors.white,
-              activeTrackColor: EasySubwayAccessibleColors.switchActiveTrack,
-              inactiveThumbColor: Colors.white,
-              inactiveTrackColor:
-                  EasySubwayAccessibleColors.switchInactiveTrack,
-              materialTapTargetSize: MaterialTapTargetSize.padded,
             ),
-          ),
+            const SizedBox(width: EasySubwaySpacing.md),
+            Semantics(
+              label: '$title ${value ? '켜짐' : '꺼짐'}',
+              toggled: value,
+              onTap: () => onChanged(!value),
+              child: ExcludeSemantics(
+                child: Switch(
+                  value: value,
+                  onChanged: onChanged,
+                  activeThumbColor: Colors.white,
+                  activeTrackColor:
+                      EasySubwayAccessibleColors.switchActiveTrack,
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor:
+                      EasySubwayAccessibleColors.switchInactiveTrack,
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -587,15 +664,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       notificationAvailable
                           ? '위치와 알림은 나중에도 켤 수 있어요'
                           : '위치는 나중에도 켤 수 있어요',
-                      style: textTheme.headlineSmall?.copyWith(
+                      // 프로필 질문과 같은 타이포 위계(titleLarge)로 통일(#1936 일관성).
+                      style: textTheme.titleLarge?.copyWith(
                         color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w800,
-                        height: 1.25,
+                        fontSize: 26,
+                        height: 1.2,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  _PermissionInfoCard(
+                  const SizedBox(height: EasySubwaySpacing.xl),
+                  _PermissionInfoList(
                     locationSelected: _locationPermissionSelected,
                     notificationSelected: _notificationPermissionSelected,
                     onLocationChanged: (value) =>
@@ -622,7 +701,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 22),
+                  const SizedBox(height: EasySubwaySpacing.xl),
                   FilledButton(
                     key: const Key('onboardingPermissionAllowButton'),
                     onPressed:
@@ -631,21 +710,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ? _handlePermissionAllow
                         : null,
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(60),
+                      // 시작·프로필 CTA와 같은 무채색 잉크 fill + 각진(≤8)로 통일.
+                      backgroundColor: EasySubwayAccessibleColors.primary,
+                      foregroundColor: EasySubwayAccessibleColors.surface,
+                      minimumSize: const Size.fromHeight(58),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          EasySubwayRadius.control,
+                        ),
                       ),
                     ),
                     child: const Text('시작하기'),
                   ),
-                  const SizedBox(height: 9),
+                  const SizedBox(height: EasySubwaySpacing.sm),
                   OutlinedButton(
                     key: const Key('onboardingPermissionSkipButton'),
                     onPressed: _completeOnboarding,
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(60),
+                      // "나중에" skip — 무채색 잉크 텍스트 + 얇은 라인 테두리(각진).
+                      foregroundColor: EasySubwayAccessibleColors.text,
+                      side: const BorderSide(
+                        color: EasySubwayAccessibleColors.line,
+                      ),
+                      minimumSize: const Size.fromHeight(58),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          EasySubwayRadius.control,
+                        ),
                       ),
                     ),
                     child: const Text('나중에 설정'),
@@ -751,8 +842,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-/// #1936: 이동 방식 프리셋 행 — 라벨만. 박스 아님(행 + Divider는 부모가 그림).
-/// 설명 문장 없음, 아이콘 없음. 선택 시 우측에 체크 표시. 탭 스플래시 사각형이
+/// #1936: 이동 방식 프리셋 행 — 무채색 라인 아이콘 + 라벨 + 우측 선택 표시.
+///
+/// personalization-first 리스트로서 프리미엄 리듬을 위해 좌측에 무채색 라인
+/// 아이콘을 둔다(색 없음 — 선택 여부와 무관하게 잉크 톤). 박스 아님(행 + Divider는
+/// 부모가 그림). 설명 문장 없음. 선택 시 우측에 체크 표시. 탭 스플래시 사각형이
 /// 생기지 않도록 GestureDetector를 쓰고, 높이는 접근성 터치 기준(≥56)을 지킨다.
 class _OnboardingProfileRow extends StatelessWidget {
   const _OnboardingProfileRow({
@@ -784,6 +878,16 @@ class _OnboardingProfileRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
                 children: [
+                  // 무채색 라인 아이콘 — 시각 리듬만. 선택 시 잉크를 진하게 해
+                  // 색 없이도 선택 위계를 준다(초록/틴트 금지).
+                  Icon(
+                    profile.icon,
+                    size: 24,
+                    color: selected
+                        ? EasySubwayAccessibleColors.text
+                        : EasySubwayAccessibleColors.mutedText,
+                  ),
+                  const SizedBox(width: EasySubwaySpacing.lg),
                   Expanded(
                     child: Text(
                       // 라벨만 노출한다. 상세 요약은 홈 설정에서 확인(#1936).
