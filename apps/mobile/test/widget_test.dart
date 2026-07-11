@@ -1288,7 +1288,7 @@ void main() {
     expect(find.text('부산'), findsOneWidget);
   });
 
-  testWidgets('노선도 지역 메뉴는 흰 표면·구분선·트리거 우측 정렬로 뜬다 (#1933)', (tester) async {
+  testWidgets('노선도 지역 메뉴는 흰 표면·구분선·화면 우측 밀착으로 뜬다 (#1933)', (tester) async {
     final repository = FakeStationSearchRepository(
       networkMapRegionNames: const ['테스트권', '부산'],
     );
@@ -1327,13 +1327,12 @@ void main() {
     );
     final menuMaterialElement = menuMaterialWidgets[menuMaterialIndex];
     final menuRect = tester.getRect(menuMaterials.at(menuMaterialIndex));
-    final triggerRect = tester.getRect(find.byKey(const Key('mapRegionTabs')));
 
-    // 트리거 우측 정렬로 패널과 화면 우측 사이 틈(노선도 삐짐)을 없앤다 —
-    // 상단바 자체 패딩만 남는다.
-    // (화면 우측 자체까지의 틈은 트리거~화면 우측 여백에 따라 달라져 불안정하므로
-    // 트리거 정렬만 검증한다.)
-    expect((menuRect.right - triggerRect.right).abs(), lessThanOrEqualTo(1));
+    // 메뉴 우측이 화면 우측 끝에 완전 밀착되어 노선도 삐짐이 없어야 한다 —
+    // right=0으로 설정하여 overlay 우측과 일치시킨다.
+    final screenWidth = tester.view.physicalSize.width /
+        tester.view.devicePixelRatio;
+    expect(menuRect.right, greaterThanOrEqualTo(screenWidth - 12));
 
     // 표면 스타일: 흰 표면, elevation 0, 라운드 8 + line 색 테두리.
     expect(menuMaterialElement.elevation, 0);

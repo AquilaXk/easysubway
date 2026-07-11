@@ -1702,7 +1702,7 @@ class _NetworkMapTopBar extends StatelessWidget {
     final position = RelativeRect.fromLTRB(
       topRight.dx,
       topRight.dy,
-      overlayBox.size.width - topRight.dx,
+      0,
       0,
     );
     final items = <PopupMenuEntry<String>>[];
