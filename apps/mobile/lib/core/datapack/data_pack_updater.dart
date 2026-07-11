@@ -69,8 +69,12 @@ class DataPackUpdater {
     )) {
       return const [];
     }
+    // 사용자가 명시적으로 수락한 다운로드(userConsent)는 실패 backoff 창과
+    // 무관하게 즉시 시도한다 — 동의 액션의 무음 실패 금지 (#1910).
     final backoffUntil = policyState.backoffUntil;
-    if (backoffUntil != null && now.isBefore(backoffUntil)) {
+    if (trigger != UpdateTrigger.userConsent &&
+        backoffUntil != null &&
+        now.isBefore(backoffUntil)) {
       return const [];
     }
     final networkCondition = await networkConditionSource.current();

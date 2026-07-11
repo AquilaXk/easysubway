@@ -6,6 +6,7 @@
   "meteredDownloadRequiresConsent": true,
   "retryBackoffSeconds": [60, 480, 3600],
   "retryMaxAttemptsPerSession": 3,
+  "userConsentIgnoresRetryBackoff": true,
   "expiryUrgentWindowDays": 7,
   "expiryUrgentIgnoresMinInterval": true
 }
