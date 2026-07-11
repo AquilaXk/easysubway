@@ -51,7 +51,7 @@ class AdBannerSlot extends StatelessWidget {
                 )
               : null,
         ),
-        child: ad ?? const _AdBannerSlotDevPlaceholder(),
+        child: ad ?? const ExcludeSemantics(child: _AdBannerSlotDevPlaceholder()),
       ),
     );
   }

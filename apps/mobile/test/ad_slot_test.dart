@@ -33,6 +33,13 @@ void main() {
     expect(find.text('광고 미리보기 (개발용)'), findsOneWidget);
     expect(find.text('표준 배너 규격 자리표시 텍스트'), findsOneWidget);
     expect(find.byType(Column), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('광고 미리보기 (개발용)'),
+        matching: find.byType(ExcludeSemantics),
+      ),
+      findsOneWidget,
+    );
     semanticsHandle.dispose();
   });
 }
