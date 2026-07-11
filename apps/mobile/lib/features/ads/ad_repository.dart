@@ -91,10 +91,6 @@ final class AdRepository {
   }
 
   ApiClient? _lazyClient() {
-    final cached = _apiClient;
-    if (cached != null) {
-      return cached;
-    }
     final baseUri = _baseUri!();
     return baseUri == null ? null : _apiClient = ApiClient(baseUri: baseUri);
   }

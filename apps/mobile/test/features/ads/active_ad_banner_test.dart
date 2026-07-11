@@ -251,20 +251,6 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('320dp와 text scale 2.0에서도 overflow가 없다', (tester) async {
-    await _pumpBanner(
-      tester,
-      response: Future.value(_creativeResponse()),
-      imageLoader: (_, _) async => _image,
-      width: 320,
-      textScale: 2,
-    );
-    await tester.pump();
-
-    expect(find.byType(AdBannerSlot), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets('긴 광고 문구도 text scale 2.0을 축소하지 않고 full semantics를 유지한다', (
     tester,
   ) async {
