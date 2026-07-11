@@ -127,7 +127,7 @@ function validateEvidenceMetadata(sample) {
   }
 
   const expectedSchemaFingerprint = sha256(JSON.stringify(
-    [...sample.fields].sort(),
+    [...sample.fields].sort((left, right) => left < right ? -1 : Number(left !== right)),
   ));
   if (sample.schemaFingerprint !== expectedSchemaFingerprint) {
     throw new Error("schemaFingerprint does not match fields");
