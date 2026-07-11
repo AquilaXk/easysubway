@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart' show rootBundle;
 
 import 'accessible_design.dart';
@@ -678,6 +679,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onClearDestination: _clearDestinationStation,
                 onClearWaypoint: _clearWaypointStation,
                 onSwapDraft: _swapDraftStations,
+                onReorderDraft: _reorderDraftStations,
                 onPickOrigin: widget.onPickStationForSlot == null
                     ? null
                     : _pickOriginStation,
@@ -724,6 +726,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 onClearDestination: _clearDestinationStation,
                 onClearWaypoint: _clearWaypointStation,
                 onSwapDraft: _swapDraftStations,
+                onReorderDraft: _reorderDraftStations,
                 onPickOrigin: widget.onPickStationForSlot == null
                     ? null
                     : _pickOriginStation,
@@ -778,6 +781,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onClearDestination: _clearDestinationStation,
               onClearWaypoint: _clearWaypointStation,
               onSwapDraft: _swapDraftStations,
+              onReorderDraft: _reorderDraftStations,
               onPickOrigin: widget.onPickStationForSlot == null
                   ? null
                   : _pickOriginStation,
@@ -1049,6 +1053,22 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.routeDraftController.swapOriginDestination();
   }
 
+  /// #1985: draft 행 드래그 재배열. 대상 슬롯이 이미 차 있으면 두 값을 맞바꾸고,
+  /// 비어 있으면 값을 옮긴다. 컨트롤러가 어느 경우든 원자적으로 처리한다.
+  void _reorderDraftStations(RouteDraftSlot from, RouteDraftSlot to) {
+    final draft = widget.routeDraftController.draft;
+    final toFilled = switch (to) {
+      RouteDraftSlot.origin => draft.origin != null,
+      RouteDraftSlot.destination => draft.destination != null,
+      RouteDraftSlot.waypoint => draft.waypoint != null,
+    };
+    if (toFilled) {
+      widget.routeDraftController.swapSlots(from, to);
+    } else {
+      widget.routeDraftController.moveSlot(from, to);
+    }
+  }
+
   /// G4: 상단 오버레이 출발 칸 탭 → 기존 역 검색을 "출발역 채우기" 모드로 연다.
   /// 지도 탭 경로와 같은 [routeDraftController]로 수렴한다.
   void _pickOriginStation() {
@@ -1163,6 +1183,7 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.onClearDestination,
     required this.onClearWaypoint,
     required this.onSwapDraft,
+    required this.onReorderDraft,
     this.onPickOrigin,
     this.onPickDestination,
     this.onPickWaypoint,
@@ -1199,6 +1220,9 @@ class _NetworkMapChrome extends StatelessWidget {
   final VoidCallback onClearDestination;
   final VoidCallback onClearWaypoint;
   final VoidCallback onSwapDraft;
+
+  /// #1985: draft 행 드래그 재배열 콜백. (from, to) 슬롯을 받아 swap/move를 분기한다.
+  final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorderDraft;
 
   /// 상단바 출발/도착/경유 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
@@ -1253,6 +1277,7 @@ class _NetworkMapChrome extends StatelessWidget {
             onClearDestination: onClearDestination,
             onClearWaypoint: onClearWaypoint,
             onSwapDraft: onSwapDraft,
+            onReorderDraft: onReorderDraft,
             onPickOrigin: onPickOrigin,
             onPickDestination: onPickDestination,
             onPickWaypoint: onPickWaypoint,
@@ -1360,6 +1385,7 @@ class _NetworkMapTopBar extends StatelessWidget {
     required this.onClearDestination,
     required this.onClearWaypoint,
     required this.onSwapDraft,
+    required this.onReorderDraft,
     this.onPickOrigin,
     this.onPickDestination,
     this.onPickWaypoint,
@@ -1382,6 +1408,7 @@ class _NetworkMapTopBar extends StatelessWidget {
   final VoidCallback onClearDestination;
   final VoidCallback onClearWaypoint;
   final VoidCallback onSwapDraft;
+  final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorderDraft;
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
   final VoidCallback? onPickWaypoint;
@@ -1415,6 +1442,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                 onClearDestination: onClearDestination,
                 onClearWaypoint: onClearWaypoint,
                 onSwapDraft: onSwapDraft,
+                onReorderDraft: onReorderDraft,
                 onPickOrigin: onPickOrigin,
                 onPickDestination: onPickDestination,
                 onPickWaypoint: onPickWaypoint,
@@ -4867,6 +4895,7 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
     required this.onClearDestination,
     required this.onClearWaypoint,
     required this.onSwapDraft,
+    required this.onReorderDraft,
     this.onPickOrigin,
     this.onPickDestination,
     this.onPickWaypoint,
@@ -4879,6 +4908,9 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   final VoidCallback onClearWaypoint;
   final VoidCallback onSwapDraft;
 
+  /// #1985: draft 행 드래그 재배열 콜백. (from, to) 슬롯 쌍을 넘긴다.
+  final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorderDraft;
+
   /// G4: 각 칸 탭 → 역 검색 열기(같은 draft로 수렴). null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
@@ -4889,28 +4921,46 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canSwap = draft.origin != null || draft.destination != null;
+    // #1985: 현재 렌더 중인 행 슬롯 순서. 경유가 있으면 출발·경유·도착 3행.
+    final visibleSlots = <RouteDraftSlot>[
+      RouteDraftSlot.origin,
+      if (draft.waypoint != null) RouteDraftSlot.waypoint,
+      RouteDraftSlot.destination,
+    ];
+    // 각 행이 이동할 수 있는 다른 슬롯 목록(자기 자신 제외).
+    List<RouteDraftSlot> targetsFor(RouteDraftSlot slot) =>
+        visibleSlots.where((s) => s != slot).toList();
     // 출발/도착 2개의 무채색 채움 필드. TalkBack 순서: 출발 먼저, 도착.
     // 행 리스트로 렌더해 중간 행 확장이 구조 변경 없이 가능하다.
     final fields = <Widget>[
       _NetworkMapRouteDraftField(
         kind: _RouteDraftFieldKind.origin,
+        slot: RouteDraftSlot.origin,
         station: draft.origin,
         onClear: onClearOrigin,
         onPick: onPickOrigin,
+        reorderTargets: targetsFor(RouteDraftSlot.origin),
+        onReorder: onReorderDraft,
       ),
       // #1948: 경유가 있으면 출발과 도착 사이에 경유 행을 삽입한다.
       if (draft.waypoint != null)
         _NetworkMapRouteDraftField(
           kind: _RouteDraftFieldKind.waypoint,
+          slot: RouteDraftSlot.waypoint,
           station: draft.waypoint,
           onClear: onClearWaypoint,
           onPick: onPickWaypoint,
+          reorderTargets: targetsFor(RouteDraftSlot.waypoint),
+          onReorder: onReorderDraft,
         ),
       _NetworkMapRouteDraftField(
         kind: _RouteDraftFieldKind.destination,
+        slot: RouteDraftSlot.destination,
         station: draft.destination,
         onClear: onClearDestination,
         onPick: onPickDestination,
+        reorderTargets: targetsFor(RouteDraftSlot.destination),
+        onReorder: onReorderDraft,
       ),
     ];
     // #1948: 경유는 출발·도착 한 쌍이 정해진 뒤에 더하는 옵션이다. 출발/도착이
@@ -5021,14 +5071,26 @@ class _NetworkMapRouteDraftAddWaypoint extends StatelessWidget {
 class _NetworkMapRouteDraftField extends StatelessWidget {
   const _NetworkMapRouteDraftField({
     required this.kind,
+    required this.slot,
     required this.station,
     required this.onClear,
+    required this.reorderTargets,
+    required this.onReorder,
     this.onPick,
   });
 
   final _RouteDraftFieldKind kind;
+
+  /// #1985: 이 행이 대응하는 draft 슬롯. 드래그 재배열의 from/to 계산에 쓴다.
+  final RouteDraftSlot slot;
   final RouteDraftStation? station;
   final VoidCallback onClear;
+
+  /// #1985: 이 행에서 옮겨 갈 수 있는 다른 슬롯들(현재 렌더 중인 다른 행들).
+  final List<RouteDraftSlot> reorderTargets;
+
+  /// #1985: 드래그·시맨틱 액션이 호출하는 재배열 콜백. (from, to) 슬롯을 넘긴다.
+  final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorder;
 
   /// G4: 이 칸(역명/플레이스홀더 영역)을 탭하면 역 검색을 연다. null이면 탭 불가.
   final VoidCallback? onPick;
@@ -5039,11 +5101,10 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
     _RouteDraftFieldKind.destination => '도착',
   };
 
-  String get _searchLabel => switch (kind) {
-    _RouteDraftFieldKind.origin => '출발역 검색',
-    _RouteDraftFieldKind.waypoint => '경유역 검색',
-    _RouteDraftFieldKind.destination => '도착역 검색',
-  };
+  /// #1985: 빈 행 placeholder 표시·낭독 문구('출발역'/'경유역'/'도착역').
+  String get _placeholderLabel => slot.displayLabel;
+
+  String get _searchLabel => '${slot.displayLabel} 검색';
 
   String get _rowKey => switch (kind) {
     _RouteDraftFieldKind.origin => 'networkMapRouteDraftOriginRow',
@@ -5067,12 +5128,14 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = _label;
     final filled = station != null;
-    final stationName = filled ? station!.displayName : label;
+    // #1985: 빈 행은 placeholder 문구('출발역'/'경유역'/'도착역')를 표시한다.
+    final stationName = filled ? station!.displayName : _placeholderLabel;
     // 접근성: 검색 진입 라벨을 "출발역 검색"/"경유역 검색"/"도착역 검색"으로 낭독한다.
     final searchLabel = _searchLabel;
+    // #1985: 빈 행은 '역역' 중복을 피하려 검색 라벨(예: '출발역 검색')만 낭독한다.
     final pickSemanticsLabel = filled
         ? '$label $stationName, $searchLabel'
-        : '$label, $searchLabel';
+        : searchLabel;
     final textRow = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -5093,7 +5156,8 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
     // 역명/플레이스홀더 영역: onPick이 있으면 검색을 여는 버튼. 없으면 정보 표시만.
     final Widget pickArea = onPick == null
         ? Semantics(
-            label: filled ? '$label $stationName' : label,
+            // #1985: 빈 행은 '역역' 중복을 피하려 placeholder 문구만 낭독한다.
+            label: filled ? '$label $stationName' : _placeholderLabel,
             child: ExcludeSemantics(child: textRow),
           )
         : Semantics(
@@ -5114,8 +5178,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
               ),
             ),
           );
-    return Container(
-      key: Key(_rowKey),
+    final rowContainer = Container(
       constraints: const BoxConstraints(minHeight: 54),
       decoration: BoxDecoration(
         color: EasySubwayAccessibleColors.scaffoldSurface,
@@ -5169,6 +5232,65 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    // #1985: 채워진 행만 드래그로 재배열할 수 있다. 빈 행은 드래그 소스를 두지
+    // 않고 이동 대상(DragTarget)으로만 쓴다.
+    Widget content = rowContainer;
+    if (filled) {
+      content = LongPressDraggable<RouteDraftSlot>(
+        data: slot,
+        maxSimultaneousDrags: 1,
+        dragAnchorStrategy: childDragAnchorStrategy,
+        // 드래그 피드백: 무채색·radius 8·elevation 0·그림자 없음(#1933 원칙 유지).
+        feedback: Material(
+          elevation: 0,
+          type: MaterialType.transparency,
+          child: SizedBox(
+            width: 220,
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 54),
+              decoration: BoxDecoration(
+                color: EasySubwayAccessibleColors.scaffoldSurface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Text(
+                station!.displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.text,
+                ),
+              ),
+            ),
+          ),
+        ),
+        // 드래그 중 원래 행은 무채색으로 흐리게(노선색/틴트 없음).
+        childWhenDragging: Opacity(opacity: 0.4, child: rowContainer),
+        child: rowContainer,
+      );
+      // 커스텀 시맨틱 액션: 각 대상 슬롯으로 '~으로 이동'. child 트리 밖 wrapper라
+      // 별도 SemanticsNode로 병합된다.
+      content = Semantics(
+        container: true,
+        customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
+          for (final target in reorderTargets)
+            CustomSemanticsAction(
+              label: '${target.displayLabel}으로 이동',
+            ): () => onReorder(slot, target),
+        },
+        child: content,
+      );
+    }
+
+    // 모든 행(빈 행 포함)이 이동 대상이 된다. 행 키는 최상위 DragTarget에 둔다.
+    return DragTarget<RouteDraftSlot>(
+      key: Key(_rowKey),
+      onWillAcceptWithDetails: (details) => details.data != slot,
+      onAcceptWithDetails: (details) => onReorder(details.data, slot),
+      builder: (context, candidateData, rejectedData) => content,
     );
   }
 }
