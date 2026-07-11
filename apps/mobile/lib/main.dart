@@ -672,45 +672,74 @@ class SupportAccessInfo {
   }
 }
 
-/// 앱 시작 시 온보딩 상태를 복원하는 짧은 구간에 보여주는 브랜디드 로딩 화면.
+/// 앱 시작 시 온보딩 상태를 복원하는 짧은 구간에 보여주는 화면.
 ///
 /// 예전에는 흰 배경 + 스피너만 떠서 네이티브 스플래시(브랜드)에서 홈으로 가는
-/// 사이에 흰 화면이 튀어 첫인상을 해쳤다(#1785). 브랜드 색과 앱 이름을 그대로
-/// 이어 스플래시에서 로딩, 콘텐츠까지 매끄럽게 연결되도록 한다.
-class _StartupLoadingScreen extends StatelessWidget {
+/// 사이에 흰 화면이 튀어 첫인상을 해쳤다(#1785). 그래서 브랜드 색(당시 파랑)과
+/// 앱 이름을 그대로 잇는 풀스크린 화면을 넣었었다. 이후 #1915에서 색 체계가
+/// 파랑에서 차콜로 바뀌면서, 이 풀스크린 화면 자체가 "흰 네이티브 스플래시 →
+/// 차콜 화면 → 흰 홈 화면" 순으로 색이 튀는 새로운 플래시 버그가 되었다.
+///
+/// 지금은 화면을 홈/네이티브 스플래시와 동일한 흰 배경으로 맞추고, 복원이
+/// 매우 빠르게 끝나는 일반적인 경우에는 아무 시각 요소도 그리지 않아
+/// 지각적으로(perceptually) 아예 보이지 않도록 한다. 복원이 드물게 느려질
+/// 때만(300ms 초과) 작은 스피너를 표시해 사용자가 대기 상태를 인지하게 한다.
+/// 스크린리더용 안내(Semantics)는 시각 스피너와 무관하게 위젯 빌드 즉시
+/// 트리에 존재한다.
+class _StartupLoadingScreen extends StatefulWidget {
   const _StartupLoadingScreen();
+
+  @override
+  State<_StartupLoadingScreen> createState() => _StartupLoadingScreenState();
+}
+
+class _StartupLoadingScreenState extends State<_StartupLoadingScreen> {
+  static const _spinnerDelay = Duration(milliseconds: 300);
+
+  Timer? _spinnerDelayTimer;
+  bool _showSpinner = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinnerDelayTimer = Timer(_spinnerDelay, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _showSpinner = true;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _spinnerDelayTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('startupLoadingScreen'),
-      backgroundColor: EasySubwayAccessibleColors.primary,
+      backgroundColor: EasySubwayAccessibleColors.surface,
       body: SafeArea(
         child: Center(
           child: Semantics(
             label: '쉬운 지하철을 불러오는 중',
             liveRegion: true,
             child: ExcludeSemantics(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '쉬운 지하철',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                ],
+              child: SizedBox(
+                width: 26,
+                height: 26,
+                child: _showSpinner
+                    ? const CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          EasySubwayAccessibleColors.mutedText,
+                        ),
+                      )
+                    : null,
               ),
             ),
           ),
@@ -809,8 +838,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   @override
   Widget build(BuildContext context) {
     if (_loadingOnboardingState) {
-      // 스플래시와 홈 사이에 흰 화면+스피너가 튀지 않도록, 브랜드 색과 앱 이름을
-      // 그대로 잇는 브랜디드 로딩을 보여준다(#1785).
+      // 스플래시와 홈 사이에 색이 튀지 않도록 흰 배경을 그대로 이어가며, 복원이
+      // 빠르게 끝나는 일반적인 경우에는 스피너조차 그리지 않는다(#1785, #1915).
       return const _StartupLoadingScreen();
     }
 
