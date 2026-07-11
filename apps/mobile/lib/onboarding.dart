@@ -186,81 +186,76 @@ class StartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: EasySubwayAccessibleColors.primary,
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final topGap = (constraints.maxHeight * 0.34).clamp(84.0, 212.0);
-              final bottomGap = 35 + MediaQuery.viewPaddingOf(context).bottom;
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: IntrinsicHeight(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(24, 48, 24, bottomGap),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: topGap),
-                          Semantics(
-                            header: true,
-                            child: Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(text: '빠른 길보다,\n'),
-                                  TextSpan(
-                                    // 스타트 화면(브랜드 스플래시) 한정 강조색.
-                                    // 팔레트 액센트(primary) 배경 위 대비를 위한 예외.
-                                    text: '갈 수 있는 길',
-                                    style: TextStyle(color: Color(0xFFB8F4DF)),
-                                  ),
-                                  TextSpan(text: '을\n먼저 안내해요.'),
-                                ],
-                              ),
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 44,
-                                fontWeight: FontWeight.w800,
-                                height: 1.12,
-                              ),
+      backgroundColor: EasySubwayAccessibleColors.surface,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final topGap = (constraints.maxHeight * 0.34).clamp(84.0, 212.0);
+            final bottomGap = 35 + MediaQuery.viewPaddingOf(context).bottom;
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(24, 48, 24, bottomGap),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: topGap),
+                        Semantics(
+                          header: true,
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: '빠른 길보다,\n'),
+                                // 강조선도 무채색 잉크로 통일한다. 과거 mint
+                                // 액센트(0xFFB8F4DF)는 초록 전면 제거로 폐기한다.
+                                TextSpan(text: '갈 수 있는 길'),
+                                TextSpan(text: '을\n먼저 안내해요.'),
+                              ],
+                            ),
+                            style: TextStyle(
+                              color: EasySubwayAccessibleColors.text,
+                              fontSize: 44,
+                              fontWeight: FontWeight.w800,
+                              height: 1.12,
                             ),
                           ),
-                          const Spacer(),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              key: const Key('startScreenStartButton'),
-                              onPressed: onStart,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: const Color(0xFF0B3B42),
-                                minimumSize: const Size.fromHeight(60),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text('쉬운 지하철 시작하기'),
-                                  SizedBox(width: 8),
-                                  Icon(Icons.arrow_forward),
-                                ],
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            key: const Key('startScreenStartButton'),
+                            onPressed: onStart,
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  EasySubwayAccessibleColors.primary,
+                              foregroundColor:
+                                  EasySubwayAccessibleColors.surface,
+                              minimumSize: const Size.fromHeight(60),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('쉬운 지하철 시작하기'),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
