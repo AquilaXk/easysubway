@@ -29,17 +29,20 @@ class _StubApiClient extends ApiClient {
   }
 }
 
-ApiResponse _creativeResponse() => const ApiResponse(
+ApiResponse _creativeResponse({
+  String advertiserName = '이지상점',
+  String altText = '여름 할인 배너',
+}) => ApiResponse(
   statusCode: 200,
-  jsonBody: {
+  jsonBody: <String, Object?>{
     'success': true,
-    'data': {
+    'data': <String, Object?>{
       'placement': 'route-result-bottom',
       'creativeId': 'creative-1',
       'imageUrl': 'https://cdn.easysubway.app/banner.png',
       'landingUrl': 'https://advertiser.example/campaign',
-      'advertiserName': '이지상점',
-      'altText': '여름 할인 배너',
+      'advertiserName': advertiserName,
+      'altText': altText,
     },
   },
 );
@@ -260,5 +263,34 @@ void main() {
 
     expect(find.byType(AdBannerSlot), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('긴 광고 문구도 text scale 2.0을 축소하지 않고 full semantics를 유지한다', (
+    tester,
+  ) async {
+    const advertiser = '아주 긴 이름을 사용하는 공식 광고주 주식회사';
+    const alt = '출퇴근 이용자를 위한 여름철 대중교통 안전 캠페인 전체 안내 문구';
+    final semantics = tester.ensureSemantics();
+    await _pumpBanner(
+      tester,
+      response: Future.value(
+        _creativeResponse(advertiserName: advertiser, altText: alt),
+      ),
+      imageLoader: (_, _) async => _image,
+      width: 320,
+      textScale: 2,
+    );
+    await tester.pump();
+
+    expect(
+      find.ancestor(
+        of: find.text(advertiser),
+        matching: find.byType(FittedBox),
+      ),
+      findsNothing,
+    );
+    expect(find.bySemanticsLabel('광고, $alt'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 }
