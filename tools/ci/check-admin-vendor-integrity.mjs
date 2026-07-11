@@ -156,7 +156,11 @@ function htmlFiles(roots) {
     }
     collectHtml(root, files);
   }
-  return files.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return files.sort((a, b) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
 }
 
 function collectHtml(dir, files) {
