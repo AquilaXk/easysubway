@@ -1292,7 +1292,13 @@ void main() {
     expect(find.text('도착'), findsOneWidget);
   });
 
-  testWidgets('노선도 팝오버 출발 선택은 상단 오버레이에 역명을 띄우고 지우기로 사라진다', (tester) async {
+  testWidgets('노선도 팝오버 출발 선택은 상단바를 출발/도착 입력으로 변신시키고 지우기로 검색바로 돌아온다', (
+    tester,
+  ) async {
+    // #1933 요구 2: 예전엔 검색바 "아래" 별도 카드가 떴다. 이제는 아래 카드 없이
+    // 상단바 자체가 출발/도착 2줄 입력으로 변신한다. 이 테스트는 (1) 빈 draft면
+    // 상단바가 검색바이고, (2) 출발이 차면 상단바가 draft 입력으로 바뀌며 검색바가
+    // 사라지고, (3) 다 비우면 다시 검색바로 돌아옴을 검증한다.
     final routeDraftController = RouteDraftController();
     await tester.pumpWidget(
       MaterialApp(
@@ -1306,10 +1312,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // draft가 비어 있으면 상단 오버레이는 뜨지 않는다.
+    // draft가 비어 있으면 상단바는 검색바이고 draft 변신은 뜨지 않는다.
     expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
 
-    // 역 탭 → 팝오버 → "출발" 선택 → 상단 오버레이에 출발역명이 즉시 뜬다(G1).
+    // 역 탭 → 팝오버 → "출발" 선택 → 상단바가 출발/도착 입력으로 변신(G1).
     await tester.tap(
       find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
     );
@@ -1322,6 +1329,8 @@ void main() {
       find.byKey(const Key('networkMapRouteDraftOverlay')),
       findsOneWidget,
     );
+    // 변신했으므로 검색바는 더 이상 상단바에 없다(아래 별도 카드가 아니라 변신).
+    expect(find.byKey(const Key('stationSearchButton')), findsNothing);
     expect(
       find.descendant(
         of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
@@ -1330,13 +1339,17 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('도착역을 탭하거나 검색'), findsOneWidget);
+    // 스왑(⇅) 어포던스가 상단바에 존재한다.
+    expect(find.byKey(const Key('networkMapRouteDraftSwap')), findsOneWidget);
 
-    // 출발칸 지우기(✕) → draft에서 출발이 지워지고, 도착도 없으니 오버레이가 사라진다.
+    // 출발칸 지우기(✕) → draft에서 출발이 지워지고, 도착도 없으니 상단바는 다시
+    // 검색바로 돌아온다.
     await tester.tap(find.byKey(const Key('networkMapRouteDraftClearOrigin')));
     await tester.pumpAndSettle();
 
     expect(routeDraftController.draft.origin, isNull);
     expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
   });
 
   testWidgets('상단 오버레이 출발칸 검색 선택은 지도 탭과 같은 draft로 수렴한다(G4)', (tester) async {
@@ -1409,6 +1422,13 @@ void main() {
       ),
       findsOneWidget,
     );
+
+    // 스왑(⇅): 출발/도착이 맞바뀌어 같은 상단바 입력에 반영된다(#1933 요구 2).
+    expect(routeDraftController.draft.destination?.nameKo, '잠실');
+    await tester.tap(find.byKey(const Key('networkMapRouteDraftSwap')));
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.origin?.nameKo, '잠실');
+    expect(routeDraftController.draft.destination?.nameKo, '강남');
   });
 
   testWidgets('노선도는 노선별 보기 우회 sheet를 노출하지 않는다', (tester) async {

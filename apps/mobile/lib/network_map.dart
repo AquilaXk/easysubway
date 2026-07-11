@@ -523,6 +523,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
+              onSwapDraft: _swapDraftStations,
               onPickOrigin: widget.onPickStationForSlot == null
                   ? null
                   : _pickOriginStation,
@@ -557,6 +558,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
+              onSwapDraft: _swapDraftStations,
               onPickOrigin: widget.onPickStationForSlot == null
                   ? null
                   : _pickOriginStation,
@@ -599,6 +601,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
             routeDraftController: widget.routeDraftController,
             onClearOrigin: _clearOriginStation,
             onClearDestination: _clearDestinationStation,
+            onSwapDraft: _swapDraftStations,
             onPickOrigin: widget.onPickStationForSlot == null
                 ? null
                 : _pickOriginStation,
@@ -837,6 +840,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.routeDraftController.clearDestination();
   }
 
+  void _swapDraftStations() {
+    widget.routeDraftController.swapOriginDestination();
+  }
+
   void _openRouteSearchFromMap(NetworkMapStation station) {
     widget.onOpenRouteSearch();
   }
@@ -942,6 +949,7 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.routeDraftController,
     required this.onClearOrigin,
     required this.onClearDestination,
+    required this.onSwapDraft,
     this.onPickOrigin,
     this.onPickDestination,
     required this.child,
@@ -968,8 +976,9 @@ class _NetworkMapChrome extends StatelessWidget {
   final RouteDraftController routeDraftController;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
+  final VoidCallback onSwapDraft;
 
-  /// 상단 draft 오버레이 출발/도착 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
+  /// 상단바 출발/도착 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
   final Widget child;
@@ -994,28 +1003,24 @@ class _NetworkMapChrome extends StatelessWidget {
             onMenuTap: onMenuTap,
             onSearchTap: onSearchTap,
             onRegionSelected: onRegionSelected,
+            // #1933 요구 2: 출발/도착이 하나라도 차면 상단바 자체가 출발/도착
+            // 2줄 입력으로 "변신"한다(아래 별도 카드 없음). 지도 탭·검색 어느
+            // 경로든 같은 [routeDraftController]로 수렴한다.
+            routeDraftController: routeDraftController,
+            onClearOrigin: onClearOrigin,
+            onClearDestination: onClearDestination,
+            onSwapDraft: onSwapDraft,
+            onPickOrigin: onPickOrigin,
+            onPickDestination: onPickDestination,
           ),
         ),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: topPadding + _networkMapTopBarHeight,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ?disruptionBanner,
-              // G1: 팝오버 "출발"/"도착" 선택 결과를 노선도 위 얇은 오버레이로
-              // 즉시 피드백한다. draft가 비어 있으면 스스로 사라진다.
-              _NetworkMapRouteDraftOverlay(
-                controller: routeDraftController,
-                onClearOrigin: onClearOrigin,
-                onClearDestination: onClearDestination,
-                onPickOrigin: onPickOrigin,
-                onPickDestination: onPickDestination,
-              ),
-            ],
+        if (disruptionBanner != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            top: topPadding + _networkMapTopBarHeight,
+            child: disruptionBanner!,
           ),
-        ),
         if (showServicePatternToggle)
           Positioned(
             left: 16,
@@ -1100,6 +1105,12 @@ class _NetworkMapTopBar extends StatelessWidget {
     required this.onMenuTap,
     required this.onSearchTap,
     required this.onRegionSelected,
+    required this.routeDraftController,
+    required this.onClearOrigin,
+    required this.onClearDestination,
+    required this.onSwapDraft,
+    this.onPickOrigin,
+    this.onPickDestination,
   });
 
   final List<NetworkMapRegion> regions;
@@ -1108,13 +1119,15 @@ class _NetworkMapTopBar extends StatelessWidget {
   final VoidCallback onMenuTap;
   final VoidCallback onSearchTap;
   final ValueChanged<String> onRegionSelected;
+  final RouteDraftController routeDraftController;
+  final VoidCallback onClearOrigin;
+  final VoidCallback onClearDestination;
+  final VoidCallback onSwapDraft;
+  final VoidCallback? onPickOrigin;
+  final VoidCallback? onPickDestination;
 
   @override
   Widget build(BuildContext context) {
-    final currentRegion = _displayRegionName(selectedRegion);
-    final availableRegions = regions.isEmpty
-        ? const [NetworkMapRegion(name: '수도권')]
-        : regions;
     return Material(
       color: EasySubwayAccessibleColors.surface,
       elevation: 0,
@@ -1126,97 +1139,114 @@ class _NetworkMapTopBar extends StatelessWidget {
         ),
         child: SafeArea(
           bottom: false,
-          child: SizedBox(
-            height: _networkMapTopBarHeight,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-              child: Row(
-                children: [
-                  IconButton(
-                    key: const Key('networkMapMenuButton'),
-                    tooltip: '메뉴',
-                    onPressed: onMenuTap,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size.square(
-                        EasySubwayTouchTarget.general,
-                      ),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: EdgeInsets.zero,
-                    ),
-                    icon: const Icon(
-                      Icons.menu,
-                      size: 22,
-                      color: Color(0xFF4B4B4B),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: _NetworkMapSearchField(onSearchTap: onSearchTap),
-                  ),
-                  const SizedBox(width: 8),
-                  Builder(
-                    builder: (regionContext) => Semantics(
-                      key: const Key('mapRegionTabs'),
-                      container: true,
-                      button: true,
-                      label: '지역: $currentRegion, 지역 변경',
-                      // 시맨틱 활성화 액션을 제공해 스크린리더로도 지역 메뉴를 연다
-                      // (형제 검색 필드와 동일한 패턴).
+          // #1933 요구 2: draft가 비면 검색바, 하나라도 차면 출발/도착 2줄 입력으로
+          // 상단바 자체가 변신한다. 별도 카드를 아래에 띄우지 않는다.
+          child: ListenableBuilder(
+            listenable: routeDraftController,
+            builder: (context, _) {
+              final draft = routeDraftController.draft;
+              if (draft.isEmpty) {
+                return _buildSearchRow(context);
+              }
+              return _NetworkMapTopBarRouteDraft(
+                key: const Key('networkMapRouteDraftOverlay'),
+                draft: draft,
+                onMenuTap: onMenuTap,
+                onClearOrigin: onClearOrigin,
+                onClearDestination: onClearDestination,
+                onSwapDraft: onSwapDraft,
+                onPickOrigin: onPickOrigin,
+                onPickDestination: onPickDestination,
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchRow(BuildContext context) {
+    final currentRegion = _displayRegionName(selectedRegion);
+    final availableRegions = regions.isEmpty
+        ? const [NetworkMapRegion(name: '수도권')]
+        : regions;
+    return SizedBox(
+      height: _networkMapTopBarHeight,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        child: Row(
+          children: [
+            IconButton(
+              key: const Key('networkMapMenuButton'),
+              tooltip: '메뉴',
+              onPressed: onMenuTap,
+              style: IconButton.styleFrom(
+                minimumSize: const Size.square(EasySubwayTouchTarget.general),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: EdgeInsets.zero,
+              ),
+              icon: const Icon(Icons.menu, size: 22, color: Color(0xFF4B4B4B)),
+            ),
+            const SizedBox(width: 4),
+            Expanded(child: _NetworkMapSearchField(onSearchTap: onSearchTap)),
+            const SizedBox(width: 8),
+            Builder(
+              builder: (regionContext) => Semantics(
+                key: const Key('mapRegionTabs'),
+                container: true,
+                button: true,
+                label: '지역: $currentRegion, 지역 변경',
+                // 시맨틱 활성화 액션을 제공해 스크린리더로도 지역 메뉴를 연다
+                // (형제 검색 필드와 동일한 패턴).
+                onTap: () => _showRegionMenu(regionContext, availableRegions),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 148),
+                  child: ExcludeSemantics(
+                    // 트리거의 ▾ 캐럿과 반응 위치를 맞춘다: 트리거 바로 아래
+                    // 앵커된 드롭다운 메뉴로 지역을 표시한다(하단 시트 대신).
+                    child: InkWell(
+                      key: const Key('networkMapRegionDropdown'),
                       onTap: () =>
                           _showRegionMenu(regionContext, availableRegions),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 148),
-                        child: ExcludeSemantics(
-                          // 트리거의 ▾ 캐럿과 반응 위치를 맞춘다: 트리거 바로 아래
-                          // 앵커된 드롭다운 메뉴로 지역을 표시한다(하단 시트 대신).
-                          child: InkWell(
-                            key: const Key('networkMapRegionDropdown'),
-                            onTap: () => _showRegionMenu(
-                              regionContext,
-                              availableRegions,
-                            ),
-                            splashFactory: NoSplash.splashFactory,
-                            splashColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                            child: SizedBox(
-                              height: EasySubwayTouchTarget.general,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      currentRegion,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Color(0xFF606060),
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  const Icon(
-                                    Icons.keyboard_arrow_down,
-                                    color: Color(0xFF606060),
-                                    size: 18,
-                                  ),
-                                ],
+                      splashFactory: NoSplash.splashFactory,
+                      splashColor: Colors.transparent,
+                      highlightColor: Colors.transparent,
+                      child: SizedBox(
+                        height: EasySubwayTouchTarget.general,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                currentRegion,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF606060),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 2),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: Color(0xFF606060),
+                              size: 18,
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                  if (notificationAction != null) ...[
-                    const SizedBox(width: 8),
-                    notificationAction!,
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
+            if (notificationAction != null) ...[
+              const SizedBox(width: 8),
+              notificationAction!,
+            ],
+          ],
         ),
       ),
     );
@@ -3870,22 +3900,27 @@ class _StationHitTarget extends StatelessWidget {
   }
 }
 
-/// G1: 노선도 역 탭 팝오버에서 "출발"/"도착"을 선택하면 [RouteDraftController]에
-/// 저장되는데, 그 결과를 노선도 상단에 얇은 2줄 오버레이로 즉시 피드백한다.
-/// draft가 비어 있으면 스스로 사라진다(빈 위젯). 지도 제스처는 오버레이 바깥에서만
-/// 일어나므로 이 오버레이는 자기 영역만 히트한다.
-class _NetworkMapRouteDraftOverlay extends StatelessWidget {
-  const _NetworkMapRouteDraftOverlay({
-    required this.controller,
+/// #1933 요구 2: 출발/도착이 하나라도 차면 상단바 "자체"가 이 2줄 출발/도착
+/// 입력으로 변신한다(참고 앱처럼 검색바 자리가 곧 출발/도착 입력이 됨). 아래
+/// 별도 카드를 띄우지 않는다 — 그림자/elevation 0, 라운딩 없이 하단 line
+/// 구분선과 여백으로만 depth를 준다. 무채색 잉크만.
+class _NetworkMapTopBarRouteDraft extends StatelessWidget {
+  const _NetworkMapTopBarRouteDraft({
+    required this.draft,
+    required this.onMenuTap,
     required this.onClearOrigin,
     required this.onClearDestination,
+    required this.onSwapDraft,
     this.onPickOrigin,
     this.onPickDestination,
+    super.key,
   });
 
-  final RouteDraftController controller;
+  final RouteDraft draft;
+  final VoidCallback onMenuTap;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
+  final VoidCallback onSwapDraft;
 
   /// G4: 각 칸 탭 → 역 검색 열기(같은 draft로 수렴). null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
@@ -3893,60 +3928,81 @@ class _NetworkMapRouteDraftOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: controller,
-      builder: (context, _) {
-        final draft = controller.draft;
-        if (draft.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: Material(
-            key: const Key('networkMapRouteDraftOverlay'),
-            color: EasySubwayAccessibleColors.surface,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: EasySubwayAccessibleColors.line),
+    final canSwap = draft.origin != null || draft.destination != null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 10, 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // 메뉴 버튼은 변신 후에도 그대로 유지(좌측 정체성·좌측 메뉴 접근).
+          IconButton(
+            key: const Key('networkMapMenuButton'),
+            tooltip: '메뉴',
+            onPressed: onMenuTap,
+            style: IconButton.styleFrom(
+              minimumSize: const Size.square(EasySubwayTouchTarget.general),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: EdgeInsets.zero,
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _NetworkMapRouteDraftRow(
-                    key: const Key('networkMapRouteDraftOriginRow'),
-                    isOrigin: true,
-                    station: draft.origin,
-                    fallback: '출발역을 탭하거나 검색',
-                    onClear: onClearOrigin,
-                    onPick: onPickOrigin,
-                  ),
-                  const Divider(
-                    height: 1,
-                    indent: 22,
-                    color: EasySubwayAccessibleColors.line,
-                  ),
-                  _NetworkMapRouteDraftRow(
-                    key: const Key('networkMapRouteDraftDestinationRow'),
-                    isOrigin: false,
-                    station: draft.destination,
-                    fallback: '도착역을 탭하거나 검색',
-                    onClear: onClearDestination,
-                    onPick: onPickDestination,
-                  ),
-                ],
+            icon: const Icon(Icons.menu, size: 22, color: Color(0xFF4B4B4B)),
+          ),
+          const SizedBox(width: 2),
+          // 출발/도착 2줄 입력. TalkBack 순서: 출발 먼저, 도착. 각 줄은 line
+          // 구분선으로만 나뉜다(박스/카드 금지).
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _NetworkMapRouteDraftRow(
+                  key: const Key('networkMapRouteDraftOriginRow'),
+                  isOrigin: true,
+                  station: draft.origin,
+                  fallback: '출발역을 탭하거나 검색',
+                  onClear: onClearOrigin,
+                  onPick: onPickOrigin,
+                ),
+                const Divider(
+                  height: 1,
+                  indent: 22,
+                  color: EasySubwayAccessibleColors.line,
+                ),
+                _NetworkMapRouteDraftRow(
+                  key: const Key('networkMapRouteDraftDestinationRow'),
+                  isOrigin: false,
+                  station: draft.destination,
+                  fallback: '도착역을 탭하거나 검색',
+                  onClear: onClearDestination,
+                  onPick: onPickDestination,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          // 출발/도착 맞바꾸기(⇅). 참고 앱 상단 입력바의 스왑 어포던스와 같은 원리.
+          Semantics(
+            button: true,
+            enabled: canSwap,
+            label: '출발 도착 바꾸기',
+            onTap: canSwap ? onSwapDraft : null,
+            child: ExcludeSemantics(
+              child: IconButton(
+                key: const Key('networkMapRouteDraftSwap'),
+                tooltip: '출발 도착 바꾸기',
+                onPressed: canSwap ? onSwapDraft : null,
+                icon: const Icon(Icons.swap_vert, size: 22),
+                color: EasySubwayAccessibleColors.mutedText,
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                padding: EdgeInsets.zero,
               ),
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
-/// 상단 draft 오버레이의 한 줄(출발 또는 도착). 노드 점 + 연결선 + 역명 +
+/// 변신한 상단바의 한 줄(출발 또는 도착). 노드 점 + 연결선 + 역명 +
 /// 채워졌을 때만 보이는 지우기(✕) 버튼. 무채색 잉크만 쓴다.
 class _NetworkMapRouteDraftRow extends StatelessWidget {
   const _NetworkMapRouteDraftRow({
@@ -4022,12 +4078,15 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
             label: pickSemanticsLabel,
             onTap: onPick,
             child: ExcludeSemantics(
-              child: InkWell(
+              // 탭 시 요란한 splash/highlight 사각형을 남기지 않는다(#1933 원칙).
+              // 입력 필드처럼 보이되 조용히 역 검색으로 전환.
+              child: GestureDetector(
                 key: Key(
                   isOrigin
                       ? 'networkMapRouteDraftPickOrigin'
                       : 'networkMapRouteDraftPickDestination',
                 ),
+                behavior: HitTestBehavior.opaque,
                 onTap: onPick,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 48),
