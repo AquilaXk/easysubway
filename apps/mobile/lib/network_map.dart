@@ -1699,75 +1699,136 @@ class _NetworkMapTopBar extends StatelessWidget {
       triggerBox.size.bottomRight(Offset.zero),
       ancestor: overlayBox,
     );
-    final position = RelativeRect.fromLTRB(
-      topRight.dx,
-      topRight.dy,
-      0,
-      0,
+    final topY = topRight.dy;
+    await showGeneralDialog<String>(
+      context: triggerContext,
+      barrierDismissible: true,
+      barrierLabel: '지역 메뉴 닫기',
+      barrierColor: Colors.transparent,
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.of(context).pop(),
+                child: const SizedBox.expand(),
+              ),
+            ),
+            Positioned(
+              top: topY,
+              right: 0,
+              child: _NetworkMapRegionMenuOverlay(
+                availableRegions: availableRegions,
+                selectedRegion: selectedRegion,
+                onRegionSelected: onRegionSelected,
+              ),
+            ),
+          ],
+        );
+      },
     );
-    final items = <PopupMenuEntry<String>>[];
+  }
+}
+
+class _NetworkMapRegionMenuOverlay extends StatelessWidget {
+  const _NetworkMapRegionMenuOverlay({
+    required this.availableRegions,
+    required this.selectedRegion,
+    required this.onRegionSelected,
+  });
+
+  final List<NetworkMapRegion> availableRegions;
+  final String selectedRegion;
+  final ValueChanged<String> onRegionSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
     for (var i = 0; i < availableRegions.length; i++) {
       final region = availableRegions[i];
       final isSelected = region.name == selectedRegion;
-      items.add(
-        PopupMenuItem<String>(
-          value: region.name,
-          height: 48,
-          child: Semantics(
-            selected: isSelected,
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 20,
-                  child: isSelected
-                      ? const Icon(
-                          Icons.check,
-                          color: EasySubwayAccessibleColors.primary,
-                          size: 20,
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    region.displayName,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.listRowText,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
+      rows.add(
+        InkWell(
+          key: ValueKey('networkMapRegionMenuRow_${region.name}'),
+          splashFactory: NoSplash.splashFactory,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          onTap: () {
+            onRegionSelected(region.name);
+            Navigator.of(context).pop();
+          },
+          child: SizedBox(
+            height: 48,
+            child: Semantics(
+              button: true,
+              selected: isSelected,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    child: isSelected
+                        ? const Icon(
+                            Icons.check,
+                            color: EasySubwayAccessibleColors.mutedText,
+                            size: 20,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      region.displayName,
+                      style: const TextStyle(
+                        color: EasySubwayAccessibleColors.listRowText,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       );
       if (i != availableRegions.length - 1) {
-        items.add(
-          const PopupMenuDivider(
-            height: 1,
-            color: EasySubwayAccessibleColors.line,
-          ),
-        );
+        rows.add(const _NetworkMapRegionMenuDivider());
       }
     }
-    final selected = await showMenu<String>(
-      context: triggerContext,
-      position: position,
-      color: EasySubwayAccessibleColors.surface,
-      elevation: 0,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(EasySubwayRadius.control),
-        side: const BorderSide(color: EasySubwayAccessibleColors.line),
-      ),
+    return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 180),
-      items: items,
+      child: IntrinsicWidth(
+        child: Material(
+          elevation: 0,
+          color: EasySubwayAccessibleColors.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: EasySubwayAccessibleColors.line),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(EasySubwayRadius.control),
+              bottomLeft: Radius.circular(EasySubwayRadius.control),
+              topRight: Radius.zero,
+              bottomRight: Radius.zero,
+            ),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: rows),
+        ),
+      ),
     );
-    if (selected != null) {
-      onRegionSelected(selected);
-    }
+  }
+}
+
+class _NetworkMapRegionMenuDivider extends StatelessWidget {
+  const _NetworkMapRegionMenuDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('networkMapRegionMenuDivider'),
+      height: 1,
+      color: EasySubwayAccessibleColors.line,
+    );
   }
 }
 

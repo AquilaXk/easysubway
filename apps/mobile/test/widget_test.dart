@@ -1307,11 +1307,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // 구분선: 지역 2개 → 행 사이 구분선은 정확히 1개(마지막 행 뒤에는 없음).
-    final dividerFinder = find.byType(PopupMenuDivider);
+    final dividerFinder = find.byKey(
+      const Key('networkMapRegionMenuDivider'),
+    );
     expect(dividerFinder, findsOneWidget);
-    final divider = tester.widget<PopupMenuDivider>(dividerFinder);
+    final divider = tester.widget<Container>(dividerFinder);
     expect(divider.color, EasySubwayAccessibleColors.line);
-    expect(divider.height, 1);
+    expect(tester.getSize(dividerFinder).height, 1);
 
     // 메뉴 패널의 Material은 '부산' 텍스트의 조상 중 실제로 color/elevation/shape가
     // 세팅된 것(내부 wrapper Material은 color가 null이라 구분해야 함).
@@ -1332,18 +1334,26 @@ void main() {
     // right=0으로 설정하여 overlay 우측과 일치시킨다.
     final screenWidth = tester.view.physicalSize.width /
         tester.view.devicePixelRatio;
-    expect(menuRect.right, greaterThanOrEqualTo(screenWidth - 12));
+    expect(menuRect.right, closeTo(screenWidth, 1.0));
 
-    // 표면 스타일: 흰 표면, elevation 0, 라운드 8 + line 색 테두리.
+    // 표면 스타일: 흰 표면, elevation 0, 라운드 8(좌측만) + line 색 테두리.
     expect(menuMaterialElement.elevation, 0);
     expect(menuMaterialElement.color, EasySubwayAccessibleColors.surface);
     final shape = menuMaterialElement.shape as RoundedRectangleBorder;
-    expect(shape.borderRadius, BorderRadius.circular(8));
+    expect(
+      shape.borderRadius,
+      const BorderRadius.only(
+        topLeft: Radius.circular(8),
+        bottomLeft: Radius.circular(8),
+        topRight: Radius.zero,
+        bottomRight: Radius.zero,
+      ),
+    );
     expect((shape.side.color), EasySubwayAccessibleColors.line);
 
     // 행 높이 48 이상 + 메뉴 최소 폭 180 이상.
     final rowSize = tester.getSize(
-      find.widgetWithText(PopupMenuItem<String>, '부산'),
+      find.byKey(const ValueKey('networkMapRegionMenuRow_부산')),
     );
     expect(rowSize.height, greaterThanOrEqualTo(48));
     expect(menuRect.width, greaterThanOrEqualTo(180));
