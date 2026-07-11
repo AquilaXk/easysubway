@@ -81,21 +81,56 @@ class LocalRouteRepository implements RouteSearchRepository {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
     final mobilityType = _mobilityType(request.mobilityType);
     final constraintMode = _constraintMode(request.effectiveConstraintMode);
-    final result =
+    final blocksStrict =
         mobilityType.blocksStairOnlyAccess(constraintMode) &&
-            !catalog.strictEvidenceSupported
-        ? local.LocalRouteResult.unknown(const ['STRICT_EVIDENCE_UNSUPPORTED'])
-        : LocalRouteEngine(graph: catalog.toGraph()).search(
-            local.RouteRequest(
-              originStationId: request.originStationId,
-              destinationStationId: request.destinationStationId,
-              mobilityType: mobilityType,
-              constraintMode: constraintMode,
-              searchMode: local
-                  .RouteSearchMode
-                  .stationToStationWithOutOfStationTransfers,
-            ),
-          );
+        !catalog.strictEvidenceSupported;
+    final waypointStationId = request.waypointStationId?.trim();
+    final local.LocalRouteResult result;
+    if (waypointStationId == null || waypointStationId.isEmpty) {
+      result = blocksStrict
+          ? local.LocalRouteResult.unknown(const [
+              'STRICT_EVIDENCE_UNSUPPORTED',
+            ])
+          : LocalRouteEngine(graph: catalog.toGraph()).search(
+              local.RouteRequest(
+                originStationId: request.originStationId,
+                destinationStationId: request.destinationStationId,
+                mobilityType: mobilityType,
+                constraintMode: constraintMode,
+                searchMode: local
+                    .RouteSearchMode
+                    .stationToStationWithOutOfStationTransfers,
+              ),
+            );
+    } else if (blocksStrict) {
+      result = local.LocalRouteResult.unknown(const [
+        'STRICT_EVIDENCE_UNSUPPORTED',
+      ]);
+    } else {
+      final graphSnapshot = catalog.toGraph();
+      final engine = LocalRouteEngine(graph: graphSnapshot);
+      final first = engine.search(
+        local.RouteRequest(
+          originStationId: request.originStationId,
+          destinationStationId: waypointStationId,
+          mobilityType: mobilityType,
+          constraintMode: constraintMode,
+          searchMode:
+              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+        ),
+      );
+      final second = engine.search(
+        local.RouteRequest(
+          originStationId: waypointStationId,
+          destinationStationId: request.destinationStationId,
+          mobilityType: mobilityType,
+          constraintMode: constraintMode,
+          searchMode:
+              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+        ),
+      );
+      result = mergeWaypointRouteResults(first, second);
+    }
 
     final plannedArrivals = await _plannedRideArrivals(result, catalog);
     return _toRouteSearchResult(
@@ -553,6 +588,134 @@ class LocalRouteRepository implements RouteSearchRepository {
       _ => throw const RouteSearchException('지원하지 않는 이동 제약 조건입니다.'),
     };
   }
+}
+
+/// 경유역 지원 1단계: 출발→경유, 경유→도착 두 구간의 탐색 결과를 하나로 합성한다.
+/// 두 구간이 모두 성공(found)일 때만 경로를 이어 붙이고, 그 사이에 경계 마커
+/// 스텝을 삽입해 후단 collapse가 서로 다른 구간의 승차를 병합하지 못하게 한다.
+/// 한쪽이라도 성공이 아니면 더 나쁜 상태를 보수적으로 채택한다.
+///
+/// 테스트에서 순수 병합 로직을 직접 검증할 수 있도록 최상위 public 함수로 노출한다
+/// (이 파일의 최상위 private 함수는 외부 테스트에서 접근할 수 없다).
+local.LocalRouteResult mergeWaypointRouteResults(
+  local.LocalRouteResult first,
+  local.LocalRouteResult second,
+) {
+  final mergedCodes = _dedupInOrder([
+    ...first.blockedReasonCodes,
+    ...second.blockedReasonCodes,
+  ]);
+  final mergedWarnings = _dedupWarningsInOrder([
+    ...first.warnings,
+    ...second.warnings,
+  ]);
+
+  final worstRank = _routeStatusRank(first.status) <=
+          _routeStatusRank(second.status)
+      ? _routeStatusRank(first.status)
+      : _routeStatusRank(second.status);
+
+  if (worstRank != _routeStatusRank(local.RouteStatus.found)) {
+    final worseStatus =
+        _routeStatusRank(first.status) <= _routeStatusRank(second.status)
+        ? first.status
+        : second.status;
+    return local.LocalRouteResult(
+      status: worseStatus,
+      totalCost: 0,
+      steps: const [],
+      warnings: mergedWarnings,
+      blockedReasonCodes: mergedCodes,
+    );
+  }
+
+  final boundaryNodeId = first.steps.isNotEmpty
+      ? first.steps.last.toNodeId
+      : (second.steps.isNotEmpty ? second.steps.first.fromNodeId : '');
+  final boundary = route_step.RouteStep(
+    sequence: 0,
+    edgeId: 'waypoint-boundary',
+    fromNodeId: boundaryNodeId,
+    toNodeId: boundaryNodeId,
+    type: route_step.RouteStepType.waypoint,
+    cost: 0,
+    durationSeconds: 0,
+    distanceMeters: 0,
+  );
+
+  final flat = <route_step.RouteStep>[
+    ...first.steps,
+    boundary,
+    ...second.steps,
+  ];
+  final renumbered = <route_step.RouteStep>[];
+  for (var index = 0; index < flat.length; index += 1) {
+    final step = flat[index];
+    renumbered.add(
+      route_step.RouteStep(
+        sequence: index + 1,
+        edgeId: step.edgeId,
+        fromNodeId: step.fromNodeId,
+        toNodeId: step.toNodeId,
+        type: step.type,
+        cost: step.cost,
+        durationSeconds: step.durationSeconds,
+        distanceMeters: step.distanceMeters,
+        lineId: step.lineId,
+        servicePattern: step.servicePattern,
+        transferStationId: step.transferStationId,
+        includesStairs: step.includesStairs,
+        stairAccessState: step.stairAccessState,
+        evidenceSources: step.evidenceSources,
+        timeSource: step.timeSource,
+        distanceSource: step.distanceSource,
+        confidenceLabel: step.confidenceLabel,
+      ),
+    );
+  }
+
+  return local.LocalRouteResult(
+    status: local.RouteStatus.found,
+    totalCost: first.totalCost + second.totalCost,
+    steps: renumbered,
+    warnings: mergedWarnings,
+    blockedReasonCodes: mergedCodes,
+  );
+}
+
+/// 상태 병합 우선순위. 낮을수록 나쁜(=우선 채택되는) 상태다.
+int _routeStatusRank(local.RouteStatus status) {
+  return switch (status) {
+    local.RouteStatus.blocked => 0,
+    local.RouteStatus.error => 1,
+    local.RouteStatus.unsupported => 1,
+    local.RouteStatus.unknown => 2,
+    local.RouteStatus.found => 3,
+  };
+}
+
+List<String> _dedupInOrder(List<String> codes) {
+  final seen = <String>{};
+  final result = <String>[];
+  for (final code in codes) {
+    if (seen.add(code)) {
+      result.add(code);
+    }
+  }
+  return result;
+}
+
+List<local.RouteWarning> _dedupWarningsInOrder(
+  List<local.RouteWarning> warnings,
+) {
+  final seen = <String>{};
+  final result = <local.RouteWarning>[];
+  for (final warning in warnings) {
+    if (seen.add(warning.code)) {
+      result.add(warning);
+    }
+  }
+  return result;
 }
 
 List<route_step.RouteStep> _collapseConsecutiveRideSteps(

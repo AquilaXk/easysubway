@@ -12,6 +12,7 @@ enum RouteStepType {
   escalator,
   facilityConnector,
   internal,
+  waypoint,
 }
 
 class RouteStep {
