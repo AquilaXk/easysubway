@@ -70,7 +70,7 @@ void main() {
       expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
       expect(
         Theme.of(homeContext).colorScheme.primary,
-        const Color(0xFF003D40),
+        const Color(0xFF1A1D1E),
       );
       expect(
         Theme.of(homeContext).textTheme.bodyLarge?.fontWeight,

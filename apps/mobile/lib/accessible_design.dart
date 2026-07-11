@@ -31,9 +31,22 @@ class EasySubwayAccessibleColors {
   /// 구분선·얇은 테두리.
   static const line = Color(0xFFDBE3E9);
 
-  // --- 브랜드 액센트 (1계열) ---
-  /// 앱 전체 단일 브랜드 액센트.
-  static const primary = Color(0xFF006D77);
+  /// 목록 행 라벨 (기준 화면 좌측 메뉴의 행 텍스트 톤).
+  static const listRowText = Color(0xFF1E3234);
+
+  /// 섹션 캡션·부제 (기준 화면 좌측 메뉴의 섹션 톤).
+  static const caption = Color(0xFF7C949A);
+
+  /// 보조 아이콘 (기준 화면 검색바 아이콘 톤).
+  static const iconMuted = Color(0xFF8A9AA0);
+
+  /// 셰브런·디스클로저·비활성 아이콘.
+  static const disclosure = Color(0xFFB0BEC5);
+
+  // --- 브랜드 액센트 (무채색 잉크 1계열) ---
+  /// 앱 전체 단일 브랜드 액센트. 초록(teal) 대신 무채색 차콜 잉크로 통일한다.
+  /// 화면의 유채색은 노선 색(데이터)뿐이며, 액센트는 CTA·선택·링크에만 쓴다.
+  static const primary = Color(0xFF2A2F31);
 
   /// 과거 navy 액센트. 단일 브랜드 액센트로 통일했다. 신규 코드는 [primary] 사용.
   static const brand = primary;
@@ -61,6 +74,9 @@ class EasySubwayAccessibleColors {
   /// 주의 상태 배경 틴트.
   static const amberSoft = Color(0xFFFFF0D1);
 
+  /// 주의 상태 테두리.
+  static const amberBorder = Color(0xFFF1D49A);
+
   // --- 상태색: 고장·오류 (danger) ---
   /// 고장·오류 상태 텍스트/아이콘.
   static const red = Color(0xFFB42318);
@@ -87,10 +103,19 @@ class EasySubwayAccessibleColors {
   /// 스위치 꺼짐 트랙.
   static const switchInactiveTrack = Color(0xFFC8D3DC);
 
+  // --- 지도 오버레이 전용 ---
+  // 지도 배경 시인성 때문에 브랜드 액센트로 수렴하지 않는다 (기준 화면 실측 값).
+
+  /// 지도 위 선택 역 말풍선 톤(밝은 시안).
+  static const mapSelectionAccent = Color(0xFF13B8D6);
+
+  /// 지도 위 지역 선택 칩 톤(밝은 블루).
+  static const mapRegionAccent = Color(0xFF006FD6);
+
   // --- 고대비 모드 ---
   static const highContrastText = Color(0xFF000000);
-  static const highContrastPrimary = Color(0xFF003D40);
-  static const highContrastSecondary = Color(0xFF005E68);
+  static const highContrastPrimary = Color(0xFF1A1D1E);
+  static const highContrastSecondary = Color(0xFF3A4143);
 }
 
 class EasySubwayTouchTarget {
