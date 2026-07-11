@@ -1753,16 +1753,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           unawaited(_searchNearby());
         }
       });
-    } else {
-      // 검색 진입은 화면을 여는 즉시 입력 모드로 들어간다: 별도 타이틀 화면 없이
-      // 바로 키보드가 뜬다. 가까운 역 진입은 위치 조회를 먼저 하므로 포커스를
-      // 가로채지 않는다.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          FocusScope.of(context).requestFocus(_searchFocusNode);
-        }
-      });
     }
+    // 검색 진입은 화면을 여는 즉시 입력 모드로 들어간다(별도 타이틀 화면 없이 바로
+    // 키보드가 뜬다). 이 즉시 포커스는 검색 필드의 autofocus: !isNearbyEntry 가
+    // 담당하므로 여기서 별도 requestFocus 는 두지 않는다. 가까운 역 진입은 위치
+    // 조회를 먼저 하고 autofocus 도 꺼져 포커스를 가로채지 않는다.
   }
 
   @override
@@ -1863,6 +1858,16 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       ),
       onSubmitted: _submit,
     );
+    // 검색 입력 필드는 v4에서 idle/active 픽셀을 통일한 고정 레이아웃이라 AppBar
+    // 기본 toolbarHeight(56)에 그대로 넣으면 시스템 글자 크기를 키웠을 때 필드가
+    // 세로로 잘린다. 입력 텍스트(fontSize 17 × height 1.3)와 상하 contentPadding
+    // (각 sm=8)을 현재 텍스트 배율로 환산해 필요한 높이를 구하고, 기본 높이보다
+    // 작아지지 않게 clamp 해 툴바를 늘린다(축소는 하지 않아 기본 배율의 레이아웃은
+    // 불변). titleSpacing·즉시 입력·뒤로가기 leading 동작은 유지된다.
+    final textScaler = MediaQuery.textScalerOf(context);
+    final scaledInputHeight =
+        textScaler.scale(17 * 1.3) + 2 * EasySubwaySpacing.sm;
+    final toolbarHeight = math.max(kToolbarHeight, scaledInputHeight);
     final recentSearchSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -1950,7 +1955,11 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       // 큰 타이틀 화면(예: "역 검색")을 없애고 입력 필드 자체가 헤더가 된다. 열리는
       // 즉시 입력 모드로 들어가 탭 두 번을 요구하던 랜딩 단계를 지운다. 뒤로가기는
       // AppBar 기본 leading을 그대로 쓴다(자동 back 버튼 → 입력 필드 순서 유지).
-      appBar: AppBar(titleSpacing: 0, title: searchInputField),
+      appBar: AppBar(
+        titleSpacing: 0,
+        toolbarHeight: toolbarHeight,
+        title: searchInputField,
+      ),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: Semantics(
         container: true,
@@ -2679,14 +2688,28 @@ class _StationSearchResultTile extends StatelessWidget {
     return Column(
       children: [
         for (var i = 0; i < lines.length; i++)
-          _StationSearchResultLineRow(
-            // 첫 행에만 대표 키를 두어 기존 테스트가 단일 위젯을 찾도록 한다.
-            key: i == 0 ? Key('stationSearchResult-${result.id}') : null,
-            stationName: stationName,
-            line: lines[i],
-            semanticLabel: '$stationName, ${lines[i].name}, 선택',
-            onTap: onTap,
-          ),
+          // 한 역이 여러 노선을 지나면 시각적으로는 노선마다 한 행씩 펼치지만,
+          // 각 행이 "역명, 노선명, 선택" 버튼 시맨틱을 노출하면 스크린리더에 같은
+          // 선택 버튼이 노선 수만큼 뜬다. 첫 행만 시맨틱 버튼으로 남기고 이후
+          // 행들은 ExcludeSemantics 로 감싸 시각 렌더만 유지한다.
+          if (i == 0)
+            _StationSearchResultLineRow(
+              // 첫 행에만 대표 키를 두어 기존 테스트가 단일 위젯을 찾도록 한다.
+              key: Key('stationSearchResult-${result.id}'),
+              stationName: stationName,
+              line: lines[i],
+              semanticLabel: '$stationName, ${lines[i].name}, 선택',
+              onTap: onTap,
+            )
+          else
+            ExcludeSemantics(
+              child: _StationSearchResultLineRow(
+                stationName: stationName,
+                line: lines[i],
+                semanticLabel: '$stationName, ${lines[i].name}, 선택',
+                onTap: onTap,
+              ),
+            ),
       ],
     );
   }

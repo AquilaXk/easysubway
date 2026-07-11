@@ -6274,14 +6274,17 @@ void main() {
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
       expect(find.text('출처 확인 필요'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
-      // 각 행 시맨틱은 자신의 노선 하나만 담아 "역명, 노선명, 선택" 형태다.
+      // 다중 노선 역은 시각적으로 노선마다 한 행씩 펼치지만(배지 2개), 선택 버튼
+      // 시맨틱은 첫 행만 노출한다 — 스크린리더에 같은 선택 버튼이 노선 수만큼
+      // 중복되지 않도록 이후 행은 ExcludeSemantics 로 감싼다. 첫 행 라벨만 존재하고
+      // 두 번째 노선 라벨은 시맨틱 트리에 없다.
       expect(
         find.bySemanticsLabel('상록수역, 수도권 4호선, 선택'),
         findsOneWidget,
       );
       expect(
         find.bySemanticsLabel('상록수역, 경의중앙선, 선택'),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         tester.getSemantics(find.bySemanticsLabel('상록수역, 수도권 4호선, 선택')),
@@ -6402,6 +6405,71 @@ void main() {
       findsNothing,
     );
     // 품질 문구 "일부 정보는 확인 중이에요"는 별도 semantic label 테스트에서 유지한다.
+  });
+
+  testWidgets('역 검색 화면 AppBar 입력 필드는 시스템 글자 크기를 키워도 잘리지 않는다', (
+    tester,
+  ) async {
+    // #1962: StationSearchScreen 의 검색 입력 필드는 v4에서 idle/active 픽셀을
+    // 통일한 고정 레이아웃이라 AppBar 기본 toolbarHeight(56)에 그대로 넣으면 큰
+    // 글자 배율에서 세로로 잘린다. 툴바 높이가 배율에 맞춰 늘어나 오버플로 없이
+    // 필드가 온전히 보이는지 검증한다. 둘러보기 주변 역 메뉴로 실제 검색 화면을 연다.
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 230,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+        child: EasySubwayApp(
+          repository: repository,
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          locationProvider: locationProvider,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapMenuNearbyButton')));
+    await tester.pumpAndSettle();
+
+    // 렌더 중 RenderFlex 오버플로 등 예외가 발생하지 않아야 한다.
+    expect(tester.takeException(), isNull);
+
+    final inputFinder = find.byKey(const Key('stationSearchInput'));
+    expect(inputFinder, findsOneWidget);
+
+    // 검색 입력 필드를 담은 AppBar 를 찾아 툴바 높이가 큰 글자 배율에서 기본
+    // 높이(56)보다 커졌는지 확인한다.
+    final appBarFinder = find.ancestor(
+      of: inputFinder,
+      matching: find.byType(AppBar),
+    );
+    expect(appBarFinder, findsOneWidget);
+    final appBar = tester.widget<AppBar>(appBarFinder);
+    expect(appBar.toolbarHeight, isNotNull);
+    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
+
+    // 입력 필드가 툴바(AppBar) 세로 범위 안에 온전히 들어간다(아래로 잘리지 않는다).
+    final appBarRect = tester.getRect(appBarFinder);
+    final inputRect = tester.getRect(inputFinder);
+    expect(inputRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
+    expect(inputRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
   });
 
   testWidgets('#1933 홈 in-place 검색 결과 탭은 역을 지도에서 포커스하고 하단 팝오버를 연다', (

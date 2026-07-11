@@ -230,7 +230,7 @@ void main() {
     expect(overlayFiles, isNotEmpty, reason: 'showGeneralDialog 사용 파일이 없다');
 
     final materialPattern = RegExp(r'\bMaterial\(');
-    final elevationZeroPattern = RegExp(r'elevation:\s*0\b');
+    final elevationZeroPattern = RegExp(r'elevation:\s*0(?![\d.])');
 
     final violations = <String>[];
     for (final filePath in overlayFiles) {

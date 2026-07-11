@@ -552,14 +552,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       searchQueryController: _searchQueryController,
       stationSearchRepository: searchRepository,
       searchHistoryRepository: widget.searchHistoryRepository,
-      reportRepository: widget.reportRepository,
-      favoriteRepository: widget.favoriteRepository,
-      realtimeRepository: widget.realtimeRepository,
       locationProvider: widget.locationProvider,
-      facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
-      internalRouteRepository: widget.internalRouteRepository,
-      internalRouteMobilityType: widget.internalRouteMobilityType,
-      routeDraftController: widget.routeDraftController,
     );
   }
 
@@ -1917,28 +1910,14 @@ class _NetworkMapSearchSession extends StatefulWidget {
     required this.searchQueryController,
     required this.stationSearchRepository,
     required this.searchHistoryRepository,
-    required this.reportRepository,
-    required this.favoriteRepository,
-    required this.realtimeRepository,
     required this.locationProvider,
-    required this.facilityReportDraftTargetStore,
-    required this.internalRouteRepository,
-    required this.internalRouteMobilityType,
-    required this.routeDraftController,
   });
 
   final ValueChanged<StationSearchResult> onResultFocus;
   final TextEditingController searchQueryController;
   final StationSearchRepository stationSearchRepository;
   final SearchHistoryRepository? searchHistoryRepository;
-  final FacilityReportRepository? reportRepository;
-  final FavoriteStationRepository? favoriteRepository;
-  final RealtimeRepository? realtimeRepository;
   final CurrentLocationProvider? locationProvider;
-  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
-  final InternalRouteRepository? internalRouteRepository;
-  final String internalRouteMobilityType;
-  final RouteDraftController routeDraftController;
 
   @override
   State<_NetworkMapSearchSession> createState() =>
