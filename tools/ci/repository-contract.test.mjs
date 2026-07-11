@@ -45,7 +45,7 @@ function collapseQuotedStringConcatenations(source) {
 function containsAdEventEndpoint(source) {
   // ponytail: literal/quoted-concat endpoint만 탐지한다. 새 interpolation/variable 광고 endpoint를
   // 허용해야 할 때는 regex를 넓히지 말고 Dart AST 기반 검사로 교체한다.
-  return /\/api\/ads\/events\b/.test(collapseQuotedStringConcatenations(source));
+  return /(["'])\/api\/ads\/events\1/.test(collapseQuotedStringConcatenations(source));
 }
 
 function mobileAdEventSenderFiles(
@@ -61,10 +61,11 @@ function mobileAdEventSenderFiles(
 }
 
 function assertAnonymousAdEventPostCall(source) {
-  const endpointCount = (collapseQuotedStringConcatenations(source).match(/\/api\/ads\/events\b/g) ?? []).length;
+  const normalizedSource = collapseQuotedStringConcatenations(source);
+  const endpointCount = (normalizedSource.match(/(["'])\/api\/ads\/events\1/g) ?? []).length;
   assert.equal(endpointCount, 1, "ad event repository must contain exactly one endpoint");
 
-  const adEventCall = source.match(
+  const adEventCall = normalizedSource.match(
     /postJson\(\s*(["'])\/api\/ads\/events\1\s*,\s*body:\s*\{(?<body>[\s\S]*?)\}\s*,?\s*\)/,
   );
   assert.ok(adEventCall?.groups, "ad event postJson call must contain only an inline body argument");
@@ -2841,6 +2842,8 @@ test("광고 event sender detector는 직접 endpoint와 quoted-string 연결을
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/events')"), true);
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/' + 'events')"), true);
   assert.equal(containsAdEventEndpoint('postJson("/api/ads/" + "events")'), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events-v2')"), false);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events/summary')"), false);
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/active')"), false);
   const sources = new Map([
     ["apps/mobile/lib/manual.dart", "postJson('/api/ads/events')"],
@@ -2865,6 +2868,9 @@ test("광고 event POST detector는 정확한 익명 세 필드 외 body와 iden
     )
   `;
   assert.doesNotThrow(() => assertAnonymousAdEventPostCall(validCall));
+  assert.doesNotThrow(() =>
+    assertAnonymousAdEventPostCall(validCall.replace("'/api/ads/events'", "'/api/ads/' + 'events'")),
+  );
 
   for (const unsafeCall of [
     validCall.replace("'eventType': eventType.wireValue,", "'eventType': eventType.wireValue,\n        'deviceId': deviceId,"),
