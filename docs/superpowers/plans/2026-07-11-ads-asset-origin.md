@@ -122,6 +122,7 @@ Expected: one commit containing only the five listed files.
 
 **Files:**
 - Modify: `tools/ci/backend-deploy.test.mjs:13-135`
+- Test: `tools/ci/repository-contract.test.mjs:1245-1300`
 - Modify: `tools/deploy/prepare-deployment-env.sh:92-180`
 
 **Interfaces:**
@@ -274,6 +275,14 @@ Expected: both ad asset-origin tests pass; invalid cases reject without echoing 
 
 - [ ] **Step 5: Run the complete local contract verification**
 
+The repository contract uses a hardcoded deployment env fixture. Since Task 1 makes the new key required, add the same visibly test-only origin to `deploymentEnvLines` after `EASYSUBWAY_REPORT_API_BASE_URL`:
+
+```js
+"EASYSUBWAY_ADS_ASSET_ORIGIN=https://ads-assets.fixture.easysubway.example",
+```
+
+This fixture-only update keeps the integration contract aligned without introducing an actual production origin.
+
 Run each command and retain its exit status:
 
 ```bash
@@ -305,16 +314,16 @@ git diff --name-only fb9d3e29
 git diff fb9d3e29 -- . ':!docs/superpowers/specs/**' ':!docs/superpowers/plans/**' | rg -n 'https://[^[:space:]`"]+' || true
 ```
 
-Expected: implementation changes are limited to `.env.example`, `contracts/env/env-scope-map.json`, `tools/ci/backend-deploy.test.mjs`, `tools/ci/fixtures/deployment-prod-valid.env`, `tools/deploy/backend-app-env.allowlist`, and `tools/deploy/prepare-deployment-env.sh`. URL matches are existing or visibly test-only; there is no actual production origin. README, Java, Compose, storage, and upload paths are absent.
+Expected: implementation changes are limited to `.env.example`, `contracts/env/env-scope-map.json`, `tools/ci/backend-deploy.test.mjs`, `tools/ci/fixtures/deployment-prod-valid.env`, `tools/ci/repository-contract.test.mjs`, `tools/deploy/backend-app-env.allowlist`, and `tools/deploy/prepare-deployment-env.sh`. URL matches are existing or visibly test-only; there is no actual production origin. README, Java, Compose, storage, and upload paths are absent.
 
 - [ ] **Step 8: Commit the fail-closed preflight**
 
 ```bash
-git add tools/ci/backend-deploy.test.mjs tools/deploy/prepare-deployment-env.sh
+git add tools/ci/backend-deploy.test.mjs tools/ci/repository-contract.test.mjs tools/deploy/prepare-deployment-env.sh
 git commit -m "feat(deploy): 광고 asset origin preflight 강화 (#1960)"
 ```
 
-Expected: a second implementation commit containing only the test and deployment script.
+Expected: a second implementation commit containing only the focused test, repository contract fixture, and deployment script.
 
 ## Risk A Review and Deployment Handoff
 
