@@ -39,6 +39,7 @@ import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_secure_key_value_storage.dart';
@@ -314,6 +315,16 @@ void main() {
   // 상대 확인 시점을 쓰는 테스트가 기준 시각을 고정한 뒤 항상 원래대로 되돌린다.
   tearDown(() {
     debugStationVerifiedClock = DateTime.now;
+  });
+
+  // #1951: 노선도 canvas와 데이터 출처 화면이 같은 datapack manifest asset을 각각
+  // rootBundle로 로드한다. rootBundle의 문자열 캐시는 테스트 간에 유지되므로, 앞선
+  // 테스트에서 manifest가 캐시에 적재되면 뒤 테스트의 FutureBuilder 완료 스케줄이
+  // 바뀌어(캐시 히트 시 microtask로 즉시 완료) 순서 의존 회귀가 생긴다. 각 테스트가
+  // cold 캐시에서 시작하도록 rootBundle과 모듈 attribution 캐시를 초기화한다.
+  tearDown(() {
+    rootBundle.clear();
+    resetNetworkMapAttributionCacheForTest();
   });
 
   testWidgets('홈에서 내 신고 화면으로 이동한다', (tester) async {
