@@ -374,13 +374,11 @@ void main() {
   testWidgets('이미 만료된 creative는 decode, render, impression을 모두 생략한다', (
     tester,
   ) async {
+    final now = DateTime.utc(2026, 7, 12, 1);
     final client = _StubApiClient(
       Future.value(
         _creativeResponse(
-          endsAt: DateTime.now()
-              .toUtc()
-              .subtract(const Duration(seconds: 1))
-              .toIso8601String(),
+          endsAt: now.subtract(const Duration(seconds: 1)).toIso8601String(),
         ),
       ),
     );
@@ -392,6 +390,7 @@ void main() {
         decodeCalls++;
         return _image;
       },
+      now: () => now,
     );
     await tester.pump();
 
@@ -401,25 +400,22 @@ void main() {
   });
 
   testWidgets('미래 endsAt에 즉시 collapse하고 자동 refetch하지 않는다', (tester) async {
+    var now = DateTime.utc(2026, 7, 12, 1);
+    final endsAt = now.add(const Duration(seconds: 5));
     final client = _StubApiClient(
-      Future.value(
-        _creativeResponse(
-          endsAt: DateTime.now()
-              .toUtc()
-              .add(const Duration(seconds: 5))
-              .toIso8601String(),
-        ),
-      ),
+      Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
     );
     await _pumpBanner(
       tester,
       repository: AdRepository(client),
       imageLoader: (_, _) async => _image,
+      now: () => now,
     );
     await tester.pump();
     await tester.pump();
     expect(find.byType(AdBannerSlot), findsOneWidget);
 
+    now = endsAt;
     await tester.pump(const Duration(seconds: 5));
 
     expect(find.byType(AdBannerSlot), findsNothing);
@@ -473,14 +469,14 @@ void main() {
     'widget 교체는 이전 expiry Timer를 cancel하고 dispose 뒤 callback을 남기지 않는다',
     (tester) async {
       const bannerKey = ValueKey('expiry-generation-banner');
+      var now = DateTime.utc(2026, 7, 12, 1);
+      final firstEndsAt = now.add(const Duration(seconds: 5));
+      final replacementEndsAt = now.add(const Duration(hours: 1));
       final firstClient = _StubApiClient(
         Future.value(
           _creativeResponse(
             advertiserName: '이전 광고',
-            endsAt: DateTime.now()
-                .toUtc()
-                .add(const Duration(seconds: 5))
-                .toIso8601String(),
+            endsAt: firstEndsAt.toIso8601String(),
           ),
         ),
       );
@@ -489,6 +485,7 @@ void main() {
         bannerKey: bannerKey,
         repository: AdRepository(firstClient),
         imageLoader: (_, _) async => _image,
+        now: () => now,
       );
       await tester.pump();
       await tester.pump();
@@ -497,10 +494,7 @@ void main() {
         Future.value(
           _creativeResponse(
             advertiserName: '현재 광고',
-            endsAt: DateTime.now()
-                .toUtc()
-                .add(const Duration(hours: 1))
-                .toIso8601String(),
+            endsAt: replacementEndsAt.toIso8601String(),
           ),
         ),
       );
@@ -509,15 +503,18 @@ void main() {
         bannerKey: bannerKey,
         repository: AdRepository(replacementClient),
         imageLoader: (_, _) async => _image,
+        now: () => now,
       );
       await tester.pump();
       await tester.pump();
+      now = firstEndsAt;
       await tester.pump(const Duration(seconds: 5));
 
       expect(find.text('현재 광고'), findsOneWidget);
       expect(find.text('이전 광고'), findsNothing);
 
       await tester.pumpWidget(const SizedBox.shrink());
+      now = replacementEndsAt;
       await tester.pump(const Duration(hours: 1));
       expect(tester.takeException(), isNull);
     },

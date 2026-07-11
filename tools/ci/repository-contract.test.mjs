@@ -2948,15 +2948,13 @@ test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를
   assert.equal(postPublishE2e.approval.decision, "DEFER_UNTIL_PLAY_STORE_PUBLICATION");
   assert.match(postPublishE2e.execution.assigneeKo, /\S/);
   assert.match(postPublishE2e.execution.deadlineAfterPublicRelease, /^P(?=\d|T\d)/);
-  const allowedStatuses = new Set(["DEFERRED_UNTIL_PUBLIC_RELEASE", "READY_TO_EXECUTE", "COMPLETED"]);
-  const allowedResults = new Set(["PENDING", "PASS", "FAIL", "BLOCKED_EXTERNAL"]);
-  assert.ok(allowedStatuses.has(postPublishE2e.execution.status));
-  assert.ok(allowedResults.has(postPublishE2e.execution.result));
+  assert.equal(postPublishE2e.execution.status, "DEFERRED_UNTIL_PUBLIC_RELEASE");
+  assert.equal(postPublishE2e.execution.result, "PENDING");
   assert.deepEqual(
     postPublishE2e.checks.map((check) => check.id).sort(),
     ["click", "daily_count", "expiry_collapse", "impression_once"],
   );
-  assert.ok(postPublishE2e.checks.every((check) => allowedResults.has(check.result)));
+  assert.ok(postPublishE2e.checks.every((check) => check.result === "PENDING"));
 
   for (const dependencyPath of ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock"]) {
     assert.doesNotMatch(
@@ -3511,7 +3509,12 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     cwd: root,
     encoding: "utf8",
   }).trim().split("\n").filter(Boolean)) {
-    for (const status of collectStatusValues(readJson(releaseFile))) {
+    const statuses = collectStatusValues(readJson(releaseFile));
+    if (releaseFile === "apps/mobile/release/post-publish-ad-event-expiry-e2e.json") {
+      assert.deepEqual(statuses, ["DEFERRED_UNTIL_PUBLIC_RELEASE"]);
+      continue;
+    }
+    for (const status of statuses) {
       assert.ok(allowedStatuses.has(status), `${releaseFile} uses unsupported status ${status}`);
     }
   }
