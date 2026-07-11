@@ -168,12 +168,15 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
     /required deployment env is empty: EASYSUBWAY_ADS_ASSET_ORIGIN/,
   );
   await assert.rejects(
+    prepare(withAssetOrigin("")),
+    /required deployment env is empty: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+  );
+  await assert.rejects(
     prepare(`${fixtureEnv()}${ASSET_ORIGIN_LINE}\n`),
     /duplicate dotenv key: EASYSUBWAY_ADS_ASSET_ORIGIN/,
   );
 
   for (const origin of [
-    "",
     " ",
     "http://ads-assets.fixture.easysubway.example",
     "https://user@ads-assets.fixture.easysubway.example",
