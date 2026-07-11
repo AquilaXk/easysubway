@@ -34,13 +34,57 @@ function assertNoNativeAdIdentityOrMeasurement({
   nativeSources = [],
   mergedManifest,
 }) {
-  const adSdk = /google_mobile_ads|play-services-ads|com\.google\.android\.gms\.ads|Google-Mobile-Ads-SDK|GoogleMobileAds|GADMobileAds|AppLovinSDK|UnityAds|IronSource|FBAudienceNetwork|AmazonPublisherServices|ChartboostSDK|VungleAds/i;
-  const adEventPost = /\/api\/ads\/events|\b(?:post|send|record)_?ad(?:vertising)?_?event\b|\bPOST\b[^\n]{0,120}\b(?:ad|advertising)[_-]?events?\b|\b(?:ad|advertising)[_-]?events?\b[^\n]{0,120}\bPOST\b/i;
+  const normalizeDependency = (value) => value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const deniedDependencies = new Set([
+    "com.google.android.gms:play-services-ads",
+    "com.google.android.gms:play-services-ads-lite",
+    "Google-Mobile-Ads-SDK",
+    "GoogleMobileAds",
+    "GADMobileAds",
+    "com.applovin:applovin-sdk",
+    "AppLovinSDK",
+    "com.unity3d.ads:unity-ads",
+    "UnityAds",
+    "com.chartboost:chartboost-sdk",
+    "ChartboostSDK",
+    "com.vungle:vungle-ads",
+    "VungleAds",
+    "com.facebook.android:audience-network-sdk",
+    "FBAudienceNetwork",
+    "com.ironsource.sdk:mediationsdk",
+    "IronSource",
+    "IronSourceSDK",
+    "com.amazon.android:aps-sdk",
+    "AmazonPublisherServices",
+    "AmazonPublisherServicesSDK",
+  ].map((dependency) => {
+    const [group, name] = dependency.split(":");
+    return name
+      ? `${normalizeDependency(group)}:${normalizeDependency(name)}`
+      : normalizeDependency(group);
+  }));
   for (const [file, source] of dependencySources) {
-    assert.doesNotMatch(source, adSdk, `${file} must not add a native ad SDK`);
+    for (const token of source.match(/[A-Za-z0-9._-]+(?::[A-Za-z0-9._-]+){0,2}/g) ?? []) {
+      const [group, name] = token.split(":");
+      const dependency = name
+        ? `${normalizeDependency(group)}:${normalizeDependency(name)}`
+        : normalizeDependency(group);
+      assert.ok(!deniedDependencies.has(dependency), `${file} must not add a native ad SDK`);
+    }
   }
   for (const [file, source] of nativeSources) {
-    assert.doesNotMatch(source, adEventPost, `${file} must not post native ad events`);
+    let collapsed = source;
+    let previous;
+    do {
+      previous = collapsed;
+      collapsed = collapsed.replace(
+        /(["'])([^"'\\]*)\1\s*\+\s*(["'])([^"'\\]*)\3/g,
+        (_match, _leftQuote, left, _rightQuote, right) => `"${left}${right}"`,
+      );
+    } while (collapsed !== previous);
+    const hasAdEventEndpoint = /\/api\/ads\/events\b/.test(collapsed);
+    const hasPostRequest = /\.post\s*\(|\.(?:method)\s*\(\s*["']POST["']|\b(?:httpMethod|method)\s*[:=]\s*(?:["']POST["']|\.?HttpMethod\.POST|\.post\b)/i.test(collapsed);
+    assert.ok(!(hasAdEventEndpoint && hasPostRequest), `${file} must not post native ad events`);
   }
   if (mergedManifest) {
     assert.doesNotMatch(
@@ -2833,28 +2877,67 @@ test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release �
     nativeSources: nativeSourcePaths.map((file) => [file, read(file)]),
   });
 
+  for (const [name, dependency] of [
+    ["google-android", "com.google.android.gms:play-services-ads:24.0.0"],
+    ["google-ios", "Google-Mobile-Ads-SDK"],
+    ["applovin-android", "com.applovin:applovin-sdk:13.0.0"],
+    ["applovin-ios", "AppLovinSDK"],
+    ["unity-android", "com.unity3d.ads:unity-ads:4.0.0"],
+    ["unity-ios", "UnityAds"],
+    ["chartboost-android", "com.chartboost:chartboost-sdk:9.0.0"],
+    ["chartboost-ios", "ChartboostSDK"],
+    ["vungle-android", "com.vungle:vungle-ads:7.0.0"],
+    ["vungle-ios", "VungleAds"],
+    ["meta-android", "com.facebook.android:audience-network-sdk:6.0.0"],
+    ["meta-ios", "FBAudienceNetwork"],
+    ["ironsource-android", "com.ironsource.sdk:mediationsdk:8.0.0"],
+    ["ironsource-ios", "IronSourceSDK"],
+    ["amazon-android", "com.amazon.android:aps-sdk:9.0.0"],
+    ["amazon-ios", "AmazonPublisherServicesSDK"],
+  ]) {
+    assert.throws(
+      () => assertNoNativeAdIdentityOrMeasurement({
+        dependencySources: [[`native-sdk-${name}`, dependency]],
+      }),
+      new RegExp(`native-sdk-${name}`),
+    );
+  }
+  for (const dependency of [
+    "com.google.android.gms:play-services-base:18.0.0",
+    "com.example:ads-reporting:1.0.0",
+    "GoogleUtilities",
+  ]) {
+    assert.doesNotThrow(() => assertNoNativeAdIdentityOrMeasurement({
+      dependencySources: [["harmless-native-dependency", dependency]],
+    }));
+  }
   assert.throws(
     () => assertNoNativeAdIdentityOrMeasurement({
-      dependencySources: [["native-gradle-sentinel", 'implementation("com.google.android.gms:play-services-ads:1.0")']],
-      nativeSources: [],
-    }),
-    /native-gradle-sentinel/,
-  );
-  assert.throws(
-    () => assertNoNativeAdIdentityOrMeasurement({
-      dependencySources: [],
-      nativeSources: [],
       mergedManifest: ["merged-manifest-sentinel", '<uses-permission android:name="android.permission.AD_ID" />'],
     }),
     /merged-manifest-sentinel/,
   );
-  assert.throws(
-    () => assertNoNativeAdIdentityOrMeasurement({
-      dependencySources: [],
-      nativeSources: [["native-event-sentinel.swift", "func postAdEvent() {}"]],
-    }),
-    /native-event-sentinel\.swift/,
-  );
+  for (const source of [
+    'client.post("/api/ads/events")',
+    'client.post("/api/" + "ads/events")',
+    'request.httpMethod = "POST"\nrequest.url = URL(string: "/api/ads/events")',
+    'Request.Builder().url("/api/ads/events").post(body)',
+  ]) {
+    assert.throws(
+      () => assertNoNativeAdIdentityOrMeasurement({
+        nativeSources: [["native-event-sentinel.swift", source]],
+      }),
+      /native-event-sentinel\.swift/,
+    );
+  }
+  for (const source of [
+    "func postAdEvent() {}",
+    'client.get("/api/ads/events")',
+  ]) {
+    assert.doesNotThrow(() => assertNoNativeAdIdentityOrMeasurement({
+      nativeSources: [["harmless-native-source.swift", source]],
+    }));
+  }
 
   const repositoryContract = read("tools/ci/repository-contract.test.mjs");
   const mobileJob = jobBlock(read(".github/workflows/ci.yml"), "mobile-app", "android");
