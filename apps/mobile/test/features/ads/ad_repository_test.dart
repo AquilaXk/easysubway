@@ -64,6 +64,30 @@ void main() {
     expect(reads, 1);
   });
 
+  test('lazy repository는 유효 base URI와 ApiClient를 한 번만 해소한다', () async {
+    var providerReads = 0;
+    var requests = 0;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      requests++;
+      request.response.statusCode = HttpStatus.noContent;
+      await request.response.close();
+    });
+    final repository = AdRepository.lazy(() {
+      providerReads++;
+      return Uri.parse('http://${server.address.host}:${server.port}');
+    });
+
+    expect(providerReads, 0);
+
+    await repository.fetchActive(AdPlacement.routeResultBottom);
+    await repository.fetchActive(AdPlacement.stationDetailBottom);
+
+    expect(providerReads, 1);
+    expect(requests, 2);
+  });
+
   test('지원 placement는 정확히 두 개다', () {
     expect(AdPlacement.values.map((placement) => placement.id), [
       'route-result-bottom',

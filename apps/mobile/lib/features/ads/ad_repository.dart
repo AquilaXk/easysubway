@@ -28,18 +28,16 @@ final class AdCreative {
 }
 
 final class AdRepository {
-  const AdRepository(ApiClient apiClient)
-    : _apiClient = apiClient,
-      _baseUri = null;
+  AdRepository(ApiClient apiClient) : _apiClient = apiClient, _baseUri = null;
 
-  const AdRepository.lazy(Uri? Function() baseUri)
+  AdRepository.lazy(Uri? Function() baseUri)
     : _apiClient = null,
       _baseUri = baseUri;
 
-  final ApiClient? _apiClient;
+  ApiClient? _apiClient;
   final Uri? Function()? _baseUri;
 
-  /// ponytail: 현재 200 응답만 사용한다. 캐시와 event 전송은 Phase A 범위 밖이다.
+  /// ponytail: 현재 200 응답만 사용한다. 소재 캐시와 event 전송은 범위 밖이다.
   Future<AdCreative?> fetchActive(AdPlacement placement) async {
     final apiClient = _apiClient;
     final resolvedClient = apiClient ?? _lazyClient();
@@ -93,8 +91,12 @@ final class AdRepository {
   }
 
   ApiClient? _lazyClient() {
+    final cached = _apiClient;
+    if (cached != null) {
+      return cached;
+    }
     final baseUri = _baseUri!();
-    return baseUri == null ? null : ApiClient(baseUri: baseUri);
+    return baseUri == null ? null : _apiClient = ApiClient(baseUri: baseUri);
   }
 }
 
