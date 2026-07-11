@@ -2014,7 +2014,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(playStoreSubmissionContent.issue, 1018);
   assert.equal(playStoreSubmissionContent.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(playStoreSubmissionContent.storePrivacyInventory, "apps/mobile/release/store-privacy-inventory.json");
-  assert.equal(playStoreSubmissionContent.appContentDeclarations.ads, false);
+  assert.equal(playStoreSubmissionContent.appContentDeclarations.ads, true);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.publicUserSignIn, false);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.accountCreation, false);
   assert.equal(playStoreSubmissionContent.appContentDeclarations.backgroundLocation, false);
@@ -2708,6 +2708,81 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.doesNotMatch(workflow, /testflight_evidence=blocked_missing_testflight_or_signed_device_install/);
   assert.doesNotMatch(workflow, /cp release\/signed-release-artifact-gate\.json release-artifacts\/ios\/signed-release-artifact-gate\.json/);
 
+});
+
+test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측 경계를 함께 고정한다", () => {
+  const readiness = readJson("apps/mobile/release/store-submission-readiness.json");
+  const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
+  const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
+  const androidMainManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+
+  assert.equal(playStoreContent.appContentDeclarations.ads, true);
+  assert.equal(privacyInventory.advertising.included, true);
+  assert.equal(privacyInventory.advertising.servingModel, "first-party-self-served");
+  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking", "measurementEvents"]) {
+    assert.equal(privacyInventory.advertising[field], false, `advertising.${field} must remain false`);
+  }
+  assert.deepEqual(privacyInventory.advertising.collectedDataTypeIds, []);
+  assert.equal(privacyInventory.tracking, false);
+  assert.ok(privacyInventory.dataTypes.every((item) => item.usedForTracking === false));
+  assert.ok(
+    privacyInventory.dataTypes.every(
+      (item) => !/Advertising|Marketing/.test(item.googlePlayDataSafety.purpose),
+    ),
+  );
+
+  const readinessItems = new Map(readiness.items.map((item) => [item.id, item]));
+  const adDisclosure = readinessItems.get("play_ads_declaration");
+  for (const id of ["play_content_rating", "appstore_age_rating"]) {
+    const item = readinessItems.get(id);
+    assert.ok(item.evidence.includes("ad-request-contract-test"), `${id} must link ad request contract evidence`);
+    assert.ok(
+      item.linkedArtifacts.includes("apps/mobile/lib/features/ads/active_ad_banner.dart"),
+      `${id} must link the rendered ad slot`,
+    );
+    assert.ok(
+      item.linkedArtifacts.includes("apps/mobile/lib/features/ads/ad_repository.dart"),
+      `${id} must link the ad request boundary`,
+    );
+    assert.match(item.readyWhenKo, /자체 서빙 비개인화 광고/);
+    assert.match(item.readyWhenKo, /명시적으로 누를 때만.*외부/);
+  }
+  for (const copy of [
+    adDisclosure.readyWhenKo,
+    readinessItems.get("play_content_rating").readyWhenKo,
+    readinessItems.get("appstore_age_rating").readyWhenKo,
+    playStoreContent.storeMetadataRequirements.contentRatingBasisKo,
+  ]) {
+    assert.doesNotMatch(copy, /광고 없음|광고 지면이 없|외부 웹 열람 없음/);
+  }
+  const contentRatingBasis = playStoreContent.storeMetadataRequirements.contentRatingBasisKo;
+  assert.match(
+    contentRatingBasis,
+    /외부 지도 앱\/웹은 사용자가 지도 또는 길안내를 명시적으로 누를 때만 열/,
+  );
+  assert.match(
+    contentRatingBasis,
+    /광고 landing은 사용자가 광고를 명시적으로 누를 때만 외부 브라우저로 열/,
+  );
+  assert.match(adDisclosure.readyWhenKo, /자체 서빙/);
+  assert.match(adDisclosure.readyWhenKo, /비개인화/);
+  assert.match(adDisclosure.readyWhenKo, /명시적으로 누를 때만.*외부 브라우저/);
+
+  for (const dependencyPath of ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock"]) {
+    assert.doesNotMatch(
+      read(dependencyPath),
+      /google_mobile_ads|play-services-ads|com\.google\.android\.gms\.ads/i,
+      `${dependencyPath} must not add a third-party ad SDK`,
+    );
+  }
+  assert.doesNotMatch(androidMainManifest, /android\.permission\.AD_ID/);
+  for (const sourcePath of mobileProductionDartFiles()) {
+    assert.doesNotMatch(
+      read(sourcePath),
+      /\/api\/ads\/events/,
+      `${sourcePath} must not send ad measurement events`,
+    );
+  }
 });
 
 test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성한다", async () => {
