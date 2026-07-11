@@ -164,7 +164,7 @@ void main() {
 
     expect(find.byType(AdBannerSlot), findsNothing);
 
-    image.completeError(StateError('decode failed'));
+    image.completeError(Exception('decode failed'));
     await tester.pump();
 
     expect(find.byType(AdBannerSlot), findsNothing);
@@ -473,7 +473,7 @@ void main() {
       imageLoader: (_, _) async => _image,
       launcher: (uri, {required mode}) async {
         calls++;
-        throw StateError('browser unavailable');
+        throw Exception('browser unavailable');
       },
     );
     await tester.pump();

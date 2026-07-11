@@ -87,7 +87,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
         _creative = creative;
         _image = image;
       });
-    } on Object {
+    } on Exception {
       // ponytail: 조회·decode 실패는 사용자에게 빈 슬롯을 남기지 않고 닫는다.
     }
   }
@@ -99,7 +99,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
     }
     try {
       await widget.launcher(landingUrl, mode: LaunchMode.externalApplication);
-    } on Object {
+    } on Exception {
       // 외부 브라우저 실패 시 내부 이동이나 다른 URL로 fallback하지 않는다.
     }
   }
