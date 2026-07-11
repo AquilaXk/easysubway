@@ -57,13 +57,35 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
       region.attributionRequired,
       `${region.id} attributionRequired가 manifest license와 일치해야 함`,
     );
+    // [#1958] redistributionAllowed·reviewStatus 교차 검증(drift 방지, 모든 지역).
+    // 정본에 두 필드가 존재하고, 허용 enum 안이며, manifest license와 정확히 일치한다.
+    assert.equal(
+      typeof region.redistributionAllowed,
+      "boolean",
+      `${region.id} 정본 redistributionAllowed는 boolean이어야 함`,
+    );
+    assert.ok(
+      decision.reviewStatusValues.includes(region.reviewStatus),
+      `${region.id} 정본 reviewStatus 값이 허용 목록에 있어야 함`,
+    );
+    assert.equal(
+      map.license.redistributionAllowed,
+      region.redistributionAllowed,
+      `${region.id} redistributionAllowed가 manifest license와 일치해야 함`,
+    );
+    assert.equal(
+      map.license.reviewStatus,
+      region.reviewStatus,
+      `${region.id} reviewStatus가 manifest license와 일치해야 함`,
+    );
   }
 
-  // 수도권은 public domain official-svg, 상용 준비 완료.
+  // 수도권은 #1950으로 오너 자작 8선형 도식(self-drawn) 정본 채택, 상용 준비 완료.
   const seoul = decisionById.get("seoul");
-  assert.equal(seoul.renderingStrategy, "official-svg");
+  assert.equal(seoul.renderingStrategy, "self-drawn-schematic");
   assert.equal(seoul.commercialProductionReady, true);
   assert.equal(seoul.attributionRequired, false);
+  assert.equal(seoul.licenseStatus, "self-drawn-confirmed");
 
   // 부산·대구·대전·광주 모두 self-drawn-schematic 전환(원본 SVG는 좌표 검수 참조만).
   for (const id of ["busan", "daegu", "daejeon", "gwangju"]) {

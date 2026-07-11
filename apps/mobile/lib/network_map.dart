@@ -3318,6 +3318,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
   Map<String, String>? _attributionTextByRegion;
+  // onTapUp 경로에서만 쓰는 stationLinesById를 매 build(팬 프레임)마다 재계산하지 않도록
+  // region·stations identity로 캐시한다(#1973). 800역/24노선 재계산이 build 스파이크 원인.
+  Map<String, List<NetworkMapLine>>? _stationLinesByIdCache;
+  String? _stationLinesByIdCacheKey;
 
   @override
   void initState() {
@@ -3365,7 +3369,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   @override
   Widget build(BuildContext context) {
-    final stationLinesById = _stationLinesById(widget.data);
     return Container(
       key: const Key('networkMapSurface'),
       decoration: const BoxDecoration(color: Colors.white),
@@ -3477,7 +3480,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                       onTapUp: (details) {
                         _openNearestStation(
                           details.localPosition,
-                          stationLinesById,
+                          _stationLinesByIdCached(widget.data),
                           geometry,
                           camera,
                         );
@@ -3567,6 +3570,21 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
         },
       ),
     );
+  }
+
+  Map<String, List<NetworkMapLine>> _stationLinesByIdCached(
+    NetworkMapData data,
+  ) {
+    final key =
+        '${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}';
+    final cached = _stationLinesByIdCache;
+    if (_stationLinesByIdCacheKey == key && cached != null) {
+      return cached;
+    }
+    final computed = _stationLinesById(data);
+    _stationLinesByIdCacheKey = key;
+    _stationLinesByIdCache = computed;
+    return computed;
   }
 
   _MapGeometry _geometryFor(NetworkMapData data) {

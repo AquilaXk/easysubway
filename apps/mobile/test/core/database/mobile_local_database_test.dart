@@ -332,10 +332,17 @@ void main() {
           .toSet(),
       {'AVAILABLE'},
     );
-    expect(
-      routeMapPosition.read<String>('label_polygon'),
-      '[{"x":2304,"y":4997},{"x":2355,"y":4997},{"x":2355,"y":5019},{"x":2304,"y":5019}]',
-    );
+    // [2026-07-11 #1950] 정본이 오너 자작 도식으로 교체되어 좌표가 바뀐다. 정확한
+    // 폴리곤 대신 구조(닫힌 4점 사각형)를 검증한다(좌표 회귀는 route-map 게이트가 강제).
+    final labelPolygon =
+        (jsonDecode(routeMapPosition.read<String>('label_polygon'))
+                as List<Object?>)
+            .cast<Map<String, Object?>>();
+    expect(labelPolygon, hasLength(4));
+    for (final point in labelPolygon) {
+      expect(point['x'], isA<num>());
+      expect(point['y'], isA<num>());
+    }
     final displayedSourceValues = [
       routeMapPosition.read<String>('source_id'),
       routeMapPosition.read<String>('source_name'),
@@ -344,7 +351,13 @@ void main() {
       routeMapPosition.read<String>('license_status'),
     ].join(' ').toLowerCase();
     expect(routeMapPosition.read<String>('source_name').trim(), isNotEmpty);
-    expect(routeMapPosition.read<String>('source_url'), startsWith('https://'));
+    // [#1950] 오너 자작 정본은 공개 URL이 없어 internal: 스킴으로 provenance를 표기한다.
+    final routeMapSourceUrl = routeMapPosition.read<String>('source_url');
+    expect(
+      routeMapSourceUrl.startsWith('https://') ||
+          routeMapSourceUrl.startsWith('internal:'),
+      isTrue,
+    );
     expect(displayedSourceValues, isNot(contains('fixture')));
     expect(displayedSourceValues, isNot(contains('easysubway.local')));
     expect(displayedSourceValues, isNot(contains('review-required')));

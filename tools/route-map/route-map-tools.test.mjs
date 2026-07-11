@@ -373,7 +373,7 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
 
   assert.equal(output.schemaVersion, 1);
   assert.equal(output.region, "fixture");
-  assert.equal(output.extractorVersion, "route-map-svg-geometry-v2");
+  assert.equal(output.extractorVersion, "route-map-svg-geometry-v3");
   assert.equal(output.sourceSvgSha256, createHash("sha256").update(source).digest("hex"));
   assert.deepEqual(output.sourceViewBox, [0, 0, 200, 120]);
   assert.match(output.browser.version, /Chrome|Chromium/i);
@@ -399,6 +399,24 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
   const rotated = output.labels.find((label) => label.sourceText === "회전역");
   assert.notEqual(rotated.polygon[0].y, rotated.polygon[1].y);
   assert.notEqual(rotated.polygon[0].x, rotated.polygon[3].x);
+
+  // v3: 역 노드(data-station+data-node-role)를 조상 transform 체인 정규화한 root 중심으로.
+  const nodesByName = new Map(output.stationNodes.map((node) => [node.dataStation, node]));
+  assert.equal(output.stationNodes.length, 2);
+  const ordinary = nodesByName.get("노드역");
+  assert.equal(ordinary.nodeRole, "ordinary");
+  assert.equal(ordinary.dataLine, "1");
+  // scaled-nodes transform translate(4 6) scale(2): cx10,cy20 → (4+20, 6+40)=(24,46).
+  assert.equal(ordinary.x, 24);
+  assert.equal(ordinary.y, 46);
+  assert.match(ordinary.sourceElementKey, /^[a-f0-9]{64}$/);
+  const transfer = nodesByName.get("환승노드");
+  assert.equal(transfer.nodeRole, "transfer");
+  assert.equal(transfer.dataLine, "2");
+  // 회전 그룹 중심(30,30)은 회전 pivot이라 root에서 (4+60, 6+60)=(64,66) 근처.
+  assert.ok(Math.abs(transfer.x - 64) < 2 && Math.abs(transfer.y - 66) < 2);
+  // 결정적 정렬: dataLine 사전순(1 < 2).
+  assert.deepEqual(output.stationNodes.map((node) => node.dataLine), ["1", "2"]);
 });
 
 test("SVG label polygon join applies only unambiguous station labels", async () => {
@@ -2138,6 +2156,120 @@ test("MOLIT nationwide fixture builder emits route map source hashes", async () 
       audit.findings.some(
         (finding) => finding.code === "MISSING_ROUTE_MAP_LABEL_POLYGON",
       ),
+    );
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
+});
+
+// #1951 작업 ①: 부산·대구·광주·대전 4권역 audit을 CI 상시 게이트로 편입한다.
+// 커밋된 원본 소스에서 build-molit-nationwide-fixture로 전국 fixture를 만들고
+// audit-route-map을 --fail-on BLOCKER,HIGH로 돌려, 4권역 각각이 BLOCKER/HIGH 0이며
+// 확정 노선 목록(#1951 "대상 노선 목록 확정" 코멘트)만큼의 station-line 커버리지를
+// 유지하는지 검증한다. 기존 MOLIT 테스트는 수도권 source-sha·label polygon에
+// 초점을 두므로, 4권역 게이트를 별도 테스트로 못박아 회귀를 막는다.
+const nationwideAuditSourceArgs = [
+  "--csv",
+  "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv",
+  "--svg-csv",
+  "tools/datapack/sources/molit-rail-station-svg-route-20250811.csv",
+  "--seoulmetro-js",
+  "tools/datapack/sources/seoulmetro-cyberstation-line-data-20260623.js",
+  "--humetro-html",
+  "tools/datapack/sources/humetro-cyberstation-map-20260623.html",
+  "--humetro-css",
+  "tools/datapack/sources/humetro-cyber-station-20250310c.css",
+  "--grtc-html",
+  "tools/datapack/sources/grtc-cyber-simple-20260623.html",
+  "--dtro-html",
+  "tools/datapack/sources/dtro-cyberstation-20260623.html",
+  "--djtc-html",
+  "tools/datapack/sources/djtc-cyberstation-20260623.html",
+  "--djtc-css",
+  "tools/datapack/sources/djtc-content-20260623.css",
+];
+
+// 확정 노선 목록의 지역별 station-line 커버리지 하한(#1951 대상 노선 목록 확정 코멘트:
+// 부산 6노선/158역, 대구 4노선(1·2·3호선+대경선)/101, 광주 1/20, 대전 1/22).
+const nationwideRegionAuditExpectations = {
+  부산권: 158,
+  대구권: 101,
+  광주권: 20,
+  대전권: 22,
+};
+
+test("route map audit gates 부산·대구·광주·대전 4권역 at BLOCKER/HIGH 0", async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), "easysubway-route-map-4region-audit-"));
+  try {
+    const fixturePath = path.join(tmp, "nationwide-fixture.json");
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-molit-nationwide-fixture.mjs",
+        ...nationwideAuditSourceArgs,
+        "--output",
+        fixturePath,
+      ],
+      { cwd: root, maxBuffer: 16 * 1024 * 1024 },
+    );
+
+    const { stdout, code } = await execFileAsync(
+      process.execPath,
+      [
+        "tools/route-map/audit-route-map.mjs",
+        "--fixture",
+        fixturePath,
+        "--reviewed-ambiguities",
+        "tools/route-map/fixtures/reviewed-ambiguities.json",
+        "--fail-on",
+        "BLOCKER,HIGH",
+      ],
+      { cwd: root, maxBuffer: 16 * 1024 * 1024 },
+    )
+      .then((result) => ({ ...result, code: 0 }))
+      .catch((error) => ({ stdout: error.stdout ?? "", code: error.code ?? 1 }));
+
+    assert.ok(
+      stdout.trim().length > 0,
+      `audit 출력이 비어 있음(비정상 종료 의심): code=${code}`,
+    );
+    const audit = JSON.parse(stdout);
+    // --fail-on BLOCKER,HIGH가 걸려 있으므로 4권역 중 하나라도 위반이면 exit 1.
+    assert.equal(code, 0, "4권역 audit이 BLOCKER/HIGH 없이 통과해야 함(exit 0)");
+    assert.equal(audit.summary.findingsBySeverity.BLOCKER, 0);
+    assert.equal(audit.summary.findingsBySeverity.HIGH, 0);
+
+    const regionsById = new Map(
+      (audit.packs[0].summary.regions ?? []).map((row) => [row.region, row]),
+    );
+    for (const [region, expectedStationLines] of Object.entries(
+      nationwideRegionAuditExpectations,
+    )) {
+      const summary = regionsById.get(region);
+      assert.ok(summary, `${region} audit 요약이 존재해야 함`);
+      assert.equal(
+        summary.stationLineCount,
+        expectedStationLines,
+        `${region} station-line 커버리지가 확정 노선 목록과 일치해야 함`,
+      );
+      assert.equal(
+        summary.coverageRatio,
+        1,
+        `${region} 모든 station-line에 routeMapPosition 좌표가 있어야 함`,
+      );
+    }
+
+    // 권역별 findings에도 BLOCKER/HIGH가 없어야 한다(요약 카운트 회귀 이중 가드).
+    const gatedRegions = new Set(Object.keys(nationwideRegionAuditExpectations));
+    const regionBlockerHigh = audit.findings.filter(
+      (finding) =>
+        gatedRegions.has(finding.region) &&
+        (finding.severity === "BLOCKER" || finding.severity === "HIGH"),
+    );
+    assert.deepEqual(
+      regionBlockerHigh,
+      [],
+      "4권역에 BLOCKER/HIGH finding이 없어야 함",
     );
   } finally {
     await rm(tmp, { recursive: true, force: true });

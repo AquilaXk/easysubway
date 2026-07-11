@@ -2,9 +2,15 @@
   "schemaVersion": 1,
   "artifactKind": "route-map-license-decision",
   "issue": 1637,
-  "decidedAt": "2026-07-04",
+  "decidedAt": "2026-07-12",
   "summary": "부산·대구·대전·광주 노선도는 원본 SVG 이미지를 앱 렌더링 source of truth로 쓰지 않고, 역 좌표·노선 위상(사실 데이터) 기반 자체 schematic layout으로 그린다(대안 A). 원본 SVG는 좌표 검수 기준으로만 사용한다.",
   "renderingSourceOfTruth": "structured-data",
+  "reviewStatusValues": [
+    "self-drawn-confirmed",
+    "self-drawn-fact-based",
+    "legal-review-required",
+    "permission-required"
+  ],
   "strategyValues": [
     "official-svg",
     "self-drawn-schematic"
@@ -17,16 +23,22 @@
     {
       "id": "seoul",
       "region": "수도권",
-      "operator": "Wikimedia Commons",
-      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Seoul_subway_linemap_ko.svg",
-      "retrievedAt": "2026-06-24",
-      "originalLicenseSpdx": "Public-Domain",
+      "operator": "오너 자작(self-drawn)",
+      "sourceUrl": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v1.svg",
+      "retrievedAt": "2026-07-11",
+      "originalLicenseSpdx": "LicenseRef-Self-Drawn",
       "originalCommercialUseAllowed": true,
-      "renderingStrategy": "official-svg",
+      "renderingStrategy": "self-drawn-schematic",
       "bundledSvgRole": "review-reference-only",
       "attributionRequired": false,
       "commercialProductionReady": true,
-      "notes": "Public domain(IRTC1015). 상용 가능. [2026-07-05 #1789 정정] SVG 번들은 #1715에서 제거되어 앱은 SVG를 직접 렌더하지 않는다. 렌더 정본은 PD SVG에서 파생한 구조화 데이터(track stroke 기하 + 투영 좌표)다 — PD는 창작적 표현의 파생·개변·상용이 모두 허용되므로 부산 등에 적용되는 'SVG 표현 파생 금지' 규칙의 예외이며, 좌표·기하 provenance = qa-wikimedia-seoul-svg-coordinate. GO SEOUL(서울시 2023) 노선도는 공공누리 제4유형(상업 금지·변경 금지)이라 레이아웃 트레이스를 렌더 소스로 쓰지 않고 비교 QA 기준 이미지로만 쓴다."
+      "redistributionAllowed": true,
+      "reviewStatus": "self-drawn-confirmed",
+      "licenseStatus": "self-drawn-confirmed",
+      "selfDrawnSource": "easy-subway-sma-v1.svg",
+      "lineColorSource": "서울시 공식 노선 색상값 PDF(공식 지하철 노선도 디자인 페이지 다운로드); GTX-A는 PDF에 없어 원본 SVG 값 유지",
+      "provenanceVerifiedAt": "2026-07-11",
+      "notes": "[2026-07-11 #1950] 수도권 렌더 정본을 오너 자작 8선형 완성 도식(easy-subway-sma-v1)으로 교체. 오너가 직접 제작한 창작물이므로 self-drawn 확정 — 상용 허용·attribution 불필요. 앱은 SVG 원본을 통째 렌더하지 않고(#1635 유지) 도식에서 파생한 구조화 좌표(route_map_positions)만 렌더한다. 노선색은 서울시 공식 노선 색상값 PDF 근거(GTX-A만 원본 SVG 유지). 이전 정본은 Wikimedia PD SVG 좌표 감사(qa-wikimedia-seoul-svg-coordinate)였고, 도라산 1역은 오너 도식 미수록으로 카탈로그 유지·위상 보존 명시 예외다."
     },
     {
       "id": "busan",
@@ -41,7 +53,9 @@
       "attributionRequired": false,
       "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": true,
-      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 사실 데이터 기반 자체 schematic으로 전환하고, 원본 SVG는 좌표 검수 참조로만 쓴다. 원본 SVG가 아직 번들되어 있는 동안에는 attribution을 유지하며(=true), 자체 도식 전환 + SVG 제거 + 좌표 provenance 확정(#1639/#1641) 후 attribution 해제 가능(attributionDropTargetAfterSelfDrawn). [2026-07-05 #1639/#1640] 좌표 provenance(qa-official-svg-coordinate=역 좌표·위상 사실 데이터, Feist/OSM 선례) 재검증 완료. line_tracks를 SVG stroke(표현)에서 down_path(역-역 위상=사실)로 재빌드해 SVG 표현 파생 제거. SVG 번들 제거(#1715)·자체 도식 전환 완료 → commercial_use_allowed=1·attribution 해제 승격.",
+      "redistributionAllowed": true,
+      "reviewStatus": "self-drawn-fact-based",
+      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 사실 데이터 기반 자체 schematic으로 전환하고, 원본 SVG는 좌표 검수 참조로만 쓴다. 원본 SVG가 아직 번들되어 있는 동안에는 attribution을 유지하며(=true), 자체 도식 전환 + SVG 제거 + 좌표 provenance 확정(#1639/#1641) 후 attribution 해제 가능(attributionDropTargetAfterSelfDrawn). [2026-07-05 #1639/#1640] 좌표 provenance(qa-official-svg-coordinate=역 좌표·위상 사실 데이터, Feist/OSM 선례) 재검증 완료. line_tracks를 SVG stroke(표현)에서 down_path(역-역 위상=사실)로 재빌드해 SVG 표현 파생 제거. SVG 번들 제거(#1715)·자체 도식 전환 완료 → commercial_use_allowed=1·attribution 해제 승격. [2026-07-11 #1958] 자체 도식 산출물은 SVG 표현 파생이 아니므로 재배포 허용(redistributionAllowed=true), 사실 데이터 재검증 완료 상태로 reviewStatus=self-drawn-fact-based. 두 필드를 정본에 명시해 manifest와 교차 검증한다.",
       "licenseStatus": "self-drawn-fact-based",
       "provenanceVerifiedAt": "2026-07-05"
     },
@@ -58,7 +72,9 @@
       "attributionRequired": false,
       "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": true,
-      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. SVG 번들 유지 중에는 attribution 유지, 자체 도식 전환 후 해제 가능. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다. [2026-07-05 #1639/#1640] 좌표 provenance(qa-official-svg-coordinate=역 좌표·위상 사실 데이터, Feist/OSM 선례) 재검증 완료. line_tracks를 SVG stroke(표현)에서 down_path(역-역 위상=사실)로 재빌드해 SVG 표현 파생 제거. SVG 번들 제거(#1715)·자체 도식 전환 완료 → commercial_use_allowed=1·attribution 해제 승격.",
+      "redistributionAllowed": true,
+      "reviewStatus": "self-drawn-fact-based",
+      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. SVG 번들 유지 중에는 attribution 유지, 자체 도식 전환 후 해제 가능. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다. [2026-07-05 #1639/#1640] 좌표 provenance(qa-official-svg-coordinate=역 좌표·위상 사실 데이터, Feist/OSM 선례) 재검증 완료. line_tracks를 SVG stroke(표현)에서 down_path(역-역 위상=사실)로 재빌드해 SVG 표현 파생 제거. SVG 번들 제거(#1715)·자체 도식 전환 완료 → commercial_use_allowed=1·attribution 해제 승격. [2026-07-11 #1958] 자체 도식 산출물은 SVG 표현 파생이 아니므로 재배포 허용(redistributionAllowed=true), 사실 데이터 재검증 완료 상태로 reviewStatus=self-drawn-fact-based. 두 필드를 정본에 명시해 manifest와 교차 검증한다. [2026-07-12 #1951] admission evidence로 대구교통공사 역별 승하차 현황 데이터셋 공공데이터포털 페이지(https://www.data.go.kr/data/15002503/fileData.do)에서 \"이용허락범위: 제한 없음\"(상업 이용 허용) 표기 확인(확인일 2026-07-11). 단, 해당 데이터셋은 승하차 현황이며 노선도 데이터셋이 아니므로 노선도 evidence로는 대상이 어긋나는 한계가 있다 — 이 한계를 명기한 채 오너 결정(2026-07-12, 선택지 ①: 공공데이터포털 정식 개방 지정 표기를 admission evidence로 인정)에 따라 보조 evidence로만 인용한다. 현행 플래그(self-drawn-fact-based 등)의 1차 근거는 여전히 #1759 사실 데이터 법리(역 좌표·노선 위상 사실 데이터 기반 자체 도식)이며, 이번 evidence 첨부는 그 근거를 대체하지 않는다. 임시 evidence 전제: 출시 후 오너 자작 도식(self-drawn) 전환 시 evidence는 자작 기록으로 대체 예정(수도권 #1950 선례와 동일 경로). 플래그 변경 없음.",
       "licenseStatus": "self-drawn-fact-based",
       "provenanceVerifiedAt": "2026-07-05"
     },
@@ -75,7 +91,9 @@
       "attributionRequired": false,
       "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": true,
-      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. SVG 번들 유지 중에는 attribution 유지, 자체 도식 전환 후 해제 가능. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다. [2026-07-05 #1639/#1640] 좌표 provenance(qa-official-svg-coordinate=역 좌표·위상 사실 데이터, Feist/OSM 선례) 재검증 완료. line_tracks를 SVG stroke(표현)에서 down_path(역-역 위상=사실)로 재빌드해 SVG 표현 파생 제거. SVG 번들 제거(#1715)·자체 도식 전환 완료 → commercial_use_allowed=1·attribution 해제 승격.",
+      "redistributionAllowed": true,
+      "reviewStatus": "self-drawn-fact-based",
+      "notes": "원본 SVG는 재배포 권한 미확인(permission-required). 앱 렌더링은 자체 schematic으로 전환, 원본 SVG는 좌표 검수 참조로만 쓴다. SVG 번들 유지 중에는 attribution 유지, 자체 도식 전환 후 해제 가능. 상용 준비 완료는 #1640 좌표·#1641 렌더러에서 판정한다. [2026-07-05 #1639/#1640] 좌표 provenance(qa-official-svg-coordinate=역 좌표·위상 사실 데이터, Feist/OSM 선례) 재검증 완료. line_tracks를 SVG stroke(표현)에서 down_path(역-역 위상=사실)로 재빌드해 SVG 표현 파생 제거. SVG 번들 제거(#1715)·자체 도식 전환 완료 → commercial_use_allowed=1·attribution 해제 승격. [2026-07-11 #1958] 자체 도식 산출물은 SVG 표현 파생이 아니므로 재배포 허용(redistributionAllowed=true), 사실 데이터 재검증 완료 상태로 reviewStatus=self-drawn-fact-based. 두 필드를 정본에 명시해 manifest와 교차 검증한다. [2026-07-12 #1951] admission evidence로 대전교통공사 노선도 파일데이터 공공데이터포털 페이지(https://www.data.go.kr/data/15050368/fileData.do)에서 \"이용허락범위: 제한 없음\"(상업 이용 허용) 표기 확인(확인일 2026-07-11), 오너 결정(2026-07-12, 선택지 ①: 공공데이터포털 정식 개방 지정 표기를 admission evidence로 인정)에 따라 admission evidence로 인정한다. 임시 evidence 전제: 출시 후 오너 자작 도식(self-drawn) 전환 시 evidence는 자작 기록으로 대체 예정(수도권 #1950 선례와 동일 경로). 기존 플래그(self-drawn-fact-based·commercial_use_allowed=1 등) 변경 없음 — #1759 사실 데이터 법리가 여전히 1차 근거다.",
       "licenseStatus": "self-drawn-fact-based",
       "provenanceVerifiedAt": "2026-07-05"
     },
@@ -92,7 +110,9 @@
       "attributionRequired": true,
       "attributionDropTargetAfterSelfDrawn": true,
       "commercialProductionReady": false,
-      "notes": "원본 SVG는 CC BY-SA 2.0 KR(상용 가능하나 attribution·ShareAlike). ShareAlike 전파 리스크를 없애기 위해 앱 렌더링을 CC-BY-SA SVG 파생이 아닌 사실 데이터 기반 자체 schematic으로 전환한다. 원본 SVG가 아직 번들되어 있으므로 CC-BY-SA attribution을 유지하며(=true), SVG 제거 + 사실 출처 provenance 확정(#1640) 후 해제 가능. 원본 SVG는 좌표 검수 참조로만 쓴다."
+      "redistributionAllowed": false,
+      "reviewStatus": "legal-review-required",
+      "notes": "원본 SVG는 CC BY-SA 2.0 KR(상용 가능하나 attribution·ShareAlike). ShareAlike 전파 리스크를 없애기 위해 앱 렌더링을 CC-BY-SA SVG 파생이 아닌 사실 데이터 기반 자체 schematic으로 전환한다. 원본 SVG가 아직 번들되어 있으므로 CC-BY-SA attribution을 유지하며(=true), SVG 제거 + 사실 출처 provenance 확정(#1640) 후 해제 가능. 원본 SVG는 좌표 검수 참조로만 쓴다. [2026-07-11 #1958] ShareAlike 파생 체인이 법률 검토 대기이므로 재배포 차단(redistributionAllowed=false)·reviewStatus=legal-review-required 유지. 두 필드를 정본에 명시해 manifest와 교차 검증한다."
     }
   ],
   "gwangjuShareAlikeConclusion": {
