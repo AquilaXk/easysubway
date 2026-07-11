@@ -104,19 +104,18 @@ function validateSample({ candidate, candidateId, sample }) {
     const availableFields = [...sampleFields]
       .filter((field) => typeof field === "string")
       .sort((left, right) => left < right ? -1 : Number(left !== right));
-    for (const expectedField of missingFields) {
-      const caseInsensitiveMatches = availableFields.filter(
-        (actualField) => actualField.toLowerCase() === expectedField.toLowerCase(),
-      );
-      if (caseInsensitiveMatches.length === 1) {
-        throw new Error(
-          `output field case mismatch: expected ${renderFieldName(expectedField)}; actual ${renderFieldName(caseInsensitiveMatches[0])}`,
-        );
-      }
+    const expectedField = missingFields[0];
+    const caseInsensitiveMatches = availableFields.filter(
+      (actualField) => actualField.toLowerCase() === expectedField.toLowerCase(),
+    );
+    if (caseInsensitiveMatches.length === 1) {
       throw new Error(
-        `output field missing: ${renderFieldName(expectedField)}; available fields: ${availableFields.map(renderFieldName).join(", ")}`,
+        `output field case mismatch: expected ${renderFieldName(expectedField)}; actual ${renderFieldName(caseInsensitiveMatches[0])}`,
       );
     }
+    throw new Error(
+      `output field missing: ${renderFieldName(expectedField)}; available fields: ${availableFields.map(renderFieldName).join(", ")}`,
+    );
   }
 
   const missingEdgeFields = candidate.evidence.missingConfirmedEdgeFields ?? [];
