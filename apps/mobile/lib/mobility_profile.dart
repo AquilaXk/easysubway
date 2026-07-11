@@ -207,9 +207,7 @@ class _MobilityProfileCard extends StatelessWidget {
     final borderColor = selected
         ? colorScheme.primary
         : EasySubwayAccessibleColors.line;
-    final backgroundColor = selected
-        ? EasySubwayAccessibleColors.mintSoft
-        : EasySubwayAccessibleColors.surface;
+    final backgroundColor = EasySubwayAccessibleColors.surface;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -247,7 +245,7 @@ class _MobilityProfileCard extends StatelessWidget {
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
                                     color: EasySubwayAccessibleColors.text,
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w700,
                                     height: 1.25,
                                   ),
                             ),
