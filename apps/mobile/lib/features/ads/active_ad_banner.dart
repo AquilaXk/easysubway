@@ -32,6 +32,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
   AdCreative? _creative;
   ImageProvider<Object>? _image;
   bool _started = false;
+  int _generation = 0;
 
   @override
   void didChangeDependencies() {
@@ -40,17 +41,46 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
       return;
     }
     _started = true;
-    unawaited(_load());
+    _reload();
   }
 
-  Future<void> _load() async {
+  @override
+  void didUpdateWidget(ActiveAdBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.repository != oldWidget.repository ||
+        widget.placement != oldWidget.placement ||
+        widget.imageLoader != oldWidget.imageLoader) {
+      _creative = null;
+      _image = null;
+      _reload();
+    }
+  }
+
+  void _reload() {
+    final generation = ++_generation;
+    unawaited(
+      _load(
+        generation,
+        widget.repository,
+        widget.placement,
+        widget.imageLoader,
+      ),
+    );
+  }
+
+  Future<void> _load(
+    int generation,
+    AdRepository repository,
+    AdPlacement placement,
+    AdImageLoader imageLoader,
+  ) async {
     try {
-      final creative = await widget.repository.fetchActive(widget.placement);
-      if (!mounted || creative == null) {
+      final creative = await repository.fetchActive(placement);
+      if (!mounted || generation != _generation || creative == null) {
         return;
       }
-      final image = await widget.imageLoader(creative.imageUrl, context);
-      if (!mounted) {
+      final image = await imageLoader(creative.imageUrl, context);
+      if (!mounted || generation != _generation) {
         return;
       }
       setState(() {
@@ -146,6 +176,13 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(width: 4),
+                  const SizedBox(
+                    key: Key('activeAdBannerExternalCta'),
+                    width: 48,
+                    height: 48,
+                    child: Icon(Icons.open_in_new),
                   ),
                 ],
               ),

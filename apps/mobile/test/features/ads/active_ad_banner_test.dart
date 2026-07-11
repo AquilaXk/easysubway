@@ -30,6 +30,8 @@ class _StubApiClient extends ApiClient {
 }
 
 ApiResponse _creativeResponse({
+  String placement = 'route-result-bottom',
+  String imageUrl = 'https://cdn.easysubway.app/banner.png',
   String advertiserName = '이지상점',
   String altText = '여름 할인 배너',
 }) => ApiResponse(
@@ -37,9 +39,9 @@ ApiResponse _creativeResponse({
   jsonBody: <String, Object?>{
     'success': true,
     'data': <String, Object?>{
-      'placement': 'route-result-bottom',
+      'placement': placement,
       'creativeId': 'creative-1',
-      'imageUrl': 'https://cdn.easysubway.app/banner.png',
+      'imageUrl': imageUrl,
       'landingUrl': 'https://advertiser.example/campaign',
       'advertiserName': advertiserName,
       'altText': altText,
@@ -63,6 +65,9 @@ Future<void> _pumpBanner(
   required AdImageLoader imageLoader,
   AdLauncher? launcher,
   Object? apiError,
+  AdRepository? repository,
+  AdPlacement placement = AdPlacement.routeResultBottom,
+  Key? bannerKey,
   double width = 400,
   double textScale = 1,
 }) {
@@ -77,10 +82,11 @@ Future<void> _pumpBanner(
           child: SizedBox(
             width: width,
             child: ActiveAdBanner(
-              repository: AdRepository(
-                _StubApiClient(response, error: apiError),
-              ),
-              placement: AdPlacement.routeResultBottom,
+              key: bannerKey,
+              repository:
+                  repository ??
+                  AdRepository(_StubApiClient(response, error: apiError)),
+              placement: placement,
               imageLoader: imageLoader,
               launcher: launcher ?? _launchSuccess,
             ),
@@ -170,6 +176,7 @@ void main() {
     expect(find.text('광고'), findsOneWidget);
     expect(find.text('이지상점'), findsOneWidget);
     expect(find.text('여름 할인 배너'), findsOneWidget);
+    expect(find.byIcon(Icons.open_in_new), findsOneWidget);
     expect(find.text('광고 미리보기 (개발용)'), findsNothing);
   });
 
@@ -190,7 +197,9 @@ void main() {
     await tester.pump();
 
     final target = find.byKey(const Key('activeAdBannerTapTarget'));
+    final cta = find.byKey(const Key('activeAdBannerExternalCta'));
     expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+    expect(tester.getSize(cta), const Size(48, 48));
     expect(
       tester.getSemantics(target),
       matchesSemantics(
@@ -213,6 +222,71 @@ void main() {
       ),
     ]);
     semantics.dispose();
+  });
+
+  testWidgets('repository와 placement 교체 뒤 늦은 이전 응답과 decode를 무시한다', (
+    tester,
+  ) async {
+    const bannerKey = ValueKey('mutable-ad-banner');
+    final routeResponse = Completer<ApiResponse>();
+    final stationResponse = Completer<ApiResponse>();
+    final routeImage = Completer<ImageProvider<Object>>();
+    final stationImage = Completer<ImageProvider<Object>>();
+    final routeRepository = AdRepository(_StubApiClient(routeResponse.future));
+    final stationRepository = AdRepository(
+      _StubApiClient(stationResponse.future),
+    );
+    Future<ImageProvider<Object>> imageLoader(Uri uri, BuildContext context) {
+      return uri.path.endsWith('route.png')
+          ? routeImage.future
+          : stationImage.future;
+    }
+
+    await _pumpBanner(
+      tester,
+      response: routeResponse.future,
+      repository: routeRepository,
+      placement: AdPlacement.routeResultBottom,
+      bannerKey: bannerKey,
+      imageLoader: imageLoader,
+    );
+    await _pumpBanner(
+      tester,
+      response: stationResponse.future,
+      repository: stationRepository,
+      placement: AdPlacement.stationDetailBottom,
+      bannerKey: bannerKey,
+      imageLoader: imageLoader,
+    );
+
+    routeResponse.complete(
+      _creativeResponse(
+        imageUrl: 'https://cdn.easysubway.app/route.png',
+        advertiserName: '이전 경로 광고',
+      ),
+    );
+    await tester.pump();
+    routeImage.complete(_image);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('이전 경로 광고'), findsNothing);
+    expect(find.byType(AdBannerSlot), findsNothing);
+
+    stationResponse.complete(
+      _creativeResponse(
+        placement: 'station-detail-bottom',
+        imageUrl: 'https://cdn.easysubway.app/station.png',
+        advertiserName: '현재 역 광고',
+      ),
+    );
+    await tester.pump();
+    stationImage.complete(_image);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('현재 역 광고'), findsOneWidget);
+    expect(find.text('이전 경로 광고'), findsNothing);
   });
 
   testWidgets('외부 브라우저 실패나 예외에 fallback을 만들지 않는다', (tester) async {

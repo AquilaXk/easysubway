@@ -143,6 +143,27 @@ void main() {
       {'placement': 'route-result-bottom'},
       {'placement': 'station-detail-bottom'},
     ]);
+    final headerNames = <String>{};
+    for (final request in requests) {
+      request.headers.forEach((name, values) => headerNames.add(name));
+    }
+    expect(
+      headerNames.intersection({
+        HttpHeaders.authorizationHeader,
+        HttpHeaders.cookieHeader,
+        'device-id',
+        'x-device-id',
+        'session-id',
+        'x-session-id',
+        'user-id',
+        'x-user-id',
+        'ad-id',
+        'x-ad-id',
+        'advertising-id',
+        'x-advertising-id',
+      }),
+      isEmpty,
+    );
     expect(
       requests.where((request) => request.uri.path == '/api/ads/events'),
       isEmpty,
