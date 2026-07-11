@@ -42,9 +42,16 @@ echo "[5/7] track 팩 반영 + 역 노드 track 투영(투영 게이트)"
 node tools/route-map/apply-route-map-line-tracks.mjs --pack "$PACK" --index "$INDEX" --tracks "$TRACKS24"
 node tools/route-map/project-nodes-to-tracks.mjs --region 수도권 --pack "$PACK" --index "$INDEX"
 
-echo "[6/7] 재간격(respace: p95/p5 균일화 + 라벨 겹침 완화) + track 8선형 잔차 스냅 + enrich"
+echo "[6/7] 재간격 → 8선형 잔차 스냅 → 분기 spur track 재생성 → enrich"
 node tools/route-map/respace-route-map.mjs --region 수도권 --pack "$PACK" --index "$INDEX" | head -1
 node tools/route-map/snap-tracks-octolinear.mjs --region 수도권 --pack "$PACK" --index "$INDEX"
+# 분기(지선) 노선을 마지막에 재생성한다: 원본 line_sequence가 지선을 본선과 선형
+# 오직결하므로 branch 정본(line-branches.json)으로 본선/spur track을 분리하고, spur
+# 시작 정점을 최종 junction 좌표에 정확히 맞춘다(#1793 위상 계약). 이 단계는 자체
+# 8선형이므로 스냅 후에 둔다(스냅이 spur 시작을 junction에서 이탈시키지 않도록).
+node tools/route-map/octolinearize-line-tracks.mjs --region 수도권 --branches tools/route-map/line-branches.json \
+  --line "수도권 2호선" --line "수도권 5호선" --line "수도권 경의중앙" --line "수도권 경춘" --line "수도권 1호선" \
+  --pack "$PACK"
 node tools/route-map/enrich-capital-route-map-layer.mjs --pack "$PACK" --index "$INDEX" --region 수도권 >/dev/null
 
 echo "[7/7] 게이트 실측"
