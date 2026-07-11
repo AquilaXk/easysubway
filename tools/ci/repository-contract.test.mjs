@@ -6691,8 +6691,12 @@ test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와
     "sfFotExt",
     "stinCd",
     "stinFlor",
-    "updnDvcd",
+    "updnDvCd",
   ]);
+  assert.equal(
+    candidate.evidence.liveSampleNote,
+    "KRIC 공식 stPlf 문서는 updnDvcd로 표기하지만, 2026-07-11 workflow run 29151697392의 live JSON은 updnDvCd를 반환했다. 검증은 live wire 표기 updnDvCd를 따른다.",
+  );
   assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
 });
 
