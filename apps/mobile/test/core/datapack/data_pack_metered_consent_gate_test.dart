@@ -67,6 +67,70 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
   });
 
+  testWidgets('동의 수락 시도가 실패로 남으면 행동 안내 스낵바를 띄운다', (tester) async {
+    final db = user_db.UserDatabase.memory();
+    addTearDown(db.close);
+    final repo = DataPackUpdateStateRepository(userDatabase: db);
+    await repo.savePolicyState(
+      const DataPackUpdatePolicyState(pendingConsentBytes: 3 * 1024 * 1024),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DataPackMeteredConsentGate(
+          stateRepository: repo,
+          onAccept: () async {
+            // 다운로드 시도 실패를 재현: updater의 _saveFailure처럼
+            // 실패 사유가 남고 pendingConsent는 유지된다.
+            await repo.savePolicyState(
+              const DataPackUpdatePolicyState(
+                pendingConsentBytes: 3 * 1024 * 1024,
+                backoffAttempts: 1,
+                lastFailureReason: '이동 정보를 확인하지 못했어요.',
+              ),
+            );
+          },
+          child: const Scaffold(body: SizedBox.shrink()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('지금 받기'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('지금 받지 못했어요. Wi-Fi 연결 시 자동으로 받아요.'), findsOneWidget);
+    // 실패 상세(원인 문자열)는 노출하지 않는다.
+    expect(find.textContaining('이동 정보를 확인하지 못했어요'), findsNothing);
+  });
+
+  testWidgets('동의 수락이 성공하면 스낵바를 띄우지 않는다', (tester) async {
+    final db = user_db.UserDatabase.memory();
+    addTearDown(db.close);
+    final repo = DataPackUpdateStateRepository(userDatabase: db);
+    await repo.savePolicyState(
+      const DataPackUpdatePolicyState(pendingConsentBytes: 3 * 1024 * 1024),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DataPackMeteredConsentGate(
+          stateRepository: repo,
+          onAccept: () async {
+            // 성공 시 updater가 pendingConsent·실패 상태를 모두 지운다.
+            await repo.savePolicyState(const DataPackUpdatePolicyState());
+          },
+          child: const Scaffold(body: SizedBox.shrink()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.tap(find.text('지금 받기'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
   testWidgets('업데이트 완료 뒤 생긴 pending metered consent도 같은 세션에서 표시한다', (
     tester,
   ) async {

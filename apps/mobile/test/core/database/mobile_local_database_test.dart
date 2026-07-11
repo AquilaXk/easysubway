@@ -425,6 +425,59 @@ void main() {
     expect(youthFare.read<int>('cash_fare'), 1650);
   });
 
+  test('신규 baseline은 50km 초과 구간을 8km당100원 9단계로 시딩한다(#1911)', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+
+    await database.seedBaselineIfEmpty();
+
+    final fareRule = await database.customSelect('''
+      SELECT additional_steps_json
+      FROM fare_rules
+      WHERE id = 'capital-integrated-standard'
+    ''').getSingle();
+    final additionalSteps =
+        jsonDecode(fareRule.read<String>('additional_steps_json')) as List;
+
+    expect(additionalSteps, hasLength(9));
+    for (var index = 0; index < 8; index += 1) {
+      expect((additionalSteps[index] as Map)['distanceMeters'], 5000);
+    }
+    expect((additionalSteps[8] as Map)['distanceMeters'], 8000);
+  });
+
+  test(
+    '기존 baseline에 남은 구버전 단일 단계 fare rule을 9단계로 갱신한다(#1911)',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+
+      await database.seedBaselineIfEmpty();
+      await database.customStatement('''
+      UPDATE fare_rules
+      SET additional_steps_json =
+        '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]'
+      WHERE id = 'capital-integrated-standard'
+      ''');
+
+      await database.seedBaselineIfEmpty();
+
+      final fareRule = await database.customSelect('''
+      SELECT additional_steps_json
+      FROM fare_rules
+      WHERE id = 'capital-integrated-standard'
+      ''').getSingle();
+      final additionalSteps =
+          jsonDecode(fareRule.read<String>('additional_steps_json')) as List;
+
+      expect(additionalSteps, hasLength(9));
+      for (var index = 0; index < 8; index += 1) {
+        expect((additionalSteps[index] as Map)['distanceMeters'], 5000);
+      }
+      expect((additionalSteps[8] as Map)['distanceMeters'], 8000);
+    },
+  );
+
   test('내장 데이터팩은 로컬 역 검색 repository에서 역 번호 검색을 제공한다', () async {
     final directory = await Directory.systemTemp.createTemp(
       'easysubway-catalog-search-',
