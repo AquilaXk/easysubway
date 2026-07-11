@@ -1544,9 +1544,7 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.doesNotMatch(main, /homeBottomNavigationBar/);
   assert.match(widgetTest, /기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다/);
   assert.match(widgetTest, /노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다/);
-  // #1933: 별도 길찾기 폼 페이지를 없애며 "노선도 메뉴 길찾기는 길찾기 화면으로 전환한다"
-  // 테스트가 사라졌다. 노선도 홈에서 출발·도착 지정 시 길찾기 화면으로 전환되는
-  // 현행 테스트로 앵커를 갱신해 계약(길찾기 화면 전환 보증)을 유지한다.
+  // #1933: 폼 페이지 제거로 대체된 현행 전환 테스트 앵커
   assert.match(widgetTest, /노선도에서 출발·도착을 정하면 길찾기 결과 화면으로 전환한다/);
   assert.match(widgetTest, /find\.byKey\(const Key\('homeBottomNavigationBar'\)\), findsNothing/);
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavHome'\)\), findsNothing/);
@@ -10190,9 +10188,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboarding, /class OnboardingResult/);
   assert.match(onboarding, /class OnboardingState/);
   assert.match(onboarding, /class OnboardingScreen extends StatefulWidget/);
-  // #1936: 온보딩 전면 재설계로 "먼저 이동 조건을 골라 주세요" 설명 문구가 삭제되고
-  // 질문형 헤더 카피로 대체되었다. 현행 canonical 카피로 앵커를 갱신해 계약(이동
-  // 조건 선택 안내 카피 존재 보증)을 유지한다.
+  // #1936: 온보딩 재설계로 대체된 현행 이동 조건 선택 안내 카피
   assert.match(onboarding, /어떻게 이동하세요\?/);
   assert.doesNotMatch(onboarding, /큰 글자/);
   assert.match(onboarding, /고대비/);
@@ -10202,9 +10198,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /final bool simpleViewEnabled/);
   assert.match(routeSearch, /_resolveInitialMobilityType/);
   assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
-  // #1933 D: 결과-우선 정리로 이동 조건 요약 위젯(_RouteMobilityTypeSummary)과
-  // 간편 보기 버튼 키(routeSimpleMobilityTypeButton)가 조건 칩(_RouteConditionChips)
-  // 구조로 대체됐다. 이동 조건 변경 진입점 보증 계약을 현행 앵커로 유지한다.
+  // #1933: 결과-우선 정리로 대체된 현행 이동 조건 변경 진입점
   assert.match(routeSearch, /_RouteConditionChips\([\s\S]*mobilityType: _selectedMobilityType[\s\S]*onChangeMobility: _showMobilityTypePicker/);
   assert.match(routeSearch, /routeConditionMobilityChip/);
   assert.match(routeSearch, /routeMobilityOption-\$\{option\.mobilityType\}/);
