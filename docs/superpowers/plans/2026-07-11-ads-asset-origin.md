@@ -298,7 +298,7 @@ Expected: all Node tests pass and the contract CLI exits 0 without errors.
 Run:
 
 ```bash
-./gradlew test --tests com.easysubway.ads.application.service.AdServiceTest --no-daemon
+backend/gradlew test --tests com.easysubway.ads.application.service.AdServiceTest --no-daemon
 bash -n tools/deploy/prepare-deployment-env.sh
 git diff --check
 ```
