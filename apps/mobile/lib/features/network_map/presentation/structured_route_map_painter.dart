@@ -286,12 +286,14 @@ class StructuredRouteMapPainter extends CustomPainter {
     required this.designScale,
     required this.camera,
     this.attributionText,
+    this.attributionPainter,
   });
 
   final ui.Picture picture;
   final double designScale;
   final MapCameraState camera;
   final String? attributionText;
+  final TextPainter? attributionPainter;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -311,13 +313,11 @@ class StructuredRouteMapPainter extends CustomPainter {
 
   void _paintAttribution(Canvas canvas, Size size) {
     final text = attributionText;
-    if (text == null || text.isEmpty) {
+    final painter = attributionPainter;
+    // painter는 State가 소유·재사용하는 캐시라 여기서 dispose하지 않는다(#1973).
+    if (text == null || text.isEmpty || painter == null) {
       return;
     }
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: _attributionStyle),
-      textDirection: TextDirection.ltr,
-    )..layout();
     const padding = 4.0;
     final origin = Offset(
       padding + 2,
@@ -334,7 +334,6 @@ class StructuredRouteMapPainter extends CustomPainter {
       Paint()..color = const Color(0xCCFFFFFF),
     );
     painter.paint(canvas, origin);
-    painter.dispose();
   }
 
   @override
@@ -342,7 +341,8 @@ class StructuredRouteMapPainter extends CustomPainter {
     return oldDelegate.camera.revision != camera.revision ||
         !identical(oldDelegate.picture, picture) ||
         oldDelegate.designScale != designScale ||
-        oldDelegate.attributionText != attributionText;
+        oldDelegate.attributionText != attributionText ||
+        !identical(oldDelegate.attributionPainter, attributionPainter);
   }
 }
 
@@ -374,6 +374,10 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   StructuredRouteMap? _sourceMap;
   RouteMapDesignSpace? _design;
   ui.Picture? _picture;
+  // attribution TextPainter는 region(텍스트) 변경 시에만 재생성한다. 매 pan 프레임의
+  // TextPainter 생성·layout 할당을 제거하기 위한 캐시(#1973). State가 dispose를 소유한다.
+  TextPainter? _attributionPainter;
+  String? _attributionPainterText;
 
   void _ensurePicture() {
     if (identical(_sourceMap, widget.map) && _picture != null) {
@@ -426,22 +430,52 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     );
   }
 
+  void _ensureAttributionPainter() {
+    final text = widget.attributionText;
+    if (text == null || text.isEmpty) {
+      if (_attributionPainter != null) {
+        _attributionPainter!.dispose();
+        _attributionPainter = null;
+        _attributionPainterText = null;
+      }
+      return;
+    }
+    if (_attributionPainterText == text && _attributionPainter != null) {
+      return;
+    }
+    _attributionPainter?.dispose();
+    _attributionPainter = TextPainter(
+      text: TextSpan(text: text, style: _attributionStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    _attributionPainterText = text;
+  }
+
   @override
   void dispose() {
     _picture?.dispose();
+    _attributionPainter?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     _ensurePicture();
-    return CustomPaint(
-      size: widget.camera.viewportSize,
-      painter: StructuredRouteMapPainter(
-        picture: _picture!,
-        designScale: _design!.designScale,
-        camera: widget.camera,
-        attributionText: widget.attributionText,
+    _ensureAttributionPainter();
+    // RepaintBoundary로 지도 레이어를 부모 Stack의 형제 오버레이 rebuild와 분리한다.
+    // isComplex/willChange 힌트로 정적 Picture 재생 레이어의 raster 캐싱을 돕는다(#1973).
+    return RepaintBoundary(
+      child: CustomPaint(
+        size: widget.camera.viewportSize,
+        isComplex: true,
+        willChange: true,
+        painter: StructuredRouteMapPainter(
+          picture: _picture!,
+          designScale: _design!.designScale,
+          camera: widget.camera,
+          attributionText: widget.attributionText,
+          attributionPainter: _attributionPainter,
+        ),
       ),
     );
   }
