@@ -125,7 +125,27 @@ class _DataPackMeteredConsentGateState
     );
     if (accepted == true) {
       await widget.onAccept?.call();
+      await _notifyIfAcceptFailed(repository);
     }
+  }
+
+  // 동의한 다운로드가 이번 시도에서 실패로 남았으면 행동 안내만 띄운다.
+  // 실패 상세는 노출하지 않고, Wi-Fi 자동 재개는 pendingConsent 유지로 보장된다.
+  Future<void> _notifyIfAcceptFailed(
+    DataPackUpdateStateRepository repository,
+  ) async {
+    final DataPackUpdatePolicyState state;
+    try {
+      state = await repository.readPolicyState();
+    } on Object {
+      return;
+    }
+    if (!mounted || state.lastFailureReason == null) {
+      return;
+    }
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('지금 받지 못했어요. Wi-Fi 연결 시 자동으로 받아요.')),
+    );
   }
 }
 

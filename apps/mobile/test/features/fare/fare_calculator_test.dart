@@ -95,5 +95,47 @@ void main() {
       expect(fare.cardFare, isNull);
       expect(fare.cashFare, isNull);
     });
+
+    group('수도권 통합요금 9단계 규칙 (10~50km 5km당100원 ×8, 50km 초과 8km당100원)', () {
+      const capitalIntegratedRule = FareRule(
+        id: 'capital-integrated-standard',
+        zoneId: 'capital-integrated',
+        baseCardFare: 1550,
+        baseCashFare: 1650,
+        baseDistanceMeters: 10000,
+        additionalSteps: [
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 5000, cardFare: 100, cashFare: 100),
+          FareAdditionalStep(distanceMeters: 8000, cardFare: 100, cashFare: 100),
+        ],
+      );
+
+      final boundaryCases = <int, int>{
+        10000: 1550, // 기본거리 이내
+        12000: 1650, // 첫 5km 단계 1회
+        50000: 2350, // 1550 + 8단계×100
+        50001: 2450, // + 마지막 8km 단계 1단위
+        58000: 2450, // 잔여 8km = 1단위 (이슈 #1911 기대값)
+        58001: 2550, // 잔여 8,001m = 2단위
+      };
+
+      for (final entry in boundaryCases.entries) {
+        test('${entry.key}m 이동 시 카드요금은 ${entry.value}원이다', () {
+          final fare = const FareCalculator().calculate(
+            distanceMeters: entry.key,
+            rule: capitalIntegratedRule,
+          );
+
+          expect(fare.status, FareStatus.available);
+          expect(fare.cardFare, entry.value);
+        });
+      }
+    });
   });
 }
