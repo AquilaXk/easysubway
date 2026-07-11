@@ -97,6 +97,10 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
     "https://ads-assets.fixture.easysubway.example#creative",
     "https://localhost",
     "https://127.0.0.1",
+    `https://${"a".repeat(64)}.example`,
+    `https://${["a", "b", "c", "d"].map((label) => label.repeat(63)).join(".")}`,
+    "https://127.1",
+    "https://0x7f.1",
     "https://[::1]",
     "https://10.0.0.1",
     "https://object-storage",
@@ -113,6 +117,7 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
   for (const origin of [
     `${ASSET_ORIGIN}/`,
     "https://ads-assets.fixture.easysubway.example:8443",
+    `https://${"a".repeat(63)}.127.example`,
   ]) {
     const outputDir = await prepare(withAssetOrigin(origin));
     const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");

@@ -148,11 +148,28 @@ if [[ "${ads_asset_authority}" == *:* ]]; then
 fi
 ads_asset_host_normalized="$(printf '%s' "${ads_asset_host}" | tr '[:upper:]' '[:lower:]')"
 ads_asset_origin_invalid=0
+IFS='.' read -r -a ads_asset_host_labels <<< "${ads_asset_host}"
+ads_asset_numeric_ipv4=0
+if [[ "${#ads_asset_host_labels[@]}" -ge 2 && "${#ads_asset_host_labels[@]}" -le 4 ]]; then
+	ads_asset_numeric_ipv4=1
+fi
 
-if [[ ! "${ads_asset_origin}" =~ ^https://([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(:[1-9][0-9]{0,4})?/?$ ]]; then
+if [[ "${#ads_asset_host}" -gt 253 ]]; then
 	ads_asset_origin_invalid=1
 fi
-if [[ "${ads_asset_host}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+for ads_asset_host_label in "${ads_asset_host_labels[@]}"; do
+	if [[ "${#ads_asset_host_label}" -lt 1 || "${#ads_asset_host_label}" -gt 63 ]]; then
+		ads_asset_origin_invalid=1
+	fi
+	if [[ "${ads_asset_numeric_ipv4}" -eq 1 && ! "${ads_asset_host_label}" =~ ^([0-9]+|0[xX][0-9A-Fa-f]+)$ ]]; then
+		ads_asset_numeric_ipv4=0
+	fi
+done
+if [[ "${ads_asset_numeric_ipv4}" -eq 1 ]]; then
+	ads_asset_origin_invalid=1
+fi
+
+if [[ ! "${ads_asset_origin}" =~ ^https://([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(:[1-9][0-9]{0,4})?/?$ ]]; then
 	ads_asset_origin_invalid=1
 fi
 if [[ "${ads_asset_port}" =~ ^[0-9]+$ && "${ads_asset_port}" -gt 65535 ]]; then
