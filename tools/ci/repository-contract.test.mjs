@@ -26,7 +26,51 @@ function mobileProductionDartFiles() {
   return execFileSync("git", ["ls-files", "apps/mobile/lib"], {
     cwd: root,
     encoding: "utf8",
-  }).trim().split("\n").filter((file) => file.endsWith(".dart") && !file.endsWith(".g.dart"));
+  }).trim().split("\n").filter((file) => file.endsWith(".dart"));
+}
+
+function collapseQuotedStringConcatenations(source) {
+  let collapsed = source;
+  let previous;
+  do {
+    previous = collapsed;
+    collapsed = collapsed.replace(
+      /(["'])([^"'\\]*)\1\s*\+\s*(["'])([^"'\\]*)\3/g,
+      (_match, _leftQuote, left, _rightQuote, right) => `"${left}${right}"`,
+    );
+  } while (collapsed !== previous);
+  return collapsed;
+}
+
+function containsAdEventEndpoint(source) {
+  return /\/api\/ads\/events\b/.test(collapseQuotedStringConcatenations(source));
+}
+
+function assertAnonymousAdEventPostCall(source) {
+  const endpointCount = (collapseQuotedStringConcatenations(source).match(/\/api\/ads\/events\b/g) ?? []).length;
+  assert.equal(endpointCount, 1, "ad event repository must contain exactly one endpoint");
+
+  const adEventCall = source.match(
+    /postJson\(\s*(["'])\/api\/ads\/events\1\s*,\s*body:\s*\{(?<body>[\s\S]*?)\}\s*,?\s*\)/,
+  );
+  assert.ok(adEventCall?.groups, "ad event postJson call must contain only an inline body argument");
+
+  const entries = [];
+  let remaining = adEventCall.groups.body;
+  const entryPattern = /^\s*(["'])([^"'\\]+)\1\s*:\s*([^,\n{}]+)\s*,?/;
+  while (remaining.trim() !== "") {
+    const entry = remaining.match(entryPattern);
+    assert.ok(entry, "ad event body must be a flat map of explicit entries");
+    entries.push([entry[2], entry[3].trim()]);
+    remaining = remaining.slice(entry[0].length);
+  }
+
+  assert.equal(new Set(entries.map(([key]) => key)).size, entries.length, "ad event body keys must be unique");
+  assert.deepEqual(Object.fromEntries(entries), {
+    placement: "placement.id",
+    creativeId: "creativeId",
+    eventType: "eventType.wireValue",
+  });
 }
 
 function assertNoNativeAdIdentityOrMeasurement({
@@ -2779,6 +2823,36 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
 
 });
 
+test("광고 event sender detector는 직접 endpoint와 quoted-string 연결을 모두 탐지한다", () => {
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/' + 'events')"), true);
+  assert.equal(containsAdEventEndpoint('postJson("/api/ads/" + "events")'), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/active')"), false);
+  assert.ok(mobileProductionDartFiles().some((file) => file.endsWith(".g.dart")));
+});
+
+test("광고 event POST detector는 정확한 익명 세 필드 외 body와 identity header를 거부한다", () => {
+  const validCall = `
+    postJson(
+      '/api/ads/events',
+      body: {
+        'placement': placement.id,
+        'creativeId': creativeId,
+        'eventType': eventType.wireValue,
+      },
+    )
+  `;
+  assert.doesNotThrow(() => assertAnonymousAdEventPostCall(validCall));
+
+  for (const unsafeCall of [
+    validCall.replace("'eventType': eventType.wireValue,", "'eventType': eventType.wireValue,\n        'deviceId': deviceId,"),
+    validCall.replace("      },", "      },\n      headers: {'Authorization': authToken},"),
+    `${validCall}\npostJson('/api/ads/' + 'events', body: anonymousBody)`,
+  ]) {
+    assert.throws(() => assertAnonymousAdEventPostCall(unsafeCall));
+  }
+});
+
 test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를 함께 고정한다", () => {
   const readiness = readJson("apps/mobile/release/store-submission-readiness.json");
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
@@ -2851,17 +2925,14 @@ test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를
   }
   assert.doesNotMatch(androidMainManifest, /android\.permission\.AD_ID/);
   const adEventSenders = mobileProductionDartFiles()
-    .filter((sourcePath) => /\/api\/ads\/events/.test(read(sourcePath)));
+    .filter((sourcePath) => containsAdEventEndpoint(read(sourcePath)));
   assert.deepEqual(adEventSenders, [
     "apps/mobile/lib/features/ads/ad_repository.dart",
   ]);
 
   const adRepository = read("apps/mobile/lib/features/ads/ad_repository.dart");
   assert.match(adRepository, /Future<void> recordEvent\(/);
-  assert.match(adRepository, /postJson\(\s*'\/api\/ads\/events'/);
-  assert.match(adRepository, /'placement': placement\.id/);
-  assert.match(adRepository, /'creativeId': creativeId/);
-  assert.match(adRepository, /'eventType': eventType\.wireValue/);
+  assertAnonymousAdEventPostCall(adRepository);
 });
 
 test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release 산출물까지 차단한다", () => {
