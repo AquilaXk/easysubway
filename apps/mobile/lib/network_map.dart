@@ -2076,22 +2076,6 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     }
   }
 
-  void _setSearchOrigin(StationSearchResult result) {
-    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
-    widget.routeDraftController.setOrigin(station);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${station.displayName}을 출발역으로 설정했습니다')),
-    );
-  }
-
-  void _setSearchDestination(StationSearchResult result) {
-    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
-    widget.routeDraftController.setDestination(station);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${station.displayName}을 도착역으로 설정했습니다')),
-    );
-  }
-
   Future<void> _openSearchLocationSettings() async {
     final locationProvider = widget.locationProvider;
     if (_searchOpeningLocationSettings || locationProvider == null) {
@@ -2141,8 +2125,6 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
                   StationSearchBody(
                     state: state,
                     onResultTap: widget.onResultFocus,
-                    onSetOrigin: _setSearchOrigin,
-                    onSetDestination: _setSearchDestination,
                     isOpeningLocationSettings: _searchOpeningLocationSettings,
                     onOpenLocationSettings: () =>
                         unawaited(_openSearchLocationSettings()),
