@@ -389,6 +389,52 @@ void main() {
   });
 
   testWidgets(
+    'endsAt 이후 timer cleanup 전 tap은 collapse하고 click과 landing을 생략한다',
+    (tester) async {
+      final endsAt = DateTime.now().toUtc().add(const Duration(seconds: 1));
+      final client = _StubApiClient(
+        Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
+      );
+      var launches = 0;
+      await _pumpBanner(
+        tester,
+        repository: AdRepository(client),
+        imageLoader: (_, _) async => _image,
+        launcher: (uri, {required mode}) async {
+          launches++;
+          return true;
+        },
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(AdBannerSlot), findsOneWidget);
+
+      final onTap = tester
+          .widget<Semantics>(find.byKey(const Key('activeAdBannerTapTarget')))
+          .properties
+          .onTap!;
+      await tester.runAsync(() async {
+        final remaining = endsAt.difference(DateTime.now().toUtc());
+        if (remaining > Duration.zero) {
+          await Future<void>.delayed(remaining);
+        }
+        onTap();
+      });
+      await tester.pump();
+
+      final collapsed = find.byType(AdBannerSlot).evaluate().isEmpty;
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      expect(collapsed, isTrue);
+      expect(
+        client.eventBodies.where((body) => body['eventType'] == 'CLICK'),
+        isEmpty,
+      );
+      expect(launches, 0);
+    },
+  );
+
+  testWidgets(
     'widget 교체는 이전 expiry Timer를 cancel하고 dispose 뒤 callback을 남기지 않는다',
     (tester) async {
       const bannerKey = ValueKey('expiry-generation-banner');

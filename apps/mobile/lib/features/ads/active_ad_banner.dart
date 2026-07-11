@@ -159,6 +159,15 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
     if (creative == null) {
       return;
     }
+    if (_isExpired(creative)) {
+      _expiryTimer?.cancel();
+      _expiryTimer = null;
+      setState(() {
+        _creative = null;
+        _image = null;
+      });
+      return;
+    }
     unawaited(
       widget.repository.recordEvent(
         creative.placement,

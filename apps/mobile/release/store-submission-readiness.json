@@ -104,7 +104,7 @@
       "decisionOwnerKo": "제품/사업 담당",
       "readyWhenKo": "자체 서빙 비개인화 하우스/제휴 배너를 포함하므로 Play Console 광고 포함 여부를 예로 제출한다. impression/click은 사용자·기기·세션 식별자 없이 일별 count로만 집계하고 AD_ID, 제3자 광고 SDK, 개인화, tracking은 사용하지 않는다. code release에서는 API·widget·privacy contract를 증거로 사용하며, production 소재·event 집계 E2E는 owner 승인으로 deferred하고 Play Store 게시 후 impression 1회, click, 종료 collapse, 일별 count를 확인한다.",
       "evidence": ["dependency-review", "business-model-review", "ad-request-contract-test", "ad-event-expiry-contract-test", "post-publish-ad-event-expiry-e2e-owner-deferred"],
-      "linkedArtifacts": ["apps/mobile/lib/features/ads/ad_repository.dart", "apps/mobile/lib/features/ads/active_ad_banner.dart", "apps/mobile/release/store-privacy-inventory.json"],
+      "linkedArtifacts": ["apps/mobile/lib/features/ads/ad_repository.dart", "apps/mobile/lib/features/ads/active_ad_banner.dart", "apps/mobile/release/store-privacy-inventory.json", "apps/mobile/release/post-publish-ad-event-expiry-e2e.json"],
       "configurationSources": ["first-party self-served in-app ad placement", "anonymous impression and click daily count", "no third-party ad SDK dependency", "no AD_ID permission", "no personalized ads or tracking"]
     },
     {

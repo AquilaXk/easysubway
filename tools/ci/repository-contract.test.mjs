@@ -2877,6 +2877,8 @@ test("광고 event POST detector는 정확한 익명 세 필드 외 body와 iden
 
 test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를 함께 고정한다", () => {
   const readiness = readJson("apps/mobile/release/store-submission-readiness.json");
+  const postPublishE2ePath = "apps/mobile/release/post-publish-ad-event-expiry-e2e.json";
+  const postPublishE2e = readJson(postPublishE2ePath);
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
   const androidMainManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
@@ -2937,6 +2939,24 @@ test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를
   assert.match(adDisclosure.readyWhenKo, /Play Store 게시 후 impression 1회, click, 종료 collapse, 일별 count/);
   assert.ok(adDisclosure.evidence.includes("ad-event-expiry-contract-test"));
   assert.ok(adDisclosure.evidence.includes("post-publish-ad-event-expiry-e2e-owner-deferred"));
+  assert.ok(adDisclosure.linkedArtifacts.includes(postPublishE2ePath));
+
+  assert.equal(postPublishE2e.schemaVersion, 1);
+  assert.equal(postPublishE2e.ownerIssue, 1971);
+  assert.match(postPublishE2e.approval.ownerKo, /\S/);
+  assert.match(postPublishE2e.approval.recordedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/);
+  assert.equal(postPublishE2e.approval.decision, "DEFER_UNTIL_PLAY_STORE_PUBLICATION");
+  assert.match(postPublishE2e.execution.assigneeKo, /\S/);
+  assert.match(postPublishE2e.execution.deadlineAfterPublicRelease, /^P(?=\d|T\d)/);
+  const allowedStatuses = new Set(["DEFERRED_UNTIL_PUBLIC_RELEASE", "READY_TO_EXECUTE", "COMPLETED"]);
+  const allowedResults = new Set(["PENDING", "PASS", "FAIL", "BLOCKED_EXTERNAL"]);
+  assert.ok(allowedStatuses.has(postPublishE2e.execution.status));
+  assert.ok(allowedResults.has(postPublishE2e.execution.result));
+  assert.deepEqual(
+    postPublishE2e.checks.map((check) => check.id).sort(),
+    ["click", "daily_count", "expiry_collapse", "impression_once"],
+  );
+  assert.ok(postPublishE2e.checks.every((check) => allowedResults.has(check.result)));
 
   for (const dependencyPath of ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock"]) {
     assert.doesNotMatch(
