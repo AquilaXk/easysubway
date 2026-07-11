@@ -19,7 +19,7 @@ PR 생성만 하고 멈추면 절차 위반이다. 아래 전부가 한 세트�
 2. PR 생성 직후 `automerge` 라벨을 부착한다.
 3. CI 전 체크가 green이 될 때까지 감시하고, 실패는 원인 수정·재push로 닫는다.
 4. 코드리뷰 thread를 전부 대응(수정 또는 근거 답변)하고 해결한다.
-5. automerge 큐는 GitHub PR Review 객체를 요구한다(merge-workflow 4단계). CodeRabbit 리뷰를 요청하고, 실패·율제한 시 독립 리뷰 경로(클로드 리뷰 기능 등)의 산출물을 **단일 PR review**로 게시한다. **에이전트가 자기 작업물을 스스로 평가해 리뷰를 작성하는 셀프 리뷰는 금지**다.
+5. automerge 큐는 GitHub PR Review 객체를 요구한다(merge-workflow 4단계). CodeRabbit 리뷰를 요청하고, 실패·율제한 시 독립 리뷰 경로(에이전트 리뷰 도구 등)의 산출물을 **단일 PR review**로 게시한다. **에이전트가 자기 작업물을 스스로 평가해 리뷰를 작성하는 셀프 리뷰는 금지**다.
 6. **폴백 리뷰 양식**: 폴백 리뷰는 **단일 PR review 하나**로 게시한다. `## <도구> fallback review` 제목 + `Source:` / `Repository visibility:` / `Fallback 사유:` / `확인 범위:` / `결과:` 불릿 필드 필수. 공개 저장소이므로 `Repository visibility: public GitHub repository`를 포함한다. 자유 양식 금지.
 7. 리뷰 객체 확보 후 `automerge` 라벨을 재부착해 큐에 재진입시키고, **병합 확인까지**가 에이전트의 몫이다.
 8. **closed/병합된 PR 본문은 사후 보정하지 않는다** (법적·보안·비밀 노출 수정 예외). 양식 guard는 PR 생성 시점에 적용한다. 이슈·PR 본문·리뷰 코멘트 서술은 전부 한국어로 작성한다 (코드 토큰·명령어·고정 섹션명 예외).
