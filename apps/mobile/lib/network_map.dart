@@ -802,6 +802,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                         ? _nearbySelectedStationId
                         : null,
                     hasOrigin: widget.routeDraftController.draft.origin != null,
+                    originStationId:
+                        widget.routeDraftController.draft.origin?.id,
+                    waypointStationId:
+                        widget.routeDraftController.draft.waypoint?.id,
+                    destinationStationId:
+                        widget.routeDraftController.draft.destination?.id,
                     onSetOrigin: _setOriginStation,
                     onSetWaypoint: _setWaypointStation,
                     onSetDestination: _setDestinationStation,
@@ -1634,8 +1640,9 @@ class _NetworkMapRegionMenuOverlay extends StatelessWidget {
                         style: TextStyle(
                           color: EasySubwayAccessibleColors.listRowText,
                           fontSize: 16,
-                          fontWeight:
-                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
                         ),
                       ),
                     ),
@@ -3230,12 +3237,20 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.onSetWaypoint,
     required this.onSetDestination,
     required this.onViewportChanged,
+    this.originStationId,
+    this.waypointStationId,
+    this.destinationStationId,
   });
 
   final NetworkMapData data;
   final Rect? initialViewport;
   final String? focusedStationId;
   final String? selectedStationId;
+
+  /// #1948: draft 핀을 그릴 지정 역 id (없으면 null).
+  final String? originStationId;
+  final String? waypointStationId;
+  final String? destinationStationId;
 
   /// #1933-3: 출발이 이미 정해졌으면 다음 역 팝오버는 [도착]을 강조한다.
   final bool hasOrigin;
@@ -3392,6 +3407,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           final selectedStation =
               _stationByIdentity(widget.data.stations, _selectedStation) ??
               _stationById(widget.data.stations, widget.selectedStationId);
+          final originStation = _stationById(
+            widget.data.stations,
+            widget.originStationId,
+          );
+          final waypointStation = _stationById(
+            widget.data.stations,
+            widget.waypointStationId,
+          );
+          final destinationStation = _stationById(
+            widget.data.stations,
+            widget.destinationStationId,
+          );
           final focusedStation = widget.focusedStationId == null
               ? null
               : _stationById(widget.data.stations, widget.focusedStationId);
@@ -3482,6 +3509,36 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                       onTap: () => _selectStation(station),
                     ),
                   ),
+              if (!_gestureActive && originStation != null)
+                _NetworkMapDraftPin(
+                  key: const Key('networkMapDraftPin-origin'),
+                  station: originStation,
+                  geometry: geometry,
+                  camera: camera,
+                  label: '출발',
+                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  semanticSuffix: '출발 지정됨',
+                ),
+              if (!_gestureActive && waypointStation != null)
+                _NetworkMapDraftPin(
+                  key: const Key('networkMapDraftPin-waypoint'),
+                  station: waypointStation,
+                  geometry: geometry,
+                  camera: camera,
+                  label: '경유',
+                  surfaceColor: const Color(0xE8404445),
+                  semanticSuffix: '경유 지정됨',
+                ),
+              if (!_gestureActive && destinationStation != null)
+                _NetworkMapDraftPin(
+                  key: const Key('networkMapDraftPin-destination'),
+                  station: destinationStation,
+                  geometry: geometry,
+                  camera: camera,
+                  label: '도착',
+                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  semanticSuffix: '도착 지정됨',
+                ),
               if (!_gestureActive && selectedStation != null)
                 _NetworkMapStationActionOverlay(
                   station: selectedStation,
@@ -5187,6 +5244,88 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// #1948: 출발/경유/도착으로 지정된 역 위에 말풍선형 draft 핀을 표시한다.
+class _NetworkMapDraftPin extends StatelessWidget {
+  const _NetworkMapDraftPin({
+    super.key,
+    required this.station,
+    required this.geometry,
+    required this.camera,
+    required this.label,
+    required this.surfaceColor,
+    required this.semanticSuffix,
+  });
+
+  final NetworkMapStation station;
+  final _MapGeometry geometry;
+  final MapCameraState camera;
+  final String label;
+  final Color surfaceColor;
+  final String semanticSuffix;
+
+  @override
+  Widget build(BuildContext context) {
+    final stationPoint = camera.sourceToViewportPoint(
+      Offset(geometry.x(station), geometry.y(station)),
+    );
+    const width = 72.0;
+    const height = 40.0;
+    final viewportWidth = camera.viewportSize.width;
+    final left = (stationPoint.dx - width / 2)
+        .clamp(12.0, math.max(12.0, viewportWidth - width - 12))
+        .toDouble();
+    final top = math.max(12.0, stationPoint.dy - height - 14);
+    final arrowLeft = (stationPoint.dx - left - 11).clamp(4.0, width - 26);
+    return Positioned(
+      left: left,
+      top: top,
+      width: width,
+      child: Semantics(
+        container: true,
+        label: '${station.displayName}, $semanticSuffix',
+        child: ExcludeSemantics(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Material(
+                color: surfaceColor,
+                elevation: 0,
+                borderRadius: BorderRadius.circular(6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: arrowLeft),
+                  child: Icon(
+                    Icons.arrow_drop_down,
+                    size: 22,
+                    color: surfaceColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
