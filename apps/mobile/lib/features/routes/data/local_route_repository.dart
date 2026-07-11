@@ -212,8 +212,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     _RouteCatalogSnapshot catalog, {
     required Map<int, String> plannedArrivals,
   }) {
-    return _collapseConsecutiveRideSteps(result.steps)
-        .indexed
+    return _collapseConsecutiveRideSteps(result.steps).indexed
         .map((entry) {
           final (index, step) = entry;
           final fromStationId = catalog.stationIdForNode(step.fromNodeId);
@@ -244,7 +243,7 @@ class LocalRouteRepository implements RouteSearchRepository {
               toName,
               lineName,
             ),
-            reason: _stepReason(),
+            reason: step.type.name == 'waypoint' ? '' : _stepReason(),
             evidenceSources: step.evidenceSources,
             timeSource: step.timeSource,
             distanceSource: step.distanceSource,
@@ -483,7 +482,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '계단 구간입니다. 계단 없는 조건에서는 안내하지 않습니다.',
       'escalator' => '에스컬레이터를 이용해 이동합니다.',
       'facilityConnector' => '역 시설 연결 동선을 따라 이동합니다.',
-      'waypoint' => '경유역을 지나 이동을 이어갑니다.',
+      'waypoint' => '내리지 않고 이 역을 지나가요',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }
@@ -525,7 +524,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '$fromName에서 $toName까지 계단으로 이동하는 구간입니다.',
       'escalator' => '$fromName에서 $toName까지 에스컬레이터를 이용합니다.',
       'facilityConnector' => '$fromName에서 $toName까지 역 시설 연결 동선을 이용합니다.',
-      'waypoint' => '$fromName을 경유해 이동을 이어갑니다.',
+      'waypoint' => '이 역에서 내리지 않고 지나갑니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }
@@ -614,8 +613,8 @@ local.LocalRouteResult mergeWaypointRouteResults(
     ...second.warnings,
   ]);
 
-  final worstRank = _routeStatusRank(first.status) <=
-          _routeStatusRank(second.status)
+  final worstRank =
+      _routeStatusRank(first.status) <= _routeStatusRank(second.status)
       ? _routeStatusRank(first.status)
       : _routeStatusRank(second.status);
 
@@ -633,9 +632,14 @@ local.LocalRouteResult mergeWaypointRouteResults(
     );
   }
 
-  final boundaryNodeId = first.steps.isNotEmpty
-      ? first.steps.last.toNodeId
-      : (second.steps.isNotEmpty ? second.steps.first.fromNodeId : '');
+  // 중간 경유는 개찰구를 나가지 않는 지점이므로, 1구간 꼬리의 도착 하차 후
+  // 동선과 2구간 머리의 출발 진입 동선을 경계에서 제거한다.
+  final firstTrimmed = _trimBoundaryAccessSteps(first.steps, fromTail: true);
+  final secondTrimmed = _trimBoundaryAccessSteps(second.steps, fromTail: false);
+
+  final boundaryNodeId = firstTrimmed.isNotEmpty
+      ? firstTrimmed.last.toNodeId
+      : (secondTrimmed.isNotEmpty ? secondTrimmed.first.fromNodeId : '');
   final boundary = route_step.RouteStep(
     sequence: 0,
     edgeId: 'waypoint-boundary',
@@ -648,9 +652,9 @@ local.LocalRouteResult mergeWaypointRouteResults(
   );
 
   final flat = <route_step.RouteStep>[
-    ...first.steps,
+    ...firstTrimmed,
     boundary,
-    ...second.steps,
+    ...secondTrimmed,
   ];
   final renumbered = <route_step.RouteStep>[];
   for (var index = 0; index < flat.length; index += 1) {
@@ -685,6 +689,45 @@ local.LocalRouteResult mergeWaypointRouteResults(
     warnings: mergedWarnings,
     blockedReasonCodes: mergedCodes,
   );
+}
+
+/// 경유 경계에서 제거하는 접근·연결 동선 타입 화이트리스트.
+/// ride/transfer/inStationTransfer/outOfStationTransfer는 절대 제거하지 않는다.
+const Set<route_step.RouteStepType> _boundaryAccessStepTypes = {
+  route_step.RouteStepType.exit,
+  route_step.RouteStepType.walkway,
+  route_step.RouteStepType.elevator,
+  route_step.RouteStepType.ramp,
+  route_step.RouteStepType.stair,
+  route_step.RouteStepType.escalator,
+  route_step.RouteStepType.facilityConnector,
+  route_step.RouteStepType.internal,
+  route_step.RouteStepType.entry,
+};
+
+/// 경유 경계에 인접한 접근 동선을 제거한다.
+/// [fromTail]이 true면 뒤에서부터(1구간 꼬리), false면 앞에서부터(2구간 머리)
+/// 화이트리스트 타입이 연속되는 구간을 제거하고, 아닌 타입을 만나면 중단한다.
+List<route_step.RouteStep> _trimBoundaryAccessSteps(
+  List<route_step.RouteStep> steps, {
+  required bool fromTail,
+}) {
+  if (steps.isEmpty) {
+    return steps;
+  }
+  if (fromTail) {
+    var end = steps.length;
+    while (end > 0 && _boundaryAccessStepTypes.contains(steps[end - 1].type)) {
+      end -= 1;
+    }
+    return steps.sublist(0, end);
+  }
+  var start = 0;
+  while (start < steps.length &&
+      _boundaryAccessStepTypes.contains(steps[start].type)) {
+    start += 1;
+  }
+  return steps.sublist(start);
 }
 
 /// 상태 병합 우선순위. 낮을수록 나쁜(=우선 채택되는) 상태다.

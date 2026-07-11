@@ -25,6 +25,42 @@ RouteStep _ride({
   );
 }
 
+RouteStep _exit({
+  required int sequence,
+  required String fromNodeId,
+  required String toNodeId,
+  int durationSeconds = 120,
+  int cost = 50,
+}) {
+  return RouteStep(
+    sequence: sequence,
+    edgeId: 'edge-$fromNodeId-$toNodeId',
+    fromNodeId: fromNodeId,
+    toNodeId: toNodeId,
+    type: RouteStepType.exit,
+    cost: cost,
+    durationSeconds: durationSeconds,
+  );
+}
+
+RouteStep _entry({
+  required int sequence,
+  required String fromNodeId,
+  required String toNodeId,
+  int durationSeconds = 60,
+  int cost = 50,
+}) {
+  return RouteStep(
+    sequence: sequence,
+    edgeId: 'edge-$fromNodeId-$toNodeId',
+    fromNodeId: fromNodeId,
+    toNodeId: toNodeId,
+    type: RouteStepType.entry,
+    cost: cost,
+    durationSeconds: durationSeconds,
+  );
+}
+
 LocalRouteResult _found({
   required List<RouteStep> steps,
   required int totalCost,
@@ -42,45 +78,98 @@ LocalRouteResult _found({
 
 void main() {
   group('mergeWaypointRouteResults', () {
-    test(
-      '규칙1: 같은 노선·패턴·연결 노드여도 경계 마커가 두 승차를 갈라 놓는다',
-      () {
-        // first의 마지막 ride와 second의 첫 ride가 collapse 병합 조건(같은 lineId,
-        // 같은 servicePattern, 연결 노드)을 모두 만족하도록 구성한다.
-        final first = _found(
-          steps: [
-            _ride(sequence: 1, fromNodeId: 'a', toNodeId: 'b'),
-          ],
-          totalCost: 100,
-        );
-        final second = _found(
-          steps: [
-            _ride(sequence: 1, fromNodeId: 'b', toNodeId: 'c'),
-          ],
-          totalCost: 100,
-        );
+    test('규칙1: 같은 노선·패턴·연결 노드여도 경계 마커가 두 승차를 갈라 놓는다', () {
+      // first의 마지막 ride와 second의 첫 ride가 collapse 병합 조건(같은 lineId,
+      // 같은 servicePattern, 연결 노드)을 모두 만족하도록 구성한다.
+      final first = _found(
+        steps: [_ride(sequence: 1, fromNodeId: 'a', toNodeId: 'b')],
+        totalCost: 100,
+      );
+      final second = _found(
+        steps: [_ride(sequence: 1, fromNodeId: 'b', toNodeId: 'c')],
+        totalCost: 100,
+      );
 
-        final merged = mergeWaypointRouteResults(first, second);
+      final merged = mergeWaypointRouteResults(first, second);
 
-        final waypointSteps = merged.steps
-            .where((step) => step.type == RouteStepType.waypoint)
-            .toList();
-        expect(waypointSteps.length, 1);
+      final waypointSteps = merged.steps
+          .where((step) => step.type == RouteStepType.waypoint)
+          .toList();
+      expect(waypointSteps.length, 1);
 
-        final markerIndex = merged.steps.indexWhere(
-          (step) => step.type == RouteStepType.waypoint,
-        );
-        expect(markerIndex, greaterThan(0));
-        expect(markerIndex, lessThan(merged.steps.length - 1));
-        // 마커 앞뒤로 승차가 각각 남아 있어(2개) 하나로 병합되지 않는다.
-        expect(merged.steps[markerIndex - 1].type, RouteStepType.ride);
-        expect(merged.steps[markerIndex + 1].type, RouteStepType.ride);
-        final rideCount = merged.steps
-            .where((step) => step.type == RouteStepType.ride)
-            .length;
-        expect(rideCount, 2);
-      },
-    );
+      final markerIndex = merged.steps.indexWhere(
+        (step) => step.type == RouteStepType.waypoint,
+      );
+      expect(markerIndex, greaterThan(0));
+      expect(markerIndex, lessThan(merged.steps.length - 1));
+      // 마커 앞뒤로 승차가 각각 남아 있어(2개) 하나로 병합되지 않는다.
+      expect(merged.steps[markerIndex - 1].type, RouteStepType.ride);
+      expect(merged.steps[markerIndex + 1].type, RouteStepType.ride);
+      final rideCount = merged.steps
+          .where((step) => step.type == RouteStepType.ride)
+          .length;
+      expect(rideCount, 2);
+    });
+
+    test('규칙1b: 경계에서 도착 하차 동선(exit)과 출발 진입 동선(entry)을 제거한다 (#1948)', () {
+      final first = _found(
+        steps: [
+          _ride(sequence: 1, fromNodeId: 'a', toNodeId: 'b'),
+          _exit(
+            sequence: 2,
+            fromNodeId: 'b',
+            toNodeId: 'b',
+            durationSeconds: 120,
+          ),
+        ],
+        totalCost: 150,
+      );
+      final second = _found(
+        steps: [
+          _entry(
+            sequence: 1,
+            fromNodeId: 'c',
+            toNodeId: 'c',
+            durationSeconds: 60,
+          ),
+          _ride(sequence: 2, fromNodeId: 'c', toNodeId: 'd'),
+        ],
+        totalCost: 150,
+      );
+
+      final merged = mergeWaypointRouteResults(first, second);
+
+      // 경계 접근 동선(exit/entry)은 제거된다.
+      expect(
+        merged.steps.any((step) => step.type == RouteStepType.exit),
+        isFalse,
+      );
+      expect(
+        merged.steps.any((step) => step.type == RouteStepType.entry),
+        isFalse,
+      );
+
+      // ride 2개 + waypoint 마커 1개 = 3스텝.
+      expect(merged.steps.length, 3);
+      final markerIndex = merged.steps.indexWhere(
+        (step) => step.type == RouteStepType.waypoint,
+      );
+      expect(markerIndex, 1);
+      expect(merged.steps[markerIndex - 1].type, RouteStepType.ride);
+      expect(merged.steps[markerIndex + 1].type, RouteStepType.ride);
+
+      // 마커는 trim 후 first 마지막 toNodeId('b')를 가리킨다.
+      final marker = merged.steps[markerIndex];
+      expect(marker.fromNodeId, 'b');
+      expect(marker.toNodeId, 'b');
+
+      // 총 소요시간은 ride 2개 합(60+60)만 남고 접근 180초는 빠진다.
+      final totalDuration = merged.steps.fold<int>(
+        0,
+        (sum, step) => sum + step.durationSeconds,
+      );
+      expect(totalDuration, 120);
+    });
 
     test('규칙2: found+found는 found & 비용 합산', () {
       final first = _found(
@@ -155,10 +244,11 @@ void main() {
       final merged = mergeWaypointRouteResults(first, second);
 
       expect(merged.blockedReasonCodes, ['X', 'Y', 'Z']);
-      expect(
-        merged.warnings.map((warning) => warning.code).toList(),
-        ['W1', 'W2', 'W3'],
-      );
+      expect(merged.warnings.map((warning) => warning.code).toList(), [
+        'W1',
+        'W2',
+        'W3',
+      ]);
     });
 
     test('규칙3: found+found 병합 결과 sequence는 1..N 연속', () {
@@ -170,18 +260,14 @@ void main() {
         totalCost: 200,
       );
       final second = _found(
-        steps: [
-          _ride(sequence: 1, fromNodeId: 'c', toNodeId: 'd'),
-        ],
+        steps: [_ride(sequence: 1, fromNodeId: 'c', toNodeId: 'd')],
         totalCost: 100,
       );
 
       final merged = mergeWaypointRouteResults(first, second);
 
       final sequences = merged.steps.map((step) => step.sequence).toList();
-      expect(sequences, [
-        for (var i = 1; i <= merged.steps.length; i += 1) i,
-      ]);
+      expect(sequences, [for (var i = 1; i <= merged.steps.length; i += 1) i]);
     });
   });
 
@@ -207,9 +293,7 @@ void main() {
         lineName: '',
         estimatedMinutes: 0,
       );
-      final secondLegSteps = [
-        _rideStep(sequence: 4, estimatedMinutes: 8),
-      ];
+      final secondLegSteps = [_rideStep(sequence: 4, estimatedMinutes: 8)];
 
       final withMarker = _result(
         steps: [...firstLegSteps, waypointMarker, ...secondLegSteps],
