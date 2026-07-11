@@ -18,6 +18,14 @@ const requiredLicenseFields = [
   "reviewStatus",
 ];
 
+// reviewStatus 허용 enum — 정본(route-map-license-decision.json)의 reviewStatusValues와 정합.
+const allowedReviewStatus = [
+  "self-drawn-confirmed",
+  "self-drawn-fact-based",
+  "legal-review-required",
+  "permission-required",
+];
+
 export function validateMapAttributionManifest(manifest) {
   const maps = Array.isArray(manifest.maps) ? manifest.maps : [];
   const failures = [];
@@ -40,6 +48,16 @@ export function validateMapAttributionManifest(manifest) {
       if (typeof map.license[field] !== "boolean") {
         failures.push(`${id}: license.${field} must be boolean`);
       }
+    }
+    if (
+      map.license.reviewStatus !== undefined &&
+      map.license.reviewStatus !== null &&
+      map.license.reviewStatus !== "" &&
+      !allowedReviewStatus.includes(map.license.reviewStatus)
+    ) {
+      failures.push(
+        `${id}: license.reviewStatus must be one of ${allowedReviewStatus.join(", ")}`,
+      );
     }
   }
   return failures;
