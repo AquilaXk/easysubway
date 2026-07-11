@@ -12355,3 +12355,70 @@ test("home_widget 호환 iOS deployment target은 모든 configuration에서 14.
     deploymentTargets.every((target) => Number.parseFloat(target) >= 14),
   );
 });
+
+test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으로 expiry alert를 배선한다", () => {
+  assert.ok(
+    existsSync(path.join(root, ".github/workflows/datapack-expiry-alert.yml")),
+    "datapack expiry alert workflow must exist",
+  );
+
+  const workflow = read(".github/workflows/datapack-expiry-alert.yml");
+  const policy = readJson("apps/mobile/release/datapack-freshness-sla.json");
+
+  assert.match(workflow, /^name: Data Pack Expiry Alert$/m);
+  assert.match(workflow, /schedule:[\s\S]*cron: "23 \*\/4 \* \* \*"/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /permissions:\s*\n\s*contents: read/);
+  assert.match(workflow, /concurrency:\s*\n\s*group: /);
+
+  // 기존 데이터팩 릴리스 workflow와 동일하게 action SHA를 고정한다.
+  const releaseWorkflow = read(".github/workflows/datapack-release.yml");
+  const checkoutSha = releaseWorkflow.match(/actions\/checkout@([0-9a-f]{40})/)?.[1];
+  const setupNodeSha = releaseWorkflow.match(/actions\/setup-node@([0-9a-f]{40})/)?.[1];
+  const uploadArtifactSha = releaseWorkflow.match(/actions\/upload-artifact@([0-9a-f]{40})/)?.[1];
+  const slackActionSha = releaseWorkflow.match(/slackapi\/slack-github-action@([0-9a-f]{40})/)?.[1];
+  assert.ok(checkoutSha, "release workflow must pin checkout SHA for comparison");
+  assert.match(workflow, new RegExp(`actions/checkout@${checkoutSha}`));
+  assert.match(workflow, new RegExp(`actions/setup-node@${setupNodeSha}`));
+  assert.match(workflow, new RegExp(`actions/upload-artifact@${uploadArtifactSha}`));
+  assert.match(workflow, new RegExp(`slackapi/slack-github-action@${slackActionSha}`));
+
+  // secret 없으면 성공 종료하는 skip 패턴 (datapack-release.yml의 Slack skip 패턴 참고).
+  assert.match(workflow, /EASYSUBWAY_ENV_SECRET:\s*\$\{\{\s*secrets\.EASYSUBWAY_ENV\s*\}\}/);
+  assert.match(workflow, /::notice/);
+  assert.match(workflow, /umask 077/);
+  assert.doesNotMatch(workflow, /EASYSUBWAY_OBJECT_STORAGE_(ACCESS|SECRET)_KEY/);
+  assert.doesNotMatch(workflow, /SIGNING_(PRIVATE|PUBLIC)_KEY/);
+
+  // manifest 다운로드와 스크립트 호출부.
+  assert.match(workflow, /curl -fsS "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
+  assert.match(workflow, /node tools\/datapack\/check-datapack-expiry-alert\.mjs/);
+  assert.match(workflow, /--manifest\s+"/);
+  assert.match(workflow, /--output\s+"/);
+
+  // --policy를 명시하면 freshness SLA 경로와 일치해야 하고, 미명시라면 스크립트 기본값과 일치해야 한다.
+  const policyFlagMatch = workflow.match(/--policy\s+"?([^"\s]+)"?/);
+  if (policyFlagMatch) {
+    assert.equal(policyFlagMatch[1], "apps/mobile/release/datapack-freshness-sla.json");
+  }
+  assert.equal(policy.monitoring.alertBeforePackExpiry, "PT6H");
+
+  // evidence artifact 업로드.
+  assert.match(workflow, /uses: actions\/upload-artifact@/);
+  assert.match(workflow, /if-no-files-found: error/);
+
+  // alert.status / alert.severity 파싱과 게이팅.
+  assert.match(workflow, /alert\.status/);
+  assert.match(workflow, /alert\.severity/);
+  assert.match(workflow, /FIRING/);
+  assert.match(workflow, /critical/);
+
+  // Slack 알림 게이트: 웹훅 미설정 시 skip.
+  assert.match(workflow, /SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(workflow, /secrets\.SLACK_RELEASE_WEBHOOK_URL/);
+
+  for (const file of workflowFiles()) {
+    const source = read(file);
+    assertActionsEnvSecretPolicy(file, source);
+  }
+});
