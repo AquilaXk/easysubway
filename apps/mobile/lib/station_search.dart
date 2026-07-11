@@ -11,6 +11,8 @@ import 'adaptive_layout.dart';
 import 'core/external/kakao_map_launcher.dart';
 import 'facility_status.dart';
 import 'facility_report.dart';
+import 'features/ads/active_ad_banner.dart';
+import 'features/ads/ad_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'features/realtime/realtime_repository.dart';
@@ -1693,6 +1695,7 @@ class StationSearchScreen extends StatefulWidget {
     required this.reportRepository,
     required this.locationProvider,
     this.favoriteRepository,
+    this.adRepository,
     this.searchHistoryRepository,
     this.realtimeRepository,
     this.facilityReportDraftTargetStore,
@@ -1709,6 +1712,7 @@ class StationSearchScreen extends StatefulWidget {
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider locationProvider;
   final FavoriteStationRepository? favoriteRepository;
+  final AdRepository? adRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final RealtimeRepository? realtimeRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
@@ -2108,6 +2112,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           repository: widget.repository,
           reportRepository: widget.reportRepository,
           favoriteRepository: widget.favoriteRepository,
+          adRepository: widget.adRepository,
           realtimeRepository: widget.realtimeRepository,
           locationProvider: widget.locationProvider,
           stationId: result.id,
@@ -2863,6 +2868,7 @@ class StationDetailScreen extends StatefulWidget {
     required this.reportRepository,
     required this.stationId,
     this.favoriteRepository,
+    this.adRepository,
     this.realtimeRepository,
     this.locationProvider,
     this.initiallyFavorite,
@@ -2878,6 +2884,7 @@ class StationDetailScreen extends StatefulWidget {
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
   final FavoriteStationRepository? favoriteRepository;
+  final AdRepository? adRepository;
   final RealtimeRepository? realtimeRepository;
   final CurrentLocationProvider? locationProvider;
   final String stationId;
@@ -2963,6 +2970,7 @@ class _StationDetailScreenState extends State<StationDetailScreen> {
                 internalRouteState: _internalRouteController?.state,
                 reportRepository: widget.reportRepository,
                 favoriteController: _favoriteController,
+                adRepository: widget.adRepository,
                 routeDraftController: widget.routeDraftController,
                 locationProvider: widget.locationProvider,
                 mapLauncher: widget.mapLauncher,
@@ -2984,6 +2992,7 @@ class _StationDetailBody extends StatelessWidget {
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
+    required this.adRepository,
     required this.routeDraftController,
     required this.locationProvider,
     required this.mapLauncher,
@@ -2995,6 +3004,7 @@ class _StationDetailBody extends StatelessWidget {
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
+  final AdRepository? adRepository;
   final RouteDraftController? routeDraftController;
   final CurrentLocationProvider? locationProvider;
   final KakaoMapLauncher mapLauncher;
@@ -3025,6 +3035,7 @@ class _StationDetailBody extends StatelessWidget {
         internalRouteState: internalRouteState,
         reportRepository: reportRepository,
         favoriteController: favoriteController,
+        adRepository: adRepository,
         routeDraftController: routeDraftController,
         locationProvider: locationProvider,
         mapLauncher: mapLauncher,
@@ -3048,6 +3059,7 @@ class _StationDetailContent extends StatelessWidget {
     required this.internalRouteState,
     required this.reportRepository,
     required this.favoriteController,
+    required this.adRepository,
     required this.routeDraftController,
     required this.locationProvider,
     required this.mapLauncher,
@@ -3066,6 +3078,7 @@ class _StationDetailContent extends StatelessWidget {
   final InternalRouteState? internalRouteState;
   final FacilityReportRepository reportRepository;
   final StationFavoriteToggleController? favoriteController;
+  final AdRepository? adRepository;
   final RouteDraftController? routeDraftController;
   final CurrentLocationProvider? locationProvider;
   final KakaoMapLauncher mapLauncher;
@@ -3152,6 +3165,14 @@ class _StationDetailContent extends StatelessWidget {
           '마지막 확인 ${stationVerifiedRelativeLabel(detail.lastVerifiedAt)}',
         ],
       ),
+      if (adRepository case final repository?) ...[
+        const SizedBox(height: 24),
+        ActiveAdBanner(
+          key: const Key('stationDetailBottomAdBanner'),
+          repository: repository,
+          placement: AdPlacement.stationDetailBottom,
+        ),
+      ],
     ];
 
     return LayoutBuilder(

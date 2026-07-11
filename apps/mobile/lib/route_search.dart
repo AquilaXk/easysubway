@@ -9,6 +9,8 @@ import 'accessible_design.dart';
 import 'ad_slot.dart';
 import 'auth_headers.dart';
 import 'core/network/api_client.dart';
+import 'features/ads/active_ad_banner.dart';
+import 'features/ads/ad_repository.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
@@ -2443,6 +2445,7 @@ class RouteSearchScreen extends StatefulWidget {
     required this.stationRepository,
     this.routeFeedbackRepository,
     this.favoriteRouteRepository,
+    this.adRepository,
     this.simpleViewEnabled = true,
     this.initialDraft,
     this.shellNavigationBar,
@@ -2456,6 +2459,7 @@ class RouteSearchScreen extends StatefulWidget {
   final StationSearchRepository stationRepository;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final AdRepository? adRepository;
   final GetOffAlarmController? getOffAlarmController;
   final RouteDraft? initialDraft;
   final Widget? shellNavigationBar;
@@ -2782,6 +2786,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                     state: _controller.state,
                     routeFeedbackRepository: widget.routeFeedbackRepository,
                     favoriteRouteRepository: widget.favoriteRouteRepository,
+                    adRepository: widget.adRepository,
                     onShellBackToHome: widget.onShellBackToHome == null
                         ? null
                         : _endRoute,
@@ -4031,6 +4036,7 @@ class _RouteSearchBody extends StatelessWidget {
     required this.state,
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
+    required this.adRepository,
     required this.onShellBackToHome,
     required this.getOffAlarmController,
     required this.stationRepository,
@@ -4039,6 +4045,7 @@ class _RouteSearchBody extends StatelessWidget {
   final RouteSearchState state;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final AdRepository? adRepository;
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
   final StationSearchRepository stationRepository;
@@ -4066,6 +4073,7 @@ class _RouteSearchBody extends StatelessWidget {
         isRefreshing: state.isRefreshing,
         routeFeedbackRepository: routeFeedbackRepository,
         favoriteRouteRepository: favoriteRouteRepository,
+        adRepository: adRepository,
         onShellBackToHome: onShellBackToHome,
         getOffAlarmController: getOffAlarmController,
         stationRepository: stationRepository,
@@ -4209,6 +4217,7 @@ class _RouteSearchResultCard extends StatefulWidget {
     required this.isRefreshing,
     required this.routeFeedbackRepository,
     required this.favoriteRouteRepository,
+    required this.adRepository,
     required this.onShellBackToHome,
     required this.getOffAlarmController,
     required this.stationRepository,
@@ -4219,6 +4228,7 @@ class _RouteSearchResultCard extends StatefulWidget {
   final bool isRefreshing;
   final RouteFeedbackRepository? routeFeedbackRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final AdRepository? adRepository;
   final AsyncCallback? onShellBackToHome;
   final GetOffAlarmController? getOffAlarmController;
   final StationSearchRepository stationRepository;
@@ -4248,6 +4258,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
           _RouteResultsListView(
             result: result,
             onOpenDetail: () => _openDetail(result),
+            adRepository: widget.adRepository,
           ),
           if (widget.getOffAlarmController != null)
             _GetOffAlarmEntryPoint(
@@ -4309,6 +4320,7 @@ class _RouteSearchResultCardState extends State<_RouteSearchResultCard> {
                 repository: widget.favoriteRouteRepository!,
               )
             : null,
+        adRepository: widget.adRepository,
       ),
     );
   }
@@ -4518,10 +4530,12 @@ class _RouteResultsListView extends StatelessWidget {
   const _RouteResultsListView({
     required this.result,
     required this.onOpenDetail,
+    required this.adRepository,
   });
 
   final RouteSearchResult result;
   final VoidCallback onOpenDetail;
+  final AdRepository? adRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -4548,7 +4562,14 @@ class _RouteResultsListView extends StatelessWidget {
         _RouteResultListButton(result: result, onPressed: onOpenDetail),
         // 경로 확인 휴지점(결과 목록 끝)에만 광고 슬롯. 안내 진행 화면에는 없음.
         const SizedBox(height: 16),
-        const AdBannerSlot(slotKey: Key('routeResultListAdBanner')),
+        if (adRepository case final repository?)
+          ActiveAdBanner(
+            key: const Key('routeResultListAdBanner'),
+            repository: repository,
+            placement: AdPlacement.routeResultBottom,
+          )
+        else
+          const AdBannerSlot(slotKey: Key('routeResultListAdBanner')),
       ],
     );
   }
@@ -4561,6 +4582,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
     required this.onStartGuidance,
     required this.onOpenFeedback,
     required this.favoriteSaveButton,
+    required this.adRepository,
   });
 
   final RouteSearchResult result;
@@ -4568,6 +4590,7 @@ class _RouteDetailWorkflowView extends StatelessWidget {
   final VoidCallback? onStartGuidance;
   final VoidCallback? onOpenFeedback;
   final Widget? favoriteSaveButton;
+  final AdRepository? adRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -4621,7 +4644,14 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         ],
         // 상세 뷰 스크롤 끝에만 광고 슬롯(안내·역 안 이동·피드백에는 없음).
         const SizedBox(height: 16),
-        const AdBannerSlot(slotKey: Key('routeDetailAdBanner')),
+        if (adRepository case final repository?)
+          ActiveAdBanner(
+            key: const Key('routeDetailAdBanner'),
+            repository: repository,
+            placement: AdPlacement.routeResultBottom,
+          )
+        else
+          const AdBannerSlot(slotKey: Key('routeDetailAdBanner')),
       ],
     );
   }

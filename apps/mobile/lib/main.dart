@@ -13,6 +13,7 @@ import 'app/app_dependencies.dart';
 import 'core/datapack/data_pack_metered_consent_gate.dart';
 import 'core/datapack/data_pack_update_state.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
+import 'features/ads/ad_repository.dart';
 import 'features/home_widget/home_widget_link_handler.dart';
 import 'features/home_widget/next_train_widget_repository.dart';
 import 'features/home_widget/next_train_widget_runtime.dart'
@@ -132,6 +133,7 @@ Future<void> main() async {
           repository: bootstrap.dependencies.repository,
           reportRepository: bootstrap.dependencies.reportRepository,
           favoriteRepository: bootstrap.dependencies.favoriteRepository,
+          adRepository: bootstrap.dependencies.adRepository,
           realtimeRepository: bootstrap.dependencies.realtimeRepository,
           locationProvider: bootstrap.dependencies.locationProvider,
           stationId: stationId,
@@ -347,6 +349,7 @@ class EasySubwayApp extends StatelessWidget {
     FavoriteStationRepository? favoriteRepository,
     FavoriteFacilityRepository? favoriteFacilityRepository,
     FavoriteRouteRepository? favoriteRouteRepository,
+    AdRepository? adRepository,
     Future<List<FavoriteRoute>>? recentRoutesFuture,
     SearchHistoryRepository? searchHistoryRepository,
     InternalRouteRepository? internalRouteRepository,
@@ -385,6 +388,7 @@ class EasySubwayApp extends StatelessWidget {
                favoriteRepository: favoriteRepository,
                favoriteFacilityRepository: favoriteFacilityRepository,
                favoriteRouteRepository: favoriteRouteRepository,
+               adRepository: adRepository,
                searchHistoryRepository: searchHistoryRepository,
                internalRouteRepository: internalRouteRepository,
                networkMapRepository: networkMapRepository,
@@ -440,6 +444,7 @@ class EasySubwayApp extends StatelessWidget {
        favoriteRepository = dependencies.favoriteRepository,
        favoriteFacilityRepository = dependencies.favoriteFacilityRepository,
        favoriteRouteRepository = dependencies.favoriteRouteRepository,
+       adRepository = dependencies.adRepository,
        searchHistoryRepository = dependencies.searchHistoryRepository,
        internalRouteRepository = dependencies.internalRouteRepository,
        networkMapRepository = dependencies.networkMapRepository,
@@ -460,6 +465,7 @@ class EasySubwayApp extends StatelessWidget {
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final AdRepository? adRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
@@ -552,6 +558,7 @@ class EasySubwayApp extends StatelessWidget {
           favoriteRepository: favoriteRepository,
           favoriteFacilityRepository: favoriteFacilityRepository,
           favoriteRouteRepository: favoriteRouteRepository,
+          adRepository: adRepository,
           searchHistoryRepository: searchHistoryRepository,
           internalRouteRepository: internalRouteRepository,
           networkMapRepository: networkMapRepository,
@@ -723,6 +730,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
+    required this.adRepository,
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
@@ -751,6 +759,7 @@ class _EasySubwayHome extends StatefulWidget {
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final AdRepository? adRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
@@ -870,6 +879,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         favoriteRepository: widget.favoriteRepository,
         favoriteFacilityRepository: widget.favoriteFacilityRepository,
         favoriteRouteRepository: widget.favoriteRouteRepository,
+        adRepository: widget.adRepository,
         searchHistoryRepository: widget.searchHistoryRepository,
         internalRouteRepository: widget.internalRouteRepository,
         networkMapRepository: widget.networkMapRepository,
@@ -1372,6 +1382,7 @@ class HomeScreen extends StatefulWidget {
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
+    this.adRepository,
     required this.searchHistoryRepository,
     required this.internalRouteRepository,
     required this.networkMapRepository,
@@ -1404,6 +1415,7 @@ class HomeScreen extends StatefulWidget {
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final AdRepository? adRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final InternalRouteRepository internalRouteRepository;
   final NetworkMapRepository networkMapRepository;
@@ -1509,6 +1521,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final favoriteRepository = widget.favoriteRepository;
     final favoriteFacilityRepository = widget.favoriteFacilityRepository;
     final favoriteRouteRepository = widget.favoriteRouteRepository;
+    final adRepository = widget.adRepository;
     final searchHistoryRepository = widget.searchHistoryRepository;
     final internalRouteRepository = widget.internalRouteRepository;
     final networkMapRepository = widget.networkMapRepository;
@@ -1639,6 +1652,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             repository: repository,
             reportRepository: reportRepository,
             favoriteRepository: favoriteRepository,
+            adRepository: adRepository,
             searchHistoryRepository: searchHistoryRepository,
             locationProvider: locationProvider,
             facilityReportDraftTargetStore: facilityReportDraftTargetStore,
@@ -1740,6 +1754,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           repository: repository,
           reportRepository: reportRepository,
           favoriteRepository: favoriteRepository,
+          adRepository: adRepository,
           searchHistoryRepository: searchHistoryRepository,
           locationProvider: locationProvider,
           facilityReportDraftTargetStore: facilityReportDraftTargetStore,
@@ -1759,6 +1774,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         routeFeedbackRepository: routeFeedbackRepository,
         getOffAlarmController: getOffAlarmController,
         favoriteRouteRepository: favoriteRouteRepository,
+        adRepository: adRepository,
         initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
         initialDraft: _routeDraftController.draft,
         simpleViewEnabled: simpleViewEnabled,
@@ -1772,6 +1788,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           favoriteRepository: favoriteRepository,
           favoriteFacilityRepository: favoriteFacilityRepository,
           favoriteRouteRepository: favoriteRouteRepository,
+          adRepository: adRepository,
           stationRepository: repository,
           reportRepository: reportRepository,
           locationProvider: locationProvider,
@@ -3007,6 +3024,7 @@ class FavoriteHomeScreen extends StatefulWidget {
     required this.favoriteRepository,
     required this.favoriteFacilityRepository,
     required this.favoriteRouteRepository,
+    this.adRepository,
     required this.stationRepository,
     required this.reportRepository,
     required this.locationProvider,
@@ -3023,6 +3041,7 @@ class FavoriteHomeScreen extends StatefulWidget {
   final FavoriteStationRepository? favoriteRepository;
   final FavoriteFacilityRepository? favoriteFacilityRepository;
   final FavoriteRouteRepository? favoriteRouteRepository;
+  final AdRepository? adRepository;
   final StationSearchRepository stationRepository;
   final FacilityReportRepository reportRepository;
   final CurrentLocationProvider locationProvider;
@@ -3214,6 +3233,7 @@ class _FavoriteHomeScreenState extends State<FavoriteHomeScreen> {
           repository: widget.stationRepository,
           reportRepository: widget.reportRepository,
           favoriteRepository: repository,
+          adRepository: widget.adRepository,
           locationProvider: widget.locationProvider,
           realtimeRepository: widget.realtimeRepository,
           stationId: favorite.stationId,

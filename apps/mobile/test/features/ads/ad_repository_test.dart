@@ -51,6 +51,19 @@ ApiResponse _response(int statusCode, {Object? data, bool success = true}) =>
     );
 
 void main() {
+  test('lazy repository는 fetch 전 base URI를 읽지 않고 없으면 null이다', () async {
+    var reads = 0;
+    final repository = AdRepository.lazy(() {
+      reads++;
+      return null;
+    });
+
+    expect(reads, 0);
+
+    expect(await repository.fetchActive(AdPlacement.routeResultBottom), isNull);
+    expect(reads, 1);
+  });
+
   test('지원 placement는 정확히 두 개다', () {
     expect(AdPlacement.values.map((placement) => placement.id), [
       'route-result-bottom',
