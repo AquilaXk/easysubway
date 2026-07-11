@@ -13494,3 +13494,334 @@ test("publish-rollout (③): --dry-run → current.json 수정 없이 exit 0 + �
     storage.server.close();
   }
 });
+
+// --- #1397 원장 해시 exporter + admin review record 생성기 ---
+
+async function runLedgerExporter(args) {
+  return execFileAsync(process.execPath, ["tools/datapack/export-ledger-hashes.mjs", ...args], { cwd: root });
+}
+
+async function runAdminReviewBuilder(args) {
+  return execFileAsync(process.execPath, ["tools/datapack/build-admin-review-record.mjs", ...args], { cwd: root });
+}
+
+const catalogFixtureArg = "tools/datapack/fixtures/catalog-fixture.json";
+const overrideLedgerArg = "tools/datapack/fixtures/admin-review-overrides.json";
+
+test("원장 해시 exporter는 fixture 원장 5종 + license를 sha256으로 산출한다", async () => {
+  const kinds = [
+    ["alias", ["--fixture", catalogFixtureArg]],
+    ["operator-mapping", ["--fixture", catalogFixtureArg]],
+    ["facility-evidence", ["--fixture", catalogFixtureArg]],
+    ["route-evidence", ["--fixture", catalogFixtureArg]],
+    ["override", ["--overrides", overrideLedgerArg]],
+    ["license", ["--source-id", "seoulmetro-station-line-info"]],
+  ];
+  for (const [kind, extra] of kinds) {
+    const { stdout } = await runLedgerExporter(["--kind", kind, ...extra]);
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.kind, kind, `${kind} kind`);
+    assert.match(parsed.ledgerHash, /^[0-9a-f]{64}$/, `${kind} ledgerHash`);
+    assert.equal(parsed.schemaVersion, 1);
+  }
+});
+
+test("원장 해시 exporter는 결정적이다 (같은 입력 = 같은 해시)", async () => {
+  const first = JSON.parse((await runLedgerExporter(["--kind", "alias", "--fixture", catalogFixtureArg])).stdout);
+  const second = JSON.parse((await runLedgerExporter(["--kind", "alias", "--fixture", catalogFixtureArg])).stdout);
+  assert.equal(first.ledgerHash, second.ledgerHash);
+});
+
+test("원장 해시 exporter는 레코드 순서가 바뀌어도 같은 해시를 낸다", async () => {
+  const fixture = JSON.parse(await readFile(path.join(root, catalogFixtureArg), "utf8"));
+  const baseline = JSON.parse((await runLedgerExporter(["--kind", "alias", "--fixture", catalogFixtureArg])).stdout);
+
+  const workspace = await mkdtemp(path.join(tmpdir(), "ledger-order-"));
+  try {
+    const reordered = structuredClone(fixture);
+    reordered.packs[0].stationAliases.reverse();
+    const reorderedPath = path.join(workspace, "reordered-fixture.json");
+    await writeFile(reorderedPath, JSON.stringify(reordered));
+    const { stdout } = await runLedgerExporter([
+      "--kind",
+      "alias",
+      "--fixture",
+      path.relative(root, reorderedPath),
+    ]);
+    assert.equal(JSON.parse(stdout).ledgerHash, baseline.ledgerHash);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("원장 해시 exporter는 알 수 없는 kind를 거부한다", async () => {
+  await assert.rejects(runLedgerExporter(["--kind", "unknown", "--fixture", catalogFixtureArg]));
+});
+
+test("원장 해시 exporter는 license source-id가 inventory에 없으면 거부한다", async () => {
+  await assert.rejects(runLedgerExporter(["--kind", "license", "--source-id", "does-not-exist"]));
+});
+
+test("admin review record 생성기는 runbook 필수 필드를 exporter 해시로 채운다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "admin-review-"));
+  try {
+    const files = {};
+    for (const [name, kind, extra] of [
+      ["license", "license", ["--source-id", "seoulmetro-station-line-info"]],
+      ["alias", "alias", ["--fixture", catalogFixtureArg]],
+      ["operator", "operator-mapping", ["--fixture", catalogFixtureArg]],
+      ["facility", "facility-evidence", ["--fixture", catalogFixtureArg]],
+      ["route", "route-evidence", ["--fixture", catalogFixtureArg]],
+      ["override", "override", ["--overrides", overrideLedgerArg]],
+    ]) {
+      const { stdout } = await runLedgerExporter(["--kind", kind, ...extra]);
+      files[name] = path.join(workspace, `${name}.json`);
+      await writeFile(files[name], stdout);
+    }
+    const sampleEvidenceHash = "a".repeat(64);
+    const samplePath = path.join(workspace, "sample.json");
+    await writeFile(samplePath, JSON.stringify({ evidenceHash: sampleEvidenceHash }));
+    const quotaPath = path.join(workspace, "quota.json");
+    const quota = {
+      defaultDailyLimit: 1000,
+      portal: "data.seoul.go.kr",
+      productionUseAllowed: true,
+      unlockStatus: "granted",
+    };
+    await writeFile(quotaPath, JSON.stringify(quota));
+    const prodPath = path.join(workspace, "prod.json");
+    await writeFile(prodPath, JSON.stringify({ id: "seoulmetro-station-line-info", displayName: "테스트" }));
+
+    const { stdout } = await runAdminReviewBuilder([
+      "--candidate", "seoulmetro-station-line-info",
+      "--source-id", "seoulmetro-station-line-info",
+      "--snapshot-id", "snap-1",
+      "--decision", "APPROVED",
+      "--approved-by", "owner",
+      "--approved-at", "2026-07-12T00:00:00Z",
+      "--sample-evidence", path.relative(root, samplePath),
+      "--license-hash", path.relative(root, files.license),
+      "--alias-hash", path.relative(root, files.alias),
+      "--operator-mapping-hash", path.relative(root, files.operator),
+      "--facility-evidence-hash", path.relative(root, files.facility),
+      "--route-evidence-hash", path.relative(root, files.route),
+      "--override-hash", path.relative(root, files.override),
+      "--quota-evidence", path.relative(root, quotaPath),
+      "--production-source", path.relative(root, prodPath),
+    ]);
+    const record = JSON.parse(stdout);
+    assert.equal(record.artifactKind, "source-admission-admin-review");
+    assert.equal(record.decision, "APPROVED");
+    assert.equal(record.sampleEvidenceHash, sampleEvidenceHash);
+    for (const field of [
+      "licenseEvidenceHash",
+      "aliasLedgerHash",
+      "operatorMappingLedgerHash",
+      "facilityEvidenceLedgerHash",
+      "routeEvidenceLedgerHash",
+      "overrideHash",
+    ]) {
+      assert.match(record[field], /^[0-9a-f]{64}$/, field);
+    }
+    // exporter 산출 해시와 record 값이 일치 (위조 불가 경로 확인)
+    assert.equal(record.aliasLedgerHash, JSON.parse(await readFile(files.alias, "utf8")).ledgerHash);
+    assert.equal(record.overrideHash, JSON.parse(await readFile(files.override, "utf8")).ledgerHash);
+    // runbook requiredAdminReviewFields 전수 존재
+    const runbook = JSON.parse(
+      await readFile(path.join(root, "tools/datapack/source-admission-runbook.json"), "utf8"),
+    );
+    for (const field of runbook.requiredAdminReviewFields) {
+      assert.ok(field in record, `record missing runbook field: ${field}`);
+    }
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("admin review record 생성기는 kind가 틀린 해시 파일을 거부한다 (위조 방지)", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "admin-review-forge-"));
+  try {
+    // alias 자리에 override 산출물을 넣어 손으로 갈아끼우려는 시도 → kind mismatch 거부
+    const { stdout: overrideOut } = await runLedgerExporter(["--kind", "override", "--overrides", overrideLedgerArg]);
+    const forgedAlias = path.join(workspace, "forged-alias.json");
+    await writeFile(forgedAlias, overrideOut);
+
+    const files = {};
+    for (const [name, kind, extra] of [
+      ["license", "license", ["--source-id", "seoulmetro-station-line-info"]],
+      ["operator", "operator-mapping", ["--fixture", catalogFixtureArg]],
+      ["facility", "facility-evidence", ["--fixture", catalogFixtureArg]],
+      ["route", "route-evidence", ["--fixture", catalogFixtureArg]],
+      ["override", "override", ["--overrides", overrideLedgerArg]],
+    ]) {
+      const { stdout } = await runLedgerExporter(["--kind", kind, ...extra]);
+      files[name] = path.join(workspace, `${name}.json`);
+      await writeFile(files[name], stdout);
+    }
+    const samplePath = path.join(workspace, "sample.json");
+    await writeFile(samplePath, JSON.stringify({ evidenceHash: "a".repeat(64) }));
+    const quotaPath = path.join(workspace, "quota.json");
+    await writeFile(
+      quotaPath,
+      JSON.stringify({ defaultDailyLimit: 1000, portal: "p", productionUseAllowed: true, unlockStatus: "granted" }),
+    );
+    const prodPath = path.join(workspace, "prod.json");
+    await writeFile(prodPath, JSON.stringify({ id: "seoulmetro-station-line-info" }));
+
+    await assert.rejects(
+      runAdminReviewBuilder([
+        "--candidate", "seoulmetro-station-line-info",
+        "--source-id", "seoulmetro-station-line-info",
+        "--snapshot-id", "snap-1",
+        "--decision", "APPROVED",
+        "--approved-by", "owner",
+        "--approved-at", "2026-07-12T00:00:00Z",
+        "--sample-evidence", path.relative(root, samplePath),
+        "--license-hash", path.relative(root, files.license),
+        "--alias-hash", path.relative(root, forgedAlias),
+        "--operator-mapping-hash", path.relative(root, files.operator),
+        "--facility-evidence-hash", path.relative(root, files.facility),
+        "--route-evidence-hash", path.relative(root, files.route),
+        "--override-hash", path.relative(root, files.override),
+        "--quota-evidence", path.relative(root, quotaPath),
+        "--production-source", path.relative(root, prodPath),
+      ]),
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("admin review record 생성기는 APPROVED가 아닌 decision을 거부한다", async () => {
+  await assert.rejects(
+    runAdminReviewBuilder([
+      "--candidate", "x", "--source-id", "x", "--snapshot-id", "s",
+      "--decision", "REJECTED", "--approved-by", "o", "--approved-at", "t",
+      "--sample-evidence", "x", "--license-hash", "x", "--alias-hash", "x",
+      "--operator-mapping-hash", "x", "--facility-evidence-hash", "x",
+      "--route-evidence-hash", "x", "--override-hash", "x",
+      "--quota-evidence", "x", "--production-source", "x",
+    ]),
+  );
+});
+
+test("build-admin-review-record 산출물은 run-source-admission-pipeline을 그대로 통과한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-ledger-e2e-${Date.now()}`);
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const rawPath = path.join(outputDir, "kric-train-operation-organ.raw.json");
+  await writeFile(rawPath, `${JSON.stringify([{ railOprIsttCd: "S1", railOprIsttNm: "서울교통공사" }])}\n`);
+
+  // sample evidence는 pipeline이 소비하는 것과 동일하게 실 도구로 생성
+  const { stdout: sampleStdout } = await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-source-candidate-sample-evidence.mjs", "--candidate", "kric-train-operation-organ", "--response", rawPath],
+    { cwd: root },
+  );
+  const samplePath = path.join(outputDir, "sample.json");
+  await writeFile(samplePath, sampleStdout);
+
+  // 6종 원장 해시를 exporter로 산출
+  const ledgerFiles = {};
+  for (const [name, kind, extra] of [
+    ["license", "license", ["--source-id", "seoulmetro-station-line-info"]],
+    ["alias", "alias", ["--fixture", catalogFixtureArg]],
+    ["operator", "operator-mapping", ["--fixture", catalogFixtureArg]],
+    ["facility", "facility-evidence", ["--fixture", catalogFixtureArg]],
+    ["route", "route-evidence", ["--fixture", catalogFixtureArg]],
+    ["override", "override", ["--overrides", overrideLedgerArg]],
+  ]) {
+    const { stdout } = await runLedgerExporter(["--kind", kind, ...extra]);
+    ledgerFiles[name] = path.join(outputDir, `${name}.json`);
+    await writeFile(ledgerFiles[name], stdout);
+  }
+
+  const quotaPath = path.join(outputDir, "quota.json");
+  await writeFile(
+    quotaPath,
+    JSON.stringify({ defaultDailyLimit: "unlimited", portal: "KRIC 레일포털", productionUseAllowed: true, unlockStatus: "not_required" }),
+  );
+  const prodPath = path.join(outputDir, "prod.json");
+  await writeFile(
+    prodPath,
+    JSON.stringify({
+      id: "kric-train-operation-organ",
+      displayName: "열차운영기관정보",
+      owner: "국가철도공단",
+      provider: "국가철도공단",
+      sourceSystem: "KRIC OpenAPI",
+      datasetUrl: "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266",
+      requiredForProductionPack: false,
+      updateFrequency: "provider-documented",
+      observedDataUpdatedAt: "2026-07-02",
+      retrievedAt: "2026-07-02",
+      license: {
+        type: "KOGL-1",
+        name: "공공누리 1유형",
+        attribution: "공공누리 제1유형: 출처표시",
+        commercialUseAllowed: true,
+        derivativeWorkAllowed: true,
+        redistributionAllowed: true,
+        evidenceUrl: "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266",
+      },
+      coverageScope: { regionIds: ["capital"], operatorIds: ["seoul-metro"], sourceDomains: ["station_line_membership"] },
+      fieldsProvided: ["railOprIsttCd", "railOprIsttNm"],
+      capabilities: {
+        schedule: { status: "UNSUPPORTED", productionUseAllowed: false, coverageStatus: "NOT_PROVIDED_BY_SOURCE", updateFrequency: "provider-documented", unsupportedNotes: "x" },
+        realtime: { status: "UNSUPPORTED", productionUseAllowed: false, liveEtaEligible: false, rateLimitStatus: "NOT_APPLICABLE", coverageStatus: "NOT_PROVIDED_BY_SOURCE", updateFrequency: "provider-documented", unsupportedNotes: "x" },
+        facility: { status: "UNSUPPORTED", productionUseAllowed: false, coverageStatus: "NOT_PROVIDED_BY_SOURCE", updateFrequency: "provider-documented", unsupportedNotes: "x" },
+      },
+    }),
+  );
+
+  // 생성기로 admin review record 작성
+  const { stdout: recordStdout } = await runAdminReviewBuilder([
+    "--candidate", "kric-train-operation-organ",
+    "--source-id", "kric-train-operation-organ",
+    "--snapshot-id", "kric-train-operation-organ-snapshot-20260702",
+    "--decision", "APPROVED",
+    "--approved-by", "owner",
+    "--approved-at", "2026-07-12T00:00:00Z",
+    "--sample-evidence", path.relative(root, samplePath),
+    "--license-hash", path.relative(root, ledgerFiles.license),
+    "--alias-hash", path.relative(root, ledgerFiles.alias),
+    "--operator-mapping-hash", path.relative(root, ledgerFiles.operator),
+    "--facility-evidence-hash", path.relative(root, ledgerFiles.facility),
+    "--route-evidence-hash", path.relative(root, ledgerFiles.route),
+    "--override-hash", path.relative(root, ledgerFiles.override),
+    "--quota-evidence", path.relative(root, quotaPath),
+    "--production-source", path.relative(root, prodPath),
+  ]);
+  const adminReviewPath = path.join(outputDir, "admin-review.json");
+  await writeFile(adminReviewPath, recordStdout);
+
+  const summaryPath = path.join(outputDir, "admission-summary.json");
+  const outputInventoryPath = path.join(outputDir, "source-inventory.admitted.json");
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/run-source-admission-pipeline.mjs",
+      "--candidate", "kric-train-operation-organ",
+      "--raw-input", rawPath,
+      "--evidence-dir", outputDir,
+      "--snapshot-id", "kric-train-operation-organ-snapshot-20260702",
+      "--source-id", "kric-train-operation-organ",
+      "--provider", "국가철도공단",
+      "--retrieved-at", "2026-07-02T00:00:00Z",
+      "--source-updated-at", "2026-07-02T00:00:00Z",
+      "--raw-object-uri", "s3://easysubway-datapack-sources/kric-train-operation-organ/20260702.json",
+      "--freshness-expires-at", "2099-08-01T00:00:00Z",
+      "--raw-retention-expires-at", "2099-10-01T00:00:00Z",
+      "--admin-review", adminReviewPath,
+      "--output-inventory", outputInventoryPath,
+      "--output", summaryPath,
+    ],
+    { cwd: root },
+  );
+  assert.match(stdout, /source admission pipeline evidence written/);
+  const summary = JSON.parse(await readFile(summaryPath, "utf8"));
+  // pipeline summary가 exporter 산출 원장 해시를 그대로 옮겨야 한다
+  assert.equal(summary.aliasLedgerHash, JSON.parse(await readFile(ledgerFiles.alias, "utf8")).ledgerHash);
+  assert.equal(summary.overrideHash, JSON.parse(await readFile(ledgerFiles.override, "utf8")).ledgerHash);
+  assert.equal(summary.licenseEvidenceHash, JSON.parse(await readFile(ledgerFiles.license, "utf8")).ledgerHash);
+});
