@@ -1,6 +1,7 @@
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
 import 'package:easysubway_mobile/features/routes/domain/route_result.dart';
 import 'package:easysubway_mobile/features/routes/domain/route_step.dart';
+import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 RouteStep _ride({
@@ -183,4 +184,146 @@ void main() {
       ]);
     });
   });
+
+  group('경유 합성 요약 정합 가드 (#1948)', () {
+    // mergeWaypointRouteResults가 삽입하는 경계 마커(RouteStepType.waypoint,
+    // cost=0/durationSeconds=0/distanceMeters=0/lineId='')가 화면 요약
+    // 계산(RouteSearchResult.estimatedDurationSeconds / transferCount)을
+    // 왜곡하지 않는지 검증하는 가드. 여기서는 마커가 _toSteps를 거쳐 변환된
+    // 뒤의 형태(stepType='waypoint', lineId='', lineName='',
+    // estimatedMinutes=0)를 RouteSearchStep으로 직접 구성해 검증한다.
+    test('총 소요시간 불변 가드: waypoint 마커는 시간 합산에 영향을 주지 않는다', () {
+      // 구간1: ride 10분 + ride 5분 = 15분, 구간2: ride 8분 = 8분.
+      // total은 두 구간 값의 합(15 + 8 = 23분)이어야 하며, 마커의 0분이 더해져도
+      // 총합이 변하지 않아야 한다.
+      final firstLegSteps = [
+        _rideStep(sequence: 1, estimatedMinutes: 10),
+        _rideStep(sequence: 2, estimatedMinutes: 5),
+      ];
+      final waypointMarker = _rideStep(
+        sequence: 3,
+        stepType: 'waypoint',
+        lineId: '',
+        lineName: '',
+        estimatedMinutes: 0,
+      );
+      final secondLegSteps = [
+        _rideStep(sequence: 4, estimatedMinutes: 8),
+      ];
+
+      final withMarker = _result(
+        steps: [...firstLegSteps, waypointMarker, ...secondLegSteps],
+      );
+      final withoutMarker = _result(
+        steps: [...firstLegSteps, ...secondLegSteps],
+      );
+
+      // total은 두 구간 값의 합: (10 + 5 + 8) * 60초.
+      expect(withMarker.estimatedDurationSeconds, (10 + 5 + 8) * 60);
+      // 마커 포함 여부와 무관하게 총합이 동일해야 한다(마커의 0이 왜곡을 만들지 않음).
+      expect(
+        withMarker.estimatedDurationSeconds,
+        withoutMarker.estimatedDurationSeconds,
+      );
+    });
+
+    test('환승 수 가드: 경유 전후 같은 노선이면 환승이 0이다', () {
+      // 구간1 line-2 ride 1개(환승 없음) + waypoint 마커 + 구간2 line-2 ride 1개.
+      // waypoint는 환승 타입이 아니고, lineId/lineName이 비어 있어 폴백 lineId
+      // 변화 카운트에서도 continue로 스킵되므로 환승 수는 0이어야 한다.
+      final steps = [
+        _rideStep(sequence: 1, lineId: 'line-2', lineName: '2호선'),
+        _rideStep(
+          sequence: 2,
+          stepType: 'waypoint',
+          lineId: '',
+          lineName: '',
+          estimatedMinutes: 0,
+        ),
+        _rideStep(sequence: 3, lineId: 'line-2', lineName: '2호선'),
+      ];
+
+      final result = _result(steps: steps);
+
+      // total은 두 구간 값의 합: 0(구간1) + 0(구간2) = 0.
+      expect(result.transferCount, 0);
+    });
+
+    test('환승 수 가드: 경유 전후 다른 노선이면 명시적 환승 스텝만 카운트된다', () {
+      // 구간1: line-2 ride + transfer 1개, waypoint 마커,
+      // 구간2: line-9 ride + transfer 1개.
+      // _isRouteTransferStepType 우선 경로가 사용되어 명시적 transfer 스텝만
+      // 카운트되고 waypoint는 포함되지 않아야 한다.
+      final steps = [
+        _rideStep(sequence: 1, lineId: 'line-2', lineName: '2호선'),
+        _rideStep(
+          sequence: 2,
+          stepType: 'transfer',
+          lineId: 'line-2',
+          lineName: '2호선',
+        ),
+        _rideStep(
+          sequence: 3,
+          stepType: 'waypoint',
+          lineId: '',
+          lineName: '',
+          estimatedMinutes: 0,
+        ),
+        _rideStep(sequence: 4, lineId: 'line-9', lineName: '9호선'),
+        _rideStep(
+          sequence: 5,
+          stepType: 'transfer',
+          lineId: 'line-9',
+          lineName: '9호선',
+        ),
+      ];
+
+      final result = _result(steps: steps);
+
+      // total은 두 구간 값의 합: 1(구간1 transfer) + 1(구간2 transfer) = 2.
+      expect(result.transferCount, 2);
+    });
+  });
+}
+
+RouteSearchStep _rideStep({
+  required int sequence,
+  String stepType = 'ride',
+  String lineId = 'line-2',
+  String lineName = '2호선',
+  int estimatedMinutes = 5,
+}) {
+  return RouteSearchStep(
+    sequence: sequence,
+    stepType: stepType,
+    title: 'step-$sequence',
+    description: 'step-$sequence',
+    lineId: lineId,
+    lineName: lineName,
+    fromStationId: 'station-from-$sequence',
+    toStationId: 'station-to-$sequence',
+    estimatedMinutes: estimatedMinutes,
+    distanceMeters: 0,
+    includesStairs: false,
+    requiresAccessibilityCheck: false,
+  );
+}
+
+RouteSearchResult _result({required List<RouteSearchStep> steps}) {
+  return RouteSearchResult(
+    routeSearchId: 'route-1',
+    originStationId: 'origin',
+    originStationName: '출발역',
+    destinationStationId: 'destination',
+    destinationStationName: '도착역',
+    mobilityType: 'GENERAL',
+    status: 'FOUND',
+    lineId: '',
+    lineName: '',
+    score: 0,
+    steps: steps,
+    warnings: const [],
+    blockedReasons: const [],
+    createdAt: '',
+  );
 }
