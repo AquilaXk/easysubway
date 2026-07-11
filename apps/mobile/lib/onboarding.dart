@@ -200,9 +200,9 @@ class StartScreen extends StatelessWidget {
             // 상단 여백을 비워 심볼이 화면 상단 1/4 지점에서 시작하게 한다.
             // 이전(~35%)보다 살짝 줄여 심볼–타이틀 묶음이 화면 중앙 위로 앉는다.
             final topGap = (constraints.maxHeight * 0.22).clamp(64.0, 168.0);
-            final bottomGap =
-                EasySubwaySpacing.xxl +
-                MediaQuery.viewPaddingOf(context).bottom;
+            // SafeArea(bottom: true) 자손이라 하단 인셋은 SafeArea가 이미 적용한다.
+            // viewPadding.bottom을 또 더하면 이중 가산이므로 토큰 여백만 쓴다.
+            const bottomGap = EasySubwaySpacing.xxl;
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -660,9 +660,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             // SingleChildScrollView + ConstrainedBox(minHeight) + IntrinsicHeight를 쓴다.
             : LayoutBuilder(
                 builder: (context, constraints) {
-                  final bottomGap =
-                      EasySubwaySpacing.xxl +
-                      MediaQuery.viewPaddingOf(context).bottom;
+                  // SafeArea(bottom: true) 자손이라 하단 인셋은 SafeArea가 이미 적용한다.
+                  // viewPadding.bottom을 또 더하면 이중 가산이므로 토큰 여백만 쓴다.
+                  const bottomGap = EasySubwaySpacing.xxl;
                   return SingleChildScrollView(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(

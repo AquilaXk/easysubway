@@ -89,8 +89,10 @@ void main() {
   testWidgets('온보딩 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    tester.view.padding = const FakeViewPadding(bottom: 34);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.view.resetPadding);
 
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
@@ -100,7 +102,11 @@ void main() {
       find.byKey(const Key('startScreenStartButton')),
     );
 
-    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
+    // SafeArea 인셋(34) + 앱 토큰 여백(xxl)만 기대한다. 이중 가산 금지.
+    expect(
+      screenBottom - buttonRect.bottom,
+      closeTo(34 + EasySubwaySpacing.xxl, 0.5),
+    );
   });
 
   testWidgets('온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다', (tester) async {
@@ -463,7 +469,7 @@ void main() {
       findsOneWidget,
     );
 
-    // 하단 여백은 시작 화면과 같은 토큰(xxl + 시스템 하단 인셋)을 쓴다.
+    // 하단 인셋은 SafeArea가 적용하므로 패딩은 토큰(xxl)만 쓴다.
     final scrollPadding = tester.widget<Padding>(
       find
           .descendant(
@@ -472,12 +478,9 @@ void main() {
           )
           .first,
     );
-    final expectedBottomGap =
-        EasySubwaySpacing.xxl +
-        tester.view.viewPadding.bottom / tester.view.devicePixelRatio;
     expect(
       scrollPadding.padding.resolve(TextDirection.ltr).bottom,
-      moreOrLessEquals(expectedBottomGap),
+      moreOrLessEquals(EasySubwaySpacing.xxl),
     );
   });
 

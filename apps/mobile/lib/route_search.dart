@@ -3273,9 +3273,7 @@ class _RoutePointNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = filled
-        ? EasySubwayAccessibleColors.primary
-        : EasySubwayAccessibleColors.primary;
+    const color = EasySubwayAccessibleColors.primary;
     return Container(
       width: 14,
       height: 14,
