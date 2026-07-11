@@ -21,9 +21,17 @@
 //   - override:              manual override ledger 파일(apply-admin-review-overrides.mjs 계약)
 //   - licenseEvidence:       source-inventory.json 해당 source.license 블록
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  compareStrings,
+  parseArgs,
+  readJsonFile,
+  requireArg,
+  requiredArray,
+  requiredString,
+  sortJson,
+} from "./lib/ledger-admission-cli.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 
@@ -53,7 +61,7 @@ async function exportLedgerHash(kind, args) {
 // fixture pack에서 원장 레코드 집합을 뽑아 canonical 해시를 낸다.
 async function exportFixtureLedgerHash(kind, args) {
   const fixturePath = path.resolve(root, requireArg(args, "fixture"));
-  const fixture = JSON.parse(await readFile(fixturePath, "utf8"));
+  const fixture = await readJsonFile(fixturePath);
   const packs = requiredArray(fixture.packs, "fixture.packs");
 
   const rows = [];
@@ -119,7 +127,7 @@ function ledgerRowsForPack(kind, pack) {
 async function exportLicenseEvidenceHash(args) {
   const inventoryPath = path.resolve(root, args.inventory ?? "tools/datapack/source-inventory.json");
   const sourceId = requireArg(args, "source-id");
-  const inventory = JSON.parse(await readFile(inventoryPath, "utf8"));
+  const inventory = await readJsonFile(inventoryPath);
   const source = requiredArray(inventory.sources, "inventory.sources").find((entry) => entry.id === sourceId);
   if (!source) {
     throw new Error(`source-id not found in inventory: ${sourceId}`);
@@ -141,7 +149,7 @@ async function exportLicenseEvidenceHash(args) {
 // override hash — manual override ledger(apply-admin-review-overrides.mjs 계약과 동일 파일).
 async function exportOverrideHash(args) {
   const overridesPath = path.resolve(root, requireArg(args, "overrides"));
-  const overrides = JSON.parse(await readFile(overridesPath, "utf8"));
+  const overrides = await readJsonFile(overridesPath);
   if (overrides.artifactKind !== "datapack-manual-override-ledger") {
     throw new Error("override ledger artifactKind must be datapack-manual-override-ledger");
   }
@@ -160,50 +168,7 @@ async function exportOverrideHash(args) {
 
 // row 집합을 canonical 문자열로 직렬화한 뒤 사전순 정렬 — 입력 순서 불변.
 function canonicalizeRows(rows) {
-  return rows
-    .map((row) => JSON.stringify(sortJson(row)))
-    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
-}
-
-function parseArgs(argv) {
-  const args = {};
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index];
-    const value = argv[index + 1];
-    if (!flag?.startsWith("--")) throw new Error(`unexpected argument: ${flag}`);
-    if (value == null || value.startsWith("--")) throw new Error(`${flag} requires a value`);
-    args[flag.slice(2)] = value;
-    index += 1;
-  }
-  return args;
-}
-
-function requireArg(args, name) {
-  return requiredString(args[name], `--${name}`);
-}
-
-function requiredString(value, label) {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${label} is required`);
-  }
-  return value;
-}
-
-function requiredArray(value, label) {
-  if (!Array.isArray(value)) {
-    throw new Error(`${label} must be an array`);
-  }
-  return value;
-}
-
-function sortJson(value) {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([key, entry]) => [key, sortJson(entry)]),
-  );
+  return rows.map((row) => JSON.stringify(sortJson(row))).sort(compareStrings);
 }
 
 function sha256(value) {

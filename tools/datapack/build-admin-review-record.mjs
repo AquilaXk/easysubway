@@ -10,9 +10,16 @@
 //     인자로 직접 hex를 받지 않는다 → 손으로 hash를 끼워넣을 수 없다.
 //   - sampleEvidenceHash는 sample evidence 파일의 evidenceHash에서 읽는다.
 //   - approvedBy·approvedAt·decision은 입력 인자(승인 결정 기록).
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  compareStrings,
+  parseArgs,
+  readJsonFile,
+  requireArg,
+  requiredString,
+  sortJson,
+} from "./lib/ledger-admission-cli.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const quotaEvidenceKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
@@ -68,7 +75,7 @@ async function buildAdminReviewRecord(args) {
 // exporter JSON 산출물 파일에서 ledgerHash만 읽는다. kind가 일치하지 않으면 거부.
 async function readLedgerHash(args, argName, expectedKind) {
   const filePath = path.resolve(root, requireArg(args, argName));
-  const parsed = JSON.parse(await readFile(filePath, "utf8"));
+  const parsed = await readJsonFile(filePath);
   if (parsed.kind !== expectedKind) {
     throw new Error(`--${argName} kind must be ${expectedKind}, got ${parsed.kind}`);
   }
@@ -77,22 +84,22 @@ async function readLedgerHash(args, argName, expectedKind) {
 
 async function readSampleEvidenceHash(args) {
   const filePath = path.resolve(root, requireArg(args, "sample-evidence"));
-  const parsed = JSON.parse(await readFile(filePath, "utf8"));
+  const parsed = await readJsonFile(filePath);
   return assertSha256(parsed.evidenceHash, "sample-evidence.evidenceHash");
 }
 
 async function readQuotaEvidence(args) {
   const filePath = path.resolve(root, requireArg(args, "quota-evidence"));
-  const parsed = JSON.parse(await readFile(filePath, "utf8"));
+  const parsed = await readJsonFile(filePath);
   validateQuotaEvidence(parsed, "quota-evidence");
   return parsed;
 }
 
 async function readProductionSource(args, sourceId, quotaEvidence, sampleEvidenceHash) {
   const filePath = path.resolve(root, requireArg(args, "production-source"));
-  const productionSource = JSON.parse(await readFile(filePath, "utf8"));
+  const productionSource = await readJsonFile(filePath);
   if (!productionSource || typeof productionSource !== "object" || Array.isArray(productionSource)) {
-    throw new Error("production-source must be an object");
+    throw new TypeError("production-source must be an object");
   }
   if (productionSource.id !== sourceId) {
     throw new Error("production-source.id must match --source-id");
@@ -102,7 +109,7 @@ async function readProductionSource(args, sourceId, quotaEvidence, sampleEvidenc
   const admissionEvidence = productionSource.admissionEvidence;
   if (admissionEvidence != null) {
     if (typeof admissionEvidence !== "object" || Array.isArray(admissionEvidence)) {
-      throw new Error("production-source.admissionEvidence must be an object");
+      throw new TypeError("production-source.admissionEvidence must be an object");
     }
     validateQuotaEvidence(admissionEvidence.quotaEvidence, "production-source.admissionEvidence.quotaEvidence");
     if (JSON.stringify(sortJson(admissionEvidence.quotaEvidence)) !== JSON.stringify(sortJson(quotaEvidence))) {
@@ -114,9 +121,9 @@ async function readProductionSource(args, sourceId, quotaEvidence, sampleEvidenc
 
 function validateQuotaEvidence(quotaEvidence, label) {
   if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
-    throw new Error(`${label} must be an object`);
+    throw new TypeError(`${label} must be an object`);
   }
-  const keys = Object.keys(quotaEvidence).sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
+  const keys = Object.keys(quotaEvidence).sort(compareStrings);
   if (JSON.stringify(keys) !== JSON.stringify(quotaEvidenceKeys)) {
     throw new Error(`${label} must only include ${quotaEvidenceKeys.join(", ")}`);
   }
@@ -129,49 +136,15 @@ function validateQuotaEvidence(quotaEvidence, label) {
   }
   requiredString(quotaEvidence.unlockStatus, `${label}.unlockStatus`);
   if (typeof quotaEvidence.productionUseAllowed !== "boolean") {
-    throw new Error(`${label}.productionUseAllowed must be a boolean`);
+    throw new TypeError(`${label}.productionUseAllowed must be a boolean`);
   }
-}
-
-function parseArgs(argv) {
-  const args = {};
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index];
-    const value = argv[index + 1];
-    if (!flag?.startsWith("--")) throw new Error(`unexpected argument: ${flag}`);
-    if (value == null || value.startsWith("--")) throw new Error(`${flag} requires a value`);
-    args[flag.slice(2)] = value;
-    index += 1;
-  }
-  return args;
-}
-
-function requireArg(args, name) {
-  return requiredString(args[name], `--${name}`);
-}
-
-function requiredString(value, label) {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${label} is required`);
-  }
-  return value;
 }
 
 function assertSha256(value, label) {
   if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
-    throw new Error(`${label} must be a sha256 hex string`);
+    throw new TypeError(`${label} must be a sha256 hex string`);
   }
   return value;
-}
-
-function sortJson(value) {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
-      .map(([key, entry]) => [key, sortJson(entry)]),
-  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
