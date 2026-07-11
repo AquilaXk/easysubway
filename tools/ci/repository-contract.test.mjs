@@ -5039,6 +5039,47 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     ],
   );
   assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 11);
+  // admittedCandidateCount는 P0 후보 전용 카운트다. #1397에서 함께 승격된 P1 route_map_positions
+  // 후보(seoulmetro-cyberstation-route-map, capital pilot deferred domain)는 이 카운트에 포함되지 않는다.
+  assert.equal(
+    targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount,
+    p0SourceCandidates.filter(
+      (candidate) =>
+        candidate.admissionStatus === targets.roadmapEvidenceLedger.sourceCandidateAdmission.requiredAdmissionStatusBeforeProductionClaim,
+    ).length,
+  );
+  const cyberstationCandidate = sourceCandidates.candidates.find(
+    (candidate) => candidate.id === "seoulmetro-cyberstation-route-map",
+  );
+  assert.equal(cyberstationCandidate.priority, "P1");
+  assert.equal(cyberstationCandidate.domain, "route_map_positions");
+  assert.equal(cyberstationCandidate.admissionStatus, "admitted_to_production_inventory");
+  assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /P0 후보 전용 카운트/);
+  assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /seoulmetro-cyberstation-route-map/);
+  // #1397 capital admission 8종 per-source admission 해시는 순차 admission 체인(선행 admit 결과가
+  // 다음 인벤토리에 포함됨)에서 산출한 immutable evidence로 고정한다. run-source-admission-pipeline.mjs가
+  // 각 source를 admit한 직후 인벤토리의 sha256을 그 source의 admissionEvidence에 기록한다.
+  const capitalAdmissionInventorySha256 = {
+    "molit-urban-rail-full-route": "9c5f4b1ab41a9be2341fd369a7c48a852e16ff47397281d6af27d97c38706b08",
+    "seoulmetro-station-line-info": "3d71bb065a0ad2886bd3c310012d4f417424749b1542578c1bfcb7ae9d882171",
+    "seoulmetro-cyberstation-route-map": "2e8d77f997089f12d026dd343b64dd927e3c2126983d2d2d0e5affbadcdb3b0f",
+    "kric-station-elevator": "2330c139fdec23e374808baa660ec646a1731721f9a83cf1e1720ff4b40a3bd4",
+    "kric-station-elevator-movement": "9ab9b9169c6cb17e8bdfbd16f904edab4daf5201117923a636856c5a58d02154",
+    "kric-station-escalator": "38f5588f797774a0e4544f5412a70ebb0a5f6e13bbea3d51c67c8f5a61affe41",
+    "kric-wheelchair-lift-location": "65ffcc558ef2d42baad3f58fbe46d3c9ac800b3990c2ed964b965e08c09d47f8",
+    "kric-wheelchair-lift-movement": "c8d407ee54b653c6e8bcf77a044c22cb7129232c3f7e842b3f0e40cd7524af6e",
+  };
+  // 순차 체인이므로 8종 해시는 전부 distinct해야 한다.
+  assert.equal(new Set(Object.values(capitalAdmissionInventorySha256)).size, 8);
+  for (const [sourceId, expectedSha256] of Object.entries(capitalAdmissionInventorySha256)) {
+    const source = inventory.sources.find((entry) => entry.id === sourceId);
+    assert.ok(source, `${sourceId} must exist in source inventory`);
+    assert.equal(
+      source.admissionEvidence.sourceInventorySha256,
+      expectedSha256,
+      `${sourceId} admissionEvidence.sourceInventorySha256 must match immutable capital admission chain hash`,
+    );
+  }
   assert.equal(
     targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentOpenAdmissionStatus,
     "evidence_recorded_admin_review_required",
