@@ -9,6 +9,8 @@ import { promisify } from "node:util";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
+const ASSET_ORIGIN = "https://ads-assets.fixture.easysubway.example";
+const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
 
 function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
@@ -32,6 +34,21 @@ async function prepare(source) {
   ], { cwd: root });
   return outputDir;
 }
+
+test("광고 asset origin은 backend env에만 변형 없이 전달한다", async () => {
+  const outputDir = await prepare(fixtureEnv());
+  const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+  const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+
+  assert.ok(
+    backendEnv.split("\n").includes(ASSET_ORIGIN_LINE),
+    "backend.env must contain the exact asset origin line",
+  );
+  assert.ok(
+    !composeEnv.split("\n").includes(ASSET_ORIGIN_LINE),
+    "compose.env must not contain the asset origin line",
+  );
+});
 
 test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다", async () => {
   const outputDir = await prepare(fixtureEnv());
