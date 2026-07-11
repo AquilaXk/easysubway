@@ -465,6 +465,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '$fromName에서 $toName까지 계단 이동',
       'escalator' => '$fromName에서 $toName까지 에스컬레이터 이동',
       'facilityConnector' => '$fromName에서 $toName까지 시설 연결 통로 이동',
+      'waypoint' => '$fromName 경유',
       _ => '$fromName에서 $toName까지 이동',
     };
   }
@@ -482,6 +483,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '계단 구간입니다. 계단 없는 조건에서는 안내하지 않습니다.',
       'escalator' => '에스컬레이터를 이용해 이동합니다.',
       'facilityConnector' => '역 시설 연결 동선을 따라 이동합니다.',
+      'waypoint' => '경유역을 지나 이동을 이어갑니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }
@@ -499,6 +501,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '계단 이동',
       'escalator' => '에스컬레이터 이동',
       'facilityConnector' => '시설 연결 이동',
+      'waypoint' => '경유',
       _ => '이동',
     };
   }
@@ -522,6 +525,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '$fromName에서 $toName까지 계단으로 이동하는 구간입니다.',
       'escalator' => '$fromName에서 $toName까지 에스컬레이터를 이용합니다.',
       'facilityConnector' => '$fromName에서 $toName까지 역 시설 연결 동선을 이용합니다.',
+      'waypoint' => '$fromName을 경유해 이동을 이어갑니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }

@@ -2010,6 +2010,7 @@ class RouteSearchStep {
       'facilityConnector' ||
       'internal' => true,
       'ride' => false,
+      'waypoint' => false,
       _ => requiresAccessibilityCheck,
     };
   }
@@ -5671,6 +5672,7 @@ class _RouteStepTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isWalking = step.isWalkingStep;
+    final isWaypoint = step.stepType == 'waypoint';
     // 노선색은 우리 데이터로 가능한 유일한 유채색(#1915). 도보/환승 구간은 노선색이
     // 없으므로 중립 회색 점선으로 강등한다.
     final lineColor = isWalking
@@ -5704,6 +5706,7 @@ class _RouteStepTile extends StatelessWidget {
                 ? EasySubwayAccessibleColors.scaffoldSurface
                 : lineColor,
             isWalking: isWalking,
+            isWaypoint: isWaypoint,
           ),
           if (!isLast)
             Expanded(
@@ -5810,6 +5813,7 @@ class _RouteTimelineBadge extends StatelessWidget {
     required this.label,
     required this.color,
     required this.isWalking,
+    this.isWaypoint = false,
   });
 
   final Key badgeKey;
@@ -5817,8 +5821,35 @@ class _RouteTimelineBadge extends StatelessWidget {
   final Color color;
   final bool isWalking;
 
+  /// #1948: 경유 노드는 승차 배지·도보 아이콘이 아니라 무채색 경유 노드로 그린다.
+  final bool isWaypoint;
+
   @override
   Widget build(BuildContext context) {
+    // #1948: 경유 노드는 무채색 진회색 원에 more_horiz 아이콘. isWalking보다 우선.
+    if (isWaypoint) {
+      return SizedBox(
+        width: _routeTimelineMinTouchTarget,
+        height: _routeTimelineMinTouchTarget,
+        child: Center(
+          child: Container(
+            key: badgeKey,
+            width: _routeTimelineBadgeSize,
+            height: _routeTimelineBadgeSize,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: EasySubwayAccessibleColors.mutedText,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.more_horiz,
+              size: 20,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
     // 터치 타깃 48 보장: 시각적 배지는 40이지만 최소 48 박스로 감싼다.
     return SizedBox(
       width: _routeTimelineMinTouchTarget,
