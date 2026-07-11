@@ -21,19 +21,19 @@ import 'fake_secure_key_value_storage.dart';
 // 첫 실행 앱은 알림 권한 제공자가 직접 주입되면 온보딩 알림 권한을 요청한다
 
 void main() {
-  testWidgets('앱 시작 로딩은 흰 화면 대신 브랜디드 로딩을 보여준다', (tester) async {
+  testWidgets('앱 시작 로딩은 흰 화면과 색이 이어지는 무플래시 로딩을 보여준다', (tester) async {
     await tester.pumpWidget(
       _testApp(onboardingStore: MemoryOnboardingResultStore()),
     );
 
-    // 온보딩 상태를 복원하는 첫 프레임에는 흰 배경+스피너가 아니라 브랜드 색과
-    // 앱 이름을 그대로 잇는 로딩을 보여준다(#1785).
+    // 온보딩 상태를 복원하는 첫 프레임에는 흰 네이티브 스플래시·홈과 같은 흰
+    // 배경을 그대로 이어간다(#1785, #1915). pump 없이도(빌드 직후) 접근성
+    // 안내는 즉시 트리에 존재해야 한다 — 지연되는 것은 시각 스피너뿐이다.
     expect(find.byKey(const Key('startupLoadingScreen')), findsOneWidget);
-    expect(find.text('쉬운 지하철'), findsOneWidget);
     final loadingScaffold = tester.widget<Scaffold>(
       find.byKey(const Key('startupLoadingScreen')),
     );
-    expect(loadingScaffold.backgroundColor, EasySubwayAccessibleColors.primary);
+    expect(loadingScaffold.backgroundColor, EasySubwayAccessibleColors.surface);
     expect(find.bySemanticsLabel('쉬운 지하철을 불러오는 중'), findsOneWidget);
 
     await tester.pumpAndSettle();
@@ -41,6 +41,36 @@ void main() {
     // 복원이 끝나면 로딩은 사라지고 시작 화면이 뜬다(#1936: 핵심 가치 한 줄).
     expect(find.byKey(const Key('startupLoadingScreen')), findsNothing);
     expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
+  });
+
+  testWidgets('앱 시작 로딩 스피너는 온보딩 복원이 300ms 넘게 걸릴 때만 나타난다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _testApp(
+        onboardingStore: MemoryOnboardingResultStore(
+          readDelay: const Duration(milliseconds: 1000),
+        ),
+      ),
+    );
+
+    // 빌드 직후(pump 없이)에는 스피너가 없고, 접근성 안내는 즉시 존재한다.
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.bySemanticsLabel('쉬운 지하철을 불러오는 중'), findsOneWidget);
+
+    // 300ms 이전(100ms 시점)에는 여전히 스피너가 보이지 않는다.
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.bySemanticsLabel('쉬운 지하철을 불러오는 중'), findsOneWidget);
+
+    // 누적 350ms(300ms 초과) 시점에는 스피너가 나타난다.
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.bySemanticsLabel('쉬운 지하철을 불러오는 중'), findsOneWidget);
+
+    // 온보딩 복원(1000ms)이 끝날 때까지 마저 진행해 pending timer를 정리한다.
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('startupLoadingScreen')), findsNothing);
   });
 
   testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
@@ -367,16 +397,24 @@ class MemoryOnboardingResultStore implements OnboardingResultStore {
   MemoryOnboardingResultStore({
     OnboardingResult? initialResult,
     this.throwOnRead = false,
+    this.readDelay,
   }) : savedResult = initialResult;
 
   OnboardingResult? savedResult;
   final bool throwOnRead;
+  // 기본은 지연 없음(즉시 완료) — 300ms 스피너 지연 테스트 등 인위적으로 느린
+  // 복원을 흉내내야 할 때만 지정한다.
+  final Duration? readDelay;
   int readCount = 0;
   int saveCount = 0;
 
   @override
   Future<OnboardingResult?> readResult() async {
     readCount++;
+    final delay = readDelay;
+    if (delay != null && delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+    }
     if (throwOnRead) {
       throw const FormatException('broken onboarding result');
     }

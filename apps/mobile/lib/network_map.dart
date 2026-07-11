@@ -9,6 +9,8 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import 'accessible_design.dart';
 import 'ad_slot.dart';
+import 'design_tokens.dart';
+import 'facility_report.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
@@ -16,12 +18,28 @@ import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
 import 'station_search.dart';
 
 const _networkMapTopBarHeight = 60.0;
 const _networkMapPillRadius = BorderRadius.all(Radius.circular(8));
 const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(8));
+
+// #1933 idle 검색바(`_NetworkMapSearchField`)와 active 인플레이스 입력 필드
+// (`_NetworkMapSearchInputField`)가 탭 전환 시 픽셀 단위로 동일한 시각 박스를
+// 유지하도록 공유하는 치수 상수. 값을 두 위젯에서 복제하지 않기 위해 이곳에
+// 모아둔다.
+const _searchFieldVisualHeight = 38.0;
+const _searchFieldHorizontalPadding = 12.0;
+const _searchFieldBorderWidth = 1.5;
+const _searchFieldIconSize = 18.0;
+const _searchFieldIconGap = 8.0;
+const _searchFieldTextStyle = TextStyle(
+  color: EasySubwayAccessibleColors.mutedText,
+  fontSize: 15,
+  fontWeight: FontWeight.w600,
+);
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -360,8 +378,15 @@ class NetworkMapScreen extends StatefulWidget {
     required this.repository,
     required this.routeDraftController,
     required this.onOpenStationSearch,
+    this.onStationSearchClosed,
     this.onPickStationForSlot,
     this.stationSearchRepository,
+    this.reportRepository,
+    this.favoriteRepository,
+    this.searchHistoryRepository,
+    this.facilityReportDraftTargetStore,
+    this.internalRouteRepository,
+    this.internalRouteMobilityType = 'SENIOR',
     this.locationProvider,
     this.viewportRepository,
     this.realtimeRepository,
@@ -380,11 +405,26 @@ class NetworkMapScreen extends StatefulWidget {
   final RouteDraftController routeDraftController;
   final VoidCallback onOpenStationSearch;
 
+  /// #1933 홈 in-place 역 검색 모드를 빠져나올 때(← 또는 시스템 back) 호출된다.
+  /// 셸이 알림/신고 상태를 다시 불러오도록 하기 위한 훅이다. 라우트 기반 검색이
+  /// 반환 후 하던 refreshHomeState와 같은 역할을 in-place 종료에도 유지한다.
+  final VoidCallback? onStationSearchClosed;
+
   /// 상단 draft 오버레이의 출발/도착 칸을 탭했을 때, 그 칸을 채우려고 기존 역 검색을
   /// 여는 콜백. 지도 탭과 같은 [routeDraftController]로 수렴한다. null이면 오버레이
   /// 칸은 탭할 수 없다(둘러보기 검색만 메뉴로 제공).
   final void Function(RouteDraftSlot slot)? onPickStationForSlot;
   final StationSearchRepository? stationSearchRepository;
+
+  /// #1933 홈 노선도 위에서 역 검색을 in-place로 열 때, 결과 탭 → 역 상세로
+  /// 이동하려면 필요한 저장소들. 검색 모드는 [stationSearchRepository]가 있을 때만
+  /// 진입 가능하다.
+  final FacilityReportRepository? reportRepository;
+  final FavoriteStationRepository? favoriteRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
+  final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final InternalRouteRepository? internalRouteRepository;
+  final String internalRouteMobilityType;
   final CurrentLocationProvider? locationProvider;
   final NetworkMapViewportRepository? viewportRepository;
   final RealtimeRepository? realtimeRepository;
@@ -418,6 +458,103 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   RealtimeSnapshot _nearbyRealtime = const RealtimeSnapshot.loading();
   int _nearbyRealtimeToken = 0;
   late Future<_NetworkMapLoadResult> _future = _loadMap();
+
+  // #1933/#1915 홈 노선도 위 in-place 역 검색 모드. 모드 플래그만 이 화면에
+  // 남는다. 검색 컨트롤러·디바운스·최근 검색어·결과 본문 등 키 입력마다 바뀌는
+  // 상태는 [_NetworkMapSearchSession]으로 격리해 타이핑이 지도 canvas/chrome을
+  // 재빌드하지 않게 한다.
+  bool _searchMode = false;
+
+  /// 상단바 편집 필드는 이 화면이 소유하는 컨트롤러/포커스로 그린다(키 입력은
+  /// setState를 일으키지 않고 필드가 컨트롤러를 직접 구독해 갱신된다). 검색
+  /// 로직은 세션이 소유하므로, 필드 제출은 이 키로 세션에 위임한다.
+  final TextEditingController _searchQueryController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  final GlobalKey<_NetworkMapSearchSessionState> _searchSessionKey =
+      GlobalKey<_NetworkMapSearchSessionState>();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.routeDraftController.addListener(_handleDraftChangedForSearch);
+  }
+
+  /// 검색 모드 중 draft가 채워지면(출발/도착 설정 등) OD 상단바가 이겨야 하므로
+  /// 검색 모드를 자동 종료한다(co-existence). draft 변경은 키 입력이 아니므로
+  /// 이 리스너는 이 화면에 남아도 입력 지연에 영향을 주지 않는다.
+  void _handleDraftChangedForSearch() {
+    if (_searchMode && !widget.routeDraftController.draft.isEmpty) {
+      _exitSearchMode();
+    }
+  }
+
+  void _enterSearchMode() {
+    if (widget.stationSearchRepository == null) {
+      return;
+    }
+    if (!widget.routeDraftController.draft.isEmpty) {
+      return;
+    }
+    setState(() => _searchMode = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _searchMode) {
+        FocusScope.of(context).requestFocus(_searchFocusNode);
+      }
+    });
+  }
+
+  void _exitSearchMode() {
+    _searchQueryController.clear();
+    if (mounted) {
+      setState(() => _searchMode = false);
+    } else {
+      _searchMode = false;
+    }
+    widget.onStationSearchClosed?.call();
+  }
+
+  /// 일반(비픽) 모드의 인플레이스 검색 결과 탭: 검색을 닫고 해당 역을 노선도에서
+  /// 포커스한 뒤 하단 주변 역 패널(팝오버)을 띄운다.
+  void _focusStationFromSearch(StationSearchResult result) {
+    // _exitSearchMode 가 이미 setState 로 검색을 닫으므로, 패널 상태는 그 뒤
+    // 별도 setState 로 세팅해 검색 종료에 덮이지 않도록 한다.
+    _exitSearchMode();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _nearbyPanelVisible = true;
+      _nearbySelectedStationId = result.id;
+      _nearbyPanelData = _NetworkMapNearbyPanelData.success([result]);
+    });
+    unawaited(_loadNearbyRealtime(result));
+  }
+
+  /// 상단바 편집 필드의 제출(엔터/검색 액션)을 검색 세션으로 위임한다.
+  void _submitSearch(String query) {
+    _searchSessionKey.currentState?.submitSearch(query);
+  }
+
+  /// 검색 모드일 때만 세션을 만든다. 세션이 검색 상태를 소유하므로 모드 진입
+  /// 시 mount·모드 이탈 시 unmount되며, 세션의 initState가 최근 검색어 로드와
+  /// 디바운스 구독을 처리한다.
+  Widget? _buildSearchBody() {
+    if (!_searchMode) {
+      return null;
+    }
+    final searchRepository = widget.stationSearchRepository;
+    if (searchRepository == null) {
+      return null;
+    }
+    return _NetworkMapSearchSession(
+      key: _searchSessionKey,
+      onResultFocus: _focusStationFromSearch,
+      searchQueryController: _searchQueryController,
+      stationSearchRepository: searchRepository,
+      searchHistoryRepository: widget.searchHistoryRepository,
+      locationProvider: widget.locationProvider,
+    );
+  }
 
   Future<void> _loadNearbyRealtime(StationSearchResult station) async {
     final repository = widget.realtimeRepository;
@@ -465,6 +602,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   @override
   void dispose() {
     _nearbyLookupMessageTimer?.cancel();
+    widget.routeDraftController.removeListener(_handleDraftChangedForSearch);
+    _searchQueryController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -491,22 +631,128 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: const Key('networkMapScreen'),
-      backgroundColor: const Color(0xFFFFFAFD),
-      body: FutureBuilder<_NetworkMapLoadResult>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
+    return PopScope(
+      canPop: !_searchMode,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _searchMode) {
+          _exitSearchMode();
+        }
+      },
+      child: Scaffold(
+        key: const Key('networkMapScreen'),
+        backgroundColor: const Color(0xFFFFFAFD),
+        body: FutureBuilder<_NetworkMapLoadResult>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return _NetworkMapChrome(
+                regions: const [NetworkMapRegion(name: '수도권')],
+                selectedRegion: _selectedRegion ?? '수도권',
+                expressView: _expressView,
+                showServicePatternToggle: true,
+                notificationAction: widget.notificationAction,
+                disruptionBanner: widget.disruptionBanner,
+                onMenuTap: _openMapMenu,
+                onSearchTap: _enterSearchMode,
+                searchMode: _searchMode,
+                searchBody: _buildSearchBody(),
+                onSearchBack: _exitSearchMode,
+                searchQueryController: _searchQueryController,
+                searchFocusNode: _searchFocusNode,
+                onSearchSubmitted: _submitSearch,
+                onSearchClear: _searchQueryController.clear,
+                onRegionSelected: (region) => _reload(region: region),
+                onExpressViewChanged: (value) {
+                  setState(() => _expressView = value);
+                },
+                nearbyPanelVisible: _nearbyPanelVisible,
+                nearbyPanelData: _nearbyPanelData,
+                realtime: _nearbyRealtime,
+                nearbyLookupMessage: _nearbyLookupMessage,
+                adjacentStations: const _NetworkMapAdjacentStations(),
+                onCurrentLocationTap: _showNearbyPanel,
+                onOpenNearbyStations: widget.onOpenNearbyStations,
+                onCloseNearbyPanel: _hideNearbyPanel,
+                routeDraftController: widget.routeDraftController,
+                onClearOrigin: _clearOriginStation,
+                onClearDestination: _clearDestinationStation,
+                onSwapDraft: _swapDraftStations,
+                onPickOrigin: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickOriginStation,
+                onPickDestination: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickDestinationStation,
+                child: const Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return _NetworkMapChrome(
+                regions: const [NetworkMapRegion(name: '수도권')],
+                selectedRegion: _selectedRegion ?? '수도권',
+                expressView: _expressView,
+                showServicePatternToggle: true,
+                notificationAction: widget.notificationAction,
+                disruptionBanner: widget.disruptionBanner,
+                onMenuTap: _openMapMenu,
+                onSearchTap: _enterSearchMode,
+                searchMode: _searchMode,
+                searchBody: _buildSearchBody(),
+                onSearchBack: _exitSearchMode,
+                searchQueryController: _searchQueryController,
+                searchFocusNode: _searchFocusNode,
+                onSearchSubmitted: _submitSearch,
+                onSearchClear: _searchQueryController.clear,
+                onRegionSelected: (region) => _reload(region: region),
+                onExpressViewChanged: (value) {
+                  setState(() => _expressView = value);
+                },
+                nearbyPanelVisible: _nearbyPanelVisible,
+                nearbyPanelData: _nearbyPanelData,
+                realtime: _nearbyRealtime,
+                nearbyLookupMessage: _nearbyLookupMessage,
+                adjacentStations: const _NetworkMapAdjacentStations(),
+                onCurrentLocationTap: _showNearbyPanel,
+                onOpenNearbyStations: widget.onOpenNearbyStations,
+                onCloseNearbyPanel: _hideNearbyPanel,
+                routeDraftController: widget.routeDraftController,
+                onClearOrigin: _clearOriginStation,
+                onClearDestination: _clearDestinationStation,
+                onSwapDraft: _swapDraftStations,
+                onPickOrigin: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickOriginStation,
+                onPickDestination: widget.onPickStationForSlot == null
+                    ? null
+                    : _pickDestinationStation,
+                child: _NetworkMapLoadFailure(onRetry: () => _reload()),
+              );
+            }
+            final loadResult = snapshot.data!;
+            final data = loadResult.data;
+            final hasExpressLines = _expressLineIds(data).isNotEmpty;
+            // #1641: 모든 지역이 구조화 canvas로 렌더되므로 express 필터·서비스 패턴
+            // 토글이 전 지역에 균일 적용된다(과거 SVG 지역 예외 제거).
+            final visibleData = hasExpressLines && _expressView
+                ? _expressOnlyMapData(data)
+                : data;
+            _startInitialNearbyFocus();
             return _NetworkMapChrome(
-              regions: const [NetworkMapRegion(name: '수도권')],
-              selectedRegion: _selectedRegion ?? '수도권',
+              regions: data.regions,
+              selectedRegion: data.selectedRegion,
               expressView: _expressView,
               showServicePatternToggle: true,
               notificationAction: widget.notificationAction,
               disruptionBanner: widget.disruptionBanner,
               onMenuTap: _openMapMenu,
-              onSearchTap: widget.onOpenStationSearch,
+              onSearchTap: _enterSearchMode,
+              searchMode: _searchMode,
+              searchBody: _buildSearchBody(),
+              onSearchBack: _exitSearchMode,
+              searchQueryController: _searchQueryController,
+              searchFocusNode: _searchFocusNode,
+              onSearchSubmitted: _submitSearch,
+              onSearchClear: _searchQueryController.clear,
               onRegionSelected: (region) => _reload(region: region),
               onExpressViewChanged: (value) {
                 setState(() => _expressView = value);
@@ -515,7 +761,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               nearbyPanelData: _nearbyPanelData,
               realtime: _nearbyRealtime,
               nearbyLookupMessage: _nearbyLookupMessage,
-              adjacentStations: const _NetworkMapAdjacentStations(),
+              adjacentStations: _adjacentStationsFor(data),
               onCurrentLocationTap: _showNearbyPanel,
               onOpenNearbyStations: widget.onOpenNearbyStations,
               onCloseNearbyPanel: _hideNearbyPanel,
@@ -529,114 +775,36 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               onPickDestination: widget.onPickStationForSlot == null
                   ? null
                   : _pickDestinationStation,
-              child: const Center(child: CircularProgressIndicator()),
+              // #1933: _setOriginStation은 routeDraftController만 갱신하고 이
+              // State에서 setState를 호출하지 않으므로, canvas를 좁게
+              // ListenableBuilder로 감싸 draft 변경 시 hasOrigin이 다시
+              // 계산되게 한다(그래야 다음 팝오버의 [도착] 강조가 즉시 반영됨).
+              child: ListenableBuilder(
+                listenable: widget.routeDraftController,
+                builder: (context, _) {
+                  return _NetworkMapCanvas(
+                    data: visibleData,
+                    initialViewport: loadResult.initialViewport,
+                    focusedStationId: _nearbySelectedStationId,
+                    selectedStationId: _nearbyPanelVisible
+                        ? _nearbySelectedStationId
+                        : null,
+                    hasOrigin: widget.routeDraftController.draft.origin != null,
+                    onSetOrigin: _setOriginStation,
+                    onSetDestination: _setDestinationStation,
+                    onViewportChanged: (viewport) {
+                      _saveRecentViewport(data.selectedRegion, viewport);
+                    },
+                  );
+                },
+              ),
             );
-          }
-          if (snapshot.hasError || !snapshot.hasData) {
-            return _NetworkMapChrome(
-              regions: const [NetworkMapRegion(name: '수도권')],
-              selectedRegion: _selectedRegion ?? '수도권',
-              expressView: _expressView,
-              showServicePatternToggle: true,
-              notificationAction: widget.notificationAction,
-              disruptionBanner: widget.disruptionBanner,
-              onMenuTap: _openMapMenu,
-              onSearchTap: widget.onOpenStationSearch,
-              onRegionSelected: (region) => _reload(region: region),
-              onExpressViewChanged: (value) {
-                setState(() => _expressView = value);
-              },
-              nearbyPanelVisible: _nearbyPanelVisible,
-              nearbyPanelData: _nearbyPanelData,
-              realtime: _nearbyRealtime,
-              nearbyLookupMessage: _nearbyLookupMessage,
-              adjacentStations: const _NetworkMapAdjacentStations(),
-              onCurrentLocationTap: _showNearbyPanel,
-              onOpenNearbyStations: widget.onOpenNearbyStations,
-              onCloseNearbyPanel: _hideNearbyPanel,
-              routeDraftController: widget.routeDraftController,
-              onClearOrigin: _clearOriginStation,
-              onClearDestination: _clearDestinationStation,
-              onSwapDraft: _swapDraftStations,
-              onPickOrigin: widget.onPickStationForSlot == null
-                  ? null
-                  : _pickOriginStation,
-              onPickDestination: widget.onPickStationForSlot == null
-                  ? null
-                  : _pickDestinationStation,
-              child: _NetworkMapLoadFailure(onRetry: () => _reload()),
-            );
-          }
-          final loadResult = snapshot.data!;
-          final data = loadResult.data;
-          final hasExpressLines = _expressLineIds(data).isNotEmpty;
-          // #1641: 모든 지역이 구조화 canvas로 렌더되므로 express 필터·서비스 패턴
-          // 토글이 전 지역에 균일 적용된다(과거 SVG 지역 예외 제거).
-          final visibleData = hasExpressLines && _expressView
-              ? _expressOnlyMapData(data)
-              : data;
-          _startInitialNearbyFocus();
-          return _NetworkMapChrome(
-            regions: data.regions,
-            selectedRegion: data.selectedRegion,
-            expressView: _expressView,
-            showServicePatternToggle: true,
-            notificationAction: widget.notificationAction,
-            disruptionBanner: widget.disruptionBanner,
-            onMenuTap: _openMapMenu,
-            onSearchTap: widget.onOpenStationSearch,
-            onRegionSelected: (region) => _reload(region: region),
-            onExpressViewChanged: (value) {
-              setState(() => _expressView = value);
-            },
-            nearbyPanelVisible: _nearbyPanelVisible,
-            nearbyPanelData: _nearbyPanelData,
-            realtime: _nearbyRealtime,
-            nearbyLookupMessage: _nearbyLookupMessage,
-            adjacentStations: _adjacentStationsFor(data),
-            onCurrentLocationTap: _showNearbyPanel,
-            onOpenNearbyStations: widget.onOpenNearbyStations,
-            onCloseNearbyPanel: _hideNearbyPanel,
-            routeDraftController: widget.routeDraftController,
-            onClearOrigin: _clearOriginStation,
-            onClearDestination: _clearDestinationStation,
-            onSwapDraft: _swapDraftStations,
-            onPickOrigin: widget.onPickStationForSlot == null
-                ? null
-                : _pickOriginStation,
-            onPickDestination: widget.onPickStationForSlot == null
-                ? null
-                : _pickDestinationStation,
-            // #1933: _setOriginStation은 routeDraftController만 갱신하고 이
-            // State에서 setState를 호출하지 않으므로, canvas를 좁게
-            // ListenableBuilder로 감싸 draft 변경 시 hasOrigin이 다시
-            // 계산되게 한다(그래야 다음 팝오버의 [도착] 강조가 즉시 반영됨).
-            child: ListenableBuilder(
-              listenable: widget.routeDraftController,
-              builder: (context, _) {
-                return _NetworkMapCanvas(
-                  data: visibleData,
-                  initialViewport: loadResult.initialViewport,
-                  focusedStationId: _nearbySelectedStationId,
-                  selectedStationId: _nearbyPanelVisible
-                      ? _nearbySelectedStationId
-                      : null,
-                  hasOrigin:
-                      widget.routeDraftController.draft.origin != null,
-                  onSetOrigin: _setOriginStation,
-                  onSetDestination: _setDestinationStation,
-                  onViewportChanged: (viewport) {
-                    _saveRecentViewport(data.selectedRegion, viewport);
-                  },
-                );
-              },
-            ),
-          );
-        },
+          },
+        ),
+        bottomNavigationBar: _searchMode || _nearbyPanelVisible
+            ? null
+            : const _NetworkMapBottomAdBanner(),
       ),
-      bottomNavigationBar: _nearbyPanelVisible
-          ? null
-          : const _NetworkMapBottomAdBanner(),
     );
   }
 
@@ -930,6 +1098,12 @@ bool _sameMapStation(NetworkMapStation? a, NetworkMapStation b) {
   return a != null && a.id == b.id && a.lineId == b.lineId;
 }
 
+/// 테스트 전용: [_NetworkMapChrome]가 build될 때마다 증가한다. 검색 중 키
+/// 입력이 지도 chrome(상단바+지도 canvas를 감싸는 서브트리) 전체를 재빌드하지
+/// 않는지(입력 지연 회귀 방지 #1915) 검증하는 회귀 테스트에서만 읽는다.
+@visibleForTesting
+int debugNetworkMapChromeBuildCount = 0;
+
 class _NetworkMapChrome extends StatelessWidget {
   const _NetworkMapChrome({
     required this.regions,
@@ -956,6 +1130,13 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.onSwapDraft,
     this.onPickOrigin,
     this.onPickDestination,
+    this.searchMode = false,
+    this.searchBody,
+    this.onSearchBack,
+    this.searchQueryController,
+    this.searchFocusNode,
+    this.onSearchSubmitted,
+    this.onSearchClear,
     required this.child,
   });
 
@@ -985,16 +1166,29 @@ class _NetworkMapChrome extends StatelessWidget {
   /// 상단바 출발/도착 칸 탭 → 역 검색 열기. null이면 칸을 탭할 수 없다.
   final VoidCallback? onPickOrigin;
   final VoidCallback? onPickDestination;
+
+  /// #1933 홈 노선도 in-place 역 검색 모드. true면 body를 [searchBody]로 바꾸고
+  /// 상단바 좌측 ≡를 ←로, 검색 필드를 실제 TextField로 전환한다. 지역 선택기는
+  /// 두 모드에서 모두 유지된다.
+  final bool searchMode;
+  final Widget? searchBody;
+  final VoidCallback? onSearchBack;
+  final TextEditingController? searchQueryController;
+  final FocusNode? searchFocusNode;
+  final ValueChanged<String>? onSearchSubmitted;
+  final VoidCallback? onSearchClear;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
+    debugNetworkMapChromeBuildCount++;
     final topPadding = MediaQuery.paddingOf(context).top;
+    final inSearchMode = searchMode && searchBody != null;
     return Stack(
       children: [
         Positioned.fill(
           top: topPadding + _networkMapTopBarHeight,
-          child: ClipRect(child: child),
+          child: ClipRect(child: inSearchMode ? searchBody! : child),
         ),
         Positioned(
           left: 0,
@@ -1006,6 +1200,12 @@ class _NetworkMapChrome extends StatelessWidget {
             notificationAction: notificationAction,
             onMenuTap: onMenuTap,
             onSearchTap: onSearchTap,
+            searchMode: inSearchMode,
+            onSearchBack: onSearchBack,
+            searchQueryController: searchQueryController,
+            searchFocusNode: searchFocusNode,
+            onSearchSubmitted: onSearchSubmitted,
+            onSearchClear: onSearchClear,
             onRegionSelected: onRegionSelected,
             // #1933 요구 2: 출발/도착이 하나라도 차면 상단바 자체가 출발/도착
             // 2줄 입력으로 "변신"한다(아래 별도 카드 없음). 지도 탭·검색 어느
@@ -1018,14 +1218,14 @@ class _NetworkMapChrome extends StatelessWidget {
             onPickDestination: onPickDestination,
           ),
         ),
-        if (disruptionBanner != null)
+        if (disruptionBanner != null && !inSearchMode)
           Positioned(
             left: 0,
             right: 0,
             top: topPadding + _networkMapTopBarHeight,
             child: disruptionBanner!,
           ),
-        if (showServicePatternToggle)
+        if (showServicePatternToggle && !inSearchMode)
           Positioned(
             left: 16,
             bottom: 26,
@@ -1034,7 +1234,7 @@ class _NetworkMapChrome extends StatelessWidget {
               onChanged: onExpressViewChanged,
             ),
           ),
-        if (nearbyPanelVisible)
+        if (nearbyPanelVisible && !inSearchMode)
           Positioned(
             left: 0,
             right: 0,
@@ -1047,14 +1247,14 @@ class _NetworkMapChrome extends StatelessWidget {
               onRetry: onCurrentLocationTap,
             ),
           ),
-        if (nearbyLookupMessage != null)
+        if (nearbyLookupMessage != null && !inSearchMode)
           Positioned(
             left: 24,
             right: 24,
             bottom: nearbyPanelVisible ? 318 : 132,
             child: _NetworkMapLookupToast(message: nearbyLookupMessage!),
           ),
-        if (onOpenNearbyStations != null)
+        if (onOpenNearbyStations != null && !inSearchMode)
           Positioned(
             right: 16,
             bottom: nearbyPanelVisible ? 280 : 26,
@@ -1108,6 +1308,12 @@ class _NetworkMapTopBar extends StatelessWidget {
     required this.notificationAction,
     required this.onMenuTap,
     required this.onSearchTap,
+    this.searchMode = false,
+    this.onSearchBack,
+    this.searchQueryController,
+    this.searchFocusNode,
+    this.onSearchSubmitted,
+    this.onSearchClear,
     required this.onRegionSelected,
     required this.routeDraftController,
     required this.onClearOrigin,
@@ -1122,6 +1328,12 @@ class _NetworkMapTopBar extends StatelessWidget {
   final Widget? notificationAction;
   final VoidCallback onMenuTap;
   final VoidCallback onSearchTap;
+  final bool searchMode;
+  final VoidCallback? onSearchBack;
+  final TextEditingController? searchQueryController;
+  final FocusNode? searchFocusNode;
+  final ValueChanged<String>? onSearchSubmitted;
+  final VoidCallback? onSearchClear;
   final ValueChanged<String> onRegionSelected;
   final RouteDraftController routeDraftController;
   final VoidCallback onClearOrigin;
@@ -1155,7 +1367,6 @@ class _NetworkMapTopBar extends StatelessWidget {
               return _NetworkMapTopBarRouteDraft(
                 key: const Key('networkMapRouteDraftOverlay'),
                 draft: draft,
-                onMenuTap: onMenuTap,
                 onClearOrigin: onClearOrigin,
                 onClearDestination: onClearDestination,
                 onSwapDraft: onSwapDraft,
@@ -1180,19 +1391,49 @@ class _NetworkMapTopBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
         child: Row(
           children: [
-            IconButton(
-              key: const Key('networkMapMenuButton'),
-              tooltip: '메뉴',
-              onPressed: onMenuTap,
-              style: IconButton.styleFrom(
-                minimumSize: const Size.square(EasySubwayTouchTarget.general),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: EdgeInsets.zero,
+            if (searchMode)
+              IconButton(
+                key: const Key('networkMapSearchBackButton'),
+                tooltip: '뒤로',
+                onPressed: onSearchBack,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(EasySubwayTouchTarget.general),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  size: 22,
+                  color: Color(0xFF4B4B4B),
+                ),
+              )
+            else
+              IconButton(
+                key: const Key('networkMapMenuButton'),
+                tooltip: '메뉴',
+                onPressed: onMenuTap,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(EasySubwayTouchTarget.general),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: const Icon(
+                  Icons.menu,
+                  size: 22,
+                  color: Color(0xFF4B4B4B),
+                ),
               ),
-              icon: const Icon(Icons.menu, size: 22, color: Color(0xFF4B4B4B)),
-            ),
             const SizedBox(width: 4),
-            Expanded(child: _NetworkMapSearchField(onSearchTap: onSearchTap)),
+            Expanded(
+              child: searchMode
+                  ? _NetworkMapSearchInputField(
+                      controller: searchQueryController,
+                      focusNode: searchFocusNode,
+                      onSubmitted: onSearchSubmitted,
+                      onClear: onSearchClear,
+                    )
+                  : _NetworkMapSearchField(onSearchTap: onSearchTap),
+            ),
             const SizedBox(width: 8),
             Builder(
               builder: (regionContext) => Semantics(
@@ -1260,39 +1501,163 @@ class _NetworkMapTopBar extends StatelessWidget {
     BuildContext triggerContext,
     List<NetworkMapRegion> availableRegions,
   ) async {
-    final trigger = triggerContext.findRenderObject();
-    final overlay = Overlay.of(triggerContext).context.findRenderObject();
-    if (trigger is! RenderBox || overlay is! RenderBox) {
+    final RenderBox? triggerBox =
+        triggerContext.findRenderObject() as RenderBox?;
+    final RenderBox? overlayBox =
+        Overlay.of(triggerContext).context.findRenderObject() as RenderBox?;
+    if (triggerBox == null || overlayBox == null) {
       return;
     }
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        trigger.localToGlobal(
-          trigger.size.bottomLeft(Offset.zero),
-          ancestor: overlay,
+    final topRight = triggerBox.localToGlobal(
+      triggerBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
+    );
+    final topY = topRight.dy;
+    await showGeneralDialog<String>(
+      context: triggerContext,
+      barrierDismissible: true,
+      barrierLabel: '지역 메뉴 닫기',
+      // 참고 07에서 차용하는 것은 모달 구조가 아니라 주변을 어둡게 해
+      // 노선도 색 소음을 죽이는 딤 스크림뿐이다. 앱 다이얼로그 관례값
+      // (Color(0x99000000))과 동일하게 맞춰 메뉴 뒤를 어둡게 한다. 메뉴는
+      // 현행대로 트리거 바로 아래·화면 우측 밀착 위치를 유지한다.
+      barrierColor: const Color(0x99000000),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => Navigator.of(context).pop(),
+                child: const SizedBox.expand(),
+              ),
+            ),
+            Positioned(
+              top: topY,
+              right: 0,
+              child: _NetworkMapRegionMenuOverlay(
+                availableRegions: availableRegions,
+                selectedRegion: selectedRegion,
+                onRegionSelected: onRegionSelected,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _NetworkMapRegionMenuOverlay extends StatelessWidget {
+  const _NetworkMapRegionMenuOverlay({
+    required this.availableRegions,
+    required this.selectedRegion,
+    required this.onRegionSelected,
+  });
+
+  final List<NetworkMapRegion> availableRegions;
+  final String selectedRegion;
+  final ValueChanged<String> onRegionSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[];
+    for (var i = 0; i < availableRegions.length; i++) {
+      final region = availableRegions[i];
+      final isSelected = region.name == selectedRegion;
+      rows.add(
+        InkWell(
+          key: ValueKey('networkMapRegionMenuRow_${region.name}'),
+          splashFactory: NoSplash.splashFactory,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          onTap: () {
+            onRegionSelected(region.name);
+            Navigator.of(context).pop();
+          },
+          child: SizedBox(
+            height: 48,
+            child: Semantics(
+              button: true,
+              selected: isSelected,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    // 라벨은 좌측 기준(좌패딩 16), ✓는 행 오른쪽 끝(우패딩 16)에
+                    // 트레일링으로 둔다(참고 07과 동일 배치). 비선택 행은
+                    // 트레일링 자리를 비운다 — 라벨이 좌측 기준이라 정렬용
+                    // 고정 폭은 불필요하다.
+                    Expanded(
+                      child: Text(
+                        region.displayName,
+                        style: TextStyle(
+                          color: EasySubwayAccessibleColors.listRowText,
+                          fontSize: 16,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (isSelected) ...[
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.check,
+                        color: EasySubwayAccessibleColors.mutedText,
+                        size: 20,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-        trigger.localToGlobal(
-          trigger.size.bottomRight(Offset.zero),
-          ancestor: overlay,
+      );
+      if (i != availableRegions.length - 1) {
+        rows.add(const _NetworkMapRegionMenuDivider());
+      }
+    }
+    return ConstrainedBox(
+      // 콘텐츠 자연폭을 따르되(IntrinsicWidth), 극단 협폭만 방지할 정도의
+      // 하한만 둔다. 폭을 강제로 넓히지 않는다.
+      constraints: const BoxConstraints(minWidth: 120),
+      child: IntrinsicWidth(
+        child: Material(
+          elevation: 0,
+          color: EasySubwayAccessibleColors.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            side: const BorderSide(color: EasySubwayAccessibleColors.line),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(EasySubwayRadius.control),
+              bottomLeft: Radius.circular(EasySubwayRadius.control),
+              topRight: Radius.zero,
+              bottomRight: Radius.zero,
+            ),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: rows),
         ),
       ),
-      Offset.zero & overlay.size,
     );
-    final selected = await showMenu<String>(
-      context: triggerContext,
-      position: position,
-      items: [
-        for (final region in availableRegions)
-          CheckedPopupMenuItem<String>(
-            value: region.name,
-            checked: region.name == selectedRegion,
-            child: Text(region.displayName),
-          ),
-      ],
+  }
+}
+
+class _NetworkMapRegionMenuDivider extends StatelessWidget {
+  const _NetworkMapRegionMenuDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    // full-width 절단형은 행을 과하게 분리해 보이게 하므로, 텍스트 시작선
+    // (좌 16)부터 우 16 전까지의 인셋 구분선으로 둔다. 색·두께는 유지.
+    return const Padding(
+      key: Key('networkMapRegionMenuDivider'),
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: SizedBox(
+        height: 1,
+        child: ColoredBox(color: EasySubwayAccessibleColors.line),
+      ),
     );
-    if (selected != null) {
-      onRegionSelected(selected);
-    }
   }
 }
 
@@ -1323,42 +1688,427 @@ class _NetworkMapSearchField extends StatelessWidget {
                 child: Center(
                   child: Container(
                     key: const Key('heroStationSearchButton'),
-                    height: 38,
+                    height: _searchFieldVisualHeight,
                     decoration: BoxDecoration(
                       color: EasySubwayAccessibleColors.surface,
                       border: Border.all(
                         color: EasySubwayAccessibleColors.line,
-                        width: 1.5,
+                        width: _searchFieldBorderWidth,
                       ),
                       borderRadius: _networkMapSearchFieldRadius,
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 0 : _searchFieldHorizontalPadding,
+                    ),
                     child: compact
                         ? const SizedBox.shrink()
                         : const Row(
                             children: [
                               Icon(
                                 Icons.search,
-                                size: 18,
+                                size: _searchFieldIconSize,
                                 color: EasySubwayAccessibleColors.iconMuted,
                               ),
-                              SizedBox(width: 8),
+                              SizedBox(width: _searchFieldIconGap),
                               Expanded(
                                 child: Text(
                                   '지하철역 검색',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: EasySubwayAccessibleColors.mutedText,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: _searchFieldTextStyle,
                                 ),
                               ),
                             ],
                           ),
                   ),
                 ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// #1933 홈 노선도 in-place 검색 모드에서 idle 검색 필드 자리에 나타나는 실제
+/// 편집 가능한 TextField. 바깥 터치타겟(56)은 유지하되, 안쪽 시각 박스는
+/// idle 필드(`_NetworkMapSearchField`)와 픽셀 단위로 동일한 높이(38)·패딩
+/// (12)·테두리·아이콘 배치를 공유 상수로 재사용해 탭 전환 시 박스가 점프하지
+/// 않도록 한다. TextField 자체는 border/배경 없이 텍스트 편집만 담당하고,
+/// 시각적인 테두리·배경·아이콘은 idle과 동일한 시각 껍데기 Container가 그린다.
+///
+/// 시각(38px 박스)과 히트 영역(≥48px)은 Stack으로 분리한다: 배경 레이어가
+/// 38px 시각 껍데기를 그리고, 그 위 Positioned.fill 레이어에서 TextField가
+/// 바깥 터치타겟 높이(56)를 그대로 채우며 지우기 IconButton도 독립적인
+/// 48x48 탭 타깃을 갖는다. TextField와 지우기 버튼을 하나의 semantics로
+/// 병합하지 않아야 스크린리더 사용자가 '검색어 지우기' 액션에 별도로 접근할
+/// 수 있다.
+///
+/// compact 분기(아이콘/텍스트 숨김)는 idle에서는 좁은 공간에서 placeholder를
+/// 숨기기 위한 것이지만, active 상태는 항상 사용자가 텍스트를 입력해야 하는
+/// 상태라 아이콘을 감추면 사용성이 깨지므로 적용하지 않고 패딩을 idle의
+/// non-compact 값(12)으로 고정한다.
+class _NetworkMapSearchInputField extends StatelessWidget {
+  const _NetworkMapSearchInputField({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+    required this.onClear,
+  });
+
+  final TextEditingController? controller;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final editController = controller;
+    return SizedBox(
+      // 터치 타겟(≥48, 실제로는 56)을 만족시키기 위해 필드 자체가 전체 높이를
+      // 차지한다. 시각적 박스(38px)는 배경 레이어 Container가 idle 필드와
+      // 동일하게 그리고, 입력/버튼 히트 영역은 그 위 레이어에서 시각 박스와
+      // 독립적으로 ≥48px를 확보한다.
+      height: EasySubwayTouchTarget.general,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 시각 껍데기: idle 필드와 픽셀 단위로 동일(높이 38, radius 8,
+          // line 1.5, surface 배경). 히트 영역과 분리된 순수 배경이다.
+          Container(
+            key: const Key('heroStationSearchInputBox'),
+            height: _searchFieldVisualHeight,
+            decoration: BoxDecoration(
+              color: EasySubwayAccessibleColors.surface,
+              border: Border.all(
+                color: EasySubwayAccessibleColors.line,
+                width: _searchFieldBorderWidth,
+              ),
+              borderRadius: _networkMapSearchFieldRadius,
+            ),
+          ),
+          Positioned.fill(
+            child: Padding(
+              // idle의 콘텐츠 시작 위치와 동일: 테두리(1.5) + 패딩(12).
+              padding: const EdgeInsets.symmetric(
+                horizontal:
+                    _searchFieldBorderWidth + _searchFieldHorizontalPadding,
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.search,
+                    size: _searchFieldIconSize,
+                    color: EasySubwayAccessibleColors.iconMuted,
+                  ),
+                  const SizedBox(width: _searchFieldIconGap),
+                  Expanded(
+                    // 바깥 SizedBox가 터치타겟 높이(≥48, 실제 56)를 차지하고,
+                    // 단일 줄 TextField가 세로 대칭 contentPadding으로 그 높이를
+                    // 채워 히트/semantics 영역이 48px 게이트를 넘는다. 텍스트는
+                    // textAlignVertical.center + 대칭 패딩으로 필드(그리고 38px
+                    // 시각 박스)의 중앙선(=idle 텍스트 위치)에 놓인다. 여러 줄
+                    // (expands) 트릭을 쓰면 실기기에서 입력 텍스트와 IME 조합
+                    // 밑줄이 첫 줄로 렌더돼 박스 상단에 붙는 회귀가 있어, 단일 줄
+                    // 필드를 유지하고 세로 중앙 정렬은 레이아웃(대칭 패딩)으로만
+                    // 달성한다.
+                    child: SizedBox(
+                      height: EasySubwayTouchTarget.general,
+                      child: Center(
+                        child: TextField(
+                          key: const Key('stationSearchInput'),
+                          controller: editController,
+                          focusNode: focusNode,
+                          autofocus: true,
+                          maxLines: 1,
+                          textAlignVertical: TextAlignVertical.center,
+                          textInputAction: TextInputAction.search,
+                          style: const TextStyle(fontSize: 15, height: 1.2),
+                          // placeholder는 부유 라벨이 아니라 hintText로 박스
+                          // 내부 수직 중앙(idle의 '지하철역 검색'과 같은 위치·
+                          // 스타일)에 렌더돼야 한다. 세로 대칭 contentPadding으로
+                          // 필드 자체가 최소 탭 타깃(≥48)을 확보하고, 그 안에서
+                          // 텍스트 줄은 중앙(=38px 시각 박스 중앙선)에 놓인다.
+                          // isCollapsed는 필드를 텍스트 줄 높이로 쪼그라뜨려 탭
+                          // 타깃을 깨므로 쓰지 않는다. floatingLabelBehavior를
+                          // 지정하면 실기기에서 hint가 라벨처럼 박스 상단 테두리
+                          // 위로 떠오르는 회귀가 확인돼 지정하지 않는다. #1933
+                          decoration: const InputDecoration(
+                            hintText: '역 이름을 입력해 주세요',
+                            hintStyle: _searchFieldTextStyle,
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(vertical: 15),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                          ),
+                          onSubmitted: onSubmitted,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // 지우기 버튼은 입력 유무에 따라 나타난다. 컨트롤러를 직접
+                  // 구독해(ListenableBuilder) 키 입력 시 이 작은 서브트리만
+                  // 재빌드되게 한다 — 상위 화면/지도 chrome은 재빌드되지 않아
+                  // 입력 지연을 막는다(#1915).
+                  if (editController != null)
+                    ListenableBuilder(
+                      listenable: editController,
+                      builder: (context, _) {
+                        final hasQuery = editController.text.trim().isNotEmpty;
+                        if (!hasQuery) {
+                          return const SizedBox.shrink();
+                        }
+                        // 시각 아이콘은 18px이지만 탭 타깃은 독립적으로 48x48을
+                        // 확보한다(top bar IconButton 패턴과 동일). 히트 영역은
+                        // 38px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
+                        // 머물러 시각 박스 높이를 밀어 올리지 않는다.
+                        return IconButton(
+                          tooltip: '검색어 지우기',
+                          onPressed: onClear ?? editController.clear,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size.square(48),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: EdgeInsets.zero,
+                          ),
+                          icon: const Icon(
+                            Icons.close,
+                            size: _searchFieldIconSize,
+                            color: EasySubwayAccessibleColors.iconMuted,
+                          ),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// #1915 홈 노선도 in-place 역 검색의 "세션" — 검색 컨트롤러·디바운스·최근
+/// 검색어·결과 본문 등 키 입력마다 바뀌는 상태를 이 서브트리로 격리한다.
+/// 검색 모드로 진입/이탈하는 모드 플래그만 상위 [_NetworkMapScreenState]에
+/// 남고, 타이핑으로 인한 재빌드는 이 세션(검색 필드 지우기 버튼·결과 본문)에
+/// 국한된다. 그래야 지도 canvas·chrome 서브트리가 키 입력마다 재빌드되지
+/// 않아 입력 지연이 사라진다.
+///
+/// 상단바의 편집 필드는 [_NetworkMapChrome]의 별도 Stack 자식이라 이 세션이
+/// 직접 렌더하지 않는다. 대신 필드의 컨트롤러([searchQueryController])를 상위와
+/// 공유하고, 세션은 그 컨트롤러를 구독해 디바운스 검색을 돌린다. 필드의 지우기
+/// 버튼과 결과 본문은 각각 컨트롤러를 직접 구독(ListenableBuilder/
+/// AnimatedBuilder)하므로 상위 setState 없이 자체 갱신된다. 제출(엔터/검색
+/// 액션)은 상위가 [GlobalKey]로 [submitSearch]를 호출해 세션 로직으로 넘긴다.
+class _NetworkMapSearchSession extends StatefulWidget {
+  const _NetworkMapSearchSession({
+    super.key,
+    required this.onResultFocus,
+    required this.searchQueryController,
+    required this.stationSearchRepository,
+    required this.searchHistoryRepository,
+    required this.locationProvider,
+  });
+
+  final ValueChanged<StationSearchResult> onResultFocus;
+  final TextEditingController searchQueryController;
+  final StationSearchRepository stationSearchRepository;
+  final SearchHistoryRepository? searchHistoryRepository;
+  final CurrentLocationProvider? locationProvider;
+
+  @override
+  State<_NetworkMapSearchSession> createState() =>
+      _NetworkMapSearchSessionState();
+}
+
+class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
+  late final StationSearchController _searchController;
+  Timer? _searchDebounce;
+  List<String> _searchRecentQueries = const [];
+  bool _searchOpeningLocationSettings = false;
+
+  TextEditingController get _queryController => widget.searchQueryController;
+
+  bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = StationSearchController(
+      repository: widget.stationSearchRepository,
+      searchHistoryRepository: widget.searchHistoryRepository,
+    );
+    _queryController.addListener(_handleSearchQueryChanged);
+    unawaited(_loadSearchRecentQueries());
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _queryController.removeListener(_handleSearchQueryChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _handleSearchQueryChanged() {
+    if (!mounted) {
+      return;
+    }
+    _searchDebounce?.cancel();
+    if (!_hasSearchQuery) {
+      if (_searchController.state.status != StationSearchStatus.idle) {
+        unawaited(_searchController.search(''));
+      }
+      return;
+    }
+    final query = _queryController.text;
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 300),
+      () => unawaited(_runInPlaceSearch(query, recordHistory: false)),
+    );
+  }
+
+  Future<void> _runInPlaceSearch(
+    String query, {
+    bool recordHistory = true,
+  }) async {
+    await _searchController.search(query, recordHistory: recordHistory);
+    if (recordHistory) {
+      await _loadSearchRecentQueries();
+    }
+  }
+
+  /// 상위 화면이 상단바 편집 필드의 제출(엔터/검색 액션)에서 [GlobalKey]로
+  /// 호출한다. 세션이 검색 로직을 소유하므로 제출도 세션에서 처리한다.
+  void submitSearch(String query) {
+    _searchDebounce?.cancel();
+    if (_searchController.state.status == StationSearchStatus.loading) {
+      return;
+    }
+    unawaited(_runInPlaceSearch(query));
+  }
+
+  Future<void> _loadSearchRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      final queries = await repository.listRecentQueries();
+      if (!mounted) {
+        return;
+      }
+      setState(() => _searchRecentQueries = queries);
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 조회 중 예외가 발생했습니다.');
+    }
+  }
+
+  void _searchRecentQuerySelected(String query) {
+    _queryController.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    submitSearch(query);
+  }
+
+  Future<void> _removeSearchRecentQuery(String query) async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.removeSearch(query);
+      await _loadSearchRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(error, stackTrace, context: '최근 검색어 삭제 중 예외가 발생했습니다.');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
+      }
+    }
+  }
+
+  Future<void> _clearSearchRecentQueries() async {
+    final repository = widget.searchHistoryRepository;
+    if (repository == null) {
+      return;
+    }
+    try {
+      await repository.clearSearches();
+      await _loadSearchRecentQueries();
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '최근 검색어 전체 삭제 중 예외가 발생했습니다.',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('최근 검색을 지우지 못했어요.')));
+      }
+    }
+  }
+
+  Future<void> _openSearchLocationSettings() async {
+    final locationProvider = widget.locationProvider;
+    if (_searchOpeningLocationSettings || locationProvider == null) {
+      return;
+    }
+    setState(() => _searchOpeningLocationSettings = true);
+    try {
+      await locationProvider.openLocationSettings();
+    } finally {
+      if (mounted) {
+        setState(() => _searchOpeningLocationSettings = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: EasySubwayAccessibleColors.scaffoldSurface,
+      child: SafeArea(
+        top: false,
+        child: Semantics(
+          container: true,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_searchController, _queryController]),
+            builder: (context, _) {
+              final state = _searchController.state;
+              final showRecent =
+                  !_hasSearchQuery && _searchRecentQueries.isNotEmpty;
+              final isSearching = state.status == StationSearchStatus.loading;
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                children: [
+                  if (showRecent)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: StationRecentSearchSection(
+                        queries: _searchRecentQueries,
+                        enabled: !isSearching,
+                        onQuerySelected: _searchRecentQuerySelected,
+                        onQueryRemoved: (query) =>
+                            unawaited(_removeSearchRecentQuery(query)),
+                        onClearAll: () =>
+                            unawaited(_clearSearchRecentQueries()),
+                      ),
+                    ),
+                  StationSearchBody(
+                    state: state,
+                    onResultTap: widget.onResultFocus,
+                    isOpeningLocationSettings: _searchOpeningLocationSettings,
+                    onOpenLocationSettings: () =>
+                        unawaited(_openSearchLocationSettings()),
+                  ),
+                ],
               );
             },
           ),
@@ -3978,14 +4728,13 @@ class _StationHitTarget extends StatelessWidget {
   }
 }
 
-/// #1933 요구 2: 출발/도착이 하나라도 차면 상단바 "자체"가 이 2줄 출발/도착
-/// 입력으로 변신한다(참고 앱처럼 검색바 자리가 곧 출발/도착 입력이 됨). 아래
-/// 별도 카드를 띄우지 않는다 — 그림자/elevation 0, 라운딩 없이 하단 line
-/// 구분선과 여백으로만 depth를 준다. 무채색 잉크만.
+/// #1933 요구 2: 출발/도착이 하나라도 차면 상단바 "자체"가 참고 앱 OD 입력
+/// 구조(출발/도착 각각을 무채색 채움 필드 2개로 표시)로 변신한다. 아래 별도
+/// 카드를 띄우지 않는다 — 그림자/elevation 0, 라운딩은 8 이하, splash 없이
+/// 채움 색과 여백만으로 depth를 준다. 무채색 잉크만.
 class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   const _NetworkMapTopBarRouteDraft({
     required this.draft,
-    required this.onMenuTap,
     required this.onClearOrigin,
     required this.onClearDestination,
     required this.onSwapDraft,
@@ -3995,7 +4744,6 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   });
 
   final RouteDraft draft;
-  final VoidCallback onMenuTap;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
   final VoidCallback onSwapDraft;
@@ -4007,55 +4755,27 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canSwap = draft.origin != null || draft.destination != null;
+    // 출발/도착 2개의 무채색 채움 필드. TalkBack 순서: 출발 먼저, 도착.
+    // 행 리스트로 렌더해 중간 행 확장이 구조 변경 없이 가능하다.
+    final fields = <Widget>[
+      _NetworkMapRouteDraftField(
+        isOrigin: true,
+        station: draft.origin,
+        onClear: onClearOrigin,
+        onPick: onPickOrigin,
+      ),
+      _NetworkMapRouteDraftField(
+        isOrigin: false,
+        station: draft.destination,
+        onClear: onClearDestination,
+        onPick: onPickDestination,
+      ),
+    ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 10, 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 메뉴 버튼은 변신 후에도 그대로 유지(좌측 정체성·좌측 메뉴 접근).
-          IconButton(
-            key: const Key('networkMapMenuButton'),
-            tooltip: '메뉴',
-            onPressed: onMenuTap,
-            style: IconButton.styleFrom(
-              minimumSize: const Size.square(EasySubwayTouchTarget.general),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: EdgeInsets.zero,
-            ),
-            icon: const Icon(Icons.menu, size: 22, color: Color(0xFF4B4B4B)),
-          ),
-          const SizedBox(width: 2),
-          // 출발/도착 2줄 입력. TalkBack 순서: 출발 먼저, 도착. 각 줄은 line
-          // 구분선으로만 나뉜다(박스/카드 금지).
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _NetworkMapRouteDraftRow(
-                  key: const Key('networkMapRouteDraftOriginRow'),
-                  isOrigin: true,
-                  station: draft.origin,
-                  fallback: '출발역을 탭하거나 검색',
-                  onClear: onClearOrigin,
-                  onPick: onPickOrigin,
-                ),
-                const Divider(
-                  height: 1,
-                  indent: 22,
-                  color: EasySubwayAccessibleColors.line,
-                ),
-                _NetworkMapRouteDraftRow(
-                  key: const Key('networkMapRouteDraftDestinationRow'),
-                  isOrigin: false,
-                  station: draft.destination,
-                  fallback: '도착역을 탭하거나 검색',
-                  onClear: onClearDestination,
-                  onPick: onPickDestination,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
           // 출발/도착 맞바꾸기(⇅). 참고 앱 상단 입력바의 스왑 어포던스와 같은 원리.
           Semantics(
             button: true,
@@ -4074,27 +4794,37 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < fields.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 6),
+                  fields[i],
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// 변신한 상단바의 한 줄(출발 또는 도착). 노드 점 + 연결선 + 역명 +
-/// 채워졌을 때만 보이는 지우기(✕) 버튼. 무채색 잉크만 쓴다.
-class _NetworkMapRouteDraftRow extends StatelessWidget {
-  const _NetworkMapRouteDraftRow({
+/// 변신한 상단바의 한 줄(출발 또는 도착) — 무채색 채움 필드. 라운딩 8 이하,
+/// 그림자/elevation 없음, splash 없음(GestureDetector만 사용). 채워졌을
+/// 때만 지우기(✕) 버튼을 보인다.
+class _NetworkMapRouteDraftField extends StatelessWidget {
+  const _NetworkMapRouteDraftField({
     required this.isOrigin,
     required this.station,
-    required this.fallback,
     required this.onClear,
     this.onPick,
-    super.key,
   });
 
   final bool isOrigin;
   final RouteDraftStation? station;
-  final String fallback;
   final VoidCallback onClear;
 
   /// G4: 이 칸(역명/플레이스홀더 영역)을 탭하면 역 검색을 연다. null이면 탭 불가.
@@ -4104,52 +4834,34 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = isOrigin ? '출발' : '도착';
     final filled = station != null;
-    final stationName = filled ? station!.displayName : fallback;
+    final stationName = filled ? station!.displayName : label;
     // 접근성: 검색 진입 라벨을 "출발역 검색"/"도착역 검색"으로 명확히 낭독한다.
     final searchLabel = isOrigin ? '출발역 검색' : '도착역 검색';
     final pickSemanticsLabel = filled
         ? '$label $stationName, $searchLabel'
-        : '$label, $stationName, $searchLabel';
-    final rowBody = IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _NetworkMapRouteDraftNodeColumn(isOrigin: isOrigin),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-              ),
+        : '$label, $searchLabel';
+    final textRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            stationName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: filled
+                  ? EasySubwayAccessibleColors.text
+                  : EasySubwayAccessibleColors.mutedText,
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(
-                stationName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: filled
-                      ? EasySubwayAccessibleColors.text
-                      : EasySubwayAccessibleColors.mutedText,
-                  height: 1.2,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
     // 역명/플레이스홀더 영역: onPick이 있으면 검색을 여는 버튼. 없으면 정보 표시만.
     final Widget pickArea = onPick == null
         ? Semantics(
-            label: filled ? '$label $stationName' : '$label, $stationName',
-            child: ExcludeSemantics(child: rowBody),
+            label: filled ? '$label $stationName' : label,
+            child: ExcludeSemantics(child: textRow),
           )
         : Semantics(
             button: true,
@@ -4168,78 +4880,73 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
                 onTap: onPick,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 48),
-                  child: rowBody,
+                  child: Center(child: textRow),
                 ),
               ),
             ),
           );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(child: pickArea),
-        if (filled)
-          Semantics(
-            button: true,
-            label: '$label역 지우기',
-            onTap: onClear,
-            child: ExcludeSemantics(
-              child: IconButton(
-                key: Key(
-                  isOrigin
-                      ? 'networkMapRouteDraftClearOrigin'
-                      : 'networkMapRouteDraftClearDestination',
-                ),
-                onPressed: onClear,
-                icon: const Icon(Icons.close, size: 18),
-                color: EasySubwayAccessibleColors.mutedText,
-                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                padding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _NetworkMapRouteDraftNodeColumn extends StatelessWidget {
-  const _NetworkMapRouteDraftNodeColumn({required this.isOrigin});
-
-  final bool isOrigin;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget connector() => Center(
-      child: Container(width: 2, color: EasySubwayAccessibleColors.line),
-    );
-    return SizedBox(
-      width: 14,
-      child: Column(
-        children: [
-          Expanded(child: isOrigin ? const SizedBox.shrink() : connector()),
-          _NetworkMapRouteDraftNode(filled: !isOrigin),
-          Expanded(child: isOrigin ? connector() : const SizedBox.shrink()),
-        ],
-      ),
-    );
-  }
-}
-
-class _NetworkMapRouteDraftNode extends StatelessWidget {
-  const _NetworkMapRouteDraftNode({required this.filled});
-
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    const color = EasySubwayAccessibleColors.primary;
     return Container(
-      width: 12,
-      height: 12,
+      key: Key(
+        isOrigin
+            ? 'networkMapRouteDraftOriginRow'
+            : 'networkMapRouteDraftDestinationRow',
+      ),
+      constraints: const BoxConstraints(minHeight: 54),
       decoration: BoxDecoration(
-        color: filled ? color : Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: color, width: 3),
+        color: EasySubwayAccessibleColors.scaffoldSurface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 14, right: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: pickArea),
+            if (filled)
+              Semantics(
+                button: true,
+                label: '$label역 지우기',
+                onTap: onClear,
+                child: ExcludeSemantics(
+                  child: IconButton(
+                    key: Key(
+                      isOrigin
+                          ? 'networkMapRouteDraftClearOrigin'
+                          : 'networkMapRouteDraftClearDestination',
+                    ),
+                    onPressed: onClear,
+                    // 작은 원형 배지형 지우기(✕) — 무채색. 탭 시 요란한
+                    // splash/highlight 사각형을 남기지 않는다(#1933 원칙).
+                    style: IconButton.styleFrom(
+                      splashFactory: NoSplash.splashFactory,
+                      highlightColor: Colors.transparent,
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                    ),
+                    icon: Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: EasySubwayAccessibleColors.disclosure,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

@@ -1731,6 +1731,7 @@ enum StationSearchEntryMode { search, nearby }
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   List<String> _recentQueries = const [];
   Timer? _searchDebounce;
   bool _isNearbySearchRunning = false;
@@ -1753,6 +1754,10 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         }
       });
     }
+    // 검색 진입은 화면을 여는 즉시 입력 모드로 들어간다(별도 타이틀 화면 없이 바로
+    // 키보드가 뜬다). 이 즉시 포커스는 검색 필드의 autofocus: !isNearbyEntry 가
+    // 담당하므로 여기서 별도 requestFocus 는 두지 않는다. 가까운 역 진입은 위치
+    // 조회를 먼저 하고 autofocus 도 꺼져 포커스를 가로채지 않는다.
   }
 
   @override
@@ -1762,6 +1767,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       ..dispose();
     _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
+    _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
@@ -1795,56 +1801,73 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
 
+  /// pickSlot·entryMode 조합에 따른 입력 힌트. 큰 타이틀 화면을 없앤 대신, 입력
+  /// 필드 자체의 힌트/시맨틱에 "무엇을 고르는 중인지"를 인코딩해 TalkBack이 출발/
+  /// 도착/일반 검색 의도를 그대로 전달하게 한다.
+  String get _searchInputHint => switch (widget.pickSlot) {
+    RouteDraftSlot.origin => '출발역 이름을 입력해 주세요',
+    RouteDraftSlot.destination => '도착역 이름을 입력해 주세요',
+    null => '역 이름을 입력해 주세요',
+  };
+
   @override
   Widget build(BuildContext context) {
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
-    const showSearchInput = true;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
-    final searchInputSection = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (showSearchInput) ...[
-          TextField(
-            key: const Key('stationSearchInput'),
-            controller: _queryController,
-            minLines: 1,
-            textInputAction: TextInputAction.search,
-            style: const TextStyle(fontSize: 20, height: 1.35),
-            decoration: InputDecoration(
-              hintText: '역 이름을 입력해 주세요',
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              prefixIcon: const Icon(
-                Icons.search,
-                color: EasySubwayAccessibleColors.iconMuted,
-              ),
-              suffixIcon: _hasSearchQuery
-                  ? IconButton(
-                      tooltip: '검색어 지우기',
-                      onPressed: _queryController.clear,
-                      icon: const Icon(Icons.close),
-                    )
-                  : null,
-              filled: true,
-              fillColor: EasySubwayAccessibleColors.scaffoldSurface,
-              border: OutlineInputBorder(
-                borderRadius: _stationSearchInputRadius,
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: _stationSearchInputRadius,
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: _stationSearchInputRadius,
-                borderSide: BorderSide.none,
-              ),
-            ),
-            onSubmitted: _submit,
-          ),
-          const SizedBox(height: 12),
-        ],
-      ],
+    final searchInputField = TextField(
+      key: const Key('stationSearchInput'),
+      controller: _queryController,
+      focusNode: _searchFocusNode,
+      autofocus: !isNearbyEntry,
+      minLines: 1,
+      textInputAction: TextInputAction.search,
+      style: const TextStyle(fontSize: 17, height: 1.3),
+      decoration: InputDecoration(
+        hintText: _searchInputHint,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        isDense: false,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: EasySubwaySpacing.md,
+          vertical: EasySubwaySpacing.sm,
+        ),
+        prefixIcon: const Icon(
+          Icons.search,
+          color: EasySubwayAccessibleColors.iconMuted,
+        ),
+        suffixIcon: _hasSearchQuery
+            ? IconButton(
+                tooltip: '검색어 지우기',
+                onPressed: _queryController.clear,
+                icon: const Icon(Icons.close),
+              )
+            : null,
+        filled: true,
+        fillColor: EasySubwayAccessibleColors.scaffoldSurface,
+        border: OutlineInputBorder(
+          borderRadius: _stationSearchInputRadius,
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: _stationSearchInputRadius,
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: _stationSearchInputRadius,
+          borderSide: const BorderSide(color: EasySubwayAccessibleColors.line),
+        ),
+      ),
+      onSubmitted: _submit,
     );
+    // 검색 입력 필드는 v4에서 idle/active 픽셀을 통일한 고정 레이아웃이라 AppBar
+    // 기본 toolbarHeight(56)에 그대로 넣으면 시스템 글자 크기를 키웠을 때 필드가
+    // 세로로 잘린다. 입력 텍스트(fontSize 17 × height 1.3)와 상하 contentPadding
+    // (각 sm=8)을 현재 텍스트 배율로 환산해 필요한 높이를 구하고, 기본 높이보다
+    // 작아지지 않게 clamp 해 툴바를 늘린다(축소는 하지 않아 기본 배율의 레이아웃은
+    // 불변). titleSpacing·즉시 입력·뒤로가기 leading 동작은 유지된다.
+    final textScaler = MediaQuery.textScalerOf(context);
+    final scaledInputHeight =
+        textScaler.scale(17 * 1.3) + 2 * EasySubwaySpacing.sm;
+    final toolbarHeight = math.max(kToolbarHeight, scaledInputHeight);
     final recentSearchSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -1855,7 +1878,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         }
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: _StationRecentSearchSection(
+          child: StationRecentSearchSection(
             queries: _recentQueries,
             enabled: !isSearching && !_isNearbySearchRunning,
             onQuerySelected: _searchRecentQuery,
@@ -1911,7 +1934,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     final resultSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        return _StationSearchBody(
+        return StationSearchBody(
           state: _controller.state,
           // 칸 채우기 모드에서는 결과 한 번 탭 = 해당 칸 설정 후 닫기. 지도 탭과 동일
           // 하게 "출발역 선택 → 도착역 선택" UX로 수렴시킨다. 둘러보기 모드에서는
@@ -1929,24 +1952,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       },
     );
     return Scaffold(
+      // 큰 타이틀 화면(예: "역 검색")을 없애고 입력 필드 자체가 헤더가 된다. 열리는
+      // 즉시 입력 모드로 들어가 탭 두 번을 요구하던 랜딩 단계를 지운다. 뒤로가기는
+      // AppBar 기본 leading을 그대로 쓴다(자동 back 버튼 → 입력 필드 순서 유지).
       appBar: AppBar(
-        title: Text(switch (widget.pickSlot) {
-          RouteDraftSlot.origin => '출발역 검색',
-          RouteDraftSlot.destination => '도착역 검색',
-          null => switch (widget.entryMode) {
-            StationSearchEntryMode.nearby => '가까운 역',
-            StationSearchEntryMode.search => '역 검색',
-          },
-        }),
-        actions: [
-          if (!isNearbyEntry)
-            TextButton.icon(
-              key: const Key('nearbyStationAppBarButton'),
-              onPressed: _isNearbySearchRunning ? null : _searchNearby,
-              icon: const Icon(Icons.my_location),
-              label: const Text('가까운 역'),
-            ),
-        ],
+        titleSpacing: 0,
+        toolbarHeight: toolbarHeight,
+        title: searchInputField,
       ),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: Semantics(
@@ -1965,7 +1977,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 children: [
                   _StationSearchAdaptiveContent(
                     isLargeScreen: isLargeScreen,
-                    searchInputSection: searchInputSection,
                     recentSearchSection: recentSearchSection,
                     actionButtonSection: actionButtonSection,
                     resultSection: resultSection,
@@ -2152,8 +2163,9 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 }
 
-class _StationRecentSearchSection extends StatelessWidget {
-  const _StationRecentSearchSection({
+class StationRecentSearchSection extends StatelessWidget {
+  const StationRecentSearchSection({
+    super.key,
     required this.queries,
     required this.enabled,
     required this.onQuerySelected,
@@ -2311,14 +2323,12 @@ class _StationRecentSearchItem extends StatelessWidget {
 class _StationSearchAdaptiveContent extends StatelessWidget {
   const _StationSearchAdaptiveContent({
     required this.isLargeScreen,
-    required this.searchInputSection,
     required this.recentSearchSection,
     required this.actionButtonSection,
     required this.resultSection,
   });
 
   final bool isLargeScreen;
-  final Widget searchInputSection;
   final Widget recentSearchSection;
   final Widget actionButtonSection;
   final Widget resultSection;
@@ -2328,12 +2338,7 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
     if (!isLargeScreen) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          searchInputSection,
-          recentSearchSection,
-          actionButtonSection,
-          resultSection,
-        ],
+        children: [recentSearchSection, actionButtonSection, resultSection],
       );
     }
 
@@ -2350,11 +2355,7 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
               flex: 5,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  searchInputSection,
-                  actionButtonSection,
-                  resultSection,
-                ],
+                children: [actionButtonSection, resultSection],
               ),
             ),
             const SizedBox(
@@ -2374,8 +2375,9 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
   }
 }
 
-class _StationSearchBody extends StatelessWidget {
-  const _StationSearchBody({
+class StationSearchBody extends StatelessWidget {
+  const StationSearchBody({
+    super.key,
     required this.state,
     required this.onResultTap,
     required this.isOpeningLocationSettings,
@@ -2446,9 +2448,6 @@ class _StationSearchBody extends StatelessWidget {
                 const SizedBox(height: 12),
               ],
             ],
-          ] else ...[
-            const _StationDetailSectionTitle(title: '검색 결과'),
-            const SizedBox(height: 12),
           ],
           for (final result
               in state.source == StationSearchResultSource.nearby
@@ -2457,12 +2456,6 @@ class _StationSearchBody extends StatelessWidget {
             _StationSearchResultTile(
               result: result,
               onTap: () => onResultTap(result),
-              onSetOrigin: onSetOrigin == null
-                  ? null
-                  : () => onSetOrigin!(result),
-              onSetDestination: onSetDestination == null
-                  ? null
-                  : () => onSetDestination!(result),
             ),
         ],
       ),
@@ -2672,26 +2665,73 @@ class _StationSearchMessage extends StatelessWidget {
 }
 
 class _StationSearchResultTile extends StatelessWidget {
-  const _StationSearchResultTile({
-    required this.result,
-    required this.onTap,
-    this.onSetOrigin,
-    this.onSetDestination,
-  });
+  const _StationSearchResultTile({required this.result, required this.onTap});
 
   final StationSearchResult result;
   final VoidCallback onTap;
-  final VoidCallback? onSetOrigin;
-  final VoidCallback? onSetDestination;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final stationName = _stationResultDisplayName(result.nameKo);
-    final semanticLabel = _stationResultSemanticLabel(result);
-    final hasRoleActions = onSetOrigin != null || onSetDestination != null;
+    // 역이 지나는 노선마다 한 행씩 표시한다. 각 행은 하단 구분선만 두고
+    // 좌측에 무채색 역명, 우측에 해당 노선 배지를 둔다(추가 텍스트·화살표 없음).
+    final lines = result.lines;
+    if (lines.isEmpty) {
+      return _StationSearchResultLineRow(
+        key: Key('stationSearchResult-${result.id}'),
+        stationName: stationName,
+        line: null,
+        semanticLabel: '$stationName, 선택',
+        onTap: onTap,
+      );
+    }
+    return Column(
+      children: [
+        for (var i = 0; i < lines.length; i++)
+          // 한 역이 여러 노선을 지나면 시각적으로는 노선마다 한 행씩 펼치지만,
+          // 각 행이 "역명, 노선명, 선택" 버튼 시맨틱을 노출하면 스크린리더에 같은
+          // 선택 버튼이 노선 수만큼 뜬다. 첫 행만 시맨틱 버튼으로 남기고 이후
+          // 행들은 ExcludeSemantics 로 감싸 시각 렌더만 유지한다.
+          if (i == 0)
+            _StationSearchResultLineRow(
+              // 첫 행에만 대표 키를 두어 기존 테스트가 단일 위젯을 찾도록 한다.
+              key: Key('stationSearchResult-${result.id}'),
+              stationName: stationName,
+              line: lines[i],
+              semanticLabel: '$stationName, ${lines[i].name}, 선택',
+              onTap: onTap,
+            )
+          else
+            ExcludeSemantics(
+              child: _StationSearchResultLineRow(
+                stationName: stationName,
+                line: lines[i],
+                semanticLabel: '$stationName, ${lines[i].name}, 선택',
+                onTap: onTap,
+              ),
+            ),
+      ],
+    );
+  }
+}
 
-    // 항목마다 테두리 박스를 두지 않고 하단 구분선만 둔 깔끔한 리스트 행으로 표시한다.
+class _StationSearchResultLineRow extends StatelessWidget {
+  const _StationSearchResultLineRow({
+    required this.stationName,
+    required this.line,
+    required this.semanticLabel,
+    required this.onTap,
+    super.key,
+  });
+
+  final String stationName;
+  final StationSearchLine? line;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = this.line;
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -2699,86 +2739,48 @@ class _StationSearchResultTile extends StatelessWidget {
           bottom: BorderSide(color: EasySubwayAccessibleColors.line),
         ),
       ),
-      child: Column(
-        children: [
-          MergeSemantics(
-            child: Semantics(
-              label: semanticLabel,
-              button: true,
+      child: MergeSemantics(
+        child: Semantics(
+          label: semanticLabel,
+          button: true,
+          onTap: onTap,
+          child: ExcludeSemantics(
+            child: InkWell(
               onTap: onTap,
-              child: ExcludeSemantics(
-                child: InkWell(
-                  key: Key('stationSearchResult-${result.id}'),
-                  onTap: onTap,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 78),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 56),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          stationName,
+                          style: const TextStyle(
+                            color: EasySubwayAccessibleColors.text,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 72),
-                            child: StationLineBadges(
-                              lines: result.lines,
-                              size: 32,
-                              maxBadgeCount: 2,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  stationName,
-                                  style: textTheme.titleLarge?.copyWith(
-                                    color: EasySubwayAccessibleColors.text,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  result.distanceLabel.isEmpty
-                                      ? result.lineLabel
-                                      : '${result.distanceLabel} · ${result.lineLabel}',
-                                  style: textTheme.bodyLarge?.copyWith(
-                                    color: EasySubwayAccessibleColors
-                                        .secondaryText,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.25,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: EasySubwayAccessibleColors.secondaryText,
-                            size: 30,
-                          ),
-                        ],
-                      ),
-                    ),
+                      if (line != null) ...[
+                        const SizedBox(width: 12),
+                        StationLineBadge(line: line, size: 32),
+                      ],
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-          if (hasRoleActions)
-            _StationRoleActionBar(
-              stationId: result.id,
-              stationName: stationName,
-              onSetOrigin: onSetOrigin,
-              onSetDestination: onSetDestination,
-            ),
-        ],
+        ),
       ),
     );
   }

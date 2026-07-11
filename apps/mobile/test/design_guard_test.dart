@@ -204,6 +204,59 @@ void main() {
     );
   });
 
+  test('showMenu/PopupMenuButton 재유입 금지 + showGeneralDialog 오버레이 elevation 가드 (#1933)', () {
+    // (A) showMenu(...)·PopupMenuButton(...) 는 기본 elevation(그림자)을 강제하는
+    //     오버레이 위젯이라 시각 언어 v4에서 재유입 자체를 금지한다. lib 전체 0건 유지.
+    final menuOffenders = countPerFile(
+      RegExp(r'\bshowMenu\(|\bPopupMenuButton\('),
+    );
+    expect(
+      menuOffenders,
+      isEmpty,
+      reason:
+          'showMenu(...)·PopupMenuButton(...) 는 기본 elevation(그림자)을 강제하므로 '
+          '전면 금지다 — 커스텀 오버레이로 대체하라 (#1933). $menuOffenders',
+    );
+
+    // (B) showGeneralDialog 로 띄우는 오버레이는 Material 표면마다 elevation: 0 을
+    //     명시해야 기본 elevation(그림자)이 조용히 재유입되지 않는다. showGeneralDialog
+    //     사용 파일에서 Material( 호출 건수 <= elevation: 0 표기 건수 여야 통과.
+    final overlayFiles = <String>[];
+    sources.forEach((path, source) {
+      if (RegExp(r'\bshowGeneralDialog\b').hasMatch(source)) {
+        overlayFiles.add(path);
+      }
+    });
+    expect(overlayFiles, isNotEmpty, reason: 'showGeneralDialog 사용 파일이 없다');
+
+    final materialPattern = RegExp(r'\bMaterial\(');
+    final elevationZeroPattern = RegExp(r'elevation:\s*0(?![\d.])');
+
+    final violations = <String>[];
+    for (final filePath in overlayFiles) {
+      final source = sources[filePath]!;
+      final materialCount = countIn(source, materialPattern);
+      final elevationZeroCount = countIn(source, elevationZeroPattern);
+
+      if (materialCount > elevationZeroCount) {
+        violations.add(
+          '$filePath: Material( 호출 $materialCount건, '
+          'elevation: 0 명시 $elevationZeroCount건',
+        );
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason:
+          'showGeneralDialog 오버레이의 Material 표면은 매번 elevation: 0 을 명시해야 '
+          '한다 — 그렇지 않으면 Flutter 기본 elevation으로 그림자가 조용히 '
+          '재유입된다 (#1933).\n'
+          '${violations.join('\n')}',
+    );
+  });
+
   test('StadiumBorder ratchet — pill 형태 제거 대상 (0으로 수렴)', () {
     // pill(stadium) 형태는 각진 사각형(radius <= 8) 원칙 위반이다.
     // 완전한 원이 필요하면 CircleBorder 를 쓴다. 상한은 내리기만 한다.

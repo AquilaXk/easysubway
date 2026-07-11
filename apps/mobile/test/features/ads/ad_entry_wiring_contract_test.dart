@@ -23,7 +23,7 @@ void main() {
       _between(
         stationSearch,
         'void _openStationDetail(StationSearchResult result)',
-        'class _StationRecentSearchSection',
+        'class StationRecentSearchSection',
       ),
       contains('adRepository: widget.adRepository'),
     );
