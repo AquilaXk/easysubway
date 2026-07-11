@@ -75,14 +75,21 @@ function parseGfxinfo(text) {
   for (const match of text.matchAll(/(50th|90th|95th|99th) percentile:\s*([\d,]+)ms/g)) {
     percentiles[match[1]] = parseNumber(match[2]);
   }
+  const totalFrames = total ? parseNumber(total[1]) : null;
+  // Flutter는 자체 canvas 렌더 파이프라인이라 dumpsys gfxinfo(HWUI)가 노선도
+  // 프레임을 잡지 못한다. totalFrames=0이면 percentile/jankyPercent는 "측정
+  // 불가"이며, histogram 최상단 버킷(4950ms)이 그대로 튀어나온 잔재이므로
+  // null로 두어 FrameTiming 정본을 오염시키지 않는다.
+  const captured = totalFrames != null && totalFrames > 0;
   return {
-    totalFrames: total ? parseNumber(total[1]) : null,
+    totalFrames,
+    measurementStatus: captured ? "captured" : "not_captured_flutter_canvas",
     jankyFrames: janky ? parseNumber(janky[1]) : null,
-    jankyPercent: janky ? Number.parseFloat(janky[2]) : null,
-    p50Ms: percentiles["50th"] ?? null,
-    p90Ms: percentiles["90th"] ?? null,
-    p95Ms: percentiles["95th"] ?? null,
-    p99Ms: percentiles["99th"] ?? null,
+    jankyPercent: captured && janky ? Number.parseFloat(janky[2]) : null,
+    p50Ms: captured ? percentiles["50th"] ?? null : null,
+    p90Ms: captured ? percentiles["90th"] ?? null : null,
+    p95Ms: captured ? percentiles["95th"] ?? null : null,
+    p99Ms: captured ? percentiles["99th"] ?? null : null,
   };
 }
 
@@ -190,12 +197,22 @@ function analyzeRun(artifactDir) {
 }
 
 function aggregate(runs) {
+  // gfxinfo(HWUI) 지표는 프레임을 실제로 캡처한(captured) run만 반영한다.
+  // Flutter canvas run(not_captured)의 4950ms 잔재가 프레임 게이트를 오염시키지
+  // 않도록 배제하고, captured run이 하나도 없으면 null로 명시한다.
+  const capturedRuns = runs.filter(
+    (run) => run.gfxinfo.measurementStatus === "captured",
+  );
+  const maxCapturedGfxinfo = (selector) =>
+    capturedRuns.length === 0
+      ? null
+      : Math.max(...capturedRuns.map((run) => selector(run.gfxinfo) ?? 0));
   return {
     runCount: runs.length,
     measurementScopes: [...new Set(runs.map((run) => run.measurementScope))],
-    maxJankyPercent: Math.max(...runs.map((run) => run.gfxinfo.jankyPercent ?? 0)),
-    maxP95FrameMs: Math.max(...runs.map((run) => run.gfxinfo.p95Ms ?? 0)),
-    maxP99FrameMs: Math.max(...runs.map((run) => run.gfxinfo.p99Ms ?? 0)),
+    maxJankyPercent: maxCapturedGfxinfo((gfxinfo) => gfxinfo.jankyPercent),
+    maxP95FrameMs: maxCapturedGfxinfo((gfxinfo) => gfxinfo.p95Ms),
+    maxP99FrameMs: maxCapturedGfxinfo((gfxinfo) => gfxinfo.p99Ms),
     maxTotalPssKb: Math.max(...runs.map((run) => run.meminfo.totalPssKb ?? 0)),
     maxFrameJankyPercent: Math.max(
       ...runs.map((run) => run.frameTiming.jankyPercent ?? 0),

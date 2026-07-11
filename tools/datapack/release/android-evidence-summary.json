@@ -15,12 +15,13 @@
       "panCount": 5,
       "gfxinfo": {
         "totalFrames": 0,
+        "measurementStatus": "not_captured_flutter_canvas",
         "jankyFrames": 0,
-        "jankyPercent": 0,
-        "p50Ms": 4950,
-        "p90Ms": 4950,
-        "p95Ms": 4950,
-        "p99Ms": 4950
+        "jankyPercent": null,
+        "p50Ms": null,
+        "p90Ms": null,
+        "p95Ms": null,
+        "p99Ms": null
       },
       "meminfo": {
         "totalPssKb": 199903,
@@ -51,9 +52,9 @@
     "measurementScopes": [
       "gesture_after_route_map_settle"
     ],
-    "maxJankyPercent": 0,
-    "maxP95FrameMs": 4950,
-    "maxP99FrameMs": 4950,
+    "maxJankyPercent": null,
+    "maxP95FrameMs": null,
+    "maxP99FrameMs": null,
     "maxTotalPssKb": 199903,
     "maxFrameJankyPercent": 3.64,
     "maxBuildP90Ms": 2.82,
