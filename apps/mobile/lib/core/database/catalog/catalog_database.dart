@@ -9,6 +9,23 @@ part 'catalog_database.g.dart';
 
 const catalogDatabaseSchemaVersion = 15;
 
+/// 수도권 통합요금 기본거리(10km) 초과분 요금 단계(#1911).
+///
+/// 10~50km 구간은 5km당 100원씩 8회, 50km 초과 구간은 8km당 100원씩
+/// 반복 부과된다(마지막 단계만 반복 — `FareCalculator` dartdoc 참고).
+/// `seedBaselineIfEmpty()`와 `_backfillBaselineFareRules()` 양쪽에서
+/// 값이 어긋나지 않도록 이 상수 하나만 사용한다.
+const capitalIntegratedAdditionalStepsJson =
+    '[{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":5000,"cardFare":100,"cashFare":100},'
+    '{"distanceMeters":8000,"cardFare":100,"cashFare":100}]';
+
 @DriftDatabase(
   tables: [
     CatalogMetadata,
@@ -280,7 +297,7 @@ class CatalogDatabase extends _$CatalogDatabase {
             baseCashFare: 1650,
             baseDistanceMeters: 10000,
             additionalStepsJson: const Value(
-              '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]',
+              capitalIntegratedAdditionalStepsJson,
             ),
           ),
         ]);
@@ -518,7 +535,7 @@ class CatalogDatabase extends _$CatalogDatabase {
           baseCashFare: 1650,
           baseDistanceMeters: 10000,
           additionalStepsJson: const Value(
-            '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]',
+            capitalIntegratedAdditionalStepsJson,
           ),
         ),
       );
@@ -639,11 +656,16 @@ class CatalogDatabase extends _$CatalogDatabase {
         (SELECT COUNT(*) FROM fare_rules) AS fare_rule_count,
         (SELECT cash_fare
          FROM fare_discounts
-         WHERE id = 'capital-integrated-youth') AS youth_cash_fare
+         WHERE id = 'capital-integrated-youth') AS youth_cash_fare,
+        (SELECT additional_steps_json
+         FROM fare_rules
+         WHERE id = 'capital-integrated-standard') AS standard_additional_steps_json
     ''').getSingle();
     return row.readNullable<String>('active_pack') == 'capital' &&
         row.read<int>('station_line_count') > 0 &&
         (row.read<int>('fare_rule_count') == 0 ||
+            row.readNullable<String>('standard_additional_steps_json') !=
+                capitalIntegratedAdditionalStepsJson ||
             row.readNullable<int>('youth_cash_fare') == 1000);
   }
 
