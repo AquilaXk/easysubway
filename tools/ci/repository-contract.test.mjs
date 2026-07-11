@@ -5393,6 +5393,35 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(schema, /CREATE TABLE fare_zones \(/);
   assert.match(schema, /CREATE TABLE fare_rules \([\s\S]+additional_steps_json TEXT NOT NULL DEFAULT '\[\]'/);
   assert.match(schema, /CREATE TABLE station_fare_zones \([\s\S]+FOREIGN KEY \(station_id, line_id\) REFERENCES station_lines/);
+
+  // #1911: 수도권 통합요금 50km 초과 구간은 8km당 100원(기존 5km당 100원 과대 산정 수정).
+  // fixture와 Dart 소스(공용 상수)의 additionalSteps 값이 어긋나지 않도록 고정한다.
+  const fixture = readJson("tools/datapack/fixtures/catalog-fixture.json");
+  const fixtureAdditionalSteps = fixture.packs[0].fareRules[0].additionalSteps;
+  const additionalStepsConstantMatch = mobileDatabase.match(
+    /const capitalIntegratedAdditionalStepsJson =\s*((?:'[^']*'\s*)+);/,
+  );
+  assert.ok(
+    additionalStepsConstantMatch,
+    "catalog_database.dart에서 capitalIntegratedAdditionalStepsJson 상수를 찾을 수 없다",
+  );
+  const additionalStepsJsonLiteral = additionalStepsConstantMatch[1]
+    .trim()
+    .split("\n")
+    .map((line) => line.trim().replace(/^'|'$/g, ""))
+    .join("");
+  const dartAdditionalSteps = JSON.parse(additionalStepsJsonLiteral);
+
+  assert.deepEqual(dartAdditionalSteps, fixtureAdditionalSteps);
+  assert.equal(dartAdditionalSteps.length, 9);
+  for (const step of dartAdditionalSteps.slice(0, 8)) {
+    assert.deepEqual(step, { distanceMeters: 5000, cardFare: 100, cashFare: 100 });
+  }
+  assert.deepEqual(dartAdditionalSteps[8], {
+    distanceMeters: 8000,
+    cardFare: 100,
+    cashFare: 100,
+  });
   assert.match(schema, /CREATE TABLE station_pathway_edges \([\s\S]+requires_facility_id TEXT[\s\S]+legacy_internal_route_edge_id TEXT NOT NULL DEFAULT ''/);
   assert.match(schema, /CREATE TABLE internal_route_edges \([\s\S]+source_snapshot_id TEXT NOT NULL DEFAULT ''[\s\S]+provider_record_hash TEXT NOT NULL DEFAULT ''/);
   assert.match(builder, /"station_facility_evidence"/);
