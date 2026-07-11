@@ -24,6 +24,21 @@ const _networkMapTopBarHeight = 60.0;
 const _networkMapPillRadius = BorderRadius.all(Radius.circular(8));
 const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(8));
 
+// #1933 idle 검색바(`_NetworkMapSearchField`)와 active 인플레이스 입력 필드
+// (`_NetworkMapSearchInputField`)가 탭 전환 시 픽셀 단위로 동일한 시각 박스를
+// 유지하도록 공유하는 치수 상수. 값을 두 위젯에서 복제하지 않기 위해 이곳에
+// 모아둔다.
+const _searchFieldVisualHeight = 38.0;
+const _searchFieldHorizontalPadding = 12.0;
+const _searchFieldBorderWidth = 1.5;
+const _searchFieldIconSize = 18.0;
+const _searchFieldIconGap = 8.0;
+const _searchFieldTextStyle = TextStyle(
+  color: EasySubwayAccessibleColors.mutedText,
+  fontSize: 15,
+  fontWeight: FontWeight.w600,
+);
+
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
 }
@@ -1734,36 +1749,34 @@ class _NetworkMapSearchField extends StatelessWidget {
                 child: Center(
                   child: Container(
                     key: const Key('heroStationSearchButton'),
-                    height: 38,
+                    height: _searchFieldVisualHeight,
                     decoration: BoxDecoration(
                       color: EasySubwayAccessibleColors.surface,
                       border: Border.all(
                         color: EasySubwayAccessibleColors.line,
-                        width: 1.5,
+                        width: _searchFieldBorderWidth,
                       ),
                       borderRadius: _networkMapSearchFieldRadius,
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 0 : _searchFieldHorizontalPadding,
+                    ),
                     child: compact
                         ? const SizedBox.shrink()
                         : const Row(
                             children: [
                               Icon(
                                 Icons.search,
-                                size: 18,
+                                size: _searchFieldIconSize,
                                 color: EasySubwayAccessibleColors.iconMuted,
                               ),
-                              SizedBox(width: 8),
+                              SizedBox(width: _searchFieldIconGap),
                               Expanded(
                                 child: Text(
                                   '지하철역 검색',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: EasySubwayAccessibleColors.mutedText,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: _searchFieldTextStyle,
                                 ),
                               ),
                             ],
@@ -1780,8 +1793,23 @@ class _NetworkMapSearchField extends StatelessWidget {
 }
 
 /// #1933 홈 노선도 in-place 검색 모드에서 idle 검색 필드 자리에 나타나는 실제
-/// 편집 가능한 TextField. 48 터치타겟을 채우고 radius 8 · line 테두리로 idle
-/// 필드와 같은 결을 유지한다.
+/// 편집 가능한 TextField. 바깥 터치타겟(56)은 유지하되, 안쪽 시각 박스는
+/// idle 필드(`_NetworkMapSearchField`)와 픽셀 단위로 동일한 높이(38)·패딩
+/// (12)·테두리·아이콘 배치를 공유 상수로 재사용해 탭 전환 시 박스가 점프하지
+/// 않도록 한다. TextField 자체는 border/배경 없이 텍스트 편집만 담당하고,
+/// 시각적인 테두리·배경·아이콘은 idle과 동일한 시각 껍데기 Container가 그린다.
+///
+/// 시각(38px 박스)과 히트 영역(≥48px)은 Stack으로 분리한다: 배경 레이어가
+/// 38px 시각 껍데기를 그리고, 그 위 Positioned.fill 레이어에서 TextField가
+/// 바깥 터치타겟 높이(56)를 그대로 채우며 지우기 IconButton도 독립적인
+/// 48x48 탭 타깃을 갖는다. TextField와 지우기 버튼을 하나의 semantics로
+/// 병합하지 않아야 스크린리더 사용자가 '검색어 지우기' 액션에 별도로 접근할
+/// 수 있다.
+///
+/// compact 분기(아이콘/텍스트 숨김)는 idle에서는 좁은 공간에서 placeholder를
+/// 숨기기 위한 것이지만, active 상태는 항상 사용자가 텍스트를 입력해야 하는
+/// 상태라 아이콘을 감추면 사용성이 깨지므로 적용하지 않고 패딩을 idle의
+/// non-compact 값(12)으로 고정한다.
 class _NetworkMapSearchInputField extends StatelessWidget {
   const _NetworkMapSearchInputField({
     required this.controller,
@@ -1801,71 +1829,104 @@ class _NetworkMapSearchInputField extends StatelessWidget {
     final hasQuery =
         editController != null && editController.text.trim().isNotEmpty;
     return SizedBox(
-      // 터치 타겟(≥48)을 만족시키기 위해 필드 자체가 전체 높이를 차지한다.
-      // 시각적 박스는 radius 8 + line 테두리로 idle 필드(높이 38)와 같은 결을
-      // 유지한다.
+      // 터치 타겟(≥48, 실제로는 56)을 만족시키기 위해 필드 자체가 전체 높이를
+      // 차지한다. 시각적 박스(38px)는 배경 레이어 Container가 idle 필드와
+      // 동일하게 그리고, 입력/버튼 히트 영역은 그 위 레이어에서 시각 박스와
+      // 독립적으로 ≥48px를 확보한다.
       height: EasySubwayTouchTarget.general,
-      child: Center(
-        child: TextField(
-          key: const Key('stationSearchInput'),
-          controller: editController,
-          focusNode: focusNode,
-          autofocus: true,
-          minLines: 1,
-          maxLines: 1,
-          textInputAction: TextInputAction.search,
-          style: const TextStyle(fontSize: 15, height: 1.2),
-          decoration: InputDecoration(
-            hintText: '역 이름을 입력해 주세요',
-            floatingLabelBehavior: FloatingLabelBehavior.always,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 13),
-            prefixIcon: const Icon(
-              Icons.search,
-              size: 18,
-              color: EasySubwayAccessibleColors.iconMuted,
-            ),
-            prefixIconConstraints: const BoxConstraints(
-              minWidth: 36,
-              minHeight: 36,
-            ),
-            suffixIcon: hasQuery
-                ? IconButton(
-                    tooltip: '검색어 지우기',
-                    onPressed: onClear ?? editController.clear,
-                    icon: const Icon(Icons.close, size: 18),
-                  )
-                : null,
-            suffixIconConstraints: const BoxConstraints(
-              minWidth: 36,
-              minHeight: 36,
-            ),
-            filled: true,
-            fillColor: EasySubwayAccessibleColors.surface,
-            border: const OutlineInputBorder(
-              borderRadius: _networkMapSearchFieldRadius,
-              borderSide: BorderSide(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 시각 껍데기: idle 필드와 픽셀 단위로 동일(높이 38, radius 8,
+          // line 1.5, surface 배경). 히트 영역과 분리된 순수 배경이다.
+          Container(
+            key: const Key('heroStationSearchInputBox'),
+            height: _searchFieldVisualHeight,
+            decoration: BoxDecoration(
+              color: EasySubwayAccessibleColors.surface,
+              border: Border.all(
                 color: EasySubwayAccessibleColors.line,
-                width: 1.5,
+                width: _searchFieldBorderWidth,
               ),
-            ),
-            enabledBorder: const OutlineInputBorder(
               borderRadius: _networkMapSearchFieldRadius,
-              borderSide: BorderSide(
-                color: EasySubwayAccessibleColors.line,
-                width: 1.5,
+            ),
+          ),
+          Positioned.fill(
+            child: Padding(
+              // idle의 콘텐츠 시작 위치와 동일: 테두리(1.5) + 패딩(12).
+              padding: const EdgeInsets.symmetric(
+                horizontal:
+                    _searchFieldBorderWidth + _searchFieldHorizontalPadding,
               ),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: _networkMapSearchFieldRadius,
-              borderSide: BorderSide(
-                color: EasySubwayAccessibleColors.line,
-                width: 1.5,
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.search,
+                    size: _searchFieldIconSize,
+                    color: EasySubwayAccessibleColors.iconMuted,
+                  ),
+                  const SizedBox(width: _searchFieldIconGap),
+                  Expanded(
+                    // TextField가 바깥 터치타겟 높이(56) 전체를 채워 히트/
+                    // semantics 영역이 48px 게이트를 넘는다. 텍스트는
+                    // isCollapsed 기본 정렬(center)로 시각 박스 중앙(=idle
+                    // 텍스트 위치)에 놓인다.
+                    child: SizedBox(
+                      height: EasySubwayTouchTarget.general,
+                      child: TextField(
+                        key: const Key('stationSearchInput'),
+                        controller: editController,
+                        focusNode: focusNode,
+                        autofocus: true,
+                        minLines: 1,
+                        maxLines: 1,
+                        textAlignVertical: TextAlignVertical.center,
+                        textInputAction: TextInputAction.search,
+                        style: const TextStyle(fontSize: 15, height: 1.2),
+                        decoration: const InputDecoration(
+                          hintText: '역 이름을 입력해 주세요',
+                          hintStyle: _searchFieldTextStyle,
+                          // labelText/label을 쓰지 않으므로
+                          // floatingLabelBehavior는 레이아웃에 영향이 없는
+                          // no-op이지만, 기존 위젯 테스트(`역 검색은 접근성
+                          // 표시가 포함된 백엔드 결과를 보여준다`)가 이 값을
+                          // 계약으로 단언하고 있어 그대로 유지한다.
+                          floatingLabelBehavior: FloatingLabelBehavior.always,
+                          isDense: true,
+                          isCollapsed: true,
+                          contentPadding: EdgeInsets.zero,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                        ),
+                        onSubmitted: onSubmitted,
+                      ),
+                    ),
+                  ),
+                  if (hasQuery)
+                    // 시각 아이콘은 18px이지만 탭 타깃은 독립적으로 48x48을
+                    // 확보한다(top bar IconButton 패턴과 동일). 히트 영역은
+                    // 38px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
+                    // 머물러 시각 박스 높이를 밀어 올리지 않는다.
+                    IconButton(
+                      tooltip: '검색어 지우기',
+                      onPressed: onClear ?? editController.clear,
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size.square(48),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: const Icon(
+                        Icons.close,
+                        size: _searchFieldIconSize,
+                        color: EasySubwayAccessibleColors.iconMuted,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-          onSubmitted: onSubmitted,
-        ),
+        ],
       ),
     );
   }

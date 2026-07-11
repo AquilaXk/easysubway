@@ -941,6 +941,51 @@ void main() {
     expect(reportRepository.listMyReportsCount, greaterThanOrEqualTo(2));
   });
 
+  testWidgets('홈 검색바는 idle에서 active로 전환돼도 시각 박스 높이가 그대로 유지된다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final idleHeight = tester
+        .getSize(find.byKey(const Key('heroStationSearchButton')))
+        .height;
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+
+    final activeHeight = tester
+        .getSize(find.byKey(const Key('heroStationSearchInputBox')))
+        .height;
+
+    expect(idleHeight, 38.0);
+    expect(activeHeight, 38.0);
+    expect(find.text('역 이름을 입력해 주세요'), findsOneWidget);
+
+    // 검색어를 입력하면 지우기 버튼이 나타나고, 시각 박스(38px)와 별개로
+    // 실제 렌더 크기가 접근성 최소 탭 타깃(48x48) 이상이어야 한다. 버튼이
+    // 나타나도 시각 박스 높이는 38px 그대로 유지돼야 한다.
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+
+    final clearButtonSize = tester.getSize(
+      find.widgetWithIcon(IconButton, Icons.close),
+    );
+    expect(clearButtonSize.width, greaterThanOrEqualTo(48.0));
+    expect(clearButtonSize.height, greaterThanOrEqualTo(48.0));
+    expect(
+      tester.getSize(find.byKey(const Key('heroStationSearchInputBox'))).height,
+      38.0,
+    );
+  });
+
   testWidgets('알림함 시설 상태는 쉬운 안내와 할 일을 함께 보여준다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
