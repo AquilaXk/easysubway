@@ -94,8 +94,8 @@ void main() {
     expectRatchet(actual, {
       // 의도 잔존: 기준 화면(노선도 홈·좌측 메뉴) — 룩 불변 원칙
       'lib/network_map.dart': 8,
-      // 의도 잔존: 온보딩 스플래시·페이지 타이틀 (w900은 w800로 강등)
-      'lib/onboarding.dart': 6,
+      // 의도 잔존: 온보딩 시작·프리셋·권한 화면 타이틀 (#1936 전면 재설계로 축소)
+      'lib/onboarding.dart': 4,
       // 의도 잔존: 노선 배지 번호 — 색 배지 위 시인성 (w900은 w800로 강등)
       'lib/features/stations/presentation/station_line_badges.dart': 2,
     }, rule: 'w800');

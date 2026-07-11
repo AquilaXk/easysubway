@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
+import 'design_tokens.dart';
 import 'mobility_profile.dart';
 import 'mobile_error_reporter.dart';
 import 'notification_settings.dart';
@@ -178,6 +179,11 @@ class OnboardingState {
   bool get isCompleted => result != null;
 }
 
+/// 화면 1 — 시작. 핵심 가치 한 줄(큰 타이틀) + 단일 CTA.
+///
+/// #1936: 부연 설명 문장은 전면 삭제한다. 상단을 크게 비우고, 가치 카피를
+/// titleLarge 급 다크 잉크로 두 줄만 두고, 하단에 각진(radius 8) 무채색 CTA를
+/// 고정한다. 블록·그림자·pill 없음.
 class StartScreen extends StatelessWidget {
   const StartScreen({required this.onStart, super.key});
 
@@ -190,35 +196,37 @@ class StartScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final topGap = (constraints.maxHeight * 0.34).clamp(84.0, 212.0);
-            final bottomGap = 35 + MediaQuery.viewPaddingOf(context).bottom;
+            // 상단 ~35%를 비워 애플식 여백을 만든다.
+            final topGap = (constraints.maxHeight * 0.35).clamp(96.0, 240.0);
+            final bottomGap =
+                EasySubwaySpacing.xxl +
+                MediaQuery.viewPaddingOf(context).bottom;
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: IntrinsicHeight(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(24, 48, 24, bottomGap),
+                    padding: EdgeInsets.fromLTRB(
+                      EasySubwaySpacing.xl,
+                      EasySubwaySpacing.xxl,
+                      EasySubwaySpacing.xl,
+                      bottomGap,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(height: topGap),
                         Semantics(
                           header: true,
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: '빠른 길보다,\n'),
-                                // 강조선도 무채색 잉크로 통일한다. 과거 mint
-                                // 액센트(0xFFB8F4DF)는 초록 전면 제거로 폐기한다.
-                                TextSpan(text: '갈 수 있는 길'),
-                                TextSpan(text: '을\n먼저 안내해요.'),
-                              ],
-                            ),
+                          child: const Text(
+                            // 핵심 가치 한 줄. 부연 설명("먼저 안내해요") 삭제(#1936).
+                            // 강조도 무채색 잉크로 통일(초록/민트 금지).
+                            '빠른 길보다,\n갈 수 있는 길',
                             style: TextStyle(
                               color: EasySubwayAccessibleColors.text,
-                              fontSize: 44,
+                              fontSize: 36,
                               fontWeight: FontWeight.w800,
-                              height: 1.12,
+                              height: 1.16,
                             ),
                           ),
                         ),
@@ -233,20 +241,14 @@ class StartScreen extends StatelessWidget {
                                   EasySubwayAccessibleColors.primary,
                               foregroundColor:
                                   EasySubwayAccessibleColors.surface,
-                              minimumSize: const Size.fromHeight(60),
+                              minimumSize: const Size.fromHeight(58),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(
+                                  EasySubwayRadius.control,
+                                ),
                               ),
                             ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('쉬운 지하철 시작하기'),
-                                SizedBox(width: 8),
-                                Icon(Icons.arrow_forward),
-                              ],
-                            ),
+                            child: const Text('시작하기'),
                           ),
                         ),
                       ],
@@ -256,77 +258,6 @@ class StartScreen extends StatelessWidget {
               ),
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-class OnboardingIntroScreen extends StatelessWidget {
-  const OnboardingIntroScreen({
-    required this.onConfigure,
-    required this.onSkip,
-    super.key,
-  });
-
-  // Repository contract marker: 먼저 이동 조건을 골라 주세요
-  final VoidCallback onConfigure;
-  final VoidCallback onSkip;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('쉬운 지하철')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-          children: [
-            const SizedBox(height: 12),
-            Semantics(
-              header: true,
-              child: Text(
-                '계단 없는 길을\n먼저 찾습니다',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
-                  height: 1.2,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '엘리베이터와 출구까지 함께 살펴, 실제로 갈 수 있는 길을 안내해요.',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-                fontWeight: FontWeight.w700,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 28),
-            FilledButton(
-              key: const Key('onboardingIntroConfigureButton'),
-              onPressed: onConfigure,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(60),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('이동 조건 설정'),
-            ),
-            const SizedBox(height: 9),
-            OutlinedButton(
-              key: const Key('onboardingIntroSkipButton'),
-              onPressed: onSkip,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(60),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('기본 설정으로 시작'),
-            ),
-          ],
         ),
       ),
     );
@@ -344,7 +275,7 @@ class _IntroCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: EasySubwayAccessibleColors.line),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(EasySubwayRadius.sheet),
       ),
       child: Padding(padding: const EdgeInsets.all(16), child: child),
     );
@@ -363,8 +294,9 @@ class _IntroDivider extends StatelessWidget {
   }
 }
 
-class _OnboardingStepIndicator extends StatelessWidget {
-  const _OnboardingStepIndicator({
+/// 진행 인디케이터 — 아주 작은 점 2개(애플식). 블록/박스 아님(#1936).
+class _OnboardingStepDots extends StatelessWidget {
+  const _OnboardingStepDots({
     required this.currentStep,
     required this.totalSteps,
   });
@@ -374,37 +306,23 @@ class _OnboardingStepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            for (var step = 1; step <= totalSteps; step++) ...[
-              Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: step <= currentStep
-                        ? EasySubwayAccessibleColors.primary
-                        : EasySubwayAccessibleColors.line,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const SizedBox(height: 5),
-                ),
+    return ExcludeSemantics(
+      child: Row(
+        children: [
+          for (var step = 1; step <= totalSteps; step++) ...[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: step <= currentStep
+                    ? EasySubwayAccessibleColors.primary
+                    : EasySubwayAccessibleColors.line,
               ),
-              if (step != totalSteps) const SizedBox(width: 4),
-            ],
+              child: const SizedBox(width: 7, height: 7),
+            ),
+            if (step != totalSteps) const SizedBox(width: 6),
           ],
-        ),
-        const SizedBox(height: 5),
-        Text(
-          '$currentStep / $totalSteps',
-          textAlign: TextAlign.right,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: EasySubwayAccessibleColors.mutedText,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -544,7 +462,8 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  MobilityProfileOption? _selectedProfile;
+  // #1936: 첫 프리셋을 기본 선택으로 두어 "이대로 시작"으로 빠르게 통과할 수 있게 한다.
+  MobilityProfileOption? _selectedProfile = mobilityProfileOptions.first;
   // 온보딩에서는 보기 설정(고대비·간편 보기)을 다루지 않는다. 기본값으로 완료하고,
   // 상세 설정은 더보기·설정 화면에서 바꾼다(#1563).
   final OnboardingViewPreferences _preferences =
@@ -602,47 +521,66 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 key: const Key('onboardingDoneButton'),
                 onPressed: onNext,
                 style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(60),
+                  backgroundColor: EasySubwayAccessibleColors.primary,
+                  foregroundColor: EasySubwayAccessibleColors.surface,
+                  minimumSize: const Size.fromHeight(58),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      EasySubwayRadius.control,
+                    ),
                   ),
                 ),
-                child: const Text('다음'),
+                // #1936: 기본 선택으로 빠르게 통과하는 프리셋 화면의 CTA.
+                child: const Text('이대로 시작'),
               ),
             ),
       body: SafeArea(
         child: ListView(
-          padding: EdgeInsets.fromLTRB(20, 20, 20, listBottomPadding),
+          padding: EdgeInsets.fromLTRB(
+            EasySubwaySpacing.xl,
+            EasySubwaySpacing.lg,
+            EasySubwaySpacing.xl,
+            listBottomPadding,
+          ),
           children: _currentStep == 0
               ? [
-                  const _OnboardingStepIndicator(currentStep: 1, totalSteps: 2),
-                  const SizedBox(height: 15),
+                  const _OnboardingStepDots(currentStep: 1, totalSteps: 2),
+                  const SizedBox(height: EasySubwaySpacing.xl),
                   Semantics(
                     header: true,
                     child: Text(
-                      '어떤 도움이 필요한가요?',
-                      style: textTheme.headlineSmall?.copyWith(
+                      // 질문 한 줄, 설명 문장 없음(#1936).
+                      '어떻게 이동하세요?',
+                      style: textTheme.titleLarge?.copyWith(
                         color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w800,
-                        height: 1.25,
+                        fontSize: 26,
+                        height: 1.2,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  for (final profile in profileOptions)
-                    _OnboardingProfileCard(
-                      profile: profile,
-                      selected: profile.id == selectedProfile?.id,
+                  const SizedBox(height: EasySubwaySpacing.xl),
+                  for (var i = 0; i < profileOptions.length; i++) ...[
+                    if (i != 0)
+                      const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: EasySubwayAccessibleColors.line,
+                      ),
+                    _OnboardingProfileRow(
+                      profile: profileOptions[i],
+                      selected: profileOptions[i].id == selectedProfile?.id,
                       onTap: () {
                         setState(() {
-                          _selectedProfile = profile;
+                          _selectedProfile = profileOptions[i];
                         });
                       },
                     ),
+                  ],
                 ]
               : [
-                  const _OnboardingStepIndicator(currentStep: 2, totalSteps: 2),
-                  const SizedBox(height: 15),
+                  const _OnboardingStepDots(currentStep: 2, totalSteps: 2),
+                  const SizedBox(height: EasySubwaySpacing.xl),
                   Semantics(
                     header: true,
                     child: Text(
@@ -813,8 +751,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-class _OnboardingProfileCard extends StatelessWidget {
-  const _OnboardingProfileCard({
+/// #1936: 이동 방식 프리셋 행 — 라벨만. 박스 아님(행 + Divider는 부모가 그림).
+/// 설명 문장 없음, 아이콘 없음. 선택 시 우측에 체크 표시. 탭 스플래시 사각형이
+/// 생기지 않도록 GestureDetector를 쓰고, 높이는 접근성 터치 기준(≥56)을 지킨다.
+class _OnboardingProfileRow extends StatelessWidget {
+  const _OnboardingProfileRow({
     required this.profile,
     required this.selected,
     required this.onTap,
@@ -826,124 +767,51 @@ class _OnboardingProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = EasySubwayAccessibleColors.primary;
-    final borderColor = selected
-        ? primaryColor
-        : EasySubwayAccessibleColors.line;
-    const backgroundColor = Colors.white;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Semantics(
-        label: profile.semanticsLabel(selected),
-        selected: selected,
-        button: true,
-        onTap: onTap,
-        child: ExcludeSemantics(
-          child: Material(
-            color: backgroundColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: borderColor, width: selected ? 2 : 1),
-            ),
-            child: InkWell(
-              key: Key('onboardingProfileCard-${profile.id}'),
-              borderRadius: BorderRadius.circular(16),
-              onTap: onTap,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 78),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 13,
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 46,
-                        height: 46,
-                        child: Icon(
-                          profile.icon,
-                          color: EasySubwayAccessibleColors.primary,
-                          size: 27,
-                        ),
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      label: profile.semanticsLabel(selected),
+      selected: selected,
+      button: true,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: GestureDetector(
+          key: Key('onboardingProfileCard-${profile.id}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 60),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      // 라벨만 노출한다. 상세 요약은 홈 설정에서 확인(#1936).
+                      profile.title,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: EasySubwayAccessibleColors.text,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                        fontSize: 18,
+                        height: 1.25,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              profile.title,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: EasySubwayAccessibleColors.text,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.25,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              // 이동 조건 설명은 앱 전체가 mobilityProfileOptions의
-                              // summary 한 벌만 쓴다(#1568). 온보딩 전용 축약 문구
-                              // (_profileDisplaySummary)를 없애 화면마다 다른 표현을
-                              // 제거하고 카드 시맨틱 라벨과도 일치시킨다.
-                              profile.summary,
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    color: EasySubwayAccessibleColors.mutedText,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.3,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      _ProfileRadio(selected: selected),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(width: EasySubwaySpacing.md),
+                  if (selected)
+                    const Icon(
+                      Icons.check,
+                      size: 22,
+                      color: EasySubwayAccessibleColors.primary,
+                    )
+                  else
+                    const SizedBox(width: 22),
+                ],
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ProfileRadio extends StatelessWidget {
-  const _ProfileRadio({required this.selected});
-
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: selected
-              ? EasySubwayAccessibleColors.primary
-              : EasySubwayAccessibleColors.line,
-          width: 2,
-        ),
-      ),
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: selected
-            ? const Center(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: EasySubwayAccessibleColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: SizedBox(width: 10, height: 10),
-                ),
-              )
-            : null,
       ),
     );
   }

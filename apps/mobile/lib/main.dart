@@ -731,7 +731,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       widget.onboardingStore != null &&
       !widget.initialOnboardingState.isCompleted;
   bool _startScreenDismissed = false;
-  bool _introScreenDismissed = false;
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
   bool _savingOnboardingResult = false;
   OnboardingResult? _pendingOnboardingResult;
@@ -779,22 +778,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
           },
         );
       }
-      if (!_introScreenDismissed) {
-        return OnboardingIntroScreen(
-          onConfigure: () {
-            setState(() {
-              _introScreenDismissed = true;
-            });
-          },
-          onSkip: () async {
-            final result = OnboardingResult(
-              profile: mobilityProfileOptions.first,
-              preferences: const OnboardingViewPreferences.defaults(),
-            );
-            await _completeOnboarding(result);
-          },
-        );
-      }
+      // #1936: 장황한 중간 소개 화면(OnboardingIntroScreen)을 제거했다. 시작 화면
+      // 다음은 곧바로 이동 방식 프리셋 → 권한 단계로 이어진다.
       return OnboardingScreen(
         locationProvider: widget.locationProvider,
         notificationPermissionProvider: widget.notificationPermissionProvider,
@@ -864,7 +849,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _lastPersistedOnboardingResult = null;
       _loadingOnboardingState = false;
       _startScreenDismissed = false;
-      _introScreenDismissed = false;
       _dataDeletionResult = result;
     });
   }
@@ -924,7 +908,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   Future<void> _completeOnboarding(OnboardingResult result) async {
     final previousOnboardingState = _onboardingState;
     final previousStartScreenDismissed = _startScreenDismissed;
-    final previousIntroScreenDismissed = _introScreenDismissed;
     try {
       await _saveOnboardingResult(result);
     } catch (error, stackTrace) {
@@ -939,7 +922,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         setState(() {
           _onboardingState = previousOnboardingState;
           _startScreenDismissed = previousStartScreenDismissed;
-          _introScreenDismissed = previousIntroScreenDismissed;
         });
       }
       ScaffoldMessenger.of(context).showSnackBar(

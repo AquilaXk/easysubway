@@ -42,20 +42,23 @@ void main() {
     expect(storage.deletedKeys, isEmpty);
   });
 
-  testWidgets('온보딩 소개는 기본 시작 버튼 아래 보조 문구를 표시하지 않는다', (tester) async {
+  testWidgets('시작 화면은 부연 설명 문장 없이 핵심 가치 한 줄과 단일 CTA만 둔다', (tester) async {
+    // #1936: 장황한 중간 소개 화면(OnboardingIntroScreen)을 제거하고, 시작 화면은
+    // 가치 카피 한 줄 + "시작하기" CTA만 남겼다.
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OnboardingIntroScreen(onConfigure: () {}, onSkip: () {}),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
-    expect(find.byKey(const Key('onboardingIntroSkipButton')), findsOneWidget);
-    expect(find.text('천천히 이동 · 큰 글씨 · 단순 보기 적용'), findsNothing);
+    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
+    expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
+    expect(find.text('시작하기'), findsOneWidget);
+    // 부연 설명 문장은 전면 삭제됐다(#1936).
+    expect(find.textContaining('먼저 안내해요'), findsNothing);
+    expect(find.textContaining('엘리베이터와 출구까지'), findsNothing);
+    expect(find.text('계단 없는 길을\n먼저 찾습니다'), findsNothing);
   });
 
   testWidgets('온보딩 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
@@ -93,18 +96,19 @@ void main() {
       );
 
       expect(find.text('쉬운 지하철'), findsOneWidget);
-      expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+      expect(find.text('어떻게 이동하세요?'), findsOneWidget);
       expect(find.text('천천히 이동'), findsOneWidget);
       expect(find.text('휠체어 이용'), findsOneWidget);
-      // 이동 조건 설명은 mobilityProfileOptions.summary 한 벌로 통일됐다(#1568):
-      // 온보딩 전용 축약 문구를 없애고 카드 본문이 정본 summary를 그대로 보여준다.
-      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
-      expect(find.text('걷기와 환승 줄이기'), findsNothing);
+      // #1936: 프리셋은 라벨만 노출한다(설명 문장 제거). 상세 요약은 홈 설정으로.
+      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsNothing);
+      expect(find.text('계단 없는 길만 안내해요'), findsNothing);
 
-      final disabledDoneButton = tester.widget<FilledButton>(
+      // #1936: 첫 프리셋이 기본 선택이라 '이대로 시작'으로 바로 통과할 수 있다.
+      final doneButton = tester.widget<FilledButton>(
         find.byKey(const Key('onboardingDoneButton')),
       );
-      expect(disabledDoneButton.onPressed, isNull);
+      expect(doneButton.onPressed, isNotNull);
+      expect(find.text('이대로 시작'), findsOneWidget);
 
       await tester.tap(
         find.byKey(const Key('onboardingProfileCard-wheelchair')),
@@ -320,7 +324,7 @@ void main() {
     expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
     await tester.tap(find.byTooltip('이전 단계'));
     await tester.pumpAndSettle();
-    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();

@@ -436,7 +436,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
-    expect(find.text('어떤 도움이 필요한가요?'), findsNothing);
+    expect(find.text('어떻게 이동하세요?'), findsNothing);
   });
 
   testWidgets('기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다', (tester) async {
@@ -580,20 +580,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // #1936: 중간 소개 화면 제거 — 시작 → 프리셋 '이대로 시작' → 권한 '나중에 설정'.
     await tester.tap(find.byKey(const Key('startScreenStartButton')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('onboardingIntroSkipButton')),
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.byKey(const Key('onboardingIntroSkipButton')));
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
     expect(onboardingStore.saveCount, 1);
     expect(onboardingStore.savedResult, isNull);
-    expect(find.byKey(const Key('onboardingIntroSkipButton')), findsOneWidget);
+    // 저장 실패 시 홈으로 넘어가지 않고 온보딩(권한 단계)에 머문다.
     expect(find.byType(HomeScreen), findsNothing);
+    expect(find.text('위치는 나중에도 켤 수 있어요'), findsOneWidget);
     expect(find.text('설정을 저장하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
   });
 
@@ -631,9 +630,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 1단계: 도움 선택
-    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
-    expect(find.text('1 / 2'), findsOneWidget);
+    // 1단계: 이동 방식 프리셋 (#1936: 진행은 점 2개로만 표시, 텍스트 카운터 없음)
+    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
+    expect(find.text('이대로 시작'), findsOneWidget);
+    expect(find.text('1 / 2'), findsNothing);
     await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
@@ -643,16 +643,14 @@ void main() {
     // 알림 요청은 숨고 위치만 남는다(#1579).
     expect(find.text('적용할 조건을 확인하세요'), findsNothing);
     expect(find.text('위치는 나중에도 켤 수 있어요'), findsOneWidget);
-    expect(find.text('2 / 2'), findsOneWidget);
     expect(find.text('시작하기'), findsOneWidget);
     expect(find.text('선택한 기능 설정하고 시작'), findsNothing);
     expect(find.text('나중에 설정'), findsOneWidget);
 
-    // 뒤로가기 → 도움 선택으로 복귀.
+    // 뒤로가기 → 프리셋 단계로 복귀.
     await tester.tap(find.byTooltip('이전 단계'));
     await tester.pumpAndSettle();
-    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
-    expect(find.text('1 / 2'), findsOneWidget);
+    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
   });
 
   testWidgets('노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다', (tester) async {
@@ -11853,14 +11851,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // #1936: 시작 → 프리셋 '이대로 시작' → 권한 '나중에 설정'으로 온보딩을 통과한다.
     await tester.tap(find.byKey(const Key('startScreenStartButton')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('onboardingIntroSkipButton')),
-      120,
-      scrollable: find.byType(Scrollable).last,
-    );
-    await tester.tap(find.byKey(const Key('onboardingIntroSkipButton')));
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
     await tester.pumpAndSettle();
 
     expect(restoreCount, 1);
