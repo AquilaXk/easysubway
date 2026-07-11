@@ -125,6 +125,13 @@ class ApiClient {
           etag: etag,
         );
       }
+      if (response.statusCode == HttpStatus.noContent) {
+        return ApiResponse(
+          statusCode: response.statusCode,
+          jsonBody: null,
+          etag: etag,
+        );
+      }
       final decoded = _decodeJson(
         responseBody,
         statusCode: response.statusCode,
