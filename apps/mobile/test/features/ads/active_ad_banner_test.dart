@@ -266,6 +266,43 @@ void main() {
     expect(client.eventBodies, hasLength(1));
   });
 
+  testWidgets('render 상태 설치 뒤 post-frame callback 전에 만료되면 impression을 생략한다', (
+    tester,
+  ) async {
+    final image = Completer<ImageProvider<Object>>();
+    final endsAt = DateTime.now().toUtc().add(const Duration(seconds: 1));
+    final client = _StubApiClient(
+      Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
+    );
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) => image.future,
+    );
+    await tester.pump();
+
+    tester.binding.addPostFrameCallback((_) => image.complete(_image));
+    tester.binding.scheduleFrame();
+    await tester.pump();
+    expect(tester.binding.hasScheduledFrame, isTrue);
+    expect(client.eventBodies, isEmpty);
+
+    await tester.runAsync(() async {
+      final remaining = endsAt.difference(DateTime.now().toUtc());
+      if (remaining > Duration.zero) {
+        await Future<void>.delayed(remaining);
+      }
+    });
+    await tester.pump();
+
+    final impressions = client.eventBodies
+        .where((body) => body['eventType'] == 'IMPRESSION')
+        .toList();
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    expect(impressions, isEmpty);
+  });
+
   testWidgets('tap마다 click을 fire-and-forget하고 event 대기와 무관하게 landing을 연다', (
     tester,
   ) async {

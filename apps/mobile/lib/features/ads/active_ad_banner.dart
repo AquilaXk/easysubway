@@ -134,6 +134,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
           generation != _generation ||
           !identical(_creative, creative) ||
           _image == null ||
+          _isExpired(creative) ||
           _impressionRecorded) {
         return;
       }
