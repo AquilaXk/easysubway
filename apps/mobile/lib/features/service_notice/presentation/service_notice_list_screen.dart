@@ -139,7 +139,7 @@ class _NoticeItem extends StatelessWidget {
                 style: TextStyle(
                   color: accent,
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.1,
                 ),
               ),

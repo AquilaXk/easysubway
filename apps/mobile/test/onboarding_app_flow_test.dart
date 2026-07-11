@@ -38,12 +38,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // 복원이 끝나면 로딩은 사라지고 온보딩 인트로가 뜬다.
+    // 복원이 끝나면 로딩은 사라지고 시작 화면이 뜬다(#1936: 핵심 가치 한 줄).
     expect(find.byKey(const Key('startupLoadingScreen')), findsNothing);
-    expect(
-      find.text('빠른 길보다,\n갈 수 있는 길을\n먼저 안내해요.', findRichText: true),
-      findsOneWidget,
-    );
+    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
   });
 
   testWidgets('첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다', (tester) async {
@@ -62,20 +59,17 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('빠른 길보다,\n갈 수 있는 길을\n먼저 안내해요.', findRichText: true),
-      findsOneWidget,
-    );
+    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
     expect(find.text('이동약자를 위한 지하철 안내'), findsNothing);
     expect(find.text('계단과 고장 시설을 미리 확인하고'), findsNothing);
     expect(find.text('로그인 없이도 이용할 수 있어요'), findsNothing);
     expect(find.bySemanticsLabel('쉬운 지하철 앱 아이콘'), findsNothing);
     await tester.tap(find.byKey(const Key('startScreenStartButton')));
     await tester.pumpAndSettle();
-    expect(find.text('계단 없는 길을\n먼저 찾습니다'), findsOneWidget);
-    await _tapIntroConfigure(tester);
+    // #1936: 중간 소개 화면 제거 — 시작 화면 다음은 곧바로 프리셋 단계.
+    expect(find.text('계단 없는 길을\n먼저 찾습니다'), findsNothing);
 
-    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsNothing);
 
     await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
@@ -92,7 +86,7 @@ void main() {
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.byKey(const Key('routeSearchButton')), findsNothing);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
-    expect(find.text('어떤 도움이 필요한가요?'), findsNothing);
+    expect(find.text('어떻게 이동하세요?'), findsNothing);
     expect(
       legacyCredentialStorage.deletedKeys,
       contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey),
@@ -171,9 +165,9 @@ void main() {
 
     expect(onboardingStore.readCount, 1);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
-    expect(find.text('어떤 도움이 필요한가요?'), findsNothing);
+    expect(find.text('어떻게 이동하세요?'), findsNothing);
     expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
-    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF003D40));
+    expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF1A1D1E));
   });
 
   testWidgets('앱은 온보딩 저장소를 읽지 못하면 다시 설정을 고르게 한다', (tester) async {
@@ -191,24 +185,14 @@ void main() {
     expect(reportedErrors, hasLength(1));
     expect(reportedErrors.single.exception, isA<FormatException>());
     await _openOnboarding(tester);
-    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsNothing);
   });
 }
 
 Future<void> _openOnboarding(WidgetTester tester) async {
+  // #1936: 중간 소개 화면을 제거해 시작 화면 다음은 곧바로 프리셋 단계다.
   await tester.tap(find.byKey(const Key('startScreenStartButton')));
-  await tester.pumpAndSettle();
-  await _tapIntroConfigure(tester);
-}
-
-Future<void> _tapIntroConfigure(WidgetTester tester) async {
-  await tester.scrollUntilVisible(
-    find.byKey(const Key('onboardingIntroConfigureButton')),
-    120,
-    scrollable: find.byType(Scrollable).last,
-  );
-  await tester.tap(find.byKey(const Key('onboardingIntroConfigureButton')));
   await tester.pumpAndSettle();
 }
 

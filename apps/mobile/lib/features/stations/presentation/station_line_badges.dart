@@ -92,7 +92,7 @@ class StationLineBadge extends StatelessWidget {
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
           color: foregroundColor,
           fontSize: badgeFontSize,
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           height: 1.05,
         ),
       ),
@@ -124,7 +124,7 @@ class _StationLineOverflowBadge extends StatelessWidget {
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
           color: EasySubwayAccessibleColors.mutedText,
           fontSize: 13 * (size / 32),
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           height: 1.0,
         ),
       ),

@@ -107,3 +107,4 @@ apps/mobile/ios/DerivedData/
 !**/terraform.tfvars.example
 
 .worktrees/
+/CLAUDE.md
