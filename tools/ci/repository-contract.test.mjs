@@ -29,6 +29,28 @@ function mobileProductionDartFiles() {
   }).trim().split("\n").filter((file) => file.endsWith(".dart") && !file.endsWith(".g.dart"));
 }
 
+function assertNoNativeAdIdentityOrMeasurement({
+  dependencySources = [],
+  nativeSources = [],
+  mergedManifest,
+}) {
+  const adSdk = /google_mobile_ads|play-services-ads|com\.google\.android\.gms\.ads|Google-Mobile-Ads-SDK|GoogleMobileAds|GADMobileAds|AppLovinSDK|UnityAds|IronSource|FBAudienceNetwork|AmazonPublisherServices|ChartboostSDK|VungleAds/i;
+  const adEventPost = /\/api\/ads\/events|\b(?:post|send|record)_?ad(?:vertising)?_?event\b|\bPOST\b[^\n]{0,120}\b(?:ad|advertising)[_-]?events?\b|\b(?:ad|advertising)[_-]?events?\b[^\n]{0,120}\bPOST\b/i;
+  for (const [file, source] of dependencySources) {
+    assert.doesNotMatch(source, adSdk, `${file} must not add a native ad SDK`);
+  }
+  for (const [file, source] of nativeSources) {
+    assert.doesNotMatch(source, adEventPost, `${file} must not post native ad events`);
+  }
+  if (mergedManifest) {
+    assert.doesNotMatch(
+      mergedManifest[1],
+      /android\.permission\.AD_ID/,
+      `${mergedManifest[0]} must not contain AD_ID`,
+    );
+  }
+}
+
 function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
@@ -2783,6 +2805,74 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
       `${sourcePath} must not send ad measurement events`,
     );
   }
+});
+
+test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release 산출물까지 차단한다", () => {
+  const dependencyPaths = execFileSync("git", [
+    "ls-files",
+    "apps/mobile/android/**/*.gradle",
+    "apps/mobile/android/**/*.gradle.kts",
+    "apps/mobile/android/**/gradle.lockfile",
+    "apps/mobile/android/**/libs.versions.toml",
+    "apps/mobile/ios/Podfile.lock",
+    "apps/mobile/ios/**/*.pbxproj",
+    "apps/mobile/ios/**/Package.resolved",
+  ], { cwd: root, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  const nativeSourcePaths = execFileSync("git", [
+    "ls-files",
+    "apps/mobile/android/app/src/main/**/*.kt",
+    "apps/mobile/android/app/src/main/**/*.java",
+    "apps/mobile/ios/Runner/**/*.swift",
+    "apps/mobile/ios/Runner/**/*.m",
+    "apps/mobile/ios/Runner/**/*.mm",
+    "apps/mobile/ios/Runner/**/*.h",
+  ], { cwd: root, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+
+  assertNoNativeAdIdentityOrMeasurement({
+    dependencySources: dependencyPaths.map((file) => [file, read(file)]),
+    nativeSources: nativeSourcePaths.map((file) => [file, read(file)]),
+  });
+
+  assert.throws(
+    () => assertNoNativeAdIdentityOrMeasurement({
+      dependencySources: [["native-gradle-sentinel", 'implementation("com.google.android.gms:play-services-ads:1.0")']],
+      nativeSources: [],
+    }),
+    /native-gradle-sentinel/,
+  );
+  assert.throws(
+    () => assertNoNativeAdIdentityOrMeasurement({
+      dependencySources: [],
+      nativeSources: [],
+      mergedManifest: ["merged-manifest-sentinel", '<uses-permission android:name="android.permission.AD_ID" />'],
+    }),
+    /merged-manifest-sentinel/,
+  );
+  assert.throws(
+    () => assertNoNativeAdIdentityOrMeasurement({
+      dependencySources: [],
+      nativeSources: [["native-event-sentinel.swift", "func postAdEvent() {}"]],
+    }),
+    /native-event-sentinel\.swift/,
+  );
+
+  const repositoryContract = read("tools/ci/repository-contract.test.mjs");
+  const mobileJob = jobBlock(read(".github/workflows/ci.yml"), "mobile-app", "android");
+  assert.match(mobileJob, /Mobile App CI \/ Generate Android release merged manifest/);
+  assert.match(mobileJob, /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon/);
+  assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
+  assert.match(mobileJob, /test-name-pattern "[^"]*Android 릴리즈 권한/);
+  assert.match(
+    repositoryContract,
+    /test\("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다"[\s\S]*assertNoNativeAdIdentityOrMeasurement\(\{[\s\S]*mergedManifest:/,
+  );
+
+  const adRepositoryTest = read("apps/mobile/test/features/ads/ad_repository_test.dart");
+  assert.match(adRepositoryTest, /test\('GET active 요청의 method, path, query가 정확하고 event 요청은 없다'/);
+  assert.match(adRepositoryTest, /AdPlacement\.routeResultBottom[\s\S]*AdPlacement\.stationDetailBottom/);
+  assert.match(adRepositoryTest, /expect\(requests, hasLength\(2\)\)/);
+  assert.match(adRepositoryTest, /requests\.map\(\(request\) => request\.method\), everyElement\('GET'\)/);
+  assert.match(adRepositoryTest, /request\.uri\.path == '\/api\/ads\/events'[\s\S]*isEmpty/);
 });
 
 test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성한다", async () => {
@@ -12005,6 +12095,9 @@ test("Android 릴리즈 권한은 앱 기능에 필요한 항목만 선언한다
 
   const androidManifest = read(mergedManifestPath);
   const permissions = androidManifestPermissions(androidManifest);
+  assertNoNativeAdIdentityOrMeasurement({
+    mergedManifest: [mergedManifestPath, androidManifest],
+  });
 
   // 하차 알림(#1766)이 flutter_local_notifications를 도입하며 알림 표시용
   // POST_NOTIFICATIONS·VIBRATE와 시간표 기반 정확 예약용 SCHEDULE_EXACT_ALARM이
