@@ -2779,7 +2779,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
 
 });
 
-test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측 경계를 함께 고정한다", () => {
+test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를 함께 고정한다", () => {
   const readiness = readJson("apps/mobile/release/store-submission-readiness.json");
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
@@ -2788,9 +2788,10 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
   assert.equal(playStoreContent.appContentDeclarations.ads, true);
   assert.equal(privacyInventory.advertising.included, true);
   assert.equal(privacyInventory.advertising.servingModel, "first-party-self-served");
-  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking", "measurementEvents"]) {
+  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking"]) {
     assert.equal(privacyInventory.advertising[field], false, `advertising.${field} must remain false`);
   }
+  assert.equal(privacyInventory.advertising.measurementEvents, true);
   assert.deepEqual(privacyInventory.advertising.collectedDataTypeIds, []);
   assert.equal(privacyInventory.tracking, false);
   assert.ok(privacyInventory.dataTypes.every((item) => item.usedForTracking === false));
@@ -2835,7 +2836,11 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
   );
   assert.match(adDisclosure.readyWhenKo, /자체 서빙/);
   assert.match(adDisclosure.readyWhenKo, /비개인화/);
-  assert.match(adDisclosure.readyWhenKo, /명시적으로 누를 때만.*외부 브라우저/);
+  assert.match(adDisclosure.readyWhenKo, /사용자·기기·세션 식별자 없이 일별 count/);
+  assert.match(adDisclosure.readyWhenKo, /production 소재·event 집계 E2E는 owner 승인으로 deferred/);
+  assert.match(adDisclosure.readyWhenKo, /Play Store 게시 후 impression 1회, click, 종료 collapse, 일별 count/);
+  assert.ok(adDisclosure.evidence.includes("ad-event-expiry-contract-test"));
+  assert.ok(adDisclosure.evidence.includes("post-publish-ad-event-expiry-e2e-owner-deferred"));
 
   for (const dependencyPath of ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock"]) {
     assert.doesNotMatch(
@@ -2845,13 +2850,18 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
     );
   }
   assert.doesNotMatch(androidMainManifest, /android\.permission\.AD_ID/);
-  for (const sourcePath of mobileProductionDartFiles()) {
-    assert.doesNotMatch(
-      read(sourcePath),
-      /\/api\/ads\/events/,
-      `${sourcePath} must not send ad measurement events`,
-    );
-  }
+  const adEventSenders = mobileProductionDartFiles()
+    .filter((sourcePath) => /\/api\/ads\/events/.test(read(sourcePath)));
+  assert.deepEqual(adEventSenders, [
+    "apps/mobile/lib/features/ads/ad_repository.dart",
+  ]);
+
+  const adRepository = read("apps/mobile/lib/features/ads/ad_repository.dart");
+  assert.match(adRepository, /Future<void> recordEvent\(/);
+  assert.match(adRepository, /postJson\(\s*'\/api\/ads\/events'/);
+  assert.match(adRepository, /'placement': placement\.id/);
+  assert.match(adRepository, /'creativeId': creativeId/);
+  assert.match(adRepository, /'eventType': eventType\.wireValue/);
 });
 
 test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release 산출물까지 차단한다", () => {
@@ -2954,11 +2964,16 @@ test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release �
   );
 
   const adRepositoryTest = read("apps/mobile/test/features/ads/ad_repository_test.dart");
-  assert.match(adRepositoryTest, /test\('GET active 요청의 method, path, query가 정확하고 event 요청은 없다'/);
-  assert.match(adRepositoryTest, /AdPlacement\.routeResultBottom[\s\S]*AdPlacement\.stationDetailBottom/);
-  assert.match(adRepositoryTest, /expect\(requests, hasLength\(2\)\)/);
-  assert.match(adRepositoryTest, /requests\.map\(\(request\) => request\.method\), everyElement\('GET'\)/);
-  assert.match(adRepositoryTest, /request\.uri\.path == '\/api\/ads\/events'[\s\S]*isEmpty/);
+  assert.match(adRepositoryTest, /test\('event는 정확한 세 필드만 POST하고 204를 완료로 취급한다'/);
+  assert.match(adRepositoryTest, /'placement': 'route-result-bottom'/);
+  assert.match(adRepositoryTest, /'creativeId': 'creative-1'/);
+  assert.match(adRepositoryTest, /'eventType': 'IMPRESSION'/);
+  assert.match(adRepositoryTest, /network와 timeout 실패는 저장이나 재시도 없이 무시한다/);
+
+  const bannerTest = read("apps/mobile/test/features/ads/active_ad_banner_test.dart");
+  assert.match(bannerTest, /실제 frame render 뒤 생명주기당 한 번/);
+  assert.match(bannerTest, /tap마다 click을 fire-and-forget/);
+  assert.match(bannerTest, /미래 endsAt에 즉시 collapse하고 자동 refetch하지 않는다/);
 });
 
 test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성한다", async () => {

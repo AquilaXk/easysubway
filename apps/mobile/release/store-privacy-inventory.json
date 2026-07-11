@@ -9,9 +9,9 @@
     "adId": false,
     "thirdPartyAdSdk": false,
     "tracking": false,
-    "measurementEvents": false,
+    "measurementEvents": true,
     "collectedDataTypeIds": [],
-    "lastVerifiedAt": "2026-07-11"
+    "lastVerifiedAt": "2026-07-12"
   },
   "sharesDataWithThirdParties": true,
   "encryptionInTransitRequired": true,
