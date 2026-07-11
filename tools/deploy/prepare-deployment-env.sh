@@ -176,7 +176,7 @@ if [[ "${ads_asset_port}" =~ ^[1-9][0-9]{0,4}$ ]] && (( 10#${ads_asset_port} > 6
 	ads_asset_origin_invalid=1
 fi
 case ".${ads_asset_host_normalized}." in
-	*.localhost.*|*.local.|*.internal.|*.example.|*.invalid.|*.test.|*.example.com.|*.example.net.|*.example.org.|*.placeholder.*|*.change-me.*|*.changeme.*|*.todo.*|*.tbd.*)
+	*.localhost.*|*.local.|*.internal.|*.example.|*.invalid.|*.test.|*.arpa.|*.onion.|*.alt.|*.example.com.|*.example.net.|*.example.org.|*.placeholder.*|*.change-me.*|*.changeme.*|*.todo.*|*.tbd.*)
 		ads_asset_origin_invalid=1
 		;;
 esac
