@@ -1,10 +1,27 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { checkAdminVendorIntegrity } from "./check-admin-vendor-integrity.mjs";
+
+test("광고 creative ID HTML pattern은 v mode에서 route-safe 경계를 유지한다", async () => {
+  const template = await readFile(
+    path.resolve(import.meta.dirname, "../../backend/src/main/resources/templates/admin/ads/list.html"),
+    "utf8",
+  );
+  const input = template.match(/<input\b[^>]*\bid="creative-id"[^>]*>/)?.[0];
+  const pattern = input?.match(/\bpattern="([^"]+)"/)?.[1];
+  assert.ok(pattern, "creative-id pattern missing");
+  assert.doesNotThrow(() => new RegExp(pattern, "v"));
+
+  const constraint = new RegExp(`^(?:${pattern})$`, "v");
+  for (const value of [".", "..", "a/b"]) assert.equal(constraint.test(value), false, value);
+  for (const value of ["A", ".banner", "a..b", "A._-".repeat(16)]) {
+    assert.equal(constraint.test(value), true, value);
+  }
+});
 
 test("admin vendor integrity check passes matching SHA256SUMS and SRI", async () => {
   const root = await fixtureRoot("console.log('ok');");

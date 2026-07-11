@@ -95,7 +95,7 @@ class AdminAdsPageControllerTest {
 		assertThat(html)
 			.contains("<h1>광고 소재</h1>")
 			.contains("for=\"creative-id\"")
-			.contains("pattern=\"(?!\\.{1,2}$)[A-Za-z0-9._-]{1,64}\"")
+			.contains("pattern=\"(?!\\.{1,2}$)[A-Za-z0-9._\\-]{1,64}\"")
 			.contains("for=\"placement-id\"")
 			.contains("for=\"advertiser-name\"")
 			.contains("for=\"image-url\"")
@@ -112,11 +112,6 @@ class AdminAdsPageControllerTest {
 			.contains("/admin/ads/disabled-ad/enable")
 			.contains("/admin/ads/enabled-ad/disable")
 			.doesNotContain("event_count", "/api/ads/events", "노출 수", "클릭 수");
-		var formPattern = Pattern.compile("(?!\\.{1,2}$)[A-Za-z0-9._-]{1,64}");
-		assertThat(formPattern.matcher(".").matches()).isFalse();
-		assertThat(formPattern.matcher("..").matches()).isFalse();
-		assertThat(formPattern.matcher(".banner").matches()).isTrue();
-		assertThat(formPattern.matcher("a..b").matches()).isTrue();
 		assertThat(count(html, "name=\"commandToken\"")).isEqualTo(3);
 		assertThat(count(html, "name=\"_csrf\"")).isGreaterThanOrEqualTo(3);
 	}
