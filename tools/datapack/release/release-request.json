@@ -1,14 +1,13 @@
 {
-  "_PROVENANCE_NOTE": "#1950 파일 기반 release request(workflow releaseRequestPath 경로 — backend/candidate 우회). 오너 확정값 반영: requestedBy=claude-fable-orchestrator, approvedBy=aquilaXk10, targetChannel=production, approvalId==dispatch releaseRequestId. approvedLedgerHash는 build-spec.approvedAliasLedgerHash와 일치 강제(workflow 188)라 실측 원장 해시를 기입. buildSpecSha256·sourceSnapshotSetHash는 build-spec이 오너 공급 필드(sourceSnapshotSetHash·sourceInventorySha256·snapshot 3필드·fixturePath·candidateId)로 최종 확정된 뒤에만 진실하게 도출 가능 → <DERIVED_AFTER_BUILDSPEC_FINAL>로 남김(거짓 attestation 금지, fail closed). 게시 전 오너가 최종 build-spec으로: buildSpecSha256=shasum -a 256 candidate-build-spec.json, sourceSnapshotSetHash=최종 build-spec.sourceSnapshotSetHash 복사. 이 _PROVENANCE_NOTE 키는 스키마 additionalProperties=false라 게시 전 삭제.",
   "schemaVersion": 1,
   "artifactKind": "datapack-release-request",
-  "candidateId": "<OWNER_SUPPLIED_CANDIDATE_ID: build-spec.candidateId와 동일>",
+  "candidateId": "capital-pilot-candidate-20260712",
   "scopeId": "capital_pilot_android_v1",
-  "buildSpecSha256": "<DERIVED_AFTER_BUILDSPEC_FINAL: sha256(최종 candidate-build-spec.json). workflow 186행 정확 일치 강제>",
-  "sourceSnapshotSetHash": "<DERIVED_AFTER_BUILDSPEC_FINAL: 최종 build-spec.sourceSnapshotSetHash와 동일. workflow 187행>",
+  "buildSpecSha256": "114fe92e316703df33b179f6f8904d1cbb5255caa85386b9f93798b72b2ddc23",
+  "sourceSnapshotSetHash": "bc138f2cea9023737b76a75bca5acb2362b2500b84022492828c2daef286ff5b",
   "approvedLedgerHash": "9a74e31d64e53f38ab575d6a7731f72138523dd34f1f6756dbed8573e3bdeabc",
   "requestedBy": "claude-fable-orchestrator",
   "approvedBy": "aquilaXk10",
-  "approvalId": "<APPROVAL_ID: dispatch modeArgs.releaseRequestId와 정확 일치(workflow 183). 파일 기반은 임의 고유 문자열 가능(예: release-request-2026-07-12-01)>",
+  "approvalId": "release-request-2026-07-12-01",
   "targetChannel": "production"
 }
