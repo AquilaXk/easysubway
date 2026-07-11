@@ -32,13 +32,10 @@ async function assertInvalidAssetOrigin(origin) {
     prepare(withAssetOrigin(origin)),
     (error) => {
       const stderr = String(error.stderr ?? "");
-      assert.match(
+      assert.equal(
         stderr,
-        /invalid public HTTPS origin: EASYSUBWAY_ADS_ASSET_ORIGIN/,
+        "invalid public HTTPS origin: EASYSUBWAY_ADS_ASSET_ORIGIN\n",
       );
-      if (origin.trim()) {
-        assert.equal(stderr.includes(origin), false, "stderr must not contain the origin value");
-      }
       return true;
     },
   );
@@ -109,6 +106,7 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
     "https://todo.example.com",
     "https://-assets.example.com",
     "https://assets.example.com:0",
+    "https://assets.example.com:08",
     "https://assets.example.com:65536",
   ]) {
     await assertInvalidAssetOrigin(origin);

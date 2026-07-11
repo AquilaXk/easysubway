@@ -172,7 +172,7 @@ fi
 if [[ ! "${ads_asset_origin}" =~ ^https://([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(:[1-9][0-9]{0,4})?/?$ ]]; then
 	ads_asset_origin_invalid=1
 fi
-if [[ "${ads_asset_port}" =~ ^[0-9]+$ && "${ads_asset_port}" -gt 65535 ]]; then
+if [[ "${ads_asset_port}" =~ ^[1-9][0-9]{0,4}$ ]] && (( 10#${ads_asset_port} > 65535 )); then
 	ads_asset_origin_invalid=1
 fi
 case ".${ads_asset_host_normalized}." in
