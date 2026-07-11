@@ -199,6 +199,9 @@ public class AdService {
 		if (value == null || !CREATIVE_ID.matcher(value).matches()) {
 			throw new InvalidRequestException("creative id는 영문자, 숫자, 점, 밑줄, 하이픈 1~64자여야 합니다.");
 		}
+		if (".".equals(value) || "..".equals(value)) {
+			throw new InvalidRequestException("creative id는 URL dot-segment일 수 없습니다.");
+		}
 		return value;
 	}
 

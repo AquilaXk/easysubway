@@ -26,7 +26,7 @@
 			<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
 			<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
 			<label for="creative-id">Creative ID</label>
-			<input id="creative-id" name="id" required maxlength="64" pattern="[A-Za-z0-9._-]{1,64}">
+			<input id="creative-id" name="id" required maxlength="64" pattern="(?!\.{1,2}$)[A-Za-z0-9._-]{1,64}">
 			<label for="placement-id">노출 위치</label>
 			<select id="placement-id" name="placementId" required>
 				<option value="route-result-bottom">경로 결과 하단</option>

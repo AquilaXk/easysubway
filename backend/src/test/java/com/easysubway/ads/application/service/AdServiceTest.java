@@ -132,6 +132,8 @@ class AdServiceTest {
 
 	private static Stream<String> routeUnsafeCreativeIds() {
 		return Stream.of(
+			".",
+			"..",
 			"summer/banner",
 			"summer%2Fbanner",
 			"summer%banner",
@@ -143,7 +145,12 @@ class AdServiceTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = {"A", "A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-"})
+	@ValueSource(strings = {
+		"A",
+		".banner",
+		"a..b",
+		"A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-A._-"
+	})
 	@DisplayName("creative id는 route-safe 문자의 1자와 64자 경계를 허용한다")
 	void acceptsRouteSafeCreativeIdBoundaries(String id) {
 		AdCreative payload = creative(id, false);
