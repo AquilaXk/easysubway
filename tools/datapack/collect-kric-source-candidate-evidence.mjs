@@ -29,6 +29,7 @@ const ALLOWED_CONTENT_TYPES = new Set(["application/xml", "text/xml"]);
 const SAFE_XML_TAG = /^[A-Za-z_][A-Za-z0-9_.-]{0,39}$/;
 const SENSITIVE_XML_TAG = /(?:authorization|credential|password|secret|servicekey|token)/i;
 const SAFE_RESULT_CODE = /^[A-Za-z0-9._-]{1,32}$/;
+const MAX_XML_TAG_LENGTH = 40;
 const MAX_XML_DEPTH = 32;
 const MAX_XML_SCALAR_LENGTH = 512;
 
@@ -164,7 +165,8 @@ function scanXmlStructure(raw) {
       const nextTag = raw.indexOf("<", index);
       const textEnd = nextTag === -1 ? raw.length : nextTag;
       if (scalar && depth() === scalar.depth && scalar.text.length < MAX_XML_SCALAR_LENGTH) {
-        scalar.text += raw.slice(index, textEnd).slice(0, MAX_XML_SCALAR_LENGTH - scalar.text.length);
+        const remaining = MAX_XML_SCALAR_LENGTH - scalar.text.length;
+        scalar.text += raw.slice(index, Math.min(textEnd, index + remaining));
       }
       index = textEnd;
       continue;
@@ -195,16 +197,17 @@ function scanXmlStructure(raw) {
     while (/\s/.test(raw[cursor] ?? "")) cursor += 1;
     const nameStart = cursor;
     while (cursor < raw.length && !/[\s/>]/.test(raw[cursor])) cursor += 1;
-    const name = raw.slice(nameStart, cursor);
-    if (!name) {
+    const nameLength = cursor - nameStart;
+    if (nameLength === 0) {
       index += 1;
       continue;
     }
+    const name = nameLength <= MAX_XML_TAG_LENGTH ? raw.slice(nameStart, nameStart + nameLength) : null;
     const end = tagEnd(cursor);
     let beforeEnd = end - 1;
     while (beforeEnd > cursor && /\s/.test(raw[beforeEnd])) beforeEnd -= 1;
     const selfClosing = raw[beforeEnd] === "/";
-    const normalizedName = name.toLowerCase();
+    const normalizedName = name?.toLowerCase() ?? SAFE_PLACEHOLDER;
 
     if (closing) {
       if (scalar && normalizedName === scalar.name && depth() === scalar.depth) {
@@ -220,7 +223,7 @@ function scanXmlStructure(raw) {
     }
 
     if (!scalar) {
-      const safeName = SAFE_XML_TAG.test(name) && !SENSITIVE_XML_TAG.test(name)
+      const safeName = name && SAFE_XML_TAG.test(name) && !SENSITIVE_XML_TAG.test(name)
         ? name
         : SAFE_PLACEHOLDER;
       if (!seen.has(safeName) && tags.length < 16) {

@@ -415,6 +415,41 @@ test("KRIC evidence collector는 malformed 반복 item을 scalar count하고 cle
   }
 });
 
+test("KRIC evidence collector는 초장문 tag와 scalar를 bounded state로 진단하고 cleanup한다", async () => {
+  const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-long-xml-token-"));
+  const longTag = `attacker-tag-${"x".repeat(8_192)}`;
+  const longResultCode = `CODE-${"z".repeat(4_096)}`;
+  const longResultMessage = `scalar-sentinel-${"y".repeat(16_384)}`;
+  try {
+    await assert.rejects(
+      collectKricSourceCandidateEvidence({
+        candidateId: xmlCandidate.id,
+        candidatesDocument: { candidates: [xmlCandidate] },
+        runnerTemp,
+        serviceKey: "credential-sentinel-long-xml-token",
+        fetchImpl: async () => new Response(
+          `<ROOT><header><resultCode>${longResultCode}</resultCode><resultMsg>${longResultMessage}</resultMsg></header><${longTag}>hidden</${longTag}></ROOT>`,
+          { status: 200, headers: { "content-type": "application/xml" } },
+        ),
+      }),
+      (error) => {
+        assert.match(error.message, /xmlTags=ROOT,header,resultCode,resultMsg,\[unsafe\]/);
+        assert.match(error.message, /itemCount=0/);
+        assert.match(error.message, /resultCode=\[unsafe\]/);
+        assert.doesNotMatch(error.message, /attacker-tag|scalar-sentinel|CODE-/);
+        return true;
+      },
+    );
+    await assertCollectorCleanup(runnerTemp);
+
+    const collectorSource = await readFile(new URL("./collect-kric-source-candidate-evidence.mjs", import.meta.url), "utf8");
+    assert.doesNotMatch(collectorSource, /raw\.slice\(nameStart,\s*cursor\)/);
+    assert.doesNotMatch(collectorSource, /raw\.slice\(index,\s*textEnd\)/);
+  } finally {
+    await rm(runnerTemp, { recursive: true, force: true });
+  }
+});
+
 test("KRIC evidence collector는 기존 XML item 성공 경로를 그대로 유지한다", async () => {
   const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-xml-success-"));
   const serviceKey = "credential-sentinel-xml-success";
