@@ -107,3 +107,57 @@ test("KRIC evidence collector는 raw를 제거하고 sanitized sample/report/has
     await rm(runnerTemp, { recursive: true, force: true });
   }
 });
+
+test("KRIC evidence collector는 실패 단계와 무관하게 raw와 uploadable output을 제거하고 key를 숨긴다", async (t) => {
+  const serviceKey = "test/key+with space";
+  const encodedServiceKey = encodeURIComponent(serviceKey);
+  const cases = [
+    {
+      name: "fetch failure",
+      fetchImpl: async () => {
+        throw new Error(`request failed for ${serviceKey} and ${encodedServiceKey}`);
+      },
+      expectedError: /request failed for \[REDACTED\] and \[REDACTED\]/,
+    },
+    {
+      name: "builder failure",
+      fetchImpl: async () => new Response(JSON.stringify({ serviceKey }), { status: 200 }),
+      expectedError: /raw sample response must not contain serviceKey credentials/,
+    },
+    {
+      name: "validator failure",
+      fetchImpl: async () => new Response(JSON.stringify([
+        { railOprIsttCd: "S1" },
+      ]), { status: 200 }),
+      expectedError: /output field missing: railOprIsttNm/,
+    },
+  ];
+
+  for (const failureCase of cases) {
+    await t.test(failureCase.name, async () => {
+      const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-evidence-failure-"));
+      try {
+        await assert.rejects(
+          collectKricSourceCandidateEvidence({
+            candidateId: candidate.id,
+            candidatesDocument: { candidates: [candidate] },
+            runnerTemp,
+            serviceKey,
+            fetchImpl: failureCase.fetchImpl,
+          }),
+          (error) => {
+            assert.match(error.message, failureCase.expectedError);
+            assert.doesNotMatch(error.message, new RegExp(serviceKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+            assert.doesNotMatch(error.message, new RegExp(encodedServiceKey.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+            return true;
+          },
+        );
+        assert.equal(existsSync(path.join(runnerTemp, "kric-source-candidate-raw")), false);
+        assert.equal(existsSync(path.join(runnerTemp, "kric-source-candidate-staging")), false);
+        assert.equal(existsSync(path.join(runnerTemp, "kric-source-candidate-evidence")), false);
+      } finally {
+        await rm(runnerTemp, { recursive: true, force: true });
+      }
+    });
+  }
+});

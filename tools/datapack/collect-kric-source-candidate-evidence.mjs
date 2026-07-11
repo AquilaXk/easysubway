@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { readFile, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -129,17 +129,23 @@ export async function collectKricSourceCandidateEvidence({
   const document = candidatesDocument ?? JSON.parse(await readFile(CANDIDATES_PATH, "utf8"));
   const request = resolveKricCandidateRequest(document, candidateId);
   const outputDirectory = path.join(runnerTemp, "kric-source-candidate-evidence");
+  const stagingDirectory = path.join(runnerTemp, "kric-source-candidate-staging");
   const rawDirectory = path.join(runnerTemp, "kric-source-candidate-raw");
   const rawPath = path.join(rawDirectory, `${candidateId}.response`);
-  const samplePath = path.join(outputDirectory, `${candidateId}.sample.json`);
-  const reportPath = path.join(outputDirectory, `${candidateId}.report.txt`);
-  const hashesPath = path.join(outputDirectory, `${candidateId}.hashes.json`);
+  const stagedSamplePath = path.join(stagingDirectory, `${candidateId}.sample.json`);
+  const stagedReportPath = path.join(stagingDirectory, `${candidateId}.report.txt`);
+  const stagedHashesPath = path.join(stagingDirectory, `${candidateId}.hashes.json`);
+  const samplePath = path.join(outputDirectory, path.basename(stagedSamplePath));
+  const reportPath = path.join(outputDirectory, path.basename(stagedReportPath));
+  const hashesPath = path.join(outputDirectory, path.basename(stagedHashesPath));
 
   await rm(outputDirectory, { recursive: true, force: true });
+  await rm(stagingDirectory, { recursive: true, force: true });
   await rm(rawDirectory, { recursive: true, force: true });
-  await mkdir(outputDirectory, { recursive: true, mode: 0o700 });
+  await mkdir(stagingDirectory, { recursive: true, mode: 0o700 });
   await mkdir(rawDirectory, { recursive: true, mode: 0o700 });
 
+  let completed = false;
   try {
     const liveUrl = new URL(request.sampleUrl);
     liveUrl.searchParams.set("serviceKey", serviceKey);
@@ -160,14 +166,14 @@ export async function collectKricSourceCandidateEvidence({
       "--format", request.format,
     ]);
     JSON.parse(sample);
-    await writeFile(samplePath, sample, { mode: 0o600 });
+    await writeFile(stagedSamplePath, sample, { mode: 0o600 });
 
     const { stdout: report } = await runEvidenceTool("validate-source-candidate-sample.mjs", [
       "--candidate", candidateId,
       "--candidates", CANDIDATES_PATH,
-      "--sample", samplePath,
+      "--sample", stagedSamplePath,
     ]);
-    await writeFile(reportPath, report, { mode: 0o600 });
+    await writeFile(stagedReportPath, report, { mode: 0o600 });
 
     const evidence = JSON.parse(sample);
     const hashes = {
@@ -177,16 +183,28 @@ export async function collectKricSourceCandidateEvidence({
       evidenceHash: evidence.evidenceHash,
       providerRecordHashes: evidence.providerRecordHashes,
     };
-    await writeFile(hashesPath, `${JSON.stringify(hashes, null, 2)}\n`, { mode: 0o600 });
+    await writeFile(stagedHashesPath, `${JSON.stringify(hashes, null, 2)}\n`, { mode: 0o600 });
 
-    for (const outputPath of [samplePath, reportPath, hashesPath]) {
+    for (const outputPath of [stagedSamplePath, stagedReportPath, stagedHashesPath]) {
       if (!(await readFile(outputPath, "utf8")).trim()) {
         throw new Error(`sanitized evidence output is empty: ${path.basename(outputPath)}`);
       }
     }
+
+    await mkdir(outputDirectory, { recursive: true, mode: 0o700 });
+    await rename(stagedSamplePath, samplePath);
+    await rename(stagedReportPath, reportPath);
+    await rename(stagedHashesPath, hashesPath);
+    completed = true;
     return { sample: samplePath, report: reportPath, hashes: hashesPath };
+  } catch (error) {
+    throw new Error(sanitizeErrorMessage(error, serviceKey));
   } finally {
     await rm(rawDirectory, { recursive: true, force: true });
+    await rm(stagingDirectory, { recursive: true, force: true });
+    if (!completed) {
+      await rm(outputDirectory, { recursive: true, force: true });
+    }
   }
 }
 

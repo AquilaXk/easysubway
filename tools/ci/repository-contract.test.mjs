@@ -12765,7 +12765,12 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
 
   const secretNames = [...workflow.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]);
   assert.deepEqual([...new Set(secretNames)], ["KRIC_SERVICE_KEY"]);
-  assert.match(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.match(
+    workflow,
+    /if: \$\{\{ github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}/,
+  );
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}/);
   assert.equal((workflow.match(/\$\{\{ inputs\.candidate \}\}/g) ?? []).length, 1);
   assert.match(workflow, /KRIC_CANDIDATE_ID: \$\{\{ inputs\.candidate \}\}/);
   assert.match(workflow, /collect-kric-source-candidate-evidence\.mjs/);
