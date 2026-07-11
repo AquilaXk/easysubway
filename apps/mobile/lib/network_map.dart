@@ -19,8 +19,8 @@ import 'mobile_error_reporter.dart';
 import 'station_search.dart';
 
 const _networkMapTopBarHeight = 60.0;
-const _networkMapPillRadius = BorderRadius.all(Radius.circular(28));
-const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(999));
+const _networkMapPillRadius = BorderRadius.all(Radius.circular(8));
+const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(8));
 
 abstract interface class NetworkMapRepository {
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId});
@@ -1070,8 +1070,7 @@ class _NetworkMapLookupToast extends StatelessWidget {
       child: Material(
         key: const Key('networkMapNearbyLookupMessage'),
         color: const Color(0xE62F3437),
-        elevation: 10,
-        shadowColor: const Color(0x33000000),
+        elevation: 0,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -1176,6 +1175,9 @@ class _NetworkMapTopBar extends StatelessWidget {
                               regionContext,
                               availableRegions,
                             ),
+                            splashFactory: NoSplash.splashFactory,
+                            splashColor: Colors.transparent,
+                            highlightColor: Colors.transparent,
                             child: SizedBox(
                               height: EasySubwayTouchTarget.general,
                               child: Row(
@@ -1272,10 +1274,13 @@ class _NetworkMapSearchField extends StatelessWidget {
       label: '지하철역 검색',
       onTap: onSearchTap,
       child: ExcludeSemantics(
-        child: InkWell(
+        // 입력 필드처럼 보이되 탭 시 어떤 ink 하이라이트/사각형도 뜨지 않게
+        // GestureDetector로 처리한다(InkWell의 transparent color로는 상위
+        // Material에 사각형이 남을 수 있음). 탭하면 조용히 검색 화면으로 전환. #1933
+        child: GestureDetector(
           key: const Key('stationSearchButton'),
+          behavior: HitTestBehavior.opaque,
           onTap: onSearchTap,
-          borderRadius: _networkMapSearchFieldRadius,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 72;
@@ -1343,9 +1348,11 @@ class _NetworkMapServicePatternToggle extends StatelessWidget {
     return Material(
       key: const Key('networkMapServicePatternToggle'),
       color: Colors.white,
-      elevation: 16,
-      shadowColor: const Color(0x30000000),
-      borderRadius: _networkMapPillRadius,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: _networkMapPillRadius,
+        side: BorderSide(color: EasySubwayAccessibleColors.line),
+      ),
       child: Container(
         height: 58,
         padding: const EdgeInsets.all(3),
@@ -1388,8 +1395,7 @@ class _NetworkMapCurrentLocationButton extends StatelessWidget {
         child: Material(
           key: const Key('nearbyStationButton'),
           color: Colors.white,
-          elevation: 14,
-          shadowColor: const Color(0x26000000),
+          elevation: 0,
           shape: const CircleBorder(
             side: BorderSide(color: Color(0xFFD8D8D8), width: 1),
           ),
@@ -1464,7 +1470,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
     return Material(
       key: const Key('networkMapNearbyStationPanel'),
       color: Colors.white,
-      elevation: 8,
+      elevation: 0,
       child: SafeArea(
         top: false,
         child: DecoratedBox(
@@ -1956,6 +1962,9 @@ class _NetworkMapToggleSegment extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: _networkMapPillRadius,
+      splashFactory: NoSplash.splashFactory,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         height: 52,
@@ -2201,8 +2210,9 @@ class _NetworkMapMenuTile extends StatelessWidget {
       child: ExcludeSemantics(
         child: InkWell(
           onTap: onTap,
-          highlightColor: const Color(0x14006D77),
-          splashColor: const Color(0x14006D77),
+          splashFactory: NoSplash.splashFactory,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
           child: SizedBox(
             height: 52,
             child: Padding(
@@ -4140,7 +4150,7 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
         children: [
           Material(
             color: const Color(0xE8404445),
-            elevation: 10,
+            elevation: 0,
             borderRadius: BorderRadius.circular(5),
             child: SizedBox(
               height: height,
@@ -4216,6 +4226,9 @@ class _NetworkMapStationActionTab extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: onTap,
+        splashFactory: NoSplash.splashFactory,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

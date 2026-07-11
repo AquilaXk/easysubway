@@ -114,4 +114,32 @@ void main() {
       'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
     }, rule: '장식 Soft 틴트');
   });
+
+  test('노선도 그림자/elevation 재유입 금지 가드 (#1933)', () {
+    final networkMap = sources['lib/network_map.dart'];
+    expect(networkMap, isNotNull, reason: 'lib/network_map.dart 를 찾을 수 없다');
+
+    // elevation: 뒤에 0(단어 경계)이 아닌 숫자가 오면 위반.
+    final nonZeroElevation = RegExp(
+      r'elevation:\s*(?!0\b)\d',
+    ).allMatches(networkMap!).length;
+    final shadow = RegExp(
+      r'shadowColor|BoxShadow|boxShadow',
+    ).allMatches(networkMap).length;
+
+    expect(
+      nonZeroElevation,
+      0,
+      reason:
+          '노선도에 그림자/elevation 재유입 금지 — border나 배경색으로만 '
+          'depth를 표현하라 #1933 (0 초과 elevation: $nonZeroElevation건)',
+    );
+    expect(
+      shadow,
+      0,
+      reason:
+          '노선도에 그림자/elevation 재유입 금지 — border나 배경색으로만 '
+          'depth를 표현하라 #1933 (shadowColor/BoxShadow: $shadow건)',
+    );
+  });
 }
