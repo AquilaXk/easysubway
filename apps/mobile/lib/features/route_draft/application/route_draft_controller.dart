@@ -104,6 +104,104 @@ class RouteDraftController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// #1985: 두 슬롯 [a], [b]의 값을 맞바꾼다. a==b거나 두 슬롯 모두 비어 있으면
+  /// 아무 것도 하지 않는다(notify 안 함). 나머지 슬롯 값은 보존한다.
+  void swapSlots(RouteDraftSlot a, RouteDraftSlot b) {
+    if (a == b) {
+      return;
+    }
+    final aStation = _stationFor(a);
+    final bStation = _stationFor(b);
+    if (aStation == null && bStation == null) {
+      return;
+    }
+    // a자리에 b값, b자리에 a값. 나머지 슬롯은 원래 값 유지.
+    _draft = RouteDraft(
+      origin: _slotValue(RouteDraftSlot.origin, a, b, aStation, bStation),
+      destination: _slotValue(
+        RouteDraftSlot.destination,
+        a,
+        b,
+        aStation,
+        bStation,
+      ),
+      waypoint: _slotValue(RouteDraftSlot.waypoint, a, b, aStation, bStation),
+      lastModifiedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  /// #1985: [from] 슬롯 값을 [to] 슬롯으로 옮기고 from을 비운다. from이 비어
+  /// 있으면 아무 것도 하지 않는다. to가 이미 채워져 있으면 값 소실을 막기 위해
+  /// swap 시맨틱으로 폴백한다.
+  void moveSlot(RouteDraftSlot from, RouteDraftSlot to) {
+    if (from == to) {
+      return;
+    }
+    final fromStation = _stationFor(from);
+    if (fromStation == null) {
+      return;
+    }
+    if (_stationFor(to) != null) {
+      swapSlots(from, to);
+      return;
+    }
+    // to가 비어 있으므로 from값을 to로 옮기고 from을 비운다.
+    _draft = RouteDraft(
+      origin: _movedValue(RouteDraftSlot.origin, from, to, fromStation),
+      destination: _movedValue(
+        RouteDraftSlot.destination,
+        from,
+        to,
+        fromStation,
+      ),
+      waypoint: _movedValue(RouteDraftSlot.waypoint, from, to, fromStation),
+      lastModifiedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  RouteDraftStation? _stationFor(RouteDraftSlot slot) {
+    return switch (slot) {
+      RouteDraftSlot.origin => _draft.origin,
+      RouteDraftSlot.destination => _draft.destination,
+      RouteDraftSlot.waypoint => _draft.waypoint,
+    };
+  }
+
+  /// swapSlots용: [slot]의 최종값을 계산한다. slot이 a면 b값, b면 a값, 그 외는 원래값.
+  RouteDraftStation? _slotValue(
+    RouteDraftSlot slot,
+    RouteDraftSlot a,
+    RouteDraftSlot b,
+    RouteDraftStation? aStation,
+    RouteDraftStation? bStation,
+  ) {
+    if (slot == a) {
+      return bStation;
+    }
+    if (slot == b) {
+      return aStation;
+    }
+    return _stationFor(slot);
+  }
+
+  /// moveSlot용: [slot]의 최종값을 계산한다. slot이 to면 from값, from이면 null, 그 외는 원래값.
+  RouteDraftStation? _movedValue(
+    RouteDraftSlot slot,
+    RouteDraftSlot from,
+    RouteDraftSlot to,
+    RouteDraftStation? fromStation,
+  ) {
+    if (slot == to) {
+      return fromStation;
+    }
+    if (slot == from) {
+      return null;
+    }
+    return _stationFor(slot);
+  }
+
   void clear() {
     if (_draft.isEmpty) {
       return;

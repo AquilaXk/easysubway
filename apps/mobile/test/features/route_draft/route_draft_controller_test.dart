@@ -104,4 +104,124 @@ void main() {
       expect(notifications, 1);
     });
   });
+
+  group('RouteDraftController 슬롯 재배열 (#1985)', () {
+    const origin = RouteDraftStation(id: 'gangnam', nameKo: '강남');
+    const destination = RouteDraftStation(id: 'jamsil', nameKo: '잠실');
+    const waypoint = RouteDraftStation(id: 'seolleung', nameKo: '선릉');
+
+    test('swapSlots(출발, 도착)은 두 값을 바꾸고 경유는 보존한다', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      controller.setDestination(destination);
+      controller.setWaypoint(waypoint);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.swapSlots(RouteDraftSlot.origin, RouteDraftSlot.destination);
+
+      expect(controller.draft.origin?.id, 'jamsil');
+      expect(controller.draft.destination?.id, 'gangnam');
+      expect(controller.draft.waypoint?.id, 'seolleung');
+      expect(notifications, 1);
+    });
+
+    test('swapSlots(출발, 경유)는 출발·경유를 바꾸고 도착은 보존한다', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      controller.setDestination(destination);
+      controller.setWaypoint(waypoint);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.swapSlots(RouteDraftSlot.origin, RouteDraftSlot.waypoint);
+
+      expect(controller.draft.origin?.id, 'seolleung');
+      expect(controller.draft.waypoint?.id, 'gangnam');
+      expect(controller.draft.destination?.id, 'jamsil');
+      expect(notifications, 1);
+    });
+
+    test('swapSlots(경유, 도착)은 경유·도착을 바꾸고 출발은 보존한다', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      controller.setDestination(destination);
+      controller.setWaypoint(waypoint);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.swapSlots(RouteDraftSlot.waypoint, RouteDraftSlot.destination);
+
+      expect(controller.draft.waypoint?.id, 'jamsil');
+      expect(controller.draft.destination?.id, 'seolleung');
+      expect(controller.draft.origin?.id, 'gangnam');
+      expect(notifications, 1);
+    });
+
+    test('swapSlots(a, a)는 no-op이고 notify하지 않는다', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.swapSlots(RouteDraftSlot.origin, RouteDraftSlot.origin);
+
+      expect(controller.draft.origin?.id, 'gangnam');
+      expect(notifications, 0);
+    });
+
+    test('swapSlots 두 슬롯 모두 비어 있으면 no-op이고 notify하지 않는다', () {
+      final controller = RouteDraftController();
+      controller.setWaypoint(waypoint);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.swapSlots(RouteDraftSlot.origin, RouteDraftSlot.destination);
+
+      expect(controller.draft.waypoint?.id, 'seolleung');
+      expect(controller.draft.origin, isNull);
+      expect(controller.draft.destination, isNull);
+      expect(notifications, 0);
+    });
+
+    test('moveSlot은 to가 비어 있으면 from 값을 to로 옮기고 from을 비운다', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.moveSlot(RouteDraftSlot.origin, RouteDraftSlot.destination);
+
+      expect(controller.draft.origin, isNull);
+      expect(controller.draft.destination?.id, 'gangnam');
+      expect(notifications, 1);
+    });
+
+    test('moveSlot은 from이 비어 있으면 no-op이고 notify하지 않는다', () {
+      final controller = RouteDraftController();
+      controller.setDestination(destination);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.moveSlot(RouteDraftSlot.origin, RouteDraftSlot.destination);
+
+      expect(controller.draft.origin, isNull);
+      expect(controller.draft.destination?.id, 'jamsil');
+      expect(notifications, 0);
+    });
+
+    test('moveSlot은 to가 채워져 있으면 값 소실 없이 두 값을 교환한다(swap 폴백)', () {
+      final controller = RouteDraftController();
+      controller.setOrigin(origin);
+      controller.setDestination(destination);
+      var notifications = 0;
+      controller.addListener(() => notifications += 1);
+
+      controller.moveSlot(RouteDraftSlot.origin, RouteDraftSlot.destination);
+
+      expect(controller.draft.origin?.id, 'jamsil');
+      expect(controller.draft.destination?.id, 'gangnam');
+      expect(notifications, 1);
+    });
+  });
 }
