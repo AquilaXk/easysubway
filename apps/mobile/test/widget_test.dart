@@ -1737,6 +1737,148 @@ void main() {
     expect(routeDraftController.draft.destination?.nameKo, '강남');
   });
 
+  testWidgets('#1948 상단바 경유 추가 진입점 탭은 출발/도착 사이에 경유 행을 넣고 지우면 추가 버튼이 복귀한다', (
+    tester,
+  ) async {
+    final routeDraftController = RouteDraftController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+          onPickStationForSlot: (slot) {
+            switch (slot) {
+              case RouteDraftSlot.origin:
+                routeDraftController.setOrigin(
+                  const RouteDraftStation(id: 'gangnam', nameKo: '강남'),
+                );
+              case RouteDraftSlot.destination:
+                routeDraftController.setDestination(
+                  const RouteDraftStation(id: 'jamsil', nameKo: '잠실'),
+                );
+              case RouteDraftSlot.waypoint:
+                routeDraftController.setWaypoint(
+                  const RouteDraftStation(id: 'seolleung', nameKo: '선릉'),
+                );
+            }
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 출발·도착을 채워 상단바를 draft 입력으로 변신시킨다.
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('출발'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('networkMapRouteDraftPickDestination')),
+    );
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.destination?.nameKo, '잠실');
+
+    // 경유가 없을 때는 경유 행이 없고 '경유 추가' 진입점이 보인다.
+    expect(find.byKey(const Key('networkMapRouteDraftWaypointRow')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapRouteDraftAddWaypoint')),
+      findsOneWidget,
+    );
+
+    // 경유 추가 진입점 탭 → waypoint slot으로 검색이 열려 경유가 채워진다.
+    await tester.tap(find.byKey(const Key('networkMapRouteDraftAddWaypoint')));
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.waypoint?.nameKo, '선릉');
+
+    // 경유 행이 출발과 도착 사이에 삽입된다.
+    expect(
+      find.byKey(const Key('networkMapRouteDraftWaypointRow')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRouteDraftWaypointRow')),
+        matching: find.text('선릉역'),
+      ),
+      findsOneWidget,
+    );
+    final originDy = tester
+        .getTopLeft(find.byKey(const Key('networkMapRouteDraftOriginRow')))
+        .dy;
+    final waypointDy = tester
+        .getTopLeft(find.byKey(const Key('networkMapRouteDraftWaypointRow')))
+        .dy;
+    final destinationDy = tester
+        .getTopLeft(find.byKey(const Key('networkMapRouteDraftDestinationRow')))
+        .dy;
+    expect(originDy < waypointDy, isTrue);
+    expect(waypointDy < destinationDy, isTrue);
+
+    // 경유가 채워졌으므로 추가 버튼은 사라지고 경유 지우기가 보인다.
+    expect(find.byKey(const Key('networkMapRouteDraftAddWaypoint')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapRouteDraftClearWaypoint')),
+      findsOneWidget,
+    );
+
+    // 경유 지우기 → 경유 행이 사라지고 추가 버튼이 복귀한다.
+    await tester.tap(
+      find.byKey(const Key('networkMapRouteDraftClearWaypoint')),
+    );
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.waypoint, isNull);
+    expect(find.byKey(const Key('networkMapRouteDraftWaypointRow')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapRouteDraftAddWaypoint')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('#1948 노선도 팝오버는 [출발][경유][도착][닫기] 순서로 경유 탭을 제공한다', (
+    tester,
+  ) async {
+    final routeDraftController = RouteDraftController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+          onPickStationForSlot: (slot) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+
+    // 팝오버에 출발/경유/도착/닫기 탭이 모두 존재한다(기존 텍스트 회귀 없음).
+    expect(find.text('출발'), findsOneWidget);
+    expect(find.text('경유'), findsOneWidget);
+    expect(find.text('도착'), findsOneWidget);
+    expect(find.text('닫기'), findsOneWidget);
+
+    // 좌→우 순서가 [출발][경유][도착][닫기]인지 x좌표로 확인한다.
+    final originDx = tester.getTopLeft(find.text('출발')).dx;
+    final waypointDx = tester.getTopLeft(find.text('경유')).dx;
+    final destinationDx = tester.getTopLeft(find.text('도착')).dx;
+    final closeDx = tester.getTopLeft(find.text('닫기')).dx;
+    expect(originDx < waypointDx, isTrue);
+    expect(waypointDx < destinationDx, isTrue);
+    expect(destinationDx < closeDx, isTrue);
+
+    // 경유 탭을 누르면 draft.waypoint가 채워진다.
+    await tester.tap(find.text('경유'));
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.waypoint?.nameKo, '상록수');
+  });
+
   testWidgets('노선도는 노선별 보기 우회 sheet를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -6930,6 +7072,109 @@ void main() {
       find.byKey(const Key('routeDestinationPointButton')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('#1948 타임라인은 경유 스텝을 무채색 경유 노드로 그리고 요약을 왜곡하지 않는다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'ride',
+            title: '상록수에서 선릉까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-seolleung',
+            estimatedMinutes: 20,
+            distanceMeters: 9000,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'waypoint',
+            title: '선릉 경유',
+            description: '경유역을 지나 이동을 이어갑니다.',
+            lineId: '',
+            lineName: '',
+            fromStationId: 'station-seolleung',
+            toStationId: 'station-seolleung',
+            estimatedMinutes: 0,
+            distanceMeters: 0,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+          ),
+          RouteSearchStep(
+            sequence: 3,
+            stepType: 'ride',
+            title: '선릉에서 사당까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-2',
+            lineName: '수도권 2호선',
+            fromStationId: 'station-seolleung',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 18,
+            distanceMeters: 8000,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(
+            favorites: [_favoriteRoute()],
+          ),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 11),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 경유 스텝의 배지 Key는 회귀 없이 유지된다.
+    expect(find.byKey(const Key('routeStepNumber-2')), findsOneWidget);
+
+    // 경유 노드는 노선색 승차 배지가 아니라 무채색 more_horiz 노드로 렌더된다.
+    final waypointBadge = find.byKey(const Key('routeStepNumber-2'));
+    expect(
+      find.descendant(
+        of: waypointBadge,
+        matching: find.byIcon(Icons.more_horiz),
+      ),
+      findsOneWidget,
+    );
+    // 경유 노드에는 승차 배지(노선번호 텍스트)나 도보 아이콘이 없다.
+    expect(
+      find.descendant(
+        of: waypointBadge,
+        matching: find.byIcon(Icons.directions_walk),
+      ),
+      findsNothing,
+    );
+
+    // 승차 스텝은 노선색 배지(노선번호)로 남아 회귀가 없다.
+    expect(find.byKey(const Key('routeStepNumber-1')), findsOneWidget);
+    expect(find.byKey(const Key('routeStepNumber-3')), findsOneWidget);
   });
 
   testWidgets('역 검색 화면은 최근 검색어를 탭해 빠르게 다시 검색한다', (tester) async {
