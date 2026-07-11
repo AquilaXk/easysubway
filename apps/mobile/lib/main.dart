@@ -4464,6 +4464,7 @@ class _AttributionCard extends StatelessWidget {
       rows: [
         ('제공 기관', _text(license['source'], _text(map['name_ko']))),
         ('라이선스', '${_text(license['name'])} (${_text(license['spdx'])})'),
+        ('작성자', _text(license['authors'])),
         ('라이선스 링크', _text(license['url'])),
         ('표기 필요', _yesNo(license['attributionRequired'])),
         ('가져온 날짜', _text(license['date'])),
