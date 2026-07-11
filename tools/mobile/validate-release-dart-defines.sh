@@ -66,4 +66,5 @@ case "${host}" in
     printf 'EASYSUBWAY_API_BASE_URL must use a public non-placeholder host.\n' >&2
     exit 1
     ;;
+  *) ;;
 esac

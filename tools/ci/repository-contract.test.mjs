@@ -1745,6 +1745,8 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
 });
 
 test("release dart-define guard는 public API URL과 demo flag를 검증한다", async () => {
+  const guard = read("tools/mobile/validate-release-dart-defines.sh");
+  assert.match(guard, /case "\$\{host\}" in[\s\S]*?\n  \*\) ;;\nesac/);
   await execFileAsync("bash", ["-n", "tools/mobile/validate-release-dart-defines.sh"], { cwd: root });
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
     "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
