@@ -44,7 +44,9 @@ fi
 host="${authority%%:*}"
 if [[ "${authority}" == *":"* ]]; then
   port="${authority#*:}"
-  if [[ "${port}" == *":"* || ! "${port}" =~ ^[0-9]+$ ]]; then
+  if [[ "${port}" == *":"* || ! "${port}" =~ ^[0-9]+$ ||
+    "${port}" == 0* || ${#port} -gt 5 ||
+    ( ${#port} -eq 5 && "${port}" > "65535" ) ]]; then
     printf 'EASYSUBWAY_API_BASE_URL has an invalid port.\n' >&2
     exit 1
   fi
@@ -52,6 +54,10 @@ fi
 host="$(printf '%s' "${host}" | tr '[:upper:]' '[:lower:]')"
 if [[ ! "${host}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ || "${host}" != *.* || "${host}" == *".."* ]]; then
   printf 'EASYSUBWAY_API_BASE_URL must include a valid public host.\n' >&2
+  exit 1
+fi
+if [[ "${host}" =~ ^[0-9.]+$ ]]; then
+  printf 'EASYSUBWAY_API_BASE_URL must not use an IP literal.\n' >&2
   exit 1
 fi
 

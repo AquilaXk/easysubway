@@ -1750,6 +1750,9 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
     "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
     "--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
   ], { cwd: root });
+  await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:443",
+  ], { cwd: root });
   const injectionDir = await mkdtemp(path.join(tmpdir(), "release-dart-define-"));
   const injectionMarker = path.join(injectionDir, "executed");
   try {
@@ -1767,7 +1770,13 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
     ["--dart-define=EASYSUBWAY_API_BASE_URL=https:///api"],
     ["--dart-define=EASYSUBWAY_API_BASE_URL=https://localhost"],
     ["--dart-define=EASYSUBWAY_API_BASE_URL=https://127.0.0.1"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://10.0.0.1"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://8.8.8.8"],
     ["--dart-define=EASYSUBWAY_API_BASE_URL=https://[::1]"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:0"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:0443"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:65536"],
+    ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:99999"],
     ["--dart-define=EASYSUBWAY_API_BASE_URL=https://backend.local"],
     ["--dart-define=EASYSUBWAY_API_BASE_URL=https://api.example.com"],
   ];
