@@ -80,9 +80,9 @@
       "category": "app-content",
       "titleKo": "Play 콘텐츠 등급 설문",
       "decisionOwnerKo": "제품/운영 담당",
-      "readyWhenKo": "대중교통 접근성 정보 앱 특성, 사용자 생성 신고 내용, 외부 웹 열람 없음, 광고 없음 기준으로 콘텐츠 등급 설문을 완료한다.",
-      "evidence": ["content-rating-certificate", "questionnaire-export"],
-      "linkedArtifacts": ["apps/mobile/lib/facility_report.dart"],
+      "readyWhenKo": "대중교통 접근성 정보 앱 특성, 사용자 생성 신고 내용, 자체 서빙 비개인화 광고와 사용자가 명시적으로 누를 때만 여는 외부 landing 기준으로 콘텐츠 등급 설문을 완료한다.",
+      "evidence": ["content-rating-certificate", "questionnaire-export", "ad-request-contract-test"],
+      "linkedArtifacts": ["apps/mobile/lib/facility_report.dart", "apps/mobile/lib/features/ads/active_ad_banner.dart", "apps/mobile/lib/features/ads/ad_repository.dart"],
       "configurationSources": ["product scope", "facility report moderation policy"]
     },
     {
@@ -102,10 +102,10 @@
       "category": "app-content",
       "titleKo": "Play 광고 포함 여부",
       "decisionOwnerKo": "제품/사업 담당",
-      "readyWhenKo": "앱 코드와 출시 계획에 광고 SDK와 광고 지면이 없음을 확인하고 Play Console 광고 포함 여부를 아니오로 제출한다.",
-      "evidence": ["dependency-review", "business-model-review"],
-      "linkedArtifacts": ["apps/mobile/lib/main.dart"],
-      "configurationSources": ["no ad SDK dependency", "no in-app ad placement"]
+      "readyWhenKo": "자체 서빙 비개인화 하우스/제휴 배너를 포함하므로 Play Console 광고 포함 여부를 예로 제출한다. AD_ID, 제3자 광고 SDK, tracking, event 계측을 사용하지 않고 광고 landing은 사용자가 명시적으로 누를 때만 외부 브라우저로 연다.",
+      "evidence": ["dependency-review", "business-model-review", "ad-request-contract-test"],
+      "linkedArtifacts": ["apps/mobile/lib/features/ads/ad_repository.dart", "apps/mobile/lib/features/ads/active_ad_banner.dart"],
+      "configurationSources": ["first-party self-served in-app ad placement", "no third-party ad SDK dependency", "no AD_ID permission", "no ad tracking or event measurement"]
     },
     {
       "id": "play_app_category",
@@ -201,9 +201,9 @@
       "category": "app-information",
       "titleKo": "App Store 연령 등급",
       "decisionOwnerKo": "제품/운영 담당",
-      "readyWhenKo": "대중교통 정보, 사용자 신고 입력, 외부 웹 열람 없음, 광고 없음 기준으로 App Store Connect 연령 등급 설문을 완료한다.",
-      "evidence": ["age-rating-result", "questionnaire-review"],
-      "linkedArtifacts": ["apps/mobile/lib/facility_report.dart"],
+      "readyWhenKo": "대중교통 정보, 사용자 신고 입력, 자체 서빙 비개인화 광고와 사용자가 명시적으로 누를 때만 여는 외부 landing 기준으로 App Store Connect 연령 등급 설문을 완료한다.",
+      "evidence": ["age-rating-result", "questionnaire-review", "ad-request-contract-test"],
+      "linkedArtifacts": ["apps/mobile/lib/facility_report.dart", "apps/mobile/lib/features/ads/active_ad_banner.dart", "apps/mobile/lib/features/ads/ad_repository.dart"],
       "configurationSources": ["product scope", "facility report moderation policy"]
     },
     {
