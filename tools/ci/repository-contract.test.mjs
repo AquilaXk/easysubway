@@ -26,7 +26,7 @@ function mobileProductionDartFiles() {
   return execFileSync("git", ["ls-files", "apps/mobile/lib"], {
     cwd: root,
     encoding: "utf8",
-  }).trim().split("\n").filter((file) => file.endsWith(".dart"));
+  }).trim().split("\n").filter((file) => file.endsWith(".dart") && !file.endsWith(".g.dart"));
 }
 
 function collapseQuotedStringConcatenations(source) {
@@ -44,6 +44,18 @@ function collapseQuotedStringConcatenations(source) {
 
 function containsAdEventEndpoint(source) {
   return /\/api\/ads\/events\b/.test(collapseQuotedStringConcatenations(source));
+}
+
+function mobileAdEventSenderFiles(
+  sourcePaths = execFileSync("git", ["ls-files", "apps/mobile/lib"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n"),
+  readSource = read,
+) {
+  return sourcePaths
+    .filter((sourcePath) => sourcePath.endsWith(".dart"))
+    .filter((sourcePath) => containsAdEventEndpoint(readSource(sourcePath)));
 }
 
 function assertAnonymousAdEventPostCall(source) {
@@ -2828,7 +2840,15 @@ test("광고 event sender detector는 직접 endpoint와 quoted-string 연결을
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/' + 'events')"), true);
   assert.equal(containsAdEventEndpoint('postJson("/api/ads/" + "events")'), true);
   assert.equal(containsAdEventEndpoint("postJson('/api/ads/active')"), false);
-  assert.ok(mobileProductionDartFiles().some((file) => file.endsWith(".g.dart")));
+  const sources = new Map([
+    ["apps/mobile/lib/manual.dart", "postJson('/api/ads/events')"],
+    ["apps/mobile/lib/generated.g.dart", "postJson('/api/ads/' + 'events')"],
+    ["apps/mobile/lib/generated.g.txt", "postJson('/api/ads/events')"],
+  ]);
+  assert.deepEqual(mobileAdEventSenderFiles([...sources.keys()], (file) => sources.get(file)), [
+    "apps/mobile/lib/manual.dart",
+    "apps/mobile/lib/generated.g.dart",
+  ]);
 });
 
 test("광고 event POST detector는 정확한 익명 세 필드 외 body와 identity header를 거부한다", () => {
@@ -2924,8 +2944,7 @@ test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를
     );
   }
   assert.doesNotMatch(androidMainManifest, /android\.permission\.AD_ID/);
-  const adEventSenders = mobileProductionDartFiles()
-    .filter((sourcePath) => containsAdEventEndpoint(read(sourcePath)));
+  const adEventSenders = mobileAdEventSenderFiles();
   assert.deepEqual(adEventSenders, [
     "apps/mobile/lib/features/ads/ad_repository.dart",
   ]);
