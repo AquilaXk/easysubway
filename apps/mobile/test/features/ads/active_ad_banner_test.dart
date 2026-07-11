@@ -113,11 +113,14 @@ final _image = MemoryImage(
 
 Future<bool> _launchSuccess(Uri uri, {required LaunchMode mode}) async => true;
 
+DateTime _utcNow() => DateTime.now().toUtc();
+
 Future<void> _pumpBanner(
   WidgetTester tester, {
   Future<ApiResponse>? response,
   required AdImageLoader imageLoader,
   AdLauncher? launcher,
+  DateTime Function() now = _utcNow,
   Object? apiError,
   AdRepository? repository,
   AdPlacement placement = AdPlacement.routeResultBottom,
@@ -143,6 +146,7 @@ Future<void> _pumpBanner(
               placement: placement,
               imageLoader: imageLoader,
               launcher: launcher ?? _launchSuccess,
+              now: now,
             ),
           ),
         ),
@@ -270,7 +274,8 @@ void main() {
     tester,
   ) async {
     final image = Completer<ImageProvider<Object>>();
-    final endsAt = DateTime.now().toUtc().add(const Duration(seconds: 1));
+    var now = DateTime.utc(2026, 7, 12, 1);
+    final endsAt = now.add(const Duration(minutes: 1));
     final client = _StubApiClient(
       Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
     );
@@ -278,6 +283,7 @@ void main() {
       tester,
       repository: AdRepository(client),
       imageLoader: (_, _) => image.future,
+      now: () => now,
     );
     await tester.pump();
 
@@ -287,12 +293,7 @@ void main() {
     expect(tester.binding.hasScheduledFrame, isTrue);
     expect(client.eventBodies, isEmpty);
 
-    await tester.runAsync(() async {
-      final remaining = endsAt.difference(DateTime.now().toUtc());
-      if (remaining > Duration.zero) {
-        await Future<void>.delayed(remaining);
-      }
-    });
+    now = endsAt;
     await tester.pump();
 
     final impressions = client.eventBodies
@@ -428,7 +429,8 @@ void main() {
   testWidgets(
     'endsAt 이후 timer cleanup 전 tap은 collapse하고 click과 landing을 생략한다',
     (tester) async {
-      final endsAt = DateTime.now().toUtc().add(const Duration(seconds: 1));
+      var now = DateTime.utc(2026, 7, 12, 1);
+      final endsAt = now.add(const Duration(minutes: 1));
       final client = _StubApiClient(
         Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
       );
@@ -437,6 +439,7 @@ void main() {
         tester,
         repository: AdRepository(client),
         imageLoader: (_, _) async => _image,
+        now: () => now,
         launcher: (uri, {required mode}) async {
           launches++;
           return true;
@@ -450,13 +453,8 @@ void main() {
           .widget<Semantics>(find.byKey(const Key('activeAdBannerTapTarget')))
           .properties
           .onTap!;
-      await tester.runAsync(() async {
-        final remaining = endsAt.difference(DateTime.now().toUtc());
-        if (remaining > Duration.zero) {
-          await Future<void>.delayed(remaining);
-        }
-        onTap();
-      });
+      now = endsAt;
+      onTap();
       await tester.pump();
 
       final collapsed = find.byType(AdBannerSlot).evaluate().isEmpty;

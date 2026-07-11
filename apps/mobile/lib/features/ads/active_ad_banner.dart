@@ -10,12 +10,15 @@ typedef AdImageLoader =
     Future<ImageProvider<Object>> Function(Uri uri, BuildContext context);
 typedef AdLauncher = Future<bool> Function(Uri uri, {required LaunchMode mode});
 
+DateTime _utcNow() => DateTime.now().toUtc();
+
 class ActiveAdBanner extends StatefulWidget {
   const ActiveAdBanner({
     required this.repository,
     required this.placement,
     this.imageLoader = _loadNetworkImage,
     this.launcher = _launchExternal,
+    this.now = _utcNow,
     super.key,
   });
 
@@ -23,6 +26,7 @@ class ActiveAdBanner extends StatefulWidget {
   final AdPlacement placement;
   final AdImageLoader imageLoader;
   final AdLauncher launcher;
+  final DateTime Function() now;
 
   @override
   State<ActiveAdBanner> createState() => _ActiveAdBannerState();
@@ -102,7 +106,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
 
   bool _isExpired(AdCreative creative) {
     final endsAt = creative.endsAt;
-    return endsAt != null && !endsAt.isAfter(DateTime.now().toUtc());
+    return endsAt != null && !endsAt.isAfter(widget.now());
   }
 
   void _scheduleExpiry(int generation, AdCreative creative) {
@@ -110,7 +114,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
     if (endsAt == null) {
       return;
     }
-    _expiryTimer = Timer(endsAt.difference(DateTime.now().toUtc()), () {
+    _expiryTimer = Timer(endsAt.difference(widget.now()), () {
       if (!mounted ||
           generation != _generation ||
           !identical(_creative, creative)) {
