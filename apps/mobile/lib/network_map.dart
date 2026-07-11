@@ -4927,11 +4927,6 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
       if (draft.waypoint != null) RouteDraftSlot.waypoint,
       RouteDraftSlot.destination,
     ];
-    const slotDisplayLabels = <RouteDraftSlot, String>{
-      RouteDraftSlot.origin: '출발역',
-      RouteDraftSlot.waypoint: '경유역',
-      RouteDraftSlot.destination: '도착역',
-    };
     // 각 행이 이동할 수 있는 다른 슬롯 목록(자기 자신 제외).
     List<RouteDraftSlot> targetsFor(RouteDraftSlot slot) =>
         visibleSlots.where((s) => s != slot).toList();
@@ -4946,7 +4941,6 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
         onPick: onPickOrigin,
         reorderTargets: targetsFor(RouteDraftSlot.origin),
         onReorder: onReorderDraft,
-        slotDisplayLabels: slotDisplayLabels,
       ),
       // #1948: 경유가 있으면 출발과 도착 사이에 경유 행을 삽입한다.
       if (draft.waypoint != null)
@@ -4958,7 +4952,6 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
           onPick: onPickWaypoint,
           reorderTargets: targetsFor(RouteDraftSlot.waypoint),
           onReorder: onReorderDraft,
-          slotDisplayLabels: slotDisplayLabels,
         ),
       _NetworkMapRouteDraftField(
         kind: _RouteDraftFieldKind.destination,
@@ -4968,7 +4961,6 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
         onPick: onPickDestination,
         reorderTargets: targetsFor(RouteDraftSlot.destination),
         onReorder: onReorderDraft,
-        slotDisplayLabels: slotDisplayLabels,
       ),
     ];
     // #1948: 경유는 출발·도착 한 쌍이 정해진 뒤에 더하는 옵션이다. 출발/도착이
@@ -5084,7 +5076,6 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
     required this.onClear,
     required this.reorderTargets,
     required this.onReorder,
-    required this.slotDisplayLabels,
     this.onPick,
   });
 
@@ -5101,9 +5092,6 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
   /// #1985: 드래그·시맨틱 액션이 호출하는 재배열 콜백. (from, to) 슬롯을 넘긴다.
   final void Function(RouteDraftSlot from, RouteDraftSlot to) onReorder;
 
-  /// #1985: 슬롯→표시 라벨('출발역'/'경유역'/'도착역'). 시맨틱 액션 문구에 쓴다.
-  final Map<RouteDraftSlot, String> slotDisplayLabels;
-
   /// G4: 이 칸(역명/플레이스홀더 영역)을 탭하면 역 검색을 연다. null이면 탭 불가.
   final VoidCallback? onPick;
 
@@ -5114,17 +5102,9 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
   };
 
   /// #1985: 빈 행 placeholder 표시·낭독 문구('출발역'/'경유역'/'도착역').
-  String get _placeholderLabel => switch (kind) {
-    _RouteDraftFieldKind.origin => '출발역',
-    _RouteDraftFieldKind.waypoint => '경유역',
-    _RouteDraftFieldKind.destination => '도착역',
-  };
+  String get _placeholderLabel => slot.displayLabel;
 
-  String get _searchLabel => switch (kind) {
-    _RouteDraftFieldKind.origin => '출발역 검색',
-    _RouteDraftFieldKind.waypoint => '경유역 검색',
-    _RouteDraftFieldKind.destination => '도착역 검색',
-  };
+  String get _searchLabel => '${slot.displayLabel} 검색';
 
   String get _rowKey => switch (kind) {
     _RouteDraftFieldKind.origin => 'networkMapRouteDraftOriginRow',
@@ -5298,7 +5278,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
         customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
           for (final target in reorderTargets)
             CustomSemanticsAction(
-              label: '${slotDisplayLabels[target]}으로 이동',
+              label: '${target.displayLabel}으로 이동',
             ): () => onReorder(slot, target),
         },
         child: content,
