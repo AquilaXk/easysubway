@@ -1120,6 +1120,39 @@ void main() {
     );
   });
 
+  testWidgets('결과 화면에서 뒤로가기로 홈에 오면 상단바가 빈 검색바로 복귀한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteRouteRepository: FakeFavoriteRouteRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openRouteSearchScreen(tester);
+    expect(find.byKey(const Key('homeBottomNavigationBar')), findsNothing);
+    expect(
+      find.descendant(of: find.byType(AppBar), matching: find.text('길찾기')),
+      findsOneWidget,
+    );
+
+    // 결과 화면에서 시스템 뒤로가기로 홈으로 복귀하면, owner 요구사항: 출발·도착
+    // draft가 완전히 초기화되어 상단바가 빈 검색바 상태로 돌아와야 한다(둘 다
+    // 채워진 채 홈 지도에 머무는 상태가 있으면 안 된다).
+    await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapRouteDraftOverlay')), findsNothing);
+  });
+
   testWidgets('노선도 메뉴에서 데이터 및 지도 출처 화면으로 이동한다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(
@@ -1296,7 +1329,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('도착역을 탭하거나 검색'), findsOneWidget);
+    expect(find.text('도착'), findsOneWidget);
+    // owner spec: 라벨 프리픽스 텍스트와 노드 점 커넥터 컬럼은 제거되고, 두 개의
+    // 무채색 채움 필드만 남는다.
+    expect(find.text('출발역을 탭하거나 검색'), findsNothing);
+    expect(find.text('도착역을 탭하거나 검색'), findsNothing);
+    expect(find.byKey(const Key('networkMapRouteDraftOriginRow')), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapRouteDraftDestinationRow')),
+      findsOneWidget,
+    );
     // 스왑(⇅) 어포던스가 상단바에 존재한다.
     expect(find.byKey(const Key('networkMapRouteDraftSwap')), findsOneWidget);
 

@@ -1828,7 +1828,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
         initialDraft: _routeDraftController.draft,
         simpleViewEnabled: simpleViewEnabled,
-        onShellBackToHome: openHomeTab,
+        onShellBackToHome: () {
+          _routeDraftController.clear();
+          openHomeTab();
+        },
       );
     }
 

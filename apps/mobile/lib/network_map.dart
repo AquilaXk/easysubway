@@ -1154,7 +1154,6 @@ class _NetworkMapTopBar extends StatelessWidget {
               return _NetworkMapTopBarRouteDraft(
                 key: const Key('networkMapRouteDraftOverlay'),
                 draft: draft,
-                onMenuTap: onMenuTap,
                 onClearOrigin: onClearOrigin,
                 onClearDestination: onClearDestination,
                 onSwapDraft: onSwapDraft,
@@ -3894,14 +3893,13 @@ class _StationHitTarget extends StatelessWidget {
   }
 }
 
-/// #1933 요구 2: 출발/도착이 하나라도 차면 상단바 "자체"가 이 2줄 출발/도착
-/// 입력으로 변신한다(참고 앱처럼 검색바 자리가 곧 출발/도착 입력이 됨). 아래
-/// 별도 카드를 띄우지 않는다 — 그림자/elevation 0, 라운딩 없이 하단 line
-/// 구분선과 여백으로만 depth를 준다. 무채색 잉크만.
+/// #1933 요구 2: 출발/도착이 하나라도 차면 상단바 "자체"가 참고 앱 OD 입력
+/// 구조(출발/도착 각각을 무채색 채움 필드 2개로 표시)로 변신한다. 아래 별도
+/// 카드를 띄우지 않는다 — 그림자/elevation 0, 라운딩은 8 이하, splash 없이
+/// 채움 색과 여백만으로 depth를 준다. 무채색 잉크만.
 class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   const _NetworkMapTopBarRouteDraft({
     required this.draft,
-    required this.onMenuTap,
     required this.onClearOrigin,
     required this.onClearDestination,
     required this.onSwapDraft,
@@ -3911,7 +3909,6 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   });
 
   final RouteDraft draft;
-  final VoidCallback onMenuTap;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
   final VoidCallback onSwapDraft;
@@ -3923,55 +3920,27 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canSwap = draft.origin != null || draft.destination != null;
+    // 출발/도착 2개의 무채색 채움 필드. TalkBack 순서: 출발 먼저, 도착.
+    // 행 리스트로 렌더해 중간 행 확장이 구조 변경 없이 가능하다.
+    final fields = <Widget>[
+      _NetworkMapRouteDraftField(
+        isOrigin: true,
+        station: draft.origin,
+        onClear: onClearOrigin,
+        onPick: onPickOrigin,
+      ),
+      _NetworkMapRouteDraftField(
+        isOrigin: false,
+        station: draft.destination,
+        onClear: onClearDestination,
+        onPick: onPickDestination,
+      ),
+    ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 10, 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 메뉴 버튼은 변신 후에도 그대로 유지(좌측 정체성·좌측 메뉴 접근).
-          IconButton(
-            key: const Key('networkMapMenuButton'),
-            tooltip: '메뉴',
-            onPressed: onMenuTap,
-            style: IconButton.styleFrom(
-              minimumSize: const Size.square(EasySubwayTouchTarget.general),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              padding: EdgeInsets.zero,
-            ),
-            icon: const Icon(Icons.menu, size: 22, color: Color(0xFF4B4B4B)),
-          ),
-          const SizedBox(width: 2),
-          // 출발/도착 2줄 입력. TalkBack 순서: 출발 먼저, 도착. 각 줄은 line
-          // 구분선으로만 나뉜다(박스/카드 금지).
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _NetworkMapRouteDraftRow(
-                  key: const Key('networkMapRouteDraftOriginRow'),
-                  isOrigin: true,
-                  station: draft.origin,
-                  fallback: '출발역을 탭하거나 검색',
-                  onClear: onClearOrigin,
-                  onPick: onPickOrigin,
-                ),
-                const Divider(
-                  height: 1,
-                  indent: 22,
-                  color: EasySubwayAccessibleColors.line,
-                ),
-                _NetworkMapRouteDraftRow(
-                  key: const Key('networkMapRouteDraftDestinationRow'),
-                  isOrigin: false,
-                  station: draft.destination,
-                  fallback: '도착역을 탭하거나 검색',
-                  onClear: onClearDestination,
-                  onPick: onPickDestination,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 4),
           // 출발/도착 맞바꾸기(⇅). 참고 앱 상단 입력바의 스왑 어포던스와 같은 원리.
           Semantics(
             button: true,
@@ -3990,27 +3959,37 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < fields.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 6),
+                  fields[i],
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// 변신한 상단바의 한 줄(출발 또는 도착). 노드 점 + 연결선 + 역명 +
-/// 채워졌을 때만 보이는 지우기(✕) 버튼. 무채색 잉크만 쓴다.
-class _NetworkMapRouteDraftRow extends StatelessWidget {
-  const _NetworkMapRouteDraftRow({
+/// 변신한 상단바의 한 줄(출발 또는 도착) — 무채색 채움 필드. 라운딩 8 이하,
+/// 그림자/elevation 없음, splash 없음(GestureDetector만 사용). 채워졌을
+/// 때만 지우기(✕) 버튼을 보인다.
+class _NetworkMapRouteDraftField extends StatelessWidget {
+  const _NetworkMapRouteDraftField({
     required this.isOrigin,
     required this.station,
-    required this.fallback,
     required this.onClear,
     this.onPick,
-    super.key,
   });
 
   final bool isOrigin;
   final RouteDraftStation? station;
-  final String fallback;
   final VoidCallback onClear;
 
   /// G4: 이 칸(역명/플레이스홀더 영역)을 탭하면 역 검색을 연다. null이면 탭 불가.
@@ -4020,52 +3999,34 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final label = isOrigin ? '출발' : '도착';
     final filled = station != null;
-    final stationName = filled ? station!.displayName : fallback;
+    final stationName = filled ? station!.displayName : label;
     // 접근성: 검색 진입 라벨을 "출발역 검색"/"도착역 검색"으로 명확히 낭독한다.
     final searchLabel = isOrigin ? '출발역 검색' : '도착역 검색';
     final pickSemanticsLabel = filled
         ? '$label $stationName, $searchLabel'
-        : '$label, $stationName, $searchLabel';
-    final rowBody = IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _NetworkMapRouteDraftNodeColumn(isOrigin: isOrigin),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: EasySubwayAccessibleColors.mutedText,
-              ),
+        : '$label, $searchLabel';
+    final textRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            stationName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: filled
+                  ? EasySubwayAccessibleColors.text
+                  : EasySubwayAccessibleColors.mutedText,
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Text(
-                stationName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: filled
-                      ? EasySubwayAccessibleColors.text
-                      : EasySubwayAccessibleColors.mutedText,
-                  height: 1.2,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
     // 역명/플레이스홀더 영역: onPick이 있으면 검색을 여는 버튼. 없으면 정보 표시만.
     final Widget pickArea = onPick == null
         ? Semantics(
-            label: filled ? '$label $stationName' : '$label, $stationName',
-            child: ExcludeSemantics(child: rowBody),
+            label: filled ? '$label $stationName' : label,
+            child: ExcludeSemantics(child: textRow),
           )
         : Semantics(
             button: true,
@@ -4084,78 +4045,73 @@ class _NetworkMapRouteDraftRow extends StatelessWidget {
                 onTap: onPick,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: 48),
-                  child: rowBody,
+                  child: Center(child: textRow),
                 ),
               ),
             ),
           );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(child: pickArea),
-        if (filled)
-          Semantics(
-            button: true,
-            label: '$label역 지우기',
-            onTap: onClear,
-            child: ExcludeSemantics(
-              child: IconButton(
-                key: Key(
-                  isOrigin
-                      ? 'networkMapRouteDraftClearOrigin'
-                      : 'networkMapRouteDraftClearDestination',
-                ),
-                onPressed: onClear,
-                icon: const Icon(Icons.close, size: 18),
-                color: EasySubwayAccessibleColors.mutedText,
-                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                padding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _NetworkMapRouteDraftNodeColumn extends StatelessWidget {
-  const _NetworkMapRouteDraftNodeColumn({required this.isOrigin});
-
-  final bool isOrigin;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget connector() => Center(
-      child: Container(width: 2, color: EasySubwayAccessibleColors.line),
-    );
-    return SizedBox(
-      width: 14,
-      child: Column(
-        children: [
-          Expanded(child: isOrigin ? const SizedBox.shrink() : connector()),
-          _NetworkMapRouteDraftNode(filled: !isOrigin),
-          Expanded(child: isOrigin ? connector() : const SizedBox.shrink()),
-        ],
-      ),
-    );
-  }
-}
-
-class _NetworkMapRouteDraftNode extends StatelessWidget {
-  const _NetworkMapRouteDraftNode({required this.filled});
-
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    const color = EasySubwayAccessibleColors.primary;
     return Container(
-      width: 12,
-      height: 12,
+      key: Key(
+        isOrigin
+            ? 'networkMapRouteDraftOriginRow'
+            : 'networkMapRouteDraftDestinationRow',
+      ),
+      constraints: const BoxConstraints(minHeight: 54),
       decoration: BoxDecoration(
-        color: filled ? color : Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: color, width: 3),
+        color: EasySubwayAccessibleColors.scaffoldSurface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 14, right: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: pickArea),
+            if (filled)
+              Semantics(
+                button: true,
+                label: '$label역 지우기',
+                onTap: onClear,
+                child: ExcludeSemantics(
+                  child: IconButton(
+                    key: Key(
+                      isOrigin
+                          ? 'networkMapRouteDraftClearOrigin'
+                          : 'networkMapRouteDraftClearDestination',
+                    ),
+                    onPressed: onClear,
+                    // 작은 원형 배지형 지우기(✕) — 무채색. 탭 시 요란한
+                    // splash/highlight 사각형을 남기지 않는다(#1933 원칙).
+                    style: IconButton.styleFrom(
+                      splashFactory: NoSplash.splashFactory,
+                      highlightColor: Colors.transparent,
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                    ),
+                    icon: Container(
+                      width: 22,
+                      height: 22,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: EasySubwayAccessibleColors.disclosure,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
