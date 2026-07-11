@@ -141,12 +141,12 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
     "https://assets.example.net",
     "https://example.org",
     "https://assets.example.org",
-    "https://placeholder.example.com",
-    "https://todo.example.com",
-    "https://-assets.example.com",
-    "https://assets.example.com:0",
-    "https://assets.example.com:08",
-    "https://assets.example.com:65536",
+    "https://assets.placeholder.test-only.dev",
+    "https://assets.todo.test-only.dev",
+    "https://-assets.test-only.dev",
+    "https://assets.test-only.dev:0",
+    "https://assets.test-only.dev:08",
+    "https://assets.test-only.dev:65536",
   ]) {
     await assertInvalidAssetOrigin(origin);
   }
