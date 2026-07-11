@@ -23,6 +23,12 @@ const TOOL_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(TOOL_DIRECTORY, "../..");
 const CANDIDATES_PATH = path.join(TOOL_DIRECTORY, "source-candidates.json");
 const execFileAsync = promisify(execFile);
+const SAFE_PLACEHOLDER = "[unsafe]";
+const MISSING_PLACEHOLDER = "[missing]";
+const ALLOWED_CONTENT_TYPES = new Set(["application/xml", "text/xml"]);
+const SAFE_XML_TAG = /^[A-Za-z_][A-Za-z0-9_.-]{0,39}$/;
+const SENSITIVE_XML_TAG = /(?:authorization|credential|password|secret|servicekey|token)/i;
+const SAFE_RESULT_CODE = /^[A-Za-z0-9._-]{1,32}$/;
 
 function requiredText(value, label) {
   if (typeof value !== "string" || value.length === 0) {
@@ -103,7 +109,79 @@ function sanitizeErrorMessage(error, serviceKey) {
       message = message.replaceAll(value, "[REDACTED]");
     }
   }
-  return message.replace(/([?&]serviceKey=)[^&\s]+/gi, "$1[REDACTED]");
+  return message
+    .replace(/([?&]serviceKey=)[^&\s]+/gi, "$1[REDACTED]")
+    .replace(/https?:\/\/[^\s]+/gi, "[REDACTED_URL]")
+    .replace(/[\u0000-\u001f\u007f]/g, " ");
+}
+
+function safeContentType(response) {
+  const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+  return contentType && ALLOWED_CONTENT_TYPES.has(contentType) ? contentType : SAFE_PLACEHOLDER;
+}
+
+function xmlScalar(raw, tagName) {
+  const match = raw.match(new RegExp(`<${tagName}\\b[^>]*>([\\s\\S]*?)<\/${tagName}\\s*>`, "i"));
+  return match?.[1].trim() ?? null;
+}
+
+function safeXmlTagSummary(raw) {
+  const tags = [];
+  const seen = new Set();
+  for (const match of raw.matchAll(/<\/?\s*([^!?][^\s/>]*)/g)) {
+    const name = match[1];
+    const safeName = SAFE_XML_TAG.test(name) && !SENSITIVE_XML_TAG.test(name)
+      ? name
+      : SAFE_PLACEHOLDER;
+    if (!seen.has(safeName)) {
+      seen.add(safeName);
+      tags.push(safeName);
+    }
+    if (tags.length === 16) {
+      break;
+    }
+  }
+  return tags.length > 0 ? tags.join(",") : MISSING_PLACEHOLDER;
+}
+
+function classifyXmlFailure({ itemCount, resultCode, resultMessage }) {
+  const classificationText = `${resultCode ?? ""} ${resultMessage ?? ""}`;
+  if (/(?:authorization|auth(?:entication)?|service\s*key|api\s*key|서비스\s*키|인증|권한|등록되지\s*않)/i.test(classificationText)) {
+    return "authorization";
+  }
+  if (/(?:invalid[\s_-]*(?:parameter|param|request)|parameter|param|파라미터|매개변수|요청\s*(?:값|변수).*잘못)/i.test(classificationText)) {
+    return "invalid-parameter";
+  }
+  if (/(?:no[\s_-]*data|데이터.*없|결과.*없|조회.*없)/i.test(classificationText)) {
+    return "no-data";
+  }
+  if (itemCount === 0 && /^(?:0+|ok|success)$/i.test(resultCode ?? "")) {
+    return "no-data";
+  }
+  return itemCount > 0 ? "parser-shape" : "unknown";
+}
+
+function kricXmlDiagnostic(response, requestedFormat, raw) {
+  const itemCount = [...raw.matchAll(/<item(?:\s|>)/gi)].length;
+  const resultCode = xmlScalar(raw, "resultCode");
+  const resultMessage = xmlScalar(raw, "resultMsg");
+  const safeResultCode = resultCode == null
+    ? MISSING_PLACEHOLDER
+    : SAFE_RESULT_CODE.test(resultCode) ? resultCode : SAFE_PLACEHOLDER;
+  const httpStatus = Number.isInteger(response.status) && response.status >= 100 && response.status <= 599
+    ? response.status
+    : SAFE_PLACEHOLDER;
+  const classification = classifyXmlFailure({ itemCount, resultCode, resultMessage });
+  return [
+    "KRIC XML diagnostic:",
+    `httpStatus=${httpStatus}`,
+    `contentType=${safeContentType(response)}`,
+    `requestedFormat=${requestedFormat}`,
+    `xmlTags=${safeXmlTagSummary(raw)}`,
+    `itemCount=${itemCount}`,
+    `resultCode=${safeResultCode}`,
+    `classification=${classification}`,
+  ].join(" ");
 }
 
 async function runEvidenceTool(scriptName, args) {
@@ -157,14 +235,23 @@ export async function collectKricSourceCandidateEvidence({
     if (!response.ok) {
       throw new Error(`KRIC request failed with HTTP ${response.status}`);
     }
-    await writeFile(rawPath, await response.text(), { mode: 0o600 });
+    const rawResponse = await response.text();
+    await writeFile(rawPath, rawResponse, { mode: 0o600 });
 
-    const { stdout: sample } = await runEvidenceTool("build-source-candidate-sample-evidence.mjs", [
-      "--candidate", candidateId,
-      "--candidates", CANDIDATES_PATH,
-      "--response", rawPath,
-      "--format", request.format,
-    ]);
+    let sample;
+    try {
+      ({ stdout: sample } = await runEvidenceTool("build-source-candidate-sample-evidence.mjs", [
+        "--candidate", candidateId,
+        "--candidates", CANDIDATES_PATH,
+        "--response", rawPath,
+        "--format", request.format,
+      ]));
+    } catch (error) {
+      if (request.format === "xml") {
+        throw new Error(`${error instanceof Error ? error.message : String(error)} ${kricXmlDiagnostic(response, request.format, rawResponse)}`);
+      }
+      throw error;
+    }
     JSON.parse(sample);
     await writeFile(stagedSamplePath, sample, { mode: 0o600 });
 
