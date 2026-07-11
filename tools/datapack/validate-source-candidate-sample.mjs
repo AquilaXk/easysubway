@@ -91,7 +91,22 @@ function validateSample({ candidate, candidateId, sample }) {
   const sampleFields = new Set(sample.fields);
   const missingFields = candidate.evidence.outputFields.filter((field) => !sampleFields.has(field));
   if (missingFields.length > 0) {
-    throw new Error(`output field missing: ${missingFields.join(", ")}`);
+    const availableFields = [...sampleFields]
+      .filter((field) => typeof field === "string")
+      .sort((left, right) => left < right ? -1 : Number(left !== right));
+    for (const expectedField of missingFields) {
+      const caseInsensitiveMatches = availableFields.filter(
+        (actualField) => actualField.toLowerCase() === expectedField.toLowerCase(),
+      );
+      if (caseInsensitiveMatches.length === 1) {
+        throw new Error(
+          `output field case mismatch: expected ${expectedField}; actual ${caseInsensitiveMatches[0]}`,
+        );
+      }
+    }
+    throw new Error(
+      `output field missing: ${missingFields.join(", ")}; available fields: ${availableFields.join(", ")}`,
+    );
   }
 
   const missingEdgeFields = candidate.evidence.missingConfirmedEdgeFields ?? [];

@@ -6660,7 +6660,7 @@ test("source candidate sample 검증기는 endpoint mismatch를 거부한다", a
   );
 });
 
-test("source candidate sample 검증기는 output field 누락을 거부한다", async () => {
+test("source candidate sample 검증기는 output field 대소문자 불일치를 field name만으로 진단한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-candidate-field-${Date.now()}`);
   const samplePath = path.join(outputDir, "sample.json");
   await rm(outputDir, { recursive: true, force: true });
@@ -6669,10 +6669,26 @@ test("source candidate sample 검증기는 output field 누락을 거부한다",
     samplePath,
     `${JSON.stringify(
       {
-        candidateId: "kric-subway-route-info",
-        endpoint: "https://openapi.kric.go.kr/openapi/trainUseInfo/subwayRouteInfo",
+        candidateId: "kric-station-platform",
+        endpoint: "https://openapi.kric.go.kr/openapi/convenientInfo/stPlf",
         format: "json",
-        fields: ["lnCd", "mreaWideCd", "railOprIsttCd", "routCd", "routNm", "stinCd", "stinNm"],
+        fields: [
+          "stinFlor",
+          "updnDvCd",
+          "plfNo",
+          "grndDvCd",
+          "lnCd",
+          "plfCplFlg",
+          "plfTpCd",
+          "plfTpNm",
+          "railOprIsttCd",
+          "runDirTmnStinCd",
+          "scrCharExt",
+          "sfFotExt",
+          "stinCd",
+        ],
+        providerSample: { updnDvCd: "SENTINEL_SAMPLE_VALUE" },
+        observedUrl: "https://provider.invalid/sample?serviceKey=credential-like-secret",
       },
       null,
       2,
@@ -6685,13 +6701,81 @@ test("source candidate sample 검증기는 output field 누락을 거부한다",
       [
         "tools/datapack/validate-source-candidate-sample.mjs",
         "--candidate",
-        "kric-subway-route-info",
+        "kric-station-platform",
         "--sample",
         samplePath,
       ],
       { cwd: root },
     ),
-    /output field missing: stinConsOrdr/,
+    (error) => {
+      assert.equal(
+        error.stderr.trim(),
+        "output field case mismatch: expected updnDvcd; actual updnDvCd",
+      );
+      assert.doesNotMatch(error.stderr, /SENTINEL_SAMPLE_VALUE/);
+      assert.doesNotMatch(error.stderr, /credential-like-secret/);
+      return true;
+    },
+  );
+});
+
+test("source candidate sample 검증기는 true missing field를 sorted field name만으로 진단한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-candidate-missing-field-${Date.now()}`);
+  const samplePath = path.join(outputDir, "sample.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await writeFile(
+    samplePath,
+    `${JSON.stringify(
+      {
+        candidateId: "kric-station-platform",
+        endpoint: "https://openapi.kric.go.kr/openapi/convenientInfo/stPlf",
+        format: "json",
+        fields: [
+          "zProviderField",
+          "stinFlor",
+          "stinCd",
+          "sfFotExt",
+          "scrCharExt",
+          "runDirTmnStinCd",
+          "railOprIsttCd",
+          "plfTpNm",
+          "plfTpCd",
+          "plfNo",
+          "plfCplFlg",
+          "lnCd",
+          "grndDvCd",
+          "aProviderField",
+        ],
+        providerSample: { updnDvCd: "SENTINEL_SAMPLE_VALUE" },
+        observedUrl: "https://provider.invalid/sample?serviceKey=credential-like-secret",
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-source-candidate-sample.mjs",
+        "--candidate",
+        "kric-station-platform",
+        "--sample",
+        samplePath,
+      ],
+      { cwd: root },
+    ),
+    (error) => {
+      assert.equal(
+        error.stderr.trim(),
+        "output field missing: updnDvcd; available fields: aProviderField, grndDvCd, lnCd, plfCplFlg, plfNo, plfTpCd, plfTpNm, railOprIsttCd, runDirTmnStinCd, scrCharExt, sfFotExt, stinCd, stinFlor, zProviderField",
+      );
+      assert.doesNotMatch(error.stderr, /SENTINEL_SAMPLE_VALUE/);
+      assert.doesNotMatch(error.stderr, /credential-like-secret/);
+      return true;
+    },
   );
 });
 
