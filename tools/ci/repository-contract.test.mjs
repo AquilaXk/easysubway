@@ -1634,13 +1634,14 @@ test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스�
 
   assert.ok(resultTileMatch, "_StationSearchResultTile block not found");
   const resultTile = resultTileMatch[0];
-  assert.match(resultTile, /StationLineBadges\([\s\S]*maxBadgeCount:\s*2/);
-  // 품질 라벨(result.dataQualityLabel) 렌더는 #1566에서 제거했다(역 검색 다이어트).
-  // 역명·거리만 노출한다.
-  assert.match(
-    resultTile,
-    /Text\(\s*stationName[\s\S]*Text\(\s*result\.distanceLabel\.isEmpty/,
-  );
+  // #1933: 결과 행은 노선마다 한 행씩(_StationSearchResultLineRow) 펼치고
+  // 각 행 우측에 해당 노선 배지(StationLineBadge) 하나만 둔다. '+N' 요약·거리 문구 없음.
+  assert.match(resultTile, /_StationSearchResultLineRow\(/);
+  assert.match(resultTile, /StationLineBadge\(line: line/);
+  assert.doesNotMatch(resultTile, /maxBadgeCount/);
+  // 역명만 노출한다(거리·노선 요약 부가 문구 제거).
+  assert.match(resultTile, /child: Text\(\s*stationName/);
+  assert.doesNotMatch(resultTile, /result\.distanceLabel/);
   assert.doesNotMatch(resultTile, /maxLines:\s*1/);
   assert.doesNotMatch(resultTile, /overflow:\s*TextOverflow\.ellipsis/);
   assert.ok(largeTextTestMatch, "station search large text widget test block not found");
@@ -1649,9 +1650,10 @@ test("모바일 역 검색 결과 시스템 글자 크기 문구 회귀 테스�
   assert.match(largeTextTest, /김포공항국제선환승센터/);
   assert.match(largeTextTest, /수도권 9호선 급행/);
   assert.match(largeTextTest, /공항철도 직통 일반 공용/);
-  assert.match(largeTextTest, /일부 정보는 확인 중이에요/);
-  assert.match(largeTextTest, /expect\(widget\.maxLines, isNot\(1\)\)/);
-  assert.match(largeTextTest, /expect\(widget\.overflow, isNot\(TextOverflow\.ellipsis\)\)/);
+  // #1933: 환승역은 노선마다 한 행씩 펼치므로 역명 Text가 노선 수만큼 있다.
+  assert.match(largeTextTest, /expect\(nameWidgets, findsNWidgets\(2\)\)/);
+  assert.match(largeTextTest, /expect\(nameWidget\.maxLines, isNot\(1\)\)/);
+  assert.match(largeTextTest, /expect\(nameWidget\.overflow, isNot\(TextOverflow\.ellipsis\)\)/);
 });
 
 test("모바일 경로 결과 단계별 뒤로가기 회귀 테스트는 유지된다", () => {
@@ -10528,8 +10530,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   // 품질 라벨 렌더는 #1566에서 제거됐다(역 검색 다이어트).
   assert.doesNotMatch(stationSearch, /Text\(\s*result\.dataQualityLabel,/);
   assert.match(widgetTest, /expect\(find\.text\('출처 확인 필요'\), findsNothing\);/);
-  // 내부 품질 라벨(일부 정보는 확인 중이에요)은 #1578에서 시맨틱에서도 중립화됐다.
-  assert.match(widgetTest, /상록수역, 수도권 4호선, 경의중앙선, 수도권/);
+  // #1933: 결과 재설계로 각 행 시맨틱은 자신의 노선 하나만 담아 "역명, 노선명, 선택" 형태다.
+  assert.match(widgetTest, /상록수역, 수도권 4호선, 선택/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /인증 실패 시 인증을 지우고 한 번 재시도한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 API 기본 주소를 반드시 설정해야 한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);
