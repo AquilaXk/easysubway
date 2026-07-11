@@ -6,12 +6,15 @@ import 'package:easysubway_mobile/features/ads/ad_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _StubApiClient extends ApiClient {
-  _StubApiClient(this.response, {this.error})
+  _StubApiClient(this.response, {this.error, this.postError})
     : super(baseUri: Uri.parse('https://api.easysubway.example'));
 
   final ApiResponse response;
   final Object? error;
+  final Object? postError;
   final paths = <String>[];
+  final postPaths = <String>[];
+  final postBodies = <Map<String, Object?>>[];
 
   @override
   Future<ApiResponse> getJson(
@@ -24,6 +27,20 @@ class _StubApiClient extends ApiClient {
     }
     return response;
   }
+
+  @override
+  Future<ApiResponse> postJson(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String> headers = const {},
+  }) async {
+    postPaths.add(path);
+    postBodies.add(Map<String, Object?>.of(body));
+    if (postError != null) {
+      throw postError!;
+    }
+    return const ApiResponse(statusCode: 204, jsonBody: null);
+  }
 }
 
 Map<String, Object?> _creativeData({
@@ -33,6 +50,7 @@ Map<String, Object?> _creativeData({
   String landingUrl = 'https://advertiser.example/campaign',
   String advertiserName = '이지상점',
   String altText = '이지상점 여름 할인',
+  Object? endsAt = '2026-07-12T12:34:56Z',
 }) => {
   'placement': placement,
   'creativeId': creativeId,
@@ -40,6 +58,7 @@ Map<String, Object?> _creativeData({
   'landingUrl': landingUrl,
   'advertiserName': advertiserName,
   'altText': altText,
+  'endsAt': endsAt,
 };
 
 ApiResponse _response(int statusCode, {Object? data, bool success = true}) =>
@@ -95,7 +114,7 @@ void main() {
     ]);
   });
 
-  test('GET active 요청의 method, path, query가 정확하고 event 요청은 없다', () async {
+  test('GET active 요청의 method, path, query가 정확하고 식별 header가 없다', () async {
     final requests = <HttpRequest>[];
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
@@ -164,10 +183,6 @@ void main() {
       }),
       isEmpty,
     );
-    expect(
-      requests.where((request) => request.uri.path == '/api/ads/events'),
-      isEmpty,
-    );
   });
 
   test('정상 200의 필드를 immutable creative로 매핑한다', () async {
@@ -187,6 +202,104 @@ void main() {
     );
     expect(creative?.advertiserName, '이지상점');
     expect(creative?.altText, '이지상점 여름 할인');
+    expect(creative?.endsAt, DateTime.utc(2026, 7, 12, 12, 34, 56));
+    expect(creative?.endsAt?.isUtc, isTrue);
+  });
+
+  test('endsAt null은 허용하고 malformed 또는 local 시각은 소재 전체를 숨긴다', () async {
+    final noExpiry = await AdRepository(
+      _StubApiClient(_response(200, data: _creativeData(endsAt: null))),
+    ).fetchActive(AdPlacement.routeResultBottom);
+    expect(noExpiry, isNotNull);
+    expect(noExpiry?.endsAt, isNull);
+
+    for (final invalid in <Object?>[
+      'not-a-date',
+      '2026-07-12T12:34:56',
+      1,
+      true,
+    ]) {
+      final creative = await AdRepository(
+        _StubApiClient(_response(200, data: _creativeData(endsAt: invalid))),
+      ).fetchActive(AdPlacement.routeResultBottom);
+      expect(creative, isNull, reason: 'endsAt=$invalid');
+    }
+  });
+
+  test('endsAt key 누락은 null과 구분해 소재 전체를 숨긴다', () async {
+    final data = _creativeData()..remove('endsAt');
+
+    final creative = await AdRepository(
+      _StubApiClient(_response(200, data: data)),
+    ).fetchActive(AdPlacement.routeResultBottom);
+
+    expect(creative, isNull);
+  });
+
+  test('endsAt은 uppercase Z RFC3339와 유효한 날짜 및 시간만 허용한다', () async {
+    for (final valid in [
+      '2026-07-12T12:34:56Z',
+      '2026-07-12T12:34:56.1Z',
+      '2026-07-12T12:34:56.123456Z',
+    ]) {
+      final creative = await AdRepository(
+        _StubApiClient(_response(200, data: _creativeData(endsAt: valid))),
+      ).fetchActive(AdPlacement.routeResultBottom);
+      expect(creative, isNotNull, reason: 'endsAt=$valid');
+      expect(creative?.endsAt?.isUtc, isTrue, reason: 'endsAt=$valid');
+    }
+
+    for (final invalid in [
+      '2026-07-12T12:34:56+09:00',
+      '2026-07-12T12:34:56z',
+      '2026-02-30T12:34:56Z',
+      '2026-07-12T24:00:00Z',
+      '2026-07-12T12:60:00Z',
+      '2026-07-12T12:34:60Z',
+    ]) {
+      final creative = await AdRepository(
+        _StubApiClient(_response(200, data: _creativeData(endsAt: invalid))),
+      ).fetchActive(AdPlacement.routeResultBottom);
+      expect(creative, isNull, reason: 'endsAt=$invalid');
+    }
+  });
+
+  test('event는 정확한 세 필드만 POST하고 204를 완료로 취급한다', () async {
+    final client = _StubApiClient(_response(204));
+    final repository = AdRepository(client);
+
+    await repository.recordEvent(
+      AdPlacement.routeResultBottom,
+      'creative-1',
+      AdEventType.impression,
+    );
+
+    expect(client.postPaths, ['/api/ads/events']);
+    expect(client.postBodies, [
+      {
+        'placement': 'route-result-bottom',
+        'creativeId': 'creative-1',
+        'eventType': 'IMPRESSION',
+      },
+    ]);
+  });
+
+  test('event network와 timeout 실패는 저장이나 재시도 없이 무시한다', () async {
+    for (final error in [
+      const ApiException('network'),
+      const ApiException('timeout'),
+    ]) {
+      final client = _StubApiClient(_response(204), postError: error);
+      await expectLater(
+        AdRepository(client).recordEvent(
+          AdPlacement.routeResultBottom,
+          'creative-1',
+          AdEventType.click,
+        ),
+        completes,
+      );
+      expect(client.postBodies, hasLength(1));
+    }
   });
 
   test('204와 non-200은 null이다', () async {

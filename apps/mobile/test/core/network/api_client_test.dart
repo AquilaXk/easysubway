@@ -105,6 +105,31 @@ void main() {
     });
   });
 
+  test('ApiClient는 성공한 204 빈 body를 JSON decode하지 않는다', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(server.close);
+    server.listen((request) async {
+      request.response.statusCode = HttpStatus.noContent;
+      await request.response.close();
+    });
+    final client = ApiClient(
+      baseUri: Uri.parse('http://${server.address.host}:${server.port}'),
+    );
+
+    final response = await client.postJson(
+      '/api/ads/events',
+      body: const {
+        'placement': 'route-result-bottom',
+        'creativeId': 'creative-1',
+        'eventType': 'IMPRESSION',
+      },
+    );
+
+    expect(response.statusCode, HttpStatus.noContent);
+    expect(response.jsonBody, isNull);
+    expect(response.isSuccess, isTrue);
+  });
+
   test('ApiClient는 PUT 요청에 JSON body와 공통 header를 적용한다', () async {
     late String requestedMethod;
     late Uri requestedUri;

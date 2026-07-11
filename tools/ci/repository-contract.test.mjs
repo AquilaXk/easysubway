@@ -29,6 +29,67 @@ function mobileProductionDartFiles() {
   }).trim().split("\n").filter((file) => file.endsWith(".dart") && !file.endsWith(".g.dart"));
 }
 
+function collapseQuotedStringConcatenations(source) {
+  let collapsed = source;
+  let previous;
+  do {
+    previous = collapsed;
+    collapsed = collapsed.replace(
+      /(["'])([^"'\\]*)\1\s*\+\s*(["'])([^"'\\]*)\3/g,
+      (_match, _leftQuote, left, _rightQuote, right) => `"${left}${right}"`,
+    );
+  } while (collapsed !== previous);
+  return collapsed;
+}
+
+const adEventEndpointOccurrence = /\/api\/ads\/events(?=["']|\?|$)/g;
+
+function containsAdEventEndpoint(source) {
+  // ponytail: literal/quoted-concat endpoint만 탐지한다. 새 interpolation/variable 광고 endpoint를
+  // 허용해야 할 때는 regex를 넓히지 말고 Dart AST 기반 검사로 교체한다.
+  return (collapseQuotedStringConcatenations(source).match(adEventEndpointOccurrence) ?? []).length > 0;
+}
+
+function mobileAdEventSenderFiles(
+  sourcePaths = execFileSync("git", ["ls-files", "apps/mobile/lib"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n"),
+  readSource = read,
+) {
+  return sourcePaths
+    .filter((sourcePath) => sourcePath.endsWith(".dart"))
+    .filter((sourcePath) => containsAdEventEndpoint(readSource(sourcePath)));
+}
+
+function assertAnonymousAdEventPostCall(source) {
+  const normalizedSource = collapseQuotedStringConcatenations(source);
+  const endpointCount = (normalizedSource.match(adEventEndpointOccurrence) ?? []).length;
+  assert.equal(endpointCount, 1, "ad event repository must contain exactly one endpoint");
+
+  const adEventCall = normalizedSource.match(
+    /postJson\(\s*(["'])\/api\/ads\/events\1\s*,\s*body:\s*\{(?<body>[\s\S]*?)\}\s*,?\s*\)/,
+  );
+  assert.ok(adEventCall?.groups, "ad event postJson call must contain only an inline body argument");
+
+  const entries = [];
+  let remaining = adEventCall.groups.body;
+  const entryPattern = /^\s*(["'])([^"'\\]+)\1\s*:\s*([^,\n{}]+)\s*,?/;
+  while (remaining.trim() !== "") {
+    const entry = remaining.match(entryPattern);
+    assert.ok(entry, "ad event body must be a flat map of explicit entries");
+    entries.push([entry[2], entry[3].trim()]);
+    remaining = remaining.slice(entry[0].length);
+  }
+
+  assert.equal(new Set(entries.map(([key]) => key)).size, entries.length, "ad event body keys must be unique");
+  assert.deepEqual(Object.fromEntries(entries), {
+    placement: "placement.id",
+    creativeId: "creativeId",
+    eventType: "eventType.wireValue",
+  });
+}
+
 function assertNoNativeAdIdentityOrMeasurement({
   dependencySources = [],
   nativeSources = [],
@@ -2779,8 +2840,61 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
 
 });
 
-test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측 경계를 함께 고정한다", () => {
+test("광고 event sender detector는 직접 endpoint와 quoted-string 연결을 모두 탐지한다", () => {
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/' + 'events')"), true);
+  assert.equal(containsAdEventEndpoint('postJson("/api/ads/" + "events")'), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events?deviceId=device-1')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('https://tracker.example/api/ads/events')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events-v2')"), false);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events/summary')"), false);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/active')"), false);
+  const sources = new Map([
+    ["apps/mobile/lib/manual.dart", "postJson('/api/ads/events')"],
+    ["apps/mobile/lib/generated.g.dart", "postJson('/api/ads/' + 'events')"],
+    ["apps/mobile/lib/query.dart", "postJson('/api/ads/events?deviceId=device-1')"],
+    ["apps/mobile/lib/absolute.dart", "postJson('https://tracker.example/api/ads/events')"],
+    ["apps/mobile/lib/v2.dart", "postJson('/api/ads/events-v2')"],
+    ["apps/mobile/lib/summary.dart", "postJson('/api/ads/events/summary')"],
+    ["apps/mobile/lib/generated.g.txt", "postJson('/api/ads/events')"],
+  ]);
+  assert.deepEqual(mobileAdEventSenderFiles([...sources.keys()], (file) => sources.get(file)), [
+    "apps/mobile/lib/manual.dart",
+    "apps/mobile/lib/generated.g.dart",
+    "apps/mobile/lib/query.dart",
+    "apps/mobile/lib/absolute.dart",
+  ]);
+});
+
+test("광고 event POST detector는 정확한 익명 세 필드 외 body와 identity header를 거부한다", () => {
+  const validCall = `
+    postJson(
+      '/api/ads/events',
+      body: {
+        'placement': placement.id,
+        'creativeId': creativeId,
+        'eventType': eventType.wireValue,
+      },
+    )
+  `;
+  assert.doesNotThrow(() => assertAnonymousAdEventPostCall(validCall));
+  assert.doesNotThrow(() =>
+    assertAnonymousAdEventPostCall(validCall.replace("'/api/ads/events'", "'/api/ads/' + 'events'")),
+  );
+
+  for (const unsafeCall of [
+    validCall.replace("'eventType': eventType.wireValue,", "'eventType': eventType.wireValue,\n        'deviceId': deviceId,"),
+    validCall.replace("      },", "      },\n      headers: {'Authorization': authToken},"),
+    `${validCall}\npostJson('/api/ads/' + 'events', body: anonymousBody)`,
+  ]) {
+    assert.throws(() => assertAnonymousAdEventPostCall(unsafeCall));
+  }
+});
+
+test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를 함께 고정한다", () => {
   const readiness = readJson("apps/mobile/release/store-submission-readiness.json");
+  const postPublishE2ePath = "apps/mobile/release/post-publish-ad-event-expiry-e2e.json";
+  const postPublishE2e = readJson(postPublishE2ePath);
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
   const androidMainManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
@@ -2788,9 +2902,10 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
   assert.equal(playStoreContent.appContentDeclarations.ads, true);
   assert.equal(privacyInventory.advertising.included, true);
   assert.equal(privacyInventory.advertising.servingModel, "first-party-self-served");
-  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking", "measurementEvents"]) {
+  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking"]) {
     assert.equal(privacyInventory.advertising[field], false, `advertising.${field} must remain false`);
   }
+  assert.equal(privacyInventory.advertising.measurementEvents, true);
   assert.deepEqual(privacyInventory.advertising.collectedDataTypeIds, []);
   assert.equal(privacyInventory.tracking, false);
   assert.ok(privacyInventory.dataTypes.every((item) => item.usedForTracking === false));
@@ -2835,7 +2950,27 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
   );
   assert.match(adDisclosure.readyWhenKo, /자체 서빙/);
   assert.match(adDisclosure.readyWhenKo, /비개인화/);
-  assert.match(adDisclosure.readyWhenKo, /명시적으로 누를 때만.*외부 브라우저/);
+  assert.match(adDisclosure.readyWhenKo, /사용자·기기·세션 식별자 없이 일별 count/);
+  assert.match(adDisclosure.readyWhenKo, /production 소재·event 집계 E2E는 owner 승인으로 deferred/);
+  assert.match(adDisclosure.readyWhenKo, /Play Store 게시 후 impression 1회, click, 종료 collapse, 일별 count/);
+  assert.ok(adDisclosure.evidence.includes("ad-event-expiry-contract-test"));
+  assert.ok(adDisclosure.evidence.includes("post-publish-ad-event-expiry-e2e-owner-deferred"));
+  assert.ok(adDisclosure.linkedArtifacts.includes(postPublishE2ePath));
+
+  assert.equal(postPublishE2e.schemaVersion, 1);
+  assert.equal(postPublishE2e.ownerIssue, 1971);
+  assert.match(postPublishE2e.approval.ownerKo, /\S/);
+  assert.match(postPublishE2e.approval.recordedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/);
+  assert.equal(postPublishE2e.approval.decision, "DEFER_UNTIL_PLAY_STORE_PUBLICATION");
+  assert.match(postPublishE2e.execution.assigneeKo, /\S/);
+  assert.match(postPublishE2e.execution.deadlineAfterPublicRelease, /^P(?=\d|T\d)/);
+  assert.equal(postPublishE2e.execution.status, "DEFERRED_UNTIL_PUBLIC_RELEASE");
+  assert.equal(postPublishE2e.execution.result, "PENDING");
+  assert.deepEqual(
+    postPublishE2e.checks.map((check) => check.id).sort(),
+    ["click", "daily_count", "expiry_collapse", "impression_once"],
+  );
+  assert.ok(postPublishE2e.checks.every((check) => check.result === "PENDING"));
 
   for (const dependencyPath of ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock"]) {
     assert.doesNotMatch(
@@ -2845,13 +2980,14 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
     );
   }
   assert.doesNotMatch(androidMainManifest, /android\.permission\.AD_ID/);
-  for (const sourcePath of mobileProductionDartFiles()) {
-    assert.doesNotMatch(
-      read(sourcePath),
-      /\/api\/ads\/events/,
-      `${sourcePath} must not send ad measurement events`,
-    );
-  }
+  const adEventSenders = mobileAdEventSenderFiles();
+  assert.deepEqual(adEventSenders, [
+    "apps/mobile/lib/features/ads/ad_repository.dart",
+  ]);
+
+  const adRepository = read("apps/mobile/lib/features/ads/ad_repository.dart");
+  assert.match(adRepository, /Future<void> recordEvent\(/);
+  assertAnonymousAdEventPostCall(adRepository);
 });
 
 test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release 산출물까지 차단한다", () => {
@@ -2954,11 +3090,16 @@ test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release �
   );
 
   const adRepositoryTest = read("apps/mobile/test/features/ads/ad_repository_test.dart");
-  assert.match(adRepositoryTest, /test\('GET active 요청의 method, path, query가 정확하고 event 요청은 없다'/);
-  assert.match(adRepositoryTest, /AdPlacement\.routeResultBottom[\s\S]*AdPlacement\.stationDetailBottom/);
-  assert.match(adRepositoryTest, /expect\(requests, hasLength\(2\)\)/);
-  assert.match(adRepositoryTest, /requests\.map\(\(request\) => request\.method\), everyElement\('GET'\)/);
-  assert.match(adRepositoryTest, /request\.uri\.path == '\/api\/ads\/events'[\s\S]*isEmpty/);
+  assert.match(adRepositoryTest, /test\('event는 정확한 세 필드만 POST하고 204를 완료로 취급한다'/);
+  assert.match(adRepositoryTest, /'placement': 'route-result-bottom'/);
+  assert.match(adRepositoryTest, /'creativeId': 'creative-1'/);
+  assert.match(adRepositoryTest, /'eventType': 'IMPRESSION'/);
+  assert.match(adRepositoryTest, /network와 timeout 실패는 저장이나 재시도 없이 무시한다/);
+
+  const bannerTest = read("apps/mobile/test/features/ads/active_ad_banner_test.dart");
+  assert.match(bannerTest, /실제 frame render 뒤 생명주기당 한 번/);
+  assert.match(bannerTest, /tap마다 click을 fire-and-forget/);
+  assert.match(bannerTest, /미래 endsAt에 즉시 collapse하고 자동 refetch하지 않는다/);
 });
 
 test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성한다", async () => {
@@ -3384,7 +3525,12 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     cwd: root,
     encoding: "utf8",
   }).trim().split("\n").filter(Boolean)) {
-    for (const status of collectStatusValues(readJson(releaseFile))) {
+    const statuses = collectStatusValues(readJson(releaseFile));
+    if (releaseFile === "apps/mobile/release/post-publish-ad-event-expiry-e2e.json") {
+      assert.deepEqual(statuses, ["DEFERRED_UNTIL_PUBLIC_RELEASE"]);
+      continue;
+    }
+    for (const status of statuses) {
       assert.ok(allowedStatuses.has(status), `${releaseFile} uses unsupported status ${status}`);
     }
   }
@@ -5025,13 +5171,61 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       .map((candidate) => candidate.id)
       .sort(),
     [
+      "kric-station-elevator",
+      "kric-station-elevator-movement",
+      "kric-station-escalator",
       "kric-subway-timetable",
+      "kric-wheelchair-lift-location",
+      "kric-wheelchair-lift-movement",
       "molit-tago-subway-info",
+      "molit-urban-rail-full-route",
       "seoul-topis-realtime-station-arrival",
       "seoul-topis-realtime-train-position",
+      "seoulmetro-station-line-info",
     ],
   );
-  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 4);
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 11);
+  // admittedCandidateCount는 P0 후보 전용 카운트다. #1397에서 함께 승격된 P1 route_map_positions
+  // 후보(seoulmetro-cyberstation-route-map, capital pilot deferred domain)는 이 카운트에 포함되지 않는다.
+  assert.equal(
+    targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount,
+    p0SourceCandidates.filter(
+      (candidate) =>
+        candidate.admissionStatus === targets.roadmapEvidenceLedger.sourceCandidateAdmission.requiredAdmissionStatusBeforeProductionClaim,
+    ).length,
+  );
+  const cyberstationCandidate = sourceCandidates.candidates.find(
+    (candidate) => candidate.id === "seoulmetro-cyberstation-route-map",
+  );
+  assert.equal(cyberstationCandidate.priority, "P1");
+  assert.equal(cyberstationCandidate.domain, "route_map_positions");
+  assert.equal(cyberstationCandidate.admissionStatus, "admitted_to_production_inventory");
+  assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /P0 후보 전용 카운트/);
+  assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /seoulmetro-cyberstation-route-map/);
+  // #1397 capital admission 8종 per-source admission 해시는 순차 admission 체인(선행 admit 결과가
+  // 다음 인벤토리에 포함됨)에서 산출한 immutable evidence로 고정한다. run-source-admission-pipeline.mjs가
+  // 각 source를 admit한 직후 인벤토리의 sha256을 그 source의 admissionEvidence에 기록한다.
+  const capitalAdmissionInventorySha256 = {
+    "molit-urban-rail-full-route": "9c5f4b1ab41a9be2341fd369a7c48a852e16ff47397281d6af27d97c38706b08",
+    "seoulmetro-station-line-info": "3d71bb065a0ad2886bd3c310012d4f417424749b1542578c1bfcb7ae9d882171",
+    "seoulmetro-cyberstation-route-map": "2e8d77f997089f12d026dd343b64dd927e3c2126983d2d2d0e5affbadcdb3b0f",
+    "kric-station-elevator": "2330c139fdec23e374808baa660ec646a1731721f9a83cf1e1720ff4b40a3bd4",
+    "kric-station-elevator-movement": "9ab9b9169c6cb17e8bdfbd16f904edab4daf5201117923a636856c5a58d02154",
+    "kric-station-escalator": "38f5588f797774a0e4544f5412a70ebb0a5f6e13bbea3d51c67c8f5a61affe41",
+    "kric-wheelchair-lift-location": "65ffcc558ef2d42baad3f58fbe46d3c9ac800b3990c2ed964b965e08c09d47f8",
+    "kric-wheelchair-lift-movement": "c8d407ee54b653c6e8bcf77a044c22cb7129232c3f7e842b3f0e40cd7524af6e",
+  };
+  // 순차 체인이므로 8종 해시는 전부 distinct해야 한다.
+  assert.equal(new Set(Object.values(capitalAdmissionInventorySha256)).size, 8);
+  for (const [sourceId, expectedSha256] of Object.entries(capitalAdmissionInventorySha256)) {
+    const source = inventory.sources.find((entry) => entry.id === sourceId);
+    assert.ok(source, `${sourceId} must exist in source inventory`);
+    assert.equal(
+      source.admissionEvidence.sourceInventorySha256,
+      expectedSha256,
+      `${sourceId} admissionEvidence.sourceInventorySha256 must match immutable capital admission chain hash`,
+    );
+  }
   assert.equal(
     targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentOpenAdmissionStatus,
     "evidence_recorded_admin_review_required",
@@ -6072,8 +6266,13 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
   // kric-subway-timetable은 라이브 재구성 실증을 가진 schedule_timetable 후보라 "샘플 URL만 문서화된"
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
+  // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
+  // #1397 capital admission)도 페이퍼 후보가 아니라 admitted production 후보이므로 이 루프에서 제외한다.
   const kricCandidates = candidates.candidates.filter(
-    (candidate) => candidate.id.startsWith("kric-") && candidate.id !== "kric-subway-timetable",
+    (candidate) =>
+      candidate.id.startsWith("kric-") &&
+      candidate.id !== "kric-subway-timetable" &&
+      candidate.admissionStatus !== "admitted_to_production_inventory",
   );
 
   assert.equal(candidates.schemaVersion, 1);
@@ -12485,6 +12684,7 @@ test("노선도 Android evidence analyzer는 profile frame, memory, 렌더러 �
   assert.equal(output.runs[0].buildMode, "profile");
   assert.equal(output.runs[0].measurementScope, "gesture_after_route_map_settle");
   assert.equal(output.runs[0].gfxinfoResetAfterRouteMapSettle, true);
+  assert.equal(output.runs[0].gfxinfo.measurementStatus, "captured");
   assert.equal(output.runs[0].gfxinfo.jankyPercent, 5.36);
   assert.equal(output.runs[0].gfxinfo.p99Ms, 33);
   assert.equal(output.runs[0].meminfo.totalPssKb, 591090);
@@ -12498,6 +12698,162 @@ test("노선도 Android evidence analyzer는 profile frame, memory, 렌더러 �
   assert.equal(output.aggregate.maxP95FrameMs, 25);
   assert.equal(output.aggregate.maxFrameJankyPercent, 25);
   assert.equal(output.aggregate.noCrashesInAllRuns, true);
+});
+
+test("노선도 Android evidence analyzer는 Flutter canvas gfxinfo 미캡처(totalFrames=0)를 측정 불가로 명시하고 FrameTiming 정본만 집계한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-route-map-evidence-nocap-"));
+  const artifactDir = path.join(dir, "run-1");
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    path.join(artifactDir, "metadata.env"),
+    [
+      "serial=RFKYA01VMQY",
+      "package=com.easysubway.app",
+      "width=1080",
+      "height=2340",
+      "build_mode=profile",
+      "pan_count=5",
+      "measurement_scope=gesture_after_route_map_settle",
+      "gfxinfoResetAfterRouteMapSettle=true",
+      "captured_at_utc=2026-07-11T17:06:48Z",
+    ].join("\n"),
+  );
+  // Flutter는 자체 canvas 렌더 파이프라인이라 dumpsys gfxinfo(HWUI)가 노선도
+  // 프레임을 못 잡는다. totalFrames=0이면 percentile 4950ms는 histogram
+  // 최상단 버킷 잔재(측정 불가)이지 실제 프레임 지연이 아니다.
+  await writeFile(
+    path.join(artifactDir, "gfxinfo.txt"),
+    [
+      "Total frames rendered: 0",
+      "Janky frames: 0 (0.00%)",
+      "50th percentile: 4950ms",
+      "90th percentile: 4950ms",
+      "95th percentile: 4950ms",
+      "99th percentile: 4950ms",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "meminfo.txt"),
+    [
+      "Java Heap:    12368",
+      "Native Heap:    48796",
+      "Graphics:    47569",
+      "TOTAL PSS:   199903            TOTAL RSS:   318821       TOTAL SWAP PSS:      0",
+    ].join("\n"),
+  );
+  await writeFile(path.join(artifactDir, "renderer-crashes.log"), "");
+  // FrameTiming 정본: 4 프레임 중 1개(build 18.3ms)가 1 vsync 초과 = 25% janky.
+  await writeFile(
+    path.join(artifactDir, "route-map-frames.log"),
+    [
+      "routeMapFrame buildMs=4.20 rasterMs=6.10 totalMs=12.50",
+      "routeMapFrame buildMs=5.00 rasterMs=8.00 totalMs=14.00",
+      "routeMapFrame buildMs=18.30 rasterMs=9.00 totalMs=22.10",
+      "routeMapFrame buildMs=6.00 rasterMs=7.50 totalMs=13.00",
+    ].join("\n"),
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/mobile/analyze-route-map-android-evidence.mjs",
+      "--artifact-dir",
+      artifactDir,
+      "--format",
+      "json",
+    ],
+    { cwd: root },
+  );
+  const output = JSON.parse(stdout);
+
+  // gfxinfo(HWUI)는 측정 불가로 명시 — percentile/jankyPercent는 null.
+  assert.equal(output.runs[0].gfxinfo.totalFrames, 0);
+  assert.equal(
+    output.runs[0].gfxinfo.measurementStatus,
+    "not_captured_flutter_canvas",
+  );
+  assert.equal(output.runs[0].gfxinfo.jankyPercent, null);
+  assert.equal(output.runs[0].gfxinfo.p95Ms, null);
+  assert.equal(output.runs[0].gfxinfo.p99Ms, null);
+
+  // 4950ms 잔재가 프레임 게이트를 오염시키지 않는다 — captured run이 없으면 null.
+  assert.equal(output.aggregate.maxJankyPercent, null);
+  assert.equal(output.aggregate.maxP95FrameMs, null);
+  assert.equal(output.aggregate.maxP99FrameMs, null);
+
+  // FrameTiming 정본은 여전히 산출된다.
+  assert.equal(output.runs[0].frameTiming.frameSampleCount, 4);
+  assert.equal(output.aggregate.maxFrameJankyPercent, 25);
+  assert.equal(output.aggregate.maxBuildP90Ms, 18.3);
+  assert.equal(output.aggregate.noCrashesInAllRuns, true);
+});
+
+test("노선도 Android evidence analyzer는 captured run이 있어도 gfxinfo 지표가 전부 null이면 집계를 null로 전파한다(0 폴백 금지)", async () => {
+  const dir = await mkdtemp(
+    path.join(tmpdir(), "easysubway-route-map-evidence-capnull-"),
+  );
+  const artifactDir = path.join(dir, "run-1");
+  await mkdir(artifactDir, { recursive: true });
+  await writeFile(
+    path.join(artifactDir, "metadata.env"),
+    [
+      "serial=RFKYA01VMQY",
+      "package=com.easysubway.app",
+      "width=1080",
+      "height=2340",
+      "build_mode=profile",
+      "pan_count=5",
+      "measurement_scope=gesture_after_route_map_settle",
+      "gfxinfoResetAfterRouteMapSettle=true",
+      "captured_at_utc=2026-07-11T17:06:48Z",
+    ].join("\n"),
+  );
+  // totalFrames>0이라 measurementStatus는 "captured"지만, dumpsys 출력에
+  // Janky/percentile 라인이 없어 jankyPercent/p95/p99가 전부 null이다. 이때
+  // Math.max(0) 폴백이 "0ms 측정됨"으로 둔갑하면 안 되고 집계는 null이어야 한다.
+  await writeFile(
+    path.join(artifactDir, "gfxinfo.txt"),
+    ["Total frames rendered: 120"].join("\n"),
+  );
+  await writeFile(
+    path.join(artifactDir, "meminfo.txt"),
+    [
+      "Java Heap:    12368",
+      "Native Heap:    48796",
+      "Graphics:    47569",
+      "TOTAL PSS:   199903            TOTAL RSS:   318821       TOTAL SWAP PSS:      0",
+    ].join("\n"),
+  );
+  await writeFile(path.join(artifactDir, "renderer-crashes.log"), "");
+  await writeFile(
+    path.join(artifactDir, "route-map-frames.log"),
+    [
+      "routeMapFrame buildMs=4.20 rasterMs=6.10 totalMs=12.50",
+      "routeMapFrame buildMs=5.00 rasterMs=8.00 totalMs=14.00",
+    ].join("\n"),
+  );
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/mobile/analyze-route-map-android-evidence.mjs",
+      "--artifact-dir",
+      artifactDir,
+      "--format",
+      "json",
+    ],
+    { cwd: root },
+  );
+  const output = JSON.parse(stdout);
+
+  // captured로 집계 대상에는 들지만 지표 자체가 측정 불가라 null 전파.
+  assert.equal(output.runs[0].gfxinfo.measurementStatus, "captured");
+  assert.equal(output.runs[0].gfxinfo.jankyPercent, null);
+  assert.equal(output.runs[0].gfxinfo.p95Ms, null);
+  assert.equal(output.runs[0].gfxinfo.p99Ms, null);
+  assert.equal(output.aggregate.maxJankyPercent, null);
+  assert.equal(output.aggregate.maxP95FrameMs, null);
+  assert.equal(output.aggregate.maxP99FrameMs, null);
 });
 
 test("데이터팩 게시 도구는 releases 불변 경로와 Cache-Control 정책을 고정한다", () => {

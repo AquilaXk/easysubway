@@ -10,12 +10,15 @@ typedef AdImageLoader =
     Future<ImageProvider<Object>> Function(Uri uri, BuildContext context);
 typedef AdLauncher = Future<bool> Function(Uri uri, {required LaunchMode mode});
 
+DateTime _utcNow() => DateTime.now().toUtc();
+
 class ActiveAdBanner extends StatefulWidget {
   const ActiveAdBanner({
     required this.repository,
     required this.placement,
     this.imageLoader = _loadNetworkImage,
     this.launcher = _launchExternal,
+    this.now = _utcNow,
     super.key,
   });
 
@@ -23,6 +26,7 @@ class ActiveAdBanner extends StatefulWidget {
   final AdPlacement placement;
   final AdImageLoader imageLoader;
   final AdLauncher launcher;
+  final DateTime Function() now;
 
   @override
   State<ActiveAdBanner> createState() => _ActiveAdBannerState();
@@ -33,6 +37,8 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
   ImageProvider<Object>? _image;
   bool _started = false;
   int _generation = 0;
+  Timer? _expiryTimer;
+  bool _impressionRecorded = false;
 
   @override
   void didChangeDependencies() {
@@ -57,6 +63,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
   }
 
   void _reload() {
+    _resetLifecycle();
     final generation = ++_generation;
     unawaited(
       _load(
@@ -79,29 +86,115 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
       if (!mounted || generation != _generation || creative == null) {
         return;
       }
+      if (_isExpired(creative)) {
+        return;
+      }
       final image = await imageLoader(creative.imageUrl, context);
-      if (!mounted || generation != _generation) {
+      if (!mounted || generation != _generation || _isExpired(creative)) {
         return;
       }
       setState(() {
         _creative = creative;
         _image = image;
       });
+      _scheduleExpiry(generation, creative);
+      _recordImpressionAfterFrame(generation, repository, creative);
     } on Exception {
       // ponytail: 조회·decode 실패는 사용자에게 빈 슬롯을 남기지 않고 닫는다.
     }
   }
 
-  Future<void> _openLanding() async {
-    final landingUrl = _creative?.landingUrl;
-    if (landingUrl == null) {
+  bool _isExpired(AdCreative creative) {
+    final endsAt = creative.endsAt;
+    return endsAt != null && !endsAt.isAfter(widget.now());
+  }
+
+  void _scheduleExpiry(int generation, AdCreative creative) {
+    final endsAt = creative.endsAt;
+    if (endsAt == null) {
       return;
     }
+    _expiryTimer = Timer(endsAt.difference(widget.now()), () {
+      if (!mounted ||
+          generation != _generation ||
+          !identical(_creative, creative)) {
+        return;
+      }
+      setState(() {
+        _creative = null;
+        _image = null;
+      });
+      _expiryTimer = null;
+    });
+  }
+
+  void _recordImpressionAfterFrame(
+    int generation,
+    AdRepository repository,
+    AdCreative creative,
+  ) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _generation ||
+          !identical(_creative, creative) ||
+          _image == null ||
+          _isExpired(creative) ||
+          _impressionRecorded) {
+        return;
+      }
+      _impressionRecorded = true;
+      unawaited(
+        repository.recordEvent(
+          creative.placement,
+          creative.creativeId,
+          AdEventType.impression,
+        ),
+      );
+    });
+  }
+
+  void _resetLifecycle() {
+    _expiryTimer?.cancel();
+    _expiryTimer = null;
+    _impressionRecorded = false;
+  }
+
+  Future<void> _openLanding() async {
+    final creative = _creative;
+    if (creative == null) {
+      return;
+    }
+    if (_isExpired(creative)) {
+      _expiryTimer?.cancel();
+      _expiryTimer = null;
+      setState(() {
+        _creative = null;
+        _image = null;
+      });
+      return;
+    }
+    unawaited(
+      widget.repository.recordEvent(
+        creative.placement,
+        creative.creativeId,
+        AdEventType.click,
+      ),
+    );
     try {
-      await widget.launcher(landingUrl, mode: LaunchMode.externalApplication);
+      await widget.launcher(
+        creative.landingUrl,
+        mode: LaunchMode.externalApplication,
+      );
     } on Exception {
       // 외부 브라우저 실패 시 내부 이동이나 다른 URL로 fallback하지 않는다.
     }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _resetLifecycle();
+    super.dispose();
   }
 
   @override
