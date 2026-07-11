@@ -13562,6 +13562,113 @@ test("원장 해시 exporter는 license source-id가 inventory에 없으면 거�
   await assert.rejects(runLedgerExporter(["--kind", "license", "--source-id", "does-not-exist"]));
 });
 
+test("원장 해시 exporter는 stationFacilityEvidence primary 분기를 쓰고 evidenceSource를 표기한다", async () => {
+  const fixture = JSON.parse(await readFile(path.join(root, catalogFixtureArg), "utf8"));
+  const evidenceRows = [
+    {
+      stationId: "station-b",
+      lineId: "line-2",
+      facilityType: "ELEVATOR",
+      evidenceHash: "b".repeat(64),
+      providerRecordHash: "2".repeat(64),
+    },
+    {
+      stationId: "station-a",
+      lineId: "line-1",
+      facilityType: "ESCALATOR",
+      evidenceHash: "a".repeat(64),
+      providerRecordHash: "1".repeat(64),
+    },
+  ];
+
+  const workspace = await mkdtemp(path.join(tmpdir(), "ledger-evidence-"));
+  try {
+    const primary = structuredClone(fixture);
+    primary.packs[0].stationFacilityEvidence = structuredClone(evidenceRows);
+    const primaryPath = path.join(workspace, "primary-fixture.json");
+    await writeFile(primaryPath, JSON.stringify(primary));
+
+    const primaryArgs = ["--kind", "facility-evidence", "--fixture", path.relative(root, primaryPath)];
+    const primaryOut = JSON.parse((await runLedgerExporter(primaryArgs)).stdout);
+    assert.equal(primaryOut.evidenceSource, "stationFacilityEvidence");
+    assert.match(primaryOut.ledgerHash, /^[0-9a-f]{64}$/);
+    assert.equal(primaryOut.rowCount, evidenceRows.length);
+
+    const primaryRepeat = JSON.parse((await runLedgerExporter(primaryArgs)).stdout);
+    assert.equal(primaryRepeat.ledgerHash, primaryOut.ledgerHash);
+
+    const fallback = structuredClone(primary);
+    delete fallback.packs[0].stationFacilityEvidence;
+    const fallbackPath = path.join(workspace, "fallback-fixture.json");
+    await writeFile(fallbackPath, JSON.stringify(fallback));
+    const fallbackOut = JSON.parse(
+      (await runLedgerExporter(["--kind", "facility-evidence", "--fixture", path.relative(root, fallbackPath)])).stdout,
+    );
+    assert.equal(fallbackOut.evidenceSource, "facilities");
+    assert.notEqual(fallbackOut.ledgerHash, primaryOut.ledgerHash);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("원장 해시 exporter는 facility-evidence source 혼합을 거부한다", async () => {
+  const fixture = JSON.parse(await readFile(path.join(root, catalogFixtureArg), "utf8"));
+  const workspace = await mkdtemp(path.join(tmpdir(), "ledger-mixed-"));
+  try {
+    const mixed = structuredClone(fixture);
+    mixed.packs[0].stationFacilityEvidence = [
+      {
+        stationId: "station-a",
+        lineId: "line-1",
+        facilityType: "ELEVATOR",
+        evidenceHash: "a".repeat(64),
+        providerRecordHash: "1".repeat(64),
+      },
+    ];
+    // 두 번째 pack은 stationFacilityEvidence 없이 facilities만 → facilities 폴백 source.
+    mixed.packs.push(structuredClone(fixture.packs[0]));
+    const mixedPath = path.join(workspace, "mixed-fixture.json");
+    await writeFile(mixedPath, JSON.stringify(mixed));
+    await assert.rejects(
+      runLedgerExporter(["--kind", "facility-evidence", "--fixture", path.relative(root, mixedPath)]),
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("override 해시는 facilityStatusUpdates 배열 순서에 민감하다", async () => {
+  const overrides = JSON.parse(await readFile(path.join(root, overrideLedgerArg), "utf8"));
+  const base = structuredClone(overrides);
+  if (!Array.isArray(base.facilityStatusUpdates)) {
+    base.facilityStatusUpdates = [];
+  }
+  while (base.facilityStatusUpdates.length < 2) {
+    base.facilityStatusUpdates.push({ facilityId: `facility-${base.facilityStatusUpdates.length}` });
+  }
+
+  const workspace = await mkdtemp(path.join(tmpdir(), "ledger-override-order-"));
+  try {
+    const baselinePath = path.join(workspace, "baseline-overrides.json");
+    await writeFile(baselinePath, JSON.stringify(base));
+    const hash1 = JSON.parse(
+      (await runLedgerExporter(["--kind", "override", "--overrides", path.relative(root, baselinePath)])).stdout,
+    ).ledgerHash;
+
+    const reversed = structuredClone(base);
+    reversed.facilityStatusUpdates.reverse();
+    const reversedPath = path.join(workspace, "reversed-overrides.json");
+    await writeFile(reversedPath, JSON.stringify(reversed));
+    const hash2 = JSON.parse(
+      (await runLedgerExporter(["--kind", "override", "--overrides", path.relative(root, reversedPath)])).stdout,
+    ).ledgerHash;
+
+    assert.notEqual(hash1, hash2);
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("admin review record 생성기는 runbook 필수 필드를 exporter 해시로 채운다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "admin-review-"));
   try {
