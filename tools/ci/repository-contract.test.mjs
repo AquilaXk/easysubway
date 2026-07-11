@@ -12391,7 +12391,7 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.doesNotMatch(workflow, /SIGNING_(PRIVATE|PUBLIC)_KEY/);
 
   // manifest 다운로드와 스크립트 호출부.
-  assert.match(workflow, /curl -fsS "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
+  assert.match(workflow, /curl -fsS --connect-timeout 10 --max-time 30 "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
   assert.match(workflow, /node tools\/datapack\/check-datapack-expiry-alert\.mjs/);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);
