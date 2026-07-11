@@ -5025,13 +5025,20 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       .map((candidate) => candidate.id)
       .sort(),
     [
+      "kric-station-elevator",
+      "kric-station-elevator-movement",
+      "kric-station-escalator",
       "kric-subway-timetable",
+      "kric-wheelchair-lift-location",
+      "kric-wheelchair-lift-movement",
       "molit-tago-subway-info",
+      "molit-urban-rail-full-route",
       "seoul-topis-realtime-station-arrival",
       "seoul-topis-realtime-train-position",
+      "seoulmetro-station-line-info",
     ],
   );
-  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 4);
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 11);
   assert.equal(
     targets.roadmapEvidenceLedger.sourceCandidateAdmission.currentOpenAdmissionStatus,
     "evidence_recorded_admin_review_required",
@@ -6072,8 +6079,13 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const productionSourceIds = new Set(inventory.sources.map((source) => source.id));
   // kric-subway-timetable은 라이브 재구성 실증을 가진 schedule_timetable 후보라 "샘플 URL만 문서화된"
   // 페이퍼 KRIC 후보 계약과 다르다 — 아래 전용 테스트에서 별도로 고정하고 이 루프에서는 제외한다.
+  // production inventory로 승격된 KRIC 시설 source(엘리베이터·에스컬레이터·휠체어리프트 위치/이동동선 등,
+  // #1397 capital admission)도 페이퍼 후보가 아니라 admitted production 후보이므로 이 루프에서 제외한다.
   const kricCandidates = candidates.candidates.filter(
-    (candidate) => candidate.id.startsWith("kric-") && candidate.id !== "kric-subway-timetable",
+    (candidate) =>
+      candidate.id.startsWith("kric-") &&
+      candidate.id !== "kric-subway-timetable" &&
+      candidate.admissionStatus !== "admitted_to_production_inventory",
   );
 
   assert.equal(candidates.schemaVersion, 1);
