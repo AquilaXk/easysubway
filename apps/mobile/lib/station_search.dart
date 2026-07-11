@@ -2434,9 +2434,6 @@ class StationSearchBody extends StatelessWidget {
                 const SizedBox(height: 12),
               ],
             ],
-          ] else ...[
-            const _StationDetailSectionTitle(title: '검색 결과'),
-            const SizedBox(height: 12),
           ],
           for (final result
               in state.source == StationSearchResultSource.nearby
@@ -2445,12 +2442,6 @@ class StationSearchBody extends StatelessWidget {
             _StationSearchResultTile(
               result: result,
               onTap: () => onResultTap(result),
-              onSetOrigin: onSetOrigin == null
-                  ? null
-                  : () => onSetOrigin!(result),
-              onSetDestination: onSetDestination == null
-                  ? null
-                  : () => onSetDestination!(result),
             ),
         ],
       ),
@@ -2660,26 +2651,59 @@ class _StationSearchMessage extends StatelessWidget {
 }
 
 class _StationSearchResultTile extends StatelessWidget {
-  const _StationSearchResultTile({
-    required this.result,
-    required this.onTap,
-    this.onSetOrigin,
-    this.onSetDestination,
-  });
+  const _StationSearchResultTile({required this.result, required this.onTap});
 
   final StationSearchResult result;
   final VoidCallback onTap;
-  final VoidCallback? onSetOrigin;
-  final VoidCallback? onSetDestination;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     final stationName = _stationResultDisplayName(result.nameKo);
-    final semanticLabel = _stationResultSemanticLabel(result);
-    final hasRoleActions = onSetOrigin != null || onSetDestination != null;
+    // 역이 지나는 노선마다 한 행씩 표시한다. 각 행은 하단 구분선만 두고
+    // 좌측에 무채색 역명, 우측에 해당 노선 배지를 둔다(추가 텍스트·화살표 없음).
+    final lines = result.lines;
+    if (lines.isEmpty) {
+      return _StationSearchResultLineRow(
+        key: Key('stationSearchResult-${result.id}'),
+        stationName: stationName,
+        line: null,
+        semanticLabel: '$stationName, 선택',
+        onTap: onTap,
+      );
+    }
+    return Column(
+      children: [
+        for (var i = 0; i < lines.length; i++)
+          _StationSearchResultLineRow(
+            // 첫 행에만 대표 키를 두어 기존 테스트가 단일 위젯을 찾도록 한다.
+            key: i == 0 ? Key('stationSearchResult-${result.id}') : null,
+            stationName: stationName,
+            line: lines[i],
+            semanticLabel: '$stationName, ${lines[i].name}, 선택',
+            onTap: onTap,
+          ),
+      ],
+    );
+  }
+}
 
-    // 항목마다 테두리 박스를 두지 않고 하단 구분선만 둔 깔끔한 리스트 행으로 표시한다.
+class _StationSearchResultLineRow extends StatelessWidget {
+  const _StationSearchResultLineRow({
+    required this.stationName,
+    required this.line,
+    required this.semanticLabel,
+    required this.onTap,
+    super.key,
+  });
+
+  final String stationName;
+  final StationSearchLine? line;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = this.line;
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -2687,86 +2711,48 @@ class _StationSearchResultTile extends StatelessWidget {
           bottom: BorderSide(color: EasySubwayAccessibleColors.line),
         ),
       ),
-      child: Column(
-        children: [
-          MergeSemantics(
-            child: Semantics(
-              label: semanticLabel,
-              button: true,
+      child: MergeSemantics(
+        child: Semantics(
+          label: semanticLabel,
+          button: true,
+          onTap: onTap,
+          child: ExcludeSemantics(
+            child: InkWell(
               onTap: onTap,
-              child: ExcludeSemantics(
-                child: InkWell(
-                  key: Key('stationSearchResult-${result.id}'),
-                  onTap: onTap,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minHeight: 78),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 56),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          stationName,
+                          style: const TextStyle(
+                            color: EasySubwayAccessibleColors.text,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 72),
-                            child: StationLineBadges(
-                              lines: result.lines,
-                              size: 32,
-                              maxBadgeCount: 2,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  stationName,
-                                  style: textTheme.titleLarge?.copyWith(
-                                    color: EasySubwayAccessibleColors.text,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  result.distanceLabel.isEmpty
-                                      ? result.lineLabel
-                                      : '${result.distanceLabel} · ${result.lineLabel}',
-                                  style: textTheme.bodyLarge?.copyWith(
-                                    color: EasySubwayAccessibleColors
-                                        .secondaryText,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.25,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.chevron_right,
-                            color: EasySubwayAccessibleColors.secondaryText,
-                            size: 30,
-                          ),
-                        ],
-                      ),
-                    ),
+                      if (line != null) ...[
+                        const SizedBox(width: 12),
+                        StationLineBadge(line: line, size: 32),
+                      ],
+                    ],
                   ),
                 ),
               ),
             ),
           ),
-          if (hasRoleActions)
-            _StationRoleActionBar(
-              stationId: result.id,
-              stationName: stationName,
-              onSetOrigin: onSetOrigin,
-              onSetDestination: onSetDestination,
-            ),
-        ],
+        ),
       ),
     );
   }

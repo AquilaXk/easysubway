@@ -512,6 +512,23 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onStationSearchClosed?.call();
   }
 
+  /// 일반(비픽) 모드의 인플레이스 검색 결과 탭: 검색을 닫고 해당 역을 노선도에서
+  /// 포커스한 뒤 하단 주변 역 패널(팝오버)을 띄운다.
+  void _focusStationFromSearch(StationSearchResult result) {
+    // _exitSearchMode 가 이미 setState 로 검색을 닫으므로, 패널 상태는 그 뒤
+    // 별도 setState 로 세팅해 검색 종료에 덮이지 않도록 한다.
+    _exitSearchMode();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _nearbyPanelVisible = true;
+      _nearbySelectedStationId = result.id;
+      _nearbyPanelData = _NetworkMapNearbyPanelData.success([result]);
+    });
+    unawaited(_loadNearbyRealtime(result));
+  }
+
   /// 상단바 편집 필드의 제출(엔터/검색 액션)을 검색 세션으로 위임한다.
   void _submitSearch(String query) {
     _searchSessionKey.currentState?.submitSearch(query);
@@ -530,6 +547,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     }
     return _NetworkMapSearchSession(
       key: _searchSessionKey,
+      onResultFocus: _focusStationFromSearch,
       searchQueryController: _searchQueryController,
       stationSearchRepository: searchRepository,
       searchHistoryRepository: widget.searchHistoryRepository,
@@ -1894,6 +1912,7 @@ class _NetworkMapSearchInputField extends StatelessWidget {
 class _NetworkMapSearchSession extends StatefulWidget {
   const _NetworkMapSearchSession({
     super.key,
+    required this.onResultFocus,
     required this.searchQueryController,
     required this.stationSearchRepository,
     required this.searchHistoryRepository,
@@ -1907,6 +1926,7 @@ class _NetworkMapSearchSession extends StatefulWidget {
     required this.routeDraftController,
   });
 
+  final ValueChanged<StationSearchResult> onResultFocus;
   final TextEditingController searchQueryController;
   final StationSearchRepository stationSearchRepository;
   final SearchHistoryRepository? searchHistoryRepository;
@@ -2055,30 +2075,6 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
     }
   }
 
-  void _openStationDetailInPlace(StationSearchResult result) {
-    final reportRepository = widget.reportRepository;
-    if (reportRepository == null) {
-      return;
-    }
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => StationDetailScreen(
-          repository: widget.stationSearchRepository,
-          reportRepository: reportRepository,
-          favoriteRepository: widget.favoriteRepository,
-          realtimeRepository: widget.realtimeRepository,
-          locationProvider: widget.locationProvider,
-          stationId: result.id,
-          facilityReportDraftTargetStore:
-              widget.facilityReportDraftTargetStore,
-          internalRouteRepository: widget.internalRouteRepository,
-          internalRouteMobilityType: widget.internalRouteMobilityType,
-          routeDraftController: widget.routeDraftController,
-        ),
-      ),
-    );
-  }
-
   void _setSearchOrigin(StationSearchResult result) {
     final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
     widget.routeDraftController.setOrigin(station);
@@ -2143,7 +2139,7 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
                     ),
                   StationSearchBody(
                     state: state,
-                    onResultTap: _openStationDetailInPlace,
+                    onResultTap: widget.onResultFocus,
                     onSetOrigin: _setSearchOrigin,
                     onSetDestination: _setSearchDestination,
                     isOpeningLocationSettings: _searchOpeningLocationSettings,

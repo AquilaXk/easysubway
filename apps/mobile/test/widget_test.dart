@@ -155,6 +155,18 @@ Future<void> _openSavedItemsScreen(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// #1933: 홈 노선도 상단바의 인플레이스 검색은 결과 탭 시 역을 지도에서 포커스하고
+/// 하단 팝오버를 띄운다(상세를 열지 않는다). 역 상세/시설 화면을 열려면 좌측 메뉴의
+/// "역 검색"으로 탭 진입형 [StationSearchScreen]을 연다(정상 탭 = 상세 열기 유지).
+Future<void> _openStationSearchScreenViaMenu(WidgetTester tester) async {
+  await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+  await tester.pumpAndSettle();
+  await tester.tap(
+    find.byKey(const Key('networkMapMenuStationSearchButton')),
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> _openSettingsScreen(WidgetTester tester) async {
   final homeContext = tester.element(find.byType(HomeScreen));
   final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
@@ -6219,28 +6231,40 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.requestedQueries, ['상록수']);
+      // #1933: 역이 지나는 노선마다 한 행씩(각 행 우측에 색 배지). '+N' 요약 없음.
       expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
       expect(
         find.byKey(const Key('stationLineBadge-korail-gyeongui-jungang')),
         findsOneWidget,
       );
-      expect(find.text('수도권 4호선, 경의중앙선'), findsOneWidget);
+      // 부가 텍스트(거리/노선 요약)·지역명은 행에 노출하지 않는다.
+      expect(find.text('수도권 4호선, 경의중앙선'), findsNothing);
       expect(find.text('수도권'), findsNothing);
       // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
       expect(find.text('출처 확인 필요'), findsNothing);
       expect(find.bySemanticsLabel('검색 결과 1개'), findsOneWidget);
+      // 각 행 시맨틱은 자신의 노선 하나만 담아 "역명, 노선명, 선택" 형태다.
       expect(
-        find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권'),
+        find.bySemanticsLabel('상록수역, 수도권 4호선, 선택'),
         findsOneWidget,
       );
       expect(
-        tester.getSemantics(find.bySemanticsLabel('상록수역, 수도권 4호선, 경의중앙선, 수도권')),
+        find.bySemanticsLabel('상록수역, 경의중앙선, 선택'),
+        findsOneWidget,
+      );
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('상록수역, 수도권 4호선, 선택')),
         isSemantics(
-          label: '상록수역, 수도권 4호선, 경의중앙선, 수도권',
+          label: '상록수역, 수도권 4호선, 선택',
           isButton: true,
           hasTapAction: true,
         ),
+      );
+      // 대표 키는 첫 행에만 두어 단일 위젯으로 남는다.
+      expect(
+        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+        findsOneWidget,
       );
       final resultTileSize = tester.getSize(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
@@ -6333,22 +6357,33 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
-    for (final text in [
-      '$longStationName역',
-      '현재 위치에서 1.3km · 수도권 9호선 급행, 공항철도 직통 일반 공용',
-    ]) {
-      final widget = tester.widget<Text>(find.text(text));
-      expect(widget.maxLines, isNot(1));
-      expect(widget.overflow, isNot(TextOverflow.ellipsis));
+    // #1933: 결과 행은 부가 문구·거리 요약 없이 역명만 노출한다. 환승역은 노선마다
+    // 한 행씩 펼치므로 역명 Text가 노선 수만큼 있다. 각 행의 역명은 시스템 글자
+    // 크기에서도 한 줄 말줄임으로 고정하지 않는다.
+    final nameWidgets = find.text('$longStationName역');
+    expect(nameWidgets, findsNWidgets(2));
+    for (final nameWidget in tester.widgetList<Text>(nameWidgets)) {
+      expect(nameWidget.maxLines, isNot(1));
+      expect(nameWidget.overflow, isNot(TextOverflow.ellipsis));
     }
+    // 노선 요약 부가 문구는 더 이상 행에 렌더링하지 않는다.
+    expect(
+      find.text('현재 위치에서 1.3km · 수도권 9호선 급행, 공항철도 직통 일반 공용'),
+      findsNothing,
+    );
     // 품질 문구 "일부 정보는 확인 중이에요"는 별도 semantic label 테스트에서 유지한다.
   });
 
-  testWidgets('역 검색 결과에서 출발 도착 역할을 지정하면 홈 이어하기가 표시된다', (tester) async {
+  testWidgets('#1933 홈 in-place 검색 결과 탭은 역을 지도에서 포커스하고 하단 팝오버를 연다', (
+    tester,
+  ) async {
+    // #1933: 홈 노선도 상단바 인플레이스 검색에서는 결과 행에 인라인 출발/도착
+    // 역할 버튼을 두지 않는다. 결과 행을 탭하면 상세를 밀지 않고 검색을 닫은 뒤
+    // 해당 역을 지도에서 포커스하고 하단 주변 역 패널(팝오버)을 띄운다. 출발/도착
+    // 지정은 지도 역 탭 팝오버로 수렴한다(역할 버튼 IA는 결과 행에서 제거됨).
     final repository = FakeStationSearchRepository(
       queryResults: {
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
-        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
       },
     );
 
@@ -6358,11 +6393,13 @@ void main() {
         reportRepository: FakeFacilityReportRepository(),
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
-
-    expect(find.byKey(const Key('homeRouteDraftPanel')), findsNothing);
 
     await tester.tap(find.byKey(const Key('stationSearchButton')));
     await tester.pumpAndSettle();
@@ -6371,84 +6408,32 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
+    // 결과 행에는 더 이상 인라인 출발/도착 역할 버튼이 없다.
     expect(
       find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const Key('stationRoleDestination-station-sangnoksu')),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.bySemanticsLabel('상록수역을 출발역으로 설정'), findsOneWidget);
-    expect(
-      tester
-          .getSemantics(find.bySemanticsLabel('상록수역을 출발역으로 설정'))
-          .getSemanticsData()
-          .hasAction(SemanticsAction.tap),
-      isTrue,
-    );
-    // #1933: 홈 노선도 in-place 검색에서 출발역 역할을 지정하면 draft가 채워지고,
-    // 검색 모드가 자동 종료되어 상단바가 출발/도착 입력(OD) 모드로 전환된다.
+    expect(find.bySemanticsLabel('상록수역을 출발역으로 설정'), findsNothing);
+
+    // 결과 행 탭 = 검색 종료 + 역 포커스 + 하단 팝오버.
     await tester.tap(
-      find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
 
-    // in-place 검색 모드가 종료되어 홈 노선도로 돌아왔고 OD 상단바가 나타난다.
+    // 상세 라우트를 밀지 않고 인플레이스 검색이 종료되어 노선도로 돌아온다.
     expect(find.byKey(const Key('stationSearchInput')), findsNothing);
+    expect(find.byType(StationDetailScreen), findsNothing);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    // 포커스한 역의 하단 주변 역 패널(팝오버)이 나타난다.
     expect(
-      find.byKey(const Key('networkMapRouteDraftOverlay')),
+      find.byKey(const Key('networkMapNearbyStationPanel')),
       findsOneWidget,
     );
-
-    // 도착 칸을 탭하면 "도착역 채우기" 검색이 열린다(칸 채우기 모드는 종전대로
-    // StationSearchScreen 경로로 유지된다).
-    await tester.tap(
-      find.byKey(const Key('networkMapRouteDraftPickDestination')),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sadang')),
-    );
-    await tester.pumpAndSettle();
-
-    // #1933 요구 3: 별도 길찾기 폼 페이지·"길찾기 보기" 스낵바 액션을 없앴다. 역
-    // 검색으로 출발·도착을 모두 채우면 홈 셸이 자동으로 결과 탭으로 전환한다.
-    expect(find.widgetWithText(SnackBarAction, '길찾기 보기'), findsNothing);
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.descendant(of: find.byType(AppBar), matching: find.text('길찾기')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('homeBottomNavigationBar')), findsNothing);
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('routeOriginPointButton')),
-        matching: find.text('상록수역'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('routeDestinationPointButton')),
-        matching: find.text('사당역'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('노선 정보 없음'), findsNothing);
-    final semanticsHandle = tester.ensureSemantics();
-    try {
-      expect(find.bySemanticsLabel('출발 상록수역'), findsOneWidget);
-      expect(find.bySemanticsLabel('도착 사당역'), findsOneWidget);
-    } finally {
-      semanticsHandle.dispose();
-    }
   });
 
   testWidgets('경로 검색 첫 화면은 v3 출발 도착 입력 구조를 보여준다', (tester) async {
@@ -6774,13 +6759,14 @@ void main() {
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
         findsOneWidget,
       );
+      // #1933: 결과 행에서 인라인 출발/도착 역할 버튼을 제거했다(행 탭 = 상세 열기).
       expect(
         find.byKey(const Key('stationRoleOrigin-station-sangnoksu')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('stationRoleDestination-station-sangnoksu')),
-        findsOneWidget,
+        findsNothing,
       );
     } finally {
       semanticsHandle.dispose();
@@ -6827,7 +6813,7 @@ void main() {
     expect(find.byKey(const Key('stationSearchInput')), findsOneWidget);
   });
 
-  testWidgets('역 검색 결과는 환승 노선 배지를 대표 노선과 추가 개수로 줄인다', (tester) async {
+  testWidgets('역 검색 결과는 환승 역을 노선마다 한 행으로 펼쳐 보여준다', (tester) async {
     final repository = FakeStationSearchRepository(
       nextResults: [
         const StationSearchResult(
@@ -6884,14 +6870,30 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
 
+    // #1933: 노선을 요약(+N)하지 않고 노선마다 한 행씩 펼친다. 4개 노선 = 4개 배지.
     expect(find.byKey(const Key('stationLineBadge-seoul-4')), findsOneWidget);
-    expect(find.text('+3'), findsOneWidget);
-    expect(find.text('경의중앙'), findsNothing);
-
-    final resultTileSize = tester.getSize(
-      find.byKey(const Key('stationSearchResult-station-transfer')),
+    expect(
+      find.byKey(const Key('stationLineBadge-korail-gyeongui-jungang')),
+      findsOneWidget,
     );
-    expect(resultTileSize.height, lessThanOrEqualTo(112));
+    expect(
+      find.byKey(const Key('stationLineBadge-suin-bundang')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('stationLineBadge-shinbundang')),
+      findsOneWidget,
+    );
+    // '+N' 요약 배지는 더 이상 쓰지 않는다.
+    expect(find.text('+3'), findsNothing);
+    expect(find.byKey(const Key('stationLineBadgeOverflow')), findsNothing);
+
+    // 대표 키는 첫 행에만 두어 단일 위젯으로 남는다.
+    expect(
+      find.byKey(const Key('stationSearchResult-station-transfer')),
+      findsOneWidget,
+    );
+    // 탭 타깃 접근성 지침은 유지한다(각 행 minHeight >= 48dp).
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
   });
@@ -7477,8 +7479,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
+      await _openStationSearchScreenViaMenu(tester);
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
@@ -7489,7 +7490,8 @@ void main() {
       // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
       expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
       expect(find.text('출처 공식 파일'), findsNothing);
-      expect(find.bySemanticsLabel('상록수역, 수도권 2호선, 수도권'), findsOneWidget);
+      // #1933: 결과 행은 노선마다 한 행이며, 각 행 시맨틱은 "역명, 노선명, 선택".
+      expect(find.bySemanticsLabel('상록수역, 수도권 2호선, 선택'), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
@@ -7692,8 +7694,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -7813,8 +7814,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
+      await _openStationSearchScreenViaMenu(tester);
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
@@ -7905,8 +7905,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -8006,8 +8005,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -8078,8 +8076,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
+      await _openStationSearchScreenViaMenu(tester);
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
@@ -8519,8 +8516,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -8596,8 +8592,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
+      await _openStationSearchScreenViaMenu(tester);
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
@@ -8656,8 +8651,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -8690,8 +8684,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -11690,8 +11683,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('stationSearchButton')));
-      await tester.pumpAndSettle();
+      await _openStationSearchScreenViaMenu(tester);
       await tester.enterText(
         find.byKey(const Key('stationSearchInput')),
         '상록수',
@@ -12894,8 +12886,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -12980,8 +12971,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -13139,8 +13129,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
@@ -13283,8 +13272,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('stationSearchButton')));
-    await tester.pumpAndSettle();
+    await _openStationSearchScreenViaMenu(tester);
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
