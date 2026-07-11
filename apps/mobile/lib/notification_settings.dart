@@ -972,7 +972,7 @@ class _NotificationSwitchTile extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             height: 1.35,
           ),
         ),
@@ -1052,7 +1052,7 @@ class _NotificationSettingsFailure extends StatelessWidget {
             message,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.35,
             ),
           ),

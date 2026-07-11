@@ -129,7 +129,7 @@ class _ActiveAdBannerState extends State<ActiveAdBanner> {
               child: Row(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     child: Image(
                       image: image,
                       width: 64,

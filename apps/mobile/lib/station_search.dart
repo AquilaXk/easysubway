@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'accessible_design.dart';
 import 'adaptive_layout.dart';
 import 'core/external/kakao_map_launcher.dart';
+import 'design_tokens.dart';
 import 'facility_status.dart';
 import 'facility_report.dart';
 import 'features/ads/active_ad_banner.dart';
@@ -44,20 +45,13 @@ const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어�
 const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
-const _stationSearchInputRadius = BorderRadius.all(Radius.circular(12));
-const _stationCompactCardRadius = BorderRadius.all(Radius.circular(12));
+const _stationSearchInputRadius = BorderRadius.all(
+  Radius.circular(EasySubwayRadius.control),
+);
 const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
 const _stationDetailFacilityCardRadius = BorderRadius.all(Radius.circular(16));
-const _stationTextMutedColor = EasySubwayAccessibleColors.secondaryText;
-const _stationTextSubtleColor = EasySubwayAccessibleColors.mutedText;
-const _stationDetailTextColor = EasySubwayAccessibleColors.secondaryText;
-const _stationDetailSoftPanelColor = EasySubwayAccessibleColors.surface;
-const _stationDetailSoftPanelBorderColor = EasySubwayAccessibleColors.line;
-const _stationDetailMintPanelColor = EasySubwayAccessibleColors.surface;
-const _stationDetailMintPanelBorderColor = EasySubwayAccessibleColors.line;
-const _stationDetailCautionColor = Color(0xFF8A4B00);
 
 abstract class StationSearchRepository {
   Future<List<StationSearchResult>> searchStations(String query);
@@ -1703,7 +1697,7 @@ class StationSearchScreen extends StatefulWidget {
     this.internalRouteMobilityType = 'SENIOR',
     this.routeDraftController,
     this.entryMode = StationSearchEntryMode.search,
-    this.onOpenRouteSearch,
+    this.pickSlot,
     this.bottomNavigationBar,
     super.key,
   });
@@ -1720,7 +1714,12 @@ class StationSearchScreen extends StatefulWidget {
   final String internalRouteMobilityType;
   final RouteDraftController? routeDraftController;
   final StationSearchEntryMode entryMode;
-  final Future<void> Function()? onOpenRouteSearch;
+
+  /// 특정 칸(출발/도착)을 채우려고 검색을 연 경우의 대상 칸. 지정되면 결과를 한 번
+  /// 탭하는 즉시 [routeDraftController]의 해당 칸을 설정하고 이 화면을 닫는다. 지도
+  /// 탭 경로와 완전히 같은 draft 상태로 수렴시키기 위한 "칸 채우기" 모드다. null이면
+  /// 기존 둘러보기(출발/도착 버튼이 각 결과에 딸린 형태) 그대로 동작한다.
+  final RouteDraftSlot? pickSlot;
   final Widget? bottomNavigationBar;
 
   @override
@@ -1814,7 +1813,10 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             decoration: InputDecoration(
               hintText: '역 이름을 입력해 주세요',
               floatingLabelBehavior: FloatingLabelBehavior.always,
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Icon(
+                Icons.search,
+                color: EasySubwayAccessibleColors.iconMuted,
+              ),
               suffixIcon: _hasSearchQuery
                   ? IconButton(
                       tooltip: '검색어 지우기',
@@ -1823,25 +1825,18 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                     )
                   : null,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: EasySubwayAccessibleColors.scaffoldSurface,
               border: OutlineInputBorder(
                 borderRadius: _stationSearchInputRadius,
-                borderSide: const BorderSide(
-                  color: EasySubwayAccessibleColors.line,
-                ),
+                borderSide: BorderSide.none,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: _stationSearchInputRadius,
-                borderSide: const BorderSide(
-                  color: EasySubwayAccessibleColors.line,
-                ),
+                borderSide: BorderSide.none,
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: _stationSearchInputRadius,
-                borderSide: const BorderSide(
-                  color: EasySubwayAccessibleColors.primary,
-                  width: 2,
-                ),
+                borderSide: BorderSide.none,
               ),
             ),
             onSubmitted: _submit,
@@ -1880,8 +1875,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 _controller.state.status == StationSearchStatus.loading;
             final isNearbyDisabled = isSearching || _isNearbySearchRunning;
             if (showNearbyRetryButton) {
-              return OutlinedButton.icon(
+              return TextButton.icon(
                 key: const Key('nearbyStationSearchButton'),
+                style: TextButton.styleFrom(
+                  foregroundColor: EasySubwayAccessibleColors.text,
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size.fromHeight(56),
+                ),
                 onPressed: isNearbyDisabled ? null : _searchNearby,
                 icon: const Icon(Icons.my_location),
                 label: const Text('내 주변 역 다시 찾기'),
@@ -1891,8 +1891,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               // 즉시(디바운스) 검색으로 통일했으므로 별도 검색 버튼을 두지 않는다.
               return const SizedBox.shrink();
             }
-            return OutlinedButton.icon(
+            return TextButton.icon(
               key: const Key('nearbyStationSearchButton'),
+              style: TextButton.styleFrom(
+                foregroundColor: EasySubwayAccessibleColors.text,
+                alignment: Alignment.centerLeft,
+                minimumSize: const Size.fromHeight(56),
+              ),
               onPressed: isNearbyDisabled ? null : _searchNearby,
               icon: const Icon(Icons.my_location),
               label: const Text('내 주변 역 찾기'),
@@ -1902,16 +1907,20 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         const SizedBox(height: 20),
       ],
     );
+    final isPicking = widget.pickSlot != null;
     final resultSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
         return _StationSearchBody(
           state: _controller.state,
-          onResultTap: _openStationDetail,
-          onSetOrigin: widget.routeDraftController == null
+          // 칸 채우기 모드에서는 결과 한 번 탭 = 해당 칸 설정 후 닫기. 지도 탭과 동일
+          // 하게 "출발역 선택 → 도착역 선택" UX로 수렴시킨다. 둘러보기 모드에서는
+          // 종전대로 역 상세로 이동한다.
+          onResultTap: isPicking ? _pickStation : _openStationDetail,
+          onSetOrigin: isPicking || widget.routeDraftController == null
               ? null
               : _setRouteOrigin,
-          onSetDestination: widget.routeDraftController == null
+          onSetDestination: isPicking || widget.routeDraftController == null
               ? null
               : _setRouteDestination,
           isOpeningLocationSettings: _isOpeningLocationSettings,
@@ -1921,9 +1930,13 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     );
     return Scaffold(
       appBar: AppBar(
-        title: Text(switch (widget.entryMode) {
-          StationSearchEntryMode.nearby => '가까운 역',
-          StationSearchEntryMode.search => '역 검색',
+        title: Text(switch (widget.pickSlot) {
+          RouteDraftSlot.origin => '출발역 검색',
+          RouteDraftSlot.destination => '도착역 검색',
+          null => switch (widget.entryMode) {
+            StationSearchEntryMode.nearby => '가까운 역',
+            StationSearchEntryMode.search => '역 검색',
+          },
         }),
         actions: [
           if (!isNearbyEntry)
@@ -2048,6 +2061,24 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     }
   }
 
+  /// 칸 채우기 모드: 결과를 탭하면 지정된 칸을 [routeDraftController]에 설정하고
+  /// 화면을 닫으면서 선택한 역을 반환한다. 지도 탭 경로와 같은 컨트롤러·같은 draft로
+  /// 수렴한다.
+  void _pickStation(StationSearchResult result) {
+    final slot = widget.pickSlot;
+    if (slot == null) {
+      return;
+    }
+    final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
+    switch (slot) {
+      case RouteDraftSlot.origin:
+        widget.routeDraftController?.setOrigin(station);
+      case RouteDraftSlot.destination:
+        widget.routeDraftController?.setDestination(station);
+    }
+    Navigator.of(context).pop(station);
+  }
+
   void _setRouteOrigin(StationSearchResult result) {
     final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
     widget.routeDraftController?.setOrigin(station);
@@ -2061,17 +2092,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   }
 
   void _showRouteDraftSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        action: widget.onOpenRouteSearch == null
-            ? null
-            : SnackBarAction(
-                label: '길찾기 보기',
-                onPressed: () => unawaited(widget.onOpenRouteSearch!()),
-              ),
-      ),
-    );
+    // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 출발·도착을 설정하면 draft로
+    // 수렴하고, 둘 다 채워지면 셸이 자동으로 결과 타임라인을 연다. 폼으로 보내던
+    // "길찾기 보기" 스낵바 액션은 더 이상 두지 않는다.
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _searchNearby() async {
@@ -2154,23 +2180,34 @@ class _StationRecentSearchSection extends StatelessWidget {
                 '최근 검색',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
               ),
             ),
             TextButton.icon(
               key: const Key('stationRecentSearchClearAllButton'),
+              style: TextButton.styleFrom(
+                foregroundColor: EasySubwayAccessibleColors.mutedText,
+              ),
               onPressed: enabled ? onClearAll : null,
-              icon: const Icon(Icons.delete_sweep_outlined),
+              icon: const Icon(Icons.delete_sweep_outlined, size: 18),
               label: const Text('전체 삭제'),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const Divider(
+          height: EasySubwaySpacing.lg,
+          color: EasySubwayAccessibleColors.line,
+        ),
         Column(
           children: [
-            for (final entry in queries.indexed)
+            for (final entry in queries.indexed) ...[
+              if (entry.$1 > 0)
+                const Divider(
+                  height: 1,
+                  color: EasySubwayAccessibleColors.line,
+                ),
               _StationRecentSearchItem(
                 query: entry.$2,
                 order: entry.$1 + 1,
@@ -2178,6 +2215,7 @@ class _StationRecentSearchSection extends StatelessWidget {
                 onQuerySelected: onQuerySelected,
                 onQueryRemoved: onQueryRemoved,
               ),
+            ],
           ],
         ),
       ],
@@ -2202,86 +2240,69 @@ class _StationRecentSearchItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: _stationCompactCardRadius,
-          side: const BorderSide(color: EasySubwayAccessibleColors.line),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Semantics(
-                  label: '최근 검색어 $query 검색, 최근 사용 $order번째',
-                  button: true,
-                  enabled: enabled,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 56),
+      child: Row(
+        children: [
+          Expanded(
+            child: Semantics(
+              label: '최근 검색어 $query 검색, 최근 사용 $order번째',
+              button: true,
+              enabled: enabled,
+              onTap: enabled ? () => onQuerySelected(query) : null,
+              child: ExcludeSemantics(
+                child: InkWell(
+                  key: Key('stationRecentSearchQuery-$query'),
                   onTap: enabled ? () => onQuerySelected(query) : null,
-                  child: ExcludeSemantics(
-                    child: InkWell(
-                      key: Key('stationRecentSearchQuery-$query'),
-                      borderRadius: _stationCompactCardRadius,
-                      onTap: enabled ? () => onQuerySelected(query) : null,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.history,
-                              color: EasySubwayAccessibleColors.brand,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    query,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color:
-                                              EasySubwayAccessibleColors.text,
-                                          fontWeight: FontWeight.w800,
-                                          height: 1.25,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    '최근 사용 $order번째',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: EasySubwayAccessibleColors
-                                              .mutedText,
-                                          fontWeight: FontWeight.w700,
-                                          height: 1.3,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: EasySubwaySpacing.md,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.history,
+                          color: EasySubwayAccessibleColors.iconMuted,
                         ),
-                      ),
+                        const SizedBox(width: EasySubwaySpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                query,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: EasySubwayAccessibleColors.text,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.25,
+                                    ),
+                              ),
+                              Text(
+                                '최근 사용 $order번째',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: EasySubwayAccessibleColors.caption,
+                                      height: 1.3,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              IconButton(
-                key: Key('stationRecentSearchRemove-$query'),
-                tooltip: '$query 최근 검색 삭제',
-                onPressed: enabled ? () => onQueryRemoved(query) : null,
-                icon: const Icon(Icons.close),
-              ),
-            ],
+            ),
           ),
-        ),
+          IconButton(
+            key: Key('stationRecentSearchRemove-$query'),
+            tooltip: '$query 최근 검색 삭제',
+            onPressed: enabled ? () => onQueryRemoved(query) : null,
+            icon: const Icon(Icons.close),
+          ),
+        ],
       ),
     );
   }
@@ -2498,7 +2519,7 @@ class _NearbyStationOverview extends StatelessWidget {
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: EasySubwayAccessibleColors.mutedText,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     height: 1.25,
                                   ),
                             ),
@@ -2508,7 +2529,7 @@ class _NearbyStationOverview extends StatelessWidget {
                               style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
                                     color: EasySubwayAccessibleColors.text,
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                     height: 1.2,
                                   ),
                             ),
@@ -2584,7 +2605,7 @@ class _StationSearchFailureMessage extends StatelessWidget {
             child: Text(
               _stationSearchFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: _stationTextSubtleColor,
+                color: EasySubwayAccessibleColors.mutedText,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -2641,7 +2662,7 @@ class _StationSearchMessage extends StatelessWidget {
       child: Text(
         message,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: _stationTextMutedColor,
+          color: EasySubwayAccessibleColors.secondaryText,
           fontWeight: FontWeight.w700,
           height: 1.35,
         ),
@@ -2739,7 +2760,7 @@ class _StationSearchResultTile extends StatelessWidget {
                           const SizedBox(width: 8),
                           const Icon(
                             Icons.chevron_right,
-                            color: _stationTextMutedColor,
+                            color: EasySubwayAccessibleColors.secondaryText,
                             size: 30,
                           ),
                         ],
@@ -2834,7 +2855,7 @@ class _StationRoleButton extends StatelessWidget {
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(EasySubwayTouchTarget.iconOnly),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            textStyle: const TextStyle(fontWeight: FontWeight.w800),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
           ),
           icon: Icon(icon, size: 20),
           label: Text(label, textAlign: TextAlign.center),
@@ -3369,7 +3390,7 @@ class _StationRealtimeSummary extends StatelessWidget {
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       height: 1.25,
                     ),
                   ),
@@ -3631,9 +3652,9 @@ class _StationLayoutStep extends StatelessWidget {
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: _stationDetailSoftPanelColor,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: _stationDetailSoftPanelBorderColor),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       child: Row(
         children: [
@@ -3644,7 +3665,7 @@ class _StationLayoutStep extends StatelessWidget {
               item.text,
               style: textTheme.bodyLarge?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 height: 1.2,
               ),
             ),
@@ -3733,7 +3754,7 @@ class _StationDetailHeader extends StatelessWidget {
                       '${detail.nameKo}역',
                       style: textTheme.headlineSmall?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.2,
                       ),
                     ),
@@ -3842,9 +3863,9 @@ class _StationInternalRouteResultCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: _stationDetailMintPanelColor,
+            color: EasySubwayAccessibleColors.surface,
             borderRadius: _stationDetailInfoCardRadius,
-            border: Border.all(color: _stationDetailMintPanelBorderColor),
+            border: Border.all(color: EasySubwayAccessibleColors.line),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3858,7 +3879,7 @@ class _StationInternalRouteResultCard extends StatelessWidget {
                 result.summaryLabel,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
               ),
@@ -3866,7 +3887,7 @@ class _StationInternalRouteResultCard extends StatelessWidget {
               Text(
                 result.totalBurdenLabel,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: _stationDetailTextColor,
+                  color: EasySubwayAccessibleColors.secondaryText,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -3912,7 +3933,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
                 step.title,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
               ),
@@ -3920,7 +3941,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
               Text(
                 step.burdenLabel,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: _stationDetailTextColor,
+                  color: EasySubwayAccessibleColors.secondaryText,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -4019,7 +4040,7 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
                     '안내 확인 방법',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -4057,7 +4078,7 @@ class _StationDetailSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           height: 1.25,
         ),
       ),
@@ -4075,7 +4096,7 @@ class _StationDetailEmptyMessage extends StatelessWidget {
     return Text(
       message,
       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-        color: _stationTextMutedColor,
+        color: EasySubwayAccessibleColors.secondaryText,
         fontWeight: FontWeight.w700,
         height: 1.35,
       ),
@@ -4146,7 +4167,7 @@ class _StationExitCardState extends State<_StationExitCard> {
                       exit.name,
                       style: textTheme.titleMedium?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.25,
                       ),
                     ),
@@ -4715,7 +4736,7 @@ class FacilityDetailScreen extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
                                 color: EasySubwayAccessibleColors.text,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 height: 1.2,
                               ),
                         ),
@@ -4757,7 +4778,7 @@ class FacilityDetailScreen extends StatelessWidget {
                                         .titleMedium
                                         ?.copyWith(
                                           color: statusIconColor,
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w700,
                                           height: 1.25,
                                         ),
                                   ),
@@ -4915,7 +4936,7 @@ class _StationDetailStatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = positive
         ? EasySubwayAccessibleColors.primary
-        : _stationDetailCautionColor;
+        : EasySubwayAccessibleColors.amber;
 
     return Row(
       children: [
@@ -4926,7 +4947,7 @@ class _StationDetailStatusPill extends StatelessWidget {
             text,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.3,
             ),
           ),
