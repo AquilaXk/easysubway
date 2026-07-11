@@ -21,6 +21,7 @@
     { "file": "play-production-access-gate.json", "scope": "mobile", "area": "store" },
     { "file": "play-store-submission-content.json", "scope": "mobile", "area": "store" },
     { "file": "post-launch-operations-review-gate.json", "scope": "product", "area": "ops" },
+    { "file": "post-publish-ad-event-expiry-e2e.json", "scope": "mobile", "area": "store" },
     { "file": "production-datapack-scope.json", "scope": "product", "area": "datapack" },
     { "file": "rc-evidence-manifest-contract.json", "scope": "product", "area": "release" },
     { "file": "release-governance-gate.json", "scope": "product", "area": "release" },

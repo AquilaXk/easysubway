@@ -29,6 +29,67 @@ function mobileProductionDartFiles() {
   }).trim().split("\n").filter((file) => file.endsWith(".dart") && !file.endsWith(".g.dart"));
 }
 
+function collapseQuotedStringConcatenations(source) {
+  let collapsed = source;
+  let previous;
+  do {
+    previous = collapsed;
+    collapsed = collapsed.replace(
+      /(["'])([^"'\\]*)\1\s*\+\s*(["'])([^"'\\]*)\3/g,
+      (_match, _leftQuote, left, _rightQuote, right) => `"${left}${right}"`,
+    );
+  } while (collapsed !== previous);
+  return collapsed;
+}
+
+const adEventEndpointOccurrence = /\/api\/ads\/events(?=["']|\?|$)/g;
+
+function containsAdEventEndpoint(source) {
+  // ponytail: literal/quoted-concat endpoint만 탐지한다. 새 interpolation/variable 광고 endpoint를
+  // 허용해야 할 때는 regex를 넓히지 말고 Dart AST 기반 검사로 교체한다.
+  return (collapseQuotedStringConcatenations(source).match(adEventEndpointOccurrence) ?? []).length > 0;
+}
+
+function mobileAdEventSenderFiles(
+  sourcePaths = execFileSync("git", ["ls-files", "apps/mobile/lib"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim().split("\n"),
+  readSource = read,
+) {
+  return sourcePaths
+    .filter((sourcePath) => sourcePath.endsWith(".dart"))
+    .filter((sourcePath) => containsAdEventEndpoint(readSource(sourcePath)));
+}
+
+function assertAnonymousAdEventPostCall(source) {
+  const normalizedSource = collapseQuotedStringConcatenations(source);
+  const endpointCount = (normalizedSource.match(adEventEndpointOccurrence) ?? []).length;
+  assert.equal(endpointCount, 1, "ad event repository must contain exactly one endpoint");
+
+  const adEventCall = normalizedSource.match(
+    /postJson\(\s*(["'])\/api\/ads\/events\1\s*,\s*body:\s*\{(?<body>[\s\S]*?)\}\s*,?\s*\)/,
+  );
+  assert.ok(adEventCall?.groups, "ad event postJson call must contain only an inline body argument");
+
+  const entries = [];
+  let remaining = adEventCall.groups.body;
+  const entryPattern = /^\s*(["'])([^"'\\]+)\1\s*:\s*([^,\n{}]+)\s*,?/;
+  while (remaining.trim() !== "") {
+    const entry = remaining.match(entryPattern);
+    assert.ok(entry, "ad event body must be a flat map of explicit entries");
+    entries.push([entry[2], entry[3].trim()]);
+    remaining = remaining.slice(entry[0].length);
+  }
+
+  assert.equal(new Set(entries.map(([key]) => key)).size, entries.length, "ad event body keys must be unique");
+  assert.deepEqual(Object.fromEntries(entries), {
+    placement: "placement.id",
+    creativeId: "creativeId",
+    eventType: "eventType.wireValue",
+  });
+}
+
 function assertNoNativeAdIdentityOrMeasurement({
   dependencySources = [],
   nativeSources = [],
@@ -2779,8 +2840,61 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
 
 });
 
-test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측 경계를 함께 고정한다", () => {
+test("광고 event sender detector는 직접 endpoint와 quoted-string 연결을 모두 탐지한다", () => {
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/' + 'events')"), true);
+  assert.equal(containsAdEventEndpoint('postJson("/api/ads/" + "events")'), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events?deviceId=device-1')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('https://tracker.example/api/ads/events')"), true);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events-v2')"), false);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/events/summary')"), false);
+  assert.equal(containsAdEventEndpoint("postJson('/api/ads/active')"), false);
+  const sources = new Map([
+    ["apps/mobile/lib/manual.dart", "postJson('/api/ads/events')"],
+    ["apps/mobile/lib/generated.g.dart", "postJson('/api/ads/' + 'events')"],
+    ["apps/mobile/lib/query.dart", "postJson('/api/ads/events?deviceId=device-1')"],
+    ["apps/mobile/lib/absolute.dart", "postJson('https://tracker.example/api/ads/events')"],
+    ["apps/mobile/lib/v2.dart", "postJson('/api/ads/events-v2')"],
+    ["apps/mobile/lib/summary.dart", "postJson('/api/ads/events/summary')"],
+    ["apps/mobile/lib/generated.g.txt", "postJson('/api/ads/events')"],
+  ]);
+  assert.deepEqual(mobileAdEventSenderFiles([...sources.keys()], (file) => sources.get(file)), [
+    "apps/mobile/lib/manual.dart",
+    "apps/mobile/lib/generated.g.dart",
+    "apps/mobile/lib/query.dart",
+    "apps/mobile/lib/absolute.dart",
+  ]);
+});
+
+test("광고 event POST detector는 정확한 익명 세 필드 외 body와 identity header를 거부한다", () => {
+  const validCall = `
+    postJson(
+      '/api/ads/events',
+      body: {
+        'placement': placement.id,
+        'creativeId': creativeId,
+        'eventType': eventType.wireValue,
+      },
+    )
+  `;
+  assert.doesNotThrow(() => assertAnonymousAdEventPostCall(validCall));
+  assert.doesNotThrow(() =>
+    assertAnonymousAdEventPostCall(validCall.replace("'/api/ads/events'", "'/api/ads/' + 'events'")),
+  );
+
+  for (const unsafeCall of [
+    validCall.replace("'eventType': eventType.wireValue,", "'eventType': eventType.wireValue,\n        'deviceId': deviceId,"),
+    validCall.replace("      },", "      },\n      headers: {'Authorization': authToken},"),
+    `${validCall}\npostJson('/api/ads/' + 'events', body: anonymousBody)`,
+  ]) {
+    assert.throws(() => assertAnonymousAdEventPostCall(unsafeCall));
+  }
+});
+
+test("자체 서빙 광고 store 계약은 무추적·무식별 계측 경계를 함께 고정한다", () => {
   const readiness = readJson("apps/mobile/release/store-submission-readiness.json");
+  const postPublishE2ePath = "apps/mobile/release/post-publish-ad-event-expiry-e2e.json";
+  const postPublishE2e = readJson(postPublishE2ePath);
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const privacyInventory = readJson("apps/mobile/release/store-privacy-inventory.json");
   const androidMainManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
@@ -2788,9 +2902,10 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
   assert.equal(playStoreContent.appContentDeclarations.ads, true);
   assert.equal(privacyInventory.advertising.included, true);
   assert.equal(privacyInventory.advertising.servingModel, "first-party-self-served");
-  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking", "measurementEvents"]) {
+  for (const field of ["personalized", "adId", "thirdPartyAdSdk", "tracking"]) {
     assert.equal(privacyInventory.advertising[field], false, `advertising.${field} must remain false`);
   }
+  assert.equal(privacyInventory.advertising.measurementEvents, true);
   assert.deepEqual(privacyInventory.advertising.collectedDataTypeIds, []);
   assert.equal(privacyInventory.tracking, false);
   assert.ok(privacyInventory.dataTypes.every((item) => item.usedForTracking === false));
@@ -2835,7 +2950,27 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
   );
   assert.match(adDisclosure.readyWhenKo, /자체 서빙/);
   assert.match(adDisclosure.readyWhenKo, /비개인화/);
-  assert.match(adDisclosure.readyWhenKo, /명시적으로 누를 때만.*외부 브라우저/);
+  assert.match(adDisclosure.readyWhenKo, /사용자·기기·세션 식별자 없이 일별 count/);
+  assert.match(adDisclosure.readyWhenKo, /production 소재·event 집계 E2E는 owner 승인으로 deferred/);
+  assert.match(adDisclosure.readyWhenKo, /Play Store 게시 후 impression 1회, click, 종료 collapse, 일별 count/);
+  assert.ok(adDisclosure.evidence.includes("ad-event-expiry-contract-test"));
+  assert.ok(adDisclosure.evidence.includes("post-publish-ad-event-expiry-e2e-owner-deferred"));
+  assert.ok(adDisclosure.linkedArtifacts.includes(postPublishE2ePath));
+
+  assert.equal(postPublishE2e.schemaVersion, 1);
+  assert.equal(postPublishE2e.ownerIssue, 1971);
+  assert.match(postPublishE2e.approval.ownerKo, /\S/);
+  assert.match(postPublishE2e.approval.recordedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/);
+  assert.equal(postPublishE2e.approval.decision, "DEFER_UNTIL_PLAY_STORE_PUBLICATION");
+  assert.match(postPublishE2e.execution.assigneeKo, /\S/);
+  assert.match(postPublishE2e.execution.deadlineAfterPublicRelease, /^P(?=\d|T\d)/);
+  assert.equal(postPublishE2e.execution.status, "DEFERRED_UNTIL_PUBLIC_RELEASE");
+  assert.equal(postPublishE2e.execution.result, "PENDING");
+  assert.deepEqual(
+    postPublishE2e.checks.map((check) => check.id).sort(),
+    ["click", "daily_count", "expiry_collapse", "impression_once"],
+  );
+  assert.ok(postPublishE2e.checks.every((check) => check.result === "PENDING"));
 
   for (const dependencyPath of ["apps/mobile/pubspec.yaml", "apps/mobile/pubspec.lock"]) {
     assert.doesNotMatch(
@@ -2845,13 +2980,14 @@ test("자체 서빙 광고 store 계약은 광고 포함과 무추적·무계측
     );
   }
   assert.doesNotMatch(androidMainManifest, /android\.permission\.AD_ID/);
-  for (const sourcePath of mobileProductionDartFiles()) {
-    assert.doesNotMatch(
-      read(sourcePath),
-      /\/api\/ads\/events/,
-      `${sourcePath} must not send ad measurement events`,
-    );
-  }
+  const adEventSenders = mobileAdEventSenderFiles();
+  assert.deepEqual(adEventSenders, [
+    "apps/mobile/lib/features/ads/ad_repository.dart",
+  ]);
+
+  const adRepository = read("apps/mobile/lib/features/ads/ad_repository.dart");
+  assert.match(adRepository, /Future<void> recordEvent\(/);
+  assertAnonymousAdEventPostCall(adRepository);
 });
 
 test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release 산출물까지 차단한다", () => {
@@ -2954,11 +3090,16 @@ test("자체 서빙 광고 native 경계는 SDK·AD_ID·event POST를 release �
   );
 
   const adRepositoryTest = read("apps/mobile/test/features/ads/ad_repository_test.dart");
-  assert.match(adRepositoryTest, /test\('GET active 요청의 method, path, query가 정확하고 event 요청은 없다'/);
-  assert.match(adRepositoryTest, /AdPlacement\.routeResultBottom[\s\S]*AdPlacement\.stationDetailBottom/);
-  assert.match(adRepositoryTest, /expect\(requests, hasLength\(2\)\)/);
-  assert.match(adRepositoryTest, /requests\.map\(\(request\) => request\.method\), everyElement\('GET'\)/);
-  assert.match(adRepositoryTest, /request\.uri\.path == '\/api\/ads\/events'[\s\S]*isEmpty/);
+  assert.match(adRepositoryTest, /test\('event는 정확한 세 필드만 POST하고 204를 완료로 취급한다'/);
+  assert.match(adRepositoryTest, /'placement': 'route-result-bottom'/);
+  assert.match(adRepositoryTest, /'creativeId': 'creative-1'/);
+  assert.match(adRepositoryTest, /'eventType': 'IMPRESSION'/);
+  assert.match(adRepositoryTest, /network와 timeout 실패는 저장이나 재시도 없이 무시한다/);
+
+  const bannerTest = read("apps/mobile/test/features/ads/active_ad_banner_test.dart");
+  assert.match(bannerTest, /실제 frame render 뒤 생명주기당 한 번/);
+  assert.match(bannerTest, /tap마다 click을 fire-and-forget/);
+  assert.match(bannerTest, /미래 endsAt에 즉시 collapse하고 자동 refetch하지 않는다/);
 });
 
 test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성한다", async () => {
@@ -3384,7 +3525,12 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     cwd: root,
     encoding: "utf8",
   }).trim().split("\n").filter(Boolean)) {
-    for (const status of collectStatusValues(readJson(releaseFile))) {
+    const statuses = collectStatusValues(readJson(releaseFile));
+    if (releaseFile === "apps/mobile/release/post-publish-ad-event-expiry-e2e.json") {
+      assert.deepEqual(statuses, ["DEFERRED_UNTIL_PUBLIC_RELEASE"]);
+      continue;
+    }
+    for (const status of statuses) {
       assert.ok(allowedStatuses.has(status), `${releaseFile} uses unsupported status ${status}`);
     }
   }
