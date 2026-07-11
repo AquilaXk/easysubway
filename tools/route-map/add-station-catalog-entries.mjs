@@ -21,6 +21,9 @@
 // line_sequence는 공식 개통 순서를 계양(11) 바로 앞 8·9·10에 인접 배치한다.
 // 도식 좌표(route_map_positions)는 #1950 수도권 정본 도식이 이어받는다.
 //
+// 발급된 station id 4건은 향후 tools/datapack/inputs/capital-pilot-production-source-input.json에
+// KRIC 공식 레코드 반영 시 반드시 재사용한다(동일 물리역 id 분기 방지).
+//
 // 사용: node tools/route-map/add-station-catalog-entries.mjs [--pack …] [--index …] [--check]
 import { createHash } from "node:crypto";
 import { mutatePack, parsePackArgs } from "./station-surgery.mjs";
@@ -30,8 +33,9 @@ const INCHEON1 = "line-98718184f016"; // 수도권 인천1호선
 const SEOHAE = "line-051552e50435"; // 수도권 서해선
 const EVERLINE = "line-828f04afc588"; // 수도권 에버라인
 
-// last_verified_at 기준: 검단연장 3역·신규 엣지는 공식 보도자료 검증일(2026-07-11),
-// KRIC 파일 기반 행(원종·개명)은 파일 데이터 기준일(2026-06-30).
+// last_verified_at 기준: 검단연장 3역과 그 체인의 RIDE 엣지는 공식 보도자료 검증일
+// (2026-07-11), 원종·개명과 원종 체인의 RIDE 엣지는 KRIC 파일 기반이므로 파일
+// 데이터 기준일(2026-06-30) — RIDE_CHAINS[*].lastVerifiedAt이 체인별 근거를 갖는다.
 export const VERIFIED_PRESS_AT = Date.UTC(2026, 6, 11) / 1000;
 export const VERIFIED_KRIC_AT = Date.UTC(2026, 5, 30) / 1000;
 
@@ -110,6 +114,7 @@ export const RIDE_CHAINS = [
     ],
     expectedMembers: 33, // 개통 보도자료: 검단연장 후 인천1호선 총 33역
     removeDirect: [],
+    lastVerifiedAt: VERIFIED_PRESS_AT, // 인천시 공식 보도자료 검증일
   },
   {
     lineId: SEOHAE,
@@ -122,6 +127,7 @@ export const RIDE_CHAINS = [
     expectedMembers: 21, // 기존 20역 + 원종
     // 원종이 사이에 들어가므로 기존 김포공항↔부천종합운동장 직결 RIDE 제거
     removeDirect: [["station-1f38f0831cb1", "station-28be6a80c00e"]],
+    lastVerifiedAt: VERIFIED_KRIC_AT, // KRIC 역사정보 2026-06-30 파일 기준일
   },
 ];
 
@@ -224,7 +230,32 @@ function applyNewStation(db, spec) {
   };
 }
 
-function applyChain(db, { lineId, chain, expectedMembers, removeDirect }) {
+/**
+ * 읽기 전용: applyChain이 던지는 사전조건(체인 역 존재·removeDirect 직결 엣지 존재)을
+ * --check 미리보기용으로 점검한다. applyChain과 동일한 id 해소 규칙을 쓴다.
+ */
+export function previewChain(db, { lineId, chain, removeDirect }) {
+  const rows = [];
+  for (const entry of chain) {
+    const id = typeof entry === "string" ? newStationId(lineId, entry) : entry.id;
+    const name = typeof entry === "string" ? entry : entry.name;
+    const present = Boolean(db.prepare("SELECT 1 FROM stations WHERE id=?").get(id));
+    rows.push({ name, id, present });
+  }
+  for (const [a, b] of removeDirect) {
+    const present = Boolean(
+      db
+        .prepare(
+          "SELECT 1 FROM network_edges WHERE edge_type='RIDE' AND from_node_id=? AND to_node_id=?",
+        )
+        .get(`${a}:${lineId}`, `${b}:${lineId}`),
+    );
+    rows.push({ name: `직결 ${a}↔${b}`, id: `${a}:${lineId}`, present });
+  }
+  return rows;
+}
+
+export function applyChain(db, { lineId, chain, expectedMembers, removeDirect, lastVerifiedAt }) {
   const ids = chain.map((entry) =>
     typeof entry === "string" ? newStationId(lineId, entry) : entry.id,
   );
@@ -245,7 +276,7 @@ function applyChain(db, { lineId, chain, expectedMembers, removeDirect }) {
   }
   let inserted = 0;
   for (let i = 0; i + 1 < ids.length; i += 1) {
-    for (const edge of rideEdgePair(lineId, ids[i], ids[i + 1], VERIFIED_PRESS_AT)) {
+    for (const edge of rideEdgePair(lineId, ids[i], ids[i + 1], lastVerifiedAt)) {
       const dup = db
         .prepare(
           "SELECT 1 FROM network_edges WHERE edge_type='RIDE' AND from_node_id=? AND to_node_id=?",
@@ -306,6 +337,13 @@ function main() {
         console.log(
           `(--check) ${spec.name} → ${station.id} ${spec.lineId} seq=${spec.lineSequence} [${exists ? "이미 있음" : "신규"}${occupied ? `, seq 점유: ${occupied.station_id}` : ""}] (${spec.evidence})`,
         );
+      }
+      for (const spec of RIDE_CHAINS) {
+        for (const { name, id, present } of previewChain(db, spec)) {
+          console.log(
+            `(--check) 체인 ${spec.lineId}: ${name}(${id}) ${present ? "있음" : "없음 ⚠"}`,
+          );
+        }
       }
       const target = db
         .prepare("SELECT name_ko FROM stations WHERE id=?")
