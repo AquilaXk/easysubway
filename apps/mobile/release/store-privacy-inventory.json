@@ -2,6 +2,17 @@
   "schemaVersion": 1,
   "applicationId": "easysubway",
   "tracking": false,
+  "advertising": {
+    "included": true,
+    "servingModel": "first-party-self-served",
+    "personalized": false,
+    "adId": false,
+    "thirdPartyAdSdk": false,
+    "tracking": false,
+    "measurementEvents": false,
+    "collectedDataTypeIds": [],
+    "lastVerifiedAt": "2026-07-11"
+  },
   "sharesDataWithThirdParties": true,
   "encryptionInTransitRequired": true,
   "userDataDeletionSupported": true,
