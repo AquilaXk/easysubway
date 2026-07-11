@@ -9,6 +9,14 @@ enum AdPlacement {
   final String id;
 }
 
+enum AdEventType {
+  impression('IMPRESSION'),
+  click('CLICK');
+
+  const AdEventType(this.wireValue);
+  final String wireValue;
+}
+
 final class AdCreative {
   const AdCreative({
     required this.placement,
@@ -17,6 +25,7 @@ final class AdCreative {
     required this.landingUrl,
     required this.advertiserName,
     required this.altText,
+    required this.endsAt,
   });
 
   final AdPlacement placement;
@@ -25,6 +34,7 @@ final class AdCreative {
   final Uri landingUrl;
   final String advertiserName;
   final String altText;
+  final DateTime? endsAt;
 }
 
 final class AdRepository {
@@ -37,7 +47,7 @@ final class AdRepository {
   ApiClient? _apiClient;
   final Uri? Function()? _baseUri;
 
-  /// ponytail: 현재 200 응답만 사용한다. 소재 캐시와 event 전송은 범위 밖이다.
+  /// ponytail: 현재 200 응답만 사용한다. 소재 캐시와 event 저장/재시도는 범위 밖이다.
   Future<AdCreative?> fetchActive(AdPlacement placement) async {
     final apiClient = _apiClient;
     final resolvedClient = apiClient ?? _lazyClient();
@@ -71,6 +81,14 @@ final class AdRepository {
     final landingUrl = _httpsUri(_text(data, 'landingUrl'));
     final advertiserName = _text(data, 'advertiserName');
     final altText = _text(data, 'altText');
+    if (!data.containsKey('endsAt')) {
+      return null;
+    }
+    final endsAtValue = data['endsAt'];
+    final endsAt = _utcDateTime(endsAtValue);
+    if (endsAtValue != null && endsAt == null) {
+      return null;
+    }
     if (responsePlacement != placement.id ||
         creativeId == null ||
         imageUrl == null ||
@@ -87,7 +105,31 @@ final class AdRepository {
       landingUrl: landingUrl,
       advertiserName: advertiserName,
       altText: altText,
+      endsAt: endsAt,
     );
+  }
+
+  Future<void> recordEvent(
+    AdPlacement placement,
+    String creativeId,
+    AdEventType eventType,
+  ) async {
+    final resolvedClient = _apiClient ?? _lazyClient();
+    if (resolvedClient == null) {
+      return;
+    }
+    try {
+      await resolvedClient.postJson(
+        '/api/ads/events',
+        body: {
+          'placement': placement.id,
+          'creativeId': creativeId,
+          'eventType': eventType.wireValue,
+        },
+      );
+    } on ApiException {
+      return;
+    }
   }
 
   ApiClient? _lazyClient() {
@@ -112,4 +154,28 @@ Uri? _httpsUri(String? value) {
   return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty
       ? uri
       : null;
+}
+
+DateTime? _utcDateTime(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final match = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$',
+  ).firstMatch(value);
+  if (match == null) {
+    return null;
+  }
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null ||
+      !parsed.isUtc ||
+      parsed.year != int.parse(match[1]!) ||
+      parsed.month != int.parse(match[2]!) ||
+      parsed.day != int.parse(match[3]!) ||
+      parsed.hour != int.parse(match[4]!) ||
+      parsed.minute != int.parse(match[5]!) ||
+      parsed.second != int.parse(match[6]!)) {
+    return null;
+  }
+  return parsed;
 }

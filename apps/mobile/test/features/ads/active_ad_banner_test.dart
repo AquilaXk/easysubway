@@ -11,21 +11,46 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class _StubApiClient extends ApiClient {
-  _StubApiClient(this.response, {this.error})
-    : super(baseUri: Uri.parse('https://api.easysubway.example'));
+  _StubApiClient(
+    this.response, {
+    this.error,
+    this.eventResponse,
+    this.eventError,
+  }) : super(baseUri: Uri.parse('https://api.easysubway.example'));
 
   final Future<ApiResponse> response;
   final Object? error;
+  final Future<ApiResponse>? eventResponse;
+  final Object? eventError;
+  final eventBodies = <Map<String, Object?>>[];
+  var getCalls = 0;
 
   @override
   Future<ApiResponse> getJson(
     String path, {
     Map<String, String> headers = const {},
   }) async {
+    getCalls++;
     if (error != null) {
       throw error!;
     }
     return response;
+  }
+
+  @override
+  Future<ApiResponse> postJson(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String> headers = const {},
+  }) async {
+    eventBodies.add(Map<String, Object?>.of(body));
+    if (eventError != null) {
+      throw eventError!;
+    }
+    if (eventResponse != null) {
+      return eventResponse!;
+    }
+    return const ApiResponse(statusCode: 204, jsonBody: null);
   }
 }
 
@@ -43,6 +68,15 @@ class _SequencedApiClient extends ApiClient {
   }) {
     return responses[calls++];
   }
+
+  @override
+  Future<ApiResponse> postJson(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String> headers = const {},
+  }) async {
+    return const ApiResponse(statusCode: 204, jsonBody: null);
+  }
 }
 
 enum _ReloadDependency { repository, placement, imageLoader }
@@ -52,6 +86,7 @@ ApiResponse _creativeResponse({
   String imageUrl = 'https://cdn.easysubway.app/banner.png',
   String advertiserName = '이지상점',
   String altText = '여름 할인 배너',
+  Object? endsAt = '2099-12-31T23:59:59Z',
 }) => ApiResponse(
   statusCode: 200,
   jsonBody: <String, Object?>{
@@ -63,6 +98,7 @@ ApiResponse _creativeResponse({
       'landingUrl': 'https://advertiser.example/campaign',
       'advertiserName': advertiserName,
       'altText': altText,
+      'endsAt': endsAt,
     },
   },
 );
@@ -77,11 +113,14 @@ final _image = MemoryImage(
 
 Future<bool> _launchSuccess(Uri uri, {required LaunchMode mode}) async => true;
 
+DateTime _utcNow() => DateTime.now().toUtc();
+
 Future<void> _pumpBanner(
   WidgetTester tester, {
   Future<ApiResponse>? response,
   required AdImageLoader imageLoader,
   AdLauncher? launcher,
+  DateTime Function() now = _utcNow,
   Object? apiError,
   AdRepository? repository,
   AdPlacement placement = AdPlacement.routeResultBottom,
@@ -107,6 +146,7 @@ Future<void> _pumpBanner(
               placement: placement,
               imageLoader: imageLoader,
               launcher: launcher ?? _launchSuccess,
+              now: now,
             ),
           ),
         ),
@@ -197,6 +237,288 @@ void main() {
     expect(find.byIcon(Icons.open_in_new), findsOneWidget);
     expect(find.text('광고 미리보기 (개발용)'), findsNothing);
   });
+
+  testWidgets('impression은 decode와 실제 frame render 뒤 생명주기당 한 번 보낸다', (
+    tester,
+  ) async {
+    final image = Completer<ImageProvider<Object>>();
+    final client = _StubApiClient(Future.value(_creativeResponse()));
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) => image.future,
+    );
+    await tester.pump();
+
+    expect(find.byType(AdBannerSlot), findsNothing);
+    expect(client.eventBodies, isEmpty);
+
+    image.complete(_image);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byType(AdBannerSlot), findsOneWidget);
+    expect(client.eventBodies, [
+      {
+        'placement': 'route-result-bottom',
+        'creativeId': 'creative-1',
+        'eventType': 'IMPRESSION',
+      },
+    ]);
+
+    await tester.pump();
+    expect(client.eventBodies, hasLength(1));
+  });
+
+  testWidgets('render 상태 설치 뒤 post-frame callback 전에 만료되면 impression을 생략한다', (
+    tester,
+  ) async {
+    final image = Completer<ImageProvider<Object>>();
+    var now = DateTime.utc(2026, 7, 12, 1);
+    final endsAt = now.add(const Duration(minutes: 1));
+    final client = _StubApiClient(
+      Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
+    );
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) => image.future,
+      now: () => now,
+    );
+    await tester.pump();
+
+    tester.binding.addPostFrameCallback((_) => image.complete(_image));
+    tester.binding.scheduleFrame();
+    await tester.pump();
+    expect(tester.binding.hasScheduledFrame, isTrue);
+    expect(client.eventBodies, isEmpty);
+
+    now = endsAt;
+    await tester.pump();
+
+    final impressions = client.eventBodies
+        .where((body) => body['eventType'] == 'IMPRESSION')
+        .toList();
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    expect(impressions, isEmpty);
+  });
+
+  testWidgets('tap마다 click을 fire-and-forget하고 event 대기와 무관하게 landing을 연다', (
+    tester,
+  ) async {
+    final pendingEvent = Completer<ApiResponse>();
+    final client = _StubApiClient(
+      Future.value(_creativeResponse()),
+      eventResponse: pendingEvent.future,
+    );
+    final launches = <Uri>[];
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+      launcher: (uri, {required mode}) async {
+        launches.add(uri);
+        return true;
+      },
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final target = find.byKey(const Key('activeAdBannerTapTarget'));
+    await tester.tap(target);
+    await tester.tap(target);
+    await tester.pump();
+
+    expect(
+      client.eventBodies.where((body) => body['eventType'] == 'CLICK'),
+      hasLength(2),
+    );
+    expect(launches, [
+      Uri.parse('https://advertiser.example/campaign'),
+      Uri.parse('https://advertiser.example/campaign'),
+    ]);
+
+    pendingEvent.complete(const ApiResponse(statusCode: 204, jsonBody: null));
+  });
+
+  testWidgets('click event 실패는 외부 browser landing을 막지 않는다', (tester) async {
+    final client = _StubApiClient(
+      Future.value(_creativeResponse()),
+      eventError: const ApiException('offline'),
+    );
+    var launches = 0;
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+      launcher: (uri, {required mode}) async {
+        launches++;
+        return true;
+      },
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('activeAdBannerTapTarget')));
+    await tester.pump();
+
+    expect(launches, 1);
+    expect(
+      client.eventBodies.where((body) => body['eventType'] == 'CLICK'),
+      hasLength(1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('이미 만료된 creative는 decode, render, impression을 모두 생략한다', (
+    tester,
+  ) async {
+    final now = DateTime.utc(2026, 7, 12, 1);
+    final client = _StubApiClient(
+      Future.value(
+        _creativeResponse(
+          endsAt: now.subtract(const Duration(seconds: 1)).toIso8601String(),
+        ),
+      ),
+    );
+    var decodeCalls = 0;
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async {
+        decodeCalls++;
+        return _image;
+      },
+      now: () => now,
+    );
+    await tester.pump();
+
+    expect(decodeCalls, 0);
+    expect(find.byType(AdBannerSlot), findsNothing);
+    expect(client.eventBodies, isEmpty);
+  });
+
+  testWidgets('미래 endsAt에 즉시 collapse하고 자동 refetch하지 않는다', (tester) async {
+    var now = DateTime.utc(2026, 7, 12, 1);
+    final endsAt = now.add(const Duration(seconds: 5));
+    final client = _StubApiClient(
+      Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
+    );
+    await _pumpBanner(
+      tester,
+      repository: AdRepository(client),
+      imageLoader: (_, _) async => _image,
+      now: () => now,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.byType(AdBannerSlot), findsOneWidget);
+
+    now = endsAt;
+    await tester.pump(const Duration(seconds: 5));
+
+    expect(find.byType(AdBannerSlot), findsNothing);
+    expect(client.getCalls, 1);
+  });
+
+  testWidgets(
+    'endsAt 이후 timer cleanup 전 tap은 collapse하고 click과 landing을 생략한다',
+    (tester) async {
+      var now = DateTime.utc(2026, 7, 12, 1);
+      final endsAt = now.add(const Duration(minutes: 1));
+      final client = _StubApiClient(
+        Future.value(_creativeResponse(endsAt: endsAt.toIso8601String())),
+      );
+      var launches = 0;
+      await _pumpBanner(
+        tester,
+        repository: AdRepository(client),
+        imageLoader: (_, _) async => _image,
+        now: () => now,
+        launcher: (uri, {required mode}) async {
+          launches++;
+          return true;
+        },
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(AdBannerSlot), findsOneWidget);
+
+      final onTap = tester
+          .widget<Semantics>(find.byKey(const Key('activeAdBannerTapTarget')))
+          .properties
+          .onTap!;
+      now = endsAt;
+      onTap();
+      await tester.pump();
+
+      final collapsed = find.byType(AdBannerSlot).evaluate().isEmpty;
+      await tester.pumpWidget(const SizedBox.shrink());
+
+      expect(collapsed, isTrue);
+      expect(
+        client.eventBodies.where((body) => body['eventType'] == 'CLICK'),
+        isEmpty,
+      );
+      expect(launches, 0);
+    },
+  );
+
+  testWidgets(
+    'widget 교체는 이전 expiry Timer를 cancel하고 dispose 뒤 callback을 남기지 않는다',
+    (tester) async {
+      const bannerKey = ValueKey('expiry-generation-banner');
+      var now = DateTime.utc(2026, 7, 12, 1);
+      final firstEndsAt = now.add(const Duration(seconds: 5));
+      final replacementEndsAt = now.add(const Duration(hours: 1));
+      final firstClient = _StubApiClient(
+        Future.value(
+          _creativeResponse(
+            advertiserName: '이전 광고',
+            endsAt: firstEndsAt.toIso8601String(),
+          ),
+        ),
+      );
+      await _pumpBanner(
+        tester,
+        bannerKey: bannerKey,
+        repository: AdRepository(firstClient),
+        imageLoader: (_, _) async => _image,
+        now: () => now,
+      );
+      await tester.pump();
+      await tester.pump();
+
+      final replacementClient = _StubApiClient(
+        Future.value(
+          _creativeResponse(
+            advertiserName: '현재 광고',
+            endsAt: replacementEndsAt.toIso8601String(),
+          ),
+        ),
+      );
+      await _pumpBanner(
+        tester,
+        bannerKey: bannerKey,
+        repository: AdRepository(replacementClient),
+        imageLoader: (_, _) async => _image,
+        now: () => now,
+      );
+      await tester.pump();
+      await tester.pump();
+      now = firstEndsAt;
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(find.text('현재 광고'), findsOneWidget);
+      expect(find.text('이전 광고'), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      now = replacementEndsAt;
+      await tester.pump(const Duration(hours: 1));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('TalkBack은 광고와 altText를 한 번 전달하고 전체 96dp가 클릭 영역이다', (
     tester,
