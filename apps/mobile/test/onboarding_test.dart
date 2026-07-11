@@ -1,3 +1,5 @@
+import 'package:easysubway_mobile/accessible_design.dart';
+import 'package:easysubway_mobile/design_tokens.dart';
 import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
@@ -42,27 +44,55 @@ void main() {
     expect(storage.deletedKeys, isEmpty);
   });
 
-  testWidgets('온보딩 소개는 기본 시작 버튼 아래 보조 문구를 표시하지 않는다', (tester) async {
+  testWidgets('시작 화면은 부연 설명 문장 없이 핵심 가치 한 줄과 단일 CTA만 둔다', (tester) async {
+    // #1936: 장황한 중간 소개 화면(OnboardingIntroScreen)을 제거하고, 시작 화면은
+    // 가치 카피 한 줄 + "시작하기" CTA만 남겼다.
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OnboardingIntroScreen(onConfigure: () {}, onSkip: () {}),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
-    expect(find.byKey(const Key('onboardingIntroSkipButton')), findsOneWidget);
-    expect(find.text('천천히 이동 · 큰 글씨 · 단순 보기 적용'), findsNothing);
+    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
+    expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
+    expect(find.text('시작하기'), findsOneWidget);
+    // #1936(프리미엄 다듬기): 상단 무채색 브랜드 심볼/워드마크로 밋밋함을 해소한다.
+    expect(find.text('쉬운 지하철'), findsOneWidget);
+    // 부연 설명 문장은 전면 삭제됐다(#1936).
+    expect(find.textContaining('먼저 안내해요'), findsNothing);
+    expect(find.textContaining('엘리베이터와 출구까지'), findsNothing);
+    expect(find.text('계단 없는 길을\n먼저 찾습니다'), findsNothing);
+  });
+
+  testWidgets('시작 화면 브랜드 심볼은 무채색 잉크 라인으로 그리고 워드마크와 함께 온다', (tester) async {
+    // #1936(프리미엄 다듬기): 텍스트+버튼만이라는 밋밋함을 해소하는 상단 앵커.
+    // 심볼은 색 없는 라인 아트(CustomPaint)로, 워드마크는 잉크 텍스트로 둔다.
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+
+    // 라인 아트 심볼(CustomPaint)이 워드마크 위/좌측에 존재한다.
+    expect(find.byType(CustomPaint), findsWidgets);
+    // 워드마크는 심볼 앵커로 노출되고, 스크린리더에는 '쉬운 지하철'로 읽힌다.
+    expect(find.bySemanticsLabel('쉬운 지하철'), findsOneWidget);
+
+    // 심볼(워드마크)이 가치 타이틀보다 위에 배치되는 여백 리듬을 확인한다.
+    final markBottom = tester.getRect(find.text('쉬운 지하철')).bottom;
+    final titleTop = tester.getRect(find.text('빠른 길보다,\n갈 수 있는 길')).top;
+    expect(markBottom, lessThan(titleTop));
   });
 
   testWidgets('온보딩 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.viewPadding = const FakeViewPadding(bottom: 34);
+    tester.view.padding = const FakeViewPadding(bottom: 34);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetViewPadding);
+    addTearDown(tester.view.resetPadding);
 
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
@@ -72,7 +102,11 @@ void main() {
       find.byKey(const Key('startScreenStartButton')),
     );
 
-    expect(screenBottom - buttonRect.bottom, greaterThanOrEqualTo(66));
+    // SafeArea 인셋(34) + 앱 토큰 여백(xxl)만 기대한다. 이중 가산 금지.
+    expect(
+      screenBottom - buttonRect.bottom,
+      closeTo(34 + EasySubwaySpacing.xxl, 0.5),
+    );
   });
 
   testWidgets('온보딩은 이동 조건과 보기 설정을 선택한 뒤 완료 결과를 반환한다', (tester) async {
@@ -93,18 +127,19 @@ void main() {
       );
 
       expect(find.text('쉬운 지하철'), findsOneWidget);
-      expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+      expect(find.text('어떻게 이동하세요?'), findsOneWidget);
       expect(find.text('천천히 이동'), findsOneWidget);
       expect(find.text('휠체어 이용'), findsOneWidget);
-      // 이동 조건 설명은 mobilityProfileOptions.summary 한 벌로 통일됐다(#1568):
-      // 온보딩 전용 축약 문구를 없애고 카드 본문이 정본 summary를 그대로 보여준다.
-      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
-      expect(find.text('걷기와 환승 줄이기'), findsNothing);
+      // #1936: 프리셋은 라벨만 노출한다(설명 문장 제거). 상세 요약은 홈 설정으로.
+      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsNothing);
+      expect(find.text('계단 없는 길만 안내해요'), findsNothing);
 
-      final disabledDoneButton = tester.widget<FilledButton>(
+      // #1936: 첫 프리셋이 기본 선택이라 '이대로 시작'으로 바로 통과할 수 있다.
+      final doneButton = tester.widget<FilledButton>(
         find.byKey(const Key('onboardingDoneButton')),
       );
-      expect(disabledDoneButton.onPressed, isNull);
+      expect(doneButton.onPressed, isNotNull);
+      expect(find.text('이대로 시작'), findsOneWidget);
 
       await tester.tap(
         find.byKey(const Key('onboardingProfileCard-wheelchair')),
@@ -142,6 +177,83 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('온보딩 권한 단계는 박스 없이 라인 아이콘 행 + 구분선으로 항목을 나열한다', (tester) async {
+    // #1936(전체 워크플로우 일관성): 권한 항목이 Card(박스)가 아니라 프로필
+    // 리스트와 같은 행+Divider 언어여야 한다. 무채색 라인 아이콘 + 라벨 + 스위치.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OnboardingScreen(
+          notificationPermissionProvider: _FakeNotificationPermissionProvider(),
+          onCompleted: (_) {},
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('onboardingDoneButton')));
+    await tester.pumpAndSettle();
+
+    // 권한 항목은 무채색 라인 아이콘으로 시각 리듬을 준다(위치·알림).
+    expect(find.byIcon(Icons.location_on_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_none), findsOneWidget);
+
+    // 두 항목 사이에는 박스 대신 무채색 구분선이 있다.
+    final permissionDividers = tester
+        .widgetList<Divider>(find.byType(Divider))
+        .where((divider) => divider.color == EasySubwayAccessibleColors.line);
+    expect(permissionDividers, isNotEmpty);
+
+    // 권한 아이콘도 무채색 잉크 토큰만 쓴다(초록/민트 금지).
+    final locationIcon = tester.widget<Icon>(
+      find.byIcon(Icons.location_on_outlined),
+    );
+    expect(
+      locationIcon.color,
+      anyOf(
+        EasySubwayAccessibleColors.text,
+        EasySubwayAccessibleColors.mutedText,
+      ),
+    );
+
+    // "나중에 설정" skip이 명확히 노출돼 몇 초 내 홈으로 통과할 수 있다.
+    expect(
+      find.byKey(const Key('onboardingPermissionSkipButton')),
+      findsOneWidget,
+    );
+    expect(find.text('나중에 설정'), findsOneWidget);
+  });
+
+  testWidgets('온보딩 프로필 프리셋 행은 무채색 라인 아이콘과 라벨을 함께 둔다', (tester) async {
+    // #1936(프리미엄 다듬기): personalization 리스트에 무채색 라인 아이콘으로
+    // 시각 리듬을 준다. 아이콘은 색(초록/틴트) 없이 잉크 톤만 쓴다.
+    await tester.pumpWidget(
+      MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
+    );
+
+    // 기본 선택(천천히 이동)의 프리셋 행에는 라벨 옆에 프로필 아이콘이 있다.
+    final elderly = mobilityProfileOptions.firstWhere(
+      (option) => option.id == 'elderly',
+    );
+    final rowFinder = find.byKey(const Key('onboardingProfileCard-elderly'));
+    expect(
+      find.descendant(of: rowFinder, matching: find.byIcon(elderly.icon)),
+      findsOneWidget,
+    );
+
+    // 아이콘 색은 무채색 잉크 토큰만 쓴다(초록/민트/틴트 금지).
+    final icon = tester.widget<Icon>(
+      find.descendant(of: rowFinder, matching: find.byIcon(elderly.icon)),
+    );
+    expect(
+      icon.color,
+      anyOf(
+        EasySubwayAccessibleColors.text,
+        EasySubwayAccessibleColors.mutedText,
+      ),
+    );
   });
 
   testWidgets('온보딩 권한 단계는 나중에 설정을 누르면 권한 요청 없이 완료한다', (tester) async {
@@ -320,7 +432,7 @@ void main() {
     expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
     await tester.tap(find.byTooltip('이전 단계'));
     await tester.pumpAndSettle();
-    expect(find.text('어떤 도움이 필요한가요?'), findsOneWidget);
+    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -328,7 +440,7 @@ void main() {
     expect(find.text('필요한 권한을 나중에 켤 수 있어요'), findsNothing);
   });
 
-  testWidgets('온보딩 고정 CTA 단계는 하단 스크롤 여백을 확보한다', (tester) async {
+  testWidgets('온보딩 단계별로 하단 CTA 고정과 스크롤 여백을 확보한다', (tester) async {
     tester.view.viewPadding = const FakeViewPadding(bottom: 34);
     addTearDown(tester.view.resetViewPadding);
 
@@ -344,9 +456,32 @@ void main() {
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
 
-    // 권한 단계는 하단 고정 버튼이 없어 여백이 32로 줄어든다(#1563).
-    final secondStepList = tester.widget<ListView>(find.byType(ListView));
-    expect(secondStepList.padding?.resolve(TextDirection.ltr).bottom, 32);
+    // #1936: 권한 단계는 시작 화면과 같은 하단 고정 CTA 리듬을 쓴다 —
+    // ListView 대신 스크롤 가능한 Column + Spacer로 두 CTA를 하단에 고정한다.
+    expect(find.byType(ListView), findsNothing);
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
+    expect(
+      find.byKey(const Key('onboardingPermissionAllowButton')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('onboardingPermissionSkipButton')),
+      findsOneWidget,
+    );
+
+    // 하단 인셋은 SafeArea가 적용하므로 패딩은 토큰(xxl)만 쓴다.
+    final scrollPadding = tester.widget<Padding>(
+      find
+          .descendant(
+            of: find.byType(IntrinsicHeight),
+            matching: find.byType(Padding),
+          )
+          .first,
+    );
+    expect(
+      scrollPadding.padding.resolve(TextDirection.ltr).bottom,
+      moreOrLessEquals(EasySubwaySpacing.xxl),
+    );
   });
 
   test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {

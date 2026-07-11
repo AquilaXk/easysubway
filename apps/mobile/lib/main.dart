@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -12,6 +13,7 @@ import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
 import 'core/datapack/data_pack_metered_consent_gate.dart';
 import 'core/datapack/data_pack_update_state.dart';
+import 'design_tokens.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'features/home_widget/home_widget_link_handler.dart';
 import 'features/home_widget/next_train_widget_repository.dart';
@@ -50,20 +52,8 @@ const _mainPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _mainListPagePadding = EdgeInsets.fromLTRB(17, 18, 17, 32);
 const _appSectionTitlePadding = EdgeInsets.fromLTRB(1, 22, 1, 11);
 const _settingsPagePadding = EdgeInsets.fromLTRB(20, 16, 20, 32);
-const _mainScaffoldBackgroundColor = EasySubwayAccessibleColors.scaffoldSurface;
 const _mainThemeControlRadius = BorderRadius.all(Radius.circular(12));
 const _mainIconControlRadius = BorderRadius.all(Radius.circular(12));
-const _appCardShadowColor = EasySubwayAccessibleColors.cardShadow;
-const _highContrastTextColor = EasySubwayAccessibleColors.highContrastText;
-const _highContrastPrimaryColor =
-    EasySubwayAccessibleColors.highContrastPrimary;
-const _highContrastSecondaryColor =
-    EasySubwayAccessibleColors.highContrastSecondary;
-const _homeFacilityCautionBorderColor = Color(0xFFF1D49A);
-const _settingsSwitchActiveTrackColor =
-    EasySubwayAccessibleColors.switchActiveTrack;
-const _settingsSwitchInactiveTrackColor =
-    EasySubwayAccessibleColors.switchInactiveTrack;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -492,13 +482,30 @@ class EasySubwayApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       scrollBehavior: const EasySubwayScrollBehavior(),
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: EasySubwayAccessibleColors.primary,
-        ),
-        scaffoldBackgroundColor: _mainScaffoldBackgroundColor,
+        // fromSeed는 시드의 미세한 hue를 M3 톤 팔레트로 증폭해 액센트를 채도
+        // 있는 색으로 만든다(무채색 시드도 청록끼로 샌다). 무채색 잉크 원칙을
+        // 지키려 primary/secondary 계열을 명시적 무채색으로 덮어쓴다.
+        colorScheme:
+            ColorScheme.fromSeed(
+              seedColor: EasySubwayAccessibleColors.primary,
+            ).copyWith(
+              primary: EasySubwayAccessibleColors.primary,
+              onPrimary: Colors.white,
+              secondary: EasySubwayAccessibleColors.primary,
+              onSecondary: Colors.white,
+            ),
+        extensions: const [EasySubwayTokens.light],
+        textTheme: easySubwayTextTheme(ThemeData(useMaterial3: true).textTheme),
+        scaffoldBackgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           toolbarHeight: 64,
+          // 평평한 상단바: Material3 surfaceTint(액센트 기반 청록 스크림)와
+          // 스크롤 elevation 그림자를 끈다. 경계는 화면별 얇은 구분선으로만.
+          backgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
+          surfaceTintColor: Colors.transparent,
+          scrolledUnderElevation: 0,
+          elevation: 0,
           titleTextStyle: TextStyle(
             color: EasySubwayAccessibleColors.text,
             fontSize: 22,
@@ -691,7 +698,7 @@ class _StartupLoadingScreen extends StatelessWidget {
                     '쉬운 지하철',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -781,7 +788,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       widget.onboardingStore != null &&
       !widget.initialOnboardingState.isCompleted;
   bool _startScreenDismissed = false;
-  bool _introScreenDismissed = false;
   bool _pendingFacilityReportPhotoRecoveryStarted = false;
   bool _savingOnboardingResult = false;
   OnboardingResult? _pendingOnboardingResult;
@@ -829,22 +835,8 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
           },
         );
       }
-      if (!_introScreenDismissed) {
-        return OnboardingIntroScreen(
-          onConfigure: () {
-            setState(() {
-              _introScreenDismissed = true;
-            });
-          },
-          onSkip: () async {
-            final result = OnboardingResult(
-              profile: mobilityProfileOptions.first,
-              preferences: const OnboardingViewPreferences.defaults(),
-            );
-            await _completeOnboarding(result);
-          },
-        );
-      }
+      // #1936: 장황한 중간 소개 화면(OnboardingIntroScreen)을 제거했다. 시작 화면
+      // 다음은 곧바로 이동 방식 프리셋 → 권한 단계로 이어진다.
       return OnboardingScreen(
         locationProvider: widget.locationProvider,
         notificationPermissionProvider: widget.notificationPermissionProvider,
@@ -914,7 +906,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       _lastPersistedOnboardingResult = null;
       _loadingOnboardingState = false;
       _startScreenDismissed = false;
-      _introScreenDismissed = false;
       _dataDeletionResult = result;
     });
   }
@@ -974,7 +965,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   Future<void> _completeOnboarding(OnboardingResult result) async {
     final previousOnboardingState = _onboardingState;
     final previousStartScreenDismissed = _startScreenDismissed;
-    final previousIntroScreenDismissed = _introScreenDismissed;
     try {
       await _saveOnboardingResult(result);
     } catch (error, stackTrace) {
@@ -989,7 +979,6 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         setState(() {
           _onboardingState = previousOnboardingState;
           _startScreenDismissed = previousStartScreenDismissed;
-          _introScreenDismissed = previousIntroScreenDismissed;
         });
       }
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1261,13 +1250,13 @@ ThemeData _themeForPreferences(
   }
 
   final colorScheme = baseTheme.colorScheme.copyWith(
-    primary: _highContrastPrimaryColor,
+    primary: EasySubwayAccessibleColors.highContrastPrimary,
     onPrimary: Colors.white,
-    secondary: _highContrastSecondaryColor,
+    secondary: EasySubwayAccessibleColors.highContrastSecondary,
     onSecondary: Colors.white,
     surface: Colors.white,
-    onSurface: _highContrastTextColor,
-    outline: _highContrastTextColor,
+    onSurface: EasySubwayAccessibleColors.highContrastText,
+    outline: EasySubwayAccessibleColors.highContrastText,
   );
 
   return baseTheme.copyWith(
@@ -1275,19 +1264,22 @@ ThemeData _themeForPreferences(
     scaffoldBackgroundColor: Colors.white,
     appBarTheme: baseTheme.appBarTheme.copyWith(
       backgroundColor: Colors.white,
-      foregroundColor: _highContrastTextColor,
+      foregroundColor: EasySubwayAccessibleColors.highContrastText,
       titleTextStyle: baseTheme.appBarTheme.titleTextStyle?.copyWith(
-        color: _highContrastTextColor,
+        color: EasySubwayAccessibleColors.highContrastText,
       ),
     ),
     // 보조 버튼이 중립 보더로 바뀌었으므로 고대비에서 보더·텍스트 대비를 보정.
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: baseTheme.outlinedButtonTheme.style?.copyWith(
         foregroundColor: const WidgetStatePropertyAll(
-          _highContrastPrimaryColor,
+          EasySubwayAccessibleColors.highContrastPrimary,
         ),
         side: const WidgetStatePropertyAll(
-          BorderSide(color: _highContrastTextColor, width: 1.5),
+          BorderSide(
+            color: EasySubwayAccessibleColors.highContrastText,
+            width: 1.5,
+          ),
         ),
       ),
     ),
@@ -1440,11 +1432,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late Future<bool> _hasNotificationItemsFuture;
   NoticeController? _noticeController;
 
+  /// #1933 C: 출발·도착이 모두 채워진 draft 조합의 서명. 노선도 위 오버레이(지도 탭·
+  /// 역 검색 어느 경로든)에서 둘 다 채워지면 별도 버튼 없이 결과 타임라인으로 자동
+  /// 연결한다. 같은 조합으로는 한 번만 자동 전환하고, 사용자가 한쪽을 지우거나 바꿔
+  /// 다시 완성하면 서명이 달라져 새로 전환한다.
+  String? _autoRoutedDraftSignature;
+  Timer? _autoRouteDebounce;
+
   @override
   void initState() {
     super.initState();
     _mobilityType = widget.initialMobilityType;
     _routeDraftController = RouteDraftController();
+    _routeDraftController.addListener(_handleRouteDraftChanged);
     final facilitiesFuture = _loadNotificationFacilities();
     _favoriteFacilitiesFuture = facilitiesFuture;
     _hasNotificationItemsFuture = _loadHasNotificationItems(facilitiesFuture);
@@ -1473,8 +1473,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
       _noticeController!.dispose();
     }
+    _autoRouteDebounce?.cancel();
+    _routeDraftController.removeListener(_handleRouteDraftChanged);
     _routeDraftController.dispose();
     super.dispose();
+  }
+
+  /// draft가 바뀔 때마다 호출된다. 출발·도착이 모두 채워지면 결과 탭으로 자동
+  /// 전환한다. 지도 탭·역 검색이 draft를 여러 번 갱신할 수 있으므로 짧게 debounce해
+  /// 마지막 상태로만 전환하고, 같은 조합으로는 중복 전환하지 않는다.
+  void _handleRouteDraftChanged() {
+    final draft = _routeDraftController.draft;
+    final origin = draft.origin;
+    final destination = draft.destination;
+    if (origin == null || destination == null) {
+      // 한쪽이라도 비면 서명을 초기화해, 다시 완성했을 때 재전환되게 한다.
+      _autoRoutedDraftSignature = null;
+      _autoRouteDebounce?.cancel();
+      return;
+    }
+    final signature = '${origin.id} ${destination.id}';
+    if (signature == _autoRoutedDraftSignature) {
+      return;
+    }
+    _autoRoutedDraftSignature = signature;
+    _autoRouteDebounce?.cancel();
+    _autoRouteDebounce = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted) {
+        return;
+      }
+      // 이미 결과 탭이면 setState만으로도 화면이 최신 draft로 다시 빌드되며
+      // RouteSearchScreen이 자동 검색을 이어간다.
+      if (_selectedTabIndex != 2) {
+        setState(() {
+          _routeTabMobilityType = _mobilityType;
+          _selectedTabIndex = 2;
+        });
+      } else {
+        setState(() {});
+      }
+      // 자동 전환을 화면 낭독기에 알린다(포커스는 옮기지 않는다).
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        '출발과 도착이 정해져 경로 결과를 보여드려요.',
+        Directionality.of(context),
+      );
+    });
   }
 
   @override
@@ -1647,10 +1691,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
             entryMode: entryMode,
-            onOpenRouteSearch: () async {
-              Navigator.of(context).pop();
-              openRouteTab();
-            },
+          ),
+        ),
+      );
+      if (!context.mounted) {
+        return;
+      }
+      await refreshHomeState();
+    }
+
+    // G4: 노선도 상단 오버레이의 출발/도착 칸 탭 → 기존 역 검색을 "칸 채우기" 모드로
+    // 연다. 결과 한 번 탭 = 지도 탭과 같은 _routeDraftController로 수렴한 뒤 닫힌다.
+    Future<void> openStationSearchForSlot(RouteDraftSlot slot) async {
+      await Navigator.of(context).push(
+        MaterialPageRoute<RouteDraftStation>(
+          builder: (_) => StationSearchScreen(
+            repository: repository,
+            reportRepository: reportRepository,
+            favoriteRepository: favoriteRepository,
+            searchHistoryRepository: searchHistoryRepository,
+            locationProvider: locationProvider,
+            facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+            internalRouteRepository: internalRouteRepository,
+            internalRouteMobilityType: initialMobilityType,
+            realtimeRepository: realtimeRepository,
+            routeDraftController: _routeDraftController,
+            pickSlot: slot,
           ),
         ),
       );
@@ -1698,8 +1764,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         NetworkMapScreen(
           repository: networkMapRepository,
           routeDraftController: _routeDraftController,
-          onOpenRouteSearch: () async => openRouteTab(),
           onOpenStationSearch: () => unawaited(openStationSearch()),
+          onPickStationForSlot: (slot) =>
+              unawaited(openStationSearchForSlot(slot)),
           stationSearchRepository: repository,
           locationProvider: locationProvider,
           viewportRepository: widget.networkMapViewportRepository,
@@ -1747,7 +1814,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           internalRouteMobilityType: initialMobilityType,
           realtimeRepository: realtimeRepository,
           routeDraftController: _routeDraftController,
-          onOpenRouteSearch: () async => openRouteTab(),
         ),
       );
     }
@@ -2333,7 +2399,7 @@ class _AppSectionTitle extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
           color: EasySubwayAccessibleColors.text,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           height: 1.2,
         ),
       ),
@@ -2364,7 +2430,7 @@ _FacilitySeverityAccent _facilitySeverityAccent(
     ),
     FacilityStatusSeverity.caution => const _FacilitySeverityAccent(
       backgroundColor: EasySubwayAccessibleColors.amberSoft,
-      borderColor: _homeFacilityCautionBorderColor,
+      borderColor: EasySubwayAccessibleColors.amberBorder,
       iconColor: EasySubwayAccessibleColors.amber,
     ),
     FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
@@ -2476,7 +2542,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
                       style: const TextStyle(
                         color: EasySubwayAccessibleColors.text,
                         fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.25,
                       ),
                     ),
@@ -2540,7 +2606,9 @@ class _HomeMiniBadge extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       backgroundColor: EasySubwayAccessibleColors.surface,
       side: const BorderSide(color: EasySubwayAccessibleColors.line),
-      shape: const StadiumBorder(),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+      ),
       labelStyle: const TextStyle(
         color: EasySubwayAccessibleColors.secondaryText,
         fontSize: 11,
@@ -2572,7 +2640,7 @@ class _AppCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       color: backgroundColor,
       elevation: 0,
-      shadowColor: _appCardShadowColor,
+      shadowColor: EasySubwayAccessibleColors.cardShadow,
       shape: RoundedRectangleBorder(
         side: showBorder ? BorderSide(color: borderColor) : BorderSide.none,
         borderRadius: BorderRadius.circular(20),
@@ -2854,7 +2922,7 @@ class _AppSettingsSection extends StatelessWidget {
               title,
               style: textTheme.titleMedium?.copyWith(
                 color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 height: 1.25,
               ),
             ),
@@ -2899,7 +2967,7 @@ class _AppSettingsActionTile extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.25,
             ),
           ),
@@ -2958,7 +3026,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: EasySubwayAccessibleColors.text,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.25,
             ),
           ),
@@ -2976,7 +3044,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                 value,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(width: 8),
@@ -2984,9 +3052,10 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
                 value: enabled,
                 onChanged: onChanged,
                 activeThumbColor: Colors.white,
-                activeTrackColor: _settingsSwitchActiveTrackColor,
+                activeTrackColor: EasySubwayAccessibleColors.switchActiveTrack,
                 inactiveThumbColor: Colors.white,
-                inactiveTrackColor: _settingsSwitchInactiveTrackColor,
+                inactiveTrackColor:
+                    EasySubwayAccessibleColors.switchInactiveTrack,
                 materialTapTargetSize: MaterialTapTargetSize.padded,
               ),
             ],
@@ -3342,7 +3411,7 @@ class _FavoriteHomeStationRow extends StatelessWidget {
                         style: const TextStyle(
                           color: EasySubwayAccessibleColors.text,
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
                       ),
@@ -3402,7 +3471,7 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
                   style: const TextStyle(
                     color: EasySubwayAccessibleColors.text,
                     fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     height: 1.25,
                   ),
                 ),
@@ -3564,7 +3633,7 @@ class _SupportSectionTitle extends StatelessWidget {
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
             color: EasySubwayAccessibleColors.text,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             height: 1.25,
           ),
         ),
@@ -3860,7 +3929,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
                 '삭제 전에 확인해 주세요',
                 style: textTheme.headlineSmall?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
               ),
@@ -3878,7 +3947,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
               _UserDataDeletionCopy.irreversibleLine,
               style: textTheme.bodyLarge?.copyWith(
                 color: EasySubwayAccessibleColors.red,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 height: 1.4,
               ),
             ),
@@ -3992,8 +4061,8 @@ class UserDataDeletionResultScreen extends StatelessWidget {
           padding: _mainPagePadding,
           children: [
             _AppCard(
-              backgroundColor: EasySubwayAccessibleColors.mintSoft,
-              borderColor: EasySubwayAccessibleColors.mintBorder,
+              backgroundColor: EasySubwayAccessibleColors.surface,
+              borderColor: EasySubwayAccessibleColors.line,
               child: Column(
                 children: [
                   const Icon(
@@ -4006,7 +4075,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                     '내 정보가 삭제됐어요',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: EasySubwayAccessibleColors.text,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -4074,7 +4143,7 @@ class _SecurityContactNotice extends StatelessWidget {
                         _title,
                         style: textTheme.titleMedium?.copyWith(
                           color: EasySubwayAccessibleColors.text,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
                       ),
@@ -4170,7 +4239,7 @@ class _SafetyDataNotice extends StatelessWidget {
                         _title,
                         style: textTheme.titleMedium?.copyWith(
                           color: EasySubwayAccessibleColors.text,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
                       ),
@@ -4440,7 +4509,7 @@ class _AttributionCard extends StatelessWidget {
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: EasySubwayAccessibleColors.text,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
               ),
@@ -4449,7 +4518,7 @@ class _AttributionCard extends StatelessWidget {
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: EasySubwayAccessibleColors.mutedText,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
               ),
@@ -4513,7 +4582,7 @@ class _AttributionRow extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               height: 1.25,
             ),
           ),
@@ -4715,7 +4784,7 @@ class FeatureTile extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: EasySubwayAccessibleColors.text,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.35,
                       ),
                     ),
