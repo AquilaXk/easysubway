@@ -1727,6 +1727,7 @@ enum StationSearchEntryMode { search, nearby }
 class _StationSearchScreenState extends State<StationSearchScreen> {
   late final StationSearchController _controller;
   final TextEditingController _queryController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   List<String> _recentQueries = const [];
   Timer? _searchDebounce;
   bool _isNearbySearchRunning = false;
@@ -1748,6 +1749,15 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           unawaited(_searchNearby());
         }
       });
+    } else {
+      // 검색 진입은 화면을 여는 즉시 입력 모드로 들어간다: 별도 타이틀 화면 없이
+      // 바로 키보드가 뜬다. 가까운 역 진입은 위치 조회를 먼저 하므로 포커스를
+      // 가로채지 않는다.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          FocusScope.of(context).requestFocus(_searchFocusNode);
+        }
+      });
     }
   }
 
@@ -1758,6 +1768,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       ..dispose();
     _queryController.removeListener(_handleQueryChanged);
     _queryController.dispose();
+    _searchFocusNode.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
@@ -1791,55 +1802,62 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   bool get _hasSearchQuery => _queryController.text.trim().isNotEmpty;
 
+  /// pickSlot·entryMode 조합에 따른 입력 힌트. 큰 타이틀 화면을 없앤 대신, 입력
+  /// 필드 자체의 힌트/시맨틱에 "무엇을 고르는 중인지"를 인코딩해 TalkBack이 출발/
+  /// 도착/일반 검색 의도를 그대로 전달하게 한다.
+  String get _searchInputHint => switch (widget.pickSlot) {
+    RouteDraftSlot.origin => '출발역 이름을 입력해 주세요',
+    RouteDraftSlot.destination => '도착역 이름을 입력해 주세요',
+    null => '역 이름을 입력해 주세요',
+  };
+
   @override
   Widget build(BuildContext context) {
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
-    const showSearchInput = true;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
-    final searchInputSection = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (showSearchInput) ...[
-          TextField(
-            key: const Key('stationSearchInput'),
-            controller: _queryController,
-            minLines: 1,
-            textInputAction: TextInputAction.search,
-            style: const TextStyle(fontSize: 20, height: 1.35),
-            decoration: InputDecoration(
-              hintText: '역 이름을 입력해 주세요',
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              prefixIcon: const Icon(
-                Icons.search,
-                color: EasySubwayAccessibleColors.iconMuted,
-              ),
-              suffixIcon: _hasSearchQuery
-                  ? IconButton(
-                      tooltip: '검색어 지우기',
-                      onPressed: _queryController.clear,
-                      icon: const Icon(Icons.close),
-                    )
-                  : null,
-              filled: true,
-              fillColor: EasySubwayAccessibleColors.scaffoldSurface,
-              border: OutlineInputBorder(
-                borderRadius: _stationSearchInputRadius,
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: _stationSearchInputRadius,
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: _stationSearchInputRadius,
-                borderSide: BorderSide.none,
-              ),
-            ),
-            onSubmitted: _submit,
-          ),
-          const SizedBox(height: 12),
-        ],
-      ],
+    final searchInputField = TextField(
+      key: const Key('stationSearchInput'),
+      controller: _queryController,
+      focusNode: _searchFocusNode,
+      autofocus: !isNearbyEntry,
+      minLines: 1,
+      textInputAction: TextInputAction.search,
+      style: const TextStyle(fontSize: 17, height: 1.3),
+      decoration: InputDecoration(
+        hintText: _searchInputHint,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        isDense: false,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: EasySubwaySpacing.md,
+          vertical: EasySubwaySpacing.sm,
+        ),
+        prefixIcon: const Icon(
+          Icons.search,
+          color: EasySubwayAccessibleColors.iconMuted,
+        ),
+        suffixIcon: _hasSearchQuery
+            ? IconButton(
+                tooltip: '검색어 지우기',
+                onPressed: _queryController.clear,
+                icon: const Icon(Icons.close),
+              )
+            : null,
+        filled: true,
+        fillColor: EasySubwayAccessibleColors.scaffoldSurface,
+        border: OutlineInputBorder(
+          borderRadius: _stationSearchInputRadius,
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: _stationSearchInputRadius,
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: _stationSearchInputRadius,
+          borderSide: const BorderSide(color: EasySubwayAccessibleColors.line),
+        ),
+      ),
+      onSubmitted: _submit,
     );
     final recentSearchSection = AnimatedBuilder(
       animation: _controller,
@@ -1925,24 +1943,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       },
     );
     return Scaffold(
+      // 큰 타이틀 화면(예: "역 검색")을 없애고 입력 필드 자체가 헤더가 된다. 열리는
+      // 즉시 입력 모드로 들어가 탭 두 번을 요구하던 랜딩 단계를 지운다. 뒤로가기는
+      // AppBar 기본 leading을 그대로 쓴다(자동 back 버튼 → 입력 필드 순서 유지).
       appBar: AppBar(
-        title: Text(switch (widget.pickSlot) {
-          RouteDraftSlot.origin => '출발역 검색',
-          RouteDraftSlot.destination => '도착역 검색',
-          null => switch (widget.entryMode) {
-            StationSearchEntryMode.nearby => '가까운 역',
-            StationSearchEntryMode.search => '역 검색',
-          },
-        }),
-        actions: [
-          if (!isNearbyEntry)
-            TextButton.icon(
-              key: const Key('nearbyStationAppBarButton'),
-              onPressed: _isNearbySearchRunning ? null : _searchNearby,
-              icon: const Icon(Icons.my_location),
-              label: const Text('가까운 역'),
-            ),
-        ],
+        titleSpacing: 0,
+        title: searchInputField,
       ),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: Semantics(
@@ -1961,7 +1967,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
                 children: [
                   _StationSearchAdaptiveContent(
                     isLargeScreen: isLargeScreen,
-                    searchInputSection: searchInputSection,
                     recentSearchSection: recentSearchSection,
                     actionButtonSection: actionButtonSection,
                     resultSection: resultSection,
@@ -2306,14 +2311,12 @@ class _StationRecentSearchItem extends StatelessWidget {
 class _StationSearchAdaptiveContent extends StatelessWidget {
   const _StationSearchAdaptiveContent({
     required this.isLargeScreen,
-    required this.searchInputSection,
     required this.recentSearchSection,
     required this.actionButtonSection,
     required this.resultSection,
   });
 
   final bool isLargeScreen;
-  final Widget searchInputSection;
   final Widget recentSearchSection;
   final Widget actionButtonSection;
   final Widget resultSection;
@@ -2323,12 +2326,7 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
     if (!isLargeScreen) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          searchInputSection,
-          recentSearchSection,
-          actionButtonSection,
-          resultSection,
-        ],
+        children: [recentSearchSection, actionButtonSection, resultSection],
       );
     }
 
@@ -2345,11 +2343,7 @@ class _StationSearchAdaptiveContent extends StatelessWidget {
               flex: 5,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  searchInputSection,
-                  actionButtonSection,
-                  resultSection,
-                ],
+                children: [actionButtonSection, resultSection],
               ),
             ),
             const SizedBox(
