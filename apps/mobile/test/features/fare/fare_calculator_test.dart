@@ -85,6 +85,31 @@ void main() {
       expect(missingRule.cardFare, isNull);
     });
 
+    // 경유역(중간 정차)은 요금상 하나의 연속 승차로 본다: 총 이동거리로 한 번에
+    // 계산해야 하며, 구간별로 쪼개 계산한 뒤 합산하면 거리 누진 특성상 과다 청구된다.
+    // 이 회귀 방지 테스트는 두 방식의 카드요금이 명확히 다름을 고정한다.
+    test('중간 경유는 요금 연속(단일 승차) 정책이라 총거리 단일계산 ≠ 구간합산', () {
+      const calculator = FareCalculator();
+      const d1 = 8000;
+      const d2 = 8000;
+
+      // (a) 총 이동거리로 한 번에 계산 = 단일 승차 정책.
+      final combined = calculator.calculate(
+        distanceMeters: d1 + d2,
+        rule: rule,
+      );
+      // (b) 구간별로 쪼개 계산한 뒤 합산.
+      final splitSum =
+          calculator.calculate(distanceMeters: d1, rule: rule).cardFare! +
+          calculator.calculate(distanceMeters: d2, rule: rule).cardFare!;
+
+      // 기본거리 10km rule에서 총 16km는 초과 6km만 과금(1550+200=1750),
+      // 8km씩 따로면 각각 초과 0(1550)이라 합산 3100 → 명확히 다르다.
+      expect(combined.cardFare, 1750);
+      expect(splitSum, 3100);
+      expect(combined.cardFare, isNot(splitSum));
+    });
+
     test('이동 거리 0m는 결측값으로 보고 요금을 만들지 않는다', () {
       final fare = const FareCalculator().calculate(
         distanceMeters: 0,

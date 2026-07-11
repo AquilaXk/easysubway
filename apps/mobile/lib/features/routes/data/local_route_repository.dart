@@ -81,21 +81,67 @@ class LocalRouteRepository implements RouteSearchRepository {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
     final mobilityType = _mobilityType(request.mobilityType);
     final constraintMode = _constraintMode(request.effectiveConstraintMode);
-    final result =
-        mobilityType.blocksStairOnlyAccess(constraintMode) &&
-            !catalog.strictEvidenceSupported
-        ? local.LocalRouteResult.unknown(const ['STRICT_EVIDENCE_UNSUPPORTED'])
-        : LocalRouteEngine(graph: catalog.toGraph()).search(
-            local.RouteRequest(
-              originStationId: request.originStationId,
-              destinationStationId: request.destinationStationId,
-              mobilityType: mobilityType,
-              constraintMode: constraintMode,
-              searchMode: local
-                  .RouteSearchMode
-                  .stationToStationWithOutOfStationTransfers,
-            ),
-          );
+    // #1975: 경유 요청의 strict 강등 판정은 전역 strict 지원이 아니라 두 구간을
+    // 각각 본다(한 구간만 미지원이어도 강등). 경유 없는 단일 구간은 엔진이 이미
+    // 구간별 strict 근거를 강제하고 구체 사유를 내므로 전역 pre-filter를 유지한다.
+    final blocksStairOnly = mobilityType.blocksStairOnlyAccess(constraintMode);
+    final blocksStrictGlobally =
+        blocksStairOnly && !catalog.strictEvidenceSupported;
+    final waypointStationId = request.waypointStationId?.trim();
+    final local.LocalRouteResult result;
+    if (waypointStationId == null || waypointStationId.isEmpty) {
+      result = blocksStrictGlobally
+          ? local.LocalRouteResult.unknown(const [
+              'STRICT_EVIDENCE_UNSUPPORTED',
+            ])
+          : LocalRouteEngine(graph: catalog.toGraph()).search(
+              local.RouteRequest(
+                originStationId: request.originStationId,
+                destinationStationId: request.destinationStationId,
+                mobilityType: mobilityType,
+                constraintMode: constraintMode,
+                searchMode: local
+                    .RouteSearchMode
+                    .stationToStationWithOutOfStationTransfers,
+              ),
+            );
+    } else if (blocksStairOnly &&
+        !(catalog.strictEvidenceSupportedFor(
+              request.originStationId,
+              waypointStationId,
+            ) &&
+            catalog.strictEvidenceSupportedFor(
+              waypointStationId,
+              request.destinationStationId,
+            ))) {
+      result = local.LocalRouteResult.unknown(const [
+        'STRICT_EVIDENCE_UNSUPPORTED',
+      ]);
+    } else {
+      final graphSnapshot = catalog.toGraph();
+      final engine = LocalRouteEngine(graph: graphSnapshot);
+      final first = engine.search(
+        local.RouteRequest(
+          originStationId: request.originStationId,
+          destinationStationId: waypointStationId,
+          mobilityType: mobilityType,
+          constraintMode: constraintMode,
+          searchMode:
+              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+        ),
+      );
+      final second = engine.search(
+        local.RouteRequest(
+          originStationId: waypointStationId,
+          destinationStationId: request.destinationStationId,
+          mobilityType: mobilityType,
+          constraintMode: constraintMode,
+          searchMode:
+              local.RouteSearchMode.stationToStationWithOutOfStationTransfers,
+        ),
+      );
+      result = mergeWaypointRouteResults(first, second);
+    }
 
     final plannedArrivals = await _plannedRideArrivals(result, catalog);
     return _toRouteSearchResult(
@@ -177,8 +223,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     _RouteCatalogSnapshot catalog, {
     required Map<int, String> plannedArrivals,
   }) {
-    return _collapseConsecutiveRideSteps(result.steps)
-        .indexed
+    return _collapseConsecutiveRideSteps(result.steps).indexed
         .map((entry) {
           final (index, step) = entry;
           final fromStationId = catalog.stationIdForNode(step.fromNodeId);
@@ -209,7 +254,7 @@ class LocalRouteRepository implements RouteSearchRepository {
               toName,
               lineName,
             ),
-            reason: _stepReason(),
+            reason: step.type.name == 'waypoint' ? '' : _stepReason(),
             evidenceSources: step.evidenceSources,
             timeSource: step.timeSource,
             distanceSource: step.distanceSource,
@@ -388,21 +433,22 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 
   List<String> _evidenceSummary(local.LocalRouteResult result) {
-    if (result.steps.isEmpty) {
+    // #1975: 경유 경계 마커(waypoint)는 실제 이동이 아닌 표식이므로 요약 집계에서
+    // 제외한다. 마커의 0/기본값 메타가 실제 이동 근거를 강등하지 못하게 한다.
+    final steps = result.steps
+        .where((step) => step.type.name != 'waypoint')
+        .toList(growable: false);
+    if (steps.isEmpty) {
       return const [];
     }
-    final requiresAccessibilityCheck = result.steps.any(
+    final requiresAccessibilityCheck = steps.any(
       (step) =>
           step.type.name == 'entry' ||
           step.type.name == 'exit' ||
           step.stairAccessState == 'unknown',
     );
-    final hasDurationEstimate = result.steps.every(
-      (step) => step.durationSeconds > 0,
-    );
-    final hasDistanceMeasure = result.steps.every(
-      (step) => step.distanceMeters > 0,
-    );
+    final hasDurationEstimate = steps.every((step) => step.durationSeconds > 0);
+    final hasDistanceMeasure = steps.every((step) => step.distanceMeters > 0);
     return [
       requiresAccessibilityCheck
           ? 'ACCESSIBILITY_CHECK_REQUIRED'
@@ -430,6 +476,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '$fromName에서 $toName까지 계단 이동',
       'escalator' => '$fromName에서 $toName까지 에스컬레이터 이동',
       'facilityConnector' => '$fromName에서 $toName까지 시설 연결 통로 이동',
+      'waypoint' => '$fromName 경유',
       _ => '$fromName에서 $toName까지 이동',
     };
   }
@@ -447,6 +494,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '계단 구간입니다. 계단 없는 조건에서는 안내하지 않습니다.',
       'escalator' => '에스컬레이터를 이용해 이동합니다.',
       'facilityConnector' => '역 시설 연결 동선을 따라 이동합니다.',
+      'waypoint' => '내리지 않고 이 역을 지나가요',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }
@@ -464,6 +512,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '계단 이동',
       'escalator' => '에스컬레이터 이동',
       'facilityConnector' => '시설 연결 이동',
+      'waypoint' => '경유',
       _ => '이동',
     };
   }
@@ -487,6 +536,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       'stair' => '$fromName에서 $toName까지 계단으로 이동하는 구간입니다.',
       'escalator' => '$fromName에서 $toName까지 에스컬레이터를 이용합니다.',
       'facilityConnector' => '$fromName에서 $toName까지 역 시설 연결 동선을 이용합니다.',
+      'waypoint' => '이 역에서 내리지 않고 지나갑니다.',
       _ => '$fromName에서 $toName까지 이동합니다.',
     };
   }
@@ -553,6 +603,197 @@ class LocalRouteRepository implements RouteSearchRepository {
       _ => throw const RouteSearchException('지원하지 않는 이동 제약 조건입니다.'),
     };
   }
+}
+
+/// 경유역 지원 1단계: 출발→경유, 경유→도착 두 구간의 탐색 결과를 하나로 합성한다.
+/// 두 구간이 모두 성공(found)일 때만 경로를 이어 붙이고, 그 사이에 경계 마커
+/// 스텝을 삽입해 후단 collapse가 서로 다른 구간의 승차를 병합하지 못하게 한다.
+/// 한쪽이라도 성공이 아니면 더 나쁜 상태를 보수적으로 채택한다.
+///
+/// 테스트에서 순수 병합 로직을 직접 검증할 수 있도록 최상위 public 함수로 노출한다
+/// (이 파일의 최상위 private 함수는 외부 테스트에서 접근할 수 없다).
+local.LocalRouteResult mergeWaypointRouteResults(
+  local.LocalRouteResult first,
+  local.LocalRouteResult second,
+) {
+  final mergedCodes = _dedupInOrder([
+    ...first.blockedReasonCodes,
+    ...second.blockedReasonCodes,
+  ]);
+  final mergedWarnings = _dedupWarningsInOrder([
+    ...first.warnings,
+    ...second.warnings,
+  ]);
+
+  final worstRank =
+      _routeStatusRank(first.status) <= _routeStatusRank(second.status)
+      ? _routeStatusRank(first.status)
+      : _routeStatusRank(second.status);
+
+  if (worstRank != _routeStatusRank(local.RouteStatus.found)) {
+    final worseStatus =
+        _routeStatusRank(first.status) <= _routeStatusRank(second.status)
+        ? first.status
+        : second.status;
+    return local.LocalRouteResult(
+      status: worseStatus,
+      totalCost: 0,
+      steps: const [],
+      warnings: mergedWarnings,
+      blockedReasonCodes: mergedCodes,
+    );
+  }
+
+  // 중간 경유는 개찰구를 나가지 않는 지점이므로, 1구간 꼬리의 도착 하차 후
+  // 동선과 2구간 머리의 출발 진입 동선을 경계에서 제거하는 것이 기본이다.
+  final firstTrimmed = _trimBoundaryAccessSteps(first.steps, fromTail: true);
+  final secondTrimmed = _trimBoundaryAccessSteps(second.steps, fromTail: false);
+
+  // #1975: trim 후 1구간 꼬리와 2구간 머리의 경계 노드가 일치할 때만(같은 승강장
+  // 무하차 연결) 접근 동선을 제거한다. 경유역에서 노선이 바뀌어 경계 노드가
+  // 어긋나면(개찰구 내 환승/연결 이동이 실제로 필요) 접근 동선을 보존해 총시간
+  // 과소계상을 막는다.
+  final trimmedBoundaryMatches =
+      firstTrimmed.isNotEmpty &&
+      secondTrimmed.isNotEmpty &&
+      firstTrimmed.last.toNodeId == secondTrimmed.first.fromNodeId;
+
+  final firstSteps = trimmedBoundaryMatches ? firstTrimmed : first.steps;
+  final secondSteps = trimmedBoundaryMatches ? secondTrimmed : second.steps;
+
+  final boundaryNodeId = firstSteps.isNotEmpty
+      ? firstSteps.last.toNodeId
+      : (secondSteps.isNotEmpty ? secondSteps.first.fromNodeId : '');
+  final boundary = route_step.RouteStep(
+    sequence: 0,
+    edgeId: 'waypoint-boundary',
+    fromNodeId: boundaryNodeId,
+    toNodeId: boundaryNodeId,
+    type: route_step.RouteStepType.waypoint,
+    cost: 0,
+    durationSeconds: 0,
+    distanceMeters: 0,
+    // #1975: 경계 마커는 실제 이동이 아닌 표식이므로 요약을 왜곡하지 않도록
+    // 무해한 메타를 명시한다(기본값 'unknown'/'UNKNOWN'/기본 안내 문구 상속 차단).
+    stairAccessState: 'stepFree',
+    timeSource: '',
+    distanceSource: '',
+    confidenceLabel: '',
+    evidenceSources: const [],
+  );
+
+  final flat = <route_step.RouteStep>[
+    ...firstSteps,
+    boundary,
+    ...secondSteps,
+  ];
+  final renumbered = <route_step.RouteStep>[];
+  for (var index = 0; index < flat.length; index += 1) {
+    final step = flat[index];
+    renumbered.add(
+      route_step.RouteStep(
+        sequence: index + 1,
+        edgeId: step.edgeId,
+        fromNodeId: step.fromNodeId,
+        toNodeId: step.toNodeId,
+        type: step.type,
+        cost: step.cost,
+        durationSeconds: step.durationSeconds,
+        distanceMeters: step.distanceMeters,
+        lineId: step.lineId,
+        servicePattern: step.servicePattern,
+        transferStationId: step.transferStationId,
+        includesStairs: step.includesStairs,
+        stairAccessState: step.stairAccessState,
+        evidenceSources: step.evidenceSources,
+        timeSource: step.timeSource,
+        distanceSource: step.distanceSource,
+        confidenceLabel: step.confidenceLabel,
+      ),
+    );
+  }
+
+  return local.LocalRouteResult(
+    status: local.RouteStatus.found,
+    totalCost: first.totalCost + second.totalCost,
+    steps: renumbered,
+    warnings: mergedWarnings,
+    blockedReasonCodes: mergedCodes,
+  );
+}
+
+/// 경유 경계에서 제거하는 접근·연결 동선 타입 화이트리스트.
+/// ride/transfer/inStationTransfer/outOfStationTransfer는 절대 제거하지 않는다.
+const Set<route_step.RouteStepType> _boundaryAccessStepTypes = {
+  route_step.RouteStepType.exit,
+  route_step.RouteStepType.walkway,
+  route_step.RouteStepType.elevator,
+  route_step.RouteStepType.ramp,
+  route_step.RouteStepType.stair,
+  route_step.RouteStepType.escalator,
+  route_step.RouteStepType.facilityConnector,
+  route_step.RouteStepType.internal,
+  route_step.RouteStepType.entry,
+};
+
+/// 경유 경계에 인접한 접근 동선을 제거한다.
+/// [fromTail]이 true면 뒤에서부터(1구간 꼬리), false면 앞에서부터(2구간 머리)
+/// 화이트리스트 타입이 연속되는 구간을 제거하고, 아닌 타입을 만나면 중단한다.
+List<route_step.RouteStep> _trimBoundaryAccessSteps(
+  List<route_step.RouteStep> steps, {
+  required bool fromTail,
+}) {
+  if (steps.isEmpty) {
+    return steps;
+  }
+  if (fromTail) {
+    var end = steps.length;
+    while (end > 0 && _boundaryAccessStepTypes.contains(steps[end - 1].type)) {
+      end -= 1;
+    }
+    return steps.sublist(0, end);
+  }
+  var start = 0;
+  while (start < steps.length &&
+      _boundaryAccessStepTypes.contains(steps[start].type)) {
+    start += 1;
+  }
+  return steps.sublist(start);
+}
+
+/// 상태 병합 우선순위. 낮을수록 나쁜(=우선 채택되는) 상태다.
+int _routeStatusRank(local.RouteStatus status) {
+  return switch (status) {
+    local.RouteStatus.blocked => 0,
+    local.RouteStatus.error => 1,
+    local.RouteStatus.unsupported => 1,
+    local.RouteStatus.unknown => 2,
+    local.RouteStatus.found => 3,
+  };
+}
+
+List<String> _dedupInOrder(List<String> codes) {
+  final seen = <String>{};
+  final result = <String>[];
+  for (final code in codes) {
+    if (seen.add(code)) {
+      result.add(code);
+    }
+  }
+  return result;
+}
+
+List<local.RouteWarning> _dedupWarningsInOrder(
+  List<local.RouteWarning> warnings,
+) {
+  final seen = <String>{};
+  final result = <local.RouteWarning>[];
+  for (final warning in warnings) {
+    if (seen.add(warning.code)) {
+      result.add(warning);
+    }
+  }
+  return result;
 }
 
 List<route_step.RouteStep> _collapseConsecutiveRideSteps(
