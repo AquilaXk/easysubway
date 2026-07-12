@@ -4,6 +4,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../core/database/catalog/catalog_database.dart';
+import '../../core/database/catalog/station_timetable_query.dart';
 import '../../core/database/user/user_database.dart';
 
 enum NextTrainWidgetStatus { available, serviceEnded, timetableUnavailable }
@@ -136,14 +137,18 @@ class NextTrainWidgetRepository {
       if (serviceDate.isAfter(feedEndDate)) {
         break;
       }
-      final serviceIds = await _activeServiceIds(serviceDate);
-      if (serviceIds.isEmpty) {
+      final departures =
+          (await CatalogStationTimetableQuery(
+                catalogDatabase,
+              ).loadDeparturesForDate(
+                stationId: selection.stationId,
+                lineId: selection.lineId,
+                date: serviceDate,
+              ))
+              .departures;
+      if (departures.isEmpty) {
         continue;
       }
-      final departures = await _departures(
-        selection: selection,
-        serviceIds: serviceIds,
-      );
       for (final departure in departures) {
         final departureAt = serviceDate.add(
           Duration(seconds: departure.seconds),
@@ -222,103 +227,16 @@ class NextTrainWidgetRepository {
     return _parseServiceDate(row.read<String>('feed_end_date'));
   }
 
-  Future<Set<String>> _activeServiceIds(DateTime date) async {
-    final dateKey = _dateKey(date);
-    final calendarRows = await catalogDatabase
-        .customSelect(
-          '''
-          SELECT *
-          FROM service_calendars
-          WHERE start_date <= ? AND end_date >= ?
-          ''',
-          variables: [
-            Variable.withString(dateKey),
-            Variable.withString(dateKey),
-          ],
-        )
-        .get();
-    final weekdayColumn = switch (date.weekday) {
-      DateTime.monday => 'monday',
-      DateTime.tuesday => 'tuesday',
-      DateTime.wednesday => 'wednesday',
-      DateTime.thursday => 'thursday',
-      DateTime.friday => 'friday',
-      DateTime.saturday => 'saturday',
-      _ => 'sunday',
-    };
-    final active = <String>{
-      for (final row in calendarRows)
-        if (_isEnabled(row.data[weekdayColumn])) row.read<String>('service_id'),
-    };
-    final exceptionRows = await catalogDatabase
-        .customSelect(
-          '''
-          SELECT service_id, exception_type
-          FROM service_calendar_dates
-          WHERE date = ?
-          ''',
-          variables: [Variable.withString(dateKey)],
-        )
-        .get();
-    for (final row in exceptionRows) {
-      final serviceId = row.read<String>('service_id');
-      if (row.read<int>('exception_type') == 1) {
-        active.add(serviceId);
-      } else {
-        active.remove(serviceId);
-      }
-    }
-    return active;
-  }
-
-  Future<List<_StopTimeDeparture>> _departures({
+  Future<List<CatalogStationDeparture>> _departures({
     required WidgetStationSelection selection,
     Set<String>? serviceIds,
-  }) async {
-    final serviceFilter = serviceIds == null
-        ? ''
-        : 'AND t.service_id IN (${List.filled(serviceIds.length, '?').join(',')})';
-    final rows = await catalogDatabase
-        .customSelect(
-          '''
-          SELECT r.direction_name, st.departure_seconds
-          FROM transit_stop_times st
-          JOIN transit_trips t ON t.id = st.trip_id
-          JOIN transit_routes r ON r.id = t.route_id
-          WHERE st.station_id = ?
-            AND st.line_id = ?
-            AND st.pickup_type = 0
-            AND r.line_id = st.line_id
-            AND TRIM(r.direction_name) <> ''
-            $serviceFilter
-          ORDER BY st.departure_seconds
-          ''',
-          variables: [
-            Variable.withString(selection.stationId),
-            Variable.withString(selection.lineId),
-            ...?serviceIds?.map(Variable.withString),
-          ],
-        )
-        .get();
-    return rows
-        .map(
-          (row) => _StopTimeDeparture(
-            directionName: row.read<String>('direction_name'),
-            seconds: row.read<int>('departure_seconds'),
-          ),
-        )
-        .toList(growable: false);
+  }) {
+    return CatalogStationTimetableQuery(catalogDatabase).loadDepartures(
+      stationId: selection.stationId,
+      lineId: selection.lineId,
+      serviceIds: serviceIds,
+    );
   }
-}
-
-class _StopTimeDeparture {
-  const _StopTimeDeparture({
-    required this.directionName,
-    required this.seconds,
-  });
-
-  final String directionName;
-  final int seconds;
 }
 
 class _Departure {
@@ -331,14 +249,6 @@ class _Departure {
   final String directionName;
   final DateTime serviceDate;
   final DateTime departureAt;
-}
-
-bool _isEnabled(Object? value) => value == true || value == 1;
-
-String _dateKey(DateTime date) {
-  return '${date.year.toString().padLeft(4, '0')}'
-      '${date.month.toString().padLeft(2, '0')}'
-      '${date.day.toString().padLeft(2, '0')}';
 }
 
 tz.TZDateTime? _parseServiceDate(String value) {
