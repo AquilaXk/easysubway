@@ -644,7 +644,7 @@
           "providerTermsOrQuotaApproval"
         ]
       },
-      "nextAction": "live sample provenance 기록 완료(run 29190984673) 후 owner admin review를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-12). 공식 상세 페이지의 저작권표시 이용조건을 license evidence로 연결했다. provider terms/quota approval과 distance·duration edge 근거는 아직 미확보라 route graph edge 자동 승격은 계속 막는다",
+      "nextAction": "live sample provenance 기록 완료(run 29190984673) 후 owner admin review를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-13). 공식 상세 페이지의 저작권표시 이용조건을 license evidence로 연결했다. provider terms/quota approval과 distance·duration edge 근거는 아직 미확보라 route graph edge 자동 승격은 계속 막는다",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -1936,7 +1936,7 @@
         "liveSampleNote": "2026-07-12 workflow run 29195907585 (datago-source-candidate-evidence.yml)은 backend-only secret 경로에서 credentialRedacted=true, format=json, rowCount=10인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). 2026-07-13 오너 admission 승격 시 동일 endpoint(page/perPage/returnType) 로컬 재수집으로 rawSha256/schemaFingerprint/evidenceHash가 동일하게 재현됐다(credentialRedacted=true). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
         "missingEvidence": []
       },
-      "nextAction": "odcloud endpoint(uddi:7008c675, _20251231) live sample과 admin admission 증거를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-12).",
+      "nextAction": "odcloud endpoint(uddi:7008c675, _20251231) live sample과 admin admission 증거를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-13).",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -2034,7 +2034,7 @@
         "liveSampleNote": "2026-07-12 workflow run 29196923356 (datago-source-candidate-evidence.yml)은 backend-only secret 경로에서 credentialRedacted=true, format=json, rowCount=10인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). 2026-07-13 오너 admission 승격 시 동일 endpoint(pageNo/numOfRows/dataType) 로컬 재수집으로 rawSha256/schemaFingerprint/evidenceHash가 동일하게 재현됐고 유추 요청 파라미터가 확정됐다(credentialRedacted=true). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
         "missingEvidence": []
       },
-      "nextAction": "operation path getFstExit·응답 필드·요청 파라미터가 live sample로 확정됐고 admin admission 증거를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-12).",
+      "nextAction": "operation path getFstExit·응답 필드·요청 파라미터가 live sample로 확정됐고 admin admission 증거를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-13).",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",

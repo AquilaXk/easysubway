@@ -5474,14 +5474,31 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   // 그 source의 admissionEvidence에 기록한다. 순차 체인이므로 3종 해시는 전부 distinct해야 한다.
   const issue1701AdmissionInventorySha256 = {
     "kric-transfer-movement-detailed": "64e991d9129da955f9c077a4383217d73d51963589ccdcaa4358e6fe8f5e9c2f",
-    "seoul-metro-fast-exit-car-door": "18dd4d0a58ce31caf08d2bd4ebe5767fffe22cba594271accab462d85aad0898",
-    "seoul-metro-transfer-distance-duration": "1d289abaa4fd83e27c288665cb504602078e6f3681e063756f3d9b5995645a0b",
+    "seoul-metro-fast-exit-car-door": "82519d1314d6dda31ff4edd1216dd33d6e2cac1ac5ee03ee1337b09b88428e84",
+    "seoul-metro-transfer-distance-duration": "509a2bb694c68dd9e4a4aa9cba8528ac6609a2a58a1843a95d89b378d0d7aefb",
   };
   assert.equal(new Set(Object.values(issue1701AdmissionInventorySha256)).size, 3);
   for (const [sourceId, expectedSha256] of Object.entries(issue1701AdmissionInventorySha256)) {
     const source = inventory.sources.find((entry) => entry.id === sourceId);
+    const candidate = sourceCandidates.candidates.find((entry) => entry.id === sourceId);
     assert.ok(source, `${sourceId} must exist in source inventory`);
+    assert.ok(candidate, `${sourceId} must exist in source candidates`);
     assert.equal(source.admissionEvidence.issue, 1701, `${sourceId} admissionEvidence.issue must be 1701`);
+    assert.equal(
+      source.admissionEvidence.approvedAt,
+      "2026-07-13T00:00:00+09:00",
+      `${sourceId} admissionEvidence.approvedAt must preserve the owner approval instant`,
+    );
+    assert.match(
+      source.admissionEvidence.productionUseNoteKo,
+      /2026-07-13/,
+      `${sourceId} productionUseNoteKo must use the local date from approvedAt`,
+    );
+    assert.match(
+      candidate.nextAction,
+      /오너 세션 승인 2026-07-13/,
+      `${sourceId} candidate nextAction must use the local date from approvedAt`,
+    );
     assert.equal(
       source.admissionEvidence.sourceInventorySha256,
       expectedSha256,

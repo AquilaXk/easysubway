@@ -1067,7 +1067,7 @@
           "productionUseAllowed": false,
           "unlockStatus": "not_required"
         },
-        "productionUseNoteKo": "오너 세션 승인(2026-07-12)으로 backend-only production inventory 소비 대상으로 승격한다. 모바일/offline pack에는 포함하지 않는다."
+        "productionUseNoteKo": "오너 세션 승인(2026-07-13)으로 backend-only production inventory 소비 대상으로 승격한다. 모바일/offline pack에는 포함하지 않는다."
       }
     },
     {
@@ -1700,7 +1700,7 @@
         "rawSha256": "d6a81c0da9ae5cc430a788bd0fc1ed6bb269cc6761a822b32c7484649e4586a5",
         "schemaFingerprint": "1b670fa8b0f1f51afb989d172c9824378b09b714bb5ce768dc3a02820931ad47",
         "sourceSnapshotSetHash": "114e9a8333b1df9245b878f3e079f476c18babf49abe8242cb49cb708557ba4b",
-        "sourceInventorySha256": "18dd4d0a58ce31caf08d2bd4ebe5767fffe22cba594271accab462d85aad0898",
+        "sourceInventorySha256": "82519d1314d6dda31ff4edd1216dd33d6e2cac1ac5ee03ee1337b09b88428e84",
         "adminReviewRecordHash": "e97a24a12ee5ebda3777eeb0a497450e2f18f2a438948a131bf0ce62fa275f71",
         "licenseEvidenceHash": "dc4c835f6bac2adf0f6aa70a64f9076bd917a067d68e70d7b1a84bb2aba17c82",
         "aliasLedgerHash": "9a74e31d64e53f38ab575d6a7731f72138523dd34f1f6756dbed8573e3bdeabc",
@@ -1716,7 +1716,7 @@
           "productionUseAllowed": false,
           "unlockStatus": "not_required"
         },
-        "productionUseNoteKo": "오너 세션 승인(2026-07-12)으로 backend-only production inventory 소비 대상으로 승격한다. 모바일/offline pack에는 포함하지 않는다."
+        "productionUseNoteKo": "오너 세션 승인(2026-07-13)으로 backend-only production inventory 소비 대상으로 승격한다. 모바일/offline pack에는 포함하지 않는다."
       }
     },
     {
@@ -1799,7 +1799,7 @@
         "rawSha256": "5efffaa748cd7c87859cf8979db96c009c85dc44cca58929015a708e8c0634fd",
         "schemaFingerprint": "39a46ae2842d5031062c768b27ae5a9853278e8caf0c1b0fc1e64e04689a300b",
         "sourceSnapshotSetHash": "1699e81cff9b71758d4dc3aa6d719783c4bee06f3ea1e89e60c1547f8fb758ec",
-        "sourceInventorySha256": "1d289abaa4fd83e27c288665cb504602078e6f3681e063756f3d9b5995645a0b",
+        "sourceInventorySha256": "509a2bb694c68dd9e4a4aa9cba8528ac6609a2a58a1843a95d89b378d0d7aefb",
         "adminReviewRecordHash": "f1636fbd2b36b2687fc8d728290158ca934461276936036606bc03a3156d594e",
         "licenseEvidenceHash": "c64b8a890c1576368566e89b5a70fdbaa88292f1b87fd44462d9a0a2bd33b4b0",
         "aliasLedgerHash": "9a74e31d64e53f38ab575d6a7731f72138523dd34f1f6756dbed8573e3bdeabc",
@@ -1814,7 +1814,7 @@
           "productionUseAllowed": false,
           "unlockStatus": "not_required"
         },
-        "productionUseNoteKo": "오너 세션 승인(2026-07-12)으로 backend-only production inventory 소비 대상으로 승격한다. 모바일/offline pack에는 포함하지 않는다."
+        "productionUseNoteKo": "오너 세션 승인(2026-07-13)으로 backend-only production inventory 소비 대상으로 승격한다. 모바일/offline pack에는 포함하지 않는다."
       }
     },
     {
