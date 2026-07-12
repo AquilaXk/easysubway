@@ -26,6 +26,8 @@ function buildKricRouteGraphCollectionPlan(candidatesDocument, candidateIds = DE
 function planRequest(candidate, priority) {
   requireCandidateState(candidate);
   const evidence = candidate.evidence ?? {};
+  const plannedSampleFormat = "json";
+  const validatedLiveSampleFormat = requiredLiveSampleFormat(evidence.liveSampleFormat, candidate.id);
   const documentedSampleUrl = requiredText(evidence.sampleUrl, `${candidate.id}.evidence.sampleUrl`);
   assertRedactedServiceKey(documentedSampleUrl, candidate.id);
   const sampleUrl = forceJsonFormat(documentedSampleUrl);
@@ -41,7 +43,11 @@ function planRequest(candidate, priority) {
     evidenceOutput: `.codex/evidence/kric/${candidate.id}.sample.json`,
     rawArchiveOutput: `.codex/evidence/kric/${candidate.id}.raw.json`,
     sampleEvidenceStatus: candidate.sampleEvidenceStatus,
-    sampleAcquisitionRequired: candidate.sampleEvidenceStatus === "sample_url_documented_key_required",
+    plannedSampleFormat,
+    validatedLiveSampleFormat,
+    sampleAcquisitionRequired:
+      candidate.sampleEvidenceStatus === "sample_url_documented_key_required"
+      || validatedLiveSampleFormat !== plannedSampleFormat,
     remainingAdmissionBlockers: [...(evidence.missingEvidence ?? [])],
     productionUseAllowed: false,
     automaticRouteGraphEdgeAllowed: false,
@@ -51,6 +57,14 @@ function planRequest(candidate, priority) {
       facility: false,
     },
   };
+}
+
+function requiredLiveSampleFormat(value, candidateId) {
+  const format = requiredText(value, `${candidateId}.evidence.liveSampleFormat`).toLowerCase();
+  if (!["json", "xml"].includes(format)) {
+    throw new Error(`${candidateId}.evidence.liveSampleFormat must be JSON or XML`);
+  }
+  return format;
 }
 
 function requireCandidateState(candidate) {

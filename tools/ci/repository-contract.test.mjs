@@ -6898,6 +6898,7 @@ test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선�
     "stinNm",
   ]);
   assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-11T09:58:45Z");
+  assert.equal(candidate.evidence.liveSampleFormat, "xml");
   assert.equal(candidate.evidence.liveSampleRowCount, 14);
   assert.equal(candidate.evidence.liveSampleRawSha256, "b886b7652cc9be69efb6a8acbdfdcb12f8110f15cdc2dcc5481455abb7fe8e9f");
   assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "d516b09e782a9afd73eb0f921b48abdf2bac3aa2247e1b0ad9f0a4a7c371f764");
@@ -6972,6 +6973,7 @@ test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변
     "strkZone",
   ]);
   assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-11T10:02:54Z");
+  assert.equal(candidate.evidence.liveSampleFormat, "xml");
   assert.equal(candidate.evidence.liveSampleRowCount, 1);
   assert.equal(candidate.evidence.liveSampleRawSha256, "dcccbf5c08a51c453264f8b56d3135e0a44a92acc6e4d9ca588f5dfa0c568297");
   assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "b33b608e3cdcc3610e3a41ab789d10294745fef124321887089291b62ee709f9");

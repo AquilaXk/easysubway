@@ -6445,7 +6445,7 @@ test("source candidate sample 검증기는 KRIC live evidence metadata를 허용
   assert.match(stdout, /source candidate sample evidence valid: kric-subway-route-info/);
 });
 
-test("KRIC route graph 수집 계획은 validated/admin-closed membership 후보의 남은 blocker와 JSON redacted URL을 고정한다", async () => {
+test("KRIC route graph 수집 계획은 XML live evidence와 JSON planned request를 구분해 재취득을 요구한다", async () => {
   const { stdout } = await execFileAsync(
     process.execPath,
     [
@@ -6472,7 +6472,9 @@ test("KRIC route graph 수집 계획은 validated/admin-closed membership 후보
     assert.match(request.url, /[?&]serviceKey=\[서비스키값\](?:&|$)/);
     assert.equal(url.searchParams.get("format"), "json");
     assert.equal(request.sampleEvidenceStatus, "validated_live_sample");
-    assert.equal(request.sampleAcquisitionRequired, false);
+    assert.equal(request.plannedSampleFormat, "json");
+    assert.equal(request.validatedLiveSampleFormat, "xml");
+    assert.equal(request.sampleAcquisitionRequired, true);
     assert.equal("remainingAdmissionBlocker" in request, false);
     assert.equal(request.productionUseAllowed, false);
     assert.equal(request.automaticRouteGraphEdgeAllowed, false);
@@ -6542,6 +6544,28 @@ test("KRIC route graph 수집 계획은 pending 후보의 sample acquisition lif
   assert.deepEqual(request.remainingAdmissionBlockers, ["sampleResponse"]);
   assert.equal(request.productionUseAllowed, false);
   assert.equal(request.automaticRouteGraphEdgeAllowed, false);
+});
+
+test("KRIC route graph 수집 계획은 live sample format 누락 또는 미지원 값을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-kric-plan-live-format-${Date.now()}`);
+  const candidatesPath = path.join(outputDir, "source-candidates.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const candidates = JSON.parse(await readFile("tools/datapack/source-candidates.json", "utf8"));
+  const candidate = candidates.candidates.find((entry) => entry.id === "kric-subway-route-info");
+  const runPlanner = () => execFileAsync(
+    process.execPath,
+    ["tools/datapack/plan-kric-route-graph-collection.mjs", "--candidates", candidatesPath, "--candidate", candidate.id],
+    { cwd: root },
+  );
+
+  delete candidate.evidence.liveSampleFormat;
+  await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
+  await assert.rejects(runPlanner(), /liveSampleFormat is required/);
+
+  candidate.evidence.liveSampleFormat = "csv";
+  await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
+  await assert.rejects(runPlanner(), /liveSampleFormat must be JSON or XML/);
 });
 
 test("KRIC route graph 수집 계획은 case-insensitive format 변형을 canonical format=json 하나로 정규화한다", async () => {

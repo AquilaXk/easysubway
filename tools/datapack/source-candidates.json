@@ -39,6 +39,7 @@
           "stinNm"
         ],
         "liveSampleRetrievedAt": "2026-07-11T09:58:45Z",
+        "liveSampleFormat": "xml",
         "liveSampleRowCount": 14,
         "liveSampleRawSha256": "b886b7652cc9be69efb6a8acbdfdcb12f8110f15cdc2dcc5481455abb7fe8e9f",
         "liveSampleSchemaFingerprint": "d516b09e782a9afd73eb0f921b48abdf2bac3aa2247e1b0ad9f0a4a7c371f764",
@@ -133,6 +134,7 @@
           "strkZone"
         ],
         "liveSampleRetrievedAt": "2026-07-11T10:02:54Z",
+        "liveSampleFormat": "xml",
         "liveSampleRowCount": 1,
         "liveSampleRawSha256": "dcccbf5c08a51c453264f8b56d3135e0a44a92acc6e4d9ca588f5dfa0c568297",
         "liveSampleSchemaFingerprint": "b33b608e3cdcc3610e3a41ab789d10294745fef124321887089291b62ee709f9",
