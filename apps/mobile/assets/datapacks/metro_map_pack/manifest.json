@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "pack_id": "kr-official-metro-map-pack",
-  "pack_version": "2026.06.24",
-  "generated_at_utc": "2026-06-24T06:37:00+00:00",
+  "pack_version": "2026.07.12",
+  "generated_at_utc": "2026-07-12T00:00:00+00:00",
   "default_display_mode": "offline",
   "requirements": {
     "live_mode_requires_network": false,
