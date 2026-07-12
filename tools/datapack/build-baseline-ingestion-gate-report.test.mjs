@@ -135,14 +135,17 @@ test("buildRosterFromPack: 짧은 lineNameKo 도출('수도권 2호선'→'2호�
 });
 
 test("buildKricMovementContext: candidate sampleUrl 누락을 명확히 거부한다", () => {
-  assert.throws(
-    () =>
-      buildKricMovementContext({
-        sourceCandidates: { candidates: [{ id: "kric-transfer-movement-detailed", evidence: {} }] },
-        sourceInventory: { sources: [{ id: "kric-transfer-movement-detailed" }] },
-      }),
-    /kric-transfer-movement-detailed candidate evidence\.sampleUrl missing/,
-  );
+  for (const sampleUrl of [undefined, " \t", null, 42]) {
+    const evidence = sampleUrl === undefined ? {} : { sampleUrl };
+    assert.throws(
+      () =>
+        buildKricMovementContext({
+          sourceCandidates: { candidates: [{ id: "kric-transfer-movement-detailed", evidence }] },
+          sourceInventory: { sources: [{ id: "kric-transfer-movement-detailed" }] },
+        }),
+      /kric-transfer-movement-detailed candidate evidence\.sampleUrl missing/,
+    );
+  }
 });
 
 test("게이트③: generated baseline edge도 matching rule과 duration을 대조한다", () => {
