@@ -44,6 +44,7 @@ function validateContract(gate) {
   uniqueStrings(contract.redactionResultValues, "redaction-result-values");
   uniqueStrings(contract.redactionPolicyIds, "redaction-policy-ids");
   if (typeof contract.rawInvocationStored !== "boolean" || typeof contract.relativeEvidencePathPattern !== "string") invalidGate("scalar-contract");
+  try { new RegExp(contract.relativeEvidencePathPattern); } catch { invalidGate("relative-evidence-path-pattern"); }
   for (const field of ["procedureIdDerivation", "targetAliasDerivation", "ownerAliasDerivation"]) if (typeof contract[field] !== "string") invalidGate("derivation");
   const fieldTypes = objectValue(contract.fieldTypes, "field-types");
   if (!sameStrings(Object.keys(fieldTypes), SUMMARY_V2_OBJECT_KINDS)) invalidGate("field-type-kinds");
@@ -106,7 +107,8 @@ export function deriveSummaryCatalog(gate) {
     }
   }
   if (new Set(targetAliases).size !== targetAliases.length || new Set(ownerAliases).size !== ownerAliases.length) invalidGate("alias-collision");
-  const productionLikeEvidenceIds = uniqueStrings(gate.productionLikeEvidencePolicy.requiredForClosing, "production-evidence-duplicate");
+  const productionLikeEvidencePolicy = objectValue(gate.productionLikeEvidencePolicy, "production-evidence-policy");
+  const productionLikeEvidenceIds = uniqueStrings(productionLikeEvidencePolicy.requiredForClosing, "production-evidence-duplicate");
   return deepFreeze({ matrixIds, procedureIds: sorted(procedureIds), targetAliases: sorted(targetAliases),
     ownerAliases: sorted(ownerAliases), matrixEvidenceIds: sorted(matrixEvidence),
     productionLikeEvidenceIds: sorted(productionLikeEvidenceIds), procedureById, evidenceIdsByMatrix,

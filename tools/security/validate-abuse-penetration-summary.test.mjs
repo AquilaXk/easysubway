@@ -221,6 +221,35 @@ test("A RED direct schema enforces deterministic identity patterns", () => {
   }
 });
 
+test("A RED direct schema normalizes invalid production evidence policy", () => {
+  for (const policy of [undefined, []]) {
+    const gateValue = structuredClone(gate);
+    if (policy === undefined) delete gateValue.productionLikeEvidencePolicy;
+    else gateValue.productionLikeEvidencePolicy = policy;
+    assert.throws(
+      () => deriveSummaryCatalog(gateValue),
+      (error) => {
+        assert.equal(error.message, "GATE_SUMMARY_CONTRACT_INVALID at $ (production-evidence-policy)");
+        assert.doesNotMatch(error.message, /Cannot read|is not iterable|is not a function/);
+        return true;
+      },
+    );
+  }
+});
+
+test("A RED direct schema normalizes invalid relative evidence path pattern", () => {
+  const gateValue = structuredClone(gate);
+  gateValue.summaryContract.relativeEvidencePathPattern = "[";
+  assert.throws(
+    () => buildAbusePenetrationSummaryV2Schema(gateValue),
+    (error) => {
+      assert.equal(error.message, "GATE_SUMMARY_CONTRACT_INVALID at $ (relative-evidence-path-pattern)");
+      assert.doesNotMatch(error.message, /Invalid regular expression/);
+      return true;
+    },
+  );
+});
+
 async function assertSensitiveValueRejected(value) {
   const summary = freshSummary();
   summary.matrices[0].redactionNotes = value;
