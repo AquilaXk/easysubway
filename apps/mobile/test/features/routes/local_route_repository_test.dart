@@ -180,6 +180,9 @@ void main() {
         '/api/v2/routes/route-v2/refresh',
       ]);
       expect(refresh.routeSearchId, 'route-v2');
+      expect(refresh.result.hasOfficialOdFareQuote, isTrue);
+      expect(refresh.result.officialOdFareQuote!.gnrlCardFare, 1550);
+      expect(refresh.result.officialOdFareQuote!.gnrlCashFare, 1650);
     },
   );
 

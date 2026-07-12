@@ -929,7 +929,19 @@ class OnlineFirstRouteSearchRepository implements RouteSearchRepository {
 
   @override
   Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
-    return onlineRepository.refreshRoute(routeSearchId);
+    final refresh = await onlineRepository.refreshRoute(routeSearchId);
+    final local = localRepository;
+    if (local == null) return refresh;
+    return RouteRefreshResult(
+      routeSearchId: refresh.routeSearchId,
+      status: refresh.status,
+      result: await local.resolveDisplayLabels(refresh.result),
+      refreshedAt: refresh.refreshedAt,
+      etaSource: refresh.etaSource,
+      etaConfidence: refresh.etaConfidence,
+      sourceLabel: refresh.sourceLabel,
+      reasonCodes: refresh.reasonCodes,
+    );
   }
 }
 
