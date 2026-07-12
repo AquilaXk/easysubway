@@ -69,7 +69,7 @@ jobs:
 
           # search 인덱스 기반 조회 — labeled 이벤트 직후엔 인덱싱 지연으로 빈 결과가 날 수 있다(#2010).
           search_candidates=$(gh pr list --repo "${REPO}" --label automerge --base main --state open \
-            --json number --jq '.[].number')
+            --json number --jq '.[].number' || true)
 
           # 이벤트 PR을 무조건 후보에 합류시키고(라벨 인덱싱 지연 보정) search 결과와 union·중복 제거한다.
           candidates=$(printf '%s\n%s\n' "${search_candidates}" "${EVENT_PR}" \
