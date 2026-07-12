@@ -8,8 +8,6 @@ on:
         required: true
         type: choice
         options:
-          - kric-subway-route-info
-          - kric-station-info
           - kric-train-operation-organ
           - kric-station-transfer-info
           - kric-station-platform

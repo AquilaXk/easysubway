@@ -13285,8 +13285,6 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
   assert.deepEqual(inputNames, ["candidate"]);
   assert.match(candidateBlock, /^ {8}type: choice$/m);
   assert.deepEqual(candidateOptions, [
-    "kric-subway-route-info",
-    "kric-station-info",
     "kric-train-operation-organ",
     "kric-station-transfer-info",
     "kric-station-platform",
@@ -13296,6 +13294,13 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
     "kric-transfer-movement-detailed",
     "kric-station-convenience-standard",
   ]);
+  assert.ok(!candidateOptions.includes("kric-subway-route-info"));
+  assert.ok(!candidateOptions.includes("kric-station-info"));
+  const sourceCandidates = readJson("tools/datapack/source-candidates.json").candidates;
+  for (const candidateId of candidateOptions) {
+    const candidate = sourceCandidates.find((entry) => entry.id === candidateId);
+    assert.equal(candidate?.sampleEvidenceStatus, "sample_url_documented_key_required");
+  }
   const permissions = workflow.match(/^ {4}permissions: *\n((?:^ {6}[^\n]+\n?)+)/m)?.[1]
     .trim()
     .split("\n")
