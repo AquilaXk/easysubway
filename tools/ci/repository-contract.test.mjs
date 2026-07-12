@@ -6224,7 +6224,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class FareZones extends Table/);
   assert.match(mobileTables, /class StationFareZones extends Table/);
   assert.match(mobileTables, /class FacilityStatusSnapshots extends Table/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 16/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 17/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
   assert.match(mobileDatabase, /_createStationPathwayIndexes/);
@@ -6240,7 +6240,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 16/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 17/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /FacilityStatusSnapshots/);
