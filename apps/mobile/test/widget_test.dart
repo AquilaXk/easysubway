@@ -12,6 +12,7 @@ import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
 import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/features/ads/active_ad_banner.dart';
 import 'package:easysubway_mobile/features/ads/ad_repository.dart';
+import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controller.dart';
@@ -10427,6 +10428,83 @@ void main() {
     expect(find.text('자주 쓰는 경로에 저장했습니다.'), findsOneWidget);
   });
 
+  testWidgets('경로 상세는 공식 OD 요금의 여섯 값을 표시한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              officialOdFareQuote: const OfficialOdFareQuote(
+                originStationId: 'station-sangnoksu',
+                destinationStationId: 'station-sadang',
+                sourceId: approvedOfficialOdFareSourceId,
+                snapshotId: approvedOfficialOdFareSnapshotId,
+                mappingLedgerHash: approvedOfficialOdFareMappingLedgerHash,
+                gnrlCardFare: 1550,
+                gnrlCashFare: 1650,
+                yungCardFare: 800,
+                yungCashFare: 900,
+                childCardFare: 500,
+                childCashFare: 500,
+              ),
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 6, 26),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openFirstRouteResultDetail(tester);
+
+    expect(find.text('일반 카드', skipOffstage: false), findsOneWidget);
+    expect(find.text('청소년 현금', skipOffstage: false), findsOneWidget);
+    expect(find.text('어린이 카드', skipOffstage: false), findsOneWidget);
+    expect(find.text('공식 OD 요금 정보 없음'), findsNothing);
+  });
+
+  testWidgets('공식 OD 요금이 없으면 unavailable 상태를 알린다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(),
+            stationRepository: FakeStationSearchRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 6, 26),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _openFirstRouteResultDetail(tester);
+
+      expect(find.text('공식 OD 요금 정보 없음'), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('공식 OD 요금 정보 없음')), findsOneWidget);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('경로 검색 UNKNOWN 결과는 저장과 안내 시작 행동을 숨긴다', (tester) async {
     final favoriteRouteRepository = FakeFavoriteRouteRepository();
 
@@ -16018,6 +16096,7 @@ RouteSearchResult _sampleRouteSearchResult({
   String mobilityType = 'SENIOR',
   String etaSource = '',
   String sourceUpdatedAt = '',
+  OfficialOdFareQuote? officialOdFareQuote,
   List<RouteSearchStep>? steps,
   List<String> recommendationReasons = const [
     '엘리베이터 동선을 우선했어요',
@@ -16090,6 +16169,7 @@ RouteSearchResult _sampleRouteSearchResult({
     createdAt: '2026-06-13T04:20:00',
     etaSource: etaSource,
     sourceUpdatedAt: sourceUpdatedAt,
+    officialOdFareQuote: officialOdFareQuote,
   );
 }
 

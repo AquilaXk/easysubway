@@ -7,6 +7,7 @@ import '../favorite_facility.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../features/favorites/data/drift_favorite_repositories.dart';
+import '../features/fare/official_od_fare_repository.dart';
 import '../features/ads/ad_repository.dart';
 import '../features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import '../features/get_off_alarm/exact_alarm_permission.dart';
@@ -143,7 +144,12 @@ class AppDependencies {
         _defaultRealtimeRepository(baseUri: optionalBaseUri);
     final localRouteRepository = catalogDatabase == null
         ? null
-        : LocalRouteRepository(catalogDatabase: catalogDatabase);
+        : LocalRouteRepository(
+            catalogDatabase: catalogDatabase,
+            officialOdFareRepository: OfficialOdFareRepository(
+              catalogDatabase: catalogDatabase,
+            ),
+          );
 
     return AppDependencies(
       repository: resolvedStationRepository,
