@@ -84,10 +84,13 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
   assert.equal(pack.version, "1");
   assert.equal(pack.artifactKind, "fixture");
   assert.equal(pack.url, "catalog/capital-v1.sqlite.gz");
-  assert.equal(pack.sourceInventory.length, 1);
+  assert.equal(pack.sourceInventory.length, 3);
   assert.equal(pack.sourceInventory[0].id, "fixture-capital-catalog");
   assert.equal(pack.sourceInventory[0].licenseStatus, "fixture-only");
   assert.equal(pack.sourceInventory[0].updatedAt, "2026-06-19T00:00:00.000Z");
+  const sourceIds = pack.sourceInventory.map((source) => source.id);
+  assert.ok(sourceIds.includes("seoul-metro-transfer-distance-duration"));
+  assert.ok(sourceIds.includes("seoul-metro-fast-exit-car-door"));
   assert.equal(pack.regionalQualityMetrics.stationCount, 6);
   assert.equal(pack.regionalQualityMetrics.facilityCoverageRatio, 0.3333);
   assert.equal(pack.regionalQualityMetrics.requiredFacilityEvidenceCoverageRatio, 0.1852);

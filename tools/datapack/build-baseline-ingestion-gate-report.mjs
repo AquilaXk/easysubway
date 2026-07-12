@@ -139,6 +139,8 @@ export function buildBaselineIngestionGateReport({
         carDoor: CAR_DOOR_SOURCE_ID,
         kricMovement: KRIC_MOVEMENT_SOURCE_ID,
       },
+      reproducibility:
+        "tracked snapshot; regenerated only from local-only raw inputs (.codex/evidence/1701/, gitignored)",
     },
     coverage: buildCoverage({
       transfer,

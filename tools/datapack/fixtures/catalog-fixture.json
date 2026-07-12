@@ -48,6 +48,50 @@
             "facilities",
             "internal_routes"
           ]
+        },
+        {
+          "id": "seoul-metro-transfer-distance-duration",
+          "owner": "서울교통공사",
+          "url": "https://www.data.go.kr/data/15044419/fileData.do",
+          "license": "PUBLIC_DATA_FREE_USE",
+          "licenseStatus": "redistributable",
+          "redistributionAllowed": true,
+          "updateFrequency": "annual file snapshot",
+          "updatedAt": "2026-07-12T00:00:00.000Z",
+          "fields": [
+            "연번",
+            "호선",
+            "환승거리",
+            "환승노선",
+            "환승소요시간",
+            "환승역명"
+          ]
+        },
+        {
+          "id": "seoul-metro-fast-exit-car-door",
+          "owner": "서울교통공사",
+          "url": "https://www.data.go.kr/data/15143840/openapi.do",
+          "license": "PUBLIC_DATA_FREE_USE",
+          "licenseStatus": "redistributable",
+          "redistributionAllowed": true,
+          "updateFrequency": "provider realtime API; sampled records dated 2024-12-31; production cadence not admitted",
+          "updatedAt": "2026-07-12T00:00:00.000Z",
+          "fields": [
+            "crtrYmd",
+            "drtnInfo",
+            "elvtrNo",
+            "facNo",
+            "facPstnNm",
+            "fwkPstnNm",
+            "lineNm",
+            "plfmCmgFac",
+            "qckgffMngNo",
+            "qckgffVhclDoorNo",
+            "stnCd",
+            "stnNm",
+            "stnNo",
+            "upbdnbSe"
+          ]
         }
       ],
       "requiredTables": [

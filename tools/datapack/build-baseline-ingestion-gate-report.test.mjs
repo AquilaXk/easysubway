@@ -86,6 +86,10 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   assert.match(report.metadata.scopeDecision, /비범위/);
   assert.match(report.metadata.scopeDecision, /#1702\/#1414/);
   assert.match(report.metadata.countingBasis, /수집 전량/);
+  assert.equal(
+    report.metadata.reproducibility,
+    "tracked snapshot; regenerated only from local-only raw inputs (.codex/evidence/1701/, gitignored)",
+  );
 
   // coverage: 전량 5행 기준, 사당 양방향+강남 매칭(3), 성수 자기루프 제외, 없는역 quarantine.
   assert.equal(report.coverage.transfer.totalRows, 5);
