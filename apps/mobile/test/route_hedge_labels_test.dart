@@ -63,5 +63,28 @@ void main() {
       );
       expect(routeWarningLabel('SOMETHING_ELSE'), routeHedgeGenericUnknown);
     });
+
+    test('실측 비가용은 보수중과 일반 이용 어려움을 구분해 정직하게 표시한다 (#1996)', () {
+      // 보수중과 일반 이용 어려움은 서로 다른 문구여야 한다(정직한 구분).
+      expect(
+        routeWarningLabel('FACILITY_UNDER_MAINTENANCE'),
+        routeFacilityUnderMaintenance,
+      );
+      expect(
+        routeWarningLabel('FACILITY_UNAVAILABLE'),
+        routeFacilityUnavailable,
+      );
+      expect(
+        routeFacilityUnderMaintenance,
+        isNot(equals(routeFacilityUnavailable)),
+      );
+      // 보수중 문구는 '보수중'임을 명시한다(available로 오인 금지).
+      expect(routeFacilityUnderMaintenance, contains('보수중'));
+      // 확인 불가(NO_OFFICIAL_FEED→UNKNOWN)와도 달라야 한다.
+      expect(
+        routeFacilityUnderMaintenance,
+        isNot(equals(routeHedgeAccessibilityUnknown)),
+      );
+    });
   });
 }

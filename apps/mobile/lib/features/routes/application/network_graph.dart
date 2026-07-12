@@ -120,6 +120,7 @@ class RouteEdge {
     RouteAccessibilityState accessibilityState =
         RouteAccessibilityState.available,
     bool? isAvailable,
+    this.isUnderMaintenance = false,
   }) : durationSeconds = durationSeconds ?? baseCost,
        stairAccessState =
            stairAccessState ??
@@ -166,6 +167,12 @@ class RouteEdge {
   final bool isGeneratedConnector;
   final RouteEdgeSafetyEvidence safetyEvidence;
   final RouteAccessibilityState accessibilityState;
+
+  /// 실측된 보수중/점검/중지/공사 상태(데이터팩 UNDER_MAINTENANCE)를 표시하기 위한
+  /// 플래그. accessibilityState는 unavailable로 정규화되지만, 표시 단계에서 단순
+  /// '이용 어려움'과 '보수중'을 정직하게 구분하기 위해 원인을 별도로 보존한다(#1996).
+  /// 확인 불가(NO_OFFICIAL_FEED)는 unknown 계열이라 이 플래그와 무관하다.
+  final bool isUnderMaintenance;
 
   bool get isAvailable =>
       accessibilityState == RouteAccessibilityState.available;
