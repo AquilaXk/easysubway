@@ -2051,7 +2051,7 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
-test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출 준비 상태를 분리한다", () => {
+test("모바일 signed release artifact gate와 광고 counter는 CI 산출물과 스토어 제출 준비 상태를 분리한다", () => {
   const gatePath = "apps/mobile/release/signed-release-artifact-gate.json";
 
   assert.equal(existsSync(path.join(root, gatePath)), true, "signed release artifact gate must exist");
