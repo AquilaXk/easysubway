@@ -84,18 +84,22 @@ async function withSummary(summary, fn) {
   return fn(summaryPath);
 }
 
+function validateSummary(summary) {
+  return withSummary(summary, (summaryPath) =>
+    execFileAsync(process.execPath, [
+      "tools/security/validate-abuse-penetration-summary.mjs",
+      "--summary",
+      summaryPath,
+      "--require-pass",
+    ], { cwd: root }),
+  );
+}
+
 async function assertSensitiveValueRejected(value) {
   const summary = validSummary();
   summary.matrices[0].redactionNotes = value;
   await assert.rejects(
-    withSummary(summary, (summaryPath) =>
-      execFileAsync(process.execPath, [
-        "tools/security/validate-abuse-penetration-summary.mjs",
-        "--summary",
-        summaryPath,
-        "--require-pass",
-      ], { cwd: root }),
-    ),
+    validateSummary(summary),
     /raw sensitive evidence material/,
   );
 }
@@ -129,7 +133,7 @@ test("abuse penetration summary validator rejects pass without production-like c
 
 test("abuse penetration summary validator rejects forbidden closure evidence markers", async () => {
   const forbiddenClosureEvidence = validSummary();
-  forbiddenClosureEvidence.productionLikeEvidence[0].source = "preflight env check only";
+  forbiddenClosureEvidence.productionLikeEvidence[0].localEvidencePath = "preflight env check only";
   await assert.rejects(
     withSummary(forbiddenClosureEvidence, (summaryPath) =>
       execFileAsync(process.execPath, [
@@ -163,6 +167,111 @@ test("abuse penetration summary validator rejects a runtime-constructed raw User
     ")",
   ].join("");
   await assertSensitiveValueRejected(syntheticRawUserAgent);
+});
+
+test("abuse penetration summary validator rejects runtime-constructed compressed IPv6 CIDR", async () => {
+  const syntheticIpv6 = [["20", "01"], ":", ["db", "8"], "::", ["4", "2"]].flat().join("");
+  await assertSensitiveValueRejected([syntheticIpv6, "/", ["6", "4"].join("")].join(""));
+});
+
+test("abuse penetration summary validator rejects a runtime-constructed bracketed IPv6 URL", async () => {
+  const syntheticIpv6 = [["20", "01"], ":", ["db", "8"], "::", ["4", "2"]].flat().join("");
+  await assertSensitiveValueRejected(["https://[", syntheticIpv6, "]/evidence"].join(""));
+});
+
+test("abuse penetration summary validator rejects runtime-constructed alternate numeric IPv4 hosts", async () => {
+  for (const value of [
+    ["https://", ["0x", "c0", "00", "02", "2a"].join(""), "/evidence"].join(""),
+    ["322", "122", "602", "6"].join(""),
+    ["1", "27"].join(""),
+  ]) {
+    await assertSensitiveValueRejected(value);
+  }
+});
+
+test("abuse penetration summary validator rejects product-independent raw User-Agent values", async () => {
+  for (const value of [
+    [["Da", "rt"].join(""), "/", ["3", "8"].join("."), " (", ["dart", ":io"].join(""), ")"].join(""),
+    [["cu", "rl"].join(""), "/", ["8", "1"].join(".")].join(""),
+    [["ok", "http"].join(""), "/", ["4", "12"].join(".")].join(""),
+  ]) {
+    await assertSensitiveValueRejected(value);
+  }
+});
+
+test("abuse penetration summary validator rejects a CamelCase UserAgent identifier", async () => {
+  await assertSensitiveValueRejected(["client", "User", "Agent"].join(""));
+});
+
+test("abuse penetration summary validator rejects unknown keys including numeric values", async () => {
+  const mutations = [
+    (summary) => { summary.unexpectedCount = 1; },
+    (summary) => { summary.artifactIdentity.unexpectedCount = 1; },
+    (summary) => { summary.productionLikeEvidence[0].unexpectedCount = 1; },
+    (summary) => { summary.matrices[0].unexpectedCount = 1; },
+    (summary) => { summary.matrices[0].findingCounts.unexpectedCount = 1; },
+    (summary) => {
+      summary.matrices[0].mediumFindingDisposition = {
+        owner: "security-owner",
+        fixPlan: "tracked follow-up",
+        unexpectedCount: 1,
+      };
+    },
+    (summary) => { summary.matrices[0].cases[0].unexpectedCount = 1; },
+  ];
+  for (const mutate of mutations) {
+    const summary = validSummary();
+    mutate(summary);
+    await assert.rejects(validateSummary(summary), /unsupported field/);
+  }
+});
+
+test("abuse penetration summary validator rejects extra and duplicate evidence, matrix, and case IDs", async () => {
+  const extraEvidence = validSummary();
+  extraEvidence.productionLikeEvidence.push({
+    evidenceId: "unexpected-evidence",
+    result: "PASS",
+    localEvidencePath: ".codex/evidence/security/abuse-penetration-rehearsal/rc/redacted-summary.json",
+  });
+  await assert.rejects(validateSummary(extraEvidence), /unexpected evidenceId/);
+
+  const duplicateEvidence = validSummary();
+  duplicateEvidence.productionLikeEvidence.push(structuredClone(duplicateEvidence.productionLikeEvidence[0]));
+  await assert.rejects(validateSummary(duplicateEvidence), /duplicate evidenceId/);
+
+  const extraMatrix = validSummary();
+  extraMatrix.matrices.push({ ...structuredClone(extraMatrix.matrices[0]), matrixId: "unexpectedMatrix" });
+  await assert.rejects(validateSummary(extraMatrix), /unexpected matrixId/);
+
+  const duplicateMatrix = validSummary();
+  duplicateMatrix.matrices.push(structuredClone(duplicateMatrix.matrices[0]));
+  await assert.rejects(validateSummary(duplicateMatrix), /duplicate matrixId/);
+
+  const extraCase = validSummary();
+  extraCase.matrices[0].cases.push({ ...structuredClone(extraCase.matrices[0].cases[0]), caseId: "unexpected_case" });
+  await assert.rejects(validateSummary(extraCase), /unexpected caseId/);
+
+  const duplicateCase = validSummary();
+  duplicateCase.matrices[0].cases.push(structuredClone(duplicateCase.matrices[0].cases[0]));
+  await assert.rejects(validateSummary(duplicateCase), /duplicate caseId/);
+});
+
+test("abuse penetration summary validator accepts safe endpoint, evidence, prose, command, and version controls", async () => {
+  const dottedVersion = ["release version ", ["1", "2", "3", "4"].join(".")].join("");
+  for (const value of [
+    "easysubway-api.aquilaxk.site",
+    "/api/v1/reports",
+    "image/jpeg",
+    ".codex/evidence/security/abuse-penetration-rehearsal/rc/redacted-summary.json",
+    "sensitive values removed",
+    "curl --fail",
+    dottedVersion,
+    ["not", "::", "an", "::", "address"].join(""),
+  ]) {
+    const summary = validSummary();
+    summary.matrices[0].redactionNotes = value;
+    await validateSummary(summary);
+  }
 });
 
 test("abuse penetration summary validator rejects missing cases, raw sensitive markers, and high findings", async () => {
