@@ -8,13 +8,7 @@ on:
         required: true
         type: choice
         options:
-          - kric-train-operation-organ
-          - kric-station-transfer-info
-          - kric-station-platform
-          - kric-station-movement-standard
-          - kric-station-movement-detailed
           - kric-transfer-movement-standard
-          - kric-station-convenience-standard
 
 jobs:
   collect:

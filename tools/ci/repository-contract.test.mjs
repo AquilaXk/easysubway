@@ -6609,8 +6609,53 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     ],
   );
 
+  const newlyValidatedEvidence = {
+    "kric-train-operation-organ": {
+      run: 29201302750,
+      rowCount: 1,
+      rawSha256: "78bfb7aac85ad6e2a032caa3e13c1981f1a5b477f1d471d11925d38f8eedda05",
+      schemaFingerprint: "71679e88d954cea55f5c5b3d31b285588d356dca59c670c65bb18c193bfcb2c5",
+      evidenceHash: "58c2bccb1270f7e0b81eea7dc3777aed4ddad6d88dc7d20e315e520e5b1586ce",
+    },
+    "kric-station-transfer-info": {
+      run: 29201337952,
+      rowCount: 4,
+      rawSha256: "4f6e82f8c4965cc358506be8f8d74252f2307807e65490da82a53d301f7f3dc0",
+      schemaFingerprint: "4a7de9cfd32f958089da12bdc3ae80a00fd9ad13ab0fe2c35ae7b6a7c4b7fa00",
+      evidenceHash: "86413bce43f163b7be74d75ba7cd1aa8b475f828f5bf23823115ef8cdc73fabd",
+    },
+    "kric-station-platform": {
+      run: 29201338889,
+      rowCount: 2,
+      rawSha256: "825099e3ee85505bb41f3af214c18ca8a01f421046f31dd9abc564e3911def81",
+      schemaFingerprint: "764d4c96d2b8fe056c12621fb485587bd83d6aee3e99a5174f1fbf9a20d2a41f",
+      evidenceHash: "f2d81fef2d1bd7bed85a36f27adde74c5b7033282a7fca50d98358d862a0e61a",
+    },
+    "kric-station-movement-standard": {
+      run: 29201339728,
+      rowCount: 6,
+      rawSha256: "0608042eb039c664ac9e9a6fa0dba016fa82c15d06fc449ce0a975d3fc45c463",
+      schemaFingerprint: "5c70f856c3ee0b18b8117c058766d46a0a3be9e9b6143a8613411d644f682ef0",
+      evidenceHash: "cfa233eee0dbeaf4a8db7eb5798d081c1ce7e7e5a1dfae3d7bf8222902e1f365",
+    },
+    "kric-station-movement-detailed": {
+      run: 29201340572,
+      rowCount: 6,
+      rawSha256: "0608042eb039c664ac9e9a6fa0dba016fa82c15d06fc449ce0a975d3fc45c463",
+      schemaFingerprint: "5c70f856c3ee0b18b8117c058766d46a0a3be9e9b6143a8613411d644f682ef0",
+      evidenceHash: "b65952f44c16eceb3a4a6bf8f9ee3d22dca2246590678271e85f446eb862ac47",
+    },
+    "kric-station-convenience-standard": {
+      run: 29201342431,
+      rowCount: 9,
+      rawSha256: "70ed3faa95bd937dfc6a777bb0f7ac3c0c0ea310372f830ff041f14b12bcdcfb",
+      schemaFingerprint: "6cf45df8488510187063c4b7396ca9628295d6961becdcf1de87f2ae521e8591",
+      evidenceHash: "561610c243d8e4abf9a8760073eb0d49b403423471c623eb310f3419d06c8ce3",
+    },
+  };
+
   for (const candidate of kricCandidates) {
-    const hasValidatedSample = ["kric-station-info", "kric-subway-route-info"].includes(candidate.id);
+    const hasValidatedSample = candidate.id !== "kric-transfer-movement-standard";
     assert.equal(candidate.priority, "P0");
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
     assert.equal(
@@ -6645,6 +6690,15 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     assert.ok(candidate.evidence.outputFields.length > 0);
     if (hasValidatedSample) {
       assert.equal(candidate.evidence.missingEvidence.includes("sampleResponse"), false);
+      const newEvidence = newlyValidatedEvidence[candidate.id];
+      if (newEvidence) {
+        assert.equal(candidate.evidence.liveSampleRowCount, newEvidence.rowCount);
+        assert.equal(candidate.evidence.liveSampleRawSha256, newEvidence.rawSha256);
+        assert.equal(candidate.evidence.liveSampleSchemaFingerprint, newEvidence.schemaFingerprint);
+        assert.equal(candidate.evidence.liveSampleEvidenceHash, newEvidence.evidenceHash);
+        assert.deepEqual(candidate.evidence.liveSampleFields.slice().sort(), candidate.evidence.outputFields.slice().sort());
+        assert.match(candidate.evidence.liveSampleNote, new RegExp(`${newEvidence.run}.*credentialRedacted=true.*source candidate sample evidence valid`));
+      }
       assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
       for (const capability of Object.values(candidate.capabilities)) {
         assert.equal(capability.productionUseAllowed, false);
@@ -7029,7 +7083,7 @@ test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
   assert.equal(
@@ -7052,7 +7106,7 @@ test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도
     "stMovePath",
   ]);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, []);
 });
 
 test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7061,7 +7115,7 @@ test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 �
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=429&service=handicapped&operation=stationMovement&page=1");
@@ -7080,7 +7134,7 @@ test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 �
     "mvPathMgNo",
     "stMovePath",
   ]);
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, []);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
 });
 
@@ -7117,6 +7171,10 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.match(
     candidate.evidence.liveSampleNote,
     /2026-07-12.*29190982462 \(head 93afed60a027c215af80039a11e8ee58d8178088\).*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0.*sanitized sample artifact가 생성되지 않음/,
+  );
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /2026-07-13.*29201341520 \(head e451fbdf352fef74dc376c9f16d476aca287b492\).*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0/,
   );
   assert.match(candidate.evidence.liveSampleNote, /resultCode=03의 공식 의미 매핑은 공개 문서에서 확인되지 않음/);
   assert.match(candidate.evidence.liveSampleNote, /공식 상세 페이지 sample URL.*422\/424.*요청변수 표.*132\/425.*불일치/);
@@ -7254,7 +7312,7 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
@@ -7265,7 +7323,7 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
     candidate.evidence.outputFields.sort(),
     ["dtlLoc", "grndDvCd", "gubun", "imgPath", "mlFmlDvCd", "stinFlor", "trfcWeakDvCd"],
   );
-  assert.deepEqual(candidate.evidence.missingEvidence.sort(), ["sampleResponse"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, []);
 });
 
 test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7415,7 +7473,7 @@ test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 �
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(
     candidate.detailUrl,
@@ -7427,7 +7485,7 @@ test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 �
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), ["railOprIsttCd", "railOprIsttNm"]);
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, []);
 });
 
 test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7436,7 +7494,7 @@ test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=181&service=convenientInfo&operation=stationTransferInfo&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -7453,7 +7511,7 @@ test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출
     "stLocCont",
     "stinCd",
   ]);
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+  assert.deepEqual(candidate.evidence.missingEvidence, []);
 });
 
 test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7462,7 +7520,7 @@ test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=433&service=convenientInfo&operation=stPlf&page=1");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -7485,11 +7543,8 @@ test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와
     "stinFlor",
     "updnDvCd",
   ]);
-  assert.equal(
-    candidate.evidence.liveSampleNote,
-    "KRIC 공식 stPlf 문서는 updnDvcd로 표기하지만, 2026-07-11 workflow run 29151697392의 live JSON은 updnDvCd를 반환했다. 검증은 live wire 표기 updnDvCd를 따른다.",
-  );
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+  assert.match(candidate.evidence.liveSampleNote, /updnDvcd.*updnDvCd.*29201338889.*credentialRedacted=true.*source candidate sample evidence valid/);
+  assert.deepEqual(candidate.evidence.missingEvidence, []);
 });
 
 test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 retired id 재사용 금지를 강제한다", () => {
@@ -13701,13 +13756,7 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
   assert.deepEqual(inputNames, ["candidate"]);
   assert.match(candidateBlock, /^ {8}type: choice$/m);
   assert.deepEqual(candidateOptions, [
-    "kric-train-operation-organ",
-    "kric-station-transfer-info",
-    "kric-station-platform",
-    "kric-station-movement-standard",
-    "kric-station-movement-detailed",
     "kric-transfer-movement-standard",
-    "kric-station-convenience-standard",
   ]);
   assert.ok(!candidateOptions.includes("kric-subway-route-info"));
   assert.ok(!candidateOptions.includes("kric-station-info"));
