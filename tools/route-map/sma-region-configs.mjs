@@ -308,7 +308,11 @@ const GWANGJU = {
     name = name.replace(/\s*\([^)]*\)\s*$/, "").trim();
     return { name };
   },
-  contentBand: { minY: 0, maxY: 1800 },
+  // 범례("노선 색상 안내") 스와치가 1호선 색(#009088) horizontal stroke(medY≈158)이라
+  // minY:0이면 buildTracksDoc이 범례를 1호선 track에 섞는다(실측: 스와치 M 260 158 L 302 158이
+  // 별도 track으로 산출됨). 범례 카드는 y=[136,240], 실역 콘텐츠는 y=[930,1210]이므로
+  // minY를 340으로 올려 범례를 배제한다(수도권과 동일 하한).
+  contentBand: { minY: 340, maxY: 1800 },
 };
 
 const REGION_CONFIGS = { seoul: SEOUL, busan: BUSAN, daegu: DAEGU, daejeon: DAEJEON, gwangju: GWANGJU };
