@@ -879,7 +879,7 @@ function validateTransitPassThroughScope(input, networkEdges, isProductionPack, 
     return;
   }
   for (const edge of networkEdges) {
-    if (!["ENTRY", "EXIT"].includes(edge.edgeType)) continue;
+    if (!["ENTRY", "EXIT"].includes(String(edge.edgeType ?? "").toUpperCase())) continue;
     const stationIds = [edge.fromNodeId, edge.toNodeId].map((nodeId) => String(nodeId).split(":")[0]);
     const passThroughStationId = stationIds.find((stationId) => passThroughIds.has(stationId));
     if (passThroughStationId) {

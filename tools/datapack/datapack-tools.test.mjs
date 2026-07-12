@@ -9993,6 +9993,29 @@ test("production transit pass-through 역은 공개 접근성 denominator를 늘
   input.minimumProductionCoverage.stations = 3;
   input.minimumProductionCoverage.stationLines = 3;
 
+  const lowercaseAccessInput = structuredClone(input);
+  const entryEdge = lowercaseAccessInput.routeEdges.find((edge) => edge.edgeType === "ENTRY");
+  lowercaseAccessInput.routeEdges.push({
+    ...entryEdge,
+    id: "edge-entry-pass-through-lowercase",
+    edgeType: "entry",
+    from: {
+      sourceId: "molit-urban-rail-full-route",
+      sourceStationCode: "MOLIT-SEOUL-4-434",
+      lineId: "seoul-4",
+      nodeKind: "STATION",
+    },
+    to: {
+      sourceId: "molit-urban-rail-full-route",
+      sourceStationCode: "MOLIT-SEOUL-4-434",
+      lineId: "seoul-4",
+    },
+  });
+  await assert.rejects(
+    importOfficialSourceInput(`${outputDir}-lowercase-access`, lowercaseAccessInput),
+    /transit pass-through station cannot expose ENTRY\/EXIT edge: station-seoul-4-434/,
+  );
+
   const generated = await importOfficialSourceInput(outputDir, input);
   assert.equal(generated.packs[0].stations.length, 3);
   assert.equal(generated.packs[0].stationLines.length, 3);
