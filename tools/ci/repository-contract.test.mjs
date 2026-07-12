@@ -4512,7 +4512,13 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /const headwayEvidenceCount =/);
   assert.match(workflow, /const headwayReportStatus = headwayEvidenceCount > 0/);
   assert.match(workflow, /"DEFERRED"/);
+  // route_graph_topology deferred domain scope 정합: pilot targets에서 deferred일 때 위반은 DEFERRED로 정직 기록하고
+  // 위반 수치를 evidence에 남긴다(은폐 금지).
+  assert.match(workflow, /tools\/datapack\/capital-pilot-coverage-targets\.json/);
+  assert.match(workflow, /const routeGraphTopologyDeferredForScope =/);
+  assert.match(workflow, /routeGraphTopologyDeferredForScope\s*\n\s*\?\s*"DEFERRED"/);
   assert.match(workflow, /routeGraphTopologyStatus,/);
+  assert.match(workflow, /routeGraphTopologyViolationCount,/);
   assert.match(workflow, /headwayReportStatus,/);
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
@@ -4535,6 +4541,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     "routeMapPositionCoverageStatus",
     "routeGraphTopologySha256",
     "routeGraphTopologyStatus",
+    "routeGraphTopologyViolationCount",
     "headwayReportSha256",
     "headwayReportStatus",
     "strictRouteRegressionSha256",
@@ -4544,8 +4551,11 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     assert.ok(releaseEvidenceBundleSchema.required.includes(field), `${field} must be required`);
   }
   assert.equal(releaseEvidenceBundleSchema.properties.headwayReportStatus.$ref, "#/$defs/headwayGateStatus");
+  // route_graph_topology는 deferred domain이므로 자체 gate status def(DEFERRED 허용)를 참조한다.
+  assert.equal(releaseEvidenceBundleSchema.properties.routeGraphTopologyStatus.$ref, "#/$defs/routeGraphGateStatus");
   assert.equal(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"), false);
   assert.equal(releaseEvidenceBundleSchema.$defs.headwayGateStatus.enum.includes("DEFERRED"), true);
+  assert.equal(releaseEvidenceBundleSchema.$defs.routeGraphGateStatus.enum.includes("DEFERRED"), true);
 });
 
 test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 credential preflight를 사용한다", () => {
@@ -4923,6 +4933,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "headwayReportSha256",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
+    "routeGraphTopologyViolationCount",
     "validatorStatus",
     "coverageStatus",
     "routeMapPositionCoverageStatus",
@@ -6764,18 +6775,17 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(sampleUrl.searchParams.get("prevStinCd"), "132");
   assert.equal(sampleUrl.searchParams.get("chthTgtLn"), "4");
   assert.equal(sampleUrl.searchParams.get("chtnNextStinCd"), "425");
-  assert.match(candidate.evidence.liveSampleNote, /prevStinCd=422/);
-  assert.match(candidate.evidence.liveSampleNote, /chtnNextStinCd=424/);
-  assert.match(candidate.evidence.liveSampleNote, /29155976812/);
-  assert.match(candidate.evidence.liveSampleNote, /3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f/);
-  assert.match(candidate.evidence.liveSampleNote, /2026-07-11/);
-  assert.match(candidate.evidence.liveSampleNote, /HTTP 200/);
-  assert.match(candidate.evidence.liveSampleNote, /application\/xml/);
-  assert.match(candidate.evidence.liveSampleNote, /resultCode=03/);
-  assert.match(candidate.evidence.liveSampleNote, /classification=no-data/);
-  assert.match(candidate.evidence.liveSampleNote, /itemCount=0/);
-  assert.match(candidate.evidence.liveSampleNote, /sampleResponse evidence가 아님/);
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /2026-07-11.*29155976812 \(head 3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f\).*prevStinCd=422.*chtnNextStinCd=424.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*sampleResponse evidence가 아님/,
+  );
   assert.match(candidate.evidence.liveSampleNote, /공식 요청변수 표에서 가져온 미검증 tuple/);
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /2026-07-12.*29177451688 \(head 3c3567b524a14f39a0bbe20a774259b7ba405694\).*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0.*sanitized sample artifact가 생성되지 않음/,
+  );
+  assert.match(candidate.evidence.liveSampleNote, /resultCode=03의 공식 의미 매핑은 공개 문서에서 확인되지 않음/);
+  assert.match(candidate.evidence.liveSampleNote, /공식 상세 페이지 sample URL.*422\/424.*요청변수 표.*132\/425.*불일치/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), [
     "chtnMvTpOrdr",
