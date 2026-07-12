@@ -384,6 +384,56 @@ test("게이트③: 공식 rule이 참조하는 기존 edge의 provenance 누락
   assert.equal(report.gateTimeSourceDistinction.status, "FAIL");
 });
 
+test("게이트③: pathwayEdgeId가 없는 공식 rule을 edgeMissing에 명시 기록하고 status는 PASS를 유지한다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [],
+    carDoorRows: [],
+    kricMovement: null,
+    existingEdges: pack.stationPathwayEdges,
+    fixtureTransferRules: pack.transferRules,
+  });
+
+  assert.equal(report.gateTimeSourceDistinction.status, "PASS");
+  assert.equal(report.gateTimeSourceDistinction.edgeMissing.length, 1);
+  assert.equal(report.gateTimeSourceDistinction.edgeMissing[0].ruleId, "transfer-gangnam");
+  assert.match(report.gateTimeSourceDistinction.edgeMissing[0].reason, /플랫폼 노드/);
+  // edgeMissing된 rule은 edgeChecks에는 나타나지 않는다(실검증 대상 아님).
+  assert.equal(
+    report.gateTimeSourceDistinction.edgeChecks.some((check) => check.ruleId === "transfer-gangnam"),
+    false,
+  );
+});
+
+test("게이트③: 모든 공식 rule은 edgeChecks 또는 edgeMissing 중 하나에 반드시 나타난다(조용히 빠지지 않는다)", () => {
+  const rogueRule = {
+    id: "transfer-rogue",
+    sourceId: "seoul-metro-transfer-distance-duration",
+    pathwayEdgeId: "e-does-not-exist",
+  };
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [],
+    carDoorRows: [],
+    kricMovement: null,
+    existingEdges: pack.stationPathwayEdges,
+    fixtureTransferRules: [...pack.transferRules, rogueRule],
+  });
+
+  const officialRuleIds = [...pack.transferRules, rogueRule]
+    .filter((rule) => rule.sourceId === "seoul-metro-transfer-distance-duration")
+    .map((rule) => rule.id);
+  const observedRuleIds = new Set([
+    ...report.gateTimeSourceDistinction.edgeChecks.map((check) => check.ruleId),
+    ...report.gateTimeSourceDistinction.edgeMissing.map((entry) => entry.ruleId),
+  ]);
+  for (const ruleId of officialRuleIds) {
+    assert.ok(observedRuleIds.has(ruleId), `rule ${ruleId}이 edgeChecks/edgeMissing 어디에도 없다(조용히 빠짐)`);
+  }
+  // pathwayEdgeId는 있으나 참조 edge가 존재하지 않는 rogue rule은 edgeChecks에서 실패로 잡혀 FAIL이 되어야 한다.
+  assert.equal(report.gateTimeSourceDistinction.status, "FAIL");
+});
+
 test("게이트③: non-empty여도 admitted transfer snapshot과 다르면 FAIL 처리한다", () => {
   const report = buildBaselineIngestionGateReport({
     roster: buildRosterFromPack(pack),

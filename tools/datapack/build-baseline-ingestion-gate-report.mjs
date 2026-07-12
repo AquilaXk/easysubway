@@ -439,9 +439,20 @@ function sha256(value) {
 // desk 게이트 ③: timeSource 구분. baseline edge의 provenance_kind는 OFFICIAL_SOURCE로 고정된다.
 function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existingEdges) {
   const existingEdgesById = new Map(existingEdges.map((edge) => [edge.id, edge]));
-  const referencedExistingEdges = fixtureTransferRules
-    .filter((rule) => rule.sourceId === TRANSFER_SOURCE_ID && rule.pathwayEdgeId)
+  const officialRules = fixtureTransferRules.filter((rule) => rule.sourceId === TRANSFER_SOURCE_ID);
+  const referencedExistingEdges = officialRules
+    .filter((rule) => rule.pathwayEdgeId)
     .map((rule) => ({ rule, edge: existingEdgesById.get(rule.pathwayEdgeId) ?? null }));
+  // pathwayEdgeId가 없는 공식 rule(예: 강남)은 플랫폼 노드 부재로 pathway edge가 애초에 생성되지 않는
+  // 기지의 한계다 — 검증 대상에서 조용히 빼지 않고 edgeMissing으로 명시 기록한다.
+  const edgeMissing = officialRules
+    .filter((rule) => !rule.pathwayEdgeId)
+    .map((rule) => ({
+      ruleId: rule.id,
+      reason:
+        "이 rule이 연결하는 역에 플랫폼 노드가 없어 pathway edge가 생성되지 않는 기지의 한계다 — " +
+        "edge 실검증 대상에서 제외하고 이 사실만 명시 기록한다(조용히 빼지 않는다).",
+    }));
   const generatedEdges = transfer.stationPathwayEdges.map((edge) => ({ rule: null, edge }));
   const edgeChecks = [...generatedEdges, ...referencedExistingEdges].map(({ rule, edge }) => {
     const failures = [];
@@ -469,7 +480,12 @@ function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existing
     };
   });
   const failedEdges = edgeChecks.filter((check) => check.failures.length > 0);
-  const status = edgeChecks.length === 0 ? "SKIPPED" : failedEdges.length === 0 ? "PASS" : "FAIL";
+  const status =
+    edgeChecks.length === 0 && edgeMissing.length === 0
+      ? "SKIPPED"
+      : failedEdges.length === 0
+        ? "PASS"
+        : "FAIL";
   const provenanceKinds = [...new Set(edgeChecks.map((check) => check.provenanceKind).filter(Boolean))].sort(compareText);
   return {
     description:
@@ -481,9 +497,12 @@ function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existing
     baselineEdgeCount: edgeChecks.length,
     baselineEdgeProvenanceKinds: provenanceKinds,
     edgeChecks,
+    edgeMissing,
     note:
-      "신규 생성 edge와 공식 baseline rule이 참조하는 기존 pathway edge를 함께 검사한다. 연결 edge가 없으면 SKIPPED, " +
-      "모든 연결 edge의 source·snapshot·OFFICIAL_SOURCE provenance가 유효하면 PASS, 하나라도 어긋나면 FAIL이다.",
+      "신규 생성 edge와 공식 baseline rule이 참조하는 기존 pathway edge를 함께 검사한다. pathwayEdgeId가 없는 공식 " +
+      "rule은 edgeMissing에 명시 기록하고 edge 실검증에서는 제외한다(조용히 빼지 않는다). 연결 edge와 " +
+      "edgeMissing이 모두 없으면 SKIPPED, 모든 연결 edge의 source·snapshot·OFFICIAL_SOURCE provenance가 유효하고 " +
+      "edgeMissing으로 명시된 rule 외에 빠진 rule이 없으면 PASS, 연결 edge 중 하나라도 검증에 실패하면 FAIL이다.",
   };
 }
 
