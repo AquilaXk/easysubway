@@ -51,7 +51,8 @@ body.admin-v3 {
 	align-self: start;
 	display: flex;
 	flex-direction: column;
-	min-height: 100vh;
+	height: 100vh;
+	height: 100dvh;
 	padding: 22px 0;
 	border-right: 1px solid var(--admin-border);
 	background: var(--admin-sidebar-bg);
@@ -1353,7 +1354,7 @@ body.admin-v3 {
 	/* no-JS 기본: 사이드바가 본문 위에 스택으로 보인다(전 기능 접근 가능). */
 	.admin-sidebar {
 		position: static;
-		min-height: auto;
+		height: auto;
 		max-height: 44vh;
 		overflow-y: auto;
 	}
