@@ -6766,16 +6766,13 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(sampleUrl.searchParams.get("chtnNextStinCd"), "425");
   assert.match(
     candidate.evidence.liveSampleNote,
-    /29155976812 \(head 3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f\).*prevStinCd=422.*chtnNextStinCd=424.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*sampleResponse evidence가 아님/,
+    /2026-07-11.*29155976812 \(head 3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f\).*prevStinCd=422.*chtnNextStinCd=424.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*sampleResponse evidence가 아님/,
   );
   assert.match(candidate.evidence.liveSampleNote, /공식 요청변수 표에서 가져온 미검증 tuple/);
-  assert.match(candidate.evidence.liveSampleNote, /29177451688 \(head 3c3567b524a14f39a0bbe20a774259b7ba405694\)/);
-  assert.match(candidate.evidence.liveSampleNote, /2026-07-12/);
   assert.match(
     candidate.evidence.liveSampleNote,
-    /29177451688.*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0/,
+    /2026-07-12.*29177451688 \(head 3c3567b524a14f39a0bbe20a774259b7ba405694\).*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0.*sanitized sample artifact가 생성되지 않음/,
   );
-  assert.match(candidate.evidence.liveSampleNote, /sanitized sample artifact가 생성되지 않음/);
   assert.match(candidate.evidence.liveSampleNote, /resultCode=03의 공식 의미 매핑은 공개 문서에서 확인되지 않음/);
   assert.match(candidate.evidence.liveSampleNote, /공식 상세 페이지 sample URL.*422\/424.*요청변수 표.*132\/425.*불일치/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
