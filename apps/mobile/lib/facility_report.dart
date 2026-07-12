@@ -12,7 +12,6 @@ import 'accessible_design.dart';
 import 'auth_headers.dart';
 import 'core/database/user/user_database.dart' as user_db;
 import 'core/network/api_client.dart';
-import 'design_tokens.dart';
 import 'mobile_error_reporter.dart';
 import 'secure_key_value_storage.dart';
 
@@ -47,15 +46,14 @@ const _facilityReportCardRadius = BorderRadius.all(Radius.circular(16));
 
 /// 제보 상태(FacilityReportStatus)를 상태색으로 매핑한다. 박스 대신 색 점·색
 /// 텍스트로 상태를 구분하기 위한 전경색만 돌려준다.
-Color _reportStatusColor(BuildContext context, String status) {
-  final tokens = EasySubwayTokens.of(context);
+Color _reportStatusColor(String status) {
   return switch (status) {
-    'SUBMITTED' => tokens.accent,
-    'UNDER_REVIEW' => tokens.warn,
+    'SUBMITTED' => EasySubwayAccessibleColors.needsInfo,
+    'UNDER_REVIEW' => EasySubwayAccessibleColors.amber,
     'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
-    'REJECTED' => tokens.danger,
-    'DUPLICATE' => tokens.inkMuted,
-    _ => tokens.inkMuted,
+    'REJECTED' => EasySubwayAccessibleColors.red,
+    'DUPLICATE' => EasySubwayAccessibleColors.mutedText,
+    _ => EasySubwayAccessibleColors.mutedText,
   };
 }
 
@@ -1464,24 +1462,23 @@ class _MyReportEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
+            const Icon(
               Icons.receipt_long_outlined,
               size: 40,
-              color: tokens.inkMuted,
+              color: EasySubwayAccessibleColors.mutedText,
             ),
             const SizedBox(height: 14),
             Text(
               '접수한 제보가 없습니다.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: tokens.ink,
+                color: EasySubwayAccessibleColors.text,
                 fontWeight: FontWeight.w700,
                 height: 1.3,
               ),
@@ -1500,7 +1497,6 @@ class _MyReportError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1511,7 +1507,7 @@ class _MyReportError extends StatelessWidget {
               _facilityReportListErrorMessage,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: tokens.ink,
+                color: EasySubwayAccessibleColors.text,
                 fontWeight: FontWeight.w700,
                 height: 1.3,
               ),
@@ -1538,7 +1534,6 @@ class _MyReportListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final tokens = EasySubwayTokens.of(context);
     final description = report.description.isEmpty
         ? report.reportTypeLabel
         : report.description;
@@ -1558,10 +1553,10 @@ class _MyReportListItem extends StatelessWidget {
       onTap: openReportDetail,
       child: ExcludeSemantics(
         child: Material(
-          color: tokens.surface,
+          color: EasySubwayAccessibleColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: _facilityReportCardRadius,
-            side: BorderSide(color: tokens.line),
+            side: const BorderSide(color: EasySubwayAccessibleColors.line),
           ),
           child: InkWell(
             key: Key('myReport-${report.id}'),
@@ -1579,7 +1574,7 @@ class _MyReportListItem extends StatelessWidget {
                         child: Text(
                           report.reportTypeLabel,
                           style: textTheme.titleMedium?.copyWith(
-                            color: tokens.ink,
+                            color: EasySubwayAccessibleColors.text,
                             fontWeight: FontWeight.w700,
                             height: 1.25,
                           ),
@@ -1596,7 +1591,7 @@ class _MyReportListItem extends StatelessWidget {
                   Text(
                     description,
                     style: textTheme.bodyLarge?.copyWith(
-                      color: tokens.ink,
+                      color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w700,
                       height: 1.35,
                     ),
@@ -1630,7 +1625,6 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final description = report.description.isEmpty
         ? report.reportTypeLabel
         : report.description;
@@ -1648,7 +1642,7 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
               Text(
                 report.reportTypeLabel,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: tokens.ink,
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
@@ -1683,7 +1677,7 @@ class _MyReportDetailStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _reportStatusColor(context, status);
+    final color = _reportStatusColor(status);
     return Align(
       alignment: Alignment.centerLeft,
       child: Row(
@@ -1717,14 +1711,13 @@ class _MyReportDetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: tokens.inkMuted,
+            color: EasySubwayAccessibleColors.mutedText,
             fontWeight: FontWeight.w700,
             height: 1.2,
           ),
@@ -1733,7 +1726,7 @@ class _MyReportDetailRow extends StatelessWidget {
         Text(
           value,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: tokens.ink,
+            color: EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w700,
             height: 1.3,
           ),
@@ -1751,7 +1744,7 @@ class _MyReportStatusLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _reportStatusColor(context, status);
+    final color = _reportStatusColor(status);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1782,11 +1775,10 @@ class _MyReportMetaText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Text(
       '$label $value',
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        color: tokens.inkMuted,
+        color: EasySubwayAccessibleColors.mutedText,
         fontWeight: FontWeight.w700,
         height: 1.3,
       ),
@@ -1847,7 +1839,6 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final state = _controller.state;
     final isLoading = state.status == FacilityReportViewStatus.loading;
     final reportResult = state.result;
@@ -1938,17 +1929,17 @@ class _FacilityReportScreenState extends State<FacilityReportScreen> {
               if (_attachedLocation != null)
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.location_on_outlined,
-                      color: tokens.accent,
+                      color: EasySubwayAccessibleColors.primary,
                       size: 24,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
+                    const Expanded(
                       child: Text(
                         '현재 위치를 첨부했어요',
                         style: TextStyle(
-                          color: tokens.ink,
+                          color: EasySubwayAccessibleColors.text,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -2457,12 +2448,11 @@ class _FacilityReportStatusPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: tokens.surface,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _facilityReportCardRadius,
-        border: Border.all(color: tokens.line),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -2514,14 +2504,13 @@ class _FacilityReportStatusRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final tokens = EasySubwayTokens.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: textTheme.labelLarge?.copyWith(
-            color: tokens.inkMuted,
+            color: EasySubwayAccessibleColors.mutedText,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -2529,7 +2518,7 @@ class _FacilityReportStatusRow extends StatelessWidget {
         Text(
           value,
           style: textTheme.titleMedium?.copyWith(
-            color: tokens.ink,
+            color: EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w700,
             height: 1.25,
           ),
@@ -2547,7 +2536,6 @@ class _FacilityReportHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final tokens = EasySubwayTokens.of(context);
 
     return Semantics(
       label:
@@ -2560,7 +2548,7 @@ class _FacilityReportHeader extends StatelessWidget {
             Text(
               '${target.stationName}역',
               style: textTheme.headlineSmall?.copyWith(
-                color: tokens.ink,
+                color: EasySubwayAccessibleColors.text,
                 fontWeight: FontWeight.w700,
                 height: 1.2,
               ),
@@ -2569,7 +2557,7 @@ class _FacilityReportHeader extends StatelessWidget {
             Text(
               target.facilityName,
               style: textTheme.titleLarge?.copyWith(
-                color: tokens.ink,
+                color: EasySubwayAccessibleColors.text,
                 fontWeight: FontWeight.w700,
                 height: 1.25,
               ),
@@ -2578,7 +2566,7 @@ class _FacilityReportHeader extends StatelessWidget {
             Text(
               '${target.facilityTypeLabel} · ${target.facilityStatusLabel}',
               style: textTheme.bodyLarge?.copyWith(
-                color: tokens.inkMuted,
+                color: EasySubwayAccessibleColors.mutedText,
                 fontWeight: FontWeight.w700,
                 height: 1.3,
               ),
@@ -2597,13 +2585,12 @@ class _FacilityReportSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       header: true,
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: tokens.ink,
+          color: EasySubwayAccessibleColors.text,
           fontWeight: FontWeight.w700,
           height: 1.25,
         ),
@@ -2625,9 +2612,12 @@ class _FacilityReportTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
-    final color = selected ? tokens.accent : tokens.line;
-    final textColor = selected ? tokens.surface : tokens.ink;
+    final color = selected
+        ? EasySubwayAccessibleColors.primary
+        : EasySubwayAccessibleColors.line;
+    final textColor = selected
+        ? EasySubwayAccessibleColors.surface
+        : EasySubwayAccessibleColors.text;
     final semanticsLabel = '${option.label} ${selected ? '선택됨' : '선택 가능'}';
 
     return Semantics(
@@ -2637,7 +2627,7 @@ class _FacilityReportTypeCard extends StatelessWidget {
       onTap: onTap,
       child: ExcludeSemantics(
         child: Material(
-          color: selected ? color : tokens.surface,
+          color: selected ? color : EasySubwayAccessibleColors.surface,
           shape: RoundedRectangleBorder(
             borderRadius: _facilityReportCardRadius,
             side: BorderSide(color: color, width: 1.5),
@@ -2686,9 +2676,10 @@ class _FacilityReportMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final isFailure = state.status == FacilityReportViewStatus.failure;
-    final color = isFailure ? tokens.danger : tokens.accent;
+    final color = isFailure
+        ? EasySubwayAccessibleColors.red
+        : EasySubwayAccessibleColors.primary;
     final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
     final shouldShowNextAction = _shouldShowFacilityReportFailureNextAction(
       state,
@@ -2710,7 +2701,7 @@ class _FacilityReportMessage extends StatelessWidget {
                   child: Text(
                     state.message,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: tokens.ink,
+                      color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w700,
                       height: 1.3,
                     ),
@@ -2731,7 +2722,7 @@ class _FacilityReportMessage extends StatelessWidget {
             child: Text(
               _facilityReportFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tokens.inkMuted,
+                color: EasySubwayAccessibleColors.mutedText,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -2759,8 +2750,9 @@ class _FacilityReportLocationMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
-    final color = isFailure ? tokens.danger : tokens.accent;
+    final color = isFailure
+        ? EasySubwayAccessibleColors.red
+        : EasySubwayAccessibleColors.primary;
     final icon = isFailure ? Icons.error_outline : Icons.check_circle_outline;
 
     return Semantics(
@@ -2775,7 +2767,7 @@ class _FacilityReportLocationMessage extends StatelessWidget {
               child: Text(
                 message,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: tokens.ink,
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
