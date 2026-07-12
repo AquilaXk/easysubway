@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'design_tokens.dart';
+import 'accessible_design.dart';
 import 'auth_headers.dart';
 import 'mobile_error_reporter.dart';
 
@@ -888,7 +888,6 @@ class _NotificationSettingsMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final shouldShowNextAction =
         _shouldShowNotificationRegistrationFailureNextAction(message);
 
@@ -904,7 +903,7 @@ class _NotificationSettingsMessage extends StatelessWidget {
             message,
             key: const Key('notificationSettingsMessage'),
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: tokens.ink,
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w700,
               height: 1.35,
             ),
@@ -921,7 +920,7 @@ class _NotificationSettingsMessage extends StatelessWidget {
             child: Text(
               _notificationRegistrationFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tokens.inkMuted,
+                color: EasySubwayAccessibleColors.mutedText,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -955,7 +954,6 @@ class _NotificationSwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final tokens = EasySubwayTokens.of(context);
 
     return Semantics(
       container: true,
@@ -973,7 +971,7 @@ class _NotificationSwitchTile extends StatelessWidget {
         title: Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: tokens.ink,
+            color: EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w700,
             height: 1.35,
           ),
@@ -993,23 +991,22 @@ class _NotificationSwitchGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Material(
-      color: tokens.surface,
+      color: Colors.white,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: _notificationSwitchTileRadius,
-        side: BorderSide(color: tokens.line),
+        side: BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Column(
         children: [
           for (var i = 0; i < tiles.length; i++) ...[
             if (i > 0)
-              Divider(
+              const Divider(
                 height: 1,
                 indent: 16,
                 endIndent: 16,
-                color: tokens.line,
+                color: EasySubwayAccessibleColors.line,
               ),
             tiles[i],
           ],
@@ -1045,7 +1042,6 @@ class _NotificationSettingsFailure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return ListView(
       padding: _notificationSettingsFailurePadding,
       children: [
@@ -1055,7 +1051,7 @@ class _NotificationSettingsFailure extends StatelessWidget {
           child: Text(
             message,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: tokens.ink,
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w700,
               height: 1.35,
             ),

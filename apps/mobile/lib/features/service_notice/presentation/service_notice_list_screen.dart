@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../design_tokens.dart';
+import '../../../accessible_design.dart';
 import '../domain/service_notice.dart';
 import 'notice_controller.dart';
 
@@ -18,12 +18,11 @@ class ServiceNoticeListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Scaffold(
-      backgroundColor: tokens.surface,
+      backgroundColor: EasySubwayAccessibleColors.surface,
       appBar: AppBar(
         title: const Text('운행 공지'),
-        backgroundColor: tokens.surface,
+        backgroundColor: EasySubwayAccessibleColors.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),
@@ -50,11 +49,11 @@ class ServiceNoticeListScreen extends StatelessWidget {
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: notices.length,
-                    separatorBuilder: (context, index) => Divider(
+                    separatorBuilder: (context, index) => const Divider(
                       height: 1,
                       indent: 20,
                       endIndent: 20,
-                      color: tokens.line,
+                      color: EasySubwayAccessibleColors.line,
                     ),
                     itemBuilder: (context, index) =>
                         _NoticeItem(notice: notices[index]),
@@ -76,28 +75,27 @@ class _StaleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Container(
       key: const Key('serviceNoticeStaleBar'),
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: tokens.scaffold,
+        color: EasySubwayAccessibleColors.scaffoldSurface,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.cloud_off_rounded,
             size: 18,
-            color: tokens.inkMuted,
+            color: EasySubwayAccessibleColors.mutedText,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               '오프라인 · $label',
-              style: TextStyle(
-                color: tokens.inkMuted,
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.mutedText,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -116,11 +114,10 @@ class _NoticeItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final isDisruption = notice.isDisruption;
     final accent = isDisruption
-        ? tokens.warn
-        : tokens.accent;
+        ? EasySubwayAccessibleColors.amber
+        : EasySubwayAccessibleColors.primary;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
       child: Column(
@@ -149,8 +146,8 @@ class _NoticeItem extends StatelessWidget {
               const Spacer(),
               Text(
                 _formatPublishedAt(notice.publishedAt),
-                style: TextStyle(
-                  color: tokens.inkMuted,
+                style: const TextStyle(
+                  color: EasySubwayAccessibleColors.mutedText,
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -160,8 +157,8 @@ class _NoticeItem extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             notice.title,
-            style: TextStyle(
-              color: tokens.ink,
+            style: const TextStyle(
+              color: EasySubwayAccessibleColors.text,
               fontSize: 16,
               fontWeight: FontWeight.w700,
               height: 1.3,
@@ -171,8 +168,8 @@ class _NoticeItem extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               notice.body,
-              style: TextStyle(
-                color: tokens.inkSecondary,
+              style: const TextStyle(
+                color: EasySubwayAccessibleColors.secondaryText,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 height: 1.4,
@@ -192,33 +189,32 @@ class _EmptyNotices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (staleLabel != null) _StaleBar(label: staleLabel!),
         SizedBox(height: MediaQuery.sizeOf(context).height * 0.22),
-        Icon(
+        const Icon(
           Icons.check_circle_outline_rounded,
           size: 44,
-          color: tokens.inkMuted,
+          color: EasySubwayAccessibleColors.mutedText,
         ),
         const SizedBox(height: 14),
-        Text(
+        const Text(
           '지금은 운행 공지가 없어요',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: tokens.ink,
+            color: EasySubwayAccessibleColors.text,
             fontSize: 17,
             fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 6),
-        Text(
+        const Text(
           '운행 장애나 안내가 생기면 여기에 표시돼요',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: tokens.inkMuted,
+            color: EasySubwayAccessibleColors.mutedText,
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
