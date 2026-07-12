@@ -234,9 +234,16 @@
           "railOprIsttNm"
         ],
         "liveSampleNote": "2026-07-12 workflow run 29201302750 (head e451fbdf352fef74dc376c9f16d476aca287b492)은 backend-only secret 경로에서 credentialRedacted=true, format=xml, rowCount=1인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
-        "missingEvidence": []
+        "missingEvidence": [
+          "adminAdmissionEvidence",
+          "credentialFreeRawArchive",
+          "licenseCommercialRedistributionEvidence",
+          "operatorCoverageEvidence",
+          "providerTermsOrQuotaApproval",
+          "rawObjectUri"
+        ]
       },
-      "nextAction": "verify operator coverage for airport rail, GTX, and light rail before production inventory admission",
+      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, and operator coverage for airport rail, GTX, and light rail before production inventory admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -312,9 +319,16 @@
           "stinCd"
         ],
         "liveSampleNote": "2026-07-12 workflow run 29201337952 (head e451fbdf352fef74dc376c9f16d476aca287b492)은 backend-only secret 경로에서 credentialRedacted=true, format=json, rowCount=4인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
-        "missingEvidence": []
+        "missingEvidence": [
+          "adminAdmissionEvidence",
+          "credentialFreeRawArchive",
+          "licenseCommercialRedistributionEvidence",
+          "providerTermsOrQuotaApproval",
+          "rawObjectUri",
+          "stepFreeMovementSeparationEvidence"
+        ]
       },
-      "nextAction": "verify live sample response and keep transfer relationship evidence separate from step-free movement evidence before production inventory admission",
+      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, and keep transfer relationship evidence separate from step-free movement evidence before production inventory admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -402,9 +416,16 @@
           "updnDvCd"
         ],
         "liveSampleNote": "KRIC 공식 stPlf 문서는 updnDvcd로 표기하지만 live wire는 updnDvCd를 반환한다. 2026-07-12 workflow run 29201338889 (head e451fbdf352fef74dc376c9f16d476aca287b492)은 backend-only secret 경로에서 credentialRedacted=true, format=json, rowCount=2인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
-        "missingEvidence": []
+        "missingEvidence": [
+          "adminAdmissionEvidence",
+          "credentialFreeRawArchive",
+          "licenseCommercialRedistributionEvidence",
+          "operatorFieldCompletenessEvidence",
+          "providerTermsOrQuotaApproval",
+          "rawObjectUri"
+        ]
       },
-      "nextAction": "verify live sample response and operator field completeness before production inventory admission",
+      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, and operator field completeness before production inventory admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -482,13 +503,20 @@
           "stMovePath"
         ],
         "liveSampleNote": "2026-07-12 workflow run 29201339728 (head e451fbdf352fef74dc376c9f16d476aca287b492)은 backend-only secret 경로에서 credentialRedacted=true, format=xml, rowCount=6인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
-        "missingEvidence": [],
+        "missingEvidence": [
+          "adminAdmissionEvidence",
+          "credentialFreeRawArchive",
+          "distanceDurationEdgeEvidence",
+          "licenseCommercialRedistributionEvidence",
+          "providerTermsOrQuotaApproval",
+          "rawObjectUri"
+        ],
         "missingConfirmedEdgeFields": [
           "distanceMeters",
           "durationSeconds"
         ]
       },
-      "nextAction": "verify live sample response and keep as admin review candidate until distance and duration evidence exists",
+      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, and distance and duration edge evidence before production inventory admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -570,9 +598,17 @@
           "distanceMeters",
           "durationSeconds"
         ],
-        "missingEvidence": []
+        "missingEvidence": [
+          "adminAdmissionEvidence",
+          "credentialFreeRawArchive",
+          "distanceDurationEdgeEvidence",
+          "licenseCommercialRedistributionEvidence",
+          "primarySourceDecisionEvidence",
+          "providerTermsOrQuotaApproval",
+          "rawObjectUri"
+        ]
       },
-      "nextAction": "compare with standard movement API before choosing a primary source",
+      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, distance and duration edge evidence, and compare with the standard movement API before choosing a primary source for production inventory admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -640,7 +676,7 @@
           "durationSeconds"
         ]
       },
-      "nextAction": "the table-derived tuple (prevStinCd=132, chtnNextStinCd=425) has been executed twice (runs 29177451688, 29190982462) and repeatedly returned no-data (resultCode=03) with unconfirmed public documentation for that code; next step is provider inquiry or confirming an alternate access path, while retaining admin review with automatic route graph edge disabled until row-bearing evidence plus distance and duration evidence exists",
+      "nextAction": "the table-derived tuple (prevStinCd=132, chtnNextStinCd=425) has been executed three times (runs 29177451688, 29190982462, 29201341520) and repeatedly returned no-data (resultCode=03) with unconfirmed public documentation for that code; next step is provider inquiry or confirming an alternate access path, while retaining admin review with automatic route graph edge disabled until row-bearing evidence plus distance and duration evidence exists",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -805,9 +841,16 @@
           "trfcWeakDvCd"
         ],
         "liveSampleNote": "2026-07-12 workflow run 29201342431 (head e451fbdf352fef74dc376c9f16d476aca287b492)은 backend-only secret 경로에서 credentialRedacted=true, format=json, rowCount=9인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
-        "missingEvidence": []
+        "missingEvidence": [
+          "adminAdmissionEvidence",
+          "credentialFreeRawArchive",
+          "licenseCommercialRedistributionEvidence",
+          "primarySourceDecisionEvidence",
+          "providerTermsOrQuotaApproval",
+          "rawObjectUri"
+        ]
       },
-      "nextAction": "verify live sample response and decide primary or secondary role against detailed facility APIs before production inventory admission",
+      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, and decide the primary or secondary role against detailed facility APIs before production inventory admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",

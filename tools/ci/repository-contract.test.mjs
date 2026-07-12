@@ -7106,7 +7106,17 @@ test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도
     "stMovePath",
   ]);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
-  assert.deepEqual(candidate.evidence.missingEvidence, []);
+  assert.deepEqual(candidate.evidence.missingEvidence, [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "distanceDurationEdgeEvidence",
+    "licenseCommercialRedistributionEvidence",
+    "primarySourceDecisionEvidence",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
+  assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*distance.*duration.*standard movement API.*primary source.*production inventory admission/);
 });
 
 test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7134,8 +7144,17 @@ test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 �
     "mvPathMgNo",
     "stMovePath",
   ]);
-  assert.deepEqual(candidate.evidence.missingEvidence, []);
+  assert.deepEqual(candidate.evidence.missingEvidence, [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "distanceDurationEdgeEvidence",
+    "licenseCommercialRedistributionEvidence",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
+  assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*distance.*duration.*production inventory admission/);
 });
 
 test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7202,6 +7221,7 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.match(candidate.nextAction, /distance and duration evidence/);
   assert.match(candidate.nextAction, /admin review/);
   assert.match(candidate.nextAction, /automatic route graph edge/);
+  assert.match(candidate.nextAction, /three times.*29177451688.*29190982462.*29201341520/);
 });
 
 test("data.go.kr 환승역거리 소요시간 후보는 확정된 odcloud endpoint를 고정한다", () => {
@@ -7323,7 +7343,16 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
     candidate.evidence.outputFields.sort(),
     ["dtlLoc", "grndDvCd", "gubun", "imgPath", "mlFmlDvCd", "stinFlor", "trfcWeakDvCd"],
   );
-  assert.deepEqual(candidate.evidence.missingEvidence, []);
+  assert.deepEqual(candidate.evidence.missingEvidence, [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
+    "primarySourceDecisionEvidence",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
+  assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*primary.*secondary.*production inventory admission/);
 });
 
 test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7485,7 +7514,15 @@ test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 �
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), ["railOprIsttCd", "railOprIsttNm"]);
-  assert.deepEqual(candidate.evidence.missingEvidence, []);
+  assert.deepEqual(candidate.evidence.missingEvidence, [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
+    "operatorCoverageEvidence",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*airport rail.*GTX.*light rail.*production inventory admission/);
 });
 
 test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7511,7 +7548,16 @@ test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출
     "stLocCont",
     "stinCd",
   ]);
-  assert.deepEqual(candidate.evidence.missingEvidence, []);
+  assert.deepEqual(candidate.evidence.missingEvidence, [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+    "stepFreeMovementSeparationEvidence",
+  ]);
+  assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*transfer relationship.*step-free movement.*production inventory admission/);
 });
 
 test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7544,7 +7590,16 @@ test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와
     "updnDvCd",
   ]);
   assert.match(candidate.evidence.liveSampleNote, /updnDvcd.*updnDvCd.*29201338889.*credentialRedacted=true.*source candidate sample evidence valid/);
-  assert.deepEqual(candidate.evidence.missingEvidence, []);
+  assert.deepEqual(candidate.evidence.missingEvidence, [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
+    "operatorFieldCompletenessEvidence",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
+  assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*operator field completeness.*production inventory admission/);
 });
 
 test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 retired id 재사용 금지를 강제한다", () => {
