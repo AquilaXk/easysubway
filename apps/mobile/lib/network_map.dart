@@ -1477,7 +1477,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                 ),
                 icon: const Icon(
                   Icons.arrow_back,
-                  size: 22,
+                  size: 26,
                   color: Color(0xFF4B4B4B),
                 ),
               )

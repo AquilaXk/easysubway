@@ -1120,6 +1120,16 @@ void main() {
         .getSize(find.byKey(const Key('heroStationSearchInputBox')))
         .height;
     expect(activeHeight, idleHeight);
+
+    // 검색 모드에서 뒤로가기 아이콘 크기는 26이어야 한다(메뉴 아이콘과 같은
+    // 슬롯이라 전환 시 크기 점프를 없애는 정합, #2003).
+    final backIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const Key('networkMapSearchBackButton')),
+        matching: find.byIcon(Icons.arrow_back),
+      ),
+    );
+    expect(backIcon.size, 26.0);
   });
 
   testWidgets('노선도 검색 중 타이핑은 지도 chrome을 재빌드하지 않는다', (tester) async {
