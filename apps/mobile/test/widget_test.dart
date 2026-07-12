@@ -4890,6 +4890,35 @@ void main() {
 
     expect(maps.map((map) => map['app_region']), contains('수도권'));
     expect(sources, isNotEmpty);
+
+    // #1701: 서울교통공사 환승역거리 소요시간·빠른하차·환승 이동경로 3건 출처가 화면에 표기된다.
+    // source-inventory.json에 이미 존재하는 항목이 필터 없이 렌더링됨을 고정한다.
+    // 각 출처 카드는 제목과 '제공 기관' 행에 displayName을 두 번(2개 Text) 렌더링하므로 단일 매치를
+    // 요구하는 scrollUntilVisible 대신 리스트를 직접 드래그해 lazy 항목을 노출시킨 뒤 findsWidgets로
+    // 확인한다. 항목 탐색 전 매번 리스트를 최상단으로 리셋해 렌더 순서에 의존하지 않게 한다.
+    final sourceScrollable = find.byType(Scrollable);
+    final sourceScrollState = tester.state<ScrollableState>(sourceScrollable);
+    for (final displayName in const [
+      '환승 이동경로',
+      '서울교통공사_빠른하차정보',
+      '서울교통공사_환승역거리 소요시간',
+    ]) {
+      sourceScrollState.position.jumpTo(
+        sourceScrollState.position.minScrollExtent,
+      );
+      await tester.pumpAndSettle();
+
+      final finder = find.textContaining(displayName);
+      while (finder.evaluate().length < 2) {
+        final position = sourceScrollState.position;
+        if (position.pixels >= position.maxScrollExtent) break;
+        final previousOffset = position.pixels;
+        await tester.drag(sourceScrollable, const Offset(0, -300));
+        await tester.pumpAndSettle();
+        if (position.pixels <= previousOffset) break;
+      }
+      expect(finder, findsNWidgets(2));
+    }
   });
 
   testWidgets('설정 화면 보기 옵션은 변경값을 저장하고 다시 실행해도 유지한다', (tester) async {
