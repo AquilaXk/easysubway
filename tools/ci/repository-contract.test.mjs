@@ -6343,9 +6343,13 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   );
 
   for (const candidate of kricCandidates) {
+    const hasValidatedSample = ["kric-station-info", "kric-subway-route-info"].includes(candidate.id);
     assert.equal(candidate.priority, "P0");
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-    assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+    assert.equal(
+      candidate.sampleEvidenceStatus,
+      hasValidatedSample ? "validated_live_sample" : "sample_url_documented_key_required",
+    );
     assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
     assert.ok(candidate.capabilities && typeof candidate.capabilities === "object");
     assert.deepEqual(Object.keys(candidate.capabilities).sort((left, right) => left.localeCompare(right)), [
@@ -6362,7 +6366,15 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
     assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
     assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
     assert.ok(candidate.evidence.outputFields.length > 0);
-    assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+    if (hasValidatedSample) {
+      assert.equal(candidate.evidence.missingEvidence.includes("sampleResponse"), false);
+      assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
+      for (const capability of Object.values(candidate.capabilities)) {
+        assert.equal(capability.productionUseAllowed, false);
+      }
+    } else {
+      assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+    }
     assert.ok(candidate.nextAction);
   }
 });
@@ -6833,18 +6845,26 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
 });
 
 test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
+  const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const candidate = candidates.candidates.find(({ id }) => id === "kric-subway-route-info");
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
+  assert.equal(inventory.sources.some(({ id }) => id === candidate.id), false);
+  assert.ok(Object.values(candidate.capabilities).every(({ productionUseAllowed }) => productionUseAllowed === false));
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=431&service=trainUseInfo&operation=subwayRouteInfo&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  const sampleUrl = new URL(candidate.evidence.sampleUrl);
+  assert.equal(sampleUrl.searchParams.get("format"), "xml");
+  assert.equal(sampleUrl.searchParams.get("mreaWideCd"), "01");
+  assert.equal(sampleUrl.searchParams.get("lnCd"), "A1");
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), [
     "lnCd",
@@ -6856,22 +6876,50 @@ test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선�
     "stinConsOrdr",
     "stinNm",
   ]);
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+  assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-11T09:58:45Z");
+  assert.equal(candidate.evidence.liveSampleRowCount, 14);
+  assert.equal(candidate.evidence.liveSampleRawSha256, "b886b7652cc9be69efb6a8acbdfdcb12f8110f15cdc2dcc5481455abb7fe8e9f");
+  assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "d516b09e782a9afd73eb0f921b48abdf2bac3aa2247e1b0ad9f0a4a7c371f764");
+  assert.equal(candidate.evidence.liveSampleEvidenceHash, "bf0d324018c6d2353bfe4da8c7385ef867aacb27a26dcda311a259641a35aa03");
+  assert.deepEqual(candidate.evidence.liveSampleFields.sort(), candidate.evidence.outputFields.sort());
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /29148603270 \(head 6d8e4f8f3fc8398f981555e99bb37ba34e7afcd1\).*backend-only.*credentialRedacted=true.*format=xml.*rowCount=14.*sample↔hashes.*validator.*raw\/provider-record 독립 재계산은 수행하지 않음.*mobile\/offline pack에 포함하지 않음.*mreaWideCd=01.*lnCd=A1.*4호선 coverage가 아님/,
+  );
+  assert.deepEqual(candidate.evidence.missingEvidence.sort(), [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
+    "line4RouteStationOrderCoverage",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*4호선.*production inventory admission/);
 });
 
 test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
+  const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const candidate = candidates.candidates.find(({ id }) => id === "kric-station-info");
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
+  assert.equal(inventory.sources.some(({ id }) => id === candidate.id), false);
+  assert.ok(Object.values(candidate.capabilities).every(({ productionUseAllowed }) => productionUseAllowed === false));
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=183&service=convenientInfo&operation=stationInfo&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
   assert.match(candidate.evidence.sampleUrl, /serviceKey=\[서비스키값\]/);
+  const sampleUrl = new URL(candidate.evidence.sampleUrl);
+  assert.equal(sampleUrl.searchParams.get("format"), "xml");
+  assert.equal(sampleUrl.searchParams.get("railOprIsttCd"), "KR");
+  assert.equal(sampleUrl.searchParams.get("lnCd"), "1");
+  assert.equal(sampleUrl.searchParams.get("stinCd"), "135");
+  assert.equal(sampleUrl.searchParams.get("stinNm"), "용산");
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), [
     "lnCd",
@@ -6891,7 +6939,25 @@ test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변
     "stinNmTradcina",
     "strkZone",
   ]);
-  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse"]);
+  assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-11T10:02:54Z");
+  assert.equal(candidate.evidence.liveSampleRowCount, 1);
+  assert.equal(candidate.evidence.liveSampleRawSha256, "dcccbf5c08a51c453264f8b56d3135e0a44a92acc6e4d9ca588f5dfa0c568297");
+  assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "b33b608e3cdcc3610e3a41ab789d10294745fef124321887089291b62ee709f9");
+  assert.equal(candidate.evidence.liveSampleEvidenceHash, "cf5b877a765f5d84b48450b6aa5ef5fe9fea5776ca856dba7dafccada9a6d2de");
+  assert.deepEqual(candidate.evidence.liveSampleFields.sort(), candidate.evidence.outputFields.sort());
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /29148721533 \(head 6d8e4f8f3fc8398f981555e99bb37ba34e7afcd1\).*backend-only.*credentialRedacted=true.*format=xml.*rowCount=1.*sample↔hashes.*validator.*raw\/provider-record 독립 재계산은 수행하지 않음.*mobile\/offline pack에 포함하지 않음.*railOprIsttCd=KR.*lnCd=1.*stinCd=135.*stinNm=용산.*4호선 coverage가 아님/,
+  );
+  assert.deepEqual(candidate.evidence.missingEvidence.sort(), [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
+    "line4StationCoverage",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
+  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*4호선.*production inventory admission/);
 });
 
 test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
