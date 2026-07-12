@@ -3,12 +3,16 @@ import { readFile } from "node:fs/promises";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL"]);
-const HEADWAY_STATUSES = new Set([...STATUSES, "DEFERRED"]);
-// route_graph_topology는 capital pilot의 deferred domain이다(pilot targets의 knownSourceDomains에만 존재).
-// deferred domain 위반은 게시를 차단하지 않고 DEFERRED로 정직 기록하되, 위반 수치는
-// routeGraphTopologyViolationCount와 topology report SHA로 evidence에 전량 남긴다(은폐 금지).
-const ROUTE_GRAPH_STATUSES = new Set([...STATUSES, "DEFERRED"]);
-const DEFERRED_ALLOWED_FIELDS = new Set(["headwayReportStatus", "routeGraphTopologyStatus"]);
+// 필드별 허용 status set의 단일 소스. DEFERRED가 포함된 필드는 곧 deferred 허용 필드다
+// (headway는 evidence 미도래, route_graph_topology는 capital pilot의 deferred domain — pilot targets의
+// knownSourceDomains에만 존재). deferred domain 위반은 게시를 차단하지 않고 DEFERRED로 정직 기록하되,
+// 위반 수치는 routeGraphTopologyViolationCount와 topology report SHA로 evidence에 전량 남긴다(은폐 금지).
+// 이 맵 하나에서 allowedStatusesFor와 DEFERRED 허용 여부를 함께 파생한다(중복 상수 제거).
+const DEFERRABLE_STATUSES = new Set([...STATUSES, "DEFERRED"]);
+const FIELD_STATUS_SETS = new Map([
+  ["headwayReportStatus", DEFERRABLE_STATUSES],
+  ["routeGraphTopologyStatus", DEFERRABLE_STATUSES],
+]);
 
 function argValue(args, name) {
   const index = args.indexOf(name);
@@ -30,13 +34,7 @@ function validateSha(bundle, field) {
 }
 
 function allowedStatusesFor(field) {
-  if (field === "headwayReportStatus") {
-    return HEADWAY_STATUSES;
-  }
-  if (field === "routeGraphTopologyStatus") {
-    return ROUTE_GRAPH_STATUSES;
-  }
-  return STATUSES;
+  return FIELD_STATUS_SETS.get(field) ?? STATUSES;
 }
 
 function validateStatus(bundle, field, requirePass) {
@@ -45,7 +43,7 @@ function validateStatus(bundle, field, requirePass) {
   if (!allowedStatuses.has(value)) {
     throw new Error(`${field} must be a release gate status`);
   }
-  if (requirePass && value !== "PASS" && !(DEFERRED_ALLOWED_FIELDS.has(field) && value === "DEFERRED")) {
+  if (requirePass && value !== "PASS" && !(allowedStatuses.has("DEFERRED") && value === "DEFERRED")) {
     throw new Error(`${field} must be PASS for publish`);
   }
 }
