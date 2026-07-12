@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { validateQuotaEvidence } from "./lib/quota-evidence.mjs";
 
 const args = process.argv.slice(2);
 const inventoryPath = optionValue("--inventory") ?? "tools/datapack/source-inventory.json";
 const candidatesPath = optionValue("--candidates") ?? "tools/datapack/source-candidates.json";
 const scopePath = optionValue("--scope");
 const compareStrings = (left, right) => left.localeCompare(right);
-const requiredQuotaEvidenceKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
-const optionalQuotaEvidenceKeys = ["documentedMonthlyLimit"];
 
 try {
   const inventory = JSON.parse(await readFile(inventoryPath, "utf8"));
@@ -272,38 +271,6 @@ function sourceHasProductionCapability(source) {
   return ["schedule", "realtime", "facility"].some(
     (capabilityName) => source.capabilities?.[capabilityName]?.productionUseAllowed === true,
   );
-}
-
-function validateQuotaEvidence(quotaEvidence, label) {
-  if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
-    throw new Error(`${label} must be an object`);
-  }
-  const keys = Object.keys(quotaEvidence);
-  const allowedKeys = new Set([...requiredQuotaEvidenceKeys, ...optionalQuotaEvidenceKeys]);
-  if (!requiredQuotaEvidenceKeys.every((key) => keys.includes(key)) || keys.some((key) => !allowedKeys.has(key))) {
-    throw new Error(`${label} must include ${requiredQuotaEvidenceKeys.join(", ")} and only optional ${optionalQuotaEvidenceKeys.join(", ")}`);
-  }
-  assertString(quotaEvidence.portal, `${label}.portal`);
-  if (
-    quotaEvidence.defaultDailyLimit !== null &&
-    quotaEvidence.defaultDailyLimit !== "unlimited" &&
-    (!Number.isInteger(quotaEvidence.defaultDailyLimit) || quotaEvidence.defaultDailyLimit < 0)
-  ) {
-    throw new Error(`${label}.defaultDailyLimit must be null, a non-negative integer, or unlimited`);
-  }
-  if (
-    "documentedMonthlyLimit" in quotaEvidence &&
-    (!Number.isInteger(quotaEvidence.documentedMonthlyLimit) || quotaEvidence.documentedMonthlyLimit <= 0)
-  ) {
-    throw new Error(`${label}.documentedMonthlyLimit must be a positive integer`);
-  }
-  if (quotaEvidence.defaultDailyLimit === null && !("documentedMonthlyLimit" in quotaEvidence)) {
-    throw new Error(`${label}.defaultDailyLimit null requires documentedMonthlyLimit`);
-  }
-  assertString(quotaEvidence.unlockStatus, `${label}.unlockStatus`);
-  if (typeof quotaEvidence.productionUseAllowed !== "boolean") {
-    throw new Error(`${label}.productionUseAllowed must be a boolean`);
-  }
 }
 
 function requireInventorySource(sources, sourceId) {
