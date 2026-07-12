@@ -147,6 +147,8 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
     "station_exits",
     "facilities",
     "data_quality_records",
+    // #1701: 빠른하차 칸/문 힌트 테이블을 required-table 계약에 편입.
+    "station_car_door_hints",
   ]);
   assert.equal(pack.minimumTableRows.stations, 6);
   assert.equal(pack.minimumTableRows.service_calendar_dates, 1);
@@ -158,12 +160,15 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
   assert.equal(pack.minimumTableRows.fare_rules, 1);
   assert.equal(pack.minimumTableRows.fare_discounts, 3);
   assert.equal(pack.minimumTableRows.station_fare_zones, 9);
-  assert.equal(pack.minimumTableRows.transfer_rules, 1);
+  // #1701: 사당(공식 62초 갱신) + 강남(신분당선 178초 baseline)으로 transfer_rules 2행.
+  assert.equal(pack.minimumTableRows.transfer_rules, 2);
   assert.equal(pack.minimumTableRows.station_pathway_nodes, 6);
   assert.equal(pack.minimumTableRows.station_pathway_edges, 5);
   assert.equal(pack.minimumTableRows.out_of_station_transfer_links, 1);
   assert.equal(pack.minimumTableRows.route_map_positions, 9);
   assert.equal(pack.minimumTableRows.data_quality_records, 5);
+  // #1701: 빠른하차 칸/문 힌트 최소 행수(안전값 1 — 실제 반영 35행 이하).
+  assert.equal(pack.minimumTableRows.station_car_door_hints, 1);
   assert.match(pack.sha256, /^[a-f0-9]{64}$/);
   assert.match(pack.sqliteSha256, /^[a-f0-9]{64}$/);
 
@@ -402,7 +407,9 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
           .get("station-sadang", "seoul-4", "station-sadang", "seoul-2"),
       },
       {
-        min_transfer_seconds: 210,
+        // #1701: 사당 환승소요시간을 서울교통공사 공식 baseline(환승역거리 소요시간, 74m/01:02=62초)으로
+        // 교체했다. 기존 수기값 210초는 공식값 62초로 갱신됨(공식값 우선). pathway edge 리치 구조는 보존.
+        min_transfer_seconds: 62,
         pathway_edge_id: "path-edge-sadang-4-to-2-fast",
         strict_step_free_pathway_edge_id: "path-edge-sadang-4-to-2-step-free",
       },
