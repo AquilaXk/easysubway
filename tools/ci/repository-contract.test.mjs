@@ -6698,6 +6698,11 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
         assert.equal(candidate.evidence.liveSampleEvidenceHash, newEvidence.evidenceHash);
         assert.deepEqual(candidate.evidence.liveSampleFields.slice().sort(), candidate.evidence.outputFields.slice().sort());
         assert.match(candidate.evidence.liveSampleNote, new RegExp(`${newEvidence.run}.*credentialRedacted=true.*source candidate sample evidence valid`));
+        if (candidate.capabilities.facility.status === "CANDIDATE") {
+          assert.equal(candidate.capabilities.facility.coverageStatus, "ADMISSION_EVIDENCE_REQUIRED");
+          assert.doesNotMatch(candidate.capabilities.facility.unsupportedNotes, /live sample evidence/i);
+          assert.match(candidate.capabilities.facility.unsupportedNotes, /admission evidence/i);
+        }
       }
       assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
       for (const capability of Object.values(candidate.capabilities)) {

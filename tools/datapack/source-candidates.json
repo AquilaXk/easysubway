@@ -349,9 +349,9 @@
         "facility": {
           "status": "CANDIDATE",
           "productionUseAllowed": false,
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "ADMISSION_EVIDENCE_REQUIRED",
           "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate facility coverage requires live sample evidence and inventory admission before production use"
+          "unsupportedNotes": "candidate facility coverage has validated live sample provenance but requires remaining admission evidence before production use"
         }
       }
     },
@@ -446,9 +446,9 @@
         "facility": {
           "status": "CANDIDATE",
           "productionUseAllowed": false,
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "ADMISSION_EVIDENCE_REQUIRED",
           "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate facility coverage requires live sample evidence and inventory admission before production use"
+          "unsupportedNotes": "candidate facility coverage has validated live sample provenance but requires remaining admission evidence before production use"
         }
       }
     },
@@ -537,9 +537,9 @@
         "facility": {
           "status": "CANDIDATE",
           "productionUseAllowed": false,
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "ADMISSION_EVIDENCE_REQUIRED",
           "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate facility coverage requires live sample evidence and inventory admission before production use"
+          "unsupportedNotes": "candidate facility coverage has validated live sample provenance but requires remaining admission evidence before production use"
         }
       }
     },
@@ -629,9 +629,9 @@
         "facility": {
           "status": "CANDIDATE",
           "productionUseAllowed": false,
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "ADMISSION_EVIDENCE_REQUIRED",
           "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate facility coverage requires live sample evidence and inventory admission before production use"
+          "unsupportedNotes": "candidate facility coverage has validated live sample provenance but requires remaining admission evidence before production use"
         }
       }
     },
@@ -871,9 +871,9 @@
         "facility": {
           "status": "CANDIDATE",
           "productionUseAllowed": false,
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "coverageStatus": "ADMISSION_EVIDENCE_REQUIRED",
           "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate facility coverage requires live sample evidence and inventory admission before production use"
+          "unsupportedNotes": "candidate facility coverage has validated live sample provenance but requires remaining admission evidence before production use"
         }
       }
     },
