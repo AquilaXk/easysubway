@@ -410,6 +410,24 @@ body.admin-v3 {
 	background: var(--admin-accent-soft);
 }
 
+/* empty-state/colspan 안내 행은 hover·고정 높이 제외(#1982 리뷰 반영) */
+.admin-v3 tbody tr:has(td[colspan]) {
+	height: auto;
+}
+
+.admin-v3 tbody tr:has(td[colspan]):hover {
+	background: transparent;
+}
+
+/* 완전 비상호작용(순수 조회) 표는 hover·고정 높이 opt-out(#1982 리뷰 반영) */
+.admin-v3 table.static-table tbody tr {
+	height: auto;
+}
+
+.admin-v3 table.static-table tbody tr:hover {
+	background: transparent;
+}
+
 .admin-v3 tbody tr:last-child td {
 	border-bottom: 0;
 }
@@ -826,6 +844,11 @@ body.admin-v3 {
 	padding: 10px 12px;
 	background: var(--admin-surface);
 	border-top: 1px solid var(--admin-border);
+}
+
+/* JS 실행 환경에서는 Alpine x-show 평가 전 플래시 방지(#1982 리뷰 반영). no-JS는 has-js 미부착이라 계속 노출 */
+.admin-v3.has-js .bulk-actionbar {
+	display: none;
 }
 
 .admin-v3 .bulk-count {
