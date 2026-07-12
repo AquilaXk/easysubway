@@ -28,13 +28,108 @@ const TOP_LEVEL_FIELDS = [
   "productionLikeEvidence",
   "matrices",
 ];
-const NUMERIC_HOST = /^(?:0[xX][0-9A-Fa-f]+|0[0-7]+|\d+)(?:\.(?:0[xX][0-9A-Fa-f]+|0[0-7]+|\d+)){0,3}$/;
-const VERSION_CONTEXT = /(?:^|\s)(?:version|release|build)(?:\s+version)?\s*[:=]?\s*$/i;
 const URL_VALUE = /\bhttps?:\/\/[^\s"'<>]+/gi;
+const ROOT_FIELD_TYPES = {
+  schemaVersion: "integer",
+  releaseGate: "string",
+  issue: "integer",
+  status: "string",
+  artifactIdentity: "object",
+  productionLikeEvidence: "array",
+  matrices: "array",
+};
+const IDENTITY_FIELD_TYPES = {
+  versionCode: "integer",
+  gitSha: "string",
+  androidApplicationId: "string",
+  dataPackManifestSha256: "string",
+  aabSha256: "string",
+  generatedApkSha256: "string",
+  backendImageDigest: "string",
+  backendArtifactSha256: "string",
+};
+const EVIDENCE_FIELD_TYPES = {
+  evidenceId: "string",
+  result: "string",
+  localEvidencePath: "string",
+};
+const MATRIX_FIELD_TYPES = {
+  matrixId: "string",
+  scenarioId: "string",
+  artifactIdentity: "object",
+  commandOrManualCheck: "string",
+  findingCounts: "object",
+  result: "string",
+  redactionNotes: "string",
+  localEvidencePath: "string",
+  requiredEvidence: "array",
+  cases: "array",
+  mediumFindingDisposition: "object",
+};
+const CASE_FIELD_TYPES = {
+  apiStep: "string",
+  artifactType: "string",
+  attemptCount: "string",
+  auditRedactionResult: "string",
+  bucketOrPolicyAlias: "string",
+  caseId: "string",
+  cleanupResult: "string",
+  commandOrManualCheck: "string",
+  contentType: "string",
+  deleteOrCleanupResult: "string",
+  endpoint: "string",
+  expectedStatus: "integer",
+  localEvidencePath: "string",
+  method: "string",
+  nodeOrStoreMode: "string",
+  observedStatus: "integer",
+  redactionResult: "string",
+  retentionRule: "string",
+  role: "string",
+  scanTarget: "string",
+  sizeBytes: "integer",
+  tenantScope: "string",
+  ttlSeconds: "integer",
+};
+
+function assertObject(value, path) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${path} must be an object`);
+  return value;
+}
+
+function assertArray(value, path) {
+  if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
+  return value;
+}
+
+function assertString(value, path) {
+  if (typeof value !== "string") throw new Error(`${path} must be a string`);
+  return value;
+}
+
+function assertInteger(value, path, nonNegative = false) {
+  if (!Number.isInteger(value) || (nonNegative && value < 0)) {
+    throw new Error(`${path} must be ${nonNegative ? "a non-negative integer" : "an integer"}`);
+  }
+  return value;
+}
+
+function assertTypedValue(value, type, path) {
+  if (type === "string") return assertString(value, path);
+  if (type === "integer") return assertInteger(value, path);
+  if (type === "array") return assertArray(value, path);
+  if (type === "object") return assertObject(value, path);
+  throw new Error(`${path} has unsupported type contract`);
+}
+
+function assertPresentFieldTypes(object, fieldTypes, path) {
+  for (const [field, type] of Object.entries(fieldTypes)) {
+    if (object[field] !== undefined) assertTypedValue(object[field], type, `${path}.${field}`);
+  }
+}
 
 function assertExactKeys(value, allowedFields, path) {
-  const object = required(value, path);
-  if (typeof object !== "object" || Array.isArray(object)) throw new Error(`${path} must be an object`);
+  const object = assertObject(value, path);
   const allowed = new Set(allowedFields);
   for (const field of Object.keys(object)) {
     if (!allowed.has(field)) throw new Error(`${path} contains unsupported field`);
@@ -45,7 +140,7 @@ function assertExactKeys(value, allowedFields, path) {
 function assertAllowedUniqueIds(items, idField, allowedIds, path) {
   const seen = new Set();
   for (const item of items) {
-    const id = required(item[idField], `${path}.${idField}`);
+    const id = assertString(item[idField], `${path}.${idField}`);
     if (!allowedIds.has(id)) throw new Error(`${path} contains unexpected ${idField}`);
     if (seen.has(id)) throw new Error(`${path} contains duplicate ${idField}`);
     seen.add(id);
@@ -68,22 +163,22 @@ function normalizedUrlHost(value) {
   }
 }
 
+function normalizedAuthorityHost(value) {
+  const token = value.trim().replace(/^[('"`<{]+/, "").replace(/[)'"`>},;.!?]+$/, "");
+  if (!token || /\s/.test(token) || /^(?:\/|\.\/|\.\.\/)/.test(token)) return "";
+  return normalizedUrlHost(`http://${token}`);
+}
+
 function containsNetworkAddress(value) {
   for (const match of value.matchAll(URL_VALUE)) {
     if (isIP(normalizedUrlHost(match[0]))) return true;
   }
 
-  const trimmed = value.trim();
-  if (NUMERIC_HOST.test(trimmed) && isIP(normalizedUrlHost(`http://${trimmed}`)) === 4) return true;
-
   for (const match of value.matchAll(/[^\s,;=]+/g)) {
     const candidate = networkToken(match[0]);
-    const family = isIP(candidate);
-    if (!family) continue;
-    if (family === 4 && VERSION_CONTEXT.test(value.slice(0, match.index))) continue;
-    return true;
+    if (isIP(candidate)) return true;
   }
-  return false;
+  return Boolean(isIP(normalizedAuthorityHost(value)));
 }
 
 function assertNoSensitiveSummary(summary, gate) {
@@ -116,6 +211,7 @@ function assertIdentity(summary, gate, path = "artifactIdentity", expectedIdenti
     ...gate.buildIdentityPolicy.requiredIdentityFields,
     ...gate.buildIdentityPolicy.requiredIdentityAnyOf.flat(),
   ], path);
+  assertPresentFieldTypes(identity, IDENTITY_FIELD_TYPES, path);
   for (const field of gate.buildIdentityPolicy.requiredIdentityFields) {
     required(identity[field], `${path}.${field}`);
   }
@@ -139,8 +235,8 @@ function assertFindingCounts(matrixSummary, requirePass, gate) {
   const critical = counts.critical ?? 0;
   const high = counts.high ?? 0;
   const medium = counts.medium ?? 0;
-  if (![critical, high, medium].every((value) => Number.isInteger(value) && value >= 0)) {
-    throw new Error(`${matrixSummary.matrixId}.findingCounts must be non-negative integers`);
+  for (const [field, value] of Object.entries(counts)) {
+    assertInteger(value, `${matrixSummary.matrixId}.findingCounts.${field}`, true);
   }
   if (critical > gate.findingPolicy.criticalHighAllowed || high > gate.findingPolicy.criticalHighAllowed) {
     throw new Error(`${matrixSummary.matrixId} has critical/high findings`);
@@ -149,11 +245,13 @@ function assertFindingCounts(matrixSummary, requirePass, gate) {
     throw new Error(`${matrixSummary.matrixId} medium findings require owner and fixPlan`);
   }
   if (matrixSummary.mediumFindingDisposition !== undefined) {
-    assertExactKeys(
+    const disposition = assertExactKeys(
       matrixSummary.mediumFindingDisposition,
       ["owner", "fixPlan"],
       `${matrixSummary.matrixId}.mediumFindingDisposition`,
     );
+    assertString(disposition.owner, `${matrixSummary.matrixId}.mediumFindingDisposition.owner`);
+    assertString(disposition.fixPlan, `${matrixSummary.matrixId}.mediumFindingDisposition.fixPlan`);
   }
   if (requirePass && matrixSummary.result !== "PASS") {
     throw new Error(`${matrixSummary.matrixId}.result must be PASS`);
@@ -162,10 +260,14 @@ function assertFindingCounts(matrixSummary, requirePass, gate) {
 
 function assertProductionLikeEvidence(summary, gate, requirePass) {
   if (!requirePass && summary.productionLikeEvidence === undefined) return;
-  const evidenceItems = required(summary.productionLikeEvidence, "productionLikeEvidence");
+  const evidenceItems = assertArray(summary.productionLikeEvidence, "productionLikeEvidence");
   const allowedIds = new Set(gate.productionLikeEvidencePolicy.requiredForClosing);
   for (const [index, item] of evidenceItems.entries()) {
-    assertExactKeys(item, ["evidenceId", "result", "localEvidencePath"], `productionLikeEvidence[${index}]`);
+    const path = `productionLikeEvidence[${index}]`;
+    const evidence = assertExactKeys(item, Object.keys(EVIDENCE_FIELD_TYPES), path);
+    for (const [field, type] of Object.entries(EVIDENCE_FIELD_TYPES)) {
+      assertTypedValue(evidence[field], type, `${path}.${field}`);
+    }
   }
   assertAllowedUniqueIds(evidenceItems, "evidenceId", allowedIds, "productionLikeEvidence");
   if (!requirePass) return;
@@ -205,20 +307,23 @@ function assertCasePass(matrixId, caseId, item, matrix) {
 }
 
 function assertMatrix(matrixId, matrix, matrixSummary, gate, requirePass) {
-  assertExactKeys(matrixSummary, [
+  const matrixPath = `matrices.${matrixId}`;
+  const summary = assertExactKeys(matrixSummary, [
     "matrixId",
     ...gate.manualRehearsalPolicy.githubSummaryFields,
     "requiredEvidence",
     "cases",
     "mediumFindingDisposition",
-  ], `matrices.${matrixId}`);
+  ], matrixPath);
+  assertPresentFieldTypes(summary, MATRIX_FIELD_TYPES, matrixPath);
   if (matrixSummary.scenarioId !== matrix.scenarioId) {
     throw new Error(`${matrixId}.scenarioId must be ${matrix.scenarioId}`);
   }
   for (const field of ["matrixId", ...gate.manualRehearsalPolicy.githubSummaryFields]) {
     required(matrixSummary[field], `${matrixId}.${field}`);
   }
-  const requiredEvidence = required(matrixSummary.requiredEvidence, `${matrixId}.requiredEvidence`);
+  const requiredEvidence = assertArray(matrixSummary.requiredEvidence, `${matrixId}.requiredEvidence`);
+  requiredEvidence.forEach((item, index) => assertString(item, `${matrixId}.requiredEvidence[${index}]`));
   const evidence = new Set(requiredEvidence);
   if (evidence.size !== requiredEvidence.length) throw new Error(`${matrixId}.requiredEvidence contains duplicate evidenceId`);
   for (const evidenceId of evidence) {
@@ -227,9 +332,16 @@ function assertMatrix(matrixId, matrix, matrixSummary, gate, requirePass) {
   for (const evidenceId of matrix.requiredEvidence) {
     if (!evidence.has(evidenceId)) throw new Error(`${matrixId}.requiredEvidence missing ${evidenceId}`);
   }
-  const cases = required(matrixSummary.cases, `${matrixId}.cases`);
+  for (const field of matrix.summaryFields) {
+    if (!CASE_FIELD_TYPES[field]) throw new Error(`gate summaryField ${field} has unsupported type contract`);
+  }
+  const cases = assertArray(matrixSummary.cases, `${matrixId}.cases`);
   for (const [index, item] of cases.entries()) {
-    assertExactKeys(item, matrix.summaryFields, `${matrixId}.cases[${index}]`);
+    const casePath = `${matrixId}.cases[${index}]`;
+    const caseSummary = assertExactKeys(item, matrix.summaryFields, casePath);
+    for (const field of matrix.summaryFields) {
+      assertTypedValue(caseSummary[field], CASE_FIELD_TYPES[field], `${casePath}.${field}`);
+    }
   }
   assertAllowedUniqueIds(cases, "caseId", new Set(matrix.requiredCases), `${matrixId}.cases`);
   const caseById = new Map(cases.map((item) => [item.caseId, item]));
@@ -250,7 +362,10 @@ async function main() {
   if (!summaryPath) throw new Error("--summary is required");
 
   const [summary, gate] = await Promise.all([readJson(summaryPath), readJson(gatePath)]);
-  assertExactKeys(summary, TOP_LEVEL_FIELDS, "summary");
+  const root = assertExactKeys(summary, TOP_LEVEL_FIELDS, "summary");
+  for (const [field, type] of Object.entries(ROOT_FIELD_TYPES)) {
+    assertTypedValue(root[field], type, `summary.${field}`);
+  }
   if (summary.schemaVersion !== 1) throw new Error("schemaVersion must be 1");
   if (summary.releaseGate !== gate.releaseGate) throw new Error(`releaseGate must be ${gate.releaseGate}`);
   if (summary.issue !== gate.issue) throw new Error(`issue must be ${gate.issue}`);
@@ -260,7 +375,11 @@ async function main() {
   const artifactIdentity = assertIdentity(summary, gate);
   assertProductionLikeEvidence(summary, gate, requirePass);
 
-  const matrices = required(summary.matrices, "matrices");
+  const matrices = assertArray(summary.matrices, "matrices");
+  matrices.forEach((matrix, index) => {
+    const item = assertObject(matrix, `matrices[${index}]`);
+    assertString(item.matrixId, `matrices[${index}].matrixId`);
+  });
   assertAllowedUniqueIds(matrices, "matrixId", new Set(Object.keys(gate.rehearsalMatrices)), "matrices");
   const matrixSummaries = new Map(matrices.map((matrix) => [matrix.matrixId, matrix]));
   for (const [matrixId, matrix] of Object.entries(gate.rehearsalMatrices)) {

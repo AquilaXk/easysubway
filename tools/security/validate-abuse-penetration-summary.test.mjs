@@ -65,7 +65,7 @@ function validSummary() {
       result: "PASS",
       redactionNotes: "sensitive values removed",
       localEvidencePath: ".codex/evidence/security/abuse-penetration-rehearsal/rc/redacted-summary.json",
-      requiredEvidence: matrix.requiredEvidence,
+      requiredEvidence: structuredClone(matrix.requiredEvidence),
       cases: matrix.requiredCases.map((caseId) => {
         const item = { caseId };
         for (const field of matrix.summaryFields) item[field] = field === "caseId" ? caseId : caseValue(field, matrix, caseId);
@@ -95,12 +95,25 @@ function validateSummary(summary) {
   );
 }
 
+function freshSummary() {
+  return structuredClone(validSummary());
+}
+
 async function assertSensitiveValueRejected(value) {
-  const summary = validSummary();
+  const summary = freshSummary();
   summary.matrices[0].redactionNotes = value;
   await assert.rejects(
     validateSummary(summary),
     /raw sensitive evidence material/,
+  );
+}
+
+async function assertWrongTypeRejected(mutate) {
+  const summary = freshSummary();
+  mutate(summary);
+  await assert.rejects(
+    validateSummary(summary),
+    /must be (?:a string|an integer|a non-negative integer|an object|an array)/,
   );
 }
 
@@ -116,7 +129,7 @@ test("abuse penetration summary validator accepts a complete redacted matrix sum
 });
 
 test("abuse penetration summary validator rejects pass without production-like closure evidence", async () => {
-  const missingProductionEvidence = validSummary();
+  const missingProductionEvidence = freshSummary();
   missingProductionEvidence.productionLikeEvidence.pop();
   await assert.rejects(
     withSummary(missingProductionEvidence, (summaryPath) =>
@@ -132,7 +145,7 @@ test("abuse penetration summary validator rejects pass without production-like c
 });
 
 test("abuse penetration summary validator rejects forbidden closure evidence markers", async () => {
-  const forbiddenClosureEvidence = validSummary();
+  const forbiddenClosureEvidence = freshSummary();
   forbiddenClosureEvidence.productionLikeEvidence[0].localEvidencePath = "preflight env check only";
   await assert.rejects(
     withSummary(forbiddenClosureEvidence, (summaryPath) =>
@@ -189,6 +202,27 @@ test("abuse penetration summary validator rejects runtime-constructed alternate 
   }
 });
 
+test("abuse penetration summary validator rejects standalone authority and path address forms", async () => {
+  const ipv4 = [["19", "2"], ["0"], ["2"], ["4", "2"]].map((parts) => parts.join("")).join(".");
+  const ipv6 = [["20", "01"], ":", ["db", "8"], "::", ["4", "2"]].flat().join("");
+  const alternate = ["0x", "c0", "00", "02", "2a"].join("");
+  for (const value of [
+    [ipv4, ":", ["8", "443"].join("")].join(""),
+    [ipv4, "/evidence"].join(""),
+    [alternate, ":", ["8", "443"].join(""), "/evidence"].join(""),
+    ["[", ipv6, "]:", ["4", "43"].join(""), "/evidence"].join(""),
+  ]) {
+    await assertSensitiveValueRejected(value);
+  }
+});
+
+test("abuse penetration summary validator rejects an address after version-like prose prefixes", async () => {
+  const ipv4 = [["19", "2"], ["0"], ["2"], ["4", "2"]].map((parts) => parts.join("")).join(".");
+  for (const prefix of ["version ", "release ", "build "]) {
+    await assertSensitiveValueRejected(`${prefix}${ipv4}`);
+  }
+});
+
 test("abuse penetration summary validator rejects product-independent raw User-Agent values", async () => {
   for (const value of [
     [["Da", "rt"].join(""), "/", ["3", "8"].join("."), " (", ["dart", ":io"].join(""), ")"].join(""),
@@ -220,14 +254,81 @@ test("abuse penetration summary validator rejects unknown keys including numeric
     (summary) => { summary.matrices[0].cases[0].unexpectedCount = 1; },
   ];
   for (const mutate of mutations) {
-    const summary = validSummary();
+    const summary = freshSummary();
     mutate(summary);
     await assert.rejects(validateSummary(summary), /unsupported field/);
   }
 });
 
+test("abuse penetration summary validator rejects wrong types across root and nested containers", async () => {
+  const isolatedFirst = freshSummary();
+  const isolatedSecond = freshSummary();
+  isolatedFirst.matrices[0].requiredEvidence[0] = 1;
+  assert.equal(typeof isolatedSecond.matrices[0].requiredEvidence[0], "string");
+
+  const mutations = [
+    (summary) => { summary.schemaVersion = "1"; },
+    (summary) => { summary.releaseGate = 1; },
+    (summary) => { summary.issue = "1022"; },
+    (summary) => { summary.status = 1; },
+    (summary) => { summary.artifactIdentity = []; },
+    (summary) => { summary.productionLikeEvidence = {}; },
+    (summary) => { summary.matrices = {}; },
+    (summary) => { summary.artifactIdentity.versionCode = "10001"; },
+    (summary) => { summary.artifactIdentity.gitSha = 1; },
+    (summary) => { summary.productionLikeEvidence[0].evidenceId = 1; },
+    (summary) => { summary.productionLikeEvidence[0].result = 1; },
+    (summary) => { summary.productionLikeEvidence[0].localEvidencePath = 1; },
+    (summary) => { summary.productionLikeEvidence[0] = "invalid"; },
+    (summary) => { summary.matrices[0].matrixId = 1; },
+    (summary) => { summary.matrices[0].scenarioId = 1; },
+    (summary) => { summary.matrices[0].commandOrManualCheck = 1; },
+    (summary) => { summary.matrices[0].result = 1; },
+    (summary) => { summary.matrices[0].redactionNotes = 1; },
+    (summary) => { summary.matrices[0].localEvidencePath = 1; },
+    (summary) => { summary.matrices[0].artifactIdentity = []; },
+    (summary) => { summary.matrices[0].findingCounts = []; },
+    (summary) => { summary.matrices[0].requiredEvidence = {}; },
+    (summary) => { summary.matrices[0].cases = {}; },
+    (summary) => { summary.matrices[0] = "invalid"; },
+    (summary) => { summary.matrices[0].findingCounts.critical = "0"; },
+    (summary) => { summary.matrices[0].findingCounts.low = -1; },
+    (summary) => {
+      summary.matrices[0].mediumFindingDisposition = { owner: 1, fixPlan: "tracked follow-up" };
+    },
+    (summary) => {
+      summary.matrices[0].mediumFindingDisposition = { owner: "security-owner", fixPlan: 1 };
+    },
+    (summary) => { summary.matrices[0].requiredEvidence[0] = 1; },
+    (summary) => { summary.matrices[0].cases[0] = "invalid"; },
+  ];
+  for (const mutate of mutations) await assertWrongTypeRejected(mutate);
+});
+
+test("abuse penetration summary validator enforces every gate-declared case field type", async () => {
+  const integerFields = new Set(["expectedStatus", "observedStatus", "sizeBytes", "ttlSeconds"]);
+  const fields = new Set(Object.values(gate.rehearsalMatrices).flatMap((matrix) => matrix.summaryFields));
+  for (const field of fields) {
+    const [matrixId] = Object.entries(gate.rehearsalMatrices).find(([, matrix]) => matrix.summaryFields.includes(field));
+    const summary = freshSummary();
+    const matrix = summary.matrices.find((item) => item.matrixId === matrixId);
+    matrix.cases[0][field] = integerFields.has(field) ? "1" : 1;
+    await assert.rejects(
+      validateSummary(summary),
+      /must be (?:a string|an integer)/,
+    );
+  }
+});
+
+test("abuse penetration summary validator rejects a numeric alternate host in an allowed endpoint field", async () => {
+  const summary = freshSummary();
+  const matrix = summary.matrices.find((item) => item.matrixId === "adCounterInflation");
+  matrix.cases[0].endpoint = Number(["322", "122", "602", "6"].join(""));
+  await assert.rejects(validateSummary(summary), /endpoint must be a string/);
+});
+
 test("abuse penetration summary validator rejects extra and duplicate evidence, matrix, and case IDs", async () => {
-  const extraEvidence = validSummary();
+  const extraEvidence = freshSummary();
   extraEvidence.productionLikeEvidence.push({
     evidenceId: "unexpected-evidence",
     result: "PASS",
@@ -235,29 +336,29 @@ test("abuse penetration summary validator rejects extra and duplicate evidence, 
   });
   await assert.rejects(validateSummary(extraEvidence), /unexpected evidenceId/);
 
-  const duplicateEvidence = validSummary();
+  const duplicateEvidence = freshSummary();
   duplicateEvidence.productionLikeEvidence.push(structuredClone(duplicateEvidence.productionLikeEvidence[0]));
   await assert.rejects(validateSummary(duplicateEvidence), /duplicate evidenceId/);
 
-  const extraMatrix = validSummary();
+  const extraMatrix = freshSummary();
   extraMatrix.matrices.push({ ...structuredClone(extraMatrix.matrices[0]), matrixId: "unexpectedMatrix" });
   await assert.rejects(validateSummary(extraMatrix), /unexpected matrixId/);
 
-  const duplicateMatrix = validSummary();
+  const duplicateMatrix = freshSummary();
   duplicateMatrix.matrices.push(structuredClone(duplicateMatrix.matrices[0]));
   await assert.rejects(validateSummary(duplicateMatrix), /duplicate matrixId/);
 
-  const extraCase = validSummary();
+  const extraCase = freshSummary();
   extraCase.matrices[0].cases.push({ ...structuredClone(extraCase.matrices[0].cases[0]), caseId: "unexpected_case" });
   await assert.rejects(validateSummary(extraCase), /unexpected caseId/);
 
-  const duplicateCase = validSummary();
+  const duplicateCase = freshSummary();
   duplicateCase.matrices[0].cases.push(structuredClone(duplicateCase.matrices[0].cases[0]));
   await assert.rejects(validateSummary(duplicateCase), /duplicate caseId/);
 });
 
 test("abuse penetration summary validator accepts safe endpoint, evidence, prose, command, and version controls", async () => {
-  const dottedVersion = ["release version ", ["1", "2", "3", "4"].join(".")].join("");
+  const semver = ["release v", ["1", "2", "3", "4"].join(".")].join("");
   for (const value of [
     "easysubway-api.aquilaxk.site",
     "/api/v1/reports",
@@ -265,17 +366,17 @@ test("abuse penetration summary validator accepts safe endpoint, evidence, prose
     ".codex/evidence/security/abuse-penetration-rehearsal/rc/redacted-summary.json",
     "sensitive values removed",
     "curl --fail",
-    dottedVersion,
+    semver,
     ["not", "::", "an", "::", "address"].join(""),
   ]) {
-    const summary = validSummary();
+    const summary = freshSummary();
     summary.matrices[0].redactionNotes = value;
     await validateSummary(summary);
   }
 });
 
 test("abuse penetration summary validator rejects missing cases, raw sensitive markers, and high findings", async () => {
-  const missingCase = validSummary();
+  const missingCase = freshSummary();
   missingCase.matrices[0].cases.pop();
   await assert.rejects(
     withSummary(missingCase, (summaryPath) =>
@@ -286,7 +387,7 @@ test("abuse penetration summary validator rejects missing cases, raw sensitive m
     /cases\./,
   );
 
-  const leaked = validSummary();
+  const leaked = freshSummary();
   leaked.matrices[0].redactionNotes = "raw signed URL leaked";
   await assert.rejects(
     withSummary(leaked, (summaryPath) =>
@@ -297,7 +398,7 @@ test("abuse penetration summary validator rejects missing cases, raw sensitive m
     /forbidden sensitive evidence marker/,
   );
 
-  const highFinding = validSummary();
+  const highFinding = freshSummary();
   highFinding.matrices[0].findingCounts.high = 1;
   await assert.rejects(
     withSummary(highFinding, (summaryPath) =>
@@ -311,7 +412,7 @@ test("abuse penetration summary validator rejects missing cases, raw sensitive m
     /critical\/high findings/,
   );
 
-  const stringCount = validSummary();
+  const stringCount = freshSummary();
   stringCount.matrices[0].findingCounts.critical = "0";
   await assert.rejects(
     withSummary(stringCount, (summaryPath) =>
@@ -319,10 +420,10 @@ test("abuse penetration summary validator rejects missing cases, raw sensitive m
         cwd: root,
       }),
     ),
-    /non-negative integers/,
+    /non-negative integer/,
   );
 
-  const mixedIdentity = validSummary();
+  const mixedIdentity = freshSummary();
   mixedIdentity.matrices[0].artifactIdentity.versionCode = 10002;
   await assert.rejects(
     withSummary(mixedIdentity, (summaryPath) =>
@@ -335,7 +436,7 @@ test("abuse penetration summary validator rejects missing cases, raw sensitive m
 });
 
 test("abuse penetration summary validator rejects case-level failed rehearsal evidence", async () => {
-  const statusMismatch = validSummary();
+  const statusMismatch = freshSummary();
   statusMismatch.matrices[0].cases[0].observedStatus = 200;
   await assert.rejects(
     withSummary(statusMismatch, (summaryPath) =>
@@ -349,7 +450,7 @@ test("abuse penetration summary validator rejects case-level failed rehearsal ev
     /observedStatus must match expectedStatus/,
   );
 
-  const redactionFailure = validSummary();
+  const redactionFailure = freshSummary();
   redactionFailure.matrices[0].cases[0].redactionResult = "FAIL";
   await assert.rejects(
     withSummary(redactionFailure, (summaryPath) =>
@@ -363,7 +464,7 @@ test("abuse penetration summary validator rejects case-level failed rehearsal ev
     /redactionResult must be PASS/,
   );
 
-  const untrustedStatusPair = validSummary();
+  const untrustedStatusPair = freshSummary();
   untrustedStatusPair.matrices[0].cases[0].expectedStatus = 500;
   untrustedStatusPair.matrices[0].cases[0].observedStatus = 500;
   await assert.rejects(
@@ -380,7 +481,7 @@ test("abuse penetration summary validator rejects case-level failed rehearsal ev
 });
 
 test("ad counter rehearsal은 edge 429와 direct-origin denial을 정확히 요구한다", async () => {
-  const wrongEdgeStatus = validSummary();
+  const wrongEdgeStatus = freshSummary();
   const adMatrix = wrongEdgeStatus.matrices.find((matrix) => matrix.matrixId === "adCounterInflation");
   const edgeCase = adMatrix.cases.find((item) => item.caseId === "edge_ip_rate_limit");
   edgeCase.expectedStatus = 204;
@@ -404,7 +505,7 @@ test("ad counter rehearsal은 edge 429와 direct-origin denial을 정확히 요�
     "missing_or_untrusted_client_auth_rejected",
     "cloudflare_ipv4_live_oci_set_equality",
   ]) {
-    const missingCase = validSummary();
+    const missingCase = freshSummary();
     const originMatrix = missingCase.matrices.find((matrix) => matrix.matrixId === "adCounterInflation");
     originMatrix.cases = originMatrix.cases.filter((item) => item.caseId !== caseId);
     await assert.rejects(
