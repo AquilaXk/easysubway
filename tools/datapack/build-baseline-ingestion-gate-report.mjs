@@ -257,6 +257,9 @@ function buildCoverage({
 }) {
   return {
     transfer: {
+      description:
+        "admittedRules는 station·line 매칭으로 rule을 생성한 행 수이고, quarantinedRows에는 이후 pathway edge 생성 " +
+        "실패도 포함하므로 두 집계는 서로 배타적이지 않다. 따라서 각 분류의 합계가 totalRows를 초과할 수 있다.",
       totalRows: transferRowTotal,
       uniqueStationNames: uniqueTransferStations,
       malformedRows: malformed.length,

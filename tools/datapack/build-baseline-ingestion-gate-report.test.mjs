@@ -211,6 +211,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   assert.equal(report.coverage.transfer.selfLoopExcludedRules.length, 1);
   assert.equal(report.coverage.transfer.selfLoopExcludedRules[0].stationId, "station-seongsu");
   assert.equal(report.coverage.transfer.quarantinedRows, 3);
+  assert.match(report.coverage.transfer.description, /서로 배타적이지 않다/);
 
   // 게이트①: 사당 방향쌍 일치(62초 양방향).
   const sadangPair = report.gateInternalConsistency.directionPairReport.find(
@@ -451,6 +452,21 @@ test("게이트③: pathwayEdgeId가 없는 공식 rule을 edgeMissing에 명시
     report.gateTimeSourceDistinction.edgeChecks.some((check) => check.ruleId === "transfer-gangnam"),
     false,
   );
+});
+
+test("게이트③: 공식 rule과 edge가 모두 없으면 SKIPPED를 기록한다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [],
+    carDoorRows: [],
+    kricMovement: null,
+    existingEdges: [],
+    fixtureTransferRules: [],
+  });
+
+  assert.equal(report.gateTimeSourceDistinction.status, "SKIPPED");
+  assert.deepEqual(report.gateTimeSourceDistinction.edgeChecks, []);
+  assert.deepEqual(report.gateTimeSourceDistinction.edgeMissing, []);
 });
 
 test("게이트③: 모든 공식 rule은 edgeChecks 또는 edgeMissing 중 하나에 반드시 나타난다(조용히 빠지지 않는다)", () => {
