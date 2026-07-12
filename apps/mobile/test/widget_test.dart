@@ -10429,48 +10429,71 @@ void main() {
   });
 
   testWidgets('경로 상세는 공식 OD 요금의 여섯 값을 표시한다', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: RouteSearchScreen(
-          repository: FakeRouteSearchRepository(
-            result: _sampleRouteSearchResult(
-              officialOdFareQuote: const OfficialOdFareQuote(
-                originStationId: 'station-sangnoksu',
-                destinationStationId: 'station-sadang',
-                sourceId: approvedOfficialOdFareSourceId,
-                snapshotId: approvedOfficialOdFareSnapshotId,
-                mappingLedgerHash: approvedOfficialOdFareMappingLedgerHash,
-                gnrlCardFare: 1550,
-                gnrlCashFare: 1650,
-                yungCardFare: 800,
-                yungCashFare: 900,
-                childCardFare: 500,
-                childCashFare: 500,
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(
+              result: _sampleRouteSearchResult(
+                officialOdFareQuote: const OfficialOdFareQuote(
+                  originStationId: 'station-sangnoksu',
+                  destinationStationId: 'station-sadang',
+                  sourceId: approvedOfficialOdFareSourceId,
+                  snapshotId: approvedOfficialOdFareSnapshotId,
+                  mappingLedgerHash: approvedOfficialOdFareMappingLedgerHash,
+                  gnrlCardFare: 1550,
+                  gnrlCashFare: 1650,
+                  yungCardFare: 800,
+                  yungCashFare: 900,
+                  childCardFare: 500,
+                  childCashFare: 500,
+                ),
               ),
             ),
-          ),
-          stationRepository: FakeStationSearchRepository(),
-          initialDraft: RouteDraft(
-            origin: const RouteDraftStation(
-              id: 'station-sangnoksu',
-              nameKo: '상록수',
+            stationRepository: FakeStationSearchRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 6, 26),
             ),
-            destination: const RouteDraftStation(
-              id: 'station-sadang',
-              nameKo: '사당',
-            ),
-            lastModifiedAt: DateTime(2026, 6, 26),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await _openFirstRouteResultDetail(tester);
+      );
+      await tester.pumpAndSettle();
+      await _openFirstRouteResultDetail(tester);
 
-    expect(find.text('일반 카드', skipOffstage: false), findsOneWidget);
-    expect(find.text('청소년 현금', skipOffstage: false), findsOneWidget);
-    expect(find.text('어린이 카드', skipOffstage: false), findsOneWidget);
-    expect(find.text('공식 OD 요금 정보 없음'), findsNothing);
+      for (final (label, amount) in const [
+        ('일반 카드', 1550),
+        ('일반 현금', 1650),
+        ('청소년 카드', 800),
+        ('청소년 현금', 900),
+        ('어린이 카드', 500),
+        ('어린이 현금', 500),
+      ]) {
+        expect(find.text(label, skipOffstage: false), findsOneWidget);
+        expect(
+          find.text('$amount원', skipOffstage: false),
+          amount == 500 ? findsNWidgets(2) : findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(
+            '$label, $amount원, 오프라인 공식 자료',
+            skipOffstage: false,
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(find.text('공식 OD 요금 정보 없음'), findsNothing);
+    } finally {
+      semanticsHandle.dispose();
+    }
   });
 
   testWidgets('공식 OD 요금이 없으면 unavailable 상태를 알린다', (tester) async {
@@ -10499,6 +10522,7 @@ void main() {
       await _openFirstRouteResultDetail(tester);
 
       expect(find.text('공식 OD 요금 정보 없음'), findsOneWidget);
+      expect(find.text('오프라인 공식 자료에 없는 경로입니다.'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('공식 OD 요금 정보 없음')), findsOneWidget);
     } finally {
       semanticsHandle.dispose();

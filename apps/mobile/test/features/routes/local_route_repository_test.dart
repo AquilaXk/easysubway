@@ -88,6 +88,17 @@ void main() {
       final database = CatalogDatabase.memory();
       addTearDown(database.close);
       await database.seedBaselineIfEmpty();
+      await database.customStatement('''
+        INSERT INTO official_od_fare_quotes (
+          origin_station_id, destination_station_id, source_id, snapshot_id,
+          mapping_ledger_hash, gnrl_card_fare, gnrl_cash_fare,
+          yung_card_fare, yung_cash_fare, child_card_fare, child_cash_fare
+        ) VALUES (
+          'station-sangnoksu', 'station-sadang',
+          '$approvedOfficialOdFareSourceId', '$approvedOfficialOdFareSnapshotId',
+          '$approvedOfficialOdFareMappingLedgerHash', 1550, 1650, 800, 900, 500, 500
+        )
+      ''');
       final requestedPaths = <String>[];
       final requestedBodies = <Map<String, Object?>>[];
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -152,6 +163,13 @@ void main() {
       );
       expect(result.etaSource, 'REALTIME');
       expect(result.isLocalResult, isFalse);
+      expect(result.hasOfficialOdFareQuote, isTrue);
+      expect(result.officialOdFareQuote!.gnrlCardFare, 1550);
+      expect(result.officialOdFareQuote!.gnrlCashFare, 1650);
+      expect(result.officialOdFareQuote!.yungCardFare, 800);
+      expect(result.officialOdFareQuote!.yungCashFare, 900);
+      expect(result.officialOdFareQuote!.childCardFare, 500);
+      expect(result.officialOdFareQuote!.childCashFare, 500);
 
       final refresh = await dependencies.routeRepository.refreshRoute(
         result.routeSearchId,

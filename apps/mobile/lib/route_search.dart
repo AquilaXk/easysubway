@@ -4534,8 +4534,12 @@ class _OfficialOdFareSection extends StatelessWidget {
     final quote = this.quote;
     if (quote == null) {
       return Semantics(
+        container: true,
         label: '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다.',
-        child: const Text('공식 OD 요금 정보 없음'),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [Text('공식 OD 요금 정보 없음'), Text('오프라인 공식 자료에 없는 경로입니다.')],
+        ),
       );
     }
     final values = [
@@ -4547,6 +4551,7 @@ class _OfficialOdFareSection extends StatelessWidget {
       ('어린이 현금', quote.childCashFare),
     ];
     return Semantics(
+      container: true,
       label: '공식 OD 요금, 오프라인 공식 자료',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -4555,6 +4560,7 @@ class _OfficialOdFareSection extends StatelessWidget {
           const SizedBox(height: 8),
           for (final value in values)
             Semantics(
+              container: true,
               label: '${value.$1}, ${value.$2}원, 오프라인 공식 자료',
               child: ExcludeSemantics(
                 child: Row(
