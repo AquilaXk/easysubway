@@ -56,7 +56,11 @@ function mockPlay({ tracks = [], uploadedVersionCode = "10005", overrides = {}, 
     if (url.endsWith("/edits") && method === "POST") return jsonResponse(200, { id: "edit-1" });
     if (url.endsWith("/tracks") && method === "GET") return jsonResponse(200, { tracks });
     if (url.includes("/bundles?uploadType=media")) return jsonResponse(200, { versionCode: uploadedVersionCode });
-    if (url.includes("/deobfuscationFiles/")) return jsonResponse(200, {});
+    // Only the correct Android Publisher v3 deobfuscation path is handled:
+    // /apks/{versionCode}/deobfuscationFiles/proguard. The old buggy path
+    // (/deobfuscationFiles/{versionCode}/proguard) falls through to the 404
+    // fallback below, so this mock fails against the pre-fix source.
+    if (url.includes("/apks/") && url.includes("/deobfuscationFiles/proguard")) return jsonResponse(200, {});
     if (url.includes("/tracks/") && method === "PUT") return jsonResponse(200, { track: "internal" });
     if (url.includes(":commit")) {
       if (typeof commit === "function") return commit(url.includes("changesNotSentForReview=true"));
@@ -103,7 +107,10 @@ test("uploads an AAB and mapping to the internal track and emits evidence", asyn
 
     const flow = requests.map((request) => `${request.method} ${request.url.replace(/^https:\/\/[^/]+/, "")}`);
     assert.ok(flow.some((entry) => entry.includes("/bundles?uploadType=media")));
-    assert.ok(flow.some((entry) => entry.includes("/deobfuscationFiles/10005/proguard")));
+    assert.ok(flow.some((entry) => entry.includes("/apks/10005/deobfuscationFiles/proguard")));
+    // Regression guard for the 404 bug (run 29193951178): the old malformed
+    // deobfuscation path must never reappear in the request flow.
+    assert.ok(!flow.some((entry) => entry.includes("/deobfuscationFiles/10005/proguard")));
     assert.ok(flow.some((entry) => entry.startsWith("PUT ") && entry.includes("/tracks/internal")));
     assert.ok(flow.some((entry) => entry.includes(":commit?changesNotSentForReview=false")));
   });
