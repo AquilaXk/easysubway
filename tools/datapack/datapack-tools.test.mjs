@@ -8272,8 +8272,17 @@ test("전국 coverage gap report는 TAGO, 국가철도공단, 부산 source inve
 
   const report = JSON.parse(await readFile(reportPath, "utf8"));
   assert.equal(report.summary.totalRequirements, 119);
-  assert.equal(report.summary.coveredRequirements, 4);
-  assert.equal(report.summary.missingRequirements, 115);
+  assert.equal(report.summary.coveredRequirements, 5);
+  assert.equal(report.summary.missingRequirements, 114);
+
+  const capitalKorailRouteMap = report.requirements.find(
+    (entry) =>
+      entry.regionId === "capital" &&
+      entry.operatorId === "korail" &&
+      entry.sourceDomain === "route_map_positions",
+  );
+  assert.deepEqual(capitalKorailRouteMap?.sourceIds, ["easysubway-owner-route-map-capital"]);
+  assert.deepEqual(capitalKorailRouteMap?.missingFields, []);
 
   const busanStationMembership = report.requirements.find(
     (entry) =>
@@ -9958,6 +9967,66 @@ test("공식 source ingest adapter는 station-line 단위 facility evidence cove
   );
 });
 
+test("production transit pass-through 역은 공개 접근성 denominator를 늘리지 않는다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-pass-through-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  input.supportedV1Scope.transitPassThroughStationIds = ["station-seoul-4-434"];
+  input.stationMappings.push({
+    sourceId: "molit-urban-rail-full-route",
+    sourceStationCode: "MOLIT-SEOUL-4-434",
+    lineId: "seoul-4",
+    stationId: "station-seoul-4-434",
+    stationLineId: "station-seoul-4-434:seoul-4",
+    mappingStatus: "active",
+  });
+  input.stationLineRows.push({
+    ...input.stationLineRows.find((row) => row.sourceStationCode === "MOLIT-SEOUL-4-433"),
+    sourceStationCode: "MOLIT-SEOUL-4-434",
+    stationNameKo: "남태령",
+    stationNameEn: "Namtaeryeong",
+    normalizedName: "남태령",
+    latitude: null,
+    longitude: null,
+    stationCode: "434",
+    lineSequence: 29,
+  });
+  input.minimumProductionCoverage.stations = 3;
+  input.minimumProductionCoverage.stationLines = 3;
+
+  const generated = await importOfficialSourceInput(outputDir, input);
+  assert.equal(generated.packs[0].stations.length, 3);
+  assert.equal(generated.packs[0].stationLines.length, 3);
+  assert.equal(generated.packs[0].stationFacilityEvidence.length, 6);
+  assert.deepEqual(JSON.parse(generated.packs[0].metadata.transitPassThroughStationIds), [
+    "station-seoul-4-434",
+  ]);
+});
+
+test("production transit pass-through scope는 배열이 아닌 값을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-invalid-pass-through-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  input.supportedV1Scope.transitPassThroughStationIds = "station-seoul-4-434";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /supportedV1Scope\.transitPassThroughStationIds must be a non-empty array/,
+  );
+});
+
+test("production transit pass-through scope는 중복 역 ID를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-duplicate-pass-through-${Date.now()}`);
+  const input = productionSourceIngestInput();
+  input.supportedV1Scope.transitPassThroughStationIds = [
+    "station-seoul-4-434",
+    "station-seoul-4-434",
+  ];
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /supportedV1Scope\.transitPassThroughStationIds must not contain duplicates/,
+  );
+});
+
 test("공식 source ingest adapter는 동일 station-line-type 시설을 evidence row 하나로 집계한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-duplicate-facility-evidence-${Date.now()}`);
   const input = productionSourceIngestInput();
@@ -10309,8 +10378,9 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
   assert.equal(input.manifest.releaseSequence, undefined);
   assert.equal(input.manifest.publishedAt, undefined);
   assert.equal(input.manifest.expiresAt, undefined);
-  assert.deepEqual(input.routeEdges.filter((edge) => edge.edgeType === "RIDE"), []);
-  assert.equal(input.routeGraphTopologyPolicy, undefined);
+  assert.equal(input.routeEdges.filter((edge) => edge.edgeType === "RIDE").length, 30);
+  assert.deepEqual(input.routeGraphTopologyPolicy, { summaryRideEdges: "fixture-only" });
+  assert.equal(input.supportedV1Scope.transitPassThroughStationIds.length, 14);
   const adjacencySafeInput = input;
   const adjacencySafeInputPath = path.join(outputDir, "capital-pilot-production-adjacency-safe.json");
   await writeFile(adjacencySafeInputPath, `${JSON.stringify(adjacencySafeInput, null, 2)}\n`);
@@ -10373,35 +10443,18 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
   );
   const importedFixture = JSON.parse(await readFile(importedFixturePath, "utf8"));
   assert.equal(importedFixture.packs[0].requiredTables.includes("route_map_positions"), true);
-  assert.equal(importedFixture.packs[0].minimumTableRows.route_map_positions, 2);
-  assert.equal(importedFixture.packs[0].routeMapPositions.length, 2);
-  assert.deepEqual(
-    importedFixture.packs[0].routeMapPositions.map((position) => ({
-      stationId: position.stationId,
-      lineId: position.lineId,
-      sourceId: position.sourceId,
-      sourceSha256: position.sourceSha256,
-      labelPolygonCount: position.labelPolygon.length,
-      updatedAt: position.updatedAt,
-    })),
-    [
-      {
-        stationId: "station-sangnoksu",
-        lineId: "seoul-4",
-        sourceId: "seoulmetro-cyberstation-route-map",
-        sourceSha256: "7370b4db2d2f398f46c55314b71d7335c77ec6745fd388793804874447cd25e0",
-        labelPolygonCount: 4,
-        updatedAt: "2026-06-28T00:00:00.000Z",
-      },
-      {
-        stationId: "station-sadang",
-        lineId: "seoul-4",
-        sourceId: "seoulmetro-cyberstation-route-map",
-        sourceSha256: "7370b4db2d2f398f46c55314b71d7335c77ec6745fd388793804874447cd25e0",
-        labelPolygonCount: 4,
-        updatedAt: "2026-06-28T00:00:00.000Z",
-      },
-    ],
+  assert.equal(importedFixture.packs[0].minimumTableRows.route_map_positions, 16);
+  assert.equal(importedFixture.packs[0].routeMapPositions.length, 16);
+  assert.equal(
+    importedFixture.packs[0].routeMapPositions.every(
+      (position) =>
+        position.lineId === "seoul-4" &&
+        position.sourceId === "easysubway-owner-route-map-capital" &&
+        position.sourceSha256 === "d1daed4d137d332b8e236c8c0019308f84068b575260febff07ac9c66c4fd838" &&
+        position.labelPolygon.length === 4 &&
+        position.updatedAt === "2026-07-12T00:00:00.000Z",
+    ),
+    true,
   );
   const scheduleScopeFixture = JSON.parse(JSON.stringify(importedFixture));
   scheduleScopeFixture.packs[0].sourceInventory.find(
@@ -10809,6 +10862,9 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
   assert.equal(manifest.signature.algorithm, "rsa-sha256-manifest-v2");
   assert.equal(manifest.packs[0].artifactKind, "production");
   assert.equal(manifest.packs[0].signature.algorithm, "rsa-sha256-pack-manifest-v2");
+  assert.equal(manifest.packs[0].regionalQualityMetrics.stationCount, 2);
+  assert.equal(manifest.packs[0].regionalQualityMetrics.facilityCoverageRatio, 1);
+  assert.equal(manifest.packs[0].regionalQualityMetrics.requiredFacilityEvidenceCoverageRatio, 1);
   assert.equal(manifest.packs[0].routeRegressionScope, undefined);
   assert.deepEqual(manifest.packs[0].representativeRouteRegressions, []);
   const database = new DatabaseSync(path.join(packOutputDir, "catalog", "capital-v1.sqlite"), { readOnly: true });
@@ -10845,17 +10901,21 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendars").get().count, 2);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM service_calendar_dates").get().count, 28);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_trips").get().count, 466);
-    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_stop_times").get().count, 932);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_stop_times").get().count, 7456);
     assert.equal(database.prepare("SELECT COUNT(*) AS count FROM transit_feed_info").get().count, 1);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM stations").get().count, 16);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM station_lines").get().count, 16);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM network_edges WHERE edge_type = 'RIDE'").get().count, 30);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM route_map_positions").get().count, 16);
   } finally {
     database.close();
   }
 
   const provenance = JSON.parse(await readFile(path.join(packOutputDir, "current.provenance.json"), "utf8"));
   const routeMapRecords = provenance.packs[0].records.filter(
-    (record) => record.sourceId === "seoulmetro-cyberstation-route-map",
+    (record) => record.sourceId === "easysubway-owner-route-map-capital",
   );
-  assert.equal(routeMapRecords.length, 4);
+  assert.equal(routeMapRecords.length, 32);
   assert.equal(
     provenance.packs[0].records.filter(
       (record) => record.entityType === "facility" && record.field === "status",
@@ -10868,7 +10928,17 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
         .filter((record) => record.sourceId === "kric-subway-timetable")
         .map((record) => record.field),
     )].sort(),
-    ["calendar_date", "feed_info", "route", "service_calendar", "stop_time", "trip"],
+    [
+      "calendar_date",
+      "distance_meters",
+      "duration_seconds",
+      "feed_info",
+      "network_edges",
+      "route",
+      "service_calendar",
+      "stop_time",
+      "trip",
+    ],
   );
 
   const coverageGapReportPath = path.join(outputDir, "coverage-gap-report.json");

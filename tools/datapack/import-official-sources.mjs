@@ -30,6 +30,10 @@ function buildFixture(inventory, input) {
   validateHeader(input);
   validateInventoryHeader(inventory, input.region);
   const isProductionPack = (input.pack.artifactKind ?? "fixture") === "production";
+  const transitPassThroughStationIds = optionalStringArray(
+    input.supportedV1Scope?.transitPassThroughStationIds,
+    "supportedV1Scope.transitPassThroughStationIds",
+  );
   const inventorySources = inventorySourceMap(inventory);
   const sourceIds = requiredStringArray(input.sourceIds, "sourceIds");
   const selectedSources = sourceIds.map((sourceId) => {
@@ -48,6 +52,7 @@ function buildFixture(inventory, input) {
   const networkEdges = routeEdges(input.routeEdges ?? [], allowedSourceIds, mappingBySourceKey, isProductionPack);
   validateProductionRideEdgeAdmission(stationLines, networkEdges, isProductionPack);
   validateProductionSummaryRideEdgePolicy(stationLines, networkEdges, input.routeGraphTopologyPolicy, isProductionPack);
+  validateTransitPassThroughScope(input, networkEdges, isProductionPack, transitPassThroughStationIds);
   const facilities = facilityRows(input.facilityRows ?? [], allowedSourceIds, mappingBySourceKey, isProductionPack);
   const stationFacilityEvidence = stationFacilityEvidenceRows(input, stationRows, facilities, isProductionPack);
   const movementCandidates = movementPathCandidates(
@@ -75,7 +80,15 @@ function buildFixture(inventory, input) {
     ? transitScheduleRowsWithProvenance(transitSchedule, scheduleProvenance)
     : transitSchedule;
   validateSelectedSourceRows(input, sourceIds);
-  validateSupportedScopeDenominator(input, stationRows, networkEdges, facilities, movementCandidates, routeMapPositions);
+  validateSupportedScopeDenominator(
+    input,
+    stationRows,
+    networkEdges,
+    facilities,
+    movementCandidates,
+    routeMapPositions,
+    transitPassThroughStationIds,
+  );
   validateSupportedFacilityCoverage(input, stationRows, stationFacilityEvidence);
   const requiresRouteMapPositions = sourceDomainEnabled(selectedSources, "route_map_positions");
   if (requiresRouteMapPositions && routeMapPositions.length === 0) {
@@ -88,7 +101,6 @@ function buildFixture(inventory, input) {
     facilities: facilities.length,
   });
   const productionCoverageEvidence = productionCoverageEvidenceSummary(input, selectedSources, allowedSourceIds);
-
   return {
     manifest: input.manifest,
     packs: [
@@ -135,6 +147,11 @@ function buildFixture(inventory, input) {
           ...(productionCoverageEvidence
             ? {
                 productionCoverageEvidence: JSON.stringify(productionCoverageEvidence),
+              }
+            : {}),
+          ...(transitPassThroughStationIds.length > 0
+            ? {
+                transitPassThroughStationIds: JSON.stringify(transitPassThroughStationIds),
               }
             : {}),
         },
@@ -271,7 +288,15 @@ function validateSelectedSourceRows(input, sourceIds) {
   }
 }
 
-function validateSupportedScopeDenominator(input, stationRows, networkEdges, facilities, movementCandidates, routeMapPositions) {
+function validateSupportedScopeDenominator(
+  input,
+  stationRows,
+  networkEdges,
+  facilities,
+  movementCandidates,
+  routeMapPositions,
+  transitPassThroughStationIds,
+) {
   if ((input.pack.artifactKind ?? "fixture") !== "production") {
     return;
   }
@@ -282,6 +307,13 @@ function validateSupportedScopeDenominator(input, stationRows, networkEdges, fac
   const includedStationIds = new Set(
     requiredStringArray(supportedV1Scope.includedStationIds, "supportedV1Scope.includedStationIds"),
   );
+  const transitPassThroughStationIdSet = new Set(transitPassThroughStationIds);
+  for (const stationId of transitPassThroughStationIdSet) {
+    if (includedStationIds.has(stationId)) {
+      throw new Error(`transit pass-through station must not be a public included station: ${stationId}`);
+    }
+  }
+  const allowedStationIds = new Set([...includedStationIds, ...transitPassThroughStationIdSet]);
   const includedLineIds = new Set(requiredStringArray(supportedV1Scope.includedLineIds, "supportedV1Scope.includedLineIds"));
   const includedOperatorIds = new Set(
     requiredStringArray(supportedV1Scope.includedOperatorIds, "supportedV1Scope.includedOperatorIds"),
@@ -323,13 +355,13 @@ function validateSupportedScopeDenominator(input, stationRows, networkEdges, fac
 
   assertActualIdsWithinScope(
     scopedStationIds,
-    includedStationIds,
-    "production scope station outside supportedV1Scope.includedStationIds",
+    allowedStationIds,
+    "production scope station outside included or transit pass-through scope",
   );
   assertScopeIdsHaveRows(
-    includedStationIds,
+    allowedStationIds,
     rowStationIds,
-    "supportedV1Scope.includedStationIds missing production station row",
+    "supportedV1Scope station missing production station row",
   );
   assertActualIdsWithinScope(scopedLineIds, includedLineIds, "production scope line outside supportedV1Scope.includedLineIds");
   assertScopeIdsHaveRows(includedLineIds, rowLineIds, "supportedV1Scope.includedLineIds missing production station row");
@@ -348,8 +380,16 @@ function validateSupportedScopeDenominator(input, stationRows, networkEdges, fac
     rowOperatorIds,
     "supportedV1Scope.includedOperatorIds missing production station row",
   );
-  const stationLineCount = new Set(stationRows.map(({ mapping }) => `${mapping.stationId}:${mapping.lineId}`)).size;
-  validateFacilityCoverageDenominator(supportedV1Scope.facilityCoverageDenominator, stationLineCount, supportedV1Scope);
+  const publicStationLineCount = new Set(
+    stationRows
+      .filter(({ mapping }) => includedStationIds.has(mapping.stationId))
+      .map(({ mapping }) => `${mapping.stationId}:${mapping.lineId}`),
+  ).size;
+  validateFacilityCoverageDenominator(
+    supportedV1Scope.facilityCoverageDenominator,
+    publicStationLineCount,
+    supportedV1Scope,
+  );
 }
 
 function operatorIdsForLines(lineIds, lineOperatorIds) {
@@ -443,7 +483,14 @@ function validateSupportedFacilityCoverage(input, stationRows, stationFacilityEv
   if (!Array.isArray(requiredFacilityTypes) || requiredFacilityTypes.length === 0) {
     throw new Error("supportedV1Scope.requiredFacilityTypes must be a non-empty array for production pack");
   }
-  const stationLineKeys = new Set(stationRows.map(({ mapping }) => `${mapping.stationId}:${mapping.lineId}`));
+  const includedStationIds = new Set(
+    requiredStringArray(input.supportedV1Scope.includedStationIds, "supportedV1Scope.includedStationIds"),
+  );
+  const stationLineKeys = new Set(
+    stationRows
+      .filter(({ mapping }) => includedStationIds.has(mapping.stationId))
+      .map(({ mapping }) => `${mapping.stationId}:${mapping.lineId}`),
+  );
   const evidenceKeys = new Set(
     stationFacilityEvidence.map((evidence) => {
       const lineId = requiredString(evidence.lineId, "stationFacilityEvidence.lineId");
@@ -821,6 +868,37 @@ function validateProductionSummaryRideEdgePolicy(stationLines, networkEdges, pol
   throw new Error(
     `production routeEdges non-adjacent EXPRESS summary edge is ${SUMMARY_RIDE_EDGE_PRODUCTION_POLICY}: ${nonAdjacentExpressRideEdgeIds.join(", ")}`,
   );
+}
+
+function validateTransitPassThroughScope(input, networkEdges, isProductionPack, transitPassThroughStationIds) {
+  if (!isProductionPack) {
+    return;
+  }
+  const passThroughIds = new Set(transitPassThroughStationIds);
+  if (passThroughIds.size === 0) {
+    return;
+  }
+  for (const edge of networkEdges) {
+    if (!["ENTRY", "EXIT"].includes(edge.edgeType)) continue;
+    const stationIds = [edge.fromNodeId, edge.toNodeId].map((nodeId) => String(nodeId).split(":")[0]);
+    const passThroughStationId = stationIds.find((stationId) => passThroughIds.has(stationId));
+    if (passThroughStationId) {
+      throw new Error(`transit pass-through station cannot expose ENTRY/EXIT edge: ${passThroughStationId}`);
+    }
+  }
+  for (const row of [...(input.stationExits ?? []), ...(input.stationAccessibilitySummaries ?? [])]) {
+    if (passThroughIds.has(row.stationId)) {
+      throw new Error(`transit pass-through station cannot expose public station metadata: ${row.stationId}`);
+    }
+  }
+  for (const regression of input.representativeRouteRegressions ?? []) {
+    for (const nodeId of [regression.fromNodeId, regression.toNodeId]) {
+      const stationId = String(nodeId).split(":")[0];
+      if (passThroughIds.has(stationId)) {
+        throw new Error(`transit pass-through station cannot be a public regression endpoint: ${stationId}`);
+      }
+    }
+  }
 }
 
 function stationLineNodeFromRouteNode(nodeId) {
@@ -1423,6 +1501,17 @@ function requiredStringArray(value, label) {
     throw new Error(`${label} must be a non-empty array`);
   }
   return value.map((entry) => requiredString(entry, `${label}[]`));
+}
+
+function optionalStringArray(value, label) {
+  if (value === undefined) {
+    return [];
+  }
+  const values = requiredStringArray(value, label);
+  if (new Set(values).size !== values.length) {
+    throw new Error(`${label} must not contain duplicates`);
+  }
+  return values;
 }
 
 function requiredString(value, label) {

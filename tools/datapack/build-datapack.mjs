@@ -692,16 +692,19 @@ function canonicalProductionPackUrl(packUrl) {
 }
 
 function regionalQualityMetrics(pack) {
-  const stationIds = new Set((pack.stations ?? []).map((station) => station.id));
+  const allStationIds = new Set((pack.stations ?? []).map((station) => station.id));
+  const passThroughStationIds = transitPassThroughStationIds(pack, allStationIds);
+  const stationIds = new Set([...allStationIds].filter((stationId) => !passThroughStationIds.has(stationId)));
   const stationCount = stationIds.size;
-  const stationLineKeys = new Set((pack.stationLines ?? []).map((row) => `${row.stationId}:${row.lineId}`));
+  const publicStationLines = (pack.stationLines ?? []).filter((row) => stationIds.has(row.stationId));
+  const stationLineKeys = new Set(publicStationLines.map((row) => `${row.stationId}:${row.lineId}`));
   const coveredStationIds = new Set(
     (pack.facilities ?? [])
       .map((facility) => facility.stationId)
       .filter((stationId) => stationIds.has(stationId)),
   );
-  const facilityEvidence = pack.stationFacilityEvidence ?? [];
-  const facilityRows = pack.facilities ?? [];
+  const facilityEvidence = (pack.stationFacilityEvidence ?? []).filter((row) => stationIds.has(row.stationId));
+  const facilityRows = (pack.facilities ?? []).filter((row) => stationIds.has(row.stationId));
   const facilityTypes = new Set([
     ...facilityEvidence.map((row) => row.facilityType),
     ...facilityRows.map((row) => row.type),
@@ -709,7 +712,7 @@ function regionalQualityMetrics(pack) {
   const facilityDenominator = stationLineKeys.size * facilityTypes.size;
   const facilityEvidenceKeys = facilityEvidence.length > 0
     ? new Set(facilityEvidence.map((row) => `${row.stationId}:${row.lineId}:${row.facilityType}`))
-    : facilityKeysFromRows(facilityRows, pack.stationLines ?? []);
+    : facilityKeysFromRows(facilityRows, publicStationLines);
   const facilityFreshnessRows = facilityEvidence.length > 0 ? facilityEvidence : facilityRows;
   const strictEligibleCount = facilityEvidence.filter((row) => row.strictRouteEligible === true).length;
   const operationalKnownCount = facilityFreshnessRows.filter((row) =>
@@ -742,6 +745,33 @@ function regionalQualityMetrics(pack) {
       lowMobility: unknownAccessibilityRatio,
     },
   };
+}
+
+function transitPassThroughStationIds(pack, allStationIds) {
+  const rawValue = pack.metadata?.transitPassThroughStationIds;
+  if (rawValue === undefined) {
+    return new Set();
+  }
+  let values;
+  try {
+    values = JSON.parse(requiredString(rawValue, "metadata.transitPassThroughStationIds"));
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error("metadata.transitPassThroughStationIds must be valid JSON");
+    }
+    throw error;
+  }
+  const stationIds = requiredStringArray(values, "metadata.transitPassThroughStationIds");
+  const uniqueStationIds = new Set(stationIds);
+  if (uniqueStationIds.size !== stationIds.length) {
+    throw new Error("metadata.transitPassThroughStationIds must not contain duplicates");
+  }
+  for (const stationId of uniqueStationIds) {
+    if (!allStationIds.has(stationId)) {
+      throw new Error(`metadata.transitPassThroughStationIds references missing station: ${stationId}`);
+    }
+  }
+  return uniqueStationIds;
 }
 
 function ratio(numerator, denominator) {

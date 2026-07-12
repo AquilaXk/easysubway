@@ -5,6 +5,8 @@ import path from "node:path";
 
 const SOURCE_ID = "kric-subway-timetable";
 const SOURCE_ARTIFACT_IDS = new Set([SOURCE_ID, "kric-subway-route-info"]);
+const MEMBERSHIP_SOURCE_ID = "molit-urban-rail-full-route";
+const ROUTE_MAP_SOURCE_ID = "easysubway-owner-route-map-capital";
 const LINE_ID = "seoul-4";
 const START_DATE = "20260101";
 const END_DATE = "20261231";
@@ -47,7 +49,17 @@ async function main() {
   const artifact = JSON.parse(artifactBytes.toString("utf8"));
   const outputPath = requireArg(args, "output");
 
-  const transformed = applySchedule(input, artifact, artifactBytes);
+  let transformed = applySchedule(input, artifact, artifactBytes);
+  const rosterPath = args.get("roster");
+  const geometryPath = args.get("geometry");
+  if (rosterPath || geometryPath) {
+    if (!rosterPath || !geometryPath) {
+      throw new Error("--roster and --geometry must be provided together");
+    }
+    const roster = JSON.parse(await readFile(rosterPath, "utf8"));
+    const geometry = JSON.parse(await readFile(geometryPath, "utf8"));
+    transformed = applyLine4RoutingGraph(transformed, artifact, roster, geometry);
+  }
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(transformed, null, 2)}\n`);
 }
@@ -143,7 +155,7 @@ export function applySchedule(input, artifact, artifactBytes = Buffer.from(JSON.
     ),
     scheduleProvenance: {
       sourceId: SOURCE_ID,
-      sourceSnapshotId: `kric-subway-timetable-line4-pilot-${String(artifact.capturedAt ?? "20260709").replaceAll("-", "")}`,
+      sourceSnapshotId: `kric-subway-timetable-snapshot-${String(artifact.capturedAt ?? "20260709").replaceAll("-", "")}`,
       providerRecordHash: sha256(artifactBytes),
       evidenceHash: sha256(`kric-line4-pilot-schedule:${sha256(artifactBytes)}`),
       retrievedAt: `${artifact.capturedAt ?? "2026-07-09"}T00:00:00.000Z`,
@@ -170,6 +182,299 @@ export function applySchedule(input, artifact, artifactBytes = Buffer.from(JSON.
     transitStopTimes,
     transitFeedInfo: [{ feedEndDate: END_DATE }],
   };
+}
+
+export function applyLine4RoutingGraph(input, artifact, roster, geometry) {
+  const stations = line4CorridorStations(roster);
+  const stationByArtifactId = new Map(
+    stations.map((station) => [`station-${LINE_ID}-${station.stinCd}`, corridorStation(station)]),
+  );
+  const stationById = new Map([...stationByArtifactId.values()].map((station) => [station.stationId, station]));
+  const stopTimesByTrip = new Map();
+  for (const stopTime of artifact.transitStopTimes ?? []) {
+    if (!stationByArtifactId.has(stopTime.stationId)) continue;
+    const rows = stopTimesByTrip.get(stopTime.tripId) ?? [];
+    rows.push(stopTime);
+    stopTimesByTrip.set(stopTime.tripId, rows);
+  }
+  const tripsById = new Map((artifact.transitTrips ?? []).map((trip) => [trip.id, trip]));
+  const transitTrips = [];
+  const transitStopTimes = [];
+  for (const [tripId, rows] of [...stopTimesByTrip.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    const ordered = rows.toSorted((left, right) => left.stopSequence - right.stopSequence);
+    const mapped = ordered.map((row) => ({ row, station: stationByArtifactId.get(row.stationId) }));
+    if (!isCompleteCorridorTrip(mapped, stations.length)) continue;
+    const trip = tripsById.get(tripId);
+    if (!trip) continue;
+    transitTrips.push({
+      ...trip,
+      tripHeadsign: mapped.at(-1).station.nameKo,
+      servicePattern: trip.servicePattern ?? "LOCAL",
+    });
+    mapped.forEach(({ row, station }, index) => {
+      transitStopTimes.push({
+        tripId,
+        stopSequence: index + 1,
+        stationId: station.stationId,
+        lineId: LINE_ID,
+        arrivalSeconds: row.arrivalSeconds,
+        departureSeconds: row.departureSeconds,
+      });
+    });
+  }
+  if (transitTrips.length === 0) {
+    throw new Error("KRIC line 4 routing graph has no complete corridor trips");
+  }
+
+  const verifiedAt = `${artifact.capturedAt ?? "2026-07-12"}T00:00:00.000Z`;
+  const stationMappings = [
+    ...(input.stationMappings ?? []).filter((row) => row.sourceId !== "seoulmetro-cyberstation-route-map"),
+    ...stations.flatMap((station) => {
+      const normalized = corridorStation(station);
+      return [
+        stationMapping(MEMBERSHIP_SOURCE_ID, `MOLIT-SEOUL-4-${station.stinCd}`, normalized),
+        stationMapping(SOURCE_ID, station.stinCd, normalized),
+        stationMapping(ROUTE_MAP_SOURCE_ID, `capital-v2:${station.stinNm}`, normalized),
+      ];
+    }),
+  ];
+  const stationLineRows = [
+    ...(input.stationLineRows ?? []),
+    ...stations.flatMap((station) => {
+      const normalized = corridorStation(station);
+      const existing = (input.stationLineRows ?? []).find((row) => row.stationCode === station.stinCd);
+      const base = {
+        lineId: LINE_ID,
+        stationNameKo: station.stinNm,
+        stationNameEn: existing?.stationNameEn ?? "",
+        normalizedName: station.stinNm,
+        region: "수도권",
+        latitude: existing?.latitude ?? null,
+        longitude: existing?.longitude ?? null,
+        stationCode: station.stinCd,
+        lineSequence: station.stinConsOrdr,
+        platformInfo: existing?.platformInfo ?? "",
+        lastVerifiedAt: verifiedAt,
+      };
+      return [
+        { ...base, sourceId: MEMBERSHIP_SOURCE_ID, sourceStationCode: `MOLIT-SEOUL-4-${station.stinCd}` },
+        { ...base, sourceId: SOURCE_ID, sourceStationCode: station.stinCd },
+      ];
+    }),
+  ];
+  const routeEdges = [
+    ...(input.routeEdges ?? []).filter((edge) => edge.edgeType !== "RIDE"),
+    ...corridorRideEdges(transitStopTimes, stationById, input.scheduleProvenance, verifiedAt),
+  ];
+  const routeMapPositions = corridorRouteMapPositions(stations, geometry, verifiedAt);
+  const publicStationIds = new Set(input.supportedV1Scope?.includedStationIds ?? []);
+  const transitPassThroughStationIds = stations
+    .map((station) => corridorStation(station).stationId)
+    .filter((stationId) => !publicStationIds.has(stationId));
+
+  return {
+    ...input,
+    sourceIds: unique([
+      ...(input.sourceIds ?? []).filter((sourceId) => sourceId !== "seoulmetro-cyberstation-route-map"),
+      ROUTE_MAP_SOURCE_ID,
+    ]),
+    supportedV1Scope: {
+      ...input.supportedV1Scope,
+      transitPassThroughStationIds,
+    },
+    stationMappings: uniqueBy(
+      stationMappings,
+      (row) => `${row.sourceId}:${row.sourceStationCode}:${row.lineId}`,
+    ),
+    stationLineRows: uniqueBy(
+      stationLineRows,
+      (row) => `${row.sourceId}:${row.sourceStationCode}:${row.lineId}`,
+    ),
+    routeEdges,
+    routeMapPositions,
+    routeGraphTopologyPolicy: {
+      ...(input.routeGraphTopologyPolicy ?? {}),
+      summaryRideEdges: "fixture-only",
+    },
+    coverageEvidence: (input.coverageEvidence ?? []).map((entry) =>
+      entry.sourceDomain === "route_map_positions"
+        ? {
+            ...entry,
+            sourceIds: [ROUTE_MAP_SOURCE_ID],
+            evidence: "오너 자작 수도권 v2 도식에서 추출한 구조화 station node·label polygon 좌표",
+          }
+        : entry,
+    ),
+    minimumProductionCoverage: {
+      ...input.minimumProductionCoverage,
+      stations: stations.length,
+      stationLines: stations.length,
+      routeEdges: routeEdges.length,
+    },
+    transitTrips,
+    transitStopTimes,
+  };
+}
+
+function line4CorridorStations(roster) {
+  const rows = [...(roster?.stations ?? [])]
+    .filter((station) => station.lnCd == null || String(station.lnCd) === "4")
+    .sort((left, right) => left.stinConsOrdr - right.stinConsOrdr);
+  const start = rows.findIndex((station) => station.stinCd === "433");
+  const end = rows.findIndex((station) => station.stinCd === "448");
+  if (start < 0 || end < start) {
+    throw new Error("KRIC line 4 roster must contain ordered corridor endpoints 433..448");
+  }
+  const corridor = rows.slice(start, end + 1);
+  if (corridor.some((station, index) => index > 0 && station.stinConsOrdr !== corridor[index - 1].stinConsOrdr + 1)) {
+    throw new Error("KRIC line 4 corridor station sequence must be contiguous");
+  }
+  return corridor;
+}
+
+function corridorStation(station) {
+  const endpoint = STATION_MAP[`station-${LINE_ID}-${station.stinCd}`];
+  return {
+    stationId: endpoint?.stationId ?? `station-${LINE_ID}-${station.stinCd}`,
+    stationCode: station.stinCd,
+    lineSequence: station.stinConsOrdr,
+    nameKo: station.stinNm,
+  };
+}
+
+function stationMapping(sourceId, sourceStationCode, station) {
+  return {
+    sourceId,
+    sourceStationCode,
+    lineId: LINE_ID,
+    stationId: station.stationId,
+    stationLineId: `${station.stationId}:${LINE_ID}`,
+    mappingStatus: "active",
+  };
+}
+
+function isCompleteCorridorTrip(mapped, expectedStationCount) {
+  if (mapped.length !== expectedStationCount || new Set(mapped.map(({ station }) => station.stationId)).size !== expectedStationCount) {
+    return false;
+  }
+  return mapped.every(
+    ({ station }, index) => index === 0 || Math.abs(station.lineSequence - mapped[index - 1].station.lineSequence) === 1,
+  );
+}
+
+function corridorRideEdges(stopTimes, stationById, scheduleProvenance, verifiedAt) {
+  const byTrip = new Map();
+  for (const stopTime of stopTimes) {
+    const rows = byTrip.get(stopTime.tripId) ?? [];
+    rows.push(stopTime);
+    byTrip.set(stopTime.tripId, rows);
+  }
+  const samples = new Map();
+  for (const rows of byTrip.values()) {
+    const ordered = rows.toSorted((left, right) => left.stopSequence - right.stopSequence);
+    for (let index = 0; index + 1 < ordered.length; index += 1) {
+      const from = ordered[index];
+      const to = ordered[index + 1];
+      const seconds = to.arrivalSeconds - from.departureSeconds;
+      if (seconds <= 0) continue;
+      const key = `${from.stationId}|${to.stationId}`;
+      const sample = samples.get(key) ?? { fromStationId: from.stationId, toStationId: to.stationId, durations: [] };
+      sample.durations.push(seconds);
+      samples.set(key, sample);
+    }
+  }
+  const edges = [...samples.values()]
+    .sort((left, right) => `${left.fromStationId}|${left.toStationId}`.localeCompare(`${right.fromStationId}|${right.toStationId}`))
+    .map((sample) => {
+      const from = stationById.get(sample.fromStationId);
+      const to = stationById.get(sample.toStationId);
+      if (!from || !to || Math.abs(from.lineSequence - to.lineSequence) !== 1) {
+        throw new Error(`KRIC line 4 timetable segment is not adjacent: ${sample.fromStationId}->${sample.toStationId}`);
+      }
+      const direction = from.lineSequence < to.lineSequence ? "up" : "down";
+      const providerRecordHash = sha256(JSON.stringify({
+        fromStationId: from.stationId,
+        toStationId: to.stationId,
+        durations: sample.durations.toSorted((left, right) => left - right),
+      }));
+      return {
+        id: `edge-${LINE_ID}-${from.stationCode}-${to.stationCode}-${direction}`,
+        sourceId: SOURCE_ID,
+        from: { sourceId: SOURCE_ID, sourceStationCode: from.stationCode, lineId: LINE_ID, nodeSuffix: direction },
+        to: { sourceId: SOURCE_ID, sourceStationCode: to.stationCode, lineId: LINE_ID, nodeSuffix: direction },
+        durationSeconds: medianSeconds(sample.durations),
+        distanceMeters: 0,
+        edgeType: "RIDE",
+        servicePattern: "LOCAL",
+        includesStairs: false,
+        stairAccessState: "UNKNOWN",
+        accessibilityStatus: "UNKNOWN",
+        reliabilityScore: 90,
+        provenanceKind: "OFFICIAL_SOURCE",
+        verificationStatus: "VERIFIED",
+        lastVerifiedAt: verifiedAt,
+        sourceSnapshotId: scheduleProvenance?.sourceSnapshotId,
+        providerRecordHash,
+        evidenceHash: sha256(`${scheduleProvenance?.evidenceHash ?? ""}:${providerRecordHash}`),
+      };
+    });
+  const expectedEdgeCount = (stationById.size - 1) * 2;
+  if (edges.length !== expectedEdgeCount) {
+    throw new Error(`KRIC line 4 adjacent RIDE edge count mismatch: ${edges.length} !== ${expectedEdgeCount}`);
+  }
+  return edges;
+}
+
+function medianSeconds(values) {
+  const sorted = values.toSorted((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  return Math.round(sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]);
+}
+
+function corridorRouteMapPositions(stations, geometry, verifiedAt) {
+  return stations.map((station) => {
+    const node = (geometry?.stationNodes ?? []).find(
+      (candidate) =>
+        candidate.dataStation === station.stinNm &&
+        (String(candidate.dataLine) === "4" || String(candidate.transferLines ?? "").split(/\s+/).includes("4")),
+    );
+    if (!node) throw new Error(`self-drawn route map station node missing: ${station.stinNm}`);
+    const labels = (geometry?.labels ?? []).filter((candidate) => candidate.normalizedText === station.stinNm);
+    const label = labels.toSorted((left, right) => labelDistance(left, node) - labelDistance(right, node))[0];
+    if (!label?.bounds || !Array.isArray(label.polygon)) {
+      throw new Error(`self-drawn route map station label missing: ${station.stinNm}`);
+    }
+    return {
+      sourceId: ROUTE_MAP_SOURCE_ID,
+      station: {
+        sourceId: ROUTE_MAP_SOURCE_ID,
+        sourceStationCode: `capital-v2:${station.stinNm}`,
+        lineId: LINE_ID,
+      },
+      region: "수도권",
+      x: Math.round(node.x),
+      y: Math.round(node.y),
+      labelDx: Math.round(label.bounds.minX - node.x),
+      labelDy: Math.round(label.bounds.minY - node.y),
+      labelPolygon: label.polygon,
+      sourceName: "오너 자작 수도권 v2 노선도",
+      sourceUrl: "https://github.com/AquilaXk/easysubway/blob/main/tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+      sourceSha256: geometry.sourceSvgSha256,
+      license: "오너 자작 저작물",
+      licenseStatus: "owner-authored-commercial-use",
+      commercialUseAllowed: true,
+      attributionRequired: false,
+      sourceLabel: station.stinNm,
+      reviewedAt: verifiedAt,
+      updatedAt: verifiedAt,
+    };
+  });
+}
+
+function labelDistance(label, node) {
+  const centerX = (label.bounds.minX + label.bounds.maxX) / 2;
+  const centerY = (label.bounds.minY + label.bounds.maxY) / 2;
+  return (centerX - node.x) ** 2 + (centerY - node.y) ** 2;
 }
 
 function holidayExceptionDates() {

@@ -705,14 +705,22 @@ function validateRegionalQualityMetricsMatchDatabase(database, pack) {
   if (!hasTable(database, "stations") || !hasTable(database, "facilities") || !hasTable(database, "network_edges")) {
     return;
   }
-  const stationCount = database.prepare("SELECT COUNT(DISTINCT id) AS count FROM stations").get().count;
-  const coveredStationCount = database
-    .prepare(`
-      SELECT COUNT(DISTINCT f.station_id) AS count
-      FROM facilities f
-      INNER JOIN stations s ON s.id = f.station_id
-    `)
-    .get().count;
+  const passThroughStationIds = transitPassThroughStationIdSet(database, pack);
+  const stationIds = new Set(
+    database
+      .prepare("SELECT id FROM stations ORDER BY id")
+      .all()
+      .map((row) => row.id)
+      .filter((stationId) => !passThroughStationIds.has(stationId)),
+  );
+  const stationCount = stationIds.size;
+  const coveredStationCount = new Set(
+    database
+      .prepare("SELECT DISTINCT station_id FROM facilities ORDER BY station_id")
+      .all()
+      .map((row) => row.station_id)
+      .filter((stationId) => stationIds.has(stationId)),
+  ).size;
   const edgeCount = database.prepare("SELECT COUNT(*) AS count FROM network_edges").get().count;
   const unknownAccessibilityCount = database
     .prepare(`
@@ -1370,7 +1378,13 @@ function validateProductionNetworkEdgeProvenance(database, pack) {
     `)
     .all();
   const accessibilityEvidence = productionAccessibilityEvidence(database, pack);
-  const coverage = productionVerifiedCoverage(database, edgeRows, accessibilityEvidence);
+  const transitPassThroughStationIds = productionTransitPassThroughStationIds(database, pack, edgeRows);
+  const coverage = productionVerifiedCoverage(
+    database,
+    edgeRows,
+    accessibilityEvidence,
+    transitPassThroughStationIds,
+  );
   const unverifiedAccessibilityCoverageEdges = edgeRows
     .filter(isUnverifiedAccessibilityCoverageEdge)
     .map((edge) => edge.id);
@@ -1710,11 +1724,74 @@ function validatePositiveEdgeProvenance(edge, sourceUpdatedAtById, pack, accessi
   validateAccessibilityCoverageEdgeProvenance(edge, sourceUpdatedAtById, pack, accessibilityEvidence);
 }
 
-function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
+function productionTransitPassThroughStationIds(database, pack, edgeRows) {
+  const passThroughStationIds = transitPassThroughStationIdSet(database, pack);
+  const publicAccessEdge = edgeRows.find((edge) => {
+    const edgeType = normalizedEdgeType(edge.edge_type);
+    return (
+      (edgeType === "ENTRY" || edgeType === "EXIT") &&
+      [edge.from_node_id, edge.to_node_id].some((nodeId) =>
+        passThroughStationIds.has(String(nodeId).split(":", 1)[0]),
+      )
+    );
+  });
+  if (publicAccessEdge) {
+    throw new Error(
+      `${pack.id}@${pack.version} transit pass-through station cannot expose ENTRY/EXIT edge: ${publicAccessEdge.id}`,
+    );
+  }
+  return passThroughStationIds;
+}
+
+function transitPassThroughStationIdSet(database, pack) {
+  const metadata = database
+    .prepare("SELECT value FROM catalog_metadata WHERE key = 'transitPassThroughStationIds'")
+    .get();
+  if (!metadata) {
+    return new Set();
+  }
+
+  let stationIds;
+  try {
+    stationIds = JSON.parse(metadata.value);
+  } catch {
+    throw new Error(`${pack.id}@${pack.version} transitPassThroughStationIds metadata must be valid JSON`);
+  }
+  if (!Array.isArray(stationIds)) {
+    throw new Error(`${pack.id}@${pack.version} transitPassThroughStationIds metadata must be an array`);
+  }
+
+  const passThroughStationIds = new Set();
+  for (const [index, stationId] of stationIds.entries()) {
+    const normalizedStationId = requiredString(
+      stationId,
+      `transitPassThroughStationIds[${index}]`,
+    );
+    if (passThroughStationIds.has(normalizedStationId)) {
+      throw new Error(
+        `${pack.id}@${pack.version} transitPassThroughStationIds metadata contains duplicate: ${normalizedStationId}`,
+      );
+    }
+    passThroughStationIds.add(normalizedStationId);
+  }
+
+  const knownStationIds = new Set(database.prepare("SELECT id FROM stations ORDER BY id").all().map((row) => row.id));
+  for (const stationId of passThroughStationIds) {
+    if (!knownStationIds.has(stationId)) {
+      throw new Error(
+        `${pack.id}@${pack.version} transitPassThroughStationIds metadata references missing station: ${stationId}`,
+      );
+    }
+  }
+
+  return passThroughStationIds;
+}
+
+function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence, transitPassThroughStationIds) {
   const stationLineRows = database
     .prepare("SELECT station_id, line_id FROM station_lines ORDER BY station_id, line_id")
     .all();
-  const requiredPairs = requiredAccessibilityCoveragePairs(stationLineRows);
+  const requiredPairs = requiredAccessibilityCoveragePairs(stationLineRows, transitPassThroughStationIds);
   const verifiedPairs = verifiedAccessibilityCoveragePairs(edgeRows, accessibilityEvidence);
 
   return {
@@ -1724,15 +1801,17 @@ function productionVerifiedCoverage(database, edgeRows, accessibilityEvidence) {
   };
 }
 
-function requiredAccessibilityCoveragePairs(stationLineRows) {
+function requiredAccessibilityCoveragePairs(stationLineRows, transitPassThroughStationIds = new Set()) {
   const requiredEntryPairs = new Set();
   const requiredExitPairs = new Set();
   const requiredTransferPairs = new Set();
   const lineNodesByStation = new Map();
   for (const row of stationLineRows) {
     const nodeId = stationLineNodeId(row.station_id, row.line_id);
-    requiredEntryPairs.add(edgePairKey(row.station_id, nodeId));
-    requiredExitPairs.add(edgePairKey(nodeId, row.station_id));
+    if (!transitPassThroughStationIds.has(row.station_id)) {
+      requiredEntryPairs.add(edgePairKey(row.station_id, nodeId));
+      requiredExitPairs.add(edgePairKey(nodeId, row.station_id));
+    }
     const stationNodes = lineNodesByStation.get(row.station_id) ?? [];
     stationNodes.push(nodeId);
     lineNodesByStation.set(row.station_id, stationNodes);

@@ -5522,6 +5522,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const sourceIds = inventory.sources.map((source) => source.id).sort();
   assert.deepEqual(sourceIds, [
     "busan-transportation-urban-rail-station-info",
+    "easysubway-owner-route-map-capital",
     "kric-braille-displays",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
@@ -5547,21 +5548,37 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "seoulmetro-cyberstation-route-map",
     "seoulmetro-station-line-info",
   ]);
+  const ownerRouteMapSource = inventory.sources.find(
+    (source) => source.id === "easysubway-owner-route-map-capital",
+  );
+  assert.deepEqual(ownerRouteMapSource.coverageScope.operatorIds, ["seoul-metro", "korail"]);
 
   for (const source of inventory.sources) {
     assert.equal(typeof source.requiredForProductionPack, "boolean", `${source.id} must declare production required flag`);
     assert.ok(
-      ["KOGL-1", "PUBLIC_DATA_FREE_USE"].includes(source.license.type),
-      `${source.id} must use an explicit public data license type`,
+      ["KOGL-1", "PUBLIC_DATA_FREE_USE", "OWNER_AUTHORED"].includes(source.license.type),
+      `${source.id} must use an explicit public or owner-authored license type`,
     );
     assert.equal(source.license.commercialUseAllowed, true, `${source.id} must allow commercial use`);
     assert.equal(source.license.derivativeWorkAllowed, true, `${source.id} must allow derivative work`);
     assert.equal(source.license.redistributionAllowed, true, `${source.id} must allow redistribution`);
-    assert.match(source.license.attribution, /공공누리 제1유형|공공데이터포털 이용허락범위 제한 없음/);
-    assert.match(
-      source.datasetUrl,
-      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
-    );
+    if (source.license.type === "OWNER_AUTHORED") {
+      assert.match(source.license.attribution, /오너 자작/);
+      assert.equal(
+        source.license.evidenceUrl,
+        "https://github.com/AquilaXk/easysubway/blob/main/tools/route-map/route-map-license-decision.json",
+      );
+      assert.equal(
+        source.datasetUrl,
+        "https://github.com/AquilaXk/easysubway/blob/main/tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+      );
+    } else {
+      assert.match(source.license.attribution, /공공누리 제1유형|공공데이터포털 이용허락범위 제한 없음/);
+      assert.match(
+        source.datasetUrl,
+        /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
+      );
+    }
     assert.match(source.observedDataUpdatedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
     assert.match(source.retrievedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
     assert.ok(source.owner);
@@ -5684,22 +5701,42 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.deepEqual(productionInput.supportedV1Scope.includedOperatorIds, scope.supportScope.includedOperatorIds);
   assert.deepEqual(productionInput.supportedV1Scope.includedLineIds, scope.supportScope.includedLineIds);
   assert.deepEqual(productionInput.supportedV1Scope.includedStationIds, scope.supportScope.includedStationIds);
+  assert.deepEqual(productionInput.supportedV1Scope.transitPassThroughStationIds, [
+    "station-seoul-4-434",
+    "station-seoul-4-435",
+    "station-seoul-4-436",
+    "station-seoul-4-437",
+    "station-seoul-4-438",
+    "station-seoul-4-439",
+    "station-seoul-4-440",
+    "station-seoul-4-441",
+    "station-seoul-4-442",
+    "station-seoul-4-443",
+    "station-seoul-4-444",
+    "station-seoul-4-445",
+    "station-seoul-4-446",
+    "station-seoul-4-447",
+  ]);
   assert.deepEqual(productionInput.supportedV1Scope.requiredFacilityTypes, scope.supportScope.requiredFacilityTypes);
   assert.deepEqual(
     productionInput.supportedV1Scope.facilityCoverageDenominator,
     scope.supportScope.facilityCoverageDenominator,
   );
   assert.equal(productionInput.routeRegressionScope, undefined);
-  assert.equal(productionInput.routeGraphTopologyPolicy, undefined);
+  assert.deepEqual(productionInput.routeGraphTopologyPolicy, { summaryRideEdges: "fixture-only" });
   assert.ok(productionInput.sourceIds.includes("kric-subway-timetable"));
   assert.ok(productionInput.transitTrips.length >= 400);
   assert.ok(productionInput.transitStopTimes.length >= 900);
   assert.deepEqual(productionInput.transitFeedInfo, [{ feedEndDate: "20261231" }]);
-  assert.deepEqual(productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE"), []);
+  assert.equal(productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE").length, 30);
   assert.deepEqual(productionInput.representativeRouteRegressions, []);
   for (const edge of productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE")) {
-    const speedKmh = (edge.distanceMeters / edge.durationSeconds) * 3.6;
-    assert.ok(speedKmh >= 15 && speedKmh <= 110, `${edge.id} must stay within production ride speed bounds`);
+    assert.ok(edge.durationSeconds > 0, `${edge.id} must have a positive timetable-derived duration`);
+    assert.ok(edge.distanceMeters >= 0, `${edge.id} distance must not be negative`);
+    if (edge.distanceMeters > 0) {
+      const speedKmh = (edge.distanceMeters / edge.durationSeconds) * 3.6;
+      assert.ok(speedKmh >= 15 && speedKmh <= 110, `${edge.id} must stay within production ride speed bounds`);
+    }
   }
   assert.deepEqual(scope.supportScope.unsupportedRegionPolicy.requiredAppStatus, [
     "UNSUPPORTED_REGION",
@@ -6380,7 +6417,7 @@ test("official source importer는 locked production denominator 밖 station을 �
       ],
       { cwd: root },
     ),
-    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+    /production scope station outside included or transit pass-through scope: station-extra/,
   );
 });
 
@@ -6491,7 +6528,7 @@ test("official source importer는 locked production denominator 밖 route endpoi
       ],
       { cwd: root },
     ),
-    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+    /production scope station outside included or transit pass-through scope: station-extra/,
   );
 });
 
@@ -6540,7 +6577,7 @@ test("official source importer는 locked production denominator 밖 pass-through
       ],
       { cwd: root },
     ),
-    /production scope station outside supportedV1Scope\.includedStationIds: station-extra/,
+    /production scope station outside included or transit pass-through scope: station-extra/,
   );
 });
 

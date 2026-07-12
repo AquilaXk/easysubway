@@ -333,7 +333,7 @@ async function collectTagoStationDiscovery(input, options = {}) {
   if (typeof fetchImpl !== "function") {
     throw new TypeError("fetch is required for TAGO station discovery");
   }
-  const stationNames = [...new Set((input.stationLineRows ?? []).map((row) => row.stationNameKo).filter(Boolean))];
+  const stationNames = [...new Set(scopedStationLineRows(input).map((row) => row.stationNameKo).filter(Boolean))];
   if (stationNames.length === 0) {
     throw new Error("stationLineRows must contain stationNameKo");
   }
@@ -490,29 +490,50 @@ function requestKeyParts(requestKey) {
 }
 
 function tagoStationIds(input) {
-  const stationIds = new Set();
-  for (const row of input.stationLineRows ?? []) {
+  const stationIdsByCode = new Map();
+  for (const row of scopedStationLineRows(input)) {
     // discovery(GetKwrdFndSubwaySttnList)로 확인된 실제 provider station id를 formula보다 우선한다.
     // 운영기관 prefix가 다르므로(코레일 MTRKR vs 서울교통공사 MTRS1) formula는 사당 등 비-코레일 역에서 틀린다.
     if (row.providerStationId) {
-      stationIds.add(row.providerStationId);
+      const stationCode = row.stationCode ?? row.providerStationId;
+      const current = stationIdsByCode.get(stationCode);
+      if (current?.explicit && current.stationId !== row.providerStationId) {
+        throw new Error(`Conflicting providerStationId for stationCode: ${stationCode}`);
+      }
+      stationIdsByCode.set(stationCode, { stationId: row.providerStationId, explicit: true });
       continue;
     }
     if (!row.stationCode) continue;
+    if (stationIdsByCode.get(row.stationCode)?.explicit) continue;
     // seoul-4 코레일 구간 한정 폴백. 비-코레일 역은 providerStationId를 명시해야 한다.
     if (row.stationCode.startsWith("MTRKR")) {
-      stationIds.add(row.stationCode);
+      stationIdsByCode.set(row.stationCode, { stationId: row.stationCode, explicit: false });
       continue;
     }
     if (row.lineId !== "seoul-4") {
       throw new Error(`Unsupported lineId for pilot mapping: ${row.lineId}`);
     }
-    stationIds.add(`MTRKR4${row.stationCode}`);
+    stationIdsByCode.set(row.stationCode, { stationId: `MTRKR4${row.stationCode}`, explicit: false });
   }
-  if (stationIds.size === 0) {
+  if (stationIdsByCode.size === 0) {
     throw new Error("stationLineRows must contain at least one providerStationId or stationCode");
   }
-  return [...stationIds];
+  return [...stationIdsByCode.values()].map(({ stationId }) => stationId);
+}
+
+function scopedStationLineRows(input) {
+  const publicStationIds = new Set(input.supportedV1Scope?.includedStationIds ?? []);
+  if (publicStationIds.size === 0) {
+    return input.stationLineRows ?? [];
+  }
+  const publicMappingKeys = new Set(
+    (input.stationMappings ?? [])
+      .filter((mapping) => publicStationIds.has(mapping.stationId))
+      .map((mapping) => `${mapping.sourceId}:${mapping.sourceStationCode}:${mapping.lineId}`),
+  );
+  return (input.stationLineRows ?? []).filter((row) =>
+    publicMappingKeys.has(`${row.sourceId}:${row.sourceStationCode}:${row.lineId}`),
+  );
 }
 
 function chunk(items, size) {

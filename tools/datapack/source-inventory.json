@@ -2095,6 +2095,73 @@
       }
     },
     {
+      "id": "easysubway-owner-route-map-capital",
+      "displayName": "EasySubway 오너 자작 수도권 v2 노선도",
+      "owner": "AquilaXk",
+      "provider": "EasySubway",
+      "providerDepartment": "오너",
+      "sourceSystem": "EasySubway 자작 도식 파이프라인",
+      "datasetUrl": "https://github.com/AquilaXk/easysubway/blob/main/tools/route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+      "datasetKind": "owner-authored-schematic",
+      "coverage": "수도권 v2 자작 도식에서 추출한 구조화 역 좌표와 label polygon",
+      "coverageScope": {
+        "regionIds": [
+          "capital"
+        ],
+        "operatorIds": [
+          "seoul-metro",
+          "korail"
+        ],
+        "sourceDomains": [
+          "route_map_positions"
+        ]
+      },
+      "requiredForProductionPack": false,
+      "updateFrequency": "owner-authored-on-change",
+      "observedDataUpdatedAt": "2026-07-12",
+      "retrievedAt": "2026-07-12",
+      "license": {
+        "type": "OWNER_AUTHORED",
+        "name": "오너 자작 저작물",
+        "attribution": "EasySubway 오너 자작 도식",
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "evidenceUrl": "https://github.com/AquilaXk/easysubway/blob/main/tools/route-map/route-map-license-decision.json"
+      },
+      "fieldsProvided": [
+        "station_name",
+        "line",
+        "route_map_position",
+        "route_map_label_polygon"
+      ],
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "owner-authored-on-change",
+          "unsupportedNotes": "source does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "owner-authored-on-change",
+          "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "owner-authored-on-change",
+          "unsupportedNotes": "source does not provide accessibility facility records"
+        }
+      }
+    },
+    {
       "id": "seoulmetro-cyberstation-route-map",
       "displayName": "서울교통공사 사이버스테이션 노선도",
       "owner": "서울교통공사",
