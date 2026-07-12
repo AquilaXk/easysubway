@@ -44,6 +44,8 @@ const capitalIntegratedAdditionalStepsJson =
     FareRules,
     FareDiscounts,
     StationFareZones,
+    OfficialOdFareQuotes,
+    OfficialOdFareQuotes,
     RealtimeProviderLineMappings,
     RealtimeProviderStationMappings,
     NetworkEdges,
@@ -148,6 +150,7 @@ class CatalogDatabase extends _$CatalogDatabase {
           await _addStationExitMapColumns();
         }
         if (from < 16) {
+          await migrator.createTable(officialOdFareQuotes);
           await migrator.createTable(stationCarDoorHints);
           await _createStationCarDoorHintIndexes();
         }

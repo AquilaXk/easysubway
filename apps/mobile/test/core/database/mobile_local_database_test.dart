@@ -18,6 +18,7 @@ import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -121,6 +122,35 @@ void main() {
       }),
     );
   });
+
+  test(
+    'catalog DB migration은 schema 15 데이터를 보존하고 official OD fare table을 만든다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-v15-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/catalog.sqlite');
+      final legacy = sqlite.sqlite3.open(file.path);
+      legacy.execute('CREATE TABLE preserved_rows (value TEXT NOT NULL)');
+      legacy.execute("INSERT INTO preserved_rows VALUES ('kept')");
+      legacy.execute('PRAGMA user_version = 15');
+      legacy.close();
+
+      final database = CatalogDatabase.file(file);
+      addTearDown(database.close);
+      final fareCount = await database
+          .customSelect('SELECT COUNT(*) AS count FROM official_od_fare_quotes')
+          .getSingle();
+      final preserved = await database
+          .customSelect('SELECT value FROM preserved_rows')
+          .getSingle();
+
+      expect(catalogDatabaseSchemaVersion, 16);
+      expect(fareCount.read<int>('count'), 0);
+      expect(preserved.read<String>('value'), 'kept');
+    },
+  );
 
   test('내장 baseline 데이터팩은 schemaVersion과 상록수/사당 기본 데이터를 제공한다', () async {
     final directory = await Directory.systemTemp.createTemp(

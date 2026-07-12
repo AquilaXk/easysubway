@@ -16,6 +16,7 @@ import {
   withoutSignature,
 } from "./lib/manifest-validation.mjs";
 import { rsaSha256Signature, signingPrivateKey } from "./lib/manifest-signing.mjs";
+import { officialOdFareQuoteSetHash } from "./lib/official-od-fare-evidence.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const productionMinimumTableRowNames = [
@@ -41,6 +42,9 @@ async function main() {
   const outputDir = path.resolve(root, requireArg(args, "output"));
   const { fixture, candidateBuild } = await loadBuildInput(args);
   const schema = await readFile(path.join(root, "tools/datapack/schema/catalog-schema.sql"), "utf8");
+  const officialOdFareAdmission = JSON.parse(
+    await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"),
+  );
 
   validateFixture(fixture);
   await mkdir(outputDir, { recursive: true });
@@ -63,7 +67,7 @@ async function main() {
     await rm(sqlitePath, { force: true });
     await rm(compressedPath, { force: true });
 
-    buildSqlitePack(sqlitePath, schema, pack);
+    buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmission);
 
     const sqliteBytes = await readFile(sqlitePath);
     const compressedBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0 });
@@ -780,7 +784,7 @@ function outOfStationTransferNetworkEdge(link) {
   };
 }
 
-function buildSqlitePack(sqlitePath, schema, pack) {
+function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmission) {
   const database = new DatabaseSync(sqlitePath);
   const isProductionPack = pack.artifactKind === "production";
   const networkEdges = routeGraphNetworkEdges(pack);
@@ -902,6 +906,37 @@ function buildSqlitePack(sqlitePath, schema, pack) {
           requiredString(row.lineId, "stationFareZones.lineId"),
           requiredString(row.zoneId, "stationFareZones.zoneId"),
         ],
+      );
+      const officialOdFareQuotes = (pack.officialOdFareQuotes ?? []).map((row) => ({
+        row,
+        values: officialOdFareQuoteValues(row, officialOdFareAdmission),
+      }));
+      if (officialOdFareQuotes.length > 0) {
+        if (officialOdFareQuotes.length !== officialOdFareAdmission.quoteCount) {
+          throw new Error("officialOdFareQuotes count must match admission");
+        }
+        if (officialOdFareQuoteSetHash(officialOdFareQuotes.map(({ row }) => row)) !== officialOdFareAdmission.quoteSetHash) {
+          throw new Error("officialOdFareQuotes quote set hash must match admission");
+        }
+      }
+      insertRows(
+        database,
+        "official_od_fare_quotes",
+        [
+          "origin_station_id",
+          "destination_station_id",
+          "source_id",
+          "snapshot_id",
+          "mapping_ledger_hash",
+          "gnrl_card_fare",
+          "gnrl_cash_fare",
+          "yung_card_fare",
+          "yung_cash_fare",
+          "child_card_fare",
+          "child_cash_fare",
+        ],
+        officialOdFareQuotes,
+        ({ values }) => values,
       );
       insertRows(
         database,
@@ -2011,6 +2046,73 @@ function requiredNonNegativeInteger(value, label) {
     throw new Error(`${label} must be a non-negative integer`);
   }
   return integer;
+}
+
+function officialOdFareQuoteValues(row, admission) {
+  const label = "officialOdFareQuotes";
+  const keys = [
+    "originStationId",
+    "destinationStationId",
+    "sourceId",
+    "snapshotId",
+    "mappingLedgerHash",
+    "gnrlCardFare",
+    "gnrlCashFare",
+    "yungCardFare",
+    "yungCashFare",
+    "childCardFare",
+    "childCashFare",
+  ];
+  assertExactKeys(row, keys, label);
+  if (admission?.decision !== "APPROVED") {
+    throw new Error(`${label} requires an approved admission`);
+  }
+  const originStationId = requiredString(row.originStationId, `${label}.originStationId`);
+  const destinationStationId = requiredString(row.destinationStationId, `${label}.destinationStationId`);
+  if (originStationId === destinationStationId) {
+    throw new Error(`${label} endpoints must be distinct`);
+  }
+  const sourceId = requiredString(row.sourceId, `${label}.sourceId`);
+  const snapshotId = requiredString(row.snapshotId, `${label}.snapshotId`);
+  const mappingLedgerHash = sha256HexString(row.mappingLedgerHash, `${label}.mappingLedgerHash`);
+  if (sourceId !== admission.sourceId) throw new Error(`${label}.sourceId must match admission`);
+  if (snapshotId !== admission.snapshotId) throw new Error(`${label}.snapshotId must match admission`);
+  if (mappingLedgerHash !== admission.fareStationLineMappingLedgerHash) {
+    throw new Error(`${label}.mappingLedgerHash must match admission`);
+  }
+  return [
+    originStationId,
+    destinationStationId,
+    sourceId,
+    snapshotId,
+    mappingLedgerHash,
+    requiredNonNegativeSafeInteger(row.gnrlCardFare, `${label}.gnrlCardFare`),
+    requiredNonNegativeSafeInteger(row.gnrlCashFare, `${label}.gnrlCashFare`),
+    requiredNonNegativeSafeInteger(row.yungCardFare, `${label}.yungCardFare`),
+    requiredNonNegativeSafeInteger(row.yungCashFare, `${label}.yungCashFare`),
+    requiredNonNegativeSafeInteger(row.childCardFare, `${label}.childCardFare`),
+    requiredNonNegativeSafeInteger(row.childCashFare, `${label}.childCashFare`),
+  ];
+}
+
+function requiredNonNegativeSafeInteger(value, label) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative safe integer`);
+  }
+  return value;
+}
+
+function assertExactKeys(value, expectedKeys, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError(`${label} must be an object`);
+  }
+  const expected = new Set(expectedKeys);
+  for (const key of Object.keys(value)) {
+    if (!expected.has(key)) throw new Error(`${label}.${key} is not allowed`);
+  }
+  for (const key of expected) {
+    if (!(key in value)) throw new Error(`${label}.${key} is required`);
+  }
 }
 
 function optionalNonNegativeInteger(value, label) {

@@ -138,6 +138,7 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
     "fare_rules",
     "fare_discounts",
     "station_fare_zones",
+    "official_od_fare_quotes",
     "transfer_rules",
     "station_pathway_nodes",
     "station_pathway_edges",
@@ -14098,10 +14099,11 @@ test("official OD fare admin review는 sanitized admission만 생성한다", asy
     const admission = JSON.parse(stdout);
     assert.deepEqual(Object.keys(admission).sort(), [
       "approvedAt", "approvedBy", "artifactKind", "decision", "evidenceHash",
-      "fareStationLineMappingLedgerHash", "quoteCount", "schemaVersion", "snapshotId", "sourceId",
+      "fareStationLineMappingLedgerHash", "quoteCount", "quoteSetHash", "schemaVersion", "snapshotId", "sourceId",
     ].sort());
     assert.equal(admission.artifactKind, "official-od-fare-admission");
     assert.equal(admission.quoteCount, 2);
+    assert.match(admission.quoteSetHash, /^[0-9a-f]{64}$/);
     assert.match(admission.fareStationLineMappingLedgerHash, /^[0-9a-f]{64}$/);
 
     const unsafeReview = { ...review, rawPath: "/tmp/provider.json" };
@@ -14314,6 +14316,194 @@ test("official OD fare candidate admission은 inventory hash 쌍과 일치해야
     await assert.rejects(validate(), /admission decision must be "APPROVED"/);
   } finally {
     await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("official OD fare 두 방향은 승인 artifact와 일치하는 SQLite row로 저장된다", async () => {
+  const fixture = JSON.parse(await readFile(path.join(root, "tools/datapack/fixtures/catalog-fixture.json"), "utf8"));
+  const admission = JSON.parse(await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"));
+  const quotes = fixture.packs[0].officialOdFareQuotes;
+  assert.equal(quotes?.length, 2);
+  assert.ok(quotes.every((quote) => quote.sourceId === admission.sourceId));
+  assert.ok(quotes.every((quote) => quote.snapshotId === admission.snapshotId));
+  assert.ok(quotes.every((quote) => quote.mappingLedgerHash === admission.fareStationLineMappingLedgerHash));
+
+  const outputDir = await mkdtemp(path.join(tmpdir(), "official-od-fare-pack-"));
+  try {
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture", "tools/datapack/fixtures/catalog-fixture.json",
+        "--output", outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    );
+    const compressed = await readFile(path.join(outputDir, "catalog/capital-v1.sqlite.gz"));
+    const databasePath = path.join(outputDir, "capital-v1.sqlite");
+    await writeFile(databasePath, gunzipSync(compressed));
+    const database = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      const rows = database.prepare(`
+        SELECT origin_station_id AS originStationId,
+               destination_station_id AS destinationStationId,
+               source_id AS sourceId,
+               snapshot_id AS snapshotId,
+               mapping_ledger_hash AS mappingLedgerHash,
+               gnrl_card_fare AS gnrlCardFare,
+               gnrl_cash_fare AS gnrlCashFare,
+               yung_card_fare AS yungCardFare,
+               yung_cash_fare AS yungCashFare,
+               child_card_fare AS childCardFare,
+               child_cash_fare AS childCashFare
+        FROM official_od_fare_quotes
+        ORDER BY origin_station_id, destination_station_id
+      `).all();
+      assert.deepEqual(rows.map((row) => ({ ...row })), [...quotes].sort((left, right) =>
+        left.originStationId.localeCompare(right.originStationId)
+          || left.destinationStationId.localeCompare(right.destinationStationId)));
+    } finally {
+      database.close();
+    }
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/validate-datapack.mjs",
+        "--manifest", path.join(outputDir, "current.json"),
+        "--root", outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    );
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("official OD fare builder는 malformed·미승인·formula-shaped row를 거부한다", async () => {
+  const baseline = JSON.parse(await readFile(path.join(root, "tools/datapack/fixtures/catalog-fixture.json"), "utf8"));
+  const cases = [
+    ["missing-fare", (quote) => delete quote.gnrlCardFare, /officialOdFareQuotes.*gnrlCardFare/],
+    ["wrong-hash", (quote) => { quote.mappingLedgerHash = "f".repeat(64); }, /mappingLedgerHash must match/],
+    ["same-endpoint", (quote) => { quote.destinationStationId = quote.originStationId; }, /endpoints must be distinct/],
+    ["formula-shaped", (quote) => { quote.baseCardFare = 1550; }, /baseCardFare is not allowed/],
+    ["changed-approved-fare", (quote) => { quote.gnrlCardFare += 1; }, /quote set hash must match admission/],
+    ["unsafe-integer", (quote) => { quote.gnrlCardFare = Number.MAX_SAFE_INTEGER + 1; }, /safe integer/],
+  ];
+
+  for (const [name, mutate, expected] of cases) {
+    const workspace = await mkdtemp(path.join(tmpdir(), `official-od-fare-${name}-`));
+    try {
+      const fixture = structuredClone(baseline);
+      mutate(fixture.packs[0].officialOdFareQuotes[0]);
+      const fixturePath = path.join(workspace, "fixture.json");
+      await writeFile(fixturePath, JSON.stringify(fixture));
+      await assert.rejects(
+        execFileAsync(
+          process.execPath,
+          ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", path.join(workspace, "out")],
+          { cwd: root, env: productionEnv },
+        ),
+        expected,
+      );
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  }
+});
+
+test("official OD fare validator는 signed pack 내부의 admission hash 변조를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "official-od-fare-tampered-pack-"));
+  try {
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture", "tools/datapack/fixtures/catalog-fixture.json",
+        "--output", outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    );
+    const manifestPath = path.join(outputDir, "current.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    const pack = manifest.packs[0];
+    const sqlitePath = path.join(outputDir, "catalog/capital-v1.sqlite");
+    const database = new DatabaseSync(sqlitePath);
+    try {
+      database.prepare("UPDATE official_od_fare_quotes SET mapping_ledger_hash = ?").run("f".repeat(64));
+    } finally {
+      database.close();
+    }
+    const sqliteBytes = await readFile(sqlitePath);
+    const compressedBytes = gzipSync(sqliteBytes);
+    await writeFile(path.join(outputDir, "catalog/capital-v1.sqlite.gz"), compressedBytes);
+    pack.sizeBytes = compressedBytes.length;
+    pack.sha256 = sha256(compressedBytes);
+    pack.sqliteSha256 = sha256(sqliteBytes);
+    const fixturePayload = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+    pack.signature.value = sha256(Buffer.from(fixturePayload));
+    pack.representativeRouteRegressionSignature.value = sha256(
+      Buffer.from(`${fixturePayload}:${representativeRouteRegressionPayload(pack.representativeRouteRegressions)}`),
+    );
+    await writeFile(manifestPath, JSON.stringify(manifest));
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["tools/datapack/validate-datapack.mjs", "--manifest", manifestPath, "--root", outputDir],
+        { cwd: root, env: productionEnv },
+      ),
+      /official OD fare mapping_ledger_hash must match admission/,
+    );
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("official OD fare validator는 signed pack 내부의 승인 요금 변조를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "official-od-fare-tampered-value-pack-"));
+  try {
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture", "tools/datapack/fixtures/catalog-fixture.json",
+        "--output", outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    );
+    const manifestPath = path.join(outputDir, "current.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    const pack = manifest.packs[0];
+    const sqlitePath = path.join(outputDir, "catalog/capital-v1.sqlite");
+    const database = new DatabaseSync(sqlitePath);
+    try {
+      database.prepare("UPDATE official_od_fare_quotes SET gnrl_card_fare = gnrl_card_fare + 1").run();
+    } finally {
+      database.close();
+    }
+    const sqliteBytes = await readFile(sqlitePath);
+    const compressedBytes = gzipSync(sqliteBytes);
+    await writeFile(path.join(outputDir, "catalog/capital-v1.sqlite.gz"), compressedBytes);
+    pack.sizeBytes = compressedBytes.length;
+    pack.sha256 = sha256(compressedBytes);
+    pack.sqliteSha256 = sha256(sqliteBytes);
+    const fixturePayload = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+    pack.signature.value = sha256(Buffer.from(fixturePayload));
+    pack.representativeRouteRegressionSignature.value = sha256(
+      Buffer.from(`${fixturePayload}:${representativeRouteRegressionPayload(pack.representativeRouteRegressions)}`),
+    );
+    await writeFile(manifestPath, JSON.stringify(manifest));
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["tools/datapack/validate-datapack.mjs", "--manifest", manifestPath, "--root", outputDir],
+        { cwd: root, env: productionEnv },
+      ),
+      /official OD fare quote set hash must match admission/,
+    );
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
   }
 });
 

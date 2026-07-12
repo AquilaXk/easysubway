@@ -291,6 +291,7 @@ function validateOfficialOdFareCandidate(candidate, sources, admissionBytes) {
     "evidenceHash",
     "fareStationLineMappingLedgerHash",
     "quoteCount",
+    "quoteSetHash",
     "schemaVersion",
     "snapshotId",
     "sourceId",
@@ -302,6 +303,7 @@ function validateOfficialOdFareCandidate(candidate, sources, admissionBytes) {
   assertEqual(admission.snapshotId, snapshotId, "admission snapshotId");
   assertEqual(admission.evidenceHash, evidenceHash, "admission evidenceHash");
   assertEqual(admission.quoteCount, 2, "admission quoteCount");
+  assertSha256(admission.quoteSetHash, "admission quoteSetHash");
   assertString(admission.approvedBy, "admission approvedBy");
   assertString(admission.approvedAt, "admission approvedAt");
   assertEqual(

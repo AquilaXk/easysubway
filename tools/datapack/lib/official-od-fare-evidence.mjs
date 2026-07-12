@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { requiredArray, requiredString } from "./ledger-admission-cli.mjs";
 
 const REQUIRED_FARE_FIELDS = [
@@ -90,6 +91,26 @@ export function validateOfficialOdFareEvidence(evidence) {
   if (expectedDirections.size !== 0) throw new Error("quote endpoints must match provider mappings");
   validateAttemptCounts(evidence.attemptCounts, stationIds);
   return { mappings, quotes };
+}
+
+export function officialOdFareQuoteSetHash(quotes) {
+  const normalized = requiredArray(quotes, "official OD fare quote set").map((quote) => {
+    assertObject(quote, "official OD fare quote set[]");
+    const row = {
+      originStationId: requiredString(quote.originStationId, "quoteSet.originStationId"),
+      destinationStationId: requiredString(quote.destinationStationId, "quoteSet.destinationStationId"),
+    };
+    for (const field of REQUIRED_FARE_FIELDS) {
+      if (!Number.isSafeInteger(quote[field]) || quote[field] < 0) {
+        throw new Error(`quoteSet.${field} must be a non-negative safe integer`);
+      }
+      row[field] = quote[field];
+    }
+    return row;
+  }).sort((left, right) =>
+    left.originStationId.localeCompare(right.originStationId)
+      || left.destinationStationId.localeCompare(right.destinationStationId));
+  return createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
 }
 
 function validateEquivalence(equivalence) {

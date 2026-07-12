@@ -5,7 +5,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildFareStationLineMappingLedger } from "./export-ledger-hashes.mjs";
 import { parseArgs, requiredString } from "./lib/ledger-admission-cli.mjs";
-import { validateOfficialOdFareEvidence } from "./lib/official-od-fare-evidence.mjs";
+import {
+  officialOdFareQuoteSetHash,
+  validateOfficialOdFareEvidence,
+} from "./lib/official-od-fare-evidence.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const REVIEW_KEYS = [
@@ -52,6 +55,11 @@ async function buildOfficialOdFareAdmission(args) {
     sourceId: review.sourceId,
     snapshotId: review.snapshotId,
     quoteCount: evidence.quotes.length,
+    quoteSetHash: officialOdFareQuoteSetHash(evidence.quotes.map((quote) => ({
+      originStationId: quote.originStationId,
+      destinationStationId: quote.destinationStationId,
+      ...quote.fares,
+    }))),
     fareStationLineMappingLedgerHash: mappingLedger.ledgerHash,
   };
 }
