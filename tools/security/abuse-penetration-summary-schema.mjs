@@ -36,6 +36,8 @@ function deepFreeze(value) {
 }
 function validateContract(gate) {
   objectValue(gate, "gate");
+  if (typeof gate.releaseGate !== "string" || gate.releaseGate.length === 0) invalidGate("release-gate");
+  if (!Number.isInteger(gate.issue) || gate.issue <= 0) invalidGate("issue");
   const contract = objectValue(gate.summaryContract, "summary-contract");
   if (!Number.isInteger(contract.currentVersion) || !Number.isInteger(contract.requirePassVersion)) invalidGate("versions");
   const legacyVersions = uniqueIntegers(contract.legacyNonPassVersions, "legacy-versions");

@@ -163,6 +163,23 @@ test("A RED direct schema normalizes invalid relative evidence path pattern", ()
   );
 });
 
+test("A RED direct schema requires valid release gate identity", () => {
+  const cases = [
+    [(value) => { delete value.releaseGate; }, "release-gate"],
+    [(value) => { value.releaseGate = 1; }, "release-gate"],
+    [(value) => { value.releaseGate = ""; }, "release-gate"],
+    [(value) => { delete value.issue; }, "issue"],
+    [(value) => { value.issue = "1"; }, "issue"],
+    [(value) => { value.issue = 0; }, "issue"],
+    [(value) => { value.issue = -1; }, "issue"],
+  ];
+  for (const [mutate, rule] of cases) {
+    const gateValue = structuredClone(gate); mutate(gateValue);
+    assert.throws(() => buildAbusePenetrationSummaryV2Schema(gateValue),
+      new RegExp(`GATE_SUMMARY_CONTRACT_INVALID at \\$ \\(${rule}\\)`));
+  }
+});
+
 const gateHashBefore = createHash("sha256").update(readFileSync(gatePath)).digest("hex");
 const statusBefore = execFileSync("git", ["status", "--short", "--untracked-files=all"], { cwd: root, encoding: "utf8" });
 function freshV2Pass(gateValue = gate) { return structuredClone(schemaV2Pass(gateValue, false)); }
