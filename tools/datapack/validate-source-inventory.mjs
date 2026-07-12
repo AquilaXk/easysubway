@@ -6,7 +6,8 @@ const inventoryPath = optionValue("--inventory") ?? "tools/datapack/source-inven
 const candidatesPath = optionValue("--candidates") ?? "tools/datapack/source-candidates.json";
 const scopePath = optionValue("--scope");
 const compareStrings = (left, right) => left.localeCompare(right);
-const quotaEvidenceKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
+const requiredQuotaEvidenceKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
+const optionalQuotaEvidenceKeys = ["documentedMonthlyLimit"];
 
 try {
   const inventory = JSON.parse(await readFile(inventoryPath, "utf8"));
@@ -277,16 +278,27 @@ function validateQuotaEvidence(quotaEvidence, label) {
   if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
     throw new Error(`${label} must be an object`);
   }
-  const keys = Object.keys(quotaEvidence).sort(compareStrings);
-  if (JSON.stringify(keys) !== JSON.stringify(quotaEvidenceKeys)) {
-    throw new Error(`${label} must only include ${quotaEvidenceKeys.join(", ")}`);
+  const keys = Object.keys(quotaEvidence);
+  const allowedKeys = [...requiredQuotaEvidenceKeys, ...optionalQuotaEvidenceKeys];
+  if (!requiredQuotaEvidenceKeys.every((key) => keys.includes(key)) || keys.some((key) => !allowedKeys.includes(key))) {
+    throw new Error(`${label} must include ${requiredQuotaEvidenceKeys.join(", ")} and only optional ${optionalQuotaEvidenceKeys.join(", ")}`);
   }
   assertString(quotaEvidence.portal, `${label}.portal`);
   if (
+    quotaEvidence.defaultDailyLimit !== null &&
     quotaEvidence.defaultDailyLimit !== "unlimited" &&
     (!Number.isInteger(quotaEvidence.defaultDailyLimit) || quotaEvidence.defaultDailyLimit < 0)
   ) {
-    throw new Error(`${label}.defaultDailyLimit must be a non-negative integer or unlimited`);
+    throw new Error(`${label}.defaultDailyLimit must be null, a non-negative integer, or unlimited`);
+  }
+  if (
+    "documentedMonthlyLimit" in quotaEvidence &&
+    (!Number.isInteger(quotaEvidence.documentedMonthlyLimit) || quotaEvidence.documentedMonthlyLimit <= 0)
+  ) {
+    throw new Error(`${label}.documentedMonthlyLimit must be a positive integer`);
+  }
+  if (quotaEvidence.defaultDailyLimit === null && !("documentedMonthlyLimit" in quotaEvidence)) {
+    throw new Error(`${label}.defaultDailyLimit null requires documentedMonthlyLimit`);
   }
   assertString(quotaEvidence.unlockStatus, `${label}.unlockStatus`);
   if (typeof quotaEvidence.productionUseAllowed !== "boolean") {

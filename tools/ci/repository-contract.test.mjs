@@ -5473,9 +5473,9 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   // 결과 해시로 고정한다. run-source-admission-pipeline.mjs가 각 source를 admit한 직후 인벤토리 sha256을
   // 그 source의 admissionEvidence에 기록한다. 순차 체인이므로 3종 해시는 전부 distinct해야 한다.
   const issue1701AdmissionInventorySha256 = {
-    "kric-transfer-movement-detailed": "bc7abcbb7e0e42e2d58c28046e5e96d3af29648cc42d43aeb9caaf5470f7c506",
-    "seoul-metro-fast-exit-car-door": "741df6c18d7fb8bac1966d568db8ca204b5c3e7ab65a60393c0b710fe2264830",
-    "seoul-metro-transfer-distance-duration": "efe91e09f151064b29c5844bd5850a766f8c03988cd0118a3a682e449450d997",
+    "kric-transfer-movement-detailed": "64e991d9129da955f9c077a4383217d73d51963589ccdcaa4358e6fe8f5e9c2f",
+    "seoul-metro-fast-exit-car-door": "18dd4d0a58ce31caf08d2bd4ebe5767fffe22cba594271accab462d85aad0898",
+    "seoul-metro-transfer-distance-duration": "1d289abaa4fd83e27c288665cb504602078e6f3681e063756f3d9b5995645a0b",
   };
   assert.equal(new Set(Object.values(issue1701AdmissionInventorySha256)).size, 3);
   for (const [sourceId, expectedSha256] of Object.entries(issue1701AdmissionInventorySha256)) {
@@ -6969,6 +6969,7 @@ test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph 
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
   assert.equal(candidate.evidence.liveSampleFormat, "xml");
+  assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-12T11:31:42Z");
   assert.equal(candidate.evidence.liveSampleRowCount, 8);
   assert.equal(candidate.evidence.liveSampleRawSha256, "93f75d6049655663ee0f14ca88347b9645781feaf5085cbf5a0013e4d7156a66");
   assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "47ec5fc575c71e57ae8dac56891097c3e3392103fc7b5b1c385e04518e9fa3f8");
@@ -6976,9 +6977,14 @@ test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph 
   assert.deepEqual(candidate.evidence.liveSampleFields.slice().sort(), candidate.evidence.outputFields.slice().sort());
   assert.match(candidate.evidence.liveSampleNote, /2026-07-12.*29190984673 \(head 93afed60a027c215af80039a11e8ee58d8178088\).*credentialRedacted=true.*format=xml.*rowCount=8.*source candidate sample evidence valid/);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.slice().sort(), ["distanceMeters", "durationSeconds"]);
+  const licenseEvidenceUrl = new URL(candidate.evidence.licenseCommercialRedistributionEvidence);
+  const detailUrl = new URL(candidate.detailUrl);
+  assert.equal(licenseEvidenceUrl.origin + licenseEvidenceUrl.pathname, detailUrl.origin + detailUrl.pathname);
+  for (const key of ["id", "service", "operation"]) {
+    assert.equal(licenseEvidenceUrl.searchParams.get(key), detailUrl.searchParams.get(key));
+  }
   assert.deepEqual(candidate.evidence.missingEvidence.slice().sort(), [
     "distanceDurationEdgeEvidence",
-    "licenseCommercialRedistributionEvidence",
     "providerTermsOrQuotaApproval",
   ]);
   assert.match(candidate.nextAction, /29190984673/);
@@ -7145,6 +7151,7 @@ test("data.go.kr 환승역거리 소요시간 후보는 확정된 odcloud endpoi
   assert.deepEqual(candidate.evidence.missingEvidence, []);
   // live sample provenance는 로컬 재수집 실측 해시로 고정한다.
   assert.equal(candidate.evidence.liveSampleFormat, "json");
+  assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-12T14:15:27Z");
   assert.equal(candidate.evidence.liveSampleRowCount, 10);
   assert.equal(candidate.evidence.liveSampleRawSha256, "5efffaa748cd7c87859cf8979db96c009c85dc44cca58929015a708e8c0634fd");
   assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "39a46ae2842d5031062c768b27ae5a9853278e8caf0c1b0fc1e64e04689a300b");
@@ -7155,6 +7162,9 @@ test("data.go.kr 환승역거리 소요시간 후보는 확정된 odcloud endpoi
   const productionSource = inventory.sources.find(({ id }) => id === candidate.productionInventoryReferenceId);
   assert.ok(productionSource, "seoul-metro-transfer-distance-duration must exist in source inventory");
   assert.equal(productionSource.requiredForProductionPack, false);
+  assert.equal(productionSource.updateFrequency, "annual file snapshot");
+  assert.equal(productionSource.observedDataUpdatedAt, "2025-12-31");
+  assert.equal(productionSource.retrievedAt, "2026-07-12");
   assert.equal(productionSource.license.type, "PUBLIC_DATA_FREE_USE");
   for (const field of candidate.evidence.outputFields) {
     assert.ok(productionSource.fieldsProvided.includes(field), `fieldsProvided must include ${field}`);
@@ -7196,6 +7206,7 @@ test("data.go.kr 빠른하차정보 후보는 확정된 operation path와 유추
   assert.deepEqual(candidate.evidence.missingEvidence, []);
   // live sample provenance는 로컬 재수집 실측 해시로 고정한다.
   assert.equal(candidate.evidence.liveSampleFormat, "json");
+  assert.equal(candidate.evidence.liveSampleRetrievedAt, "2026-07-12T14:47:12Z");
   assert.equal(candidate.evidence.liveSampleRowCount, 10);
   assert.equal(candidate.evidence.liveSampleRawSha256, "d6a81c0da9ae5cc430a788bd0fc1ed6bb269cc6761a822b32c7484649e4586a5");
   assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "1b670fa8b0f1f51afb989d172c9824378b09b714bb5ce768dc3a02820931ad47");
@@ -7216,6 +7227,8 @@ test("data.go.kr 빠른하차정보 후보는 확정된 operation path와 유추
   assert.equal(productionSource.admissionEvidence.candidateId, candidate.id);
   assert.equal(productionSource.admissionEvidence.sampleEvidenceHash, candidate.evidence.liveSampleEvidenceHash);
   assert.equal(productionSource.admissionEvidence.quotaEvidence.productionUseAllowed, false);
+  assert.equal(productionSource.admissionEvidence.quotaEvidence.defaultDailyLimit, null);
+  assert.equal(productionSource.admissionEvidence.quotaEvidence.documentedMonthlyLimit, 10000);
 });
 
 test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {

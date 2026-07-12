@@ -607,6 +607,7 @@
           "XML"
         ],
         "usePermissionRange": "저작권표시",
+        "licenseCommercialRedistributionEvidence": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=307&service=vulnerableUserInfo&operation=transferMovement&page=1",
         "outputFields": [
           "chtnMvTpOrdr",
           "edMovePath",
@@ -617,7 +618,7 @@
           "mvPathMgNo",
           "stMovePath"
         ],
-        "liveSampleRetrievedAt": "2026-07-12T00:00:00Z",
+        "liveSampleRetrievedAt": "2026-07-12T11:31:42Z",
         "liveSampleFormat": "xml",
         "liveSampleRowCount": 8,
         "liveSampleRawSha256": "93f75d6049655663ee0f14ca88347b9645781feaf5085cbf5a0013e4d7156a66",
@@ -640,11 +641,10 @@
         ],
         "missingEvidence": [
           "distanceDurationEdgeEvidence",
-          "licenseCommercialRedistributionEvidence",
           "providerTermsOrQuotaApproval"
         ]
       },
-      "nextAction": "live sample provenance 기록 완료(run 29190984673) 후 credential-free raw archive·approved object URI·owner admin review를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-12). commercial/redistribution license evidence, provider terms/quota approval, distance·duration edge 근거는 아직 미확보라 route graph edge 자동 승격은 계속 막는다",
+      "nextAction": "live sample provenance 기록 완료(run 29190984673) 후 owner admin review를 확보해 production inventory 소비 대상으로 승격 완료(오너 세션 승인 2026-07-12). 공식 상세 페이지의 저작권표시 이용조건을 license evidence로 연결했다. provider terms/quota approval과 distance·duration edge 근거는 아직 미확보라 route graph edge 자동 승격은 계속 막는다",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -1919,7 +1919,7 @@
           "145개 환승역(2025-12-31 기준) 커버",
           "파일데이터(CSV) 원본과 odcloud 오픈 API(JSON/XML)로 제공되며, 최신 버전 endpoint는 공개 OAS(namespace 15044419/v1)에서 확정한 uddi:7008c675-928f-41d6-9a01-b3541f78466b(_20251231)이다. odcloud 요청 파라미터는 page/perPage/returnType(기본 JSON)이며 인증은 serviceKey로 한다."
         ],
-        "liveSampleRetrievedAt": "2026-07-13T00:00:00Z",
+        "liveSampleRetrievedAt": "2026-07-12T14:15:27Z",
         "liveSampleFormat": "json",
         "liveSampleRowCount": 10,
         "liveSampleRawSha256": "5efffaa748cd7c87859cf8979db96c009c85dc44cca58929015a708e8c0634fd",
@@ -2009,7 +2009,7 @@
           "operation path getFstExit와 응답 item 14종 필드명은 공개 swagger에서 확정. 요청 파라미터는 swagger에 비어 있어 유추한 뒤 live sample 수집으로 확정했다.",
           "실시간 제공, 개발계정 트래픽 10,000회/월"
         ],
-        "liveSampleRetrievedAt": "2026-07-13T00:00:00Z",
+        "liveSampleRetrievedAt": "2026-07-12T14:47:12Z",
         "liveSampleFormat": "json",
         "liveSampleRowCount": 10,
         "liveSampleRawSha256": "d6a81c0da9ae5cc430a788bd0fc1ed6bb269cc6761a822b32c7484649e4586a5",
