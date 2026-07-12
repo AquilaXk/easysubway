@@ -225,8 +225,8 @@ function validateQuotaEvidence(quotaEvidence, label) {
     throw new Error(`${label} must be an object`);
   }
   const keys = Object.keys(quotaEvidence);
-  const allowedKeys = [...requiredQuotaEvidenceKeys, ...optionalQuotaEvidenceKeys];
-  if (!requiredQuotaEvidenceKeys.every((key) => keys.includes(key)) || keys.some((key) => !allowedKeys.includes(key))) {
+  const allowedKeys = new Set([...requiredQuotaEvidenceKeys, ...optionalQuotaEvidenceKeys]);
+  if (!requiredQuotaEvidenceKeys.every((key) => keys.includes(key)) || keys.some((key) => !allowedKeys.has(key))) {
     throw new Error(`${label} must include ${requiredQuotaEvidenceKeys.join(", ")} and only optional ${optionalQuotaEvidenceKeys.join(", ")}`);
   }
   requiredText(quotaEvidence.portal, `${label}.portal`);
