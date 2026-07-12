@@ -19,7 +19,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { parseArgs, readJsonFile, requireArg, requiredArray, requiredString, sortJson } from "./lib/ledger-admission-cli.mjs";
+import { parseArgs, readJsonFile, requireArg, requiredArray, sortJson } from "./lib/ledger-admission-cli.mjs";
 import { canonicalJson, sha256 } from "./lib/manifest-validation.mjs";
 import { buildRosterIndex } from "./lib/station-roster.mjs";
 
@@ -78,38 +78,19 @@ export function buildTransferBaseline({
   const directionRecords = new Map();
 
   for (const raw of rows) {
-    const parsed = parseTransferRow(raw);
-    if (parsed.error) {
-      quarantine.push({ reason: parsed.error, row: raw });
+    const resolved = resolveTransferRow(index, raw);
+    if (resolved.error) {
+      quarantine.push({ reason: resolved.error, row: raw });
       continue;
     }
-    const { stationName, fromLineName, toLineName, distanceMeters, transferSeconds } = parsed;
-
-    const stationMatch = index.matchStation(stationName);
-    if (stationMatch.error) {
-      quarantine.push({ reason: stationMatch.error, row: raw });
-      continue;
-    }
-    const stationId = stationMatch.stationId;
-
-    const fromLineId = index.matchLineForStation(stationId, fromLineName);
-    if (fromLineId.error) {
-      quarantine.push({ reason: fromLineId.error, row: raw });
-      continue;
-    }
-    const toLineId = index.matchLineForStation(stationId, toLineName);
-    if (toLineId.error) {
-      quarantine.push({ reason: toLineId.error, row: raw });
-      continue;
-    }
-
+    const { stationId, fromLineId, toLineId, distanceMeters, transferSeconds } = resolved;
     const providerRecordHash = sha256(canonicalJson(raw));
-    const ruleKey = `${stationId}:${fromLineId.lineId}:${toLineId.lineId}`;
+    const ruleKey = `${stationId}:${fromLineId}:${toLineId}`;
 
     directionRecords.set(ruleKey, {
       stationId,
-      fromLineId: fromLineId.lineId,
-      toLineId: toLineId.lineId,
+      fromLineId,
+      toLineId,
       minTransferSeconds: transferSeconds,
     });
 
@@ -117,8 +98,8 @@ export function buildTransferBaseline({
       duplicateReport.push({
         ruleKey,
         stationId,
-        fromLineId: fromLineId.lineId,
-        toLineId: toLineId.lineId,
+        fromLineId,
+        toLineId,
         firstMinTransferSeconds: seenRuleKeys.get(ruleKey),
         duplicateMinTransferSeconds: transferSeconds,
       });
@@ -126,41 +107,25 @@ export function buildTransferBaseline({
     }
     seenRuleKeys.set(ruleKey, transferSeconds);
 
-    const pairKey = pathwayEdgePairKey(stationId, fromLineId.lineId, toLineId.lineId);
-    let pathwayEdgeId = null;
-    if (!existingEdgePairs.has(pairKey)) {
-      const fromNodeId = platformNodesByStationLine.get(`${stationId}:${fromLineId.lineId}`);
-      const toNodeId = platformNodesByStationLine.get(`${stationId}:${toLineId.lineId}`);
-      if (!fromNodeId || !toNodeId) {
-        quarantine.push({
-          reason: `platform node missing for baseline pathway edge: ${stationId}:${fromLineId.lineId}->${toLineId.lineId}`,
-          row: raw,
-        });
-      } else {
-        pathwayEdgeId = `pathedge-baseline-${stationId}-${fromLineId.lineId}-${toLineId.lineId}`;
-        stationPathwayEdges.push({
-          id: pathwayEdgeId,
-          fromNodeId,
-          toNodeId,
-          edgeType: "WALK",
-          durationSeconds: transferSeconds,
-          distanceMeters,
-          bidirectional: 1,
-          sourceId,
-          sourceSnapshotId: snapshotId,
-          providerRecordHash,
-          provenanceKind: "OFFICIAL_BASELINE",
-          verificationStatus,
-        });
-      }
-    }
+    const pathwayEdgeId = appendBaselineEdge({
+      existingEdgePairs,
+      platformNodesByStationLine,
+      stationPathwayEdges,
+      quarantine,
+      record: resolved,
+      raw,
+      sourceId,
+      snapshotId,
+      providerRecordHash,
+      verificationStatus,
+    });
 
     transferRules.push({
-      id: `transfer-${stationId}-${fromLineId.lineId}-${toLineId.lineId}`,
+      id: `transfer-${stationId}-${fromLineId}-${toLineId}`,
       fromStationId: stationId,
-      fromLineId: fromLineId.lineId,
+      fromLineId,
       toStationId: stationId,
-      toLineId: toLineId.lineId,
+      toLineId,
       minTransferSeconds: transferSeconds,
       pathwayEdgeId,
       sourceId,
@@ -182,13 +147,74 @@ export function buildTransferBaseline({
   };
 }
 
+function resolveTransferRow(index, raw) {
+  const parsed = parseTransferRow(raw);
+  if (parsed.error) return parsed;
+  const stationMatch = index.matchStation(parsed.stationName);
+  if (stationMatch.error) return stationMatch;
+  const fromLineMatch = index.matchLineForStation(stationMatch.stationId, parsed.fromLineName);
+  if (fromLineMatch.error) return fromLineMatch;
+  const toLineMatch = index.matchLineForStation(stationMatch.stationId, parsed.toLineName);
+  if (toLineMatch.error) return toLineMatch;
+  return {
+    stationId: stationMatch.stationId,
+    fromLineId: fromLineMatch.lineId,
+    toLineId: toLineMatch.lineId,
+    distanceMeters: parsed.distanceMeters,
+    transferSeconds: parsed.transferSeconds,
+  };
+}
+
+function appendBaselineEdge({
+  existingEdgePairs,
+  platformNodesByStationLine,
+  stationPathwayEdges,
+  quarantine,
+  record,
+  raw,
+  sourceId,
+  snapshotId,
+  providerRecordHash,
+  verificationStatus,
+}) {
+  const { stationId, fromLineId, toLineId, distanceMeters, transferSeconds } = record;
+  if (existingEdgePairs.has(pathwayEdgePairKey(stationId, fromLineId, toLineId))) return null;
+
+  const fromNodeId = platformNodesByStationLine.get(`${stationId}:${fromLineId}`);
+  const toNodeId = platformNodesByStationLine.get(`${stationId}:${toLineId}`);
+  if (!fromNodeId || !toNodeId) {
+    quarantine.push({
+      reason: `platform node missing for baseline pathway edge: ${stationId}:${fromLineId}->${toLineId}`,
+      row: raw,
+    });
+    return null;
+  }
+
+  const id = `pathedge-baseline-${stationId}-${fromLineId}-${toLineId}`;
+  stationPathwayEdges.push({
+    id,
+    fromNodeId,
+    toNodeId,
+    edgeType: "WALK",
+    durationSeconds: transferSeconds,
+    distanceMeters,
+    bidirectional: 1,
+    sourceId,
+    sourceSnapshotId: snapshotId,
+    providerRecordHash,
+    provenanceKind: "OFFICIAL_BASELINE",
+    verificationStatus,
+  });
+  return id;
+}
+
 // 방향쌍(A→B / B→A) 존재 여부와 소요시간 불일치를 리포트한다(적재 거부 아님).
 function buildDirectionPairReport(directionRecords) {
   const report = [];
   const seenPairs = new Set();
   for (const record of directionRecords.values()) {
     const { stationId, fromLineId, toLineId, minTransferSeconds } = record;
-    const canonicalPairKey = [fromLineId, toLineId].sort().join("|");
+    const canonicalPairKey = [fromLineId, toLineId].sort(compareText).join("|");
     const dedupeKey = `${stationId}:${canonicalPairKey}`;
     if (seenPairs.has(dedupeKey)) {
       continue;
@@ -291,13 +317,18 @@ function pathwayEndpointStationLine(nodeId, explicitStationId, explicitLineId) {
 
 // 방향 무관 쌍 키(정렬된 lineId 쌍) — 반대 방향 edge가 이미 있으면 baseline 생성 안 함.
 function pathwayEdgePairKey(stationId, lineA, lineB) {
-  return `${stationId}:${[lineA, lineB].sort().join("|")}`;
+  return `${stationId}:${[lineA, lineB].sort(compareText).join("|")}`;
 }
 
-main.__isEntry = import.meta.url === `file://${process.argv[1]}`;
-if (main.__isEntry) {
-  main().catch((error) => {
+function compareText(left, right) {
+  return String(left).localeCompare(String(right));
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    await main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
-  });
+  }
 }

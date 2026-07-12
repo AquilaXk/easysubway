@@ -73,52 +73,38 @@ export function buildCarDoorHints({ roster, rows, sourceId = "", snapshotId = ""
   const quarantine = [];
 
   for (const raw of rows) {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-      quarantine.push({ reason: "car door row must be an object", row: raw });
-      continue;
-    }
+    const result = normalizeCarDoorHint(index, raw, { sourceId, snapshotId, verificationStatus });
+    if (result.error) quarantine.push({ reason: result.error, row: raw });
+    else stationCarDoorHints.push(result.hint);
+  }
 
-    const stationName = raw.stnNm;
-    const lineName = raw.lineNm;
-    if (typeof stationName !== "string" || stationName.trim() === "") {
-      quarantine.push({ reason: "stnNm must be a non-empty string", row: raw });
-      continue;
-    }
-    if (typeof lineName !== "string" || lineName.trim() === "") {
-      quarantine.push({ reason: "lineNm must be a non-empty string", row: raw });
-      continue;
-    }
+  return { stationCarDoorHints, quarantine };
+}
 
-    const stationMatch = index.matchStation(stationName);
-    if (stationMatch.error) {
-      quarantine.push({ reason: stationMatch.error, row: raw });
-      continue;
-    }
-    const lineMatch = index.matchLineForStation(stationMatch.stationId, lineName);
-    if (lineMatch.error) {
-      quarantine.push({ reason: lineMatch.error, row: raw });
-      continue;
-    }
+function normalizeCarDoorHint(index, raw, provenance) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { error: "car door row must be an object" };
+  }
+  if (typeof raw.stnNm !== "string" || raw.stnNm.trim() === "") {
+    return { error: "stnNm must be a non-empty string" };
+  }
+  if (typeof raw.lineNm !== "string" || raw.lineNm.trim() === "") {
+    return { error: "lineNm must be a non-empty string" };
+  }
 
-    const carDoor = parseCarDoor(raw.qckgffVhclDoorNo);
-    if (carDoor.error) {
-      quarantine.push({ reason: carDoor.error, row: raw });
-      continue;
-    }
+  const stationMatch = index.matchStation(raw.stnNm);
+  if (stationMatch.error) return stationMatch;
+  const lineMatch = index.matchLineForStation(stationMatch.stationId, raw.lineNm);
+  if (lineMatch.error) return lineMatch;
+  const carDoor = parseCarDoor(raw.qckgffVhclDoorNo);
+  if (carDoor.error) return carDoor;
+  const direction = mapDirection(raw.upbdnbSe);
+  if (direction.error) return direction;
+  const facility = mapFacilityType(raw.plfmCmgFac, raw.facPstnNm);
+  if (facility.error) return facility;
 
-    const direction = mapDirection(raw.upbdnbSe);
-    if (direction.error) {
-      quarantine.push({ reason: direction.error, row: raw });
-      continue;
-    }
-
-    const facility = mapFacilityType(raw.plfmCmgFac, raw.facPstnNm);
-    if (facility.error) {
-      quarantine.push({ reason: facility.error, row: raw });
-      continue;
-    }
-
-    stationCarDoorHints.push({
+  return {
+    hint: {
       id: `cardoor-${stationMatch.stationId}-${lineMatch.lineId}-${direction.direction}-${facility.type}-${carDoor.carNumber}-${carDoor.doorNumber}`,
       stationId: stationMatch.stationId,
       lineId: lineMatch.lineId,
@@ -126,15 +112,13 @@ export function buildCarDoorHints({ roster, rows, sourceId = "", snapshotId = ""
       targetFacilityType: facility.type,
       carNumber: carDoor.carNumber,
       doorNumber: carDoor.doorNumber,
-      sourceId,
-      sourceSnapshotId: snapshotId,
+      sourceId: provenance.sourceId,
+      sourceSnapshotId: provenance.snapshotId,
       providerRecordHash: sha256(canonicalJson(raw)),
       provenanceKind: "OFFICIAL",
-      verificationStatus,
-    });
-  }
-
-  return { stationCarDoorHints, quarantine };
+      verificationStatus: provenance.verificationStatus,
+    },
+  };
 }
 
 // "칸-문" 형식을 carNumber/doorNumber 정수로 분해. 구분자 없음·비숫자·범위밖은 error.
@@ -188,10 +172,11 @@ function mapFacilityType(plfmCmgFac, facPstnNm) {
   };
 }
 
-main.__isEntry = import.meta.url === `file://${process.argv[1]}`;
-if (main.__isEntry) {
-  main().catch((error) => {
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    await main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
-  });
+  }
 }

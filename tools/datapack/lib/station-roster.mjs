@@ -12,9 +12,7 @@
  * 괄호/대괄호 병기·중점·공백 제거 후 "역" 접미사를 제거한다.
  */
 export function normalizeStationName(name) {
-  return String(name ?? "")
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\[[^\]]*]/g, "")
+  return stripDelimitedSections(stripDelimitedSections(String(name ?? ""), "(", ")"), "[", "]")
     .replace(/[·.\s]/g, "")
     .replace(/역$/g, "")
     .trim();
@@ -42,88 +40,99 @@ export function buildRosterIndex(roster) {
   // stationId → Map(normalizedLineName → Set(lineId))
   const lineNamesByStation = new Map();
 
-  const addNameKey = (key, stationId) => {
-    if (!key) return;
-    if (!stationIdsByNormalizedName.has(key)) {
-      stationIdsByNormalizedName.set(key, new Set());
-    }
-    stationIdsByNormalizedName.get(key).add(stationId);
-  };
-
   for (const entry of roster) {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new TypeError("roster entries must be objects");
-    }
-    const stationId = requiredRosterString(entry.stationId, "roster.stationId");
-    const lineId = requiredRosterString(entry.lineId, "roster.lineId");
-
-    const normalizedName = typeof entry.normalizedName === "string" && entry.normalizedName.trim() !== ""
-      ? normalizeStationName(entry.normalizedName)
-      : normalizeStationName(entry.nameKo);
-    addNameKey(normalizedName, stationId);
-
-    for (const alias of entry.aliases ?? []) {
-      if (!alias || typeof alias !== "object") continue;
-      const normalizedAlias = typeof alias.normalizedAlias === "string" && alias.normalizedAlias.trim() !== ""
-        ? normalizeStationName(alias.normalizedAlias)
-        : normalizeStationName(alias.alias);
-      addNameKey(normalizedAlias, stationId);
-    }
-
-    if (!lineIdsByStation.has(stationId)) {
-      lineIdsByStation.set(stationId, new Set());
-    }
-    lineIdsByStation.get(stationId).add(lineId);
-
-    if (!lineNamesByStation.has(stationId)) {
-      lineNamesByStation.set(stationId, new Map());
-    }
-    const lineNameMap = lineNamesByStation.get(stationId);
-    // lineId 자체와 nameKo에서 유추한 노선명 후보를 등록. lineNameKo가 있으면 그것도.
-    for (const candidate of [entry.lineNameKo, entry.lineName, lineId]) {
-      const key = normalizeLineName(candidate);
-      if (!key) continue;
-      if (!lineNameMap.has(key)) {
-        lineNameMap.set(key, new Set());
-      }
-      lineNameMap.get(key).add(lineId);
-    }
+    addRosterEntry({ stationIdsByNormalizedName, lineIdsByStation, lineNamesByStation }, entry);
   }
 
   return {
     matchStation(name) {
-      const normalized = normalizeStationName(name);
-      if (!normalized) {
-        return { error: `station name normalization empty: ${name}` };
-      }
-      const candidates = stationIdsByNormalizedName.get(normalized);
-      if (!candidates || candidates.size === 0) {
-        return { error: `station roster match failed: ${name}` };
-      }
-      if (candidates.size > 1) {
-        return { error: `station roster match ambiguous: ${name} -> ${[...candidates].sort().join(", ")}` };
-      }
-      return { stationId: [...candidates][0] };
+      return matchStation(stationIdsByNormalizedName, name);
     },
     matchLineForStation(stationId, lineName) {
-      const lineNameMap = lineNamesByStation.get(stationId);
-      if (!lineNameMap) {
-        return { error: `line roster match failed (unknown station): ${stationId}` };
-      }
-      const normalized = normalizeLineName(lineName);
-      if (!normalized) {
-        return { error: `line name normalization empty: ${lineName}` };
-      }
-      const candidates = lineNameMap.get(normalized);
-      if (!candidates || candidates.size === 0) {
-        return { error: `line roster match failed: ${stationId}:${lineName}` };
-      }
-      if (candidates.size > 1) {
-        return { error: `line roster match ambiguous: ${stationId}:${lineName} -> ${[...candidates].sort().join(", ")}` };
-      }
-      return { lineId: [...candidates][0] };
+      return matchLine(lineNamesByStation, stationId, lineName);
     },
   };
+}
+
+function addRosterEntry(indexes, entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    throw new TypeError("roster entries must be objects");
+  }
+  const stationId = requiredRosterString(entry.stationId, "roster.stationId");
+  const lineId = requiredRosterString(entry.lineId, "roster.lineId");
+  const normalizedName = preferredNormalizedName(entry.normalizedName, entry.nameKo);
+  addSetValue(indexes.stationIdsByNormalizedName, normalizedName, stationId);
+
+  for (const alias of entry.aliases ?? []) {
+    if (!alias || typeof alias !== "object") continue;
+    addSetValue(
+      indexes.stationIdsByNormalizedName,
+      preferredNormalizedName(alias.normalizedAlias, alias.alias),
+      stationId,
+    );
+  }
+
+  addSetValue(indexes.lineIdsByStation, stationId, lineId);
+  const lineNameMap = mapValue(indexes.lineNamesByStation, stationId, () => new Map());
+  for (const candidate of [entry.lineNameKo, entry.lineName, lineId]) {
+    addSetValue(lineNameMap, normalizeLineName(candidate), lineId);
+  }
+}
+
+function matchStation(stationIdsByNormalizedName, name) {
+  const normalized = normalizeStationName(name);
+  if (!normalized) return { error: `station name normalization empty: ${name}` };
+  const candidates = stationIdsByNormalizedName.get(normalized);
+  if (!candidates || candidates.size === 0) return { error: `station roster match failed: ${name}` };
+  if (candidates.size > 1) {
+    return { error: `station roster match ambiguous: ${name} -> ${[...candidates].sort(compareText).join(", ")}` };
+  }
+  return { stationId: [...candidates][0] };
+}
+
+function matchLine(lineNamesByStation, stationId, lineName) {
+  const lineNameMap = lineNamesByStation.get(stationId);
+  if (!lineNameMap) return { error: `line roster match failed (unknown station): ${stationId}` };
+  const normalized = normalizeLineName(lineName);
+  if (!normalized) return { error: `line name normalization empty: ${lineName}` };
+  const candidates = lineNameMap.get(normalized);
+  if (!candidates || candidates.size === 0) return { error: `line roster match failed: ${stationId}:${lineName}` };
+  if (candidates.size > 1) {
+    return { error: `line roster match ambiguous: ${stationId}:${lineName} -> ${[...candidates].sort(compareText).join(", ")}` };
+  }
+  return { lineId: [...candidates][0] };
+}
+
+function preferredNormalizedName(preferred, fallback) {
+  return normalizeStationName(typeof preferred === "string" && preferred.trim() !== "" ? preferred : fallback);
+}
+
+function addSetValue(map, key, value) {
+  if (!key) return;
+  mapValue(map, key, () => new Set()).add(value);
+}
+
+function mapValue(map, key, create) {
+  if (!map.has(key)) map.set(key, create());
+  return map.get(key);
+}
+
+function stripDelimitedSections(value, open, close) {
+  let result = "";
+  let cursor = 0;
+  while (cursor < value.length) {
+    const start = value.indexOf(open, cursor);
+    if (start < 0) return result + value.slice(cursor);
+    const end = value.indexOf(close, start + open.length);
+    if (end < 0) return result + value.slice(cursor);
+    result += value.slice(cursor, start);
+    cursor = end + close.length;
+  }
+  return result;
+}
+
+function compareText(left, right) {
+  return String(left).localeCompare(String(right));
 }
 
 function requiredRosterString(value, label) {
