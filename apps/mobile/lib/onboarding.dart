@@ -192,8 +192,9 @@ class StartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Scaffold(
-      backgroundColor: EasySubwayAccessibleColors.surface,
+      backgroundColor: tokens.surface,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -223,12 +224,12 @@ class StartScreen extends StatelessWidget {
                         const SizedBox(height: EasySubwaySpacing.xxl),
                         Semantics(
                           header: true,
-                          child: const Text(
+                          child: Text(
                             // 핵심 가치 한 줄. 부연 설명("먼저 안내해요") 삭제(#1936).
                             // 강조도 무채색 잉크로 통일(초록/민트 금지).
                             '빠른 길보다,\n갈 수 있는 길',
                             style: TextStyle(
-                              color: EasySubwayAccessibleColors.text,
+                              color: tokens.ink,
                               fontSize: 36,
                               fontWeight: FontWeight.w800,
                               height: 1.16,
@@ -242,10 +243,8 @@ class StartScreen extends StatelessWidget {
                             key: const Key('startScreenStartButton'),
                             onPressed: onStart,
                             style: FilledButton.styleFrom(
-                              backgroundColor:
-                                  EasySubwayAccessibleColors.primary,
-                              foregroundColor:
-                                  EasySubwayAccessibleColors.surface,
+                              backgroundColor: tokens.accent,
+                              foregroundColor: tokens.surface,
                               minimumSize: const Size.fromHeight(58),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
@@ -280,6 +279,7 @@ class _BrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       label: '쉬운 지하철',
       image: true,
@@ -290,14 +290,14 @@ class _BrandMark extends StatelessWidget {
             CustomPaint(
               size: const Size(40, 40),
               painter: _RouteGlyphPainter(
-                color: EasySubwayAccessibleColors.text,
+                color: tokens.ink,
               ),
             ),
             const SizedBox(width: EasySubwaySpacing.md),
             Text(
               '쉬운 지하철',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: EasySubwayAccessibleColors.text,
+                color: tokens.ink,
                 fontWeight: FontWeight.w700,
                 fontSize: 19,
                 letterSpacing: -0.2,
@@ -367,6 +367,7 @@ class _OnboardingStepDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return ExcludeSemantics(
       child: Row(
         children: [
@@ -375,8 +376,8 @@ class _OnboardingStepDots extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: step <= currentStep
-                    ? EasySubwayAccessibleColors.primary
-                    : EasySubwayAccessibleColors.line,
+                    ? tokens.accent
+                    : tokens.line,
               ),
               child: const SizedBox(width: 7, height: 7),
             ),
@@ -411,6 +412,7 @@ class _PermissionInfoList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Column(
       children: [
         _PermissionInfoRow(
@@ -421,10 +423,10 @@ class _PermissionInfoList extends StatelessWidget {
           onChanged: onLocationChanged,
         ),
         if (notificationAvailable) ...[
-          const Divider(
+          Divider(
             height: 1,
             thickness: 1,
-            color: EasySubwayAccessibleColors.line,
+            color: tokens.line,
           ),
           _PermissionInfoRow(
             icon: Icons.notifications_none,
@@ -461,6 +463,7 @@ class _PermissionInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final tokens = EasySubwayTokens.of(context);
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 60),
       child: Padding(
@@ -468,7 +471,7 @@ class _PermissionInfoRow extends StatelessWidget {
         child: Row(
           children: [
             // 무채색 라인 아이콘 — 프로필 리스트와 같은 시각 리듬(색 없음).
-            Icon(icon, color: EasySubwayAccessibleColors.mutedText, size: 24),
+            Icon(icon, color: tokens.inkMuted, size: 24),
             const SizedBox(width: EasySubwaySpacing.lg),
             Expanded(
               child: Column(
@@ -478,7 +481,7 @@ class _PermissionInfoRow extends StatelessWidget {
                   Text(
                     title,
                     style: textTheme.bodyLarge?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
+                      color: tokens.ink,
                       fontWeight: FontWeight.w700,
                       fontSize: 18,
                       height: 1.25,
@@ -488,7 +491,7 @@ class _PermissionInfoRow extends StatelessWidget {
                   Text(
                     subtitle,
                     style: textTheme.bodyMedium?.copyWith(
-                      color: EasySubwayAccessibleColors.mutedText,
+                      color: tokens.inkMuted,
                       fontWeight: FontWeight.w600,
                       height: 1.3,
                     ),
@@ -554,6 +557,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final selectedProfile = _selectedProfile;
     final textTheme = Theme.of(context).textTheme;
+    final tokens = EasySubwayTokens.of(context);
     // 알림 기능 가용 여부의 단일 소스: 알림 권한 provider가 주입됐는지(#1579).
     // 더보기 알림 섹션(notificationRepository)과 함께 켜지고 꺼진다.
     final notificationAvailable = widget.notificationPermissionProvider != null;
@@ -597,8 +601,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 key: const Key('onboardingDoneButton'),
                 onPressed: onNext,
                 style: FilledButton.styleFrom(
-                  backgroundColor: EasySubwayAccessibleColors.primary,
-                  foregroundColor: EasySubwayAccessibleColors.surface,
+                  backgroundColor: tokens.accent,
+                  foregroundColor: tokens.surface,
                   minimumSize: const Size.fromHeight(58),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(
@@ -628,7 +632,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       // 질문 한 줄, 설명 문장 없음(#1936).
                       '어떻게 이동하세요?',
                       style: textTheme.titleLarge?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
+                        color: tokens.ink,
                         fontWeight: FontWeight.w800,
                         fontSize: 26,
                         height: 1.2,
@@ -638,10 +642,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   const SizedBox(height: EasySubwaySpacing.xl),
                   for (var i = 0; i < profileOptions.length; i++) ...[
                     if (i != 0)
-                      const Divider(
+                      Divider(
                         height: 1,
                         thickness: 1,
-                        color: EasySubwayAccessibleColors.line,
+                        color: tokens.line,
                       ),
                     _OnboardingProfileRow(
                       profile: profileOptions[i],
@@ -692,7 +696,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       : '위치는 나중에도 켤 수 있어요',
                                   // 프로필 질문과 같은 타이포 위계(titleLarge)로 통일(#1936 일관성).
                                   style: textTheme.titleLarge?.copyWith(
-                                    color: EasySubwayAccessibleColors.text,
+                                    color: tokens.ink,
                                     fontWeight: FontWeight.w800,
                                     fontSize: 26,
                                     height: 1.2,
@@ -726,8 +730,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   child: Text(
                                     _onboardingNotificationFailureNextAction,
                                     style: textTheme.bodyMedium?.copyWith(
-                                      color:
-                                          EasySubwayAccessibleColors.mutedText,
+                                      color: tokens.inkMuted,
                                       fontWeight: FontWeight.w700,
                                       height: 1.35,
                                     ),
@@ -747,10 +750,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     : null,
                                 style: FilledButton.styleFrom(
                                   // 시작·프로필 CTA와 같은 무채색 잉크 fill + 각진(≤8)로 통일.
-                                  backgroundColor:
-                                      EasySubwayAccessibleColors.primary,
-                                  foregroundColor:
-                                      EasySubwayAccessibleColors.surface,
+                                  backgroundColor: tokens.accent,
+                                  foregroundColor: tokens.surface,
                                   minimumSize: const Size.fromHeight(58),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(
@@ -768,10 +769,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 onPressed: _completeOnboarding,
                                 style: OutlinedButton.styleFrom(
                                   // "나중에" skip — 무채색 잉크 텍스트 + 얇은 라인 테두리(각진).
-                                  foregroundColor:
-                                      EasySubwayAccessibleColors.text,
-                                  side: const BorderSide(
-                                    color: EasySubwayAccessibleColors.line,
+                                  foregroundColor: tokens.ink,
+                                  side: BorderSide(
+                                    color: tokens.line,
                                   ),
                                   minimumSize: const Size.fromHeight(58),
                                   shape: RoundedRectangleBorder(
@@ -909,6 +909,7 @@ class _OnboardingProfileRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       label: profile.semanticsLabel(selected),
       selected: selected,
@@ -930,9 +931,7 @@ class _OnboardingProfileRow extends StatelessWidget {
                   Icon(
                     profile.icon,
                     size: 24,
-                    color: selected
-                        ? EasySubwayAccessibleColors.text
-                        : EasySubwayAccessibleColors.mutedText,
+                    color: selected ? tokens.ink : tokens.inkMuted,
                   ),
                   const SizedBox(width: EasySubwaySpacing.lg),
                   Expanded(
@@ -940,7 +939,7 @@ class _OnboardingProfileRow extends StatelessWidget {
                       // 라벨만 노출한다. 상세 요약은 홈 설정에서 확인(#1936).
                       profile.title,
                       style: textTheme.bodyLarge?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
+                        color: tokens.ink,
                         fontWeight: selected
                             ? FontWeight.w700
                             : FontWeight.w600,
@@ -951,10 +950,10 @@ class _OnboardingProfileRow extends StatelessWidget {
                   ),
                   const SizedBox(width: EasySubwaySpacing.md),
                   if (selected)
-                    const Icon(
+                    Icon(
                       Icons.check,
                       size: 22,
-                      color: EasySubwayAccessibleColors.primary,
+                      color: tokens.accent,
                     )
                   else
                     const SizedBox(width: 22),

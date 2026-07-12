@@ -671,9 +671,10 @@ class _StartupLoadingScreenState extends State<_StartupLoadingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Scaffold(
       key: const Key('startupLoadingScreen'),
-      backgroundColor: EasySubwayAccessibleColors.surface,
+      backgroundColor: tokens.surface,
       body: SafeArea(
         child: Center(
           child: Semantics(
@@ -684,10 +685,10 @@ class _StartupLoadingScreenState extends State<_StartupLoadingScreen> {
                 width: 26,
                 height: 26,
                 child: _showSpinner
-                    ? const CircularProgressIndicator(
+                    ? CircularProgressIndicator(
                         strokeWidth: 2.5,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          EasySubwayAccessibleColors.mutedText,
+                          tokens.inkMuted,
                         ),
                       )
                     : null,
@@ -1970,6 +1971,7 @@ class _HomeNotificationButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       button: true,
       label: hasNotificationItems ? '알림, 확인할 알림 있음' : '알림, 새 알림이 없어요',
@@ -1980,7 +1982,7 @@ class _HomeNotificationButton extends StatelessWidget {
           child: Badge(
             isLabelVisible: hasNotificationItems,
             smallSize: 10,
-            backgroundColor: EasySubwayAccessibleColors.red,
+            backgroundColor: tokens.danger,
             offset: const Offset(-10, 10),
             child: IconButton.filledTonal(
               onPressed: onPressed,
@@ -1988,9 +1990,9 @@ class _HomeNotificationButton extends StatelessWidget {
               style: IconButton.styleFrom(
                 minimumSize: const Size.square(48),
                 backgroundColor: Colors.white,
-                foregroundColor: EasySubwayAccessibleColors.secondaryText,
-                side: const BorderSide(
-                  color: EasySubwayAccessibleColors.line,
+                foregroundColor: tokens.inkSecondary,
+                side: BorderSide(
+                  color: tokens.line,
                   width: 1.5,
                 ),
                 shape: RoundedRectangleBorder(
@@ -2036,6 +2038,7 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('알림'),
@@ -2093,17 +2096,17 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                       padding: const EdgeInsets.only(top: 80),
                       child: Column(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.notifications_none,
                             size: 44,
-                            color: EasySubwayAccessibleColors.mutedText,
+                            color: tokens.inkMuted,
                           ),
                           const SizedBox(height: 12),
                           Text(
                             '새 알림이 없습니다',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: EasySubwayAccessibleColors.text,
+                            style: TextStyle(
+                              color: tokens.ink,
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2112,8 +2115,8 @@ class _NotificationInboxScreenState extends State<NotificationInboxScreen> {
                           Text(
                             '즐겨찾기 시설과 제보 상태가 바뀌면 여기에서 볼 수 있어요.',
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: EasySubwayAccessibleColors.mutedText,
+                            style: TextStyle(
+                              color: tokens.inkMuted,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                               height: 1.4,
@@ -2259,6 +2262,7 @@ class _NotificationInboxChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final facilityCount = items.where((item) => item.kind == '시설').length;
     final reportCount = items.length - facilityCount;
     final parts = <String>[
@@ -2270,8 +2274,8 @@ class _NotificationInboxChips extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4, top: 4),
       child: Text(
         parts.join('  ·  '),
-        style: const TextStyle(
-          color: EasySubwayAccessibleColors.mutedText,
+        style: TextStyle(
+          color: tokens.inkMuted,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
@@ -2287,6 +2291,7 @@ class _NotificationInboxRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     void open() {
       final report = item.report;
       if (report == null) {
@@ -2302,9 +2307,9 @@ class _NotificationInboxRow extends StatelessWidget {
     final accent = _facilitySeverityAccent(item.severity);
     final row = Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+          bottom: BorderSide(color: tokens.line),
         ),
       ),
       child: Row(
@@ -2325,8 +2330,8 @@ class _NotificationInboxRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         item.title,
-                        style: const TextStyle(
-                          color: EasySubwayAccessibleColors.text,
+                        style: TextStyle(
+                          color: tokens.ink,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           height: 1.25,
@@ -2336,8 +2341,8 @@ class _NotificationInboxRow extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       item.kind,
-                      style: const TextStyle(
-                        color: EasySubwayAccessibleColors.mutedText,
+                      style: TextStyle(
+                        color: tokens.inkMuted,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2358,8 +2363,8 @@ class _NotificationInboxRow extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     item.actionLabel,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.text,
+                    style: TextStyle(
+                      color: tokens.ink,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       height: 1.3,
@@ -2396,12 +2401,13 @@ class _AppSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Padding(
       padding: _appSectionTitlePadding,
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: EasySubwayAccessibleColors.text,
+          color: tokens.ink,
           fontWeight: FontWeight.w700,
           height: 1.2,
         ),
@@ -2516,6 +2522,7 @@ class _HomeSavedRouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final originName = _stationNameWithSuffix(route.originStationName);
     final destinationName = _stationNameWithSuffix(
       route.destinationStationName,
@@ -2530,9 +2537,9 @@ class _HomeSavedRouteCard extends StatelessWidget {
           onTap: onTap,
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.route_outlined,
-                color: EasySubwayAccessibleColors.primary,
+                color: tokens.accent,
                 size: 30,
               ),
               const SizedBox(width: 12),
@@ -2542,8 +2549,8 @@ class _HomeSavedRouteCard extends StatelessWidget {
                   children: [
                     Text(
                       '$originName → $destinationName',
-                      style: const TextStyle(
-                        color: EasySubwayAccessibleColors.text,
+                      style: TextStyle(
+                        color: tokens.ink,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         height: 1.25,
@@ -2576,9 +2583,9 @@ class _HomeSavedRouteCard extends StatelessWidget {
             IconButton(
               key: Key('favoriteRouteRemoveButton-${route.favoriteRouteId}'),
               onPressed: onRemove,
-              icon: const Icon(
+              icon: Icon(
                 Icons.delete_outline,
-                color: EasySubwayAccessibleColors.mutedText,
+                color: tokens.inkMuted,
               ),
               tooltip: '즐겨찾기 경로 삭제',
             )
@@ -2604,16 +2611,17 @@ class _HomeMiniBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Chip(
       label: Text(label),
       visualDensity: VisualDensity.compact,
-      backgroundColor: EasySubwayAccessibleColors.surface,
-      side: const BorderSide(color: EasySubwayAccessibleColors.line),
+      backgroundColor: tokens.surface,
+      side: BorderSide(color: tokens.line),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(8)),
       ),
-      labelStyle: const TextStyle(
-        color: EasySubwayAccessibleColors.secondaryText,
+      labelStyle: TextStyle(
+        color: tokens.inkSecondary,
         fontSize: 11,
         fontWeight: FontWeight.w700,
         height: 1.2,
@@ -2669,6 +2677,7 @@ class _AppInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final subtitle = this.subtitle;
     final leading = SizedBox(
       width: 32,
@@ -2680,8 +2689,8 @@ class _AppInfoRow extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: EasySubwayAccessibleColors.text,
+          style: TextStyle(
+            color: tokens.ink,
             fontSize: 15,
             fontWeight: FontWeight.w700,
             height: 1.25,
@@ -2691,8 +2700,8 @@ class _AppInfoRow extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             subtitle,
-            style: const TextStyle(
-              color: EasySubwayAccessibleColors.mutedText,
+            style: TextStyle(
+              color: tokens.inkMuted,
               fontSize: 12,
               fontWeight: FontWeight.w500,
               height: 1.4,
@@ -2913,6 +2922,7 @@ class _AppSettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
@@ -2924,7 +2934,7 @@ class _AppSettingsSection extends StatelessWidget {
             child: Text(
               title,
               style: textTheme.titleMedium?.copyWith(
-                color: EasySubwayAccessibleColors.text,
+                color: tokens.ink,
                 fontWeight: FontWeight.w700,
                 height: 1.25,
               ),
@@ -2955,6 +2965,7 @@ class _AppSettingsActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final subtitle = this.subtitle;
     return Semantics(
       button: true,
@@ -2965,11 +2976,11 @@ class _AppSettingsActionTile extends StatelessWidget {
           onTap: onTap,
           minVerticalPadding: 12,
           minLeadingWidth: 32,
-          leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
+          leading: Icon(icon, color: tokens.accent),
           title: Text(
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.text,
+              color: tokens.ink,
               fontWeight: FontWeight.w700,
               height: 1.25,
             ),
@@ -2979,7 +2990,7 @@ class _AppSettingsActionTile extends StatelessWidget {
               : Text(
                   subtitle,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.mutedText,
+                    color: tokens.inkMuted,
                     height: 1.3,
                   ),
                 ),
@@ -3013,6 +3024,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final value = enabled ? '켜짐' : '꺼짐';
     final action = enabled ? '끄기' : '켜기';
     return Semantics(
@@ -3024,11 +3036,11 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
           onTap: () => onChanged(!enabled),
           minVerticalPadding: 12,
           minLeadingWidth: 32,
-          leading: Icon(icon, color: EasySubwayAccessibleColors.primary),
+          leading: Icon(icon, color: tokens.accent),
           title: Text(
             title,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.text,
+              color: tokens.ink,
               fontWeight: FontWeight.w700,
               height: 1.25,
             ),
@@ -3036,7 +3048,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
           subtitle: Text(
             subtitle,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: EasySubwayAccessibleColors.mutedText,
+              color: tokens.inkMuted,
               height: 1.3,
             ),
           ),
@@ -3046,7 +3058,7 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
               Text(
                 value,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
+                  color: tokens.ink,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -3382,6 +3394,7 @@ class _FavoriteHomeStationRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final name = _stationNameWithSuffix(station.nameKo);
     final lineLabel = station.lineLabel;
     return Semantics(
@@ -3394,17 +3407,17 @@ class _FavoriteHomeStationRow extends StatelessWidget {
           key: Key('favoriteHomeStationRow-${station.stationId}'),
           onTap: onTap,
           child: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+                bottom: BorderSide(color: tokens.line),
               ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.train_outlined,
-                  color: EasySubwayAccessibleColors.primary,
+                  color: tokens.accent,
                   size: 26,
                 ),
                 const SizedBox(width: 12),
@@ -3414,8 +3427,8 @@ class _FavoriteHomeStationRow extends StatelessWidget {
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
-                          color: EasySubwayAccessibleColors.text,
+                        style: TextStyle(
+                          color: tokens.ink,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           height: 1.25,
@@ -3453,18 +3466,19 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+          bottom: BorderSide(color: tokens.line),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.elevator_outlined,
-            color: EasySubwayAccessibleColors.primary,
+            color: tokens.accent,
             size: 26,
           ),
           const SizedBox(width: 12),
@@ -3474,8 +3488,8 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
               children: [
                 Text(
                   facility.name,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.text,
+                  style: TextStyle(
+                    color: tokens.ink,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     height: 1.25,
@@ -3484,8 +3498,8 @@ class _FavoriteHomeFacilityRow extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   facility.stationLabel,
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.mutedText,
+                  style: TextStyle(
+                    color: tokens.inkMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     height: 1.3,
@@ -3631,6 +3645,7 @@ class _SupportSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Semantics(
@@ -3638,7 +3653,7 @@ class _SupportSectionTitle extends StatelessWidget {
         child: Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: EasySubwayAccessibleColors.text,
+            color: tokens.ink,
             fontWeight: FontWeight.w700,
             height: 1.25,
           ),
@@ -3655,6 +3670,7 @@ class _SupportGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     // 연결 가능한 항목이 없으면(전 항목 숨김) 빈 테두리 카드를 그리지 않는다.
     if (children.isEmpty) {
       return const SizedBox.shrink();
@@ -3664,14 +3680,14 @@ class _SupportGroupCard extends StatelessWidget {
       rows.add(children[i]);
       if (i != children.length - 1) {
         rows.add(
-          const Divider(height: 1, color: EasySubwayAccessibleColors.line),
+          Divider(height: 1, color: tokens.line),
         );
       }
     }
     return Container(
       decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.surface,
-        border: Border.all(color: EasySubwayAccessibleColors.line),
+        color: tokens.surface,
+        border: Border.all(color: tokens.line),
         borderRadius: const BorderRadius.all(Radius.circular(16)),
       ),
       child: Padding(
@@ -3699,6 +3715,7 @@ class _SupportNavRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       button: true,
       label: title,
@@ -3711,13 +3728,13 @@ class _SupportNavRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 14),
             child: Row(
               children: [
-                Icon(icon, size: 24, color: EasySubwayAccessibleColors.primary),
+                Icon(icon, size: 24, color: tokens.accent),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.text,
+                    style: TextStyle(
+                      color: tokens.ink,
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       height: 1.25,
@@ -3725,9 +3742,9 @@ class _SupportNavRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(
+                Icon(
                   Icons.chevron_right,
-                  color: EasySubwayAccessibleColors.mutedText,
+                  color: tokens.inkMuted,
                   size: 22,
                 ),
               ],
@@ -3752,6 +3769,7 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final copy = _UserDataDeletionCopy.forScope(deletionScope);
     void openDeletionScreen() {
       Navigator.of(context).push(
@@ -3778,11 +3796,11 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 14),
             child: Row(
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 1),
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
                   child: Icon(
                     Icons.delete_outline,
-                    color: EasySubwayAccessibleColors.red,
+                    color: tokens.danger,
                     size: 24,
                   ),
                 ),
@@ -3790,17 +3808,17 @@ class _UserDataDeletionAccessItem extends StatelessWidget {
                 Expanded(
                   child: Text(
                     copy.title,
-                    style: const TextStyle(
-                      color: EasySubwayAccessibleColors.text,
+                    style: TextStyle(
+                      color: tokens.ink,
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       height: 1.25,
                     ),
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right,
-                  color: EasySubwayAccessibleColors.mutedText,
+                  color: tokens.inkMuted,
                 ),
               ],
             ),
@@ -3902,6 +3920,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
     final copy = _UserDataDeletionCopy.forScope(widget.deletionScope);
     return Scaffold(
@@ -3920,8 +3939,8 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
               : const Icon(Icons.delete_forever_outlined),
           label: Text(_isDeleting ? '삭제 중' : copy.title),
           style: FilledButton.styleFrom(
-            backgroundColor: EasySubwayAccessibleColors.red,
-            foregroundColor: EasySubwayAccessibleColors.surface,
+            backgroundColor: tokens.danger,
+            foregroundColor: tokens.surface,
           ),
         ),
       ),
@@ -3934,7 +3953,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
               child: Text(
                 '삭제 전에 확인해 주세요',
                 style: textTheme.headlineSmall?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
+                  color: tokens.ink,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
@@ -3944,7 +3963,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             Text(
               copy.deletedSummary,
               style: textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
+                color: tokens.ink,
                 height: 1.4,
               ),
             ),
@@ -3952,7 +3971,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
             Text(
               _UserDataDeletionCopy.irreversibleLine,
               style: textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.red,
+                color: tokens.danger,
                 fontWeight: FontWeight.w700,
                 height: 1.4,
               ),
@@ -3962,7 +3981,7 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
               Text(
                 copy.exceptionNote!,
                 style: textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
+                  color: tokens.inkMuted,
                   height: 1.4,
                 ),
               ),
@@ -3976,27 +3995,30 @@ class _UserDataDeletionScreenState extends State<UserDataDeletionScreen> {
   Future<void> _confirmAndDelete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('정말 삭제할까요?'),
-        content: Text(
-          _UserDataDeletionCopy.forScope(widget.deletionScope).confirmText,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
+      builder: (context) {
+        final tokens = EasySubwayTokens.of(context);
+        return AlertDialog(
+          title: const Text('정말 삭제할까요?'),
+          content: Text(
+            _UserDataDeletionCopy.forScope(widget.deletionScope).confirmText,
           ),
-          FilledButton(
-            key: const Key('dataDeletionConfirmButton'),
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: EasySubwayAccessibleColors.red,
-              foregroundColor: EasySubwayAccessibleColors.surface,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('취소'),
             ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
+            FilledButton(
+              key: const Key('dataDeletionConfirmButton'),
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: tokens.danger,
+                foregroundColor: tokens.surface,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed == true) {
       await _deleteCurrentUserData();
@@ -4048,6 +4070,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('삭제 완료'),
@@ -4067,8 +4090,8 @@ class UserDataDeletionResultScreen extends StatelessWidget {
           padding: _mainPagePadding,
           children: [
             _AppCard(
-              backgroundColor: EasySubwayAccessibleColors.surface,
-              borderColor: EasySubwayAccessibleColors.line,
+              backgroundColor: tokens.surface,
+              borderColor: tokens.line,
               child: Column(
                 children: [
                   const Icon(
@@ -4080,7 +4103,7 @@ class UserDataDeletionResultScreen extends StatelessWidget {
                   Text(
                     '내 정보가 삭제됐어요',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: EasySubwayAccessibleColors.text,
+                      color: tokens.ink,
                       fontWeight: FontWeight.w700,
                     ),
                     textAlign: TextAlign.center,
@@ -4118,6 +4141,7 @@ class _SecurityContactNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Semantics(
       key: const Key('securityContactNotice'),
@@ -4125,9 +4149,9 @@ class _SecurityContactNotice extends StatelessWidget {
       label: '$_title, $_contactNotice $_scopeNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(
-              top: BorderSide(color: EasySubwayAccessibleColors.line),
+              top: BorderSide(color: tokens.line),
             ),
           ),
           child: Padding(
@@ -4148,7 +4172,7 @@ class _SecurityContactNotice extends StatelessWidget {
                       child: Text(
                         _title,
                         style: textTheme.titleMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.text,
+                          color: tokens.ink,
                           fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
@@ -4175,6 +4199,7 @@ class _SecurityContactNoticeLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -4193,7 +4218,7 @@ class _SecurityContactNoticeLine extends StatelessWidget {
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
+                color: tokens.ink,
                 height: 1.35,
               ),
             ),
@@ -4214,6 +4239,7 @@ class _SafetyDataNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
     return Semantics(
       key: const Key('safetyDataNotice'),
@@ -4221,9 +4247,9 @@ class _SafetyDataNotice extends StatelessWidget {
       label: '$_title, $_referenceNotice $_fieldNotice $_limitationNotice',
       child: ExcludeSemantics(
         child: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(
-              top: BorderSide(color: EasySubwayAccessibleColors.line),
+              top: BorderSide(color: tokens.line),
             ),
           ),
           child: Padding(
@@ -4234,9 +4260,9 @@ class _SafetyDataNotice extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.info_outline,
-                      color: EasySubwayAccessibleColors.amber,
+                      color: tokens.warn,
                       size: 24,
                     ),
                     const SizedBox(width: 10),
@@ -4244,7 +4270,7 @@ class _SafetyDataNotice extends StatelessWidget {
                       child: Text(
                         _title,
                         style: textTheme.titleMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.text,
+                          color: tokens.ink,
                           fontWeight: FontWeight.w700,
                           height: 1.25,
                         ),
@@ -4272,17 +4298,18 @@ class _SafetyDataNoticeLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 7),
+          Padding(
+            padding: const EdgeInsets.only(top: 7),
             child: Icon(
               Icons.circle,
               size: 7,
-              color: EasySubwayAccessibleColors.amber,
+              color: tokens.warn,
             ),
           ),
           const SizedBox(width: 10),
@@ -4290,7 +4317,7 @@ class _SafetyDataNoticeLine extends StatelessWidget {
             child: Text(
               text,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: EasySubwayAccessibleColors.text,
+                color: tokens.ink,
                 height: 1.35,
               ),
             ),
@@ -4499,6 +4526,7 @@ class _AttributionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final semanticLabel = [
       title,
       subtitle,
@@ -4515,7 +4543,7 @@ class _AttributionCard extends StatelessWidget {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
+                  color: tokens.ink,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
@@ -4524,7 +4552,7 @@ class _AttributionCard extends StatelessWidget {
               Text(
                 subtitle,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.mutedText,
+                  color: tokens.inkMuted,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -4580,6 +4608,7 @@ class _AttributionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 7),
       child: Column(
@@ -4588,7 +4617,7 @@ class _AttributionRow extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: EasySubwayAccessibleColors.secondaryText,
+              color: tokens.inkSecondary,
               fontWeight: FontWeight.w700,
               height: 1.25,
             ),
@@ -4597,7 +4626,7 @@ class _AttributionRow extends StatelessWidget {
           Text(
             value,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: EasySubwayAccessibleColors.text,
+              color: tokens.ink,
               fontWeight: FontWeight.w700,
               height: 1.3,
             ),
@@ -4628,6 +4657,7 @@ class _SupportAccessItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final targetUri = uri;
     final targetText = value.trim();
     final displayValue = this.displayValue ?? targetText;
@@ -4659,8 +4689,8 @@ class _SupportAccessItem extends StatelessWidget {
                     icon,
                     size: 24,
                     color: targetUri == null
-                        ? EasySubwayAccessibleColors.mutedText
-                        : EasySubwayAccessibleColors.primary,
+                        ? tokens.inkMuted
+                        : tokens.accent,
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -4671,8 +4701,8 @@ class _SupportAccessItem extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
-                          color: EasySubwayAccessibleColors.text,
+                        style: TextStyle(
+                          color: tokens.ink,
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           height: 1.25,
@@ -4682,7 +4712,7 @@ class _SupportAccessItem extends StatelessWidget {
                       Text(
                         displayValue,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: EasySubwayAccessibleColors.secondaryText,
+                          color: tokens.inkSecondary,
                           height: 1.3,
                         ),
                       ),
@@ -4691,9 +4721,9 @@ class _SupportAccessItem extends StatelessWidget {
                 ),
                 if (targetUri != null) ...[
                   const SizedBox(width: 8),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right,
-                    color: EasySubwayAccessibleColors.mutedText,
+                    color: tokens.inkMuted,
                     size: 22,
                   ),
                 ],
@@ -4765,6 +4795,7 @@ class FeatureTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return MergeSemantics(
@@ -4777,7 +4808,7 @@ class FeatureTile extends StatelessWidget {
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: _mainThemeControlRadius,
-              side: const BorderSide(color: EasySubwayAccessibleColors.line),
+              side: BorderSide(color: tokens.line),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -4790,7 +4821,7 @@ class FeatureTile extends StatelessWidget {
                     child: Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
+                        color: tokens.ink,
                         fontWeight: FontWeight.w700,
                         height: 1.35,
                       ),

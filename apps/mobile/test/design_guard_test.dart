@@ -330,6 +330,64 @@ void main() {
     }, rule: '블록(박스) Card');
   });
 
+  test('EasySubwayAccessibleColors 정적 팔레트 직접 참조 ratchet — 12개 대응 상수 (#1917)', () {
+    // #1917 다크 모드 1단계: 화면 코드는 정적 팔레트(EasySubwayAccessibleColors)를
+    // 직접 참조하지 않고 EasySubwayTokens.of(context)를 통해 참조해야 다크 테마
+    // 전환 시 값이 갈아끼워진다. 아래 12개 대응 상수는 원칙적으로 0건이 목표다.
+    // \b(단어 경계) 필수 — mintDark/amberSoft/redSoft/highContrastText/listRowText
+    // 등 치환 대상이 아닌 형제 상수가 오탐되지 않도록 한다.
+    // route_search.dart는 #1917 1단계 마이그레이션 대상 11개 파일에 포함되지
+    // 않아 이번 작업에서 손대지 않았다 — 후속 단계에서 별도로 마이그레이션한다.
+    // 상한은 내리기만 한다(기존 ratchet 관례).
+    final offenders = countPerFile(
+      RegExp(
+        r'EasySubwayAccessibleColors\.(?:text|secondaryText|mutedText|line|surface|scaffoldSurface|primary|mint|amber|red|mapSelectionAccent|mapRegionAccent)\b',
+      ),
+      exclude: {'accessible_design.dart', 'design_tokens.dart', 'route_search.dart'},
+    );
+    expectRatchet(offenders, {
+      // 의도 잔존(context 미가용 보류, #1917): _FacilitySeverityAccent(혼합 const
+      // 상수 객체, .red/.amber/.line)·_AppCard 기본 파라미터(.line)·_AppInfoRow
+      // const 트리(.mutedText/.primary) — 시그니처 전면 변경 없이는 안전하게
+      // 전환 불가.
+      'lib/main.dart': 10,
+      // 의도 잔존(context 미가용 보류, #1917): _facilityStatusNoticeIconColor —
+      // BuildContext를 받지 않는 top-level 함수(.red/.amber/.mint).
+      'lib/station_search.dart': 3,
+      // 의도 잔존(context 미가용 보류, #1917): _searchFieldTextStyle —
+      // top-level const(.mutedText), context 없음.
+      'lib/network_map.dart': 1,
+    }, rule: 'EasySubwayAccessibleColors 12개 대응 상수 직접 참조');
+  });
+
+  test('EasySubwayAccessibleColors 잔존 상수 ratchet — 나머지 정적 참조 축소 (#1917)', () {
+    // #1917 1단계에서 치환하지 않은 나머지 정적 팔레트 상수(highContrastText,
+    // brand, mintSoft, needsInfo, iconMuted, switchInactiveTrack/ActiveTrack,
+    // redSoft, listRowText, caption, amberSoft/Border, disclosure, cardShadow,
+    // skySoft 등)와, context 미가용으로 보류한 12개 대응 상수 사이트의 파일별
+    // 총량을 현재값으로 상한 고정한다. 상한은 내리기만 한다(기존 ratchet 관례).
+    // route_search.dart는 #1917 1단계 대상 파일이 아니라 이번 ratchet 범위에서
+    // 제외한다(위 하드밴 테스트와 동일 사유).
+    final actual = countPerFile(
+      RegExp(r'EasySubwayAccessibleColors\.'),
+      exclude: {'accessible_design.dart', 'design_tokens.dart', 'route_search.dart'},
+    );
+    expectRatchet(actual, {
+      // 의도 잔존: _FacilitySeverityAccent(혼합 const 상수 객체)·_AppCard 기본
+      // 파라미터·_AppInfoRow const 트리 — context 미가용 보류 10건 포함 (#1917)
+      'lib/main.dart': 33,
+      // 의도 잔존: _facilityStatusNoticeIconColor(context 없는 top-level 함수) —
+      // context 미가용 보류 3건 포함 (#1917)
+      'lib/station_search.dart': 8,
+      // 의도 잔존: _searchFieldTextStyle(top-level const) — context 미가용
+      // 보류 1건 포함 (#1917)
+      'lib/network_map.dart': 11,
+      'lib/facility_report.dart': 1,
+      'lib/onboarding.dart': 2,
+      'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
+    }, rule: 'EasySubwayAccessibleColors 잔존 참조');
+  });
+
   test('탭 splash/highlight 하드 밴 — 리플 재유입 금지 (0건 유지)', () {
     // splashColor/highlightColor 가 Colors.transparent 가 아니거나,
     // InkSplash/InkRipple 팩토리를 명시하면 위반.

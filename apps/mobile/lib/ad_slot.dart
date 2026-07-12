@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'accessible_design.dart';
 import 'design_tokens.dart';
 
 /// 표준 배너 규격(아이콘 + 제목/부제 + CTA) 기준 슬롯 높이 (#1931).
@@ -34,6 +33,7 @@ class AdBannerSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final ad = child;
     // 실광고가 없는 상태에서 release면 슬롯 자체를 숨긴다(collapse).
     if (ad == null && kReleaseMode) {
@@ -45,10 +45,10 @@ class AdBannerSlot extends StatelessWidget {
         key: slotKey,
         height: height,
         decoration: BoxDecoration(
-          color: EasySubwayAccessibleColors.surface,
+          color: tokens.surface,
           border: showTopDivider
-              ? const Border(
-                  top: BorderSide(color: EasySubwayAccessibleColors.line),
+              ? Border(
+                  top: BorderSide(color: tokens.line),
                 )
               : null,
         ),
@@ -65,6 +65,7 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: EasySubwaySpacing.lg,
@@ -77,19 +78,19 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.line,
+              color: tokens.line,
               borderRadius: BorderRadius.circular(EasySubwayRadius.control),
             ),
             alignment: Alignment.center,
-            child: const Icon(
+            child: Icon(
               Icons.image_outlined,
-              color: EasySubwayAccessibleColors.mutedText,
+              color: tokens.inkMuted,
             ),
           ),
           const SizedBox(width: EasySubwaySpacing.md),
           // 제목/부제 플레이스홀더. 시스템 글자 크기가 커도 슬롯 높이를 넘지 않도록
           // 각 줄을 FittedBox로 축소한다(장식용 자리표시 텍스트, 실제 정보 없음).
-          const Expanded(
+          Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,21 +101,21 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
                   child: Text(
                     '광고 미리보기 (개발용)',
                     style: TextStyle(
-                      color: EasySubwayAccessibleColors.mutedText,
+                      color: tokens.inkMuted,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
                   ),
                 ),
-                SizedBox(height: EasySubwaySpacing.xs),
+                const SizedBox(height: EasySubwaySpacing.xs),
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
                     '표준 배너 규격 자리표시 텍스트',
                     style: TextStyle(
-                      color: EasySubwayAccessibleColors.mutedText,
+                      color: tokens.inkMuted,
                       fontSize: 12,
                     ),
                     maxLines: 1,
@@ -129,7 +130,7 @@ class _AdBannerSlotDevPlaceholder extends StatelessWidget {
             width: 64,
             height: 32,
             decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.line,
+              color: tokens.line,
               borderRadius: BorderRadius.circular(EasySubwayRadius.control),
             ),
           ),
