@@ -17514,6 +17514,840 @@ class DataQualityRecordsCompanion extends UpdateCompanion<DataQualityRecord> {
   }
 }
 
+class $StationCarDoorHintsTable extends StationCarDoorHints
+    with TableInfo<$StationCarDoorHintsTable, StationCarDoorHint> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StationCarDoorHintsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stationIdMeta = const VerificationMeta(
+    'stationId',
+  );
+  @override
+  late final GeneratedColumn<String> stationId = GeneratedColumn<String>(
+    'station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _lineIdMeta = const VerificationMeta('lineId');
+  @override
+  late final GeneratedColumn<String> lineId = GeneratedColumn<String>(
+    'line_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _directionMeta = const VerificationMeta(
+    'direction',
+  );
+  @override
+  late final GeneratedColumn<String> direction = GeneratedColumn<String>(
+    'direction',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _targetFacilityTypeMeta =
+      const VerificationMeta('targetFacilityType');
+  @override
+  late final GeneratedColumn<String> targetFacilityType =
+      GeneratedColumn<String>(
+        'target_facility_type',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _carNumberMeta = const VerificationMeta(
+    'carNumber',
+  );
+  @override
+  late final GeneratedColumn<int> carNumber = GeneratedColumn<int>(
+    'car_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _doorNumberMeta = const VerificationMeta(
+    'doorNumber',
+  );
+  @override
+  late final GeneratedColumn<int> doorNumber = GeneratedColumn<int>(
+    'door_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _sourceSnapshotIdMeta = const VerificationMeta(
+    'sourceSnapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceSnapshotId = GeneratedColumn<String>(
+    'source_snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _providerRecordHashMeta =
+      const VerificationMeta('providerRecordHash');
+  @override
+  late final GeneratedColumn<String> providerRecordHash =
+      GeneratedColumn<String>(
+        'provider_record_hash',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _provenanceKindMeta = const VerificationMeta(
+    'provenanceKind',
+  );
+  @override
+  late final GeneratedColumn<String> provenanceKind = GeneratedColumn<String>(
+    'provenance_kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('UNKNOWN'),
+  );
+  static const VerificationMeta _verificationStatusMeta =
+      const VerificationMeta('verificationStatus');
+  @override
+  late final GeneratedColumn<String> verificationStatus =
+      GeneratedColumn<String>(
+        'verification_status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('UNKNOWN'),
+      );
+  static const VerificationMeta _lastVerifiedAtMeta = const VerificationMeta(
+    'lastVerifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastVerifiedAt =
+      GeneratedColumn<DateTime>(
+        'last_verified_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _evidenceHashMeta = const VerificationMeta(
+    'evidenceHash',
+  );
+  @override
+  late final GeneratedColumn<String> evidenceHash = GeneratedColumn<String>(
+    'evidence_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    stationId,
+    lineId,
+    direction,
+    targetFacilityType,
+    carNumber,
+    doorNumber,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    provenanceKind,
+    verificationStatus,
+    lastVerifiedAt,
+    evidenceHash,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'station_car_door_hints';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StationCarDoorHint> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('station_id')) {
+      context.handle(
+        _stationIdMeta,
+        stationId.isAcceptableOrUnknown(data['station_id']!, _stationIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stationIdMeta);
+    }
+    if (data.containsKey('line_id')) {
+      context.handle(
+        _lineIdMeta,
+        lineId.isAcceptableOrUnknown(data['line_id']!, _lineIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_lineIdMeta);
+    }
+    if (data.containsKey('direction')) {
+      context.handle(
+        _directionMeta,
+        direction.isAcceptableOrUnknown(data['direction']!, _directionMeta),
+      );
+    }
+    if (data.containsKey('target_facility_type')) {
+      context.handle(
+        _targetFacilityTypeMeta,
+        targetFacilityType.isAcceptableOrUnknown(
+          data['target_facility_type']!,
+          _targetFacilityTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetFacilityTypeMeta);
+    }
+    if (data.containsKey('car_number')) {
+      context.handle(
+        _carNumberMeta,
+        carNumber.isAcceptableOrUnknown(data['car_number']!, _carNumberMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_carNumberMeta);
+    }
+    if (data.containsKey('door_number')) {
+      context.handle(
+        _doorNumberMeta,
+        doorNumber.isAcceptableOrUnknown(data['door_number']!, _doorNumberMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_doorNumberMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    }
+    if (data.containsKey('source_snapshot_id')) {
+      context.handle(
+        _sourceSnapshotIdMeta,
+        sourceSnapshotId.isAcceptableOrUnknown(
+          data['source_snapshot_id']!,
+          _sourceSnapshotIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provider_record_hash')) {
+      context.handle(
+        _providerRecordHashMeta,
+        providerRecordHash.isAcceptableOrUnknown(
+          data['provider_record_hash']!,
+          _providerRecordHashMeta,
+        ),
+      );
+    }
+    if (data.containsKey('provenance_kind')) {
+      context.handle(
+        _provenanceKindMeta,
+        provenanceKind.isAcceptableOrUnknown(
+          data['provenance_kind']!,
+          _provenanceKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('verification_status')) {
+      context.handle(
+        _verificationStatusMeta,
+        verificationStatus.isAcceptableOrUnknown(
+          data['verification_status']!,
+          _verificationStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_verified_at')) {
+      context.handle(
+        _lastVerifiedAtMeta,
+        lastVerifiedAt.isAcceptableOrUnknown(
+          data['last_verified_at']!,
+          _lastVerifiedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('evidence_hash')) {
+      context.handle(
+        _evidenceHashMeta,
+        evidenceHash.isAcceptableOrUnknown(
+          data['evidence_hash']!,
+          _evidenceHashMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StationCarDoorHint map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StationCarDoorHint(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      stationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}station_id'],
+      )!,
+      lineId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}line_id'],
+      )!,
+      direction: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}direction'],
+      )!,
+      targetFacilityType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_facility_type'],
+      )!,
+      carNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}car_number'],
+      )!,
+      doorNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}door_number'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      sourceSnapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_snapshot_id'],
+      )!,
+      providerRecordHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_record_hash'],
+      )!,
+      provenanceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provenance_kind'],
+      )!,
+      verificationStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}verification_status'],
+      )!,
+      lastVerifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_verified_at'],
+      ),
+      evidenceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}evidence_hash'],
+      )!,
+    );
+  }
+
+  @override
+  $StationCarDoorHintsTable createAlias(String alias) {
+    return $StationCarDoorHintsTable(attachedDatabase, alias);
+  }
+}
+
+class StationCarDoorHint extends DataClass
+    implements Insertable<StationCarDoorHint> {
+  final String id;
+  final String stationId;
+  final String lineId;
+  final String direction;
+  final String targetFacilityType;
+  final int carNumber;
+  final int doorNumber;
+  final String sourceId;
+  final String sourceSnapshotId;
+  final String providerRecordHash;
+  final String provenanceKind;
+  final String verificationStatus;
+  final DateTime? lastVerifiedAt;
+  final String evidenceHash;
+  const StationCarDoorHint({
+    required this.id,
+    required this.stationId,
+    required this.lineId,
+    required this.direction,
+    required this.targetFacilityType,
+    required this.carNumber,
+    required this.doorNumber,
+    required this.sourceId,
+    required this.sourceSnapshotId,
+    required this.providerRecordHash,
+    required this.provenanceKind,
+    required this.verificationStatus,
+    this.lastVerifiedAt,
+    required this.evidenceHash,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['station_id'] = Variable<String>(stationId);
+    map['line_id'] = Variable<String>(lineId);
+    map['direction'] = Variable<String>(direction);
+    map['target_facility_type'] = Variable<String>(targetFacilityType);
+    map['car_number'] = Variable<int>(carNumber);
+    map['door_number'] = Variable<int>(doorNumber);
+    map['source_id'] = Variable<String>(sourceId);
+    map['source_snapshot_id'] = Variable<String>(sourceSnapshotId);
+    map['provider_record_hash'] = Variable<String>(providerRecordHash);
+    map['provenance_kind'] = Variable<String>(provenanceKind);
+    map['verification_status'] = Variable<String>(verificationStatus);
+    if (!nullToAbsent || lastVerifiedAt != null) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt);
+    }
+    map['evidence_hash'] = Variable<String>(evidenceHash);
+    return map;
+  }
+
+  StationCarDoorHintsCompanion toCompanion(bool nullToAbsent) {
+    return StationCarDoorHintsCompanion(
+      id: Value(id),
+      stationId: Value(stationId),
+      lineId: Value(lineId),
+      direction: Value(direction),
+      targetFacilityType: Value(targetFacilityType),
+      carNumber: Value(carNumber),
+      doorNumber: Value(doorNumber),
+      sourceId: Value(sourceId),
+      sourceSnapshotId: Value(sourceSnapshotId),
+      providerRecordHash: Value(providerRecordHash),
+      provenanceKind: Value(provenanceKind),
+      verificationStatus: Value(verificationStatus),
+      lastVerifiedAt: lastVerifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastVerifiedAt),
+      evidenceHash: Value(evidenceHash),
+    );
+  }
+
+  factory StationCarDoorHint.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StationCarDoorHint(
+      id: serializer.fromJson<String>(json['id']),
+      stationId: serializer.fromJson<String>(json['stationId']),
+      lineId: serializer.fromJson<String>(json['lineId']),
+      direction: serializer.fromJson<String>(json['direction']),
+      targetFacilityType: serializer.fromJson<String>(
+        json['targetFacilityType'],
+      ),
+      carNumber: serializer.fromJson<int>(json['carNumber']),
+      doorNumber: serializer.fromJson<int>(json['doorNumber']),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      sourceSnapshotId: serializer.fromJson<String>(json['sourceSnapshotId']),
+      providerRecordHash: serializer.fromJson<String>(
+        json['providerRecordHash'],
+      ),
+      provenanceKind: serializer.fromJson<String>(json['provenanceKind']),
+      verificationStatus: serializer.fromJson<String>(
+        json['verificationStatus'],
+      ),
+      lastVerifiedAt: serializer.fromJson<DateTime?>(json['lastVerifiedAt']),
+      evidenceHash: serializer.fromJson<String>(json['evidenceHash']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'stationId': serializer.toJson<String>(stationId),
+      'lineId': serializer.toJson<String>(lineId),
+      'direction': serializer.toJson<String>(direction),
+      'targetFacilityType': serializer.toJson<String>(targetFacilityType),
+      'carNumber': serializer.toJson<int>(carNumber),
+      'doorNumber': serializer.toJson<int>(doorNumber),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'sourceSnapshotId': serializer.toJson<String>(sourceSnapshotId),
+      'providerRecordHash': serializer.toJson<String>(providerRecordHash),
+      'provenanceKind': serializer.toJson<String>(provenanceKind),
+      'verificationStatus': serializer.toJson<String>(verificationStatus),
+      'lastVerifiedAt': serializer.toJson<DateTime?>(lastVerifiedAt),
+      'evidenceHash': serializer.toJson<String>(evidenceHash),
+    };
+  }
+
+  StationCarDoorHint copyWith({
+    String? id,
+    String? stationId,
+    String? lineId,
+    String? direction,
+    String? targetFacilityType,
+    int? carNumber,
+    int? doorNumber,
+    String? sourceId,
+    String? sourceSnapshotId,
+    String? providerRecordHash,
+    String? provenanceKind,
+    String? verificationStatus,
+    Value<DateTime?> lastVerifiedAt = const Value.absent(),
+    String? evidenceHash,
+  }) => StationCarDoorHint(
+    id: id ?? this.id,
+    stationId: stationId ?? this.stationId,
+    lineId: lineId ?? this.lineId,
+    direction: direction ?? this.direction,
+    targetFacilityType: targetFacilityType ?? this.targetFacilityType,
+    carNumber: carNumber ?? this.carNumber,
+    doorNumber: doorNumber ?? this.doorNumber,
+    sourceId: sourceId ?? this.sourceId,
+    sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+    providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+    provenanceKind: provenanceKind ?? this.provenanceKind,
+    verificationStatus: verificationStatus ?? this.verificationStatus,
+    lastVerifiedAt: lastVerifiedAt.present
+        ? lastVerifiedAt.value
+        : this.lastVerifiedAt,
+    evidenceHash: evidenceHash ?? this.evidenceHash,
+  );
+  StationCarDoorHint copyWithCompanion(StationCarDoorHintsCompanion data) {
+    return StationCarDoorHint(
+      id: data.id.present ? data.id.value : this.id,
+      stationId: data.stationId.present ? data.stationId.value : this.stationId,
+      lineId: data.lineId.present ? data.lineId.value : this.lineId,
+      direction: data.direction.present ? data.direction.value : this.direction,
+      targetFacilityType: data.targetFacilityType.present
+          ? data.targetFacilityType.value
+          : this.targetFacilityType,
+      carNumber: data.carNumber.present ? data.carNumber.value : this.carNumber,
+      doorNumber: data.doorNumber.present
+          ? data.doorNumber.value
+          : this.doorNumber,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      sourceSnapshotId: data.sourceSnapshotId.present
+          ? data.sourceSnapshotId.value
+          : this.sourceSnapshotId,
+      providerRecordHash: data.providerRecordHash.present
+          ? data.providerRecordHash.value
+          : this.providerRecordHash,
+      provenanceKind: data.provenanceKind.present
+          ? data.provenanceKind.value
+          : this.provenanceKind,
+      verificationStatus: data.verificationStatus.present
+          ? data.verificationStatus.value
+          : this.verificationStatus,
+      lastVerifiedAt: data.lastVerifiedAt.present
+          ? data.lastVerifiedAt.value
+          : this.lastVerifiedAt,
+      evidenceHash: data.evidenceHash.present
+          ? data.evidenceHash.value
+          : this.evidenceHash,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationCarDoorHint(')
+          ..write('id: $id, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('direction: $direction, ')
+          ..write('targetFacilityType: $targetFacilityType, ')
+          ..write('carNumber: $carNumber, ')
+          ..write('doorNumber: $doorNumber, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    stationId,
+    lineId,
+    direction,
+    targetFacilityType,
+    carNumber,
+    doorNumber,
+    sourceId,
+    sourceSnapshotId,
+    providerRecordHash,
+    provenanceKind,
+    verificationStatus,
+    lastVerifiedAt,
+    evidenceHash,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StationCarDoorHint &&
+          other.id == this.id &&
+          other.stationId == this.stationId &&
+          other.lineId == this.lineId &&
+          other.direction == this.direction &&
+          other.targetFacilityType == this.targetFacilityType &&
+          other.carNumber == this.carNumber &&
+          other.doorNumber == this.doorNumber &&
+          other.sourceId == this.sourceId &&
+          other.sourceSnapshotId == this.sourceSnapshotId &&
+          other.providerRecordHash == this.providerRecordHash &&
+          other.provenanceKind == this.provenanceKind &&
+          other.verificationStatus == this.verificationStatus &&
+          other.lastVerifiedAt == this.lastVerifiedAt &&
+          other.evidenceHash == this.evidenceHash);
+}
+
+class StationCarDoorHintsCompanion extends UpdateCompanion<StationCarDoorHint> {
+  final Value<String> id;
+  final Value<String> stationId;
+  final Value<String> lineId;
+  final Value<String> direction;
+  final Value<String> targetFacilityType;
+  final Value<int> carNumber;
+  final Value<int> doorNumber;
+  final Value<String> sourceId;
+  final Value<String> sourceSnapshotId;
+  final Value<String> providerRecordHash;
+  final Value<String> provenanceKind;
+  final Value<String> verificationStatus;
+  final Value<DateTime?> lastVerifiedAt;
+  final Value<String> evidenceHash;
+  final Value<int> rowid;
+  const StationCarDoorHintsCompanion({
+    this.id = const Value.absent(),
+    this.stationId = const Value.absent(),
+    this.lineId = const Value.absent(),
+    this.direction = const Value.absent(),
+    this.targetFacilityType = const Value.absent(),
+    this.carNumber = const Value.absent(),
+    this.doorNumber = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StationCarDoorHintsCompanion.insert({
+    required String id,
+    required String stationId,
+    required String lineId,
+    this.direction = const Value.absent(),
+    required String targetFacilityType,
+    required int carNumber,
+    required int doorNumber,
+    this.sourceId = const Value.absent(),
+    this.sourceSnapshotId = const Value.absent(),
+    this.providerRecordHash = const Value.absent(),
+    this.provenanceKind = const Value.absent(),
+    this.verificationStatus = const Value.absent(),
+    this.lastVerifiedAt = const Value.absent(),
+    this.evidenceHash = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       stationId = Value(stationId),
+       lineId = Value(lineId),
+       targetFacilityType = Value(targetFacilityType),
+       carNumber = Value(carNumber),
+       doorNumber = Value(doorNumber);
+  static Insertable<StationCarDoorHint> custom({
+    Expression<String>? id,
+    Expression<String>? stationId,
+    Expression<String>? lineId,
+    Expression<String>? direction,
+    Expression<String>? targetFacilityType,
+    Expression<int>? carNumber,
+    Expression<int>? doorNumber,
+    Expression<String>? sourceId,
+    Expression<String>? sourceSnapshotId,
+    Expression<String>? providerRecordHash,
+    Expression<String>? provenanceKind,
+    Expression<String>? verificationStatus,
+    Expression<DateTime>? lastVerifiedAt,
+    Expression<String>? evidenceHash,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (stationId != null) 'station_id': stationId,
+      if (lineId != null) 'line_id': lineId,
+      if (direction != null) 'direction': direction,
+      if (targetFacilityType != null)
+        'target_facility_type': targetFacilityType,
+      if (carNumber != null) 'car_number': carNumber,
+      if (doorNumber != null) 'door_number': doorNumber,
+      if (sourceId != null) 'source_id': sourceId,
+      if (sourceSnapshotId != null) 'source_snapshot_id': sourceSnapshotId,
+      if (providerRecordHash != null)
+        'provider_record_hash': providerRecordHash,
+      if (provenanceKind != null) 'provenance_kind': provenanceKind,
+      if (verificationStatus != null) 'verification_status': verificationStatus,
+      if (lastVerifiedAt != null) 'last_verified_at': lastVerifiedAt,
+      if (evidenceHash != null) 'evidence_hash': evidenceHash,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StationCarDoorHintsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? stationId,
+    Value<String>? lineId,
+    Value<String>? direction,
+    Value<String>? targetFacilityType,
+    Value<int>? carNumber,
+    Value<int>? doorNumber,
+    Value<String>? sourceId,
+    Value<String>? sourceSnapshotId,
+    Value<String>? providerRecordHash,
+    Value<String>? provenanceKind,
+    Value<String>? verificationStatus,
+    Value<DateTime?>? lastVerifiedAt,
+    Value<String>? evidenceHash,
+    Value<int>? rowid,
+  }) {
+    return StationCarDoorHintsCompanion(
+      id: id ?? this.id,
+      stationId: stationId ?? this.stationId,
+      lineId: lineId ?? this.lineId,
+      direction: direction ?? this.direction,
+      targetFacilityType: targetFacilityType ?? this.targetFacilityType,
+      carNumber: carNumber ?? this.carNumber,
+      doorNumber: doorNumber ?? this.doorNumber,
+      sourceId: sourceId ?? this.sourceId,
+      sourceSnapshotId: sourceSnapshotId ?? this.sourceSnapshotId,
+      providerRecordHash: providerRecordHash ?? this.providerRecordHash,
+      provenanceKind: provenanceKind ?? this.provenanceKind,
+      verificationStatus: verificationStatus ?? this.verificationStatus,
+      lastVerifiedAt: lastVerifiedAt ?? this.lastVerifiedAt,
+      evidenceHash: evidenceHash ?? this.evidenceHash,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (stationId.present) {
+      map['station_id'] = Variable<String>(stationId.value);
+    }
+    if (lineId.present) {
+      map['line_id'] = Variable<String>(lineId.value);
+    }
+    if (direction.present) {
+      map['direction'] = Variable<String>(direction.value);
+    }
+    if (targetFacilityType.present) {
+      map['target_facility_type'] = Variable<String>(targetFacilityType.value);
+    }
+    if (carNumber.present) {
+      map['car_number'] = Variable<int>(carNumber.value);
+    }
+    if (doorNumber.present) {
+      map['door_number'] = Variable<int>(doorNumber.value);
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (sourceSnapshotId.present) {
+      map['source_snapshot_id'] = Variable<String>(sourceSnapshotId.value);
+    }
+    if (providerRecordHash.present) {
+      map['provider_record_hash'] = Variable<String>(providerRecordHash.value);
+    }
+    if (provenanceKind.present) {
+      map['provenance_kind'] = Variable<String>(provenanceKind.value);
+    }
+    if (verificationStatus.present) {
+      map['verification_status'] = Variable<String>(verificationStatus.value);
+    }
+    if (lastVerifiedAt.present) {
+      map['last_verified_at'] = Variable<DateTime>(lastVerifiedAt.value);
+    }
+    if (evidenceHash.present) {
+      map['evidence_hash'] = Variable<String>(evidenceHash.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StationCarDoorHintsCompanion(')
+          ..write('id: $id, ')
+          ..write('stationId: $stationId, ')
+          ..write('lineId: $lineId, ')
+          ..write('direction: $direction, ')
+          ..write('targetFacilityType: $targetFacilityType, ')
+          ..write('carNumber: $carNumber, ')
+          ..write('doorNumber: $doorNumber, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('sourceSnapshotId: $sourceSnapshotId, ')
+          ..write('providerRecordHash: $providerRecordHash, ')
+          ..write('provenanceKind: $provenanceKind, ')
+          ..write('verificationStatus: $verificationStatus, ')
+          ..write('lastVerifiedAt: $lastVerifiedAt, ')
+          ..write('evidenceHash: $evidenceHash, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$CatalogDatabase extends GeneratedDatabase {
   _$CatalogDatabase(QueryExecutor e) : super(e);
   $CatalogDatabaseManager get managers => $CatalogDatabaseManager(this);
@@ -17567,6 +18401,8 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   late final $TransferRulesTable transferRules = $TransferRulesTable(this);
   late final $DataQualityRecordsTable dataQualityRecords =
       $DataQualityRecordsTable(this);
+  late final $StationCarDoorHintsTable stationCarDoorHints =
+      $StationCarDoorHintsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -17602,6 +18438,7 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     stationPathwayEdges,
     transferRules,
     dataQualityRecords,
+    stationCarDoorHints,
   ];
 }
 
@@ -26449,6 +27286,409 @@ typedef $$DataQualityRecordsTableProcessedTableManager =
       DataQualityRecord,
       PrefetchHooks Function()
     >;
+typedef $$StationCarDoorHintsTableCreateCompanionBuilder =
+    StationCarDoorHintsCompanion Function({
+      required String id,
+      required String stationId,
+      required String lineId,
+      Value<String> direction,
+      required String targetFacilityType,
+      required int carNumber,
+      required int doorNumber,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
+      Value<int> rowid,
+    });
+typedef $$StationCarDoorHintsTableUpdateCompanionBuilder =
+    StationCarDoorHintsCompanion Function({
+      Value<String> id,
+      Value<String> stationId,
+      Value<String> lineId,
+      Value<String> direction,
+      Value<String> targetFacilityType,
+      Value<int> carNumber,
+      Value<int> doorNumber,
+      Value<String> sourceId,
+      Value<String> sourceSnapshotId,
+      Value<String> providerRecordHash,
+      Value<String> provenanceKind,
+      Value<String> verificationStatus,
+      Value<DateTime?> lastVerifiedAt,
+      Value<String> evidenceHash,
+      Value<int> rowid,
+    });
+
+class $$StationCarDoorHintsTableFilterComposer
+    extends Composer<_$CatalogDatabase, $StationCarDoorHintsTable> {
+  $$StationCarDoorHintsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetFacilityType => $composableBuilder(
+    column: $table.targetFacilityType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get carNumber => $composableBuilder(
+    column: $table.carNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get doorNumber => $composableBuilder(
+    column: $table.doorNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StationCarDoorHintsTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $StationCarDoorHintsTable> {
+  $$StationCarDoorHintsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get stationId => $composableBuilder(
+    column: $table.stationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lineId => $composableBuilder(
+    column: $table.lineId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get direction => $composableBuilder(
+    column: $table.direction,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetFacilityType => $composableBuilder(
+    column: $table.targetFacilityType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get carNumber => $composableBuilder(
+    column: $table.carNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get doorNumber => $composableBuilder(
+    column: $table.doorNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StationCarDoorHintsTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $StationCarDoorHintsTable> {
+  $$StationCarDoorHintsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get stationId =>
+      $composableBuilder(column: $table.stationId, builder: (column) => column);
+
+  GeneratedColumn<String> get lineId =>
+      $composableBuilder(column: $table.lineId, builder: (column) => column);
+
+  GeneratedColumn<String> get direction =>
+      $composableBuilder(column: $table.direction, builder: (column) => column);
+
+  GeneratedColumn<String> get targetFacilityType => $composableBuilder(
+    column: $table.targetFacilityType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get carNumber =>
+      $composableBuilder(column: $table.carNumber, builder: (column) => column);
+
+  GeneratedColumn<int> get doorNumber => $composableBuilder(
+    column: $table.doorNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceSnapshotId => $composableBuilder(
+    column: $table.sourceSnapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get providerRecordHash => $composableBuilder(
+    column: $table.providerRecordHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get provenanceKind => $composableBuilder(
+    column: $table.provenanceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get verificationStatus => $composableBuilder(
+    column: $table.verificationStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastVerifiedAt => $composableBuilder(
+    column: $table.lastVerifiedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get evidenceHash => $composableBuilder(
+    column: $table.evidenceHash,
+    builder: (column) => column,
+  );
+}
+
+class $$StationCarDoorHintsTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $StationCarDoorHintsTable,
+          StationCarDoorHint,
+          $$StationCarDoorHintsTableFilterComposer,
+          $$StationCarDoorHintsTableOrderingComposer,
+          $$StationCarDoorHintsTableAnnotationComposer,
+          $$StationCarDoorHintsTableCreateCompanionBuilder,
+          $$StationCarDoorHintsTableUpdateCompanionBuilder,
+          (
+            StationCarDoorHint,
+            BaseReferences<
+              _$CatalogDatabase,
+              $StationCarDoorHintsTable,
+              StationCarDoorHint
+            >,
+          ),
+          StationCarDoorHint,
+          PrefetchHooks Function()
+        > {
+  $$StationCarDoorHintsTableTableManager(
+    _$CatalogDatabase db,
+    $StationCarDoorHintsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StationCarDoorHintsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StationCarDoorHintsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$StationCarDoorHintsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> stationId = const Value.absent(),
+                Value<String> lineId = const Value.absent(),
+                Value<String> direction = const Value.absent(),
+                Value<String> targetFacilityType = const Value.absent(),
+                Value<int> carNumber = const Value.absent(),
+                Value<int> doorNumber = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationCarDoorHintsCompanion(
+                id: id,
+                stationId: stationId,
+                lineId: lineId,
+                direction: direction,
+                targetFacilityType: targetFacilityType,
+                carNumber: carNumber,
+                doorNumber: doorNumber,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String stationId,
+                required String lineId,
+                Value<String> direction = const Value.absent(),
+                required String targetFacilityType,
+                required int carNumber,
+                required int doorNumber,
+                Value<String> sourceId = const Value.absent(),
+                Value<String> sourceSnapshotId = const Value.absent(),
+                Value<String> providerRecordHash = const Value.absent(),
+                Value<String> provenanceKind = const Value.absent(),
+                Value<String> verificationStatus = const Value.absent(),
+                Value<DateTime?> lastVerifiedAt = const Value.absent(),
+                Value<String> evidenceHash = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StationCarDoorHintsCompanion.insert(
+                id: id,
+                stationId: stationId,
+                lineId: lineId,
+                direction: direction,
+                targetFacilityType: targetFacilityType,
+                carNumber: carNumber,
+                doorNumber: doorNumber,
+                sourceId: sourceId,
+                sourceSnapshotId: sourceSnapshotId,
+                providerRecordHash: providerRecordHash,
+                provenanceKind: provenanceKind,
+                verificationStatus: verificationStatus,
+                lastVerifiedAt: lastVerifiedAt,
+                evidenceHash: evidenceHash,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StationCarDoorHintsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $StationCarDoorHintsTable,
+      StationCarDoorHint,
+      $$StationCarDoorHintsTableFilterComposer,
+      $$StationCarDoorHintsTableOrderingComposer,
+      $$StationCarDoorHintsTableAnnotationComposer,
+      $$StationCarDoorHintsTableCreateCompanionBuilder,
+      $$StationCarDoorHintsTableUpdateCompanionBuilder,
+      (
+        StationCarDoorHint,
+        BaseReferences<
+          _$CatalogDatabase,
+          $StationCarDoorHintsTable,
+          StationCarDoorHint
+        >,
+      ),
+      StationCarDoorHint,
+      PrefetchHooks Function()
+    >;
 
 class $CatalogDatabaseManager {
   final _$CatalogDatabase _db;
@@ -26531,4 +27771,6 @@ class $CatalogDatabaseManager {
       $$TransferRulesTableTableManager(_db, _db.transferRules);
   $$DataQualityRecordsTableTableManager get dataQualityRecords =>
       $$DataQualityRecordsTableTableManager(_db, _db.dataQualityRecords);
+  $$StationCarDoorHintsTableTableManager get stationCarDoorHints =>
+      $$StationCarDoorHintsTableTableManager(_db, _db.stationCarDoorHints);
 }
