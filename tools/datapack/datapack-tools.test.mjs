@@ -14507,29 +14507,64 @@ test("official OD fare validator는 signed pack 내부의 승인 요금 변조�
   }
 });
 
-test("official OD fare release evidence는 승인된 두 방향 quote를 순서대로 고정한다", async () => {
-  const fixture = JSON.parse(await readFile(path.join(root, "tools/datapack/fixtures/catalog-fixture.json"), "utf8"));
-  const admission = JSON.parse(await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"));
-  const approvedMappingHash = admission.fareStationLineMappingLedgerHash;
-  const officialOdFareQuotes = fixture.packs[0].officialOdFareQuotes;
-  const releaseEvidencePaths = [
-    "tools/datapack/release/candidate-build-spec.json",
-    "tools/datapack/release/hash-evidence.json",
-  ];
+test("official OD fare release candidate는 승인된 두 방향 quote와 provenance를 SQLite에 남긴다", async () => {
+  const approvedEvidence = JSON.parse(await readFile(path.join(root, "tools/datapack/release/hash-evidence.json"), "utf8")).officialOdFareEvidence;
+  const candidateFixture = JSON.parse(await readFile(path.join(root, "tools/datapack/release/capital-production-reviewed-pack.json"), "utf8"));
+  assert.deepEqual(candidateFixture.packs[0].officialOdFareQuotes, approvedEvidence.quotes);
+  assert.equal(candidateFixture.packs[0].officialOdFareQuotes.length, 2);
 
-  for (const releaseEvidencePath of releaseEvidencePaths) {
-    const approvedEvidence = JSON.parse(await readFile(path.join(root, releaseEvidencePath), "utf8")).officialOdFareEvidence;
-    assert.deepEqual(officialOdFareQuotes, approvedEvidence.quotes);
-    assert.equal(officialOdFareQuotes.length, 2);
-    assert.ok(officialOdFareQuotes.every((quote) => quote.mappingLedgerHash === approvedMappingHash));
-    assert.equal(approvedEvidence.sourceId, admission.sourceId);
-    assert.equal(approvedEvidence.snapshotId, admission.snapshotId);
-    assert.equal(approvedEvidence.evidenceHash, admission.evidenceHash);
-    assert.equal(approvedEvidence.admissionHash, sha256(await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"))));
-    assert.equal(approvedEvidence.quoteSetHash, admission.quoteSetHash);
+  const outputDir = await mkdtemp(path.join(tmpdir(), "official-od-fare-release-candidate-"));
+  try {
+    await execFileAsync(
+      process.execPath,
+      ["tools/datapack/build-datapack.mjs", "--build-spec", "tools/datapack/release/candidate-build-spec.json", "--output", outputDir],
+      { cwd: root, env: productionEnv },
+    );
+    const database = new DatabaseSync(path.join(outputDir, "catalog/capital-v1.sqlite"));
+    let rows;
+    try {
+      rows = database.prepare(`SELECT origin_station_id AS originStationId,
+                                      destination_station_id AS destinationStationId,
+                                      source_id AS sourceId,
+                                      snapshot_id AS snapshotId,
+                                      mapping_ledger_hash AS mappingLedgerHash,
+                                      gnrl_card_fare AS gnrlCardFare,
+                                      gnrl_cash_fare AS gnrlCashFare,
+                                      yung_card_fare AS yungCardFare,
+                                      yung_cash_fare AS yungCashFare,
+                                      child_card_fare AS childCardFare,
+                                      child_cash_fare AS childCashFare
+                               FROM official_od_fare_quotes
+                               ORDER BY rowid`).all();
+    } finally {
+      database.close();
+    }
+    assert.deepEqual(rows.map((row) => ({ ...row })), approvedEvidence.quotes);
+    const provenance = JSON.parse(await readFile(path.join(outputDir, "current.provenance.json"), "utf8"));
+    assert.deepEqual(provenance.candidateBuild.officialOdFareEvidence, approvedEvidence);
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
   }
-  const releaseRequest = JSON.parse(await readFile(path.join(root, "tools/datapack/release/release-request.json"), "utf8"));
-  assert.equal(releaseRequest.buildSpecSha256, sha256(await readFile(path.join(root, "tools/datapack/release/candidate-build-spec.json"))));
+});
+
+test("official OD fare release candidate는 admission과 다른 quote set evidence를 거부한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "official-od-fare-release-mismatch-"));
+  try {
+    const buildSpec = JSON.parse(await readFile(path.join(root, "tools/datapack/release/candidate-build-spec.json"), "utf8"));
+    buildSpec.officialOdFareEvidence.quoteSetHash = "f".repeat(64);
+    const buildSpecPath = path.join(workspace, "candidate-build-spec.json");
+    await writeFile(buildSpecPath, JSON.stringify(buildSpec));
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["tools/datapack/build-datapack.mjs", "--build-spec", buildSpecPath, "--output", path.join(workspace, "output")],
+        { cwd: root, env: productionEnv },
+      ),
+      /officialOdFareEvidence.quoteSetHash must match admission/,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test("원장 해시 exporter는 fixture 원장 5종 + license를 sha256으로 산출한다", async () => {

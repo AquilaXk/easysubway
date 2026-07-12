@@ -40,11 +40,10 @@ const sourceSnapshotStatuses = new Set(["LOCKED"]);
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const outputDir = path.resolve(root, requireArg(args, "output"));
-  const { fixture, candidateBuild } = await loadBuildInput(args);
   const schema = await readFile(path.join(root, "tools/datapack/schema/catalog-schema.sql"), "utf8");
-  const officialOdFareAdmission = JSON.parse(
-    await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"),
-  );
+  const officialOdFareAdmissionBytes = await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"));
+  const officialOdFareAdmission = JSON.parse(officialOdFareAdmissionBytes);
+  const { fixture, candidateBuild } = await loadBuildInput(args, officialOdFareAdmission, officialOdFareAdmissionBytes);
 
   validateFixture(fixture);
   await mkdir(outputDir, { recursive: true });
@@ -162,7 +161,7 @@ async function main() {
   );
 }
 
-async function loadBuildInput(args) {
+async function loadBuildInput(args, officialOdFareAdmission, officialOdFareAdmissionBytes) {
   const fixtureArg = args.fixture;
   const buildSpecArg = args["build-spec"];
   if ((fixtureArg == null) === (buildSpecArg == null)) {
@@ -178,14 +177,20 @@ async function loadBuildInput(args) {
   const buildSpecPath = await resolveBuildInputPath(buildSpecArg, "buildSpec");
   const buildSpecBytes = await readFile(buildSpecPath);
   const buildSpec = JSON.parse(buildSpecBytes);
-  await validateCandidateBuildSpec(buildSpec);
+  const fixture = JSON.parse(await readFile(await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8"));
+  const officialOdFareEvidence = await validateCandidateBuildSpec(
+    buildSpec,
+    fixture,
+    officialOdFareAdmission,
+    officialOdFareAdmissionBytes,
+  );
   return {
-    fixture: JSON.parse(await readFile(await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8")),
-    candidateBuild: candidateBuildProvenance(buildSpec, sha256(buildSpecBytes)),
+    fixture,
+    candidateBuild: candidateBuildProvenance(buildSpec, sha256(buildSpecBytes), officialOdFareEvidence),
   };
 }
 
-async function validateCandidateBuildSpec(buildSpec) {
+async function validateCandidateBuildSpec(buildSpec, fixture, admission, admissionBytes) {
   if (!buildSpec || typeof buildSpec !== "object" || Array.isArray(buildSpec)) {
     throw new Error("buildSpec must be an object");
   }
@@ -209,9 +214,10 @@ async function validateCandidateBuildSpec(buildSpec) {
     throw new Error("buildSpec.builderGitSha must be a git sha");
   }
   requiredString(buildSpec.builderVersion, "buildSpec.builderVersion");
+  return validateOfficialOdFareEvidence(buildSpec.officialOdFareEvidence, fixture, admission, admissionBytes);
 }
 
-function candidateBuildProvenance(buildSpec, buildSpecSha256) {
+function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvidence) {
   const normalizedHashes = Object.fromEntries(candidateBuildSpecHashFields.map((field) => [
     field,
     sha256HexString(buildSpec[field], `buildSpec.${field}`),
@@ -232,7 +238,46 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256) {
     sourceInventorySha256: normalizedHashes.sourceInventorySha256,
     builderGitSha: requiredString(buildSpec.builderGitSha, "buildSpec.builderGitSha"),
     builderVersion: requiredString(buildSpec.builderVersion, "buildSpec.builderVersion"),
+    ...(officialOdFareEvidence ? { officialOdFareEvidence } : {}),
   };
+}
+
+function validateOfficialOdFareEvidence(evidence, fixture, admission, admissionBytes) {
+  const candidateQuotes = fixture?.packs?.flatMap((pack) => pack.officialOdFareQuotes ?? []) ?? [];
+  if (evidence == null && candidateQuotes.length === 0) return null;
+  const label = "officialOdFareEvidence";
+  const keys = ["sourceId", "snapshotId", "evidenceHash", "admissionHash", "quoteSetHash", "mappingLedgerHash", "quotes"];
+  assertExactKeys(evidence, keys, label);
+  if (admission?.decision !== "APPROVED") throw new Error(`${label} requires an approved admission`);
+  if (requiredString(evidence.sourceId, `${label}.sourceId`) !== admission.sourceId) {
+    throw new Error(`${label}.sourceId must match admission`);
+  }
+  if (requiredString(evidence.snapshotId, `${label}.snapshotId`) !== admission.snapshotId) {
+    throw new Error(`${label}.snapshotId must match admission`);
+  }
+  if (sha256HexString(evidence.evidenceHash, `${label}.evidenceHash`) !== admission.evidenceHash) {
+    throw new Error(`${label}.evidenceHash must match admission`);
+  }
+  if (sha256HexString(evidence.admissionHash, `${label}.admissionHash`) !== sha256(admissionBytes)) {
+    throw new Error(`${label}.admissionHash must match tracked admission bytes`);
+  }
+  if (sha256HexString(evidence.quoteSetHash, `${label}.quoteSetHash`) !== admission.quoteSetHash) {
+    throw new Error(`${label}.quoteSetHash must match admission`);
+  }
+  if (sha256HexString(evidence.mappingLedgerHash, `${label}.mappingLedgerHash`) !== admission.fareStationLineMappingLedgerHash) {
+    throw new Error(`${label}.mappingLedgerHash must match admission`);
+  }
+  if (!Array.isArray(evidence.quotes) || evidence.quotes.length !== admission.quoteCount) {
+    throw new Error(`${label}.quotes count must match admission`);
+  }
+  for (const quote of evidence.quotes) officialOdFareQuoteValues(quote, admission);
+  if (officialOdFareQuoteSetHash(evidence.quotes) !== admission.quoteSetHash) {
+    throw new Error(`${label}.quotes must match admission quote set`);
+  }
+  if (JSON.stringify(candidateQuotes) !== JSON.stringify(evidence.quotes)) {
+    throw new Error(`${label}.quotes must exactly match candidate fixture quotes`);
+  }
+  return evidence;
 }
 
 function requiredSourceSnapshots(value, label) {
