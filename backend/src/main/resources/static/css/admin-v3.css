@@ -846,8 +846,15 @@ body.admin-v3 {
 	border-top: 1px solid var(--admin-border);
 }
 
-/* JS 실행 환경에서는 Alpine x-show 평가 전 플래시 방지(#1982 리뷰 반영). no-JS는 has-js 미부착이라 계속 노출 */
-.admin-v3.has-js .bulk-actionbar {
+/*
+ * JS 실행 환경에서는 Alpine이 x-show를 최초 평가하기 전 짧은 순간 플래시가 생긴다(#1982 리뷰 반영).
+ * has-js-ready(app.js가 alpine:initialized 시점에 부착)가 아직 없는 동안만 숨겨 그 틈을 가린다.
+ * has-js-ready가 붙은 뒤로는 이 규칙이 매치되지 않으므로, x-show가 설정하는 인라인 style이
+ * 전담한다 — Alpine의 x-show 구현(_x_doShow)은 인라인 display를 제거만 할 뿐 값을 넣지 않아,
+ * 이 규칙을 has-js에만 걸어두면 선택 후에도 계속 이겨서 bar가 영원히 숨겨지는 회귀가 생긴다.
+ * no-JS는 has-js 자체가 없어 이 규칙이 걸리지 않으므로 계속 노출된다(기존 폴백 유지).
+ */
+.admin-v3.has-js:not(.has-js-ready) .bulk-actionbar {
 	display: none;
 }
 
