@@ -27,7 +27,9 @@ function planRequest(candidate, priority) {
   requireCandidateState(candidate);
   const evidence = candidate.evidence ?? {};
   const plannedSampleFormat = "json";
-  const validatedLiveSampleFormat = requiredLiveSampleFormat(evidence.liveSampleFormat, candidate.id);
+  const validatedLiveSampleFormat = candidate.sampleEvidenceStatus === "validated_live_sample"
+    ? requiredLiveSampleFormat(evidence.liveSampleFormat, candidate.id)
+    : null;
   const documentedSampleUrl = requiredText(evidence.sampleUrl, `${candidate.id}.evidence.sampleUrl`);
   assertRedactedServiceKey(documentedSampleUrl, candidate.id);
   const sampleUrl = forceJsonFormat(documentedSampleUrl);

@@ -6522,6 +6522,7 @@ test("KRIC route graph 수집 계획은 pending 후보의 sample acquisition lif
   const candidates = JSON.parse(await readFile("tools/datapack/source-candidates.json", "utf8"));
   const candidate = candidates.candidates.find((entry) => entry.id === "kric-subway-route-info");
   candidate.sampleEvidenceStatus = "sample_url_documented_key_required";
+  delete candidate.evidence.liveSampleFormat;
   candidate.evidence.missingEvidence = ["sampleResponse"];
   await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
 
@@ -6539,6 +6540,8 @@ test("KRIC route graph 수집 계획은 pending 후보의 sample acquisition lif
   const [request] = JSON.parse(stdout).requests;
 
   assert.equal(request.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(request.plannedSampleFormat, "json");
+  assert.equal(request.validatedLiveSampleFormat, null);
   assert.equal(request.sampleAcquisitionRequired, true);
   assert.equal("remainingAdmissionBlocker" in request, false);
   assert.deepEqual(request.remainingAdmissionBlockers, ["sampleResponse"]);
