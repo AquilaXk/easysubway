@@ -36,6 +36,7 @@
     "requiredSourceIds": [
       "molit-urban-rail-full-route",
       "seoulmetro-station-line-info",
+      "seoul-metro-accessibility",
       "kric-station-elevator",
       "kric-station-elevator-movement",
       "kric-station-escalator",
