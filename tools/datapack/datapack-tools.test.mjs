@@ -9890,6 +9890,22 @@ test("NO_OFFICIAL_FEED ENTRY edge는 피드 부재 기록 증거 없이는 거�
   );
 });
 
+test("NO_OFFICIAL_FEED ENTRY edge는 NOT_EXISTS이나 statusMeaning이 FEED_ABSENCE_RECORD가 아니면 거부된다 (#1998)", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-nofeed-statusmeaning-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  // 상록수 NO_OFFICIAL_FEED probe는 NOT_EXISTS로 남기되 statusMeaning을 피드 부재 기록이 아닌 값(시설 물리
+  // 부재)으로 변조 → 임의 NOT_EXISTS로는 피드 부재 커버리지를 채울 수 없어야 하므로 검증 실패해야 한다.
+  const probe = input.accessibilityStatusEvidence.find((row) => row.stationId === "station-sangnoksu");
+  assert.equal(probe.evidenceKind, "NOT_EXISTS");
+  probe.statusMeaning = "FACILITY_PHYSICALLY_ABSENT";
+  probe.operationalStatus = "NOT_INSTALLED";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /NO_OFFICIAL_FEED ENTRY\/EXIT edge requires recorded absence-of-feed evidence/,
+  );
+});
+
 test("검증된 상태 3분류(AVAILABLE/UNDER_MAINTENANCE/NO_OFFICIAL_FEED) edge는 게시 게이트를 통과하고 UNKNOWN만 unverified로 남는다 (#1996)", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-accessibility-verified-states-${Date.now()}`);
   const packOutputDir = path.join(outputDir, "pack");

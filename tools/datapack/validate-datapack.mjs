@@ -1739,7 +1739,14 @@ function productionAccessibilityEvidence(database, pack) {
       }
       // NO_OFFICIAL_FEED edge 증거: 해당 station-line을 공식 상태 피드가 구조적으로 커버하지 않음을 명시 기록한
       // 부재 증거(evidence_kind=NOT_EXISTS). 실측 근거는 "이 API가 그 구간을 커버하지 않는다"는 기록이다.
-      if (row.evidence_kind === "NOT_EXISTS" && accessibilitySource) {
+      // statusMeaning=FEED_ABSENCE_RECORD + operationalStatus=NOT_COVERED를 강제해 임의 NOT_EXISTS(예: 시설
+      // 물리 부재)가 피드 부재 커버리지를 채우지 못하게 한다(UNDER_MAINTENANCE 분기의 statusMeaning 강제와 대칭).
+      if (
+        row.evidence_kind === "NOT_EXISTS" &&
+        statusMeaning === "FEED_ABSENCE_RECORD" &&
+        operationalStatus === "NOT_COVERED" &&
+        accessibilitySource
+      ) {
         noOfficialFeedStationLines.add(stationLineEvidenceKey(row.station_id, row.line_id));
       }
     }

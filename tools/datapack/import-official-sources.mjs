@@ -1100,7 +1100,12 @@ function validateProductionAccessibilityCoverageEdges(
   );
   const noOfficialFeedStationLines = new Set(
     accessibilityFacilityRows
-      .filter((row) => row.evidenceKind === "NOT_EXISTS")
+      .filter(
+        (row) =>
+          row.evidenceKind === "NOT_EXISTS" &&
+          String(row.statusMeaning ?? "").toUpperCase() === "FEED_ABSENCE_RECORD" &&
+          String(row.operationalStatus ?? "").toUpperCase() === "NOT_COVERED",
+      )
       .map((row) => stationLineEvidenceKey(row.stationId, row.lineId)),
   );
   const approvedMovementStationLines = new Set(
