@@ -279,12 +279,16 @@ function validateOfficialOdFareQuotes(database, pack, admission) {
   if (admission?.decision !== "APPROVED") {
     throw new Error(`${pack.id}@${pack.version} official OD fare admission is not approved`);
   }
+  const sourceIds = new Set(pack.sourceInventory.map((source) => source.id));
   for (const row of rows) {
     if (row.origin_station_id === row.destination_station_id) {
       throw new Error(`${pack.id}@${pack.version} official OD fare endpoints must be distinct`);
     }
     if (row.source_id !== admission.sourceId) {
       throw new Error(`${pack.id}@${pack.version} official OD fare source_id must match admission`);
+    }
+    if (!sourceIds.has(row.source_id)) {
+      throw new Error(`${pack.id}@${pack.version} official OD fare source_id is not in sourceInventory`);
     }
     if (row.snapshot_id !== admission.snapshotId) {
       throw new Error(`${pack.id}@${pack.version} official OD fare snapshot_id must match admission`);

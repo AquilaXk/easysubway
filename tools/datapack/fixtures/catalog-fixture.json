@@ -49,6 +49,36 @@
             "facilities",
             "internal_routes"
           ]
+        },
+        {
+          "id": "seoul-metro-official-od-fares",
+          "owner": "서울특별시",
+          "url": "https://www.data.go.kr/data/15143846/openapi.do",
+          "license": "공공데이터포털 이용허락범위 제한 없음",
+          "licenseStatus": "redistributable",
+          "redistributionAllowed": true,
+          "updateFrequency": "approved-snapshot-only",
+          "updatedAt": "2026-07-12T00:00:00.000Z",
+          "fields": [
+            "childCardFare",
+            "childCashFare",
+            "gnrlCardFare",
+            "gnrlCashFare",
+            "yungCardFare",
+            "yungCashFare"
+          ],
+          "coverageScope": {
+            "regionIds": [
+              "capital"
+            ],
+            "operatorIds": [
+              "seoul-metro",
+              "korail"
+            ],
+            "sourceDomains": [
+              "official_od_fares"
+            ]
+          }
         }
       ],
       "requiredTables": [

@@ -84,10 +84,14 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
   assert.equal(pack.version, "1");
   assert.equal(pack.artifactKind, "fixture");
   assert.equal(pack.url, "catalog/capital-v1.sqlite.gz");
-  assert.equal(pack.sourceInventory.length, 1);
+  assert.deepEqual(pack.sourceInventory.map((source) => source.id), [
+    "fixture-capital-catalog",
+    "seoul-metro-official-od-fares",
+  ]);
   assert.equal(pack.sourceInventory[0].id, "fixture-capital-catalog");
   assert.equal(pack.sourceInventory[0].licenseStatus, "fixture-only");
   assert.equal(pack.sourceInventory[0].updatedAt, "2026-06-19T00:00:00.000Z");
+  assert.deepEqual(pack.sourceInventory[1].coverageScope.sourceDomains, ["official_od_fares"]);
   assert.equal(pack.regionalQualityMetrics.stationCount, 6);
   assert.equal(pack.regionalQualityMetrics.facilityCoverageRatio, 0.3333);
   assert.equal(pack.regionalQualityMetrics.requiredFacilityEvidenceCoverageRatio, 0.1852);
@@ -13097,6 +13101,9 @@ function completeCoverageProvenance(inventory) {
 
 function markFixturePackProduction(fixture) {
   const pack = fixture.packs[0];
+  const officialOdFareSource = pack.sourceInventory.find(
+    (source) => source.id === "seoul-metro-official-od-fares",
+  );
   pack.artifactKind = "production";
   pack.url = "https://datapack.example.com/easysubway/catalog/capital-v1.sqlite.gz";
   pack.sourceInventory = [
@@ -13112,6 +13119,7 @@ function markFixturePackProduction(fixture) {
       fields: ["stations", "station_lines", "network_edges", "out_of_station_transfer_links", "facilities"],
       coverageScope: productionSourceCoverageScope(),
     },
+    ...(officialOdFareSource ? [officialOdFareSource] : []),
   ];
   for (const edge of pack.networkEdges) {
     if (edge.edgeType === "RIDE" && edge.distanceMeters > 0 && edge.durationSeconds > 0) {
@@ -14507,11 +14515,47 @@ test("official OD fare validator는 signed pack 내부의 승인 요금 변조�
   }
 });
 
+test("official OD fare validator는 pack inventory에 없는 source를 거부한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "official-od-fare-missing-source-"));
+  try {
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture", "tools/datapack/fixtures/catalog-fixture.json",
+        "--output", outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    );
+    const manifestPath = path.join(outputDir, "current.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    manifest.packs[0].sourceInventory = manifest.packs[0].sourceInventory.filter(
+      (source) => source.id !== "seoul-metro-official-od-fares",
+    );
+    await writeFile(manifestPath, JSON.stringify(manifest));
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["tools/datapack/validate-datapack.mjs", "--manifest", manifestPath, "--root", outputDir],
+        { cwd: root, env: productionEnv },
+      ),
+      /official OD fare source_id is not in sourceInventory/,
+    );
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("official OD fare release candidate는 승인된 두 방향 quote와 provenance를 SQLite에 남긴다", async () => {
   const approvedEvidence = JSON.parse(await readFile(path.join(root, "tools/datapack/release/hash-evidence.json"), "utf8")).officialOdFareEvidence;
   const candidateFixture = JSON.parse(await readFile(path.join(root, "tools/datapack/release/capital-production-reviewed-pack.json"), "utf8"));
   assert.deepEqual(candidateFixture.packs[0].officialOdFareQuotes, approvedEvidence.quotes);
   assert.equal(candidateFixture.packs[0].officialOdFareQuotes.length, 2);
+  assert.ok(candidateFixture.packs[0].sourceInventory.some(
+    (source) => source.id === approvedEvidence.sourceId
+      && source.coverageScope.sourceDomains.includes("official_od_fares"),
+  ));
 
   const outputDir = await mkdtemp(path.join(tmpdir(), "official-od-fare-release-candidate-"));
   try {
@@ -14540,6 +14584,10 @@ test("official OD fare release candidate는 승인된 두 방향 quote와 proven
       database.close();
     }
     assert.deepEqual(rows.map((row) => ({ ...row })), approvedEvidence.quotes);
+    const manifest = JSON.parse(await readFile(path.join(outputDir, "current.json"), "utf8"));
+    assert.ok(manifest.packs[0].sourceInventory.some(
+      (source) => source.id === approvedEvidence.sourceId,
+    ));
     const provenance = JSON.parse(await readFile(path.join(outputDir, "current.provenance.json"), "utf8"));
     assert.deepEqual(provenance.candidateBuild.officialOdFareEvidence, approvedEvidence);
   } finally {
