@@ -102,7 +102,7 @@
     .ourclass-transfer-symbol { isolation:isolate; pointer-events:none; }
     .ourclass-transfer-dot { stroke:none; shape-rendering:geometricPrecision; }
     [data-state=&quot;inactive&quot;], .is-inactive { opacity:.28; }
-  
+
 
     /* sma-v1 transfer capsule parity pass */
     .ourclass-transfer-symbol { isolation:isolate; pointer-events:none; }
@@ -118,7 +118,7 @@
       fill:#FFFFFF; stroke:none; paint-order:normal; text-rendering:geometricPrecision;
       letter-spacing:-0.08px;
     }
-    
+
 
     /* Construction-state visual grammar — SMA-v1 family extension */
     .construction-route-base {
