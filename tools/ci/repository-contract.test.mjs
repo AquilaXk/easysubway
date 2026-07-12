@@ -6559,7 +6559,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   );
 
   for (const candidate of kricCandidates) {
-    const hasValidatedSample = ["kric-station-info", "kric-subway-route-info"].includes(candidate.id);
+    const hasValidatedSample = ["kric-station-info", "kric-subway-route-info", "kric-transfer-movement-detailed"].includes(candidate.id);
     assert.equal(candidate.priority, "P0");
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
     assert.equal(
@@ -6907,7 +6907,7 @@ test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph 
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
-  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -6929,6 +6929,25 @@ test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph 
     ],
   );
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
+  assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
+  assert.equal(candidate.mobileEmbeddingAllowed, false);
+  assert.equal(candidate.evidence.liveSampleFormat, "xml");
+  assert.equal(candidate.evidence.liveSampleRowCount, 8);
+  assert.equal(candidate.evidence.liveSampleRawSha256, "93f75d6049655663ee0f14ca88347b9645781feaf5085cbf5a0013e4d7156a66");
+  assert.equal(candidate.evidence.liveSampleSchemaFingerprint, "47ec5fc575c71e57ae8dac56891097c3e3392103fc7b5b1c385e04518e9fa3f8");
+  assert.equal(candidate.evidence.liveSampleEvidenceHash, "055cda38e2a297d53f3fb7dd0a8c0a6069fd4517d33557bfdf97637728a22743");
+  assert.deepEqual(candidate.evidence.liveSampleFields.slice().sort(), candidate.evidence.outputFields.slice().sort());
+  assert.match(candidate.evidence.liveSampleNote, /2026-07-12.*29190984673 \(head 93afed60a027c215af80039a11e8ee58d8178088\).*credentialRedacted=true.*format=xml.*rowCount=8.*source candidate sample evidence valid/);
+  assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.slice().sort(), ["distanceMeters", "durationSeconds"]);
+  assert.deepEqual(candidate.evidence.missingEvidence.slice().sort(), [
+    "adminAdmissionEvidence",
+    "credentialFreeRawArchive",
+    "distanceDurationEdgeEvidence",
+    "licenseCommercialRedistributionEvidence",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
+  ]);
+  assert.match(candidate.nextAction, /29190984673/);
 });
 
 test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {
@@ -7022,6 +7041,10 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
     candidate.evidence.liveSampleNote,
     /2026-07-12.*29177451688 \(head 3c3567b524a14f39a0bbe20a774259b7ba405694\).*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0.*sanitized sample artifact가 생성되지 않음/,
   );
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /2026-07-12.*29190982462 \(head 93afed60a027c215af80039a11e8ee58d8178088\).*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0.*sanitized sample artifact가 생성되지 않음/,
+  );
   assert.match(candidate.evidence.liveSampleNote, /resultCode=03의 공식 의미 매핑은 공개 문서에서 확인되지 않음/);
   assert.match(candidate.evidence.liveSampleNote, /공식 상세 페이지 sample URL.*422\/424.*요청변수 표.*132\/425.*불일치/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
@@ -7048,6 +7071,50 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.match(candidate.nextAction, /distance and duration evidence/);
   assert.match(candidate.nextAction, /admin review/);
   assert.match(candidate.nextAction, /automatic route graph edge/);
+});
+
+test("data.go.kr 환승역거리 소요시간 후보는 확정된 odcloud endpoint를 고정한다", () => {
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const candidate = candidates.candidates.find(({ id }) => id === "seoul-metro-transfer-distance-duration");
+  assert.ok(candidate);
+  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.serviceKeyHandling, "offline_collection_secret_only");
+  assert.equal(candidate.requestUrl, "https://api.odcloud.kr/api/15044419/v1/uddi:7008c675-928f-41d6-9a01-b3541f78466b");
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  const sampleUrl = new URL(candidate.evidence.sampleUrl);
+  assert.equal(sampleUrl.origin + sampleUrl.pathname, candidate.evidence.endpoint);
+  const serviceKeyEntries = [...sampleUrl.searchParams.entries()].filter(([name]) => name.toLowerCase() === "servicekey");
+  assert.deepEqual(serviceKeyEntries, [["serviceKey", "[서비스키값]"]]);
+  assert.equal(sampleUrl.searchParams.get("returnType"), "JSON");
+  assert.deepEqual(candidate.evidence.formats.slice().sort(), ["CSV", "JSON", "XML"]);
+  assert.equal(candidate.evidence.missingEvidence.includes("endpointConfirmation"), false);
+  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse", "credentialFreeSnapshotHash", "adminAdmissionEvidence"]);
+});
+
+test("data.go.kr 빠른하차정보 후보는 확정된 operation path와 유추 파라미터를 구분해 고정한다", () => {
+  const candidates = readJson("tools/datapack/source-candidates.json");
+  const candidate = candidates.candidates.find(({ id }) => id === "seoul-metro-fast-exit-car-door");
+  assert.ok(candidate);
+  assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
+  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.serviceKeyHandling, "offline_collection_secret_only");
+  assert.equal(candidate.requestUrl, "https://apis.data.go.kr/B553766/inout/getFstExit");
+  assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
+  const sampleUrl = new URL(candidate.evidence.sampleUrl);
+  assert.equal(sampleUrl.origin + sampleUrl.pathname, candidate.evidence.endpoint);
+  const serviceKeyEntries = [...sampleUrl.searchParams.entries()].filter(([name]) => name.toLowerCase() === "servicekey");
+  assert.deepEqual(serviceKeyEntries, [["serviceKey", "[서비스키값]"]]);
+  assert.equal(sampleUrl.searchParams.get("dataType"), "JSON");
+  assert.deepEqual(candidate.evidence.outputFields.slice().sort(), [
+    "crtrYmd","drtnInfo","elvtrNo","facNo","facPstnNm","fwkPstnNm","lineNm",
+    "plfmCmgFac","qckgffMngNo","qckgffVhclDoorNo","stnCd","stnNm","stnNo","upbdnbSe",
+  ]);
+  assert.match(candidate.evidence.requestParamsProvenance, /getFstExit.*swagger에서 확정/);
+  assert.match(candidate.evidence.requestParamsProvenance, /유추/);
+  assert.equal(candidate.evidence.missingEvidence.includes("endpointConfirmation"), false);
+  assert.equal(candidate.evidence.missingEvidence.includes("outputFieldsConfirmation"), false);
+  assert.deepEqual(candidate.evidence.missingEvidence, ["sampleResponse", "requestParamsConfirmation", "credentialFreeSnapshotHash", "adminAdmissionEvidence"]);
 });
 
 test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -13509,11 +13576,11 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
     "kric-station-movement-standard",
     "kric-station-movement-detailed",
     "kric-transfer-movement-standard",
-    "kric-transfer-movement-detailed",
     "kric-station-convenience-standard",
   ]);
   assert.ok(!candidateOptions.includes("kric-subway-route-info"));
   assert.ok(!candidateOptions.includes("kric-station-info"));
+  assert.ok(!candidateOptions.includes("kric-transfer-movement-detailed"));
   const sourceCandidates = readJson("tools/datapack/source-candidates.json").candidates;
   for (const candidateId of candidateOptions) {
     const candidate = sourceCandidates.find((entry) => entry.id === candidateId);
