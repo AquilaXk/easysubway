@@ -14212,16 +14212,7 @@ test("official OD fare admission은 probe 내부 계약과 hash binding을 강�
 test("source inventory는 official OD fare admission hash 쌍을 함께 요구한다", async () => {
   const sourceInventory = JSON.parse(await readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8"));
   const validInventory = structuredClone(sourceInventory);
-  validInventory.sources[0].fieldsProvided.push(
-    "childCardFare",
-    "childCashFare",
-    "gnrlCardFare",
-    "gnrlCashFare",
-    "yungCardFare",
-    "yungCashFare",
-  );
-  validInventory.sources[0].officialOdFareAdmissionHash = "a".repeat(64);
-  validInventory.sources[0].fareStationLineMappingLedgerHash = "b".repeat(64);
+  const fareSource = validInventory.sources.find(({ id }) => id === "seoul-metro-official-od-fares");
   const workspace = await mkdtemp(path.join(tmpdir(), "official-od-fare-inventory-"));
   try {
     const validPath = path.join(workspace, "valid.json");
@@ -14231,7 +14222,7 @@ test("source inventory는 official OD fare admission hash 쌍을 함께 요구�
     ], { cwd: root });
 
     const invalidInventory = structuredClone(validInventory);
-    delete invalidInventory.sources[0].fareStationLineMappingLedgerHash;
+    delete invalidInventory.sources.find(({ id }) => id === fareSource.id).fareStationLineMappingLedgerHash;
     const invalidPath = path.join(workspace, "invalid.json");
     await writeFile(invalidPath, JSON.stringify(invalidInventory));
     await assert.rejects(
@@ -14263,6 +14254,64 @@ test("source inventory는 official OD fare admission hash 쌍을 함께 요구�
       ], { cwd: root }),
       /official OD fare references require all six official fare fields/,
     );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("official OD fare candidate admission은 inventory hash 쌍과 일치해야 한다", async () => {
+  const inventory = JSON.parse(await readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8"));
+  const candidates = JSON.parse(await readFile(path.join(root, "tools/datapack/source-candidates.json"), "utf8"));
+  const source = inventory.sources.find(({ id }) => id === "seoul-metro-official-od-fares");
+  const candidate = candidates.candidates.find(({ id }) => id === "seoul-metro-official-od-fares");
+  const admission = JSON.parse(await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"));
+
+  const workspace = await mkdtemp(path.join(tmpdir(), "official-od-fare-candidate-"));
+  try {
+    const inventoryPath = path.join(workspace, "inventory.json");
+    const candidatesPath = path.join(workspace, "candidates.json");
+    const admissionPath = path.join(workspace, "admission.json");
+    const validate = () => execFileAsync(process.execPath, [
+      "tools/datapack/validate-source-inventory.mjs",
+      "--inventory", inventoryPath,
+      "--candidates", candidatesPath,
+      "--official-od-fare-admission", admissionPath,
+    ], { cwd: root });
+    await writeFile(inventoryPath, JSON.stringify(inventory));
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await writeFile(admissionPath, JSON.stringify(admission, null, 2) + "\n");
+    await validate();
+
+    candidate.evidence.fareStationLineMappingLedgerHash = "c".repeat(64);
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await assert.rejects(validate(), /fareStationLineMappingLedgerHash must match/);
+
+    candidate.evidence.fareStationLineMappingLedgerHash = source.fareStationLineMappingLedgerHash;
+    candidate.domain = "accessibility_facilities";
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await assert.rejects(validate(), /candidate domain must be "official_od_fares"/);
+
+    candidate.domain = "official_od_fares";
+    source.coverageScope.sourceDomains = ["accessibility_facilities"];
+    await writeFile(inventoryPath, JSON.stringify(inventory));
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await assert.rejects(validate(), /source domain must be official_od_fares/);
+
+    source.coverageScope.sourceDomains = ["official_od_fares"];
+    candidate.admissionStatus = "evidence_recorded_admin_review_required";
+    await writeFile(inventoryPath, JSON.stringify(inventory));
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await assert.rejects(validate(), /official OD fare source requires an admitted candidate/);
+
+    candidate.admissionStatus = "official_od_fare_admitted_to_production_inventory";
+    admission.decision = "REJECTED";
+    const rejectedBytes = JSON.stringify(admission, null, 2) + "\n";
+    source.officialOdFareAdmissionHash = sha256(rejectedBytes);
+    candidate.evidence.officialOdFareAdmissionHash = source.officialOdFareAdmissionHash;
+    await writeFile(inventoryPath, JSON.stringify(inventory));
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await writeFile(admissionPath, rejectedBytes);
+    await assert.rejects(validate(), /admission decision must be "APPROVED"/);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

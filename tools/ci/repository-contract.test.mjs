@@ -5316,6 +5316,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     ],
   );
   assert.deepEqual(targets.knownSourceDomains, [
+    "official_od_fares",
     "realtime_train_positions",
     "transfer_walk_duration",
     "station_car_door_hints",
@@ -5539,6 +5540,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
     "seoul-metro-transfer-distance-duration",
+    "seoul-metro-official-od-fares",
     "seoul-realtime-arrival-station-info",
     "seoul-subway-hourly-boarding",
     "seoul-topis-realtime-train-position",
