@@ -14,7 +14,9 @@ import {
   defaultApiBaseUrl,
   encodePath,
   fetchAccessToken,
+  maskSecrets,
   parseDotenv,
+  PlayApiError,
   readServiceAccount,
   requestJson,
   requireJsonString,
@@ -40,6 +42,51 @@ function maxTrackVersionCode(tracks) {
 
 function sha256OfBuffer(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
+}
+
+function commitUrl(editsBase, editId, changesNotSentForReview) {
+  return `${editsBase}/${encodePath(editId)}:commit?changesNotSentForReview=${changesNotSentForReview ? "true" : "false"}`;
+}
+
+// The Android Publisher edits.commit contract is asymmetric (issue #2011):
+//   - A never-published app (draft status) rejects commit unless
+//     changesNotSentForReview=true, with a plaintext body like
+//     "Could not commit changes for edit ... app is in draft status".
+//   - A published app whose changes are auto-sent for review rejects commit
+//     WITH changesNotSentForReview=true, with "Changes are sent for review
+//     automatically. The query parameter changesNotSentForReview must not be
+//     set."
+// So blindly forcing true is unsafe. We commit with the requested flag (default
+// false), and only when the failure explicitly signals the draft/not-sent
+// condition do we retry once with true. This keeps the normal review flow of an
+// already-published app intact while unblocking the first-ever draft upload.
+// Refs: developers.google.com/android-publisher/api-ref/rest/v3/edits/commit
+function isDraftCommitError(error) {
+  if (!(error instanceof PlayApiError)) {
+    return false;
+  }
+  const haystack = `${error.parsed?.error?.message ?? ""} ${error.rawBody ?? ""}`.toLowerCase();
+  return haystack.includes("draft status")
+    || (haystack.includes("could not commit") && haystack.includes("draft"))
+    || haystack.includes("not been reviewed")
+    || haystack.includes("changes cannot be sent for review");
+}
+
+async function commitEdit({ editsBase, editId, token, changesNotSentForReview }, fetchImpl) {
+  try {
+    await requestJson(commitUrl(editsBase, editId, changesNotSentForReview), { method: "POST", token }, fetchImpl);
+    return { changesNotSentForReview, retried: false };
+  } catch (error) {
+    // Already asked not to send for review, or a non-draft failure — surface it.
+    if (changesNotSentForReview || !isDraftCommitError(error)) {
+      throw error;
+    }
+    process.stderr.write(
+      `play internal commit rejected as draft; retrying once with changesNotSentForReview=true — ${error.message}\n`,
+    );
+    await requestJson(commitUrl(editsBase, editId, true), { method: "POST", token }, fetchImpl);
+    return { changesNotSentForReview: true, retried: true };
+  }
 }
 
 export async function runUploadPlayInternal({
@@ -124,9 +171,8 @@ export async function runUploadPlayInternal({
     fetchImpl,
   );
 
-  await requestJson(
-    `${editsBase}/${encodePath(editId)}:commit?changesNotSentForReview=${changesNotSentForReview ? "true" : "false"}`,
-    { method: "POST", token },
+  const commit = await commitEdit(
+    { editsBase, editId, token, changesNotSentForReview },
     fetchImpl,
   );
 
@@ -140,7 +186,10 @@ export async function runUploadPlayInternal({
     versionCode: String(versionCode),
     aabSha256,
     mappingSha256: mappingSha256 ?? null,
-    changesNotSentForReview,
+    // Reflect the value actually used to commit — the draft-status fallback can
+    // escalate false -> true, and the evidence must record what really happened.
+    changesNotSentForReview: commit.changesNotSentForReview,
+    changesNotSentForReviewRetried: commit.retried,
     uploadedAt: new Date().toISOString(),
   };
   if (reportPath) {
@@ -192,6 +241,15 @@ async function main() {
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error(error.message);
+    // On a Play API failure, dump the HTTP status and the *raw* response body
+    // (secret-masked) verbatim so a plaintext error (e.g. draft status) is
+    // diagnosable in a single run instead of being swallowed by JSON parsing.
+    if (error instanceof PlayApiError) {
+      console.error(`play api status: ${error.status}`);
+      if (typeof error.rawBody === "string" && error.rawBody.length > 0) {
+        console.error(`play api raw body: ${maskSecrets(error.rawBody)}`);
+      }
+    }
     process.exitCode = 1;
   });
 }
