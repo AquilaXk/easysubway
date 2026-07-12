@@ -437,7 +437,7 @@ function sha256(value) {
 }
 
 // desk 게이트 ③: timeSource 구분. baseline edge의 provenance_kind는 OFFICIAL_SOURCE로 고정된다.
-function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existingEdges) {
+export function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existingEdges) {
   const existingEdgesById = new Map(existingEdges.map((edge) => [edge.id, edge]));
   const officialRules = fixtureTransferRules.filter((rule) => rule.sourceId === TRANSFER_SOURCE_ID);
   const referencedExistingEdges = officialRules
@@ -453,7 +453,13 @@ function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existing
         "이 rule이 연결하는 역에 플랫폼 노드가 없어 pathway edge가 생성되지 않는 기지의 한계다 — " +
         "edge 실검증 대상에서 제외하고 이 사실만 명시 기록한다(조용히 빼지 않는다).",
     }));
-  const generatedEdges = transfer.stationPathwayEdges.map((edge) => ({ rule: null, edge }));
+  const rulesByEdgeId = new Map(
+    transfer.transferRules.filter((rule) => rule.pathwayEdgeId).map((rule) => [rule.pathwayEdgeId, rule]),
+  );
+  const generatedEdges = transfer.stationPathwayEdges.map((edge) => ({
+    rule: rulesByEdgeId.get(edge.id) ?? null,
+    edge,
+  }));
   const edgeChecks = [...generatedEdges, ...referencedExistingEdges].map(({ rule, edge }) => {
     const failures = [];
     if (!edge) {

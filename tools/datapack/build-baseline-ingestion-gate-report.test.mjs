@@ -4,6 +4,7 @@ import test from "node:test";
 
 import {
   buildBaselineIngestionGateReport,
+  buildGateTimeSourceDistinction,
   buildRosterFromPack,
 } from "./build-baseline-ingestion-gate-report.mjs";
 
@@ -132,6 +133,29 @@ test("buildRosterFromPack: 짧은 lineNameKo 도출('수도권 2호선'→'2호�
   assert.equal(shinbundang.lineNameKo, "신분당선");
 });
 
+test("게이트③: generated baseline edge도 matching rule과 duration을 대조한다", () => {
+  const report = buildGateTimeSourceDistinction(
+    {
+      transferRules: [{ id: "generated-rule", pathwayEdgeId: "generated-edge", minTransferSeconds: 62 }],
+      stationPathwayEdges: [
+        {
+          id: "generated-edge",
+          durationSeconds: 63,
+          sourceId: "seoul-metro-transfer-distance-duration",
+          sourceSnapshotId: "seoul-metro-transfer-distance-duration-admission-20260713",
+          provenanceKind: "OFFICIAL_SOURCE",
+        },
+      ],
+    },
+    [],
+    [],
+  );
+
+  assert.equal(report.status, "FAIL");
+  assert.equal(report.edgeChecks[0].ruleId, "generated-rule");
+  assert.ok(report.edgeChecks[0].failures.includes("edge durationSeconds does not match rule minTransferSeconds"));
+});
+
 test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata", () => {
   const roster = buildRosterFromPack(pack);
   const transferRows = [
@@ -218,6 +242,24 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   assert.equal(report.coverage.carDoor.totalRows, 2);
   assert.equal(report.coverage.carDoor.admittedHints, 1);
   assert.equal(report.coverage.carDoor.quarantinedRows, 1);
+});
+
+test("게이트①: 양방향 환승 시간이 다르면 secondsMismatch를 기록한다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [
+      { 연번: 1, 호선: 2, 환승거리: 74, 환승노선: "4호선", 환승소요시간: "01:02", 환승역명: "사당" },
+      { 연번: 2, 호선: 4, 환승거리: 74, 환승노선: "2호선", 환승소요시간: "01:03", 환승역명: "사당" },
+    ],
+    carDoorRows: [],
+    kricMovement: null,
+  });
+  const sadangPair = report.gateInternalConsistency.directionPairReport.find(
+    (row) => row.stationId === "station-sadang",
+  );
+
+  assert.equal(sadangPair.hasReverse, true);
+  assert.equal(sadangPair.secondsMismatch, true);
 });
 
 test("리포트: 객체가 아닌 transfer row를 malformed로 계측하고 중단하지 않는다", () => {
@@ -329,11 +371,16 @@ test("게이트②: tracked endpoint·request tuple·admission hash가 다르면
   };
 
   assertRejected(
-    build(admittedKricContext({ endpoint: "https://example.invalid/wrong" })),
+    build(admittedKricContext({ endpoint: "https://example.invalid/wrong", liveSampleRowCount: 1 })),
     "endpoint mismatch",
   );
   assertRejected(
-    build(admittedKricContext({ requestTuple: { ...admittedKricContext().requestTuple, stinCd: "999" } })),
+    build(
+      admittedKricContext({
+        requestTuple: { ...admittedKricContext().requestTuple, stinCd: "999" },
+        liveSampleRowCount: 1,
+      }),
+    ),
     "request tuple mismatch: stinCd",
   );
   const changedContent = { ...kricStep(), mvContDtl: "변조된 이동 경로" };
@@ -351,6 +398,7 @@ test("게이트②: tracked endpoint·request tuple·admission hash가 다르면
     build(
       admittedKricContext({
         admission: { ...admittedKricContext().admission, sampleEvidenceHash: "d".repeat(64) },
+        liveSampleRowCount: 1,
       }),
     ),
     "sampleEvidenceHash admission mismatch",
