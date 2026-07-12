@@ -1121,6 +1121,14 @@ void main() {
         .height;
     expect(activeHeight, idleHeight);
 
+    // in-place 입력 TextField의 스타일을 검증한다(폰트 크기 17, 줄 높이 1.2,
+    // #2003 안 B 검색 모드 텍스트 스타일).
+    final activeField = tester.widget<TextField>(
+      find.byKey(const Key('stationSearchInput')),
+    );
+    expect(activeField.style?.fontSize, 17);
+    expect(activeField.style?.height, 1.2);
+
     // 검색 모드에서 뒤로가기 아이콘 크기는 26이어야 한다(메뉴 아이콘과 같은
     // 슬롯이라 전환 시 크기 점프를 없애는 정합, #2003).
     final backIcon = tester.widget<Icon>(
