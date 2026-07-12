@@ -17,7 +17,12 @@ import 'package:easysubway_mobile/features/network_map/presentation/structured_r
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// network_map.dart의 private `_mapManifestAssetPath`와 동일한 값을 가져야 한다
+/// (재시도 회귀 테스트에서 manifest asset 로드를 mock으로 가로채기 위한 키).
+const _mapManifestAssetPath = 'assets/datapacks/metro_map_pack/manifest.json';
 
 class _FakeNetworkMapRepository implements NetworkMapRepository {
   _FakeNetworkMapRepository({required this.selectedRegion});
@@ -169,6 +174,101 @@ void main() {
     expect(painter.attributionText, isNull);
   });
 
+  testWidgets(
+    'manifest 로드가 1차 실패해도 캐시가 비워져 재마운트 시 재시도한다(#1951 회귀, #2011 자작 재작성)',
+    (tester) async {
+      // [연혁] 이 회귀 테스트는 원래 광주 CC-BY-SA attribution 표시(kiwitree)를
+      // 성공 관측 수단으로 삼았으나, #2011 자작 전환으로 광주를 포함한 모든 권역이
+      // attributionRequired=false가 되어 성공/실패와 무관하게 attributionText가 항상
+      // null이다. 따라서 관측 수단을 attribution 표시 대신 manifest 로드 시도 횟수
+      // (manifestLoadAttempts)로 재작성한다 — 자작 manifest 상태와 무관하게 성립한다.
+      //
+      // 가드하는 회귀: _loadNetworkMapAttributionTextByRegion의
+      // `_sharedAttributionTextByRegionFuture ??=` 캐시가 실패한 Future를 그대로
+      // 붙들면 1차 실패가 영구 미표기로 고정된다. 캐시 무효화는 _loadAttributionText의
+      // catch 블록(`_sharedAttributionTextByRegionFuture = null`)이 담당하므로, 그
+      // 무효화가 사라지면(=재시도 안 됨) manifestLoadAttempts가 2에 도달하지 못한다.
+      final manifestBytes = await rootBundle.load(_mapManifestAssetPath);
+      // rootBundle은 loadString(cache:true)을 프로세스 생애주기 동안 캐시한다. 앞선
+      // 테스트가 이미 이 키를 성공 로드해 rootBundle 자체의 _stringCache에 남아
+      // 있으므로, induced failure를 실제로 겪으려면 그 캐시를 먼저 비운다.
+      rootBundle.evict(_mapManifestAssetPath);
+      addTearDown(() => rootBundle.evict(_mapManifestAssetPath));
+
+      final binaryMessenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      var manifestLoadAttempts = 0;
+      binaryMessenger.setMockMessageHandler('flutter/assets', (
+        ByteData? message,
+      ) async {
+        final key = utf8.decode(message!.buffer.asUint8List());
+        if (key != _mapManifestAssetPath) {
+          return null;
+        }
+        manifestLoadAttempts += 1;
+        if (manifestLoadAttempts == 1) {
+          return null; // 1차 로드 실패를 유도한다.
+        }
+        return manifestBytes; // 2차부터는 실제 번들 바이트로 성공 로드.
+      });
+      addTearDown(
+        () => binaryMessenger.setMockMessageHandler('flutter/assets', null),
+      );
+
+      resetNetworkMapAttributionCacheForTest();
+      addTearDown(resetNetworkMapAttributionCacheForTest);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkMapScreen(
+            repository: _FakeNetworkMapRepository(selectedRegion: '광주'),
+            routeDraftController: RouteDraftController(),
+            onOpenStationSearch: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pumpAndSettle();
+
+      // 1차 시도는 실패했어야 한다. 실패는 reportMobileError를 거쳐
+      // FlutterError.reportError로 전파되므로 takeException으로 소비해 의도된
+      // 예외임을 확인한다. 자작 전환 후 attribution은 성공/실패 무관하게 null이므로
+      // 표시 여부가 아니라 시도 횟수와 예외로 실패를 관측한다.
+      expect(find.byType(StructuredRouteMapView), findsOneWidget);
+      expect(_findRouteMapPainter(tester).attributionText, isNull);
+      expect(manifestLoadAttempts, 1);
+      expect(tester.takeException(), isNotNull);
+
+      // 재마운트 시 _sharedAttributionTextByRegionFuture는 catch에서 비워졌으므로
+      // _loadNetworkMapAttributionTextByRegion이 재시도된다. rootBundle
+      // (cache:true)이 실패 Future를 자체 _stringCache에 캐시하므로 하위 레이어도
+      // evict해야 실제 새 로드가 일어난다.
+      rootBundle.evict(_mapManifestAssetPath);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkMapScreen(
+            repository: _FakeNetworkMapRepository(selectedRegion: '광주'),
+            routeDraftController: RouteDraftController(),
+            onOpenStationSearch: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pumpAndSettle();
+
+      // 재시도가 실제로 일어나 2차 로드가 성공했다: 시도 횟수가 2에 도달하고,
+      // 2차에는 예외가 남지 않는다(성공 파싱). 캐시 무효화가 없었다면 실패 Future가
+      // 붙들려 재시도가 일어나지 않고 attempts는 1에 머문다.
+      expect(find.byType(StructuredRouteMapView), findsOneWidget);
+      expect(_findRouteMapPainter(tester).attributionText, isNull);
+      expect(manifestLoadAttempts, 2);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 /// #2011 계약 전환 테스트용 최소 manifest JSON. 광주 한 권역만 담고

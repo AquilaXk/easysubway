@@ -99,7 +99,7 @@
       "offline": {
         "included": false,
         "type": "svg",
-        "path": "assets/datapacks/maps/gwangju-cc-by-sa-route-map.svg",
+        "path": "assets/datapacks/maps/gwangju-self-drawn-route-map.svg",
         "mime_type": "image/svg+xml"
       },
       "license": {
