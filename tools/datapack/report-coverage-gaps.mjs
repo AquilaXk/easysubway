@@ -25,6 +25,16 @@ async function main() {
   // release-scope 평가: 전국 gap은 전량 산출·기록하되 게시 차단 판정은 게시 범위(pilot region/operator ×
   // capitalPilotTargets.requiredSourceDomains) 내 gap만 대상으로 한다. 전국 gap 은폐 금지 — summary에 양쪽 수치를 남긴다.
   if (releaseScope) {
+    // scope의 region/operator id가 pilot targets와 하나도 매칭되지 않으면 in-scope requirement가 0개가 되어
+    // missingRequirements === 0으로 공허 통과(게이트 무력화)한다. fail closed — 0 매칭은 scope/targets id 불일치로 본다.
+    if (report.summary.releaseScope.totalRequirements === 0) {
+      throw new Error(
+        "release scope matched zero coverage requirements — scope/targets id 불일치 의심 " +
+          `(scopeId: ${report.summary.releaseScope.scopeId}, ` +
+          `regionIds: ${report.summary.releaseScope.regionIds.join(",") || "-"}, ` +
+          `operatorIds: ${report.summary.releaseScope.operatorIds.join(",") || "-"})`,
+      );
+    }
     if (!args.allowGaps && report.summary.releaseScope.missingRequirements > 0) {
       throw new Error(
         `in-scope coverage gaps remain: ${report.summary.releaseScope.missingRequirements} missing requirements ` +

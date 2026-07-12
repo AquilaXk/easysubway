@@ -10695,6 +10695,34 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
   );
   assert.equal(injectedGap.inReleaseScope, true);
   assert.equal(injectedGap.status, "missing");
+
+  // #2000: scope의 region/operator id가 pilot targets와 하나도 매칭되지 않으면 in-scope requirement가 0개가 되어
+  // missingRequirements === 0으로 공허 통과할 위험이 있다. fail closed — 존재하지 않는 regionId scope는 exit 1로 실패한다.
+  const emptyScope = JSON.parse(await readFile("apps/mobile/release/production-datapack-scope.json", "utf8"));
+  emptyScope.supportScope.regionIds = ["nonexistent-region"];
+  const emptyScopePath = path.join(outputDir, "empty-release-scope.json");
+  await writeFile(emptyScopePath, `${JSON.stringify(emptyScope, null, 2)}\n`);
+  const emptyScopeReportPath = path.join(outputDir, "empty-scope-coverage-gap-report.json");
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/report-coverage-gaps.mjs",
+        "--targets",
+        "tools/datapack/nationwide-coverage-targets.json",
+        "--inventory",
+        "tools/datapack/source-inventory.json",
+        "--provenance",
+        path.join(packOutputDir, "current.provenance.json"),
+        "--release-scope",
+        emptyScopePath,
+        "--output",
+        emptyScopeReportPath,
+      ],
+      { cwd: root },
+    ),
+    /release scope matched zero coverage requirements/,
+  );
 });
 
 test("관리자 검수 NORMAL override는 production 시설 provenance와 validator를 통과한다", async () => {
