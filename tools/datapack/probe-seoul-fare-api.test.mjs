@@ -161,6 +161,7 @@ test("fare canary 응답 code가 모호하면 target 호출 전에 실패한다"
     const canaryResponse = ({ url }) => {
       const payload = farePayload(url);
       payload.response.body.items.item.push({ ...payload.response.body.items.item[0], dptreStnCd: "9999" });
+      payload.response.body.totalCount = 2;
       return Response.json(payload);
     };
 
@@ -185,6 +186,24 @@ test("fare canary 응답 code가 known pair와 다르면 target 호출 전에 �
     await assert.rejects(
       () => probe({ outputPath, fetchImpl: createFetch({ canaryResponse, onCall: (kind) => calls.push(kind) }) }),
       /dptreStnCd/,
+    );
+    assert.deepEqual(calls, ["fare:서울역→시청"]);
+    await assert.rejects(access(outputPath));
+  });
+});
+
+test("현재 page가 totalCount 전체를 포함하지 않으면 target 호출 전에 실패한다", async () => {
+  await withOutput(async (outputPath) => {
+    const calls = [];
+    const canaryResponse = ({ url }) => {
+      const payload = farePayload(url);
+      payload.response.body.totalCount = 2;
+      return Response.json(payload);
+    };
+
+    await assert.rejects(
+      () => probe({ outputPath, fetchImpl: createFetch({ canaryResponse, onCall: (kind) => calls.push(kind) }) }),
+      /pagination is incomplete/,
     );
     assert.deepEqual(calls, ["fare:서울역→시청"]);
     await assert.rejects(access(outputPath));
@@ -252,6 +271,47 @@ test("transport failure는 한 번만 재시도한다", async () => {
     const evidence = await probe({ outputPath, fetchImpl });
     assert.equal(evidence.attemptCounts["station-sangnoksu→station-sadang"], 2);
     assert.equal(forwardAttempts, 2);
+  });
+});
+
+test("response body transport failure도 한 번만 재시도한다", async () => {
+  await withOutput(async (outputPath) => {
+    const attempts = new Map();
+    const fetchImpl = createFetch({
+      fareResponse: ({ direction, url }) => {
+        const count = (attempts.get(direction) ?? 0) + 1;
+        attempts.set(direction, count);
+        const payload = farePayload(url);
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            if (count === 1) throw new TypeError("terminated");
+            return payload;
+          },
+        };
+      },
+    });
+
+    const evidence = await probe({ outputPath, fetchImpl });
+    assert.deepEqual(evidence.attemptCounts, { "station-sangnoksu→station-sadang": 2, "station-sadang→station-sangnoksu": 2 });
+    assert.deepEqual(Object.fromEntries(attempts), { "상록수→사당": 2, "사당→상록수": 2 });
+  });
+});
+
+test("malformed JSON은 transport failure로 재시도하지 않는다", async () => {
+  await withOutput(async (outputPath) => {
+    let attempts = 0;
+    const fetchImpl = createFetch({
+      fareResponse: () => {
+        attempts += 1;
+        return new Response("{invalid", { status: 200, headers: { "content-type": "application/json" } });
+      },
+    });
+
+    await assert.rejects(() => probe({ outputPath, fetchImpl }), /fare API returned invalid JSON/);
+    assert.equal(attempts, 1);
+    await assert.rejects(access(outputPath));
   });
 });
 

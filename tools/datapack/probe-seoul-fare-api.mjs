@@ -80,7 +80,7 @@ function shouldRetryStatus(status) {
   return status === 429 || status >= 500;
 }
 
-async function fetchWithRetry({ fetchImpl, url, timeoutMs, retryDelayMs, label }) {
+async function fetchJsonWithRetry({ fetchImpl, url, timeoutMs, retryDelayMs, label }) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let response;
     try {
@@ -92,12 +92,21 @@ async function fetchWithRetry({ fetchImpl, url, timeoutMs, retryDelayMs, label }
       }
       throw error;
     }
-    if (response.ok) return { attempts: attempt, response };
-    if (attempt < MAX_ATTEMPTS && shouldRetryStatus(response.status)) {
+    if (!response.ok && attempt < MAX_ATTEMPTS && shouldRetryStatus(response.status)) {
       await sleep(retryDelayMs);
       continue;
     }
-    throw new Error(`${label} HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`${label} HTTP ${response.status}`);
+    try {
+      return { attempts: attempt, payload: await response.json() };
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new Error(`${label} returned invalid JSON`);
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(retryDelayMs);
+        continue;
+      }
+      throw error;
+    }
   }
   throw new Error(`${label} retry exhausted`);
 }
@@ -120,6 +129,9 @@ function responseItems(payload, label) {
   const rawItems = body?.items?.item ?? body?.items ?? body?.item;
   const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
   if (resultCode !== "00") throw new Error(`${label} response rejected: resultCode=${resultCode || "missing"}`);
+  if (!Number.isSafeInteger(body?.totalCount) || body.totalCount !== items.length) {
+    throw new Error(`${label} response pagination is incomplete`);
+  }
   return items;
 }
 
@@ -144,19 +156,13 @@ function validatedFareItem(items, origin, destination) {
 }
 
 async function fetchFareQuote({ destination, fareServiceKey, fetchImpl, origin, retryDelayMs, timeoutMs }) {
-  const { attempts, response } = await fetchWithRetry({
+  const { attempts, payload } = await fetchJsonWithRetry({
     fetchImpl,
     url: fareUrl({ fareServiceKey, origin, destination }),
     timeoutMs,
     retryDelayMs,
     label: "fare API",
   });
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new Error("fare API returned invalid JSON");
-  }
   return { attempts, ...validatedFareItem(responseItems(payload, "fare API"), origin, destination) };
 }
 
