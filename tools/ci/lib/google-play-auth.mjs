@@ -66,9 +66,9 @@ export async function requestJson(url, { method, token, body }, fetchImpl = fetc
     return {};
   }
   const text = await response.text();
-  const parsed = text.length === 0 ? {} : JSON.parse(text);
+  const parsed = readResponseBody(text, `google play api ${method}`, response);
   if (!response.ok) {
-    throw new Error(`google play api ${method} failed: ${response.status} ${apiErrorSummary(parsed)}`);
+    throw new PlayApiError(`google play api ${method} failed`, response.status, text, parsed);
   }
   return parsed;
 }
@@ -81,20 +81,75 @@ export async function uploadMedia(url, { token, contentType, data }, fetchImpl =
     body: data,
   });
   const text = await response.text();
-  const parsed = text.length === 0 ? {} : JSON.parse(text);
+  const parsed = readResponseBody(text, "google play upload", response);
   if (!response.ok) {
-    throw new Error(`google play upload failed: ${response.status} ${apiErrorSummary(parsed)}`);
+    throw new PlayApiError("google play upload failed", response.status, text, parsed);
   }
   return parsed;
 }
 
-export function apiErrorSummary(parsed) {
-  const error = parsed.error;
+// Error carrying the HTTP status plus the *raw* (masked) response body. The raw
+// body is the load-bearing diagnostic: Google occasionally returns a plaintext
+// error (e.g. "Could not commit changes for edit ... app is in draft status")
+// instead of JSON, and the previous unconditional JSON.parse discarded it —
+// leaving only the useless "... is not valid JSON" (issue #2011).
+export class PlayApiError extends Error {
+  constructor(label, status, rawBody, parsed) {
+    super(`${label}: ${status} ${apiErrorSummary(parsed, rawBody)}`);
+    this.name = "PlayApiError";
+    this.status = status;
+    this.rawBody = rawBody;
+    this.parsed = parsed;
+  }
+}
+
+// Parse a response body as JSON when it *is* JSON; when it is not (a 2xx is
+// still expected to be JSON, but a plaintext error must not blow up parsing),
+// return the raw text under `_raw` so callers/summaries can surface it verbatim.
+export function readResponseBody(text, label, response) {
+  if (!text || text.length === 0) {
+    return {};
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Non-JSON body. On a successful status this is unexpected and must still
+    // fail loudly; on an error status the caller emits the raw body.
+    if (response && response.ok) {
+      throw new PlayApiError(`${label} returned non-JSON on success`, response.status, text, { _raw: text });
+    }
+    return { _raw: text };
+  }
+}
+
+// Mask anything that looks like a bearer/access token so a raw body echoed back
+// by the server never leaks a credential into logs.
+export function maskSecrets(text) {
+  if (typeof text !== "string") {
+    return text;
+  }
+  return text
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/-]+=*/gi, "$1***")
+    .replace(/("?access_token"?\s*[:=]\s*"?)[A-Za-z0-9._~+/-]+=*/gi, "$1***")
+    .replace(/(ya29\.)[A-Za-z0-9._~+/-]+/g, "$1***");
+}
+
+export function apiErrorSummary(parsed, rawBody) {
+  const error = parsed?.error;
   if (!error || typeof error !== "object") {
+    // No structured error object — surface the raw body verbatim (masked,
+    // whitespace-collapsed, capped) so plaintext errors are diagnosable at a
+    // glance instead of being reduced to "status=unknown".
+    const raw = typeof rawBody === "string" && rawBody.length > 0
+      ? rawBody
+      : (typeof parsed?._raw === "string" ? parsed._raw : "");
+    if (raw) {
+      return `status=unknown body=${maskSecrets(raw).replace(/\s+/g, " ").trim().slice(0, 400)}`;
+    }
     return "status=unknown";
   }
   const status = typeof error.status === "string" ? error.status : "unknown";
-  const message = typeof error.message === "string" ? error.message.replace(/\s+/g, " ").slice(0, 180) : "none";
+  const message = typeof error.message === "string" ? maskSecrets(error.message).replace(/\s+/g, " ").slice(0, 180) : "none";
   return `status=${status} message=${message}`;
 }
 
