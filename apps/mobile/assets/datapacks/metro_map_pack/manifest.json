@@ -88,12 +88,12 @@
       "id": "gwangju",
       "name_ko": "광주",
       "app_region": "광주",
-      "operator": "광주교통공사",
-      "source_url": "https://www.grtc.co.kr/cyber/simple",
+      "operator": "오너 자작(self-drawn)",
+      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg",
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-schematic",
         "bundled_svg_role": "review-reference-only",
-        "commercial_production_ready": false,
+        "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
       "offline": {
@@ -103,23 +103,21 @@
         "mime_type": "image/svg+xml"
       },
       "license": {
-        "name": "Creative Commons Attribution-ShareAlike 2.0 Korea",
-        "spdx": "CC-BY-SA-2.0-KR",
-        "url": "https://creativecommons.org/licenses/by-sa/2.0/kr/",
-        "source": "파일:광주 도시철도 1호선 노선도.svg",
-        "source_page": "https://namu.wiki/w/%ED%8C%8C%EC%9D%BC:%EA%B4%91%EC%A3%BC%20%EB%8F%84%EC%8B%9C%EC%B2%A0%EB%8F%84%201%ED%98%B8%EC%84%A0%20%EB%85%B8%EC%84%A0%EB%8F%84.svg",
-        "based_on": "파일:서울 지하철 7호선 노선도(2021_05).svg",
-        "date": "210712",
+        "name": "오너 자작 노선도(self-drawn)",
+        "spdx": "LicenseRef-Self-Drawn",
+        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg",
+        "source": "오너 자작 광주 8선형 정본 도식(easy-subway-gwangju-v1)",
+        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg",
+        "date": "2026-07-12",
         "authors": [
-          "kiwitree",
-          "grafiker"
+          "오너"
         ],
-        "attributionRequired": true,
-        "commercialUseAllowed": false,
-        "derivativeWorkAllowed": false,
-        "redistributionAllowed": false,
-        "reviewStatus": "legal-review-required",
-        "changes": "File stored unchanged as a bundled offline route-map asset. Derivative-work license chain is pending legal review; commercial use and redistribution remain blocked until confirmed."
+        "attributionRequired": false,
+        "commercialUseAllowed": true,
+        "derivativeWorkAllowed": true,
+        "redistributionAllowed": true,
+        "reviewStatus": "self-drawn-confirmed",
+        "changes": "Attribution contract transition (not removal): the previously bundled CC BY-SA 2.0 KR route-map asset (kiwitree, ShareAlike) is superseded by the owner's self-drawn 8-linear Gwangju schematic (easy-subway-gwangju-v1). App rendering uses structured coordinates (route_map_positions) derived from the self-drawn schematic, not the CC BY-SA SVG, so the ShareAlike/attribution chain no longer attaches to the distributed render. Only line-1 catalog stations are mapped; line 2 drawn in the schematic is excluded. The self-drawn SVG is retained only as a coordinate-review reference and is not distributed as the render source."
       }
     },
     {

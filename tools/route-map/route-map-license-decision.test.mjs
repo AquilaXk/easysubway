@@ -98,9 +98,10 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
     assert.equal(region.bundledSvgRole, "review-reference-only");
   }
 
-  // 부산·대구·대전: #1639/#1640 좌표 provenance(사실 데이터) 재검증 + line_tracks를
-  // down_path(위상=사실)로 재빌드 + SVG 번들 제거(#1715) 완료 → 상용 승격·attribution 해제.
-  for (const id of ["busan", "daegu", "daejeon"]) {
+  // 부산·대구·대전·광주: #2011 오너 자작 도식 정본 반입으로 self-drawn 확정 승격 →
+  // 상용 승격·attribution 해제. 광주는 이전 CC-BY-SA 유지 상태에서 자작 전환으로
+  // 함께 해제됐다(attribution 제거가 아니라 계약 전환 — regions[].notes 참조).
+  for (const id of ["busan", "daegu", "daejeon", "gwangju"]) {
     const region = decisionById.get(id);
     assert.equal(
       region.commercialProductionReady,
@@ -119,13 +120,14 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
     );
   }
 
-  // 광주: CC-BY-SA 2.0 KR ShareAlike라 사실 재구성에도 보수적으로 미승격·attribution 유지.
+  // 광주: [연혁] CC-BY-SA 2.0 KR ShareAlike라 보수적으로 attribution을 유지했으나,
+  // #2011 오너 자작 도식 반입으로 배포 렌더링이 CC-BY-SA SVG(kiwitree) 파생이
+  // 아니게 되어 attribution을 해제하고 상용 승격했다(위 self-drawn 루프에 포함).
   const gwangjuRegion = decisionById.get("gwangju");
-  assert.equal(gwangjuRegion.commercialProductionReady, false);
-  assert.equal(gwangjuRegion.attributionRequired, true);
-  assert.equal(manifestById.get("gwangju").license.commercialUseAllowed, false);
+  assert.equal(gwangjuRegion.reviewStatus, "self-drawn-confirmed");
+  assert.equal(gwangjuRegion.selfDrawnSource, "easy-subway-gwangju-v1.svg");
 
-  // 광주 ShareAlike 결론이 사실≠저작물 근거와 함께 기록된다.
+  // 광주 ShareAlike 결론이 사실≠저작물 근거와 함께 기록된다(연혁 근거로 보존).
   const gwangju = decision.gwangjuShareAlikeConclusion;
   assert.ok(/ShareAlike/.test(gwangju.conclusion));
   assert.ok(/파생물이 아니/.test(gwangju.conclusion));
@@ -134,8 +136,8 @@ test("route map license decision pins 대안 A(self-drawn) 전환과 근거", ()
 
   // attribution 필요 지역 목록이 #1641로 전달 가능한 형태로 확정된다.
   const handoff = decision.attributionHandoffTo1641;
-  // #1639/#1640: 부산·대구·대전 attribution 해제, 광주(CC-BY-SA)만 유지.
-  assert.deepEqual(handoff.attributionRequiredRegions, ["광주"]);
+  // #2011: 4권역 전부 self-drawn 전환으로 attribution 해제 — 요구 지역 목록은 빈다.
+  assert.deepEqual(handoff.attributionRequiredRegions, []);
   // handoff 목록이 per-region attributionRequired 플래그와 정합한다.
   const requiredKoreanNames = decision.regions
     .filter((region) => region.attributionRequired)

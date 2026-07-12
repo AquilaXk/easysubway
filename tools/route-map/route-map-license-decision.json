@@ -106,43 +106,43 @@
     {
       "id": "gwangju",
       "region": "광주",
-      "operator": "광주교통공사",
-      "sourceUrl": "https://www.grtc.co.kr/cyber/simple",
-      "retrievedAt": "2026-06-23",
-      "originalLicenseSpdx": "CC-BY-SA-2.0-KR",
+      "operator": "오너 자작(self-drawn)",
+      "sourceUrl": "internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg",
+      "retrievedAt": "2026-07-12",
+      "originalLicenseSpdx": "LicenseRef-Self-Drawn",
       "originalCommercialUseAllowed": true,
       "renderingStrategy": "self-drawn-schematic",
       "bundledSvgRole": "review-reference-only",
-      "attributionRequired": true,
+      "attributionRequired": false,
       "attributionDropTargetAfterSelfDrawn": true,
-      "commercialProductionReady": false,
-      "redistributionAllowed": false,
-      "reviewStatus": "legal-review-required",
-      "notes": "원본 SVG는 CC BY-SA 2.0 KR(상용 가능하나 attribution·ShareAlike). ShareAlike 전파 리스크를 없애기 위해 앱 렌더링을 CC-BY-SA SVG 파생이 아닌 사실 데이터 기반 자체 schematic으로 전환한다. 원본 SVG가 아직 번들되어 있으므로 CC-BY-SA attribution을 유지하며(=true), SVG 제거 + 사실 출처 provenance 확정(#1640) 후 해제 가능. 원본 SVG는 좌표 검수 참조로만 쓴다. [2026-07-11 #1958] ShareAlike 파생 체인이 법률 검토 대기이므로 재배포 차단(redistributionAllowed=false)·reviewStatus=legal-review-required 유지. 두 필드를 정본에 명시해 manifest와 교차 검증한다."
+      "commercialProductionReady": true,
+      "redistributionAllowed": true,
+      "reviewStatus": "self-drawn-confirmed",
+      "selfDrawnSource": "easy-subway-gwangju-v1.svg",
+      "notes": "[연혁] 원본은 CC BY-SA 2.0 KR(상용 가능하나 attribution·ShareAlike, kiwitree/grafiker 저작). ShareAlike 전파 리스크 때문에 앱 렌더링을 사실 데이터 기반 자체 schematic으로 두되, 원본 SVG가 번들·법률 검토 대기라 attribution을 유지(=true)·재배포 차단(false)·reviewStatus=legal-review-required였다(#1958). [2026-07-12 #2011/#1951] 오너가 광주 노선도를 직접 재제작(easy-subway-gwangju-v1 — 8선형 self-contained SVG)해 새 정본으로 반입했다. 오너가 직접 제작한 창작물이므로 self-drawn 확정으로 승격 — #1951 오너 결정 이행. 이는 attribution 제거가 아니라 계약 전환이다: 배포 렌더링이 더 이상 CC-BY-SA SVG(kiwitree)의 파생이 아니게 되어 ShareAlike/attribution 체인이 배포물에 부착되지 않으므로, attribution_required를 false로 전환하고(수도권 PD·부산·대구·대전 self-drawn과 동일 상태) 상용 준비·재배포를 허용한다. 앱은 SVG 원본을 통째 렌더하지 않고(#1635 유지) 도식에서 파생한 구조화 좌표(route_map_positions)만 렌더한다. #2011 3단계 반복 파이프라인 재실행 결과 역 추가/삭제 0·위상 보존 100%(현행 광주 팩 20 (station,line) 쌍 동일)이며 미매핑 0. 광주 도식은 카탈로그 밖 미개통 2호선까지 그리므로 nodeFilter로 1호선 실역(20)만 정합 대상으로 남겼다(카탈로그 확장은 별도 이슈). 이전 CC-BY-SA 원본 SVG 및 자작 SVG는 review-reference로만 보관한다(앱 렌더 source 아님). route_map_attribution_test의 kiwitree 배선 계약도 이 전환에 맞춰 자작 기준(광주 attribution 미표시)으로 정합 갱신했다."
     }
   ],
   "gwangjuShareAlikeConclusion": {
     "conclusion": "CC BY-SA 2.0 KR의 ShareAlike는 원본 SVG(원저작물의 창작적 표현)의 파생 저작물에 전파될 수 있으므로, 앱에 배포하는 렌더링을 CC-BY-SA SVG에서 파생하지 않는다. 역 좌표·노선 위상·역 순서는 사실(fact) 데이터로 취급해 자체 schematic layout으로 재구성하며, 배포 산출물은 CC-BY-SA SVG의 창작적 표현을 복제·각색한 파생물이 아니다. 따라서 ShareAlike 조항이 배포 렌더링에 부착되지 않는다. 다만 좌표를 CC-BY-SA SVG에서 직접 추출(trace)하면 파생 논란이 남으므로, 좌표 provenance를 사실 출처(공공데이터포털/공식 역 목록)로 확정하는지는 #1640에서 검증한다.",
     "legalBasis": "저작권은 표현에만 미치고 사실·아이디어에는 미치지 않는다(Feist v. Rural Telephone, 미국; 한국 저작권법 제7조·사실 전달에 불과한 시사보도 등 유사 원리). 좌표·역 순서 같은 사실 데이터는 저작권 대상이 아니므로, 이를 사실 출처에서 취득해 자체 도식으로 그리면 원본 SVG의 파생물이 아니다.",
     "precedent": "OpenStreetMap Foundation은 CC BY-SA가 '사실 데이터베이스에 부적합'하다고 판단해 데이터 라이선스를 ODbL로 전환했다. 근거: (1) 사실은 저작권 보호 대상이 아니라 CC BY-SA(저작권 기반)가 데이터에는 실효가 없고, (2) ShareAlike는 렌더링 타일에만 전파되고 원천 데이터 공개를 강제하지 않으며, (3) 다수 기여자 attribution이 실무상 불가능. 우리는 반대 방향으로 이 원리를 사용한다: 사실 데이터 기반 자체 도식이므로 ShareAlike가 배포물에 부착되지 않는다.",
-    "conservativeGuard": "확정 전까지 광주는 attribution-pending으로 두고, CC-BY-SA SVG 자체는 앱에 배포하지 않으며 좌표 검수 참조로만 쓴다."
+    "conservativeGuard": "[연혁] 확정 전까지 광주는 attribution-pending으로 두고 CC-BY-SA SVG 자체는 앱에 배포하지 않으며 좌표 검수 참조로만 썼다. [2026-07-12 #2011/#1951 해소] 오너 자작 광주 도식(easy-subway-gwangju-v1) 반입으로 배포 렌더링이 CC-BY-SA SVG 파생이 아니게 되어 ShareAlike 리스크가 원천 제거됐고, attribution을 자작 기준(미표시)으로 전환했다. 이 결론(사실 재구성이면 ShareAlike 미부착)은 자작 전환 후에도 그대로 성립한다."
   },
   "attributionHandoffTo1641": {
-    "attributionRequiredRegions": [
-      "광주"
-    ],
+    "attributionRequiredRegions": [],
     "attributionDropTargetRegions": [
       "부산",
       "대구",
       "대전",
       "광주"
     ],
-    "rule": "[2026-07-05 #1639/#1640 기준 현재 상태] #1641 렌더러는 attributionRequiredRegions(=광주)에 대해서만 화면 attribution(출처표시)을 표시한다. 부산·대구·대전은 자체 도식(down_path=사실 위상) 전환 + 원본 SVG 번들 제거(#1715) + 좌표 provenance 사실 출처 확정 완료로 원본 저작물 파생이 아니게 되어 attribution을 해제했다(attributionDroppedRegions). 수도권은 public domain으로 attribution 불필요. 광주는 CC-BY-SA ShareAlike라 사실 재구성에도 보수적으로 attribution 유지. [연혁] 원본 SVG(permission-required / CC-BY-SA)가 번들되어 있던 동안에는 부산·대구·대전·광주 전체에 attribution을 표시했고, 대안 A 완료(#1639/#1640/#1641) 시점에 위와 같이 갱신했다.",
-    "consistencyRule": "각 지역의 attributionRequiredRegions 포함 여부는 regions[].attributionRequired와 일치한다(attributionRequired=true인 지역은 목록에 포함, 수도권은 false로 제외).",
+    "rule": "[2026-07-12 #2011/#1951 기준 현재 상태] #1641 렌더러는 attributionRequiredRegions(현재 빈 목록)에 대해서만 화면 attribution(출처표시)을 표시한다 — 즉 현재 어떤 권역도 화면 attribution을 표시하지 않는다. 부산·대구·대전·광주 4권역 전부 오너 자작 도식(self-drawn) 정본으로 전환 완료(#2011)되어 원본 저작물 파생이 아니게 되었고, 수도권은 self-drawn(구 public domain)으로 attribution 불필요다. 광주는 이전에 CC-BY-SA ShareAlike라 보수적으로 attribution을 유지했으나, 오너 자작 도식 반입으로 배포 렌더링이 CC-BY-SA SVG(kiwitree) 파생이 아니게 되어 attribution을 해제했다(제거가 아니라 계약 전환 — attributionDroppedRegions로 이동). [연혁] 원본 SVG(permission-required / CC-BY-SA)가 번들되어 있던 동안에는 부산·대구·대전·광주 전체에 attribution을 표시했고, 이후 단계적으로 위와 같이 갱신했다.",
+    "consistencyRule": "각 지역의 attributionRequiredRegions 포함 여부는 regions[].attributionRequired와 일치한다(attributionRequired=true인 지역만 목록에 포함). 현재 4권역+수도권 모두 attributionRequired=false이므로 목록은 비어 있다.",
     "attributionDroppedRegions": [
       "부산",
       "대구",
-      "대전"
+      "대전",
+      "광주"
     ]
   },
   "productionPromotionRule": "renderingStrategy=self-drawn-schematic 지역은 원본 SVG 라이선스로 production source 승격하지 않는다. 상용 가능성이 불명확한 원본(permission-required, ShareAlike)은 앱 렌더링 source of truth가 아니며, PDF/SVG 원본은 좌표 검수 기준으로만 쓴다.",
