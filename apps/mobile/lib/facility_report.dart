@@ -50,7 +50,7 @@ const _facilityReportCardRadius = BorderRadius.all(Radius.circular(16));
 Color _reportStatusColor(BuildContext context, String status) {
   final tokens = EasySubwayTokens.of(context);
   return switch (status) {
-    'SUBMITTED' => EasySubwayAccessibleColors.needsInfo,
+    'SUBMITTED' => tokens.accent,
     'UNDER_REVIEW' => tokens.warn,
     'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
     'REJECTED' => tokens.danger,

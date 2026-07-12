@@ -995,7 +995,7 @@ class _NotificationSwitchGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = EasySubwayTokens.of(context);
     return Material(
-      color: Colors.white,
+      color: tokens.surface,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: _notificationSwitchTileRadius,

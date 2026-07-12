@@ -382,7 +382,7 @@ void main() {
       // 의도 잔존: _searchFieldTextStyle(top-level const) — context 미가용
       // 보류 1건 포함 (#1917)
       'lib/network_map.dart': 11,
-      'lib/facility_report.dart': 2,
+      'lib/facility_report.dart': 1,
       'lib/onboarding.dart': 2,
       'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
     }, rule: 'EasySubwayAccessibleColors 잔존 참조');
