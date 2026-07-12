@@ -43,6 +43,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     coverageStatus: "PASS",
     routeMapPositionCoverageStatus: "PASS",
     routeGraphTopologyStatus: "PASS",
+    routeGraphTopologyViolationCount: 0,
     headwayReportStatus: "PASS",
     strictRouteRegressionStatus: "PASS",
     manifestSignatureStatus: "PASS",
@@ -79,6 +80,31 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   );
 
   bundle.headwayReportStatus = "PASS";
+  // route_graph_topology는 capital pilot deferred domain이므로 위반 기록 시 DEFERRED가 publish gate를 통과한다.
+  bundle.routeGraphTopologyStatus = "DEFERRED";
+  bundle.routeGraphTopologyViolationCount = 4;
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+    { cwd: root },
+  );
+
+  // deferred가 아닌 다른 게이트(예: routeMapPositionCoverageStatus)는 DEFERRED를 허용하지 않는다.
+  bundle.routeGraphTopologyStatus = "PASS";
+  bundle.routeGraphTopologyViolationCount = 0;
+  bundle.routeMapPositionCoverageStatus = "DEFERRED";
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+      { cwd: root },
+    ),
+    /routeMapPositionCoverageStatus must be a release gate status/,
+  );
+
+  bundle.routeMapPositionCoverageStatus = "PASS";
   bundle.validatorStatus = "DEFERRED";
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await assert.rejects(
