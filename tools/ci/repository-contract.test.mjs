@@ -5162,7 +5162,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 15/);
+  assert.match(schema, /PRAGMA user_version = 16/);
   assert.match(schema, /CREATE TABLE stations/);
   assert.match(schema, /CREATE TABLE transit_feed_info/);
   assert.match(schema, /CREATE TABLE station_facility_evidence/);
@@ -5172,6 +5172,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.match(schema, /CREATE TABLE station_pathway_nodes/);
   assert.match(schema, /CREATE TABLE station_pathway_edges/);
   assert.match(schema, /CREATE TABLE transfer_rules/);
+  assert.match(schema, /CREATE TABLE station_car_door_hints/);
   assert.match(schema, /CREATE TABLE realtime_provider_line_mappings/);
   assert.match(schema, /CREATE TABLE realtime_provider_station_mappings/);
   assert.match(schema, /source_id TEXT NOT NULL DEFAULT ''/);
@@ -5196,6 +5197,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.match(builder, /candidateBuild/);
   assert.match(builder, /"transit_stop_times"/);
   assert.match(builder, /"station_pathway_edges"/);
+  assert.match(builder, /"station_car_door_hints"/);
   assert.match(validator, /PRAGMA quick_check/);
   assert.match(validator, /PRAGMA foreign_key_check/);
   assert.match(validator, /PRAGMA user_version/);
@@ -5207,6 +5209,9 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.match(validator, /validateRepresentativeRouteRegressions/);
   assert.match(validator, /validateTransitSchedule/);
   assert.match(validator, /validateStationPathways/);
+  assert.match(validator, /validateStationCarDoorHints/);
+  assert.match(validator, /station_car_door_hints car_number out of range/);
+  assert.match(validator, /station_car_door_hints target_facility_type is invalid/);
   assert.match(validator, /transit_stop_times must be monotonic/);
   assert.match(validator, /station_pathway_edges generated connector cannot be VERIFIED/);
   assert.match(validator, /transfer_rules strict step-free edge is not step-free/);
@@ -6170,7 +6175,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class FareZones extends Table/);
   assert.match(mobileTables, /class StationFareZones extends Table/);
   assert.match(mobileTables, /class FacilityStatusSnapshots extends Table/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 15/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 16/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
   assert.match(mobileDatabase, /_createStationPathwayIndexes/);
@@ -6186,7 +6191,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 15/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 16/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /FacilityStatusSnapshots/);
