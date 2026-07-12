@@ -155,6 +155,7 @@ const LEGACY_COMMAND_DEFENSE=/\b(?:curl|wget|ssh|scp|sftp|bash|zsh|fish|powershe
 const LEGACY_USER_AGENT_TOKEN_DEFENSE=/\b[0-9A-Za-z_$]*UserAgent[0-9A-Za-z_$]*\b/i;
 const LEGACY_PRODUCT_VERSION_DEFENSE=/(?:^|[\s(])[!#$%&'*+.^_`|~0-9A-Za-z-]+\/\d+(?:\.\d+)*(?=$|[\s;)])/;
 const BASE64URL_CANDIDATE=/[A-Za-z0-9_-]{12,}/g;
+const STANDARD_BASE64_PATH_CANDIDATE=/(?=([A-Za-z0-9+/]{12,4096}={0,2})(?=[^A-Za-z0-9+/=]|$))/g;
 function decodeBounded(value) {
   let current=value.normalize("NFKC");
   for (let count=0; count<2; count+=1) { try { const next=decodeURIComponent(current); if (next===current) break; current=next; } catch { break; } }
@@ -225,6 +226,11 @@ function scanPrivacy(value, gate, version, path="$", seen=new Set(), depth=0) {
     const candidates=value.match(BASE64URL_CANDIDATE) ?? [];
     if (/^[A-Za-z0-9+/_-]+={0,2}$/.test(value)) candidates.push(value);
     for (const candidate of candidates) {
+      const base64Decoded=decodeCanonicalBase64(candidate);
+      if (base64Decoded) scanPrivacy(base64Decoded,gate,version,path,seen,depth+1);
+    }
+    for (const [,candidate] of value.matchAll(STANDARD_BASE64_PATH_CANDIDATE)) {
+      if (!candidate.includes("/")) continue;
       const base64Decoded=decodeCanonicalBase64(candidate);
       if (base64Decoded) scanPrivacy(base64Decoded,gate,version,path,seen,depth+1);
     }

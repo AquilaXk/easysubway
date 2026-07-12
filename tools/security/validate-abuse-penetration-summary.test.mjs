@@ -401,6 +401,26 @@ test("B RED privacy rejects canonical Base64url sensitive evidence-path segments
   });
 });
 
+test("B RED privacy rejects canonical standard Base64 split across allowed evidence-path segments without echo", async (t) => {
+  const sensitive = ["ht", "tp", ":", "//", "19", "2", ".0.2.42", "/", "x"].join("");
+  const prefix = String.fromCodePoint(0x01df, 0x3448);
+  const encoded = Buffer.from(`${prefix}${sensitive}`, "utf8").toString("base64");
+  assert.equal(encoded.includes("/"), true);
+  const summary = freshV2Pass();
+  summary.evidence[0].localEvidencePath = `.codex/evidence/security/abuse-penetration-rehearsal/${encoded}.json`;
+  await assert.rejects(runSummary(t, summary, { requirePass: true }), (error) => {
+    assert.match(error.stderr, /SUMMARY_PRIVACY_VIOLATION/);
+    assert.equal(error.stderr.includes(sensitive), false);
+    return true;
+  });
+});
+
+test("B RED privacy allows benign multi-segment evidence paths", async (t) => {
+  const summary = freshV2Pass();
+  summary.evidence[0].localEvidencePath = ".codex/evidence/security/abuse-penetration-rehearsal/run/nested/redacted.json";
+  await runSummary(t, summary, { requirePass: true });
+});
+
 test("B RED direct validator rejects prototype-inherited v2 summaries as schema-invalid", () => {
   const inherited = freshV2Pass();
   const summary = Object.create(inherited);
