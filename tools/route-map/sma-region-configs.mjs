@@ -138,7 +138,56 @@ const BUSAN = {
   contentBand: { minY: 300, maxY: 2700 },
 };
 
-const REGION_CONFIGS = { seoul: SEOUL, busan: BUSAN };
+// ── 대구(daegu): #2011 3단계. 오너 자작 easy-subway-daegu-v1. ─────────────────
+// 문법 차이(수도권 대비): viewBox 2400×1800, route-line은 노선당 단일 <path>
+// (route-line-1/2/3/daegyeong 그룹), data-line 슬러그가 line1..line3/daegyeong,
+// lines.name_ko 접두가 "대구"이나 route_map_positions.region은 "대구권"(불일치),
+// 역 노드는 부산과 동일하게 [data-node-role][data-station] g(circle/g)로 마킹되고
+// 환승역은 data-line 빈값(멤버십 broadcast), 범례 노드(data-station="범례") 1개 존재.
+// 색↔슬러그는 도식 data-line-color 실측(line1=#ee265b·line2=#00b794·line3=#ffc513·
+// daegyeong=#0066b3). 대경선은 #1951 확정 4노선의 하나.
+const DAEGU = {
+  id: "daegu",
+  regionKey: "대구권",
+  lineNamePrefix: "대구",
+  svgSource: {
+    sourceId: "owner-self-drawn-sma-schematic",
+    sourceName: "오너 자작 대구 8선형 정본 도식",
+    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
+    license: "self-drawn",
+    licenseStatus: "confirmed",
+    commercialUseAllowed: true,
+    attributionRequired: false,
+  },
+  slugToSuffix: {
+    line1: "1호선", line2: "2호선", line3: "3호선",
+    daegyeong: "대경선",
+  },
+  colorToSlug: {
+    "#ee265b": "line1", "#00b794": "line2", "#ffc513": "line3", "#0066b3": "daegyeong",
+  },
+  // 대구 도식은 data-line 없는 환승역을 멤버십으로 해소하므로 힌트 불필요.
+  missingLineHint: {},
+  markerlessFallback: [],
+  // 대구 카탈로그는 도식과 위상 일치(누락 없음). 예외 없음.
+  topologyExceptions: [],
+  // 정합 대상에서 제외할 SVG data-station:
+  //   범례(비역 노드), 북삼(도식 수록 대경선 역이나 현행 카탈로그 미수록 — fail-closed로
+  //   억지 매핑하지 않고 명시 제외한다. 카탈로그 확장은 별도 이슈).
+  excludedStations: ["범례", "북삼"],
+  // canonical 정합 규칙(대구 카탈로그 실측): 괄호 부제 제거(부호(경일대·호산대)→부호,
+  // 하양(대구가톨릭대)→하양), 서대구→서대구역.
+  canonicalRules: (svgName) => {
+    let name = svgName.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    if (name === "서대구") name = "서대구역";
+    return { name };
+  },
+  // 범례 노선 swatch(medY≈166, len 42px)를 콘텐츠 밴드 밖으로 배제한다. 실 노선
+  // path의 medY는 820~1193이므로 minY 300이면 범례 swatch만 걸러진다.
+  contentBand: { minY: 300, maxY: 1800 },
+};
+
+const REGION_CONFIGS = { seoul: SEOUL, busan: BUSAN, daegu: DAEGU };
 // regionKey(예: "부산권")로도 조회 가능.
 const BY_REGION_KEY = new Map(Object.values(REGION_CONFIGS).map((c) => [c.regionKey, c]));
 
@@ -151,4 +200,4 @@ export function getRegionConfig(idOrRegionKey) {
   return config;
 }
 
-export { SEOUL, BUSAN, REGION_CONFIGS };
+export { SEOUL, BUSAN, DAEGU, REGION_CONFIGS };
