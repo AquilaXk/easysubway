@@ -11,6 +11,8 @@ const root = process.cwd();
 const execFileAsync = promisify(execFile);
 const ASSET_ORIGIN = "https://ads-assets.fixture.test-only.dev";
 const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
+const EVENT_DAILY_CAP_LINE = "EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000";
+const BACKEND_BIND_LINE = "EASYSUBWAY_BACKEND_BIND=127.0.0.1";
 const deploymentTempDirs = new Set();
 
 function read(relativePath) {
@@ -33,6 +35,14 @@ function withAssetOrigin(origin) {
     ASSET_ORIGIN_LINE,
     `EASYSUBWAY_ADS_ASSET_ORIGIN=${origin}`,
   );
+}
+
+function withEventDailyCap(value) {
+  return fixtureEnv().replace(EVENT_DAILY_CAP_LINE, `EASYSUBWAY_ADS_EVENT_DAILY_CAP=${value}`);
+}
+
+function withBackendBind(value) {
+  return fixtureEnv().replace(BACKEND_BIND_LINE, `EASYSUBWAY_BACKEND_BIND=${value}`);
 }
 
 async function assertInvalidAssetOrigin(origin) {
@@ -167,6 +177,34 @@ test("광고 asset origin production preflight는 unsafe 값을 차단한다", a
     assert.ok(
       backendEnv.split("\n").includes(`EASYSUBWAY_ADS_ASSET_ORIGIN=${origin}`),
       "backend.env must preserve an allowed origin exactly",
+    );
+  }
+});
+
+test("광고 event daily cap은 positive PostgreSQL INTEGER로 backend env에만 전달한다", async () => {
+  const outputDir = await prepare(fixtureEnv());
+  const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+  const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
+  assert.match(backendEnv, /^EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000$/m);
+  assert.doesNotMatch(composeEnv, /^EASYSUBWAY_ADS_EVENT_DAILY_CAP=/m);
+
+  for (const value of ["", "0", "-1", "1.5", "value", "2147483648", "99999999999999999999"]) {
+    await assert.rejects(
+      prepare(withEventDailyCap(value)),
+      /invalid positive integer: EASYSUBWAY_ADS_EVENT_DAILY_CAP/,
+    );
+  }
+  await assert.rejects(
+    prepare(fixtureEnv().replace(`${EVENT_DAILY_CAP_LINE}\n`, "")),
+    /required deployment env is empty: EASYSUBWAY_ADS_EVENT_DAILY_CAP/,
+  );
+});
+
+test("production backend bind는 loopback만 허용한다", async () => {
+  for (const value of ["", "0.0.0.0", "::", "10.52.1.10"]) {
+    await assert.rejects(
+      prepare(withBackendBind(value)),
+      /backend bind must be 127.0.0.1/,
     );
   }
 });
