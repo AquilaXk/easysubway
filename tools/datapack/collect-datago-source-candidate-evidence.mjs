@@ -68,7 +68,10 @@ export function resolveDatagoCandidateRequest(candidatesDocument, candidateId) {
     throw new Error(`${candidateId} sampleUrl must contain exactly one redacted serviceKey`);
   }
 
-  const format = requiredText(sampleUrl.searchParams.get("format"), `${candidateId} sample format`).toLowerCase();
+  const formatParam = ["format", "dataType", "_type"]
+    .map((name) => sampleUrl.searchParams.get(name))
+    .find((value) => value !== null);
+  const format = requiredText(formatParam, `${candidateId} sample format`).toLowerCase();
   if (format === "csv") {
     throw new Error(`${candidateId} csv sample collection not yet supported`);
   }

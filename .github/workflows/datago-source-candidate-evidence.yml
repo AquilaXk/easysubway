@@ -11,6 +11,8 @@ on:
           - seoul-metro-transfer-distance-duration
           - seoul-metro-fast-exit-car-door
 
+permissions: {}
+
 jobs:
   collect:
     name: Data.go.kr Source Candidate Evidence

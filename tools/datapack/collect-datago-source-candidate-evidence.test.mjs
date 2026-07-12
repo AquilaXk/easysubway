@@ -32,6 +32,30 @@ const xmlCandidate = {
   },
 };
 
+const dataTypeCandidate = {
+  ...candidate,
+  evidence: {
+    ...candidate.evidence,
+    sampleUrl: candidate.evidence.sampleUrl.replace("format=json", "dataType=JSON"),
+  },
+};
+
+const underscoreTypeCandidate = {
+  ...candidate,
+  evidence: {
+    ...candidate.evidence,
+    sampleUrl: candidate.evidence.sampleUrl.replace("format=json", "_type=xml"),
+  },
+};
+
+const dataTypeCsvCandidate = {
+  ...candidate,
+  evidence: {
+    ...candidate.evidence,
+    sampleUrl: candidate.evidence.sampleUrl.replace("format=json", "dataType=csv"),
+  },
+};
+
 async function assertCollectorCleanup(runnerTemp) {
   assert.equal(existsSync(path.join(runnerTemp, "datago-source-candidate-raw")), false);
   assert.equal(existsSync(path.join(runnerTemp, "datago-source-candidate-staging")), false);
@@ -75,6 +99,34 @@ test("Data.go.kr evidence collector는 정확한 2개 allowlist와 tracked endpo
       }],
     }, candidate.id),
     /provider origin must be a data\.go\.kr origin/,
+  );
+});
+
+test("Data.go.kr evidence collector는 dataType/_type 쿼리 파라미터도 sample format으로 인식한다", () => {
+  const dataTypeRequest = resolveDatagoCandidateRequest({ candidates: [dataTypeCandidate] }, dataTypeCandidate.id);
+  assert.equal(dataTypeRequest.format, "json");
+
+  const underscoreTypeRequest = resolveDatagoCandidateRequest(
+    { candidates: [underscoreTypeCandidate] },
+    underscoreTypeCandidate.id,
+  );
+  assert.equal(underscoreTypeRequest.format, "xml");
+
+  assert.throws(
+    () => resolveDatagoCandidateRequest({ candidates: [dataTypeCsvCandidate] }, dataTypeCsvCandidate.id),
+    /csv sample collection not yet supported/,
+  );
+
+  const unsupportedDataTypeCandidate = {
+    ...candidate,
+    evidence: {
+      ...candidate.evidence,
+      sampleUrl: candidate.evidence.sampleUrl.replace("format=json", "dataType=yaml"),
+    },
+  };
+  assert.throws(
+    () => resolveDatagoCandidateRequest({ candidates: [unsupportedDataTypeCandidate] }, unsupportedDataTypeCandidate.id),
+    /sample format is not supported: yaml/,
   );
 });
 
