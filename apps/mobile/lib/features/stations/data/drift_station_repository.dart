@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:drift/drift.dart';
 
 import '../../../core/database/catalog/catalog_database.dart';
+import '../../../core/database/catalog/station_timetable_query.dart';
 import '../../../network_map.dart';
 import '../../../station_search.dart';
 
@@ -10,6 +11,7 @@ class DriftStationRepository
     implements
         StationSearchRepository,
         StationLineFilterRepository,
+        StationTimetableRepository,
         NetworkMapRepository {
   DriftStationRepository({required this.database});
 
@@ -32,6 +34,88 @@ class DriftStationRepository
         .where((station) => station.matches(trimmedQuery))
         .map((station) => station.toSearchResult())
         .toList(growable: false);
+  }
+
+  @override
+  Future<StationTimetable> loadStationTimetable({
+    required String stationId,
+    required String lineId,
+    required StationTimetableDayType dayType,
+    required DateTime referenceDate,
+  }) async {
+    final catalogDayType = switch (dayType) {
+      StationTimetableDayType.weekday => CatalogTimetableDayType.weekday,
+      StationTimetableDayType.saturday => CatalogTimetableDayType.saturday,
+      StationTimetableDayType.sundayHoliday =>
+        CatalogTimetableDayType.sundayHoliday,
+    };
+    final rows = await CatalogStationTimetableQuery(database).loadDepartures(
+      stationId: stationId,
+      lineId: lineId,
+      dayType: catalogDayType,
+      referenceDate: referenceDate,
+    );
+    return _stationTimetable(
+      stationId: stationId,
+      lineId: lineId,
+      dayType: dayType,
+      rows: rows,
+    );
+  }
+
+  @override
+  Future<StationTimetable> loadStationTimetableForDate({
+    required String stationId,
+    required String lineId,
+    required DateTime date,
+  }) async {
+    final timetable = await CatalogStationTimetableQuery(
+      database,
+    ).loadDeparturesForDate(stationId: stationId, lineId: lineId, date: date);
+    final dayType = switch (timetable.dayType) {
+      CatalogTimetableDayType.weekday => StationTimetableDayType.weekday,
+      CatalogTimetableDayType.saturday => StationTimetableDayType.saturday,
+      CatalogTimetableDayType.sundayHoliday =>
+        StationTimetableDayType.sundayHoliday,
+    };
+    return _stationTimetable(
+      stationId: stationId,
+      lineId: lineId,
+      dayType: dayType,
+      rows: timetable.departures,
+    );
+  }
+
+  StationTimetable _stationTimetable({
+    required String stationId,
+    required String lineId,
+    required StationTimetableDayType dayType,
+    required List<CatalogStationDeparture> rows,
+  }) {
+    final grouped = <String, List<StationTimetableDeparture>>{};
+    for (final row in rows) {
+      final directionName = row.directionName;
+      grouped
+          .putIfAbsent(directionName, () => <StationTimetableDeparture>[])
+          .add(
+            StationTimetableDeparture(
+              directionName: directionName,
+              seconds: row.seconds,
+            ),
+          );
+    }
+    return StationTimetable(
+      stationId: stationId,
+      lineId: lineId,
+      dayType: dayType,
+      directions: [
+        for (final entry in grouped.entries)
+          StationTimetableDirection(
+            name: entry.key,
+            departures: List.unmodifiable(entry.value),
+          ),
+      ],
+    );
   }
 
   @override
