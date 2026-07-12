@@ -296,12 +296,14 @@ test("Data.go.kr evidence collector는 URL 인코딩된 service key를 fetch URL
   const encodedServiceKey = "abc%2Bdef%3D%3D";
   try {
     let capturedServiceKeyParam;
+    let capturedUrl;
     const outputs = await collectDatagoSourceCandidateEvidence({
       candidateId: candidate.id,
       candidatesDocument: { candidates: [candidate] },
       runnerTemp,
       serviceKey: encodedServiceKey,
       fetchImpl: async (url) => {
+        capturedUrl = url;
         capturedServiceKeyParam = url.searchParams.get("serviceKey");
         return new Response(JSON.stringify([
           { stnNm: "사당", carNo: "3-2" },
@@ -313,10 +315,8 @@ test("Data.go.kr evidence collector는 URL 인코딩된 service key를 fetch URL
     });
 
     assert.equal(capturedServiceKeyParam, "abc+def==");
-    const requestedUrl = new URL(candidate.evidence.sampleUrl);
-    requestedUrl.searchParams.set("serviceKey", capturedServiceKeyParam);
-    assert.equal(requestedUrl.searchParams.get("serviceKey"), "abc+def==");
-    assert.match(requestedUrl.toString(), /serviceKey=abc%2Bdef%3D%3D(&|$)/);
+    assert.match(capturedUrl.toString(), /serviceKey=abc%2Bdef%3D%3D(&|$)/);
+    assert.doesNotMatch(capturedUrl.toString(), /serviceKey=abc%252Bdef/);
     assert.ok(outputs.sample);
   } finally {
     await rm(runnerTemp, { recursive: true, force: true });
@@ -328,12 +328,14 @@ test("Data.go.kr evidence collector는 이미 디코딩된 service key도 동일
   const decodedServiceKeyValue = "abc+def==";
   try {
     let capturedServiceKeyParam;
+    let capturedUrl;
     await collectDatagoSourceCandidateEvidence({
       candidateId: candidate.id,
       candidatesDocument: { candidates: [candidate] },
       runnerTemp,
       serviceKey: decodedServiceKeyValue,
       fetchImpl: async (url) => {
+        capturedUrl = url;
         capturedServiceKeyParam = url.searchParams.get("serviceKey");
         return new Response(JSON.stringify([
           { stnNm: "사당", carNo: "3-2" },
@@ -345,9 +347,8 @@ test("Data.go.kr evidence collector는 이미 디코딩된 service key도 동일
     });
 
     assert.equal(capturedServiceKeyParam, "abc+def==");
-    const requestedUrl = new URL(candidate.evidence.sampleUrl);
-    requestedUrl.searchParams.set("serviceKey", capturedServiceKeyParam);
-    assert.match(requestedUrl.toString(), /serviceKey=abc%2Bdef%3D%3D(&|$)/);
+    assert.match(capturedUrl.toString(), /serviceKey=abc%2Bdef%3D%3D(&|$)/);
+    assert.doesNotMatch(capturedUrl.toString(), /serviceKey=abc%252Bdef/);
   } finally {
     await rm(runnerTemp, { recursive: true, force: true });
   }
