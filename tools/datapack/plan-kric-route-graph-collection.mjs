@@ -7,6 +7,9 @@ const DEFAULT_CANDIDATES_PATH = "tools/datapack/source-candidates.json";
 function buildKricRouteGraphCollectionPlan(candidatesDocument, candidateIds = DEFAULT_CANDIDATE_IDS) {
   const candidates = candidatesDocument.candidates ?? [];
   const requests = candidateIds.map((candidateId, index) => {
+    if (!DEFAULT_CANDIDATE_IDS.includes(candidateId)) {
+      throw new Error(`unsupported KRIC route graph candidate: ${candidateId}`);
+    }
     const candidate = candidates.find((entry) => entry.id === candidateId);
     if (!candidate) {
       throw new Error(`unknown KRIC route graph candidate: ${candidateId}`);
@@ -29,6 +32,9 @@ function planRequest(candidate, priority) {
   const validatedLiveSampleFormat = candidate.sampleEvidenceStatus === "validated_live_sample"
     ? requiredLiveSampleFormat(evidence.liveSampleFormat, candidate.id)
     : null;
+  if (validatedLiveSampleFormat) {
+    requireValidatedLiveSampleProvenance(evidence, candidate.id);
+  }
   const plannedSampleFormat = validatedLiveSampleFormat ?? "json";
   const documentedSampleUrl = requiredText(evidence.sampleUrl, `${candidate.id}.evidence.sampleUrl`);
   assertRedactedServiceKey(documentedSampleUrl, candidate.id);
@@ -65,6 +71,49 @@ function requiredLiveSampleFormat(value, candidateId) {
     throw new Error(`${candidateId}.evidence.liveSampleFormat must be JSON or XML`);
   }
   return format;
+}
+
+function requireValidatedLiveSampleProvenance(evidence, candidateId) {
+  for (const field of ["liveSampleRawSha256", "liveSampleSchemaFingerprint", "liveSampleEvidenceHash"]) {
+    const value = evidence[field];
+    if (value == null) throw new Error(`${candidateId}.evidence.${field} is required`);
+    if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) {
+      throw new Error(`${candidateId}.evidence.${field} must be a lowercase sha256 hex string`);
+    }
+  }
+  const retrievedAt = evidence.liveSampleRetrievedAt;
+  if (retrievedAt == null) throw new Error(`${candidateId}.evidence.liveSampleRetrievedAt is required`);
+  if (typeof retrievedAt !== "string" || !isIsoUtcTimestamp(retrievedAt)) {
+    throw new Error(`${candidateId}.evidence.liveSampleRetrievedAt must be a valid ISO UTC timestamp`);
+  }
+  const rowCount = evidence.liveSampleRowCount;
+  if (rowCount == null) throw new Error(`${candidateId}.evidence.liveSampleRowCount is required`);
+  if (!Number.isInteger(rowCount) || rowCount <= 0) {
+    throw new Error(`${candidateId}.evidence.liveSampleRowCount must be a positive integer`);
+  }
+  const liveSampleFields = evidence.liveSampleFields;
+  if (liveSampleFields == null) throw new Error(`${candidateId}.evidence.liveSampleFields is required`);
+  if (!Array.isArray(liveSampleFields) || liveSampleFields.length === 0
+    || liveSampleFields.some((field) => typeof field !== "string" || field.length === 0)
+    || new Set(liveSampleFields).size !== liveSampleFields.length) {
+    throw new Error(`${candidateId}.evidence.liveSampleFields must be non-empty unique strings`);
+  }
+  const outputFields = evidence.outputFields;
+  if (!Array.isArray(outputFields) || outputFields.length === 0
+    || outputFields.some((field) => typeof field !== "string" || field.length === 0)
+    || new Set(outputFields).size !== outputFields.length) {
+    throw new Error(`${candidateId}.evidence.outputFields must be non-empty unique strings`);
+  }
+  if (liveSampleFields.length !== outputFields.length
+    || liveSampleFields.some((field) => !outputFields.includes(field))) {
+    throw new Error(`${candidateId}.evidence.liveSampleFields must match outputFields`);
+  }
+}
+
+function isIsoUtcTimestamp(value) {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)
+    && !Number.isNaN(Date.parse(value))
+    && new Date(value).toISOString() === value.replace("Z", ".000Z");
 }
 
 function requireCandidateState(candidate) {

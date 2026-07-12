@@ -6571,6 +6571,66 @@ test("KRIC route graph 수집 계획은 live sample format 누락 또는 미지�
   await assert.rejects(runPlanner(), /liveSampleFormat must be JSON or XML/);
 });
 
+test("KRIC route graph 수집 계획은 validated live sample provenance 누락·invalid·field mismatch를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-kric-plan-live-provenance-${Date.now()}`);
+  const candidatesPath = path.join(outputDir, "source-candidates.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const candidates = JSON.parse(await readFile("tools/datapack/source-candidates.json", "utf8"));
+  const candidate = candidates.candidates.find((entry) => entry.id === "kric-subway-route-info");
+  const runPlanner = () => execFileAsync(
+    process.execPath,
+    ["tools/datapack/plan-kric-route-graph-collection.mjs", "--candidates", candidatesPath, "--candidate", candidate.id],
+    { cwd: root },
+  );
+  const invalidValues = {
+    liveSampleRawSha256: "A".repeat(64),
+    liveSampleSchemaFingerprint: "invalid",
+    liveSampleEvidenceHash: "0".repeat(63),
+    liveSampleRetrievedAt: "2026-07-11T09:58:45+09:00",
+    liveSampleRowCount: 0,
+    liveSampleFields: ["lnCd", "lnCd"],
+  };
+
+  for (const [field, invalidValue] of Object.entries(invalidValues)) {
+    const invalidCandidates = structuredClone(candidates);
+    const invalidCandidate = invalidCandidates.candidates.find((entry) => entry.id === candidate.id);
+    delete invalidCandidate.evidence[field];
+    await writeFile(candidatesPath, `${JSON.stringify(invalidCandidates, null, 2)}\n`);
+    await assert.rejects(runPlanner(), new RegExp(`${field}.*required`));
+
+    invalidCandidate.evidence[field] = invalidValue;
+    await writeFile(candidatesPath, `${JSON.stringify(invalidCandidates, null, 2)}\n`);
+    await assert.rejects(runPlanner(), new RegExp(field));
+  }
+
+  const mismatchedCandidates = structuredClone(candidates);
+  const mismatchedCandidate = mismatchedCandidates.candidates.find((entry) => entry.id === candidate.id);
+  mismatchedCandidate.evidence.liveSampleFields = mismatchedCandidate.evidence.liveSampleFields.slice(1);
+  await writeFile(candidatesPath, `${JSON.stringify(mismatchedCandidates, null, 2)}\n`);
+  await assert.rejects(runPlanner(), /liveSampleFields must match outputFields/);
+
+  for (const outputFields of ["lnCd", [], ["lnCd", "lnCd"]]) {
+    const invalidCandidates = structuredClone(candidates);
+    const invalidCandidate = invalidCandidates.candidates.find((entry) => entry.id === candidate.id);
+    invalidCandidate.evidence.outputFields = outputFields;
+    invalidCandidate.evidence.liveSampleFields = ["lnCd"];
+    await writeFile(candidatesPath, `${JSON.stringify(invalidCandidates, null, 2)}\n`);
+    await assert.rejects(runPlanner(), /outputFields must be non-empty unique strings/);
+  }
+});
+
+test("KRIC route graph 수집 계획은 지원하지 않는 KRIC 후보를 거부한다", async () => {
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/plan-kric-route-graph-collection.mjs", "--candidate", "kric-station-platform"],
+      { cwd: root },
+    ),
+    /unsupported KRIC route graph candidate: kric-station-platform/,
+  );
+});
+
 test("KRIC route graph 수집 계획은 case-insensitive format 변형을 validated XML format 하나로 정규화한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-kric-plan-format-${Date.now()}`);
   const candidatesPath = path.join(outputDir, "source-candidates.json");
