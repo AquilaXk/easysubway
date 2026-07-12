@@ -421,6 +421,38 @@ test("B RED privacy allows benign multi-segment evidence paths", async (t) => {
   await runSummary(t, summary, { requirePass: true });
 });
 
+test("B RED privacy rejects a sixth nested Base64url network-shaped evidence segment without echo", async (t) => {
+  const sensitive = ["ht", "tp", ":", "//", "19", "2", ".0.2.42"].join("");
+  const encoded = Array.from({ length: 6 }, (_, index) => index)
+    .reduce((value) => Buffer.from(value, "utf8").toString("base64url"), sensitive);
+  const summary = freshV2Pass();
+  summary.evidence[0].localEvidencePath = `.codex/evidence/security/abuse-penetration-rehearsal/${encoded}.json`;
+  await assert.rejects(runSummary(t, summary, { requirePass: true }), (error) => {
+    assert.match(error.stderr, /SUMMARY_PRIVACY_VIOLATION/);
+    assert.equal(error.stderr.includes(sensitive), false);
+    return true;
+  });
+});
+
+test("B RED privacy rejects an allowed evidence path exceeding the UTF-8 byte bound without echo", async (t) => {
+  const oversized = "a".repeat(4097);
+  const summary = freshV2Pass();
+  summary.evidence[0].localEvidencePath = `.codex/evidence/security/abuse-penetration-rehearsal/${oversized}.json`;
+  await assert.rejects(runSummary(t, summary, { requirePass: true }), (error) => {
+    assert.match(error.stderr, /SUMMARY_PRIVACY_VIOLATION/);
+    assert.equal(error.stderr.includes(oversized), false);
+    return true;
+  });
+});
+
+test("B RED privacy allows a benign Base64url value decoded at the maximum decode depth", async (t) => {
+  const encoded = Array.from({ length: 8 }, (_, index) => index)
+    .reduce((value) => Buffer.from(value, "utf8").toString("base64url"), "sanitized evidence");
+  const summary = freshV2Pass();
+  summary.evidence[0].localEvidencePath = `.codex/evidence/security/abuse-penetration-rehearsal/${encoded}.json`;
+  await runSummary(t, summary, { requirePass: true });
+});
+
 test("B RED direct validator rejects prototype-inherited v2 summaries as schema-invalid", () => {
   const inherited = freshV2Pass();
   const summary = Object.create(inherited);

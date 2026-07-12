@@ -156,6 +156,8 @@ const LEGACY_USER_AGENT_TOKEN_DEFENSE=/\b[0-9A-Za-z_$]*UserAgent[0-9A-Za-z_$]*\b
 const LEGACY_PRODUCT_VERSION_DEFENSE=/(?:^|[\s(])[!#$%&'*+.^_`|~0-9A-Za-z-]+\/\d+(?:\.\d+)*(?=$|[\s;)])/;
 const BASE64URL_CANDIDATE=/[A-Za-z0-9_-]{12,}/g;
 const STANDARD_BASE64_PATH_CANDIDATE=/(?=([A-Za-z0-9+/]{12,4096}={0,2})(?=[^A-Za-z0-9+/=]|$))/g;
+const MAX_PRIVACY_STRING_BYTES=4096;
+const MAX_PRIVACY_DECODE_DEPTH=8;
 function decodeBounded(value) {
   let current=value.normalize("NFKC");
   for (let count=0; count<2; count+=1) { try { const next=decodeURIComponent(current); if (next===current) break; current=next; } catch { break; } }
@@ -208,11 +210,15 @@ function decodeCanonicalBase64(value) {
     return Array.from(decoded).every((character)=>character.codePointAt(0)>=0x20&&character.codePointAt(0)!==0x7f) ? decoded : "";
   } catch { return ""; }
 }
-function scanPrivacy(value, gate, version, path="$", seen=new Set(), depth=0) {
-  if (depth>8 || seen.has(value)) return;
-  if (value!==null && typeof value==="object") seen.add(value);
-  if (typeof value==="string") {
+function scanPrivacy(value, gate, version, path="$", seen=new Set(), decodeDepth=0) {
+  if (value!==null && typeof value==="object") {
+    if (seen.has(value)) return;
     seen.add(value);
+  }
+  if (typeof value==="string") {
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Buffer.byteLength(value,"utf8")>MAX_PRIVACY_STRING_BYTES) fail("SUMMARY_PRIVACY_VIOLATION",path,"string-byte-limit");
     const decoded=decodeBounded(value); const compact=decoded.replace(/\s+/g,"");
     const forbidden=gate.manualRehearsalPolicy.forbiddenInEvidence.concat(
       Object.values(gate.rehearsalMatrices).flatMap((matrix)=>matrix.forbiddenSummaryValues),
@@ -227,17 +233,23 @@ function scanPrivacy(value, gate, version, path="$", seen=new Set(), depth=0) {
     if (/^[A-Za-z0-9+/_-]+={0,2}$/.test(value)) candidates.push(value);
     for (const candidate of candidates) {
       const base64Decoded=decodeCanonicalBase64(candidate);
-      if (base64Decoded) scanPrivacy(base64Decoded,gate,version,path,seen,depth+1);
+      if (base64Decoded) {
+        if (decodeDepth>=MAX_PRIVACY_DECODE_DEPTH) fail("SUMMARY_PRIVACY_VIOLATION",path,"base64-depth-limit");
+        scanPrivacy(base64Decoded,gate,version,path,seen,decodeDepth+1);
+      }
     }
     for (const [,candidate] of value.matchAll(STANDARD_BASE64_PATH_CANDIDATE)) {
       if (!candidate.includes("/")) continue;
       const base64Decoded=decodeCanonicalBase64(candidate);
-      if (base64Decoded) scanPrivacy(base64Decoded,gate,version,path,seen,depth+1);
+      if (base64Decoded) {
+        if (decodeDepth>=MAX_PRIVACY_DECODE_DEPTH) fail("SUMMARY_PRIVACY_VIOLATION",path,"base64-depth-limit");
+        scanPrivacy(base64Decoded,gate,version,path,seen,decodeDepth+1);
+      }
     }
     return;
   }
-  if (Array.isArray(value)) { value.forEach((item,index)=>scanPrivacy(item,gate,version,`${path}[${index}]`,seen,depth+1)); return; }
-  if (isObject(value)) for (const [key,child] of Object.entries(value)) scanPrivacy(child,gate,version,`${path}.${key}`,seen,depth+1);
+  if (Array.isArray(value)) { value.forEach((item,index)=>scanPrivacy(item,gate,version,`${path}[${index}]`,seen,decodeDepth)); return; }
+  if (isObject(value)) for (const [key,child] of Object.entries(value)) scanPrivacy(child,gate,version,`${path}.${key}`,seen,decodeDepth);
 }
 export function validateAbusePenetrationSummary(summary, gate, { requirePass=false } = {}) {
   if (!isJsonLike(summary)) fail("SUMMARY_V2_SCHEMA_INVALID","$","json-like");
