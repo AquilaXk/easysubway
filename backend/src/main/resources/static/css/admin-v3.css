@@ -426,7 +426,7 @@ body.admin-v3 {
 }
 
 .admin-v3 .alert-dismiss:hover {
-	background: rgba(22, 48, 47, 0.08);
+	background: color-mix(in srgb, var(--admin-ink) 8%, transparent);
 }
 
 /* 표준 테이블 검색 툴바·정렬 헤더(#1737) */
@@ -585,7 +585,7 @@ body.admin-v3 {
 
 /* 키보드로 이동한 행 강조(#1740): 상세 링크에 포커스가 들어오면 행 전체를 표시 */
 .admin-v3 .report-row:focus-within {
-	background: var(--admin-surface-2, rgba(22, 48, 47, 0.06));
+	background: var(--admin-surface-2, color-mix(in srgb, var(--admin-ink) 6%, transparent));
 	outline: 2px solid var(--admin-accent);
 	outline-offset: -2px;
 }
@@ -619,7 +619,7 @@ body.admin-v3 {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	background: rgba(22, 48, 47, 0.35);
+	background: color-mix(in srgb, var(--admin-ink) 35%, transparent);
 }
 
 .admin-v3 .shortcut-help-panel {
@@ -677,7 +677,7 @@ body.admin-v3 {
 }
 
 .admin-v3 .hub-tabs a:hover {
-	background: var(--admin-surface-2, rgba(22, 48, 47, 0.05));
+	background: var(--admin-surface-2, color-mix(in srgb, var(--admin-ink) 5%, transparent));
 }
 
 .admin-v3 .hub-tabs a.is-active {
@@ -850,7 +850,7 @@ body.admin-v3 {
 .admin-drawer-backdrop {
 	position: absolute;
 	inset: 0;
-	background: rgba(22, 48, 47, 0.35);
+	background: color-mix(in srgb, var(--admin-ink) 35%, transparent);
 }
 
 .admin-drawer-panel {
@@ -1357,7 +1357,7 @@ body.admin-v3 {
 		position: fixed;
 		inset: 0;
 		z-index: 80;
-		background: rgba(22, 48, 47, 0.4);
+		background: color-mix(in srgb, var(--admin-ink) 40%, transparent);
 	}
 }
 
@@ -1482,7 +1482,7 @@ body.admin-v3 {
 .command-palette-backdrop {
 	position: absolute;
 	inset: 0;
-	background: rgba(22, 48, 47, 0.35);
+	background: color-mix(in srgb, var(--admin-ink) 35%, transparent);
 }
 
 .command-palette-panel {
