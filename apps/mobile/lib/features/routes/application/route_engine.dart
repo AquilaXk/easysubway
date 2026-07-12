@@ -164,7 +164,9 @@ class AccessGraphRouter {
   }
 
   bool _hasUnknownRouteReason(List<String> reasonCodes) {
-    if (reasonCodes.contains('FACILITY_UNAVAILABLE')) {
+    // 실측된 비가용(이용 어려움·보수중)은 '확인 불가'가 아니라 차단 사유다.
+    if (reasonCodes.contains('FACILITY_UNAVAILABLE') ||
+        reasonCodes.contains('FACILITY_UNDER_MAINTENANCE')) {
       return false;
     }
     const unknownCodes = {
@@ -535,6 +537,8 @@ class RouteAssembler {
       'STRICT_EVIDENCE_UNSUPPORTED' => '검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.',
       'DURATION_UNKNOWN' => '소요 시간을 확인하고 있어요.',
       'ACCESSIBILITY_STATE_UNKNOWN' => routeHedgeAccessibilityUnknown,
+      'FACILITY_UNDER_MAINTENANCE' => routeFacilityUnderMaintenance,
+      'FACILITY_UNAVAILABLE' => routeFacilityUnavailable,
       'ROUTE_GRAPH_UNKNOWN' => routeHedgeConnectivityUnknown,
       _ => '이동 전 현장 안내를 확인해 주세요.',
     };
