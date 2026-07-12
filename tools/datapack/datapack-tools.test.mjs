@@ -170,8 +170,8 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
   assert.equal(pack.minimumTableRows.out_of_station_transfer_links, 1);
   assert.equal(pack.minimumTableRows.route_map_positions, 9);
   assert.equal(pack.minimumTableRows.data_quality_records, 5);
-  // #1701: 빠른하차 칸/문 힌트 최소 행수(안전값 1 — 실제 반영 35행 이하).
-  assert.equal(pack.minimumTableRows.station_car_door_hints, 1);
+  // #1701: 빠른하차 칸/문 힌트 admitted 35행을 최소 계약으로 고정한다.
+  assert.equal(pack.minimumTableRows.station_car_door_hints, 35);
   assert.match(pack.sha256, /^[a-f0-9]{64}$/);
   assert.match(pack.sqliteSha256, /^[a-f0-9]{64}$/);
 
@@ -14384,6 +14384,7 @@ async function prepareCarDoorHintFixture(label, hintOverrides) {
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
   fixture.packs[0].stationCarDoorHints = [baseCarDoorHint(hintOverrides)];
+  fixture.packs[0].minimumTableRows.station_car_door_hints = 1;
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   return { outputDir, fixturePath };
 }

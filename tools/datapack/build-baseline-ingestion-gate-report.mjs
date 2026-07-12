@@ -47,6 +47,7 @@ async function main(argv) {
     kricMovement,
     existingEdges: pack.stationPathwayEdges ?? [],
     existingNodes: pack.stationPathwayNodes ?? [],
+    fixtureReflectedRuleCount: (pack.transferRules ?? []).length,
   });
 
   await mkdir(path.dirname(outputPath), { recursive: true });
@@ -96,8 +97,14 @@ export function buildBaselineIngestionGateReport({
   kricMovement,
   existingEdges = [],
   existingNodes = [],
+  fixtureReflectedRuleCount = 0,
 }) {
-  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows(transferRows);
+  const transferRowList = Array.isArray(transferRows) ? transferRows : [];
+  const carDoorRowList = Array.isArray(carDoorRows) ? carDoorRows : [];
+  const validTransferRows = transferRowList.filter(
+    (row) => row != null && typeof row === "object" && !Array.isArray(row),
+  );
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows(transferRowList);
 
   const transfer = buildTransferBaseline({
     roster,
@@ -109,7 +116,7 @@ export function buildBaselineIngestionGateReport({
   });
   const carDoor = buildCarDoorHints({
     roster,
-    rows: carDoorRows,
+    rows: carDoorRowList,
     sourceId: CAR_DOOR_SOURCE_ID,
     verificationStatus: "OFFICIAL",
   });
@@ -118,7 +125,7 @@ export function buildBaselineIngestionGateReport({
   const admittedTransferRules = transfer.transferRules.filter((rule) => rule.fromLineId !== rule.toLineId);
   const selfLoopTransferRules = transfer.transferRules.filter((rule) => rule.fromLineId === rule.toLineId);
 
-  const uniqueTransferStations = new Set((transferRows ?? []).map((row) => String(row["환승역명"]))).size;
+  const uniqueTransferStations = new Set(validTransferRows.map((row) => String(row["환승역명"]))).size;
   const matchedTransferStations = new Set(admittedTransferRules.map((rule) => rule.fromStationId));
 
   return {
@@ -131,7 +138,8 @@ export function buildBaselineIngestionGateReport({
         "capital 참조 팩(tools/datapack/fixtures/catalog-fixture.json)뿐이며, tools/datapack/release/의 " +
         "프로덕션 pilot 팩·tools/datapack/inputs/*·release gate는 건드리지 않았다.",
       countingBasis:
-        "coverage와 desk 게이트 수치는 수집 전량(환승역거리 소요시간 145행, 빠른하차 2358행) 기준으로 계산한다. " +
+        `coverage와 desk 게이트 수치는 수집 전량(환승역거리 소요시간 ${transferRowList.length}행, ` +
+        `빠른하차 ${carDoorRowList.length}행) 기준으로 계산한다. ` +
         "팩 적재 매칭은 capital 6역(상록수·사당·강남·정자·성수·신설동) roster 스코프로 한정되어 대부분의 전량 행은 " +
         "roster 밖이라 quarantine된다 — 이 한정 사유를 정직하게 계측한다.",
       officialSources: {
@@ -149,12 +157,13 @@ export function buildBaselineIngestionGateReport({
       malformed,
       uniqueTransferStations,
       matchedTransferStations,
-      transferRowTotal: (transferRows ?? []).length,
+      transferRowTotal: transferRowList.length,
       carDoor,
-      carDoorRowTotal: (carDoorRows ?? []).length,
+      carDoorRowTotal: carDoorRowList.length,
+      fixtureReflectedRuleCount,
     }),
     gateInternalConsistency: buildGateInternalConsistency(transfer, admittedTransferRules, selfLoopTransferRules),
-    gateKricStructuralAlignment: buildGateKricStructuralAlignment(transferRows, kricMovement),
+    gateKricStructuralAlignment: buildGateKricStructuralAlignment(validTransferRows, kricMovement),
     gateTimeSourceDistinction: buildGateTimeSourceDistinction(transfer),
     pilotFieldDeviation: {
       status: "SKIPPED",
@@ -175,6 +184,7 @@ function buildCoverage({
   transferRowTotal,
   carDoor,
   carDoorRowTotal,
+  fixtureReflectedRuleCount,
 }) {
   return {
     transfer: {
@@ -183,7 +193,7 @@ function buildCoverage({
       malformedRows: malformed.length,
       admittedRules: admittedTransferRules.length,
       fixtureReflectedRules: {
-        count: 2,
+        count: fixtureReflectedRuleCount,
         note:
           "importer는 사당 양방향(2→4/4→2)을 각각 rule로 산출하지만(admittedRules에 2건 포함), 팩에는 사당 방향쌍을 " +
           "기존 수기 정본 rule(transfer-sadang-seoul-4-to-seoul-2, 공식 62초로 갱신) 1건으로 유지한다. 따라서 " +

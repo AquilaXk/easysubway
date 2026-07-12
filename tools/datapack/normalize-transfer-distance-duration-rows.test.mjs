@@ -56,27 +56,40 @@ test("콜론 없는 환승소요시간 → malformed(필터링 아님)", () => {
 });
 
 test("빈 콜론(\":\") 환승소요시간 → malformed", () => {
-  const { malformed } = normalizeTransferDistanceDurationRows([transferRow({ 환승소요시간: ":" })]);
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([transferRow({ 환승소요시간: ":" })]);
+  assert.equal(normalizedRows.length, 0);
   assert.equal(malformed.length, 1);
+  assert.equal(typeof malformed[0].reason, "string");
   assert.match(malformed[0].reason, /환승소요시간 format invalid/);
 });
 
 test("초 범위 초과(\"09:99\") → malformed(0-59 검증)", () => {
-  const { malformed } = normalizeTransferDistanceDurationRows([transferRow({ 환승소요시간: "09:99" })]);
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([transferRow({ 환승소요시간: "09:99" })]);
+  assert.equal(normalizedRows.length, 0);
   assert.equal(malformed.length, 1);
+  assert.equal(typeof malformed[0].reason, "string");
   assert.match(malformed[0].reason, /out of range/);
 });
 
 test("분 범위 초과(\"99:00\") → malformed", () => {
-  const { malformed } = normalizeTransferDistanceDurationRows([transferRow({ 환승소요시간: "99:00" })]);
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([transferRow({ 환승소요시간: "99:00" })]);
+  assert.equal(normalizedRows.length, 0);
   assert.equal(malformed.length, 1);
+  assert.equal(typeof malformed[0].reason, "string");
   assert.match(malformed[0].reason, /out of range/);
 });
 
 test("호선이 정수도 문자열도 아니면 malformed", () => {
-  const { malformed } = normalizeTransferDistanceDurationRows([transferRow({ 호선: null })]);
-  assert.equal(malformed.length, 1);
-  assert.match(malformed[0].reason, /호선 must be/);
+  const invalidLineValues = [null, true, 2.5, {}, []];
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows(
+    invalidLineValues.map((호선) => transferRow({ 호선 })),
+  );
+  assert.equal(normalizedRows.length, 0);
+  assert.equal(malformed.length, invalidLineValues.length);
+  for (const entry of malformed) {
+    assert.equal(typeof entry.reason, "string");
+    assert.match(entry.reason, /호선 must be/);
+  }
 });
 
 test("이미 문자열인 호선은 그대로 통과", () => {
@@ -85,9 +98,20 @@ test("이미 문자열인 호선은 그대로 통과", () => {
   assert.equal(normalizedRows[0].호선, "4호선");
 });
 
+test("N호선 전체 형식이 아닌 문자열은 malformed", () => {
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([
+    transferRow({ 호선: "4호선abc" }),
+  ]);
+  assert.equal(normalizedRows.length, 0);
+  assert.equal(malformed.length, 1);
+  assert.match(malformed[0].reason, /호선 must be/);
+});
+
 test("객체 아닌 행 → malformed", () => {
-  const { malformed } = normalizeTransferDistanceDurationRows(["not-an-object", null]);
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows(["not-an-object", null]);
+  assert.equal(normalizedRows.length, 0);
   assert.equal(malformed.length, 2);
+  for (const entry of malformed) assert.equal(typeof entry.reason, "string");
 });
 
 test("빈 입력 → 빈 결과", () => {

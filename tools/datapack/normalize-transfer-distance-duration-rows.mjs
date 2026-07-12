@@ -75,15 +75,16 @@ export function normalizeTransferDistanceDurationRows(rows) {
   return { normalizedRows, malformed };
 }
 
-// 호선 정수 N → "N호선" 문자열. 이미 문자열이면 그대로 통과(환승노선처럼). 정수 아닌 값은 실패.
+// 호선 정수 N → "N호선" 문자열. 문자열도 전체 N호선 형식만 허용한다.
 function normalizeLineNumber(value) {
   if (typeof value === "string" && value.trim() !== "") {
-    return { value: value.trim() };
+    const trimmed = value.trim();
+    if (/^\d+호선$/.test(trimmed)) return { value: trimmed };
   }
   if (Number.isInteger(value) && value > 0) {
     return { value: `${value}호선` };
   }
-  return { error: `호선 must be a positive integer or non-empty string: ${JSON.stringify(value)}` };
+  return { error: `호선 must be a positive integer or N호선 string: ${JSON.stringify(value)}` };
 }
 
 // "MM:SS" → 초 정수. 콜론 없음·비숫자·MM/SS 범위(0-59) 초과는 malformed.

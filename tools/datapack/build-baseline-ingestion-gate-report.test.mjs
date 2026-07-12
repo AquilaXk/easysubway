@@ -34,6 +34,7 @@ const pack = {
   stationPathwayEdges: [
     { id: "e-sadang", fromNodeId: "n-sadang-4", toNodeId: "n-sadang-2", bidirectional: true },
   ],
+  transferRules: [{ id: "transfer-sadang" }, { id: "transfer-gangnam" }],
 };
 
 test("buildRosterFromPack: 짧은 lineNameKo 도출('수도권 2호선'→'2호선')", () => {
@@ -79,6 +80,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
     },
     existingEdges: pack.stationPathwayEdges,
     existingNodes: pack.stationPathwayNodes,
+    fixtureReflectedRuleCount: pack.transferRules.length,
   });
 
   // 스코프 metadata 명기.
@@ -86,6 +88,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   assert.match(report.metadata.scopeDecision, /비범위/);
   assert.match(report.metadata.scopeDecision, /#1702\/#1414/);
   assert.match(report.metadata.countingBasis, /수집 전량/);
+  assert.match(report.metadata.countingBasis, /환승역거리 소요시간 5행.*빠른하차 2행/);
   assert.equal(
     report.metadata.reproducibility,
     "tracked snapshot; regenerated only from local-only raw inputs (.codex/evidence/1701/, gitignored)",
@@ -97,7 +100,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   assert.equal(report.coverage.transfer.fixtureReflectedRules.count, 2);
   assert.equal(report.coverage.transfer.selfLoopExcludedRules.length, 1);
   assert.equal(report.coverage.transfer.selfLoopExcludedRules[0].stationId, "station-seongsu");
-  assert.ok(report.coverage.transfer.quarantinedRows >= 1);
+  assert.equal(report.coverage.transfer.quarantinedRows, 3);
 
   // 게이트①: 사당 방향쌍 일치(62초 양방향).
   const sadangPair = report.gateInternalConsistency.directionPairReport.find(
@@ -121,7 +124,22 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   // car-door 전량 2행 중 1행 매칭, 1행 quarantine.
   assert.equal(report.coverage.carDoor.totalRows, 2);
   assert.equal(report.coverage.carDoor.admittedHints, 1);
-  assert.ok(report.coverage.carDoor.quarantinedRows >= 1);
+  assert.equal(report.coverage.carDoor.quarantinedRows, 1);
+});
+
+test("리포트: 객체가 아닌 transfer row를 malformed로 계측하고 중단하지 않는다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [null, "not-an-object"],
+    carDoorRows: [],
+    kricMovement: null,
+    fixtureReflectedRuleCount: pack.transferRules.length,
+  });
+
+  assert.equal(report.coverage.transfer.totalRows, 2);
+  assert.equal(report.coverage.transfer.uniqueStationNames, 0);
+  assert.equal(report.coverage.transfer.malformedRows, 2);
+  assert.equal(report.gateKricStructuralAlignment.structurallyAligned, false);
 });
 
 test("게이트②: 충무로 3↔4 baseline 행을 전량에서 추출한다", () => {
