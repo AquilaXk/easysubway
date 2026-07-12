@@ -313,30 +313,39 @@ test("게이트②: tracked endpoint·request tuple·admission hash가 다르면
       kricMovementContext,
     }).gateKricStructuralAlignment;
 
-  assert.equal(build(admittedKricContext({ endpoint: "https://example.invalid/wrong" })).structurallyAligned, false);
-  assert.equal(
-    build(admittedKricContext({ requestTuple: { ...admittedKricContext().requestTuple, stinCd: "999" } }))
-      .structurallyAligned,
-    false,
+  const assertRejected = (result, expectedFailure) => {
+    assert.equal(result.structurallyAligned, false);
+    assert.equal(result.kricMovementDetailed.admitted, false);
+    assert.equal(result.kricMovementDetailed.evidenceValidation.status, "FAIL");
+    assert.ok(result.kricMovementDetailed.evidenceValidation.failures.includes(expectedFailure));
+  };
+
+  assertRejected(
+    build(admittedKricContext({ endpoint: "https://example.invalid/wrong" })),
+    "endpoint mismatch",
+  );
+  assertRejected(
+    build(admittedKricContext({ requestTuple: { ...admittedKricContext().requestTuple, stinCd: "999" } })),
+    "request tuple mismatch: stinCd",
   );
   const changedContent = { ...kricStep(), mvContDtl: "변조된 이동 경로" };
-  assert.equal(
+  assertRejected(
     buildBaselineIngestionGateReport({
       roster: buildRosterFromPack(pack),
       transferRows,
       carDoorRows: [],
       kricMovement: { header: { resultCode: "00" }, body: [changedContent] },
       kricMovementContext: admittedKricContext({ liveSampleRowCount: 1 }),
-    }).gateKricStructuralAlignment.structurallyAligned,
-    false,
+    }).gateKricStructuralAlignment,
+    "response content evidenceHash mismatch",
   );
-  assert.equal(
+  assertRejected(
     build(
       admittedKricContext({
         admission: { ...admittedKricContext().admission, sampleEvidenceHash: "d".repeat(64) },
       }),
-    ).structurallyAligned,
-    false,
+    ),
+    "sampleEvidenceHash admission mismatch",
   );
 });
 

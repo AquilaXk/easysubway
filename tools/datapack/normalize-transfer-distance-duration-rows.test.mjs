@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import { normalizeTransferDistanceDurationRows } from "./normalize-transfer-distance-duration-rows.mjs";
+
+const execFileAsync = promisify(execFile);
 
 function transferRow(overrides = {}) {
   return {
@@ -145,4 +152,22 @@ test("빈 입력 → 빈 결과", () => {
   const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([]);
   assert.equal(normalizedRows.length, 0);
   assert.equal(malformed.length, 0);
+});
+
+test("CLI 상대경로 실행은 --output 파일을 생성한다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "transfer-normalizer-"));
+  const rowsPath = path.join(outputDir, "rows.json");
+  const outputPath = path.join(outputDir, "normalized.json");
+  try {
+    await writeFile(rowsPath, `${JSON.stringify([transferRow()])}\n`);
+    await execFileAsync(
+      process.execPath,
+      ["tools/datapack/normalize-transfer-distance-duration-rows.mjs", "--rows", rowsPath, "--output", outputPath],
+      { cwd: process.cwd() },
+    );
+    const result = JSON.parse(await readFile(outputPath, "utf8"));
+    assert.equal(result.normalizedRows[0].환승소요시간, 62);
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
 });
