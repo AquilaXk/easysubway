@@ -2594,14 +2594,18 @@ void main() {
       expect(license['redistributionAllowed'], isA<bool>());
       expect(license['reviewStatus'], isA<String>());
     }
+    // [2026-07-12 #2011/#1951] 광주 정본이 오너 자작(self-drawn)으로 전환됐다 —
+    // 이전 CC-BY-SA 2.0 KR(kiwitree) attribution 계약은 배포 렌더링이 CC-BY-SA
+    // SVG 파생이 아니게 되어 자작 기준(attribution 미표시)으로 전환됐다.
     final gwangju = maps.singleWhere((map) => map['id'] == 'gwangju');
     final license = gwangju['license'] as Map<String, Object?>;
-    expect(license['spdx'], 'CC-BY-SA-2.0-KR');
+    expect(license['spdx'], 'LicenseRef-Self-Drawn');
     expect(
       license['url'],
-      'https://creativecommons.org/licenses/by-sa/2.0/kr/',
+      'internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg',
     );
-    expect(license['reviewStatus'], 'legal-review-required');
+    expect(license['reviewStatus'], 'self-drawn-confirmed');
+    expect(license['attributionRequired'], isFalse);
   });
 
   testWidgets('노선도는 카드가 아니라 공식 지도처럼 전면 캔버스로 보인다', (tester) async {
