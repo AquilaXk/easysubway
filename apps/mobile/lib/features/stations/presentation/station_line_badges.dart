@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../accessible_design.dart';
+import '../../../design_tokens.dart';
 import '../domain/station_line.dart';
 
 class StationLineBadges extends StatelessWidget {
@@ -108,21 +108,22 @@ class _StationLineOverflowBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Container(
       key: const Key('stationLineBadgeOverflow'),
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.scaffoldSurface,
+        color: tokens.scaffold,
         shape: BoxShape.circle,
-        border: Border.all(color: EasySubwayAccessibleColors.line),
+        border: Border.all(color: tokens.line),
       ),
       child: Text(
         '+$count',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: EasySubwayAccessibleColors.mutedText,
+          color: tokens.inkMuted,
           fontSize: 13 * (size / 32),
           fontWeight: FontWeight.w800,
           height: 1.0,

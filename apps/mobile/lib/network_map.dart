@@ -1415,13 +1415,14 @@ class _NetworkMapTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Material(
-      color: EasySubwayAccessibleColors.surface,
+      color: tokens.surface,
       elevation: 0,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(
-            bottom: BorderSide(color: EasySubwayAccessibleColors.line),
+            bottom: BorderSide(color: tokens.line),
           ),
         ),
         child: SafeArea(
@@ -1635,6 +1636,7 @@ class _NetworkMapRegionMenuOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final rows = <Widget>[];
     for (var i = 0; i < availableRegions.length; i++) {
       final region = availableRegions[i];
@@ -1676,9 +1678,9 @@ class _NetworkMapRegionMenuOverlay extends StatelessWidget {
                     ),
                     if (isSelected) ...[
                       const SizedBox(width: 12),
-                      const Icon(
+                      Icon(
                         Icons.check,
-                        color: EasySubwayAccessibleColors.mutedText,
+                        color: tokens.inkMuted,
                         size: 20,
                       ),
                     ],
@@ -1700,10 +1702,10 @@ class _NetworkMapRegionMenuOverlay extends StatelessWidget {
       child: IntrinsicWidth(
         child: Material(
           elevation: 0,
-          color: EasySubwayAccessibleColors.surface,
+          color: tokens.surface,
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            side: const BorderSide(color: EasySubwayAccessibleColors.line),
+            side: BorderSide(color: tokens.line),
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(EasySubwayRadius.control),
               bottomLeft: Radius.circular(EasySubwayRadius.control),
@@ -1723,14 +1725,15 @@ class _NetworkMapRegionMenuDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     // full-width 절단형은 행을 과하게 분리해 보이게 하므로, 텍스트 시작선
     // (좌 16)부터 우 16 전까지의 인셋 구분선으로 둔다. 색·두께는 유지.
-    return const Padding(
-      key: Key('networkMapRegionMenuDivider'),
-      padding: EdgeInsets.symmetric(horizontal: 16),
+    return Padding(
+      key: const Key('networkMapRegionMenuDivider'),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(
         height: 1,
-        child: ColoredBox(color: EasySubwayAccessibleColors.line),
+        child: ColoredBox(color: tokens.line),
       ),
     );
   }
@@ -1743,6 +1746,7 @@ class _NetworkMapSearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       button: true,
       label: '지하철역 검색',
@@ -1765,9 +1769,9 @@ class _NetworkMapSearchField extends StatelessWidget {
                     key: const Key('heroStationSearchButton'),
                     height: _searchFieldVisualHeight,
                     decoration: BoxDecoration(
-                      color: EasySubwayAccessibleColors.surface,
+                      color: tokens.surface,
                       border: Border.all(
-                        color: EasySubwayAccessibleColors.line,
+                        color: tokens.line,
                         width: _searchFieldBorderWidth,
                       ),
                       borderRadius: _networkMapSearchFieldRadius,
@@ -1839,6 +1843,7 @@ class _NetworkMapSearchInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final editController = controller;
     return SizedBox(
       // 터치 타겟(≥48, 실제로는 56)을 만족시키기 위해 필드 자체가 전체 높이를
@@ -1855,9 +1860,9 @@ class _NetworkMapSearchInputField extends StatelessWidget {
             key: const Key('heroStationSearchInputBox'),
             height: _searchFieldVisualHeight,
             decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.surface,
+              color: tokens.surface,
               border: Border.all(
-                color: EasySubwayAccessibleColors.line,
+                color: tokens.line,
                 width: _searchFieldBorderWidth,
               ),
               borderRadius: _networkMapSearchFieldRadius,
@@ -2147,8 +2152,9 @@ class _NetworkMapSearchSessionState extends State<_NetworkMapSearchSession> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return ColoredBox(
-      color: EasySubwayAccessibleColors.scaffoldSurface,
+      color: tokens.scaffold,
       child: SafeArea(
         top: false,
         child: Semantics(
@@ -2204,13 +2210,14 @@ class _NetworkMapServicePatternToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Material(
       key: const Key('networkMapServicePatternToggle'),
       color: Colors.white,
       elevation: 0,
-      shape: const RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: _networkMapPillRadius,
-        side: BorderSide(color: EasySubwayAccessibleColors.line),
+        side: BorderSide(color: tokens.line),
       ),
       child: Container(
         height: 58,
@@ -2322,6 +2329,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final primary = data.results.isEmpty ? null : data.results.first;
     final primaryLine = primary == null || primary.lines.isEmpty
         ? null
@@ -2363,10 +2371,10 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                             ),
                             borderRadius: BorderRadius.circular(3),
                           ),
-                          child: const Text(
+                          child: Text(
                             '실시간',
                             style: TextStyle(
-                              color: EasySubwayAccessibleColors.mint,
+                              color: tokens.good,
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                             ),
@@ -2467,6 +2475,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final primary = results.first;
     final leftName = adjacentStations.leftName;
     final rightName = adjacentStations.rightName;
@@ -2478,7 +2487,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
           child: Container(
             height: 26,
             decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.mapSelectionAccent,
+              color: tokens.mapSelectionAccent,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
@@ -2505,7 +2514,7 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: EasySubwayAccessibleColors.mapSelectionAccent,
+                      color: tokens.mapSelectionAccent,
                       width: 3,
                     ),
                   ),
@@ -2614,6 +2623,7 @@ class _SubwayArrivalPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     switch (snapshot.status) {
       case RealtimeSnapshotStatus.loading:
         return const SizedBox(
@@ -2669,8 +2679,8 @@ class _SubwayArrivalPanel extends StatelessWidget {
                   snapshot.receivedAt.trim().isEmpty
                       ? '최근 도착 정보'
                       : '최근 도착 정보 · ${snapshot.receivedAt.trim()}',
-                  style: const TextStyle(
-                    color: EasySubwayAccessibleColors.mutedText,
+                  style: TextStyle(
+                    color: tokens.inkMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -2707,6 +2717,7 @@ class _SubwayArrivalNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return SizedBox(
       height: 46,
       child: Center(
@@ -2715,8 +2726,8 @@ class _SubwayArrivalNotice extends StatelessWidget {
           textAlign: TextAlign.center,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: EasySubwayAccessibleColors.mutedText,
+          style: TextStyle(
+            color: tokens.inkMuted,
             fontSize: 13,
             height: 1.3,
             fontWeight: FontWeight.w600,
@@ -2734,6 +2745,7 @@ class _SubwayArrivalColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final visible = arrivals.take(2).toList(growable: false);
     final directionLabel = visible.isEmpty
         ? ''
@@ -2749,8 +2761,8 @@ class _SubwayArrivalColumn extends StatelessWidget {
               directionLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.primary,
+              style: TextStyle(
+                color: tokens.accent,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -2769,6 +2781,7 @@ class _SubwayArrivalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final destination = arrival.destination.trim();
     final eta = _formatArrivalEta(arrival);
     return Padding(
@@ -2792,8 +2805,8 @@ class _SubwayArrivalRow extends StatelessWidget {
               eta,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: EasySubwayAccessibleColors.secondaryText,
+              style: TextStyle(
+                color: tokens.inkSecondary,
                 fontSize: 12,
                 height: 1.3,
                 fontWeight: FontWeight.w600,
@@ -2818,6 +2831,7 @@ class _NetworkMapToggleSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: _networkMapPillRadius,
@@ -2831,7 +2845,7 @@ class _NetworkMapToggleSegment extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected
-              ? EasySubwayAccessibleColors.mapRegionAccent
+              ? tokens.mapRegionAccent
               : Colors.transparent,
           borderRadius: _networkMapPillRadius,
         ),
@@ -3051,6 +3065,7 @@ class _NetworkMapMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       button: true,
       label: label,
@@ -3070,7 +3085,7 @@ class _NetworkMapMenuTile extends StatelessWidget {
                   Icon(
                     icon,
                     size: 22,
-                    color: EasySubwayAccessibleColors.mutedText,
+                    color: tokens.inkMuted,
                   ),
                   const SizedBox(width: 18),
                   Expanded(
@@ -3397,6 +3412,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Container(
       key: const Key('networkMapSurface'),
       decoration: const BoxDecoration(color: Colors.white),
@@ -3547,7 +3563,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   geometry: geometry,
                   camera: camera,
                   label: '출발',
-                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  surfaceColor: tokens.accent,
                   semanticSuffix: '출발 지정됨',
                 ),
               if (!_gestureActive && waypointStation != null)
@@ -3567,7 +3583,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   geometry: geometry,
                   camera: camera,
                   label: '도착',
-                  surfaceColor: EasySubwayAccessibleColors.primary,
+                  surfaceColor: tokens.accent,
                   semanticSuffix: '도착 지정됨',
                 ),
               if (!_gestureActive && selectedStation != null)
@@ -4924,6 +4940,7 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final canSwap = draft.origin != null || draft.destination != null;
     // #1985: 현재 렌더 중인 행 슬롯 순서. 경유가 있으면 출발·경유·도착 3행.
     final visibleSlots = <RouteDraftSlot>[
@@ -4992,7 +5009,7 @@ class _NetworkMapTopBarRouteDraft extends StatelessWidget {
                 tooltip: '출발 도착 바꾸기',
                 onPressed: canSwap ? onSwapDraft : null,
                 icon: const Icon(Icons.swap_vert, size: 22),
-                color: EasySubwayAccessibleColors.mutedText,
+                color: tokens.inkMuted,
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 padding: EdgeInsets.zero,
               ),
@@ -5029,6 +5046,7 @@ class _NetworkMapRouteDraftAddWaypoint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       button: true,
       label: '경유역 추가',
@@ -5041,22 +5059,22 @@ class _NetworkMapRouteDraftAddWaypoint extends StatelessWidget {
           child: Container(
             constraints: const BoxConstraints(minHeight: 48),
             decoration: BoxDecoration(
-              color: EasySubwayAccessibleColors.scaffoldSurface,
+              color: tokens.scaffold,
               borderRadius: BorderRadius.circular(8),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.add,
                   size: 18,
-                  color: EasySubwayAccessibleColors.mutedText,
+                  color: tokens.inkMuted,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   '경유 추가',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: EasySubwayAccessibleColors.mutedText,
+                    color: tokens.inkMuted,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -5130,6 +5148,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     final label = _label;
     final filled = station != null;
     // #1985: 빈 행은 placeholder 문구('출발역'/'경유역'/'도착역')를 표시한다.
@@ -5149,9 +5168,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: filled
-                  ? EasySubwayAccessibleColors.text
-                  : EasySubwayAccessibleColors.mutedText,
+              color: filled ? tokens.ink : tokens.inkMuted,
             ),
           ),
         ),
@@ -5185,7 +5202,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
     final rowContainer = Container(
       constraints: const BoxConstraints(minHeight: 54),
       decoration: BoxDecoration(
-        color: EasySubwayAccessibleColors.scaffoldSurface,
+        color: tokens.scaffold,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Padding(
@@ -5255,7 +5272,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
             child: Container(
               constraints: const BoxConstraints(minHeight: 54),
               decoration: BoxDecoration(
-                color: EasySubwayAccessibleColors.scaffoldSurface,
+                color: tokens.scaffold,
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.centerLeft,
@@ -5265,7 +5282,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: EasySubwayAccessibleColors.text,
+                  color: tokens.ink,
                 ),
               ),
             ),
@@ -5529,15 +5546,16 @@ class _NetworkMapStationActionTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = EasySubwayTokens.of(context);
     // 팝오버 배경(0xE8404445)은 이미 짙은 무채색이라 primary(0xFF2A2F31) 같은
     // 어두운 잉크로 채우면 배경과 구분되지 않는다. 대비를 위해 강조 시에는
     // 흰 배경 + 짙은 잉크(text)로 반전한다.
     final iconColor = !enabled
-        ? EasySubwayAccessibleColors.mutedText
-        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
+        ? tokens.inkMuted
+        : (emphasized ? tokens.ink : Colors.white);
     final textColor = !enabled
-        ? EasySubwayAccessibleColors.mutedText
-        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
+        ? tokens.inkMuted
+        : (emphasized ? tokens.ink : Colors.white);
     final content = Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -5571,7 +5589,7 @@ class _NetworkMapStationActionTab extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
-                  color: EasySubwayAccessibleColors.surface,
+                  color: tokens.surface,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: content,
