@@ -100,8 +100,8 @@ class AdminSearchControllerTest {
 	}
 
 	@Test
-	@DisplayName("topbar에 커맨드 팔레트 트리거가 렌더되고 no-JS는 검색 페이지로 이동한다")
-	void topbarRendersCommandPalette() throws Exception {
+	@DisplayName("사이드바에 커맨드 팔레트 트리거가 렌더되고 no-JS는 검색 페이지로 이동한다")
+	void sidebarRendersCommandPalette() throws Exception {
 		String html = mockMvc.perform(get("/admin/search")
 				.param("q", "제보")
 				.with(httpBasic("admin-test", "admin-test-password")))

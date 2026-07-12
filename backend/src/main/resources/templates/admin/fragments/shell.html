@@ -54,11 +54,15 @@
 			   th:text="${program.label}">메뉴</a>
 		</div>
 	</div>
+</nav>
+<a th:fragment="skipLink" class="skip-link" href="#admin-content">본문으로 건너뛰기</a>
+<div th:fragment="topbar" class="admin-topbar">
 	<!--
-	  반응형 사이드바 토글(#1981): 기존 topbar에 있던 오프캔버스 토글(#1738)을 사이드바 하단으로
-	  이동했다. 로직·상태(sidebarToggle, body.sidebar-open)는 불변 — 위치만 이동.
+	  반응형 사이드바 토글(#1738): ≤1024px에서만 보인다. 누르면 사이드바를 오프캔버스로 연다
+	  (body.sidebar-open + 백드롭). nav 바깥(topbar)에 둬야 한다 — .has-js .admin-sidebar가
+	  transform: translateX(-100%)로 화면 밖에 있을 때도 이 토글은 항상 화면에 남아야 열 수 있다.
 	-->
-	<div class="admin-sidebar-nav-control admin-sidebar-collapse" x-data="sidebarToggle"
+	<div class="admin-sidebar-nav-control" x-data="sidebarToggle"
 	     x-on:keydown.escape.window="close">
 		<button type="button" class="admin-sidebar-toggle" x-on:click="toggle"
 		        x-bind:aria-expanded="ariaExpanded" aria-controls="admin-primary-nav"
@@ -67,9 +71,6 @@
 		</button>
 		<div class="admin-sidebar-backdrop" x-cloak x-show="open" x-on:click="close"></div>
 	</div>
-</nav>
-<a th:fragment="skipLink" class="skip-link" href="#admin-content">본문으로 건너뛰기</a>
-<div th:fragment="topbar" class="admin-topbar">
 	<div class="admin-topbar-row" aria-label="관리자 실행 환경">
 		<div class="admin-topbar-meta">
 			<span class="admin-env-badge"

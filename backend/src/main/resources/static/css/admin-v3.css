@@ -157,10 +157,6 @@ body.admin-v3 {
 	font-weight: var(--admin-w-strong);
 }
 
-/* 사이드바 하단 접기 토글(#1981): 반응형(≤1024px)에서만 노출되는 기존 토글을 사이드바 하단
-   마크업 위치로 이동했다. .admin-sidebar-nav-control은 display:contents라 자신은 박스가 없으므로
-   실제 여백은 노출 시점에 보이는 .admin-sidebar-toggle 쪽(아래 반응형 규칙)에서 준다. */
-
 .admin-main {
 	min-width: 0;
 	width: 100%;
@@ -1377,7 +1373,6 @@ body.admin-v3 {
 
 	.admin-sidebar-toggle {
 		display: inline-flex;
-		margin: 12px 24px 0;
 	}
 
 	/* JS 있으면 오프캔버스: 사이드바를 화면 밖에 두고 토글로 연다(body.sidebar-open). */
