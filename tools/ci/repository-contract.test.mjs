@@ -1168,10 +1168,39 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
 
   const variables = read(`${terraformDir}/variables.tf`);
   const locals = read(`${terraformDir}/locals.tf`);
+  const network = read(`${terraformDir}/network.tf`);
   const providers = read(`${terraformDir}/providers.tf`);
   const datapackStorage = read(`${terraformDir}/datapack_object_storage.tf`);
   const outputs = read(`${terraformDir}/outputs.tf`);
   const tfvarsExample = read(`${terraformDir}/terraform.tfvars.example`);
+
+  const officialCloudflareIpv4Cidrs = [
+    "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22",
+    "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18",
+    "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22",
+    "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
+    "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22",
+  ].sort();
+  const cloudflareBlock = locals.match(
+    /cloudflare_ipv4_ingress_cidrs\s*=\s*toset\(\[([\s\S]*?)\]\)/,
+  );
+  assert.ok(cloudflareBlock, "tracked locals must contain the canonical Cloudflare IPv4 set");
+  const configuredCloudflareIpv4Cidrs = [
+    ...cloudflareBlock[1].matchAll(/"([0-9.]+\/[0-9]+)"/g),
+  ].map((match) => match[1]).sort();
+  assert.deepEqual(configuredCloudflareIpv4Cidrs, officialCloudflareIpv4Cidrs);
+  assert.equal(new Set(configuredCloudflareIpv4Cidrs).size, 15);
+
+  assert.match(locals, /cloudflare_ipv4_source_url\s*=\s*"https:\/\/www\.cloudflare\.com\/ips-v4\/"/);
+  assert.match(locals, /cloudflare_ipv4_checked_date\s*=\s*"2026-07-12"/);
+  assert.doesNotMatch(variables, /variable "cloudflare_ipv4_ingress_cidrs"/);
+  assert.doesNotMatch(variables, /variable "http_ingress_cidr"/);
+  assert.doesNotMatch(variables, /variable "https_ingress_cidr"/);
+  assert.doesNotMatch(network, /max\s+= 80|source\s+= var\.http_ingress_cidr/);
+  assert.match(network, /for_each = local\.cloudflare_ipv4_ingress_cidrs/);
+  assert.match(network, /source\s+= ingress_security_rules\.value/);
+  assert.match(network, /max\s+= 443/);
+  assert.doesNotMatch(tfvarsExample, /http_ingress_cidr|https_ingress_cidr|cloudflare_ipv4_ingress_cidrs|0\.0\.0\.0\/0/);
 
   assert.match(variables, /default\s+= "easysubway-a1"/);
   assert.match(variables, /default\s+= "easysubway-datapacks"/);
