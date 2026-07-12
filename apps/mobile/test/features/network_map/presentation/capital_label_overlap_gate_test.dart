@@ -17,9 +17,10 @@ Size _measureBadge(String text) => Size(
   kRouteMapDesignBadgeFontPx + 7,
 );
 
-// 재간격 + 부역명 축약 + gap 확장 반영(2026-07-06 실측): 64→2. 잔여 1쌍은
-// 임진강/운천(경의중앙 최북단, 둘 다 짧은 평역명·지리적 근접)으로 라벨 배치로는
-// 분리 불가한 기약 케이스 — 도심 겹침은 0이다(스펙 R3). baseline은 악화 금지.
+// 재간격 + 부역명 축약 + gap 확장 반영(2026-07-06 실측): 64→2. 잔여 기약 1쌍은
+// 라벨 배치로 분리 불가한 근접 평역명 케이스로, v1에서는 임진강/운천(경의중앙
+// 최북단)이었고 v2(#2011) canonical에서는 삼성중앙/봉은사(9호선 인접)로 이동했다
+// — 도심 겹침은 0이다(스펙 R3). baseline은 악화 금지(unresolved≤2·라벨-라벨≤1 유지).
 const int kCapitalUnresolvedBaseline = 2;
 
 // 2026-07-06 실기기 클러터 게이트 확장 — 라벨-라벨 외 라벨-선·뱃지 겹침도 측정해
@@ -29,8 +30,14 @@ const int kCapitalUnresolvedBaseline = 2;
 // [2026-07-11 #1965 리뷰 후속] 우이신설 뱃지 ↔ 성수지선 spur 라벨(용두) 코너 ~3px
 // 접촉을 라벨 배치 gap 사다리 확장(+18 단 추가)으로 해소 — 뱃지-라벨 1→0 복귀,
 // 라벨-선도 부수 개선(14→9). 라벨-라벨 0·unresolved 0은 유지(다른 게이트 무영향).
-// 실측값(악화 금지): 라벨-선 9, 뱃지-선 0, 뱃지-라벨 0.
-const int kCapitalLabelLineOverlapBaseline = 9;
+// [2026-07-12 #2011] 오너 자작 수도권 정본을 v2(환승 중심 정렬 v4-clean·경의중앙
+// 동농~지평 스무딩)로 교체하며 신 canonical 기하 실측으로 baseline 재설정. v2는
+// 역 추가/삭제 0·이동 29(도심 환승부 + 5호선 하남지선 + 경의중앙 동부)로, 서울역/
+// 공덕/효창공원앞 중심 재정렬이 도심 라벨-선 접점을 2 늘렸다(9→11). 라벨 solver는
+// 이미 floor(unresolved 1·라벨-라벨 1)이며 나머지는 v2 기하에서 라벨 배치로 분리
+// 불가한 기약 접점(도심 환승 밀집부)이다. 핵심 불변식(라벨-라벨 ≤1·뱃지 0·unresolved
+// ≤2)은 v2에서도 유지된다. 실측값(악화 금지): 라벨-선 11, 뱃지-선 0, 뱃지-라벨 0.
+const int kCapitalLabelLineOverlapBaseline = 11;
 const int kCapitalBadgeLineOverlapBaseline = 0;
 const int kCapitalBadgeLabelOverlapBaseline = 0;
 
