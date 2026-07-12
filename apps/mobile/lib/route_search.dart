@@ -11,6 +11,7 @@ import 'auth_headers.dart';
 import 'core/network/api_client.dart';
 import 'features/ads/active_ad_banner.dart';
 import 'features/ads/ad_repository.dart';
+import 'features/fare/official_od_fare_quote.dart';
 import 'features/route_draft/domain/route_draft.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
@@ -1098,6 +1099,7 @@ class RouteSearchResult {
     this.hasOutOfStationTransfer = false,
     this.commercialEtaEligible = false,
     this.sourceUpdatedAt = '',
+    this.officialOdFareQuote,
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1296,6 +1298,9 @@ class RouteSearchResult {
   final bool hasOutOfStationTransfer;
   final bool commercialEtaEligible;
   final String sourceUpdatedAt;
+  final OfficialOdFareQuote? officialOdFareQuote;
+
+  bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
   int get accessibilityScore => _accessibilityScore ?? score;
 
@@ -1445,6 +1450,7 @@ class RouteSearchResult {
     String? lineName,
     List<RouteSearchStep>? steps,
     String? etaSource,
+    OfficialOdFareQuote? officialOdFareQuote,
   }) {
     return RouteSearchResult(
       routeSearchId: routeSearchId,
@@ -1477,6 +1483,7 @@ class RouteSearchResult {
       hasOutOfStationTransfer: hasOutOfStationTransfer,
       commercialEtaEligible: commercialEtaEligible,
       sourceUpdatedAt: sourceUpdatedAt,
+      officialOdFareQuote: officialOdFareQuote ?? this.officialOdFareQuote,
     );
   }
 
@@ -4469,6 +4476,8 @@ class _RouteDetailWorkflowView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        _OfficialOdFareSection(quote: result.officialOdFareQuote),
+        const SizedBox(height: 16),
         _RouteStepSection(steps: result.movementSteps),
         if (result.arrivalGuidanceStep case final arrivalStep?) ...[
           const SizedBox(height: 8),
@@ -4511,6 +4520,59 @@ class _RouteDetailWorkflowView extends StatelessWidget {
         else
           const AdBannerSlot(slotKey: Key('routeDetailAdBanner')),
       ],
+    );
+  }
+}
+
+class _OfficialOdFareSection extends StatelessWidget {
+  const _OfficialOdFareSection({required this.quote});
+
+  final OfficialOdFareQuote? quote;
+
+  @override
+  Widget build(BuildContext context) {
+    final quote = this.quote;
+    if (quote == null) {
+      return Semantics(
+        container: true,
+        label: '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다.',
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [Text('공식 OD 요금 정보 없음'), Text('오프라인 공식 자료에 없는 경로입니다.')],
+        ),
+      );
+    }
+    final values = [
+      ('일반 카드', quote.gnrlCardFare),
+      ('일반 현금', quote.gnrlCashFare),
+      ('청소년 카드', quote.yungCardFare),
+      ('청소년 현금', quote.yungCashFare),
+      ('어린이 카드', quote.childCardFare),
+      ('어린이 현금', quote.childCashFare),
+    ];
+    return Semantics(
+      container: true,
+      label: '공식 OD 요금, 오프라인 공식 자료',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _RouteSectionHeader(title: '공식 OD 요금'),
+          const SizedBox(height: 8),
+          for (final value in values)
+            Semantics(
+              container: true,
+              label: '${value.$1}, ${value.$2}원, 오프라인 공식 자료',
+              child: ExcludeSemantics(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [Text(value.$1), Text('${value.$2}원')],
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
+          const Text('오프라인 공식 자료 기준'),
+        ],
+      ),
     );
   }
 }

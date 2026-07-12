@@ -6486,6 +6486,725 @@ class StationFareZonesCompanion extends UpdateCompanion<StationFareZone> {
   }
 }
 
+class $OfficialOdFareQuotesTable extends OfficialOdFareQuotes
+    with TableInfo<$OfficialOdFareQuotesTable, OfficialOdFareQuoteRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OfficialOdFareQuotesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _originStationIdMeta = const VerificationMeta(
+    'originStationId',
+  );
+  @override
+  late final GeneratedColumn<String> originStationId = GeneratedColumn<String>(
+    'origin_station_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _destinationStationIdMeta =
+      const VerificationMeta('destinationStationId');
+  @override
+  late final GeneratedColumn<String> destinationStationId =
+      GeneratedColumn<String>(
+        'destination_station_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _sourceIdMeta = const VerificationMeta(
+    'sourceId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceId = GeneratedColumn<String>(
+    'source_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _snapshotIdMeta = const VerificationMeta(
+    'snapshotId',
+  );
+  @override
+  late final GeneratedColumn<String> snapshotId = GeneratedColumn<String>(
+    'snapshot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _mappingLedgerHashMeta = const VerificationMeta(
+    'mappingLedgerHash',
+  );
+  @override
+  late final GeneratedColumn<String> mappingLedgerHash =
+      GeneratedColumn<String>(
+        'mapping_ledger_hash',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _gnrlCardFareMeta = const VerificationMeta(
+    'gnrlCardFare',
+  );
+  @override
+  late final GeneratedColumn<int> gnrlCardFare = GeneratedColumn<int>(
+    'gnrl_card_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gnrlCashFareMeta = const VerificationMeta(
+    'gnrlCashFare',
+  );
+  @override
+  late final GeneratedColumn<int> gnrlCashFare = GeneratedColumn<int>(
+    'gnrl_cash_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _yungCardFareMeta = const VerificationMeta(
+    'yungCardFare',
+  );
+  @override
+  late final GeneratedColumn<int> yungCardFare = GeneratedColumn<int>(
+    'yung_card_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _yungCashFareMeta = const VerificationMeta(
+    'yungCashFare',
+  );
+  @override
+  late final GeneratedColumn<int> yungCashFare = GeneratedColumn<int>(
+    'yung_cash_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _childCardFareMeta = const VerificationMeta(
+    'childCardFare',
+  );
+  @override
+  late final GeneratedColumn<int> childCardFare = GeneratedColumn<int>(
+    'child_card_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _childCashFareMeta = const VerificationMeta(
+    'childCashFare',
+  );
+  @override
+  late final GeneratedColumn<int> childCashFare = GeneratedColumn<int>(
+    'child_cash_fare',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    originStationId,
+    destinationStationId,
+    sourceId,
+    snapshotId,
+    mappingLedgerHash,
+    gnrlCardFare,
+    gnrlCashFare,
+    yungCardFare,
+    yungCashFare,
+    childCardFare,
+    childCashFare,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'official_od_fare_quotes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<OfficialOdFareQuoteRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('origin_station_id')) {
+      context.handle(
+        _originStationIdMeta,
+        originStationId.isAcceptableOrUnknown(
+          data['origin_station_id']!,
+          _originStationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_originStationIdMeta);
+    }
+    if (data.containsKey('destination_station_id')) {
+      context.handle(
+        _destinationStationIdMeta,
+        destinationStationId.isAcceptableOrUnknown(
+          data['destination_station_id']!,
+          _destinationStationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_destinationStationIdMeta);
+    }
+    if (data.containsKey('source_id')) {
+      context.handle(
+        _sourceIdMeta,
+        sourceId.isAcceptableOrUnknown(data['source_id']!, _sourceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIdMeta);
+    }
+    if (data.containsKey('snapshot_id')) {
+      context.handle(
+        _snapshotIdMeta,
+        snapshotId.isAcceptableOrUnknown(data['snapshot_id']!, _snapshotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_snapshotIdMeta);
+    }
+    if (data.containsKey('mapping_ledger_hash')) {
+      context.handle(
+        _mappingLedgerHashMeta,
+        mappingLedgerHash.isAcceptableOrUnknown(
+          data['mapping_ledger_hash']!,
+          _mappingLedgerHashMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_mappingLedgerHashMeta);
+    }
+    if (data.containsKey('gnrl_card_fare')) {
+      context.handle(
+        _gnrlCardFareMeta,
+        gnrlCardFare.isAcceptableOrUnknown(
+          data['gnrl_card_fare']!,
+          _gnrlCardFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_gnrlCardFareMeta);
+    }
+    if (data.containsKey('gnrl_cash_fare')) {
+      context.handle(
+        _gnrlCashFareMeta,
+        gnrlCashFare.isAcceptableOrUnknown(
+          data['gnrl_cash_fare']!,
+          _gnrlCashFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_gnrlCashFareMeta);
+    }
+    if (data.containsKey('yung_card_fare')) {
+      context.handle(
+        _yungCardFareMeta,
+        yungCardFare.isAcceptableOrUnknown(
+          data['yung_card_fare']!,
+          _yungCardFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_yungCardFareMeta);
+    }
+    if (data.containsKey('yung_cash_fare')) {
+      context.handle(
+        _yungCashFareMeta,
+        yungCashFare.isAcceptableOrUnknown(
+          data['yung_cash_fare']!,
+          _yungCashFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_yungCashFareMeta);
+    }
+    if (data.containsKey('child_card_fare')) {
+      context.handle(
+        _childCardFareMeta,
+        childCardFare.isAcceptableOrUnknown(
+          data['child_card_fare']!,
+          _childCardFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_childCardFareMeta);
+    }
+    if (data.containsKey('child_cash_fare')) {
+      context.handle(
+        _childCashFareMeta,
+        childCashFare.isAcceptableOrUnknown(
+          data['child_cash_fare']!,
+          _childCashFareMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_childCashFareMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {
+    originStationId,
+    destinationStationId,
+  };
+  @override
+  OfficialOdFareQuoteRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OfficialOdFareQuoteRow(
+      originStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}origin_station_id'],
+      )!,
+      destinationStationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}destination_station_id'],
+      )!,
+      sourceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_id'],
+      )!,
+      snapshotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}snapshot_id'],
+      )!,
+      mappingLedgerHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mapping_ledger_hash'],
+      )!,
+      gnrlCardFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}gnrl_card_fare'],
+      )!,
+      gnrlCashFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}gnrl_cash_fare'],
+      )!,
+      yungCardFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}yung_card_fare'],
+      )!,
+      yungCashFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}yung_cash_fare'],
+      )!,
+      childCardFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}child_card_fare'],
+      )!,
+      childCashFare: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}child_cash_fare'],
+      )!,
+    );
+  }
+
+  @override
+  $OfficialOdFareQuotesTable createAlias(String alias) {
+    return $OfficialOdFareQuotesTable(attachedDatabase, alias);
+  }
+}
+
+class OfficialOdFareQuoteRow extends DataClass
+    implements Insertable<OfficialOdFareQuoteRow> {
+  final String originStationId;
+  final String destinationStationId;
+  final String sourceId;
+  final String snapshotId;
+  final String mappingLedgerHash;
+  final int gnrlCardFare;
+  final int gnrlCashFare;
+  final int yungCardFare;
+  final int yungCashFare;
+  final int childCardFare;
+  final int childCashFare;
+  const OfficialOdFareQuoteRow({
+    required this.originStationId,
+    required this.destinationStationId,
+    required this.sourceId,
+    required this.snapshotId,
+    required this.mappingLedgerHash,
+    required this.gnrlCardFare,
+    required this.gnrlCashFare,
+    required this.yungCardFare,
+    required this.yungCashFare,
+    required this.childCardFare,
+    required this.childCashFare,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['origin_station_id'] = Variable<String>(originStationId);
+    map['destination_station_id'] = Variable<String>(destinationStationId);
+    map['source_id'] = Variable<String>(sourceId);
+    map['snapshot_id'] = Variable<String>(snapshotId);
+    map['mapping_ledger_hash'] = Variable<String>(mappingLedgerHash);
+    map['gnrl_card_fare'] = Variable<int>(gnrlCardFare);
+    map['gnrl_cash_fare'] = Variable<int>(gnrlCashFare);
+    map['yung_card_fare'] = Variable<int>(yungCardFare);
+    map['yung_cash_fare'] = Variable<int>(yungCashFare);
+    map['child_card_fare'] = Variable<int>(childCardFare);
+    map['child_cash_fare'] = Variable<int>(childCashFare);
+    return map;
+  }
+
+  OfficialOdFareQuotesCompanion toCompanion(bool nullToAbsent) {
+    return OfficialOdFareQuotesCompanion(
+      originStationId: Value(originStationId),
+      destinationStationId: Value(destinationStationId),
+      sourceId: Value(sourceId),
+      snapshotId: Value(snapshotId),
+      mappingLedgerHash: Value(mappingLedgerHash),
+      gnrlCardFare: Value(gnrlCardFare),
+      gnrlCashFare: Value(gnrlCashFare),
+      yungCardFare: Value(yungCardFare),
+      yungCashFare: Value(yungCashFare),
+      childCardFare: Value(childCardFare),
+      childCashFare: Value(childCashFare),
+    );
+  }
+
+  factory OfficialOdFareQuoteRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OfficialOdFareQuoteRow(
+      originStationId: serializer.fromJson<String>(json['originStationId']),
+      destinationStationId: serializer.fromJson<String>(
+        json['destinationStationId'],
+      ),
+      sourceId: serializer.fromJson<String>(json['sourceId']),
+      snapshotId: serializer.fromJson<String>(json['snapshotId']),
+      mappingLedgerHash: serializer.fromJson<String>(json['mappingLedgerHash']),
+      gnrlCardFare: serializer.fromJson<int>(json['gnrlCardFare']),
+      gnrlCashFare: serializer.fromJson<int>(json['gnrlCashFare']),
+      yungCardFare: serializer.fromJson<int>(json['yungCardFare']),
+      yungCashFare: serializer.fromJson<int>(json['yungCashFare']),
+      childCardFare: serializer.fromJson<int>(json['childCardFare']),
+      childCashFare: serializer.fromJson<int>(json['childCashFare']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'originStationId': serializer.toJson<String>(originStationId),
+      'destinationStationId': serializer.toJson<String>(destinationStationId),
+      'sourceId': serializer.toJson<String>(sourceId),
+      'snapshotId': serializer.toJson<String>(snapshotId),
+      'mappingLedgerHash': serializer.toJson<String>(mappingLedgerHash),
+      'gnrlCardFare': serializer.toJson<int>(gnrlCardFare),
+      'gnrlCashFare': serializer.toJson<int>(gnrlCashFare),
+      'yungCardFare': serializer.toJson<int>(yungCardFare),
+      'yungCashFare': serializer.toJson<int>(yungCashFare),
+      'childCardFare': serializer.toJson<int>(childCardFare),
+      'childCashFare': serializer.toJson<int>(childCashFare),
+    };
+  }
+
+  OfficialOdFareQuoteRow copyWith({
+    String? originStationId,
+    String? destinationStationId,
+    String? sourceId,
+    String? snapshotId,
+    String? mappingLedgerHash,
+    int? gnrlCardFare,
+    int? gnrlCashFare,
+    int? yungCardFare,
+    int? yungCashFare,
+    int? childCardFare,
+    int? childCashFare,
+  }) => OfficialOdFareQuoteRow(
+    originStationId: originStationId ?? this.originStationId,
+    destinationStationId: destinationStationId ?? this.destinationStationId,
+    sourceId: sourceId ?? this.sourceId,
+    snapshotId: snapshotId ?? this.snapshotId,
+    mappingLedgerHash: mappingLedgerHash ?? this.mappingLedgerHash,
+    gnrlCardFare: gnrlCardFare ?? this.gnrlCardFare,
+    gnrlCashFare: gnrlCashFare ?? this.gnrlCashFare,
+    yungCardFare: yungCardFare ?? this.yungCardFare,
+    yungCashFare: yungCashFare ?? this.yungCashFare,
+    childCardFare: childCardFare ?? this.childCardFare,
+    childCashFare: childCashFare ?? this.childCashFare,
+  );
+  OfficialOdFareQuoteRow copyWithCompanion(OfficialOdFareQuotesCompanion data) {
+    return OfficialOdFareQuoteRow(
+      originStationId: data.originStationId.present
+          ? data.originStationId.value
+          : this.originStationId,
+      destinationStationId: data.destinationStationId.present
+          ? data.destinationStationId.value
+          : this.destinationStationId,
+      sourceId: data.sourceId.present ? data.sourceId.value : this.sourceId,
+      snapshotId: data.snapshotId.present
+          ? data.snapshotId.value
+          : this.snapshotId,
+      mappingLedgerHash: data.mappingLedgerHash.present
+          ? data.mappingLedgerHash.value
+          : this.mappingLedgerHash,
+      gnrlCardFare: data.gnrlCardFare.present
+          ? data.gnrlCardFare.value
+          : this.gnrlCardFare,
+      gnrlCashFare: data.gnrlCashFare.present
+          ? data.gnrlCashFare.value
+          : this.gnrlCashFare,
+      yungCardFare: data.yungCardFare.present
+          ? data.yungCardFare.value
+          : this.yungCardFare,
+      yungCashFare: data.yungCashFare.present
+          ? data.yungCashFare.value
+          : this.yungCashFare,
+      childCardFare: data.childCardFare.present
+          ? data.childCardFare.value
+          : this.childCardFare,
+      childCashFare: data.childCashFare.present
+          ? data.childCashFare.value
+          : this.childCashFare,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OfficialOdFareQuoteRow(')
+          ..write('originStationId: $originStationId, ')
+          ..write('destinationStationId: $destinationStationId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('snapshotId: $snapshotId, ')
+          ..write('mappingLedgerHash: $mappingLedgerHash, ')
+          ..write('gnrlCardFare: $gnrlCardFare, ')
+          ..write('gnrlCashFare: $gnrlCashFare, ')
+          ..write('yungCardFare: $yungCardFare, ')
+          ..write('yungCashFare: $yungCashFare, ')
+          ..write('childCardFare: $childCardFare, ')
+          ..write('childCashFare: $childCashFare')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    originStationId,
+    destinationStationId,
+    sourceId,
+    snapshotId,
+    mappingLedgerHash,
+    gnrlCardFare,
+    gnrlCashFare,
+    yungCardFare,
+    yungCashFare,
+    childCardFare,
+    childCashFare,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OfficialOdFareQuoteRow &&
+          other.originStationId == this.originStationId &&
+          other.destinationStationId == this.destinationStationId &&
+          other.sourceId == this.sourceId &&
+          other.snapshotId == this.snapshotId &&
+          other.mappingLedgerHash == this.mappingLedgerHash &&
+          other.gnrlCardFare == this.gnrlCardFare &&
+          other.gnrlCashFare == this.gnrlCashFare &&
+          other.yungCardFare == this.yungCardFare &&
+          other.yungCashFare == this.yungCashFare &&
+          other.childCardFare == this.childCardFare &&
+          other.childCashFare == this.childCashFare);
+}
+
+class OfficialOdFareQuotesCompanion
+    extends UpdateCompanion<OfficialOdFareQuoteRow> {
+  final Value<String> originStationId;
+  final Value<String> destinationStationId;
+  final Value<String> sourceId;
+  final Value<String> snapshotId;
+  final Value<String> mappingLedgerHash;
+  final Value<int> gnrlCardFare;
+  final Value<int> gnrlCashFare;
+  final Value<int> yungCardFare;
+  final Value<int> yungCashFare;
+  final Value<int> childCardFare;
+  final Value<int> childCashFare;
+  final Value<int> rowid;
+  const OfficialOdFareQuotesCompanion({
+    this.originStationId = const Value.absent(),
+    this.destinationStationId = const Value.absent(),
+    this.sourceId = const Value.absent(),
+    this.snapshotId = const Value.absent(),
+    this.mappingLedgerHash = const Value.absent(),
+    this.gnrlCardFare = const Value.absent(),
+    this.gnrlCashFare = const Value.absent(),
+    this.yungCardFare = const Value.absent(),
+    this.yungCashFare = const Value.absent(),
+    this.childCardFare = const Value.absent(),
+    this.childCashFare = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OfficialOdFareQuotesCompanion.insert({
+    required String originStationId,
+    required String destinationStationId,
+    required String sourceId,
+    required String snapshotId,
+    required String mappingLedgerHash,
+    required int gnrlCardFare,
+    required int gnrlCashFare,
+    required int yungCardFare,
+    required int yungCashFare,
+    required int childCardFare,
+    required int childCashFare,
+    this.rowid = const Value.absent(),
+  }) : originStationId = Value(originStationId),
+       destinationStationId = Value(destinationStationId),
+       sourceId = Value(sourceId),
+       snapshotId = Value(snapshotId),
+       mappingLedgerHash = Value(mappingLedgerHash),
+       gnrlCardFare = Value(gnrlCardFare),
+       gnrlCashFare = Value(gnrlCashFare),
+       yungCardFare = Value(yungCardFare),
+       yungCashFare = Value(yungCashFare),
+       childCardFare = Value(childCardFare),
+       childCashFare = Value(childCashFare);
+  static Insertable<OfficialOdFareQuoteRow> custom({
+    Expression<String>? originStationId,
+    Expression<String>? destinationStationId,
+    Expression<String>? sourceId,
+    Expression<String>? snapshotId,
+    Expression<String>? mappingLedgerHash,
+    Expression<int>? gnrlCardFare,
+    Expression<int>? gnrlCashFare,
+    Expression<int>? yungCardFare,
+    Expression<int>? yungCashFare,
+    Expression<int>? childCardFare,
+    Expression<int>? childCashFare,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (originStationId != null) 'origin_station_id': originStationId,
+      if (destinationStationId != null)
+        'destination_station_id': destinationStationId,
+      if (sourceId != null) 'source_id': sourceId,
+      if (snapshotId != null) 'snapshot_id': snapshotId,
+      if (mappingLedgerHash != null) 'mapping_ledger_hash': mappingLedgerHash,
+      if (gnrlCardFare != null) 'gnrl_card_fare': gnrlCardFare,
+      if (gnrlCashFare != null) 'gnrl_cash_fare': gnrlCashFare,
+      if (yungCardFare != null) 'yung_card_fare': yungCardFare,
+      if (yungCashFare != null) 'yung_cash_fare': yungCashFare,
+      if (childCardFare != null) 'child_card_fare': childCardFare,
+      if (childCashFare != null) 'child_cash_fare': childCashFare,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OfficialOdFareQuotesCompanion copyWith({
+    Value<String>? originStationId,
+    Value<String>? destinationStationId,
+    Value<String>? sourceId,
+    Value<String>? snapshotId,
+    Value<String>? mappingLedgerHash,
+    Value<int>? gnrlCardFare,
+    Value<int>? gnrlCashFare,
+    Value<int>? yungCardFare,
+    Value<int>? yungCashFare,
+    Value<int>? childCardFare,
+    Value<int>? childCashFare,
+    Value<int>? rowid,
+  }) {
+    return OfficialOdFareQuotesCompanion(
+      originStationId: originStationId ?? this.originStationId,
+      destinationStationId: destinationStationId ?? this.destinationStationId,
+      sourceId: sourceId ?? this.sourceId,
+      snapshotId: snapshotId ?? this.snapshotId,
+      mappingLedgerHash: mappingLedgerHash ?? this.mappingLedgerHash,
+      gnrlCardFare: gnrlCardFare ?? this.gnrlCardFare,
+      gnrlCashFare: gnrlCashFare ?? this.gnrlCashFare,
+      yungCardFare: yungCardFare ?? this.yungCardFare,
+      yungCashFare: yungCashFare ?? this.yungCashFare,
+      childCardFare: childCardFare ?? this.childCardFare,
+      childCashFare: childCashFare ?? this.childCashFare,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (originStationId.present) {
+      map['origin_station_id'] = Variable<String>(originStationId.value);
+    }
+    if (destinationStationId.present) {
+      map['destination_station_id'] = Variable<String>(
+        destinationStationId.value,
+      );
+    }
+    if (sourceId.present) {
+      map['source_id'] = Variable<String>(sourceId.value);
+    }
+    if (snapshotId.present) {
+      map['snapshot_id'] = Variable<String>(snapshotId.value);
+    }
+    if (mappingLedgerHash.present) {
+      map['mapping_ledger_hash'] = Variable<String>(mappingLedgerHash.value);
+    }
+    if (gnrlCardFare.present) {
+      map['gnrl_card_fare'] = Variable<int>(gnrlCardFare.value);
+    }
+    if (gnrlCashFare.present) {
+      map['gnrl_cash_fare'] = Variable<int>(gnrlCashFare.value);
+    }
+    if (yungCardFare.present) {
+      map['yung_card_fare'] = Variable<int>(yungCardFare.value);
+    }
+    if (yungCashFare.present) {
+      map['yung_cash_fare'] = Variable<int>(yungCashFare.value);
+    }
+    if (childCardFare.present) {
+      map['child_card_fare'] = Variable<int>(childCardFare.value);
+    }
+    if (childCashFare.present) {
+      map['child_cash_fare'] = Variable<int>(childCashFare.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OfficialOdFareQuotesCompanion(')
+          ..write('originStationId: $originStationId, ')
+          ..write('destinationStationId: $destinationStationId, ')
+          ..write('sourceId: $sourceId, ')
+          ..write('snapshotId: $snapshotId, ')
+          ..write('mappingLedgerHash: $mappingLedgerHash, ')
+          ..write('gnrlCardFare: $gnrlCardFare, ')
+          ..write('gnrlCashFare: $gnrlCashFare, ')
+          ..write('yungCardFare: $yungCardFare, ')
+          ..write('yungCashFare: $yungCashFare, ')
+          ..write('childCardFare: $childCardFare, ')
+          ..write('childCashFare: $childCashFare, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RealtimeProviderLineMappingsTable extends RealtimeProviderLineMappings
     with
         TableInfo<
@@ -18377,6 +19096,8 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   late final $StationFareZonesTable stationFareZones = $StationFareZonesTable(
     this,
   );
+  late final $OfficialOdFareQuotesTable officialOdFareQuotes =
+      $OfficialOdFareQuotesTable(this);
   late final $RealtimeProviderLineMappingsTable realtimeProviderLineMappings =
       $RealtimeProviderLineMappingsTable(this);
   late final $RealtimeProviderStationMappingsTable
@@ -18424,6 +19145,7 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     fareRules,
     fareDiscounts,
     stationFareZones,
+    officialOdFareQuotes,
     realtimeProviderLineMappings,
     realtimeProviderStationMappings,
     networkEdges,
@@ -21983,6 +22705,356 @@ typedef $$StationFareZonesTableProcessedTableManager =
         >,
       ),
       StationFareZone,
+      PrefetchHooks Function()
+    >;
+typedef $$OfficialOdFareQuotesTableCreateCompanionBuilder =
+    OfficialOdFareQuotesCompanion Function({
+      required String originStationId,
+      required String destinationStationId,
+      required String sourceId,
+      required String snapshotId,
+      required String mappingLedgerHash,
+      required int gnrlCardFare,
+      required int gnrlCashFare,
+      required int yungCardFare,
+      required int yungCashFare,
+      required int childCardFare,
+      required int childCashFare,
+      Value<int> rowid,
+    });
+typedef $$OfficialOdFareQuotesTableUpdateCompanionBuilder =
+    OfficialOdFareQuotesCompanion Function({
+      Value<String> originStationId,
+      Value<String> destinationStationId,
+      Value<String> sourceId,
+      Value<String> snapshotId,
+      Value<String> mappingLedgerHash,
+      Value<int> gnrlCardFare,
+      Value<int> gnrlCashFare,
+      Value<int> yungCardFare,
+      Value<int> yungCashFare,
+      Value<int> childCardFare,
+      Value<int> childCashFare,
+      Value<int> rowid,
+    });
+
+class $$OfficialOdFareQuotesTableFilterComposer
+    extends Composer<_$CatalogDatabase, $OfficialOdFareQuotesTable> {
+  $$OfficialOdFareQuotesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get originStationId => $composableBuilder(
+    column: $table.originStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get destinationStationId => $composableBuilder(
+    column: $table.destinationStationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get snapshotId => $composableBuilder(
+    column: $table.snapshotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mappingLedgerHash => $composableBuilder(
+    column: $table.mappingLedgerHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get gnrlCardFare => $composableBuilder(
+    column: $table.gnrlCardFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get gnrlCashFare => $composableBuilder(
+    column: $table.gnrlCashFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get yungCardFare => $composableBuilder(
+    column: $table.yungCardFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get yungCashFare => $composableBuilder(
+    column: $table.yungCashFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get childCardFare => $composableBuilder(
+    column: $table.childCardFare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get childCashFare => $composableBuilder(
+    column: $table.childCashFare,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$OfficialOdFareQuotesTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $OfficialOdFareQuotesTable> {
+  $$OfficialOdFareQuotesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get originStationId => $composableBuilder(
+    column: $table.originStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get destinationStationId => $composableBuilder(
+    column: $table.destinationStationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceId => $composableBuilder(
+    column: $table.sourceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get snapshotId => $composableBuilder(
+    column: $table.snapshotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mappingLedgerHash => $composableBuilder(
+    column: $table.mappingLedgerHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get gnrlCardFare => $composableBuilder(
+    column: $table.gnrlCardFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get gnrlCashFare => $composableBuilder(
+    column: $table.gnrlCashFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get yungCardFare => $composableBuilder(
+    column: $table.yungCardFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get yungCashFare => $composableBuilder(
+    column: $table.yungCashFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get childCardFare => $composableBuilder(
+    column: $table.childCardFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get childCashFare => $composableBuilder(
+    column: $table.childCashFare,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$OfficialOdFareQuotesTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $OfficialOdFareQuotesTable> {
+  $$OfficialOdFareQuotesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get originStationId => $composableBuilder(
+    column: $table.originStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get destinationStationId => $composableBuilder(
+    column: $table.destinationStationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceId =>
+      $composableBuilder(column: $table.sourceId, builder: (column) => column);
+
+  GeneratedColumn<String> get snapshotId => $composableBuilder(
+    column: $table.snapshotId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mappingLedgerHash => $composableBuilder(
+    column: $table.mappingLedgerHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get gnrlCardFare => $composableBuilder(
+    column: $table.gnrlCardFare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get gnrlCashFare => $composableBuilder(
+    column: $table.gnrlCashFare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get yungCardFare => $composableBuilder(
+    column: $table.yungCardFare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get yungCashFare => $composableBuilder(
+    column: $table.yungCashFare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get childCardFare => $composableBuilder(
+    column: $table.childCardFare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get childCashFare => $composableBuilder(
+    column: $table.childCashFare,
+    builder: (column) => column,
+  );
+}
+
+class $$OfficialOdFareQuotesTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $OfficialOdFareQuotesTable,
+          OfficialOdFareQuoteRow,
+          $$OfficialOdFareQuotesTableFilterComposer,
+          $$OfficialOdFareQuotesTableOrderingComposer,
+          $$OfficialOdFareQuotesTableAnnotationComposer,
+          $$OfficialOdFareQuotesTableCreateCompanionBuilder,
+          $$OfficialOdFareQuotesTableUpdateCompanionBuilder,
+          (
+            OfficialOdFareQuoteRow,
+            BaseReferences<
+              _$CatalogDatabase,
+              $OfficialOdFareQuotesTable,
+              OfficialOdFareQuoteRow
+            >,
+          ),
+          OfficialOdFareQuoteRow,
+          PrefetchHooks Function()
+        > {
+  $$OfficialOdFareQuotesTableTableManager(
+    _$CatalogDatabase db,
+    $OfficialOdFareQuotesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OfficialOdFareQuotesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OfficialOdFareQuotesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$OfficialOdFareQuotesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> originStationId = const Value.absent(),
+                Value<String> destinationStationId = const Value.absent(),
+                Value<String> sourceId = const Value.absent(),
+                Value<String> snapshotId = const Value.absent(),
+                Value<String> mappingLedgerHash = const Value.absent(),
+                Value<int> gnrlCardFare = const Value.absent(),
+                Value<int> gnrlCashFare = const Value.absent(),
+                Value<int> yungCardFare = const Value.absent(),
+                Value<int> yungCashFare = const Value.absent(),
+                Value<int> childCardFare = const Value.absent(),
+                Value<int> childCashFare = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => OfficialOdFareQuotesCompanion(
+                originStationId: originStationId,
+                destinationStationId: destinationStationId,
+                sourceId: sourceId,
+                snapshotId: snapshotId,
+                mappingLedgerHash: mappingLedgerHash,
+                gnrlCardFare: gnrlCardFare,
+                gnrlCashFare: gnrlCashFare,
+                yungCardFare: yungCardFare,
+                yungCashFare: yungCashFare,
+                childCardFare: childCardFare,
+                childCashFare: childCashFare,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String originStationId,
+                required String destinationStationId,
+                required String sourceId,
+                required String snapshotId,
+                required String mappingLedgerHash,
+                required int gnrlCardFare,
+                required int gnrlCashFare,
+                required int yungCardFare,
+                required int yungCashFare,
+                required int childCardFare,
+                required int childCashFare,
+                Value<int> rowid = const Value.absent(),
+              }) => OfficialOdFareQuotesCompanion.insert(
+                originStationId: originStationId,
+                destinationStationId: destinationStationId,
+                sourceId: sourceId,
+                snapshotId: snapshotId,
+                mappingLedgerHash: mappingLedgerHash,
+                gnrlCardFare: gnrlCardFare,
+                gnrlCashFare: gnrlCashFare,
+                yungCardFare: yungCardFare,
+                yungCashFare: yungCashFare,
+                childCardFare: childCardFare,
+                childCashFare: childCashFare,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$OfficialOdFareQuotesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $OfficialOdFareQuotesTable,
+      OfficialOdFareQuoteRow,
+      $$OfficialOdFareQuotesTableFilterComposer,
+      $$OfficialOdFareQuotesTableOrderingComposer,
+      $$OfficialOdFareQuotesTableAnnotationComposer,
+      $$OfficialOdFareQuotesTableCreateCompanionBuilder,
+      $$OfficialOdFareQuotesTableUpdateCompanionBuilder,
+      (
+        OfficialOdFareQuoteRow,
+        BaseReferences<
+          _$CatalogDatabase,
+          $OfficialOdFareQuotesTable,
+          OfficialOdFareQuoteRow
+        >,
+      ),
+      OfficialOdFareQuoteRow,
       PrefetchHooks Function()
     >;
 typedef $$RealtimeProviderLineMappingsTableCreateCompanionBuilder =
@@ -27725,6 +28797,8 @@ class $CatalogDatabaseManager {
       $$FareDiscountsTableTableManager(_db, _db.fareDiscounts);
   $$StationFareZonesTableTableManager get stationFareZones =>
       $$StationFareZonesTableTableManager(_db, _db.stationFareZones);
+  $$OfficialOdFareQuotesTableTableManager get officialOdFareQuotes =>
+      $$OfficialOdFareQuotesTableTableManager(_db, _db.officialOdFareQuotes);
   $$RealtimeProviderLineMappingsTableTableManager
   get realtimeProviderLineMappings =>
       $$RealtimeProviderLineMappingsTableTableManager(
