@@ -285,6 +285,7 @@ class StructuredRouteMapPainter extends CustomPainter {
     required this.picture,
     required this.designScale,
     required this.camera,
+    this.sourceOrigin = Offset.zero,
     this.attributionText,
     this.attributionPainter,
   });
@@ -292,18 +293,36 @@ class StructuredRouteMapPainter extends CustomPainter {
   final ui.Picture picture;
   final double designScale;
   final MapCameraState camera;
+
+  /// Picture는 raw source 좌표(`station.position·k*`)로 녹화되지만, 카메라와
+  /// 오버레이(히트 rect·팝오버·핀)는 origin을 뺀 geometry 공간에서 동작한다(#1970).
+  /// 이 origin을 재생 변환에 반영해 두 좌표계를 하나로 맞춘다. 기본 (0,0)은
+  /// origin이 없는 맵(테스트 등)과의 하위호환을 유지한다.
+  final Offset sourceOrigin;
+
   final String? attributionText;
   final TextPainter? attributionPainter;
+
+  /// design space point(`source·k*`)를 카메라 재생 후 화면(viewport) 좌표로
+  /// 변환한다. paint()의 재생 변환과 동일한 단일 수식이며(#1970 회귀 방지),
+  /// `camera.sourceToViewportPoint(source − sourceOrigin)`와 항등이다.
+  @visibleForTesting
+  Offset designToViewport(Offset designPoint) {
+    final vc = camera.viewportSize.center(Offset.zero);
+    final source = designPoint / designScale;
+    return vc + (source - sourceOrigin - camera.center) * camera.scale;
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     final vc = camera.viewportSize.center(Offset.zero);
-    // viewport = vc + (source − camera.center)·scale, design = source·k*
-    //  → translate 후 scale/k* 배율로 Picture 재생.
+    // viewport = vc + (source − sourceOrigin − camera.center)·scale,
+    // design = source·k* → translate 후 scale/k* 배율로 Picture 재생.
+    // sourceOrigin은 오버레이·카메라의 origin-뺀 공간과 raw picture 공간을 잇는다.
     canvas.translate(
-      vc.dx - camera.center.dx * camera.scale,
-      vc.dy - camera.center.dy * camera.scale,
+      vc.dx - (camera.center.dx + sourceOrigin.dx) * camera.scale,
+      vc.dy - (camera.center.dy + sourceOrigin.dy) * camera.scale,
     );
     canvas.scale(camera.scale / designScale);
     canvas.drawPicture(picture);
@@ -341,6 +360,7 @@ class StructuredRouteMapPainter extends CustomPainter {
     return oldDelegate.camera.revision != camera.revision ||
         !identical(oldDelegate.picture, picture) ||
         oldDelegate.designScale != designScale ||
+        oldDelegate.sourceOrigin != sourceOrigin ||
         oldDelegate.attributionText != attributionText ||
         !identical(oldDelegate.attributionPainter, attributionPainter);
   }
@@ -355,6 +375,7 @@ class StructuredRouteMapView extends StatefulWidget {
     required this.lineColors,
     this.labelTextByStationId = const {},
     this.lineBadgeLabelByLineId = const {},
+    this.sourceOrigin = Offset.zero,
     this.attributionText,
     super.key,
   });
@@ -364,6 +385,11 @@ class StructuredRouteMapView extends StatefulWidget {
   final Map<String, Color> lineColors;
   final Map<String, String> labelTextByStationId;
   final Map<String, String> lineBadgeLabelByLineId;
+
+  /// 오버레이·카메라의 geometry origin. Picture 재생을 origin-뺀 공간으로 맞춰
+  /// 캔버스와 오버레이 좌표계를 일치시킨다(#1970).
+  final Offset sourceOrigin;
+
   final String? attributionText;
 
   @override
@@ -473,6 +499,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
           picture: _picture!,
           designScale: _design!.designScale,
           camera: widget.camera,
+          sourceOrigin: widget.sourceOrigin,
           attributionText: widget.attributionText,
           attributionPainter: _attributionPainter,
         ),
