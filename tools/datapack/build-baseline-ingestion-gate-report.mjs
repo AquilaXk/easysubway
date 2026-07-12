@@ -22,7 +22,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { readJsonFile, requireArg, sortJson } from "./lib/ledger-admission-cli.mjs";
+import { parseArgs, readJsonFile, requireArg, sortJson } from "./lib/ledger-admission-cli.mjs";
 import { buildTransferBaseline } from "./import-transfer-baseline.mjs";
 import { buildCarDoorHints } from "./import-car-door-hints.mjs";
 import { normalizeTransferDistanceDurationRows } from "./normalize-transfer-distance-duration-rows.mjs";
@@ -304,19 +304,6 @@ function countBy(items, keyFn) {
 
 function compareText(left, right) {
   return String(left).localeCompare(String(right));
-}
-
-function parseArgs(argv) {
-  const args = {};
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index];
-    if (!flag?.startsWith("--")) throw new Error(`unexpected argument: ${flag}`);
-    const value = argv[index + 1];
-    if (value == null || value.startsWith("--")) throw new Error(`${flag} requires a value`);
-    args[flag.slice(2)] = value;
-    index += 1;
-  }
-  return args;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
