@@ -29,9 +29,24 @@ function jsonResponse(status, body) {
   };
 }
 
+// A response whose body is plain text (not JSON) — mirrors Google returning a
+// bare error string that the previous unconditional JSON.parse would choke on.
+function textResponse(status, text) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => {
+      throw new SyntaxError("Unexpected token");
+    },
+    text: async () => text,
+  };
+}
+
 // Builds a mock Android Publisher API. `tracks` is the existing track list, and
-// `overrides` can force specific endpoints (e.g. an auth failure).
-function mockPlay({ tracks = [], uploadedVersionCode = "10005", overrides = {} } = {}) {
+// `overrides` can force specific endpoints (e.g. an auth failure). `commit` may
+// override the commit response: pass a single response applied to every commit
+// call, or a function `(changesNotSentForReview) => response` to vary by flag.
+function mockPlay({ tracks = [], uploadedVersionCode = "10005", overrides = {}, commit } = {}) {
   const requests = [];
   const fetchImpl = async (url, options = {}) => {
     const method = options.method ?? "GET";
@@ -43,7 +58,11 @@ function mockPlay({ tracks = [], uploadedVersionCode = "10005", overrides = {} }
     if (url.includes("/bundles?uploadType=media")) return jsonResponse(200, { versionCode: uploadedVersionCode });
     if (url.includes("/deobfuscationFiles/")) return jsonResponse(200, {});
     if (url.includes("/tracks/") && method === "PUT") return jsonResponse(200, { track: "internal" });
-    if (url.includes(":commit")) return jsonResponse(200, {});
+    if (url.includes(":commit")) {
+      if (typeof commit === "function") return commit(url.includes("changesNotSentForReview=true"));
+      if (commit) return commit;
+      return jsonResponse(200, {});
+    }
     return jsonResponse(404, { error: { status: "NOT_FOUND", message: url } });
   };
   return { fetchImpl, requests };
@@ -147,6 +166,93 @@ test("fails when the uploaded bundle versionCode does not match the expected one
       }),
       /does not match expected 10005/,
     );
+  });
+});
+
+test("surfaces the raw plaintext body when Play returns a non-JSON error (issue #2011)", async () => {
+  await withFiles(async ({ envFile, aabPath, mappingPath, reportPath }) => {
+    // Google occasionally returns a bare plaintext error instead of JSON; the
+    // old code JSON.parse'd it unconditionally and lost the original message.
+    const raw = "Could not commit changes for edit edit-1 because the app is in draft status.";
+    const { fetchImpl } = mockPlay({ tracks: [], commit: textResponse(400, raw) });
+    await assert.rejects(
+      runUploadPlayInternal({
+        envFile,
+        aabPath,
+        mappingPath,
+        versionCode: "10005",
+        reportPath,
+        // changesNotSentForReview already true => no draft retry, error surfaces.
+        changesNotSentForReview: true,
+        apiBaseUrl: "https://api.example/v3",
+        uploadBaseUrl: "https://upload.example/v3",
+        fetchImpl,
+      }),
+      (error) => {
+        assert.equal(error.name, "PlayApiError");
+        assert.equal(error.status, 400);
+        assert.equal(error.rawBody, raw);
+        // The raw body must appear verbatim in the message, not "is not valid JSON".
+        assert.match(error.message, /draft status/);
+        assert.doesNotMatch(error.message, /is not valid JSON/);
+        return true;
+      },
+    );
+  });
+});
+
+test("retries commit once with changesNotSentForReview=true on a draft-status rejection", async () => {
+  await withFiles(async ({ envFile, aabPath, mappingPath, reportPath }) => {
+    const raw = "Could not commit changes for edit edit-1 because the app is in draft status.";
+    // First commit (false) is rejected as draft; the retry (true) succeeds.
+    const { fetchImpl, requests } = mockPlay({
+      tracks: [],
+      commit: (notSent) => (notSent ? jsonResponse(200, {}) : textResponse(400, raw)),
+    });
+    const evidence = await runUploadPlayInternal({
+      envFile,
+      aabPath,
+      mappingPath,
+      versionCode: "10005",
+      reportPath,
+      apiBaseUrl: "https://api.example/v3",
+      uploadBaseUrl: "https://upload.example/v3",
+      fetchImpl,
+    });
+
+    // Evidence records the escalated flag and that a retry occurred.
+    assert.equal(evidence.changesNotSentForReview, true);
+    assert.equal(evidence.changesNotSentForReviewRetried, true);
+
+    const commits = requests.filter((request) => request.url.includes(":commit"));
+    assert.equal(commits.length, 2);
+    assert.ok(commits[0].url.includes("changesNotSentForReview=false"));
+    assert.ok(commits[1].url.includes("changesNotSentForReview=true"));
+  });
+});
+
+test("does not retry when a non-draft commit error occurs", async () => {
+  await withFiles(async ({ envFile, aabPath, mappingPath, reportPath }) => {
+    // A generic server error must NOT be masked by a draft retry.
+    const { fetchImpl, requests } = mockPlay({
+      tracks: [],
+      commit: jsonResponse(500, { error: { status: "INTERNAL", message: "backend unavailable" } }),
+    });
+    await assert.rejects(
+      runUploadPlayInternal({
+        envFile,
+        aabPath,
+        mappingPath,
+        versionCode: "10005",
+        reportPath,
+        apiBaseUrl: "https://api.example/v3",
+        uploadBaseUrl: "https://upload.example/v3",
+        fetchImpl,
+      }),
+      /backend unavailable/,
+    );
+    const commits = requests.filter((request) => request.url.includes(":commit"));
+    assert.equal(commits.length, 1, "a non-draft failure must not trigger a retry");
   });
 });
 
