@@ -555,7 +555,7 @@
           "durationSeconds"
         ]
       },
-      "nextAction": "run the table-derived tuple and retain admin review with automatic route graph edge disabled until row-bearing evidence plus distance and duration evidence exists",
+      "nextAction": "the table-derived tuple (prevStinCd=132, chtnNextStinCd=425) has been executed twice (runs 29177451688, 29190982462) and repeatedly returned no-data (resultCode=03) with unconfirmed public documentation for that code; next step is provider inquiry or confirming an alternate access path, while retaining admin review with automatic route graph edge disabled until row-bearing evidence plus distance and duration evidence exists",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
