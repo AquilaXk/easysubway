@@ -31,14 +31,14 @@ const _networkMapSearchFieldRadius = BorderRadius.all(Radius.circular(8));
 // (`_NetworkMapSearchInputField`)가 탭 전환 시 픽셀 단위로 동일한 시각 박스를
 // 유지하도록 공유하는 치수 상수. 값을 두 위젯에서 복제하지 않기 위해 이곳에
 // 모아둔다.
-const _searchFieldVisualHeight = 38.0;
+const _searchFieldVisualHeight = 46.0;
 const _searchFieldHorizontalPadding = 12.0;
 const _searchFieldBorderWidth = 1.5;
-const _searchFieldIconSize = 18.0;
+const _searchFieldIconSize = 22.0;
 const _searchFieldIconGap = 8.0;
 const _searchFieldTextStyle = TextStyle(
   color: EasySubwayAccessibleColors.mutedText,
-  fontSize: 15,
+  fontSize: 17,
   fontWeight: FontWeight.w600,
 );
 
@@ -1477,7 +1477,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                 ),
                 icon: const Icon(
                   Icons.arrow_back,
-                  size: 22,
+                  size: 26,
                   color: Color(0xFF4B4B4B),
                 ),
               )
@@ -1493,7 +1493,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                 ),
                 icon: const Icon(
                   Icons.menu,
-                  size: 22,
+                  size: 26,
                   color: Color(0xFF4B4B4B),
                 ),
               ),
@@ -1542,7 +1542,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Color(0xFF606060),
-                                  fontSize: 15,
+                                  fontSize: 17,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1551,7 +1551,7 @@ class _NetworkMapTopBar extends StatelessWidget {
                             const Icon(
                               Icons.keyboard_arrow_down,
                               color: Color(0xFF606060),
-                              size: 18,
+                              size: 22,
                             ),
                           ],
                         ),
@@ -1808,13 +1808,13 @@ class _NetworkMapSearchField extends StatelessWidget {
 
 /// #1933 홈 노선도 in-place 검색 모드에서 idle 검색 필드 자리에 나타나는 실제
 /// 편집 가능한 TextField. 바깥 터치타겟(56)은 유지하되, 안쪽 시각 박스는
-/// idle 필드(`_NetworkMapSearchField`)와 픽셀 단위로 동일한 높이(38)·패딩
+/// idle 필드(`_NetworkMapSearchField`)와 픽셀 단위로 동일한 높이(46)·패딩
 /// (12)·테두리·아이콘 배치를 공유 상수로 재사용해 탭 전환 시 박스가 점프하지
 /// 않도록 한다. TextField 자체는 border/배경 없이 텍스트 편집만 담당하고,
 /// 시각적인 테두리·배경·아이콘은 idle과 동일한 시각 껍데기 Container가 그린다.
 ///
-/// 시각(38px 박스)과 히트 영역(≥48px)은 Stack으로 분리한다: 배경 레이어가
-/// 38px 시각 껍데기를 그리고, 그 위 Positioned.fill 레이어에서 TextField가
+/// 시각(46px 박스)과 히트 영역(≥48px)은 Stack으로 분리한다: 배경 레이어가
+/// 46px 시각 껍데기를 그리고, 그 위 Positioned.fill 레이어에서 TextField가
 /// 바깥 터치타겟 높이(56)를 그대로 채우며 지우기 IconButton도 독립적인
 /// 48x48 탭 타깃을 갖는다. TextField와 지우기 버튼을 하나의 semantics로
 /// 병합하지 않아야 스크린리더 사용자가 '검색어 지우기' 액션에 별도로 접근할
@@ -1842,14 +1842,14 @@ class _NetworkMapSearchInputField extends StatelessWidget {
     final editController = controller;
     return SizedBox(
       // 터치 타겟(≥48, 실제로는 56)을 만족시키기 위해 필드 자체가 전체 높이를
-      // 차지한다. 시각적 박스(38px)는 배경 레이어 Container가 idle 필드와
+      // 차지한다. 시각적 박스(46px)는 배경 레이어 Container가 idle 필드와
       // 동일하게 그리고, 입력/버튼 히트 영역은 그 위 레이어에서 시각 박스와
       // 독립적으로 ≥48px를 확보한다.
       height: EasySubwayTouchTarget.general,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // 시각 껍데기: idle 필드와 픽셀 단위로 동일(높이 38, radius 8,
+          // 시각 껍데기: idle 필드와 픽셀 단위로 동일(높이 46, radius 8,
           // line 1.5, surface 배경). 히트 영역과 분리된 순수 배경이다.
           Container(
             key: const Key('heroStationSearchInputBox'),
@@ -1882,7 +1882,7 @@ class _NetworkMapSearchInputField extends StatelessWidget {
                     // 바깥 SizedBox가 터치타겟 높이(≥48, 실제 56)를 차지하고,
                     // 단일 줄 TextField가 세로 대칭 contentPadding으로 그 높이를
                     // 채워 히트/semantics 영역이 48px 게이트를 넘는다. 텍스트는
-                    // textAlignVertical.center + 대칭 패딩으로 필드(그리고 38px
+                    // textAlignVertical.center + 대칭 패딩으로 필드(그리고 46px
                     // 시각 박스)의 중앙선(=idle 텍스트 위치)에 놓인다. 여러 줄
                     // (expands) 트릭을 쓰면 실기기에서 입력 텍스트와 IME 조합
                     // 밑줄이 첫 줄로 렌더돼 박스 상단에 붙는 회귀가 있어, 단일 줄
@@ -1899,12 +1899,15 @@ class _NetworkMapSearchInputField extends StatelessWidget {
                           maxLines: 1,
                           textAlignVertical: TextAlignVertical.center,
                           textInputAction: TextInputAction.search,
-                          style: const TextStyle(fontSize: 15, height: 1.2),
+                          style: TextStyle(
+                            fontSize: _searchFieldTextStyle.fontSize,
+                            height: 1.2,
+                          ),
                           // placeholder는 부유 라벨이 아니라 hintText로 박스
                           // 내부 수직 중앙(idle의 '지하철역 검색'과 같은 위치·
                           // 스타일)에 렌더돼야 한다. 세로 대칭 contentPadding으로
                           // 필드 자체가 최소 탭 타깃(≥48)을 확보하고, 그 안에서
-                          // 텍스트 줄은 중앙(=38px 시각 박스 중앙선)에 놓인다.
+                          // 텍스트 줄은 중앙(=46px 시각 박스 중앙선)에 놓인다.
                           // isCollapsed는 필드를 텍스트 줄 높이로 쪼그라뜨려 탭
                           // 타깃을 깨므로 쓰지 않는다. floatingLabelBehavior를
                           // 지정하면 실기기에서 hint가 라벨처럼 박스 상단 테두리
@@ -1935,9 +1938,9 @@ class _NetworkMapSearchInputField extends StatelessWidget {
                         if (!hasQuery) {
                           return const SizedBox.shrink();
                         }
-                        // 시각 아이콘은 18px이지만 탭 타깃은 독립적으로 48x48을
+                        // 시각 아이콘은 22px이지만 탭 타깃은 독립적으로 48x48을
                         // 확보한다(top bar IconButton 패턴과 동일). 히트 영역은
-                        // 38px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
+                        // 46px 시각 박스 밖으로 넘치되 바깥 56px 터치타겟 안에
                         // 머물러 시각 박스 높이를 밀어 올리지 않는다.
                         return IconButton(
                           tooltip: '검색어 지우기',
