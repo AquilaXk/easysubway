@@ -357,6 +357,15 @@ test("실패한 재실행은 기존 evidence를 제거한다", async () => {
   });
 });
 
+test("credential 검증 실패도 기존 evidence를 제거한다", async () => {
+  await withOutput(async (outputPath) => {
+    await writeFile(outputPath, "stale evidence\n", { mode: 0o600 });
+
+    await assert.rejects(() => probe({ fareServiceKey: "", outputPath }), /DATA_GO_KR_SERVICE_KEY/);
+    await assert.rejects(access(outputPath));
+  });
+});
+
 test("필수 요금 필드 누락과 credential-bearing 오류를 fail closed하고 redaction한다", async () => {
   await withOutput(async (outputPath) => {
     const missingFieldFetch = createFetch({

@@ -175,11 +175,11 @@ export async function probeOfficialOdFares({
 } = {}) {
   let temporaryOutputPath;
   try {
-    requiredText(fareServiceKey, "DATA_GO_KR_SERVICE_KEY");
     if (!path.isAbsolute(requiredText(outputPath, "FARE_API_PROBE_OUTPUT"))) {
       throw new Error("FARE_API_PROBE_OUTPUT must be an absolute path");
     }
     await rm(outputPath, { force: true });
+    requiredText(fareServiceKey, "DATA_GO_KR_SERVICE_KEY");
 
     const canary = await fetchFareQuote({
       destination: CANARY_DESTINATION,
