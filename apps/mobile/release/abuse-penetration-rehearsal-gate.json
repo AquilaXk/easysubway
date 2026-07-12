@@ -40,7 +40,10 @@
       "deployed-admin-operator-auth-session-csrf-summary",
       "deployed-signed-url-boundary-summary",
       "object-storage-lifecycle-retention-delete-summary",
-      "deployed-distributed-or-multi-node-rate-limit-rehearsal"
+      "deployed-distributed-or-multi-node-rate-limit-rehearsal",
+      "deployed-ad-event-edge-rate-limit",
+      "deployed-ad-event-origin-bypass-denial",
+      "deployed-ad-event-privacy-redaction"
     ],
     "notClosingReasonKo": "#1022는 Play credential/store preflight와 local/backend 자동 검증은 확보됐지만, Play-generated/Play-installed artifact 및 deployed production-like rehearsal evidence가 아직 없어 open 유지한다.",
     "redactionPolicy": {
@@ -64,7 +67,10 @@
       "deployed-admin-security-negative-test",
       "deployed-signed-url-boundary-run",
       "deployed-object-storage-lifecycle-run",
-      "distributed-or-waived-rate-limit-rehearsal"
+      "distributed-or-waived-rate-limit-rehearsal",
+      "deployed-ad-event-edge-rate-limit",
+      "deployed-ad-event-origin-bypass-denial",
+      "deployed-ad-event-privacy-redaction"
     ],
     "forbiddenClosureEvidence": [
       "static gate JSON",
@@ -113,6 +119,55 @@
       "network-trace-redaction-summary"
     ]
   },
+  "adEventAbuseGuardrails": {
+    "issue": 1912,
+    "edge": {
+      "hostname": "easysubway-api.aquilaxk.site",
+      "method": "POST",
+      "exactPath": "/api/ads/events",
+      "excludedPath": "/api/ads/active",
+      "characteristic": "ip.src",
+      "requests": 120,
+      "periodSeconds": 60,
+      "mitigationSeconds": 60,
+      "action": "block",
+      "responseStatus": 429
+    },
+    "server": {
+      "env": "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+      "eventsPerUtcCompositeKey": 1000000,
+      "productionDefaultAllowed": false,
+      "capResponseStatus": 204,
+      "malformedResponseStatus": 400,
+      "unexpectedDatabaseFailure": "5xx"
+    },
+    "capacityBasis": {
+      "assumedDau": 10000,
+      "sessionsPerUserPerDay": 5,
+      "exposuresPerSession": 2,
+      "projectedEventsPerDay": 100000,
+      "safetyMultiplier": 10
+    },
+    "origin": {
+      "httpIngressOpen": false,
+      "httpsIngress": "official-cloudflare-ipv4-only",
+      "backendBind": "127.0.0.1",
+      "exactHostAndSniEvidenceRequired": true,
+      "sharedCloudflareCidrsAuthenticateTargetZone": false,
+      "originAuthenticationRequired": true,
+      "cloudflareIpv4SourceUrl": "https://www.cloudflare.com/ips-v4/",
+      "cloudflareIpv4CheckedDate": "2026-07-12",
+      "cloudflareIpv4Owner": "infra-owner",
+      "cloudflareIpv4ReapplyTrigger": "official-endpoint-set-change",
+      "publicIpv6Enabled": false
+    },
+    "revisitTriggers": {
+      "hottestKeyAcceptedEventsPerDay": 700000,
+      "consecutiveDays": 3,
+      "nonAbuseEdge429Ratio": 0.01,
+      "candidateRequestsPer60Seconds": 300
+    }
+  },
   "abuseScenarios": [
     {
       "id": "report_photo_upload_abuse",
@@ -155,9 +210,92 @@
       "severity": "release-blocker",
       "targetKo": "provider key, object credential, production password, local/internal endpoint exposure in app artifact, backend image, logs, PR evidence",
       "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"]
+    },
+    {
+      "id": "ad_counter_inflation",
+      "area": "ads-public-api",
+      "severity": "release-blocker",
+      "targetKo": "광고 event single-IP 폭주, direct-origin 우회, composite key 일일 cap 선점·초과, 식별자 및 IP/User-Agent 저장",
+      "requiredEvidence": [
+        "cloudflare-rate-limit-sanitized-export",
+        "edge-threshold-plus-one-429-summary",
+        "direct-origin-negative-summary",
+        "hostname-scoped-origin-auth-sanitized-export",
+        "reverse-proxy-exact-host-sni-default-reject-export",
+        "wrong-host-wrong-sni-client-auth-negative-summary",
+        "origin-auth-rollback-rehearsal-summary",
+        "cloudflare-ipv4-live-oci-set-equality-summary",
+        "postgres-atomic-daily-cap-test-output",
+        "identifier-zero-request-capture-summary",
+        "origin-log-ip-ua-absence-summary",
+        "cloudflare-logpush-ip-ua-absence-summary"
+      ]
     }
   ],
   "rehearsalMatrices": {
+    "adCounterInflation": {
+      "scenarioId": "ad_counter_inflation",
+      "requiredEvidence": [
+        "cloudflare-rate-limit-sanitized-export",
+        "edge-threshold-plus-one-429-summary",
+        "direct-origin-negative-summary",
+        "hostname-scoped-origin-auth-sanitized-export",
+        "reverse-proxy-exact-host-sni-default-reject-export",
+        "wrong-host-wrong-sni-client-auth-negative-summary",
+        "origin-auth-rollback-rehearsal-summary",
+        "cloudflare-ipv4-live-oci-set-equality-summary",
+        "postgres-atomic-daily-cap-test-output",
+        "identifier-zero-request-capture-summary",
+        "origin-log-ip-ua-absence-summary",
+        "cloudflare-logpush-ip-ua-absence-summary"
+      ],
+      "requiredCases": [
+        "edge_ip_rate_limit",
+        "direct_origin_bypass",
+        "target_hostname_authenticated_origin",
+        "wrong_host_origin_rejected",
+        "wrong_sni_origin_rejected",
+        "missing_or_untrusted_client_auth_rejected",
+        "cloudflare_ipv4_live_oci_set_equality",
+        "postgres_atomic_daily_cap",
+        "cap_silent_drop",
+        "identifier_zero_request_capture",
+        "origin_log_ip_ua_absent",
+        "edge_log_export_ip_ua_absent"
+      ],
+      "summaryFields": [
+        "caseId",
+        "endpoint",
+        "commandOrManualCheck",
+        "expectedStatus",
+        "observedStatus",
+        "redactionResult",
+        "localEvidencePath"
+      ],
+      "expectedStatusByCase": {
+        "edge_ip_rate_limit": [429],
+        "direct_origin_bypass": [0, 403],
+        "target_hostname_authenticated_origin": [204],
+        "wrong_host_origin_rejected": [0, 400, 403, 421],
+        "wrong_sni_origin_rejected": [0, 403],
+        "missing_or_untrusted_client_auth_rejected": [0, 403],
+        "cloudflare_ipv4_live_oci_set_equality": [0],
+        "postgres_atomic_daily_cap": [0],
+        "cap_silent_drop": [204],
+        "identifier_zero_request_capture": [204],
+        "origin_log_ip_ua_absent": [204],
+        "edge_log_export_ip_ua_absent": [0]
+      },
+      "forbiddenSummaryValues": [
+        "full client IP",
+        "raw user-agent",
+        "authorization header",
+        "session cookie",
+        "user identifier",
+        "device identifier",
+        "advertising identifier"
+      ]
+    },
     "receiptTokenAbuse": {
       "scenarioId": "receipt_token_replay_and_status_abuse",
       "requiredEvidence": ["receipt-token-negative-tests", "redacted-request-response-summary", "log-redaction-check"],

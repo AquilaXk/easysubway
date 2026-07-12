@@ -231,3 +231,45 @@ test("abuse penetration summary validator rejects case-level failed rehearsal ev
     /expectedStatus must match release gate/,
   );
 });
+
+test("ad counter rehearsal은 edge 429와 direct-origin denial을 정확히 요구한다", async () => {
+  const wrongEdgeStatus = validSummary();
+  const adMatrix = wrongEdgeStatus.matrices.find((matrix) => matrix.matrixId === "adCounterInflation");
+  const edgeCase = adMatrix.cases.find((item) => item.caseId === "edge_ip_rate_limit");
+  edgeCase.expectedStatus = 204;
+  edgeCase.observedStatus = 204;
+  await assert.rejects(
+    withSummary(wrongEdgeStatus, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/security/validate-abuse-penetration-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /expectedStatus must match release gate/,
+  );
+
+  for (const caseId of [
+    "direct_origin_bypass",
+    "wrong_host_origin_rejected",
+    "wrong_sni_origin_rejected",
+    "missing_or_untrusted_client_auth_rejected",
+    "cloudflare_ipv4_live_oci_set_equality",
+  ]) {
+    const missingCase = validSummary();
+    const originMatrix = missingCase.matrices.find((matrix) => matrix.matrixId === "adCounterInflation");
+    originMatrix.cases = originMatrix.cases.filter((item) => item.caseId !== caseId);
+    await assert.rejects(
+      withSummary(missingCase, (summaryPath) =>
+        execFileAsync(process.execPath, [
+          "tools/security/validate-abuse-penetration-summary.mjs",
+          "--summary",
+          summaryPath,
+          "--require-pass",
+        ], { cwd: root }),
+      ),
+      new RegExp(`cases\\.${caseId}`),
+    );
+  }
+});

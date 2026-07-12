@@ -2451,6 +2451,50 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
   assert.match(abusePenetrationRehearsalGate.evidenceRoot, /\.codex\/evidence\/security\/abuse-penetration-rehearsal\/<rc-or-run>/);
+  const adGuardrails = abusePenetrationRehearsalGate.adEventAbuseGuardrails;
+  assert.equal(adGuardrails.issue, 1912);
+  assert.deepEqual(adGuardrails.edge, {
+    hostname: "easysubway-api.aquilaxk.site",
+    method: "POST",
+    exactPath: "/api/ads/events",
+    excludedPath: "/api/ads/active",
+    characteristic: "ip.src",
+    requests: 120,
+    periodSeconds: 60,
+    mitigationSeconds: 60,
+    action: "block",
+    responseStatus: 429,
+  });
+  assert.equal(adGuardrails.server.env, "EASYSUBWAY_ADS_EVENT_DAILY_CAP");
+  assert.equal(adGuardrails.server.eventsPerUtcCompositeKey, 1000000);
+  assert.equal(adGuardrails.server.productionDefaultAllowed, false);
+  assert.equal(adGuardrails.server.capResponseStatus, 204);
+  assert.equal(adGuardrails.server.malformedResponseStatus, 400);
+  assert.equal(adGuardrails.server.unexpectedDatabaseFailure, "5xx");
+  assert.deepEqual(adGuardrails.capacityBasis, {
+    assumedDau: 10000,
+    sessionsPerUserPerDay: 5,
+    exposuresPerSession: 2,
+    projectedEventsPerDay: 100000,
+    safetyMultiplier: 10,
+  });
+  assert.equal(adGuardrails.origin.httpIngressOpen, false);
+  assert.equal(adGuardrails.origin.httpsIngress, "official-cloudflare-ipv4-only");
+  assert.equal(adGuardrails.origin.backendBind, "127.0.0.1");
+  assert.equal(adGuardrails.origin.exactHostAndSniEvidenceRequired, true);
+  assert.equal(adGuardrails.origin.sharedCloudflareCidrsAuthenticateTargetZone, false);
+  assert.equal(adGuardrails.origin.originAuthenticationRequired, true);
+  assert.equal(adGuardrails.origin.cloudflareIpv4SourceUrl, "https://www.cloudflare.com/ips-v4/");
+  assert.equal(adGuardrails.origin.cloudflareIpv4CheckedDate, "2026-07-12");
+  assert.equal(adGuardrails.origin.cloudflareIpv4Owner, "infra-owner");
+  assert.equal(adGuardrails.origin.cloudflareIpv4ReapplyTrigger, "official-endpoint-set-change");
+  assert.equal(adGuardrails.origin.publicIpv6Enabled, false);
+  assert.deepEqual(adGuardrails.revisitTriggers, {
+    hottestKeyAcceptedEventsPerDay: 700000,
+    consecutiveDays: 3,
+    nonAbuseEdge429Ratio: 0.01,
+    candidateRequestsPer60Seconds: 300,
+  });
   assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.qaEvidenceDateKst, "2026-06-28");
   assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.playAndStorePreflight.androidPlayInternalTrack, "READY");
   assert.equal(
@@ -2482,6 +2526,9 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     "deployed-signed-url-boundary-summary",
     "object-storage-lifecycle-retention-delete-summary",
     "deployed-distributed-or-multi-node-rate-limit-rehearsal",
+    "deployed-ad-event-edge-rate-limit",
+    "deployed-ad-event-origin-bypass-denial",
+    "deployed-ad-event-privacy-redaction",
   ]);
   assert.match(abusePenetrationRehearsalGate.latestQaEvidenceStatus.notClosingReasonKo, /#1022/);
   assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.redactionPolicy.secretValuesPrinted, false);
@@ -2513,6 +2560,7 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   assert.deepEqual(
     abusePenetrationRehearsalGate.abuseScenarios.map((scenario) => scenario.id).sort(),
     [
+      "ad_counter_inflation",
       "admin_operator_auth_session_csrf",
       "distributed_rate_limit_abuse",
       "provider_and_release_secret_exposure",
@@ -2522,7 +2570,35 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
     ],
   );
   const rehearsalMatrices = abusePenetrationRehearsalGate.rehearsalMatrices;
+  const adScenario = abusePenetrationRehearsalGate.abuseScenarios.find(
+    (scenario) => scenario.id === "ad_counter_inflation",
+  );
+  assert.ok(adScenario);
+  const adMatrix = rehearsalMatrices.adCounterInflation;
+  assert.equal(adMatrix.scenarioId, "ad_counter_inflation");
+  assert.deepEqual(adMatrix.requiredCases, [
+    "edge_ip_rate_limit",
+    "direct_origin_bypass",
+    "target_hostname_authenticated_origin",
+    "wrong_host_origin_rejected",
+    "wrong_sni_origin_rejected",
+    "missing_or_untrusted_client_auth_rejected",
+    "cloudflare_ipv4_live_oci_set_equality",
+    "postgres_atomic_daily_cap",
+    "cap_silent_drop",
+    "identifier_zero_request_capture",
+    "origin_log_ip_ua_absent",
+    "edge_log_export_ip_ua_absent",
+  ]);
+  assert.deepEqual(adMatrix.expectedStatusByCase.edge_ip_rate_limit, [429]);
+  assert.deepEqual(adMatrix.expectedStatusByCase.direct_origin_bypass, [0, 403]);
+  assert.deepEqual(adMatrix.expectedStatusByCase.target_hostname_authenticated_origin, [204]);
+  assert.deepEqual(adMatrix.expectedStatusByCase.wrong_host_origin_rejected, [0, 400, 403, 421]);
+  assert.deepEqual(adMatrix.expectedStatusByCase.wrong_sni_origin_rejected, [0, 403]);
+  assert.deepEqual(adMatrix.expectedStatusByCase.missing_or_untrusted_client_auth_rejected, [0, 403]);
+  assert.deepEqual(adMatrix.expectedStatusByCase.cap_silent_drop, [204]);
   assert.deepEqual(Object.keys(rehearsalMatrices).sort(), [
+    "adCounterInflation",
     "adminOperatorSecurity",
     "distributedRateLimitAbuse",
     "objectStorageLifecycle",
@@ -2538,6 +2614,20 @@ test("모바일 signed release artifact gate는 CI 산출물과 스토어 제출
   );
   const abuseScenarioIds = new Set(abusePenetrationRehearsalGate.abuseScenarios.map((scenario) => scenario.id));
   const requiredMatrixCases = {
+    adCounterInflation: [
+      "edge_ip_rate_limit",
+      "direct_origin_bypass",
+      "target_hostname_authenticated_origin",
+      "wrong_host_origin_rejected",
+      "wrong_sni_origin_rejected",
+      "missing_or_untrusted_client_auth_rejected",
+      "cloudflare_ipv4_live_oci_set_equality",
+      "postgres_atomic_daily_cap",
+      "cap_silent_drop",
+      "identifier_zero_request_capture",
+      "origin_log_ip_ua_absent",
+      "edge_log_export_ip_ua_absent",
+    ],
     receiptTokenAbuse: [
       "brute_force_guessing",
       "replay_after_status_lookup",
