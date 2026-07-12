@@ -14,6 +14,9 @@ const RAW_SECRET_PATTERNS = [
   /\bCookie:\s*\S+/i,
   /\b(JSESSIONID|sessionid)=\S+/i,
   /-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----/i,
+  /\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?:\/(?:3[0-2]|[12]?\d))?\b/,
+  /\bUser-Agent\s*:\s*\S[^\r\n]*/i,
+  /\bMozilla\/\d+(?:\.\d+)?\s+\([^)\r\n]+\)/i,
 ];
 
 function assertNoSensitiveSummary(summary, gate) {
@@ -32,7 +35,7 @@ function assertNoSensitiveSummary(summary, gate) {
     }
     for (const pattern of RAW_SECRET_PATTERNS) {
       if (pattern.test(value)) {
-        throw new Error(`${path} appears to contain raw secret, token, cookie, or signed URL material`);
+        throw new Error(`${path} appears to contain raw sensitive evidence material`);
       }
     }
   }

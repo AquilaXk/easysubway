@@ -84,6 +84,22 @@ async function withSummary(summary, fn) {
   return fn(summaryPath);
 }
 
+async function assertSensitiveValueRejected(value) {
+  const summary = validSummary();
+  summary.matrices[0].redactionNotes = value;
+  await assert.rejects(
+    withSummary(summary, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/security/validate-abuse-penetration-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /raw sensitive evidence material/,
+  );
+}
+
 test("abuse penetration summary validator accepts a complete redacted matrix summary", async () => {
   await withSummary(validSummary(), (summaryPath) =>
     execFileAsync(process.execPath, [
@@ -125,6 +141,28 @@ test("abuse penetration summary validator rejects forbidden closure evidence mar
     ),
     /forbidden sensitive evidence marker/,
   );
+});
+
+test("abuse penetration summary validator rejects a runtime-constructed IPv4 CIDR value", async () => {
+  const syntheticReservedCidr = [
+    ["19", "2"],
+    ["0"],
+    ["2"],
+    ["4", "2"],
+  ].map((parts) => parts.join("")).join(".") + `/${["2", "4"].join("")}`;
+  await assertSensitiveValueRejected(syntheticReservedCidr);
+});
+
+test("abuse penetration summary validator rejects a runtime-constructed raw User-Agent value", async () => {
+  const syntheticRawUserAgent = [
+    ["Moz", "illa"].join(""),
+    "/",
+    ["5", "0"].join("."),
+    " (",
+    ["syn", "thetic"].join(""),
+    ")",
+  ].join("");
+  await assertSensitiveValueRejected(syntheticRawUserAgent);
 });
 
 test("abuse penetration summary validator rejects missing cases, raw sensitive markers, and high findings", async () => {
