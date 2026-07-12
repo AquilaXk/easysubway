@@ -3479,7 +3479,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               Positioned.fill(
                 child: !_routeMapRendererActive
                     ? const _OriginalRouteMapUnavailable()
-                    : _buildStructuredRouteMapCanvas(camera),
+                    : _buildStructuredRouteMapCanvas(camera, geometry.origin),
               ),
               Positioned.fill(
                 child: Semantics(
@@ -3801,7 +3801,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   // 구조화 canvas 렌더러(#1641)를 visual camera로 마운트한다. WebView와 달리
   // 명령형 controller 없이 camera prop 변경(setState)으로 갱신된다.
-  Widget _buildStructuredRouteMapCanvas(MapCameraState camera) {
+  Widget _buildStructuredRouteMapCanvas(
+    MapCameraState camera,
+    Offset sourceOrigin,
+  ) {
     _ensureStructuredRouteMap();
     return StructuredRouteMapView(
       map: _structuredRouteMapCache!,
@@ -3809,6 +3812,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       lineColors: _structuredLineColorsCache!,
       labelTextByStationId: _structuredLabelTextCache!,
       lineBadgeLabelByLineId: _structuredLineBadgeLabelCache!,
+      sourceOrigin: sourceOrigin,
       attributionText: _attributionTextByRegion?[widget.data.selectedRegion],
     );
   }
