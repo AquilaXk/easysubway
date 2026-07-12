@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "pack_id": "kr-official-metro-map-pack",
-  "pack_version": "2026.06.24",
-  "generated_at_utc": "2026-06-24T06:37:00+00:00",
+  "pack_version": "2026.07.12",
+  "generated_at_utc": "2026-07-12T00:00:00+00:00",
   "default_display_mode": "offline",
   "requirements": {
     "live_mode_requires_network": false,
@@ -15,7 +15,7 @@
       "name_ko": "수도권",
       "app_region": "수도권",
       "operator": "오너 자작(self-drawn)",
-      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v1.svg",
+      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-schematic",
         "bundled_svg_role": "review-reference-only",
@@ -26,16 +26,16 @@
         "included": false,
         "type": "svg",
         "path": "assets/datapacks/maps/seoul-official-route-map.svg",
-        "official_asset_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v1.svg",
+        "official_asset_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
         "mime_type": "image/svg+xml"
       },
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
         "spdx": "LicenseRef-Self-Drawn",
-        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v1.svg",
-        "source": "오너 자작 수도권 8선형 정본 도식(easy-subway-sma-v1)",
-        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v1.svg",
-        "date": "2026-07-11",
+        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+        "source": "오너 자작 수도권 8선형 정본 도식(easy-subway-sma-v2)",
+        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
+        "date": "2026-07-12",
         "authors": [
           "오너"
         ],
