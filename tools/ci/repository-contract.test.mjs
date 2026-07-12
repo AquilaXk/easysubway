@@ -6764,17 +6764,10 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(sampleUrl.searchParams.get("prevStinCd"), "132");
   assert.equal(sampleUrl.searchParams.get("chthTgtLn"), "4");
   assert.equal(sampleUrl.searchParams.get("chtnNextStinCd"), "425");
-  assert.match(candidate.evidence.liveSampleNote, /prevStinCd=422/);
-  assert.match(candidate.evidence.liveSampleNote, /chtnNextStinCd=424/);
-  assert.match(candidate.evidence.liveSampleNote, /29155976812/);
-  assert.match(candidate.evidence.liveSampleNote, /3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f/);
-  assert.match(candidate.evidence.liveSampleNote, /2026-07-11/);
-  assert.match(candidate.evidence.liveSampleNote, /HTTP 200/);
-  assert.match(candidate.evidence.liveSampleNote, /application\/xml/);
-  assert.match(candidate.evidence.liveSampleNote, /resultCode=03/);
-  assert.match(candidate.evidence.liveSampleNote, /classification=no-data/);
-  assert.match(candidate.evidence.liveSampleNote, /itemCount=0/);
-  assert.match(candidate.evidence.liveSampleNote, /sampleResponse evidence가 아님/);
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /29155976812 \(head 3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f\).*prevStinCd=422.*chtnNextStinCd=424.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*sampleResponse evidence가 아님/,
+  );
   assert.match(candidate.evidence.liveSampleNote, /공식 요청변수 표에서 가져온 미검증 tuple/);
   assert.match(candidate.evidence.liveSampleNote, /29177451688 \(head 3c3567b524a14f39a0bbe20a774259b7ba405694\)/);
   assert.match(candidate.evidence.liveSampleNote, /2026-07-12/);
