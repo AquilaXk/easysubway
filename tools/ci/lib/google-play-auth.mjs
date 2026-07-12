@@ -122,8 +122,13 @@ export function readResponseBody(text, label, response) {
   }
 }
 
-// Mask anything that looks like a bearer/access token so a raw body echoed back
-// by the server never leaks a credential into logs.
+// Mask anything that looks like a credential so a raw body / echoed request
+// header never leaks a secret into logs. Defense in depth: beyond the primary
+// Bearer/access_token/ya29 leak paths, cover credentials that a
+// misconfiguration or verbose error could surface — a bare (non-Bearer)
+// authorization header value, a Google OAuth refresh token, a client_secret,
+// and a PEM private-key block. Patterns stay conservative (anchored on a
+// distinctive prefix/marker) so ordinary response fields are not clobbered.
 export function maskSecrets(text) {
   if (typeof text !== "string") {
     return text;
@@ -131,7 +136,20 @@ export function maskSecrets(text) {
   return text
     .replace(/(Bearer\s+)[A-Za-z0-9._~+/-]+=*/gi, "$1***")
     .replace(/("?access_token"?\s*[:=]\s*"?)[A-Za-z0-9._~+/-]+=*/gi, "$1***")
-    .replace(/(ya29\.)[A-Za-z0-9._~+/-]+/g, "$1***");
+    .replace(/(ya29\.)[A-Za-z0-9._~+/-]+/g, "$1***")
+    // Bare `authorization: <value>` header (no Bearer scheme). Only fires when a
+    // value follows the header name and it is not already a masked Bearer.
+    // Handles both `authorization: value` and JSON `"authorization":"value"`.
+    .replace(/("?authorization"?\s*[:=]\s*"?)(?!Bearer\b)[A-Za-z0-9._~+/-]+=*/gi, "$1***")
+    // Google OAuth refresh token — always prefixed with the distinctive `1//`.
+    .replace(/(1\/\/)[A-Za-z0-9._-]+/g, "$1***")
+    // OAuth client secret value.
+    .replace(/("?client_secret"?\s*[:=]\s*"?)[A-Za-z0-9._~+/-]+=*/gi, "$1***")
+    // PEM private-key block (RSA/EC/PKCS#8), body redacted between the markers.
+    .replace(
+      /(-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----)[\s\S]*?(-----END (?:[A-Z ]+ )?PRIVATE KEY-----)/g,
+      "$1***$2",
+    );
 }
 
 export function apiErrorSummary(parsed, rawBody) {

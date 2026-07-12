@@ -17,6 +17,46 @@ test("maskSecrets redacts bearer tokens and access_token values", () => {
   assert.equal(maskSecrets(undefined), undefined);
 });
 
+test("maskSecrets redacts a bare (non-Bearer) authorization header value", () => {
+  assert.equal(maskSecrets("authorization: rawTokenValue-123_abc"), "authorization: ***");
+  assert.equal(maskSecrets('{"authorization":"rawTokenValue-123"}'), '{"authorization":"***"}');
+  // A Bearer scheme is still handled by the Bearer rule, not double-masked.
+  assert.equal(maskSecrets("authorization: Bearer ya29.abc-123"), "authorization: Bearer ***");
+  // Not a credential-bearing field: an unrelated word after "authorization" text
+  // (no `:`/`=` separator) is left alone.
+  assert.equal(maskSecrets("authorization failed for user"), "authorization failed for user");
+});
+
+test("maskSecrets redacts a Google OAuth refresh token", () => {
+  assert.equal(
+    maskSecrets('{"refresh_token":"1//0abcDEF-123_ghi.jkl"}'),
+    '{"refresh_token":"1//***"}',
+  );
+  assert.equal(maskSecrets("token=1//longRefreshValue-xyz"), "token=1//***");
+  // A plain "1//" not followed by token characters is untouched.
+  assert.equal(maskSecrets("ratio is 1// or so"), "ratio is 1// or so");
+});
+
+test("maskSecrets redacts a client_secret value", () => {
+  assert.equal(
+    maskSecrets('{"client_secret":"GOCSPX-secretValue123"}'),
+    '{"client_secret":"***"}',
+  );
+  assert.equal(maskSecrets("client_secret=GOCSPX-abcdef"), "client_secret=***");
+  // A field merely mentioning the term without a value separator is untouched.
+  assert.equal(maskSecrets("the client_secret is missing"), "the client_secret is missing");
+});
+
+test("maskSecrets redacts a PEM private-key block", () => {
+  const pem = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\nkqhkiG9w0B\n-----END PRIVATE KEY-----";
+  assert.equal(maskSecrets(pem), "-----BEGIN PRIVATE KEY-----***-----END PRIVATE KEY-----");
+  const rsaPem = "-----BEGIN RSA PRIVATE KEY-----\nAAAA\nBBBB\n-----END RSA PRIVATE KEY-----";
+  assert.equal(maskSecrets(rsaPem), "-----BEGIN RSA PRIVATE KEY-----***-----END RSA PRIVATE KEY-----");
+  // A public-key block is not a secret and stays intact.
+  const pub = "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----";
+  assert.equal(maskSecrets(pub), pub);
+});
+
 test("readResponseBody parses JSON and passes through empty bodies", () => {
   assert.deepEqual(readResponseBody("", "label", { ok: true }), {});
   assert.deepEqual(readResponseBody('{"a":1}', "label", { ok: true }), { a: 1 });
