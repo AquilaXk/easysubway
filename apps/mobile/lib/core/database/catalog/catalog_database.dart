@@ -7,7 +7,7 @@ import 'catalog_tables.dart';
 
 part 'catalog_database.g.dart';
 
-const catalogDatabaseSchemaVersion = 16;
+const catalogDatabaseSchemaVersion = 17;
 
 /// 수도권 통합요금 기본거리(10km) 초과분 요금 단계(#1911).
 ///
@@ -44,6 +44,7 @@ const capitalIntegratedAdditionalStepsJson =
     FareRules,
     FareDiscounts,
     StationFareZones,
+    OfficialOdFareQuotes,
     RealtimeProviderLineMappings,
     RealtimeProviderStationMappings,
     NetworkEdges,
@@ -150,6 +151,9 @@ class CatalogDatabase extends _$CatalogDatabase {
         if (from < 16) {
           await migrator.createTable(stationCarDoorHints);
           await _createStationCarDoorHintIndexes();
+        }
+        if (from < 17) {
+          await migrator.createTable(officialOdFareQuotes);
         }
       },
       beforeOpen: (_) async {

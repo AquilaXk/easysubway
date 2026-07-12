@@ -303,6 +303,42 @@ class StationFareZones extends Table {
   ];
 }
 
+@DataClassName('OfficialOdFareQuoteRow')
+class OfficialOdFareQuotes extends Table {
+  @override
+  String get tableName => 'official_od_fare_quotes';
+
+  TextColumn get originStationId => text().named('origin_station_id')();
+  TextColumn get destinationStationId =>
+      text().named('destination_station_id')();
+  TextColumn get sourceId => text().named('source_id')();
+  TextColumn get snapshotId => text().named('snapshot_id')();
+  TextColumn get mappingLedgerHash => text().named('mapping_ledger_hash')();
+  IntColumn get gnrlCardFare => integer().named('gnrl_card_fare')();
+  IntColumn get gnrlCashFare => integer().named('gnrl_cash_fare')();
+  IntColumn get yungCardFare => integer().named('yung_card_fare')();
+  IntColumn get yungCashFare => integer().named('yung_cash_fare')();
+  IntColumn get childCardFare => integer().named('child_card_fare')();
+  IntColumn get childCashFare => integer().named('child_cash_fare')();
+
+  @override
+  Set<Column> get primaryKey => {originStationId, destinationStationId};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (origin_station_id) REFERENCES stations(id)',
+    'FOREIGN KEY (destination_station_id) REFERENCES stations(id)',
+    'CHECK (origin_station_id <> destination_station_id)',
+    "CHECK (length(mapping_ledger_hash) = 64 AND mapping_ledger_hash NOT GLOB '*[^0-9a-f]*')",
+    'CHECK (gnrl_card_fare >= 0)',
+    'CHECK (gnrl_cash_fare >= 0)',
+    'CHECK (yung_card_fare >= 0)',
+    'CHECK (yung_cash_fare >= 0)',
+    'CHECK (child_card_fare >= 0)',
+    'CHECK (child_cash_fare >= 0)',
+  ];
+}
+
 class RealtimeProviderLineMappings extends Table {
   @override
   String get tableName => 'realtime_provider_line_mappings';

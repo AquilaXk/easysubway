@@ -4,14 +4,18 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:easysubway_mobile/accessible_design.dart';
+import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
+import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart'
+    hide InternalRouteNode;
 import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/features/ads/active_ad_banner.dart';
 import 'package:easysubway_mobile/features/ads/ad_repository.dart';
+import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/data/get_off_alarm_state_repository.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/exact_alarm_permission.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_controller.dart';
@@ -10455,6 +10459,120 @@ void main() {
     expect(find.text('자주 쓰는 경로에 저장했습니다.'), findsOneWidget);
   });
 
+  testWidgets('경로 상세는 공식 OD 요금의 여섯 값을 표시한다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: FakeRouteSearchRepository(
+              result: _sampleRouteSearchResult(
+                officialOdFareQuote: const OfficialOdFareQuote(
+                  originStationId: 'station-sangnoksu',
+                  destinationStationId: 'station-sadang',
+                  sourceId: approvedOfficialOdFareSourceId,
+                  snapshotId: approvedOfficialOdFareSnapshotId,
+                  mappingLedgerHash: approvedOfficialOdFareMappingLedgerHash,
+                  gnrlCardFare: 1550,
+                  gnrlCashFare: 1650,
+                  yungCardFare: 800,
+                  yungCashFare: 900,
+                  childCardFare: 500,
+                  childCashFare: 500,
+                ),
+              ),
+            ),
+            stationRepository: FakeStationSearchRepository(),
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 6, 26),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _openFirstRouteResultDetail(tester);
+
+      for (final (label, amount) in const [
+        ('일반 카드', 1550),
+        ('일반 현금', 1650),
+        ('청소년 카드', 800),
+        ('청소년 현금', 900),
+        ('어린이 카드', 500),
+        ('어린이 현금', 500),
+      ]) {
+        expect(find.text(label, skipOffstage: false), findsOneWidget);
+        expect(
+          find.text('$amount원', skipOffstage: false),
+          amount == 500 ? findsNWidgets(2) : findsOneWidget,
+        );
+        expect(
+          find.bySemanticsLabel(
+            '$label, $amount원, 오프라인 공식 자료',
+            skipOffstage: false,
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(find.text('공식 OD 요금 정보 없음'), findsNothing);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
+  testWidgets('공식 OD 요금이 없으면 unavailable 상태를 알린다', (tester) async {
+    final catalogDatabase = CatalogDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    var apiBaseReads = 0;
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      apiBaseUri: () {
+        apiBaseReads += 1;
+        return Uri.parse('https://fare-api-must-not-be-used.example');
+      },
+      enablePushNotifications: false,
+    );
+    final semanticsHandle = tester.ensureSemantics();
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RouteSearchScreen(
+            repository: dependencies.routeRepository,
+            stationRepository: dependencies.repository,
+            initialDraft: RouteDraft(
+              origin: const RouteDraftStation(
+                id: 'station-sangnoksu',
+                nameKo: '상록수',
+              ),
+              destination: const RouteDraftStation(
+                id: 'station-sadang',
+                nameKo: '사당',
+              ),
+              lastModifiedAt: DateTime(2026, 6, 26),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _openFirstRouteResultDetail(tester);
+
+      expect(find.text('공식 OD 요금 정보 없음'), findsOneWidget);
+      expect(find.text('오프라인 공식 자료에 없는 경로입니다.'), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('공식 OD 요금 정보 없음')), findsOneWidget);
+      expect(apiBaseReads, 0);
+    } finally {
+      semanticsHandle.dispose();
+    }
+  });
+
   testWidgets('경로 검색 UNKNOWN 결과는 저장과 안내 시작 행동을 숨긴다', (tester) async {
     final favoriteRouteRepository = FakeFavoriteRouteRepository();
 
@@ -16046,6 +16164,7 @@ RouteSearchResult _sampleRouteSearchResult({
   String mobilityType = 'SENIOR',
   String etaSource = '',
   String sourceUpdatedAt = '',
+  OfficialOdFareQuote? officialOdFareQuote,
   List<RouteSearchStep>? steps,
   List<String> recommendationReasons = const [
     '엘리베이터 동선을 우선했어요',
@@ -16118,6 +16237,7 @@ RouteSearchResult _sampleRouteSearchResult({
     createdAt: '2026-06-13T04:20:00',
     etaSource: etaSource,
     sourceUpdatedAt: sourceUpdatedAt,
+    officialOdFareQuote: officialOdFareQuote,
   );
 }
 

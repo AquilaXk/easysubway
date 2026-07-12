@@ -5316,6 +5316,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     ],
   );
   assert.deepEqual(targets.knownSourceDomains, [
+    "official_od_fares",
     "realtime_train_positions",
     "transfer_walk_duration",
     "station_car_door_hints",
@@ -5538,6 +5539,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "molit-urban-rail-full-route",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
+    "seoul-metro-official-od-fares",
     "seoul-metro-transfer-distance-duration",
     "seoul-realtime-arrival-station-info",
     "seoul-subway-hourly-boarding",
@@ -6222,7 +6224,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class FareZones extends Table/);
   assert.match(mobileTables, /class StationFareZones extends Table/);
   assert.match(mobileTables, /class FacilityStatusSnapshots extends Table/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 16/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 17/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
   assert.match(mobileDatabase, /_createStationPathwayIndexes/);
@@ -6238,7 +6240,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 16/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 17/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /FacilityStatusSnapshots/);
