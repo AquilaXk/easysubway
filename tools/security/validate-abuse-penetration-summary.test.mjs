@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 import { buildAbusePenetrationSummaryV2Schema, deriveSummaryCatalog } from "./abuse-penetration-summary-schema.mjs";
+import { validateAbusePenetrationSummary } from "./validate-abuse-penetration-summary.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -376,12 +377,48 @@ test("B RED privacy rejects network credential identifier command and normalized
 test("B RED privacy allows every controlled id and approved relative evidence path", async (t) => {
   await runSummary(t, schemaV2Blocked());
   await runSummary(t, freshV2Pass(), { requirePass: true });
+  const encodedBenign = Buffer.from(["sanitized", " normal", " evidence"].join(""), "utf8").toString("base64url");
+  const encodedSummary = freshV2Pass();
+  encodedSummary.evidence[0].localEvidencePath = `.codex/evidence/security/abuse-penetration-rehearsal/${encodedBenign}.json`;
+  await runSummary(t, encodedSummary, { requirePass: true });
   const legacy = v1Optional(); legacy.matrices[0].commandOrManualCheck = "sanitized local rehearsal";
   legacy.matrices[0].redactionNotes = "sanitized values removed";
   legacy.matrices[0].cases[0].endpoint = "/sanitized-relative-route";
   legacy.matrices[0].cases[0].commandOrManualCheck = joined(["synthetic", ".invalid"]);
   legacy.matrices[0].redactionNotes = joined(["user", " agent", " fields removed"]);
   await runSummary(t, legacy);
+});
+
+test("B RED privacy rejects canonical Base64url sensitive evidence-path segments without echo", async (t) => {
+  const sensitive = ["ht", "tp", ":", "//", "19", "2", ".0.2.42"].join("");
+  const encoded = Buffer.from(sensitive, "utf8").toString("base64url");
+  const summary = freshV2Pass();
+  summary.evidence[0].localEvidencePath = `.codex/evidence/security/abuse-penetration-rehearsal/${encoded}.json`;
+  await assert.rejects(runSummary(t, summary, { requirePass: true }), (error) => {
+    assert.match(error.stderr, /SUMMARY_PRIVACY_VIOLATION/);
+    assert.equal(error.stderr.includes(sensitive), false);
+    return true;
+  });
+});
+
+test("B RED direct validator rejects prototype-inherited v2 summaries as schema-invalid", () => {
+  const inherited = freshV2Pass();
+  const summary = Object.create(inherited);
+  assert.throws(() => validateAbusePenetrationSummary(summary, gate, { requirePass: true }), (error) => {
+    assert.match(error.message, /SUMMARY_V2_SCHEMA_INVALID/);
+    assert.match(error.message, /json-like/);
+    return true;
+  });
+});
+
+test("B RED v1 matrix item shape is rejected before controlled ID collection", async (t) => {
+  const summary = v1Minimal("FAIL");
+  summary.matrices = [[]];
+  await assert.rejects(runSummary(t, summary), (error) => {
+    assert.match(error.stderr, /SUMMARY_V1_SCHEMA_INVALID/);
+    assert.doesNotMatch(error.stderr, /SUMMARY_ID_SET_MISMATCH/);
+    return true;
+  });
 });
 
 test("B RED CLI handles defaults explicit gate files malformed JSON and options", async (t) => {

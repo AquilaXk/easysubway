@@ -10,6 +10,14 @@ export class SummaryValidationError extends Error {
 }
 const fail = (code, path, rule) => { throw new SummaryValidationError(code, path, rule); };
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+function isJsonLike(value, seen = new Set(), depth = 0) {
+  if (value === null || typeof value !== "object") return true;
+  if (depth > 64 || seen.has(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  if (Array.isArray(value) ? prototype !== Array.prototype : prototype !== Object.prototype && prototype !== null) return false;
+  seen.add(value);
+  return Object.keys(value).every((key) => isJsonLike(value[key], seen, depth + 1));
+}
 function typeOk(value, type) {
   return type === "string" ? typeof value === "string" : type === "integer" ? Number.isInteger(value) :
     type === "boolean" ? typeof value === "boolean" : type === "array" ? Array.isArray(value) : type === "object" ? isObject(value) : false;
@@ -72,6 +80,9 @@ function validateLegacyV1(summary, gate, requirePass) {
   }
   if (summary.matrices === undefined) return;
   requireType(summary.matrices, "array", "$.matrices", "SUMMARY_V1_SCHEMA_INVALID");
+  summary.matrices.forEach((item,index) => {
+    const path=`$.matrices[${index}]`; exactKeys(item,Object.keys(V1_MATRIX_TYPES),path);
+  });
   const matrixAllowed = new Set(Object.keys(gate.rehearsalMatrices)); uniqueIds(summary.matrices,"matrixId",matrixAllowed,"$.matrices");
   summary.matrices.forEach((item,index) => {
     const path=`$.matrices[${index}]`; const matrix=gate.rehearsalMatrices[item.matrixId]; exactKeys(item,Object.keys(V1_MATRIX_TYPES),path);
@@ -143,6 +154,7 @@ const IDENTIFIER=/(?:user|device|advertising|account|request)[_-]?(?:id|identifi
 const LEGACY_COMMAND_DEFENSE=/\b(?:curl|wget|ssh|scp|sftp|bash|zsh|fish|powershell|pwsh|cmd|python|node|ruby|perl|kubectl|docker|podman|psql|mysql|redis-cli|adb)\b|--(?:header|data|request)\b/i;
 const LEGACY_USER_AGENT_TOKEN_DEFENSE=/\b[0-9A-Za-z_$]*UserAgent[0-9A-Za-z_$]*\b/i;
 const LEGACY_PRODUCT_VERSION_DEFENSE=/(?:^|[\s(])[!#$%&'*+.^_`|~0-9A-Za-z-]+\/\d+(?:\.\d+)*(?=$|[\s;)])/;
+const BASE64URL_CANDIDATE=/[A-Za-z0-9_-]{12,}/g;
 function decodeBounded(value) {
   let current=value.normalize("NFKC");
   for (let count=0; count<2; count+=1) { try { const next=decodeURIComponent(current); if (next===current) break; current=next; } catch { break; } }
@@ -185,8 +197,21 @@ function containsLegacyAuthorityEndpoint(value) {
     try { const parsed=new URL(`http://${token}`); return !isIP(parsed.hostname)&&parsed.hostname.includes("."); } catch { return false; }
   });
 }
-function scanPrivacy(value, gate, version, path="$") {
+function decodeCanonicalBase64(value) {
+  if (value.length > 4096 || !/^[A-Za-z0-9+/_-]+={0,2}$/.test(value)) return "";
+  const urlSafe = !/[+/=]/.test(value);
+  try {
+    const bytes=Buffer.from(value,urlSafe ? "base64url" : "base64");
+    if (bytes.length===0 || (urlSafe ? bytes.toString("base64url")!==value : bytes.toString("base64")!==value)) return "";
+    const decoded=new TextDecoder("utf-8",{fatal:true}).decode(bytes);
+    return Array.from(decoded).every((character)=>character.codePointAt(0)>=0x20&&character.codePointAt(0)!==0x7f) ? decoded : "";
+  } catch { return ""; }
+}
+function scanPrivacy(value, gate, version, path="$", seen=new Set(), depth=0) {
+  if (depth>8 || seen.has(value)) return;
+  if (value!==null && typeof value==="object") seen.add(value);
   if (typeof value==="string") {
+    seen.add(value);
     const decoded=decodeBounded(value); const compact=decoded.replace(/\s+/g,"");
     const forbidden=gate.manualRehearsalPolicy.forbiddenInEvidence.concat(
       Object.values(gate.rehearsalMatrices).flatMap((matrix)=>matrix.forbiddenSummaryValues),
@@ -197,12 +222,19 @@ function scanPrivacy(value, gate, version, path="$") {
     const legacyAuthority=version===1 && containsLegacyAuthorityEndpoint(decoded);
     const legacyUserAgent=version===1 && (/user-agent:/.test(compact)||LEGACY_USER_AGENT_TOKEN_DEFENSE.test(value)||LEGACY_PRODUCT_VERSION_DEFENSE.test(value));
     if (SCHEME.test(compact)||CREDENTIAL.test(compact)||IDENTIFIER.test(compact)||legacyCommand||legacyAuthority||legacyUserAgent||containsAddress(decoded)||forbidden.some((item)=>compact.includes(item.toLowerCase().replace(/\s+/g,"")))) fail("SUMMARY_PRIVACY_VIOLATION",path,"sensitive-string");
+    const candidates=value.match(BASE64URL_CANDIDATE) ?? [];
+    if (/^[A-Za-z0-9+/_-]+={0,2}$/.test(value)) candidates.push(value);
+    for (const candidate of candidates) {
+      const base64Decoded=decodeCanonicalBase64(candidate);
+      if (base64Decoded) scanPrivacy(base64Decoded,gate,version,path,seen,depth+1);
+    }
     return;
   }
-  if (Array.isArray(value)) { value.forEach((item,index)=>scanPrivacy(item,gate,version,`${path}[${index}]`)); return; }
-  if (isObject(value)) for (const [key,child] of Object.entries(value)) scanPrivacy(child,gate,version,`${path}.${key}`);
+  if (Array.isArray(value)) { value.forEach((item,index)=>scanPrivacy(item,gate,version,`${path}[${index}]`,seen,depth+1)); return; }
+  if (isObject(value)) for (const [key,child] of Object.entries(value)) scanPrivacy(child,gate,version,`${path}.${key}`,seen,depth+1);
 }
 export function validateAbusePenetrationSummary(summary, gate, { requirePass=false } = {}) {
+  if (!isJsonLike(summary)) fail("SUMMARY_V2_SCHEMA_INVALID","$","json-like");
   validateAbuseEnvelope(summary);
   if (requirePass && summary.schemaVersion!==gate.summaryContract.requirePassVersion) fail("SUMMARY_VERSION_UNSUPPORTED","$.schemaVersion","require-pass-version");
   if (summary.schemaVersion===1) { validateLegacyV1(summary,gate,requirePass); scanPrivacy(summary,gate,1); return Object.freeze({schemaVersion:1,status:summary.status}); }
