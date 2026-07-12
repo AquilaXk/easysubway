@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
@@ -54,7 +55,41 @@ const pack = {
   ],
 };
 
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function kricStep() {
+  return {
+    chtnMvTpOrdr: "1",
+    edMovePath: "끝",
+    elvtSttCd: null,
+    elvtTpCd: null,
+    imgPath: "",
+    mvContDtl: "이동",
+    mvPathMgNo: "1",
+    stMovePath: "시작",
+  };
+}
+
 function admittedKricContext(overrides = {}) {
+  const liveSampleRowCount = overrides.liveSampleRowCount ?? 8;
+  const rows = new Array(liveSampleRowCount).fill(null).map(() => kricStep());
+  const providerRecordHashes = rows.map((row) => sha256(JSON.stringify(row)));
+  const liveSampleRawSha256 = "a".repeat(64);
+  const liveSampleSchemaFingerprint = "b".repeat(64);
+  const evidence = {
+    candidateId: "kric-transfer-movement-detailed",
+    endpoint: "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement",
+    format: "xml",
+    fields: Object.keys(kricStep()),
+    rowCount: liveSampleRowCount,
+    rawSha256: liveSampleRawSha256,
+    schemaFingerprint: liveSampleSchemaFingerprint,
+    credentialRedacted: true,
+    providerRecordHashes,
+  };
+  const liveSampleEvidenceHash = sha256(JSON.stringify(evidence));
   return {
     candidateId: "kric-transfer-movement-detailed",
     endpoint: "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement",
@@ -67,43 +102,22 @@ function admittedKricContext(overrides = {}) {
       chthTgtLn: "4",
       chtnNextStinCd: "424",
     },
-    liveSampleRowCount: 8,
-    liveSampleFields: [
-      "chtnMvTpOrdr",
-      "edMovePath",
-      "elvtSttCd",
-      "elvtTpCd",
-      "imgPath",
-      "mvContDtl",
-      "mvPathMgNo",
-      "stMovePath",
-    ],
-    liveSampleRawSha256: "a".repeat(64),
-    liveSampleSchemaFingerprint: "b".repeat(64),
-    liveSampleEvidenceHash: "c".repeat(64),
+    liveSampleRowCount,
+    liveSampleFormat: "xml",
+    liveSampleFields: Object.keys(kricStep()),
+    liveSampleRawSha256,
+    liveSampleSchemaFingerprint,
+    liveSampleEvidenceHash,
     admission: {
       candidateId: "kric-transfer-movement-detailed",
       sourceId: "kric-transfer-movement-detailed",
       snapshotId: "kric-transfer-movement-detailed-admission-20260713",
       decision: "APPROVED",
-      rawSha256: "a".repeat(64),
-      schemaFingerprint: "b".repeat(64),
-      sampleEvidenceHash: "c".repeat(64),
+      rawSha256: liveSampleRawSha256,
+      schemaFingerprint: liveSampleSchemaFingerprint,
+      sampleEvidenceHash: liveSampleEvidenceHash,
     },
     ...overrides,
-  };
-}
-
-function kricStep() {
-  return {
-    chtnMvTpOrdr: "1",
-    edMovePath: "끝",
-    elvtSttCd: "",
-    elvtTpCd: "",
-    imgPath: "",
-    mvContDtl: "이동",
-    mvPathMgNo: "1",
-    stMovePath: "시작",
   };
 }
 
@@ -305,6 +319,17 @@ test("게이트②: tracked endpoint·request tuple·admission hash가 다르면
       .structurallyAligned,
     false,
   );
+  const changedContent = { ...kricStep(), mvContDtl: "변조된 이동 경로" };
+  assert.equal(
+    buildBaselineIngestionGateReport({
+      roster: buildRosterFromPack(pack),
+      transferRows,
+      carDoorRows: [],
+      kricMovement: { header: { resultCode: "00" }, body: [changedContent] },
+      kricMovementContext: admittedKricContext({ liveSampleRowCount: 1 }),
+    }).gateKricStructuralAlignment.structurallyAligned,
+    false,
+  );
   assert.equal(
     build(
       admittedKricContext({
@@ -336,6 +361,27 @@ test("게이트③: 공식 rule이 참조하는 기존 edge의 provenance 누락
     carDoorRows: [],
     kricMovement: null,
     existingEdges: [{ id: "e-sadang", provenanceKind: "UNKNOWN", sourceId: "fixture" }],
+    fixtureTransferRules: pack.transferRules,
+  });
+
+  assert.equal(report.gateTimeSourceDistinction.status, "FAIL");
+});
+
+test("게이트③: non-empty여도 admitted transfer snapshot과 다르면 FAIL 처리한다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [],
+    carDoorRows: [],
+    kricMovement: null,
+    existingEdges: [
+      {
+        id: "e-sadang",
+        durationSeconds: 62,
+        provenanceKind: "OFFICIAL_SOURCE",
+        sourceId: "seoul-metro-transfer-distance-duration",
+        sourceSnapshotId: "different-admission-snapshot",
+      },
+    ],
     fixtureTransferRules: pack.transferRules,
   });
 

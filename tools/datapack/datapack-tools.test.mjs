@@ -260,10 +260,15 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
             `
               SELECT COUNT(*) AS count
               FROM station_car_door_hints
-              WHERE provenance_kind = 'OFFICIAL' AND source_snapshot_id = ?
+              WHERE provenance_kind = 'OFFICIAL'
+                AND source_id = ?
+                AND source_snapshot_id = ?
             `,
           )
-          .get("seoul-metro-fast-exit-car-door-admission-20260713"),
+          .get(
+            "seoul-metro-fast-exit-car-door",
+            "seoul-metro-fast-exit-car-door-admission-20260713",
+          ),
       },
       { count: 35 },
     );
@@ -14468,6 +14473,7 @@ test("데이터팩 생성기는 car_number 0을 CHECK 위반으로 거부한다"
 test("데이터팩 생성기는 OFFICIAL car-door hint의 빈 sourceSnapshotId를 거부한다", async () => {
   const { outputDir, fixturePath } = await prepareCarDoorHintFixture("car-door-official-snapshot", {
     provenanceKind: "OFFICIAL",
+    sourceId: "official-source",
     sourceSnapshotId: "",
   });
   await assert.rejects(
@@ -14477,6 +14483,22 @@ test("데이터팩 생성기는 OFFICIAL car-door hint의 빈 sourceSnapshotId�
       { cwd: root, env: productionEnv },
     ),
     /stationCarDoorHints\.sourceSnapshotId/,
+  );
+});
+
+test("데이터팩 생성기는 공백 포함 OFFICIAL provenance를 정규화하고 빈 sourceId를 거부한다", async () => {
+  const { outputDir, fixturePath } = await prepareCarDoorHintFixture("car-door-official-source", {
+    provenanceKind: " OFFICIAL ",
+    sourceId: " ",
+    sourceSnapshotId: "snapshot",
+  });
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
+      { cwd: root, env: productionEnv },
+    ),
+    /stationCarDoorHints\.sourceId/,
   );
 });
 

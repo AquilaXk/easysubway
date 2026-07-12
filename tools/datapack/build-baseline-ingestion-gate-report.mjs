@@ -21,6 +21,7 @@
 //   --source-inventory tools/datapack/source-inventory.json \
 //   [--kric-standard-movement <kric-transfer-movement-standard.raw.json>] \
 //   --output <report.json>
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -98,6 +99,7 @@ export function buildKricMovementContext({ sourceCandidates, sourceInventory }) 
     sampleEndpoint: `${sampleUrl.origin}${sampleUrl.pathname}`,
     requestTuple,
     liveSampleRowCount: candidate.evidence?.liveSampleRowCount ?? null,
+    liveSampleFormat: candidate.evidence?.liveSampleFormat ?? null,
     liveSampleFields: candidate.evidence?.liveSampleFields ?? [],
     liveSampleRawSha256: candidate.evidence?.liveSampleRawSha256 ?? null,
     liveSampleSchemaFingerprint: candidate.evidence?.liveSampleSchemaFingerprint ?? null,
@@ -399,7 +401,36 @@ function validateKricMovementEvidence(kricMovement, context) {
   ) {
     failures.push("response field schema mismatch");
   }
+  if (context.liveSampleFormat !== "xml") failures.push("live sample format is not xml");
+  const providerRecordHashes = rows.map((row) => sha256(JSON.stringify(normalizeKricXmlRow(row))));
+  const sampleEvidence = {
+    candidateId: context.candidateId,
+    endpoint: context.endpoint,
+    format: context.liveSampleFormat,
+    fields: context.liveSampleFields,
+    rowCount: rows.length,
+    rawSha256: context.liveSampleRawSha256,
+    schemaFingerprint: context.liveSampleSchemaFingerprint,
+    credentialRedacted: true,
+    providerRecordHashes,
+  };
+  if (sha256(JSON.stringify(sampleEvidence)) !== context.liveSampleEvidenceHash) {
+    failures.push("response content evidenceHash mismatch");
+  }
   return failures;
+}
+
+function normalizeKricXmlRow(row) {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return {};
+  return Object.fromEntries(
+    Object.entries(row)
+      .sort(([left], [right]) => compareText(left, right))
+      .map(([key, value]) => [key, value == null ? null : String(value)]),
+  );
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 // desk 게이트 ③: timeSource 구분. baseline edge의 provenance_kind는 OFFICIAL_SOURCE로 고정된다.
@@ -416,8 +447,8 @@ function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existing
     } else {
       if (edge.provenanceKind !== "OFFICIAL_SOURCE") failures.push("provenanceKind is not OFFICIAL_SOURCE");
       if (edge.sourceId !== TRANSFER_SOURCE_ID) failures.push("sourceId does not match official transfer source");
-      if (typeof edge.sourceSnapshotId !== "string" || edge.sourceSnapshotId.trim() === "") {
-        failures.push("sourceSnapshotId is empty");
+      if (edge.sourceSnapshotId !== TRANSFER_SNAPSHOT_ID) {
+        failures.push("sourceSnapshotId does not match admitted transfer snapshot");
       }
       if (
         rule &&

@@ -79,6 +79,14 @@ test("분 범위 초과(\"99:00\") → malformed", () => {
   assert.match(malformed[0].reason, /out of range/);
 });
 
+test("최대 유효 시간 59:59 → 3599초", () => {
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([
+    transferRow({ 환승소요시간: "59:59" }),
+  ]);
+  assert.equal(malformed.length, 0);
+  assert.equal(normalizedRows[0].환승소요시간, 3599);
+});
+
 test("호선이 정수도 문자열도 아니면 malformed", () => {
   const invalidLineValues = [null, true, 2.5, {}, []];
   const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows(

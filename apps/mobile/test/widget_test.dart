@@ -4907,7 +4907,7 @@ void main() {
 
       final finder = find.textContaining(displayName);
       var attempts = 0;
-      while (finder.evaluate().isEmpty && attempts < 60) {
+      while (finder.evaluate().length < 2 && attempts < 60) {
         await tester.drag(sourceScrollable, const Offset(0, -300));
         await tester.pumpAndSettle();
         attempts += 1;
