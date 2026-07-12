@@ -1,15 +1,68 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
+import { buildAbusePenetrationSummaryV2Schema, deriveSummaryCatalog } from "./abuse-penetration-summary-schema.mjs";
+import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const gate = JSON.parse(readFileSync(path.join(root, "apps/mobile/release/abuse-penetration-rehearsal-gate.json"), "utf8"));
+
+const schemaV2EvidencePath = ".codex/evidence/security/abuse-penetration-rehearsal/run/redacted.json";
+const schemaV2Identity = Object.freeze({
+  gitSha: "a".repeat(40), versionCode: 10001, androidApplicationId: "com.easysubway.app",
+  dataPackManifestSha256: "b".repeat(64), aabSha256: "c".repeat(64),
+  generatedApkSha256: "d".repeat(64), backendImageDigest: `sha256:${"e".repeat(64)}`,
+  backendArtifactSha256: "f".repeat(64),
+});
+function schemaV2Evidence(evidenceId) {
+  return { evidenceId, result: "PASS", localEvidencePath: schemaV2EvidencePath };
+}
+function schemaV2Blocked(gateValue = gate, status = "BLOCKED_EXTERNAL") {
+  return { schemaVersion: 2, releaseGate: gateValue.releaseGate, issue: gateValue.issue, status,
+    rawInvocationStored: false, redactionPolicyId: "summary-v2-no-sensitive-values" };
+}
+function schemaV2Pass(gateValue = gate, withDisposition = true) {
+  const evidenceIds = Array.from(new Set(Object.values(gateValue.rehearsalMatrices)
+    .flatMap((matrix) => matrix.requiredEvidence))).sort();
+  const summary = Object.assign(schemaV2Blocked(gateValue, "PASS"), {
+    artifactIdentity: structuredClone(schemaV2Identity), evidence: evidenceIds.map(schemaV2Evidence),
+    productionLikeEvidence: gateValue.productionLikeEvidencePolicy.requiredForClosing.map(schemaV2Evidence),
+    matrices: Object.entries(gateValue.rehearsalMatrices).map(([matrixId, matrix]) => ({
+      matrixId, result: "PASS", findingCounts: { critical: 0, high: 0, medium: 0, low: 0 },
+      cases: matrix.requiredCases.map((caseId) => ({
+        procedureId: `${matrixId}.${caseId}`, targetAlias: `target.${matrixId}`,
+        expectedStatus: matrix.expectedStatusByCase[caseId][0], observedStatus: matrix.expectedStatusByCase[caseId][0],
+        redactionResult: "PASS", localEvidencePath: schemaV2EvidencePath,
+      })),
+    })),
+  });
+  if (withDisposition) {
+    summary.matrices[0].findingCounts.medium = 1;
+    summary.matrices[0].mediumFindingDisposition = {
+      ownerAlias: `owner.${summary.matrices[0].matrixId}`,
+      fixPlanEvidencePath: ".codex/evidence/security/abuse-penetration-rehearsal/run/fix-plan.json",
+    };
+  }
+  return summary;
+}
+function schemaV2Nodes(summary) {
+  return {
+    root: summary, artifactIdentity: summary.artifactIdentity, evidence: summary.evidence[0],
+    matrix: summary.matrices[0], findingCounts: summary.matrices[0].findingCounts,
+    mediumFindingDisposition: summary.matrices[0].mediumFindingDisposition,
+    case: summary.matrices[0].cases[0],
+  };
+}
+function schemaV2Validate(summary, gateValue = gate) {
+  return validateSchema(buildAbusePenetrationSummaryV2Schema(gateValue), summary);
+}
 const artifactIdentity = {
   gitSha: "abcdef1234567890",
   versionCode: 10001,
@@ -98,6 +151,75 @@ function validateSummary(summary) {
 function freshSummary() {
   return structuredClone(validSummary());
 }
+
+test("A RED direct schema rejects every missing required and extra field", () => {
+  const requiredByKind = {
+    root: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
+    artifactIdentity: ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
+    evidence: ["evidenceId", "result", "localEvidencePath"], matrix: ["matrixId", "result", "findingCounts", "cases"],
+    findingCounts: ["critical", "high", "medium", "low"],
+    mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
+    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+  };
+  for (const [kind, fields] of Object.entries(requiredByKind)) {
+    for (const field of fields) {
+      const summary = schemaV2Pass(); delete schemaV2Nodes(summary)[kind][field];
+      assert.equal(schemaV2Validate(summary).ok, false, `${kind}.${field} missing`);
+    }
+    const summary = schemaV2Pass(); schemaV2Nodes(summary)[kind].unexpectedField = 1;
+    assert.equal(schemaV2Validate(summary).ok, false, `${kind} extra`);
+  }
+});
+
+test("A RED direct schema rejects every wrong declared type", () => {
+  const wrong = { string: 1, integer: "1", boolean: "false", object: [], array: {} };
+  for (const [kind, fields] of Object.entries(gate.summaryContract.fieldTypes)) {
+    for (const [field, type] of Object.entries(fields)) {
+      const summary = schemaV2Pass();
+      schemaV2Nodes(summary)[kind][field] = structuredClone(wrong[type]);
+      assert.equal(schemaV2Validate(summary).ok, false, `${kind}.${field}:${type}`);
+    }
+  }
+});
+
+test("A RED direct schema enforces every enum const count and relative path", () => {
+  const mutations = [
+    (s) => { s.schemaVersion = 3; }, (s) => { s.releaseGate = "other"; }, (s) => { s.issue = -1; },
+    (s) => { s.status = "UNKNOWN"; }, (s) => { s.rawInvocationStored = true; },
+    (s) => { s.redactionPolicyId = "unknown-policy"; }, (s) => { s.evidence[0].evidenceId = "unknown-evidence"; },
+    (s) => { s.evidence[0].result = "UNKNOWN"; }, (s) => { s.productionLikeEvidence[0].evidenceId = "unknown-evidence"; },
+    (s) => { s.matrices[0].matrixId = "unknownMatrix"; }, (s) => { s.matrices[0].result = "UNKNOWN"; },
+    (s) => { s.matrices[0].cases[0].procedureId = "unknown.procedure"; },
+    (s) => { s.matrices[0].cases[0].targetAlias = "target.unknown"; },
+    (s) => { s.matrices[0].cases[0].redactionResult = "UNKNOWN"; },
+    (s) => { s.matrices[0].findingCounts.high = -1; }, (s) => { s.matrices[0].findingCounts.high = 0.5; },
+    (s) => { s.matrices[0].findingCounts.high = "0"; },
+  ];
+  for (const mutate of mutations) { const summary = schemaV2Pass(); mutate(summary); assert.equal(schemaV2Validate(summary).ok, false); }
+  const badPaths = ["/absolute", "../parent", "scheme:path", "with?query", "with#fragment", "with space"];
+  for (const value of badPaths) { const summary = schemaV2Pass(); summary.evidence[0].localEvidencePath = value; assert.equal(schemaV2Validate(summary).ok, false); }
+  const allowed = new Set(["$id", "additionalProperties", "const", "enum", "items", "minimum", "pattern", "properties", "required", "type"]);
+  const visit = (schema) => {
+    for (const key of Object.keys(schema)) assert.equal(allowed.has(key), true, key);
+    for (const child of Object.values(schema.properties ?? {})) visit(child);
+    if (schema.items) visit(schema.items);
+  };
+  visit(buildAbusePenetrationSummaryV2Schema(gate));
+});
+
+test("A RED direct schema enforces deterministic identity patterns", () => {
+  assert.equal(schemaV2Validate(schemaV2Pass()).ok, true);
+  const fields = ["gitSha", "androidApplicationId", "dataPackManifestSha256", "aabSha256", "generatedApkSha256", "backendImageDigest", "backendArtifactSha256"];
+  const invalid = {
+    gitSha: "a".repeat(39), androidApplicationId: "com.example.app", dataPackManifestSha256: "b".repeat(63),
+    aabSha256: "c".repeat(63), generatedApkSha256: "d".repeat(65),
+    backendImageDigest: `sha256:${"g".repeat(64)}`, backendArtifactSha256: "f".repeat(63),
+  };
+  for (const field of fields) {
+    const summary = schemaV2Pass(); summary.artifactIdentity[field] = invalid[field];
+    assert.equal(schemaV2Validate(summary).ok, false, field);
+  }
+});
 
 async function assertSensitiveValueRejected(value) {
   const summary = freshSummary();

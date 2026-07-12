@@ -5,6 +5,50 @@
   "releaseGate": "abuse-penetration-rehearsal",
   "issue": 1022,
   "status": "BLOCKED_EXTERNAL",
+  "summaryContract": {
+    "currentVersion": 2,
+    "requirePassVersion": 2,
+    "legacyNonPassVersions": [1],
+    "statusValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL"],
+    "resultValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL"],
+    "redactionResultValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL"],
+    "rawInvocationStored": false,
+    "redactionPolicyIds": ["summary-v2-no-sensitive-values"],
+    "procedureIdDerivation": "matrixId + '.' + caseId",
+    "targetAliasDerivation": "'target.' + matrixId",
+    "ownerAliasDerivation": "'owner.' + matrixId",
+    "relativeEvidencePathPattern": "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+    "fieldTypes": {
+      "root": { "schemaVersion": "integer", "releaseGate": "string", "issue": "integer", "status": "string", "rawInvocationStored": "boolean", "redactionPolicyId": "string", "artifactIdentity": "object", "evidence": "array", "productionLikeEvidence": "array", "matrices": "array" },
+      "artifactIdentity": { "gitSha": "string", "versionCode": "integer", "androidApplicationId": "string", "dataPackManifestSha256": "string", "aabSha256": "string", "generatedApkSha256": "string", "backendImageDigest": "string", "backendArtifactSha256": "string" },
+      "evidence": { "evidenceId": "string", "result": "string", "localEvidencePath": "string" },
+      "matrix": { "matrixId": "string", "result": "string", "findingCounts": "object", "mediumFindingDisposition": "object", "cases": "array" },
+      "findingCounts": { "critical": "integer", "high": "integer", "medium": "integer", "low": "integer" },
+      "mediumFindingDisposition": { "ownerAlias": "string", "fixPlanEvidencePath": "string" },
+      "case": { "procedureId": "string", "targetAlias": "string", "expectedStatus": "integer", "observedStatus": "integer", "redactionResult": "string", "localEvidencePath": "string" }
+    },
+    "requiredFields": {
+      "rootForAllStatuses": ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
+      "rootAdditionalForPass": ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
+      "artifactIdentity": ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
+      "evidence": ["evidenceId", "result", "localEvidencePath"],
+      "matrix": ["matrixId", "result", "findingCounts", "cases"],
+      "findingCounts": ["critical", "high", "medium", "low"],
+      "mediumFindingDisposition": ["ownerAlias", "fixPlanEvidencePath"],
+      "case": ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]
+    },
+    "fieldPatterns": {
+      "artifactIdentity": {
+        "gitSha": "^[0-9a-f]{40}$",
+        "androidApplicationId": "^com\\.easysubway\\.app$",
+        "dataPackManifestSha256": "^[0-9a-f]{64}$",
+        "aabSha256": "^[0-9a-f]{64}$",
+        "generatedApkSha256": "^[0-9a-f]{64}$",
+        "backendArtifactSha256": "^[0-9a-f]{64}$",
+        "backendImageDigest": "^sha256:[0-9a-f]{64}$"
+      }
+    }
+  },
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "securityPrivacyEvidenceManifest": "apps/mobile/release/security-privacy-release-evidence.json",
   "releaseSecurityGate": "apps/mobile/release/release-security-gate.json",
