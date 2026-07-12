@@ -14507,6 +14507,31 @@ test("official OD fare validator는 signed pack 내부의 승인 요금 변조�
   }
 });
 
+test("official OD fare release evidence는 승인된 두 방향 quote를 순서대로 고정한다", async () => {
+  const fixture = JSON.parse(await readFile(path.join(root, "tools/datapack/fixtures/catalog-fixture.json"), "utf8"));
+  const admission = JSON.parse(await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"));
+  const approvedMappingHash = admission.fareStationLineMappingLedgerHash;
+  const officialOdFareQuotes = fixture.packs[0].officialOdFareQuotes;
+  const releaseEvidencePaths = [
+    "tools/datapack/release/candidate-build-spec.json",
+    "tools/datapack/release/hash-evidence.json",
+  ];
+
+  for (const releaseEvidencePath of releaseEvidencePaths) {
+    const approvedEvidence = JSON.parse(await readFile(path.join(root, releaseEvidencePath), "utf8")).officialOdFareEvidence;
+    assert.deepEqual(officialOdFareQuotes, approvedEvidence.quotes);
+    assert.equal(officialOdFareQuotes.length, 2);
+    assert.ok(officialOdFareQuotes.every((quote) => quote.mappingLedgerHash === approvedMappingHash));
+    assert.equal(approvedEvidence.sourceId, admission.sourceId);
+    assert.equal(approvedEvidence.snapshotId, admission.snapshotId);
+    assert.equal(approvedEvidence.evidenceHash, admission.evidenceHash);
+    assert.equal(approvedEvidence.admissionHash, sha256(await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"))));
+    assert.equal(approvedEvidence.quoteSetHash, admission.quoteSetHash);
+  }
+  const releaseRequest = JSON.parse(await readFile(path.join(root, "tools/datapack/release/release-request.json"), "utf8"));
+  assert.equal(releaseRequest.buildSpecSha256, sha256(await readFile(path.join(root, "tools/datapack/release/candidate-build-spec.json"))));
+});
+
 test("원장 해시 exporter는 fixture 원장 5종 + license를 sha256으로 산출한다", async () => {
   const kinds = [
     ["alias", ["--fixture", catalogFixtureArg]],
