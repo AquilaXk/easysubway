@@ -124,7 +124,57 @@ void main() {
   });
 
   test(
-    'catalog DB migration은 schema 15 데이터를 보존하고 official OD fare table을 만든다',
+    'catalog DB migration은 schema 16 station car door hint를 보존하고 official OD fare table을 만든다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-v16-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/catalog.sqlite');
+      final legacy = sqlite.sqlite3.open(file.path);
+      legacy.execute('''
+        CREATE TABLE station_car_door_hints (
+          id TEXT NOT NULL PRIMARY KEY,
+          station_id TEXT NOT NULL,
+          line_id TEXT NOT NULL,
+          direction TEXT NOT NULL DEFAULT '',
+          target_facility_type TEXT NOT NULL,
+          car_number INTEGER NOT NULL,
+          door_number INTEGER NOT NULL,
+          source_id TEXT NOT NULL DEFAULT '',
+          source_snapshot_id TEXT NOT NULL DEFAULT '',
+          provider_record_hash TEXT NOT NULL DEFAULT '',
+          provenance_kind TEXT NOT NULL DEFAULT 'UNKNOWN',
+          verification_status TEXT NOT NULL DEFAULT 'UNKNOWN',
+          last_verified_at INTEGER,
+          evidence_hash TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+      legacy.execute('''
+        INSERT INTO station_car_door_hints (
+          id, station_id, line_id, target_facility_type, car_number, door_number
+        ) VALUES ('kept-hint', 'station-kept', 'line-kept', 'STAIR', 1, 1)
+      ''');
+      legacy.execute('PRAGMA user_version = 16');
+      legacy.close();
+
+      final database = CatalogDatabase.file(file);
+      addTearDown(database.close);
+      final fareCount = await database
+          .customSelect('SELECT COUNT(*) AS count FROM official_od_fare_quotes')
+          .getSingle();
+      final hint = await database
+          .customSelect('SELECT id FROM station_car_door_hints')
+          .getSingle();
+
+      expect(catalogDatabaseSchemaVersion, 17);
+      expect(fareCount.read<int>('count'), 0);
+      expect(hint.read<String>('id'), 'kept-hint');
+    },
+  );
+
+  test(
+    'catalog DB migration은 schema 15 데이터를 보존하고 두 v16-v17 table을 만든다',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'easysubway-catalog-v15-',
@@ -142,12 +192,16 @@ void main() {
       final fareCount = await database
           .customSelect('SELECT COUNT(*) AS count FROM official_od_fare_quotes')
           .getSingle();
+      final hintCount = await database
+          .customSelect('SELECT COUNT(*) AS count FROM station_car_door_hints')
+          .getSingle();
       final preserved = await database
           .customSelect('SELECT value FROM preserved_rows')
           .getSingle();
 
-      expect(catalogDatabaseSchemaVersion, 16);
+      expect(catalogDatabaseSchemaVersion, 17);
       expect(fareCount.read<int>('count'), 0);
+      expect(hintCount.read<int>('count'), 0);
       expect(preserved.read<String>('value'), 'kept');
     },
   );
