@@ -1673,7 +1673,9 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmission) {
             isOfficial
               ? requiredString(row.sourceSnapshotId, "stationCarDoorHints.sourceSnapshotId")
               : row.sourceSnapshotId ?? "",
-            row.providerRecordHash ?? "",
+            isOfficial
+              ? requiredString(row.providerRecordHash, "stationCarDoorHints.providerRecordHash")
+              : row.providerRecordHash ?? "",
             provenanceKind,
             row.verificationStatus ?? "UNKNOWN",
             timestamp(row.verifiedAt ?? row.lastVerifiedAt) ?? 0,

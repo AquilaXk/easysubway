@@ -296,6 +296,14 @@ test("게이트②: 정확한 충무로 3↔4 양방향과 비어 있지 않은 
     build([{ ...direction3To4, 호선: 2, 환승노선: "4호선" }, direction4To3]).structurallyAligned,
     false,
   );
+  assert.equal(
+    build([{ ...direction3To4, 환승거리: 18 }, direction4To3]).structurallyAligned,
+    false,
+  );
+  assert.equal(
+    build([direction3To4, { ...direction4To3, 환승소요시간: "00:15" }]).structurallyAligned,
+    false,
+  );
   assert.equal(build([direction3To4, direction4To3], []).structurallyAligned, false);
 });
 

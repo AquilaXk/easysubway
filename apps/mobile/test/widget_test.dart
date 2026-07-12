@@ -4897,24 +4897,25 @@ void main() {
     // 요구하는 scrollUntilVisible 대신 리스트를 직접 드래그해 lazy 항목을 노출시킨 뒤 findsWidgets로
     // 확인한다. 항목 탐색 전 매번 리스트를 최상단으로 리셋해 렌더 순서에 의존하지 않게 한다.
     final sourceScrollable = find.byType(Scrollable);
+    final sourceScrollState = tester.state<ScrollableState>(sourceScrollable);
     for (final displayName in const [
       '환승 이동경로',
       '서울교통공사_빠른하차정보',
       '서울교통공사_환승역거리 소요시간',
     ]) {
-      // 리스트를 최상단으로 되감는다(이미 최상단이면 no-op).
-      for (var reset = 0; reset < 60; reset++) {
-        await tester.drag(sourceScrollable, const Offset(0, 300));
-        await tester.pump();
-      }
+      sourceScrollState.position.jumpTo(
+        sourceScrollState.position.minScrollExtent,
+      );
       await tester.pumpAndSettle();
 
       final finder = find.textContaining(displayName);
-      var attempts = 0;
-      while (finder.evaluate().length < 2 && attempts < 60) {
+      while (finder.evaluate().length < 2) {
+        final position = sourceScrollState.position;
+        if (position.pixels >= position.maxScrollExtent) break;
+        final previousOffset = position.pixels;
         await tester.drag(sourceScrollable, const Offset(0, -300));
         await tester.pumpAndSettle();
-        attempts += 1;
+        if (position.pixels <= previousOffset) break;
       }
       expect(finder, findsNWidgets(2));
     }

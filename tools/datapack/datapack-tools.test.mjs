@@ -15191,6 +15191,23 @@ test("데이터팩 생성기는 공백 포함 OFFICIAL provenance를 정규화�
   );
 });
 
+test("데이터팩 생성기는 OFFICIAL car-door hint의 빈 providerRecordHash를 거부한다", async () => {
+  const { outputDir, fixturePath } = await prepareCarDoorHintFixture("car-door-official-provider-hash", {
+    provenanceKind: "OFFICIAL",
+    sourceId: "official-source",
+    sourceSnapshotId: "official-snapshot",
+    providerRecordHash: "",
+  });
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
+      { cwd: root, env: productionEnv },
+    ),
+    /stationCarDoorHints\.providerRecordHash/,
+  );
+});
+
 test("데이터팩 생성기는 car_number 11을 CHECK 위반으로 거부한다", async () => {
   const { outputDir, fixturePath } = await prepareCarDoorHintFixture("car-door-car11", { carNumber: 11 });
   await assert.rejects(

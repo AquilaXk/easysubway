@@ -315,6 +315,9 @@ function buildGateKricStructuralAlignment(transferRows, kricMovement, kricMoveme
   });
   const directionKeys = new Set(chungmuroBaseline.map((row) => `${row["호선"]}->${row["환승노선"]}`));
   const hasDirectionPair = directionKeys.has("3호선->4호선") && directionKeys.has("4호선->3호선");
+  const hasExpectedBaselineValues =
+    chungmuroBaseline.length === 2 &&
+    chungmuroBaseline.every((row) => row["환승거리"] === 17 && row["환승소요시간"] === 14);
   const resultCode = kricMovement?.header?.resultCode ?? null;
   const steps = Array.isArray(kricMovement?.body) ? kricMovement.body.length : 0;
   const evidenceFailures = validateKricMovementEvidence(kricMovement, kricMovementContext);
@@ -358,7 +361,7 @@ function buildGateKricStructuralAlignment(transferRows, kricMovement, kricMoveme
       환승거리: row["환승거리"],
       환승소요시간: row["환승소요시간"],
     })),
-    structurallyAligned: admitted && hasDirectionPair,
+    structurallyAligned: admitted && hasDirectionPair && hasExpectedBaselineValues,
     note:
       "충무로 baseline은 capital 6역에 없으므로 팩에는 적재되지 않는다 — 전량 기준 교차검증 근거로만 리포트에 남긴다.",
   };
