@@ -2894,6 +2894,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /EASYSUBWAY_ANDROID_UPLOAD_KEY_SHA256/);
   assert.match(workflow, /EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256/);
   assert.match(workflow, /--require-android-rc-production/);
+  assert.match(
+    workflow,
+    /Android Production RC Artifact \/ Audit bundled datapacks[\s\S]*node tools\/ci\/audit-mobile-datapack-assets\.mjs --index apps\/mobile\/assets\/datapacks\/index\.json --root apps\/mobile > "\$\{RUNNER_TEMP\}\/release-gate\/mobile-datapack-asset-audit\.json"[\s\S]*EASYSUBWAY_MOBILE_DATAPACK_ASSET_AUDIT=\$\{RUNNER_TEMP\}\/release-gate\/mobile-datapack-asset-audit\.json[\s\S]*Android Production RC Artifact \/ Collect production metadata/,
+    "Production RC job must self-audit datapacks before consuming EASYSUBWAY_MOBILE_DATAPACK_ASSET_AUDIT (GITHUB_ENV does not cross job boundaries)",
+  );
   assert.match(workflow, /base64 --decode > "\$\{EASYSUBWAY_ANDROID_KEYSTORE_PATH\}"/);
   assert.match(workflow, /rm -f "\$\{RUNNER_TEMP\}\/easysubway-ci-release\.jks" "\$\{RUNNER_TEMP\}\/easysubway-upload-key\.jks" "\$\{RUNNER_TEMP\}\/easysubway-release\.env"/);
   assert.match(workflow, /gitSha=\$\{GITHUB_SHA\}/);
