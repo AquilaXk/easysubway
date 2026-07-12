@@ -20,7 +20,7 @@
     },
     {
       "path": "planned-result-ui.xml",
-      "sha256": "752df0d722cd73c81bbff2e0c30ae6f97af673cc8e76d4a9e5bc5867d8d9ac22"
+      "sha256": "7f19dbcc9e033d8b6912570c70922abbab369053a06345f422f59e09966f2d00"
     }
   ],
   "relatedPullRequests": [1904, 1906],
