@@ -4,11 +4,14 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:easysubway_mobile/accessible_design.dart';
+import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/auth_headers.dart';
 import 'package:easysubway_mobile/main.dart';
 import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
+import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart'
+    hide InternalRouteNode;
 import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/features/ads/active_ad_banner.dart';
 import 'package:easysubway_mobile/features/ads/ad_repository.dart';
@@ -10497,13 +10500,25 @@ void main() {
   });
 
   testWidgets('공식 OD 요금이 없으면 unavailable 상태를 알린다', (tester) async {
+    final catalogDatabase = CatalogDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    var apiBaseReads = 0;
+    final dependencies = AppDependencies.resolve(
+      catalogDatabase: catalogDatabase,
+      apiBaseUri: () {
+        apiBaseReads += 1;
+        return Uri.parse('https://fare-api-must-not-be-used.example');
+      },
+      enablePushNotifications: false,
+    );
     final semanticsHandle = tester.ensureSemantics();
     try {
       await tester.pumpWidget(
         MaterialApp(
           home: RouteSearchScreen(
-            repository: FakeRouteSearchRepository(),
-            stationRepository: FakeStationSearchRepository(),
+            repository: dependencies.routeRepository,
+            stationRepository: dependencies.repository,
             initialDraft: RouteDraft(
               origin: const RouteDraftStation(
                 id: 'station-sangnoksu',
@@ -10524,6 +10539,7 @@ void main() {
       expect(find.text('공식 OD 요금 정보 없음'), findsOneWidget);
       expect(find.text('오프라인 공식 자료에 없는 경로입니다.'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('공식 OD 요금 정보 없음')), findsOneWidget);
+      expect(apiBaseReads, 0);
     } finally {
       semanticsHandle.dispose();
     }
