@@ -5179,12 +5179,13 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "kric-wheelchair-lift-movement",
       "molit-tago-subway-info",
       "molit-urban-rail-full-route",
+      "seoul-metro-accessibility",
       "seoul-topis-realtime-station-arrival",
       "seoul-topis-realtime-train-position",
       "seoulmetro-station-line-info",
     ],
   );
-  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 11);
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 12);
   // admittedCandidateCount는 P0 후보 전용 카운트다. #1397에서 함께 승격된 P1 route_map_positions
   // 후보(seoulmetro-cyberstation-route-map, capital pilot deferred domain)는 이 카운트에 포함되지 않는다.
   assert.equal(
@@ -5214,9 +5215,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-station-escalator": "38f5588f797774a0e4544f5412a70ebb0a5f6e13bbea3d51c67c8f5a61affe41",
     "kric-wheelchair-lift-location": "65ffcc558ef2d42baad3f58fbe46d3c9ac800b3990c2ed964b965e08c09d47f8",
     "kric-wheelchair-lift-movement": "c8d407ee54b653c6e8bcf77a044c22cb7129232c3f7e842b3f0e40cd7524af6e",
+    // #1996: seoul-metro-accessibility를 현행 admitted inventory(8종 + kric-subway-timetable 위) 위에 순차 admit한 결과 해시.
+    "seoul-metro-accessibility": "596041ee8944abe9a7987793efc844e35ea6e449ac841a4fd80301e06865714d",
   };
-  // 순차 체인이므로 8종 해시는 전부 distinct해야 한다.
-  assert.equal(new Set(Object.values(capitalAdmissionInventorySha256)).size, 8);
+  // 순차 체인이므로 9종 해시는 전부 distinct해야 한다.
+  assert.equal(new Set(Object.values(capitalAdmissionInventorySha256)).size, 9);
   for (const [sourceId, expectedSha256] of Object.entries(capitalAdmissionInventorySha256)) {
     const source = inventory.sources.find((entry) => entry.id === sourceId);
     assert.ok(source, `${sourceId} must exist in source inventory`);
@@ -5256,6 +5259,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-wheelchair-lift-movement",
     "molit-tago-subway-info",
     "molit-urban-rail-full-route",
+    "seoul-metro-accessibility",
     "seoul-realtime-arrival-station-info",
     "seoul-subway-hourly-boarding",
     "seoul-topis-realtime-train-position",
@@ -5456,6 +5460,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
     "molit-urban-rail-full-route",
+    "seoul-metro-accessibility",
     "seoulmetro-station-line-info",
   ]);
   assert.ok(scope.productionSourceSet.excludedFromV1SupportClaims.includes("seoul-realtime-arrival-station-info"));
@@ -5968,11 +5973,16 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-strict-route-coverage-"));
   const importedFixturePath = path.join(outputDir, "capital-pilot-production.json");
 
-  assert.doesNotMatch(validator, /\["AVAILABLE", "UNKNOWN"\]\.includes\(String\(edge\.accessibility_status/);
-  assert.match(validator, /String\(edge\.accessibility_status \?\? ""\)\.toUpperCase\(\) === "AVAILABLE"/);
+  // #1996: 게시 coverage는 검증된 상태 3분류(AVAILABLE/UNDER_MAINTENANCE/NO_OFFICIAL_FEED)를 verified로 인정하고
+  // 증거 없는 UNKNOWN만 차단한다. strict route 보장(#1394)은 AVAILABLE 전용으로 불변.
+  assert.match(validator, /const verifiedAccessibilityStatuses = new Set\(\["AVAILABLE", "UNDER_MAINTENANCE", "NO_OFFICIAL_FEED"\]\)/);
   assert.match(validator, /function isAccessibilityProvenanceCandidate/);
-  assert.match(validator, /\["AVAILABLE", "UNKNOWN"\]\.includes\(accessibilityStatus\)/);
+  assert.match(validator, /function isUnverifiedAccessibilityCoverageEdge/);
+  assert.match(validator, /!verifiedAccessibilityStatuses\.has\(String\(edge\.accessibility_status/);
   assert.match(validator, /unverifiedAccessibilityCoverageEdges/);
+  // strict guarantee 불변: transfer strict edge·movement pathway·strict facility 는 AVAILABLE 전용.
+  assert.match(validator, /strictAccessibilityStatus !== "AVAILABLE"/);
+  assert.match(validator, /String\(edge\.accessibility_status \?\? ""\)\.toUpperCase\(\) !== "AVAILABLE"/);
 
   for (const candidate of input.movementPathCandidates) {
     assert.match(candidate.evidenceHash, /^[0-9a-f]{64}$/);
@@ -6005,7 +6015,30 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
     })),
   );
   assert.equal(importedPack.networkEdges.some((edge) => edge.edgeType === "MOVEMENT"), false);
-  assert.equal(importedPack.stationFacilityEvidence.length, input.supportedV1Scope.facilityCoverageDenominator.expectedRows);
+  // 필수 시설유형 커버리지 증거는 denominator(2역 x 3유형=6)와 정확히 일치한다.
+  const requiredFacilityEvidence = importedPack.stationFacilityEvidence.filter(
+    (row) => row.facilityType !== "ACCESSIBILITY_STATUS_PROBE",
+  );
+  assert.equal(requiredFacilityEvidence.length, input.supportedV1Scope.facilityCoverageDenominator.expectedRows);
+  // #1996: 접근성 상태 실측 증거(ACCESSIBILITY_STATUS_PROBE)는 별도 행으로 추가된다.
+  // 사당 UNDER_MAINTENANCE(EXISTS·보수중·strict 부적격), 상록수 NO_OFFICIAL_FEED(NOT_EXISTS·부재 기록).
+  const probeEvidence = importedPack.stationFacilityEvidence.filter(
+    (row) => row.facilityType === "ACCESSIBILITY_STATUS_PROBE",
+  );
+  assert.deepEqual(
+    probeEvidence
+      .map((row) => ({
+        stationId: row.stationId,
+        evidenceKind: row.evidenceKind,
+        operationalStatus: row.operationalStatus,
+        strictRouteEligible: row.strictRouteEligible,
+      }))
+      .sort((left, right) => left.stationId.localeCompare(right.stationId)),
+    [
+      { stationId: "station-sadang", evidenceKind: "EXISTS", operationalStatus: "UNDER_MAINTENANCE", strictRouteEligible: false },
+      { stationId: "station-sangnoksu", evidenceKind: "NOT_EXISTS", operationalStatus: "NOT_COVERED", strictRouteEligible: false },
+    ],
+  );
 });
 
 test("official source importer는 locked production denominator 밖 station을 거부한다", async () => {
@@ -6146,6 +6179,10 @@ test("official source importer는 locked production denominator 밖 route endpoi
   input.routeEdges.push({
     ...input.routeEdges[0],
     id: "edge-extra-route-endpoint",
+    // 스코프-역 거부만 격리 검증한다: 검증된 접근성 상태(#1996) 증거 경로가 아니라
+    // 미검증(UNKNOWN) plain edge로 두어 accessibility coverage 검증보다 scope 검증이 먼저 걸리게 한다.
+    sourceId: "seoulmetro-station-line-info",
+    accessibilityStatus: "UNKNOWN",
     from: {
       sourceId: "seoulmetro-station-line-info",
       sourceStationCode: "448",

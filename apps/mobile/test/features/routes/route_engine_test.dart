@@ -377,6 +377,48 @@ void main() {
       expect(result.warningCodes, isEmpty);
     });
 
+    test('보수중(UNDER_MAINTENANCE) edge는 어떤 조건에서도 가용으로 렌더되지 않고 보수중 사유로 차단된다 (#1996)', () {
+      // 실측 보수중 edge는 available로 오인되면 절대 안 된다. 휠체어뿐 아니라
+      // 계단을 쓸 수 있는 일반 조건(SENIOR)에서도 차단되어야 정직 표시다.
+      for (final mobility in [MobilityType.wheelchair, MobilityType.senior]) {
+        final engine = LocalRouteEngine(graph: _underMaintenanceFixtureGraph());
+
+        final result = engine.search(
+          RouteRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: mobility,
+          ),
+        );
+
+        expect(result.status, RouteStatus.blocked, reason: '$mobility');
+        expect(result.edgeIds, isEmpty, reason: '$mobility');
+        expect(
+          result.blockedReasonCodes,
+          ['FACILITY_UNDER_MAINTENANCE'],
+          reason: '$mobility',
+        );
+        expect(result.warningCodes, isEmpty, reason: '$mobility');
+      }
+    });
+
+    test('실측 비가용(보수중 아님) edge는 일반 이용 어려움 사유로 차단된다 (#1996)', () {
+      final engine = LocalRouteEngine(graph: _unavailableFixtureGraph());
+
+      final result = engine.search(
+        const RouteRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: MobilityType.wheelchair,
+        ),
+      );
+
+      expect(result.status, RouteStatus.blocked);
+      expect(result.edgeIds, isEmpty);
+      expect(result.blockedReasonCodes, ['FACILITY_UNAVAILABLE']);
+      expect(result.warningCodes, isEmpty);
+    });
+
     test('휠체어 조건은 계단 상태가 없는 기본 edge를 안전한 경로로 사용하지 않는다', () {
       final engine = LocalRouteEngine(graph: _missingStairAccessFixtureGraph());
 
@@ -1354,6 +1396,97 @@ NetworkGraph _mixedUnknownAndBlockedFixtureGraph() {
         baseCost: 180,
         lineId: 'line-1',
         stairAccessState: RouteStairAccessState.stairOnly,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _underMaintenanceFixtureGraph() {
+  // 진입 edge가 실측 보수중(unavailable + isUnderMaintenance)인 경로.
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-sangnoksu:seoul-4',
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+      ),
+      RouteNode(
+        id: 'station-sadang:seoul-4',
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-sadang-under-maintenance',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: 'station-sangnoksu:seoul-4',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        accessibilityState: RouteAccessibilityState.unavailable,
+        isUnderMaintenance: true,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-sangnoksu-sadang-line4',
+        fromNodeId: 'station-sangnoksu:seoul-4',
+        toNodeId: 'station-sadang:seoul-4',
+        type: RouteEdgeType.ride,
+        baseCost: 420,
+        lineId: 'seoul-4',
+      ),
+      RouteEdge(
+        id: 'exit-sadang-step-free',
+        fromNodeId: 'station-sadang:seoul-4',
+        toNodeId: 'station-sadang',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+    ],
+  );
+}
+
+NetworkGraph _unavailableFixtureGraph() {
+  // 진입 edge가 실측 비가용(보수중은 아님)인 경로.
+  return NetworkGraph(
+    nodes: const [
+      RouteNode(
+        id: 'station-sangnoksu:seoul-4',
+        stationId: 'station-sangnoksu',
+        lineId: 'seoul-4',
+      ),
+      RouteNode(
+        id: 'station-sadang:seoul-4',
+        stationId: 'station-sadang',
+        lineId: 'seoul-4',
+      ),
+    ],
+    edges: const [
+      RouteEdge(
+        id: 'entry-sadang-unavailable',
+        fromNodeId: 'station-sangnoksu',
+        toNodeId: 'station-sangnoksu:seoul-4',
+        type: RouteEdgeType.entry,
+        baseCost: 90,
+        accessibilityState: RouteAccessibilityState.unavailable,
+        stairAccessState: RouteStairAccessState.stepFree,
+      ),
+      RouteEdge(
+        id: 'ride-sangnoksu-sadang-line4',
+        fromNodeId: 'station-sangnoksu:seoul-4',
+        toNodeId: 'station-sadang:seoul-4',
+        type: RouteEdgeType.ride,
+        baseCost: 420,
+        lineId: 'seoul-4',
+      ),
+      RouteEdge(
+        id: 'exit-sadang-step-free',
+        fromNodeId: 'station-sadang:seoul-4',
+        toNodeId: 'station-sadang',
+        type: RouteEdgeType.exit,
+        baseCost: 60,
+        stairAccessState: RouteStairAccessState.stepFree,
       ),
     ],
   );

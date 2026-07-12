@@ -570,7 +570,9 @@ class LocalRouteRepository implements RouteSearchRepository {
       // 경로 연결 문구로 바로잡는다(이전 매핑 불일치 수정).
       'STAIR_ONLY_ACCESS_UNKNOWN' => routeHedgeStepFreeUnknown,
       'GENERATED_CONNECTOR_UNVERIFIED' => routeHedgeConnectivityUnknown,
-      'FACILITY_UNAVAILABLE' => '꼭 필요한 시설을 지금 이용하기 어려워요.',
+      // 보수중(실측)과 일반 이용 어려움을 정직하게 구분해 표시한다(#1996).
+      'FACILITY_UNDER_MAINTENANCE' => routeFacilityUnderMaintenance,
+      'FACILITY_UNAVAILABLE' => routeFacilityUnavailable,
       'ACCESSIBILITY_STATE_UNKNOWN' => routeHedgeAccessibilityUnknown,
       'STALE_ACCESSIBILITY_DATA' => '오래된 안내라 계단 없는 경로로 안내하지 않아요.',
       'BLOCKED_UNVERIFIED_EDGE' => '검증되지 않은 경로는 안내하지 않아요.',
@@ -1267,6 +1269,11 @@ class _RouteCatalogSnapshot {
                 ),
               );
           final accessibilityStatus = row.read<String>('accessibility_status');
+          final effectiveAccessibilityStatus = _effectiveAccessibilityStatus(
+            accessibilityStatus,
+            facility,
+            facilityHasEligibleEvidence,
+          );
           final reliabilityScore = row.read<int>('reliability_score');
           final lastVerifiedAtSeconds = row.readNullable<int>(
             'last_verified_at',
@@ -1281,10 +1288,10 @@ class _RouteCatalogSnapshot {
             servicePattern: row.read<String>('service_pattern'),
             includesStairs: row.read<int>('includes_stairs') != 0,
             stairAccessState: row.read<String>('stair_access_state'),
-            accessibilityStatus: _effectiveAccessibilityStatus(
+            accessibilityStatus: effectiveAccessibilityStatus,
+            isUnderMaintenance: _effectiveIsUnderMaintenance(
               accessibilityStatus,
-              facility,
-              facilityHasEligibleEvidence,
+              effectiveAccessibilityStatus,
             ),
             reliabilityScore: _effectiveReliabilityScore(
               reliabilityScore,
@@ -1909,6 +1916,7 @@ graph.RouteEdge _toGraphRouteEdge(
     reliabilityScore: networkEdge.effectiveReliabilityScore,
     isDataStale: networkEdge.isDataStale,
     accessibilityState: networkEdge.accessibilityState,
+    isUnderMaintenance: networkEdge.isUnderMaintenance,
     safetyEvidence: networkEdge.safetyEvidence,
   );
 }
@@ -2086,11 +2094,33 @@ class _FacilityStatusSnapshotIndex {
   final Map<String, _FacilityStatusSnapshot> expiredByFacilityId;
 }
 
+/// 데이터팩 network_edges.accessibility_status 어휘를 앱 표시 3종
+/// (UNAVAILABLE / UNKNOWN / AVAILABLE)으로 정규화한다(#1996). 백엔드 게이트가
+/// 확정한 상태값을 정직하게 매핑한다:
+/// - UNDER_MAINTENANCE(보수중/점검/중지/공사, 실측된 비가용) → UNAVAILABLE.
+///   절대 available로 흘러가면 안 되므로 unknown 이하가 아니라 확정 차단이다.
+/// - NO_OFFICIAL_FEED(공식 상태 피드 부재) → UNKNOWN(확인 불가).
+/// - 그 밖의 값은 원문 유지(기존 UNAVAILABLE/UNKNOWN/AVAILABLE).
+String _normalizeEdgeAccessibilityStatus(String edgeStatus) {
+  return switch (edgeStatus.toUpperCase()) {
+    'UNDER_MAINTENANCE' => 'UNAVAILABLE',
+    'NO_OFFICIAL_FEED' => 'UNKNOWN',
+    _ => edgeStatus,
+  };
+}
+
+/// 원본 edge 상태가 실측 보수중(UNDER_MAINTENANCE)인지 여부. 정규화 후에는
+/// UNAVAILABLE로 합쳐지므로, 표시 단계에서 '보수중'을 별도 구분하려면 원본을 본다.
+bool _isEdgeUnderMaintenance(String edgeStatus) {
+  return edgeStatus.toUpperCase() == 'UNDER_MAINTENANCE';
+}
+
 String _effectiveAccessibilityStatus(
-  String edgeStatus,
+  String rawEdgeStatus,
   _FacilitySnapshot? facility,
   bool facilityHasEligibleEvidence,
 ) {
+  final edgeStatus = _normalizeEdgeAccessibilityStatus(rawEdgeStatus);
   final edgeStatusUpper = edgeStatus.toUpperCase();
   if (facility == null || edgeStatusUpper == 'UNAVAILABLE') {
     return edgeStatus;
@@ -2126,6 +2156,21 @@ String _effectiveAccessibilityStatus(
     return 'UNKNOWN';
   }
   return staticFacilityStatus;
+}
+
+/// 정규화된 접근성 상태가 UNAVAILABLE일 때, 그 비가용이 데이터팩 게이트가 확정한
+/// edge-level 실측 보수중(UNDER_MAINTENANCE)에서 비롯됐는지 판정한다(#1996). 이
+/// 확정 어휘만 '보수중'으로 구분 표시하고, 시설 스냅샷 계열(OUT_OF_SERVICE/BROKEN
+/// 등)의 비가용은 기존대로 일반 '이용 어려움'으로 둔다(범위 확정 유지). UNAVAILABLE이
+/// 아닌 경우엔 항상 false.
+bool _effectiveIsUnderMaintenance(
+  String rawEdgeStatus,
+  String effectiveStatus,
+) {
+  if (effectiveStatus.toUpperCase() != 'UNAVAILABLE') {
+    return false;
+  }
+  return _isEdgeUnderMaintenance(rawEdgeStatus);
 }
 
 String _effectiveFacilityStatus({
@@ -2407,6 +2452,7 @@ class _NetworkEdgeSnapshot {
     required this.provenanceKind,
     required this.verificationStatus,
     required this.evidenceHash,
+    this.isUnderMaintenance = false,
   });
 
   final String id;
@@ -2427,6 +2473,9 @@ class _NetworkEdgeSnapshot {
   final String provenanceKind;
   final String verificationStatus;
   final String evidenceHash;
+
+  /// 정직 표시: 이 edge의 비가용이 실측 보수중에서 비롯됐는지(#1996).
+  final bool isUnderMaintenance;
 
   graph.RouteEdgeType? get routeEdgeType =>
       graph.routeEdgeTypeFromCatalogValue(edgeType);
