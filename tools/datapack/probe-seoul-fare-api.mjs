@@ -6,7 +6,6 @@ import { pathToFileURL } from "node:url";
 import { sanitizeErrorMessage } from "./lib/source-candidate-evidence-collector.mjs";
 
 const FARE_ENDPOINT = "https://apis.data.go.kr/B553766/fare2/getRltmFare2";
-const SCHEDULE_ENDPOINT = "https://apis.data.go.kr/B553766/schedule/getTrainSch";
 const MAX_ATTEMPTS = 2;
 const REQUIRED_FARE_FIELDS = Object.freeze([
   "gnrlCardFare",
@@ -28,13 +27,11 @@ const EXPECTED_SAMPLE = Object.freeze({
   childCardFare: 550,
   childCashFare: 550,
 });
-const CANARIES = Object.freeze([
-  { evidenceKey: "seoulStationLine4", stationName: "서울역", lineNumber: "4", fareCode: "0150" },
-  { evidenceKey: "cityHallLine1", stationName: "시청", lineNumber: "1", fareCode: "0151" },
-]);
+const CANARY_ORIGIN = Object.freeze({ stationName: "서울역" });
+const CANARY_DESTINATION = Object.freeze({ stationName: "시청" });
 const TARGETS = Object.freeze([
-  { stationId: "station-sangnoksu", lineId: "seoul-4", stationName: "상록수", lineNumber: "4" },
-  { stationId: "station-sadang", lineId: "seoul-4", stationName: "사당", lineNumber: "4" },
+  { stationId: "station-sangnoksu", lineId: "seoul-4", stationName: "상록수" },
+  { stationId: "station-sadang", lineId: "seoul-4", stationName: "사당" },
 ]);
 
 function requiredText(value, label) {
@@ -99,36 +96,13 @@ async function fetchWithRetry({ fetchImpl, url, timeoutMs, retryDelayMs, label }
   throw new Error(`${label} retry exhausted`);
 }
 
-function normalizedLineNumber(value) {
-  if (typeof value !== "string") return null;
-  const match = /^0*([1-9][0-9]*)호선$/.exec(value.trim());
-  return match?.[1] ?? null;
-}
-
-function scheduleUrl({ fareServiceKey, lineNumber, stationName }) {
-  const url = new URL(SCHEDULE_ENDPOINT);
-  url.searchParams.set("serviceKey", decodedServiceKey(fareServiceKey));
-  url.searchParams.set("pageNo", "1");
-  url.searchParams.set("numOfRows", "100");
-  url.searchParams.set("dataType", "JSON");
-  url.searchParams.set("selectFields", "lineNm,stnNm,stnCd");
-  url.searchParams.set("tmprTmtblYn", "N");
-  url.searchParams.set("upbdnbSe", "상행");
-  url.searchParams.set("wkndSe", "평일");
-  url.searchParams.set("lineNm", `${lineNumber}호선`);
-  url.searchParams.set("stnNm", stationName);
-  return url;
-}
-
 function fareUrl({ fareServiceKey, origin, destination }) {
   const url = new URL(FARE_ENDPOINT);
   url.searchParams.set("serviceKey", decodedServiceKey(fareServiceKey));
   url.searchParams.set("pageNo", "1");
   url.searchParams.set("numOfRows", "10");
   url.searchParams.set("dataType", "JSON");
-  url.searchParams.set("dptreStnCd", origin.fareStationCode);
   url.searchParams.set("dptreStnNm", origin.stationName);
-  url.searchParams.set("arvlStnCd", destination.fareStationCode);
   url.searchParams.set("arvlStnNm", destination.stationName);
   return url;
 }
@@ -143,43 +117,24 @@ function responseItems(payload, label) {
   return items;
 }
 
-async function fetchScheduleStationCode({ fareServiceKey, fetchImpl, lineNumber, retryDelayMs, stationName, timeoutMs }) {
-  const { response } = await fetchWithRetry({
-    fetchImpl,
-    url: scheduleUrl({ fareServiceKey, lineNumber, stationName }),
-    timeoutMs,
-    retryDelayMs,
-    label: "schedule API",
-  });
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    throw new Error("schedule API returned invalid JSON");
-  }
-  const codes = new Set(responseItems(payload, "schedule API")
-    .filter((item) => item && typeof item === "object" && !Array.isArray(item)
-      && item.stnNm === stationName && normalizedLineNumber(item.lineNm) === lineNumber
-      && typeof item.stnCd === "string" && /^\d{4}$/.test(item.stnCd))
-    .map(({ stnCd }) => stnCd));
-  if (codes.size !== 1) throw new Error(`schedule station code is absent or ambiguous: ${stationName}`);
-  return [...codes][0];
-}
-
 function validatedFareItem(items, origin, destination) {
   const matching = items.filter((item) => item && typeof item === "object" && !Array.isArray(item)
-    && item.dptreStnCd === origin.fareStationCode
     && item.dptreStnNm === origin.stationName
-    && item.arvlStnCd === destination.fareStationCode
     && item.arvlStnNm === destination.stationName);
   if (matching.length !== 1) throw new Error("fare API response mapping is absent or ambiguous");
+  const item = matching[0];
+  if (typeof item.dptreStnCd !== "string" || !/^\d{4}$/.test(item.dptreStnCd)
+    || typeof item.arvlStnCd !== "string" || !/^\d{4}$/.test(item.arvlStnCd)
+    || item.dptreStnCd === item.arvlStnCd) {
+    throw new Error("fare API station code mapping is invalid");
+  }
   const fares = {};
   for (const field of REQUIRED_FARE_FIELDS) {
-    const value = matching[0][field];
+    const value = item[field];
     if (!Number.isSafeInteger(value) || value < 0) throw new Error(`fare API field invalid: ${field}`);
     fares[field] = value;
   }
-  return fares;
+  return { destinationCode: item.arvlStnCd, fares, originCode: item.dptreStnCd };
 }
 
 async function fetchFareQuote({ destination, fareServiceKey, fetchImpl, origin, retryDelayMs, timeoutMs }) {
@@ -196,7 +151,7 @@ async function fetchFareQuote({ destination, fareServiceKey, fetchImpl, origin, 
   } catch {
     throw new Error("fare API returned invalid JSON");
   }
-  return { attempts, fares: validatedFareItem(responseItems(payload, "fare API"), origin, destination) };
+  return { attempts, ...validatedFareItem(responseItems(payload, "fare API"), origin, destination) };
 }
 
 export async function probeOfficialOdFares({
@@ -212,46 +167,28 @@ export async function probeOfficialOdFares({
       throw new Error("FARE_API_PROBE_OUTPUT must be an absolute path");
     }
 
-    const canaryMappings = [];
-    for (const expected of CANARIES) {
-      const stationCode = await fetchScheduleStationCode({
-        fareServiceKey,
-        fetchImpl,
-        lineNumber: expected.lineNumber,
-        retryDelayMs,
-        stationName: expected.stationName,
-        timeoutMs,
-      });
-      if (stationCode !== expected.fareCode) throw new Error(`schedule fare code equivalence failed: ${expected.stationName}`);
-      canaryMappings.push({ expected, stationCode });
-    }
+    const canary = await fetchFareQuote({
+      destination: CANARY_DESTINATION,
+      fareServiceKey,
+      fetchImpl,
+      origin: CANARY_ORIGIN,
+      retryDelayMs,
+      timeoutMs,
+    });
+    validateFareSample({
+      dptreStnCd: canary.originCode,
+      dptreStnNm: CANARY_ORIGIN.stationName,
+      arvlStnCd: canary.destinationCode,
+      arvlStnNm: CANARY_DESTINATION.stationName,
+      ...canary.fares,
+    });
 
-    const providerMappings = [];
-    for (const target of TARGETS) {
-      const fareStationCode = await fetchScheduleStationCode({
-        fareServiceKey,
-        fetchImpl,
-        lineNumber: target.lineNumber,
-        retryDelayMs,
-        stationName: target.stationName,
-        timeoutMs,
-      });
-      providerMappings.push({
-        stationId: target.stationId,
-        lineId: target.lineId,
-        stationName: target.stationName,
-        fareStationCode,
-      });
-    }
-    if (new Set(providerMappings.map(({ fareStationCode }) => fareStationCode)).size !== providerMappings.length) {
-      throw new Error("schedule target fare codes must be distinct");
-    }
-
-    const directions = [[providerMappings[0], providerMappings[1]], [providerMappings[1], providerMappings[0]]];
+    const directions = [[TARGETS[0], TARGETS[1]], [TARGETS[1], TARGETS[0]]];
     const quotes = [];
+    const targetMappings = [];
     const attemptCounts = {};
     for (const [origin, destination] of directions) {
-      const { attempts, fares } = await fetchFareQuote({
+      const { attempts, destinationCode, fares, originCode } = await fetchFareQuote({
         destination,
         fareServiceKey,
         fetchImpl,
@@ -262,18 +199,28 @@ export async function probeOfficialOdFares({
       const directionKey = `${origin.stationId}→${destination.stationId}`;
       attemptCounts[directionKey] = attempts;
       quotes.push({ originStationId: origin.stationId, destinationStationId: destination.stationId, fares });
+      targetMappings.push({ destinationCode, originCode });
+    }
+    if (targetMappings[0].originCode !== targetMappings[1].destinationCode
+      || targetMappings[0].destinationCode !== targetMappings[1].originCode) {
+      throw new Error("fare API target station code equivalence failed");
     }
 
-    const equivalence = Object.fromEntries(canaryMappings.map(({ expected, stationCode }) => [expected.evidenceKey, {
-      scheduleStationCode: stationCode,
-      fareCode: expected.fareCode,
-      verified: true,
-    }]));
+    const providerMappings = TARGETS.map((target, index) => ({
+      stationId: target.stationId,
+      lineId: target.lineId,
+      stationName: target.stationName,
+      fareStationCode: index === 0 ? targetMappings[0].originCode : targetMappings[0].destinationCode,
+    }));
+    const equivalence = {
+      seoulStationLine4: { fareResponseStationCode: canary.originCode, fareCode: "0150", verified: true },
+      cityHallLine1: { fareResponseStationCode: canary.destinationCode, fareCode: "0151", verified: true },
+    };
     const evidence = {
       schemaVersion: 1,
       artifactKind: "official-od-fare-probe-evidence",
       mappingAvailability: "AVAILABLE",
-      mappingField: "stnCd",
+      mappingField: "dptreStnCd/arvlStnCd",
       equivalence,
       providerMappings,
       quotes,

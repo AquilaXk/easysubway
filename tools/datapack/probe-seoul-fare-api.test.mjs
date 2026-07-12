@@ -29,26 +29,28 @@ const officialSample = {
   childCashFare: 550,
 };
 
-const scheduleRows = {
-  서울역: [{ lineNm: "4호선", stnNm: "서울역", stnCd: "0150", trainno: "SYNTHETIC-1" }],
-  시청: [{ lineNm: "1호선", stnNm: "시청", stnCd: "0151", trainno: "SYNTHETIC-2" }],
-  상록수: [{ lineNm: "4호선", stnNm: "상록수", stnCd: "9001", trainno: "SYNTHETIC-3" }],
-  사당: [{ lineNm: "4호선", stnNm: "사당", stnCd: "9002", trainno: "SYNTHETIC-4" }],
-};
-
 const directionalFares = {
+  "서울역→시청": [1550, 1650, 900, 1650, 550, 550],
   "상록수→사당": [101, 102, 103, 104, 105, 106],
   "사당→상록수": [201, 202, 203, 204, 205, 206],
+};
+
+const directionalCodes = {
+  "서울역→시청": ["0150", "0151"],
+  "상록수→사당": ["9001", "9002"],
+  "사당→상록수": ["9002", "9001"],
 };
 
 function farePayload(url, { omitField, extra = true } = {}) {
   const originName = url.searchParams.get("dptreStnNm");
   const destinationName = url.searchParams.get("arvlStnNm");
-  const values = directionalFares[`${originName}→${destinationName}`];
+  const direction = `${originName}→${destinationName}`;
+  const values = directionalFares[direction];
+  const codes = directionalCodes[direction];
   const item = {
-    dptreStnCd: url.searchParams.get("dptreStnCd"),
+    dptreStnCd: codes[0],
     dptreStnNm: originName,
-    arvlStnCd: url.searchParams.get("arvlStnCd"),
+    arvlStnCd: codes[1],
     arvlStnNm: destinationName,
     gnrlCardFare: values[0],
     gnrlCashFare: values[1],
@@ -63,25 +65,16 @@ function farePayload(url, { omitField, extra = true } = {}) {
 }
 
 function createFetch({
-  rows = scheduleRows,
+  canaryResponse,
   fareResponse,
   onCall = () => {},
 } = {}) {
   return async (input) => {
     const url = new URL(input);
-    if (url.pathname === "/B553766/schedule/getTrainSch") {
-      const stationName = url.searchParams.get("stnNm");
-      onCall(`schedule:${stationName}`, url);
-      return Response.json({
-        response: {
-          header: { resultCode: "00" },
-          body: { totalCount: rows[stationName].length, items: { item: rows[stationName] } },
-        },
-      });
-    }
     const direction = `${url.searchParams.get("dptreStnNm")}→${url.searchParams.get("arvlStnNm")}`;
     onCall(`fare:${direction}`, url);
-    if (fareResponse) return fareResponse({ direction, url });
+    if (direction === "서울역→시청" && canaryResponse) return canaryResponse({ direction, url });
+    if (direction !== "서울역→시청" && fareResponse) return fareResponse({ direction, url });
     return Response.json(farePayload(url));
   };
 }
@@ -116,7 +109,7 @@ test("서울역-시청 공식 요금 응답 계약을 검증한다", () => {
   assert.throws(() => fareProbe.validateFareSample(missingFare), /childCashFare/);
 });
 
-test("HTTPS schedule stnCd canary로 양방향 공식 OD 증거만 기록한다", async () => {
+test("HTTPS fare 응답 code canary로 양방향 공식 OD 증거만 기록한다", async () => {
   await withOutput(async (outputPath) => {
     const calls = [];
     const evidence = await probe({
@@ -124,21 +117,20 @@ test("HTTPS schedule stnCd canary로 양방향 공식 OD 증거만 기록한다"
       fetchImpl: createFetch({
         onCall: (kind, url) => {
           assert.equal(url.protocol, "https:");
+          assert.equal(url.searchParams.has("dptreStnCd"), false);
+          assert.equal(url.searchParams.has("arvlStnCd"), false);
           calls.push(kind);
         },
       }),
     });
 
     assert.deepEqual(calls, [
-      "schedule:서울역",
-      "schedule:시청",
-      "schedule:상록수",
-      "schedule:사당",
+      "fare:서울역→시청",
       "fare:상록수→사당",
       "fare:사당→상록수",
     ]);
     assert.equal(evidence.artifactKind, "official-od-fare-probe-evidence");
-    assert.equal(evidence.mappingField, "stnCd");
+    assert.equal(evidence.mappingField, "dptreStnCd/arvlStnCd");
     assert.deepEqual(evidence.providerMappings.map(({ stationId, lineId, fareStationCode }) => ({
       stationId,
       lineId,
@@ -163,17 +155,54 @@ test("HTTPS schedule stnCd canary로 양방향 공식 OD 증거만 기록한다"
   });
 });
 
-test("한 역·노선에서 schedule stnCd가 둘이면 target 호출 전에 실패한다", async () => {
+test("fare canary 응답 code가 모호하면 target 호출 전에 실패한다", async () => {
   await withOutput(async (outputPath) => {
-    const rows = structuredClone(scheduleRows);
-    rows.서울역.push({ ...rows.서울역[0], stnCd: "9999" });
     const calls = [];
+    const canaryResponse = ({ url }) => {
+      const payload = farePayload(url);
+      payload.response.body.items.item.push({ ...payload.response.body.items.item[0], dptreStnCd: "9999" });
+      return Response.json(payload);
+    };
 
     await assert.rejects(
-      () => probe({ outputPath, fetchImpl: createFetch({ rows, onCall: (kind) => calls.push(kind) }) }),
-      /schedule station code is absent or ambiguous/,
+      () => probe({ outputPath, fetchImpl: createFetch({ canaryResponse, onCall: (kind) => calls.push(kind) }) }),
+      /fare API response mapping is absent or ambiguous/,
     );
-    assert.deepEqual(calls, ["schedule:서울역"]);
+    assert.deepEqual(calls, ["fare:서울역→시청"]);
+    await assert.rejects(access(outputPath));
+  });
+});
+
+test("fare canary 응답 code가 known pair와 다르면 target 호출 전에 실패한다", async () => {
+  await withOutput(async (outputPath) => {
+    const calls = [];
+    const canaryResponse = ({ url }) => {
+      const payload = farePayload(url);
+      payload.response.body.items.item[0].dptreStnCd = "9999";
+      return Response.json(payload);
+    };
+
+    await assert.rejects(
+      () => probe({ outputPath, fetchImpl: createFetch({ canaryResponse, onCall: (kind) => calls.push(kind) }) }),
+      /dptreStnCd/,
+    );
+    assert.deepEqual(calls, ["fare:서울역→시청"]);
+    await assert.rejects(access(outputPath));
+  });
+});
+
+test("target 양방향 응답 code가 서로 다르면 output을 만들지 않는다", async () => {
+  await withOutput(async (outputPath) => {
+    const fareResponse = ({ direction, url }) => {
+      const payload = farePayload(url);
+      if (direction === "사당→상록수") payload.response.body.items.item[0].arvlStnCd = "9999";
+      return Response.json(payload);
+    };
+
+    await assert.rejects(
+      () => probe({ outputPath, fetchImpl: createFetch({ fareResponse }) }),
+      /target station code equivalence failed/,
+    );
     await assert.rejects(access(outputPath));
   });
 });
