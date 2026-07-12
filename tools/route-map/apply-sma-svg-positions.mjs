@@ -127,6 +127,10 @@ export function buildAssignments(db, extraction, config = SEOUL) {
   // 1) 노드 마커: 결정적 순서(추출기 안정 정렬)로 순회.
   for (const node of extraction.stationNodes) {
     if (excluded.has(node.dataStation)) continue; // 범례 등 비역 노드
+    // 권역 nodeFilter(선택): 도식이 카탈로그 밖 노선/미개통 노드까지 그리는 경우
+    // (대전 2호선·충청권 광역철도·미개통 라벨) 그 노드를 정합 대상에서 배제한다.
+    // 정의되지 않은 권역(수도권·부산·대구)에는 영향이 없다.
+    if (config.nodeFilter && !config.nodeFilter(node)) continue;
     const slug = node.dataLine || config.missingLineHint[node.dataStation] || "";
     const lineId = slug ? slugToLineId.get(slug) : null;
     const canon = config.canonicalRules(node.dataStation);

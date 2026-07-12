@@ -187,7 +187,77 @@ const DAEGU = {
   contentBand: { minY: 300, maxY: 1800 },
 };
 
-const REGION_CONFIGS = { seoul: SEOUL, busan: BUSAN, daegu: DAEGU };
+// ── 대전(daejeon): #2011 3단계. 오너 자작 easy-subway-daejeon-v1. ─────────────
+// 문법 차이(수도권·부산·대구 대비): 역 마커 g(station-symbol)는 data-node-role
+// 없이 data-line·data-station-code만 들고, 역 정체(이름)와 노드 좌표는 <text>
+// station-label의 data-full-official-name·data-node-x·data-node-y에 실린다.
+// 추출기의 라벨 앵커 노드 소스(data-node-x/y+data-full-official-name)가 이를
+// stationNodes로 승격한다. 도식은 카탈로그 밖 노선까지 그린다: 대전 2호선(도시철도
+// 순환2호선, data-line="2", 전부 construction), 충청권 광역철도(regional,
+// construction), 미개통 라벨(construction/planned). 카탈로그는 대전 1호선 1개
+// (22역)뿐이므로 nodeFilter로 1호선 실역만 남긴다.
+// 1호선 역은 두 갈래로 실린다: (a) data-line="1"·active 라벨 17개, (b) 환승역은
+// data-line="transfer"·active 라벨로 그려지며 이름이 "1호선 <역명> | 2호선 …"
+// 복합 표기다(5개: 대전역·대동·서대전네거리·정부청사·유성온천). canonicalRules가
+// 복합 표기에서 1호선 역명을 뽑고 카탈로그 표기로 정규화(대전역→대전 등).
+const DAEJEON = {
+  id: "daejeon",
+  regionKey: "대전권",
+  lineNamePrefix: "대전",
+  svgSource: {
+    sourceId: "owner-self-drawn-sma-schematic",
+    sourceName: "오너 자작 대전 8선형 정본 도식",
+    sourceUrl: "internal:route-map/route-map-defs/svg-sources/easy-subway-daejeon-v1.svg",
+    license: "self-drawn",
+    licenseStatus: "confirmed",
+    commercialUseAllowed: true,
+    attributionRequired: false,
+  },
+  slugToSuffix: {
+    "1": "1호선",
+  },
+  // 대전 1호선 색(#00975a)만 카탈로그 대상. 2호선·광역철도 색은 배제(build-sma-tracks
+  // 는 colorToSlug 미등록 stroke를 자연 배제한다).
+  colorToSlug: {
+    "#00975a": "1",
+  },
+  missingLineHint: {},
+  markerlessFallback: [],
+  topologyExceptions: [],
+  excludedStations: [],
+  // 1호선 실역만 정합 대상으로 남긴다. (a) data-line=1·active, (b) data-line=transfer·
+  // active이며 이름이 "1호선 "으로 시작(1호선 환승역). 나머지(2호선·광역철도·미개통·
+  // 1호선 미개통 식장산)는 fail-closed로 배제한다(카탈로그 미수록).
+  nodeFilter: (node) => {
+    const status = node.dataStatus || "";
+    const line = node.dataLine || "";
+    const name = node.dataStation || "";
+    if (status !== "active") return false;
+    if (line === "1") return true;
+    if (line === "transfer" && /^1호선\s/.test(name)) return true;
+    return false;
+  },
+  // canonical 정합 규칙(대전 카탈로그 실측):
+  //   - 환승 복합 표기 "1호선 대전역 | 2호선 …" → 파이프 앞의 "1호선 " 뒤 토큰만.
+  //   - 괄호 부제 제거, 대전역→대전.
+  canonicalRules: (svgName) => {
+    let name = svgName;
+    // 환승 복합 표기: 파이프 이전 segment에서 "1호선 " 접두 제거.
+    const pipe = name.indexOf("|");
+    if (pipe >= 0) name = name.slice(0, pipe).trim();
+    name = name.replace(/^1호선\s+/, "").trim();
+    // 괄호 부제 제거.
+    name = name.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    // 역 접미 정규화(대전역→대전). 카탈로그는 접미 없는 표기.
+    if (name.length > 1 && name.endsWith("역")) name = name.slice(0, -1);
+    return { name };
+  },
+  // 대전 도식 노드 좌표(data-node-x/y)는 콘텐츠 밴드 제약이 track 추출에만 적용된다.
+  // 1호선 stroke의 medY 범위를 포함하도록 넉넉히 둔다.
+  contentBand: { minY: 0, maxY: 1800 },
+};
+
+const REGION_CONFIGS = { seoul: SEOUL, busan: BUSAN, daegu: DAEGU, daejeon: DAEJEON };
 // regionKey(예: "부산권")로도 조회 가능.
 const BY_REGION_KEY = new Map(Object.values(REGION_CONFIGS).map((c) => [c.regionKey, c]));
 
@@ -200,4 +270,4 @@ export function getRegionConfig(idOrRegionKey) {
   return config;
 }
 
-export { SEOUL, BUSAN, DAEGU, REGION_CONFIGS };
+export { SEOUL, BUSAN, DAEGU, DAEJEON, REGION_CONFIGS };

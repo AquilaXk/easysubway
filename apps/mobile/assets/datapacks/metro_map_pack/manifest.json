@@ -163,8 +163,8 @@
       "id": "daejeon",
       "name_ko": "대전",
       "app_region": "대전",
-      "operator": "대전교통공사",
-      "source_url": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
+      "operator": "오너 자작(self-drawn)",
+      "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daejeon-v1.svg",
       "route_map_strategy": {
         "rendering_strategy": "self-drawn-schematic",
         "bundled_svg_role": "review-reference-only",
@@ -179,21 +179,21 @@
         "mime_type": "image/svg+xml"
       },
       "license": {
-        "name": "기관 공식 노선도 asset - 재배포 권한 확인 필요",
-        "spdx": "LicenseRef-DJTC-Route-Map-Permission-Required",
-        "url": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
-        "source": "대전교통공사 사이버스테이션 노선도",
-        "source_page": "https://www.djtc.kr/kor/cyberStation.do?menuIdx=28",
-        "date": "2026-06-23",
+        "name": "오너 자작 노선도(self-drawn)",
+        "spdx": "LicenseRef-Self-Drawn",
+        "url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daejeon-v1.svg",
+        "source": "오너 자작 대전 8선형 정본 도식(easy-subway-daejeon-v1)",
+        "source_page": "internal:route-map/route-map-defs/svg-sources/easy-subway-daejeon-v1.svg",
+        "date": "2026-07-12",
         "authors": [
-          "대전교통공사"
+          "오너"
         ],
         "attributionRequired": false,
         "commercialUseAllowed": true,
-        "derivativeWorkAllowed": false,
+        "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
-        "reviewStatus": "self-drawn-fact-based",
-        "changes": "App rendering uses a self-drawn schematic built from factual station coordinates and line topology, not a derivative of the bundled SVG's expressive content. The original SVG is retained only as a coordinate-review reference and is not distributed as the render source."
+        "reviewStatus": "self-drawn-confirmed",
+        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daejeon schematic (easy-subway-daejeon-v1), not the raw SVG. Only line-1 catalog stations are mapped; unopened lines drawn in the schematic (circular line 2, Chungcheong regional rail) are excluded. The SVG itself is retained only as a coordinate-review reference and is not distributed as the render source."
       }
     }
   ]
