@@ -4852,7 +4852,7 @@ test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 
   assert.ok(gateIndex !== -1 && uploadIndex !== -1 && gateIndex < uploadIndex, "monotonic gate must precede bundle upload");
   // Bundle, deobfuscation mapping, track completion, commit.
   assert.match(tool, /\/bundles\?uploadType=media/);
-  assert.match(tool, /\/deobfuscationFiles\/\$\{encodePath\(String\(versionCode\)\)\}\/proguard/);
+  assert.match(tool, /\/apks\/\$\{encodePath\(String\(versionCode\)\)\}\/deobfuscationFiles\/proguard/);
   assert.match(tool, /status: "completed", versionCodes: \[String\(versionCode\)\]/);
   assert.match(tool, /:commit\?changesNotSentForReview=/);
 
