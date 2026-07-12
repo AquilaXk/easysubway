@@ -7,6 +7,14 @@ const inventoryPath = optionValue("--inventory") ?? "tools/datapack/source-inven
 const candidatesPath = optionValue("--candidates") ?? "tools/datapack/source-candidates.json";
 const scopePath = optionValue("--scope");
 const compareStrings = (left, right) => left.localeCompare(right);
+const officialOdFareFields = new Set([
+  "childCardFare",
+  "childCashFare",
+  "gnrlCardFare",
+  "gnrlCashFare",
+  "yungCardFare",
+  "yungCashFare",
+]);
 
 try {
   const inventory = JSON.parse(await readFile(inventoryPath, "utf8"));
@@ -84,6 +92,19 @@ function validateSource(source, label) {
   for (const field of source.fieldsProvided) {
     assertString(field, `${id}.fieldsProvided[]`);
   }
+  validateOfficialOdFareReferences(source, id);
+}
+
+function validateOfficialOdFareReferences(source, sourceId) {
+  const declaredFareFields = new Set(source.fieldsProvided.filter((field) => officialOdFareFields.has(field)));
+  const declaresReference = source.officialOdFareAdmissionHash != null
+    || source.fareStationLineMappingLedgerHash != null;
+  if (declaredFareFields.size === 0 && !declaresReference) return;
+  if (declaredFareFields.size !== officialOdFareFields.size) {
+    throw new Error(`${sourceId} official OD fare references require all six official fare fields`);
+  }
+  assertSha256(source.officialOdFareAdmissionHash, `${sourceId}.officialOdFareAdmissionHash`);
+  assertSha256(source.fareStationLineMappingLedgerHash, `${sourceId}.fareStationLineMappingLedgerHash`);
 }
 
 function validateCapabilities(capabilities, source, sourceId) {
