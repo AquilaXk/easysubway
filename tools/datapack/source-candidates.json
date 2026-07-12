@@ -15,6 +15,8 @@
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "evidence_recorded_admin_review_required",
       "automaticRouteGraphEdgeAllowed": false,
+      "serviceKeyHandling": "offline_import_secret_only",
+      "mobileEmbeddingAllowed": false,
       "evidence": {
         "listPageUrl": "https://data.kric.go.kr/rips/M_01_02/intro.do?page=2",
         "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=431&service=trainUseInfo&operation=subwayRouteInfo&page=2",
@@ -99,6 +101,8 @@
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "evidence_recorded_admin_review_required",
       "automaticRouteGraphEdgeAllowed": false,
+      "serviceKeyHandling": "offline_import_secret_only",
+      "mobileEmbeddingAllowed": false,
       "evidence": {
         "listPageUrl": "https://data.kric.go.kr/rips/M_01_02/intro.do?page=2",
         "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=183&service=convenientInfo&operation=stationInfo&page=2",
@@ -156,12 +160,13 @@
           "adminAdmissionEvidence",
           "credentialFreeRawArchive",
           "licenseCommercialRedistributionEvidence",
+          "kricStandardStationFileComparison",
           "line4StationCoverage",
           "providerTermsOrQuotaApproval",
           "rawObjectUri"
         ]
       },
-      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, and 4호선 station coverage before production inventory admission",
+      "nextAction": "complete credential-free raw archive and approved object URI, owner admin review, commercial/redistribution license evidence, provider terms/quota approval, KRIC standard station file comparison, and 4호선 station coverage before production inventory admission",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",

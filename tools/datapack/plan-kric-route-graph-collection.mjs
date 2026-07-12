@@ -20,15 +20,18 @@ function buildKricRouteGraphCollectionPlan(candidatesDocument, candidateIds = DE
     totalRequestCount: requests.length,
     requests,
     productionUseAllowed: false,
-    remainingAdmissionBlocker: "validated_live_sample_and_admin_review_required",
+    remainingAdmissionBlocker: requests.some(({ sampleAcquisitionRequired }) => sampleAcquisitionRequired)
+      ? "sample_acquisition_and_admin_review_required"
+      : "raw_archive_coverage_and_admin_review_required",
   };
 }
 
 function planRequest(candidate, priority) {
   requireCandidateState(candidate);
   const evidence = candidate.evidence ?? {};
-  const sampleUrl = forceJsonFormat(requiredText(evidence.sampleUrl, `${candidate.id}.evidence.sampleUrl`));
-  assertRedactedServiceKey(sampleUrl, candidate.id);
+  const documentedSampleUrl = requiredText(evidence.sampleUrl, `${candidate.id}.evidence.sampleUrl`);
+  assertRedactedServiceKey(documentedSampleUrl, candidate.id);
+  const sampleUrl = forceJsonFormat(documentedSampleUrl);
   if (!(evidence.formats ?? []).some((format) => String(format).toLowerCase() === "json")) {
     throw new Error(`${candidate.id} must support JSON sample collection`);
   }
@@ -40,6 +43,16 @@ function planRequest(candidate, priority) {
     expectedFields: [...(evidence.outputFields ?? [])].sort((left, right) => left.localeCompare(right)),
     evidenceOutput: `.codex/evidence/kric/${candidate.id}.sample.json`,
     rawArchiveOutput: `.codex/evidence/kric/${candidate.id}.raw.json`,
+    sampleEvidenceStatus: candidate.sampleEvidenceStatus,
+    sampleAcquisitionRequired: candidate.sampleEvidenceStatus === "sample_url_documented_key_required",
+    remainingAdmissionBlocker: remainingAdmissionBlocker(candidate),
+    productionUseAllowed: false,
+    automaticRouteGraphEdgeAllowed: false,
+    capabilities: {
+      schedule: false,
+      realtime: false,
+      facility: false,
+    },
   };
 }
 
@@ -47,18 +60,49 @@ function requireCandidateState(candidate) {
   if (!candidate.id.startsWith("kric-")) {
     throw new Error(`candidate is not KRIC: ${candidate.id}`);
   }
-  if (candidate.sampleEvidenceStatus !== "sample_url_documented_key_required") {
-    throw new Error(`${candidate.id} sampleEvidenceStatus must stay pending until live sample evidence is recorded`);
-  }
   if (candidate.admissionStatus !== "evidence_recorded_admin_review_required") {
     throw new Error(`${candidate.id} admissionStatus must require admin review before production use`);
+  }
+  if (!["sample_url_documented_key_required", "validated_live_sample"].includes(candidate.sampleEvidenceStatus)) {
+    throw new Error(`${candidate.id} sampleEvidenceStatus must be pending or validated live sample evidence`);
+  }
+  if (candidate.automaticRouteGraphEdgeAllowed !== false) {
+    throw new Error(`${candidate.id} automatic route graph edge must stay disabled`);
+  }
+  if (candidate.productionUseAllowed === true) {
+    throw new Error(`${candidate.id} production use must stay disabled`);
+  }
+  for (const capability of ["schedule", "realtime", "facility"]) {
+    if (candidate.capabilities?.[capability]?.productionUseAllowed !== false) {
+      throw new Error(`${candidate.id} production capability must stay disabled: ${capability}`);
+    }
   }
 }
 
 function forceJsonFormat(sampleUrl) {
   const url = new URL(sampleUrl);
+  for (const name of [...url.searchParams.keys()]) {
+    if (name.toLowerCase() === "servicekey") {
+      url.searchParams.delete(name);
+    }
+  }
+  url.searchParams.set("serviceKey", "[서비스키값]");
   url.searchParams.set("format", "json");
   return url.toString().replace("serviceKey=%5B%EC%84%9C%EB%B9%84%EC%8A%A4%ED%82%A4%EA%B0%92%5D", "serviceKey=[서비스키값]");
+}
+
+function remainingAdmissionBlocker(candidate) {
+  const missingEvidence = candidate.evidence?.missingEvidence ?? [];
+  if (candidate.sampleEvidenceStatus === "sample_url_documented_key_required") {
+    return [...missingEvidence];
+  }
+  return missingEvidence.filter(
+    (item) =>
+      item === "adminAdmissionEvidence" ||
+      item === "credentialFreeRawArchive" ||
+      item === "line4RouteStationOrderCoverage" ||
+      item === "line4StationCoverage",
+  );
 }
 
 function assertRedactedServiceKey(sampleUrl, candidateId) {
