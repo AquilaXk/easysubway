@@ -1,13 +1,17 @@
 package com.easysubway.ads.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.ads.domain.AdCreative;
+import com.easysubway.ads.domain.AdEventType;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
@@ -15,6 +19,8 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 @DisplayName("H2 광고 소재 저장소")
 class JdbcAdRepositoryTest {
 
+	private static final int EVENT_DAILY_CAP = 2;
+	private static final LocalDate EVENT_DATE = LocalDate.of(2026, 7, 12);
 	private static final LocalDateTime T0 = LocalDateTime.parse("2026-07-11T00:00:00");
 
 	private JdbcTemplate jdbcTemplate;
@@ -32,7 +38,47 @@ class JdbcAdRepositoryTest {
 			.locations("classpath:db/migration/h2")
 			.load()
 			.migrate();
-		repository = new JdbcAdRepository(jdbcTemplate);
+		repository = new JdbcAdRepository(jdbcTemplate, EVENT_DAILY_CAP);
+	}
+
+	@Test
+	@DisplayName("같은 UTC 일자 composite key count는 설정 cap에서 멈춘다")
+	void capsDailyEventCount() {
+		repository.save(creative("event-creative", "route-result-bottom", T0, T0.plusDays(1), true));
+
+		for (int attempt = 0; attempt < EVENT_DAILY_CAP + 2; attempt++) {
+			repository.incrementEvent(
+				"route-result-bottom", "event-creative", AdEventType.IMPRESSION, EVENT_DATE);
+		}
+
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT event_count FROM ad_event_daily WHERE event_date = ? AND placement_id = ? AND creative_id = ? AND event_type = ?",
+			Integer.class,
+			EVENT_DATE, "route-result-bottom", "event-creative", "IMPRESSION"))
+			.isEqualTo(EVENT_DAILY_CAP);
+	}
+
+	@Test
+	@DisplayName("unknown 또는 placement가 다른 creative event는 저장하지 않는다")
+	void ignoresUnknownAndMismatchedEventIds() {
+		repository.save(creative("event-creative", "route-result-bottom", T0, T0.plusDays(1), true));
+
+		repository.incrementEvent(
+			"route-result-bottom", "missing", AdEventType.IMPRESSION, EVENT_DATE);
+		repository.incrementEvent(
+			"station-detail-bottom", "event-creative", AdEventType.IMPRESSION, EVENT_DATE);
+
+		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM ad_event_daily", Integer.class)).isZero();
+	}
+
+	@Test
+	@DisplayName("예상하지 못한 DB failure는 익명 no-op으로 숨기지 않는다")
+	void propagatesUnexpectedDatabaseFailure() {
+		jdbcTemplate.execute("DROP TABLE ad_event_daily");
+
+		assertThatThrownBy(() -> repository.incrementEvent(
+			"route-result-bottom", "event-creative", AdEventType.IMPRESSION, EVENT_DATE))
+			.isInstanceOf(DataAccessException.class);
 	}
 
 	@Test
