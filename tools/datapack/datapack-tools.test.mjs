@@ -6458,7 +6458,7 @@ test("KRIC route graph 수집 계획은 validated/admin-closed membership 후보
   assert.equal(plan.artifactKind, "kric-route-graph-membership-collection-plan");
   assert.equal(plan.serviceKeyEnv, "KRIC_SERVICE_KEY");
   assert.equal(plan.productionUseAllowed, false);
-  assert.equal(plan.remainingAdmissionBlocker, "raw_archive_coverage_and_admin_review_required");
+  assert.equal("remainingAdmissionBlocker" in plan, false);
   assert.deepEqual(
     plan.requests.map((request) => request.candidateId),
     ["kric-subway-route-info", "kric-station-info"],
@@ -6473,6 +6473,7 @@ test("KRIC route graph 수집 계획은 validated/admin-closed membership 후보
     assert.equal(url.searchParams.get("format"), "json");
     assert.equal(request.sampleEvidenceStatus, "validated_live_sample");
     assert.equal(request.sampleAcquisitionRequired, false);
+    assert.equal("remainingAdmissionBlocker" in request, false);
     assert.equal(request.productionUseAllowed, false);
     assert.equal(request.automaticRouteGraphEdgeAllowed, false);
     assert.deepEqual(request.capabilities, {
@@ -6482,15 +6483,22 @@ test("KRIC route graph 수집 계획은 validated/admin-closed membership 후보
     });
   }
   assert.equal(plan.requests[0].priority, 1);
-  assert.deepEqual(plan.requests[0].remainingAdmissionBlocker, [
+  assert.deepEqual(plan.requests[0].remainingAdmissionBlockers, [
     "adminAdmissionEvidence",
     "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
     "line4RouteStationOrderCoverage",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
   ]);
-  assert.deepEqual(plan.requests[1].remainingAdmissionBlocker, [
+  assert.deepEqual(plan.requests[1].remainingAdmissionBlockers, [
     "adminAdmissionEvidence",
     "credentialFreeRawArchive",
+    "licenseCommercialRedistributionEvidence",
+    "kricStandardStationFileComparison",
     "line4StationCoverage",
+    "providerTermsOrQuotaApproval",
+    "rawObjectUri",
   ]);
   assert.deepEqual(plan.requests[0].expectedFields, [
     "lnCd",
@@ -6530,9 +6538,43 @@ test("KRIC route graph 수집 계획은 pending 후보의 sample acquisition lif
 
   assert.equal(request.sampleEvidenceStatus, "sample_url_documented_key_required");
   assert.equal(request.sampleAcquisitionRequired, true);
-  assert.deepEqual(request.remainingAdmissionBlocker, ["sampleResponse"]);
+  assert.equal("remainingAdmissionBlocker" in request, false);
+  assert.deepEqual(request.remainingAdmissionBlockers, ["sampleResponse"]);
   assert.equal(request.productionUseAllowed, false);
   assert.equal(request.automaticRouteGraphEdgeAllowed, false);
+});
+
+test("KRIC route graph 수집 계획은 case-insensitive format 변형을 canonical format=json 하나로 정규화한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-kric-plan-format-${Date.now()}`);
+  const candidatesPath = path.join(outputDir, "source-candidates.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  const candidates = JSON.parse(await readFile("tools/datapack/source-candidates.json", "utf8"));
+  const candidate = candidates.candidates.find((entry) => entry.id === "kric-subway-route-info");
+  candidate.evidence.sampleUrl = candidate.evidence.sampleUrl.replace(
+    "format=xml",
+    "Format=xml&format=xml",
+  );
+  await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
+
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    [
+      "tools/datapack/plan-kric-route-graph-collection.mjs",
+      "--candidates",
+      candidatesPath,
+      "--candidate",
+      "kric-subway-route-info",
+    ],
+    { cwd: root },
+  );
+  const [request] = JSON.parse(stdout).requests;
+  const formatEntries = [...new URL(request.url).searchParams.entries()].filter(
+    ([name]) => name.toLowerCase() === "format",
+  );
+
+  assert.deepEqual(formatEntries, [["format", "json"]]);
+  assert.match(request.url, /[?&]format=json(?:&|$)/);
 });
 
 test("KRIC route graph 수집 계획은 admitted 또는 production/automatic edge가 열린 후보를 거부한다", async () => {

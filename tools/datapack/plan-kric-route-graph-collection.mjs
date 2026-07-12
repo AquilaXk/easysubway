@@ -20,9 +20,6 @@ function buildKricRouteGraphCollectionPlan(candidatesDocument, candidateIds = DE
     totalRequestCount: requests.length,
     requests,
     productionUseAllowed: false,
-    remainingAdmissionBlocker: requests.some(({ sampleAcquisitionRequired }) => sampleAcquisitionRequired)
-      ? "sample_acquisition_and_admin_review_required"
-      : "raw_archive_coverage_and_admin_review_required",
   };
 }
 
@@ -45,7 +42,7 @@ function planRequest(candidate, priority) {
     rawArchiveOutput: `.codex/evidence/kric/${candidate.id}.raw.json`,
     sampleEvidenceStatus: candidate.sampleEvidenceStatus,
     sampleAcquisitionRequired: candidate.sampleEvidenceStatus === "sample_url_documented_key_required",
-    remainingAdmissionBlocker: remainingAdmissionBlocker(candidate),
+    remainingAdmissionBlockers: [...(evidence.missingEvidence ?? [])],
     productionUseAllowed: false,
     automaticRouteGraphEdgeAllowed: false,
     capabilities: {
@@ -82,27 +79,13 @@ function requireCandidateState(candidate) {
 function forceJsonFormat(sampleUrl) {
   const url = new URL(sampleUrl);
   for (const name of [...url.searchParams.keys()]) {
-    if (name.toLowerCase() === "servicekey") {
+    if (["servicekey", "format"].includes(name.toLowerCase())) {
       url.searchParams.delete(name);
     }
   }
   url.searchParams.set("serviceKey", "[서비스키값]");
   url.searchParams.set("format", "json");
   return url.toString().replace("serviceKey=%5B%EC%84%9C%EB%B9%84%EC%8A%A4%ED%82%A4%EA%B0%92%5D", "serviceKey=[서비스키값]");
-}
-
-function remainingAdmissionBlocker(candidate) {
-  const missingEvidence = candidate.evidence?.missingEvidence ?? [];
-  if (candidate.sampleEvidenceStatus === "sample_url_documented_key_required") {
-    return [...missingEvidence];
-  }
-  return missingEvidence.filter(
-    (item) =>
-      item === "adminAdmissionEvidence" ||
-      item === "credentialFreeRawArchive" ||
-      item === "line4RouteStationOrderCoverage" ||
-      item === "line4StationCoverage",
-  );
 }
 
 function assertRedactedServiceKey(sampleUrl, candidateId) {

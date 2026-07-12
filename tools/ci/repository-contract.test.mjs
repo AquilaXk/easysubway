@@ -6879,6 +6879,10 @@ test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선�
     [["serviceKey", "[서비스키값]"]],
   );
   assert.match(candidate.evidence.sampleUrl, /[?&]serviceKey=\[서비스키값\](?:&|$)/);
+  assert.deepEqual(
+    [...sampleUrl.searchParams.entries()].filter(([name]) => name.toLowerCase() === "format"),
+    [["format", "xml"]],
+  );
   assert.equal(sampleUrl.searchParams.get("format"), "xml");
   assert.equal(sampleUrl.searchParams.get("mreaWideCd"), "01");
   assert.equal(sampleUrl.searchParams.get("lnCd"), "A1");
@@ -6939,6 +6943,10 @@ test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변
     [["serviceKey", "[서비스키값]"]],
   );
   assert.match(candidate.evidence.sampleUrl, /[?&]serviceKey=\[서비스키값\](?:&|$)/);
+  assert.deepEqual(
+    [...sampleUrl.searchParams.entries()].filter(([name]) => name.toLowerCase() === "format"),
+    [["format", "xml"]],
+  );
   assert.equal(sampleUrl.searchParams.get("format"), "xml");
   assert.equal(sampleUrl.searchParams.get("railOprIsttCd"), "KR");
   assert.equal(sampleUrl.searchParams.get("lnCd"), "1");
