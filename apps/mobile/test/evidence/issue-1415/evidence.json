@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "issue": 1415,
+  "capturedAt": "2026-07-10",
+  "platform": "Android emulator",
+  "route": {
+    "origin": "상록수역",
+    "destination": "사당역"
+  },
+  "assertions": [
+    "출발 상록수역",
+    "도착 사당역",
+    "예상 소요시간: 시간표 기준",
+    "약 38분 · 27.9km"
+  ],
+  "files": [
+    {
+      "path": "planned-result.png",
+      "sha256": "be56243767705c71803d1fd56ff42a137d8a7584d0d5c424eee3bb60b1e66a80"
+    },
+    {
+      "path": "planned-result-ui.xml",
+      "sha256": "7f19dbcc9e033d8b6912570c70922abbab369053a06345f422f59e09966f2d00"
+    }
+  ],
+  "relatedPullRequests": [1904, 1906],
+  "scope": "상록수역-사당역 pilot PLANNED UI evidence only",
+  "excludedClaims": [
+    "nationwide timetable coverage",
+    "realtime overlay",
+    "ENTRY/EXIT accessibility",
+    "deployment completion"
+  ]
+}
