@@ -62,7 +62,8 @@ export function validateOfficialOdFareEvidence(evidence) {
     providerCodes.add(providerCode);
     targets.push(`${stationId}\u0000${lineId}\u0000${stationName}`);
   }
-  if (JSON.stringify(targets.sort()) !== JSON.stringify(FIXED_TARGETS)) {
+  const sortedTargets = targets.toSorted((left, right) => left.localeCompare(right));
+  if (JSON.stringify(sortedTargets) !== JSON.stringify(FIXED_TARGETS)) {
     throw new Error("evidence.providerMappings must match fixed targets");
   }
 
