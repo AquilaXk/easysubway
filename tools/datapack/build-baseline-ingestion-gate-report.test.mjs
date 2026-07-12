@@ -288,9 +288,9 @@ test("게이트①: 동일 역·노선 방향의 중복 행을 duplicateReport�
     carDoorRows: [],
     kricMovement: null,
   });
-  const duplicate = report.gateInternalConsistency.duplicateReport[0];
-
-  assert.equal(report.gateInternalConsistency.duplicateReport.length, 1);
+  const duplicates = report.gateInternalConsistency.duplicateReport;
+  assert.equal(duplicates.length, 1);
+  const duplicate = duplicates[0];
   assert.equal(duplicate.stationId, "station-sadang");
   assert.equal(duplicate.fromLineId, "seoul-2");
   assert.equal(duplicate.toLineId, "seoul-4");
