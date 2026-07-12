@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
-import 'design_tokens.dart';
 
 const _mobilityProfilePagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _mobilityProfileCardRadius = BorderRadius.all(Radius.circular(16));
@@ -205,11 +204,10 @@ class _MobilityProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final tokens = EasySubwayTokens.of(context);
     final borderColor = selected
         ? colorScheme.primary
-        : tokens.line;
-    final backgroundColor = tokens.surface;
+        : EasySubwayAccessibleColors.line;
+    final backgroundColor = EasySubwayAccessibleColors.surface;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -246,7 +244,7 @@ class _MobilityProfileCard extends StatelessWidget {
                               option.title,
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
-                                    color: tokens.ink,
+                                    color: EasySubwayAccessibleColors.text,
                                     fontWeight: FontWeight.w700,
                                     height: 1.25,
                                   ),
@@ -256,7 +254,7 @@ class _MobilityProfileCard extends StatelessWidget {
                               option.summary,
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(
-                                    color: tokens.inkMuted,
+                                    color: EasySubwayAccessibleColors.mutedText,
                                     fontWeight: FontWeight.w700,
                                     height: 1.3,
                                   ),
