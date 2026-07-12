@@ -229,6 +229,88 @@ void main() {
     );
   });
 
+  test('로컬 역 시간표는 요일 유형별 출발을 방향으로 묶고 첫차와 막차를 보존한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    final repository = DriftStationRepository(database: database);
+
+    final timetable = await repository.loadStationTimetable(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.weekday,
+    );
+
+    expect(timetable.isAvailable, isTrue);
+    expect(timetable.dayType.label, '평일');
+    expect(
+      timetable.directions.map((direction) => direction.name),
+      unorderedEquals(['상록수 방면', '사당 방면']),
+    );
+    final sadang = timetable.directions.singleWhere(
+      (direction) => direction.name == '사당 방면',
+    );
+    expect(sadang.departures.map((departure) => departure.timeLabel), [
+      '05:20',
+      '다음 날 00:25',
+    ]);
+    expect(sadang.firstDeparture.timeLabel, '05:20');
+    expect(sadang.lastDeparture.timeLabel, '다음 날 00:25');
+    expect(sadang.lastDeparture.semanticLabel, '사당 방면, 다음 날 00시 25분 출발');
+  });
+
+  test('로컬 역 시간표는 토요일과 일요일·공휴일 calendar를 분리하고 미지원 역을 강등한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    final repository = DriftStationRepository(database: database);
+
+    final saturday = await repository.loadStationTimetable(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.saturday,
+    );
+    final holiday = await repository.loadStationTimetable(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.sundayHoliday,
+    );
+    final unavailable = await repository.loadStationTimetable(
+      stationId: 'station-sangnoksu',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.weekday,
+    );
+
+    expect(saturday.directions.single.departures.single.timeLabel, '09:12');
+    expect(holiday.directions.single.departures.single.timeLabel, '10:30');
+    expect(unavailable.isAvailable, isFalse);
+    expect(unavailable.directions, isEmpty);
+  });
+
+  test('로컬 역 시간표는 평일 공휴일 exception을 일요일·공휴일로 자동 선택한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    await database.customStatement('''
+      INSERT INTO service_calendar_dates (service_id, date, exception_type)
+      VALUES ('weekday-1919', '20260817', 2),
+             ('holiday-1919', '20260817', 1)
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    final timetable = await repository.loadStationTimetableForDate(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      date: DateTime(2026, 8, 17),
+    );
+
+    expect(timetable.dayType, StationTimetableDayType.sundayHoliday);
+    expect(timetable.directions.single.departures.single.timeLabel, '10:30');
+  });
+
   test('앱 기본 의존성은 catalog DB가 있으면 로컬 역 repository를 사용한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -269,4 +351,51 @@ void main() {
 
     expect(track.paths, ['M 0 0 L 10 0', 'M 20 0 L 30 0']);
   });
+}
+
+Future<void> _seedStationTimetable(CatalogDatabase database) async {
+  await database.customStatement('''
+    INSERT INTO service_calendars (
+      service_id, monday, tuesday, wednesday, thursday, friday,
+      saturday, sunday, start_date, end_date, timezone
+    ) VALUES
+      ('weekday-1919', 0, 1, 0, 0, 0, 0, 0, '20260101', '20261231', 'Asia/Seoul'),
+      ('saturday-1919', 0, 0, 0, 0, 0, 1, 0, '20260101', '20261231', 'Asia/Seoul'),
+      ('holiday-1919', 0, 0, 0, 0, 0, 0, 1, '20260101', '20261231', 'Asia/Seoul')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_routes (
+      id, line_id, route_short_name, route_long_name, direction_name, timezone
+    ) VALUES
+      ('line4-up-1919', 'seoul-4', '4', '상록수 방면', '상록수 방면', 'Asia/Seoul'),
+      ('line4-down-1919', 'seoul-4', '4', '사당 방면', '사당 방면', 'Asia/Seoul')
+  ''');
+  await database.customStatement('''
+    INSERT INTO transit_trips (
+      id, route_id, service_id, trip_headsign, direction_id,
+      service_pattern, service_day_start_seconds
+    ) VALUES
+      ('weekday-up-1919', 'line4-up-1919', 'weekday-1919', '상록수', 'up', 'LOCAL', 0),
+      ('weekday-down-1919-a', 'line4-down-1919', 'weekday-1919', '사당', 'down', 'LOCAL', 0),
+      ('weekday-down-1919-b', 'line4-down-1919', 'weekday-1919', '사당', 'down', 'LOCAL', 0),
+      ('saturday-down-1919', 'line4-down-1919', 'saturday-1919', '사당', 'down', 'LOCAL', 0),
+      ('holiday-down-1919', 'line4-down-1919', 'holiday-1919', '사당', 'down', 'LOCAL', 0)
+  ''');
+  for (final row in <(String, int)>[
+    ('weekday-up-1919', 19500),
+    ('weekday-down-1919-a', 19200),
+    ('weekday-down-1919-b', 87900),
+    ('saturday-down-1919', 33120),
+    ('holiday-down-1919', 37800),
+  ]) {
+    await database.customStatement(
+      '''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds, pickup_type, drop_off_type
+      ) VALUES (?, 1, 'station-sadang', 'seoul-4', ?, ?, 0, 0)
+      ''',
+      [row.$1, row.$2, row.$2],
+    );
+  }
 }
