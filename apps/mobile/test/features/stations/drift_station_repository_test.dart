@@ -240,6 +240,7 @@ void main() {
       stationId: 'station-sadang',
       lineId: 'seoul-4',
       dayType: StationTimetableDayType.weekday,
+      referenceDate: DateTime(2026, 7, 12),
     );
 
     expect(timetable.isAvailable, isTrue);
@@ -271,16 +272,19 @@ void main() {
       stationId: 'station-sadang',
       lineId: 'seoul-4',
       dayType: StationTimetableDayType.saturday,
+      referenceDate: DateTime(2026, 7, 12),
     );
     final holiday = await repository.loadStationTimetable(
       stationId: 'station-sadang',
       lineId: 'seoul-4',
       dayType: StationTimetableDayType.sundayHoliday,
+      referenceDate: DateTime(2026, 7, 12),
     );
     final unavailable = await repository.loadStationTimetable(
       stationId: 'station-sangnoksu',
       lineId: 'seoul-4',
       dayType: StationTimetableDayType.weekday,
+      referenceDate: DateTime(2026, 7, 12),
     );
 
     expect(saturday.directions.single.departures.single.timeLabel, '09:12');
@@ -309,6 +313,46 @@ void main() {
 
     expect(timetable.dayType, StationTimetableDayType.sundayHoliday);
     expect(timetable.directions.single.departures.single.timeLabel, '10:30');
+  });
+
+  test('로컬 역 시간표는 Asia/Seoul service date로 요일을 선택한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    final repository = DriftStationRepository(database: database);
+
+    final timetable = await repository.loadStationTimetableForDate(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      date: DateTime.utc(2026, 7, 6, 15, 30),
+    );
+
+    expect(timetable.dayType, StationTimetableDayType.weekday);
+    expect(
+      timetable.directions
+          .singleWhere((direction) => direction.name == '사당 방면')
+          .firstDeparture
+          .timeLabel,
+      '05:20',
+    );
+  });
+
+  test('로컬 역 요일 시간표는 feed 만료 뒤 출발을 반환하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    final repository = DriftStationRepository(database: database);
+
+    final timetable = await repository.loadStationTimetable(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.weekday,
+      referenceDate: DateTime(2027, 1, 1),
+    );
+
+    expect(timetable.isAvailable, isFalse);
   });
 
   test('앱 기본 의존성은 catalog DB가 있으면 로컬 역 repository를 사용한다', () async {
@@ -354,6 +398,15 @@ void main() {
 }
 
 Future<void> _seedStationTimetable(CatalogDatabase database) async {
+  await database.customStatement('''
+    CREATE TABLE transit_feed_info (
+      id INTEGER PRIMARY KEY,
+      feed_end_date TEXT NOT NULL
+    )
+  ''');
+  await database.customStatement(
+    "INSERT INTO transit_feed_info (id, feed_end_date) VALUES (1, '20261231')",
+  );
   await database.customStatement('''
     INSERT INTO service_calendars (
       service_id, monday, tuesday, wednesday, thursday, friday,

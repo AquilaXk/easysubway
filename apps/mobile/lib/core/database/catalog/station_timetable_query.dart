@@ -1,4 +1,6 @@
 import 'package:drift/drift.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'catalog_database.dart';
 
@@ -34,8 +36,9 @@ class CatalogStationTimetableQuery {
     required String lineId,
     required DateTime date,
   }) async {
-    final dateKey = _dateKey(date);
-    final weekdayColumn = _weekdayColumn(date.weekday);
+    final serviceDate = tz.TZDateTime.from(date, _seoulLocation);
+    final dateKey = _dateKey(serviceDate);
+    final weekdayColumn = _weekdayColumn(serviceDate.weekday);
     final calendarRows = await database
         .customSelect(
           '''
@@ -86,7 +89,7 @@ class CatalogStationTimetableQuery {
       }
     }
     final dayType = _dayTypeForDate(
-      date,
+      serviceDate,
       weekdayColumn: weekdayColumn,
       addedServiceIds: addedServiceIds,
       calendarsById: calendarsById,
@@ -105,10 +108,14 @@ class CatalogStationTimetableQuery {
     required String stationId,
     required String lineId,
     CatalogTimetableDayType? dayType,
+    DateTime? referenceDate,
     Set<String>? serviceIds,
   }) async {
     if (serviceIds != null && serviceIds.isEmpty) {
       return const [];
+    }
+    if (dayType != null && referenceDate == null) {
+      throw ArgumentError.notNull('referenceDate');
     }
     final sortedServiceIds = serviceIds == null
         ? null
@@ -116,6 +123,9 @@ class CatalogStationTimetableQuery {
     final calendarJoin = dayType == null
         ? ''
         : 'JOIN service_calendars c ON c.service_id = t.service_id';
+    final referenceDateKey = dayType == null
+        ? null
+        : _dateKey(tz.TZDateTime.from(referenceDate!, _seoulLocation));
     final dayFilter = switch (dayType) {
       CatalogTimetableDayType.weekday =>
         'AND (c.monday = 1 OR c.tuesday = 1 OR c.wednesday = 1 '
@@ -124,6 +134,17 @@ class CatalogStationTimetableQuery {
       CatalogTimetableDayType.sundayHoliday => 'AND c.sunday = 1',
       null => '',
     };
+    final validityFilter = dayType == null
+        ? ''
+        : '''
+            AND c.start_date <= ?
+            AND c.end_date >= ?
+            AND EXISTS (
+              SELECT 1
+              FROM transit_feed_info feed
+              WHERE feed.feed_end_date >= ?
+            )
+          ''';
     final serviceFilter = sortedServiceIds == null
         ? ''
         : 'AND t.service_id IN '
@@ -142,12 +163,18 @@ class CatalogStationTimetableQuery {
             AND r.line_id = st.line_id
             AND TRIM(r.direction_name) <> ''
             $dayFilter
+            $validityFilter
             $serviceFilter
           ORDER BY r.direction_name, st.departure_seconds
           ''',
           variables: [
             Variable.withString(stationId),
             Variable.withString(lineId),
+            if (referenceDateKey != null) ...[
+              Variable.withString(referenceDateKey),
+              Variable.withString(referenceDateKey),
+              Variable.withString(referenceDateKey),
+            ],
             ...?sortedServiceIds?.map(Variable.withString),
           ],
         )
@@ -203,3 +230,10 @@ String _dateKey(DateTime date) {
 }
 
 bool _isEnabled(Object? value) => value == true || value == 1;
+
+final tz.Location _seoulLocation = _loadSeoulLocation();
+
+tz.Location _loadSeoulLocation() {
+  tz_data.initializeTimeZones();
+  return tz.getLocation('Asia/Seoul');
+}

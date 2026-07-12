@@ -103,6 +103,7 @@ abstract class StationTimetableRepository {
     required String stationId,
     required String lineId,
     required StationTimetableDayType dayType,
+    required DateTime referenceDate,
   });
 
   Future<StationTimetable> loadStationTimetableForDate({
@@ -3044,13 +3045,14 @@ class _StationTimetableScreenState extends State<StationTimetableScreen> {
   void initState() {
     super.initState();
     _lineId = widget.lines.firstOrNull?.id;
-    _dayType = _todayTimetableDayType(debugStationVerifiedClock());
+    final now = debugStationVerifiedClock();
+    _dayType = _todayTimetableDayType(now);
     if (widget.repository != null && _lineId != null) {
-      unawaited(_load(date: debugStationVerifiedClock()));
+      unawaited(_load(date: now, findCoverage: true));
     }
   }
 
-  Future<void> _load({DateTime? date}) async {
+  Future<void> _load({DateTime? date, bool findCoverage = false}) async {
     final repository = widget.repository;
     final lineId = _lineId;
     if (repository == null || lineId == null) {
@@ -3059,11 +3061,19 @@ class _StationTimetableScreenState extends State<StationTimetableScreen> {
     final requestId = ++_requestId;
     setState(() => _loading = true);
     try {
-      final timetable = date == null
+      final timetable = findCoverage
+          ? await _loadFirstAvailableStationTimetable(
+              stationId: widget.stationId,
+              lines: widget.lines,
+              repository: repository,
+              date: date!,
+            )
+          : date == null
           ? await repository.loadStationTimetable(
               stationId: widget.stationId,
               lineId: lineId,
               dayType: _dayType,
+              referenceDate: debugStationVerifiedClock(),
             )
           : await repository.loadStationTimetableForDate(
               stationId: widget.stationId,
@@ -3073,11 +3083,16 @@ class _StationTimetableScreenState extends State<StationTimetableScreen> {
       if (!mounted || requestId != _requestId) {
         return;
       }
+      if (timetable == null) {
+        setState(() => _loading = false);
+        return;
+      }
       final directionNames = timetable.directions
           .map((direction) => direction.name)
           .toSet();
       setState(() {
         _timetable = timetable;
+        _lineId = timetable.lineId;
         _dayType = timetable.dayType;
         _directionName = directionNames.contains(_directionName)
             ? _directionName
@@ -3211,6 +3226,27 @@ StationTimetableDayType _todayTimetableDayType(DateTime now) {
     DateTime.sunday => StationTimetableDayType.sundayHoliday,
     _ => StationTimetableDayType.weekday,
   };
+}
+
+Future<StationTimetable?> _loadFirstAvailableStationTimetable({
+  required String stationId,
+  required List<StationSearchLine> lines,
+  required StationTimetableRepository repository,
+  required DateTime date,
+}) async {
+  StationTimetable? firstResult;
+  for (final line in lines) {
+    final timetable = await repository.loadStationTimetableForDate(
+      stationId: stationId,
+      lineId: line.id,
+      date: date,
+    );
+    firstResult ??= timetable;
+    if (timetable.isAvailable) {
+      return timetable;
+    }
+  }
+  return firstResult;
 }
 
 class _StationDetailScreenState extends State<StationDetailScreen> {
@@ -3603,23 +3639,23 @@ class _StationTimetableEntryState extends State<_StationTimetableEntry> {
   void initState() {
     super.initState();
     final repository = widget.repository;
-    final line = widget.detail.lines.firstOrNull;
-    if (repository != null && line != null) {
-      unawaited(_load(repository, line.id));
+    if (repository != null && widget.detail.lines.isNotEmpty) {
+      unawaited(_load(repository, widget.detail.lines));
     }
   }
 
   Future<void> _load(
     StationTimetableRepository repository,
-    String lineId,
+    List<StationSearchLine> lines,
   ) async {
     try {
-      final timetable = await repository.loadStationTimetableForDate(
+      final timetable = await _loadFirstAvailableStationTimetable(
         stationId: widget.detail.id,
-        lineId: lineId,
+        lines: lines,
+        repository: repository,
         date: debugStationVerifiedClock(),
       );
-      if (mounted) {
+      if (mounted && timetable != null) {
         setState(() => _timetable = timetable);
       }
     } catch (error, stackTrace) {

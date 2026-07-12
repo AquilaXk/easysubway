@@ -41,6 +41,7 @@ class DriftStationRepository
     required String stationId,
     required String lineId,
     required StationTimetableDayType dayType,
+    required DateTime referenceDate,
   }) async {
     final catalogDayType = switch (dayType) {
       StationTimetableDayType.weekday => CatalogTimetableDayType.weekday,
@@ -52,6 +53,7 @@ class DriftStationRepository
       stationId: stationId,
       lineId: lineId,
       dayType: catalogDayType,
+      referenceDate: referenceDate,
     );
     return _stationTimetable(
       stationId: stationId,

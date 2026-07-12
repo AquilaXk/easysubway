@@ -9035,6 +9035,74 @@ void main() {
     expect(find.textContaining('임시'), findsNothing);
   });
 
+  testWidgets('환승역 시간표는 coverage가 있는 첫 노선을 기본 선택한다', (tester) async {
+    debugStationVerifiedClock = () => DateTime(2026, 7, 6);
+    const lines = [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '226',
+      ),
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '433',
+      ),
+    ];
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(
+        id: 'station-sadang',
+        name: '사당',
+        lines: lines,
+      ),
+      timetableLineId: 'seoul-4',
+      timetables: {
+        StationTimetableDayType.weekday: _stationTimetable(
+          StationTimetableDayType.weekday,
+          stationId: 'station-sadang',
+          lineId: 'seoul-4',
+          directions: const [
+            StationTimetableDirection(
+              name: '상록수 방면',
+              departures: [
+                StationTimetableDeparture(
+                  directionName: '상록수 방면',
+                  seconds: 19500,
+                ),
+              ],
+            ),
+          ],
+        ),
+      },
+    );
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationDetailScreen(
+            repository: repository,
+            reportRepository: FakeFacilityReportRepository(),
+            stationId: 'station-sadang',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('상록수 방면 · 첫차 05:25 · 막차 05:25'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('stationTimetableButton')));
+      await tester.pumpAndSettle();
+
+      final selectedLine = tester.widget<ChoiceChip>(
+        find.byKey(const Key('stationTimetableLine-seoul-4')),
+      );
+      expect(selectedLine.selected, isTrue);
+    } finally {
+      debugStationVerifiedClock = DateTime.now;
+    }
+  });
+
   testWidgets('역 상세는 좌표 있는 출구에만 카카오맵 버튼을 보여준다', (tester) async {
     debugStationVerifiedClock = () => DateTime(2026, 7, 9);
     final semanticsHandle = tester.ensureSemantics();
@@ -14893,9 +14961,11 @@ class FakeTimetableStationRepository extends FakeStationSearchRepository
   FakeTimetableStationRepository({
     required super.stationDetail,
     required this.timetables,
+    this.timetableLineId = 'seoul-2',
   });
 
   final Map<StationTimetableDayType, StationTimetable> timetables;
+  final String timetableLineId;
   final requestedDayTypes = <StationTimetableDayType>[];
 
   @override
@@ -14903,8 +14973,17 @@ class FakeTimetableStationRepository extends FakeStationSearchRepository
     required String stationId,
     required String lineId,
     required StationTimetableDayType dayType,
+    required DateTime referenceDate,
   }) async {
     requestedDayTypes.add(dayType);
+    if (lineId != timetableLineId) {
+      return StationTimetable(
+        stationId: stationId,
+        lineId: lineId,
+        dayType: dayType,
+        directions: const [],
+      );
+    }
     return timetables[dayType] ??
         StationTimetable(
           stationId: stationId,
@@ -14929,6 +15008,7 @@ class FakeTimetableStationRepository extends FakeStationSearchRepository
       stationId: stationId,
       lineId: lineId,
       dayType: dayType,
+      referenceDate: date,
     );
   }
 }
@@ -15893,6 +15973,7 @@ StationDetail _stationDetail({
   required String name,
   double? latitude,
   double? longitude,
+  List<StationSearchLine>? lines,
 }) {
   return StationDetail(
     id: id,
@@ -15904,24 +15985,28 @@ StationDetail _stationDetail({
     dataQualityLevel: 'LEVEL_1',
     dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
-    lines: const [
-      StationSearchLine(
-        id: 'seoul-2',
-        name: '수도권 2호선',
-        color: '#00A84D',
-        stationCode: '222',
-      ),
-    ],
+    lines:
+        lines ??
+        const [
+          StationSearchLine(
+            id: 'seoul-2',
+            name: '수도권 2호선',
+            color: '#00A84D',
+            stationCode: '222',
+          ),
+        ],
   );
 }
 
 StationTimetable _stationTimetable(
   StationTimetableDayType dayType, {
   required List<StationTimetableDirection> directions,
+  String stationId = 'station-sangnoksu',
+  String lineId = 'seoul-2',
 }) {
   return StationTimetable(
-    stationId: 'station-sangnoksu',
-    lineId: 'seoul-2',
+    stationId: stationId,
+    lineId: lineId,
     dayType: dayType,
     directions: directions,
   );
