@@ -762,8 +762,7 @@ class StationCarDoorHints extends Table {
   TextColumn get id => text()();
   TextColumn get stationId => text().named('station_id')();
   TextColumn get lineId => text().named('line_id')();
-  TextColumn get direction =>
-      text().withDefault(const Constant(''))();
+  TextColumn get direction => text().withDefault(const Constant(''))();
   TextColumn get targetFacilityType => text().named('target_facility_type')();
   IntColumn get carNumber => integer().named('car_number')();
   IntColumn get doorNumber => integer().named('door_number')();
@@ -785,4 +784,12 @@ class StationCarDoorHints extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'CHECK (car_number >= 1 AND car_number <= 10)',
+    'CHECK (door_number >= 1 AND door_number <= 4)',
+    "CHECK (target_facility_type IN ('STAIR', 'ELEVATOR', 'ESCALATOR', 'TRANSFER'))",
+    'FOREIGN KEY (station_id, line_id) REFERENCES station_lines(station_id, line_id)',
+  ];
 }

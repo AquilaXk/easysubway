@@ -107,3 +107,25 @@ test("역명 매칭 실패 → quarantine", () => {
   assert.equal(result.stationCarDoorHints.length, 0);
   assert.match(result.quarantine[0].reason, /station roster match failed/);
 });
+
+test("같은 위치라도 provider 관리번호가 다르면 서로 다른 안정 ID를 만든다", () => {
+  const rows = [
+    carDoorRow({ qckgffMngNo: "quick-1", facNo: "facility-1" }),
+    carDoorRow({ qckgffMngNo: "quick-2", facNo: "facility-2" }),
+  ];
+  const first = buildCarDoorHints({ roster, rows });
+  const second = buildCarDoorHints({ roster, rows });
+  assert.equal(first.stationCarDoorHints.length, 2);
+  assert.notEqual(first.stationCarDoorHints[0].id, first.stationCarDoorHints[1].id);
+  assert.deepEqual(
+    first.stationCarDoorHints.map((hint) => hint.id),
+    second.stationCarDoorHints.map((hint) => hint.id),
+  );
+});
+
+test("provider 관리번호가 없는 동일 semantic row는 첫 행만 유지하고 중복을 보고한다", () => {
+  const result = buildCarDoorHints({ roster, rows: [carDoorRow(), carDoorRow({ crtrYmd: "20260102" })] });
+  assert.equal(result.stationCarDoorHints.length, 1);
+  assert.equal(result.duplicateReport.length, 1);
+  assert.equal(result.duplicateReport[0].id, result.stationCarDoorHints[0].id);
+});

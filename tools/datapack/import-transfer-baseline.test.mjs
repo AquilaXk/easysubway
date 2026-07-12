@@ -143,22 +143,78 @@ test("pathway edge 이미 있는 역 → baseline edge 생성 안 함", () => {
   assert.equal(result.transferRules[0].pathwayEdgeId, null);
 });
 
-test("pathway edge 없는 역 → OFFICIAL_BASELINE edge 생성 + rule 연결", () => {
+test("pathway edge 없는 역 → 검증 가능한 OFFICIAL_SOURCE 단방향 edge 생성 + rule 연결", () => {
   const existingNodes = [
     { id: "sadang:line-2:PLATFORM", stationId: "sadang", lineId: "line-2", nodeType: "PLATFORM" },
     { id: "sadang:line-4:PLATFORM", stationId: "sadang", lineId: "line-4", nodeType: "PLATFORM" },
   ];
-  const result = buildTransferBaseline({ roster, rows: [transferRow()], existingEdges: [], existingNodes });
+  const result = buildTransferBaseline({
+    roster,
+    rows: [transferRow()],
+    existingEdges: [],
+    existingNodes,
+    verifiedAt: "2026-07-12T00:00:00.000Z",
+    evidenceHash: "a".repeat(64),
+  });
   assert.equal(result.stationPathwayEdges.length, 1);
   const edge = result.stationPathwayEdges[0];
-  assert.equal(edge.provenanceKind, "OFFICIAL_BASELINE");
+  assert.equal(edge.provenanceKind, "OFFICIAL_SOURCE");
   assert.equal(edge.edgeType, "WALK");
   assert.equal(edge.durationSeconds, 180);
   assert.equal(edge.distanceMeters, 120);
-  assert.equal(edge.bidirectional, 1);
+  assert.equal(edge.bidirectional, false);
+  assert.equal(edge.verificationStatus, "VERIFIED");
+  assert.equal(edge.verifiedAt, "2026-07-12T00:00:00.000Z");
+  assert.equal(edge.evidenceHash, "a".repeat(64));
   assert.equal(edge.fromNodeId, "sadang:line-2:PLATFORM");
   assert.equal(edge.toNodeId, "sadang:line-4:PLATFORM");
   assert.equal(result.transferRules[0].pathwayEdgeId, edge.id);
+});
+
+test("서로 다른 방향 row는 각각 단방향 pathway edge로 보존한다", () => {
+  const result = buildTransferBaseline({
+    roster,
+    rows: [transferRow(), transferRow({ 호선: "4호선", 환승노선: "2호선", 환승소요시간: 200 })],
+    existingNodes: sadangPlatformNodes,
+  });
+  assert.equal(result.stationPathwayEdges.length, 2);
+  assert.deepEqual(
+    result.stationPathwayEdges.map((edge) => [edge.fromNodeId, edge.toNodeId, edge.bidirectional]),
+    [
+      ["sadang:line-2:PLATFORM", "sadang:line-4:PLATFORM", false],
+      ["sadang:line-4:PLATFORM", "sadang:line-2:PLATFORM", false],
+    ],
+  );
+});
+
+test("임의 node ID를 쓰는 기존 edge도 node roster로 endpoint를 찾아 중복 생성하지 않는다", () => {
+  const existingNodes = [
+    { id: "platform-a", stationId: "sadang", lineId: "line-2", nodeType: "PLATFORM" },
+    { id: "platform-b", stationId: "sadang", lineId: "line-4", nodeType: "PLATFORM" },
+  ];
+  const result = buildTransferBaseline({
+    roster,
+    rows: [transferRow()],
+    existingNodes,
+    existingEdges: [{ fromNodeId: "platform-a", toNodeId: "platform-b" }],
+  });
+  assert.equal(result.stationPathwayEdges.length, 0);
+  assert.equal(result.transferRules[0].pathwayEdgeId, null);
+});
+
+test("중복 row는 방향쌍 리포트의 첫 적재값을 덮어쓰지 않는다", () => {
+  const result = buildTransferBaseline({
+    roster,
+    rows: [
+      transferRow({ 환승소요시간: 180 }),
+      transferRow({ 환승소요시간: 240 }),
+      transferRow({ 호선: "4호선", 환승노선: "2호선", 환승소요시간: 180 }),
+    ],
+  });
+  const pair = result.directionPairReport.find((row) => row.stationId === "sadang");
+  assert.equal(pair.forwardMinTransferSeconds, 180);
+  assert.equal(pair.reverseMinTransferSeconds, 180);
+  assert.equal(pair.secondsMismatch, false);
 });
 
 test("PLATFORM 노드 없는 역 → pathway edge quarantine, edge 미생성", () => {

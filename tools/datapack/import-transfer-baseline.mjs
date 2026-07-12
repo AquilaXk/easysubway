@@ -8,13 +8,14 @@
 //
 // transfer_rules는 같은 역 내부 환승이므로 from_station_id = to_station_id 이며
 // from_line_id=호선, to_line_id=환승노선이다. 환승소요시간은 공식값이므로 대응
-// station_pathway_edge는 provenance_kind='OFFICIAL_BASELINE'. 산정기준 1.2 m/s를
-// metadata에 문자열로 기록한다.
+// station_pathway_edge의 시간 source는 OFFICIAL_BASELINE이며 provenance_kind는
+// OFFICIAL_SOURCE다. 산정기준 1.2 m/s를 metadata에 문자열로 기록한다.
 //
 // 사용: node tools/datapack/import-transfer-baseline.mjs \
 //   --roster <roster.json> --rows <rows.json> \
 //   [--pathway-edges <edges.json>] [--pathway-nodes <nodes.json>] \
 //   [--source-id <id>] [--snapshot-id <id>] [--verification-status <status>] \
+//   [--verified-at <ISO-8601>] [--evidence-hash <sha256>] \
 //   --output <out.json>
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -42,7 +43,9 @@ async function main() {
     existingNodes,
     sourceId: args["source-id"] ?? "",
     snapshotId: args["snapshot-id"] ?? "",
-    verificationStatus: args["verification-status"] ?? "OFFICIAL",
+    verificationStatus: args["verification-status"] ?? "VERIFIED",
+    verifiedAt: args["verified-at"] ?? "",
+    evidenceHash: args["evidence-hash"] ?? "",
   });
 
   await mkdir(path.dirname(outputPath), { recursive: true });
@@ -61,11 +64,13 @@ export function buildTransferBaseline({
   existingNodes = [],
   sourceId = "",
   snapshotId = "",
-  verificationStatus = "OFFICIAL",
+  verificationStatus = "VERIFIED",
+  verifiedAt = "",
+  evidenceHash = "",
 }) {
   const index = buildRosterIndex(roster);
   const platformNodesByStationLine = platformNodeIndex(existingNodes);
-  const existingEdgePairs = existingEdgePairKeys(existingEdges);
+  const existingEdgePairs = existingEdgePairKeys(existingEdges, existingNodes);
 
   const transferRules = [];
   const stationPathwayNodes = [];
@@ -87,13 +92,6 @@ export function buildTransferBaseline({
     const providerRecordHash = sha256(canonicalJson(raw));
     const ruleKey = `${stationId}:${fromLineId}:${toLineId}`;
 
-    directionRecords.set(ruleKey, {
-      stationId,
-      fromLineId,
-      toLineId,
-      minTransferSeconds: transferSeconds,
-    });
-
     if (seenRuleKeys.has(ruleKey)) {
       duplicateReport.push({
         ruleKey,
@@ -106,6 +104,12 @@ export function buildTransferBaseline({
       continue;
     }
     seenRuleKeys.set(ruleKey, transferSeconds);
+    directionRecords.set(ruleKey, {
+      stationId,
+      fromLineId,
+      toLineId,
+      minTransferSeconds: transferSeconds,
+    });
 
     const pathwayEdgeId = appendBaselineEdge({
       existingEdgePairs,
@@ -118,6 +122,8 @@ export function buildTransferBaseline({
       snapshotId,
       providerRecordHash,
       verificationStatus,
+      verifiedAt,
+      evidenceHash,
     });
 
     transferRules.push({
@@ -176,6 +182,8 @@ function appendBaselineEdge({
   snapshotId,
   providerRecordHash,
   verificationStatus,
+  verifiedAt,
+  evidenceHash,
 }) {
   const { stationId, fromLineId, toLineId, distanceMeters, transferSeconds } = record;
   if (existingEdgePairs.has(pathwayEdgePairKey(stationId, fromLineId, toLineId))) return null;
@@ -198,12 +206,14 @@ function appendBaselineEdge({
     edgeType: "WALK",
     durationSeconds: transferSeconds,
     distanceMeters,
-    bidirectional: 1,
+    bidirectional: false,
     sourceId,
     sourceSnapshotId: snapshotId,
     providerRecordHash,
-    provenanceKind: "OFFICIAL_BASELINE",
+    provenanceKind: "OFFICIAL_SOURCE",
     verificationStatus,
+    verifiedAt,
+    evidenceHash,
   });
   return id;
 }
@@ -292,12 +302,22 @@ function platformNodeIndex(nodes) {
 
 // 기존 station_pathway_edges에서 (station, fromLine, toLine) 방향 무관 쌍 키를 뽑는다.
 // node id는 stationId:lineId... 형식을 가정하되, 없으면 명시적 stationId/lineId를 쓴다.
-function existingEdgePairKeys(edges) {
+function existingEdgePairKeys(edges, nodes) {
   const pairs = new Set();
+  const endpointsByNodeId = new Map();
+  for (const node of nodes) {
+    const id = node?.id;
+    const stationId = node?.stationId ?? node?.station_id;
+    const lineId = node?.lineId ?? node?.line_id;
+    if (id && stationId && lineId) endpointsByNodeId.set(id, { stationId, lineId });
+  }
   for (const edge of edges) {
     if (!edge || typeof edge !== "object") continue;
-    const from = pathwayEndpointStationLine(edge.fromNodeId ?? edge.from_node_id, edge.fromStationId, edge.fromLineId);
-    const to = pathwayEndpointStationLine(edge.toNodeId ?? edge.to_node_id, edge.toStationId, edge.toLineId);
+    const fromNodeId = edge.fromNodeId ?? edge.from_node_id;
+    const toNodeId = edge.toNodeId ?? edge.to_node_id;
+    const from =
+      endpointsByNodeId.get(fromNodeId) ?? pathwayEndpointStationLine(fromNodeId, edge.fromStationId, edge.fromLineId);
+    const to = endpointsByNodeId.get(toNodeId) ?? pathwayEndpointStationLine(toNodeId, edge.toStationId, edge.toLineId);
     if (!from || !to) continue;
     if (from.stationId !== to.stationId) continue;
     pairs.add(pathwayEdgePairKey(from.stationId, from.lineId, to.lineId));

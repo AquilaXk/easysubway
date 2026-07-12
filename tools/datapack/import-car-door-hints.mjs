@@ -65,20 +65,26 @@ async function main() {
 
 /**
  * 순수 함수: 빠른하차 raw rows + roster → 정규화 산출.
- * 반환: { stationCarDoorHints, quarantine }.
+ * 반환: { stationCarDoorHints, quarantine, duplicateReport }.
  */
 export function buildCarDoorHints({ roster, rows, sourceId = "", snapshotId = "", verificationStatus = "OFFICIAL" }) {
   const index = buildRosterIndex(roster);
   const stationCarDoorHints = [];
   const quarantine = [];
+  const duplicateReport = [];
+  const seenIds = new Set();
 
   for (const raw of rows) {
     const result = normalizeCarDoorHint(index, raw, { sourceId, snapshotId, verificationStatus });
     if (result.error) quarantine.push({ reason: result.error, row: raw });
-    else stationCarDoorHints.push(result.hint);
+    else if (seenIds.has(result.hint.id)) duplicateReport.push({ id: result.hint.id, row: raw });
+    else {
+      seenIds.add(result.hint.id);
+      stationCarDoorHints.push(result.hint);
+    }
   }
 
-  return { stationCarDoorHints, quarantine };
+  return { stationCarDoorHints, quarantine, duplicateReport };
 }
 
 function normalizeCarDoorHint(index, raw, provenance) {
@@ -102,10 +108,14 @@ function normalizeCarDoorHint(index, raw, provenance) {
   if (direction.error) return direction;
   const facility = mapFacilityType(raw.plfmCmgFac, raw.facPstnNm);
   if (facility.error) return facility;
+  const providerIdentity = [raw.qckgffMngNo, raw.facNo]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  const providerIdentitySuffix = providerIdentity.length > 0 ? `-${sha256(canonicalJson(providerIdentity))}` : "";
 
   return {
     hint: {
-      id: `cardoor-${stationMatch.stationId}-${lineMatch.lineId}-${direction.direction}-${facility.type}-${carDoor.carNumber}-${carDoor.doorNumber}`,
+      id: `cardoor-${stationMatch.stationId}-${lineMatch.lineId}-${direction.direction}-${facility.type}-${carDoor.carNumber}-${carDoor.doorNumber}${providerIdentitySuffix}`,
       stationId: stationMatch.stationId,
       lineId: lineMatch.lineId,
       direction: direction.direction,
