@@ -7527,6 +7527,7 @@ test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 �
     "providerTermsOrQuotaApproval",
     "rawObjectUri",
   ]);
+  assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
   assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*airport rail.*GTX.*light rail.*production inventory admission/);
 });
 
