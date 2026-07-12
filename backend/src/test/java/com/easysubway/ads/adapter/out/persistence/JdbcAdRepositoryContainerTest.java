@@ -8,10 +8,12 @@ import com.easysubway.ads.domain.AdEventType;
 import com.easysubway.common.error.InvalidRequestException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -206,8 +208,18 @@ class JdbcAdRepositoryContainerTest {
 	}
 
 	@Test
-	@DisplayName("동시 event UPSERT도 composite key count를 cap 이상으로 올리지 않는다")
-	void concurrentEventsStopExactlyAtCap() throws Exception {
+	@DisplayName("absent-row 동시 event UPSERT는 예외 없이 cap에 정확히 도달한다")
+	void concurrentEventsFromAbsentRowStopExactlyAtCap() throws Exception {
+		assertConcurrentEventsStopExactlyAtCap(false);
+	}
+
+	@Test
+	@DisplayName("cap-1 동시 event UPSERT는 예외 없이 cap에 정확히 도달한다")
+	void concurrentEventsFromCapMinusOneStopExactlyAtCap() throws Exception {
+		assertConcurrentEventsStopExactlyAtCap(true);
+	}
+
+	private void assertConcurrentEventsStopExactlyAtCap(boolean seedToCapMinusOne) throws Exception {
 		int cap = 5;
 		int workers = 8;
 		var dataSource = migratedDataSource();
@@ -220,14 +232,17 @@ class JdbcAdRepositoryContainerTest {
 			""");
 		repository.save(creative("capped-event", "광고주", startsAt, startsAt.plusDays(1), true));
 		LocalDate eventDate = LocalDate.of(2026, 7, 12);
-		for (int count = 1; count < cap; count++) {
-			repository.incrementEvent(
-				"route-result-bottom", "capped-event", AdEventType.IMPRESSION, eventDate);
+		if (seedToCapMinusOne) {
+			for (int count = 1; count < cap; count++) {
+				repository.incrementEvent(
+					"route-result-bottom", "capped-event", AdEventType.IMPRESSION, eventDate);
+			}
 		}
 
 		var ready = new CountDownLatch(workers);
 		var start = new CountDownLatch(1);
 		var executor = Executors.newFixedThreadPool(workers);
+		var failures = new ArrayList<Throwable>();
 		try {
 			var futures = java.util.stream.IntStream.range(0, workers)
 				.mapToObj(ignored -> executor.submit(() -> {
@@ -243,7 +258,11 @@ class JdbcAdRepositoryContainerTest {
 			assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
 			start.countDown();
 			for (var future : futures) {
-				future.get(5, TimeUnit.SECONDS);
+				try {
+					future.get(5, TimeUnit.SECONDS);
+				} catch (ExecutionException exception) {
+					failures.add(exception.getCause());
+				}
 			}
 		} finally {
 			start.countDown();
@@ -251,6 +270,7 @@ class JdbcAdRepositoryContainerTest {
 			assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
 		}
 
+		assertThat(failures).isEmpty();
 		assertThat(jdbcTemplate.queryForObject(
 			"SELECT event_count FROM ad_event_daily WHERE event_date = ? AND creative_id = ?",
 			Integer.class,
