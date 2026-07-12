@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { compareStrings } from "./lib/ledger-admission-cli.mjs";
 
 // 게시 범위(capital pilot)의 domain/field 계약 정본. --release-scope 평가는 이 targets로 in-scope gap을 판정한다.
 const DEFAULT_RELEASE_SCOPE_TARGETS = "tools/datapack/capital-pilot-coverage-targets.json";
@@ -105,9 +106,9 @@ function buildCoverageGapReport(targets, inventory, provenance = null, releaseSc
     summary.releaseScope = {
       scopeId: scopeFilter.scopeId,
       targetVersion: pilotTargets.targetVersion,
-      regionIds: [...scopeFilter.regionIds].sort(),
-      operatorIds: [...scopeFilter.operatorIds].sort(),
-      sourceDomains: [...new Set(scopeRequirements.map((entry) => entry.sourceDomain))].sort(),
+      regionIds: [...scopeFilter.regionIds].sort(compareStrings),
+      operatorIds: [...scopeFilter.operatorIds].sort(compareStrings),
+      sourceDomains: [...new Set(scopeRequirements.map((entry) => entry.sourceDomain))].sort(compareStrings),
       totalRequirements: inScopeTotal,
       coveredRequirements: inScopeCovered,
       missingRequirements: inScopeMissing,
