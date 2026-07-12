@@ -26,15 +26,15 @@ function buildKricRouteGraphCollectionPlan(candidatesDocument, candidateIds = DE
 function planRequest(candidate, priority) {
   requireCandidateState(candidate);
   const evidence = candidate.evidence ?? {};
-  const plannedSampleFormat = "json";
   const validatedLiveSampleFormat = candidate.sampleEvidenceStatus === "validated_live_sample"
     ? requiredLiveSampleFormat(evidence.liveSampleFormat, candidate.id)
     : null;
+  const plannedSampleFormat = validatedLiveSampleFormat ?? "json";
   const documentedSampleUrl = requiredText(evidence.sampleUrl, `${candidate.id}.evidence.sampleUrl`);
   assertRedactedServiceKey(documentedSampleUrl, candidate.id);
-  const sampleUrl = forceJsonFormat(documentedSampleUrl);
-  if (!(evidence.formats ?? []).some((format) => String(format).toLowerCase() === "json")) {
-    throw new Error(`${candidate.id} must support JSON sample collection`);
+  const sampleUrl = forceFormat(documentedSampleUrl, plannedSampleFormat);
+  if (!(evidence.formats ?? []).some((format) => String(format).toLowerCase() === plannedSampleFormat)) {
+    throw new Error(`${candidate.id} must support ${plannedSampleFormat.toUpperCase()} sample collection`);
   }
   return {
     priority,
@@ -47,9 +47,7 @@ function planRequest(candidate, priority) {
     sampleEvidenceStatus: candidate.sampleEvidenceStatus,
     plannedSampleFormat,
     validatedLiveSampleFormat,
-    sampleAcquisitionRequired:
-      candidate.sampleEvidenceStatus === "sample_url_documented_key_required"
-      || validatedLiveSampleFormat !== plannedSampleFormat,
+    sampleAcquisitionRequired: candidate.sampleEvidenceStatus === "sample_url_documented_key_required",
     remainingAdmissionBlockers: [...(evidence.missingEvidence ?? [])],
     productionUseAllowed: false,
     automaticRouteGraphEdgeAllowed: false,
@@ -92,7 +90,7 @@ function requireCandidateState(candidate) {
   }
 }
 
-function forceJsonFormat(sampleUrl) {
+function forceFormat(sampleUrl, format) {
   const url = new URL(sampleUrl);
   for (const name of [...url.searchParams.keys()]) {
     if (["servicekey", "format"].includes(name.toLowerCase())) {
@@ -100,7 +98,7 @@ function forceJsonFormat(sampleUrl) {
     }
   }
   url.searchParams.set("serviceKey", "[서비스키값]");
-  url.searchParams.set("format", "json");
+  url.searchParams.set("format", format);
   return url.toString().replace("serviceKey=%5B%EC%84%9C%EB%B9%84%EC%8A%A4%ED%82%A4%EA%B0%92%5D", "serviceKey=[서비스키값]");
 }
 

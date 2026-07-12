@@ -6445,7 +6445,7 @@ test("source candidate sample 검증기는 KRIC live evidence metadata를 허용
   assert.match(stdout, /source candidate sample evidence valid: kric-subway-route-info/);
 });
 
-test("KRIC route graph 수집 계획은 XML live evidence와 JSON planned request를 구분해 재취득을 요구한다", async () => {
+test("KRIC route graph 수집 계획은 검증된 XML live sample을 재취득 없이 그대로 계획한다", async () => {
   const { stdout } = await execFileAsync(
     process.execPath,
     [
@@ -6470,11 +6470,11 @@ test("KRIC route graph 수집 계획은 XML live evidence와 JSON planned reques
     );
     assert.deepEqual(serviceKeyEntries, [["serviceKey", "[서비스키값]"]]);
     assert.match(request.url, /[?&]serviceKey=\[서비스키값\](?:&|$)/);
-    assert.equal(url.searchParams.get("format"), "json");
+    assert.equal(url.searchParams.get("format"), "xml");
     assert.equal(request.sampleEvidenceStatus, "validated_live_sample");
-    assert.equal(request.plannedSampleFormat, "json");
+    assert.equal(request.plannedSampleFormat, "xml");
     assert.equal(request.validatedLiveSampleFormat, "xml");
-    assert.equal(request.sampleAcquisitionRequired, true);
+    assert.equal(request.sampleAcquisitionRequired, false);
     assert.equal("remainingAdmissionBlocker" in request, false);
     assert.equal(request.productionUseAllowed, false);
     assert.equal(request.automaticRouteGraphEdgeAllowed, false);
@@ -6571,7 +6571,7 @@ test("KRIC route graph 수집 계획은 live sample format 누락 또는 미지�
   await assert.rejects(runPlanner(), /liveSampleFormat must be JSON or XML/);
 });
 
-test("KRIC route graph 수집 계획은 case-insensitive format 변형을 canonical format=json 하나로 정규화한다", async () => {
+test("KRIC route graph 수집 계획은 case-insensitive format 변형을 validated XML format 하나로 정규화한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-kric-plan-format-${Date.now()}`);
   const candidatesPath = path.join(outputDir, "source-candidates.json");
   await rm(outputDir, { recursive: true, force: true });
@@ -6600,8 +6600,8 @@ test("KRIC route graph 수집 계획은 case-insensitive format 변형을 canoni
     ([name]) => name.toLowerCase() === "format",
   );
 
-  assert.deepEqual(formatEntries, [["format", "json"]]);
-  assert.match(request.url, /[?&]format=json(?:&|$)/);
+  assert.deepEqual(formatEntries, [["format", "xml"]]);
+  assert.match(request.url, /[?&]format=xml(?:&|$)/);
 });
 
 test("KRIC route graph 수집 계획은 admitted 또는 production/automatic edge가 열린 후보를 거부한다", async () => {
