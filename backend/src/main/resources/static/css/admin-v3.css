@@ -1935,6 +1935,7 @@ body.admin-v3 {
 	font-weight: var(--admin-w-strong);
 }
 
+.batch-history-charts,
 .trend-charts {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -1942,30 +1943,14 @@ body.admin-v3 {
 	margin-bottom: 20px;
 }
 
+.batch-history-canvas-wrap,
 .trend-canvas-wrap {
 	position: relative;
 	height: 240px;
 }
 
+.batch-history-canvas,
 .trend-canvas {
-	width: 100%;
-	height: 100%;
-}
-
-/* 배치 실행 이력 차트(#1742) — 추이 패널과 동일한 그리드·캔버스 높이 규격(#1983 정합). */
-.batch-history-charts {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-	gap: 16px;
-	margin-bottom: 20px;
-}
-
-.batch-history-canvas-wrap {
-	position: relative;
-	height: 240px;
-}
-
-.batch-history-canvas {
 	width: 100%;
 	height: 100%;
 }

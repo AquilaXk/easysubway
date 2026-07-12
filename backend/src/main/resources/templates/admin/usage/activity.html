@@ -84,9 +84,9 @@
 		</section>
 
 		<div class="trend-charts">
-			<section class="admin-panel trend-chart-panel">
+			<section class="admin-panel trend-chart-panel" aria-labelledby="usage-trend-panel-title">
 				<div class="admin-panel-head">
-					<h2 th:text="|활성 사용자·API 오류율 최근 ${trendDays}일 추이|">활성 사용자·API 오류율 추이</h2>
+					<h2 id="usage-trend-panel-title" th:text="|활성 사용자·API 오류율 최근 ${trendDays}일 추이|">활성 사용자·API 오류율 추이</h2>
 				</div>
 				<div class="trend-canvas-wrap">
 					<canvas id="user-activity-trend-canvas" class="trend-canvas" role="img"
