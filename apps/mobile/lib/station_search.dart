@@ -1813,7 +1813,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
     final searchInputField = TextField(
@@ -1844,7 +1843,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               )
             : null,
         filled: true,
-        fillColor: tokens.scaffold,
+        fillColor: EasySubwayAccessibleColors.scaffoldSurface,
         border: OutlineInputBorder(
           borderRadius: _stationSearchInputRadius,
           borderSide: BorderSide.none,
@@ -1855,7 +1854,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: _stationSearchInputRadius,
-          borderSide: BorderSide(color: tokens.line),
+          borderSide: const BorderSide(color: EasySubwayAccessibleColors.line),
         ),
       ),
       onSubmitted: _submit,
@@ -1903,7 +1902,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
               return TextButton.icon(
                 key: const Key('nearbyStationSearchButton'),
                 style: TextButton.styleFrom(
-                  foregroundColor: tokens.ink,
+                  foregroundColor: EasySubwayAccessibleColors.text,
                   alignment: Alignment.centerLeft,
                   minimumSize: const Size.fromHeight(56),
                 ),
@@ -1919,7 +1918,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
             return TextButton.icon(
               key: const Key('nearbyStationSearchButton'),
               style: TextButton.styleFrom(
-                foregroundColor: tokens.ink,
+                foregroundColor: EasySubwayAccessibleColors.text,
                 alignment: Alignment.centerLeft,
                 minimumSize: const Size.fromHeight(56),
               ),
@@ -2185,7 +2184,6 @@ class StationRecentSearchSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Column(
       key: const Key('stationRecentSearchSection'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2196,7 +2194,7 @@ class StationRecentSearchSection extends StatelessWidget {
               child: Text(
                 '최근 검색',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: tokens.ink,
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
@@ -2205,7 +2203,7 @@ class StationRecentSearchSection extends StatelessWidget {
             TextButton.icon(
               key: const Key('stationRecentSearchClearAllButton'),
               style: TextButton.styleFrom(
-                foregroundColor: tokens.inkMuted,
+                foregroundColor: EasySubwayAccessibleColors.mutedText,
               ),
               onPressed: enabled ? onClearAll : null,
               icon: const Icon(Icons.delete_sweep_outlined, size: 18),
@@ -2213,17 +2211,17 @@ class StationRecentSearchSection extends StatelessWidget {
             ),
           ],
         ),
-        Divider(
+        const Divider(
           height: EasySubwaySpacing.lg,
-          color: tokens.line,
+          color: EasySubwayAccessibleColors.line,
         ),
         Column(
           children: [
             for (final entry in queries.indexed) ...[
               if (entry.$1 > 0)
-                Divider(
+                const Divider(
                   height: 1,
-                  color: tokens.line,
+                  color: EasySubwayAccessibleColors.line,
                 ),
               _StationRecentSearchItem(
                 query: entry.$2,
@@ -2257,7 +2255,6 @@ class _StationRecentSearchItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 56),
       child: Row(
@@ -2291,7 +2288,7 @@ class _StationRecentSearchItem extends StatelessWidget {
                                 query,
                                 style: Theme.of(context).textTheme.titleMedium
                                     ?.copyWith(
-                                      color: tokens.ink,
+                                      color: EasySubwayAccessibleColors.text,
                                       fontWeight: FontWeight.w700,
                                       height: 1.25,
                                     ),
@@ -2484,15 +2481,14 @@ class _NearbyStationOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final stationName = _stationResultDisplayName(result.nameKo);
     return Card(
       margin: EdgeInsets.zero,
-      color: tokens.surface,
+      color: EasySubwayAccessibleColors.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: _stationDetailFacilityCardRadius,
-        side: BorderSide(color: tokens.line),
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Column(
         children: [
@@ -2518,7 +2514,7 @@ class _NearbyStationOverview extends StatelessWidget {
                               '가장 가까운 역',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
-                                    color: tokens.inkMuted,
+                                    color: EasySubwayAccessibleColors.mutedText,
                                     fontWeight: FontWeight.w700,
                                     height: 1.25,
                                   ),
@@ -2528,7 +2524,7 @@ class _NearbyStationOverview extends StatelessWidget {
                               stationName,
                               style: Theme.of(context).textTheme.headlineSmall
                                   ?.copyWith(
-                                    color: tokens.ink,
+                                    color: EasySubwayAccessibleColors.text,
                                     fontWeight: FontWeight.w700,
                                     height: 1.2,
                                   ),
@@ -2540,7 +2536,7 @@ class _NearbyStationOverview extends StatelessWidget {
                                   : '${result.distanceLabel} · ${result.lineLabel}',
                               style: Theme.of(context).textTheme.bodyLarge
                                   ?.copyWith(
-                                    color: tokens.inkMuted,
+                                    color: EasySubwayAccessibleColors.mutedText,
                                     fontWeight: FontWeight.w700,
                                     height: 1.3,
                                   ),
@@ -2586,7 +2582,6 @@ class _StationSearchFailureMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final shouldShowLocationSettings =
         message == _currentLocationDisabledMessage;
     final shouldShowStationSearchNextAction =
@@ -2606,7 +2601,7 @@ class _StationSearchFailureMessage extends StatelessWidget {
             child: Text(
               _stationSearchFailureNextAction,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tokens.inkMuted,
+                color: EasySubwayAccessibleColors.mutedText,
                 fontWeight: FontWeight.w700,
                 height: 1.35,
               ),
@@ -2657,14 +2652,13 @@ class _StationSearchMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       container: true,
       liveRegion: liveRegion,
       child: Text(
         message,
         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-          color: tokens.inkSecondary,
+          color: EasySubwayAccessibleColors.secondaryText,
           fontWeight: FontWeight.w700,
           height: 1.35,
         ),
@@ -2740,13 +2734,12 @@ class _StationSearchResultLineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final line = this.line;
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
-          bottom: BorderSide(color: tokens.line),
+          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
         ),
       ),
       child: MergeSemantics(
@@ -2772,8 +2765,8 @@ class _StationSearchResultLineRow extends StatelessWidget {
                       Expanded(
                         child: Text(
                           stationName,
-                          style: TextStyle(
-                            color: tokens.ink,
+                          style: const TextStyle(
+                            color: EasySubwayAccessibleColors.text,
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
                             height: 1.2,
@@ -3352,7 +3345,6 @@ class _StationRealtimeSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final title = switch (snapshot.status) {
       RealtimeSnapshotStatus.fresh => '도착 정보',
       RealtimeSnapshotStatus.stale => '최근 도착 정보',
@@ -3384,7 +3376,7 @@ class _StationRealtimeSummary extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: _stationDetailInfoCardRadius,
-          border: Border.all(color: tokens.line),
+          border: Border.all(color: EasySubwayAccessibleColors.line),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3392,9 +3384,9 @@ class _StationRealtimeSummary extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
+                const Icon(
                   Icons.schedule,
-                  color: tokens.accent,
+                  color: EasySubwayAccessibleColors.primary,
                   size: 28,
                 ),
                 const SizedBox(width: 10),
@@ -3402,7 +3394,7 @@ class _StationRealtimeSummary extends StatelessWidget {
                   child: Text(
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: tokens.ink,
+                      color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w700,
                       height: 1.25,
                     ),
@@ -3414,7 +3406,7 @@ class _StationRealtimeSummary extends StatelessWidget {
             Text(
               summary,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: tokens.ink,
+                color: EasySubwayAccessibleColors.text,
                 height: 1.35,
                 fontWeight: FontWeight.w700,
               ),
@@ -3424,7 +3416,7 @@ class _StationRealtimeSummary extends StatelessWidget {
               Text(
                 updatedLabel,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: tokens.inkMuted,
+                  color: EasySubwayAccessibleColors.mutedText,
                   height: 1.3,
                 ),
               ),
@@ -3589,7 +3581,6 @@ class _StationPointButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     // 같은 성격 행동은 화면이 달라도 같은 패턴: 검색 결과의 _StationRoleButton과
     // 동일하게 아웃라인 아이콘 + 라벨, 단일 primary 계열.
     return OutlinedButton.icon(
@@ -3597,8 +3588,8 @@ class _StationPointButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
         backgroundColor: Colors.white,
-        foregroundColor: tokens.accent,
-        side: BorderSide(color: tokens.line),
+        foregroundColor: EasySubwayAccessibleColors.primary,
+        side: const BorderSide(color: EasySubwayAccessibleColors.line),
         shape: const RoundedRectangleBorder(
           borderRadius: _stationDetailActionButtonRadius,
         ),
@@ -3660,26 +3651,25 @@ class _StationLayoutStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     // 상용 앱 리스트 밀도에 맞춰 세로 타일을 아이콘+텍스트 가로 행으로 낮춰
     // 높이를 줄인다(고정 minHeight 제거).
     return Container(
       width: width,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: tokens.surface,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: tokens.line),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       child: Row(
         children: [
-          Icon(item.icon, color: tokens.accent, size: 22),
+          Icon(item.icon, color: EasySubwayAccessibleColors.primary, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               item.text,
               style: textTheme.bodyLarge?.copyWith(
-                color: tokens.ink,
+                color: EasySubwayAccessibleColors.text,
                 fontWeight: FontWeight.w700,
                 height: 1.2,
               ),
@@ -3702,7 +3692,6 @@ class _StationFacilityStatusSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       label: semanticLabel,
       child: ExcludeSemantics(
@@ -3717,9 +3706,9 @@ class _StationFacilityStatusSummary extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.warning_amber,
-                  color: tokens.danger,
+                  color: EasySubwayAccessibleColors.red,
                   size: 24,
                 ),
                 const SizedBox(width: 10),
@@ -3727,7 +3716,7 @@ class _StationFacilityStatusSummary extends StatelessWidget {
                   child: Text(
                     text,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: tokens.danger,
+                      color: EasySubwayAccessibleColors.red,
                       fontWeight: FontWeight.w700,
                       height: 1.3,
                     ),
@@ -3749,7 +3738,6 @@ class _StationDetailHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
 
     return Semantics(
@@ -3770,7 +3758,7 @@ class _StationDetailHeader extends StatelessWidget {
                     Text(
                       '${detail.nameKo}역',
                       style: textTheme.headlineSmall?.copyWith(
-                        color: tokens.ink,
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
                       ),
@@ -3782,7 +3770,7 @@ class _StationDetailHeader extends StatelessWidget {
                       Text(
                         detail.nameSub,
                         style: textTheme.bodyMedium?.copyWith(
-                          color: tokens.inkSecondary,
+                          color: EasySubwayAccessibleColors.secondaryText,
                           fontWeight: FontWeight.w600,
                           height: 1.2,
                         ),
@@ -3792,7 +3780,7 @@ class _StationDetailHeader extends StatelessWidget {
                     Text(
                       detail.lineLabel,
                       style: textTheme.bodyLarge?.copyWith(
-                        color: tokens.inkSecondary,
+                        color: EasySubwayAccessibleColors.secondaryText,
                         fontWeight: FontWeight.w600,
                         height: 1.3,
                       ),
@@ -3804,10 +3792,10 @@ class _StationDetailHeader extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
+                  const Text(
                     '마지막 확인',
                     style: TextStyle(
-                      color: tokens.inkMuted,
+                      color: EasySubwayAccessibleColors.mutedText,
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
                       height: 1.2,
@@ -3816,8 +3804,8 @@ class _StationDetailHeader extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     stationVerifiedRelativeLabel(detail.lastVerifiedAt),
-                    style: TextStyle(
-                      color: tokens.inkMuted,
+                    style: const TextStyle(
+                      color: EasySubwayAccessibleColors.mutedText,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       height: 1.2,
@@ -3873,7 +3861,6 @@ class _StationInternalRouteResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       container: true,
       label: result.semanticLabel,
@@ -3881,9 +3868,9 @@ class _StationInternalRouteResultCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: tokens.surface,
+            color: EasySubwayAccessibleColors.surface,
             borderRadius: _stationDetailInfoCardRadius,
-            border: Border.all(color: tokens.line),
+            border: Border.all(color: EasySubwayAccessibleColors.line),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3896,7 +3883,7 @@ class _StationInternalRouteResultCard extends StatelessWidget {
               Text(
                 result.summaryLabel,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: tokens.ink,
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w700,
                   height: 1.25,
                 ),
@@ -3905,7 +3892,7 @@ class _StationInternalRouteResultCard extends StatelessWidget {
               Text(
                 result.totalBurdenLabel,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: tokens.inkSecondary,
+                  color: EasySubwayAccessibleColors.secondaryText,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -3938,7 +3925,6 @@ class _StationInternalRouteStepTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       container: true,
       label: step.semanticLabel,
@@ -3951,7 +3937,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
               Text(
                 step.title,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: tokens.ink,
+                  color: EasySubwayAccessibleColors.text,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -3960,7 +3946,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
               Text(
                 step.burdenLabel,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: tokens.inkSecondary,
+                  color: EasySubwayAccessibleColors.secondaryText,
                   fontWeight: FontWeight.w700,
                   height: 1.3,
                 ),
@@ -3969,7 +3955,7 @@ class _StationInternalRouteStepTile extends StatelessWidget {
               Text(
                 step.guidance,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: tokens.ink,
+                  color: EasySubwayAccessibleColors.text,
                   height: 1.35,
                 ),
               ),
@@ -3989,16 +3975,15 @@ class _StationDetailInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Row(
       children: [
-        Icon(icon, size: 22, color: tokens.accent),
+        Icon(icon, size: 22, color: EasySubwayAccessibleColors.primary),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: tokens.inkSecondary,
+              color: EasySubwayAccessibleColors.secondaryText,
               fontWeight: FontWeight.w700,
               height: 1.3,
             ),
@@ -4023,7 +4008,6 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final labels = widget.labels
         .where((label) => label.trim().isNotEmpty)
         .toList(growable: false);
@@ -4048,9 +4032,9 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
             margin: EdgeInsets.zero,
             elevation: 0,
             color: Colors.white,
-            shape: RoundedRectangleBorder(
+            shape: const RoundedRectangleBorder(
               borderRadius: _stationDetailHelpCardRadius,
-              side: BorderSide(color: tokens.line),
+              side: BorderSide(color: EasySubwayAccessibleColors.line),
             ),
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -4060,7 +4044,7 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
                   Text(
                     '안내 확인 방법',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: tokens.ink,
+                      color: EasySubwayAccessibleColors.text,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -4069,7 +4053,7 @@ class _InfoBasisDisclosureState extends State<_InfoBasisDisclosure> {
                     Text(
                       label,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: tokens.inkMuted,
+                        color: EasySubwayAccessibleColors.mutedText,
                         fontWeight: FontWeight.w700,
                         height: 1.3,
                       ),
@@ -4093,13 +4077,12 @@ class _StationDetailSectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Semantics(
       header: true,
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: tokens.ink,
+          color: EasySubwayAccessibleColors.text,
           fontWeight: FontWeight.w700,
           height: 1.25,
         ),
@@ -4115,11 +4098,10 @@ class _StationDetailEmptyMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     return Text(
       message,
       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-        color: tokens.inkSecondary,
+        color: EasySubwayAccessibleColors.secondaryText,
         fontWeight: FontWeight.w700,
         height: 1.35,
       ),
@@ -4152,7 +4134,6 @@ class _StationExitCardState extends State<_StationExitCard> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
     final station = widget.station;
     final exit = widget.exit;
@@ -4171,9 +4152,9 @@ class _StationExitCardState extends State<_StationExitCard> {
       margin: const EdgeInsets.only(bottom: 12),
       color: Colors.white,
       elevation: 0,
-      shape: RoundedRectangleBorder(
+      shape: const RoundedRectangleBorder(
         borderRadius: _stationDetailInfoCardRadius,
-        side: BorderSide(color: tokens.line),
+        side: BorderSide(color: EasySubwayAccessibleColors.line),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -4190,7 +4171,7 @@ class _StationExitCardState extends State<_StationExitCard> {
                     Text(
                       exit.name,
                       style: textTheme.titleMedium?.copyWith(
-                        color: tokens.ink,
+                        color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w700,
                         height: 1.25,
                       ),
@@ -4601,7 +4582,6 @@ class _StationFacilityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     final textTheme = Theme.of(context).textTheme;
 
     return Semantics(
@@ -4614,9 +4594,9 @@ class _StationFacilityCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         color: Colors.white,
         elevation: 0,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: _stationDetailFacilityCardRadius,
-          side: BorderSide(color: tokens.line),
+          side: BorderSide(color: EasySubwayAccessibleColors.line),
         ),
         child: InkWell(
           key: Key('stationFacilityCard-${facility.id}'),
@@ -4630,7 +4610,7 @@ class _StationFacilityCard extends StatelessWidget {
                 Text(
                   facility.name,
                   style: textTheme.titleMedium?.copyWith(
-                    color: tokens.ink,
+                    color: EasySubwayAccessibleColors.text,
                     fontWeight: FontWeight.w700,
                     height: 1.25,
                   ),
@@ -4679,9 +4659,9 @@ class _StationFacilityCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    Icon(
+                    const Icon(
                       Icons.chevron_right,
-                      color: tokens.inkMuted,
+                      color: EasySubwayAccessibleColors.mutedText,
                     ),
                   ],
                 ),
@@ -4726,7 +4706,6 @@ class FacilityDetailScreen extends StatelessWidget {
     final statusIcon = _facilityStatusNoticeIcon(
       facility.statusPresentation.severity,
     );
-    final tokens = EasySubwayTokens.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('시설 상세')),
       body: SafeArea(
@@ -4740,7 +4719,7 @@ class FacilityDetailScreen extends StatelessWidget {
                 children: [
                   Icon(
                     facility.layoutSummaryIcon,
-                    color: tokens.accent,
+                    color: EasySubwayAccessibleColors.primary,
                     size: 28,
                   ),
                   const SizedBox(width: 12),
@@ -4752,7 +4731,7 @@ class FacilityDetailScreen extends StatelessWidget {
                           '${station.nameKo}역',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(
-                                color: tokens.inkMuted,
+                                color: EasySubwayAccessibleColors.mutedText,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
@@ -4761,7 +4740,7 @@ class FacilityDetailScreen extends StatelessWidget {
                           facility.name,
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
-                                color: tokens.ink,
+                                color: EasySubwayAccessibleColors.text,
                                 fontWeight: FontWeight.w700,
                                 height: 1.2,
                               ),
@@ -4776,9 +4755,9 @@ class FacilityDetailScreen extends StatelessWidget {
             Container(
               key: Key('facilityDetailStatusNotice-${facility.id}'),
               decoration: BoxDecoration(
-                color: tokens.surface,
+                color: EasySubwayAccessibleColors.surface,
                 borderRadius: _stationDetailFacilityCardRadius,
-                border: Border.all(color: tokens.line),
+                border: Border.all(color: EasySubwayAccessibleColors.line),
               ),
               clipBehavior: Clip.antiAlias,
               child: IntrinsicHeight(
@@ -4818,7 +4797,8 @@ class FacilityDetailScreen extends StatelessWidget {
                                         .textTheme
                                         .bodyMedium
                                         ?.copyWith(
-                                          color: tokens.inkMuted,
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
                                           fontWeight: FontWeight.w700,
                                           height: 1.3,
                                         ),
@@ -4830,7 +4810,8 @@ class FacilityDetailScreen extends StatelessWidget {
                                         .textTheme
                                         .bodyMedium
                                         ?.copyWith(
-                                          color: tokens.inkMuted,
+                                          color: EasySubwayAccessibleColors
+                                              .mutedText,
                                           fontWeight: FontWeight.w700,
                                           height: 1.3,
                                         ),
@@ -4853,9 +4834,9 @@ class FacilityDetailScreen extends StatelessWidget {
               margin: EdgeInsets.zero,
               color: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(
+              shape: const RoundedRectangleBorder(
                 borderRadius: _stationDetailFacilityCardRadius,
-                side: BorderSide(color: tokens.line),
+                side: BorderSide(color: EasySubwayAccessibleColors.line),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -4958,8 +4939,9 @@ class _StationDetailStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
-    final color = positive ? tokens.accent : tokens.warn;
+    final color = positive
+        ? EasySubwayAccessibleColors.primary
+        : EasySubwayAccessibleColors.amber;
 
     return Row(
       children: [
@@ -4969,7 +4951,7 @@ class _StationDetailStatusPill extends StatelessWidget {
           child: Text(
             text,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: tokens.ink,
+              color: EasySubwayAccessibleColors.text,
               fontWeight: FontWeight.w700,
               height: 1.3,
             ),
@@ -4987,20 +4969,19 @@ class _StationDetailTextPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = EasySubwayTokens.of(context);
     // 유형·품질 라벨은 상태 의미가 없으므로 틴트 필 대신 중립 아웃라인으로.
     return Container(
       decoration: BoxDecoration(
-        color: tokens.surface,
+        color: EasySubwayAccessibleColors.surface,
         borderRadius: _stationDetailInfoCardRadius,
-        border: Border.all(color: tokens.line),
+        border: Border.all(color: EasySubwayAccessibleColors.line),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Text(
           text,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: tokens.inkSecondary,
+            color: EasySubwayAccessibleColors.secondaryText,
             fontWeight: FontWeight.w700,
             height: 1.2,
           ),

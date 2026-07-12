@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
-import '../../../design_tokens.dart';
 import 'notice_controller.dart';
 
 /// 노선도 홈 상단에 얹는 disruption 공지 1줄 배너.
@@ -26,7 +25,6 @@ class ServiceNoticeBanner extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
-        final tokens = EasySubwayTokens.of(context);
         final notice = controller.topDisruption;
         if (notice == null) {
           return const SizedBox.shrink();
@@ -42,10 +40,10 @@ class ServiceNoticeBanner extends StatelessWidget {
               padding: const EdgeInsets.only(left: 14, right: 4),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.warning_amber_rounded,
                     size: 20,
-                    color: tokens.warn,
+                    color: EasySubwayAccessibleColors.amber,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -64,8 +62,8 @@ class ServiceNoticeBanner extends StatelessWidget {
                                   notice.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: tokens.warn,
+                                  style: const TextStyle(
+                                    color: EasySubwayAccessibleColors.amber,
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
                                     height: 1.2,
@@ -77,8 +75,8 @@ class ServiceNoticeBanner extends StatelessWidget {
                                 Text(
                                   staleLabel,
                                   maxLines: 1,
-                                  style: TextStyle(
-                                    color: tokens.inkMuted,
+                                  style: const TextStyle(
+                                    color: EasySubwayAccessibleColors.mutedText,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -94,7 +92,7 @@ class ServiceNoticeBanner extends StatelessWidget {
                     key: const Key('serviceNoticeBannerDismiss'),
                     onPressed: () => controller.dismissBanner(notice.id),
                     iconSize: 20,
-                    color: tokens.warn,
+                    color: EasySubwayAccessibleColors.amber,
                     visualDensity: VisualDensity.compact,
                     tooltip: '공지 닫기',
                     icon: const Icon(Icons.close_rounded),
