@@ -20,8 +20,8 @@
 // excludedStations에서 "북삼"을 제거한다.
 //
 // 사용: node tools/route-map/add-daegu-buksam-catalog.mjs [--pack …] [--index …] [--check]
-import { createHash } from "node:crypto";
 import { mutatePack, parsePackArgs } from "./station-surgery.mjs";
+import { createStationCatalog, insertRow, rideEdgePair } from "./lib/station-catalog.mjs";
 
 export const REGION = "대구권";
 export const DAEGYEONG = "line-8f7ed01f290a"; // 대구 대경선
@@ -29,13 +29,11 @@ export const DAEGYEONG = "line-8f7ed01f290a"; // 대구 대경선
 // 경상북도 공식 보도자료 개통식(2026-02-27) 검증 기준일.
 export const VERIFIED_PRESS_AT = Date.UTC(2026, 1, 27) / 1000;
 
-/** 신설 역의 결정적 station id — #1954 해시 기반 id 정책과 동일(이슈 번호로 salt). */
-export function newStationId(lineId, nameKo) {
-  const hex = createHash("sha256")
-    .update(`new-station:${lineId}:${nameKo}:2019`)
-    .digest("hex");
-  return `station-${hex.slice(0, 12)}`;
-}
+// 신설 역의 결정적 station id·행 planning·체인 반영은 공용 코어(#2035)를 쓴다.
+// salt는 #1954 해시 기반 id 정책과 동일한 이슈 번호(2019).
+const catalog = createStationCatalog({ salt: 2019, region: REGION });
+export const { newStationId, planNewStation, previewChain, applyChain } = catalog;
+export { rideEdgePair };
 
 /** 신설 역 스펙(공식 근거 첨부). 좌표 null = admitted 소스 미반영(날조 금지). */
 export const BUKSAM = {
@@ -68,64 +66,6 @@ export const RIDE_CHAIN = {
   removeDirect: [["station-6502c3637045", "station-2e9e270f159d"]],
   lastVerifiedAt: VERIFIED_PRESS_AT,
 };
-
-/**
- * 순수: 신설 역 스펙 → stations/station_lines 행. 기존 대구 카탈로그 관례를 따른다
- * (normalized_name = name_ko 원문, station_code = line_sequence 문자열,
- * name_en/name_sub/platform_info 빈 문자열).
- */
-export function planNewStation(spec) {
-  const id = newStationId(spec.lineId, spec.name);
-  return {
-    station: {
-      id,
-      name_ko: spec.name,
-      name_en: "",
-      normalized_name: spec.name,
-      region: REGION,
-      latitude: spec.latitude,
-      longitude: spec.longitude,
-      data_quality_level: spec.dataQualityLevel,
-      data_source_type: spec.dataSourceType,
-      last_verified_at: spec.lastVerifiedAt,
-      name_sub: "",
-    },
-    stationLine: {
-      station_id: id,
-      line_id: spec.lineId,
-      station_code: String(spec.lineSequence),
-      line_sequence: spec.lineSequence,
-      platform_info: "",
-    },
-  };
-}
-
-/** 순수: 인접쌍 → 양방향 RIDE 엣지 2행(기존 RIDE 관례 필드값·id 포맷). */
-export function rideEdgePair(lineId, fromStationId, toStationId, lastVerifiedAt) {
-  const row = (a, b) => ({
-    id: `edge-${lineId}-${a}-${b}`,
-    from_node_id: `${a}:${lineId}`,
-    to_node_id: `${b}:${lineId}`,
-    duration_seconds: 120,
-    distance_meters: 0,
-    edge_type: "RIDE",
-    service_pattern: "LOCAL",
-    includes_stairs: 0,
-    stair_access_state: "UNKNOWN",
-    accessibility_status: "UNKNOWN",
-    reliability_score: 80,
-    facility_id: null,
-    last_verified_at: lastVerifiedAt,
-  });
-  return [row(fromStationId, toStationId), row(toStationId, fromStationId)];
-}
-
-function insertRow(db, table, row) {
-  const cols = Object.keys(row);
-  db.prepare(
-    `INSERT INTO ${table} (${cols.join(",")}) VALUES (${cols.map(() => "?").join(",")})`,
-  ).run(...cols.map((c) => row[c]));
-}
 
 /**
  * 신설 역의 seq를 비우기 위해, 해당 노선에서 line_sequence >= insertAt인 기존 역의
@@ -175,72 +115,6 @@ function applyNewStation(db, spec) {
   };
 }
 
-/**
- * 읽기 전용: applyChain 사전조건(체인 역 존재·removeDirect 직결 엣지 존재)을
- * --check 미리보기용으로 점검한다. applyChain과 동일한 id 해소 규칙을 쓴다.
- */
-export function previewChain(db, { lineId, chain, removeDirect }) {
-  const rows = [];
-  for (const entry of chain) {
-    const id = typeof entry === "string" ? newStationId(lineId, entry) : entry.id;
-    const name = typeof entry === "string" ? entry : entry.name;
-    const present = Boolean(db.prepare("SELECT 1 FROM stations WHERE id=?").get(id));
-    rows.push({ name, id, present });
-  }
-  for (const [a, b] of removeDirect) {
-    const present = Boolean(
-      db
-        .prepare(
-          "SELECT 1 FROM network_edges WHERE edge_type='RIDE' AND from_node_id=? AND to_node_id=?",
-        )
-        .get(`${a}:${lineId}`, `${b}:${lineId}`),
-    );
-    rows.push({ name: `직결 ${a}↔${b}`, id: `${a}:${lineId}`, present });
-  }
-  return rows;
-}
-
-export function applyChain(db, { lineId, chain, expectedMembers, removeDirect, lastVerifiedAt }) {
-  const ids = chain.map((entry) =>
-    typeof entry === "string" ? newStationId(lineId, entry) : entry.id,
-  );
-  for (const entry of chain) {
-    const id = typeof entry === "string" ? newStationId(lineId, entry) : entry.id;
-    if (!db.prepare("SELECT 1 FROM stations WHERE id=?").get(id)) {
-      const name = typeof entry === "string" ? entry : entry.name;
-      throw new Error(`${lineId}: 체인 역 없음 ${name}(${id})`);
-    }
-  }
-  const del = db.prepare(
-    "DELETE FROM network_edges WHERE edge_type='RIDE' AND from_node_id=? AND to_node_id=?",
-  );
-  let removed = 0;
-  for (const [a, b] of removeDirect) {
-    removed += del.run(`${a}:${lineId}`, `${b}:${lineId}`).changes;
-    removed += del.run(`${b}:${lineId}`, `${a}:${lineId}`).changes;
-  }
-  let inserted = 0;
-  for (let i = 0; i + 1 < ids.length; i += 1) {
-    for (const edge of rideEdgePair(lineId, ids[i], ids[i + 1], lastVerifiedAt)) {
-      const dup = db
-        .prepare(
-          "SELECT 1 FROM network_edges WHERE edge_type='RIDE' AND from_node_id=? AND to_node_id=?",
-        )
-        .get(edge.from_node_id, edge.to_node_id);
-      if (dup) continue;
-      insertRow(db, "network_edges", edge);
-      inserted += 1;
-    }
-  }
-  const members = db
-    .prepare("SELECT COUNT(*) c FROM station_lines WHERE line_id=?")
-    .get(lineId).c;
-  if (members !== expectedMembers) {
-    throw new Error(`${lineId}: 반영 후 멤버 수 ${members} ≠ 기대 ${expectedMembers}`);
-  }
-  return { lineId, removedEdges: removed, insertedEdges: inserted, members };
-}
-
 function main() {
   const o = parsePackArgs(process.argv.slice(2));
   mutatePack({ ...o, tmpPrefix: "add-daegu-buksam-", run: (db) => {
@@ -250,8 +124,12 @@ function main() {
       const occupied = db
         .prepare("SELECT station_id FROM station_lines WHERE line_id=? AND line_sequence=?")
         .get(BUKSAM.lineId, BUKSAM.lineSequence);
+      const existsLabel = exists ? "이미 있음" : "신규";
+      const occupiedNote = occupied
+        ? `, seq 현재 점유: ${occupied.station_id}(리시퀀싱 대상)`
+        : "";
       console.log(
-        `(--check) ${BUKSAM.name} → ${station.id} ${BUKSAM.lineId} seq=${BUKSAM.lineSequence} [${exists ? "이미 있음" : "신규"}${occupied ? `, seq 현재 점유: ${occupied.station_id}(리시퀀싱 대상)` : ""}] (${BUKSAM.evidence})`,
+        `(--check) ${BUKSAM.name} → ${station.id} ${BUKSAM.lineId} seq=${BUKSAM.lineSequence} [${existsLabel}${occupiedNote}] (${BUKSAM.evidence})`,
       );
       for (const { name, id, present } of previewChain(db, RIDE_CHAIN)) {
         console.log(`(--check) 체인 ${RIDE_CHAIN.lineId}: ${name}(${id}) ${present ? "있음" : "없음 ⚠"}`);
