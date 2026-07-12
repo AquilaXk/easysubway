@@ -4512,7 +4512,13 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /const headwayEvidenceCount =/);
   assert.match(workflow, /const headwayReportStatus = headwayEvidenceCount > 0/);
   assert.match(workflow, /"DEFERRED"/);
+  // route_graph_topology deferred domain scope 정합: pilot targets에서 deferred일 때 위반은 DEFERRED로 정직 기록하고
+  // 위반 수치를 evidence에 남긴다(은폐 금지).
+  assert.match(workflow, /tools\/datapack\/capital-pilot-coverage-targets\.json/);
+  assert.match(workflow, /const routeGraphTopologyDeferredForScope =/);
+  assert.match(workflow, /routeGraphTopologyDeferredForScope\s*\n\s*\?\s*"DEFERRED"/);
   assert.match(workflow, /routeGraphTopologyStatus,/);
+  assert.match(workflow, /routeGraphTopologyViolationCount,/);
   assert.match(workflow, /headwayReportStatus,/);
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
@@ -4535,6 +4541,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     "routeMapPositionCoverageStatus",
     "routeGraphTopologySha256",
     "routeGraphTopologyStatus",
+    "routeGraphTopologyViolationCount",
     "headwayReportSha256",
     "headwayReportStatus",
     "strictRouteRegressionSha256",
@@ -4544,8 +4551,11 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     assert.ok(releaseEvidenceBundleSchema.required.includes(field), `${field} must be required`);
   }
   assert.equal(releaseEvidenceBundleSchema.properties.headwayReportStatus.$ref, "#/$defs/headwayGateStatus");
+  // route_graph_topology는 deferred domain이므로 자체 gate status def(DEFERRED 허용)를 참조한다.
+  assert.equal(releaseEvidenceBundleSchema.properties.routeGraphTopologyStatus.$ref, "#/$defs/routeGraphGateStatus");
   assert.equal(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"), false);
   assert.equal(releaseEvidenceBundleSchema.$defs.headwayGateStatus.enum.includes("DEFERRED"), true);
+  assert.equal(releaseEvidenceBundleSchema.$defs.routeGraphGateStatus.enum.includes("DEFERRED"), true);
 });
 
 test("스토어 배포 증거 workflow는 단일 dotenv secret과 명시적 credential preflight를 사용한다", () => {
@@ -4923,6 +4933,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "headwayReportSha256",
     "strictRouteRegressionSha256",
     "androidEvidenceSha256",
+    "routeGraphTopologyViolationCount",
     "validatorStatus",
     "coverageStatus",
     "routeMapPositionCoverageStatus",
