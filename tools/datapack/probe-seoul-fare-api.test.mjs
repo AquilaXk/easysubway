@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -89,9 +89,9 @@ async function withOutput(run) {
   }
 }
 
-async function probe({ fetchImpl, outputPath }) {
+async function probe({ fareServiceKey = FARE_KEY, fetchImpl, outputPath }) {
   return fareProbe.probeOfficialOdFares({
-    fareServiceKey: FARE_KEY,
+    fareServiceKey,
     outputPath,
     fetchImpl,
     retryDelayMs: 0,
@@ -285,6 +285,18 @@ test("429가 아닌 4xx는 재시도하지 않고 output을 만들지 않는다"
   });
 });
 
+test("실패한 재실행은 기존 evidence를 제거한다", async () => {
+  await withOutput(async (outputPath) => {
+    await writeFile(outputPath, "stale evidence\n", { mode: 0o600 });
+    const fetchImpl = createFetch({
+      fareResponse: () => new Response("bad request", { status: 400 }),
+    });
+
+    await assert.rejects(() => probe({ outputPath, fetchImpl }), /fare API HTTP 400/);
+    await assert.rejects(access(outputPath));
+  });
+});
+
 test("필수 요금 필드 누락과 credential-bearing 오류를 fail closed하고 redaction한다", async () => {
   await withOutput(async (outputPath) => {
     const missingFieldFetch = createFetch({
@@ -300,6 +312,19 @@ test("필수 요금 필드 누락과 credential-bearing 오류를 fail closed하
     const error = await probe({ outputPath, fetchImpl: secretErrorFetch }).catch((caught) => caught);
     assert.equal(error instanceof Error, true);
     assert.doesNotMatch(error.message, new RegExp(`${FARE_KEY}|https?://|serviceKey=`));
+    await assert.rejects(access(outputPath));
+
+    const encodedKey = "ENCODED%2FKEY";
+    const decodedKey = "ENCODED/KEY";
+    const decodedErrorFetch = async () => {
+      throw new Error(`request failed with ${decodedKey}`);
+    };
+    const decodedError = await probe({
+      fareServiceKey: encodedKey,
+      outputPath,
+      fetchImpl: decodedErrorFetch,
+    }).catch((caught) => caught);
+    assert.doesNotMatch(decodedError.message, new RegExp(`${encodedKey}|${decodedKey}`));
     await assert.rejects(access(outputPath));
   });
 });

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { chmod, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { chmod, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -66,7 +67,12 @@ export function validateFareSample(sample) {
 
 export function sanitizeProbeError(error, secrets = []) {
   let message = error instanceof Error ? error.message : String(error);
-  for (const secret of secrets) message = sanitizeErrorMessage(message, secret ?? "");
+  for (const secret of secrets) {
+    const original = secret ?? "";
+    for (const variant of new Set([original, decodedServiceKey(original)])) {
+      message = sanitizeErrorMessage(message, variant);
+    }
+  }
   return message;
 }
 
@@ -161,11 +167,13 @@ export async function probeOfficialOdFares({
   retryDelayMs = 250,
   timeoutMs = 30_000,
 } = {}) {
+  let temporaryOutputPath;
   try {
     requiredText(fareServiceKey, "DATA_GO_KR_SERVICE_KEY");
     if (!path.isAbsolute(requiredText(outputPath, "FARE_API_PROBE_OUTPUT"))) {
       throw new Error("FARE_API_PROBE_OUTPUT must be an absolute path");
     }
+    await rm(outputPath, { force: true });
 
     const canary = await fetchFareQuote({
       destination: CANARY_DESTINATION,
@@ -227,10 +235,14 @@ export async function probeOfficialOdFares({
       fieldNames: [...REQUIRED_FARE_FIELDS].sort(),
       attemptCounts,
     };
-    await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, { mode: 0o600 });
-    await chmod(outputPath, 0o600);
+    temporaryOutputPath = `${outputPath}.${randomUUID()}.tmp`;
+    await writeFile(temporaryOutputPath, `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+    await chmod(temporaryOutputPath, 0o600);
+    await rename(temporaryOutputPath, outputPath);
+    temporaryOutputPath = undefined;
     return evidence;
   } catch (error) {
+    if (temporaryOutputPath) await rm(temporaryOutputPath, { force: true }).catch(() => {});
     throw new Error(sanitizeProbeError(error, [fareServiceKey]));
   }
 }
