@@ -8924,6 +8924,185 @@ void main() {
     expect(banner.placement, AdPlacement.stationDetailBottom);
   });
 
+  testWidgets('역 상세 시간표는 요일과 방향을 바꾸며 첫차·막차와 출발 시각을 읽는다', (tester) async {
+    debugStationVerifiedClock = () => DateTime(2026, 7, 6);
+    final semanticsHandle = tester.ensureSemantics();
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      timetables: {
+        StationTimetableDayType.weekday: _stationTimetable(
+          StationTimetableDayType.weekday,
+          directions: const [
+            StationTimetableDirection(
+              name: '사당 방면',
+              departures: [
+                StationTimetableDeparture(
+                  directionName: '사당 방면',
+                  seconds: 19200,
+                ),
+                StationTimetableDeparture(
+                  directionName: '사당 방면',
+                  seconds: 87900,
+                ),
+              ],
+            ),
+            StationTimetableDirection(
+              name: '오이도 방면',
+              departures: [
+                StationTimetableDeparture(
+                  directionName: '오이도 방면',
+                  seconds: 21000,
+                ),
+              ],
+            ),
+          ],
+        ),
+        StationTimetableDayType.saturday: _stationTimetable(
+          StationTimetableDayType.saturday,
+          directions: const [
+            StationTimetableDirection(
+              name: '사당 방면',
+              departures: [
+                StationTimetableDeparture(
+                  directionName: '사당 방면',
+                  seconds: 33120,
+                ),
+              ],
+            ),
+          ],
+        ),
+      },
+    );
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationDetailScreen(
+            repository: repository,
+            reportRepository: FakeFacilityReportRepository(),
+            stationId: 'station-sangnoksu',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('stationTimetableButton')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('상록수 시간표'), findsOneWidget);
+      expect(find.text('첫차 05:20'), findsOneWidget);
+      expect(find.text('막차 다음 날 00:25'), findsOneWidget);
+      expect(find.bySemanticsLabel('사당 방면, 다음 날 00시 25분 출발'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('stationTimetableDirection-오이도 방면')),
+      );
+      await tester.pump();
+      expect(find.text('05:50'), findsOneWidget);
+      expect(find.text('다음 날 00:25'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('stationTimetableDay-saturday')));
+      await tester.pumpAndSettle();
+      expect(find.text('첫차 09:12'), findsOneWidget);
+      expect(
+        repository.requestedDayTypes,
+        contains(StationTimetableDayType.saturday),
+      );
+    } finally {
+      semanticsHandle.dispose();
+      debugStationVerifiedClock = DateTime.now;
+    }
+  });
+
+  testWidgets('역 상세 시간표는 로컬 coverage가 없으면 준비 중으로 강등한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationDetailScreen(
+          repository: FakeStationSearchRepository(
+            stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          stationId: 'station-sangnoksu',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('stationTimetableButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('시간표를 준비 중이에요.'), findsOneWidget);
+    expect(find.textContaining('임시'), findsNothing);
+  });
+
+  testWidgets('환승역 시간표는 coverage가 있는 첫 노선을 기본 선택한다', (tester) async {
+    debugStationVerifiedClock = () => DateTime(2026, 7, 6);
+    const lines = [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '226',
+      ),
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '433',
+      ),
+    ];
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(
+        id: 'station-sadang',
+        name: '사당',
+        lines: lines,
+      ),
+      timetableLineId: 'seoul-4',
+      timetables: {
+        StationTimetableDayType.weekday: _stationTimetable(
+          StationTimetableDayType.weekday,
+          stationId: 'station-sadang',
+          lineId: 'seoul-4',
+          directions: const [
+            StationTimetableDirection(
+              name: '상록수 방면',
+              departures: [
+                StationTimetableDeparture(
+                  directionName: '상록수 방면',
+                  seconds: 19500,
+                ),
+              ],
+            ),
+          ],
+        ),
+      },
+    );
+
+    try {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationDetailScreen(
+            repository: repository,
+            reportRepository: FakeFacilityReportRepository(),
+            stationId: 'station-sadang',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('상록수 방면 · 첫차 05:25 · 막차 05:25'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('stationTimetableButton')));
+      await tester.pumpAndSettle();
+
+      final selectedLine = tester.widget<ChoiceChip>(
+        find.byKey(const Key('stationTimetableLine-seoul-4')),
+      );
+      expect(selectedLine.selected, isTrue);
+    } finally {
+      debugStationVerifiedClock = DateTime.now;
+    }
+  });
+
   testWidgets('역 상세는 좌표 있는 출구에만 카카오맵 버튼을 보여준다', (tester) async {
     debugStationVerifiedClock = () => DateTime(2026, 7, 9);
     final semanticsHandle = tester.ensureSemantics();
@@ -8970,6 +9149,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('stationExitMapButton-exit-sangnoksu-1')),
+        500,
+      );
+      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('stationExitMapButton-exit-sangnoksu-1')),
         findsOneWidget,
@@ -8982,12 +9166,6 @@ void main() {
         find.bySemanticsLabel('1번 출구, 엘리베이터 연결, 계단 없는 이동 가능, 최근 확인 2주 전'),
         findsOneWidget,
       );
-
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('stationExitMapButton-exit-sangnoksu-1')),
-        500,
-      );
-      await tester.pumpAndSettle();
       expect(
         find.bySemanticsLabel('1번 출구 카카오맵에서 보기, 새 앱이 열립니다'),
         findsOneWidget,
@@ -14778,6 +14956,63 @@ class FakeStationSearchRepository
   }
 }
 
+class FakeTimetableStationRepository extends FakeStationSearchRepository
+    implements StationTimetableRepository {
+  FakeTimetableStationRepository({
+    required super.stationDetail,
+    required this.timetables,
+    this.timetableLineId = 'seoul-2',
+  });
+
+  final Map<StationTimetableDayType, StationTimetable> timetables;
+  final String timetableLineId;
+  final requestedDayTypes = <StationTimetableDayType>[];
+
+  @override
+  Future<StationTimetable> loadStationTimetable({
+    required String stationId,
+    required String lineId,
+    required StationTimetableDayType dayType,
+    required DateTime referenceDate,
+  }) async {
+    requestedDayTypes.add(dayType);
+    if (lineId != timetableLineId) {
+      return StationTimetable(
+        stationId: stationId,
+        lineId: lineId,
+        dayType: dayType,
+        directions: const [],
+      );
+    }
+    return timetables[dayType] ??
+        StationTimetable(
+          stationId: stationId,
+          lineId: lineId,
+          dayType: dayType,
+          directions: const [],
+        );
+  }
+
+  @override
+  Future<StationTimetable> loadStationTimetableForDate({
+    required String stationId,
+    required String lineId,
+    required DateTime date,
+  }) {
+    final dayType = switch (date.weekday) {
+      DateTime.saturday => StationTimetableDayType.saturday,
+      DateTime.sunday => StationTimetableDayType.sundayHoliday,
+      _ => StationTimetableDayType.weekday,
+    };
+    return loadStationTimetable(
+      stationId: stationId,
+      lineId: lineId,
+      dayType: dayType,
+      referenceDate: date,
+    );
+  }
+}
+
 class FakeSearchHistoryRepository implements SearchHistoryRepository {
   FakeSearchHistoryRepository(List<String> queries) : queries = [...queries];
 
@@ -15738,6 +15973,7 @@ StationDetail _stationDetail({
   required String name,
   double? latitude,
   double? longitude,
+  List<StationSearchLine>? lines,
 }) {
   return StationDetail(
     id: id,
@@ -15749,14 +15985,30 @@ StationDetail _stationDetail({
     dataQualityLevel: 'LEVEL_1',
     dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
-    lines: const [
-      StationSearchLine(
-        id: 'seoul-2',
-        name: '수도권 2호선',
-        color: '#00A84D',
-        stationCode: '222',
-      ),
-    ],
+    lines:
+        lines ??
+        const [
+          StationSearchLine(
+            id: 'seoul-2',
+            name: '수도권 2호선',
+            color: '#00A84D',
+            stationCode: '222',
+          ),
+        ],
+  );
+}
+
+StationTimetable _stationTimetable(
+  StationTimetableDayType dayType, {
+  required List<StationTimetableDirection> directions,
+  String stationId = 'station-sangnoksu',
+  String lineId = 'seoul-2',
+}) {
+  return StationTimetable(
+    stationId: stationId,
+    lineId: lineId,
+    dayType: dayType,
+    directions: directions,
   );
 }
 
