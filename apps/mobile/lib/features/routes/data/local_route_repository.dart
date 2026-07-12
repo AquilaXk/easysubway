@@ -3,6 +3,8 @@ import 'package:drift/drift.dart' show Variable;
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
+import '../../fare/official_od_fare_quote.dart';
+import '../../fare/official_od_fare_repository.dart';
 import '../application/network_graph.dart' as graph;
 import '../application/route_engine.dart';
 import '../domain/route_request.dart' as local;
@@ -12,11 +14,16 @@ import '../domain/route_step.dart' as route_step;
 class LocalRouteRepository implements RouteSearchRepository {
   LocalRouteRepository({
     required this.catalogDatabase,
+    OfficialOdFareRepository? officialOdFareRepository,
     DateTime Function()? now,
-  }) : now = now ?? DateTime.now;
+  }) : now = now ?? DateTime.now,
+       officialOdFareRepository =
+           officialOdFareRepository ??
+           OfficialOdFareRepository(catalogDatabase: catalogDatabase);
 
   final CatalogDatabase catalogDatabase;
   final DateTime Function() now;
+  final OfficialOdFareRepository officialOdFareRepository;
 
   Future<RouteCapabilityMetadata> routeCapability(
     RouteSearchRequest request,
@@ -144,11 +151,16 @@ class LocalRouteRepository implements RouteSearchRepository {
     }
 
     final plannedArrivals = await _plannedRideArrivals(result, catalog);
+    final quote = await officialOdFareRepository.findExact(
+      originStationId: request.originStationId,
+      destinationStationId: request.destinationStationId,
+    );
     return _toRouteSearchResult(
       request,
       result,
       catalog,
       plannedArrivals: plannedArrivals,
+      officialOdFareQuote: quote,
     );
   }
 
@@ -162,6 +174,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     local.LocalRouteResult result,
     _RouteCatalogSnapshot catalog, {
     required Map<int, String> plannedArrivals,
+    required OfficialOdFareQuote? officialOdFareQuote,
   }) {
     final originName = catalog.stationName(request.originStationId);
     final destinationName = catalog.stationName(request.destinationStationId);
@@ -205,6 +218,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       etaSource: 'STATIC_LOCAL',
       etaConfidence: 'STATIC',
       sourceUpdatedAt: catalog.sourceUpdatedAt,
+      officialOdFareQuote: officialOdFareQuote,
     );
   }
 
@@ -915,7 +929,19 @@ class OnlineFirstRouteSearchRepository implements RouteSearchRepository {
 
   @override
   Future<RouteRefreshResult> refreshRoute(String routeSearchId) async {
-    return onlineRepository.refreshRoute(routeSearchId);
+    final refresh = await onlineRepository.refreshRoute(routeSearchId);
+    final local = localRepository;
+    if (local == null) return refresh;
+    return RouteRefreshResult(
+      routeSearchId: refresh.routeSearchId,
+      status: refresh.status,
+      result: await local.resolveDisplayLabels(refresh.result),
+      refreshedAt: refresh.refreshedAt,
+      etaSource: refresh.etaSource,
+      etaConfidence: refresh.etaConfidence,
+      sourceLabel: refresh.sourceLabel,
+      reasonCodes: refresh.reasonCodes,
+    );
   }
 }
 
@@ -947,6 +973,10 @@ extension _OnlineRouteDisplayLabels on LocalRouteRepository {
       destinationStationName: catalog.stationName(result.destinationStationId),
       lineName: catalog.lineName(result.lineId),
       steps: steps,
+      officialOdFareQuote: await officialOdFareRepository.findExact(
+        originStationId: result.originStationId,
+        destinationStationId: result.destinationStationId,
+      ),
     );
   }
 
