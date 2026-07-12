@@ -17,6 +17,9 @@
 //   --transfer-rows <transfer.merged-rows.json> \
 //   --car-door-rows <fast-exit.merged-rows.json> \
 //   --kric-movement <kric-transfer-movement-detailed.raw.json> \
+//   --source-candidates tools/datapack/source-candidates.json \
+//   --source-inventory tools/datapack/source-inventory.json \
+//   [--kric-standard-movement <kric-transfer-movement-standard.raw.json>] \
 //   --output <report.json>
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -30,8 +33,18 @@ import { normalizeTransferDistanceDurationRows } from "./normalize-transfer-dist
 const TRANSFER_SOURCE_ID = "seoul-metro-transfer-distance-duration";
 const CAR_DOOR_SOURCE_ID = "seoul-metro-fast-exit-car-door";
 const KRIC_MOVEMENT_SOURCE_ID = "kric-transfer-movement-detailed";
+const KRIC_STANDARD_SOURCE_ID = "kric-transfer-movement-standard";
 const TRANSFER_SNAPSHOT_ID = "seoul-metro-transfer-distance-duration-admission-20260713";
 const CAR_DOOR_SNAPSHOT_ID = "seoul-metro-fast-exit-car-door-admission-20260713";
+const KRIC_DETAILED_ENDPOINT = "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement";
+const KRIC_CHUNGMURO_REQUEST_TUPLE = Object.freeze({
+  railOprIsttCd: "S1",
+  lnCd: "3",
+  stinCd: "321",
+  prevStinCd: "422",
+  chthTgtLn: "4",
+  chtnNextStinCd: "424",
+});
 
 async function main(argv) {
   const args = parseArgs(argv);
@@ -39,6 +52,11 @@ async function main(argv) {
   const transferRows = await readJsonFile(requireArg(args, "transfer-rows"));
   const carDoorRows = await readJsonFile(requireArg(args, "car-door-rows"));
   const kricMovement = await readJsonFile(requireArg(args, "kric-movement"));
+  const sourceCandidates = await readJsonFile(requireArg(args, "source-candidates"));
+  const sourceInventory = await readJsonFile(requireArg(args, "source-inventory"));
+  const kricStandardMovement = args["kric-standard-movement"]
+    ? await readJsonFile(args["kric-standard-movement"])
+    : null;
   const outputPath = requireArg(args, "output");
 
   const pack = fixture.packs[0];
@@ -47,6 +65,8 @@ async function main(argv) {
     transferRows,
     carDoorRows,
     kricMovement,
+    kricMovementContext: buildKricMovementContext({ sourceCandidates, sourceInventory }),
+    kricStandardMovement,
     existingEdges: pack.stationPathwayEdges ?? [],
     existingNodes: pack.stationPathwayNodes ?? [],
     fixtureTransferRules: pack.transferRules ?? [],
@@ -55,6 +75,35 @@ async function main(argv) {
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(sortJson(report), null, 2)}\n`);
+}
+
+/**
+ * tracked candidate의 exact request context와 admitted inventory evidence를 결합한다.
+ * KRIC response body에는 station/line identifier가 없으므로 serviceKey를 제외한 이 context가
+ * detailed response의 endpoint·tuple identity를 제공한다.
+ */
+export function buildKricMovementContext({ sourceCandidates, sourceInventory }) {
+  const candidate = (sourceCandidates?.candidates ?? []).find((entry) => entry.id === KRIC_MOVEMENT_SOURCE_ID);
+  const inventorySource = (sourceInventory?.sources ?? []).find((entry) => entry.id === KRIC_MOVEMENT_SOURCE_ID);
+  if (!candidate) throw new Error(`${KRIC_MOVEMENT_SOURCE_ID} source candidate missing`);
+  if (!inventorySource) throw new Error(`${KRIC_MOVEMENT_SOURCE_ID} source inventory entry missing`);
+
+  const sampleUrl = new URL(candidate.evidence?.sampleUrl ?? "");
+  const requestTuple = Object.fromEntries(
+    Object.keys(KRIC_CHUNGMURO_REQUEST_TUPLE).map((key) => [key, sampleUrl.searchParams.get(key)]),
+  );
+  return {
+    candidateId: candidate.id,
+    endpoint: candidate.evidence?.endpoint ?? null,
+    sampleEndpoint: `${sampleUrl.origin}${sampleUrl.pathname}`,
+    requestTuple,
+    liveSampleRowCount: candidate.evidence?.liveSampleRowCount ?? null,
+    liveSampleFields: candidate.evidence?.liveSampleFields ?? [],
+    liveSampleRawSha256: candidate.evidence?.liveSampleRawSha256 ?? null,
+    liveSampleSchemaFingerprint: candidate.evidence?.liveSampleSchemaFingerprint ?? null,
+    liveSampleEvidenceHash: candidate.evidence?.liveSampleEvidenceHash ?? null,
+    admission: inventorySource.admissionEvidence ?? null,
+  };
 }
 
 /**
@@ -98,6 +147,8 @@ export function buildBaselineIngestionGateReport({
   transferRows,
   carDoorRows,
   kricMovement,
+  kricMovementContext = null,
+  kricStandardMovement = null,
   existingEdges = [],
   existingNodes = [],
   fixtureTransferRules = [],
@@ -174,7 +225,12 @@ export function buildBaselineIngestionGateReport({
       fixtureReflectedRuleCount,
     }),
     gateInternalConsistency: buildGateInternalConsistency(transfer, admittedTransferRules, selfLoopTransferRules),
-    gateKricStructuralAlignment: buildGateKricStructuralAlignment(normalizedRows, kricMovement),
+    gateKricStructuralAlignment: buildGateKricStructuralAlignment(
+      normalizedRows,
+      kricMovement,
+      kricMovementContext,
+      kricStandardMovement,
+    ),
     gateTimeSourceDistinction: buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existingEdges),
     pilotFieldDeviation: {
       status: "SKIPPED",
@@ -249,7 +305,7 @@ function buildGateInternalConsistency(transfer, admittedTransferRules, selfLoopT
 }
 
 // desk 게이트 ②: KRIC 동선 존재 ↔ 환승소요시간 baseline 존재의 구조 정합(충무로 3↔4).
-function buildGateKricStructuralAlignment(transferRows, kricMovement) {
+function buildGateKricStructuralAlignment(transferRows, kricMovement, kricMovementContext, kricStandardMovement) {
   const chungmuroBaseline = (transferRows ?? []).filter((row) => {
     if (row["환승역명"]?.trim() !== "충무로") return false;
     const direction = `${row["호선"]}->${row["환승노선"]}`;
@@ -259,21 +315,40 @@ function buildGateKricStructuralAlignment(transferRows, kricMovement) {
   const hasDirectionPair = directionKeys.has("3호선->4호선") && directionKeys.has("4호선->3호선");
   const resultCode = kricMovement?.header?.resultCode ?? null;
   const steps = Array.isArray(kricMovement?.body) ? kricMovement.body.length : 0;
-  const admitted = resultCode === "00" && steps > 0;
+  const evidenceFailures = validateKricMovementEvidence(kricMovement, kricMovementContext);
+  const admitted = resultCode === "00" && steps > 0 && evidenceFailures.length === 0;
+  const standardResultCode = kricStandardMovement?.header?.resultCode ?? null;
+  const standardSteps = Array.isArray(kricStandardMovement?.body) ? kricStandardMovement.body.length : 0;
   return {
     description:
       "충무로역 KRIC 동선(3호선↔4호선 detailed tuple) 존재와 환승소요시간 baseline 충무로(3↔4, 17m/00:14) 존재의 " +
       "구조 정합을 명시 기록한다.",
-    kricStandardResult:
-      "KRIC standard tuple은 no-data(resultCode=03)라 detailed tuple만 사용한다. 서울 환승소요시간 데이터와 겹치는 " +
-      "역이 충무로 1건뿐이라(standard 결과 없음 + detailed tuple 단위 호출 비용) 전량 교차검증은 불가하며 이 한정 " +
-      "사유를 정직하게 기록한다.",
+    kricStandardResult: {
+      sourceId: KRIC_STANDARD_SOURCE_ID,
+      status: kricStandardMovement ? "OBSERVED" : "SKIPPED",
+      resultCode: standardResultCode,
+      stepCount: standardSteps,
+      reason: kricStandardMovement
+        ? "입력된 standard response의 실제 resultCode와 body 행 수를 해석 없이 기록한다."
+        : "row-bearing standard response artifact가 제공되지 않아 resultCode를 추정하지 않고 SKIPPED 처리한다.",
+    },
     kricMovementDetailed: {
       sourceId: KRIC_MOVEMENT_SOURCE_ID,
       resultCode,
       admitted,
       stepCount: steps,
       station: "충무로(3호선↔4호선)",
+      requestContext: {
+        endpoint: kricMovementContext?.endpoint ?? null,
+        tuple: kricMovementContext?.requestTuple ?? null,
+        admissionSnapshotId: kricMovementContext?.admission?.snapshotId ?? null,
+      },
+      evidenceValidation: {
+        status: evidenceFailures.length === 0 ? "PASS" : "FAIL",
+        failures: evidenceFailures,
+        rawSha256: kricMovementContext?.liveSampleRawSha256 ?? null,
+        evidenceHash: kricMovementContext?.liveSampleEvidenceHash ?? null,
+      },
     },
     transferBaselineChungmuro: chungmuroBaseline.map((row) => ({
       호선: row["호선"],
@@ -285,6 +360,46 @@ function buildGateKricStructuralAlignment(transferRows, kricMovement) {
     note:
       "충무로 baseline은 capital 6역에 없으므로 팩에는 적재되지 않는다 — 전량 기준 교차검증 근거로만 리포트에 남긴다.",
   };
+}
+
+function validateKricMovementEvidence(kricMovement, context) {
+  const failures = [];
+  if (!context) return ["tracked detailed request context missing"];
+  if (context.candidateId !== KRIC_MOVEMENT_SOURCE_ID) failures.push("candidateId mismatch");
+  if (context.endpoint !== KRIC_DETAILED_ENDPOINT) failures.push("endpoint mismatch");
+  if (context.sampleEndpoint !== KRIC_DETAILED_ENDPOINT) failures.push("sample URL endpoint mismatch");
+  for (const [key, expected] of Object.entries(KRIC_CHUNGMURO_REQUEST_TUPLE)) {
+    if (context.requestTuple?.[key] !== expected) failures.push(`request tuple mismatch: ${key}`);
+  }
+
+  const admission = context.admission;
+  if (admission?.candidateId !== KRIC_MOVEMENT_SOURCE_ID) failures.push("admission candidateId mismatch");
+  if (admission?.sourceId !== KRIC_MOVEMENT_SOURCE_ID) failures.push("admission sourceId mismatch");
+  if (admission?.decision !== "APPROVED") failures.push("admission decision is not APPROVED");
+  if (context.liveSampleRawSha256 !== admission?.rawSha256) failures.push("rawSha256 admission mismatch");
+  if (context.liveSampleSchemaFingerprint !== admission?.schemaFingerprint) {
+    failures.push("schemaFingerprint admission mismatch");
+  }
+  if (context.liveSampleEvidenceHash !== admission?.sampleEvidenceHash) {
+    failures.push("sampleEvidenceHash admission mismatch");
+  }
+
+  const rows = Array.isArray(kricMovement?.body) ? kricMovement.body : [];
+  if (rows.length !== context.liveSampleRowCount) failures.push("response row count mismatch");
+  const expectedFields = [...(context.liveSampleFields ?? [])].sort(compareText);
+  if (
+    expectedFields.length === 0 ||
+    rows.some(
+      (row) =>
+        !row ||
+        typeof row !== "object" ||
+        Array.isArray(row) ||
+        JSON.stringify(Object.keys(row).sort(compareText)) !== JSON.stringify(expectedFields),
+    )
+  ) {
+    failures.push("response field schema mismatch");
+  }
+  return failures;
 }
 
 // desk 게이트 ③: timeSource 구분. baseline edge의 provenance_kind는 OFFICIAL_SOURCE로 고정된다.

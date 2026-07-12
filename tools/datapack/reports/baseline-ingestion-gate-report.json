@@ -81,12 +81,36 @@
     "description": "충무로역 KRIC 동선(3호선↔4호선 detailed tuple) 존재와 환승소요시간 baseline 충무로(3↔4, 17m/00:14) 존재의 구조 정합을 명시 기록한다.",
     "kricMovementDetailed": {
       "admitted": true,
+      "evidenceValidation": {
+        "evidenceHash": "055cda38e2a297d53f3fb7dd0a8c0a6069fd4517d33557bfdf97637728a22743",
+        "failures": [],
+        "rawSha256": "93f75d6049655663ee0f14ca88347b9645781feaf5085cbf5a0013e4d7156a66",
+        "status": "PASS"
+      },
+      "requestContext": {
+        "admissionSnapshotId": "kric-transfer-movement-detailed-admission-20260713",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement",
+        "tuple": {
+          "chthTgtLn": "4",
+          "chtnNextStinCd": "424",
+          "lnCd": "3",
+          "prevStinCd": "422",
+          "railOprIsttCd": "S1",
+          "stinCd": "321"
+        }
+      },
       "resultCode": "00",
       "sourceId": "kric-transfer-movement-detailed",
       "station": "충무로(3호선↔4호선)",
       "stepCount": 8
     },
-    "kricStandardResult": "KRIC standard tuple은 no-data(resultCode=03)라 detailed tuple만 사용한다. 서울 환승소요시간 데이터와 겹치는 역이 충무로 1건뿐이라(standard 결과 없음 + detailed tuple 단위 호출 비용) 전량 교차검증은 불가하며 이 한정 사유를 정직하게 기록한다.",
+    "kricStandardResult": {
+      "reason": "row-bearing standard response artifact가 제공되지 않아 resultCode를 추정하지 않고 SKIPPED 처리한다.",
+      "resultCode": null,
+      "sourceId": "kric-transfer-movement-standard",
+      "status": "SKIPPED",
+      "stepCount": 0
+    },
     "note": "충무로 baseline은 capital 6역에 없으므로 팩에는 적재되지 않는다 — 전량 기준 교차검증 근거로만 리포트에 남긴다.",
     "structurallyAligned": true,
     "transferBaselineChungmuro": [

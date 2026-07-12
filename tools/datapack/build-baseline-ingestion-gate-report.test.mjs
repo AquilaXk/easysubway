@@ -54,6 +54,59 @@ const pack = {
   ],
 };
 
+function admittedKricContext(overrides = {}) {
+  return {
+    candidateId: "kric-transfer-movement-detailed",
+    endpoint: "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement",
+    sampleEndpoint: "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement",
+    requestTuple: {
+      railOprIsttCd: "S1",
+      lnCd: "3",
+      stinCd: "321",
+      prevStinCd: "422",
+      chthTgtLn: "4",
+      chtnNextStinCd: "424",
+    },
+    liveSampleRowCount: 8,
+    liveSampleFields: [
+      "chtnMvTpOrdr",
+      "edMovePath",
+      "elvtSttCd",
+      "elvtTpCd",
+      "imgPath",
+      "mvContDtl",
+      "mvPathMgNo",
+      "stMovePath",
+    ],
+    liveSampleRawSha256: "a".repeat(64),
+    liveSampleSchemaFingerprint: "b".repeat(64),
+    liveSampleEvidenceHash: "c".repeat(64),
+    admission: {
+      candidateId: "kric-transfer-movement-detailed",
+      sourceId: "kric-transfer-movement-detailed",
+      snapshotId: "kric-transfer-movement-detailed-admission-20260713",
+      decision: "APPROVED",
+      rawSha256: "a".repeat(64),
+      schemaFingerprint: "b".repeat(64),
+      sampleEvidenceHash: "c".repeat(64),
+    },
+    ...overrides,
+  };
+}
+
+function kricStep() {
+  return {
+    chtnMvTpOrdr: "1",
+    edMovePath: "끝",
+    elvtSttCd: "",
+    elvtTpCd: "",
+    imgPath: "",
+    mvContDtl: "이동",
+    mvPathMgNo: "1",
+    stMovePath: "시작",
+  };
+}
+
 test("buildRosterFromPack: 짧은 lineNameKo 도출('수도권 2호선'→'2호선')", () => {
   const roster = buildRosterFromPack(pack);
   assert.equal(roster.length, 6);
@@ -86,7 +139,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
     },
     { stnNm: "없는역", lineNm: "9호선", qckgffVhclDoorNo: "1-1", upbdnbSe: "상행", plfmCmgFac: "계단" },
   ];
-  const kricMovement = { header: { resultCode: "00", resultCnt: 8 }, body: new Array(8).fill({}) };
+  const kricMovement = { header: { resultCode: "00", resultCnt: 8 }, body: new Array(8).fill(kricStep()) };
 
   const report = buildBaselineIngestionGateReport({
     roster,
@@ -95,6 +148,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
     kricMovement: {
       ...kricMovement,
     },
+    kricMovementContext: admittedKricContext(),
     existingEdges: pack.stationPathwayEdges,
     existingNodes: pack.stationPathwayNodes,
     fixtureTransferRules: pack.transferRules,
@@ -137,7 +191,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   // 게이트②: KRIC detailed admitted + 구조 정합.
   assert.equal(report.gateKricStructuralAlignment.kricMovementDetailed.admitted, true);
   assert.equal(report.gateKricStructuralAlignment.kricMovementDetailed.stepCount, 8);
-  assert.match(report.gateKricStructuralAlignment.kricStandardResult, /no-data/);
+  assert.equal(report.gateKricStructuralAlignment.kricStandardResult.status, "SKIPPED");
 
   // 게이트③: OFFICIAL_SOURCE 구분 축.
   assert.equal(report.gateTimeSourceDistinction.provenanceKindAxis, "OFFICIAL_SOURCE");
@@ -192,7 +246,10 @@ test("게이트②: 충무로 3↔4 baseline 행을 전량에서 추출한다", 
     roster,
     transferRows,
     carDoorRows: [],
-    kricMovement: { header: { resultCode: "00" }, body: [{}] },
+    kricMovement: { header: { resultCode: "00" }, body: [kricStep()] },
+    kricMovementContext: admittedKricContext({
+      liveSampleRowCount: 1,
+    }),
   });
   assert.equal(report.gateKricStructuralAlignment.transferBaselineChungmuro.length, 2);
   assert.equal(report.gateKricStructuralAlignment.structurallyAligned, true);
@@ -209,12 +266,15 @@ test("게이트②: 정확한 충무로 3↔4 양방향과 비어 있지 않은 
     환승역명: "충무로",
   };
   const direction4To3 = { ...direction3To4, 연번: 71, 호선: 4, 환승노선: "3호선" };
-  const build = (transferRows, body = [{}]) =>
+  const build = (transferRows, body = [kricStep()]) =>
     buildBaselineIngestionGateReport({
       roster,
       transferRows,
       carDoorRows: [],
       kricMovement: { header: { resultCode: "00" }, body },
+      kricMovementContext: admittedKricContext({
+        liveSampleRowCount: body.length,
+      }),
     }).gateKricStructuralAlignment;
 
   assert.equal(build([direction3To4]).structurallyAligned, false);
@@ -223,6 +283,50 @@ test("게이트②: 정확한 충무로 3↔4 양방향과 비어 있지 않은 
     false,
   );
   assert.equal(build([direction3To4, direction4To3], []).structurallyAligned, false);
+});
+
+test("게이트②: tracked endpoint·request tuple·admission hash가 다르면 detailed 응답을 admit하지 않는다", () => {
+  const transferRows = [
+    { 연번: 52, 호선: 3, 환승거리: 17, 환승노선: "4호선", 환승소요시간: "00:14", 환승역명: "충무로" },
+    { 연번: 71, 호선: 4, 환승거리: 17, 환승노선: "3호선", 환승소요시간: "00:14", 환승역명: "충무로" },
+  ];
+  const build = (kricMovementContext) =>
+    buildBaselineIngestionGateReport({
+      roster: buildRosterFromPack(pack),
+      transferRows,
+      carDoorRows: [],
+      kricMovement: { header: { resultCode: "00" }, body: [kricStep()] },
+      kricMovementContext,
+    }).gateKricStructuralAlignment;
+
+  assert.equal(build(admittedKricContext({ endpoint: "https://example.invalid/wrong" })).structurallyAligned, false);
+  assert.equal(
+    build(admittedKricContext({ requestTuple: { ...admittedKricContext().requestTuple, stinCd: "999" } }))
+      .structurallyAligned,
+    false,
+  );
+  assert.equal(
+    build(
+      admittedKricContext({
+        admission: { ...admittedKricContext().admission, sampleEvidenceHash: "d".repeat(64) },
+      }),
+    ).structurallyAligned,
+    false,
+  );
+});
+
+test("게이트②: standard 응답 artifact가 없으면 resultCode를 hardcode하지 않고 SKIPPED로 기록한다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [],
+    carDoorRows: [],
+    kricMovement: null,
+    kricMovementContext: admittedKricContext(),
+    kricStandardMovement: null,
+  });
+
+  assert.equal(report.gateKricStructuralAlignment.kricStandardResult.status, "SKIPPED");
+  assert.equal(report.gateKricStructuralAlignment.kricStandardResult.resultCode, null);
 });
 
 test("게이트③: 공식 rule이 참조하는 기존 edge의 provenance 누락을 FAIL 처리한다", () => {
