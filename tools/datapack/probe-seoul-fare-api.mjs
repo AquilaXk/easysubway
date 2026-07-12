@@ -239,7 +239,7 @@ export async function probeOfficialOdFares({
       providerMappings,
       quotes,
       fieldNames: [...REQUIRED_FARE_FIELDS].sort((left, right) =>
-        left.localeCompare(right)),
+        left < right ? -1 : 1),
       attemptCounts,
     };
     temporaryOutputPath = `${outputPath}.${randomUUID()}.tmp`;

@@ -155,6 +155,18 @@ test("HTTPS fare 응답 code canary로 양방향 공식 OD 증거만 기록한�
   });
 });
 
+test("fieldNames는 process locale과 무관한 canonical 순서를 유지한다", async (context) => {
+  const collator = new Intl.Collator("cs");
+  context.mock.method(String.prototype, "localeCompare", function compare(other) {
+    return collator.compare(String(this), other);
+  });
+
+  await withOutput(async (outputPath) => {
+    const evidence = await probe({ outputPath, fetchImpl: createFetch() });
+    assert.deepEqual(evidence.fieldNames, requiredFareFields);
+  });
+});
+
 test("fare canary 응답 code가 모호하면 target 호출 전에 실패한다", async () => {
   await withOutput(async (outputPath) => {
     const calls = [];
