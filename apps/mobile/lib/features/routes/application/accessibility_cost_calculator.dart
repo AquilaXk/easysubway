@@ -46,10 +46,16 @@ class AccessibilityCostCalculator {
     }
 
     if (edge.accessibilityState == RouteAccessibilityState.unavailable) {
-      return const AccessibilityCost(
+      // route contract: honest maintenance display (#1996)
+      // 실측된 보수중/점검/중지/공사(UNDER_MAINTENANCE)는 일반 '이용 어려움'과
+      // 구분되는 전용 사유로 정직하게 표시한다. 어느 쪽이든 available로는 절대
+      // 렌더되지 않고 차단된다.
+      return AccessibilityCost(
         cost: 0,
         isBlocked: true,
-        warningCodes: ['FACILITY_UNAVAILABLE'],
+        warningCodes: edge.isUnderMaintenance
+            ? const ['FACILITY_UNDER_MAINTENANCE']
+            : const ['FACILITY_UNAVAILABLE'],
       );
     }
 
