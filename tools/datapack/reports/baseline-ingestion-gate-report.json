@@ -66,15 +66,6 @@
         "secondsMismatch": false,
         "stationId": "station-sadang",
         "toLineId": "seoul-4"
-      },
-      {
-        "forwardMinTransferSeconds": 19,
-        "fromLineId": "seoul-2",
-        "hasReverse": true,
-        "reverseMinTransferSeconds": 19,
-        "secondsMismatch": false,
-        "stationId": "station-seongsu",
-        "toLineId": "seoul-2"
       }
     ],
     "duplicateReport": [],
@@ -100,25 +91,36 @@
     "structurallyAligned": true,
     "transferBaselineChungmuro": [
       {
-        "호선": 3,
+        "호선": "3호선",
         "환승거리": 17,
         "환승노선": "4호선",
-        "환승소요시간": "00:14"
+        "환승소요시간": 14
       },
       {
-        "호선": 4,
+        "호선": "4호선",
         "환승거리": 17,
         "환승노선": "3호선",
-        "환승소요시간": "00:14"
+        "환승소요시간": 14
       }
     ]
   },
   "gateTimeSourceDistinction": {
-    "baselineEdgeCount": 0,
-    "baselineEdgeProvenanceKinds": [],
+    "baselineEdgeCount": 1,
+    "baselineEdgeProvenanceKinds": [
+      "OFFICIAL_SOURCE"
+    ],
     "description": "station_pathway_edges 스키마의 provenance_kind가 OFFICIAL_SOURCE(공식 baseline)와 거리기반 추정류를 구분하는 축이다. importer가 baseline edge에 provenanceKind:OFFICIAL_SOURCE를 고정하는 것을 node --test로 고정했다 (import-transfer-baseline.test.mjs).",
-    "note": "capital 스코프에서는 사당(기존 양방향 edge로 중복 억제)·강남(platform node 부재) 때문에 신규 baseline edge가 생성되지 않지만(baselineEdgeCount=0), 구분 축 자체는 스키마·importer·테스트에 실재한다.",
-    "provenanceKindAxis": "OFFICIAL_SOURCE"
+    "edgeChecks": [
+      {
+        "edgeId": "path-edge-sadang-4-to-2-fast",
+        "failures": [],
+        "provenanceKind": "OFFICIAL_SOURCE",
+        "ruleId": "transfer-sadang-seoul-4-to-seoul-2"
+      }
+    ],
+    "note": "신규 생성 edge와 공식 baseline rule이 참조하는 기존 pathway edge를 함께 검사한다. 연결 edge가 없으면 SKIPPED, 모든 연결 edge의 source·snapshot·OFFICIAL_SOURCE provenance가 유효하면 PASS, 하나라도 어긋나면 FAIL이다.",
+    "provenanceKindAxis": "OFFICIAL_SOURCE",
+    "status": "PASS"
   },
   "metadata": {
     "countingBasis": "coverage와 desk 게이트 수치는 수집 전량(환승역거리 소요시간 145행, 빠른하차 2358행) 기준으로 계산한다. 팩 적재 매칭은 capital 6역(상록수·사당·강남·정자·성수·신설동) roster 스코프로 한정되어 대부분의 전량 행은 roster 밖이라 quarantine된다 — 이 한정 사유를 정직하게 계측한다.",

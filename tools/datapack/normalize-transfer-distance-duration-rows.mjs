@@ -79,7 +79,7 @@ export function normalizeTransferDistanceDurationRows(rows) {
 function normalizeLineNumber(value) {
   if (typeof value === "string" && value.trim() !== "") {
     const trimmed = value.trim();
-    if (/^\d+호선$/.test(trimmed)) return { value: trimmed };
+    if (/^[1-9]\d*호선$/.test(trimmed)) return { value: trimmed };
   }
   if (Number.isInteger(value) && value > 0) {
     return { value: `${value}호선` };
@@ -92,7 +92,7 @@ function parseMinuteSecond(value) {
   if (typeof value !== "string") {
     return { error: `환승소요시간 must be a "MM:SS" string: ${JSON.stringify(value)}` };
   }
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  const match = /^(\d{2}):(\d{2})$/.exec(value.trim());
   if (!match) {
     return { error: `환승소요시간 format invalid (expected MM:SS): ${value}` };
   }

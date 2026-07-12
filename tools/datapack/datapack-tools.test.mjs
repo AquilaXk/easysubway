@@ -234,6 +234,40 @@ test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack�
       },
     );
     assert.deepEqual(
+      {
+        ...database
+          .prepare(
+            `
+              SELECT duration_seconds, distance_meters, source_id, source_snapshot_id, provenance_kind
+              FROM station_pathway_edges
+              WHERE id = ?
+            `,
+          )
+          .get("path-edge-sadang-4-to-2-fast"),
+      },
+      {
+        duration_seconds: 62,
+        distance_meters: 74,
+        source_id: "seoul-metro-transfer-distance-duration",
+        source_snapshot_id: "seoul-metro-transfer-distance-duration-admission-20260713",
+        provenance_kind: "OFFICIAL_SOURCE",
+      },
+    );
+    assert.deepEqual(
+      {
+        ...database
+          .prepare(
+            `
+              SELECT COUNT(*) AS count
+              FROM station_car_door_hints
+              WHERE provenance_kind = 'OFFICIAL' AND source_snapshot_id = ?
+            `,
+          )
+          .get("seoul-metro-fast-exit-car-door-admission-20260713"),
+      },
+      { count: 35 },
+    );
+    assert.deepEqual(
       database
         .prepare(
           `
@@ -14428,6 +14462,21 @@ test("데이터팩 생성기는 car_number 0을 CHECK 위반으로 거부한다"
       { cwd: root, env: productionEnv },
     ),
     /CHECK constraint failed|car_number/,
+  );
+});
+
+test("데이터팩 생성기는 OFFICIAL car-door hint의 빈 sourceSnapshotId를 거부한다", async () => {
+  const { outputDir, fixturePath } = await prepareCarDoorHintFixture("car-door-official-snapshot", {
+    provenanceKind: "OFFICIAL",
+    sourceSnapshotId: "",
+  });
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", outputDir],
+      { cwd: root, env: productionEnv },
+    ),
+    /stationCarDoorHints\.sourceSnapshotId/,
   );
 });
 

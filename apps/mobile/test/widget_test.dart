@@ -4912,7 +4912,7 @@ void main() {
         await tester.pumpAndSettle();
         attempts += 1;
       }
-      expect(finder, findsWidgets);
+      expect(finder, findsNWidgets(2));
     }
   });
 

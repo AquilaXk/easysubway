@@ -32,9 +32,26 @@ const pack = {
     { id: "n-sadang-4", stationId: "station-sadang", lineId: "seoul-4", nodeType: "PLATFORM" },
   ],
   stationPathwayEdges: [
-    { id: "e-sadang", fromNodeId: "n-sadang-4", toNodeId: "n-sadang-2", bidirectional: true },
+    {
+      id: "e-sadang",
+      fromNodeId: "n-sadang-4",
+      toNodeId: "n-sadang-2",
+      bidirectional: true,
+      durationSeconds: 62,
+      sourceId: "seoul-metro-transfer-distance-duration",
+      sourceSnapshotId: "seoul-metro-transfer-distance-duration-admission-20260713",
+      provenanceKind: "OFFICIAL_SOURCE",
+    },
   ],
-  transferRules: [{ id: "transfer-sadang" }, { id: "transfer-gangnam" }],
+  transferRules: [
+    {
+      id: "transfer-sadang",
+      sourceId: "seoul-metro-transfer-distance-duration",
+      pathwayEdgeId: "e-sadang",
+      minTransferSeconds: 62,
+    },
+    { id: "transfer-gangnam", sourceId: "seoul-metro-transfer-distance-duration", pathwayEdgeId: null },
+  ],
 };
 
 test("buildRosterFromPack: 짧은 lineNameKo 도출('수도권 2호선'→'2호선')", () => {
@@ -80,6 +97,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
     },
     existingEdges: pack.stationPathwayEdges,
     existingNodes: pack.stationPathwayNodes,
+    fixtureTransferRules: pack.transferRules,
     fixtureReflectedRuleCount: pack.transferRules.length,
   });
 
@@ -109,6 +127,12 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
   assert.equal(sadangPair.forwardMinTransferSeconds, 62);
   assert.equal(sadangPair.hasReverse, true);
   assert.equal(sadangPair.secondsMismatch, false);
+  assert.equal(
+    report.gateInternalConsistency.directionPairReport.some(
+      (row) => row.fromLineId === row.toLineId,
+    ),
+    false,
+  );
 
   // 게이트②: KRIC detailed admitted + 구조 정합.
   assert.equal(report.gateKricStructuralAlignment.kricMovementDetailed.admitted, true);
@@ -117,6 +141,7 @@ test("리포트: 수집 전량 기준 coverage + 게이트 + 스코프 metadata"
 
   // 게이트③: OFFICIAL_SOURCE 구분 축.
   assert.equal(report.gateTimeSourceDistinction.provenanceKindAxis, "OFFICIAL_SOURCE");
+  assert.equal(report.gateTimeSourceDistinction.status, "PASS");
 
   // pilot 편차 SKIPPED.
   assert.equal(report.pilotFieldDeviation.status, "SKIPPED");
@@ -142,6 +167,21 @@ test("리포트: 객체가 아닌 transfer row를 malformed로 계측하고 중�
   assert.equal(report.gateKricStructuralAlignment.structurallyAligned, false);
 });
 
+test("리포트: 빈 환승역명은 고유 역 수에서 제외한다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [
+      { 연번: 1, 호선: 2, 환승거리: 10, 환승노선: "4호선", 환승소요시간: "00:10" },
+      { 연번: 2, 호선: 2, 환승거리: 10, 환승노선: "4호선", 환승소요시간: "00:10", 환승역명: "  " },
+    ],
+    carDoorRows: [],
+    kricMovement: null,
+  });
+
+  assert.equal(report.coverage.transfer.uniqueStationNames, 0);
+  assert.equal(report.coverage.transfer.malformedRows, 0);
+});
+
 test("게이트②: 충무로 3↔4 baseline 행을 전량에서 추출한다", () => {
   const roster = buildRosterFromPack(pack);
   const transferRows = [
@@ -156,4 +196,44 @@ test("게이트②: 충무로 3↔4 baseline 행을 전량에서 추출한다", 
   });
   assert.equal(report.gateKricStructuralAlignment.transferBaselineChungmuro.length, 2);
   assert.equal(report.gateKricStructuralAlignment.structurallyAligned, true);
+});
+
+test("게이트②: 정확한 충무로 3↔4 양방향과 비어 있지 않은 detailed body를 모두 요구한다", () => {
+  const roster = buildRosterFromPack(pack);
+  const direction3To4 = {
+    연번: 52,
+    호선: 3,
+    환승거리: 17,
+    환승노선: "4호선",
+    환승소요시간: "00:14",
+    환승역명: "충무로",
+  };
+  const direction4To3 = { ...direction3To4, 연번: 71, 호선: 4, 환승노선: "3호선" };
+  const build = (transferRows, body = [{}]) =>
+    buildBaselineIngestionGateReport({
+      roster,
+      transferRows,
+      carDoorRows: [],
+      kricMovement: { header: { resultCode: "00" }, body },
+    }).gateKricStructuralAlignment;
+
+  assert.equal(build([direction3To4]).structurallyAligned, false);
+  assert.equal(
+    build([{ ...direction3To4, 호선: 2, 환승노선: "4호선" }, direction4To3]).structurallyAligned,
+    false,
+  );
+  assert.equal(build([direction3To4, direction4To3], []).structurallyAligned, false);
+});
+
+test("게이트③: 공식 rule이 참조하는 기존 edge의 provenance 누락을 FAIL 처리한다", () => {
+  const report = buildBaselineIngestionGateReport({
+    roster: buildRosterFromPack(pack),
+    transferRows: [],
+    carDoorRows: [],
+    kricMovement: null,
+    existingEdges: [{ id: "e-sadang", provenanceKind: "UNKNOWN", sourceId: "fixture" }],
+    fixtureTransferRules: pack.transferRules,
+  });
+
+  assert.equal(report.gateTimeSourceDistinction.status, "FAIL");
 });

@@ -107,6 +107,25 @@ test("N호선 전체 형식이 아닌 문자열은 malformed", () => {
   assert.match(malformed[0].reason, /호선 must be/);
 });
 
+test("0호선·선행 0 호선 문자열은 malformed", () => {
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([
+    transferRow({ 호선: "0호선" }),
+    transferRow({ 호선: "04호선" }),
+  ]);
+  assert.equal(normalizedRows.length, 0);
+  assert.equal(malformed.length, 2);
+  for (const entry of malformed) assert.match(entry.reason, /호선 must be/);
+});
+
+test("MM:SS의 분이 한 자리인 시간은 malformed", () => {
+  const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows([
+    transferRow({ 환승소요시간: "9:02" }),
+  ]);
+  assert.equal(normalizedRows.length, 0);
+  assert.equal(malformed.length, 1);
+  assert.match(malformed[0].reason, /format invalid/);
+});
+
 test("객체 아닌 행 → malformed", () => {
   const { normalizedRows, malformed } = normalizeTransferDistanceDurationRows(["not-an-object", null]);
   assert.equal(normalizedRows.length, 0);

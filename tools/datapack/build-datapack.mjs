@@ -1584,7 +1584,9 @@ function buildSqlitePack(sqlitePath, schema, pack) {
           requiredInteger(row.carNumber, "stationCarDoorHints.carNumber"),
           requiredInteger(row.doorNumber, "stationCarDoorHints.doorNumber"),
           row.sourceId ?? "",
-          row.sourceSnapshotId ?? "",
+          row.provenanceKind === "OFFICIAL"
+            ? requiredString(row.sourceSnapshotId, "stationCarDoorHints.sourceSnapshotId")
+            : row.sourceSnapshotId ?? "",
           row.providerRecordHash ?? "",
           row.provenanceKind ?? "UNKNOWN",
           row.verificationStatus ?? "UNKNOWN",

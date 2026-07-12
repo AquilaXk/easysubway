@@ -1360,15 +1360,17 @@
           "fromNodeId": "path-node-sadang-platform-4",
           "toNodeId": "path-node-sadang-platform-2",
           "edgeType": "STAIRS",
-          "durationSeconds": 210,
-          "distanceMeters": 120,
+          "durationSeconds": 62,
+          "distanceMeters": 74,
           "bidirectional": true,
           "includesStairs": true,
           "levelFrom": "B3",
           "levelTo": "B2",
           "reliabilityScore": 80,
           "accessibilityStatus": "LIMITED",
-          "sourceId": "fixture-capital-catalog",
+          "sourceId": "seoul-metro-transfer-distance-duration",
+          "sourceSnapshotId": "seoul-metro-transfer-distance-duration-admission-20260713",
+          "provenanceKind": "OFFICIAL_SOURCE",
           "verificationStatus": "VERIFIED",
           "instruction": "계단 환승 통로로 2호선 승강장 이동"
         },
@@ -1431,7 +1433,7 @@
           "carNumber": 3,
           "doorNumber": 4,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "b503c11481bca3cb8019af4535f064b013850c30d5501d76fdecf628fbbff7ac",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1445,7 +1447,7 @@
           "carNumber": 2,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "bb381160d52a19fee659bd160faac67778d9a0f252ab9d6bb4002673b865d9ca",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1459,7 +1461,7 @@
           "carNumber": 4,
           "doorNumber": 2,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "8ca88924112eb71caefad2d8b4fcf0a4f92c9afc7bb1173b9c08ff8b6ec72aee",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1473,7 +1475,7 @@
           "carNumber": 7,
           "doorNumber": 2,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "df540c3a6cd812ba0164a7765a0b53cfe86deb3ea34c161fcc419145d0f85e27",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1487,7 +1489,7 @@
           "carNumber": 9,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "6fa84e4dabea6e79bbf3667eb1d2fecc86010fe743ce9ecc1f82717923b19c50",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1501,7 +1503,7 @@
           "carNumber": 8,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "9a02308b6874c068563b531157b040202dadf1306cec1272c7acad6ee1cbfc80",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1515,7 +1517,7 @@
           "carNumber": 2,
           "doorNumber": 4,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "d4d87fc73f6f48287afb8cd27815f1ee518836423d525b8473a62038d198c485",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1529,7 +1531,7 @@
           "carNumber": 4,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "7efe060307cc7bf1790d35261ac222afff8ae3dfba433502256ad5e589ab2572",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1543,7 +1545,7 @@
           "carNumber": 7,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "5e2e163b3238ec61d3cb81518845b87de696c5c26775acf5f08d2ef5ec84f087",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1557,7 +1559,7 @@
           "carNumber": 9,
           "doorNumber": 2,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "15bdca1edca25ae37cbe7c0325ef4417db40d3e0cb44798b6a36083e5cbe378f",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1571,7 +1573,7 @@
           "carNumber": 3,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "c6ecd312fa4a985373a6259184b8ac533146e6bd63bb0b92cd768c17c0280c6f",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1585,7 +1587,7 @@
           "carNumber": 3,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "3a5dc14a5e9678d78e114bd6d31f30ba071545fae231638f81219265e1b22cd5",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1599,7 +1601,7 @@
           "carNumber": 8,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "9e0ec3f7f7f8701368dd86baab8762f4e89bae7267c2234b12dcfafcb2eb6cbd",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1613,7 +1615,7 @@
           "carNumber": 8,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "7cf5288c8a8b8d852c45da683e4ec998fc7df12d9b023835bceea43d3017835d",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1627,7 +1629,7 @@
           "carNumber": 3,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "c1f031e5bbea3ecbb9fdb1a88f15abfe9af9688cf00b6694d86c4e38c3fc54b7",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1641,7 +1643,7 @@
           "carNumber": 8,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "582171b8f7ce00c922376252d2a7fe005b99a3cf351ee7f16def43292653fc40",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1655,7 +1657,7 @@
           "carNumber": 4,
           "doorNumber": 4,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "952be8e6fe6bf5e9c56a029bde1438b87274e9a3977f0c8c81b540b6e0769a24",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1669,7 +1671,7 @@
           "carNumber": 3,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "8100d3e89d6e1ca044878ececea34a08889c58129eb7ebd0d9d7eef6ce948b4f",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1683,7 +1685,7 @@
           "carNumber": 3,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "e166d76e77a401f39023a98f15d7499bf2a6d8f7b56e00b6af2ad6be200ae69d",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1697,7 +1699,7 @@
           "carNumber": 8,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "aedc464063b3839ef3f309103c3596fcfbce8fe8b043cc785ab6e3626d9ee638",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1711,7 +1713,7 @@
           "carNumber": 8,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "2a01bb0fce1dca73ce8cbfde05abc329e7c7751a1bd01779d77b224de1811c07",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1725,7 +1727,7 @@
           "carNumber": 3,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "2714c37372d57e10d049e81660619e06e8af21e82a82845640078e02c7e90b50",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1739,7 +1741,7 @@
           "carNumber": 8,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "16c640a83525e9d887c8a6f97eb3e4974397c9d1e9749decdf28e80c3edd5490",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1753,7 +1755,7 @@
           "carNumber": 2,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "4bdcc1267aa2730943bf30f5b49a56f8bf3115d5b35aca4a6da3901c26ada27e",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1767,7 +1769,7 @@
           "carNumber": 1,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "6d6ca5166e82e908f3971ae2385b2ff10423428e2c60608896c1ffdbf3c684e6",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1781,7 +1783,7 @@
           "carNumber": 1,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "0bc22601c555f92a12737e571a9835da0cb263d66d289e5b6b0090182a4897df",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1795,7 +1797,7 @@
           "carNumber": 5,
           "doorNumber": 2,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "2e157ad0f1a8920573df7ab49146d126a29b614013ed8e8d9b562fdf80dec1d9",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1809,7 +1811,7 @@
           "carNumber": 9,
           "doorNumber": 2,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "d7745ea46274264f49c3dfceb66bb27a09bb2fe11d1aac822c8201ef8be1914d",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1823,7 +1825,7 @@
           "carNumber": 10,
           "doorNumber": 4,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "8755ee8432fd9a02f6739e9361682dbc9a47316bc9e80ff2a27f47004c2330c9",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1837,7 +1839,7 @@
           "carNumber": 10,
           "doorNumber": 4,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "b5e431160a51bfc04887532990108900fb5665a55d179de40d6c9a136c909ef1",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1851,7 +1853,7 @@
           "carNumber": 6,
           "doorNumber": 3,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "aa64cecec184e169fe988752d3779448aa0d270eb54f1d420f1dc7c6359a4379",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1865,7 +1867,7 @@
           "carNumber": 4,
           "doorNumber": 4,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "e26534c8c3a2e8798bb62212685bd4a400b5beb6e4469f80dd51fdc330d0cd40",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1879,7 +1881,7 @@
           "carNumber": 7,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "b9be04a4d0403624b2ab9efe933022f630194147e2030ead0f4562e2a189cea8",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1893,7 +1895,7 @@
           "carNumber": 1,
           "doorNumber": 1,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "fe8404ddb59ae83e4add31a548b48c9d888683a3e18307ca3757afb45f8d1070",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"
@@ -1907,7 +1909,7 @@
           "carNumber": 10,
           "doorNumber": 4,
           "sourceId": "seoul-metro-fast-exit-car-door",
-          "sourceSnapshotId": "",
+          "sourceSnapshotId": "seoul-metro-fast-exit-car-door-admission-20260713",
           "providerRecordHash": "f4975803614f270e083d3fbd2f9c0d405b3ccc9251de90de60790ebcf41e355f",
           "provenanceKind": "OFFICIAL",
           "verificationStatus": "OFFICIAL"

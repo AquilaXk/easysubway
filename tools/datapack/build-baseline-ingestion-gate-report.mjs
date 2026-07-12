@@ -30,6 +30,8 @@ import { normalizeTransferDistanceDurationRows } from "./normalize-transfer-dist
 const TRANSFER_SOURCE_ID = "seoul-metro-transfer-distance-duration";
 const CAR_DOOR_SOURCE_ID = "seoul-metro-fast-exit-car-door";
 const KRIC_MOVEMENT_SOURCE_ID = "kric-transfer-movement-detailed";
+const TRANSFER_SNAPSHOT_ID = "seoul-metro-transfer-distance-duration-admission-20260713";
+const CAR_DOOR_SNAPSHOT_ID = "seoul-metro-fast-exit-car-door-admission-20260713";
 
 async function main(argv) {
   const args = parseArgs(argv);
@@ -47,6 +49,7 @@ async function main(argv) {
     kricMovement,
     existingEdges: pack.stationPathwayEdges ?? [],
     existingNodes: pack.stationPathwayNodes ?? [],
+    fixtureTransferRules: pack.transferRules ?? [],
     fixtureReflectedRuleCount: (pack.transferRules ?? []).length,
   });
 
@@ -97,6 +100,7 @@ export function buildBaselineIngestionGateReport({
   kricMovement,
   existingEdges = [],
   existingNodes = [],
+  fixtureTransferRules = [],
   fixtureReflectedRuleCount = 0,
 }) {
   const transferRowList = Array.isArray(transferRows) ? transferRows : [];
@@ -112,12 +116,14 @@ export function buildBaselineIngestionGateReport({
     existingEdges,
     existingNodes,
     sourceId: TRANSFER_SOURCE_ID,
+    snapshotId: TRANSFER_SNAPSHOT_ID,
     verificationStatus: "VERIFIED",
   });
   const carDoor = buildCarDoorHints({
     roster,
     rows: carDoorRowList,
     sourceId: CAR_DOOR_SOURCE_ID,
+    snapshotId: CAR_DOOR_SNAPSHOT_ID,
     verificationStatus: "OFFICIAL",
   });
 
@@ -125,7 +131,12 @@ export function buildBaselineIngestionGateReport({
   const admittedTransferRules = transfer.transferRules.filter((rule) => rule.fromLineId !== rule.toLineId);
   const selfLoopTransferRules = transfer.transferRules.filter((rule) => rule.fromLineId === rule.toLineId);
 
-  const uniqueTransferStations = new Set(validTransferRows.map((row) => String(row["환승역명"]))).size;
+  const uniqueTransferStations = new Set(
+    validTransferRows
+      .map((row) => row["환승역명"])
+      .filter((stationName) => typeof stationName === "string" && stationName.trim() !== "")
+      .map((stationName) => stationName.trim()),
+  ).size;
   const matchedTransferStations = new Set(admittedTransferRules.map((rule) => rule.fromStationId));
 
   return {
@@ -163,8 +174,8 @@ export function buildBaselineIngestionGateReport({
       fixtureReflectedRuleCount,
     }),
     gateInternalConsistency: buildGateInternalConsistency(transfer, admittedTransferRules, selfLoopTransferRules),
-    gateKricStructuralAlignment: buildGateKricStructuralAlignment(validTransferRows, kricMovement),
-    gateTimeSourceDistinction: buildGateTimeSourceDistinction(transfer),
+    gateKricStructuralAlignment: buildGateKricStructuralAlignment(normalizedRows, kricMovement),
+    gateTimeSourceDistinction: buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existingEdges),
     pilotFieldDeviation: {
       status: "SKIPPED",
       reason:
@@ -226,7 +237,7 @@ function buildGateInternalConsistency(transfer, admittedTransferRules, selfLoopT
     description:
       "적재 대상(capital roster 매칭 성공분)의 방향쌍 존재/소요시간 불일치·중복을 리포트한다. capital 6역 스코프 " +
       "한정이라 전량 내부 정합은 roster 확장이 필요하며(비범위), 매칭 실패 전량 행은 coverage.quarantine으로 집계된다.",
-    directionPairReport: transfer.directionPairReport,
+    directionPairReport: transfer.directionPairReport.filter((row) => row.fromLineId !== row.toLineId),
     duplicateReport: transfer.duplicateReport,
     selfLoopExcluded: selfLoopTransferRules.map((rule) => ({
       stationId: rule.fromStationId,
@@ -239,10 +250,16 @@ function buildGateInternalConsistency(transfer, admittedTransferRules, selfLoopT
 
 // desk 게이트 ②: KRIC 동선 존재 ↔ 환승소요시간 baseline 존재의 구조 정합(충무로 3↔4).
 function buildGateKricStructuralAlignment(transferRows, kricMovement) {
-  const chungmuroBaseline = (transferRows ?? []).filter((row) => String(row["환승역명"]).includes("충무로"));
+  const chungmuroBaseline = (transferRows ?? []).filter((row) => {
+    if (row["환승역명"]?.trim() !== "충무로") return false;
+    const direction = `${row["호선"]}->${row["환승노선"]}`;
+    return direction === "3호선->4호선" || direction === "4호선->3호선";
+  });
+  const directionKeys = new Set(chungmuroBaseline.map((row) => `${row["호선"]}->${row["환승노선"]}`));
+  const hasDirectionPair = directionKeys.has("3호선->4호선") && directionKeys.has("4호선->3호선");
   const resultCode = kricMovement?.header?.resultCode ?? null;
   const steps = Array.isArray(kricMovement?.body) ? kricMovement.body.length : 0;
-  const admitted = resultCode === "00";
+  const admitted = resultCode === "00" && steps > 0;
   return {
     description:
       "충무로역 KRIC 동선(3호선↔4호선 detailed tuple) 존재와 환승소요시간 baseline 충무로(3↔4, 17m/00:14) 존재의 " +
@@ -264,28 +281,60 @@ function buildGateKricStructuralAlignment(transferRows, kricMovement) {
       환승거리: row["환승거리"],
       환승소요시간: row["환승소요시간"],
     })),
-    structurallyAligned: admitted && chungmuroBaseline.length > 0,
+    structurallyAligned: admitted && hasDirectionPair,
     note:
       "충무로 baseline은 capital 6역에 없으므로 팩에는 적재되지 않는다 — 전량 기준 교차검증 근거로만 리포트에 남긴다.",
   };
 }
 
 // desk 게이트 ③: timeSource 구분. baseline edge의 provenance_kind는 OFFICIAL_SOURCE로 고정된다.
-function buildGateTimeSourceDistinction(transfer) {
-  const provenanceKinds = [...new Set(transfer.stationPathwayEdges.map((edge) => edge.provenanceKind))].sort(
-    compareText,
-  );
+function buildGateTimeSourceDistinction(transfer, fixtureTransferRules, existingEdges) {
+  const existingEdgesById = new Map(existingEdges.map((edge) => [edge.id, edge]));
+  const referencedExistingEdges = fixtureTransferRules
+    .filter((rule) => rule.sourceId === TRANSFER_SOURCE_ID && rule.pathwayEdgeId)
+    .map((rule) => ({ rule, edge: existingEdgesById.get(rule.pathwayEdgeId) ?? null }));
+  const generatedEdges = transfer.stationPathwayEdges.map((edge) => ({ rule: null, edge }));
+  const edgeChecks = [...generatedEdges, ...referencedExistingEdges].map(({ rule, edge }) => {
+    const failures = [];
+    if (!edge) {
+      failures.push("referenced pathway edge missing");
+    } else {
+      if (edge.provenanceKind !== "OFFICIAL_SOURCE") failures.push("provenanceKind is not OFFICIAL_SOURCE");
+      if (edge.sourceId !== TRANSFER_SOURCE_ID) failures.push("sourceId does not match official transfer source");
+      if (typeof edge.sourceSnapshotId !== "string" || edge.sourceSnapshotId.trim() === "") {
+        failures.push("sourceSnapshotId is empty");
+      }
+      if (
+        rule &&
+        Number.isInteger(rule.minTransferSeconds) &&
+        edge.durationSeconds !== rule.minTransferSeconds
+      ) {
+        failures.push("edge durationSeconds does not match rule minTransferSeconds");
+      }
+    }
+    return {
+      edgeId: edge?.id ?? rule?.pathwayEdgeId ?? null,
+      ruleId: rule?.id ?? null,
+      provenanceKind: edge?.provenanceKind ?? null,
+      failures,
+    };
+  });
+  const failedEdges = edgeChecks.filter((check) => check.failures.length > 0);
+  const status = edgeChecks.length === 0 ? "SKIPPED" : failedEdges.length === 0 ? "PASS" : "FAIL";
+  const provenanceKinds = [...new Set(edgeChecks.map((check) => check.provenanceKind).filter(Boolean))].sort(compareText);
   return {
     description:
       "station_pathway_edges 스키마의 provenance_kind가 OFFICIAL_SOURCE(공식 baseline)와 거리기반 추정류를 구분하는 " +
       "축이다. importer가 baseline edge에 provenanceKind:OFFICIAL_SOURCE를 고정하는 것을 node --test로 고정했다 " +
       "(import-transfer-baseline.test.mjs).",
     provenanceKindAxis: "OFFICIAL_SOURCE",
-    baselineEdgeCount: transfer.stationPathwayEdges.length,
+    status,
+    baselineEdgeCount: edgeChecks.length,
     baselineEdgeProvenanceKinds: provenanceKinds,
+    edgeChecks,
     note:
-      "capital 스코프에서는 사당(기존 양방향 edge로 중복 억제)·강남(platform node 부재) 때문에 신규 baseline edge가 " +
-      "생성되지 않지만(baselineEdgeCount=0), 구분 축 자체는 스키마·importer·테스트에 실재한다.",
+      "신규 생성 edge와 공식 baseline rule이 참조하는 기존 pathway edge를 함께 검사한다. 연결 edge가 없으면 SKIPPED, " +
+      "모든 연결 edge의 source·snapshot·OFFICIAL_SOURCE provenance가 유효하면 PASS, 하나라도 어긋나면 FAIL이다.",
   };
 }
 
