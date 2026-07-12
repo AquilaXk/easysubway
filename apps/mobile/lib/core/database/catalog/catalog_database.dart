@@ -7,7 +7,7 @@ import 'catalog_tables.dart';
 
 part 'catalog_database.g.dart';
 
-const catalogDatabaseSchemaVersion = 15;
+const catalogDatabaseSchemaVersion = 16;
 
 /// 수도권 통합요금 기본거리(10km) 초과분 요금 단계(#1911).
 ///
@@ -58,6 +58,7 @@ const capitalIntegratedAdditionalStepsJson =
     StationPathwayEdges,
     TransferRules,
     DataQualityRecords,
+    StationCarDoorHints,
   ],
 )
 /// The catalog database is replaceable installed-pack state.
@@ -145,6 +146,10 @@ class CatalogDatabase extends _$CatalogDatabase {
         }
         if (from < 15) {
           await _addStationExitMapColumns();
+        }
+        if (from < 16) {
+          await migrator.createTable(stationCarDoorHints);
+          await _createStationCarDoorHintIndexes();
         }
       },
       beforeOpen: (_) async {
@@ -1005,6 +1010,14 @@ class CatalogDatabase extends _$CatalogDatabase {
       'ON internal_route_edges(from_node_id)',
     );
     await _createStationPathwayIndexes();
+    await _createStationCarDoorHintIndexes();
+  }
+
+  Future<void> _createStationCarDoorHintIndexes() async {
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_station_car_door_hints_station '
+      'ON station_car_door_hints(station_id, line_id)',
+    );
   }
 
   Future<void> _createRealtimeProviderIndexes() async {
