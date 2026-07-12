@@ -1005,35 +1005,38 @@ void main() {
         .getSize(find.byKey(const Key('heroStationSearchInputBox')))
         .height;
 
-    expect(idleHeight, 38.0);
-    expect(activeHeight, 38.0);
+    expect(idleHeight, 46.0);
+    expect(activeHeight, 46.0);
     expect(find.text('역 이름을 입력해 주세요'), findsOneWidget);
 
-    // hint는 부유 라벨이 아니라 박스 내부 수직 중앙에 렌더돼야 한다
+    // hint는 부유 라벨이 아니라 박스 내부 수직 중앙 부근에 렌더돼야 한다
     // (idle의 '지하철역 검색' 텍스트와 같은 위치). 박스 상단 테두리 위로
-    // 떠오르는 부유 라벨 회귀를 막는다.
+    // 떠오르는 부유 라벨 회귀를 막는다. #2003에서 폰트가 15→17로 커지며
+    // strut 라인 높이와 실제 glyph 메트릭 사이 오차가 최대 2px 정도
+    // 나타나는데, 이는 부유 라벨 회귀(수 px~10px 단위로 위로 뜸)와는
+    // 규모가 다르므로 epsilon을 소폭 완화해 판별한다.
     expect(
       tester.getCenter(find.text('역 이름을 입력해 주세요')).dy,
       moreOrLessEquals(
         tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
-        epsilon: 1.0,
+        epsilon: 3.0,
       ),
     );
 
-    // 검색어를 입력하면 지우기 버튼이 나타나고, 시각 박스(38px)와 별개로
+    // 검색어를 입력하면 지우기 버튼이 나타나고, 시각 박스(46px)와 별개로
     // 실제 렌더 크기가 접근성 최소 탭 타깃(48x48) 이상이어야 한다. 버튼이
-    // 나타나도 시각 박스 높이는 38px 그대로 유지돼야 한다.
+    // 나타나도 시각 박스 높이는 46px 그대로 유지돼야 한다.
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
 
-    // 입력한 편집 텍스트도 hint와 마찬가지로 시각 박스 수직 중앙에 놓여야 한다
-    // (박스 상단에 붙는 회귀 방지). 편집 텍스트의 세로 중심이 38px 박스 중심과
-    // 일치하는지 확인한다.
+    // 입력한 편집 텍스트도 hint와 마찬가지로 시각 박스 수직 중앙 부근에
+    // 놓여야 한다(박스 상단에 붙는 회귀 방지). epsilon 근거는 위 hint
+    // 주석과 동일.
     expect(
       tester.getCenter(find.text('상록수')).dy,
       moreOrLessEquals(
         tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
-        epsilon: 1.0,
+        epsilon: 3.0,
       ),
     );
 
@@ -1054,8 +1057,69 @@ void main() {
     expect(clearButtonSize.height, greaterThanOrEqualTo(48.0));
     expect(
       tester.getSize(find.byKey(const Key('heroStationSearchInputBox'))).height,
-      38.0,
+      46.0,
     );
+  });
+
+  testWidgets('#2003 상단 내비게이션(검색바·메뉴·힌트 텍스트)이 확대된 안 B 치수를 갖는다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // idle 검색바의 시각 박스 높이는 46px이어야 한다(#2003 안 B).
+    expect(
+      tester.getSize(find.byKey(const Key('heroStationSearchButton'))).height,
+      46.0,
+    );
+
+    // idle 검색바의 힌트 텍스트('지하철역 검색') 폰트 크기는 17이어야 한다.
+    final hintText = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const Key('heroStationSearchButton')),
+        matching: find.text('지하철역 검색'),
+      ),
+    );
+    expect(hintText.style?.fontSize, 17);
+
+    // idle 검색바의 검색 아이콘 크기는 22여야 한다.
+    final idleSearchIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const Key('heroStationSearchButton')),
+        matching: find.byIcon(Icons.search),
+      ),
+    );
+    expect(idleSearchIcon.size, 22.0);
+
+    // 상단바 햄버거 메뉴 아이콘 크기는 26이어야 한다.
+    final menuIcon = tester.widget<Icon>(
+      find.descendant(
+        of: find.byKey(const Key('networkMapMenuButton')),
+        matching: find.byIcon(Icons.menu),
+      ),
+    );
+    expect(menuIcon.size, 26.0);
+
+    // in-place 편집 검색 필드로 전환해도 시각 박스 높이가 idle과 동일하게
+    // 유지돼야 한다(박스 점프 없음, #1933 계약 확장).
+    final idleHeight = tester
+        .getSize(find.byKey(const Key('heroStationSearchButton')))
+        .height;
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+
+    final activeHeight = tester
+        .getSize(find.byKey(const Key('heroStationSearchInputBox')))
+        .height;
+    expect(activeHeight, idleHeight);
   });
 
   testWidgets('노선도 검색 중 타이핑은 지도 chrome을 재빌드하지 않는다', (tester) async {
