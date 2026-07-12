@@ -50,6 +50,30 @@ function validateStatus(bundle, field, requirePass) {
   }
 }
 
+function validateNonNegativeInteger(bundle, field) {
+  const value = requireField(bundle, field);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${field} must be a non-negative integer`);
+  }
+  return value;
+}
+
+// route_graph_topology의 status와 위반 수치는 워크플로에서 함께 파생된다:
+// violationCount === 0 이면 PASS, 위반이 있으면 deferred scope에서 DEFERRED(그 외 FAIL/BLOCKED_EXTERNAL).
+// 손 조립 bundle에서 이 정합이 깨진 조합(예: DEFERRED + violationCount 0 → 위반 은폐)을 런타임에서 차단한다.
+function validateRouteGraphTopologyIntegrity(bundle) {
+  const violationCount = validateNonNegativeInteger(bundle, "routeGraphTopologyViolationCount");
+  const status = bundle.routeGraphTopologyStatus;
+  if (status === "DEFERRED" && violationCount === 0) {
+    throw new Error(
+      "routeGraphTopologyStatus DEFERRED requires routeGraphTopologyViolationCount > 0 (위반 은폐 차단)",
+    );
+  }
+  if (status === "PASS" && violationCount !== 0) {
+    throw new Error("routeGraphTopologyStatus PASS requires routeGraphTopologyViolationCount 0");
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const bundlePath = argValue(args, "--bundle");
@@ -111,6 +135,8 @@ async function main() {
   ]) {
     validateStatus(bundle, field, requirePass);
   }
+
+  validateRouteGraphTopologyIntegrity(bundle);
 }
 
 main().catch((error) => {
