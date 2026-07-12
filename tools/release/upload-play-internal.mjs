@@ -154,8 +154,12 @@ export async function runUploadPlayInternal({
   }
 
   if (mapping) {
+    // Android Publisher v3 deobfuscationfiles.upload path per the discovery doc:
+    // /apks/{apkVersionCode}/deobfuscationFiles/{deobfuscationFileType} — the
+    // versionCode is the /apks/ segment and the type (proguard) follows the
+    // /deobfuscationFiles/ segment (not a nested versionCode/proguard tail).
     await uploadMedia(
-      `${uploadEditsBase}/${encodePath(editId)}/deobfuscationFiles/${encodePath(String(versionCode))}/proguard?uploadType=media`,
+      `${uploadEditsBase}/${encodePath(editId)}/apks/${encodePath(String(versionCode))}/deobfuscationFiles/proguard?uploadType=media`,
       { token, contentType: "application/octet-stream", data: mapping },
       fetchImpl,
     );
