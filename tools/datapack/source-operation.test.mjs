@@ -87,6 +87,28 @@ test("validate는 nested auth credential 값도 거부한다", () => {
   );
 });
 
+test("validate는 endpoint URL과 runner 문자열의 credential을 거부한다", () => {
+  for (const operation of [
+    validOperation({
+      endpoint: "https://provider.example/a?client_secret=actual-secret",
+    }),
+    validOperation({
+      endpoint: "https://user:password@provider.example/a",
+    }),
+    validOperation({
+      runner: {
+        command: "node tools/datapack/probe-provider.mjs --token actual-secret",
+        requiredEnv: ["PROVIDER_SERVICE_KEY"],
+      },
+    }),
+  ]) {
+    assert.throws(
+      () => validateOperation(candidate("a", { requestUrl: operation.endpoint, operation })),
+      /credential values are forbidden|literal repository Node command/,
+    );
+  }
+});
+
 test("validate는 credential-free operation을 명시적으로 허용한다", () => {
   const publicOperation = validOperation({
     auth: { placement: "none" },
@@ -179,6 +201,6 @@ test("공식 OD fare source는 재현 가능한 operation과 조회 명령을 �
   });
   assert.equal(
     runbook.operationLookupCommand,
-    "node tools/api/api-catalog.mjs show provider:<sourceId>",
+    "node tools/ci/api-catalog.mjs show provider:<sourceId>",
   );
 });

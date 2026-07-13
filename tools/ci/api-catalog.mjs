@@ -65,15 +65,21 @@ function containsForbiddenValue(value) {
       // Invalid URL encoding is handled by the structural validators.
     }
     if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(decoded)) return true;
-    if (/\bBearer\s+(?!\[|\{|env:)[A-Za-z0-9._~-]+/i.test(decoded)) return true;
-    for (const match of decoded.matchAll(/[?&](?:accessKey|apiKey|password|secret|serviceKey|token)=([^&#]*)/gi)) {
+    if (/\b(?:Basic|Bearer)\s+(?!\[|\{|env:)[A-Za-z0-9._~+/=-]+/i.test(decoded)) return true;
+    try {
+      const url = new URL(decoded);
+      if (url.username || url.password) return true;
+    } catch {
+      // Non-URL catalog strings are checked by the other credential patterns.
+    }
+    for (const match of decoded.matchAll(/[?&](?:(?:access|api|private|service)[_-]?key|client[_-]?secret|password|refresh[_-]?token|secret|token)=([^&#]*)/gi)) {
       if (!/^(?:\[[^\]]+\]|\{[^}]+\}|\$\{[^}]+\})$/.test(match[1])) return true;
     }
     return false;
   }
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
-    /^(?:apiKey|credential|password|secret|serviceKey|token)(?:Value)?$/i.test(key) ||
+    /^(?:accessKey|apiKey|authorization|clientSecret|credential|password|privateKey|secret|serviceKey|token)(?:Value)?$/i.test(key) ||
     containsForbiddenValue(child),
   );
 }
@@ -130,7 +136,7 @@ export function validateCatalogPolicy(policy) {
     throw new Error("API catalog runtime exposure must be forbidden");
   }
   for (const command of ["list", "show", "validate"]) {
-    if (typeof policy.commands?.[command] !== "string" || !policy.commands[command].startsWith("node tools/api/api-catalog.mjs ")) {
+    if (typeof policy.commands?.[command] !== "string" || !policy.commands[command].startsWith("node tools/ci/api-catalog.mjs ")) {
       throw new Error(`API catalog ${command} command is invalid`);
     }
   }

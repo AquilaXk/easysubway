@@ -3,9 +3,9 @@
   "artifactKind": "repository-api-catalog-contract",
   "runtimeExposure": "forbidden",
   "commands": {
-    "list": "node tools/api/api-catalog.mjs list [--kind <kind>] [--query <text>] [--json]",
-    "show": "node tools/api/api-catalog.mjs show <id> [--json]",
-    "validate": "node tools/api/api-catalog.mjs validate"
+    "list": "node tools/ci/api-catalog.mjs list [--kind <kind>] [--query <text>] [--json]",
+    "show": "node tools/ci/api-catalog.mjs show <id> [--json]",
+    "validate": "node tools/ci/api-catalog.mjs validate"
   },
   "sources": [
     "spring-request-mappings",

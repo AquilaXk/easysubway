@@ -11,7 +11,7 @@ import {
   loadProjectCatalog,
   validateCatalog,
   validateCatalogPolicy,
-} from "../api/api-catalog.mjs";
+} from "./api-catalog.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -160,6 +160,22 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
       kind: "provider",
       endpoint: "https://api.example/x?serviceKey=actual-secret",
     },
+    {
+      id: "provider:leaked-client-secret",
+      kind: "provider",
+      endpoint: "https://api.example/x?client_secret=actual-secret",
+    },
+    {
+      id: "provider:leaked-userinfo",
+      kind: "provider",
+      endpoint: "https://user:password@api.example/x",
+    },
+    {
+      id: "provider:leaked-authorization",
+      kind: "provider",
+      endpoint: "https://api.example/x",
+      authorization: "Basic dXNlcjpwYXNzd29yZA==",
+    },
   ]) {
     assert.throws(
       () => validateCatalog([leaked]),
@@ -185,14 +201,14 @@ test("integration auth는 credential reference 표현만 허용한다", () => {
             source: "example.java",
           },
         ]),
-      /integration auth is invalid/,
+      /secret-like values are forbidden|integration auth is invalid/,
     );
   }
 });
 
 test("CLI list는 provider operation method를 표시한다", async () => {
   const { stdout } = await execFileAsync(process.execPath, [
-    "tools/api/api-catalog.mjs",
+    "tools/ci/api-catalog.mjs",
     "list",
     "--kind",
     "provider",
@@ -208,7 +224,7 @@ test("CLI list는 provider operation method를 표시한다", async () => {
 
 test("CLI show는 기본 human 출력과 --json 출력을 구분한다", async () => {
   const args = [
-    "tools/api/api-catalog.mjs",
+    "tools/ci/api-catalog.mjs",
     "show",
     "provider:seoul-metro-official-od-fares",
   ];
@@ -242,7 +258,7 @@ test("catalog 운영 계약은 repository-local 전용과 source-of-truth 경계
 
   validateCatalogPolicy(policy);
   assert.equal(policy.runtimeExposure, "forbidden");
-  assert.equal(policy.commands.validate, "node tools/api/api-catalog.mjs validate");
+  assert.equal(policy.commands.validate, "node tools/ci/api-catalog.mjs validate");
   assert.deepEqual(policy.sources, [
     "spring-request-mappings",
     "openapi-contracts",

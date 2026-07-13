@@ -24,6 +24,24 @@ function stringList(value, label, { allowEmpty = false } = {}) {
 
 function hasCredentialValue(value) {
   if (Array.isArray(value)) return value.some(hasCredentialValue);
+  if (typeof value === "string") {
+    let decoded = value;
+    try {
+      decoded = decodeURIComponent(value);
+    } catch {
+      // Non-URL strings are checked by the other credential patterns.
+    }
+    if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(decoded)) return true;
+    if (/\b(?:Basic|Bearer)\s+(?!\[|\{|env:)[A-Za-z0-9._~+/=-]+/i.test(decoded)) return true;
+    try {
+      const url = new URL(decoded);
+      if (url.username || url.password) return true;
+    } catch {
+      // Not every operation string is a URL.
+    }
+    return [...decoded.matchAll(/[?&](?:(?:access|api|private|service)[_-]?key|client[_-]?secret|password|refresh[_-]?token|secret|token)=([^&#]*)/gi)]
+      .some((match) => !/^(?:\[[^\]]+\]|\{[^}]+\}|\$\{[^}]+\})$/.test(match[1]));
+  }
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
     /^(?:accessKey|apiKey|credential|password|privateKey|secret|serviceKey|token)(?:Value)?$/i.test(key) ||
@@ -93,7 +111,7 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   }
   requireAllowedKeys(runner, new Set(["command", "requiredEnv"]), `${candidate.id}.operation.runner`);
   const command = requiredText(runner.command, `${candidate.id}.operation.runner.command`);
-  if (!command.startsWith("node tools/") || /[;&|`$]/.test(command)) {
+  if (!/^node tools\/[A-Za-z0-9_./-]+\.mjs$/.test(command)) {
     throw new Error(`${candidate.id}.operation.runner.command must be a literal repository Node command`);
   }
   const requiredEnv = stringList(
