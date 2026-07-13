@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 const CANDIDATES_URL = new URL("./source-candidates.json", import.meta.url);
-const CREDENTIAL_NAME = /^(?:accesskey|accesstoken|apikey|authorization|clientsecret|credential|password|privatekey|refreshtoken|secret|servicekey|signature|token|xamzcredential|xamzsecuritytoken|xamzsignature|xapikey)$/;
+const CREDENTIAL_NAME = /^(?:accesskey|accesstoken|apikey|authorization|clientsecret|credential|key|password|privatekey|refreshtoken|secret|servicekey|signature|token|xamzcredential|xamzsecuritytoken|xamzsignature|xapikey)$/;
 
 function normalizedName(value) {
   return value.replace(/[^A-Za-z0-9]/g, "").toLowerCase();

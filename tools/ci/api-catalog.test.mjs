@@ -180,6 +180,11 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
       sampleUrl: "https://api.example/actual-secret/items",
     },
     {
+      id: "provider:leaked-generic-key",
+      kind: "provider",
+      endpoint: "https://api.example/items?key=actual-secret",
+    },
+    {
       id: "provider:leaked-signed-query",
       kind: "provider",
       endpoint: "https://api.example/items",

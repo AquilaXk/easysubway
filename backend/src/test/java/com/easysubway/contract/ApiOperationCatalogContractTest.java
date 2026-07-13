@@ -14,7 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -37,6 +39,12 @@ class ApiOperationCatalogContractTest {
 			.extracting(ApiOperation::path)
 			.noneMatch(path -> path.matches("(?:.*/)?api/catalog(?:/.*)?")
 				|| path.contains("/api-catalog"));
+		assertThat(catalog.operations())
+			.filteredOn(operation -> operation.handlerClass().endsWith("DataCollectionController")
+				|| operation.handlerClass().endsWith("DataQualityController")
+				|| operation.handlerClass().endsWith("RealtimeProviderAdminController")
+				|| operation.handlerClass().endsWith("UserActivityAdminApiController"))
+			.allMatch(operation -> operation.surface().equals("ADMIN_API"));
 
 		String actual = catalogJson(catalog, new ObjectMapper());
 		if ("1".equals(System.getenv("EASYSUBWAY_API_CATALOG_WRITE"))) {
@@ -83,7 +91,7 @@ class ApiOperationCatalogContractTest {
 						"internal:" + method + ":" + path + ":" + handlerClass + "#" + javaMethod,
 						method,
 						path,
-						classify(path),
+						classify(path, handler.getBeanType()),
 						handlerClass,
 						javaMethod
 					));
@@ -97,10 +105,11 @@ class ApiOperationCatalogContractTest {
 		return new ApiCatalog(1, "Spring RequestMappingHandlerMapping", List.copyOf(operations));
 	}
 
-	private static String classify(String path) {
-		if (path.startsWith("/api/")) return "PUBLIC_API";
-		if (path.startsWith("/admin/api/")) return "ADMIN_API";
-		if (path.startsWith("/operator/api/")) return "OPERATOR_API";
+	private static String classify(String path, Class<?> handlerType) {
+		boolean restController = AnnotatedElementUtils.hasAnnotation(handlerType, RestController.class);
+		if (path.startsWith("/admin/api/") || (restController && path.startsWith("/admin/"))) return "ADMIN_API";
+		if (path.startsWith("/operator/api/") || (restController && path.startsWith("/operator/"))) return "OPERATOR_API";
+		if (path.startsWith("/api/") || restController) return "PUBLIC_API";
 		return "PAGE";
 	}
 
