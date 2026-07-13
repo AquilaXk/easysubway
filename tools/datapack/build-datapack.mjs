@@ -39,7 +39,7 @@ const candidateBuildSpecHashFields = [
   "sourceInventorySha256",
 ];
 const sourceSnapshotStatuses = new Set(["LOCKED"]);
-const compareStrings = (left, right) => left.localeCompare(right);
+const compareStrings = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));

@@ -8384,6 +8384,36 @@ test("데이터팩 생성기는 top-level 노선 scope를 여러 pack scope의 �
   assert.deepEqual(manifest.packs.map(({ id }) => id), ["capital", "capital-copy"]);
 });
 
+test("데이터팩 생성기는 Unicode 정규화 형태가 다른 operator scope 집합을 순서와 무관하게 비교한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-coverage-scope-unicode-${Date.now()}`);
+  const fixturePath = path.join(outputDir, "fixture.json");
+  const packOutputDir = path.join(outputDir, "pack");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  const pack = fixture.packs[0];
+  pack.operators.push(
+    { id: "é", nameKo: "합성형 운영기관", nameEn: "" },
+    { id: "e\u0301", nameKo: "분해형 운영기관", nameEn: "" },
+  );
+  const scopes = [
+    { regionId: "capital", operatorId: "é", lineId: "seoul-4" },
+    { regionId: "capital", operatorId: "e\u0301", lineId: "seoul-4" },
+    { regionId: "capital", operatorId: "seoul-metro", lineId: "seoul-4" },
+  ];
+  fixture.coverageLineOperatorScopeSemantics = "UNION_OF_PACK_SCOPES";
+  fixture.coverageLineOperatorScopes = scopes;
+  pack.coverageLineOperatorScopes = [scopes[1], scopes[0], scopes[2]];
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutputDir],
+    { cwd: root },
+  );
+});
+
 test("전국 coverage report는 운행 노선 launch와 enhancement 분모를 분리한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-coverage-tier-report-${Date.now()}`);
   const reportPath = path.join(outputDir, "coverage-gap-report.json");
