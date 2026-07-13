@@ -36,6 +36,63 @@ void main() {
     expect(await repository.listFavoriteStations(), isEmpty);
   });
 
+  test('흡수 station ID 즐겨찾기는 대표 ID로 이관한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    await catalogDatabase.customStatement('''
+      INSERT INTO station_aliases (station_id, alias, normalized_alias)
+      VALUES ('station-sangnoksu', 'station-sangnoksu-old', 'station-sangnoksu-old')
+    ''');
+    await userDatabase.customStatement(
+      'INSERT INTO favorite_stations (station_id, added_at) VALUES (?, ?), (?, ?)',
+      [
+        'station-sangnoksu-old',
+        DateTime.utc(2026, 7, 13).millisecondsSinceEpoch ~/ 1000,
+        'station-sangnoksu',
+        DateTime.utc(2026, 7, 14).millisecondsSinceEpoch ~/ 1000,
+      ],
+    );
+    final repository = DriftFavoriteStationRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+
+    final favorites = await repository.listFavoriteStations();
+    final stored = await userDatabase
+        .customSelect('SELECT station_id FROM favorite_stations')
+        .getSingle();
+
+    expect(favorites.single.stationId, 'station-sangnoksu');
+    expect(stored.read<String>('station_id'), 'station-sangnoksu');
+  });
+
+  test('흡수 station ID로 저장해도 대표 ID 즐겨찾기만 남긴다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    await catalogDatabase.customStatement('''
+      INSERT INTO station_aliases (station_id, alias, normalized_alias)
+      VALUES ('station-sangnoksu', 'station-sangnoksu-old', 'station-sangnoksu-old')
+    ''');
+    final repository = DriftFavoriteStationRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+
+    final saved = await repository.saveFavoriteStation('station-sangnoksu-old');
+
+    expect(saved.stationId, 'station-sangnoksu');
+    final stored = await userDatabase
+        .customSelect('SELECT station_id FROM favorite_stations')
+        .getSingle();
+    expect(stored.read<String>('station_id'), 'station-sangnoksu');
+  });
+
   test('로컬 시설 즐겨찾기는 데이터팩 catalog 정보와 user DB 보관 시간을 조합한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
