@@ -242,9 +242,9 @@
       {
         "dataType": "Personal info",
         "inventoryDataIds": ["mobility_profile"],
-        "containsCollectedData": true,
+        "containsCollectedData": false,
         "containsRequiredData": false,
-        "containsOptionalData": true,
+        "containsOptionalData": false,
         "requiredConsoleFields": [
           "collected",
           "collectionType",
