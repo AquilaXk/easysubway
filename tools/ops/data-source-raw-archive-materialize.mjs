@@ -20,7 +20,10 @@ await mkdir(objectsDir, { recursive: true, mode: 0o700 });
 const materialized = [];
 for (const row of rows) {
   const storageUri = row[index.storage_uri] ?? "";
-  if (!storageUri.startsWith("file://")) continue;
+  assert.ok(
+    storageUri.startsWith("file://"),
+    `unsupported storage_uri for self-contained archive: ${row[index.archive_id]}`,
+  );
   const expectedSha256 = row[index.payload_sha256];
   assert.match(expectedSha256, /^[a-f0-9]{64}$/i, "payload_sha256 must be hex");
   const sourcePath = fileURLToPath(new URL(storageUri));

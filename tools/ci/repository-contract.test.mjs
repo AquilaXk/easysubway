@@ -8271,7 +8271,7 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   );
 
   assert.match(archiveScript, /data-source-raw-archive-materialize\.mjs/);
-  assert.match(materializeScript, /storageUri\.startsWith\("file:\/\/"\)/);
+  assert.match(materializeScript, /unsupported storage_uri for self-contained archive/);
   assert.match(materializeScript, /payload hash mismatch/);
   assert.match(materializeScript, /payload-manifest\.json/);
   assert.match(restoreCheckScript, /objectPath must not contain traversal/);
@@ -8284,6 +8284,34 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   const result = execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8" });
   assert.match(result, /data source archive restore rehearsal ok: 1 payload/);
 
+  await writeFile(
+    path.join(fixtureDir, "raw-archives.csv"),
+    [
+      "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at",
+      `archive-1,run-1,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:01Z`,
+      `archive-2,run-1,SYNTHETIC,https://example.invalid/source-2,s3://bucket/source-2.json,${payloadSha256},application/json,2026-07-13T00:00:02Z`,
+    ].join("\n"),
+  );
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [materializePath, path.join(fixtureDir, "raw-archives.csv"), fixtureDir],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /Command failed/,
+  );
+  assert.throws(
+    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    /Command failed/,
+  );
+
+  await writeFile(
+    path.join(fixtureDir, "raw-archives.csv"),
+    [
+      "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at",
+      `archive-1,run-1,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:01Z`,
+    ].join("\n"),
+  );
   await writeFile(path.join(fixtureDir, "objects", `${payloadSha256}.payload`), Buffer.from("tampered"));
   assert.throws(
     () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),

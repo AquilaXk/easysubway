@@ -23,6 +23,11 @@ for (const name of ["archive_id", "run_id", "payload_sha256"]) {
 }
 const runIds = new Set(collectionRuns.map((row) => row[collectionRunIndex]));
 const archives = new Map(rawArchives.map((row) => [row[rawIndex.archive_id], row]));
+assert.equal(
+  manifest.materialized.length,
+  rawArchives.length,
+  "every raw archive row must have a materialized payload",
+);
 
 for (const record of manifest.materialized) {
   const row = archives.get(record.archiveId);
