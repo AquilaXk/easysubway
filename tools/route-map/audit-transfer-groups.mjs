@@ -8,6 +8,7 @@ import path from "node:path";
 import { cleanupPackDir, openPack, repoRoot } from "./pack-io.mjs";
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const compareStrings = (a, b) => a.localeCompare(b, "en");
 
 /** station_id별 (line,x,y) 묶음에서 2노선 이상 그룹의 최대 쌍거리. */
 export function transferGroupSpreads(rows) {
@@ -31,7 +32,7 @@ export function transferGroupSpreads(rows) {
     }
     spreads.push({
       stationId,
-      lineIds: members.map((m) => m.line_id).sort(),
+      lineIds: members.map((m) => m.line_id).sort(compareStrings),
       spread: Math.round(spread * 10) / 10,
     });
   }
@@ -79,6 +80,18 @@ export function loadCanonicalStationDecisions(
 }
 
 export function canonicalStationIdentityViolations({ stations, aliases, decisions }) {
+  const byName = indexStationsByName(stations);
+  const byDecision = new Map(decisions.map((decision) => [decision.normalizedName, decision]));
+  const aliasTargets = indexAliasTargets(aliases);
+  const violations = missingDecisionViolations(byName, byDecision);
+
+  for (const decision of decisions) {
+    appendDecisionViolations(violations, decision, byName, aliasTargets);
+  }
+  return violations;
+}
+
+function indexStationsByName(stations) {
   const byName = new Map();
   for (const row of stations) {
     if (!byName.has(row.normalizedName)) byName.set(row.normalizedName, new Map());
@@ -86,60 +99,75 @@ export function canonicalStationIdentityViolations({ stations, aliases, decision
     if (!byId.has(row.stationId)) byId.set(row.stationId, new Set());
     byId.get(row.stationId).add(row.lineId);
   }
-  const byDecision = new Map(decisions.map((decision) => [decision.normalizedName, decision]));
+  return byName;
+}
+
+function indexAliasTargets(aliases) {
   const aliasTargets = new Map();
   for (const row of aliases) {
     if (!aliasTargets.has(row.alias)) aliasTargets.set(row.alias, new Set());
     aliasTargets.get(row.alias).add(row.stationId);
   }
-  const violations = [];
+  return aliasTargets;
+}
 
+function missingDecisionViolations(byName, byDecision) {
+  const violations = [];
   for (const [name, byId] of byName) {
     if (byId.size > 1 && !byDecision.has(name)) {
       violations.push(`${name}: MISSING_EVIDENCE (canonical station ${byId.size}개)`);
     }
   }
-  for (const decision of decisions) {
-    const { normalizedName: name, status } = decision;
-    if (!["MERGE_CONFIRMED", "DISTINCT_CONFIRMED", "MISSING_EVIDENCE"].includes(status)) {
-      violations.push(`${name}: 알 수 없는 판정 ${status}`);
-      continue;
-    }
-    if (status === "MISSING_EVIDENCE" || !isReviewedDecision(decision)) {
-      violations.push(`${name}: MISSING_EVIDENCE`);
-      continue;
-    }
-    const byId = byName.get(name) ?? new Map();
-    if (status === "MERGE_CONFIRMED") {
-      if (byId.size !== 1 || !byId.has(decision.canonicalStationId)) {
-        violations.push(`${name}: MERGE_CONFIRMED인데 canonical station이 ${byId.size}개입니다`);
-        continue;
-      }
-      appendLineViolation(violations, name, decision.canonicalStationId, byId.get(decision.canonicalStationId), decision.expectedLineIds);
-      for (const absorbedId of decision.absorbedStationIds ?? []) {
-        const targets = aliasTargets.get(absorbedId) ?? new Set();
-        if (targets.size !== 1 || !targets.has(decision.canonicalStationId)) {
-          violations.push(`${name}: 흡수 ID alias ${absorbedId} → ${decision.canonicalStationId}가 없습니다`);
-        }
-      }
-      continue;
-    }
-    const expectedStationIds = Object.keys(decision.stationLines ?? {}).sort();
-    const actualStationIds = [...byId.keys()].sort();
-    if (
-      JSON.stringify(actualStationIds) !== JSON.stringify(expectedStationIds)
-    ) {
-      violations.push(`${name}: DISTINCT_CONFIRMED station ID 집합이 기대와 다릅니다 (${actualStationIds.join(",")})`);
-    }
-    for (const [stationId, expectedLines] of Object.entries(decision.stationLines ?? {})) {
-      if (!byId.has(stationId)) {
-        violations.push(`${name}: DISTINCT_CONFIRMED station ${stationId}가 없습니다`);
-      } else {
-        appendLineViolation(violations, name, stationId, byId.get(stationId), expectedLines);
-      }
+  return violations;
+}
+
+function appendDecisionViolations(violations, decision, byName, aliasTargets) {
+  const { normalizedName: name, status } = decision;
+  if (!["MERGE_CONFIRMED", "DISTINCT_CONFIRMED", "MISSING_EVIDENCE"].includes(status)) {
+    violations.push(`${name}: 알 수 없는 판정 ${status}`);
+    return;
+  }
+  if (status === "MISSING_EVIDENCE" || !isReviewedDecision(decision)) {
+    violations.push(`${name}: MISSING_EVIDENCE`);
+    return;
+  }
+  const byId = byName.get(name) ?? new Map();
+  if (status === "MERGE_CONFIRMED") {
+    appendMergeViolations(violations, decision, byId, aliasTargets);
+    return;
+  }
+  appendDistinctViolations(violations, decision, byId);
+}
+
+function appendMergeViolations(violations, decision, byId, aliasTargets) {
+  const name = decision.normalizedName;
+  if (byId.size !== 1 || !byId.has(decision.canonicalStationId)) {
+    violations.push(`${name}: MERGE_CONFIRMED인데 canonical station이 ${byId.size}개입니다`);
+    return;
+  }
+  appendLineViolation(violations, name, decision.canonicalStationId, byId.get(decision.canonicalStationId), decision.expectedLineIds);
+  for (const absorbedId of decision.absorbedStationIds ?? []) {
+    const targets = aliasTargets.get(absorbedId) ?? new Set();
+    if (targets.size !== 1 || !targets.has(decision.canonicalStationId)) {
+      violations.push(`${name}: 흡수 ID alias ${absorbedId} → ${decision.canonicalStationId}가 없습니다`);
     }
   }
-  return violations;
+}
+
+function appendDistinctViolations(violations, decision, byId) {
+  const name = decision.normalizedName;
+  const expectedStationIds = Object.keys(decision.stationLines ?? {}).sort(compareStrings);
+  const actualStationIds = [...byId.keys()].sort(compareStrings);
+  if (JSON.stringify(actualStationIds) !== JSON.stringify(expectedStationIds)) {
+    violations.push(`${name}: DISTINCT_CONFIRMED station ID 집합이 기대와 다릅니다 (${actualStationIds.join(",")})`);
+  }
+  for (const [stationId, expectedLines] of Object.entries(decision.stationLines ?? {})) {
+    if (!byId.has(stationId)) {
+      violations.push(`${name}: DISTINCT_CONFIRMED station ${stationId}가 없습니다`);
+    } else {
+      appendLineViolation(violations, name, stationId, byId.get(stationId), expectedLines);
+    }
+  }
 }
 
 export function canonicalStationViolationsForRegion({
@@ -164,14 +192,14 @@ export function canonicalStationViolationsForRegion({
 }
 
 function isReviewedDecision(decision) {
-  return /^https:\/\//.test(decision.evidenceUrl ?? "") &&
+  return (decision.evidenceUrl ?? "").startsWith("https://") &&
     /^\d{4}-\d{2}-\d{2}$/.test(decision.reviewedAt ?? "") &&
     Boolean(decision.reason?.trim());
 }
 
 function appendLineViolation(violations, name, stationId, actual, expected) {
-  const actualLines = [...(actual ?? [])].sort();
-  const expectedLines = [...(expected ?? [])].sort();
+  const actualLines = [...(actual ?? [])].sort(compareStrings);
+  const expectedLines = [...(expected ?? [])].sort(compareStrings);
   if (JSON.stringify(actualLines) !== JSON.stringify(expectedLines)) {
     violations.push(`${name}: ${stationId} 노선이 기대와 다릅니다 (${actualLines.join(",")})`);
   }
