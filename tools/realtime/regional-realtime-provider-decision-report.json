@@ -236,6 +236,7 @@
     "targetCount": 12,
     "credentialSafeCallCount": 28,
     "uniqueQueryCount": 14,
+    "supportedCount": 0,
     "explicitNoDataCount": 11,
     "falsePositiveClassifiedCount": 1,
     "boundedRetryCount": 1,

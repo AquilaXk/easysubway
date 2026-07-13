@@ -779,6 +779,7 @@ test("route commercialization gate requires every regional realtime scope to hav
     execChecker(fixture),
     (error) => {
       const report = JSON.parse(error.stdout);
+      assert.equal(report.status, "FAIL");
       assert.ok(report.failures.includes("realtimeCoverage regional requirements must all have terminal decisions"));
       return true;
     },

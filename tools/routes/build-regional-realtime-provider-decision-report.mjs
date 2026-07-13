@@ -29,7 +29,6 @@ export function buildRegionalRealtimeProviderDecisionReport({ targets, contract 
 
   const sources = validateOfficialSources(contract.officialSources);
   const sourcesById = new Map(sources.map((source) => [source.id, source]));
-  validatePublicApiAudit(contract.publicApiAudit, scopes.length);
 
   const decisionsByKey = new Map();
   for (const [index, decision] of contract.decisions.entries()) {
@@ -49,6 +48,8 @@ export function buildRegionalRealtimeProviderDecisionReport({ targets, contract 
     if (!decision) throw new Error(`missing regional realtime decision: ${key}`);
     return decision;
   });
+  const supportedDecisionCount = decisions.filter(({ state }) => state === "SUPPORTED").length;
+  validatePublicApiAudit(contract.publicApiAudit, scopes.length, supportedDecisionCount);
 
   const regionIds = [...new Set(scopes.map(({ regionId }) => regionId))]
     .sort((left, right) => left.localeCompare(right, "en"));
@@ -130,13 +131,14 @@ function validateOfficialSources(value) {
   });
 }
 
-function validatePublicApiAudit(audit, scopeCount) {
+function validatePublicApiAudit(audit, scopeCount, supportedDecisionCount) {
   if (!audit || typeof audit !== "object" || Array.isArray(audit)) {
     throw new Error("publicApiAudit is required");
   }
   for (const field of [
     "targetCount",
     "credentialSafeCallCount",
+    "supportedCount",
     "explicitNoDataCount",
     "falsePositiveClassifiedCount",
     "boundedRetryCount",
@@ -146,8 +148,11 @@ function validatePublicApiAudit(audit, scopeCount) {
     }
   }
   if (audit.targetCount !== scopeCount
-    || audit.explicitNoDataCount + audit.falsePositiveClassifiedCount !== scopeCount) {
+    || audit.supportedCount + audit.explicitNoDataCount + audit.falsePositiveClassifiedCount !== scopeCount) {
     throw new Error("publicApiAudit counts must resolve every regional scope");
+  }
+  if (audit.supportedCount !== supportedDecisionCount) {
+    throw new Error("publicApiAudit.supportedCount must match supported decisions");
   }
   if (audit.credentialSafeCallCount < audit.targetCount) {
     throw new Error("publicApiAudit credential-safe calls must cover every target");

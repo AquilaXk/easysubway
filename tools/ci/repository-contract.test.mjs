@@ -321,7 +321,11 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   );
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("validate-datapack.mjs --require-production")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-coverage-report.mjs")));
-  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-regional-realtime-provider-decision-report.mjs")));
+  assert.ok(gate.requiredVerificationCommands.some((command) =>
+    command.includes("build-regional-realtime-provider-decision-report.mjs")
+    && command.includes("--targets tools/datapack/nationwide-coverage-targets.json")
+    && command.includes("--contract tools/realtime/regional-realtime-provider-decisions.json")
+    && command.includes("--output tools/realtime/regional-realtime-provider-decision-report.json")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-topology-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("itx-cheongchun-coverage-contract.test.mjs")));

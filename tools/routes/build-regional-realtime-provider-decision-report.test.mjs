@@ -36,6 +36,7 @@ function contract(decisions = [
     publicApiAudit: {
       targetCount: 2,
       credentialSafeCallCount: 2,
+      supportedCount: 0,
       explicitNoDataCount: 1,
       falsePositiveClassifiedCount: 1,
       boundedRetryCount: 1,
@@ -54,6 +55,20 @@ function decision(regionId, operatorId, lineId) {
     fallback: "UNSUPPORTED_REGION",
     routeFallbackCapability: "PLANNED",
     userMessageKo: "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+    evidenceRefs: ["public-api-audit"],
+  };
+}
+
+function supportedDecision(regionId, operatorId, lineId) {
+  return {
+    regionId,
+    operatorId,
+    lineId,
+    state: "SUPPORTED",
+    fallback: "NONE",
+    routeFallbackCapability: "PLANNED",
+    providerId: "approved-provider",
+    userMessageKo: "실시간 도착 정보를 제공해요.",
     evidenceRefs: ["public-api-audit"],
   };
 }
@@ -107,6 +122,44 @@ test("target 누락·알 수 없는 evidence·내부 gate 문구를 거부한다
       ]),
     }),
     /internal release vocabulary/,
+  );
+});
+
+test("SUPPORTED 결정은 providerId와 fallback NONE 계약을 지킨다", () => {
+  const supported = supportedDecision("busan", "busan-transportation", "busan-1");
+  const supportedContract = contract([
+    supported,
+    decision("daejeon", "daejeon-transportation", "daejeon-1"),
+  ]);
+  supportedContract.publicApiAudit = {
+    ...supportedContract.publicApiAudit,
+    supportedCount: 1,
+    explicitNoDataCount: 0,
+  };
+
+  const report = buildRegionalRealtimeProviderDecisionReport({ targets, contract: supportedContract });
+  assert.equal(report.coverageResolution.supportedCount, 1);
+  assert.equal(report.coverageResolution.explicitlyUnsupportedCount, 1);
+  assert.equal(report.resolutionGate.allRequirementsResolved, true);
+  assert.equal(report.claimGate.nationwideRealtimeSupportAllowed, false);
+
+  const { providerId: _providerId, ...missingProvider } = supported;
+  assert.throws(
+    () => buildRegionalRealtimeProviderDecisionReport({
+      targets,
+      contract: { ...supportedContract, decisions: [missingProvider, supportedContract.decisions[1]] },
+    }),
+    /providerId is required/,
+  );
+  assert.throws(
+    () => buildRegionalRealtimeProviderDecisionReport({
+      targets,
+      contract: {
+        ...supportedContract,
+        decisions: [{ ...supported, fallback: "UNSUPPORTED_REGION" }, supportedContract.decisions[1]],
+      },
+    }),
+    /supported fallback must be NONE/,
   );
 });
 
