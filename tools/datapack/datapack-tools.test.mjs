@@ -14058,6 +14058,82 @@ function officialOdFareEvidenceFixture() {
   };
 }
 
+function busanOfficialOdFareEvidenceFixture() {
+  return {
+    schemaVersion: 1,
+    artifactKind: "official-od-fare-probe-evidence",
+    mappingAvailability: "AVAILABLE",
+    mappingField: "mo_scode_s/mo_scode_e",
+    providerId: "busan-transportation-cyberstation",
+    equivalence: {
+      routeForm: {
+        cyberKinds: "1",
+        destinationField: "mo_scode_e",
+        originField: "mo_scode_s",
+        verified: true,
+      },
+    },
+    providerMappings: [
+      { stationId: "station-fcb7a21e5606", lineId: "line-ab1a041f6266", stationName: "하단", fareStationCode: "102" },
+      { stationId: "station-dd45c69d3e40", lineId: "line-ab1a041f6266", stationName: "당리", fareStationCode: "103" },
+      { stationId: "station-1fc7a7c971c8", lineId: "line-ab1a041f6266", stationName: "서면", fareStationCode: "119" },
+      { stationId: "station-6b611916f76a", lineId: "line-eb7b47920390", stationName: "장산", fareStationCode: "201" },
+    ],
+    quotes: [
+      {
+        originStationId: "station-fcb7a21e5606",
+        destinationStationId: "station-dd45c69d3e40",
+        fares: {
+          childCardFare: 0,
+          childCashFare: 700,
+          gnrlCardFare: 1600,
+          gnrlCashFare: 1700,
+          yungCardFare: 1050,
+          yungCashFare: 1150,
+        },
+      },
+      {
+        originStationId: "station-fcb7a21e5606",
+        destinationStationId: "station-6b611916f76a",
+        fares: {
+          childCardFare: 0,
+          childCashFare: 800,
+          gnrlCardFare: 1800,
+          gnrlCashFare: 1900,
+          yungCardFare: 1200,
+          yungCashFare: 1300,
+        },
+      },
+      {
+        originStationId: "station-1fc7a7c971c8",
+        destinationStationId: "station-6b611916f76a",
+        fares: {
+          childCardFare: 0,
+          childCashFare: 800,
+          gnrlCardFare: 1800,
+          gnrlCashFare: 1900,
+          yungCardFare: 1200,
+          yungCashFare: 1300,
+        },
+      },
+    ],
+    fieldNames: [
+      "childCardFare",
+      "childCashFare",
+      "gnrlCardFare",
+      "gnrlCashFare",
+      "yungCardFare",
+      "yungCashFare",
+    ],
+    attemptCounts: {
+      officialFareTable: 1,
+      "station-fcb7a21e5606→station-dd45c69d3e40": 1,
+      "station-fcb7a21e5606→station-6b611916f76a": 1,
+      "station-1fc7a7c971c8→station-6b611916f76a": 1,
+    },
+  };
+}
+
 test("fare station-line mapping 원장은 probe mapping만 canonical hash로 산출한다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "fare-station-line-ledger-"));
   try {
@@ -14281,6 +14357,39 @@ test("official OD fare admin review는 sanitized admission만 생성한다", asy
       ]),
       /quote endpoints must match provider mappings/,
     );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("부산 official OD fare admission은 공식 운임표 시도 횟수를 보존한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "busan-official-od-fare-admission-"));
+  try {
+    const evidence = busanOfficialOdFareEvidenceFixture();
+    const evidencePath = path.join(workspace, "evidence.json");
+    const evidenceBytes = JSON.stringify(evidence);
+    await writeFile(evidencePath, evidenceBytes);
+    const review = {
+      schemaVersion: 1,
+      artifactKind: "official-od-fare-admin-review",
+      evidenceHash: sha256(evidenceBytes),
+      decision: "APPROVED",
+      approvedBy: "owner",
+      approvedAt: "2026-07-13T00:00:00.000Z",
+      sourceId: "busan-transportation-official-od-fares",
+      snapshotId: "busan-transportation-official-od-fares-20260713",
+    };
+    const reviewPath = path.join(workspace, "review.json");
+    await writeFile(reviewPath, JSON.stringify(review));
+
+    const { stdout } = await runOfficialOdFareAdmissionBuilder([
+      "--evidence", path.relative(root, evidencePath),
+      "--admin-review", path.relative(root, reviewPath),
+    ]);
+    const bundle = JSON.parse(stdout);
+    const admission = bundle.admissions.find(({ sourceId }) => sourceId === review.sourceId);
+    assert.equal(admission.quoteCount, 3);
+    assert.equal(admission.snapshotId, review.snapshotId);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

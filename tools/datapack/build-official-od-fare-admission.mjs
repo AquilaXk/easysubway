@@ -118,10 +118,13 @@ function evidenceForSource(evidence, sourceId) {
     originStationId,
     destinationStationId,
   ]));
-  const attemptCounts = Object.fromEntries(expected.map((direction) => {
-    const key = direction.replace("\u0000", "→");
-    return [key, evidence.attemptCounts[key]];
-  }));
+  const attemptCounts = Object.fromEntries([
+    ...Object.entries(evidence.attemptCounts).filter(([key]) => !key.includes("→")),
+    ...expected.map((direction) => {
+      const key = direction.replace("\u0000", "→");
+      return [key, evidence.attemptCounts[key]];
+    }),
+  ]);
   const selected = {
     ...evidence,
     attemptCounts,
