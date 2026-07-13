@@ -37,6 +37,7 @@ final class OfficialOdFareRepository {
     final sourceId = row.read<String>('source_id');
     final snapshotId = row.read<String>('snapshot_id');
     final mappingLedgerHash = row.read<String>('mapping_ledger_hash');
+    final approvedProvenance = approvedOfficialOdFareProvenance[sourceId];
     final fares = [
       row.read<int>('gnrl_card_fare'),
       row.read<int>('gnrl_cash_fare'),
@@ -45,9 +46,9 @@ final class OfficialOdFareRepository {
       row.read<int>('child_card_fare'),
       row.read<int>('child_cash_fare'),
     ];
-    if (sourceId != approvedOfficialOdFareSourceId ||
-        snapshotId != approvedOfficialOdFareSnapshotId ||
-        mappingLedgerHash != approvedOfficialOdFareMappingLedgerHash ||
+    if (approvedProvenance == null ||
+        snapshotId != approvedProvenance.snapshotId ||
+        mappingLedgerHash != approvedProvenance.mappingLedgerHash ||
         fares.any((fare) => fare < 0)) {
       return null;
     }
