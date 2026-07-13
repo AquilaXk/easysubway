@@ -82,6 +82,25 @@ void main() {
     },
   );
 
+  test('offline 로컬 경로는 STANDARD 프리셋 대표 이동 유형을 지원한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'STANDARD',
+          ),
+        );
+
+    // STANDARD는 senior로 폴백해 계단 회피 없는 표준 보행(preferStepFree)으로 안내된다.
+    expect(result.status, 'FOUND');
+    expect(result.isLocalResult, isTrue);
+  });
+
   test(
     'online-first repository는 flag가 켜지면 V2 backend itinerary를 우선 사용한다',
     () async {
@@ -136,6 +155,7 @@ void main() {
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
           mobilityType: 'WHEELCHAIR',
+          mobilityPreset: 'STEP_FREE',
         ),
       );
 
@@ -143,6 +163,9 @@ void main() {
       expect(requestedBodies.single, containsPair('useRealtime', true));
       expect(requestedBodies.single, containsPair('maxTransfers', 3));
       expect(requestedBodies.single, containsPair('alternativeCount', 3));
+      // 프리셋은 v2 body에 실리고, mobilityType은 하위호환으로 함께 전송된다.
+      expect(requestedBodies.single, containsPair('mobilityPreset', 'STEP_FREE'));
+      expect(requestedBodies.single, containsPair('mobilityType', 'WHEELCHAIR'));
       expect(requestedBodies.single['departureTime'], isA<String>());
       expect(result.routeSearchId, 'route-v2');
       expect(result.originStationName, '상록수');

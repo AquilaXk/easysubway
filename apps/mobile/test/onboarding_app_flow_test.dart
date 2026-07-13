@@ -1,8 +1,8 @@
 import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/main.dart';
-import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -99,10 +99,10 @@ void main() {
     // #1936: 중간 소개 화면 제거 — 시작 화면 다음은 곧바로 프리셋 단계.
     expect(find.text('계단 없는 길을\n먼저 찾습니다'), findsNothing);
 
-    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
+    expect(find.text('어떻게 걸으세요?'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsNothing);
 
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -116,7 +116,7 @@ void main() {
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.byKey(const Key('routeSearchButton')), findsNothing);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
-    expect(find.text('어떻게 이동하세요?'), findsNothing);
+    expect(find.text('어떻게 걸으세요?'), findsNothing);
     expect(
       legacyCredentialStorage.deletedKeys,
       contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey),
@@ -125,7 +125,7 @@ void main() {
       legacyCredentialStorage.values,
       isNot(contains(SecureLegacyCredentialCleaner.legacyAuthCredentialsKey)),
     );
-    expect(onboardingStore.savedResult?.profile.id, 'elderly');
+    expect(onboardingStore.savedResult?.preset, MobilityPreset.slow);
     expect(onboardingStore.saveCount, 1);
   });
 
@@ -177,9 +177,7 @@ void main() {
   testWidgets('앱은 저장된 온보딩 설정으로 홈을 바로 보여준다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.firstWhere(
-          (option) => option.id == 'wheelchair',
-        ),
+        preset: MobilityPreset.stepFree,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: true,
@@ -195,7 +193,7 @@ void main() {
 
     expect(onboardingStore.readCount, 1);
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
-    expect(find.text('어떻게 이동하세요?'), findsNothing);
+    expect(find.text('어떻게 걸으세요?'), findsNothing);
     expect(MediaQuery.textScalerOf(homeContext).scale(20), closeTo(20, 0.01));
     expect(Theme.of(homeContext).colorScheme.primary, const Color(0xFF1A1D1E));
   });
@@ -215,7 +213,7 @@ void main() {
     expect(reportedErrors, hasLength(1));
     expect(reportedErrors.single.exception, isA<FormatException>());
     await _openOnboarding(tester);
-    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
+    expect(find.text('어떻게 걸으세요?'), findsOneWidget);
     expect(find.byKey(const Key('stationSearchButton')), findsNothing);
   });
 }
@@ -228,7 +226,7 @@ Future<void> _openOnboarding(WidgetTester tester) async {
 
 Future<void> _continueFromProfileToPermission(WidgetTester tester) async {
   // 2단계 흐름(#1563): 프로필 → '다음' 한 번이면 권한 단계.
-  await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+  await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('onboardingDoneButton')));
   await tester.pumpAndSettle();

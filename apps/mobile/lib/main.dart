@@ -26,9 +26,11 @@ import 'favorite_facility.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/mobility_profile/mobility_preset_labels.dart';
+import 'features/mobility_profile/mobility_preset_picker.dart';
+import 'features/mobility_profile/mobility_profile_policy.dart';
 import 'internal_route.dart';
 import 'legacy_credential_cleanup.dart';
-import 'mobility_profile.dart';
 import 'network_map.dart';
 import 'notification_settings.dart';
 import 'features/service_notice/data/notice_repository.dart';
@@ -909,7 +911,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         notificationRepository: widget.notificationRepository,
         notificationPermissionProvider: widget.notificationPermissionProvider,
         locationProvider: widget.locationProvider,
-        initialMobilityType: onboardingResult?.profile.mobilityType,
+        initialMobilityType: onboardingResult?.mobilityType,
         viewPreferences: preferences,
         simpleViewEnabled: preferences.simpleViewEnabled,
         facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
@@ -1087,13 +1089,13 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
     return saveCompleter.future;
   }
 
-  Future<void> _saveMobilityProfile(MobilityProfileOption profile) async {
+  Future<void> _saveMobilityProfile(MobilityPreset preset) async {
     final currentResult = _onboardingState.result;
     if (currentResult == null) {
       return;
     }
     final nextResult = OnboardingResult(
-      profile: profile,
+      preset: preset,
       preferences: currentResult.preferences,
     );
     try {
@@ -1114,7 +1116,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
       return;
     }
     final nextResult = OnboardingResult(
-      profile: currentResult.profile,
+      preset: currentResult.preset,
       preferences: preferences,
     );
     try {
@@ -1146,7 +1148,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
 
   bool _isSameOnboardingResult(OnboardingResult? left, OnboardingResult right) {
     return left != null &&
-        left.profile.id == right.profile.id &&
+        left.preset == right.preset &&
         _isSameViewPreferences(left.preferences, right.preferences);
   }
 
@@ -1426,7 +1428,8 @@ class HomeScreen extends StatefulWidget {
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
-           initialMobilityType ?? mobilityProfileOptions.first.mobilityType;
+           initialMobilityType ??
+           mobilityPresetRepresentativeMobilityType(MobilityPreset.standard);
 
   final StationSearchRepository repository;
   final FacilityReportRepository reportRepository;
@@ -1450,8 +1453,7 @@ class HomeScreen extends StatefulWidget {
   final UserDataDeletionRepository? userDataDeletionRepository;
   final NoticeRepository? noticeRepository;
   final Future<void> Function(UserDataDeletionResult result)? onUserDataDeleted;
-  final Future<void> Function(MobilityProfileOption profile)?
-  onMobilityProfileChanged;
+  final Future<void> Function(MobilityPreset preset)? onMobilityProfileChanged;
   final Future<void> Function(OnboardingViewPreferences preferences)
   onViewPreferencesChanged;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
@@ -1616,10 +1618,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final facilityReportDraftTargetStore =
         widget.facilityReportDraftTargetStore;
     final initialMobilityType = _mobilityType;
-    final currentProfile = mobilityProfileOptions.firstWhere(
-      (option) => option.mobilityType == _mobilityType,
-      orElse: () => mobilityProfileOptions.first,
-    );
+    final currentPreset =
+        mobilityPresetFromRepresentativeMobilityType(_mobilityType) ??
+        MobilityPreset.standard;
     void openSupportAccess() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -1914,7 +1915,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_selectedTabIndex == 4) {
       return rootTab(
         AppSettingsScreen(
-          currentProfile: currentProfile,
+          currentPreset: currentPreset,
           viewPreferences: widget.viewPreferences,
           notificationRepository: notificationRepository,
           notificationPermissionProvider: notificationPermissionProvider,
@@ -1972,25 +1973,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return false;
   }
 
-  Future<MobilityProfileOption?> _openMobilityProfile() async {
-    final currentProfile = mobilityProfileOptions.firstWhere(
-      (option) => option.mobilityType == _mobilityType,
-      orElse: () => mobilityProfileOptions.first,
+  Future<MobilityPreset?> _openMobilityProfile() async {
+    final currentPreset =
+        mobilityPresetFromRepresentativeMobilityType(_mobilityType) ??
+        MobilityPreset.standard;
+    final selectedPreset = await showMobilityPresetSheet(
+      context,
+      current: currentPreset,
     );
-    final selectedProfile = await Navigator.of(context).push(
-      MaterialPageRoute<MobilityProfileOption>(
-        builder: (_) => MobilityProfileScreen(initialSelection: currentProfile),
-      ),
-    );
-    if (!mounted || selectedProfile == null) {
+    if (!mounted || selectedPreset == null) {
       return null;
     }
     final previousMobilityType = _mobilityType;
     setState(() {
-      _mobilityType = selectedProfile.mobilityType;
+      _mobilityType = mobilityPresetRepresentativeMobilityType(selectedPreset);
     });
     try {
-      await widget.onMobilityProfileChanged?.call(selectedProfile);
+      await widget.onMobilityProfileChanged?.call(selectedPreset);
     } catch (error, stackTrace) {
       reportMobileError(error, stackTrace, context: '이동 조건 저장 중 예외가 발생했습니다.');
       if (!mounted) {
@@ -2008,9 +2007,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return null;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${selectedProfile.title} 조건으로 변경했습니다')),
+      SnackBar(
+        content: Text(
+          '${mobilityPresetDisplayName(selectedPreset)} 조건으로 변경했습니다',
+        ),
+      ),
     );
-    return selectedProfile;
+    return selectedPreset;
   }
 }
 
@@ -2769,7 +2772,7 @@ class _AppInfoRow extends StatelessWidget {
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({
-    required this.currentProfile,
+    required this.currentPreset,
     required this.viewPreferences,
     required this.notificationRepository,
     required this.notificationPermissionProvider,
@@ -2781,13 +2784,13 @@ class AppSettingsScreen extends StatefulWidget {
     super.key,
   });
 
-  final MobilityProfileOption currentProfile;
+  final MobilityPreset currentPreset;
   final OnboardingViewPreferences viewPreferences;
   final NotificationSettingsRepository? notificationRepository;
   final NotificationPermissionProvider? notificationPermissionProvider;
   final Future<void> Function(OnboardingViewPreferences preferences)
   onViewPreferencesChanged;
-  final Future<MobilityProfileOption?> Function() onOpenMobilityProfile;
+  final Future<MobilityPreset?> Function() onOpenMobilityProfile;
   final VoidCallback onOpenSupportAccess;
   final VoidCallback onOpenMyReports;
   final Widget? bottomNavigationBar;
@@ -2797,7 +2800,7 @@ class AppSettingsScreen extends StatefulWidget {
 }
 
 class _AppSettingsScreenState extends State<AppSettingsScreen> {
-  late MobilityProfileOption _profile = widget.currentProfile;
+  late MobilityPreset _preset = widget.currentPreset;
   late OnboardingViewPreferences _viewPreferences = widget.viewPreferences;
 
   @override
@@ -2827,15 +2830,15 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                   _AppSettingsActionTile(
                     key: const Key('mobilityProfileButton'),
                     icon: Icons.directions_walk,
-                    title: _profile.appliedConditionLabel,
-                    subtitle: _profile.summary,
+                    title: mobilityPresetDisplayName(_preset),
+                    subtitle: mobilityPresetDescription(_preset),
                     onTap: () async {
                       final selected = await widget.onOpenMobilityProfile();
                       if (!mounted || selected == null) {
                         return;
                       }
                       setState(() {
-                        _profile = selected;
+                        _preset = selected;
                       });
                     },
                   ),

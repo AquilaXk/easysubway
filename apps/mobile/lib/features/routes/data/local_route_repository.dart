@@ -601,6 +601,11 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   local.MobilityType _mobilityType(String mobilityType) {
     return switch (mobilityType) {
+      // STANDARD는 계단 회피 없는 표준 보행이나 local enum에 직접 대응이 없어,
+      // preferStepFree(strict 아님)라 blocksStairOnlyAccess=false인 senior로 폴백한다.
+      // speedFactor STANDARD=1.0이라 무보정이고, 이 폴백은 offline 결과의 mobilityType
+      // 표기에만 영향을 줄 뿐 실제 필터링은 preferStepFree라 동일하다.
+      'STANDARD' => local.MobilityType.senior,
       'SENIOR' => local.MobilityType.senior,
       'STROLLER' => local.MobilityType.stroller,
       'WHEELCHAIR' => local.MobilityType.wheelchair,

@@ -1,6 +1,6 @@
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/main.dart';
-import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:easysubway_mobile/station_search.dart';
@@ -55,9 +55,7 @@ void main() {
 OnboardingState _completedOnboardingState() {
   return OnboardingState.completed(
     result: OnboardingResult(
-      profile: mobilityProfileOptions.firstWhere(
-        (option) => option.id == 'elderly',
-      ),
+      preset: MobilityPreset.slow,
       preferences: const OnboardingViewPreferences.defaults(),
     ),
   );
