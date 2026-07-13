@@ -1088,6 +1088,7 @@ void main() {
           reportRepository: FakeFacilityReportRepository(),
           locationProvider: FakeCurrentLocationProvider(),
           pickSlot: RouteDraftSlot.origin,
+          regionLabel: '수도권',
         ),
       ),
     );
@@ -1183,6 +1184,40 @@ void main() {
   );
 
   testWidgets(
+    '#2090 수도권 외 지역(부산) 선택 상태에서 열어도 검색 화면 지역 표시가 실제 선택 지역을 따른다',
+    (tester) async {
+      // 회귀 방지: 직전 구현은 regionLabel 기본값이 '수도권' 고정이고 호출부가
+      // 실제 선택 지역을 주입하지 않아, 부산 선택 상태에서 검색을 열어도
+      // '수도권'이 잘못 표시됐다. 이제 호출부(main.dart)가 NetworkMapScreen의
+      // 현재 선택 지역 표시명을 regionLabel로 넘기므로, 여기서는 그 배선의
+      // 최종 결과(regionLabel이 실제로 화면에 반영되는지)를 검증한다.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.origin,
+            regionLabel: '부산',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
+      expect(indicator, findsOneWidget);
+      expect(
+        find.descendant(of: indicator, matching: find.text('부산')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: indicator, matching: find.text('수도권')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
     '#2090 공용 검색 필드는 시스템 글자 배율에 비례해 입력 텍스트가 커지고 잘리지 않는다',
     (tester) async {
       // #2090: 이전 구현은 안쪽 고정 높이(SizedBox 48) tight constraint 탓에
@@ -1248,6 +1283,7 @@ void main() {
               reportRepository: FakeFacilityReportRepository(),
               locationProvider: FakeCurrentLocationProvider(),
               pickSlot: RouteDraftSlot.origin,
+              regionLabel: '수도권',
             ),
           ),
         ),
@@ -1292,6 +1328,7 @@ void main() {
             reportRepository: FakeFacilityReportRepository(),
             locationProvider: FakeCurrentLocationProvider(),
             pickSlot: RouteDraftSlot.origin,
+            regionLabel: '수도권',
           ),
         ),
       );
@@ -1327,6 +1364,7 @@ void main() {
             reportRepository: FakeFacilityReportRepository(),
             locationProvider: FakeCurrentLocationProvider(),
             pickSlot: RouteDraftSlot.destination,
+            regionLabel: '수도권',
           ),
         ),
       );
@@ -1892,7 +1930,7 @@ void main() {
             networkMapError: StateError('map failed'),
           ),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -1949,7 +1987,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2015,7 +2053,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2061,11 +2099,11 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
           // main.dart의 openStationSearchForSlot 대역: 실제 앱에서는 역 검색을 열어
           // 결과 탭 시 같은 controller에 slot을 설정한다. 여기선 그 계약(어떤 slot을
           // 채우려 열렸는지 + 같은 controller로 수렴)만 검증한다.
-          onPickStationForSlot: (slot) {
+          onPickStationForSlot: (slot, _) {
             pickedSlots.add(slot);
             switch (slot) {
               case RouteDraftSlot.origin:
@@ -2144,8 +2182,8 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
-          onPickStationForSlot: (slot) {
+          onOpenStationSearch: (_) {},
+          onPickStationForSlot: (slot, _) {
             switch (slot) {
               case RouteDraftSlot.origin:
                 routeDraftController.setOrigin(
@@ -2253,7 +2291,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2284,7 +2322,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2314,7 +2352,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2343,7 +2381,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2377,7 +2415,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2408,7 +2446,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2430,8 +2468,8 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
-          onPickStationForSlot: (slot) {},
+          onOpenStationSearch: (_) {},
+          onPickStationForSlot: (slot, _) {},
         ),
       ),
     );

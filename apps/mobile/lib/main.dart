@@ -1720,7 +1720,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
 
-    Future<void> openStationSearch([
+    Future<void> openStationSearch(
+      String regionLabel, [
       StationSearchEntryMode entryMode = StationSearchEntryMode.search,
     ]) async {
       await Navigator.of(context).push(
@@ -1738,6 +1739,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
             entryMode: entryMode,
+            regionLabel: regionLabel,
           ),
         ),
       );
@@ -1749,7 +1751,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // G4: 노선도 상단 오버레이의 출발/도착 칸 탭 → 기존 역 검색을 "칸 채우기" 모드로
     // 연다. 결과 한 번 탭 = 지도 탭과 같은 _routeDraftController로 수렴한 뒤 닫힌다.
-    Future<void> openStationSearchForSlot(RouteDraftSlot slot) async {
+    Future<void> openStationSearchForSlot(
+      RouteDraftSlot slot,
+      String regionLabel,
+    ) async {
       await Navigator.of(context).push(
         MaterialPageRoute<RouteDraftStation>(
           builder: (_) => StationSearchScreen(
@@ -1764,6 +1769,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             realtimeRepository: realtimeRepository,
             routeDraftController: _routeDraftController,
             pickSlot: slot,
+            regionLabel: regionLabel,
           ),
         ),
       );
@@ -1811,10 +1817,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         NetworkMapScreen(
           repository: networkMapRepository,
           routeDraftController: _routeDraftController,
-          onOpenStationSearch: () => unawaited(openStationSearch()),
+          onOpenStationSearch: (regionLabel) =>
+              unawaited(openStationSearch(regionLabel)),
           onStationSearchClosed: () => unawaited(refreshHomeState()),
-          onPickStationForSlot: (slot) =>
-              unawaited(openStationSearchForSlot(slot)),
+          onPickStationForSlot: (slot, regionLabel) =>
+              unawaited(openStationSearchForSlot(slot, regionLabel)),
           stationSearchRepository: repository,
           reportRepository: reportRepository,
           favoriteRepository: favoriteRepository,
@@ -1826,8 +1833,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           viewportRepository: widget.networkMapViewportRepository,
           realtimeRepository: widget.realtimeRepository,
           onOpenSavedItems: openSavedTab,
-          onOpenNearbyStations: () =>
-              unawaited(openStationSearch(StationSearchEntryMode.nearby)),
+          onOpenNearbyStations: (regionLabel) => unawaited(
+            openStationSearch(regionLabel, StationSearchEntryMode.nearby),
+          ),
           onOpenSettings: openMoreTab,
           onOpenDataSources: openDataSources,
           onOpenServiceNotices: noticeController == null
@@ -1856,6 +1864,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     if (_selectedTabIndex == 1) {
+      // 하단 탭 인덱스 1은 현재 어떤 탭 전환 경로에서도 setState로 선택되지
+      // 않는 미도달 분기다(탭 0 노선도 안 "역 검색" 메뉴가 실사용 경로).
+      // 지역 상태는 NetworkMapScreen 안에만 있어 이 분기는 알 수 없으므로
+      // 홈 기본 지역과 동일한 '수도권'을 명시한다.
       return rootTab(
         StationSearchScreen(
           repository: repository,
@@ -1869,6 +1881,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           internalRouteMobilityType: initialMobilityType,
           realtimeRepository: realtimeRepository,
           routeDraftController: _routeDraftController,
+          regionLabel: '수도권',
         ),
       );
     }

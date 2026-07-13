@@ -389,7 +389,12 @@ class NetworkMapScreen extends StatefulWidget {
 
   final NetworkMapRepository repository;
   final RouteDraftController routeDraftController;
-  final VoidCallback onOpenStationSearch;
+
+  /// 역 검색을 열 때 현재 선택 지역 표시명(예: '수도권', '부산')을 함께 전달한다.
+  /// #2090에서 검색 화면에 지역 표시가 추가됐는데 호출부가 이를 안 넘겨 기본값
+  /// '수도권'이 고정 표시되던 결함을 고치기 위해, 파라미터 없는 VoidCallback에서
+  /// `ValueChanged<String>`으로 바꿨다.
+  final ValueChanged<String> onOpenStationSearch;
 
   /// #1933 홈 in-place 역 검색 모드를 빠져나올 때(← 또는 시스템 back) 호출된다.
   /// 셸이 알림/신고 상태를 다시 불러오도록 하기 위한 훅이다. 라우트 기반 검색이
@@ -398,8 +403,10 @@ class NetworkMapScreen extends StatefulWidget {
 
   /// 상단 draft 오버레이의 출발/도착 칸을 탭했을 때, 그 칸을 채우려고 기존 역 검색을
   /// 여는 콜백. 지도 탭과 같은 [routeDraftController]로 수렴한다. null이면 오버레이
-  /// 칸은 탭할 수 없다(둘러보기 검색만 메뉴로 제공).
-  final void Function(RouteDraftSlot slot)? onPickStationForSlot;
+  /// 칸은 탭할 수 없다(둘러보기 검색만 메뉴로 제공). 두 번째 인자는 현재 선택 지역
+  /// 표시명(#2090 검색 화면 지역 표시 배선).
+  final void Function(RouteDraftSlot slot, String regionLabel)?
+  onPickStationForSlot;
   final StationSearchRepository? stationSearchRepository;
 
   /// #1933 홈 노선도 위에서 역 검색을 in-place로 열 때, 결과 탭 → 역 상세로
@@ -415,7 +422,9 @@ class NetworkMapScreen extends StatefulWidget {
   final NetworkMapViewportRepository? viewportRepository;
   final RealtimeRepository? realtimeRepository;
   final VoidCallback? onOpenSavedItems;
-  final VoidCallback? onOpenNearbyStations;
+
+  /// 현재 선택 지역 표시명을 함께 전달한다(#2090 검색 화면 지역 표시 배선).
+  final ValueChanged<String>? onOpenNearbyStations;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenDataSources;
 
@@ -657,7 +666,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
                 onCurrentLocationTap: _showNearbyPanel,
-                onOpenNearbyStations: widget.onOpenNearbyStations,
+                onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
@@ -704,7 +713,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
                 onCurrentLocationTap: _showNearbyPanel,
-                onOpenNearbyStations: widget.onOpenNearbyStations,
+                onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
@@ -759,7 +768,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               nearbyLookupMessage: _nearbyLookupMessage,
               adjacentStations: _adjacentStationsFor(data),
               onCurrentLocationTap: _showNearbyPanel,
-              onOpenNearbyStations: widget.onOpenNearbyStations,
+              onOpenNearbyStations: _openNearbyStationsWithRegion,
               onCloseNearbyPanel: _hideNearbyPanel,
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
@@ -975,6 +984,21 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     });
   }
 
+  /// 현재 선택 지역의 표시명(예: '수도권', '부산'). 역 검색 화면을 열 때
+  /// [StationSearchScreen.regionLabel]로 그대로 넘긴다(#2090 배선).
+  String get _currentRegionDisplayName =>
+      _displayRegionName(_selectedRegion ?? '수도권');
+
+  /// 파라미터 없는 [VoidCallback]만 받는 하위 위젯(_NetworkMapChrome,
+  /// _NetworkMapMenuPanel)에 현재 지역을 실어 전달하기 위한 래퍼.
+  VoidCallback? get _openNearbyStationsWithRegion {
+    final callback = widget.onOpenNearbyStations;
+    if (callback == null) {
+      return null;
+    }
+    return () => callback(_currentRegionDisplayName);
+  }
+
   Future<void> _openMapMenu() {
     return showGeneralDialog<void>(
       context: context,
@@ -984,9 +1008,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (context, animation, secondaryAnimation) {
         return _NetworkMapMenuPanel(
-          onOpenStationSearch: widget.onOpenStationSearch,
+          onOpenStationSearch: () =>
+              widget.onOpenStationSearch(_currentRegionDisplayName),
           onOpenSavedItems: widget.onOpenSavedItems,
-          onOpenNearbyStations: widget.onOpenNearbyStations,
+          onOpenNearbyStations: _openNearbyStationsWithRegion,
           onOpenServiceNotices: widget.onOpenServiceNotices,
           onOpenSettings: widget.onOpenSettings,
           onOpenDataSources: widget.onOpenDataSources,
@@ -1057,17 +1082,26 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   /// G4: 상단 오버레이 출발 칸 탭 → 기존 역 검색을 "출발역 채우기" 모드로 연다.
   /// 지도 탭 경로와 같은 [routeDraftController]로 수렴한다.
   void _pickOriginStation() {
-    widget.onPickStationForSlot?.call(RouteDraftSlot.origin);
+    widget.onPickStationForSlot?.call(
+      RouteDraftSlot.origin,
+      _currentRegionDisplayName,
+    );
   }
 
   /// G4: 상단 오버레이 도착 칸 탭 → 기존 역 검색을 "도착역 채우기" 모드로 연다.
   void _pickDestinationStation() {
-    widget.onPickStationForSlot?.call(RouteDraftSlot.destination);
+    widget.onPickStationForSlot?.call(
+      RouteDraftSlot.destination,
+      _currentRegionDisplayName,
+    );
   }
 
   /// #1948: 상단 오버레이 경유 행·추가 진입점 탭 → 역 검색을 "경유역 채우기" 모드로 연다.
   void _pickWaypointStation() {
-    widget.onPickStationForSlot?.call(RouteDraftSlot.waypoint);
+    widget.onPickStationForSlot?.call(
+      RouteDraftSlot.waypoint,
+      _currentRegionDisplayName,
+    );
   }
 
   _NetworkMapAdjacentStations _adjacentStationsFor(NetworkMapData data) {

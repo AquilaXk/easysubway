@@ -1785,7 +1785,7 @@ class StationSearchScreen extends StatefulWidget {
     this.routeDraftController,
     this.entryMode = StationSearchEntryMode.search,
     this.pickSlot,
-    this.regionLabel = '수도권',
+    required this.regionLabel,
     this.bottomNavigationBar,
     super.key,
   });
@@ -1812,8 +1812,8 @@ class StationSearchScreen extends StatefulWidget {
   /// #2082: 검색 화면 상단 필드 우측에 표시하는 현재 지역명. 홈 idle 상단바
   /// [≡ | 검색필드 | 지역표시] 구성과 정합하기 위해, 검색 화면(← + 필드)에도
   /// 같은 위치·스타일의 지역 표시를 둔다. 검색 맥락에서는 지역 변경 UI를 새로
-  /// 만들지 않고 표시 전용으로 둔다(오너 지시: "변경은 못해도 알려는 줘야"). 홈
-  /// 기본 지역과 동일하게 기본값은 '수도권'.
+  /// 만들지 않고 표시 전용으로 둔다(오너 지시: "변경은 못해도 알려는 줘야"). 호출부가
+  /// 홈이 들고 있는 실제 선택 지역 표시명을 반드시 넘겨야 한다(#2090 배선 누락 수정).
   final String regionLabel;
   final Widget? bottomNavigationBar;
 
