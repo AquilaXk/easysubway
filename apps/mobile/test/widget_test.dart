@@ -7381,6 +7381,89 @@ void main() {
     );
   });
 
+  testWidgets('#2066 승차 step에 빠른 하차 칸-문·시설 안내 줄을 그린다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'entry',
+            title: '상록수 승강장 접근',
+            description: '승강장까지 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sangnoksu',
+            estimatedMinutes: 6,
+            distanceMeters: 180,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'ride',
+            title: '상록수에서 사당까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 32,
+            distanceMeters: 13500,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+            carDoorCarNumber: 3,
+            carDoorDoorNumber: 4,
+            carDoorFacilityType: 'ELEVATOR',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(
+            favorites: [_favoriteRoute()],
+          ),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 11),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 승차 step에만 빠른 하차 안내 줄이 나온다.
+    expect(find.byKey(const Key('routeStepCarDoor-2')), findsOneWidget);
+    expect(find.textContaining('빠른 하차 3-4칸'), findsWidgets);
+    expect(find.textContaining('엘리베이터'), findsWidgets);
+    // 데이터 없는 entry step(sequence 1)에는 줄을 그리지 않는다.
+    expect(find.byKey(const Key('routeStepCarDoor-1')), findsNothing);
+
+    // 스크린리더용 시맨틱 라벨은 "번 칸/번 문" 형태로 풀어 읽는다.
+    final semanticsHandle = tester.ensureSemantics();
+    final node = tester.getSemantics(
+      find.byKey(const Key('routeStepCarDoor-2')),
+    );
+    expect(node.label, contains('3번 칸'));
+    expect(node.label, contains('4번 문'));
+    expect(node.label, contains('엘리베이터'));
+    semanticsHandle.dispose();
+  });
+
   testWidgets('#1948 타임라인은 경유 스텝을 무채색 경유 노드로 그리고 요약을 왜곡하지 않는다', (tester) async {
     final routeRepository = FakeRouteSearchRepository(
       result: _sampleRouteSearchResult(

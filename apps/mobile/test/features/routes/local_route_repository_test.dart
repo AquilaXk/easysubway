@@ -4063,6 +4063,148 @@ void main() {
       expect(result.steps, isEmpty);
     },
   );
+
+  test('빠른 하차 안내: 방향(UP) 일치하면 승차 step에 칸-문·시설을 채운다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-a', 'station-sadang', 'seoul-4', 'UP', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, 3);
+    expect(ride.carDoorDoorNumber, 4);
+    expect(ride.carDoorFacilityType, 'ELEVATOR');
+    expect(ride.hasCarDoorHint, isTrue);
+  });
+
+  test('빠른 하차 안내: 반대 방향(DOWN)만 있으면 매칭하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-down', 'station-sadang', 'seoul-4', 'DOWN', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, isNull);
+    expect(ride.hasCarDoorHint, isFalse);
+  });
+
+  test('빠른 하차 안내: direction이 비면 방향 무관하게 매칭한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-anydir', 'station-sadang', 'seoul-4', '', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, 3);
+    expect(ride.carDoorDoorNumber, 4);
+  });
+
+  test('빠른 하차 안내: 미검증(UNKNOWN) 힌트는 게이트에서 제외된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-unknown', 'station-sadang', 'seoul-4', 'UP', 'ELEVATOR',
+        3, 4, 'UNKNOWN'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, isNull);
+  });
+
+  test('빠른 하차 안내: 후보가 여럿이면 시설 우선순위로 엘리베이터를 고른다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES
+        ('cardoor-stair', 'station-sadang', 'seoul-4', 'UP', 'STAIR',
+          1, 1, 'OFFICIAL'),
+        ('cardoor-elev', 'station-sadang', 'seoul-4', 'UP', 'ELEVATOR',
+          3, 4, 'OFFICIAL')
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorFacilityType, 'ELEVATOR');
+    expect(ride.carDoorCarNumber, 3);
+  });
 }
 
 Map<String, Object?> _routeV2Payload({

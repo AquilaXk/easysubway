@@ -288,6 +288,13 @@ class LocalRouteRepository implements RouteSearchRepository {
           final fromName = catalog.stationName(fromStationId);
           final toName = catalog.stationName(toStationId);
           final lineName = catalog.lineName(step.lineId);
+          final carDoorHint = step.type.name == 'ride'
+              ? catalog.carDoorHintFor(
+                  fromStationId: fromStationId,
+                  toStationId: toStationId,
+                  lineId: step.lineId,
+                )
+              : null;
 
           return RouteSearchStep(
             sequence: index + 1,
@@ -317,6 +324,9 @@ class LocalRouteRepository implements RouteSearchRepository {
             distanceSource: step.distanceSource,
             confidenceLabel: step.confidenceLabel,
             plannedArrivalTimeIso: plannedArrivals[step.sequence] ?? '',
+            carDoorCarNumber: carDoorHint?.carNumber,
+            carDoorDoorNumber: carDoorHint?.doorNumber,
+            carDoorFacilityType: carDoorHint?.facilityType ?? '',
           );
         })
         .toList(growable: false);
@@ -1083,6 +1093,7 @@ class _RouteCatalogSnapshot {
     required this.sourceUpdatedAt,
     required this.realtimeStationLineKeysByProvider,
     required this.plannedStationLineKeys,
+    required this.carDoorHintsByStationLine,
   });
 
   final Map<String, String> stationsById;
@@ -1095,6 +1106,10 @@ class _RouteCatalogSnapshot {
   final String sourceUpdatedAt;
   final Map<String, Set<String>> realtimeStationLineKeysByProvider;
   final Set<String> plannedStationLineKeys;
+
+  /// 키=_stationLineKey(stationId, lineId). 빠른 하차 안내(#2066)용, 오프라인
+  /// 로컬 catalog에 station_car_door_hints가 있을 때만 채워진다.
+  final Map<String, List<_CarDoorHintSnapshot>> carDoorHintsByStationLine;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final sourceUpdatedAtRow = await database.customSelect('''
@@ -1147,6 +1162,33 @@ class _RouteCatalogSnapshot {
           row.read<String>('line_id'),
         ),
     };
+    final carDoorHintsByStationLine = <String, List<_CarDoorHintSnapshot>>{};
+    if (await _tableExists(database, 'station_car_door_hints')) {
+      final carDoorRows = await database.customSelect('''
+            SELECT station_id, line_id, direction, target_facility_type,
+              car_number, door_number
+            FROM station_car_door_hints
+            WHERE UPPER(verification_status) IN ('OFFICIAL', 'VERIFIED')
+            ''').get();
+      for (final row in carDoorRows) {
+        carDoorHintsByStationLine
+            .putIfAbsent(
+              _stationLineKey(
+                row.read<String>('station_id'),
+                row.read<String>('line_id'),
+              ),
+              () => <_CarDoorHintSnapshot>[],
+            )
+            .add(
+              _CarDoorHintSnapshot(
+                direction: row.read<String>('direction'),
+                facilityType: row.read<String>('target_facility_type'),
+                carNumber: row.read<int>('car_number'),
+                doorNumber: row.read<int>('door_number'),
+              ),
+            );
+      }
+    }
     final networkEdgeColumns = await database
         .customSelect('PRAGMA table_info(network_edges)')
         .get();
@@ -1447,6 +1489,7 @@ class _RouteCatalogSnapshot {
       ),
       realtimeStationLineKeysByProvider: realtimeStationLineKeysByProvider,
       plannedStationLineKeys: plannedStationLineKeys,
+      carDoorHintsByStationLine: carDoorHintsByStationLine,
     );
   }
 
@@ -1501,6 +1544,78 @@ class _RouteCatalogSnapshot {
       (keys) =>
           originKeys.any(keys.contains) && destinationKeys.any(keys.contains),
     );
+  }
+
+  /// 빠른 하차 안내(#2066): 승차 step의 (from,to,line)에 맞는 하차 칸-문을 고른다.
+  /// 방향은 station_lines의 line_sequence로 유추한다(감소=UP, 증가=DOWN).
+  /// direction 게이트: 값 방향은 유추 방향과 일치할 때만, 빈 direction은 방향 무관.
+  /// 후보가 여럿이면 시설 우선순위(ELEVATOR>ESCALATOR>STAIR>TRANSFER), 이어서
+  /// carNumber·doorNumber 오름차순으로 결정적으로 하나를 고른다.
+  ({int carNumber, int doorNumber, String facilityType})? carDoorHintFor({
+    required String fromStationId,
+    required String toStationId,
+    required String lineId,
+  }) {
+    if (toStationId.isEmpty || lineId.isEmpty) {
+      return null;
+    }
+    final candidates =
+        carDoorHintsByStationLine[_stationLineKey(toStationId, lineId)] ??
+        const <_CarDoorHintSnapshot>[];
+    if (candidates.isEmpty) {
+      return null;
+    }
+    final fromSeq = _lineSequenceFor(fromStationId, lineId);
+    final toSeq = _lineSequenceFor(toStationId, lineId);
+    String? inferredDirection;
+    if (fromSeq != null && toSeq != null) {
+      if (toSeq > fromSeq) {
+        inferredDirection = 'DOWN';
+      } else if (toSeq < fromSeq) {
+        inferredDirection = 'UP';
+      }
+    }
+    final matches = candidates.where((hint) {
+      final direction = hint.direction.toUpperCase();
+      if (direction.isEmpty) {
+        return true;
+      }
+      if (direction == 'UP' || direction == 'DOWN') {
+        return inferredDirection != null && inferredDirection == direction;
+      }
+      return false;
+    }).toList(growable: false);
+    if (matches.isEmpty) {
+      return null;
+    }
+    matches.sort((a, b) {
+      final priority = _carDoorFacilityPriority(a.facilityType).compareTo(
+        _carDoorFacilityPriority(b.facilityType),
+      );
+      if (priority != 0) {
+        return priority;
+      }
+      final byCar = a.carNumber.compareTo(b.carNumber);
+      if (byCar != 0) {
+        return byCar;
+      }
+      return a.doorNumber.compareTo(b.doorNumber);
+    });
+    final best = matches.first;
+    return (
+      carNumber: best.carNumber,
+      doorNumber: best.doorNumber,
+      facilityType: best.facilityType,
+    );
+  }
+
+  int? _lineSequenceFor(String stationId, String lineId) {
+    for (final stationLine in stationLines) {
+      if (stationLine.stationId == stationId && stationLine.lineId == lineId) {
+        return stationLine.sequence;
+      }
+    }
+    return null;
   }
 
   List<String> regionsFor(String originStationId, String destinationStationId) {
@@ -1958,6 +2073,16 @@ String _stationLineKey(String stationId, String lineId) {
   return '$stationId:$lineId';
 }
 
+int _carDoorFacilityPriority(String facilityType) {
+  return switch (facilityType.toUpperCase()) {
+    'ELEVATOR' => 0,
+    'ESCALATOR' => 1,
+    'STAIR' => 2,
+    'TRANSFER' => 3,
+    _ => 4,
+  };
+}
+
 graph.RouteEdge _toGraphRouteEdge(
   _NetworkEdgeSnapshot networkEdge,
   graph.RouteEdgeType routeEdgeType, {
@@ -2073,6 +2198,20 @@ class _StationLineSnapshot {
 
   _RouteNodeKey get routeNodeKey =>
       _RouteNodeKey(stationId: stationId, lineId: lineId, servicePattern: '');
+}
+
+class _CarDoorHintSnapshot {
+  const _CarDoorHintSnapshot({
+    required this.direction,
+    required this.facilityType,
+    required this.carNumber,
+    required this.doorNumber,
+  });
+
+  final String direction;
+  final String facilityType;
+  final int carNumber;
+  final int doorNumber;
 }
 
 class _FacilitySnapshot {
