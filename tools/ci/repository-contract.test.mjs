@@ -4205,7 +4205,17 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.equal(operationsEvidence.backendControlPlane.issue, 1017);
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.qaEvidenceDateKst,
-    "2026-06-28",
+    "2026-07-14",
+  );
+  assert.equal(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.status, "SATISFIED");
+  assert.equal(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.readinessResult, "PASS");
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.scope,
+    "production-environment-and-local-prod-like-readiness",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.productionMutationPerformed,
+    false,
   );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.githubEnvironmentProtection
@@ -4229,6 +4239,70 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
+      .targetReadiness,
+    "PASS_UP",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
+      .rollbackReadiness,
+    "PASS_UP",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.runUrl,
+    "https://github.com/AquilaXk/easysubway/actions/runs/29274432867",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.commit,
+    "95702961b3bc59d1d1e2a3c89131ea242c349353",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.result,
+    "PASS_SUCCESS",
+  );
+  assert.match(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.imageId,
+    /^sha256:[0-9a-f]{64}$/,
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.postgresql,
+    "PASS_ISOLATED_DUMP_RESTORE",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.facilityReportPhoto,
+    "PASS_FIXTURE_HASH_SIZE_PATH",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.datapackManifest,
+    "PASS_BUNDLED_CHECKSUM_SQLITE_AUDIT",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.datapackSourceInventory,
+    "PASS_SOURCE_INVENTORY_VALIDATION",
+  );
+  assert.deepEqual(
+    Object.values(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.securityAndAdminReadiness),
+    [
+      "PASS_SECURITY_CONFIG_TEST",
+      "PASS_DISABLED",
+      "PASS_FOCUSED_TESTS",
+      "PASS_PAGE_SMOKE_AND_ACCESSIBILITY_TESTS",
+      "PASS_SECURITY_CONTRACT_TESTS",
+      "PASS_FOCUSED_TESTS",
+      "PASS_REPOSITORY_AND_BACKEND_TESTS",
+    ],
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.temporaryReleaseDecisions
+      .singleInstanceAbuseControl.backendReplicaCount,
+    1,
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.temporaryReleaseDecisions
+      .singleInstanceAbuseControl.distributedLimiterFollowUpIssue,
+    1022,
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
       .secretValueCapturedInEvidence,
     false,
   );
@@ -4237,47 +4311,41 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     [
       "github-production-environment-required-reviewer-summary",
       "production-secret-scope-review",
+      "main-release-artifact-run-and-image-inspect",
       "prod-like-env-validation-output",
+      "local-prod-like-target-readiness-output",
+      "local-prod-like-rollback-readiness-output",
+      "postgresql-isolated-dump-restore-output",
+      "facility-report-photo-fixture-restore-output",
+      "datapack-source-inventory-validation-output",
+      "bundled-datapack-checksum-sqlite-audit-output",
+      "public-api-default-deny-and-security-matcher-tests",
+      "admin-lockout-audit-page-accessibility-and-abuse-tests",
       "backend-gradle-check-output",
     ],
   );
-  assert.deepEqual(
-    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.remainingBlockers,
-    [
-      "production-or-prod-like-deploy-readiness-summary",
-      "backend-release-artifact-sha",
-      "deployment-target-sha",
-      "backend-rollback-drill-result",
-      "migration-diff-summary",
-      "postgresql-restore-rehearsal-result",
-      "facility-report-photo-object-restore-result",
-      "datapack-source-inventory-validation",
-      "datapack-release-manifest-restore",
-      "backend-public-api-surface-inventory",
-      "default-deny-public-chain-test-output",
-      "security-matcher-contract-test-output",
-      "admin-auth-transition-decision-record",
-      "admin-basic-auth-prod-disabled-test-output",
-      "admin-operator-lockout-test-output",
-      "break-glass-rotation-drill-record",
-      "break-glass-use-immediate-rotation-record",
-      "admin-credential-rotation-cadence-record",
-      "operator-tenant-scope-decision-record",
-      "operator-global-audit-sample",
-      "trusted-proxy-negative-test-output",
-      "multi-instance-rate-limit-test-output-or-single-instance-exception",
-      "abuse-store-mode-release-blocker-record",
-      "staging-prod-environment-separation-summary",
-      "admin-operator-page-smoke-output",
-      "admin-page-accessibility-smoke-output",
-      "admin-role-matrix-test-output",
-      "admin-mutating-action-audit-sample",
-      "privacy-read-audit-sample",
-      "report-photo-read-audit-sample",
-      "break-glass-use-audit-sample",
-    ],
+  assert.deepEqual(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.remainingBlockers, []);
+  assert.match(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.closingDecisionKo, /#1017/);
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.productionExecutionGate.status,
+    "DEFERRED_OUT_OF_SCOPE",
   );
-  assert.match(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.notClosingReasonKo, /#1017/);
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.productionExecutionGate.decision,
+    "FINAL_GO_NO_GO_1020",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.productionExecutionGate.issue,
+    1020,
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.productionExecutionGate.productionMutationPerformed,
+    false,
+  );
+  assert.ok(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.productionExecutionGate.requiredBeforeProduction
+      .includes("production-deploy-and-public-readiness-result"),
+  );
   assert.ok(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.redactionPolicy.forbiddenInGitHubEvidence.includes(
       "raw environment secret",
@@ -8059,7 +8127,7 @@ test("로컬 PostgreSQL 백업과 복구 리허설 기준선을 제공한다", (
   assert.match(restoreScript, /docker compose --env-file "\$\{ENV_FILE\}" -f "\$\{COMPOSE_FILE\}" exec -T -e RESTORE_DB="\$\{RESTORE_DB\}" postgres sh -lc/);
   assert.match(restoreScript, /sh -lc '\nset -eu\n/);
   assert.match(restoreScript, /"\$POSTGRES_DB"\|postgres\|template0\|template1/);
-  assert.match(restoreScript, /Refusing to use protected restore database/);
+  assert.match(restoreScript, /printf "Refusing to use protected restore database: %s\\n"/);
   assert.match(restoreScript, /dropdb --if-exists -U "\$POSTGRES_USER" "\$RESTORE_DB"/);
   assert.match(restoreScript, /createdb -U "\$POSTGRES_USER" "\$RESTORE_DB"/);
   assert.match(restoreScript, /pg_restore --clean --if-exists --no-owner --no-privileges -U "\$POSTGRES_USER" -d "\$RESTORE_DB"/);
