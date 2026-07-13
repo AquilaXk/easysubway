@@ -13233,6 +13233,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
 
+  const cd = await classifyChangedFiles([".github/workflows/cd.yml"]);
+  assert.equal(cd.repository, "true");
+  assert.equal(cd.ci, "true");
+  assert.equal(cd.deploy, "true");
+
   const repoTool = await classifyChangedFiles(["tools/repo/check-split-readiness.mjs"]);
   assert.equal(repoTool.repository, "true");
   assert.equal(repoTool.ci, "true");
