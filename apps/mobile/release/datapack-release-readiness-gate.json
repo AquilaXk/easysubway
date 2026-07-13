@@ -75,6 +75,7 @@
     "routeGraphCoverageReport": "artifacts/route-graph-coverage-report.json",
     "routeV2ContractReport": "artifacts/route-v2-contract-report.json",
     "coverageGapReport": "artifacts/datapack-coverage-gaps.json",
+    "itxCheongchunCoverageContract": "tools/datapack/itx-cheongchun-coverage-contract.json",
     "qualityMetricReport": "artifacts/datapack-quality-metrics.json",
     "routeGraphTopologyReport": "artifacts/route-graph-topology-report.json",
     "freshnessSlaPolicy": "apps/mobile/release/datapack-freshness-sla.json",
@@ -87,7 +88,8 @@
     "node tools/routes/build-route-graph-coverage-report.mjs --input artifacts/route-graph-coverage-input.json --output artifacts/route-graph-coverage-report.json",
     "node tools/routes/check-route-commercialization-gate.mjs --gate apps/mobile/release/route-commercialization-gate.json --accuracy artifacts/route-accuracy-report.json --accessibility artifacts/route-accessibility-regression-report.json --coverage artifacts/realtime-provider-coverage-report.json --routeGraphCoverage artifacts/route-graph-coverage-report.json --contract artifacts/route-v2-contract-report.json",
     "node tools/datapack/build-route-graph-topology-report.mjs --manifest ... --root ... --output artifacts/route-graph-topology-report.json",
-    "node tools/datapack/report-coverage-gaps.mjs ..."
+    "node tools/datapack/report-coverage-gaps.mjs ...",
+    "node --test tools/datapack/itx-cheongchun-coverage-contract.test.mjs"
   ],
   "evidencePolicy": {
     "githubSummaryOnly": true,
