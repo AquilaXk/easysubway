@@ -48,8 +48,8 @@
       "area": "datapack",
       "ownerKo": "데이터팩 운영 담당자",
       "backupCommand": "tools/ops/data-source-raw-archive.sh",
-      "restoreRehearsalCommand": "node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json",
-      "successEvidence": "source archive manifest와 source-inventory validation 통과",
+      "restoreRehearsalCommand": "node tools/ops/data-source-raw-archive-restore-check.mjs \"$EASYSUBWAY_DATA_SOURCE_RESTORE_DIR\" && node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json",
+      "successEvidence": "self-contained source archive payload hash·size·ID 검증과 source-inventory validation 통과",
       "failureConditions": [
         "source inventory license 또는 updatedAt 누락",
         "source archive manifest가 비어 있음",
@@ -57,6 +57,8 @@
       ],
       "linkedArtifacts": [
         "tools/ops/data-source-raw-archive.sh",
+        "tools/ops/data-source-raw-archive-materialize.mjs",
+        "tools/ops/data-source-raw-archive-restore-check.mjs",
         "tools/datapack/source-inventory.json",
         "tools/datapack/validate-source-inventory.mjs"
       ]

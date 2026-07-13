@@ -8414,6 +8414,14 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
     photoTarget.linkedArtifacts.includes(photoRestoreCheckPath),
     "facility photo restore target must link the restore check script",
   );
+  const sourceArchiveTarget = backupTargets.get("datapack_source_inventory");
+  assert.equal(
+    sourceArchiveTarget.restoreRehearsalCommand,
+    'node tools/ops/data-source-raw-archive-restore-check.mjs "$EASYSUBWAY_DATA_SOURCE_RESTORE_DIR" && node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json',
+  );
+  assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-materialize.mjs"));
+  assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-restore-check.mjs"));
+  assert.match(sourceArchiveTarget.successEvidence, /payload hash·size·ID 검증/);
 
   assert.match(gate.rehearsalPolicy.frequencyKo, /월 1회|릴리즈/);
   assert.match(gate.rehearsalPolicy.dataSafetyKo, /운영 데이터 직접 복원 금지|격리/);
