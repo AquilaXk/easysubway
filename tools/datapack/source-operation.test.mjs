@@ -185,6 +185,27 @@ test("승인된 provider의 human 요약은 승인 범위와 기간을 표시한
   assert.match(sourceOperation.operationHumanSummary(summary), /^approval valid: 2026-07-06\.\.2027-07-06$/m);
 });
 
+test("list는 만료 상태 오류를 candidate에 남기고 다른 provider를 계속 반환한다", () => {
+  const expired = candidate("expired", {
+    providerApproval: {
+      status: "APPROVED",
+      serviceId: "handicapped",
+      operationId: "transferMovement",
+      validFrom: "2020-01-01",
+      validTo: "2020-12-31",
+      evidenceSource: "owner-confirmed",
+      recordedAt: "2020-01-01",
+    },
+  });
+
+  const rows = listOperations({ candidates: [candidate("active"), expired] });
+
+  assert.deepEqual(rows.map(({ id }) => id), ["active", "expired"]);
+  assert.equal(rows[0].providerApprovalValidationError, null);
+  assert.match(rows[1].providerApprovalValidationError, /status is APPROVED but validTo has expired/);
+  assert.match(sourceOperation.operationHumanSummary(rows[1]), /^provider approval validation: .*has expired$/m);
+});
+
 test("show는 operation이 없어도 sample URL credential을 출력 전에 거부한다", () => {
   for (const sampleUrl of [
     "https://provider.example/actual-secret/items",

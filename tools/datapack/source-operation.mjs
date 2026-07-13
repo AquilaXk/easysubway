@@ -248,7 +248,12 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
 
 export function operationSummary(candidate) {
   validateOperation(candidate, { allowMissing: true });
-  validateProviderApproval(candidate);
+  let providerApprovalValidationError = null;
+  try {
+    validateProviderApproval(candidate);
+  } catch (error) {
+    providerApprovalValidationError = error instanceof Error ? error.message : "provider approval is invalid";
+  }
   return {
     id: requiredText(candidate.id, "candidate.id"),
     status: candidate.admissionStatus ?? null,
@@ -256,6 +261,7 @@ export function operationSummary(candidate) {
     sampleUrl: candidate.evidence?.sampleUrl ?? null,
     responseFields: candidate.evidence?.outputFields ?? [],
     providerApproval: candidate.providerApproval ?? null,
+    providerApprovalValidationError,
     operation: candidate.operation ?? null,
   };
 }
@@ -285,6 +291,9 @@ export function operationHumanSummary(summary) {
   } else {
     lines.push("provider approval: none");
   }
+  if (summary.providerApprovalValidationError) {
+    lines.push(`provider approval validation: ${summary.providerApprovalValidationError}`);
+  }
   if (summary.operation) {
     lines.push(
       `auth env: ${summary.operation.auth.env ?? "not required"}`,
@@ -305,7 +314,6 @@ async function main(args = process.argv.slice(2)) {
   const [command, sourceId] = args.filter((arg) => arg !== "--json");
   const json = args.includes("--json");
   const document = JSON.parse(await readFile(CANDIDATES_URL, "utf8"));
-  validateSourceCandidateDocument(document);
   const operations = listOperations(document);
   if (command === "list") {
     console.log(
@@ -322,6 +330,7 @@ async function main(args = process.argv.slice(2)) {
     return;
   }
   if (command === "validate" && !sourceId) {
+    validateSourceCandidateDocument(document);
     const candidates = document.candidates.filter((candidate) => candidate.operation != null);
     for (const candidate of candidates) validateOperation(candidate);
     console.log(`source operation contracts valid: ${candidates.length}`);
