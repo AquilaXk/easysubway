@@ -282,6 +282,50 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   validateCatalog(catalog);
   assert.ok(catalog.some((entry) => entry.kind === "internal"));
   assert.ok(catalog.some((entry) => entry.id === "provider:seoul-topis-realtime-station-arrival"));
+  const publicDataSearch = findCatalogEntry(catalog, "provider:public-data-portal-search");
+  assert.equal(publicDataSearch.operation.method, "POST");
+  assert.equal(publicDataSearch.operation.auth.env, "DATA_GO_KR_SERVICE_KEY");
+  assert.deepEqual(publicDataSearch.responseFields, [
+    "sum",
+    "dataCount",
+    "dataName",
+    "dataDescription",
+    "organization",
+    "keywords",
+    "dataType",
+    "detailPageUrl",
+  ]);
+  for (const [id, method, authEnv] of [
+    ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY"],
+    ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY"],
+    ["provider:daejeon-braille-guide-map", "GET", "DATA_GO_KR_SERVICE_KEY"],
+  ]) {
+    const entry = findCatalogEntry(catalog, id);
+    assert.equal(entry.operation.method, method);
+    assert.equal(entry.operation.auth.env, authEnv);
+    assert.equal(entry.operation.runner.command, "node tools/datapack/probe-daejeon-coverage-api.mjs");
+  }
+  const daejeonSearchIds = new Set(listCatalog(catalog, { kind: "provider", query: "대전" }).map(({ id }) => id));
+  for (const id of [
+    "provider:daejeon-braille-guide-map",
+    "provider:daejeon-station-distance-fare",
+    "provider:daejeon-train-timetable",
+  ]) assert.ok(daejeonSearchIds.has(id));
+  assert.deepEqual(
+    listCatalog(catalog, { kind: "provider", query: "ITX-청춘" })
+      .map(({ id }) => id)
+      .filter((id) => id.startsWith("provider:tago-train-") || id.startsWith("provider:kric-")),
+    [
+      "provider:kric-station-timetable",
+      "provider:kric-subway-route-info",
+      "provider:kric-subway-timetable",
+      "provider:kric-subway-timetable-exp",
+      "provider:tago-train-city-codes",
+      "provider:tago-train-grades",
+      "provider:tago-train-schedule-fares",
+      "provider:tago-train-stations",
+    ],
+  );
   assert.equal(
     findCatalogEntry(catalog, "provider:busan-transportation-official-od-fares").operation.method,
     "POST",

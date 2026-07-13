@@ -306,6 +306,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     routeGraphCoverageReport: "artifacts/route-graph-coverage-report.json",
     routeV2ContractReport: "artifacts/route-v2-contract-report.json",
     coverageGapReport: "artifacts/datapack-coverage-gaps.json",
+    itxCheongchunCoverageContract: "tools/datapack/itx-cheongchun-coverage-contract.json",
     qualityMetricReport: "artifacts/datapack-quality-metrics.json",
     routeGraphTopologyReport: "artifacts/route-graph-topology-report.json",
     freshnessSlaPolicy: "apps/mobile/release/datapack-freshness-sla.json",
@@ -320,6 +321,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-coverage-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-topology-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
+  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("itx-cheongchun-coverage-contract.test.mjs")));
   assert.equal(gate.evidencePolicy.githubSummaryOnly, true);
   assert.ok(gate.evidencePolicy.forbiddenInGithubSummary.includes("backend-only provider key"));
   assert.ok(governance.latestGoNoGoStatus.blockingOpenIssues.includes(1414));
@@ -4622,6 +4624,8 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   const remotePublishIndex = workflow.indexOf("Data Pack Release / Publish staged data packs to object storage");
   const artifactIndex = workflow.indexOf("Data Pack Release / Upload staged data packs");
   const manifestIndex = workflow.indexOf("Data Pack Release / Stage manifest");
+  const itxContractValidationIndex = workflow.indexOf("Data Pack Release / Validate ITX-청춘 coverage contract");
+  const evidenceBundleIndex = workflow.indexOf("Data Pack Release / Write release evidence bundle");
   const jobEnvBlock = workflow.match(/\n    env:\n[\s\S]*?\n\n    steps:/)?.[0] ?? "";
 
   assert.match(workflow, /^name: Data Pack Release$/m);
@@ -4630,6 +4634,12 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /paths:[\s\S]*- tools\/route-map\/\*\*/);
   assert.doesNotMatch(jobEnvBlock, /runner\.temp/, "job-level env cannot use runner context");
   assert.match(workflow, /Data Pack Release \/ Configure temp directories/);
+  assert.ok(itxContractValidationIndex >= 0, "ITX coverage contract validation step must exist");
+  assert.ok(
+    itxContractValidationIndex < evidenceBundleIndex,
+    "ITX coverage contract must be validated before release evidence is hashed",
+  );
+  assert.match(workflow, /node --test tools\/datapack\/itx-cheongchun-coverage-contract\.test\.mjs/);
   assert.match(workflow, /GITHUB_ENV/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_OUTPUT=\$\{\{ runner\.temp \}\}\/easysubway-datapacks/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_STAGE=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage/);
@@ -5187,6 +5197,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "gzipSha256",
     "manifestSha256",
     "coverageSummarySha256",
+    "itxCheongchunCoverageSha256",
     "routeMapPositionCoverageSha256",
     "routeGraphTopologySha256",
     "headwayReportSha256",
@@ -6758,7 +6769,11 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   const kricCandidates = candidates.candidates.filter(
     (candidate) =>
       candidate.id.startsWith("kric-") &&
-      candidate.id !== "kric-subway-timetable" &&
+      !new Set([
+        "kric-station-timetable",
+        "kric-subway-timetable",
+        "kric-subway-timetable-exp",
+      ]).has(candidate.id) &&
       candidate.admissionStatus !== "admitted_to_production_inventory",
   );
 
