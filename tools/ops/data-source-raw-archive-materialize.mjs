@@ -1,0 +1,88 @@
+#!/usr/bin/env node
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const [csvPath, archiveDir] = process.argv.slice(2);
+assert.ok(csvPath && archiveDir, "usage: data-source-raw-archive-materialize.mjs <raw-archives.csv> <archive-dir>");
+
+const rows = parseCsv(await readFile(csvPath, "utf8"));
+const header = rows.shift() ?? [];
+const index = Object.fromEntries(header.map((name, column) => [name, column]));
+for (const name of ["archive_id", "run_id", "source", "storage_uri", "payload_sha256"]) {
+  assert.ok(Number.isInteger(index[name]), `raw archive CSV missing ${name}`);
+}
+
+const objectsDir = path.join(archiveDir, "objects");
+await mkdir(objectsDir, { recursive: true, mode: 0o700 });
+const materialized = [];
+for (const row of rows) {
+  const storageUri = row[index.storage_uri] ?? "";
+  if (!storageUri.startsWith("file://")) continue;
+  const expectedSha256 = row[index.payload_sha256];
+  assert.match(expectedSha256, /^[a-f0-9]{64}$/i, "payload_sha256 must be hex");
+  const sourcePath = fileURLToPath(new URL(storageUri));
+  const bytes = await readFile(sourcePath);
+  assert.equal(sha256(bytes), expectedSha256.toLowerCase(), `payload hash mismatch: ${row[index.archive_id]}`);
+  const objectPath = path.posix.join("objects", `${expectedSha256.toLowerCase()}.payload`);
+  await copyFile(sourcePath, path.join(archiveDir, objectPath));
+  materialized.push({
+    archiveId: row[index.archive_id],
+    runId: row[index.run_id],
+    source: row[index.source],
+    sha256: expectedSha256.toLowerCase(),
+    sizeBytes: (await stat(sourcePath)).size,
+    objectPath,
+  });
+}
+
+await writeFile(
+  path.join(archiveDir, "payload-manifest.json"),
+  `${JSON.stringify({ schemaVersion: 1, materialized }, null, 2)}\n`,
+  { mode: 0o600 },
+);
+console.log(`data source payloads materialized: ${materialized.length}`);
+
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+  for (let offset = 0; offset < text.length; offset += 1) {
+    const character = text[offset];
+    if (quoted) {
+      if (character === '"' && text[offset + 1] === '"') {
+        field += '"';
+        offset += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        field += character;
+      }
+    } else if (character === '"') {
+      quoted = true;
+    } else if (character === ",") {
+      row.push(field);
+      field = "";
+    } else if (character === "\n") {
+      row.push(field.replace(/\r$/, ""));
+      if (row.some((value) => value !== "")) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += character;
+    }
+  }
+  if (field !== "" || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  assert.equal(quoted, false, "unterminated quoted CSV field");
+  return rows;
+}

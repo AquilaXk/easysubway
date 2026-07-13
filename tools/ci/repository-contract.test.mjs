@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { promisify } from "node:util";
@@ -4125,6 +4126,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const gate = readJson(gatePath);
   const operationsEvidencePath = "apps/mobile/release/operations-release-evidence.json";
   const operationsEvidence = readJson(operationsEvidencePath);
+  const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
   const backupRestoreGate = readJson("apps/mobile/release/backup-restore-rehearsal-gate.json");
   const datapackWorkflow = read(".github/workflows/datapack-release.yml");
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
@@ -4203,6 +4205,12 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.ok(operationsEvidence.restoreRehearsal.requiredChecks.includes("postgresql-restore-rehearsal"));
   assert.ok(operationsEvidence.restoreRehearsal.requiredChecks.includes("facility-report-photo-restore-check"));
   assert.equal(operationsEvidence.backendControlPlane.issue, 1017);
+  const backendControlPlaneGate = releaseGovernanceGate.gates.find(
+    (releaseGate) => releaseGate.id === "G5_BACKEND_CONTROL_PLANE",
+  );
+  assert.equal(backendControlPlaneGate.issue, 1017);
+  assert.equal(backendControlPlaneGate.status, "SATISFIED");
+  assert.match(backendControlPlaneGate.nextAction, /실제 restore, break-glass·audit 증거 완료/);
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.qaEvidenceDateKst,
     "2026-07-14",
@@ -4264,20 +4272,28 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     /^sha256:[0-9a-f]{64}$/,
   );
   assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.datapackArtifact.runUrl,
+    "https://github.com/AquilaXk/easysubway/actions/runs/29271665083",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.datapackArtifact.manifestRestore,
+    "PASS_DOWNLOADED_ARTIFACT_MANIFEST_AND_SQLITE_VALIDATION",
+  );
+  assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.postgresql,
     "PASS_ISOLATED_DUMP_RESTORE",
   );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.facilityReportPhoto,
-    "PASS_FIXTURE_HASH_SIZE_PATH",
+    "PASS_ACTUAL_BACKUP_MANIFEST_OBJECT_HASH_SIZE_PATH",
   );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.datapackManifest,
-    "PASS_BUNDLED_CHECKSUM_SQLITE_AUDIT",
+    "PASS_DOWNLOADED_ACTIONS_ARTIFACT_MANIFEST_RESTORE",
   );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.restoreReadiness.datapackSourceInventory,
-    "PASS_SOURCE_INVENTORY_VALIDATION",
+    "PASS_ACTUAL_SELF_CONTAINED_RAW_ARCHIVE_RESTORE",
   );
   assert.deepEqual(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.securityAndAdminReadiness,
@@ -4288,7 +4304,19 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       adminPagesRoleAndAccessibility: "PASS_PAGE_SMOKE_AND_ACCESSIBILITY_TESTS",
       trustedProxyNegativeBoundary: "PASS_SECURITY_CONTRACT_TESTS",
       facilityReportAbuseAndObjectStorage: "PASS_FOCUSED_TESTS",
-      auditRedaction: "PASS_REPOSITORY_AND_BACKEND_TESTS",
+      auditRedaction: "PASS_LOCAL_PROD_LIKE_AUDIT_DRILL_AND_TESTS",
+    },
+  );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.localProdLikeAdminDrill,
+    {
+      breakGlassFirstUse: "PASS_LOGIN_AND_CREDENTIAL_ROTATION_REQUIRED",
+      breakGlassSecondCredentialUse: "PASS_LOGIN_AND_CREDENTIAL_ROTATION_REQUIRED",
+      breakGlassFinalCredential: "PASS_ACTIVE_UNUSED_AFTER_RESTART",
+      breakGlassLoginAudit: "PASS_SUCCESS_WITH_REASON_NO_SECRET",
+      reportPhotoReadAudit: "PASS_PRIVACY_READ_WITH_REQUEST_ID_AND_REASON",
+      adminMutationAudit: "PASS_CSRF_REJECTION_RECORDED_WITH_REQUEST_ID",
+      sensitiveValueCapturedInEvidence: false,
     },
   );
   const singleInstanceAbuseControl = operationsEvidence.backendControlPlane.latestQaEvidenceStatus
@@ -4314,24 +4342,22 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       .secretValueCapturedInEvidence,
     false,
   );
-  assert.deepEqual(
-    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.resolvedEvidence,
-    [
-      "github-production-environment-required-reviewer-summary",
-      "production-secret-scope-review",
-      "main-release-artifact-run-and-image-inspect",
-      "prod-like-env-validation-output",
-      "local-prod-like-target-readiness-output",
-      "local-prod-like-rollback-readiness-output",
-      "postgresql-isolated-dump-restore-output",
-      "facility-report-photo-fixture-restore-output",
-      "datapack-source-inventory-validation-output",
-      "bundled-datapack-checksum-sqlite-audit-output",
-      "public-api-default-deny-and-security-matcher-tests",
-      "admin-lockout-audit-page-accessibility-and-abuse-tests",
-      "backend-gradle-check-output",
-    ],
-  );
+  const resolvedEvidence = operationsEvidence.backendControlPlane.latestQaEvidenceStatus.resolvedEvidence;
+  assert.equal(new Set(resolvedEvidence).size, resolvedEvidence.length, "resolved evidence IDs must be unique");
+  for (const section of Object.values(operationsEvidence.backendControlPlane)) {
+    if (!section || typeof section !== "object" || !Array.isArray(section.requiredEvidence)) continue;
+    for (const evidenceId of section.requiredEvidence) {
+      assert.ok(resolvedEvidence.includes(evidenceId), `resolved evidence must include ${evidenceId}`);
+    }
+  }
+  for (const evidenceId of [
+    "datapack-release-artifact-manifest-history-restore",
+    "facility-report-photo-actual-backup-restore-output",
+    "datapack-source-raw-archive-actual-restore-output",
+    "local-prod-like-break-glass-and-admin-audit-drill",
+  ]) {
+    assert.ok(resolvedEvidence.includes(evidenceId), `resolved evidence must include ${evidenceId}`);
+  }
   assert.deepEqual(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.remainingBlockers, []);
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.closingDecisionKo,
@@ -8162,12 +8188,13 @@ test("시설 신고 사진 백업은 로컬 전용 객체와 manifest 기준선�
   assert.match(backupScript, /REPLACE\(REPLACE\(ENCODE\(CONVERT_TO\(COALESCE\(photo_file_name, ''\), 'UTF8'\), 'base64'\), E'\\n', ''\), E'\\r', ''\)/);
   assert.match(backupScript, /REPLACE\(REPLACE\(ENCODE\(CONVERT_TO\(COALESCE\(photo_content_type, ''\), 'UTF8'\), 'base64'\), E'\\n', ''\), E'\\r', ''\)/);
   assert.match(backupScript, /COALESCE\(photo_object_key, ''\) AS photo_object_key/);
-  assert.match(backupScript, /COALESCE\(photo_thumbnail_object_key, ''\) AS photo_thumbnail_object_key/);
+  assert.match(backupScript, /COALESCE\(photo_thumbnail_object_key, '__EASYSUBWAY_EMPTY__'\) AS photo_thumbnail_object_key/);
   assert.match(backupScript, /photo_object_key IS NOT NULL/);
   assert.match(backupScript, /photo_object_key <> ''/);
   assert.match(backupScript, /ORDER BY report_id ASC/);
   assert.match(backupScript, /TO STDOUT WITH \(FORMAT text, DELIMITER E'\\t'\)/);
   assert.match(backupScript, /copy_object\(\) \{/);
+  assert.match(backupScript, /thumbnail_object_key.*__EASYSUBWAY_EMPTY__/s);
   assert.match(backupScript, /cp "\$\{source_file\}" "\$\{target_path\}"/);
   assert.match(backupScript, /manifest_field\(\) \{/);
   assert.match(backupScript, /tr '\\t\\r\\n' ' '/);
@@ -8204,6 +8231,55 @@ test("시설 신고 사진 복구 리허설은 manifest와 object 산출물을 �
 
   const result = execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8" });
   assert.match(result, /facility report photo restore rehearsal ok/);
+});
+
+test("source raw archive는 file payload를 self-contained 산출물로 만들고 복구 시 hash를 검증한다", async () => {
+  const archiveScript = read("tools/ops/data-source-raw-archive.sh");
+  const materializePath = "tools/ops/data-source-raw-archive-materialize.mjs";
+  const restoreCheckPath = "tools/ops/data-source-raw-archive-restore-check.mjs";
+  const materializeScript = read(materializePath);
+  const restoreCheckScript = read(restoreCheckPath);
+  const fixtureDir = await mkdtemp(path.join(tmpdir(), "easysubway-source-archive-"));
+  const payloadPath = path.join(fixtureDir, "source-payload.json");
+  const payload = Buffer.from('{"provider":"synthetic","items":[1]}\n');
+  const payloadSha256 = createHash("sha256").update(payload).digest("hex");
+
+  await writeFile(payloadPath, payload);
+  await writeFile(
+    path.join(fixtureDir, "collection-runs.csv"),
+    [
+      "run_id,source,status,requested_by,started_at,completed_at,collected_count,failure_message,retryable,operator_action",
+      "run-1,SYNTHETIC,COMPLETED,drill,2026-07-13T00:00:00Z,2026-07-13T00:00:01Z,1,,false,archive",
+    ].join("\n"),
+  );
+  await writeFile(
+    path.join(fixtureDir, "raw-archives.csv"),
+    [
+      "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at",
+      `archive-1,run-1,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:01Z`,
+    ].join("\n"),
+  );
+
+  assert.match(archiveScript, /data-source-raw-archive-materialize\.mjs/);
+  assert.match(materializeScript, /storageUri\.startsWith\("file:\/\/"\)/);
+  assert.match(materializeScript, /payload hash mismatch/);
+  assert.match(materializeScript, /payload-manifest\.json/);
+  assert.match(restoreCheckScript, /objectPath must not contain traversal/);
+  assert.match(restoreCheckScript, /materialized payload missing/);
+
+  execFileSync(process.execPath, [materializePath, path.join(fixtureDir, "raw-archives.csv"), fixtureDir], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const result = execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8" });
+  assert.match(result, /data source archive restore rehearsal ok: 1 payload/);
+
+  await writeFile(path.join(fixtureDir, "objects", `${payloadSha256}.payload`), Buffer.from("tampered"));
+  assert.throws(
+    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    /Command failed/,
+  );
+  await rm(fixtureDir, { recursive: true, force: true });
 });
 
 test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검증 명령을 고정한다", () => {

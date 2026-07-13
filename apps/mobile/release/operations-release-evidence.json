@@ -67,11 +67,18 @@
         "entrypoint": "java -jar /app/app.jar",
         "profile": "prod"
       },
+      "datapackArtifact": {
+        "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29271665083",
+        "result": "PASS_SUCCESS",
+        "commit": "c28a1c99b88ccf49bbecb60ca1810775db530813",
+        "artifact": "easysubway-datapacks-c28a1c99b88ccf49bbecb60ca1810775db530813",
+        "manifestRestore": "PASS_DOWNLOADED_ARTIFACT_MANIFEST_AND_SQLITE_VALIDATION"
+      },
       "restoreReadiness": {
         "postgresql": "PASS_ISOLATED_DUMP_RESTORE",
-        "facilityReportPhoto": "PASS_FIXTURE_HASH_SIZE_PATH",
-        "datapackSourceInventory": "PASS_SOURCE_INVENTORY_VALIDATION",
-        "datapackManifest": "PASS_BUNDLED_CHECKSUM_SQLITE_AUDIT"
+        "facilityReportPhoto": "PASS_ACTUAL_BACKUP_MANIFEST_OBJECT_HASH_SIZE_PATH",
+        "datapackSourceInventory": "PASS_ACTUAL_SELF_CONTAINED_RAW_ARCHIVE_RESTORE",
+        "datapackManifest": "PASS_DOWNLOADED_ACTIONS_ARTIFACT_MANIFEST_RESTORE"
       },
       "securityAndAdminReadiness": {
         "publicApiDefaultDenyAndMatcherContract": "PASS_SECURITY_CONFIG_TEST",
@@ -80,7 +87,16 @@
         "adminPagesRoleAndAccessibility": "PASS_PAGE_SMOKE_AND_ACCESSIBILITY_TESTS",
         "trustedProxyNegativeBoundary": "PASS_SECURITY_CONTRACT_TESTS",
         "facilityReportAbuseAndObjectStorage": "PASS_FOCUSED_TESTS",
-        "auditRedaction": "PASS_REPOSITORY_AND_BACKEND_TESTS"
+        "auditRedaction": "PASS_LOCAL_PROD_LIKE_AUDIT_DRILL_AND_TESTS"
+      },
+      "localProdLikeAdminDrill": {
+        "breakGlassFirstUse": "PASS_LOGIN_AND_CREDENTIAL_ROTATION_REQUIRED",
+        "breakGlassSecondCredentialUse": "PASS_LOGIN_AND_CREDENTIAL_ROTATION_REQUIRED",
+        "breakGlassFinalCredential": "PASS_ACTIVE_UNUSED_AFTER_RESTART",
+        "breakGlassLoginAudit": "PASS_SUCCESS_WITH_REASON_NO_SECRET",
+        "reportPhotoReadAudit": "PASS_PRIVACY_READ_WITH_REQUEST_ID_AND_REASON",
+        "adminMutationAudit": "PASS_CSRF_REJECTION_RECORDED_WITH_REQUEST_ID",
+        "sensitiveValueCapturedInEvidence": false
       },
       "temporaryReleaseDecisions": {
         "operatorTenantScope": {
@@ -101,18 +117,40 @@
         }
       },
       "resolvedEvidence": [
+        "backend-public-api-surface-inventory",
+        "default-deny-public-chain-test-output",
+        "security-matcher-contract-test-output",
+        "admin-auth-transition-decision-record",
+        "admin-basic-auth-prod-disabled-test-output",
+        "admin-operator-lockout-test-output",
+        "break-glass-rotation-drill-record",
+        "break-glass-use-immediate-rotation-record",
+        "admin-credential-rotation-cadence-record",
+        "operator-tenant-scope-decision-record",
+        "operator-global-audit-sample",
+        "trusted-proxy-negative-test-output",
+        "multi-instance-rate-limit-test-output-or-single-instance-exception",
+        "abuse-store-mode-release-blocker-record",
         "github-production-environment-required-reviewer-summary",
+        "staging-prod-environment-separation-summary",
         "production-secret-scope-review",
+        "admin-operator-page-smoke-output",
+        "admin-page-accessibility-smoke-output",
+        "admin-role-matrix-test-output",
+        "admin-mutating-action-audit-sample",
+        "privacy-read-audit-sample",
+        "report-photo-read-audit-sample",
+        "break-glass-use-audit-sample",
         "main-release-artifact-run-and-image-inspect",
+        "datapack-release-artifact-manifest-history-restore",
         "prod-like-env-validation-output",
         "local-prod-like-target-readiness-output",
         "local-prod-like-rollback-readiness-output",
         "postgresql-isolated-dump-restore-output",
-        "facility-report-photo-fixture-restore-output",
-        "datapack-source-inventory-validation-output",
-        "bundled-datapack-checksum-sqlite-audit-output",
+        "facility-report-photo-actual-backup-restore-output",
+        "datapack-source-raw-archive-actual-restore-output",
         "public-api-default-deny-and-security-matcher-tests",
-        "admin-lockout-audit-page-accessibility-and-abuse-tests",
+        "local-prod-like-break-glass-and-admin-audit-drill",
         "backend-gradle-check-output"
       ],
       "remainingBlockers": [],
