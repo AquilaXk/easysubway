@@ -14,6 +14,30 @@ import { normalizeKricSubwayTimetable } from "./normalize-kric-timetable.mjs";
 import { reconstructTransitTrips } from "./reconstruct-transit-trips.mjs";
 
 const SERVICE_ID_BY_DAY_CD = { "8": "weekday-kric", "7": "saturday-kric", "9": "holiday-kric" };
+const RAW_ARCHIVE_FIELDS = [
+  "railOprIsttCd",
+  "trnNo",
+  "dayCd",
+  "dayNm",
+  "stinCd",
+  "lnCd",
+  "arvTm",
+  "dptTm",
+  "exptCd",
+];
+
+export function credentialFreeRawArchiveRows(rows) {
+  return rows.map((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      throw new Error("KRIC raw archive row must be an object");
+    }
+    return Object.fromEntries(
+      RAW_ARCHIVE_FIELDS
+        .filter((field) => Object.hasOwn(row, field))
+        .map((field) => [field, row[field]]),
+    );
+  });
+}
 
 export function buildCollectionContext(roster, lineId) {
   const stationIdByProviderStation = {};
@@ -49,6 +73,7 @@ async function main() {
   const context = buildCollectionContext(roster, lineId);
 
   const intermediate = [];
+  const rawArchiveRows = [];
   const perRequest = [];
   let failed = 0;
   for (const request of plan.requests) {
@@ -58,7 +83,9 @@ async function main() {
       const code = payload?.header?.resultCode;
       const rows = Array.isArray(payload.body) ? payload.body : [];
       // servicePattern은 normalizer가 row별 exptCd로 도출한다(급행 표시 시각표).
+      const successfulRows = code === "00" ? credentialFreeRawArchiveRows(rows) : [];
       const normalized = code === "00" ? normalizeKricSubwayTimetable(rows, context) : [];
+      rawArchiveRows.push(...successfulRows);
       intermediate.push(...normalized);
       perRequest.push({ requestKey: request.requestKey, resultCode: code, rows: rows.length, normalized: normalized.length });
     } catch (error) {
@@ -85,6 +112,9 @@ async function main() {
   if (args.output) {
     await writeFile(args.output, `${JSON.stringify(artifact, null, 2)}\n`);
   }
+  if (args["raw-output"]) {
+    await writeFile(args["raw-output"], `${JSON.stringify(rawArchiveRows, null, 2)}\n`);
+  }
   const { transitTrips: _t, transitStopTimes: _s, perRequest: _p, ...summary } = artifact;
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 }
@@ -107,14 +137,24 @@ function parseArgs(argv) {
 }
 
 // transient 네트워크 오류(DNS ENOTFOUND 등)에 소폭 재시도한다. KRIC quota 무제한이라 재시도 비용 무해.
-async function fetchWithRetry(url, attempts = 3) {
+export async function fetchWithRetry(
+  url,
+  attempts = 3,
+  fetchImpl = fetch,
+  timeoutMs = 15000,
+  retryDelayMs = 500,
+) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      return await (await fetch(url)).text();
+      return await (
+        await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
+      ).text();
     } catch (error) {
       lastError = error;
-      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * attempt));
+      }
     }
   }
   throw lastError;

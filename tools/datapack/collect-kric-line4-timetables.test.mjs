@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildCollectionContext } from "./collect-kric-line4-timetables.mjs";
+import {
+  buildCollectionContext,
+  credentialFreeRawArchiveRows,
+  fetchWithRetry,
+} from "./collect-kric-line4-timetables.mjs";
 import { normalizeKricSubwayTimetable } from "./normalize-kric-timetable.mjs";
 import { reconstructTransitTrips } from "./reconstruct-transit-trips.mjs";
 
@@ -37,4 +41,52 @@ test("KRIC 응답→context→normalizer→코어가 직결(같은 trnNo)을 온
   assert.equal(transitTrips.length, 1);
   assert.equal(transitStopTimes.length, 2); // 사당 + 상록수 한 trip으로 연결
   assert.equal(transitTrips[0].serviceId, "weekday-kric");
+});
+
+test("KRIC raw archive는 문서화된 provider 필드만 보존한다", () => {
+  const rows = credentialFreeRawArchiveRows([
+    {
+      railOprIsttCd: "S1",
+      trnNo: "4719",
+      dayCd: "8",
+      dayNm: "평일",
+      stinCd: "433",
+      lnCd: "4",
+      arvTm: "084830",
+      dptTm: "084900",
+      exptCd: "0",
+      serviceKey: "must-not-be-archived",
+      undocumented: "must-not-be-archived",
+    },
+  ]);
+
+  assert.deepEqual(rows, [
+    {
+      railOprIsttCd: "S1",
+      trnNo: "4719",
+      dayCd: "8",
+      dayNm: "평일",
+      stinCd: "433",
+      lnCd: "4",
+      arvTm: "084830",
+      dptTm: "084900",
+      exptCd: "0",
+    },
+  ]);
+});
+
+test("KRIC 수집 요청은 timeout 뒤 bounded retry로 중단한다", async () => {
+  let attempts = 0;
+  const stalledFetch = (_url, { signal }) => {
+    attempts += 1;
+    return new Promise((resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  };
+
+  await assert.rejects(
+    fetchWithRetry("https://openapi.kric.go.kr/test", 2, stalledFetch, 1, 0),
+    /timeout|aborted/i,
+  );
+  assert.equal(attempts, 2);
 });
