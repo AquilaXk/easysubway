@@ -4280,16 +4280,16 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     "PASS_SOURCE_INVENTORY_VALIDATION",
   );
   assert.deepEqual(
-    Object.values(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.securityAndAdminReadiness),
-    [
-      "PASS_SECURITY_CONFIG_TEST",
-      "PASS_DISABLED",
-      "PASS_FOCUSED_TESTS",
-      "PASS_PAGE_SMOKE_AND_ACCESSIBILITY_TESTS",
-      "PASS_SECURITY_CONTRACT_TESTS",
-      "PASS_FOCUSED_TESTS",
-      "PASS_REPOSITORY_AND_BACKEND_TESTS",
-    ],
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.securityAndAdminReadiness,
+    {
+      publicApiDefaultDenyAndMatcherContract: "PASS_SECURITY_CONFIG_TEST",
+      adminBasicAuthProdDefault: "PASS_DISABLED",
+      adminLockoutAndAudit: "PASS_FOCUSED_TESTS",
+      adminPagesRoleAndAccessibility: "PASS_PAGE_SMOKE_AND_ACCESSIBILITY_TESTS",
+      trustedProxyNegativeBoundary: "PASS_SECURITY_CONTRACT_TESTS",
+      facilityReportAbuseAndObjectStorage: "PASS_FOCUSED_TESTS",
+      auditRedaction: "PASS_REPOSITORY_AND_BACKEND_TESTS",
+    },
   );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.temporaryReleaseDecisions
