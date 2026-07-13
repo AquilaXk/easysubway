@@ -71,6 +71,7 @@
   "requiredArtifacts": {
     "routeAccuracyReport": "artifacts/route-accuracy-report.json",
     "realtimeProviderCoverageReport": "artifacts/realtime-provider-coverage-report.json",
+    "regionalRealtimeProviderDecisionReport": "tools/realtime/regional-realtime-provider-decision-report.json",
     "routeAccessibilityRegressionReport": "artifacts/route-accessibility-regression-report.json",
     "routeGraphCoverageReport": "artifacts/route-graph-coverage-report.json",
     "routeV2ContractReport": "artifacts/route-v2-contract-report.json",
@@ -86,6 +87,7 @@
     "node --test tools/datapack/*.test.mjs tools/routes/*.test.mjs",
     "node tools/routes/evaluate-eta-accuracy.mjs ...",
     "node tools/routes/build-route-graph-coverage-report.mjs --input artifacts/route-graph-coverage-input.json --output artifacts/route-graph-coverage-report.json",
+    "node tools/routes/build-regional-realtime-provider-decision-report.mjs --targets tools/datapack/nationwide-coverage-targets.json --contract tools/realtime/regional-realtime-provider-decisions.json --output tools/realtime/regional-realtime-provider-decision-report.json",
     "node tools/routes/check-route-commercialization-gate.mjs --gate apps/mobile/release/route-commercialization-gate.json --accuracy artifacts/route-accuracy-report.json --accessibility artifacts/route-accessibility-regression-report.json --coverage artifacts/realtime-provider-coverage-report.json --routeGraphCoverage artifacts/route-graph-coverage-report.json --contract artifacts/route-v2-contract-report.json",
     "node tools/datapack/build-route-graph-topology-report.mjs --manifest ... --root ... --output artifacts/route-graph-topology-report.json",
     "node tools/datapack/report-coverage-gaps.mjs ...",

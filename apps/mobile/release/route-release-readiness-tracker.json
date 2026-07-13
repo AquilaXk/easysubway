@@ -58,6 +58,7 @@
       "artifacts/route-accuracy-report.json",
       "artifacts/route-accessibility-regression-report.json",
       "artifacts/realtime-provider-coverage-report.json",
+      "tools/realtime/regional-realtime-provider-decision-report.json",
       "artifacts/route-graph-coverage-report.json",
       "artifacts/route-v2-contract-report.json"
     ],
