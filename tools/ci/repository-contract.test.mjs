@@ -928,6 +928,15 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
     );
     assert.ok(restoreStep.includes(`drop["${name}"] = 1`), `${name} must replace a stale dotenv value`);
   }
+  assert.ok(
+    restoreStep.includes('drop["EASYSUBWAY_BACKEND_BIND"] = 1'),
+    "CD must replace a stale backend bind",
+  );
+  assert.match(
+    restoreStep,
+    /printf 'EASYSUBWAY_BACKEND_BIND=127\.0\.0\.1\\n' >> "\$\{env_file\}"/,
+    "CD must force the production backend bind to loopback",
+  );
   assert.match(
     restoreStep,
     /for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+if \[\[ -z "\$\{value\}" \|\| "\$\{value\}" == \*\$'\\n'\* \|\| "\$\{value\}" == \*\$'\\r'\* \]\]; then[\s\S]*?exit 1\s+fi\s+done[\s\S]*?for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+printf '%s=%s\\n' "\$\{name\}" "\$\{value\}" >> "\$\{env_file\}"\s+done/,
