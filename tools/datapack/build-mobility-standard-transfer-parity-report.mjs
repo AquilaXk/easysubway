@@ -27,10 +27,12 @@ import { parseArgs, readJsonFile, requireArg, sortJson } from "./lib/ledger-admi
 
 const DEVIATION_TOLERANCE_PERCENT = 10;
 
-// STANDARD 프리셋을 baseline 초에 적용한 산출 초. speedFactor 1.0 = 항등이므로
-// ceilDiv 규약(정수 초 반올림 올림)과 무관하게 baseline과 동일해야 한다.
+// STANDARD 프리셋을 baseline 초에 적용한 산출 초. backend ProfileWalkTimeCalculator.estimateSeconds의
+// Math.toIntExact(Math.ceilDiv((long) baselineSeconds * preset.speedFactorPercent, 100))와 동일한
+// 정수 나눗셈 올림(ceil division)을 구현한다. 부동소수 Math.ceil은 큰 값에서 부동소수 오차로 backend와
+// 어긋날 수 있어 쓰지 않는다. speedFactorPercent=100(STANDARD)에서는 항등(standardSeconds(x,100)===x)이다.
 export function standardSeconds(baselineSeconds, speedFactorPercent) {
-  return Math.ceil((baselineSeconds * speedFactorPercent) / 100);
+  return Math.floor((baselineSeconds * speedFactorPercent + 99) / 100);
 }
 
 export function buildMobilityStandardTransferParityReport({ baseline, policy }) {

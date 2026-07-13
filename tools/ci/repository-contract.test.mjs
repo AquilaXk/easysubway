@@ -13926,10 +13926,19 @@ test("#1702 backend ProfileWalkTimeCalculator enum은 정책 JSON 계수·매핑
   assert.match(source, /STEP_FREE_FACILITY_WAIT_SECONDS\s*=\s*60\b/);
   assert.equal(policy.presets.STEP_FREE.elevatorWaitSeconds, 60);
 
-  // presetFor switch 매핑이 JSON mobilityTypeMapping과 일치한다.
-  assert.match(source, /case\s+SENIOR,\s*PREGNANT,\s*TEMPORARY_INJURY\s*->\s*MobilityPreset\.SLOW\s*;/);
-  assert.match(source, /case\s+LUGGAGE\s*->\s*MobilityPreset\.NO_STAIRS\s*;/);
-  assert.match(source, /case\s+STROLLER,\s*WHEELCHAIR\s*->\s*MobilityPreset\.STEP_FREE\s*;/);
+  // presetFor switch 매핑이 JSON mobilityTypeMapping과 일치한다. case 라벨 나열 순서는 의미에 영향을 주지 않으므로
+  // 라벨 집합을 정렬해 비교한다(선언 순서가 바뀌어도 계약이 깨지지 않도록).
+  const assertCaseLabels = (presetName, expectedLabels) => {
+    const match = source.match(
+      new RegExp(`case\\s+([A-Z_,\\s]+?)\\s*->\\s*MobilityPreset\\.${presetName}\\s*;`),
+    );
+    assert.ok(match, `presetFor switch must have a case clause mapping to MobilityPreset.${presetName}`);
+    const actualLabels = match[1].split(",").map((label) => label.trim()).sort();
+    assert.deepEqual(actualLabels, [...expectedLabels].sort());
+  };
+  assertCaseLabels("SLOW", ["SENIOR", "PREGNANT", "TEMPORARY_INJURY"]);
+  assertCaseLabels("NO_STAIRS", ["LUGGAGE"]);
+  assertCaseLabels("STEP_FREE", ["STROLLER", "WHEELCHAIR"]);
   assert.equal(policy.mobilityTypeMapping.SENIOR, "SLOW");
   assert.equal(policy.mobilityTypeMapping.PREGNANT, "SLOW");
   assert.equal(policy.mobilityTypeMapping.TEMPORARY_INJURY, "SLOW");
