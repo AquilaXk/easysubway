@@ -6648,7 +6648,6 @@ test("KRIC route graph 수집 계획은 검증된 XML live sample을 재취득 �
   }
   assert.equal(plan.requests[0].priority, 1);
   assert.deepEqual(plan.requests[0].remainingAdmissionBlockers, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "licenseCommercialRedistributionEvidence",
     "line4RouteStationOrderCoverage",
@@ -6656,7 +6655,6 @@ test("KRIC route graph 수집 계획은 검증된 XML live sample을 재취득 �
     "rawObjectUri",
   ]);
   assert.deepEqual(plan.requests[1].remainingAdmissionBlockers, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "licenseCommercialRedistributionEvidence",
     "kricStandardStationFileComparison",
@@ -6826,7 +6824,7 @@ test("KRIC route graph 수집 계획은 case-insensitive format 변형을 valida
   assert.match(request.url, /[?&]format=xml(?:&|$)/);
 });
 
-test("KRIC route graph 수집 계획은 admitted 또는 production/automatic edge가 열린 후보를 거부한다", async () => {
+test("KRIC route graph 수집 계획은 provenance 전용이 아닌 admission 또는 production/automatic edge가 열린 후보를 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-kric-plan-state-${Date.now()}`);
   const candidatesPath = path.join(outputDir, "source-candidates.json");
   await rm(outputDir, { recursive: true, force: true });
@@ -6846,8 +6844,9 @@ test("KRIC route graph 수집 계획은 admitted 또는 production/automatic edg
   );
 
   candidate.admissionStatus = "admitted_to_production_inventory";
+  candidate.productionInventoryRelationship = "production_runtime_source";
   await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
-  await assert.rejects(runPlanner(), /admissionStatus must require admin review before production use/);
+  await assert.rejects(runPlanner(), /admissionStatus must be pending admin review or inventory provenance only/);
 
   candidate.admissionStatus = "evidence_recorded_admin_review_required";
   candidate.automaticRouteGraphEdgeAllowed = true;
@@ -7671,6 +7670,7 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
   const summaryPath = path.join(outputDir, "admission-summary.json");
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
+  const candidatesPath = await writePendingCandidateFixture(outputDir, "kric-train-operation-organ");
   await writeFile(rawPath, `${JSON.stringify([{ railOprIsttCd: "S1", railOprIsttNm: "서울교통공사" }])}\n`);
 
   const { stdout: sampleStdout } = await execFileAsync(
@@ -7768,6 +7768,8 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
     process.execPath,
     [
       "tools/datapack/run-source-admission-pipeline.mjs",
+      "--candidates",
+      candidatesPath,
       "--candidate",
       "kric-train-operation-organ",
       "--raw-input",
@@ -7825,6 +7827,8 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
       process.execPath,
       [
         "tools/datapack/run-source-admission-pipeline.mjs",
+        "--candidates",
+        candidatesPath,
         "--candidate",
         "kric-train-operation-organ",
         "--raw-input",
@@ -7867,6 +7871,8 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
       process.execPath,
       [
         "tools/datapack/run-source-admission-pipeline.mjs",
+        "--candidates",
+        candidatesPath,
         "--candidate",
         "kric-train-operation-organ",
         "--raw-input",
@@ -7927,6 +7933,7 @@ test("source admission pipeline은 custom candidates를 최종 inventory 검증�
   const sample = JSON.parse(sampleStdout);
 
   const stagedCandidates = JSON.parse(await readFile(path.join(root, "tools/datapack/source-candidates.json"), "utf8"));
+  resetCandidateForAdmissionTest(stagedCandidates, "kric-train-operation-organ");
   const tagoCandidate = stagedCandidates.candidates.find((entry) => entry.id === "molit-tago-subway-info");
   tagoCandidate.evidence.liveSampleEvidenceHash = sha256("staged-candidate-hash-mismatch");
   await writeFile(candidatesPath, `${JSON.stringify(stagedCandidates, null, 2)}\n`);
@@ -13447,6 +13454,25 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+async function writePendingCandidateFixture(outputDir, candidateId) {
+  const candidates = JSON.parse(await readFile(path.join(root, "tools/datapack/source-candidates.json"), "utf8"));
+  resetCandidateForAdmissionTest(candidates, candidateId);
+  const candidatesPath = path.join(outputDir, "source-candidates.pending.json");
+  await writeFile(candidatesPath, `${JSON.stringify(candidates, null, 2)}\n`);
+  return candidatesPath;
+}
+
+function resetCandidateForAdmissionTest(candidates, candidateId) {
+  const candidate = candidates.candidates.find(({ id }) => id === candidateId);
+  candidate.admissionStatus = "evidence_recorded_admin_review_required";
+  delete candidate.productionInventoryReferenceId;
+  delete candidate.productionInventoryRelationship;
+  delete candidate.evidence.adminReview;
+  candidate.evidence.missingEvidence = [
+    ...new Set([...(candidate.evidence.missingEvidence ?? []), "adminAdmissionEvidence"]),
+  ];
+}
+
 function objectStorageEnv(origin) {
   return {
     ...process.env,
@@ -15882,8 +15908,9 @@ test("source inventory는 official OD fare admission hash 쌍을 함께 요구�
     );
 
     const nonFareInventory = structuredClone(sourceInventory);
-    nonFareInventory.sources[0].officialOdFareAdmissionHash = "a".repeat(64);
-    nonFareInventory.sources[0].fareStationLineMappingLedgerHash = "b".repeat(64);
+    const nonFareSource = nonFareInventory.sources.find(({ id }) => id === "kric-braille-displays");
+    nonFareSource.officialOdFareAdmissionHash = "a".repeat(64);
+    nonFareSource.fareStationLineMappingLedgerHash = "b".repeat(64);
     const nonFarePath = path.join(workspace, "non-fare.json");
     await writeFile(nonFarePath, JSON.stringify(nonFareInventory));
     await assert.rejects(
@@ -15894,7 +15921,7 @@ test("source inventory는 official OD fare admission hash 쌍을 함께 요구�
     );
 
     const partialFareInventory = structuredClone(nonFareInventory);
-    partialFareInventory.sources[0].fieldsProvided.push("gnrlCardFare");
+    partialFareInventory.sources.find(({ id }) => id === "kric-braille-displays").fieldsProvided.push("gnrlCardFare");
     const partialFarePath = path.join(workspace, "partial-fare.json");
     await writeFile(partialFarePath, JSON.stringify(partialFareInventory));
     await assert.rejects(
@@ -16831,6 +16858,7 @@ test("build-admin-review-record 산출물은 run-source-admission-pipeline을 �
   const outputDir = path.join(tmpdir(), `easysubway-ledger-e2e-${Date.now()}`);
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
+  const candidatesPath = await writePendingCandidateFixture(outputDir, "kric-train-operation-organ");
   const rawPath = path.join(outputDir, "kric-train-operation-organ.raw.json");
   await writeFile(rawPath, `${JSON.stringify([{ railOprIsttCd: "S1", railOprIsttNm: "서울교통공사" }])}\n`);
 
@@ -16923,6 +16951,7 @@ test("build-admin-review-record 산출물은 run-source-admission-pipeline을 �
     process.execPath,
     [
       "tools/datapack/run-source-admission-pipeline.mjs",
+      "--candidates", candidatesPath,
       "--candidate", "kric-train-operation-organ",
       "--raw-input", rawPath,
       "--evidence-dir", outputDir,

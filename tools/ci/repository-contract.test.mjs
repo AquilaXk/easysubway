@@ -5496,10 +5496,18 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       .map((candidate) => candidate.id)
       .sort(),
     [
+      "kric-station-convenience-standard",
       "kric-station-elevator",
       "kric-station-elevator-movement",
       "kric-station-escalator",
+      "kric-station-info",
+      "kric-station-movement-detailed",
+      "kric-station-movement-standard",
+      "kric-station-platform",
+      "kric-station-transfer-info",
+      "kric-subway-route-info",
       "kric-subway-timetable",
+      "kric-train-operation-organ",
       "kric-transfer-movement-detailed",
       "kric-wheelchair-lift-location",
       "kric-wheelchair-lift-movement",
@@ -5513,7 +5521,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "seoulmetro-station-line-info",
     ],
   );
-  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 15);
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 23);
   // admittedCandidateCount는 P0 후보 전용 카운트다. #1397에서 함께 승격된 P1 route_map_positions
   // 후보(seoulmetro-cyberstation-route-map, capital pilot deferred domain)는 이 카운트에 포함되지 않는다.
   assert.equal(
@@ -5620,10 +5628,18 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-metropolitan-rail-station-info",
     "kric-platform-train-distance",
     "kric-safety-platform",
+    "kric-station-convenience-standard",
     "kric-station-elevator",
     "kric-station-elevator-movement",
     "kric-station-escalator",
+    "kric-station-info",
+    "kric-station-movement-detailed",
+    "kric-station-movement-standard",
+    "kric-station-platform",
+    "kric-station-transfer-info",
+    "kric-subway-route-info",
     "kric-subway-timetable",
+    "kric-train-operation-organ",
     "kric-transfer-movement-detailed",
     "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
@@ -6753,14 +6769,6 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
-      "kric-station-convenience-standard",
-      "kric-station-info",
-      "kric-station-movement-detailed",
-      "kric-station-movement-standard",
-      "kric-station-platform",
-      "kric-station-transfer-info",
-      "kric-subway-route-info",
-      "kric-train-operation-organ",
       "kric-transfer-movement-standard",
     ],
   );
@@ -7239,13 +7247,14 @@ test("KRIC 환승 이동경로 후보는 상세 근거가 있어도 route graph 
 });
 
 test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도 route graph edge로 자동 승격하지 않는다", () => {
+  const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const candidate = candidates.candidates.find(({ id }) => id === "kric-station-movement-detailed");
 
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
   assert.equal(
     candidate.detailUrl,
@@ -7268,7 +7277,6 @@ test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도
   ]);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
   assert.deepEqual(candidate.evidence.missingEvidence, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "distanceDurationEdgeEvidence",
     "licenseCommercialRedistributionEvidence",
@@ -7277,7 +7285,10 @@ test("KRIC 출입구 승강장 이동경로 후보는 상세 근거가 있어도
     "rawObjectUri",
   ]);
   assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*distance.*duration.*standard movement API.*primary source.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1701.*productionUseAllowed=false/);
+  const source = inventory.sources.find(({ id }) => id === candidate.id);
+  assert.equal(source.admissionEvidence.issue, 1397);
+  assert.equal(source.requiredForProductionPack, false);
 });
 
 test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7287,7 +7298,7 @@ test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 �
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=429&service=handicapped&operation=stationMovement&page=1");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -7306,7 +7317,6 @@ test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 �
     "stMovePath",
   ]);
   assert.deepEqual(candidate.evidence.missingEvidence, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "distanceDurationEdgeEvidence",
     "licenseCommercialRedistributionEvidence",
@@ -7315,7 +7325,7 @@ test("KRIC 출입구 승강장 이동경로 표준 후보는 상세 페이지 �
   ]);
   assert.deepEqual(candidate.evidence.missingConfirmedEdgeFields.sort(), ["distanceMeters", "durationSeconds"]);
   assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*distance.*duration.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1701.*productionUseAllowed=false/);
 });
 
 test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7420,11 +7430,11 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(candidate.capabilities.facility.status, "CANDIDATE");
   assert.equal(candidate.capabilities.facility.productionUseAllowed, false);
   assert.equal(candidate.capabilities.facility.coverageStatus, "SAMPLE_EVIDENCE_REQUIRED");
-  assert.match(candidate.nextAction, /row-bearing evidence/);
-  assert.match(candidate.nextAction, /distance and duration evidence/);
-  assert.match(candidate.nextAction, /admin review/);
-  assert.match(candidate.nextAction, /automatic route graph edge/);
-  assert.match(candidate.nextAction, /documented tuple.*prevStinCd=422.*chtnNextStinCd=424.*tracked workflow/);
+  assert.equal(candidate.evidence.adminReview.decision, "REJECTED_NO_DATA");
+  assert.match(candidate.evidence.adminReview.reasonKo, /29251592781/);
+  assert.match(candidate.evidence.adminReview.reasonKo, /29252661883/);
+  assert.match(candidate.evidence.adminReview.reasonKo, /resultCode=03/);
+  assert.match(candidate.nextAction, /no-data.*admission을 거부.*row-bearing.*재심사.*automaticRouteGraphEdgeAllowed=false/);
 });
 
 test("data.go.kr 환승역거리 소요시간 후보는 확정된 odcloud endpoint를 고정한다", () => {
@@ -7536,7 +7546,7 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.endpoint, candidate.requestUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
@@ -7547,7 +7557,6 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
     ["dtlLoc", "grndDvCd", "gubun", "imgPath", "mlFmlDvCd", "stinFlor", "trfcWeakDvCd"],
   );
   assert.deepEqual(candidate.evidence.missingEvidence, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "licenseCommercialRedistributionEvidence",
     "primarySourceDecisionEvidence",
@@ -7555,7 +7564,7 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
     "rawObjectUri",
   ]);
   assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*primary.*secondary.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1701.*productionUseAllowed=false/);
 });
 
 test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7566,11 +7575,11 @@ test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선�
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
-  assert.equal(inventory.sources.some(({ id }) => id === candidate.id), false);
+  assert.equal(inventory.sources.some(({ id }) => id === candidate.id), true);
   assert.ok(Object.values(candidate.capabilities).every(({ productionUseAllowed }) => productionUseAllowed === false));
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=431&service=trainUseInfo&operation=subwayRouteInfo&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -7613,14 +7622,13 @@ test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선�
     /29148603270 \(head 6d8e4f8f3fc8398f981555e99bb37ba34e7afcd1\).*backend-only.*credentialRedacted=true.*format=xml.*rowCount=14.*sample↔hashes.*validator.*raw\/provider-record 독립 재계산은 수행하지 않음.*mobile\/offline pack에 포함하지 않음.*mreaWideCd=01.*lnCd=A1.*4호선 coverage가 아님/,
   );
   assert.deepEqual(candidate.evidence.missingEvidence.sort(), [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "licenseCommercialRedistributionEvidence",
     "line4RouteStationOrderCoverage",
     "providerTermsOrQuotaApproval",
     "rawObjectUri",
   ]);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*4호선.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1400.*productionUseAllowed=false/);
 });
 
 test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7631,11 +7639,11 @@ test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.serviceKeyHandling, "offline_import_secret_only");
   assert.equal(candidate.mobileEmbeddingAllowed, false);
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
-  assert.equal(inventory.sources.some(({ id }) => id === candidate.id), false);
+  assert.equal(inventory.sources.some(({ id }) => id === candidate.id), true);
   assert.ok(Object.values(candidate.capabilities).every(({ productionUseAllowed }) => productionUseAllowed === false));
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=183&service=convenientInfo&operation=stationInfo&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -7688,7 +7696,6 @@ test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변
     /29148721533 \(head 6d8e4f8f3fc8398f981555e99bb37ba34e7afcd1\).*backend-only.*credentialRedacted=true.*format=xml.*rowCount=1.*sample↔hashes.*validator.*raw\/provider-record 독립 재계산은 수행하지 않음.*mobile\/offline pack에 포함하지 않음.*railOprIsttCd=KR.*lnCd=1.*stinCd=135.*stinNm=용산.*4호선 coverage가 아님/,
   );
   assert.deepEqual(candidate.evidence.missingEvidence.sort(), [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "kricStandardStationFileComparison",
     "licenseCommercialRedistributionEvidence",
@@ -7696,7 +7703,7 @@ test("KRIC 역사별 정보 후보는 상세 페이지 라이선스와 출력변
     "providerTermsOrQuotaApproval",
     "rawObjectUri",
   ]);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*KRIC standard station file comparison.*4호선.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1400.*productionUseAllowed=false/);
 });
 
 test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7706,7 +7713,7 @@ test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 �
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(
     candidate.detailUrl,
     "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266&service=convenientInfo&operation=trainOperationOrgan&page=3",
@@ -7718,7 +7725,6 @@ test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 �
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), ["railOprIsttCd", "railOprIsttNm"]);
   assert.deepEqual(candidate.evidence.missingEvidence, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "licenseCommercialRedistributionEvidence",
     "operatorCoverageEvidence",
@@ -7726,7 +7732,7 @@ test("KRIC 열차운영기관정보 후보는 상세 페이지 라이선스와 �
     "rawObjectUri",
   ]);
   assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*airport rail.*GTX.*light rail.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1400.*productionUseAllowed=false/);
 });
 
 test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7736,7 +7742,7 @@ test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=181&service=convenientInfo&operation=stationTransferInfo&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
@@ -7753,7 +7759,6 @@ test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출
     "stinCd",
   ]);
   assert.deepEqual(candidate.evidence.missingEvidence, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "licenseCommercialRedistributionEvidence",
     "providerTermsOrQuotaApproval",
@@ -7761,7 +7766,7 @@ test("KRIC 역사별 환승정보 후보는 상세 페이지 라이선스와 출
     "stepFreeMovementSeparationEvidence",
   ]);
   assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*transfer relationship.*step-free movement.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1701.*productionUseAllowed=false/);
 });
 
 test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {
@@ -7771,7 +7776,7 @@ test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와
   assert.ok(candidate);
   assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
   assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
-  assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
+  assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=433&service=convenientInfo&operation=stPlf&page=1");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
@@ -7795,7 +7800,6 @@ test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와
   ]);
   assert.match(candidate.evidence.liveSampleNote, /updnDvcd.*updnDvCd.*29201338889.*credentialRedacted=true.*source candidate sample evidence valid/);
   assert.deepEqual(candidate.evidence.missingEvidence, [
-    "adminAdmissionEvidence",
     "credentialFreeRawArchive",
     "licenseCommercialRedistributionEvidence",
     "operatorFieldCompletenessEvidence",
@@ -7803,7 +7807,7 @@ test("KRIC 역사별 승강장 정보 후보는 상세 페이지 라이선스와
     "rawObjectUri",
   ]);
   assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
-  assert.match(candidate.nextAction, /raw archive.*object URI.*admin review.*license.*quota.*operator field completeness.*production inventory admission/);
+  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1701.*productionUseAllowed=false/);
 });
 
 test("운영 데이터팩 공식 출처 ingest adapter는 stable id mapping과 retired id 재사용 금지를 강제한다", () => {
