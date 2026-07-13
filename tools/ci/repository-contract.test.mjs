@@ -4338,6 +4338,19 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       sensitiveValueCapturedInEvidence: false,
     },
   );
+  const adminAuthTransition = operationsEvidence.backendControlPlane.latestQaEvidenceStatus
+    .temporaryReleaseDecisions.adminAuthTransition;
+  assert.deepEqual(
+    Object.keys(adminAuthTransition).toSorted(),
+    operationsEvidence.backendControlPlane.adminAuthTransition.temporaryExceptionRequiredFields.toSorted(),
+  );
+  assert.deepEqual(adminAuthTransition, {
+    owner: "AquilaXk",
+    untilDate: "2026-10-13",
+    risk: "OIDC/MFA/SSO 전환 전까지 운영 관리자 인증은 제한된 legacy 경로와 break-glass 절차에 의존한다.",
+    mitigation: "production Basic auth 기본 비활성화, required reviewer, lockout, credential rotation과 audit를 강제한다.",
+    followUpIssue: 1020,
+  });
   const singleInstanceAbuseControl = operationsEvidence.backendControlPlane.latestQaEvidenceStatus
     .temporaryReleaseDecisions.singleInstanceAbuseControl;
   assert.deepEqual(
@@ -8314,6 +8327,25 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   });
   const result = execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8" });
   assert.match(result, /data source archive restore rehearsal ok: 1 payload/);
+
+  const collectionRunsPath = path.join(fixtureDir, "collection-runs.csv");
+  const collectionRunsContent = readFileSync(collectionRunsPath);
+  const outsideMetadataDir = await mkdtemp(path.join(tmpdir(), "easysubway-source-metadata-outside-"));
+  const outsideCollectionRunsPath = path.join(outsideMetadataDir, "collection-runs.csv");
+  await writeFile(outsideCollectionRunsPath, collectionRunsContent);
+  await rm(collectionRunsPath);
+  await symlink(outsideCollectionRunsPath, collectionRunsPath);
+  assert.throws(
+    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: "pipe",
+    }),
+    /Command failed/,
+  );
+  await rm(collectionRunsPath);
+  await writeFile(collectionRunsPath, collectionRunsContent);
+  await rm(outsideMetadataDir, { recursive: true, force: true });
 
   const linkedArchiveParent = await mkdtemp(path.join(tmpdir(), "easysubway-source-archive-link-"));
   const linkedArchiveDir = path.join(linkedArchiveParent, "archive");

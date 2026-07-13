@@ -7,9 +7,9 @@ import { parseCsv } from "./data-source-raw-archive-csv.mjs";
 
 const archiveDir = resolveArchiveDirectory(process.argv[2]);
 
-const collectionRuns = parseCsv(readFileSync(path.join(archiveDir, "collection-runs.csv"), "utf8"));
-const rawArchives = parseCsv(readFileSync(path.join(archiveDir, "raw-archives.csv"), "utf8"));
-const manifest = JSON.parse(readFileSync(path.join(archiveDir, "payload-manifest.json"), "utf8"));
+const collectionRuns = parseCsv(readArchiveMetadata("collection-runs.csv"));
+const rawArchives = parseCsv(readArchiveMetadata("raw-archives.csv"));
+const manifest = JSON.parse(readArchiveMetadata("payload-manifest.json"));
 assert.equal(manifest.schemaVersion, 1);
 assert.ok(manifest.materialized.length > 0, "source archive must contain at least one materialized payload");
 
@@ -65,6 +65,16 @@ console.log(`data source archive restore rehearsal ok: ${manifest.materialized.l
 function assertSafeRelativePath(value) {
   assert.equal(path.isAbsolute(value), false, "objectPath must be relative");
   assert.equal(value.split(/[\\/]/).includes(".."), false, "objectPath must not contain traversal");
+}
+
+function readArchiveMetadata(fileName) {
+  const filePath = path.join(archiveDir, fileName);
+  const status = lstatSync(filePath);
+  assert.equal(status.isSymbolicLink(), false, `archive metadata must not be a symlink: ${fileName}`);
+  assert.equal(status.isFile(), true, `archive metadata must be a regular file: ${fileName}`);
+  const realFilePath = realpathSync(filePath);
+  assert.ok(realFilePath.startsWith(`${archiveDir}${path.sep}`), `archive metadata must stay inside archive: ${fileName}`);
+  return readFileSync(realFilePath, "utf8");
 }
 
 function resolveArchiveDirectory(value) {

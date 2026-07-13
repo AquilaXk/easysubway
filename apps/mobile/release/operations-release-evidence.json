@@ -99,6 +99,13 @@
         "sensitiveValueCapturedInEvidence": false
       },
       "temporaryReleaseDecisions": {
+        "adminAuthTransition": {
+          "owner": "AquilaXk",
+          "untilDate": "2026-10-13",
+          "risk": "OIDC/MFA/SSO 전환 전까지 운영 관리자 인증은 제한된 legacy 경로와 break-glass 절차에 의존한다.",
+          "mitigation": "production Basic auth 기본 비활성화, required reviewer, lockout, credential rotation과 audit를 강제한다.",
+          "followUpIssue": 1020
+        },
         "operatorTenantScope": {
           "scope": "operator-global",
           "owner": "AquilaXk",

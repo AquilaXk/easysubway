@@ -10,6 +10,31 @@ export function assertTemporaryReleaseDecisionsCurrent(evidence, now = new Date(
 
   const decisions = latestStatus.temporaryReleaseDecisions;
   assert.ok(decisions && typeof decisions === "object", "temporaryReleaseDecisions is required for SATISFIED");
+  const requirements = [
+    {
+      id: "adminAuthTransition",
+      required: evidence.backendControlPlane.adminAuthTransition?.oidcMfaSsoDeferredExceptionRequired,
+      fields: evidence.backendControlPlane.adminAuthTransition?.temporaryExceptionRequiredFields,
+    },
+    {
+      id: "operatorTenantScope",
+      required: evidence.backendControlPlane.operatorTenantScope?.releaseExceptionRequired,
+      fields: evidence.backendControlPlane.operatorTenantScope?.requiredDecisionFields,
+    },
+    {
+      id: "singleInstanceAbuseControl",
+      required: evidence.backendControlPlane.abuseControlReleaseException?.distributedStorePreferred,
+      fields: evidence.backendControlPlane.abuseControlReleaseException?.singleInstanceExceptionRequiredFields,
+    },
+  ];
+  for (const requirement of requirements.filter(({ required }) => required)) {
+    const decision = decisions[requirement.id];
+    assert.ok(decision, `required temporary release decision missing: ${requirement.id}`);
+    assert.ok(Array.isArray(requirement.fields), `required decision fields missing: ${requirement.id}`);
+    for (const field of requirement.fields) {
+      assert.ok(hasValue(decision[field]), `${requirement.id}.${field} is required`);
+    }
+  }
   for (const [decisionId, decision] of Object.entries(decisions)) {
     assert.match(decision.untilDate ?? "", /^\d{4}-\d{2}-\d{2}$/, `${decisionId}.untilDate must be YYYY-MM-DD`);
     assert.equal(isValidCalendarDate(decision.untilDate), true, `${decisionId}.untilDate must be valid`);
@@ -18,6 +43,10 @@ export function assertTemporaryReleaseDecisionsCurrent(evidence, now = new Date(
       throw new Error(`temporary release decision expired: ${decisionId} (${decision.untilDate})`);
     }
   }
+}
+
+function hasValue(value) {
+  return value !== undefined && value !== null && (typeof value !== "string" || value.trim() !== "");
 }
 
 function isValidCalendarDate(value) {
