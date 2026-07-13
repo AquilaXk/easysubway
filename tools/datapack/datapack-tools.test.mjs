@@ -14682,6 +14682,38 @@ test("전국 bundled datapack은 수도권·부산 대표 공식 OD를 각 3건 
   }
 });
 
+test("bundled 공식 OD quote 적용은 admission 일부 source가 빠진 입력을 거부한다", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-partial-source-"));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const quotesPath = path.join(directory, "quotes.json");
+  try {
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"), packPath);
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+    const quotes = JSON.parse(
+      await readFile(path.join(root, "tools/datapack/official-od-fare-quotes.json"), "utf8"),
+    );
+    quotes.quotes = quotes.quotes.filter(
+      ({ sourceId }) => sourceId === "seoul-metro-official-od-fares",
+    );
+    await writeFile(quotesPath, JSON.stringify(quotes));
+    const originalPackHash = sha256(await readFile(packPath));
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/apply-official-od-fares-to-bundled-pack.mjs",
+        "--pack", packPath,
+        "--index", indexPath,
+        "--quotes", quotesPath,
+      ], { cwd: root }),
+      /quote source set must match admission source set/,
+    );
+    assert.equal(sha256(await readFile(packPath)), originalPackHash);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("bundled 공식 OD quote 재적용은 SQLite와 gzip hash를 변경하지 않는다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-idempotent-"));
   const packPath = path.join(directory, "capital.sqlite.gz");
@@ -14702,6 +14734,46 @@ test("bundled 공식 OD quote 재적용은 SQLite와 gzip hash를 변경하지 �
 
     assert.equal(sha256(await readFile(packPath)), sha256(firstPack));
     assert.equal(sha256(await readFile(indexPath)), sha256(firstIndex));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("bundled 공식 OD quote check는 catalog user_version 16을 요구한다", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-check-version-"));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  try {
+    await writeFile(
+      sqlitePath,
+      gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
+    );
+    const database = new DatabaseSync(sqlitePath);
+    database.exec("PRAGMA user_version = 15");
+    database.close();
+    const sqliteBytes = await readFile(sqlitePath);
+    const gzipBytes = gzipSync(sqliteBytes, { level: 9, mtime: 0 });
+    await writeFile(packPath, gzipBytes);
+    const index = JSON.parse(
+      await readFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), "utf8"),
+    );
+    Object.assign(index.packs.find(({ id }) => id === "capital"), {
+      sha256: sha256(gzipBytes),
+      sqliteSha256: sha256(sqliteBytes),
+      byteSize: gzipBytes.length,
+    });
+    await writeFile(indexPath, JSON.stringify(index));
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/apply-official-od-fares-to-bundled-pack.mjs",
+        "--pack", packPath,
+        "--index", indexPath,
+        "--check",
+      ], { cwd: root }),
+      /bundled catalog user_version must be 16/,
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

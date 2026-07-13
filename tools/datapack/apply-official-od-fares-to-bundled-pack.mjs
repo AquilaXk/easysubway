@@ -45,6 +45,9 @@ function validateQuotes(document, admissions) {
     rows.push(quote);
     grouped.set(quote.sourceId, rows);
   }
+  if (grouped.size !== admissions.size) {
+    throw new Error("quote source set must match admission source set");
+  }
   for (const [sourceId, quotes] of grouped) {
     const admission = admissions.get(sourceId);
     if (quotes.length !== admission.quoteCount || officialOdFareQuoteSetHash(quotes) !== admission.quoteSetHash) {
@@ -137,6 +140,9 @@ function storedQuotes(database) {
 function assertStoredQuotes(sqlitePath, quotes) {
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
+    if (database.prepare("PRAGMA user_version").get().user_version !== BUNDLED_CATALOG_USER_VERSION) {
+      throw new Error(`bundled catalog user_version must be ${BUNDLED_CATALOG_USER_VERSION}`);
+    }
     if (JSON.stringify(storedQuotes(database)) !== JSON.stringify(canonicalQuotes(quotes))) {
       throw new Error("bundled official OD fare rows are stale");
     }
