@@ -79,13 +79,17 @@ function applyQuotes(sqlitePath, quotes) {
         CHECK (yung_card_fare >= 0), CHECK (yung_cash_fare >= 0),
         CHECK (child_card_fare >= 0), CHECK (child_cash_fare >= 0)
       );
-      DELETE FROM official_od_fare_quotes;
     `);
+    if (JSON.stringify(storedQuotes(database)) === JSON.stringify(canonicalQuotes(quotes))) {
+      assertIntegrity(database);
+      return;
+    }
     const insert = database.prepare(`
       INSERT INTO official_od_fare_quotes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     database.exec("BEGIN IMMEDIATE");
     try {
+      database.exec("DELETE FROM official_od_fare_quotes");
       for (const quote of quotes) {
         insert.run(
           quote.originStationId, quote.destinationStationId, quote.sourceId, quote.snapshotId,
@@ -98,28 +102,40 @@ function applyQuotes(sqlitePath, quotes) {
       database.exec("ROLLBACK");
       throw error;
     }
-    const integrity = database.prepare("PRAGMA integrity_check").get();
-    if (integrity.integrity_check !== "ok") throw new Error("bundled datapack integrity_check failed");
+    assertIntegrity(database);
   } finally {
     database.close();
   }
 }
 
+function assertIntegrity(database) {
+  const integrity = database.prepare("PRAGMA integrity_check").get();
+  if (integrity.integrity_check !== "ok") throw new Error("bundled datapack integrity_check failed");
+}
+
+function canonicalQuotes(quotes) {
+  return [...quotes].sort((left, right) => left.sourceId.localeCompare(right.sourceId)
+    || left.originStationId.localeCompare(right.originStationId)
+    || left.destinationStationId.localeCompare(right.destinationStationId));
+}
+
+function storedQuotes(database) {
+  return database.prepare(`
+    SELECT origin_station_id AS originStationId, destination_station_id AS destinationStationId,
+           source_id AS sourceId, snapshot_id AS snapshotId, mapping_ledger_hash AS mappingLedgerHash,
+           gnrl_card_fare AS gnrlCardFare, gnrl_cash_fare AS gnrlCashFare,
+           yung_card_fare AS yungCardFare, yung_cash_fare AS yungCashFare,
+           child_card_fare AS childCardFare, child_cash_fare AS childCashFare
+    FROM official_od_fare_quotes ORDER BY source_id, origin_station_id, destination_station_id
+  `).all().map((row) => ({ ...row }));
+}
+
 function assertStoredQuotes(sqlitePath, quotes) {
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
-    const rows = database.prepare(`
-      SELECT origin_station_id AS originStationId, destination_station_id AS destinationStationId,
-             source_id AS sourceId, snapshot_id AS snapshotId, mapping_ledger_hash AS mappingLedgerHash,
-             gnrl_card_fare AS gnrlCardFare, gnrl_cash_fare AS gnrlCashFare,
-             yung_card_fare AS yungCardFare, yung_cash_fare AS yungCashFare,
-             child_card_fare AS childCardFare, child_cash_fare AS childCashFare
-      FROM official_od_fare_quotes ORDER BY source_id, origin_station_id, destination_station_id
-    `).all().map((row) => ({ ...row }));
-    const expected = [...quotes].sort((left, right) => left.sourceId.localeCompare(right.sourceId)
-      || left.originStationId.localeCompare(right.originStationId)
-      || left.destinationStationId.localeCompare(right.destinationStationId));
-    if (JSON.stringify(rows) !== JSON.stringify(expected)) throw new Error("bundled official OD fare rows are stale");
+    if (JSON.stringify(storedQuotes(database)) !== JSON.stringify(canonicalQuotes(quotes))) {
+      throw new Error("bundled official OD fare rows are stale");
+    }
   } finally {
     database.close();
   }

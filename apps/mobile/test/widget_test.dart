@@ -10521,6 +10521,54 @@ void main() {
     }
   });
 
+  testWidgets('부산 공식 OD의 대체 운임은 QR승차권으로 표시한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              officialOdFareQuote: const OfficialOdFareQuote(
+                originStationId: 'station-1fc7a7c971c8',
+                destinationStationId: 'station-6b611916f76a',
+                sourceId: 'busan-transportation-official-od-fares',
+                snapshotId: 'busan-transportation-official-od-fares-20260713',
+                mappingLedgerHash:
+                    '9c327840275be5c4583fc9e9cfdd16d2e4ecc06f660d08fd682bf9fe27d72390',
+                gnrlCardFare: 1800,
+                gnrlCashFare: 1900,
+                yungCardFare: 1200,
+                yungCashFare: 1300,
+                childCardFare: 0,
+                childCashFare: 800,
+              ),
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-1fc7a7c971c8',
+              nameKo: '서면',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-6b611916f76a',
+              nameKo: '장산',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 13),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openFirstRouteResultDetail(tester);
+
+    for (final label in const ['일반 QR승차권', '청소년 QR승차권', '어린이 QR승차권']) {
+      expect(find.text(label, skipOffstage: false), findsOneWidget);
+    }
+    expect(find.text('일반 현금', skipOffstage: false), findsNothing);
+    expect(find.text('청소년 현금', skipOffstage: false), findsNothing);
+    expect(find.text('어린이 현금', skipOffstage: false), findsNothing);
+  });
+
   testWidgets('공식 OD 요금이 없으면 unavailable 상태를 알린다', (tester) async {
     final catalogDatabase = CatalogDatabase.memory();
     addTearDown(catalogDatabase.close);
@@ -10560,7 +10608,10 @@ void main() {
 
       expect(find.text('공식 OD 요금 정보 없음'), findsOneWidget);
       expect(find.text('오프라인 공식 자료에 없는 경로입니다.'), findsOneWidget);
-      expect(find.text('연락운송 경계 등 승인되지 않은 경로는 요금을 추정하지 않습니다.'), findsOneWidget);
+      expect(
+        find.text('연락운송 경계 등 승인되지 않은 경로는 요금을 임의로 계산하지 않습니다.'),
+        findsOneWidget,
+      );
       expect(find.bySemanticsLabel(RegExp('공식 OD 요금 정보 없음')), findsOneWidget);
       expect(apiBaseReads, 0);
     } finally {

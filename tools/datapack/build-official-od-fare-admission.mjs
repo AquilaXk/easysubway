@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { buildFareStationLineMappingLedger } from "./export-ledger-hashes.mjs";
 import { parseArgs, requiredString } from "./lib/ledger-admission-cli.mjs";
 import {
+  officialOdFareAdmissionsBySource,
   officialOdFareQuoteSetHash,
   validateOfficialOdFareEvidence,
 } from "./lib/official-od-fare-evidence.mjs";
@@ -28,24 +29,30 @@ async function main() {
 }
 
 async function buildOfficialOdFareAdmission(args) {
-  assertExactKeys(args, ["admin-review", "evidence"], "argument");
+  assertAllowedKeys(args, ["admin-review", "bundle", "evidence"], "argument");
   const evidenceArg = requiredString(args.evidence, "--evidence");
   const reviewArg = requiredString(args["admin-review"], "--admin-review");
+  const bundleArg = args.bundle === undefined
+    ? "tools/datapack/official-od-fare-admission.json"
+    : requiredString(args.bundle, "--bundle");
   const evidencePath = path.resolve(root, evidenceArg);
   const reviewPath = path.resolve(root, reviewArg);
+  const bundlePath = path.resolve(root, bundleArg);
   const evidenceBytes = await readFile(evidencePath);
   const evidence = JSON.parse(evidenceBytes);
   const review = JSON.parse(await readFile(reviewPath, "utf8"));
+  const bundle = JSON.parse(await readFile(bundlePath, "utf8"));
 
   validateOfficialOdFareEvidence(evidence);
   validateReview(review);
+  officialOdFareAdmissionsBySource(bundle);
   const evidenceHash = sha256(evidenceBytes);
   if (review.evidenceHash !== evidenceHash) {
     throw new Error("admin review evidenceHash must match sanitized evidence");
   }
   const mappingLedger = buildFareStationLineMappingLedger(evidence, review.sourceId);
 
-  return {
+  const admission = {
     schemaVersion: 1,
     artifactKind: "official-od-fare-admission",
     evidenceHash,
@@ -61,6 +68,14 @@ async function buildOfficialOdFareAdmission(args) {
       ...quote.fares,
     }))),
     fareStationLineMappingLedgerHash: mappingLedger.ledgerHash,
+  };
+  return {
+    schemaVersion: 1,
+    artifactKind: "official-od-fare-admission-bundle",
+    admissions: [
+      ...bundle.admissions.filter(({ sourceId }) => sourceId !== admission.sourceId),
+      admission,
+    ].sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
   };
 }
 
@@ -92,6 +107,13 @@ function assertExactKeys(value, allowedKeys, label) {
   }
   for (const key of allowed) {
     if (!(key in value)) throw new Error(`${label}.${key} is required`);
+  }
+}
+
+function assertAllowedKeys(value, allowedKeys, label) {
+  const allowed = new Set(allowedKeys);
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) throw new Error(`${key} is not allowed in ${label}`);
   }
 }
 

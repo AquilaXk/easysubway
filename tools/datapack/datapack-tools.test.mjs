@@ -14219,11 +14219,27 @@ test("official OD fare admin review는 sanitized admission만 생성한다", asy
     };
     const reviewPath = path.join(workspace, "review.json");
     await writeFile(reviewPath, JSON.stringify(review));
+    const trackedBundle = JSON.parse(
+      await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"),
+    );
+    const preservedAdmission = trackedBundle.admissions.find(
+      ({ sourceId }) => sourceId === "busan-transportation-official-od-fares",
+    );
+    const bundlePath = path.join(workspace, "bundle.json");
+    await writeFile(bundlePath, JSON.stringify(trackedBundle));
     const { stdout } = await runOfficialOdFareAdmissionBuilder([
       "--evidence", path.relative(root, evidencePath),
       "--admin-review", path.relative(root, reviewPath),
+      "--bundle", path.relative(root, bundlePath),
     ]);
-    const admission = JSON.parse(stdout);
+    const bundle = JSON.parse(stdout);
+    assert.equal(bundle.artifactKind, "official-od-fare-admission-bundle");
+    assert.equal(bundle.schemaVersion, 1);
+    assert.deepEqual(
+      bundle.admissions.find(({ sourceId }) => sourceId === preservedAdmission.sourceId),
+      preservedAdmission,
+    );
+    const admission = bundle.admissions.find(({ sourceId }) => sourceId === review.sourceId);
     assert.deepEqual(Object.keys(admission).sort(), [
       "approvedAt", "approvedBy", "artifactKind", "decision", "evidenceHash",
       "fareStationLineMappingLedgerHash", "quoteCount", "quoteSetHash", "schemaVersion", "snapshotId", "sourceId",
@@ -14545,6 +14561,31 @@ test("전국 bundled datapack은 수도권·부산 대표 공식 OD를 각 3건 
     } finally {
       database.close();
     }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("bundled 공식 OD quote 재적용은 SQLite와 gzip hash를 변경하지 않는다", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-idempotent-"));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  try {
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"), packPath);
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+    const apply = () => execFileAsync(process.execPath, [
+      "tools/datapack/apply-official-od-fares-to-bundled-pack.mjs",
+      "--pack", packPath,
+      "--index", indexPath,
+    ], { cwd: root });
+
+    await apply();
+    const firstPack = await readFile(packPath);
+    const firstIndex = await readFile(indexPath);
+    await apply();
+
+    assert.equal(sha256(await readFile(packPath)), sha256(firstPack));
+    assert.equal(sha256(await readFile(indexPath)), sha256(firstIndex));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

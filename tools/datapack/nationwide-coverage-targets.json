@@ -304,7 +304,7 @@
     },
     "sourceCandidateAdmission": {
       "sourceCandidatesPath": "tools/datapack/source-candidates.json",
-      "p0CandidateCount": 26,
+      "p0CandidateCount": 29,
       "requiredAdmissionStatusBeforeProductionClaim": "admitted_to_production_inventory",
       "admittedCandidateCount": 15,
       "currentOpenAdmissionStatus": "evidence_recorded_admin_review_required",
