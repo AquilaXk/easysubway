@@ -1805,6 +1805,16 @@ String _routeV2LegTitle(RouteSearchV2Leg leg) {
   };
 }
 
+String _carDoorFacilityLabel(String facilityType) {
+  return switch (facilityType.toUpperCase()) {
+    'STAIR' => '계단 가까움',
+    'ELEVATOR' => '엘리베이터 가까움',
+    'ESCALATOR' => '에스컬레이터 가까움',
+    'TRANSFER' => '빠른 환승',
+    _ => '',
+  };
+}
+
 class RouteSearchStep {
   const RouteSearchStep({
     required this.sequence,
@@ -1829,6 +1839,9 @@ class RouteSearchStep {
     this.confidenceLabel = '',
     this.plannedArrivalTimeIso = '',
     this.realtimeArrivalTimeIso = '',
+    this.carDoorCarNumber,
+    this.carDoorDoorNumber,
+    this.carDoorFacilityType = '',
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
@@ -1937,6 +1950,12 @@ class RouteSearchStep {
   final String distanceSource;
   final String confidenceLabel;
 
+  /// 오프라인 로컬 catalog의 빠른 하차 안내(#2066)용. 로컬 승차 step에서만 채워지고,
+  /// 데이터가 없으면 null(칸·문)·빈 문자열(시설)로 남아 안내 줄을 그리지 않는다.
+  final int? carDoorCarNumber;
+  final int? carDoorDoorNumber;
+  final String carDoorFacilityType;
+
   RouteSearchStep withDisplayLabels({
     required String title,
     required String lineName,
@@ -1969,6 +1988,9 @@ class RouteSearchStep {
           plannedArrivalTimeIso ?? this.plannedArrivalTimeIso,
       realtimeArrivalTimeIso:
           realtimeArrivalTimeIso ?? this.realtimeArrivalTimeIso,
+      carDoorCarNumber: carDoorCarNumber,
+      carDoorDoorNumber: carDoorDoorNumber,
+      carDoorFacilityType: carDoorFacilityType,
     );
   }
 
@@ -1988,6 +2010,21 @@ class RouteSearchStep {
       if (requiresAccessibilityCheck) '엘리베이터 안내 준비 중',
     ];
     return labels.join(' · ');
+  }
+
+  bool get hasCarDoorHint =>
+      carDoorCarNumber != null && carDoorDoorNumber != null;
+
+  String get carDoorHintLabel {
+    final suffix = _carDoorFacilityLabel(carDoorFacilityType);
+    final base = '빠른 하차 $carDoorCarNumber-$carDoorDoorNumber칸';
+    return suffix.isEmpty ? base : '$base · $suffix';
+  }
+
+  String get carDoorHintSemanticLabel {
+    final suffix = _carDoorFacilityLabel(carDoorFacilityType);
+    final base = '빠른 하차 $carDoorCarNumber번 칸 $carDoorDoorNumber번 문';
+    return suffix.isEmpty ? base : '$base, $suffix';
   }
 
   String get semanticGuidanceLabel {
@@ -5549,7 +5586,8 @@ const double _routeTimelineWaypointNodeSize = 16;
 /// 세로 타임라인 한 스텝. 좌측(시각·노선색 배지·연결선) + 우측(역명·구간 요약).
 ///
 /// 데이터 경계(#1704): 노선색·역명·구간 요약·(있을 때만) 시각만 그린다.
-/// 빠른 환승 칸번호·내리는 문·빠른 하차는 모델에 필드가 없어 줄 자체를 그리지 않는다.
+/// 빠른 하차 칸-문 안내(#2066)는 오프라인 로컬 catalog에 데이터가 있을 때만 그린다.
+/// 빠른 환승 칸번호·내리는 문은 여전히 데이터 경계로 줄 자체를 그리지 않는다.
 class _RouteStepTile extends StatelessWidget {
   const _RouteStepTile({required this.step, this.isLast = false});
 
@@ -5658,6 +5696,22 @@ class _RouteStepTile extends StatelessWidget {
                 color: EasySubwayAccessibleColors.secondaryText,
                 fontWeight: FontWeight.w700,
                 height: 1.3,
+              ),
+            ),
+          ],
+          // 빠른 하차 칸-문 안내(#2066): 오프라인 로컬 catalog에 데이터가 있을 때만.
+          if (step.stepType == 'ride' && step.hasCarDoorHint) ...[
+            const SizedBox(height: 4),
+            Semantics(
+              label: step.carDoorHintSemanticLabel,
+              child: Text(
+                step.carDoorHintLabel,
+                key: Key('routeStepCarDoor-${step.sequence}'),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.secondaryText,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
               ),
             ),
           ],
