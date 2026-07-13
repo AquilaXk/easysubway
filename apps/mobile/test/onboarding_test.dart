@@ -108,6 +108,54 @@ void main() {
     expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
   });
 
+  testWidgets('시작 화면은 소형 화면(320×568)+확대 텍스트에서도 스크롤로 CTA에 닿는다', (
+    tester,
+  ) async {
+    // #2081 리뷰 finding: 기본 배율(320×568)에서는 콘텐츠가 화면에 다 들어가
+    // maxScrollExtent가 0이라 SingleChildScrollView 구조가 제거돼도 이전
+    // 테스트가 green일 수 있었다. textScaler를 키워 실제로 오버플로가
+    // 발생하는 조건을 만든 뒤, Scrollable이 그 초과분을 흡수해 CTA까지
+    // 스크롤·탭할 수 있음을 직접 검증한다.
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: StartScreen(onStart: () => tapped = true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+
+    // 확대된 텍스트가 화면 높이를 넘어서 스크롤이 실제로 필요한 상태인지
+    // 먼저 확인한다(회귀 시 이 값이 0으로 떨어져 아래 단언들이 무의미해지는
+    // 것을 방지).
+    final scrollPosition = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position;
+    expect(scrollPosition.maxScrollExtent, greaterThan(0));
+
+    // ensureVisible로 스크롤해야 CTA를 탭할 수 있고, 탭이 실제로 콜백을
+    // 호출한다 — SingleChildScrollView 구조가 제거되면 오버플로 예외로
+    // 이 흐름 자체가 실패한다.
+    await tester.ensureVisible(
+      find.byKey(const Key('startScreenStartButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('startScreenStartButton')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(tapped, isTrue);
+  });
+
   testWidgets('온보딩 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.viewPadding = const FakeViewPadding(bottom: 34);
