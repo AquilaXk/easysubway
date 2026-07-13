@@ -35,7 +35,9 @@ class ApiOperationCatalogContractTest {
 		ApiCatalog catalog = buildCatalog(handlerMapping.getHandlerMethods());
 		assertThat(catalog.operations())
 			.extracting(ApiOperation::path)
-			.noneMatch(path -> path.equals("/api/catalog") || path.contains("/api-catalog"));
+			.noneMatch(path -> path.equals("/api/catalog")
+				|| path.startsWith("/api/catalog/")
+				|| path.contains("/api-catalog"));
 
 		String actual = catalogJson(catalog, new ObjectMapper());
 		if ("1".equals(System.getenv("EASYSUBWAY_API_CATALOG_WRITE"))) {

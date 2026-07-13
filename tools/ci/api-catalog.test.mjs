@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   buildCatalog,
@@ -10,6 +12,8 @@ import {
   validateCatalog,
   validateCatalogPolicy,
 } from "../api/api-catalog.mjs";
+
+const execFileAsync = promisify(execFile);
 
 function fixtureCatalog() {
   return buildCatalog({
@@ -40,6 +44,7 @@ function fixtureCatalog() {
           id: "integration:datapack-manifest",
           method: "GET",
           endpointRef: "config:EASYSUBWAY_DATA_PACK_BASE_URL/catalog/current.json",
+          auth: "signed-manifest-verification",
           source: "apps/mobile/lib/core/datapack/data_pack_client.dart",
         },
       ],
@@ -106,6 +111,19 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
       ]),
     /runtime catalog endpoint is forbidden/,
   );
+  assert.throws(
+    () =>
+      validateCatalog([
+        {
+          id: "internal:GET:/api/catalog/v1:example.CatalogController#get",
+          kind: "internal",
+          method: "GET",
+          path: "/api/catalog/v1",
+          surface: "PUBLIC_API",
+        },
+      ]),
+    /runtime catalog endpoint is forbidden/,
+  );
   for (const leaked of [
     {
       id: "integration:leaked-query-token",
@@ -125,6 +143,59 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
       /secret-like values are forbidden/,
     );
   }
+});
+
+test("integration auth는 credential reference 표현만 허용한다", () => {
+  for (const auth of [
+    "Basic dXNlcjpwYXNzd29yZA==",
+    "AWS4-HMAC-SHA256 Credential=AKIAEXAMPLE/20260713/ap-northeast-2/s3/aws4_request",
+  ]) {
+    assert.throws(
+      () =>
+        validateCatalog([
+          {
+            id: `integration:bad-auth-${auth.slice(0, 5)}`,
+            kind: "integration",
+            method: "GET",
+            endpointRef: "config:EXAMPLE_API",
+            auth,
+            source: "example.java",
+          },
+        ]),
+      /integration auth is invalid/,
+    );
+  }
+});
+
+test("CLI list는 provider operation method를 표시한다", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "tools/api/api-catalog.mjs",
+    "list",
+    "--kind",
+    "provider",
+    "--query",
+    "seoul-metro-official-od-fares",
+  ]);
+
+  assert.match(
+    stdout,
+    /^provider:seoul-metro-official-od-fares\tprovider\tGET\thttps:\/\/apis\.data\.go\.kr\//,
+  );
+});
+
+test("CLI show는 기본 human 출력과 --json 출력을 구분한다", async () => {
+  const args = [
+    "tools/api/api-catalog.mjs",
+    "show",
+    "provider:seoul-metro-official-od-fares",
+  ];
+  const human = await execFileAsync(process.execPath, args);
+  const json = await execFileAsync(process.execPath, [...args, "--json"]);
+
+  assert.match(human.stdout, /^id: provider:seoul-metro-official-od-fares$/m);
+  assert.match(human.stdout, /^method: GET$/m);
+  assert.doesNotMatch(human.stdout, /^\{$/m);
+  assert.equal(JSON.parse(json.stdout).id, "provider:seoul-metro-official-od-fares");
 });
 
 test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", async () => {

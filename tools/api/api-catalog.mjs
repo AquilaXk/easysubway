@@ -13,6 +13,11 @@ const POLICY_URL = new URL("contracts/api/api-catalog-contract.json", ROOT_URL);
 const CONTRACTS_URL = new URL("contracts/api/", ROOT_URL);
 const KINDS = new Set(["contract", "integration", "internal", "provider"]);
 const HTTP_METHODS = new Set(["ANY", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]);
+const INTEGRATION_AUTH_DESCRIPTORS = new Set([
+  "aws-sigv4-env",
+  "signed-manifest-and-artifact-hash",
+  "signed-manifest-verification",
+]);
 
 function contractId(path) {
   return `contract:${basename(path).replace(/\.openapi\.ya?ml$/, "")}`;
@@ -88,7 +93,9 @@ export function validateCatalog(catalog) {
       if (!HTTP_METHODS.has(entry.method) || typeof entry.path !== "string" || !entry.path.startsWith("/")) {
         throw new Error(`${entry.id}: invalid internal method/path`);
       }
-      if (entry.path === "/api/catalog" || entry.path.includes("/api-catalog")) {
+      if (entry.path === "/api/catalog"
+        || entry.path.startsWith("/api/catalog/")
+        || entry.path.includes("/api-catalog")) {
         throw new Error(`${entry.id}: runtime catalog endpoint is forbidden`);
       }
     }
@@ -101,6 +108,10 @@ export function validateCatalog(catalog) {
       }
       if (typeof entry.source !== "string" || entry.source.length === 0) {
         throw new Error(`${entry.id}: integration source is required`);
+      }
+      if (!INTEGRATION_AUTH_DESCRIPTORS.has(entry.auth)
+        && !/^env:[A-Z][A-Z0-9_]*$/.test(entry.auth ?? "")) {
+        throw new Error(`${entry.id}: integration auth is invalid`);
       }
     }
     if (entry.kind === "contract" && !/^contracts\/api\/.+\.openapi\.ya?ml$/.test(entry.path ?? "")) {
@@ -177,7 +188,23 @@ function option(args, name) {
 
 function humanLine(entry) {
   const target = entry.path ?? entry.endpointRef ?? entry.endpoint ?? "";
-  return [entry.id, entry.kind, entry.method ?? "-", target].join("\t");
+  return [entry.id, entry.kind, entry.operation?.method ?? entry.method ?? "-", target].join("\t");
+}
+
+function humanSummary(entry) {
+  const lines = [
+    `id: ${entry.id}`,
+    `kind: ${entry.kind}`,
+    `method: ${entry.operation?.method ?? entry.method ?? "-"}`,
+    `target: ${entry.path ?? entry.endpointRef ?? entry.endpoint ?? "-"}`,
+  ];
+  if (entry.status) lines.push(`status: ${entry.status}`);
+  if (entry.source) lines.push(`source: ${entry.source}`);
+  if (entry.documentationStatus) lines.push(`documentation: ${entry.documentationStatus}`);
+  if (entry.responseFields?.length) lines.push(`response fields: ${entry.responseFields.join(", ")}`);
+  if (entry.operation?.runner?.command) lines.push(`runner: ${entry.operation.runner.command}`);
+  if (entry.operation?.auth) lines.push(`auth env: ${entry.operation.auth.env ?? "not required"}`);
+  return lines.join("\n");
 }
 
 async function main(args = process.argv.slice(2)) {
@@ -194,7 +221,7 @@ async function main(args = process.argv.slice(2)) {
   }
   if (command === "show" && args[1]) {
     const entry = findCatalogEntry(catalog, args[1]);
-    console.log(JSON.stringify(entry, null, 2));
+    console.log(json ? JSON.stringify(entry, null, 2) : humanSummary(entry));
     return;
   }
   if (command === "validate") {
