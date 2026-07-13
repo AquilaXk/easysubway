@@ -20,6 +20,37 @@ const INTEGRATION_AUTH_DESCRIPTORS = new Set([
   "signed-manifest-and-artifact-hash",
   "signed-manifest-verification",
 ]);
+const CREDENTIAL_NAME = /^(?:accesskey|accesstoken|apikey|authorization|clientsecret|credential|password|privatekey|refreshtoken|secret|servicekey|signature|token|xamzcredential|xamzsecuritytoken|xamzsignature|xapikey)$/;
+
+function normalizedName(value) {
+  return value.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+}
+
+function isPlaceholder(value) {
+  return /^(?:\[[^\]]+\]|\{[^}]+\}|\$\{[^}]+\})$/.test(value);
+}
+
+function httpUrl(value) {
+  try {
+    const url = new URL(value);
+    return new Set(["http:", "https:"]).has(url.protocol) && url.hostname ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function hasConcretePathCredential(template, sample) {
+  const templateUrl = httpUrl(template);
+  const sampleUrl = httpUrl(sample);
+  if (!templateUrl || !sampleUrl) return false;
+  const templateSegments = templateUrl.pathname.split("/").map(decodeURIComponent);
+  const sampleSegments = sampleUrl.pathname.split("/").map(decodeURIComponent);
+  return templateSegments.some((segment, index) => {
+    const match = /^\{([^}]+)\}$/.exec(segment);
+    return match && CREDENTIAL_NAME.test(normalizedName(match[1]))
+      && !isPlaceholder(sampleSegments[index] ?? "");
+  });
+}
 
 function contractId(path) {
   return `contract:${basename(path).replace(/\.openapi\.ya?ml$/, "")}`;
@@ -69,19 +100,20 @@ function containsForbiddenValue(value) {
     try {
       const url = new URL(decoded);
       if (url.username || url.password) return true;
+      for (const [key, child] of url.searchParams) {
+        if (CREDENTIAL_NAME.test(normalizedName(key)) && !isPlaceholder(child)) return true;
+      }
     } catch {
       // Non-URL catalog strings are checked by the other credential patterns.
     }
     for (const match of decoded.matchAll(/[?&](?:(?:access|api|private|service)[_-]?key|client[_-]?secret|password|refresh[_-]?token|secret|token)=([^&#]*)/gi)) {
-      if (!/^(?:\[[^\]]+\]|\{[^}]+\}|\$\{[^}]+\})$/.test(match[1])) return true;
+      if (!isPlaceholder(match[1])) return true;
     }
     return false;
   }
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
-    /^(?:accesskey|accesstoken|apikey|authorization|clientsecret|credential|password|privatekey|refreshtoken|secret|servicekey|token|xapikey)(?:value)?$/.test(
-      key.replace(/[^A-Za-z0-9]/g, "").toLowerCase(),
-    ) ||
+    CREDENTIAL_NAME.test(normalizedName(key).replace(/value$/, "")) ||
     containsForbiddenValue(child),
   );
 }
@@ -108,8 +140,12 @@ export function validateCatalog(catalog) {
         throw new Error(`${entry.id}: runtime catalog endpoint is forbidden`);
       }
     }
-    if (entry.kind === "provider" && !/^https?:\/\//.test(entry.endpoint ?? "")) {
-      throw new Error(`${entry.id}: invalid provider endpoint`);
+    if (entry.kind === "provider") {
+      if (!httpUrl(entry.endpoint)) throw new Error(`${entry.id}: invalid provider endpoint`);
+      if (entry.sampleUrl != null && (!httpUrl(entry.sampleUrl)
+        || hasConcretePathCredential(entry.endpoint, entry.sampleUrl))) {
+        throw new Error(`${entry.id}: secret-like values are forbidden`);
+      }
     }
     if (entry.kind === "integration") {
       if (!HTTP_METHODS.has(entry.method) || !/^(?:config|constant|manifest-entry|response-field):/.test(entry.endpointRef ?? "")) {

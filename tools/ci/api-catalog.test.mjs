@@ -174,6 +174,18 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
       endpoint: "https://user:password@api.example/x",
     },
     {
+      id: "provider:leaked-path-key",
+      kind: "provider",
+      endpoint: "https://api.example/{serviceKey}/items",
+      sampleUrl: "https://api.example/actual-secret/items",
+    },
+    {
+      id: "provider:leaked-signed-query",
+      kind: "provider",
+      endpoint: "https://api.example/items",
+      sampleUrl: "https://api.example/items?X-Amz-Security-Token=actual-secret",
+    },
+    {
       id: "provider:leaked-authorization",
       kind: "provider",
       endpoint: "https://api.example/x",
@@ -183,6 +195,12 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
     assert.throws(
       () => validateCatalog([leaked]),
       /secret-like values are forbidden/,
+    );
+  }
+  for (const endpoint of ["https://", "http:// not-a-host", "ftp://api.example/items"]) {
+    assert.throws(
+      () => validateCatalog([{ id: "provider:bad-url", kind: "provider", endpoint }]),
+      /invalid provider endpoint/,
     );
   }
 });

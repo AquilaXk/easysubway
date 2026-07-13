@@ -65,6 +65,23 @@ test("show는 operation이 없어도 기존 endpoint와 response fields를 반�
   assert.equal(summary.operation, null);
 });
 
+test("show는 operation이 없어도 sample URL credential을 출력 전에 거부한다", () => {
+  for (const sampleUrl of [
+    "https://provider.example/actual-secret/items",
+    "https://provider.example/items?X-Amz-Security-Token=actual-secret",
+  ]) {
+    const invalid = candidate("a", {
+      requestUrl: "https://provider.example/{serviceKey}/items",
+      evidence: { outputFields: ["fieldA"], sampleUrl },
+    });
+
+    assert.throws(
+      () => operationSummary(invalid),
+      /credential values are forbidden/,
+    );
+  }
+});
+
 test("validate는 credential 값을 거부한다", () => {
   const invalid = candidate("a", {
     operation: validOperation({ credentialValue: "actual-secret-value" }),
@@ -137,6 +154,18 @@ test("validate는 operation endpoint mismatch를 거부한다", () => {
     () => validateOperation(invalid),
     /endpoint must match requestUrl/,
   );
+});
+
+test("validate는 실행할 수 없는 provider URL을 거부한다", () => {
+  for (const endpoint of ["https://", "http:// not-a-host", "ftp://provider.example/a"]) {
+    assert.throws(
+      () => validateOperation(candidate("a", {
+        requestUrl: endpoint,
+        operation: validOperation({ endpoint }),
+      })),
+      /valid HTTP\(S\) URL/,
+    );
+  }
 });
 
 test("validate는 requiredEnv의 실제 환경변수 이름만 허용한다", () => {

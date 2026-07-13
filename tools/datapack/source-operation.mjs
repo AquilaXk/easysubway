@@ -3,6 +3,36 @@ import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 const CANDIDATES_URL = new URL("./source-candidates.json", import.meta.url);
+const CREDENTIAL_NAME = /^(?:accesskey|accesstoken|apikey|authorization|clientsecret|credential|password|privatekey|refreshtoken|secret|servicekey|signature|token|xamzcredential|xamzsecuritytoken|xamzsignature|xapikey)$/;
+
+function normalizedName(value) {
+  return value.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+}
+
+function isPlaceholder(value) {
+  return /^(?:\[[^\]]+\]|\{[^}]+\}|\$\{[^}]+\})$/.test(value);
+}
+
+function requiredHttpUrl(value, label) {
+  const text = requiredText(value, label);
+  try {
+    const url = new URL(text);
+    if (!new Set(["http:", "https:"]).has(url.protocol) || !url.hostname) throw new Error();
+    return url;
+  } catch {
+    throw new Error(`${label} must be a valid HTTP(S) URL`);
+  }
+}
+
+function hasConcretePathCredential(templateUrl, sampleUrl) {
+  const templateSegments = templateUrl.pathname.split("/").map(decodeURIComponent);
+  const sampleSegments = sampleUrl.pathname.split("/").map(decodeURIComponent);
+  return templateSegments.some((segment, index) => {
+    const match = /^\{([^}]+)\}$/.exec(segment);
+    return match && CREDENTIAL_NAME.test(normalizedName(match[1]))
+      && !isPlaceholder(sampleSegments[index] ?? "");
+  });
+}
 
 function requiredText(value, label) {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -36,17 +66,18 @@ function hasCredentialValue(value) {
     try {
       const url = new URL(decoded);
       if (url.username || url.password) return true;
+      for (const [key, child] of url.searchParams) {
+        if (CREDENTIAL_NAME.test(normalizedName(key)) && !isPlaceholder(child)) return true;
+      }
     } catch {
       // Not every operation string is a URL.
     }
     return [...decoded.matchAll(/[?&](?:(?:access|api|private|service)[_-]?key|client[_-]?secret|password|refresh[_-]?token|secret|token)=([^&#]*)/gi)]
-      .some((match) => !/^(?:\[[^\]]+\]|\{[^}]+\}|\$\{[^}]+\})$/.test(match[1]));
+      .some((match) => !isPlaceholder(match[1]));
   }
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
-    /^(?:accesskey|accesstoken|apikey|authorization|clientsecret|credential|password|privatekey|refreshtoken|secret|servicekey|token|xapikey)(?:value)?$/.test(
-      key.replace(/[^A-Za-z0-9]/g, "").toLowerCase(),
-    ) ||
+    CREDENTIAL_NAME.test(normalizedName(key).replace(/value$/, "")) ||
     hasCredentialValue(child),
   );
 }
@@ -57,6 +88,14 @@ function requireAllowedKeys(value, allowed, label) {
 }
 
 export function validateOperation(candidate, { allowMissing = false } = {}) {
+  const requestUrl = requiredHttpUrl(candidate?.requestUrl, `${candidate?.id ?? "candidate"}.requestUrl`);
+  const sampleValue = candidate?.evidence?.sampleUrl;
+  if (sampleValue != null) {
+    const sampleUrl = requiredHttpUrl(sampleValue, `${candidate.id}.evidence.sampleUrl`);
+    if (hasCredentialValue(sampleValue) || hasConcretePathCredential(requestUrl, sampleUrl)) {
+      throw new Error(`${candidate.id}.evidence.sampleUrl credential values are forbidden`);
+    }
+  }
   const operation = candidate?.operation;
   if (operation == null) {
     if (allowMissing) return null;
@@ -74,8 +113,8 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (!new Set(["GET", "POST"]).has(operation.method)) {
     throw new Error(`${candidate.id}.operation.method must be GET or POST`);
   }
-  const requestUrl = requiredText(candidate.requestUrl, `${candidate.id}.requestUrl`);
-  if (requiredText(operation.endpoint, `${candidate.id}.operation.endpoint`) !== requestUrl) {
+  const operationUrl = requiredHttpUrl(operation.endpoint, `${candidate.id}.operation.endpoint`);
+  if (operationUrl.href !== requestUrl.href) {
     throw new Error(`${candidate.id}.operation endpoint must match requestUrl`);
   }
   const auth = operation.auth;
