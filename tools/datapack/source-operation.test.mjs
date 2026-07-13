@@ -157,6 +157,66 @@ test("provider 승인은 잘못된 기간과 secret-like field를 거부한다",
   );
 });
 
+test("summary는 provider 승인에 secret-like 값이 있으면 출력 전에 거부한다", () => {
+  assert.throws(
+    () => operationSummary(candidate("a", {
+      providerApproval: {
+        status: "APPROVED",
+        serviceId: "handicapped",
+        operationId: "transferMovement",
+        validFrom: "2020-01-01",
+        validTo: FUTURE_APPROVAL_DATE,
+        evidenceSource: "owner-confirmed",
+        recordedAt: "2026-07-13",
+        serviceKey: "actual-secret-value",
+      },
+    })),
+    /secret-like values are forbidden/,
+  );
+});
+
+test("provider 승인은 service와 operation이 endpoint 경로와 일치해야 한다", () => {
+  const endpoint = "https://provider.example/handicapped/transferMovement";
+  const approval = {
+    status: "APPROVED",
+    serviceId: "handicapped",
+    operationId: "transferMovement",
+    validFrom: "2020-01-01",
+    validTo: FUTURE_APPROVAL_DATE,
+    evidenceSource: "owner-confirmed",
+    recordedAt: "2026-07-13",
+  };
+  const approvedCandidate = candidate("approved", {
+    requestUrl: endpoint,
+    operation: validOperation({ endpoint }),
+    providerApproval: approval,
+  });
+
+  assert.equal(validateSourceCandidateDocument({
+    schemaVersion: 1,
+    artifactKind: "production-source-candidates",
+    source: "tools/datapack/source-candidates.json",
+    updatedAt: "2026-07-13",
+    candidates: [approvedCandidate],
+  }).candidates[0], approvedCandidate);
+
+  for (const providerApproval of [
+    { ...approval, serviceId: "different-service" },
+    { ...approval, operationId: "different-operation" },
+  ]) {
+    assert.throws(
+      () => validateSourceCandidateDocument({
+        schemaVersion: 1,
+        artifactKind: "production-source-candidates",
+        source: "tools/datapack/source-candidates.json",
+        updatedAt: "2026-07-13",
+        candidates: [{ ...approvedCandidate, providerApproval }],
+      }),
+      /providerApproval serviceId\/operationId must match operation endpoint path/,
+    );
+  }
+});
+
 test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지를 고정한다", () => {
   const operation = validOperation({
     auth: {

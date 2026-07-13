@@ -112,8 +112,15 @@ export function validateProviderApproval(candidate) {
   if (!new Set(["APPROVED", "EXPIRED", "REVOKED"]).has(approval.status)) {
     throw new Error(`${candidate.id}.providerApproval.status is invalid`);
   }
-  requiredText(approval.serviceId, `${candidate.id}.providerApproval.serviceId`);
-  requiredText(approval.operationId, `${candidate.id}.providerApproval.operationId`);
+  const serviceId = requiredText(approval.serviceId, `${candidate.id}.providerApproval.serviceId`);
+  const operationId = requiredText(approval.operationId, `${candidate.id}.providerApproval.operationId`);
+  if (candidate.operation?.endpoint != null) {
+    const endpoint = requiredHttpUrl(candidate.operation.endpoint, `${candidate.id}.operation.endpoint`);
+    const path = endpoint.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+    if (path.at(-2) !== serviceId || path.at(-1) !== operationId) {
+      throw new Error(`${candidate.id}.providerApproval serviceId/operationId must match operation endpoint path`);
+    }
+  }
   const validFrom = requiredDate(approval.validFrom, `${candidate.id}.providerApproval.validFrom`);
   const validTo = requiredDate(approval.validTo, `${candidate.id}.providerApproval.validTo`);
   if (validTo < validFrom) {
@@ -262,6 +269,7 @@ export function operationSummary(candidate) {
   try {
     validateProviderApproval(candidate);
   } catch (error) {
+    if (error instanceof Error && /secret-like values are forbidden/.test(error.message)) throw error;
     providerApprovalValidationError = error instanceof Error ? error.message : "provider approval is invalid";
   }
   return {
