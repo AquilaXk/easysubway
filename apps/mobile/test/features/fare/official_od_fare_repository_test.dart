@@ -61,6 +61,58 @@ void main() {
       );
     }
   });
+
+  test(
+    'official OD fare repository는 승인된 수도권 canary와 부산 snapshot을 반환한다',
+    () async {
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      final repository = OfficialOdFareRepository(catalogDatabase: database);
+      await database.customStatement('''
+      INSERT INTO stations (
+        id, name_ko, name_en, name_sub, normalized_name, region,
+        data_quality_level, data_source_type
+      ) VALUES
+        ('station-2af75c3d707b', '서울역', '', '', '서울역', '수도권', 'LEVEL_1', 'OFFICIAL_FILE'),
+        ('station-a2d54a5d63d2', '시청', '', '', '시청', '수도권', 'LEVEL_1', 'OFFICIAL_FILE'),
+        ('station-fcb7a21e5606', '하단', '', '', '하단', '부산', 'LEVEL_1', 'OFFICIAL_FILE'),
+        ('station-dd45c69d3e40', '당리', '', '', '당리', '부산', 'LEVEL_1', 'OFFICIAL_FILE')
+    ''');
+      await _insertQuote(
+        database,
+        'station-2af75c3d707b',
+        'station-a2d54a5d63d2',
+        sourceId: 'seoul-metro-official-od-fare-canary',
+        snapshotId: 'seoul-metro-official-od-fare-canary-run-29085674167',
+        mappingLedgerHash:
+            '58e795e03161e2100cffb2c777efcaa1d09a5e03abc7363676be5f26ae353541',
+      );
+      await _insertQuote(
+        database,
+        'station-fcb7a21e5606',
+        'station-dd45c69d3e40',
+        sourceId: 'busan-transportation-official-od-fares',
+        snapshotId: 'busan-transportation-official-od-fares-20260713',
+        mappingLedgerHash:
+            '9c327840275be5c4583fc9e9cfdd16d2e4ecc06f660d08fd682bf9fe27d72390',
+      );
+
+      expect(
+        await repository.findExact(
+          originStationId: 'station-2af75c3d707b',
+          destinationStationId: 'station-a2d54a5d63d2',
+        ),
+        isNotNull,
+      );
+      expect(
+        await repository.findExact(
+          originStationId: 'station-fcb7a21e5606',
+          destinationStationId: 'station-dd45c69d3e40',
+        ),
+        isNotNull,
+      );
+    },
+  );
 }
 
 Future<void> _insertStations(CatalogDatabase database) {
@@ -77,8 +129,12 @@ Future<void> _insertStations(CatalogDatabase database) {
 Future<void> _insertQuote(
   CatalogDatabase database,
   String originStationId,
-  String destinationStationId,
-) {
+  String destinationStationId, {
+  String sourceId = 'seoul-metro-official-od-fares',
+  String snapshotId = 'seoul-metro-official-od-fares-20260712',
+  String mappingLedgerHash =
+      '4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a',
+}) {
   return database.customStatement(
     '''
     INSERT INTO official_od_fare_quotes (
@@ -90,9 +146,9 @@ Future<void> _insertQuote(
     [
       originStationId,
       destinationStationId,
-      'seoul-metro-official-od-fares',
-      'seoul-metro-official-od-fares-20260712',
-      '4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a',
+      sourceId,
+      snapshotId,
+      mappingLedgerHash,
       1950,
       2050,
       1220,

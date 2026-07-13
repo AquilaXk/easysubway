@@ -1978,9 +1978,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final originRow = find.byKey(
-      const Key('networkMapRouteDraftOriginRow'),
-    );
+    final originRow = find.byKey(const Key('networkMapRouteDraftOriginRow'));
     final destinationRow = find.byKey(
       const Key('networkMapRouteDraftDestinationRow'),
     );
@@ -2011,9 +2009,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final originRow = find.byKey(
-      const Key('networkMapRouteDraftOriginRow'),
-    );
+    final originRow = find.byKey(const Key('networkMapRouteDraftOriginRow'));
     final waypointRow = find.byKey(
       const Key('networkMapRouteDraftWaypointRow'),
     );
@@ -2043,9 +2039,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final originRow = find.byKey(
-      const Key('networkMapRouteDraftOriginRow'),
-    );
+    final originRow = find.byKey(const Key('networkMapRouteDraftOriginRow'));
     final destinationRow = find.byKey(
       const Key('networkMapRouteDraftDestinationRow'),
     );
@@ -2109,10 +2103,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final node = tester.getSemantics(
-      find.descendant(
-        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
-        matching: find.byType(Semantics),
-      ).first,
+      find
+          .descendant(
+            of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+            matching: find.byType(Semantics),
+          )
+          .first,
     );
     final labels = node
         .getSemanticsData()
@@ -7504,10 +7500,7 @@ void main() {
     expect(find.byKey(const Key('routeStepNumber-3')), findsOneWidget);
 
     // #1948: 경유 스텝은 0값 placeholder burdenLabel을 렌더하지 않는다.
-    expect(
-      find.text('시간을 확인하고 있어요 · 거리를 확인하고 있어요'),
-      findsNothing,
-    );
+    expect(find.text('시간을 확인하고 있어요 · 거리를 확인하고 있어요'), findsNothing);
     expect(find.textContaining('시간을 확인하고 있어요'), findsNothing);
     // #1948: 경유 스텝은 보일러플레이트 기본 안내 문장 대신 간결 카피를 쓴다.
     expect(find.text('안내된 순서대로 이동합니다.'), findsNothing);
@@ -10567,6 +10560,7 @@ void main() {
 
       expect(find.text('공식 OD 요금 정보 없음'), findsOneWidget);
       expect(find.text('오프라인 공식 자료에 없는 경로입니다.'), findsOneWidget);
+      expect(find.text('연락운송 경계 등 승인되지 않은 경로는 요금을 추정하지 않습니다.'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('공식 OD 요금 정보 없음')), findsOneWidget);
       expect(apiBaseReads, 0);
     } finally {

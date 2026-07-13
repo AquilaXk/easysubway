@@ -4535,10 +4535,15 @@ class _OfficialOdFareSection extends StatelessWidget {
     if (quote == null) {
       return Semantics(
         container: true,
-        label: '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다.',
+        label:
+            '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다. 연락운송 경계 등 승인되지 않은 경로는 요금을 추정하지 않습니다.',
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [Text('공식 OD 요금 정보 없음'), Text('오프라인 공식 자료에 없는 경로입니다.')],
+          children: [
+            Text('공식 OD 요금 정보 없음'),
+            Text('오프라인 공식 자료에 없는 경로입니다.'),
+            Text('연락운송 경계 등 승인되지 않은 경로는 요금을 추정하지 않습니다.'),
+          ],
         ),
       );
     }
