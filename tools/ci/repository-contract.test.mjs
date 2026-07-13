@@ -13867,3 +13867,163 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
   assert.doesNotMatch(uploadBlock, /\braw\b|response|\.env|dotenv/i);
   assert.doesNotMatch(workflow, /github\.event\.inputs\.(?:url|host|ref|command|output|path)/i);
 });
+
+test("#1702 보행 프로필 프리셋 정책 JSON은 프리셋 계수·시설 제약·유형 매핑을 고정한다", () => {
+  const policyPath = "apps/mobile/release/mobility-profile-policy.json";
+  assert.equal(existsSync(path.join(root, policyPath)), true, "mobility-profile-policy JSON must exist");
+
+  const policy = readJson(policyPath);
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.artifactKind, "mobility-profile-policy");
+  assert.equal(policy.anchorWalkSpeedMps, 1.2);
+
+  // 프리셋 4종 계수·시설 제약. speedFactor 1.0 = 표준 속도(회귀 불변).
+  assert.equal(policy.presets.STANDARD.speedFactor, 1.0);
+  assert.equal(policy.presets.STANDARD.facilityConstraint, "NONE");
+  assert.equal(policy.presets.SLOW.speedFactor, 1.35);
+  assert.equal(policy.presets.SLOW.facilityConstraint, "NONE");
+  assert.equal(policy.presets.NO_STAIRS.speedFactor, 1.2);
+  assert.equal(policy.presets.NO_STAIRS.facilityConstraint, "NO_STAIRS");
+  assert.equal(policy.presets.STEP_FREE.speedFactor, 1.0);
+  assert.equal(policy.presets.STEP_FREE.facilityConstraint, "ELEVATOR_ONLY");
+  assert.equal(policy.presets.STEP_FREE.elevatorWaitSeconds, 60);
+
+  // 이동 유형 → 기본 프리셋 매핑 6종.
+  assert.deepEqual(policy.mobilityTypeMapping, {
+    SENIOR: "SLOW",
+    PREGNANT: "SLOW",
+    TEMPORARY_INJURY: "SLOW",
+    LUGGAGE: "NO_STAIRS",
+    STROLLER: "STEP_FREE",
+    WHEELCHAIR: "STEP_FREE",
+  });
+});
+
+test("#1702 backend ProfileWalkTimeCalculator enum은 정책 JSON 계수·매핑과 동기화된다", () => {
+  const policy = readJson("apps/mobile/release/mobility-profile-policy.json");
+  const source = read("backend/src/main/java/com/easysubway/route/domain/ProfileWalkTimeCalculator.java");
+
+  // backend는 정수 speedFactorPercent, JSON은 소수 speedFactor. Math.round(factor*100)로 상호 고정.
+  const percentByPreset = {};
+  for (const match of source.matchAll(/\b(STANDARD|SLOW|NO_STAIRS|STEP_FREE)\((\d+)\)/g)) {
+    percentByPreset[match[1]] = Number(match[2]);
+  }
+  assert.deepEqual(percentByPreset, {
+    STANDARD: 100,
+    SLOW: 135,
+    NO_STAIRS: 120,
+    STEP_FREE: 100,
+  });
+  for (const preset of ["STANDARD", "SLOW", "NO_STAIRS", "STEP_FREE"]) {
+    assert.equal(
+      Math.round(policy.presets[preset].speedFactor * 100),
+      percentByPreset[preset],
+      `${preset} JSON speedFactor must match backend speedFactorPercent`,
+    );
+  }
+
+  // STEP_FREE 승강기 대기 초는 backend 상수와 JSON이 일치한다.
+  assert.match(source, /STEP_FREE_FACILITY_WAIT_SECONDS\s*=\s*60\b/);
+  assert.equal(policy.presets.STEP_FREE.elevatorWaitSeconds, 60);
+
+  // presetFor switch 매핑이 JSON mobilityTypeMapping과 일치한다.
+  assert.match(source, /case\s+SENIOR,\s*PREGNANT,\s*TEMPORARY_INJURY\s*->\s*MobilityPreset\.SLOW\s*;/);
+  assert.match(source, /case\s+LUGGAGE\s*->\s*MobilityPreset\.NO_STAIRS\s*;/);
+  assert.match(source, /case\s+STROLLER,\s*WHEELCHAIR\s*->\s*MobilityPreset\.STEP_FREE\s*;/);
+  assert.equal(policy.mobilityTypeMapping.SENIOR, "SLOW");
+  assert.equal(policy.mobilityTypeMapping.PREGNANT, "SLOW");
+  assert.equal(policy.mobilityTypeMapping.TEMPORARY_INJURY, "SLOW");
+  assert.equal(policy.mobilityTypeMapping.LUGGAGE, "NO_STAIRS");
+  assert.equal(policy.mobilityTypeMapping.STROLLER, "STEP_FREE");
+  assert.equal(policy.mobilityTypeMapping.WHEELCHAIR, "STEP_FREE");
+});
+
+test("#1702 mobile 파생 상수 Dart는 정책 JSON 계수·매핑과 동기화된다", () => {
+  const policy = readJson("apps/mobile/release/mobility-profile-policy.json");
+  const dartPath = "apps/mobile/lib/features/mobility_profile/mobility_profile_policy.dart";
+  assert.equal(existsSync(path.join(root, dartPath)), true, "mobility_profile_policy.dart must exist");
+  const dart = read(dartPath);
+
+  // anchor 속도·승강기 대기 초.
+  assert.match(dart, /anchorWalkSpeedMps\s*=\s*1\.2\b/);
+  assert.equal(policy.anchorWalkSpeedMps, 1.2);
+  assert.match(dart, /stepFreeElevatorWaitSeconds\s*=\s*60\b/);
+  assert.equal(policy.presets.STEP_FREE.elevatorWaitSeconds, 60);
+
+  // 프리셋 4종 speedFactor·시설 제약이 Dart const map과 JSON에서 일치한다.
+  const specByPreset = {
+    standard: { key: "STANDARD", constraint: "FacilityConstraint.none" },
+    slow: { key: "SLOW", constraint: "FacilityConstraint.none" },
+    noStairs: { key: "NO_STAIRS", constraint: "FacilityConstraint.noStairs" },
+    stepFree: { key: "STEP_FREE", constraint: "FacilityConstraint.elevatorOnly" },
+  };
+  for (const [enumName, spec] of Object.entries(specByPreset)) {
+    const factor = policy.presets[spec.key].speedFactor;
+    const factorLiteral = Number.isInteger(factor) ? `${factor}\\.0` : `${factor}`;
+    const block = dart.match(
+      new RegExp(`MobilityPreset\\.${enumName}:\\s*MobilityPresetSpec\\(([\\s\\S]*?)\\)`),
+    )?.[1];
+    assert.ok(block, `Dart preset spec for ${enumName} must exist`);
+    assert.match(block, new RegExp(`speedFactor:\\s*${factorLiteral}\\b`));
+    assert.match(block, new RegExp(`facilityConstraint:\\s*${spec.constraint.replace(".", "\\.")}\\b`));
+  }
+
+  // 이동 유형 매핑 6종이 Dart const map과 JSON에서 일치한다.
+  const dartTypeToEnum = {
+    SENIOR: "senior",
+    PREGNANT: "pregnant",
+    TEMPORARY_INJURY: "temporaryInjury",
+    LUGGAGE: "luggage",
+    STROLLER: "stroller",
+    WHEELCHAIR: "wheelchair",
+  };
+  const presetToEnum = {
+    STANDARD: "standard",
+    SLOW: "slow",
+    NO_STAIRS: "noStairs",
+    STEP_FREE: "stepFree",
+  };
+  for (const [jsonType, preset] of Object.entries(policy.mobilityTypeMapping)) {
+    assert.match(
+      dart,
+      new RegExp(`MobilityType\\.${dartTypeToEnum[jsonType]}:\\s*MobilityPreset\\.${presetToEnum[preset]}\\b`),
+    );
+  }
+});
+
+test("#1702 STANDARD 환승 parity 리포트는 재현 가능하고 ±10% 이내 편차를 고정한다", async () => {
+  const trackedPath = "tools/datapack/reports/mobility-standard-transfer-parity-report.json";
+  assert.equal(existsSync(path.join(root, trackedPath)), true, "parity report must be tracked");
+
+  const outputDir = await mkdtemp(path.join(tmpdir(), "mobility-parity-"));
+  const output = path.join(outputDir, "mobility-standard-transfer-parity-report.json");
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-mobility-standard-transfer-parity-report.mjs",
+    "--baseline",
+    "tools/datapack/reports/baseline-ingestion-gate-report.json",
+    "--policy",
+    "apps/mobile/release/mobility-profile-policy.json",
+    "--output",
+    output,
+  ], { cwd: root });
+
+  // 재현성: 재생성 결과가 tracked 산출물과 바이트 단위로 동일해야 한다.
+  assert.equal(readFileSync(output, "utf8"), read(trackedPath));
+
+  const report = JSON.parse(readFileSync(output, "utf8"));
+  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.artifactKind, "mobility-standard-transfer-parity-report");
+  assert.equal(report.issue, 1702);
+  assert.equal(report.standardPreset.speedFactorPercent, 100);
+  assert.equal(report.toleranceProfile.maxDeviationPercent, 10);
+  // STANDARD는 speedFactor 1.0이므로 baseline과 0% 편차, 모두 ±10% 이내.
+  assert.equal(report.summary.maxAbsoluteDeviationPercent, 0);
+  assert.equal(report.summary.allWithinTolerance, true);
+  assert.ok(report.directionPairs.length >= 2);
+  for (const pair of report.directionPairs) {
+    assert.equal(pair.standardPresetSeconds, pair.baselineTransferSeconds);
+    assert.equal(pair.deviationPercent, 0);
+    assert.equal(pair.withinTolerance, true);
+    assert.ok(Math.abs(pair.deviationPercent) <= report.toleranceProfile.maxDeviationPercent);
+  }
+});
