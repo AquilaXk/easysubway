@@ -90,6 +90,56 @@ void main() {
     semanticsHandle.dispose();
   });
 
+  testWidgets('시작 화면 타이틀은 2행("갈 수 있는 길을")만 시그니처 브랜드 색이고 1·3행은 잉크 토큰이다', (
+    tester,
+  ) async {
+    // #2089: 시그니처 브랜드 색 1차 적용 — 강조는 2행 한 행에만 고정한다.
+    // Text.rich 전환 후에도 스크린리더가 읽는 전체 문자열은 그대로 유지되고,
+    // span별 색만 브랜드/잉크로 갈린다.
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+
+    final titleWidget = tester.widget<Text>(
+      find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'),
+    );
+    final rootSpan = titleWidget.textSpan! as TextSpan;
+    final children = rootSpan.children!.cast<TextSpan>();
+
+    // 3개 span으로 나뉘고, 합친 평문은 기존 카피 3행과 동일하다.
+    expect(children, hasLength(3));
+    expect(rootSpan.toPlainText(), '빠른 길보다\n갈 수 있는 길을\n안내합니다');
+
+    // 1행: 브랜드 색을 쓰지 않는다(루트 스타일의 잉크 토큰 상속).
+    expect(children[0].text, '빠른 길보다\n');
+    expect(children[0].style?.color, isNull);
+    // 2행: 시그니처 브랜드 색.
+    expect(children[1].text, '갈 수 있는 길을');
+    expect(children[1].style?.color, EasySubwayAccessibleColors.brandSignature);
+    // 3행: 브랜드 색을 쓰지 않는다.
+    expect(children[2].text, '\n안내합니다');
+    expect(children[2].style?.color, isNull);
+
+    // 루트 스타일은 기존 잉크 토큰을 유지한다.
+    expect(titleWidget.style?.color, EasySubwayAccessibleColors.text);
+  });
+
+  testWidgets('시작 화면 CTA는 시그니처 브랜드 색 채움 + 흰 글자다', (tester) async {
+    // #2089: '시작하기' CTA만 브랜드 색으로 채우고 글자는 흰색(대비 5.7:1, AA).
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('startScreenStartButton')),
+    );
+    final style = button.style!;
+    expect(
+      style.backgroundColor?.resolve(<WidgetState>{}),
+      EasySubwayAccessibleColors.brandSignature,
+    );
+    expect(
+      style.foregroundColor?.resolve(<WidgetState>{}),
+      EasySubwayAccessibleColors.surface,
+    );
+  });
+
   testWidgets('시작 화면은 소형 화면(320×568)에서도 카피 3행과 CTA를 오버플로 없이 렌더한다', (
     tester,
   ) async {

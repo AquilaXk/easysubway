@@ -241,10 +241,25 @@ class StartScreen extends StatelessWidget {
                         SizedBox(height: topGap),
                         Semantics(
                           header: true,
-                          child: const Text(
-                            // 핵심 가치 카피 3행(#2081). 강조는 무채색 잉크로 통일.
-                            '빠른 길보다\n갈 수 있는 길을\n안내합니다',
-                            style: TextStyle(
+                          child: Text.rich(
+                            // 핵심 가치 카피 3행(#2081). #2089: 2행("갈 수 있는
+                            // 길을")만 시그니처 브랜드 색으로 강조하고 1·3행은
+                            // 기존 잉크 토큰을 유지한다. 스크린리더가 읽는 전체
+                            // 문자열은 그대로 보존된다.
+                            const TextSpan(
+                              children: [
+                                TextSpan(text: '빠른 길보다\n'),
+                                TextSpan(
+                                  text: '갈 수 있는 길을',
+                                  style: TextStyle(
+                                    color: EasySubwayAccessibleColors
+                                        .brandSignature,
+                                  ),
+                                ),
+                                TextSpan(text: '\n안내합니다'),
+                              ],
+                            ),
+                            style: const TextStyle(
                               color: EasySubwayAccessibleColors.text,
                               fontSize: 40,
                               fontWeight: FontWeight.w800,
@@ -259,8 +274,10 @@ class StartScreen extends StatelessWidget {
                             key: const Key('startScreenStartButton'),
                             onPressed: onStart,
                             style: FilledButton.styleFrom(
+                              // #2089: 시작 CTA만 시그니처 브랜드 색 채움 +
+                              // 흰 글자(대비 5.7:1, AA 통과).
                               backgroundColor:
-                                  EasySubwayAccessibleColors.primary,
+                                  EasySubwayAccessibleColors.brandSignature,
                               foregroundColor:
                                   EasySubwayAccessibleColors.surface,
                               minimumSize: const Size.fromHeight(58),
