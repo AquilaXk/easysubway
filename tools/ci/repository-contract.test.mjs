@@ -465,7 +465,7 @@ function workflowFiles() {
 
 function assertActionsEnvSecretPolicy(file, source) {
   const secretAccess = /secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
-  const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
+  const appVariableAccess = /vars(?:\.(EASYSUBWAY_[A-Z0-9_]+)|\[['"](EASYSUBWAY_[A-Z0-9_]+)['"]\])/g;
   const allowedExtraSecretsByFile = {
     ".github/workflows/cd.yml": new Set([
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
@@ -483,6 +483,13 @@ function assertActionsEnvSecretPolicy(file, source) {
     ]),
   };
   const allowedExtraSecrets = allowedExtraSecretsByFile[file] ?? new Set();
+  const allowedAppVariablesByFile = {
+    ".github/workflows/cd.yml": new Set([
+      "EASYSUBWAY_ADS_ASSET_ORIGIN",
+      "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+    ]),
+  };
+  const allowedAppVariables = allowedAppVariablesByFile[file] ?? new Set();
 
   for (const match of source.matchAll(secretAccess)) {
     const secretName = match[1] ?? match[2];
@@ -494,7 +501,14 @@ function assertActionsEnvSecretPolicy(file, source) {
       assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved scoped secrets`);
     }
   }
-  assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
+  const appVariables = new Set(
+    [...source.matchAll(appVariableAccess)].map((match) => match[1] ?? match[2]),
+  );
+  assert.deepEqual(
+    [...appVariables].sort(),
+    [...allowedAppVariables].sort(),
+    `${file} must not use GitHub Actions vars for app env except the approved allowlist`,
+  );
 }
 
 function assertMobileCatchPolicy(file, source) {
@@ -899,6 +913,26 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
   assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
+  const restoreStep = workflow.slice(
+    workflow.indexOf("CD Deploy / Restore GitHub Actions dotenv secret"),
+    workflow.indexOf("CD Deploy / Validate deployment dotenv contract"),
+  );
+  const adVariableNames = [
+    "EASYSUBWAY_ADS_ASSET_ORIGIN",
+    "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+  ];
+  for (const name of adVariableNames) {
+    assert.ok(
+      restoreStep.includes(`${name}: $` + `{{ vars.${name} }}`),
+      `${name} must come from a repository variable`,
+    );
+    assert.ok(restoreStep.includes(`drop["${name}"] = 1`), `${name} must replace a stale dotenv value`);
+  }
+  assert.match(
+    restoreStep,
+    /for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+if \[\[ -z "\$\{value\}" \|\| "\$\{value\}" == \*\$'\\n'\* \|\| "\$\{value\}" == \*\$'\\r'\* \]\]; then[\s\S]*?exit 1\s+fi\s+done[\s\S]*?for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+printf '%s=%s\\n' "\$\{name\}" "\$\{value\}" >> "\$\{env_file\}"\s+done/,
+    "invalid repository variables must exit before any approved value is written",
+  );
   assert.match(workflow, /CD Deploy \/ Validate deployment dotenv contract/);
   assert.match(workflow, /CD Plan \/ Detect deployment changes/);
   assert.match(workflow, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
@@ -13198,6 +13232,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   const ci = await classifyChangedFiles([".github/workflows/ci.yml"]);
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
+
+  const cd = await classifyChangedFiles([".github/workflows/cd.yml"]);
+  assert.equal(cd.repository, "true");
+  assert.equal(cd.ci, "true");
+  assert.equal(cd.deploy, "true");
 
   const repoTool = await classifyChangedFiles(["tools/repo/check-split-readiness.mjs"]);
   assert.equal(repoTool.repository, "true");
