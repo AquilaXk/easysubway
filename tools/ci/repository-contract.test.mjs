@@ -4256,6 +4256,16 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     "PASS_UP",
   );
   assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
+      .targetRevision,
+    "95702961b3bc59d1d1e2a3c89131ea242c349353",
+  );
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
+      .rollbackRevision,
+    "c28a1c99b88ccf49bbecb60ca1810775db530813",
+  );
+  assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.runUrl,
     "https://github.com/AquilaXk/easysubway/actions/runs/29274432867",
   );
