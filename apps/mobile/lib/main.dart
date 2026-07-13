@@ -1984,6 +1984,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!mounted || selectedPreset == null) {
       return null;
     }
+    // 현재와 동일한 프리셋을 다시 선택하면 저장·토스트 없이 종료한다(불필요한
+    // 저장 I/O와 "변경했습니다" 오해 토스트 방지, #1703).
+    if (selectedPreset == currentPreset) {
+      return null;
+    }
     final previousMobilityType = _mobilityType;
     setState(() {
       _mobilityType = mobilityPresetRepresentativeMobilityType(selectedPreset);
