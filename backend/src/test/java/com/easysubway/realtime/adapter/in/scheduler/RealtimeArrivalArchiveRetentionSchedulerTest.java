@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
 import com.easysubway.realtime.domain.RealtimeArrivalObservation;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,11 +54,9 @@ class RealtimeArrivalArchiveRetentionSchedulerTest {
 		List<String> messages = new ArrayList<>();
 		LoggerContext loggerContext = (LoggerContext) LogManager.getContext(false);
 		Configuration loggingConfiguration = loggerContext.getConfiguration();
-		LoggerConfig loggerConfig = loggingConfiguration.getLoggerConfig(
-			RealtimeArrivalArchiveRetentionScheduler.class.getName()
-		);
-		Level previousLevel = loggerConfig.getLevel();
-		loggerConfig.setLevel(Level.INFO);
+		String loggerName = RealtimeArrivalArchiveRetentionScheduler.class.getName();
+		LoggerConfig previousExactConfig = loggingConfiguration.getLoggers().get(loggerName);
+		LoggerConfig loggerConfig = new LoggerConfig(loggerName, Level.INFO, false);
 		AbstractAppender appender = new AbstractAppender(
 			"realtime-archive-retention-test",
 			null,
@@ -73,20 +72,57 @@ class RealtimeArrivalArchiveRetentionSchedulerTest {
 		appender.start();
 		loggingConfiguration.addAppender(appender);
 		loggerConfig.addAppender(appender, Level.INFO, null);
+		loggingConfiguration.addLogger(loggerName, loggerConfig);
 		loggerContext.updateLoggers();
 		Instant before = Instant.now();
 
 		try {
-			new RealtimeArrivalArchiveRetentionScheduler(archivePort).purgeExpiredObservations();
+			new RealtimeArrivalArchiveRetentionScheduler(archivePort, new SimpleMeterRegistry())
+				.purgeExpiredObservations();
 
 			assertThat(deletedAt.get()).isBetween(before, Instant.now());
 			assertThat(messages)
 				.contains("Realtime arrival archive retention purge completed. deletedRows=7");
 		} finally {
-			loggerConfig.removeAppender(appender.getName());
-			loggerConfig.setLevel(previousLevel);
+			loggingConfiguration.removeLogger(loggerName);
+			if (previousExactConfig != null) {
+				loggingConfiguration.addLogger(loggerName, previousExactConfig);
+			}
 			loggerContext.updateLoggers();
 			appender.stop();
 		}
+	}
+
+	@Test
+	@DisplayName("purge 실패를 metric으로 기록하고 다음 실행을 계속한다")
+	void recordsFailureAndContinuesNextRun() {
+		AtomicReference<Integer> attempts = new AtomicReference<>(0);
+		RealtimeArrivalArchivePort archivePort = new RealtimeArrivalArchivePort() {
+			@Override
+			public void saveAll(List<RealtimeArrivalObservation> observations) {
+			}
+
+			@Override
+			public int deleteExpired(Instant now) {
+				int attempt = attempts.updateAndGet(value -> value + 1);
+				if (attempt == 1) {
+					throw new IllegalStateException("database unavailable");
+				}
+				return 3;
+			}
+		};
+		SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+		RealtimeArrivalArchiveRetentionScheduler scheduler =
+			new RealtimeArrivalArchiveRetentionScheduler(archivePort, meterRegistry);
+
+		scheduler.purgeExpiredObservations();
+		scheduler.purgeExpiredObservations();
+
+		assertThat(attempts.get()).isEqualTo(2);
+		assertThat(meterRegistry.counter(
+			"easysubway.realtime.archive.purge.failures",
+			"provider", "seoul-topis",
+			"operation", "delete-expired"
+		).count()).isEqualTo(1);
 	}
 }

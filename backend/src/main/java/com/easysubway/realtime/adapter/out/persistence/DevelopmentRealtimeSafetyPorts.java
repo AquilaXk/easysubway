@@ -5,17 +5,17 @@ import com.easysubway.realtime.application.port.out.RealtimeProviderCallQuotaPor
 import com.easysubway.realtime.domain.RealtimeArrivalObservation;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 @Repository
 @Profile({"default", "dev", "test"})
 public class DevelopmentRealtimeSafetyPorts implements RealtimeArrivalArchivePort, RealtimeProviderCallQuotaPort {
-	private long windowMinute = Long.MIN_VALUE;
-	private long windowDay = Long.MIN_VALUE;
-	private int minuteCalls;
-	private int dailyCalls;
+	private final Map<String, QuotaState> statesByProvider = new HashMap<>();
 
 	@Override
 	public void saveAll(List<RealtimeArrivalObservation> observations) {
@@ -30,21 +30,30 @@ public class DevelopmentRealtimeSafetyPorts implements RealtimeArrivalArchivePor
 		int limitPerMinute,
 		int limitPerDay
 	) {
+		Objects.requireNonNull(providerId, "providerId must not be null");
+		QuotaState state = statesByProvider.computeIfAbsent(providerId, ignored -> new QuotaState());
 		long minute = now.getEpochSecond() / 60;
 		long day = now.atZone(providerZone).toLocalDate().toEpochDay();
-		if (minute != windowMinute) {
-			windowMinute = minute;
-			minuteCalls = 0;
+		if (minute != state.windowMinute) {
+			state.windowMinute = minute;
+			state.minuteCalls = 0;
 		}
-		if (day != windowDay) {
-			windowDay = day;
-			dailyCalls = 0;
+		if (day != state.windowDay) {
+			state.windowDay = day;
+			state.dailyCalls = 0;
 		}
-		if (minuteCalls >= limitPerMinute || dailyCalls >= limitPerDay) {
+		if (state.minuteCalls >= limitPerMinute || state.dailyCalls >= limitPerDay) {
 			return false;
 		}
-		minuteCalls += 1;
-		dailyCalls += 1;
+		state.minuteCalls += 1;
+		state.dailyCalls += 1;
 		return true;
+	}
+
+	private static final class QuotaState {
+		private long windowMinute = Long.MIN_VALUE;
+		private long windowDay = Long.MIN_VALUE;
+		private int minuteCalls;
+		private int dailyCalls;
 	}
 }

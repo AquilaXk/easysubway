@@ -27,7 +27,7 @@ public class JdbcRealtimeProviderCallQuotaRepository implements RealtimeProvider
 	}
 
 	@Override
-	@Transactional
+	@Transactional(timeout = 2)
 	public boolean tryAcquire(
 		String providerId,
 		Instant now,

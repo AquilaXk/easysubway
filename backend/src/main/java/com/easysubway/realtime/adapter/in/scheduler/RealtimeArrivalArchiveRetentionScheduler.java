@@ -1,6 +1,8 @@
 package com.easysubway.realtime.adapter.in.scheduler;
 
 import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,9 +16,17 @@ public class RealtimeArrivalArchiveRetentionScheduler {
 	private static final Logger log = LoggerFactory.getLogger(RealtimeArrivalArchiveRetentionScheduler.class);
 
 	private final RealtimeArrivalArchivePort archivePort;
+	private final Counter purgeFailureCounter;
 
-	public RealtimeArrivalArchiveRetentionScheduler(RealtimeArrivalArchivePort archivePort) {
+	public RealtimeArrivalArchiveRetentionScheduler(
+		RealtimeArrivalArchivePort archivePort,
+		MeterRegistry meterRegistry
+	) {
 		this.archivePort = archivePort;
+		this.purgeFailureCounter = Counter.builder("easysubway.realtime.archive.purge.failures")
+			.tag("provider", "seoul-topis")
+			.tag("operation", "delete-expired")
+			.register(meterRegistry);
 	}
 
 	@Scheduled(
@@ -24,7 +34,18 @@ public class RealtimeArrivalArchiveRetentionScheduler {
 		zone = "UTC"
 	)
 	void purgeExpiredObservations() {
-		int deleted = archivePort.deleteExpired(Instant.now());
-		log.info("Realtime arrival archive retention purge completed. deletedRows={}", deleted);
+		try {
+			int deleted = archivePort.deleteExpired(Instant.now());
+			log.info("Realtime arrival archive retention purge completed. deletedRows={}", deleted);
+		} catch (RuntimeException exception) {
+			purgeFailureCounter.increment();
+			log.error(
+				"Realtime arrival archive retention purge failed. providerId={} operation={} exceptionType={}",
+				"seoul-topis",
+				"delete-expired",
+				exception.getClass().getSimpleName(),
+				exception
+			);
+		}
 	}
 }

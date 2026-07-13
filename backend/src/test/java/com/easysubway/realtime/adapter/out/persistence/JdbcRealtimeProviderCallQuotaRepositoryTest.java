@@ -11,6 +11,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("JDBC realtime provider 공유 quota")
@@ -18,10 +22,11 @@ class JdbcRealtimeProviderCallQuotaRepositoryTest {
 
 	private JdbcRealtimeProviderCallQuotaRepository repository;
 	private JdbcTemplate jdbcTemplate;
+	private DriverManagerDataSource dataSource;
 
 	@BeforeEach
 	void setUp() {
-		var dataSource = new DriverManagerDataSource(
+		dataSource = new DriverManagerDataSource(
 			"jdbc:h2:mem:realtime-provider-quota-" + UUID.randomUUID()
 				+ ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
 			"sa",
@@ -33,7 +38,7 @@ class JdbcRealtimeProviderCallQuotaRepositoryTest {
 			.load()
 			.migrate();
 		jdbcTemplate = new JdbcTemplate(dataSource);
-		repository = new JdbcRealtimeProviderCallQuotaRepository(jdbcTemplate);
+		repository = proxiedRepository();
 	}
 
 	@Test
@@ -44,7 +49,7 @@ class JdbcRealtimeProviderCallQuotaRepositoryTest {
 		assertThat(repository.tryAcquire("seoul-topis", now, providerZone, 10, 2)).isTrue();
 		assertThat(repository.tryAcquire("seoul-topis", now.plusSeconds(60), providerZone, 10, 2)).isTrue();
 
-		var restarted = new JdbcRealtimeProviderCallQuotaRepository(jdbcTemplate);
+		var restarted = proxiedRepository();
 		assertThat(restarted.tryAcquire("seoul-topis", now.plusSeconds(120), providerZone, 10, 2)).isFalse();
 	}
 
@@ -60,9 +65,21 @@ class JdbcRealtimeProviderCallQuotaRepositoryTest {
 	@Test
 	@DisplayName("quota 획득은 transaction 경계를 선언한다")
 	void declaresTransactionalAcquire() throws NoSuchMethodException {
-		assertThat(JdbcRealtimeProviderCallQuotaRepository.class
+		Transactional transactional = JdbcRealtimeProviderCallQuotaRepository.class
 			.getMethod("tryAcquire", String.class, Instant.class, ZoneId.class, int.class, int.class)
-			.getAnnotation(Transactional.class))
-			.isNotNull();
+			.getAnnotation(Transactional.class);
+		assertThat(transactional).isNotNull();
+		assertThat(transactional.timeout()).isEqualTo(2);
+	}
+
+	private JdbcRealtimeProviderCallQuotaRepository proxiedRepository() {
+		var target = new JdbcRealtimeProviderCallQuotaRepository(jdbcTemplate);
+		var proxyFactory = new ProxyFactory(target);
+		proxyFactory.setProxyTargetClass(true);
+		proxyFactory.addAdvice(new TransactionInterceptor(
+			new DataSourceTransactionManager(dataSource),
+			new AnnotationTransactionAttributeSource()
+		));
+		return (JdbcRealtimeProviderCallQuotaRepository) proxyFactory.getProxy();
 	}
 }
