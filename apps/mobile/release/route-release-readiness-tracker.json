@@ -45,7 +45,6 @@
     { "number": 1412, "area": "backend-planner", "releaseBlocker": true },
     { "number": 1413, "area": "backend-planner", "releaseBlocker": true },
     { "number": 1415, "area": "offline-datapack", "releaseBlocker": true },
-    { "number": 1416, "area": "realtime-overlay", "releaseBlocker": true },
     { "number": 1417, "area": "contract-tests-gate", "releaseBlocker": true },
     { "number": 1418, "area": "datapack-release", "releaseBlocker": true },
     { "number": 1620, "area": "backend-planner", "releaseBlocker": true },
