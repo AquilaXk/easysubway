@@ -6798,7 +6798,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
-  assert.equal(candidates.source, "easysubway_public_subway_api_inventory.xlsx");
+  assert.equal(candidates.source, "tools/datapack/source-candidates.json");
+  assert.equal(candidates.updatedAt, "2026-07-13");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
@@ -7376,6 +7377,44 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
+  assert.deepEqual(candidate.providerApproval, {
+    status: "APPROVED",
+    approvalScope: "API_CREDENTIAL",
+    termsStatus: "REVIEW_REQUIRED",
+    quotaStatus: "REVIEW_REQUIRED",
+    productionUseAllowed: false,
+    serviceId: "handicapped",
+    operationId: "transferMovement",
+    validFrom: "2026-07-06",
+    validTo: "2027-07-06",
+    renewalNoticeDays: 30,
+    evidenceReferences: [{
+      type: "OWNER_CONFIRMATION",
+      url: "https://github.com/AquilaXk/easysubway/issues/1397#issuecomment-4956908695",
+    }],
+    recordedAt: "2026-07-13",
+  });
+  assert.deepEqual(candidate.operation, {
+    method: "GET",
+    endpoint: "https://openapi.kric.go.kr/openapi/handicapped/transferMovement",
+    auth: {
+      env: "KRIC_SERVICE_KEY",
+      placement: "query",
+      parameter: "serviceKey",
+      valueEncoding: "url-search-params-once",
+      loadPolicy: "process-env-no-shell-parsing",
+    },
+    requiredParameters: [
+      "serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd", "prevStinCd", "chthTgtLn", "chtnNextStinCd",
+    ],
+    responseEnvelope: "root.body.items.item",
+    runner: {
+      command: "node tools/datapack/collect-kric-source-candidate-evidence.mjs",
+      arguments: ["--candidate", "kric-transfer-movement-standard"],
+      requiredEnv: ["KRIC_SERVICE_KEY", "RUNNER_TEMP"],
+    },
+    secretPolicy: "env-only-redacted-output",
+  });
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=428&service=handicapped&operation=transferMovement&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
@@ -13953,6 +13992,7 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
 
   assert.match(workflow, /^name: Data Pack Expiry Alert$/m);
   assert.match(workflow, /schedule:[\s\S]*cron: "23 \*\/4 \* \* \*"/);
+  assert.match(workflow, /schedule:[\s\S]*cron: "41 0 \* \* \*"/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:\s*\n\s*contents: read/);
   assert.match(workflow, /concurrency:\s*\n\s*group: /);
@@ -13979,6 +14019,14 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   // manifest 다운로드와 스크립트 호출부.
   assert.match(workflow, /curl -fsS --connect-timeout 10 --max-time 30 "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
   assert.match(workflow, /node tools\/datapack\/check-datapack-expiry-alert\.mjs/);
+  assert.match(workflow, /node tools\/datapack\/source-operation\.mjs check-approvals/);
+  assert.match(workflow, /^  provider-approval-expiry:\s*$/m);
+  assert.match(workflow, /^    name: Provider Approval Expiry$/m);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*id:\s*check[\s\S]*GITHUB_OUTPUT/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*github\.event\.schedule == '41 0 \* \* \*'/);
+  assert.match(workflow, /datapack-expiry-alert:[\s\S]*github\.event\.schedule == '23 \*\/4 \* \* \*'/);
+  assert.doesNotMatch(workflow, /notification_due/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*steps\.check\.outputs\.status == 'WARNING'[\s\S]*slackapi\/slack-github-action@/);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);
 
