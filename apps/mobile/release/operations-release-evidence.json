@@ -92,11 +92,11 @@
           "followUpIssue": 1020
         },
         "singleInstanceAbuseControl": {
-          "backendReplicaCount": 1,
-          "scaleOutPolicy": "분산 limiter 구현 전 backend service scale-out 금지",
+          "backendReplicaCountOneEvidence": "PASS_COMPOSE_BACKEND_SERVICE_SINGLE_REPLICA",
+          "scaleOutProhibitedRunbook": "분산 limiter 구현 전 backend service scale-out 금지; 후속 #1022",
           "owner": "AquilaXk",
           "untilDate": "2026-10-13",
-          "postLaunchMonitoringThreshold": "report API 429 비율과 duplicate/orphan cleanup 실패를 운영 대시보드에서 감시",
+          "postLaunchAbuseMonitoringThreshold": "report API 429 비율과 duplicate/orphan cleanup 실패를 운영 대시보드에서 감시",
           "distributedLimiterFollowUpIssue": 1022
         }
       },

@@ -4291,15 +4291,23 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       auditRedaction: "PASS_REPOSITORY_AND_BACKEND_TESTS",
     },
   );
-  assert.equal(
-    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.temporaryReleaseDecisions
-      .singleInstanceAbuseControl.backendReplicaCount,
-    1,
+  const singleInstanceAbuseControl = operationsEvidence.backendControlPlane.latestQaEvidenceStatus
+    .temporaryReleaseDecisions.singleInstanceAbuseControl;
+  assert.deepEqual(
+    Object.keys(singleInstanceAbuseControl).toSorted(),
+    operationsEvidence.backendControlPlane.abuseControlReleaseException.singleInstanceExceptionRequiredFields
+      .toSorted(),
   );
-  assert.equal(
-    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.temporaryReleaseDecisions
-      .singleInstanceAbuseControl.distributedLimiterFollowUpIssue,
-    1022,
+  assert.deepEqual(
+    singleInstanceAbuseControl,
+    {
+      backendReplicaCountOneEvidence: "PASS_COMPOSE_BACKEND_SERVICE_SINGLE_REPLICA",
+      scaleOutProhibitedRunbook: "분산 limiter 구현 전 backend service scale-out 금지; 후속 #1022",
+      owner: "AquilaXk",
+      untilDate: "2026-10-13",
+      postLaunchAbuseMonitoringThreshold: "report API 429 비율과 duplicate/orphan cleanup 실패를 운영 대시보드에서 감시",
+      distributedLimiterFollowUpIssue: 1022,
+    },
   );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.prodLikeLocalValidation
