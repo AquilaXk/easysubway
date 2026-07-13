@@ -39,6 +39,7 @@ const candidateBuildSpecHashFields = [
   "sourceInventorySha256",
 ];
 const sourceSnapshotStatuses = new Set(["LOCKED"]);
+const compareStrings = (left, right) => left.localeCompare(right);
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -644,7 +645,7 @@ function recordCoverageScopes(sourceScope, operatorIds, lineIds, coverageOperato
   return scopedLineIds.flatMap((lineId) => {
     const scopedLineOperatorIds = [...(coverageOperatorIdsByLine.get(lineId) ?? [])]
       .filter((operatorId) => sourceScope.operatorIds.includes(operatorId))
-      .sort();
+      .sort(compareStrings);
     if (scopedLineOperatorIds.length === 0) {
       throw new Error(`source coverageScope does not include operator for record line: ${lineId}`);
     }
@@ -658,7 +659,7 @@ function recordCoverageScopes(sourceScope, operatorIds, lineIds, coverageOperato
 }
 
 function lineIdsForNodes(nodeIds) {
-  return [...new Set(nodeIds.map((nodeId) => String(nodeId).split(":")[1]).filter(Boolean))].sort();
+  return [...new Set(nodeIds.map((nodeId) => String(nodeId).split(":")[1]).filter(Boolean))].sort(compareStrings);
 }
 
 function operatorIdsForNodes(nodeIds, stationLineOperatorIds) {
@@ -1990,12 +1991,12 @@ function validateCoverageLineOperatorScopeAlignment(fixture) {
   const fixtureKeys = [...new Set(
     fixture.coverageLineOperatorScopes
       .map(({ regionId, operatorId, lineId }) => `${regionId}:${operatorId}:${lineId}`),
-  )].sort();
+  )].sort(compareStrings);
   const packKeys = [...new Set(
     fixture.packs
       .flatMap((pack) => pack.coverageLineOperatorScopes ?? [])
       .map(({ regionId, operatorId, lineId }) => `${regionId}:${operatorId}:${lineId}`),
-  )].sort();
+  )].sort(compareStrings);
   if (JSON.stringify(fixtureKeys) !== JSON.stringify(packKeys)) {
     throw new Error("fixture coverageLineOperatorScopes must equal the union of pack coverageLineOperatorScopes");
   }

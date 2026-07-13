@@ -406,7 +406,7 @@ function coveredField(
         .map((source) => source.id),
     );
     if (sourceIdsByPack.length > 0 && sourceIdsByPack.every((ids) => ids.length > 0)) {
-      sourceIds = [...new Set(sourceIdsByPack.flat())].sort();
+      sourceIds = [...new Set(sourceIdsByPack.flat())].sort(compareStrings);
     }
   } else if (!requireProvenance) {
     sourceIds = candidateSources.filter((source) => source.fields.includes(field)).map((source) => source.id).sort();
