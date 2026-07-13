@@ -15,6 +15,7 @@ test("TAGO ITX-청춘 probe는 grade·station·OD를 연결하고 secret을 제�
   const artifact = await collectTagoItxCheongchunOd({
     serviceKey: secret,
     departureDate: "2026-07-14",
+    kricServiceDayCode: "8",
     now: new Date("2026-07-13T00:00:00.000Z"),
     fetchImpl: async (url) => {
       const parsed = new URL(url);
@@ -41,21 +42,27 @@ test("TAGO ITX-청춘 probe는 grade·station·OD를 연결하고 secret을 제�
   assert.equal(artifact.departureStation.providerStationId, "NAT130126");
   assert.equal(artifact.arrivalStation.providerStationId, "NAT140873");
   assert.deepEqual(artifact.trainNumbers, ["2001"]);
+  assert.equal(artifact.kricServiceDayCode, "8");
   assert.equal(artifact.itineraries[0].adultFareWon, 9800);
   assert.equal(artifact.pickupDropoff.status, "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE");
   assert.doesNotMatch(JSON.stringify(artifact), new RegExp(secret));
 });
 
 test("TAGO ITX-청춘 probe는 grade 없음·provider failure·역순 시간을 거부한다", async (context) => {
-  await context.test("grade missing", async () => {
+  await context.test("KRIC service day code missing", async () => {
     await assert.rejects(collectTagoItxCheongchunOd({
       serviceKey: "key", departureDate: "2026-07-14",
+    }), /kricServiceDayCode must be 7, 8, or 9/);
+  });
+  await context.test("grade missing", async () => {
+    await assert.rejects(collectTagoItxCheongchunOd({
+      serviceKey: "key", departureDate: "2026-07-14", kricServiceDayCode: "8",
       fetchImpl: async () => tagoResponse([{ vehiclekndid: "00", vehiclekndnm: "KTX" }]),
     }), /ITX-청춘 train grade is missing/);
   });
   await context.test("provider failure", async () => {
     await assert.rejects(collectTagoItxCheongchunOd({
-      serviceKey: "key", departureDate: "2026-07-14",
+      serviceKey: "key", departureDate: "2026-07-14", kricServiceDayCode: "8",
       fetchImpl: async () => new Response(JSON.stringify({ response: { header: { resultCode: "99" } } }), {
         status: 200, headers: { "content-type": "application/json" },
       }),
@@ -63,13 +70,13 @@ test("TAGO ITX-청춘 probe는 grade 없음·provider failure·역순 시간을 
   });
   await context.test("duplicate train number", async () => {
     await assert.rejects(collectTagoItxCheongchunOd({
-      serviceKey: "key", departureDate: "2026-07-14",
+      serviceKey: "key", departureDate: "2026-07-14", kricServiceDayCode: "8",
       fetchImpl: validFetch({ duplicateOd: true }),
     }), /duplicate train number/);
   });
   await context.test("arrival before departure", async () => {
     await assert.rejects(collectTagoItxCheongchunOd({
-      serviceKey: "key", departureDate: "2026-07-14",
+      serviceKey: "key", departureDate: "2026-07-14", kricServiceDayCode: "8",
       fetchImpl: validFetch({ reverseTime: true }),
     }), /arrival must follow departure/);
   });

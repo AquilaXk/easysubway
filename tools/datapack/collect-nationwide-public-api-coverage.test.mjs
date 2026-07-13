@@ -170,6 +170,47 @@ test("지역 전용 provider 후보는 다른 지역의 공식 미지원 판정�
   ]);
 });
 
+test("기존 HTTP 공식 provider도 정확한 scope의 미지원 판정을 막는다", () => {
+  const searchPlan = buildNationwidePublicApiSearchPlan({
+    targets: {
+      targetVersion: "2026-07-13",
+      activeLineScopes: [
+        { regionId: "capital", operatorId: "seoul-metro", lineId: "seoul-2" },
+        { regionId: "busan", operatorId: "busan-transportation", lineId: "busan-1" },
+      ],
+      requiredSourceDomains: [{ id: "realtime_arrivals", releaseTier: "LAUNCH_REQUIRED" }],
+    },
+    fixture: {
+      packs: [{
+        operators: [
+          { id: "seoul-metro", nameKo: "서울교통공사" },
+          { id: "busan-transportation", nameKo: "부산교통공사" },
+        ],
+        lines: [
+          { id: "seoul-2", nameKo: "수도권 2호선" },
+          { id: "busan-1", nameKo: "부산 1호선" },
+        ],
+      }],
+    },
+    sourceCandidates: {
+      candidates: [{
+        id: "seoul-topis-realtime-station-arrival",
+        domain: "realtime_arrivals",
+        requestUrl: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
+        coverageScope: { regionIds: ["capital"] },
+      }],
+    },
+  });
+
+  assert.deepEqual(searchPlan.entries.map(({ lineId, knownProviderCandidateIds }) => ({
+    lineId,
+    knownProviderCandidateIds,
+  })), [
+    { lineId: "seoul-2", knownProviderCandidateIds: ["seoul-topis-realtime-station-arrival"] },
+    { lineId: "busan-1", knownProviderCandidateIds: [] },
+  ]);
+});
+
 test("공공데이터 검색이 거부하는 GTX-A 문장부호는 안전한 alias로 정규화한다", () => {
   const searchPlan = buildNationwidePublicApiSearchPlan({
     targets: {
@@ -200,6 +241,7 @@ test("공공기관 API 정상 0건만 공식 미지원 resolution을 생성한�
 
   assert.equal(resolutions.entries.length, 1);
   assert.equal(resolutions.unresolved.length, 0);
+  assert.match(resolutions.searchPlanSha256, /^[a-f0-9]{64}$/);
   assert.equal(resolutions.entries[0].state, "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE");
   assert.equal(resolutions.entries[0].publicApiQueries[0].providerResultCode, "00");
   assert.equal(resolutions.entries[0].publicApiQueries[0].schemaStatus, "EXPECTED");

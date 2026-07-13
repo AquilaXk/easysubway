@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// 실행 시 --date YYYY-MM-DD, 검증된 KRIC 운행일 코드 --kric-day-cd 7|8|9,
+// credential 비포함 absolute --output 경로를 함께 전달한다.
 import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -11,9 +13,18 @@ const CANONICAL_STATIONS = Object.freeze({
   "춘천": "station-dd14cfb89cbc",
 });
 
-export async function collectTagoItxCheongchunOd({ serviceKey, departureDate, fetchImpl = fetch, now = new Date() } = {}) {
+export async function collectTagoItxCheongchunOd({
+  serviceKey,
+  departureDate,
+  kricServiceDayCode,
+  fetchImpl = fetch,
+  now = new Date(),
+} = {}) {
   const key = decodedServiceKey(requiredString(serviceKey, "DATA_GO_KR_SERVICE_KEY"));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(departureDate ?? "")) throw new Error("departureDate must be YYYY-MM-DD");
+  if (!["7", "8", "9"].includes(kricServiceDayCode)) {
+    throw new Error("kricServiceDayCode must be 7, 8, or 9");
+  }
   const trainGrades = await fetchAll("GetVhcleKndList", {}, key, fetchImpl);
   const gradeRows = trainGrades.rows.filter((row) => normalize(row.vehiclekndnm) === "itx청춘");
   if (gradeRows.length !== 1) throw new Error("TAGO ITX-청춘 train grade is missing or ambiguous");
@@ -47,6 +58,7 @@ export async function collectTagoItxCheongchunOd({ serviceKey, departureDate, fe
     developmentDailyQuota: 10_000,
     observedAt: now.toISOString(),
     departureDate,
+    kricServiceDayCode,
     trainGrade: { code: String(grade.vehiclekndid), name: grade.vehiclekndnm, serviceId: "ITX_CHEONGCHUN" },
     departureStation: stationMapping(departure, "청량리"),
     arrivalStation: stationMapping(arrival, "춘천"),
@@ -60,7 +72,7 @@ export async function collectTagoItxCheongchunOd({ serviceKey, departureDate, fe
     operations: [trainGrades, cities, od].map(operationEvidence),
     trainNumbers,
     itineraries,
-    evidenceHash: sha256(JSON.stringify({ grade, departure, arrival, itineraries })),
+    evidenceHash: sha256(JSON.stringify({ departureDate, kricServiceDayCode, grade, departure, arrival, itineraries })),
     credentialRedacted: true,
   };
 }
@@ -171,7 +183,11 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const output = requiredString(args.output, "--output");
   if (!path.isAbsolute(output)) throw new Error("--output must be absolute");
-  const artifact = await collectTagoItxCheongchunOd({ serviceKey: process.env.DATA_GO_KR_SERVICE_KEY, departureDate: args.date });
+  const artifact = await collectTagoItxCheongchunOd({
+    serviceKey: process.env.DATA_GO_KR_SERVICE_KEY,
+    departureDate: args.date,
+    kricServiceDayCode: args["kric-day-cd"],
+  });
   await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
   console.log(`sanitized TAGO ITX-청춘 OD evidence ready: trains=${artifact.trainNumbers.length}`);
 }

@@ -8502,9 +8502,35 @@ test("전국 coverage report는 운행 노선 launch와 enhancement 분모를 �
   assert.ok(report.requirements.every(({ evidenceRef }) => evidenceRef === "source:molit-urban-rail-full-route"));
 });
 
+function coverageResolutionSearchPlan(entry, publicApiQueries) {
+  return {
+    schemaVersion: 1,
+    artifactKind: "nationwide-public-api-coverage-search-plan",
+    targetVersion: "2026-07-13",
+    entries: [{
+      regionId: entry.regionId,
+      operatorId: entry.operatorId,
+      lineId: entry.lineId,
+      sourceDomain: entry.sourceDomain,
+      fallback: entry.fallback,
+      userMessageKo: entry.userMessageKo,
+      queries: publicApiQueries.map(({ providerId, endpoint, operation, query, matchAnyTerms, matchTermGroups, captureFields }) => ({
+        providerId,
+        endpoint,
+        operation,
+        query,
+        ...(matchAnyTerms ? { matchAnyTerms } : {}),
+        ...(matchTermGroups ? { matchTermGroups } : {}),
+        ...(captureFields ? { captureFields } : {}),
+      })),
+    }],
+  };
+}
+
 test("전국 coverage report는 공공기관 API 실제 부재만 공식 미지원 terminal 상태로 집계한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-coverage-resolution-${Date.now()}`);
   const resolutionsPath = path.join(outputDir, "nationwide-coverage-resolutions.json");
+  const resolutionPlanPath = path.join(outputDir, "nationwide-coverage-search-plan.json");
   const reportPath = path.join(outputDir, "coverage-gap-report.json");
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
@@ -8520,27 +8546,31 @@ test("전국 coverage report는 공공기관 API 실제 부재만 공식 미지�
     matchCount: 0,
     responseSha256: "a".repeat(64),
   }];
+  const resolutionEntry = {
+    regionId: "busan",
+    operatorId: "busan-transportation",
+    lineId: "line-ab1a041f6266",
+    sourceDomain: "schedule_timetable",
+    state: "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+    reasonCode: "PUBLIC_API_NO_DATA",
+    userMessageKo: "공공기관 API에서 시간표 데이터를 제공하지 않습니다.",
+    fallback: "STATIC_LOCAL",
+    checkedAt: "2026-07-13T00:00:00.000Z",
+    reviewedAt: "2026-07-13T00:00:00.000Z",
+    reviewerRole: "DATA_STEWARD",
+    nextReviewAt: "2099-07-13T00:00:00.000Z",
+    requiredProviderIds: ["kric"],
+    publicApiQueries,
+    evidenceHash: sha256(JSON.stringify(publicApiQueries)),
+  };
+  const resolutionPlan = coverageResolutionSearchPlan(resolutionEntry, publicApiQueries);
+  await writeFile(resolutionPlanPath, `${JSON.stringify(resolutionPlan, null, 2)}\n`);
   await writeFile(resolutionsPath, `${JSON.stringify({
     schemaVersion: 1,
     artifactKind: "nationwide-coverage-resolutions",
     targetVersion: "2026-07-13",
-    entries: [{
-      regionId: "busan",
-      operatorId: "busan-transportation",
-      lineId: "line-ab1a041f6266",
-      sourceDomain: "schedule_timetable",
-      state: "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
-      reasonCode: "PUBLIC_API_NO_DATA",
-      userMessageKo: "공공기관 API에서 시간표 데이터를 제공하지 않습니다.",
-      fallback: "STATIC_LOCAL",
-      checkedAt: "2026-07-13T00:00:00.000Z",
-      reviewedAt: "2026-07-13T00:00:00.000Z",
-      reviewerRole: "DATA_STEWARD",
-      nextReviewAt: "2099-07-13T00:00:00.000Z",
-      requiredProviderIds: ["kric"],
-      publicApiQueries,
-      evidenceHash: sha256(JSON.stringify(publicApiQueries)),
-    }],
+    searchPlanSha256: sha256(JSON.stringify(resolutionPlan)),
+    entries: [resolutionEntry],
   }, null, 2)}\n`);
 
   await execFileAsync(
@@ -8550,6 +8580,7 @@ test("전국 coverage report는 공공기관 API 실제 부재만 공식 미지�
       "--targets", "tools/datapack/nationwide-coverage-targets.json",
       "--inventory", "tools/datapack/source-inventory.json",
       "--resolutions", resolutionsPath,
+      "--resolution-plan", resolutionPlanPath,
       "--output", reportPath,
       "--allow-gaps",
     ],
@@ -8609,6 +8640,7 @@ test("전국 coverage report는 불완전하거나 만료된 공공 API 미지�
     publicApiQueries,
     evidenceHash: sha256(JSON.stringify(publicApiQueries)),
   };
+  const resolutionPlan = coverageResolutionSearchPlan(baseEntry, publicApiQueries);
   const cases = [
     ["duplicate", [baseEntry, baseEntry], /duplicate coverage resolution/],
     ["unknown key", [{ ...baseEntry, lineId: "unknown-line" }], /unknown coverage resolution requirement/],
@@ -8635,16 +8667,26 @@ test("전국 coverage report는 불완전하거나 만료된 공공 API 미지�
       publicApiQueries: [{ ...publicApiQueries[0], schemaStatus: "MISMATCH" }],
       evidenceHash: sha256(JSON.stringify([{ ...publicApiQueries[0], schemaStatus: "MISMATCH" }])),
     }], /schemaStatus must be EXPECTED/],
+    ["different line query", [{
+      ...baseEntry,
+      publicApiQueries: [{ ...publicApiQueries[0], query: { railOprIsttCd: "B1", lnCd: "2" } }],
+      evidenceHash: sha256(JSON.stringify([{
+        ...publicApiQueries[0], query: { railOprIsttCd: "B1", lnCd: "2" },
+      }])),
+    }], /search plan query mismatch/],
   ];
 
   for (const [label, entries, expected] of cases) {
     await context.test(label, async () => {
       const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-coverage-resolution-invalid-"));
       const resolutionsPath = path.join(outputDir, "resolutions.json");
+      const resolutionPlanPath = path.join(outputDir, "resolution-plan.json");
+      await writeFile(resolutionPlanPath, `${JSON.stringify(resolutionPlan)}\n`);
       await writeFile(resolutionsPath, `${JSON.stringify({
         schemaVersion: 1,
         artifactKind: "nationwide-coverage-resolutions",
         targetVersion: "2026-07-13",
+        searchPlanSha256: sha256(JSON.stringify(resolutionPlan)),
         entries,
       })}\n`);
       await assert.rejects(execFileAsync(
@@ -8654,6 +8696,7 @@ test("전국 coverage report는 불완전하거나 만료된 공공 API 미지�
           "--targets", "tools/datapack/nationwide-coverage-targets.json",
           "--inventory", "tools/datapack/source-inventory.json",
           "--resolutions", resolutionsPath,
+          "--resolution-plan", resolutionPlanPath,
           "--output", path.join(outputDir, "report.json"),
           "--allow-gaps",
         ],
@@ -8665,11 +8708,14 @@ test("전국 coverage report는 불완전하거나 만료된 공공 API 미지�
   await context.test("expired evidence returns to MISSING", async () => {
     const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-coverage-resolution-expired-"));
     const resolutionsPath = path.join(outputDir, "resolutions.json");
+    const resolutionPlanPath = path.join(outputDir, "resolution-plan.json");
     const reportPath = path.join(outputDir, "report.json");
+    await writeFile(resolutionPlanPath, `${JSON.stringify(resolutionPlan)}\n`);
     await writeFile(resolutionsPath, `${JSON.stringify({
       schemaVersion: 1,
       artifactKind: "nationwide-coverage-resolutions",
       targetVersion: "2026-07-13",
+      searchPlanSha256: sha256(JSON.stringify(resolutionPlan)),
       entries: [{ ...baseEntry, nextReviewAt: "2026-07-12T00:00:00.000Z" }],
     })}\n`);
     await execFileAsync(
@@ -8679,6 +8725,7 @@ test("전국 coverage report는 불완전하거나 만료된 공공 API 미지�
         "--targets", "tools/datapack/nationwide-coverage-targets.json",
         "--inventory", "tools/datapack/source-inventory.json",
         "--resolutions", resolutionsPath,
+        "--resolution-plan", resolutionPlanPath,
         "--output", reportPath,
         "--allow-gaps",
       ],

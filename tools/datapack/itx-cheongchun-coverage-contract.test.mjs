@@ -12,6 +12,7 @@ test("ITX-청춘 coverage contract는 OD 성공을 stop-sequence 지원으로 �
   });
   assert.equal(contract.officialEvidence.tagoTrainOd.providerResultCode, "00");
   assert.equal(contract.officialEvidence.tagoTrainOd.rowCount, 18);
+  assert.equal(contract.officialEvidence.tagoTrainOd.query.kricServiceDayCode, "8");
   assert.equal(contract.officialEvidence.tagoTrainOd.limitation, "OD 결과는 완전한 trip stop sequence가 아니다.");
   assert.equal(contract.officialEvidence.kricUrbanTimetable.trainNumberJoinCount, 0);
   assert.equal(contract.officialEvidence.kricStationTimetable.providerResultCode, "30");

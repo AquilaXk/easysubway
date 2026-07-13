@@ -36,6 +36,7 @@
         "departureStationId": "NAT130126",
         "arrivalStationId": "NAT140873",
         "departureDate": "2026-07-14",
+        "kricServiceDayCode": "8",
         "trainGradeCode": "09"
       },
       "canonicalStationMappings": [
@@ -91,7 +92,7 @@
     }
   },
   "materialization": {
-    "algorithm": "provider train number + service day로 station rows를 group하고 canonical lineSequence 단조성을 검증",
+    "algorithm": "provider train number + 호출자가 공휴일을 반영해 검증한 KRIC service day code로 station rows를 group하고 canonical lineSequence 단조성을 검증",
     "deterministicKey": ["serviceId", "serviceDay", "providerTrainNumber"],
     "reject": ["MISSING_STOP", "DUPLICATE_STOP", "NON_MONOTONE_STOP_ORDER", "ARRIVAL_AFTER_DEPARTURE", "OD_ONLY_AS_COMPLETE_TRIP"],
     "status": "MISSING_STATION_LEVEL_ITX_ROWS"

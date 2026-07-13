@@ -1347,6 +1347,11 @@
       "id": "seoul-topis-realtime-station-arrival",
       "priority": "P0",
       "domain": "realtime_arrivals",
+      "coverageScope": {
+        "regionIds": [
+          "capital"
+        ]
+      },
       "displayName": "서울시 지하철 실시간 도착정보",
       "detailUrl": "https://data.seoul.go.kr/dataList/OA-12764/F/1/datasetView.do",
       "requestUrl": "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
@@ -1603,6 +1608,11 @@
       "id": "seoulmetro-station-line-info",
       "priority": "P0",
       "domain": "station_line_membership",
+      "coverageScope": {
+        "operatorIds": [
+          "seoul-metro"
+        ]
+      },
       "displayName": "서울교통공사_노선별 지하철역 정보",
       "detailUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do",
       "requestUrl": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo",

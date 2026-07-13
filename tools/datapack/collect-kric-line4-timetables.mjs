@@ -49,6 +49,8 @@ export function filterRowsByTrainNumbers(rows, trainNumbers, servicePattern = "E
 
 export function validateItxOdJoin(rows, evidence) {
   if (evidence?.serviceId !== "ITX_CHEONGCHUN") throw new Error("ITX OD evidence serviceId is invalid");
+  const dayCd = evidence?.kricServiceDayCode;
+  if (!["7", "8", "9"].includes(dayCd)) throw new Error("kricServiceDayCode must be 7, 8, or 9");
   const departureStationId = evidence?.departureStation?.canonicalStationId;
   const arrivalStationId = evidence?.arrivalStation?.canonicalStationId;
   if (typeof departureStationId !== "string" || typeof arrivalStationId !== "string") {
@@ -71,7 +73,6 @@ export function validateItxOdJoin(rows, evidence) {
     const trainNumber = normalizeTrainNumber(itinerary?.trainNumber);
     if (itineraryNumbers.has(trainNumber)) throw new Error(`ITX OD evidence duplicate train number: ${trainNumber}`);
     itineraryNumbers.add(trainNumber);
-    const dayCd = serviceDayCd(itinerary?.departureAt, `itineraries[${index}].departureAt`);
     const trainRows = rowsByTrain.get(`${trainNumber}|${dayCd}`) ?? [];
     const departures = trainRows.filter(({ stationId }) => stationId === departureStationId);
     const arrivals = trainRows.filter(({ stationId }) => stationId === arrivalStationId);
@@ -104,21 +105,11 @@ function isoServiceSeconds(value, label) {
   return (hours < 3 ? hours + 24 : hours) * 3600 + minutes * 60 + seconds;
 }
 
-function serviceDayCd(value, label) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T/.exec(String(value ?? ""));
-  if (!match) throw new Error(`${label} must use Asia/Seoul ISO timestamp`);
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1
-    || date.getUTCDate() !== Number(match[3])) {
-    throw new Error(`${label} is invalid`);
-  }
-  const weekday = date.getUTCDay();
-  return weekday === 6 ? "7" : weekday === 0 ? "9" : "8";
-}
-
 function evidenceServiceDayCds(evidence) {
-  return new Set(evidence.itineraries.map((itinerary, index) =>
-    serviceDayCd(itinerary?.departureAt, `itineraries[${index}].departureAt`)));
+  if (!["7", "8", "9"].includes(evidence?.kricServiceDayCode)) {
+    throw new Error("kricServiceDayCode must be 7, 8, or 9");
+  }
+  return new Set([evidence.kricServiceDayCode]);
 }
 
 export function validateKricTimetablePayload(payload) {

@@ -34,8 +34,17 @@ async function main() {
     ? JSON.parse(await readFile(args.releaseTargets ?? DEFAULT_RELEASE_SCOPE_TARGETS, "utf8"))
     : null;
   const resolutionBytes = args.resolutions ? await readFile(args.resolutions) : null;
+  if (args.resolutions && !args.resolutionPlan) {
+    throw new Error("--resolution-plan is required with --resolutions");
+  }
+  if (args.resolutionPlan && !args.resolutions) {
+    throw new Error("--resolutions is required with --resolution-plan");
+  }
+  const resolutionPlan = args.resolutionPlan
+    ? JSON.parse(await readFile(args.resolutionPlan, "utf8"))
+    : null;
   const resolutions = resolutionBytes
-    ? { document: JSON.parse(resolutionBytes), sha256: sha256(resolutionBytes) }
+    ? { document: JSON.parse(resolutionBytes), sha256: sha256(resolutionBytes), searchPlan: resolutionPlan }
     : null;
   const outputPath = requireArg(args, "output");
   const report = buildCoverageGapReport(
@@ -95,7 +104,12 @@ function buildCoverageGapReport(
 
   // 전국 requirement는 nationwide targets 전량으로 산출한다(은폐 금지 — 전국 gap은 그대로 기록).
   const requirements = evaluateRequirements(targets, sources, provenanceIndex);
-  const transitions = applyCoverageResolutions(targets, requirements, resolutions?.document);
+  const transitions = applyCoverageResolutions(
+    targets,
+    requirements,
+    resolutions?.document,
+    resolutions?.searchPlan,
+  );
   const summary = targets.schemaVersion === 2
     ? buildTierSummary(targets, requirements)
     : buildLegacySummary(requirements);
@@ -106,7 +120,10 @@ function buildCoverageGapReport(
     targetVersion: targets.targetVersion,
     inventoryRetrievedAt: inventory.retrievedAt,
     candidate: provenanceIndex?.candidate ?? null,
-    resolutions: resolutions ? { sha256: resolutions.sha256 } : null,
+    resolutions: resolutions ? {
+      sha256: resolutions.sha256,
+      searchPlanSha256: resolutions.document.searchPlanSha256,
+    } : null,
     summary,
     requirements,
     transitions,
@@ -218,7 +235,7 @@ function summarizeTier(requirements, releaseTier) {
   };
 }
 
-function applyCoverageResolutions(targets, requirements, document) {
+function applyCoverageResolutions(targets, requirements, document, searchPlan) {
   if (!document) return [];
   if (!document || typeof document !== "object" || Array.isArray(document)) {
     throw new Error("coverage resolutions must be an object");
@@ -231,6 +248,7 @@ function applyCoverageResolutions(targets, requirements, document) {
     throw new Error("coverage resolutions targetVersion must match coverage targets");
   }
   if (!Array.isArray(document.entries)) throw new Error("coverage resolutions entries must be an array");
+  const planByKey = coverageResolutionPlanIndex(targets, document, searchPlan);
 
   const byKey = new Map(requirements.map((entry) => [requirementKey(entry), entry]));
   const seen = new Set();
@@ -257,6 +275,7 @@ function applyCoverageResolutions(targets, requirements, document) {
       throw new Error(`supported requirement must not have unsupported resolution: ${key}`);
     }
     const evidence = validateUnsupportedResolution(resolution, label);
+    validateResolutionSearchPlan(resolution, planByKey.get(key), label);
     if (evidence.expired || resolution.supportStartedAt) {
       requirement.resolutionReviewStatus = resolution.supportStartedAt ? "SUPPORT_STARTED" : "EXPIRED";
       continue;
@@ -278,6 +297,78 @@ function applyCoverageResolutions(targets, requirements, document) {
     });
   }
   return transitions;
+}
+
+function coverageResolutionPlanIndex(targets, resolutions, plan) {
+  if (!plan || typeof plan !== "object" || Array.isArray(plan)) {
+    throw new Error("coverage resolution search plan must be an object");
+  }
+  if (plan.schemaVersion !== 1) throw new Error("coverage resolution search plan schemaVersion must be 1");
+  if (plan.artifactKind !== "nationwide-public-api-coverage-search-plan") {
+    throw new Error("coverage resolution search plan artifactKind is invalid");
+  }
+  if (plan.targetVersion !== targets.targetVersion) {
+    throw new Error("coverage resolution search plan targetVersion must match coverage targets");
+  }
+  const actualHash = sha256(JSON.stringify(plan));
+  if (requiredString(resolutions.searchPlanSha256, "coverage resolutions.searchPlanSha256") !== actualHash) {
+    throw new Error("coverage resolutions search plan hash mismatch");
+  }
+  if (!Array.isArray(plan.entries) || plan.entries.length === 0) {
+    throw new Error("coverage resolution search plan entries must be a non-empty array");
+  }
+  const byKey = new Map();
+  for (const [index, entry] of plan.entries.entries()) {
+    const label = `coverage resolution search plan entries[${index}]`;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw new Error(`${label} must be an object`);
+    const key = requirementKey({
+      regionId: requiredString(entry.regionId, `${label}.regionId`),
+      operatorId: requiredString(entry.operatorId, `${label}.operatorId`),
+      lineId: requiredString(entry.lineId, `${label}.lineId`),
+      sourceDomain: requiredString(entry.sourceDomain, `${label}.sourceDomain`),
+    });
+    if (byKey.has(key)) throw new Error(`duplicate coverage resolution search plan entry: ${key}`);
+    if (!Array.isArray(entry.queries) || entry.queries.length === 0) {
+      throw new Error(`${label}.queries must be a non-empty array`);
+    }
+    byKey.set(key, entry);
+  }
+  return byKey;
+}
+
+function validateResolutionSearchPlan(resolution, planEntry, label) {
+  if (!planEntry) throw new Error(`${label} has no matching search plan entry`);
+  if (resolution.fallback !== planEntry.fallback || resolution.userMessageKo !== planEntry.userMessageKo) {
+    throw new Error(`${label} search plan resolution contract mismatch`);
+  }
+  const actual = resolution.publicApiQueries.map(publicApiQueryContract).map(canonicalJson).sort(compareStrings);
+  const expected = planEntry.queries.map(publicApiQueryContract).map(canonicalJson).sort(compareStrings);
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${label} search plan query mismatch`);
+  }
+}
+
+function publicApiQueryContract(query) {
+  if (!query || typeof query !== "object" || Array.isArray(query)) return query;
+  return Object.fromEntries([
+    "providerId",
+    "endpoint",
+    "operation",
+    "query",
+    "matchAnyTerms",
+    "matchTermGroups",
+    "captureFields",
+  ].flatMap((field) => query[field] === undefined ? [] : [[field, query[field]]]));
+}
+
+function canonicalJson(value) {
+  return JSON.stringify(canonicalValue(value));
+}
+
+function canonicalValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.keys(value).sort(compareStrings).map((key) => [key, canonicalValue(value[key])]));
 }
 
 function validateUnsupportedResolution(resolution, label) {

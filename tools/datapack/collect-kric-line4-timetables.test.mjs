@@ -132,6 +132,7 @@ test("ITX materialization은 TAGO OD의 양 끝역·열차번호·시각이 모�
   ];
   const evidence = {
     serviceId: "ITX_CHEONGCHUN",
+    kricServiceDayCode: "8",
     departureStation: { canonicalStationId: "station-cheongnyangni" },
     arrivalStation: { canonicalStationId: "station-chuncheon" },
     trainNumbers: ["02001"],
@@ -154,5 +155,9 @@ test("ITX materialization은 TAGO OD의 양 끝역·열차번호·시각이 모�
   assert.throws(
     () => validateItxOdJoin([{ ...rows[0], departureSeconds: rows[0].departureSeconds + 60 }, ...rows.slice(1)], evidence),
     /OD time mismatch/,
+  );
+  assert.throws(
+    () => validateItxOdJoin(rows, { ...evidence, kricServiceDayCode: undefined }),
+    /kricServiceDayCode must be 7, 8, or 9/,
   );
 });
