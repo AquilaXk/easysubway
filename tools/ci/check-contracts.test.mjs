@@ -24,6 +24,21 @@ test("번들 source-inventory 실물이 계약 스키마를 통과한다", () =>
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
+test("inventory provenance 전용 source는 production 사용 금지만 선언할 수 있다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const provenanceOnlySource = inventory.sources.find((source) => source.productionUseAllowed === false);
+
+  assert.ok(provenanceOnlySource, "production 사용 금지 source fixture가 필요하다");
+  assert.deepEqual(validateSchema(schema, inventory).errors, []);
+
+  provenanceOnlySource.productionUseAllowed = true;
+  assert.deepEqual(
+    validateSchema(schema, inventory).errors,
+    [`$.sources.${inventory.sources.indexOf(provenanceOnlySource)}.productionUseAllowed: const false 불일치`],
+  );
+});
+
 test("boundaries.json이 스스로 정합하다", () => {
   const boundaries = loadJson("contracts/boundaries.json");
 
