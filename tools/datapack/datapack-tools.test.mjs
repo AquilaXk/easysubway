@@ -1328,17 +1328,25 @@ test("데이터팩 생성기는 buildSpec과 다른 fixture bytes를 거부한�
 test("tracked production buildSpec은 현재 reviewed fixture와 provenance에 묶인다", async () => {
   const buildSpec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
   const fixtureBytes = await readFile(buildSpec.fixturePath);
+  const fixture = JSON.parse(fixtureBytes);
   const sourceInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
   const sourceSnapshots = JSON.parse(await readFile("tools/datapack/release/source-snapshots.json", "utf8"));
+  const hashEvidence = JSON.parse(await readFile("tools/datapack/release/hash-evidence.json", "utf8"));
 
   assert.equal(buildSpec.fixtureSha256, sha256(fixtureBytes));
   assert.equal(buildSpec.sourceInventorySha256, sha256(Buffer.from(JSON.stringify(sourceInventory))));
+  assert.equal(sourceSnapshots.length, 9);
   assert.deepEqual(buildSpec.sourceSnapshotIds, sourceSnapshots.map((snapshot) => snapshot.snapshotId));
   assert.deepEqual(
     buildSpec.sourceSnapshots.map(({ snapshotId, sourceId }) => ({ snapshotId, sourceId })),
     sourceSnapshots.map(({ snapshotId, sourceId }) => ({ snapshotId, sourceId })),
   );
   assert.equal(buildSpec.sourceSnapshotSetHash, sha256(Buffer.from(JSON.stringify(sourceSnapshots))));
+  assert.match(hashEvidence.sourceSnapshotSetHash.contract, /9-snapshot 배열/);
+  assert.deepEqual(fixture.manifest.activePack, { id: "capital", version: "2" });
+  assert.equal(fixture.packs[0].version, "2");
+  assert.match(hashEvidence.buildDryRun.result, /capital@2\(artifactKind=production\)/);
+  assert.doesNotMatch(hashEvidence.buildDryRun.result, /capital@1/);
   assert.ok(!sourceSnapshots.some((snapshot) => snapshot.sourceId === "seoulmetro-cyberstation-route-map"));
 });
 
