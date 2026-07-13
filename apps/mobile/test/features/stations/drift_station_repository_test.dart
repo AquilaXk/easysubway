@@ -158,6 +158,27 @@ void main() {
     expect(elevator.lastUpdatedAt, '2026-06-19');
   });
 
+  test('흡수된 station ID로 상세·출구·시설을 요청해도 대표 역을 반환한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_aliases (station_id, alias, normalized_alias)
+      VALUES ('station-sangnoksu', 'station-sangnoksu-old', 'station-sangnoksu-old')
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    final detail = await repository.getStationDetail('station-sangnoksu-old');
+    final exits = await repository.listStationExits('station-sangnoksu-old');
+    final facilities = await repository.listStationFacilities(
+      'station-sangnoksu-old',
+    );
+
+    expect(detail.id, 'station-sangnoksu');
+    expect(exits, isNotEmpty);
+    expect(facilities, isNotEmpty);
+  });
+
   test('상록수역 시설은 검증됨, 알 수 없음, 오래됨 현장 상태를 구분한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

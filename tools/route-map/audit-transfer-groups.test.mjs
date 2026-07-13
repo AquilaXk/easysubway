@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canonicalStationIdentityViolations,
+  loadCanonicalStationDecisions,
   suspectMergePairs,
   suspectSplitGroups,
   transferGroupSpreads,
@@ -37,4 +39,58 @@ test("suspectMergePairs는 '역' 꼬리 정규화 동명·근접·별개 id 쌍�
     [pairs[0].a.stationId, pairs[0].b.stationId].sort(),
     ["s-dup", "s-hub"],
   );
+});
+
+test("canonical station strict audit는 미분류·오분리·오병합·흡수 ID alias 누락을 잡는다", () => {
+  const contract = loadCanonicalStationDecisions();
+  const stations = [
+    { stationId: "sangbong-a", normalizedName: "상봉", lineId: "line-7" },
+    { stationId: "sangbong-b", normalizedName: "상봉", lineId: "line-gyeongui" },
+    { stationId: "sinchon-2", normalizedName: "신촌", lineId: "line-2" },
+    { stationId: "seoknam", normalizedName: "석남", lineId: "line-7" },
+    { stationId: "unknown-a", normalizedName: "미분류", lineId: "line-a" },
+    { stationId: "unknown-b", normalizedName: "미분류", lineId: "line-b" },
+  ];
+  const decisions = [
+    {
+      normalizedName: "상봉",
+      status: "MERGE_CONFIRMED",
+      canonicalStationId: "sangbong-a",
+      absorbedStationIds: ["sangbong-b"],
+      expectedLineIds: ["line-7", "line-gyeongui"],
+      evidenceUrl: "https://example.com/official",
+      reviewedAt: "2026-07-13",
+      reason: "공식 환승역",
+    },
+    {
+      normalizedName: "신촌",
+      status: "DISTINCT_CONFIRMED",
+      stationLines: {
+        "sinchon-2": ["line-2"],
+        "sinchon-gyeongui": ["line-gyeongui"],
+      },
+      evidenceUrl: "https://example.com/official",
+      reviewedAt: "2026-07-13",
+      reason: "공식 동명이역",
+    },
+    {
+      normalizedName: "석남",
+      status: "MERGE_CONFIRMED",
+      canonicalStationId: "seoknam",
+      absorbedStationIds: ["seoknam-old"],
+      expectedLineIds: ["line-7"],
+      evidenceUrl: "https://example.com/official",
+      reviewedAt: "2026-07-13",
+      reason: "공식 환승역",
+    },
+  ];
+
+  assert.deepEqual(canonicalStationIdentityViolations({ stations, aliases: [], decisions }), [
+    "미분류: MISSING_EVIDENCE (canonical station 2개)",
+    "상봉: MERGE_CONFIRMED인데 canonical station이 2개입니다",
+    "신촌: DISTINCT_CONFIRMED station sinchon-gyeongui가 없습니다",
+    "석남: 흡수 ID alias seoknam-old → seoknam가 없습니다",
+  ]);
+  assert.ok(contract.decisions.some((decision) => decision.normalizedName === "상봉"));
+  assert.ok(contract.decisions.some((decision) => decision.normalizedName === "신촌"));
 });

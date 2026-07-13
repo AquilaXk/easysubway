@@ -217,6 +217,7 @@ class DriftStationRepository
 
   @override
   Future<List<StationExitInfo>> listStationExits(String stationId) async {
+    stationId = await _canonicalStationId(stationId);
     final rows = await database
         .customSelect(
           '''
@@ -296,6 +297,7 @@ class DriftStationRepository
   Future<List<StationFacilityInfo>> listStationFacilities(
     String stationId,
   ) async {
+    stationId = await _canonicalStationId(stationId);
     final rows = await database
         .customSelect(
           '''
@@ -602,6 +604,7 @@ class DriftStationRepository
       return _stationSummaryCache ??= _readStationSummaries();
     }
 
+    stationId = await _canonicalStationId(stationId);
     final cached = _stationSummaryCache;
     if (cached != null) {
       return (await cached)
@@ -610,6 +613,22 @@ class DriftStationRepository
     }
 
     return _readStationSummaries(stationId: stationId);
+  }
+
+  Future<String> _canonicalStationId(String stationId) async {
+    final rows = await database
+        .customSelect(
+          '''
+      SELECT DISTINCT station_id
+      FROM station_aliases
+      WHERE alias = ? AND alias LIKE 'station-%'
+      ''',
+          variables: [Variable.withString(stationId)],
+        )
+        .get();
+    return rows.length == 1
+        ? rows.single.read<String>('station_id')
+        : stationId;
   }
 
   Future<List<_LocalStationSummary>> _readStationSummaries({

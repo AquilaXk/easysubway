@@ -3,7 +3,7 @@
 // 기계 검출한다. 지도는 렌더 3모드로 방어하지만(스택/스팬/분리), 근본 원인
 // (동명이역 오병합: 양평·신촌 / 별칭 중복: 김포공항역)은 카탈로그 수술이
 // 필요하므로 리포트를 후속 이슈의 증거로 남긴다.
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { cleanupPackDir, openPack, repoRoot } from "./pack-io.mjs";
 
@@ -51,12 +51,13 @@ export function suspectMergePairs(stations) {
   for (const s of stations) {
     const key = normalizeName(s.nameKo);
     if (!byName.has(key)) {
-      byName.set(key, []);
+      byName.set(key, new Map());
     }
-    byName.get(key).push(s);
+    if (!byName.get(key).has(s.stationId)) byName.get(key).set(s.stationId, s);
   }
   const pairs = [];
-  for (const group of byName.values()) {
+  for (const entries of byName.values()) {
+    const group = [...entries.values()];
     for (let i = 0; i < group.length; i += 1) {
       for (let j = i + 1; j < group.length; j += 1) {
         if (
@@ -71,17 +72,96 @@ export function suspectMergePairs(stations) {
   return pairs;
 }
 
+export function loadCanonicalStationDecisions(
+  file = path.join(repoRoot, "tools/route-map/canonical-station-decisions.json"),
+) {
+  return JSON.parse(readFileSync(file, "utf8"));
+}
+
+export function canonicalStationIdentityViolations({ stations, aliases, decisions }) {
+  const byName = new Map();
+  for (const row of stations) {
+    if (!byName.has(row.normalizedName)) byName.set(row.normalizedName, new Map());
+    const byId = byName.get(row.normalizedName);
+    if (!byId.has(row.stationId)) byId.set(row.stationId, new Set());
+    byId.get(row.stationId).add(row.lineId);
+  }
+  const byDecision = new Map(decisions.map((decision) => [decision.normalizedName, decision]));
+  const aliasTargets = new Map();
+  for (const row of aliases) {
+    if (!aliasTargets.has(row.alias)) aliasTargets.set(row.alias, new Set());
+    aliasTargets.get(row.alias).add(row.stationId);
+  }
+  const violations = [];
+
+  for (const [name, byId] of byName) {
+    if (byId.size > 1 && !byDecision.has(name)) {
+      violations.push(`${name}: MISSING_EVIDENCE (canonical station ${byId.size}개)`);
+    }
+  }
+  for (const decision of decisions) {
+    const { normalizedName: name, status } = decision;
+    if (!["MERGE_CONFIRMED", "DISTINCT_CONFIRMED", "MISSING_EVIDENCE"].includes(status)) {
+      violations.push(`${name}: 알 수 없는 판정 ${status}`);
+      continue;
+    }
+    if (status === "MISSING_EVIDENCE" || !isReviewedDecision(decision)) {
+      violations.push(`${name}: MISSING_EVIDENCE`);
+      continue;
+    }
+    const byId = byName.get(name) ?? new Map();
+    if (status === "MERGE_CONFIRMED") {
+      if (byId.size !== 1 || !byId.has(decision.canonicalStationId)) {
+        violations.push(`${name}: MERGE_CONFIRMED인데 canonical station이 ${byId.size}개입니다`);
+        continue;
+      }
+      appendLineViolation(violations, name, decision.canonicalStationId, byId.get(decision.canonicalStationId), decision.expectedLineIds);
+      for (const absorbedId of decision.absorbedStationIds ?? []) {
+        const targets = aliasTargets.get(absorbedId) ?? new Set();
+        if (targets.size !== 1 || !targets.has(decision.canonicalStationId)) {
+          violations.push(`${name}: 흡수 ID alias ${absorbedId} → ${decision.canonicalStationId}가 없습니다`);
+        }
+      }
+      continue;
+    }
+    for (const [stationId, expectedLines] of Object.entries(decision.stationLines ?? {})) {
+      if (!byId.has(stationId)) {
+        violations.push(`${name}: DISTINCT_CONFIRMED station ${stationId}가 없습니다`);
+      } else {
+        appendLineViolation(violations, name, stationId, byId.get(stationId), expectedLines);
+      }
+    }
+  }
+  return violations;
+}
+
+function isReviewedDecision(decision) {
+  return /^https:\/\//.test(decision.evidenceUrl ?? "") &&
+    /^\d{4}-\d{2}-\d{2}$/.test(decision.reviewedAt ?? "") &&
+    Boolean(decision.reason?.trim());
+}
+
+function appendLineViolation(violations, name, stationId, actual, expected) {
+  const actualLines = [...(actual ?? [])].sort();
+  const expectedLines = [...(expected ?? [])].sort();
+  if (JSON.stringify(actualLines) !== JSON.stringify(expectedLines)) {
+    violations.push(`${name}: ${stationId} 노선이 기대와 다릅니다 (${actualLines.join(",")})`);
+  }
+}
+
 function parseArgs(argv) {
   const options = {
     pack: "apps/mobile/assets/datapacks/capital.sqlite.gz",
     region: "수도권",
     json: null,
+    strict: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     switch (argv[i]) {
       case "--pack": options.pack = argv[++i]; break;
       case "--region": options.region = argv[++i]; break;
       case "--json": options.json = argv[++i]; break;
+      case "--strict": options.strict = true; break;
     }
   }
   return options;
@@ -106,6 +186,25 @@ function main() {
     const spreads = transferGroupSpreads(rows);
     const splits = suspectSplitGroups(spreads);
     const merges = suspectMergePairs(named);
+    const contract = loadCanonicalStationDecisions();
+    const identityRows = db.prepare(
+      `SELECT s.normalized_name AS normalizedName, s.id AS stationId, sl.line_id AS lineId
+       FROM stations s JOIN station_lines sl ON sl.station_id=s.id
+       WHERE s.region=? ORDER BY s.normalized_name, s.id, sl.line_id`,
+    ).all(options.region);
+    const aliases = db.prepare("SELECT station_id AS stationId, alias FROM station_aliases").all();
+    const controlDecisions = contract.controls.map((control) => ({
+      ...control,
+      status: "MERGE_CONFIRMED",
+      absorbedStationIds: [],
+      reviewedAt: contract.reviewedAt,
+      reason: "회귀 control",
+    }));
+    const identityViolations = canonicalStationIdentityViolations({
+      stations: identityRows,
+      aliases,
+      decisions: [...contract.decisions, ...controlDecisions],
+    });
     console.log(`[${options.region}] 환승 그룹 ${spreads.length}`);
     console.log(`분리/좌표검수 의심(spread>60): ${splits.length}`);
     for (const s of splits) {
@@ -116,12 +215,15 @@ function main() {
     for (const p of merges) {
       console.log(`  ${p.a.nameKo}(${p.a.stationId}) ~ ${p.b.nameKo}(${p.b.stationId})`);
     }
+    console.log(`canonical station strict 위반: ${identityViolations.length}`);
+    for (const violation of identityViolations) console.log(`  ${violation}`);
     if (options.json) {
       writeFileSync(
         path.join(repoRoot, options.json),
-        JSON.stringify({ region: options.region, spreads, splits, merges }, null, 2) + "\n",
+        JSON.stringify({ region: options.region, spreads, splits, merges, identityViolations }, null, 2) + "\n",
       );
     }
+    if (options.strict && identityViolations.length > 0) process.exitCode = 1;
   } finally {
     cleanupPackDir(dir);
   }

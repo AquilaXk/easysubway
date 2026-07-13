@@ -27,6 +27,14 @@ class LocalRouteRepository implements RouteSearchRepository {
   final DateTime Function() now;
   final OfficialOdFareRepository officialOdFareRepository;
 
+  Future<RouteSearchRequest> canonicalRequest(
+    RouteSearchRequest request,
+  ) async {
+    return (await _RouteCatalogSnapshot.load(
+      catalogDatabase,
+    )).canonicalRequest(request);
+  }
+
   Future<RouteCapabilityMetadata> routeCapability(
     RouteSearchRequest request,
   ) async {
@@ -86,8 +94,9 @@ class LocalRouteRepository implements RouteSearchRepository {
   }
 
   @override
-  Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
+  Future<RouteSearchResult> searchRoute(RouteSearchRequest rawRequest) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    final request = catalog.canonicalRequest(rawRequest);
     final mobilityType = _mobilityType(request.mobilityType);
     final constraintMode = _constraintMode(request.effectiveConstraintMode);
     // #1975: 경유 요청의 strict 강등 판정은 전역 strict 지원이 아니라 두 구간을
@@ -972,8 +981,11 @@ class OnlineFirstRouteSearchRepository implements RouteSearchRepository {
 
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
+    final canonicalRequest = localRepository == null
+        ? request
+        : await localRepository!.canonicalRequest(request);
     try {
-      final onlineResult = await onlineRepository.searchRoute(request);
+      final onlineResult = await onlineRepository.searchRoute(canonicalRequest);
       final result = localRepository == null
           ? onlineResult
           : await localRepository!.resolveDisplayLabels(onlineResult);
@@ -1101,6 +1113,7 @@ const Map<String, _SeqDirectionConvention> _carDoorSeqConventionByLine = {
 class _RouteCatalogSnapshot {
   const _RouteCatalogSnapshot({
     required this.stationsById,
+    required this.canonicalStationIdsByAlias,
     required this.regionsByStationId,
     required this.linesById,
     required this.operatorIdsByLineId,
@@ -1114,6 +1127,7 @@ class _RouteCatalogSnapshot {
   });
 
   final Map<String, String> stationsById;
+  final Map<String, String> canonicalStationIdsByAlias;
   final Map<String, String> regionsByStationId;
   final Map<String, String> linesById;
   final Map<String, String> operatorIdsByLineId;
@@ -1136,6 +1150,17 @@ class _RouteCatalogSnapshot {
     final stationRows = await database
         .customSelect('SELECT id, name_ko, region FROM stations')
         .get();
+    final stationAliasRows = await database.customSelect('''
+          SELECT alias, station_id
+          FROM station_aliases
+          WHERE alias LIKE 'station-%'
+          ''').get();
+    final stationIdsByAlias = <String, Set<String>>{};
+    for (final row in stationAliasRows) {
+      stationIdsByAlias
+          .putIfAbsent(row.read<String>('alias'), () => <String>{})
+          .add(row.read<String>('station_id'));
+    }
     final lineRows = await database
         .customSelect('SELECT id, name_ko, operator_id FROM lines')
         .get();
@@ -1478,6 +1503,10 @@ class _RouteCatalogSnapshot {
         for (final row in stationRows)
           row.read<String>('id'): row.read<String>('name_ko'),
       },
+      canonicalStationIdsByAlias: {
+        for (final entry in stationIdsByAlias.entries)
+          if (entry.value.length == 1) entry.key: entry.value.single,
+      },
       regionsByStationId: {
         for (final row in stationRows)
           row.read<String>('id'): row.read<String>('region'),
@@ -1516,6 +1545,8 @@ class _RouteCatalogSnapshot {
     required local.MobilityType mobilityType,
     required local.ConstraintMode constraintMode,
   }) {
+    originStationId = canonicalStationId(originStationId);
+    destinationStationId = canonicalStationId(destinationStationId);
     return LocalRouteEngine(graph: toGraph()).search(
       local.RouteRequest(
         originStationId: originStationId,
@@ -1645,6 +1676,8 @@ class _RouteCatalogSnapshot {
   }
 
   List<String> regionsFor(String originStationId, String destinationStationId) {
+    originStationId = canonicalStationId(originStationId);
+    destinationStationId = canonicalStationId(destinationStationId);
     return {
       if ((regionsByStationId[originStationId] ?? '').isNotEmpty)
         regionsByStationId[originStationId]!,
@@ -1657,6 +1690,8 @@ class _RouteCatalogSnapshot {
     String originStationId,
     String destinationStationId,
   ) {
+    originStationId = canonicalStationId(originStationId);
+    destinationStationId = canonicalStationId(destinationStationId);
     final lineIds = {
       ...stationLines
           .where(
@@ -1893,14 +1928,15 @@ class _RouteCatalogSnapshot {
   }
 
   String stationName(String stationId) {
-    return stationsById[stationId] ?? '역 이름을 확인하고 있어요';
+    return stationsById[canonicalStationId(stationId)] ?? '역 이름을 확인하고 있어요';
   }
 
   bool hasStation(String stationId) {
-    return stationsById.containsKey(stationId);
+    return stationsById.containsKey(canonicalStationId(stationId));
   }
 
   List<String> _stationLineKeysFor(String stationId) {
+    stationId = canonicalStationId(stationId);
     return stationLines
         .where((stationLine) => stationLine.stationId == stationId)
         .map((stationLine) => _stationLineKey(stationId, stationLine.lineId))
@@ -1919,6 +1955,26 @@ class _RouteCatalogSnapshot {
       return nodeId;
     }
     return nodeId.split(':').first;
+  }
+
+  String canonicalStationId(String stationId) {
+    return canonicalStationIdsByAlias[stationId] ?? stationId;
+  }
+
+  RouteSearchRequest canonicalRequest(RouteSearchRequest request) {
+    final waypoint = request.waypointStationId?.trim();
+    return RouteSearchRequest(
+      originStationId: canonicalStationId(request.originStationId.trim()),
+      destinationStationId: canonicalStationId(
+        request.destinationStationId.trim(),
+      ),
+      mobilityType: request.mobilityType,
+      constraintMode: request.constraintMode,
+      waypointStationId: waypoint == null || waypoint.isEmpty
+          ? waypoint
+          : canonicalStationId(waypoint),
+      mobilityPreset: request.mobilityPreset,
+    );
   }
 }
 
