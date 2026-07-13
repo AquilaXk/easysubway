@@ -21,6 +21,7 @@ import 'features/stations/domain/station_line.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'internal_route.dart';
 import 'mobile_error_reporter.dart';
+import 'search_field.dart';
 
 export 'features/stations/domain/station_line.dart';
 
@@ -45,9 +46,6 @@ const _searchHistoryChangeErrorMessage = '최근 검색을 지우지 못했어�
 const _stationSearchPagePadding = EdgeInsets.fromLTRB(20, 20, 20, 32);
 const _stationSearchLargePagePadding = EdgeInsets.fromLTRB(24, 24, 24, 40);
 const _stationRoleActionPadding = EdgeInsets.fromLTRB(12, 0, 12, 12);
-const _stationSearchInputRadius = BorderRadius.all(
-  Radius.circular(EasySubwayRadius.control),
-);
 const _stationDetailInfoCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailHelpCardRadius = BorderRadius.all(Radius.circular(16));
 const _stationDetailActionButtonRadius = BorderRadius.all(Radius.circular(12));
@@ -1904,60 +1902,35 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   Widget build(BuildContext context) {
     final isNearbyEntry = widget.entryMode == StationSearchEntryMode.nearby;
     final showNearbyRetryButton = isNearbyEntry && !_hasSearchQuery;
-    final searchInputField = TextField(
-      key: const Key('stationSearchInput'),
+    // #2083 홈 편집 모드와 동일한 공용 검색 필드를 쓴다. pickSlot별 힌트는
+    // hintText로 전달돼 placeholder이자 TalkBack 라벨 역할을 유지하고, 즉시
+    // (디바운스) 검색은 _queryController를, 지우기는 onClear를 통해 보존된다.
+    // AppBar leading(자동 뒤로가기)은 title 왼쪽에 그대로 남아 "← + 46px 필드"
+    // 구성이 홈 편집 모드와 일치한다.
+    final searchInputField = EasySubwaySearchField(
       controller: _queryController,
       focusNode: _searchFocusNode,
+      hintText: _searchInputHint,
       autofocus: !isNearbyEntry,
-      minLines: 1,
-      textInputAction: TextInputAction.search,
-      style: const TextStyle(fontSize: 17, height: 1.3),
-      decoration: InputDecoration(
-        hintText: _searchInputHint,
-        floatingLabelBehavior: FloatingLabelBehavior.always,
-        isDense: false,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: EasySubwaySpacing.md,
-          vertical: EasySubwaySpacing.sm,
-        ),
-        prefixIcon: const Icon(
-          Icons.search,
-          color: EasySubwayAccessibleColors.iconMuted,
-        ),
-        suffixIcon: _hasSearchQuery
-            ? IconButton(
-                tooltip: '검색어 지우기',
-                onPressed: _queryController.clear,
-                icon: const Icon(Icons.close),
-              )
-            : null,
-        filled: true,
-        fillColor: EasySubwayAccessibleColors.scaffoldSurface,
-        border: OutlineInputBorder(
-          borderRadius: _stationSearchInputRadius,
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: _stationSearchInputRadius,
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: _stationSearchInputRadius,
-          borderSide: const BorderSide(color: EasySubwayAccessibleColors.line),
-        ),
-      ),
       onSubmitted: _submit,
+      onClear: _queryController.clear,
     );
-    // 검색 입력 필드는 v4에서 idle/active 픽셀을 통일한 고정 레이아웃이라 AppBar
-    // 기본 toolbarHeight(56)에 그대로 넣으면 시스템 글자 크기를 키웠을 때 필드가
-    // 세로로 잘린다. 입력 텍스트(fontSize 17 × height 1.3)와 상하 contentPadding
-    // (각 sm=8)을 현재 텍스트 배율로 환산해 필요한 높이를 구하고, 기본 높이보다
-    // 작아지지 않게 clamp 해 툴바를 늘린다(축소는 하지 않아 기본 배율의 레이아웃은
-    // 불변). titleSpacing·즉시 입력·뒤로가기 leading 동작은 유지된다.
+    // 공용 필드는 56 터치타겟 안에 46px 시각 박스를 고정 배치하고, 그 안 고정
+    // 높이(48) 단일 줄 TextField가 입력 텍스트(fontSize 17, 폰트 기본 라인 높이)를
+    // 세로 contentPadding으로 감싼다. AppBar 기본 toolbarHeight(56)에 그대로 넣으면
+    // 시스템 글자 크기를 키웠을 때 필드가 세로로 잘리므로, 확대된 입력 줄 높이
+    // (글자 배율 × 라인 높이)에 상하 패딩을 더한 값을 기본 높이(56)와 함께 clamp
+    // 한다. 축소는 하지 않아 기본 배율의 레이아웃은 불변이고, titleSpacing·즉시
+    // 입력·뒤로가기 leading 동작은 유지된다.
     final textScaler = MediaQuery.textScalerOf(context);
-    final scaledInputHeight =
-        textScaler.scale(17 * 1.3) + 2 * EasySubwaySpacing.sm;
-    final toolbarHeight = math.max(kToolbarHeight, scaledInputHeight);
+    // 입력 style은 height 미지정이라 폰트 기본 라인 높이(대략 fontSize의 1.2배)를
+    // 따른다. 확대 시 세로 잘림을 막기 위해 이 실효 라인 높이에 세로
+    // contentPadding(상 21 + 하 9 = 30)을 더해 필요한 높이를 구한다.
+    final scaledInputHeight = textScaler.scale(17 * 1.2) + 30.0;
+    final toolbarHeight = math.max(
+      kToolbarHeight,
+      math.max(EasySubwayTouchTarget.general, scaledInputHeight),
+    );
     final recentSearchSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
