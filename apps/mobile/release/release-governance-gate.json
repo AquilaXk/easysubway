@@ -227,9 +227,9 @@
       "id": "G5_BACKEND_CONTROL_PLANE",
       "issue": 1017,
       "priority": "P0",
-      "status": "IN_PROGRESS",
+      "status": "SATISFIED",
       "owner": "backend-admin",
-      "nextAction": "admin/backend public API, RBAC, audit, restore evidence 수집",
+      "nextAction": "production environment와 로컬 prod-like 배포·rollback, 실제 restore, break-glass·audit 증거 완료; production 실행은 #1020에서 판정",
       "evidenceReference": "apps/mobile/release/operations-release-evidence.json"
     },
     {
