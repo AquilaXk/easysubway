@@ -3,6 +3,7 @@ import 'package:sqlite3/common.dart' show SqliteException;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../core/database/catalog/canonical_station_id.dart';
 import '../../core/database/catalog/catalog_database.dart';
 import '../../core/database/catalog/station_timetable_query.dart';
 import '../../core/database/user/user_database.dart';
@@ -79,7 +80,7 @@ class NextTrainWidgetRepository {
     }
     final stationIds = <String>{};
     for (final favorite in favorites) {
-      final stationId = await _canonicalStationId(
+      final stationId = await catalogDatabase.findCanonicalStationId(
         favorite.read<String>('station_id'),
       );
       if (stationId != null) stationIds.add(stationId);
@@ -124,7 +125,9 @@ class NextTrainWidgetRepository {
     WidgetStationSelection selection,
     DateTime now,
   ) async {
-    final canonicalStationId = await _canonicalStationId(selection.stationId);
+    final canonicalStationId = await catalogDatabase.findCanonicalStationId(
+      selection.stationId,
+    );
     if (canonicalStationId != null &&
         canonicalStationId != selection.stationId) {
       selection = WidgetStationSelection(
@@ -221,28 +224,6 @@ class NextTrainWidgetRepository {
           : '시간표 기준',
       updatedAt: serviceNow,
     );
-  }
-
-  Future<String?> _canonicalStationId(String stationId) async {
-    final rows = await catalogDatabase
-        .customSelect(
-          '''
-      SELECT id AS station_id FROM stations WHERE id = ?
-      UNION
-      SELECT sa.station_id
-      FROM station_aliases sa
-      JOIN stations s ON s.id = sa.station_id
-      WHERE sa.alias = ?
-      LIMIT 2
-      ''',
-          variables: [
-            Variable.withString(stationId),
-            Variable.withString(stationId),
-          ],
-          readsFrom: {catalogDatabase.stations, catalogDatabase.stationAliases},
-        )
-        .get();
-    return rows.length == 1 ? rows.single.read<String>('station_id') : null;
   }
 
   Future<tz.TZDateTime?> _feedEndDate() async {

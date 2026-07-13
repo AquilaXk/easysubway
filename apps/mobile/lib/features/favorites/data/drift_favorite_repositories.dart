@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../core/database/user/user_database.dart' as user_db;
 import '../../../favorite_facility.dart';
@@ -37,7 +38,9 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
     final seenStationIds = <String>{};
     for (final favoriteRow in favoriteRows) {
       final storedStationId = favoriteRow.read<String>('station_id');
-      final stationId = await _canonicalStationId(storedStationId);
+      final stationId = await catalogDatabase.findCanonicalStationId(
+        storedStationId,
+      );
       if (stationId == null) {
         continue;
       }
@@ -118,7 +121,9 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
   @override
   Future<FavoriteStation> saveFavoriteStation(String stationId) async {
     final trimmedStationId = stationId.trim();
-    final canonicalStationId = await _canonicalStationId(trimmedStationId);
+    final canonicalStationId = await catalogDatabase.findCanonicalStationId(
+      trimmedStationId,
+    );
     if (canonicalStationId == null) {
       throw const FavoriteStationException('즐겨찾기 역을 저장하지 못했어요.');
     }
@@ -139,33 +144,13 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
   @override
   Future<void> removeFavoriteStation(String stationId) async {
     final trimmedStationId = stationId.trim();
-    final canonicalStationId = await _canonicalStationId(trimmedStationId);
+    final canonicalStationId = await catalogDatabase.findCanonicalStationId(
+      trimmedStationId,
+    );
     await userDatabase.customStatement(
       'DELETE FROM favorite_stations WHERE station_id = ? OR station_id = ?',
       [trimmedStationId, canonicalStationId ?? trimmedStationId],
     );
-  }
-
-  Future<String?> _canonicalStationId(String stationId) async {
-    final rows = await catalogDatabase
-        .customSelect(
-          '''
-      SELECT id AS station_id FROM stations WHERE id = ?
-      UNION
-      SELECT sa.station_id
-      FROM station_aliases sa
-      JOIN stations s ON s.id = sa.station_id
-      WHERE sa.alias = ?
-      LIMIT 2
-      ''',
-          variables: [
-            Variable.withString(stationId),
-            Variable.withString(stationId),
-          ],
-          readsFrom: {catalogDatabase.stations, catalogDatabase.stationAliases},
-        )
-        .get();
-    return rows.length == 1 ? rows.single.read<String>('station_id') : null;
   }
 
   Future<void> _migrateFavoriteStationId(

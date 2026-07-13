@@ -219,7 +219,7 @@ export function assertReferentialIntegrity(db) {
       .all()
       .map((r) => r.node),
   );
-  const nodePattern = /^(station-[0-9a-f]{12}):(line-[0-9a-f]{12})(?::.*)?$/;
+  const nodePattern = /^(station-[0-9a-f]{12}):((?:line-[0-9a-f]{12})|(?:seoul-[a-z0-9-]+))(?::.*)?$/;
   const dangling = new Set();
   for (const e of db
     .prepare("SELECT from_node_id, to_node_id FROM network_edges")

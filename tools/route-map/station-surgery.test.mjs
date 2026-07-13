@@ -176,3 +176,14 @@ test("assertReferentialIntegrity는 멤버십이 빠진 노드를 잡는다(분�
   db.exec(`DELETE FROM station_lines WHERE station_id='${s1}' AND line_id='${l1}'`);
   assert.throws(() => assertReferentialIntegrity(db), /network_edges 고아 노드/);
 });
+
+test("assertReferentialIntegrity는 seoul-* line ID의 고아 노드도 잡는다", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`CREATE TABLE stations (id TEXT PRIMARY KEY);`);
+  db.exec(`CREATE TABLE station_lines (station_id TEXT, line_id TEXT, PRIMARY KEY (station_id, line_id));`);
+  db.exec(`CREATE TABLE network_edges (id TEXT PRIMARY KEY, from_node_id TEXT NOT NULL, to_node_id TEXT NOT NULL);`);
+  db.exec(`INSERT INTO stations VALUES ('station-0123456789ab');`);
+  db.exec(`INSERT INTO network_edges VALUES ('e1','station-0123456789ab:seoul-4','station-0123456789ab:seoul-4:EXPRESS');`);
+
+  assert.throws(() => assertReferentialIntegrity(db), /network_edges 고아 노드/);
+});

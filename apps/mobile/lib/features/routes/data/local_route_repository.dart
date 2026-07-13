@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart' show Variable;
 
+import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
@@ -32,35 +33,19 @@ class LocalRouteRepository implements RouteSearchRepository {
   ) async {
     final waypoint = request.waypointStationId?.trim();
     return RouteSearchRequest(
-      originStationId: await _canonicalStationId(
+      originStationId: await catalogDatabase.resolveCanonicalStationId(
         request.originStationId.trim(),
       ),
-      destinationStationId: await _canonicalStationId(
+      destinationStationId: await catalogDatabase.resolveCanonicalStationId(
         request.destinationStationId.trim(),
       ),
       mobilityType: request.mobilityType,
       constraintMode: request.constraintMode,
       waypointStationId: waypoint == null || waypoint.isEmpty
           ? waypoint
-          : await _canonicalStationId(waypoint),
+          : await catalogDatabase.resolveCanonicalStationId(waypoint),
       mobilityPreset: request.mobilityPreset,
     );
-  }
-
-  Future<String> _canonicalStationId(String stationId) async {
-    final rows = await catalogDatabase
-        .customSelect(
-          '''
-      SELECT DISTINCT station_id
-      FROM station_aliases
-      WHERE alias = ? AND alias LIKE 'station-%'
-      ''',
-          variables: [Variable.withString(stationId)],
-        )
-        .get();
-    return rows.length == 1
-        ? rows.single.read<String>('station_id')
-        : stationId;
   }
 
   Future<RouteCapabilityMetadata> routeCapability(

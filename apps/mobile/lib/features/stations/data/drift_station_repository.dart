@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:drift/drift.dart';
 
+import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../core/database/catalog/station_timetable_query.dart';
 import '../../../network_map.dart';
@@ -43,7 +44,7 @@ class DriftStationRepository
     required StationTimetableDayType dayType,
     required DateTime referenceDate,
   }) async {
-    stationId = await _canonicalStationId(stationId);
+    stationId = await database.resolveCanonicalStationId(stationId);
     final catalogDayType = switch (dayType) {
       StationTimetableDayType.weekday => CatalogTimetableDayType.weekday,
       StationTimetableDayType.saturday => CatalogTimetableDayType.saturday,
@@ -70,7 +71,7 @@ class DriftStationRepository
     required String lineId,
     required DateTime date,
   }) async {
-    stationId = await _canonicalStationId(stationId);
+    stationId = await database.resolveCanonicalStationId(stationId);
     final timetable = await CatalogStationTimetableQuery(
       database,
     ).loadDeparturesForDate(stationId: stationId, lineId: lineId, date: date);
@@ -219,7 +220,7 @@ class DriftStationRepository
 
   @override
   Future<List<StationExitInfo>> listStationExits(String stationId) async {
-    stationId = await _canonicalStationId(stationId);
+    stationId = await database.resolveCanonicalStationId(stationId);
     final rows = await database
         .customSelect(
           '''
@@ -299,7 +300,7 @@ class DriftStationRepository
   Future<List<StationFacilityInfo>> listStationFacilities(
     String stationId,
   ) async {
-    stationId = await _canonicalStationId(stationId);
+    stationId = await database.resolveCanonicalStationId(stationId);
     final rows = await database
         .customSelect(
           '''
@@ -606,7 +607,7 @@ class DriftStationRepository
       return _stationSummaryCache ??= _readStationSummaries();
     }
 
-    stationId = await _canonicalStationId(stationId);
+    stationId = await database.resolveCanonicalStationId(stationId);
     final cached = _stationSummaryCache;
     if (cached != null) {
       return (await cached)
@@ -615,22 +616,6 @@ class DriftStationRepository
     }
 
     return _readStationSummaries(stationId: stationId);
-  }
-
-  Future<String> _canonicalStationId(String stationId) async {
-    final rows = await database
-        .customSelect(
-          '''
-      SELECT DISTINCT station_id
-      FROM station_aliases
-      WHERE alias = ? AND alias LIKE 'station-%'
-      ''',
-          variables: [Variable.withString(stationId)],
-        )
-        .get();
-    return rows.length == 1
-        ? rows.single.read<String>('station_id')
-        : stationId;
   }
 
   Future<List<_LocalStationSummary>> _readStationSummaries({
