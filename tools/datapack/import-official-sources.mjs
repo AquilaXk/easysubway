@@ -891,6 +891,10 @@ function validateTransitPassThroughScope(input, networkEdges, isProductionPack, 
       throw new Error(`transit pass-through station cannot expose public station metadata: ${row.stationId}`);
     }
   }
+  assertNoPassThroughRegressionEndpoint(input, passThroughIds);
+}
+
+function assertNoPassThroughRegressionEndpoint(input, passThroughIds) {
   for (const regression of input.representativeRouteRegressions ?? []) {
     for (const nodeId of [regression.fromNodeId, regression.toNodeId]) {
       const stationId = String(nodeId).split(":")[0];

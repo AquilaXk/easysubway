@@ -249,7 +249,6 @@ export function applyLine4RoutingGraph(input, artifact, roster, geometry) {
   const stationLineRows = [
     ...(input.stationLineRows ?? []),
     ...stations.flatMap((station) => {
-      const normalized = corridorStation(station);
       const existing = (input.stationLineRows ?? []).find((row) => row.stationCode === station.stinCd);
       const base = {
         lineId: LINE_ID,
