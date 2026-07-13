@@ -47,6 +47,42 @@ void main() {
     ]);
   });
 
+  test('흡수 station ID 즐겨찾기도 대표 station-line으로 선택한다', () async {
+    await catalogDatabase.customStatement('''
+      INSERT INTO station_aliases (station_id, alias, normalized_alias)
+      VALUES ('station-sadang', 'station-sadang-old', 'station-sadang-old')
+    ''');
+    await _favorite(userDatabase, 'station-sadang-old');
+    await _seedSchedule(catalogDatabase);
+
+    final selections = await repository.availableSelections();
+
+    expect(selections.map((item) => '${item.stationId}|${item.lineId}'), [
+      'station-sadang|seoul-4',
+    ]);
+  });
+
+  test('흡수 station ID로 저장된 위젯 선택도 대표 ID로 시간표를 조회한다', () async {
+    await catalogDatabase.customStatement('''
+      INSERT INTO station_aliases (station_id, alias, normalized_alias)
+      VALUES ('station-sadang', 'station-sadang-old', 'station-sadang-old')
+    ''');
+    await _seedSchedule(catalogDatabase);
+
+    final data = await repository.load(
+      const WidgetStationSelection(
+        stationId: 'station-sadang-old',
+        lineId: 'seoul-4',
+        stationName: '사당',
+        lineName: '수도권 4호선',
+      ),
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 10, 5),
+    );
+
+    expect(data.selection.stationId, 'station-sadang');
+    expect(data.status, NextTrainWidgetStatus.available);
+  });
+
   test('공휴일 exception은 평일 calendar보다 우선한다', () async {
     await _seedSchedule(catalogDatabase, holidayDate: '20260817');
 

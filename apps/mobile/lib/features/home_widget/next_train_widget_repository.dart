@@ -77,9 +77,14 @@ class NextTrainWidgetRepository {
     if (favorites.isEmpty) {
       return const [];
     }
-    final stationIds = favorites
-        .map((row) => row.read<String>('station_id'))
-        .toList(growable: false);
+    final stationIds = <String>{};
+    for (final favorite in favorites) {
+      final stationId = await _canonicalStationId(
+        favorite.read<String>('station_id'),
+      );
+      if (stationId != null) stationIds.add(stationId);
+    }
+    if (stationIds.isEmpty) return const [];
     final placeholders = List.filled(stationIds.length, '?').join(',');
     final rows = await catalogDatabase.customSelect('''
           SELECT DISTINCT
@@ -119,6 +124,16 @@ class NextTrainWidgetRepository {
     WidgetStationSelection selection,
     DateTime now,
   ) async {
+    final canonicalStationId = await _canonicalStationId(selection.stationId);
+    if (canonicalStationId != null &&
+        canonicalStationId != selection.stationId) {
+      selection = WidgetStationSelection(
+        stationId: canonicalStationId,
+        lineId: selection.lineId,
+        stationName: selection.stationName,
+        lineName: selection.lineName,
+      );
+    }
     final serviceNow = tz.TZDateTime.from(now, _seoulLocation);
     final feedEndDate = await _feedEndDate();
     if (feedEndDate == null) {
@@ -206,6 +221,28 @@ class NextTrainWidgetRepository {
           : '시간표 기준',
       updatedAt: serviceNow,
     );
+  }
+
+  Future<String?> _canonicalStationId(String stationId) async {
+    final rows = await catalogDatabase
+        .customSelect(
+          '''
+      SELECT id AS station_id FROM stations WHERE id = ?
+      UNION
+      SELECT sa.station_id
+      FROM station_aliases sa
+      JOIN stations s ON s.id = sa.station_id
+      WHERE sa.alias = ?
+      LIMIT 2
+      ''',
+          variables: [
+            Variable.withString(stationId),
+            Variable.withString(stationId),
+          ],
+          readsFrom: {catalogDatabase.stations, catalogDatabase.stationAliases},
+        )
+        .get();
+    return rows.length == 1 ? rows.single.read<String>('station_id') : null;
   }
 
   Future<tz.TZDateTime?> _feedEndDate() async {

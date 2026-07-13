@@ -124,6 +124,13 @@ export function canonicalStationIdentityViolations({ stations, aliases, decision
       }
       continue;
     }
+    const expectedStationIds = Object.keys(decision.stationLines ?? {}).sort();
+    const actualStationIds = [...byId.keys()].sort();
+    if (
+      JSON.stringify(actualStationIds) !== JSON.stringify(expectedStationIds)
+    ) {
+      violations.push(`${name}: DISTINCT_CONFIRMED station ID 집합이 기대와 다릅니다 (${actualStationIds.join(",")})`);
+    }
     for (const [stationId, expectedLines] of Object.entries(decision.stationLines ?? {})) {
       if (!byId.has(stationId)) {
         violations.push(`${name}: DISTINCT_CONFIRMED station ${stationId}가 없습니다`);
@@ -133,6 +140,27 @@ export function canonicalStationIdentityViolations({ stations, aliases, decision
     }
   }
   return violations;
+}
+
+export function canonicalStationViolationsForRegion({
+  contract,
+  region,
+  stations,
+  aliases,
+}) {
+  if (contract.region !== region) return [];
+  const controlDecisions = contract.controls.map((control) => ({
+    ...control,
+    status: "MERGE_CONFIRMED",
+    absorbedStationIds: [],
+    reviewedAt: contract.reviewedAt,
+    reason: "회귀 control",
+  }));
+  return canonicalStationIdentityViolations({
+    stations,
+    aliases,
+    decisions: [...contract.decisions, ...controlDecisions],
+  });
 }
 
 function isReviewedDecision(decision) {
@@ -193,17 +221,11 @@ function main() {
        WHERE s.region=? ORDER BY s.normalized_name, s.id, sl.line_id`,
     ).all(options.region);
     const aliases = db.prepare("SELECT station_id AS stationId, alias FROM station_aliases").all();
-    const controlDecisions = contract.controls.map((control) => ({
-      ...control,
-      status: "MERGE_CONFIRMED",
-      absorbedStationIds: [],
-      reviewedAt: contract.reviewedAt,
-      reason: "회귀 control",
-    }));
-    const identityViolations = canonicalStationIdentityViolations({
+    const identityViolations = canonicalStationViolationsForRegion({
+      contract,
+      region: options.region,
       stations: identityRows,
       aliases,
-      decisions: [...contract.decisions, ...controlDecisions],
     });
     console.log(`[${options.region}] 환승 그룹 ${spreads.length}`);
     console.log(`분리/좌표검수 의심(spread>60): ${splits.length}`);
