@@ -38,7 +38,7 @@ import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/search_field.dart';
-import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -1818,10 +1818,10 @@ void main() {
     expect(find.bySemanticsLabel('노선: 전체 노선'), findsNothing);
     expect(find.text('전체 노선'), findsNothing);
     expect(find.byKey(const Key('networkMapInteractiveViewer')), findsNothing);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
 
     expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
   });
 
   testWidgets('홈 shell 경로 상세 뒤로가기는 결과 목록으로 돌아간다', (tester) async {
@@ -2015,7 +2015,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
     expect(find.byKey(const Key('networkMapLineFilter')), findsNothing);
 
     await tester.tap(find.text('테스트권'));
@@ -3254,13 +3254,16 @@ void main() {
       final path = offline['path'] as String;
       expect(map['source_url'], isA<String>());
       expect(validSourceScheme(map['source_url'] as String), isTrue);
-      // #1641: SVG 이미지는 더 이상 번들하지 않는다(canvas 렌더). 소스 경로와
-      // 라이선스 속성표기만 유지된다(광주 CC-BY-SA 등).
-      expect(offline['included'], isFalse);
-      expect(path, startsWith('assets/datapacks/maps/'));
+      // [#2068] 하이브리드 바탕층 전환: 오너 자작 SVG를 build-time 컴파일한
+      // vector_graphics 바이너리(.vec)를 basemap/으로 번들한다. offline 블록은
+      // 이제 실제 번들 .vec를 가리키고 included=true다.
+      expect(offline['included'], isTrue);
+      expect(path, startsWith('assets/datapacks/metro_map_pack/basemap/'));
       final extension = path.split('.').last.toLowerCase();
-      expect(extension, anyOf('pdf', 'svg'));
-      expect(offline['type'], extension);
+      expect(extension, 'vec');
+      expect(offline['type'], 'vector-graphics-vec');
+      // 가리키는 .vec가 실제로 번들에 존재해야 한다(offline included 계약 강화).
+      expect(File(path).existsSync(), isTrue, reason: '$path가 번들에 없다');
       final license = map['license'] as Map<String, Object?>;
       expect(license['name'], isA<String>());
       expect(license['spdx'], isA<String>());
@@ -3311,7 +3314,7 @@ void main() {
     expect(decoration.color, Colors.white);
     expect(decoration.border, isNull);
     expect(decoration.borderRadius, isNull);
-    expect(find.byType(StructuredRouteMapView), findsOneWidget);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
   });
 
@@ -3338,15 +3341,15 @@ void main() {
         find.byKey(const Key('networkMapInteractiveViewer')),
         findsNothing,
       );
-      final renderer = tester.getSize(find.byType(StructuredRouteMapView));
+      final renderer = tester.getSize(find.byType(RouteMapBasemapView));
       final surface = tester.getSize(
         find.byKey(const Key('networkMapSurface')),
       );
       expect(renderer.width, surface.width);
       expect(renderer.height, surface.height);
       expect(
-        tester.widget(find.byType(StructuredRouteMapView)),
-        isA<StructuredRouteMapView>(),
+        tester.widget(find.byType(RouteMapBasemapView)),
+        isA<RouteMapBasemapView>(),
       );
     } finally {
       debugDefaultTargetPlatformOverride = null;

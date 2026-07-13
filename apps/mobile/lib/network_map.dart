@@ -19,7 +19,7 @@ import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/station_fan_menu_geometry.dart'
     show kFanMenuDesignSize;
-import 'features/network_map/presentation/structured_route_map_painter.dart';
+import 'features/network_map/presentation/route_map_basemap_view.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
 import 'features/route_draft/domain/route_draft.dart';
@@ -3763,12 +3763,6 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Offset? _gestureStartFocalPoint;
   String? _geometryCacheKey;
   _MapGeometry? _geometryCache;
-  // 구조화 canvas 렌더러(#1641) 파생 데이터 캐시 — region 단위로 재계산.
-  String? _structuredCacheKey;
-  StructuredRouteMap? _structuredRouteMapCache;
-  Map<String, Color>? _structuredLineColorsCache;
-  Map<String, String>? _structuredLabelTextCache;
-  Map<String, String>? _structuredLineBadgeLabelCache;
   NetworkMapStation? _selectedStation;
   // region → attribution 표시 문자열(#1951). manifest 로드 전에는 null로 두고
   // attribution을 표시하지 않는다(로드 실패 시에도 동일하게 조용히 미표기).
@@ -4360,45 +4354,20 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     );
   }
 
-  // 구조화 canvas 렌더러(#1641)를 visual camera로 마운트한다. WebView와 달리
-  // 명령형 controller 없이 camera prop 변경(setState)으로 갱신된다.
+  // 하이브리드 바탕층(#2068)을 visual camera로 마운트한다. 바탕은 region에 매핑된
+  // 컴파일 .vec를 런타임 디코드해 그리며(RouteMapBasemapView), 인터랙션 좌표계와
+  // 1:1 정렬된다. WebView와 달리 명령형 controller 없이 camera prop 변경(setState)
+  // 으로 갱신된다. sourceOrigin은 오버레이·카메라의 origin-뺀 공간과 맞춘다.
   Widget _buildStructuredRouteMapCanvas(
     MapCameraState camera,
     Offset sourceOrigin,
   ) {
-    _ensureStructuredRouteMap();
-    return StructuredRouteMapView(
-      map: _structuredRouteMapCache!,
+    return RouteMapBasemapView(
+      region: widget.data.selectedRegion,
       camera: camera,
-      lineColors: _structuredLineColorsCache!,
-      labelTextByStationId: _structuredLabelTextCache!,
-      lineBadgeLabelByLineId: _structuredLineBadgeLabelCache!,
       sourceOrigin: sourceOrigin,
       attributionText: _attributionTextByRegion?[widget.data.selectedRegion],
     );
-  }
-
-  void _ensureStructuredRouteMap() {
-    final data = widget.data;
-    // geometry 캐시와 동일하게 identityHashCode를 포함해, 같은 region·같은 개수라도
-    // data 인스턴스가 바뀌면(좌표 수정/노선 교체) 재계산되게 한다(overlay와 정합).
-    final key =
-        '${data.selectedRegion}:${identityHashCode(data.stations)}:${data.stations.length}:${data.lines.length}';
-    if (_structuredCacheKey == key && _structuredRouteMapCache != null) {
-      return;
-    }
-    _structuredCacheKey = key;
-    _structuredRouteMapCache = data.toStructuredRouteMap();
-    _structuredLineColorsCache = routeMapLineColors({
-      for (final line in data.lines) line.id: line.color,
-    });
-    _structuredLabelTextCache = {
-      for (final station in data.stations)
-        station.id: routeMapStationLabel(station.nameKo),
-    };
-    _structuredLineBadgeLabelCache = {
-      for (final line in data.lines) line.id: routeMapLineBadgeLabel(line.name),
-    };
   }
 }
 
