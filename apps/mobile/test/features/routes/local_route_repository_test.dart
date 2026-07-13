@@ -15,6 +15,28 @@ import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('흡수된 station ID는 대표 station ID로 정규화해 경로를 검색한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_aliases (station_id, alias, normalized_alias)
+      VALUES ('station-sangnoksu', 'station-sangnoksu-old', 'station-sangnoksu-old')
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu-old',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'STANDARD',
+          ),
+        );
+
+    expect(result.status, 'FOUND');
+    expect(result.originStationId, 'station-sangnoksu');
+  });
+
   test('로컬 경로는 exact official OD 요금을 함께 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
