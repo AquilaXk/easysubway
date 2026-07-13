@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
@@ -44,14 +45,11 @@ class AdminNavigationAdvice {
 	@ModelAttribute("adminShell")
 	AdminShell adminShell(Authentication authentication) {
 		String username = isAuthenticated(authentication) ? authentication.getName() : "anonymous";
-		List<String> roles = roleNames(authentication);
 		return new AdminShell(
 			environmentLabel(),
 			environmentTone(),
 			username,
-			rolesLabel(authentication),
-			roles.size(),
-			rolesTitle(roles),
+			roleLabel(authentication),
 			environment.getProperty("easysubway.admin.revision", "local"),
 			environment.getProperty("easysubway.admin.master-data-version", "unknown")
 		);
@@ -83,33 +81,22 @@ class AdminNavigationAdvice {
 		return Arrays.stream(environment.getActiveProfiles()).toList();
 	}
 
-	private static List<String> roleNames(Authentication authentication) {
+	// 사용자 신원 표기는 역할 등급(ROLE_*)만 노출한다. 세부 RBAC 권한(authority) 개수는
+	// 내부 구현 상세라 상단바에 드러내지 않는다(#2047 후속 오너 지시).
+	private static String roleLabel(Authentication authentication) {
 		if (!isAuthenticated(authentication)) {
-			return List.of();
-		}
-		return authentication.getAuthorities().stream()
-			.map(authority -> authority.getAuthority().replaceFirst("^ROLE_", ""))
-			.sorted(Comparator.naturalOrder())
-			.toList();
-	}
-
-	private static String rolesLabel(Authentication authentication) {
-		List<String> authorities = roleNames(authentication);
-		if (authorities.isEmpty()) {
 			return "권한 없음";
 		}
-		if (authorities.size() == 1) {
-			return authorities.get(0);
-		}
-		return authorities.get(0) + " 외 " + (authorities.size() - 1) + "개";
-	}
-
-	// 상태 스트립 툴팁용 전체 역할 목록. 상단바는 "권한 N개"만 보이고 의미는 이 title로 설명한다.
-	private static String rolesTitle(List<String> roles) {
+		List<String> roles = authentication.getAuthorities().stream()
+			.map(GrantedAuthority::getAuthority)
+			.filter(authority -> authority.startsWith("ROLE_"))
+			.map(authority -> authority.substring("ROLE_".length()))
+			.sorted(Comparator.naturalOrder())
+			.toList();
 		if (roles.isEmpty()) {
-			return "부여된 권한이 없습니다";
+			return "권한 없음";
 		}
-		return "부여된 권한: " + String.join(", ", roles);
+		return String.join(", ", roles);
 	}
 
 	private static boolean isAuthenticated(Authentication authentication) {
@@ -126,8 +113,6 @@ class AdminNavigationAdvice {
 		String environmentTone,
 		String username,
 		String rolesLabel,
-		int rolesCount,
-		String rolesTitle,
 		String revision,
 		String masterDataVersion
 	) {

@@ -132,7 +132,8 @@
 	</div>
 	<!--
 	  상태 스트립(#2047): 환경 배지 + 라벨드 항목. 정적·무채색·비인터랙티브 시각(버튼 아님).
-	  각 항목은 title 툴팁으로 의미를 설명하고, 권한은 개수 + 역할 목록 툴팁으로 정리한다.
+	  각 항목은 title 툴팁으로 의미를 설명한다. 사용자 신원(계정·역할)은 상단 사용자 메뉴가 전담하므로
+	  이 스트립에는 권한 개수 등 내부 RBAC 표기를 두지 않는다(#2047 후속 오너 지시).
 	-->
 	<div class="admin-status-strip" aria-label="실행 환경 상태">
 		<span class="admin-env-badge"
@@ -148,11 +149,6 @@
 		      title="현재 적재된 마스터데이터(역·시설 참조 팩) 버전">
 			<span class="admin-status-label">마스터데이터</span>
 			<strong th:text="${adminShell != null ? adminShell.masterDataVersion : 'unknown'}">unknown</strong>
-		</span>
-		<span class="admin-status-item"
-		      th:title="${adminShell != null ? adminShell.rolesTitle : '부여된 권한이 없습니다'}">
-			<span class="admin-status-label">권한</span>
-			<strong th:text="|${adminShell != null ? adminShell.rolesCount : 0}개|">0개</strong>
 		</span>
 	</div>
 </div>
