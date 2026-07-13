@@ -6,7 +6,7 @@ import 'accessible_design.dart';
 import 'design_tokens.dart';
 import 'features/mobility_profile/mobility_preset_labels.dart';
 import 'features/mobility_profile/mobility_preset_picker.dart'
-    show MobilityPresetRow;
+    show MobilityPresetRow, mobilityPresetSheetOrder;
 import 'features/mobility_profile/mobility_profile_policy.dart';
 import 'mobile_error_reporter.dart';
 import 'notification_settings.dart';
@@ -578,12 +578,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // 알림 기능 가용 여부의 단일 소스: 알림 권한 provider가 주입됐는지(#1579).
     // 더보기 알림 섹션(notificationRepository)과 함께 켜지고 꺼진다.
     final notificationAvailable = widget.notificationPermissionProvider != null;
-    const presetOptions = <MobilityPreset>[
-      MobilityPreset.standard,
-      MobilityPreset.slow,
-      MobilityPreset.noStairs,
-      MobilityPreset.stepFree,
-    ];
 
     // 프리셋은 항상 기본값이 선택돼 있어 CTA는 늘 활성이다(#1703).
     void onNext() {
@@ -652,7 +646,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const SizedBox(height: EasySubwaySpacing.xl),
-                  for (var i = 0; i < presetOptions.length; i++) ...[
+                  for (
+                    var i = 0;
+                    i < mobilityPresetSheetOrder.length;
+                    i++
+                  ) ...[
                     if (i != 0)
                       const Divider(
                         height: 1,
@@ -660,13 +658,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         color: EasySubwayAccessibleColors.line,
                       ),
                     MobilityPresetRow(
-                      preset: presetOptions[i],
-                      selected: presetOptions[i] == _selectedPreset,
+                      preset: mobilityPresetSheetOrder[i],
+                      selected: mobilityPresetSheetOrder[i] == _selectedPreset,
                       // 온보딩 step0은 각 행 아래 부가설명도 노출한다(#1703).
                       showDescription: true,
                       onTap: () {
                         setState(() {
-                          _selectedPreset = presetOptions[i];
+                          _selectedPreset = mobilityPresetSheetOrder[i];
                         });
                       },
                     ),

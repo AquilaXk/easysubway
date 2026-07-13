@@ -28,6 +28,7 @@ Future<MobilityPreset?> showMobilityPresetSheet(
 }) {
   return showModalBottomSheet<MobilityPreset>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: EasySubwayAccessibleColors.surface,
     builder: (sheetContext) {
       final textTheme = Theme.of(sheetContext).textTheme;
