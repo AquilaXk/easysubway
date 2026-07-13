@@ -269,6 +269,14 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   validateCatalog(catalog);
   assert.ok(catalog.some((entry) => entry.kind === "internal"));
   assert.ok(catalog.some((entry) => entry.id === "provider:seoul-topis-realtime-station-arrival"));
+  assert.equal(
+    findCatalogEntry(catalog, "provider:busan-transportation-official-od-fares").operation.method,
+    "POST",
+  );
+  assert.equal(
+    findCatalogEntry(catalog, "provider:busan-transportation-official-fare-table").operation.method,
+    "GET",
+  );
   assert.ok(catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"));
   assert.ok(catalog.some((entry) => entry.id === "integration:mobile-ad-creative-image"));
   assert.ok(catalog.some((entry) => entry.id === "integration:mobile-report-photo-upload"));
