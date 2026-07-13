@@ -471,7 +471,17 @@ class DriftStationRepository
       positionSources: await _networkMapPositionSources(selectedRegion),
       stationLineMemberships: stationLineMemberships,
       lineTracks: await _networkMapLineTracks(selectedRegion, selectedLineIds),
+      transitPassThroughStationIds: await _readTransitPassThroughStationIds(),
     );
+  }
+
+  Future<Set<String>> _readTransitPassThroughStationIds() async {
+    final rows = await database.customSelect('''
+      SELECT CAST(pass_through.value AS TEXT) AS station_id
+      FROM catalog_metadata metadata, json_each(metadata.value) pass_through
+      WHERE metadata.key = 'transitPassThroughStationIds'
+    ''').get();
+    return {for (final row in rows) row.read<String>('station_id')};
   }
 
   /// route_map_line_tracks에서 노선별 track path를 track_index 순으로 로드한다(#1638).

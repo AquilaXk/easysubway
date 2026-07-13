@@ -29,9 +29,7 @@ class LocalRouteRepository implements RouteSearchRepository {
     RouteSearchRequest request,
   ) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
-    final stationExists =
-        catalog.hasStation(request.originStationId) &&
-        catalog.hasStation(request.destinationStationId);
+    final stationExists = _hasSearchEndpoints(catalog, request);
     final routeResult = stationExists
         ? catalog.routeResult(
             request.originStationId,
@@ -79,8 +77,19 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   Future<bool> canSearchRoute(RouteSearchRequest request) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
+    return _hasSearchEndpoints(catalog, request);
+  }
+
+  bool _hasSearchEndpoints(
+    _RouteCatalogSnapshot catalog,
+    RouteSearchRequest request,
+  ) {
+    final waypointStationId = request.waypointStationId?.trim();
     return catalog.hasStation(request.originStationId) &&
-        catalog.hasStation(request.destinationStationId);
+        catalog.hasStation(request.destinationStationId) &&
+        (waypointStationId == null ||
+            waypointStationId.isEmpty ||
+            catalog.hasStation(waypointStationId));
   }
 
   @override
@@ -1722,7 +1731,8 @@ class _RouteCatalogSnapshot {
   }
 
   bool hasStation(String stationId) {
-    return stationsById.containsKey(stationId);
+    return stationsById.containsKey(stationId) &&
+        !transitPassThroughStationIds.contains(stationId);
   }
 
   List<String> _stationLineKeysFor(String stationId) {

@@ -72,6 +72,7 @@ class NetworkMapData {
     required this.positionSources,
     this.stationLineMemberships = const [],
     this.lineTracks = const [],
+    this.transitPassThroughStationIds = const {},
   });
 
   final List<NetworkMapRegion> regions;
@@ -81,6 +82,7 @@ class NetworkMapData {
   final List<NetworkMapEdge> edges;
   final List<NetworkMapPositionSource> positionSources;
   final List<NetworkMapStationLineMembership> stationLineMemberships;
+  final Set<String> transitPassThroughStationIds;
 
   /// 노선별 실제 track polyline (#1638). route_map_line_tracks에서 온다 —
   /// 렌더러 line geometry의 source(역별 down_path 조립을 대체).
@@ -110,6 +112,11 @@ class NetworkMapData {
       lineTracks: _objectList(
         json['lineTracks'],
       ).map(NetworkMapLineTrack.fromJson).toList(growable: false),
+      transitPassThroughStationIds:
+          (json['transitPassThroughStationIds'] as List<Object?>?)
+              ?.whereType<String>()
+              .toSet() ??
+          const {},
     );
   }
 
@@ -3164,6 +3171,7 @@ NetworkMapData _expressOnlyMapData(NetworkMapData data) {
     stationLineMemberships: data.stationLineMemberships
         .where((membership) => lineIds.contains(membership.lineId))
         .toList(growable: false),
+    transitPassThroughStationIds: data.transitPassThroughStationIds,
   );
 }
 
@@ -3576,6 +3584,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               if (!_gestureActive && selectedStation != null)
                 _NetworkMapStationActionOverlay(
                   station: selectedStation,
+                  endpointSelectionEnabled: !widget
+                      .data
+                      .transitPassThroughStationIds
+                      .contains(selectedStation.id),
                   geometry: geometry,
                   camera: camera,
                   emphasizeDestination: widget.hasOrigin,
@@ -5305,6 +5317,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
 class _NetworkMapStationActionOverlay extends StatelessWidget {
   const _NetworkMapStationActionOverlay({
     required this.station,
+    required this.endpointSelectionEnabled,
     required this.geometry,
     required this.camera,
     required this.onSetOrigin,
@@ -5318,6 +5331,7 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
   });
 
   final NetworkMapStation station;
+  final bool endpointSelectionEnabled;
   final _MapGeometry geometry;
   final MapCameraState camera;
   final VoidCallback onSetOrigin;
@@ -5350,11 +5364,17 @@ class _NetworkMapStationActionOverlay extends StatelessWidget {
     // #1975: 이 역이 다른 슬롯에 이미 있으면 그 탭을 비활성화한다. 자기 슬롯에
     // 이미 있는 경우는 재지정 허용이므로 enabled를 유지한다.
     final originEnabled =
-        station.id != waypointStationId && station.id != destinationStationId;
+        endpointSelectionEnabled &&
+        station.id != waypointStationId &&
+        station.id != destinationStationId;
     final waypointEnabled =
-        station.id != originStationId && station.id != destinationStationId;
+        endpointSelectionEnabled &&
+        station.id != originStationId &&
+        station.id != destinationStationId;
     final destinationEnabled =
-        station.id != originStationId && station.id != waypointStationId;
+        endpointSelectionEnabled &&
+        station.id != originStationId &&
+        station.id != waypointStationId;
     return Positioned(
       key: const Key('networkMapStationSheet'),
       left: left,

@@ -222,8 +222,16 @@ export function applyLine4RoutingGraph(input, artifact, roster, geometry) {
       });
     });
   }
-  if (transitTrips.length === 0) {
-    throw new Error("KRIC line 4 routing graph has no complete corridor trips");
+  if (transitTrips.length !== EXPECTED_PILOT_TRANSIT_TRIP_COUNT) {
+    throw new Error(
+      `KRIC line 4 routing graph trip count mismatch: ${transitTrips.length} !== ${EXPECTED_PILOT_TRANSIT_TRIP_COUNT}`,
+    );
+  }
+  const expectedStopTimeCount = EXPECTED_PILOT_TRANSIT_TRIP_COUNT * stations.length;
+  if (transitStopTimes.length !== expectedStopTimeCount) {
+    throw new Error(
+      `KRIC line 4 routing graph stop time count mismatch: ${transitStopTimes.length} !== ${expectedStopTimeCount}`,
+    );
   }
 
   const verifiedAt = `${artifact.capturedAt ?? "2026-07-12"}T00:00:00.000Z`;

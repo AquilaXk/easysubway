@@ -39,20 +39,30 @@ test("4호선 corridor는 중간역을 pass-through로 두고 인접 RIDE·도�
       { stinConsOrdr: 30, stinCd: "448", railOprIsttCd: "KR", stinNm: "상록수" },
     ],
   };
+  const transitTrips = Array.from({ length: 466 }, (_, index) => ({
+    id: `trip-${index}`,
+    routeId: index % 2 === 0 ? "route-seoul-4-up" : "route-seoul-4-down",
+    serviceId: "weekday-kric",
+    directionId: index % 2 === 0 ? "up" : "down",
+    servicePattern: "LOCAL",
+  }));
+  const transitStopTimes = transitTrips.flatMap((trip, index) =>
+    trip.directionId === "up"
+      ? [
+          stop(trip.id, 1, "433", 100 + index, 110 + index),
+          stop(trip.id, 2, "434", 200 + index, 210 + index),
+          stop(trip.id, 3, "448", 310 + index, 320 + index),
+        ]
+      : [
+          stop(trip.id, 1, "448", 400 + index, 410 + index),
+          stop(trip.id, 2, "434", 500 + index, 510 + index),
+          stop(trip.id, 3, "433", 610 + index, 620 + index),
+        ],
+  );
   const artifact = {
     capturedAt: "2026-07-12",
-    transitTrips: [
-      { id: "up", routeId: "route-seoul-4-up", serviceId: "weekday-kric", directionId: "up", servicePattern: "LOCAL" },
-      { id: "down", routeId: "route-seoul-4-down", serviceId: "weekday-kric", directionId: "down", servicePattern: "LOCAL" },
-    ],
-    transitStopTimes: [
-      stop("up", 1, "433", 100, 110),
-      stop("up", 2, "434", 200, 210),
-      stop("up", 3, "448", 310, 320),
-      stop("down", 1, "448", 400, 410),
-      stop("down", 2, "434", 500, 510),
-      stop("down", 3, "433", 610, 620),
-    ],
+    transitTrips,
+    transitStopTimes,
   };
   const geometry = {
     sourceSvgSha256: "c".repeat(64),
@@ -74,9 +84,10 @@ test("4호선 corridor는 중간역을 pass-through로 두고 인접 RIDE·도�
   assert.deepEqual(result.supportedV1Scope.transitPassThroughStationIds, ["station-seoul-4-434"]);
   assert.ok(result.sourceIds.includes(SELF_DRAWN_SOURCE_ID));
   assert.equal(new Set(result.stationLineRows.map((row) => row.stationCode)).size, 3);
-  assert.equal(result.transitTrips.length, 2);
+  assert.equal(result.transitTrips.length, 466);
+  assert.equal(result.transitStopTimes.length, 466 * roster.stations.length);
   assert.deepEqual(
-    result.transitStopTimes.filter((row) => row.tripId === "up").map((row) => row.stationId),
+    result.transitStopTimes.filter((row) => row.tripId === "trip-0").map((row) => row.stationId),
     ["station-sadang", "station-seoul-4-434", "station-sangnoksu"],
   );
   assert.equal(result.routeEdges.filter((edge) => edge.edgeType === "RIDE").length, 4);
@@ -92,6 +103,13 @@ test("4호선 corridor는 중간역을 pass-through로 두고 인접 RIDE·도�
     routeEdges: 4,
     facilities: 1,
   });
+
+  const incompleteArtifact = structuredClone(artifact);
+  incompleteArtifact.transitStopTimes[1].stationId = "station-seoul-4-999";
+  assert.throws(
+    () => applyLine4RoutingGraph(input, incompleteArtifact, roster, geometry),
+    /KRIC line 4 routing graph trip count mismatch: 465 !== 466/,
+  );
 });
 
 function stop(tripId, stopSequence, stationCode, arrivalSeconds, departureSeconds) {

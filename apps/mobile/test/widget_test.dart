@@ -2186,6 +2186,74 @@ void main() {
     expect(routeDraftController.draft.waypoint?.nameKo, '상록수');
   });
 
+  testWidgets('통과 전용 역은 노선도에 표시하되 endpoint로 선택할 수 없다', (tester) async {
+    final routeDraftController = RouteDraftController();
+    final repository = FakeStationSearchRepository(
+      networkMapData: const NetworkMapData(
+        regions: [NetworkMapRegion(name: '테스트권')],
+        selectedRegion: '테스트권',
+        lines: [
+          NetworkMapLine(
+            id: 'seoul-4',
+            name: '수도권 4호선',
+            color: '#00A5DE',
+            region: '테스트권',
+          ),
+        ],
+        stations: [
+          NetworkMapStation(
+            id: 'station-pass-through',
+            nameKo: '통과역',
+            nameEn: 'Pass-through',
+            region: '테스트권',
+            lineId: 'seoul-4',
+            stationCode: '434',
+            sequence: 1,
+            position: NetworkMapPosition(
+              x: 100,
+              y: 100,
+              labelDx: 0,
+              labelDy: 0,
+              upPath: '',
+              downPath: '',
+              sourceId: 'fixture-route-map-source-capital-review',
+            ),
+          ),
+        ],
+        edges: [],
+        positionSources: [
+          NetworkMapPositionSource(
+            id: 'fixture-route-map-source-capital-review',
+            name: '테스트 좌표',
+            licenseStatus: 'fixture-only',
+          ),
+        ],
+        transitPassThroughStationIds: {'station-pass-through'},
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: repository,
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: () {},
+          onPickStationForSlot: (slot) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-pass-through-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+
+    await tester.tap(find.text('출발'));
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.origin, isNull);
+  });
+
   testWidgets('노선도는 노선별 보기 우회 sheet를 노출하지 않는다', (tester) async {
     await tester.pumpWidget(
       EasySubwayApp(

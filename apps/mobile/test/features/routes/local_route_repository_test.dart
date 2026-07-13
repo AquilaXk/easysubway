@@ -2099,9 +2099,30 @@ void main() {
         mobilityType: 'STROLLER',
       ),
     );
+    const endpointRequest = RouteSearchRequest(
+      originStationId: 'station-b',
+      destinationStationId: 'station-c',
+      mobilityType: 'STROLLER',
+    );
+    final endpointCapability = await repository.routeCapability(
+      endpointRequest,
+    );
+    const waypointRequest = RouteSearchRequest(
+      originStationId: 'station-a',
+      waypointStationId: 'station-b',
+      destinationStationId: 'station-c',
+      mobilityType: 'STROLLER',
+    );
+    final waypointCapability = await repository.routeCapability(
+      waypointRequest,
+    );
 
     expect(throughResult.status, 'FOUND');
     expect(endpointResult.status, isNot('FOUND'));
+    expect(await repository.canSearchRoute(endpointRequest), isFalse);
+    expect(endpointCapability.stationExists, isFalse);
+    expect(await repository.canSearchRoute(waypointRequest), isFalse);
+    expect(waypointCapability.stationExists, isFalse);
   });
 
   test('구형 catalog의 network_edges는 미확인 접근성 상태로 안전하게 차단한다', () async {

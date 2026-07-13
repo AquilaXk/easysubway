@@ -33,6 +33,15 @@ void main() {
 
     expect(await repository.searchStations('상록수'), isEmpty);
     expect(await repository.searchStations('사당'), hasLength(1));
+    final map = await repository.getNetworkMap(
+      region: '수도권',
+      lineId: 'seoul-4',
+    );
+    expect(map.transitPassThroughStationIds, {'station-sangnoksu'});
+    expect(
+      map.stations.map((station) => station.id),
+      contains('station-sangnoksu'),
+    );
   });
 
   test('로컬 역 검색은 부역명(name_sub)으로도 역을 찾는다', () async {
