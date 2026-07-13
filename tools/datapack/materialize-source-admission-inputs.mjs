@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { exportLedgerHash } from "./export-ledger-hashes.mjs";
-import { parseArgs, requireArg } from "./lib/ledger-admission-cli.mjs";
+import { parseArgs, requireArg, requiredString } from "./lib/ledger-admission-cli.mjs";
 import { validateQuotaEvidence } from "./lib/quota-evidence.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
@@ -71,6 +71,7 @@ async function finalizeSourceAdmission(args) {
   if (!Array.isArray(hashEvidence.perSourceEvidence)) {
     throw new Error("hashEvidence.perSourceEvidence must be an array");
   }
+  const specification = resolveAdmissionSpecification(source, candidate, buildSpec);
 
   source.retrievedAt = snapshot.retrievedAt.slice(0, 10);
   source.admissionEvidence = {
@@ -96,7 +97,7 @@ async function finalizeSourceAdmission(args) {
     overrideHash: summary.overrideHash,
     admissionDurationSeconds: summary.admissionDurationSeconds,
     quotaEvidence: summary.quotaEvidence,
-    productionUseNoteKo: "수도권 4호선 상록수-사당 pilot stop_times 적재에 한해 production 사용을 허용한다.",
+    productionUseNoteKo: specification.productionUseNoteKo,
   };
 
   Object.assign(candidate.evidence, {
@@ -106,7 +107,7 @@ async function finalizeSourceAdmission(args) {
     liveSampleSchemaFingerprint: sample.schemaFingerprint,
     liveSampleEvidenceHash: sample.evidenceHash,
     liveSampleFields: sample.fields,
-    liveSampleNote: "2026-07-13 4호선 pilot 전량 수집 raw를 immutable object storage에 보존하고 실제 bytes·schema·row hash로 재승인했다.",
+    liveSampleNote: specification.liveSampleNote,
   });
   Object.assign(candidate.evidence.reconstructionValidation, {
     capturedAt: collection.capturedAt,
@@ -114,7 +115,7 @@ async function finalizeSourceAdmission(args) {
     failureCount: collection.failedRequestCount,
     tripCount: collection.transitTripCount,
     stopTimesCount: collection.transitStopTimeCount,
-    reproductionNote: "tracked collector를 node --env-file로 실행한다. KRIC dayCd=7은 공식 resultCode=03(데이터 없음)이므로 default plan은 평일(8)·휴일(9) 102요청이며 토요일은 휴일 시각표를 사용한다. raw는 object storage에 보존한다.",
+    reproductionNote: specification.reproductionNote,
   });
 
   const updatedSnapshots = sourceSnapshots.filter((entry) => entry.sourceId !== sourceId);
@@ -164,7 +165,7 @@ async function finalizeSourceAdmission(args) {
   });
   fixture.packs[0].officialOdFareQuotes = hashEvidence.officialOdFareEvidence.quotes;
   const finalizedFixtureBytes = Buffer.from(`${JSON.stringify(fixture, null, 2)}\n`);
-  buildSpec.candidateId = "capital-pilot-candidate-20260713";
+  buildSpec.candidateId = specification.buildCandidateId;
   buildSpec.fixtureSha256 = sha256(finalizedFixtureBytes);
   buildSpec.sourceSnapshotIds = updatedSnapshots.map((entry) => entry.snapshotId);
   buildSpec.sourceSnapshots = buildSpec.sourceSnapshots.filter((entry) => entry.sourceId !== sourceId);
@@ -175,7 +176,7 @@ async function finalizeSourceAdmission(args) {
 
   hashEvidence.builderGitSha = buildSpec.builderGitSha;
   hashEvidence.truthfulnessRule = "모든 값은 tracked exporter·source admission pipeline·업로드된 immutable raw object의 실제 hash에서만 생성했다. 임의 합성값 없음.";
-  hashEvidence.sourceSnapshots.note = "reviewed pack이 사용하는 admission 9종의 locked snapshot 객체다. KRIC 시각표 raw는 2026-07-13 immutable object storage 보존본과 byte hash가 일치한다.";
+  hashEvidence.sourceSnapshots.note = `reviewed pack이 사용하는 admission ${updatedSnapshots.length}종의 locked snapshot 객체다. 각 immutable raw object와 byte hash가 일치한다.`;
   hashEvidence.sourceSnapshots.order = updatedSnapshots.map((entry) => entry.sourceId).join(" → ");
   hashEvidence.sourceSnapshots.committedVerificationCommand = "node --test --test-name-pattern='tracked production buildSpec은 현재 reviewed fixture와 provenance에 묶인다' tools/datapack/datapack-tools.test.mjs";
   hashEvidence.sourceSnapshots.specRowRawSha256Note = "build-spec sourceSnapshots[].rawSha256는 각 immutable raw object의 실제 bytes SHA-256이다.";
@@ -230,4 +231,19 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export { finalizeSourceAdmission, materializeSourceAdmissionInputs };
+function resolveAdmissionSpecification(source, candidate, buildSpec) {
+  return {
+    productionUseNoteKo: requiredString(
+      source.admissionEvidence?.productionUseNoteKo,
+      `${source.id}.admissionEvidence.productionUseNoteKo`,
+    ),
+    liveSampleNote: requiredString(candidate.evidence?.liveSampleNote, `${candidate.id}.evidence.liveSampleNote`),
+    reproductionNote: requiredString(
+      candidate.evidence?.reconstructionValidation?.reproductionNote,
+      `${candidate.id}.evidence.reconstructionValidation.reproductionNote`,
+    ),
+    buildCandidateId: requiredString(buildSpec.candidateId, "buildSpec.candidateId"),
+  };
+}
+
+export { finalizeSourceAdmission, materializeSourceAdmissionInputs, resolveAdmissionSpecification };

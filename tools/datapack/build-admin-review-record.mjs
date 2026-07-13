@@ -12,7 +12,7 @@
 //   - approvedBy·approvedAt·decision은 입력 인자(승인 결정 기록).
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import {
   parseArgs,
   readJsonFile,
@@ -28,7 +28,9 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const record = await buildAdminReviewRecord(args);
   if (args.output) {
-    await writeFile(path.resolve(root, args.output), `${JSON.stringify(record, null, 2)}\n`);
+    const outputPath = path.resolve(root, args.output);
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, `${JSON.stringify(record, null, 2)}\n`);
   }
   console.log(JSON.stringify(record, null, 2));
 }

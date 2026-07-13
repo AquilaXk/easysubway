@@ -5,7 +5,31 @@ import path from "node:path";
 import test from "node:test";
 
 import { exportLedgerHash } from "./export-ledger-hashes.mjs";
-import { materializeSourceAdmissionInputs } from "./materialize-source-admission-inputs.mjs";
+import {
+  materializeSourceAdmissionInputs,
+  resolveAdmissionSpecification,
+} from "./materialize-source-admission-inputs.mjs";
+
+test("source admission finalizer는 검토된 specification 값을 그대로 사용한다", () => {
+  const specification = resolveAdmissionSpecification(
+    { id: "source-next", admissionEvidence: { productionUseNoteKo: "승인된 production 범위" } },
+    {
+      id: "source-next",
+      evidence: {
+        liveSampleNote: "승인된 live sample 근거",
+        reconstructionValidation: { reproductionNote: "승인된 재현 절차" },
+      },
+    },
+    { candidateId: "capital-candidate-next" },
+  );
+
+  assert.deepEqual(specification, {
+    productionUseNoteKo: "승인된 production 범위",
+    liveSampleNote: "승인된 live sample 근거",
+    reproductionNote: "승인된 재현 절차",
+    buildCandidateId: "capital-candidate-next",
+  });
+});
 
 test("source admission 입력은 tracked 원장에서만 materialize된다", async () => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "source-admission-inputs-"));

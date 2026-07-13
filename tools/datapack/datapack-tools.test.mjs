@@ -17032,7 +17032,8 @@ test("build-admin-review-record 산출물은 run-source-admission-pipeline을 �
   );
 
   // 생성기로 admin review record 작성
-  const { stdout: recordStdout } = await runAdminReviewBuilder([
+  const adminReviewPath = path.join(outputDir, "nested", "review", "admin-review.json");
+  await runAdminReviewBuilder([
     "--candidate", "kric-train-operation-organ",
     "--source-id", "kric-train-operation-organ",
     "--snapshot-id", "kric-train-operation-organ-snapshot-20260702",
@@ -17048,9 +17049,10 @@ test("build-admin-review-record 산출물은 run-source-admission-pipeline을 �
     "--override-hash", path.relative(root, ledgerFiles.override),
     "--quota-evidence", path.relative(root, quotaPath),
     "--production-source", path.relative(root, prodPath),
+    "--output", path.relative(root, adminReviewPath),
   ]);
-  const adminReviewPath = path.join(outputDir, "admin-review.json");
-  await writeFile(adminReviewPath, recordStdout);
+  const generatedAdminReview = JSON.parse(await readFile(adminReviewPath, "utf8"));
+  assert.equal(generatedAdminReview.sourceId, "kric-train-operation-organ");
 
   const summaryPath = path.join(outputDir, "admission-summary.json");
   const outputInventoryPath = path.join(outputDir, "source-inventory.admitted.json");
