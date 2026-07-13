@@ -12,12 +12,19 @@ export function assertTemporaryReleaseDecisionsCurrent(evidence, now = new Date(
   assert.ok(decisions && typeof decisions === "object", "temporaryReleaseDecisions is required for SATISFIED");
   for (const [decisionId, decision] of Object.entries(decisions)) {
     assert.match(decision.untilDate ?? "", /^\d{4}-\d{2}-\d{2}$/, `${decisionId}.untilDate must be YYYY-MM-DD`);
+    assert.equal(isValidCalendarDate(decision.untilDate), true, `${decisionId}.untilDate must be valid`);
     const expiresAt = new Date(`${decision.untilDate}T23:59:59.999+09:00`);
-    assert.equal(Number.isNaN(expiresAt.getTime()), false, `${decisionId}.untilDate must be valid`);
     if (now.getTime() > expiresAt.getTime()) {
       throw new Error(`temporary release decision expired: ${decisionId} (${decision.untilDate})`);
     }
   }
+}
+
+function isValidCalendarDate(value) {
+  const [year, month, day] = value.split("-").map(Number);
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth[month - 1];
 }
 
 async function main() {

@@ -32,3 +32,13 @@ test("production readiness validator는 만료된 임시 예외의 SATISFIED 상
     /temporary release decision expired: operatorTenantScope/,
   );
 });
+
+test("production readiness validator는 존재하지 않는 달력 날짜를 거부한다", () => {
+  assert.throws(
+    () => assertTemporaryReleaseDecisionsCurrent(
+      evidenceWithUntilDate("2026-02-31"),
+      new Date("2026-02-01T00:00:00.000+09:00"),
+    ),
+    /operatorTenantScope\.untilDate must be valid/,
+  );
+});
