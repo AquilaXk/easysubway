@@ -121,6 +121,14 @@ test("ITX materialization은 TAGO OD의 양 끝역·열차번호·시각이 모�
       stationId: "station-chuncheon", lineId: "gyeongchun", trnNo: "K2001", dayCd: "8",
       arrivalSeconds: 9 * 3600 + 50 * 60, departureSeconds: 9 * 3600 + 50 * 60,
     },
+    {
+      stationId: "station-cheongnyangni", lineId: "gyeongchun", trnNo: "K2001", dayCd: "7",
+      arrivalSeconds: 10 * 3600, departureSeconds: 10 * 3600,
+    },
+    {
+      stationId: "station-chuncheon", lineId: "gyeongchun", trnNo: "K2001", dayCd: "7",
+      arrivalSeconds: 11 * 3600 + 20 * 60, departureSeconds: 11 * 3600 + 20 * 60,
+    },
   ];
   const evidence = {
     serviceId: "ITX_CHEONGCHUN",
@@ -136,7 +144,7 @@ test("ITX materialization은 TAGO OD의 양 끝역·열차번호·시각이 모�
 
   assert.doesNotThrow(() => validateItxOdJoin(rows, evidence));
   assert.throws(
-    () => validateItxOdJoin(rows.slice(1), evidence),
+    () => validateItxOdJoin(rows.filter(({ stationId, dayCd }) => stationId !== "station-cheongnyangni" || dayCd !== "8"), evidence),
     /missing OD endpoint row/,
   );
   assert.throws(
@@ -144,7 +152,7 @@ test("ITX materialization은 TAGO OD의 양 끝역·열차번호·시각이 모�
     /duplicate OD endpoint row/,
   );
   assert.throws(
-    () => validateItxOdJoin([{ ...rows[0], departureSeconds: rows[0].departureSeconds + 60 }, rows[1]], evidence),
+    () => validateItxOdJoin([{ ...rows[0], departureSeconds: rows[0].departureSeconds + 60 }, ...rows.slice(1)], evidence),
     /OD time mismatch/,
   );
 });

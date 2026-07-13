@@ -323,7 +323,10 @@ function validatePublicApiQuery(query, label) {
   const providerId = requiredString(query.providerId, `${label}.providerId`);
   const endpoint = new URL(requiredString(query.endpoint, `${label}.endpoint`));
   if (!PUBLIC_API_ORIGINS.has(endpoint.origin)) throw new Error(`${label} public API origin is not allowed`);
-  if (endpoint.username || endpoint.password || endpoint.hash) throw new Error(`${label}.endpoint must not contain credentials`);
+  if (endpoint.username || endpoint.password || endpoint.hash
+    || [...endpoint.searchParams.keys()].some(isCredentialName)) {
+    throw new Error(`${label}.endpoint must not contain credentials`);
+  }
   requiredString(query.operation, `${label}.operation`);
   if (!query.query || typeof query.query !== "object" || Array.isArray(query.query)) {
     throw new Error(`${label}.query must be an object`);

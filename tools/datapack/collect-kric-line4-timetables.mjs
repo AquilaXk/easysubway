@@ -61,16 +61,18 @@ export function validateItxOdJoin(rows, evidence) {
   const rowsByTrain = new Map();
   for (const row of rows) {
     const trainNumber = normalizeTrainNumber(row.trnNo);
-    const grouped = rowsByTrain.get(trainNumber) ?? [];
+    const key = `${trainNumber}|${row.dayCd}`;
+    const grouped = rowsByTrain.get(key) ?? [];
     grouped.push(row);
-    rowsByTrain.set(trainNumber, grouped);
+    rowsByTrain.set(key, grouped);
   }
   const itineraryNumbers = new Set();
   for (const [index, itinerary] of evidence.itineraries.entries()) {
     const trainNumber = normalizeTrainNumber(itinerary?.trainNumber);
     if (itineraryNumbers.has(trainNumber)) throw new Error(`ITX OD evidence duplicate train number: ${trainNumber}`);
     itineraryNumbers.add(trainNumber);
-    const trainRows = rowsByTrain.get(trainNumber) ?? [];
+    const dayCd = serviceDayCd(itinerary?.departureAt, `itineraries[${index}].departureAt`);
+    const trainRows = rowsByTrain.get(`${trainNumber}|${dayCd}`) ?? [];
     const departures = trainRows.filter(({ stationId }) => stationId === departureStationId);
     const arrivals = trainRows.filter(({ stationId }) => stationId === arrivalStationId);
     if (departures.length === 0 || arrivals.length === 0) {
@@ -100,6 +102,23 @@ function isoServiceSeconds(value, label) {
   const seconds = Number(match[3]);
   if (hours > 23 || minutes > 59 || seconds > 59) throw new Error(`${label} is invalid`);
   return (hours < 3 ? hours + 24 : hours) * 3600 + minutes * 60 + seconds;
+}
+
+function serviceDayCd(value, label) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T/.exec(String(value ?? ""));
+  if (!match) throw new Error(`${label} must use Asia/Seoul ISO timestamp`);
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (date.getUTCFullYear() !== Number(match[1]) || date.getUTCMonth() !== Number(match[2]) - 1
+    || date.getUTCDate() !== Number(match[3])) {
+    throw new Error(`${label} is invalid`);
+  }
+  const weekday = date.getUTCDay();
+  return weekday === 6 ? "7" : weekday === 0 ? "9" : "8";
+}
+
+function evidenceServiceDayCds(evidence) {
+  return new Set(evidence.itineraries.map((itinerary, index) =>
+    serviceDayCd(itinerary?.departureAt, `itineraries[${index}].departureAt`)));
 }
 
 export function validateKricTimetablePayload(payload) {
@@ -196,8 +215,10 @@ async function main() {
   }
 
   assertCompleteKricCollection(failed, plan.requestCount);
+  const evidenceDayCds = trainNumberEvidence ? evidenceServiceDayCds(trainNumberEvidence) : null;
   const reconstructionRows = trainNumberEvidence
     ? filterRowsByTrainNumbers(intermediate, trainNumberEvidence.trainNumbers)
+      .filter(({ dayCd }) => evidenceDayCds.has(dayCd))
     : intermediate;
   if (trainNumberEvidence && reconstructionRows.length === 0) {
     const available = [...new Set(intermediate.map(({ trnNo }) => trnNo))]

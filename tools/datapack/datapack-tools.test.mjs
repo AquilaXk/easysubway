@@ -8618,6 +8618,13 @@ test("전국 coverage report는 불완전하거나 만료된 공공 API 미지�
       publicApiQueries: [{ ...publicApiQueries[0], endpoint: "https://example.com/blog" }],
       evidenceHash: sha256(JSON.stringify([{ ...publicApiQueries[0], endpoint: "https://example.com/blog" }])),
     }], /public API origin is not allowed/],
+    ["credential query endpoint", [{
+      ...baseEntry,
+      publicApiQueries: [{ ...publicApiQueries[0], endpoint: `${publicApiQueries[0].endpoint}?serviceKey=secret` }],
+      evidenceHash: sha256(JSON.stringify([{
+        ...publicApiQueries[0], endpoint: `${publicApiQueries[0].endpoint}?serviceKey=secret`,
+      }])),
+    }], /endpoint must not contain credentials/],
     ["provider failure", [{
       ...baseEntry,
       publicApiQueries: [{ ...publicApiQueries[0], providerResultCode: "99" }],

@@ -265,7 +265,6 @@ async function runQuery(query, credentials, fetchImpl, requestCache) {
         url,
         request: {
           redirect: "error",
-          signal: AbortSignal.timeout(15_000),
           headers: { accept: "application/xml,text/xml", ...authorization },
         },
         expectedContentTypes: new Set(["application/xml", "text/xml"]),
@@ -318,7 +317,6 @@ async function fetchAllDataGoPages({ query, url, authorization, fetchImpl }) {
       request: {
         method: "POST",
         redirect: "error",
-        signal: AbortSignal.timeout(15_000),
         headers: { accept: "application/json", "content-type": "application/json", ...authorization },
         body: JSON.stringify({ ...query.query, page }),
       },
@@ -364,7 +362,7 @@ async function fetchPublicApiPage({ url, request, expectedContentTypes, fetchImp
   let response;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      response = await fetchImpl(url, request);
+      response = await fetchImpl(url, { ...request, signal: AbortSignal.timeout(15_000) });
       break;
     } catch {
       if (attempt === 1) return { reasonCode: "PUBLIC_API_FETCH_FAILED", attempts: 2 };
@@ -530,6 +528,10 @@ function validatePlan(plan) {
 function validateQuery(query, label) {
   const endpoint = new URL(requiredString(query.endpoint, `${label}.endpoint`));
   if (!PUBLIC_API_ORIGINS.has(endpoint.origin)) throw new Error(`${label} public API origin is not allowed`);
+  if (endpoint.username || endpoint.password || endpoint.hash
+    || [...endpoint.searchParams.keys()].some(isCredentialName)) {
+    throw new Error(`${label}.endpoint must not contain credentials`);
+  }
   requiredString(query.providerId, `${label}.providerId`);
   requiredString(query.operation, `${label}.operation`);
   if (!CREDENTIAL_ENVS.has(query.credentialEnv)) throw new Error(`${label}.credentialEnv is not allowed`);

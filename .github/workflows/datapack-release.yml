@@ -484,6 +484,10 @@ jobs:
             --output "${EASYSUBWAY_HEADWAY_REPORT}"
           test -s "${EASYSUBWAY_HEADWAY_REPORT}"
 
+      - name: Data Pack Release / Validate ITX-청춘 coverage contract
+        if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' }}
+        run: node --test tools/datapack/itx-cheongchun-coverage-contract.test.mjs
+
       - name: Data Pack Release / Write release evidence bundle
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' }}
         id: evidence-bundle

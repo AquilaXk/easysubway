@@ -4624,6 +4624,8 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   const remotePublishIndex = workflow.indexOf("Data Pack Release / Publish staged data packs to object storage");
   const artifactIndex = workflow.indexOf("Data Pack Release / Upload staged data packs");
   const manifestIndex = workflow.indexOf("Data Pack Release / Stage manifest");
+  const itxContractValidationIndex = workflow.indexOf("Data Pack Release / Validate ITX-청춘 coverage contract");
+  const evidenceBundleIndex = workflow.indexOf("Data Pack Release / Write release evidence bundle");
   const jobEnvBlock = workflow.match(/\n    env:\n[\s\S]*?\n\n    steps:/)?.[0] ?? "";
 
   assert.match(workflow, /^name: Data Pack Release$/m);
@@ -4632,6 +4634,12 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /paths:[\s\S]*- tools\/route-map\/\*\*/);
   assert.doesNotMatch(jobEnvBlock, /runner\.temp/, "job-level env cannot use runner context");
   assert.match(workflow, /Data Pack Release \/ Configure temp directories/);
+  assert.ok(itxContractValidationIndex >= 0, "ITX coverage contract validation step must exist");
+  assert.ok(
+    itxContractValidationIndex < evidenceBundleIndex,
+    "ITX coverage contract must be validated before release evidence is hashed",
+  );
+  assert.match(workflow, /node --test tools\/datapack\/itx-cheongchun-coverage-contract\.test\.mjs/);
   assert.match(workflow, /GITHUB_ENV/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_OUTPUT=\$\{\{ runner\.temp \}\}\/easysubway-datapacks/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_STAGE=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage/);

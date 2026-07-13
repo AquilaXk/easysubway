@@ -40,6 +40,22 @@ function xmlResponse({ code = "00", items = "" } = {}) {
   );
 }
 
+test("수동 검색 plan은 endpoint URL에 포함된 credential을 거부한다", async () => {
+  for (const endpoint of [
+    "https://user:password@openapi.kric.go.kr/openapi/trainUseInfo/subwayTimetable",
+    "https://openapi.kric.go.kr/openapi/trainUseInfo/subwayTimetable?serviceKey=secret",
+  ]) {
+    await assert.rejects(
+      collectNationwidePublicApiCoverage({
+        searchPlan: plan([{ ...target, queries: [{ ...target.queries[0], endpoint }] }]),
+        credentials: { KRIC_SERVICE_KEY: "key" },
+        fetchImpl: async () => xmlResponse(),
+      }),
+      /endpoint must not contain credentials/,
+    );
+  }
+});
+
 test("전국 target과 fixture에서 line AND domain 실제 검색 계획을 만든다", () => {
   const searchPlan = buildNationwidePublicApiSearchPlan({
     targets: {
@@ -490,4 +506,22 @@ test("데이터 존재·provider 실패·bounded retry 실패는 MISSING으로 �
   assert.equal(retryCalls, 2);
   assert.deepEqual(resolutions.unresolved[0].matches, [{ stinCd: "101" }]);
   assert.equal(resolutions.unresolved[2].attempts, 2);
+});
+
+test("bounded retry는 attempt마다 새 timeout signal을 사용한다", async () => {
+  const signals = [];
+  const resolutions = await collectNationwidePublicApiCoverage({
+    searchPlan: plan(),
+    credentials: { KRIC_SERVICE_KEY: "key" },
+    fetchImpl: async (_url, init) => {
+      signals.push(init.signal);
+      if (signals.length === 1) throw new DOMException("timed out", "TimeoutError");
+      return xmlResponse();
+    },
+    now: new Date("2026-07-13T00:00:00.000Z"),
+  });
+
+  assert.equal(resolutions.entries.length, 1);
+  assert.equal(signals.length, 2);
+  assert.notEqual(signals[0], signals[1]);
 });
