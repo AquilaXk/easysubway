@@ -13864,6 +13864,8 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.match(workflow, /^  provider-approval-expiry:\s*$/m);
   assert.match(workflow, /^    name: Provider Approval Expiry$/m);
   assert.match(workflow, /provider-approval-expiry:[\s\S]*id:\s*check[\s\S]*GITHUB_OUTPUT/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*notification_due/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*github\.event_name == 'workflow_dispatch'/);
   assert.match(workflow, /provider-approval-expiry:[\s\S]*steps\.check\.outputs\.status == 'WARNING'[\s\S]*slackapi\/slack-github-action@/);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);

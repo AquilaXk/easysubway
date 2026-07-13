@@ -221,6 +221,13 @@ export function providerApprovalExpirySummary(document, { today = new Date().toI
   };
 }
 
+export function providerApprovalNotificationDue(summary, { now = new Date() } = {}) {
+  if (!(now instanceof Date) || Number.isNaN(now.valueOf())) {
+    throw new Error("provider approval notification time must be a valid Date");
+  }
+  return summary?.status === "WARNING" && now.getUTCHours() === 0;
+}
+
 export function validateOperation(candidate, { allowMissing = false } = {}) {
   const requestUrl = requiredHttpUrl(candidate?.requestUrl, `${candidate?.id ?? "candidate"}.requestUrl`);
   if (hasCredentialValue(candidate.requestUrl)) {
@@ -437,7 +444,11 @@ async function main(args = process.argv.slice(2)) {
       }
     }
     if (githubOutput) {
-      await appendFile(githubOutput, `status=${summary.status}\napproved_count=${summary.approvals.length}\n`);
+      const notificationDue = providerApprovalNotificationDue(summary);
+      await appendFile(
+        githubOutput,
+        `status=${summary.status}\napproved_count=${summary.approvals.length}\nnotification_due=${notificationDue}\n`,
+      );
     }
     console.log(`provider approval expiry: ${summary.status} (${summary.approvals.length} approved)`);
     return;

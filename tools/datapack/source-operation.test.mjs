@@ -6,6 +6,7 @@ import {
   listOperations,
   operationSummary,
   providerApprovalExpirySummary,
+  providerApprovalNotificationDue,
   validateOperation,
   validateSourceCandidateDocument,
 } from "./source-operation.mjs";
@@ -260,6 +261,14 @@ test("provider 승인 만료 요약은 갱신 window부터 경고한다", () => 
     () => providerApprovalExpirySummary(document, { today: "2027-07-07" }),
     /status is APPROVED but validTo has expired/,
   );
+});
+
+test("provider 승인 갱신 알림은 scheduled 실행에서 UTC 하루 한 번만 허용한다", () => {
+  const warning = { status: "WARNING" };
+
+  assert.equal(providerApprovalNotificationDue(warning, { now: new Date("2027-06-06T00:23:00Z") }), true);
+  assert.equal(providerApprovalNotificationDue(warning, { now: new Date("2027-06-06T04:23:00Z") }), false);
+  assert.equal(providerApprovalNotificationDue({ status: "OK" }, { now: new Date("2027-06-06T00:23:00Z") }), false);
 });
 
 test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지를 고정한다", () => {
