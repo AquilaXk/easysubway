@@ -7,7 +7,10 @@ import 'catalog_tables.dart';
 
 part 'catalog_database.g.dart';
 
-const catalogDatabaseSchemaVersion = 17;
+// v18 is a reader-compatibility boundary for transitPassThroughStationIds.
+// It intentionally adds no table migration; older apps must reject packs that
+// use the new public-scope semantics instead of exposing pass-through stations.
+const catalogDatabaseSchemaVersion = 18;
 
 /// 수도권 통합요금 기본거리(10km) 초과분 요금 단계(#1911).
 ///

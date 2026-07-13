@@ -167,7 +167,7 @@ void main() {
           .customSelect('SELECT id FROM station_car_door_hints')
           .getSingle();
 
-      expect(catalogDatabaseSchemaVersion, 17);
+      expect(catalogDatabaseSchemaVersion, 18);
       expect(fareCount.read<int>('count'), 0);
       expect(hint.read<String>('id'), 'kept-hint');
     },
@@ -199,7 +199,7 @@ void main() {
           .customSelect('SELECT value FROM preserved_rows')
           .getSingle();
 
-      expect(catalogDatabaseSchemaVersion, 17);
+      expect(catalogDatabaseSchemaVersion, 18);
       expect(fareCount.read<int>('count'), 0);
       expect(hintCount.read<int>('count'), 0);
       expect(preserved.read<String>('value'), 'kept');

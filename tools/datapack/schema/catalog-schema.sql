@@ -1,5 +1,6 @@
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 16;
+-- v18 gates pass-through station metadata to apps that understand its public-scope semantics.
+PRAGMA user_version = 18;
 
 CREATE TABLE catalog_metadata (
   key TEXT NOT NULL PRIMARY KEY,
