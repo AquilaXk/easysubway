@@ -928,10 +928,11 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
     );
     assert.ok(restoreStep.includes(`drop["${name}"] = 1`), `${name} must replace a stale dotenv value`);
   }
-  assert.match(restoreStep, /for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do/);
-  assert.match(restoreStep, /value="\$\{!name\}"/);
-  assert.match(restoreStep, /\[\[ -z "\$\{value\}" \|\| "\$\{value\}" == \*\$'\\n'\* \|\| "\$\{value\}" == \*\$'\\r'\* \]\]/);
-  assert.match(restoreStep, /printf '%s=%s\\n' "\$\{name\}" "\$\{value\}" >> "\$\{env_file\}"/);
+  assert.match(
+    restoreStep,
+    /for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+if \[\[ -z "\$\{value\}" \|\| "\$\{value\}" == \*\$'\\n'\* \|\| "\$\{value\}" == \*\$'\\r'\* \]\]; then[\s\S]*?exit 1\s+fi\s+done[\s\S]*?for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+printf '%s=%s\\n' "\$\{name\}" "\$\{value\}" >> "\$\{env_file\}"\s+done/,
+    "invalid repository variables must exit before any approved value is written",
+  );
   assert.match(workflow, /CD Deploy \/ Validate deployment dotenv contract/);
   assert.match(workflow, /CD Plan \/ Detect deployment changes/);
   assert.match(workflow, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
