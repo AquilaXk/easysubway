@@ -51,6 +51,11 @@ class EasySubwayAccessibleColors {
   /// 과거 navy 액센트. 단일 브랜드 액센트로 통일했다. 신규 코드는 [primary] 사용.
   static const brand = primary;
 
+  /// 시그니처 브랜드 색(라이트 단일 모드). 오너 결정(#2089)으로 1차 적용 —
+  /// 온보딩 시작 화면의 강조 행·CTA에만 쓴다. 흰 글자 대비 5.7:1(AA 통과).
+  /// 이 앱은 라이트 단일 모드(#1917 revert)라 다크 변형을 두지 않는다.
+  static const brandSignature = Color(0xFF7C3AED);
+
   /// 다크 히어로 등 짙은 브랜드 표면(레거시). 신규 화면에서는 사용하지 않는다.
   static const brandDark = Color(0xFF071B2F);
 

@@ -201,12 +201,11 @@ class OnboardingState {
   bool get isCompleted => result != null;
 }
 
-/// 화면 1 — 시작. 상단 브랜드 심볼(무채색 라인) + 핵심 가치 큰 타이틀 + 단일 CTA.
+/// 화면 1 — 시작. 핵심 가치 카피 3행 + 단일 CTA만 둔 카피 중심 화면.
 ///
-/// #1936(프리미엄 다듬기): 텍스트+버튼만이라 밋밋하다는 판정에 대응해, 상단에
-/// 무채색 라인 아트 브랜드 심볼/워드마크를 둔다. 색·그림자·블록 없이 심볼만으로
-/// 브랜딩을 세우고, 심볼–타이틀–여백–CTA의 세로 리듬을 균형 있게 구성한다.
-/// 상단 여백을 크게 비운 뒤 심볼→타이틀, Spacer로 CTA를 하단에 고정한다.
+/// #2081: 상단 브랜드 심볼/워드마크를 걷어내고 카피만으로 화면을 세운다.
+/// 가치 카피 3행을 크게 두고 Spacer로 CTA를 하단에 고정하며, 상단 여백을 비워
+/// 타이틀이 화면 상단 1/4~1/3 지점에서 시작하는 세로 리듬을 유지한다.
 class StartScreen extends StatelessWidget {
   const StartScreen({required this.onStart, super.key});
 
@@ -219,12 +218,14 @@ class StartScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            // 상단 여백을 비워 심볼이 화면 상단 1/4 지점에서 시작하게 한다.
-            // 이전(~35%)보다 살짝 줄여 심볼–타이틀 묶음이 화면 중앙 위로 앉는다.
-            final topGap = (constraints.maxHeight * 0.22).clamp(64.0, 168.0);
+            // 상단 여백을 비워 타이틀이 화면 상단 1/4~1/3 지점에서 시작하게 한다.
+            // 심볼 제거(#2081)로 세로 여백을 조금 넉넉히 잡아 타이틀 묶음을 앉힌다.
+            final topGap = (constraints.maxHeight * 0.28).clamp(72.0, 200.0);
             // SafeArea(bottom: true) 자손이라 하단 인셋은 SafeArea가 이미 적용한다.
             // viewPadding.bottom을 또 더하면 이중 가산이므로 토큰 여백만 쓴다.
-            const bottomGap = EasySubwaySpacing.xxl;
+            // #2089(오너 실기기 검수): CTA가 화면 최하단에 과하게 붙어 있어
+            // 하단 여백을 xxl의 2배로 늘려 버튼을 세로 리듬 안에서 위로 올린다.
+            const bottomGap = EasySubwaySpacing.xxl * 2;
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -240,20 +241,31 @@ class StartScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(height: topGap),
-                        // 브랜드 심볼(무채색 라인 아트) + 워드마크. 밋밋함 해소(#1936).
-                        const _BrandMark(),
-                        const SizedBox(height: EasySubwaySpacing.xxl),
                         Semantics(
                           header: true,
-                          child: const Text(
-                            // 핵심 가치 한 줄. 부연 설명("먼저 안내해요") 삭제(#1936).
-                            // 강조도 무채색 잉크로 통일(초록/민트 금지).
-                            '빠른 길보다,\n갈 수 있는 길',
-                            style: TextStyle(
+                          child: Text.rich(
+                            // 핵심 가치 카피 3행(#2081). #2089: 2행 중 "갈 수 있는
+                            // 길"까지만 시그니처 브랜드 색으로 강조하고, 조사 "을"과
+                            // 1·3행은 기존 잉크 토큰을 유지한다(오너 실기기 검수).
+                            // 스크린리더가 읽는 전체 문자열은 그대로 보존된다.
+                            const TextSpan(
+                              children: [
+                                TextSpan(text: '빠른 길보다\n'),
+                                TextSpan(
+                                  text: '갈 수 있는 길',
+                                  style: TextStyle(
+                                    color: EasySubwayAccessibleColors
+                                        .brandSignature,
+                                  ),
+                                ),
+                                TextSpan(text: '을\n안내합니다'),
+                              ],
+                            ),
+                            style: const TextStyle(
                               color: EasySubwayAccessibleColors.text,
-                              fontSize: 36,
+                              fontSize: 40,
                               fontWeight: FontWeight.w800,
-                              height: 1.16,
+                              height: 1.18,
                             ),
                           ),
                         ),
@@ -264,11 +276,19 @@ class StartScreen extends StatelessWidget {
                             key: const Key('startScreenStartButton'),
                             onPressed: onStart,
                             style: FilledButton.styleFrom(
+                              // #2089: 시작 CTA만 시그니처 브랜드 색 채움 +
+                              // 흰 글자(대비 5.7:1, AA 통과).
                               backgroundColor:
-                                  EasySubwayAccessibleColors.primary,
+                                  EasySubwayAccessibleColors.brandSignature,
                               foregroundColor:
                                   EasySubwayAccessibleColors.surface,
                               minimumSize: const Size.fromHeight(58),
+                              // #2089(오너 실기기 검수 2차): 58px 버튼 대비 라벨이
+                              // 여전히 작아 보여 글자를 더 키운다(22/w700, 가독 우선).
+                              textStyle: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
                                   EasySubwayRadius.control,
@@ -289,92 +309,6 @@ class StartScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-/// #1936: 미니멀 무채색 브랜드 심볼 + 워드마크.
-///
-/// 심볼은 노선·경로를 은유하는 라인 아트(두 정거장을 잇는 route 글리프)로,
-/// 색·그림자·블록 없이 잉크 라인과 점만으로 그린다. 워드마크는 앱 이름을
-/// 무채색 잉크로 둔다(w800은 화면 타이틀 예산 밖으로 두어 w700 + 자간). 브랜드
-/// 부재로 인한 "텍스트+버튼만" 밋밋함을 해소하는 시각 앵커다.
-class _BrandMark extends StatelessWidget {
-  const _BrandMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '쉬운 지하철',
-      image: true,
-      child: ExcludeSemantics(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CustomPaint(
-              size: const Size(40, 40),
-              painter: _RouteGlyphPainter(
-                color: EasySubwayAccessibleColors.text,
-              ),
-            ),
-            const SizedBox(width: EasySubwaySpacing.md),
-            Text(
-              '쉬운 지하철',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: EasySubwayAccessibleColors.text,
-                fontWeight: FontWeight.w700,
-                fontSize: 19,
-                letterSpacing: -0.2,
-                height: 1.0,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 노선/경로 글리프 — 두 정거장을 잇는 무채색 라인 아트.
-///
-/// 굵은 라인 1개 + 양끝 정거장 노드(속이 빈 원)로 "이동 경로"를 은유한다.
-/// 색 없이 잉크 선만 쓰고, 그림자·채움 블록은 두지 않는다(#1936 제약).
-class _RouteGlyphPainter extends CustomPainter {
-  const _RouteGlyphPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = size.width * 0.11;
-    final cy = size.height * 0.5;
-    final line = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round;
-
-    final nodeRadius = size.width * 0.17;
-    final left = Offset(nodeRadius + stroke * 0.5, cy);
-    final right = Offset(size.width - nodeRadius - stroke * 0.5, cy);
-
-    // 두 정거장을 잇는 경로 라인.
-    canvas.drawLine(
-      Offset(left.dx + nodeRadius, cy),
-      Offset(right.dx - nodeRadius, cy),
-      line,
-    );
-
-    // 양끝 정거장 노드(속 빈 원 = 라인 아트).
-    final node = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke;
-    canvas.drawCircle(left, nodeRadius, node);
-    canvas.drawCircle(right, nodeRadius, node);
-  }
-
-  @override
-  bool shouldRepaint(_RouteGlyphPainter oldDelegate) =>
-      oldDelegate.color != color;
 }
 
 /// 진행 인디케이터 — 아주 작은 점 2개(애플식). 블록/박스 아님(#1936).
