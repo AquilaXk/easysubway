@@ -223,7 +223,9 @@ class StartScreen extends StatelessWidget {
             final topGap = (constraints.maxHeight * 0.28).clamp(72.0, 200.0);
             // SafeArea(bottom: true) 자손이라 하단 인셋은 SafeArea가 이미 적용한다.
             // viewPadding.bottom을 또 더하면 이중 가산이므로 토큰 여백만 쓴다.
-            const bottomGap = EasySubwaySpacing.xxl;
+            // #2089(오너 실기기 검수): CTA가 화면 최하단에 과하게 붙어 있어
+            // 하단 여백을 xxl의 2배로 늘려 버튼을 세로 리듬 안에서 위로 올린다.
+            const bottomGap = EasySubwaySpacing.xxl * 2;
             return SingleChildScrollView(
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -241,10 +243,25 @@ class StartScreen extends StatelessWidget {
                         SizedBox(height: topGap),
                         Semantics(
                           header: true,
-                          child: const Text(
-                            // 핵심 가치 카피 3행(#2081). 강조는 무채색 잉크로 통일.
-                            '빠른 길보다\n갈 수 있는 길을\n안내합니다',
-                            style: TextStyle(
+                          child: Text.rich(
+                            // 핵심 가치 카피 3행(#2081). #2089: 2행 중 "갈 수 있는
+                            // 길"까지만 시그니처 브랜드 색으로 강조하고, 조사 "을"과
+                            // 1·3행은 기존 잉크 토큰을 유지한다(오너 실기기 검수).
+                            // 스크린리더가 읽는 전체 문자열은 그대로 보존된다.
+                            const TextSpan(
+                              children: [
+                                TextSpan(text: '빠른 길보다\n'),
+                                TextSpan(
+                                  text: '갈 수 있는 길',
+                                  style: TextStyle(
+                                    color: EasySubwayAccessibleColors
+                                        .brandSignature,
+                                  ),
+                                ),
+                                TextSpan(text: '을\n안내합니다'),
+                              ],
+                            ),
+                            style: const TextStyle(
                               color: EasySubwayAccessibleColors.text,
                               fontSize: 40,
                               fontWeight: FontWeight.w800,
@@ -259,11 +276,19 @@ class StartScreen extends StatelessWidget {
                             key: const Key('startScreenStartButton'),
                             onPressed: onStart,
                             style: FilledButton.styleFrom(
+                              // #2089: 시작 CTA만 시그니처 브랜드 색 채움 +
+                              // 흰 글자(대비 5.7:1, AA 통과).
                               backgroundColor:
-                                  EasySubwayAccessibleColors.primary,
+                                  EasySubwayAccessibleColors.brandSignature,
                               foregroundColor:
                                   EasySubwayAccessibleColors.surface,
                               minimumSize: const Size.fromHeight(58),
+                              // #2089(오너 실기기 검수 2차): 58px 버튼 대비 라벨이
+                              // 여전히 작아 보여 글자를 더 키운다(22/w700, 가독 우선).
+                              textStyle: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(
                                   EasySubwayRadius.control,
