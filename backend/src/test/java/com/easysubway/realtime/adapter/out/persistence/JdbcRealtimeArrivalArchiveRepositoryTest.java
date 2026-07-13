@@ -139,7 +139,9 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 	void databaseEnforcesRawLabelLength() {
 		assertThatCode(() -> insertRawLabels("x".repeat(120), "y".repeat(120)))
 			.doesNotThrowAnyException();
-		assertThatThrownBy(() -> insertRawLabels("x".repeat(121), "y".repeat(121)))
+		assertThatThrownBy(() -> insertRawLabels("x".repeat(121), "y".repeat(120)))
+			.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> insertRawLabels("x".repeat(120), "y".repeat(121)))
 			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
