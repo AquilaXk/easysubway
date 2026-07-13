@@ -3,8 +3,8 @@ import 'dart:ui';
 
 import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/facility_report.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/main.dart';
-import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/onboarding.dart';
 import 'package:easysubway_mobile/route_search.dart';
@@ -145,7 +145,7 @@ OnboardingState _completedOnboardingState({
 }) {
   return OnboardingState.completed(
     result: OnboardingResult(
-      profile: mobilityProfileOptions.first,
+      preset: MobilityPreset.standard,
       preferences: preferences,
     ),
   );

@@ -305,8 +305,6 @@ void main() {
       'lib/network_map.dart': 2,
       // 의도 잔존: 시설 신고 카드 radius(16) — 무박스 전환 대상
       'lib/facility_report.dart': 1,
-      // 의도 잔존: 이동성 프로필 카드 radius(16) — 무박스 전환 대상
-      'lib/mobility_profile.dart': 1,
       // 의도 잔존: 알림 설정 카드 radius(16) — 무박스 전환 대상
       'lib/notification_settings.dart': 1,
       // 의도 잔존: 운행 공지 리스트 카드 radius(12) — 무박스 전환 대상
