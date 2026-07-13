@@ -8271,6 +8271,12 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   const restoreCheckPath = "tools/ops/data-source-raw-archive-restore-check.mjs";
   const materializeScript = read(materializePath);
   const restoreCheckScript = read(restoreCheckPath);
+  const restoreArchive = (archiveDir, stdio) => execFileSync(process.execPath, [restoreCheckPath], {
+    cwd: root,
+    encoding: "utf8",
+    ...(stdio ? { stdio } : {}),
+    env: { ...process.env, EASYSUBWAY_DATA_SOURCE_RESTORE_DIR: archiveDir },
+  });
   const fixtureDir = await mkdtemp(path.join(tmpdir(), "easysubway-source-archive-"));
   const payloadPath = path.join(fixtureDir, "source-payload.json");
   const payload = Buffer.from('{"provider":"synthetic","items":[1]}\n');
@@ -8320,12 +8326,14 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   assert.match(restoreCheckScript, /materialized archive IDs must be unique/);
   assert.match(restoreCheckScript, /materialized payload must not be a symlink/);
   assert.match(restoreCheckScript, /archive directory must not be a symlink/);
+  assert.match(restoreCheckScript, /EASYSUBWAY_DATA_SOURCE_RESTORE_DIR/);
+  assert.doesNotMatch(restoreCheckScript, /process\.argv/);
 
   execFileSync(process.execPath, [materializePath, path.join(fixtureDir, "raw-archives.csv"), fixtureDir], {
     cwd: root,
     encoding: "utf8",
   });
-  const result = execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8" });
+  const result = restoreArchive(fixtureDir);
   assert.match(result, /data source archive restore rehearsal ok: 1 payload/);
 
   const collectionRunsPath = path.join(fixtureDir, "collection-runs.csv");
@@ -8336,11 +8344,7 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   await rm(collectionRunsPath);
   await symlink(outsideCollectionRunsPath, collectionRunsPath);
   assert.throws(
-    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: "pipe",
-    }),
+    () => restoreArchive(fixtureDir, "pipe"),
     /Command failed/,
   );
   await rm(collectionRunsPath);
@@ -8351,11 +8355,7 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   const linkedArchiveDir = path.join(linkedArchiveParent, "archive");
   await symlink(fixtureDir, linkedArchiveDir, "dir");
   assert.throws(
-    () => execFileSync(process.execPath, [restoreCheckPath, linkedArchiveDir], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: "pipe",
-    }),
+    () => restoreArchive(linkedArchiveDir, "pipe"),
     /Command failed/,
   );
   await rm(linkedArchiveParent, { recursive: true, force: true });
@@ -8377,7 +8377,7 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
     /Command failed/,
   );
   assert.throws(
-    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    () => restoreArchive(fixtureDir, "pipe"),
     /Command failed/,
   );
 
@@ -8395,7 +8395,7 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   duplicateManifest.materialized[1].archiveId = duplicateManifest.materialized[0].archiveId;
   await writeFile(path.join(fixtureDir, "payload-manifest.json"), `${JSON.stringify(duplicateManifest)}\n`);
   assert.throws(
-    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    () => restoreArchive(fixtureDir, "pipe"),
     /Command failed/,
   );
 
@@ -8410,14 +8410,14 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   await rm(objectPath);
   await symlink(outsidePayloadPath, objectPath);
   assert.throws(
-    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    () => restoreArchive(fixtureDir, "pipe"),
     /Command failed/,
   );
 
   await rm(objectPath);
   await writeFile(objectPath, Buffer.from("tampered"));
   assert.throws(
-    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    () => restoreArchive(fixtureDir, "pipe"),
     /Command failed/,
   );
   await rm(outsideDir, { recursive: true, force: true });
@@ -8494,7 +8494,7 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   const sourceArchiveTarget = backupTargets.get("datapack_source_inventory");
   assert.equal(
     sourceArchiveTarget.restoreRehearsalCommand,
-    'node tools/ops/data-source-raw-archive-restore-check.mjs "$EASYSUBWAY_DATA_SOURCE_RESTORE_DIR" && node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json',
+    'node tools/ops/data-source-raw-archive-restore-check.mjs && node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json',
   );
   assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-materialize.mjs"));
   assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-restore-check.mjs"));

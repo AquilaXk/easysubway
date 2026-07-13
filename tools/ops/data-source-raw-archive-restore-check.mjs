@@ -5,7 +5,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "nod
 import path from "node:path";
 import { parseCsv } from "./data-source-raw-archive-csv.mjs";
 
-const archiveDir = resolveArchiveDirectory(process.argv[2]);
+const archiveDir = resolveArchiveDirectory(process.env.EASYSUBWAY_DATA_SOURCE_RESTORE_DIR);
 
 const collectionRuns = parseCsv(readArchiveMetadata("collection-runs.csv"));
 const rawArchives = parseCsv(readArchiveMetadata("raw-archives.csv"));
@@ -78,7 +78,7 @@ function readArchiveMetadata(fileName) {
 }
 
 function resolveArchiveDirectory(value) {
-  assert.ok(value, "usage: data-source-raw-archive-restore-check.mjs <archive-dir>");
+  assert.ok(value, "EASYSUBWAY_DATA_SOURCE_RESTORE_DIR is required");
   const resolved = path.resolve(value);
   const status = lstatSync(resolved);
   if (status.isSymbolicLink()) throw new Error("archive directory must not be a symlink");

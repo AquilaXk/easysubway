@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 import { assertTemporaryReleaseDecisionsCurrent } from "./validate-production-readiness-evidence.mjs";
+
+test("production readiness validator module은 argv 없는 ESM import를 허용한다", () => {
+  const moduleUrl = new URL("./validate-production-readiness-evidence.mjs", import.meta.url).href;
+  assert.doesNotThrow(() => execFileSync(
+    process.execPath,
+    ["--input-type=module", "-e", `import(${JSON.stringify(moduleUrl)})`],
+    { stdio: "pipe" },
+  ));
+});
 
 function evidenceWithUntilDate(untilDate) {
   const commonDecision = {
