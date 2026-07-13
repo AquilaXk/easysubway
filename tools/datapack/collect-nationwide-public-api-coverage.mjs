@@ -12,10 +12,10 @@ const PUBLIC_API_ORIGINS = new Set([
   "https://openapi.kric.go.kr",
   "https://openapi.seoul.go.kr",
 ]);
-const KNOWN_PROVIDER_API_ORIGINS = new Set([
-  ...PUBLIC_API_ORIGINS,
-  "http://swopenapi.seoul.go.kr",
-  "http://openapi.seoul.go.kr:8088",
+// 아래 host는 공식 catalog 존재 판정 전용이다. HTTP endpoint를 fetch allowlist에 넣지 않는다.
+const KNOWN_HTTP_PROVIDER_HOSTS = new Set([
+  "swopenapi.seoul.go.kr",
+  "openapi.seoul.go.kr:8088",
 ]);
 const CREDENTIAL_ENVS = new Set(["DATA_GO_KR_SERVICE_KEY", "KRIC_SERVICE_KEY", "SEOUL_OPENAPI_KEY"]);
 const SOURCE_DOMAIN_SEARCH = Object.freeze({
@@ -208,7 +208,7 @@ function indexKnownProviderCandidates(sourceCandidates) {
     } catch {
       continue;
     }
-    if (!KNOWN_PROVIDER_API_ORIGINS.has(endpoint.origin) || domain === "provider_discovery") continue;
+    if (!isKnownProviderApiEndpoint(endpoint) || domain === "provider_discovery") continue;
     const candidates = indexed.get(domain) ?? [];
     candidates.push({ id, coverageScope: candidate.coverageScope });
     indexed.set(domain, candidates);
@@ -218,6 +218,11 @@ function indexKnownProviderCandidates(sourceCandidates) {
       .sort((a, b) => alphabeticalCompare(a.id, b.id)));
   }
   return indexed;
+}
+
+function isKnownProviderApiEndpoint(endpoint) {
+  return PUBLIC_API_ORIGINS.has(endpoint.origin)
+    || (endpoint.protocol === "http:" && KNOWN_HTTP_PROVIDER_HOSTS.has(endpoint.host));
 }
 
 function validateCoverageScope(scope, label) {
