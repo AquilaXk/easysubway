@@ -6,25 +6,98 @@
   "issue": 1016,
   "parentEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
-  "status": "BLOCKED_EXTERNAL",
+  "status": "IN_PROGRESS",
+  "goNoGoDecision": "NO_GO",
   "latestApiAccessCheck": {
-    "qaEvidenceDateKst": "2026-06-29",
+    "qaEvidenceDateKst": "2026-07-13",
     "result": "PASS",
     "packageName": "com.easysubway.app",
     "serviceAccountJsonSource": "base64",
     "oauthScope": "androidpublisher",
-    "latestVersionCodeEnv": 10001,
+    "latestVersionCodeEnv": 10004,
     "editInsertReady": true,
     "tracksListReady": true,
     "tracks": ["alpha", "beta", "internal", "production"],
-    "tracksMaxVersionCode": 10001,
+    "tracksMaxVersionCode": 10004,
     "latestVersionCodeCoversTrackMax": true,
+    "trackReleases": {
+      "alpha": {
+        "releaseState": "completed",
+        "versionCodes": [10003]
+      },
+      "beta": {
+        "releaseState": "empty",
+        "versionCodes": []
+      },
+      "internal": {
+        "releaseState": "completed",
+        "versionCodes": [10004]
+      },
+      "production": {
+        "releaseState": "empty",
+        "versionCodes": []
+      }
+    },
+    "generatedApksListReady": true,
+    "generatedUniversalApkReady": true,
+    "generatedSplitApkCount": 235,
     "editValidateReady": true,
     "editDeleteReady": true,
     "uploadAttempted": false,
     "storeSubmitAttempted": false,
     "secretValuesPrinted": false,
-    "localOnlyEvidence": ".codex/evidence/release/play-production-access/1016-api-recheck-20260629/"
+    "localOnlyEvidence": ".codex/evidence/release/play-production-access/1016-api-track-testers-20260713/"
+  },
+  "accountEvidence": {
+    "qaEvidenceDateKst": "2026-07-05",
+    "source": "owner-direct-play-console-summary",
+    "accountType": "personal",
+    "createdAtMonth": "2026-06",
+    "personalAccountTestingRequirementApplies": true,
+    "identityVerification": "READY",
+    "developerContact": "READY",
+    "paymentsProfile": "READY",
+    "leastPrivilegeConsoleUsers": "READY",
+    "twoFactorAuthentication": "READY",
+    "testerPersonalDataStoredInTrackedFiles": false,
+    "localOnlyEvidence": ".codex/evidence/release/play-production-access/1016-console-account-access-20260705/"
+  },
+  "closedTestProgress": {
+    "track": "alpha",
+    "trackVersionCode": 10003,
+    "trackReleaseStatus": "completed",
+    "lastConsoleEvidenceDateKst": "2026-07-05",
+    "lastKnownOptedInTesterCount": 0,
+    "googleGroupCountFromApi": 0,
+    "emailListsSupportedByApi": false,
+    "optedInTesterCountAvailableFromApi": false,
+    "continuousOptInDaysAvailableFromApi": false,
+    "requiredOptedInTesterCount": 12,
+    "requiredContinuousOptInDays": 14,
+    "progressState": "RECRUITMENT_AND_CONTINUOUS_OPT_IN_PENDING",
+    "testerPersonalDataPrinted": false
+  },
+  "productionAccess": {
+    "accessState": "NOT_APPLIED_REQUIREMENTS_INCOMPLETE",
+    "productionTrackVersionCodes": [],
+    "submissionAttempted": false,
+    "approvalRecorded": false
+  },
+  "physicalDeviceEvidence": {
+    "qaEvidenceDateKst": "2026-07-13",
+    "androidVersion": 16,
+    "verifiedBoot": "green",
+    "bootloaderLocked": true,
+    "secureBuild": true,
+    "debuggableBuild": false,
+    "playStoreInstalled": true,
+    "playConsoleAppInstalled": false,
+    "playInstalledBuildVerified": false,
+    "currentSigningCertificateMatchesPlay": false,
+    "playInstallRequiresCurrentAppUninstall": true,
+    "currentInstallerProvenance": "shell",
+    "deviceIdentifierPrinted": false,
+    "verificationState": "OWNER_AUTHENTICATED_CONSOLE_FLOW_PENDING"
   },
   "officialPolicy": {
     "source": "https://support.google.com/googleplay/android-developer/answer/14151465",
