@@ -6893,7 +6893,10 @@ test("서울 TOPIS 실시간 source는 backend-only key 경계와 guarded produc
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
     assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
     assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
-    assert.match(candidate.productionInventoryRelationship, /production_approved_with_guarded_default_quota/);
+    assert.equal(
+      candidate.productionInventoryRelationship,
+      "same_dataset_inventory_and_live_provider_are_production_approved_with_guarded_default_quota",
+    );
     assert.equal(candidate.serviceKeyHandling, "backend_secret_only");
     assert.equal(candidate.mobileEmbeddingAllowed, false);
     assert.equal(candidate.dataRetentionPolicy, "provider_does_not_offer_past_realtime_data");

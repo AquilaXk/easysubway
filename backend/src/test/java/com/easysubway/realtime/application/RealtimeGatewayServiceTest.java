@@ -35,6 +35,16 @@ import org.junit.jupiter.api.Test;
 class RealtimeGatewayServiceTest {
 
 	@Test
+	@DisplayName("Spring constructor는 archive와 shared quota 포트를 필수 의존성으로 받는다")
+	void springConstructorRequiresProductionSafetyPorts() {
+		var parameterTypes = List.of(RealtimeGatewayService.class.getConstructors()[0].getParameterTypes());
+
+		assertThat(parameterTypes)
+			.contains(RealtimeArrivalArchivePort.class, RealtimeProviderCallQuotaPort.class)
+			.doesNotContain(Optional.class);
+	}
+
+	@Test
 	@DisplayName("provider의 TOPIS 로컬(KST) recptnDt는 경계에서 ISO providerReceivedAt으로 정규화되어 emit된다")
 	void normalizesProviderTimestampToIsoAtBoundary() {
 		// TOPIS recptnDt는 "yyyy-MM-dd HH:mm:ss"(KST). 17:00:00 KST = 08:00:00Z, clock과 20초 차 → fresh.

@@ -77,8 +77,8 @@ public class RealtimeGatewayService {
 		RealtimeProvider provider,
 		RealtimeMappingPort mappingPort,
 		RealtimeProviderControl providerControl,
-		Optional<RealtimeArrivalArchivePort> arrivalArchivePort,
-		Optional<RealtimeProviderCallQuotaPort> providerCallQuotaPort,
+		RealtimeArrivalArchivePort arrivalArchivePort,
+		RealtimeProviderCallQuotaPort providerCallQuotaPort,
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE:1}") int providerCallLimitPerMinute,
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY:800}") int providerCallLimitPerDay
 	) {
@@ -87,8 +87,8 @@ public class RealtimeGatewayService {
 			Clock.systemUTC(),
 			mappingPort,
 			providerControl,
-			arrivalArchivePort.orElse(RealtimeArrivalArchivePort.NO_OP),
-			providerCallQuotaPort.orElseGet(ProviderCallRateLimiter::new),
+			arrivalArchivePort,
+			providerCallQuotaPort,
 			providerCallLimitPerMinute,
 			providerCallLimitPerDay
 		);

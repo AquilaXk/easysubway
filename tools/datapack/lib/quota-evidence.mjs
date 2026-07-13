@@ -39,6 +39,9 @@ export function validateQuotaEvidence(quotaEvidence, label) {
   }
   if ("sharedQuotaStore" in quotaEvidence) {
     requiredText(quotaEvidence.sharedQuotaStore, `${label}.sharedQuotaStore`);
+    if (!hasRuntimeDailyHardLimit || !hasRuntimePerMinuteHardLimit) {
+      throw new Error(`${label}.sharedQuotaStore requires runtimeDailyHardLimit and runtimePerMinuteHardLimit`);
+    }
   }
   if (
     Number.isInteger(quotaEvidence.defaultDailyLimit) &&

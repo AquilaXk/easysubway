@@ -25,14 +25,14 @@
       "path": "tools/realtime/fixtures/seoul-topis-arrivals.sample.json",
       "sha256": "faf66484f765de250a3a64958aeaa7012a1f204d0c144128d399ba2b47afe2e7",
       "providerResultCode": "INFO-000",
-      "rowCount": 5
+      "rowCount": 1
     },
     {
       "capability": "TRAIN_POSITIONS",
       "path": "tools/realtime/fixtures/seoul-topis-train-positions.sample.json",
       "sha256": "e69692b28c41a501c3b9883b7b36b66e157c0da5c98508502c96e44b3b9110bf",
       "providerResultCode": "INFO-000",
-      "rowCount": 5
+      "rowCount": 1
     }
   ],
   "runtime": {

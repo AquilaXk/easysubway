@@ -14,7 +14,11 @@ CREATE TABLE realtime_arrival_observations (
   raw_destination VARCHAR(120),
   retained_until TIMESTAMP WITH TIME ZONE NOT NULL,
   CONSTRAINT chk_realtime_arrival_retention
-    CHECK (retained_until > backend_received_at)
+    CHECK (retained_until > backend_received_at),
+  CONSTRAINT chk_realtime_arrival_raw_eta
+    CHECK (raw_eta_seconds IS NULL OR raw_eta_seconds >= 0),
+  CONSTRAINT chk_realtime_arrival_adjusted_eta
+    CHECK (adjusted_eta_seconds IS NULL OR adjusted_eta_seconds >= 0)
 );
 
 CREATE INDEX idx_realtime_arrival_provider_train_time

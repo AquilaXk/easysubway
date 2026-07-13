@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -97,9 +98,9 @@ test("서울 TOPIS는 공식 기본 quota 안의 hard cap으로 guarded producti
       assert.equal(source.capabilities.realtime.liveEtaEligible, true);
       assert.equal(source.admissionEvidence.issue, 1416);
       assert.equal(source.admissionEvidence.quotaEvidence.defaultDailyLimit, 1000);
-    assert.equal(source.admissionEvidence.quotaEvidence.runtimeDailyHardLimit, 800);
-    assert.equal(source.admissionEvidence.quotaEvidence.runtimePerMinuteHardLimit, 1);
-    assert.equal(source.admissionEvidence.quotaEvidence.sharedQuotaStore, "realtime_provider_call_quota_state");
+      assert.equal(source.admissionEvidence.quotaEvidence.runtimeDailyHardLimit, 800);
+      assert.equal(source.admissionEvidence.quotaEvidence.runtimePerMinuteHardLimit, 1);
+      assert.equal(source.admissionEvidence.quotaEvidence.sharedQuotaStore, "realtime_provider_call_quota_state");
       assert.equal(source.admissionEvidence.quotaEvidence.productionUseAllowed, true);
     }
   }
@@ -117,6 +118,19 @@ test("quota evidence는 runtime 일일·분당 hard limit을 함께 요구한다
   assert.throws(
     () => validateQuotaEvidence(quotaEvidence, "quotaEvidence"),
     /runtimeDailyHardLimit and runtimePerMinuteHardLimit together/,
+  );
+});
+
+test("quota evidence는 shared store가 있으면 runtime hard limit을 요구한다", () => {
+  assert.throws(
+    () => validateQuotaEvidence({
+      portal: "서울 열린데이터광장",
+      defaultDailyLimit: 1000,
+      sharedQuotaStore: "realtime_provider_call_quota_state",
+      unlockStatus: "guarded_default_quota_gallery_review_pending",
+      productionUseAllowed: true,
+    }, "quotaEvidence"),
+    /sharedQuotaStore requires runtimeDailyHardLimit and runtimePerMinuteHardLimit/,
   );
 });
 
@@ -153,6 +167,11 @@ test("#1416 production evidence는 quota·freshness·archive·fallback을 PASS�
   for (const sample of evidence.liveSamples) {
     assert.equal(sample.sha256, expectedSamples.get(sample.path));
     assert.equal(await sha256File(path.join(root, sample.path)), sample.sha256);
+    const fixture = await readJson(path.join(root, sample.path));
+    const items = sample.capability === "ARRIVALS"
+      ? fixture.payload.realtimeArrivalList
+      : fixture.payload.realtimePositionList;
+    assert.equal(sample.rowCount, items.length);
     expectedSamples.delete(sample.path);
   }
   assert.equal(expectedSamples.size, 0);
@@ -212,7 +231,6 @@ async function readJson(filePath) {
 }
 
 async function sha256File(filePath) {
-  const { createHash } = await import("node:crypto");
   return createHash("sha256").update(await readFile(filePath)).digest("hex");
 }
 

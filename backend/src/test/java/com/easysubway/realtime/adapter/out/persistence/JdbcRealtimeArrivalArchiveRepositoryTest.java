@@ -14,6 +14,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("JDBC 실시간 도착 관측 archive")
@@ -37,7 +42,14 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 			.load()
 			.migrate();
 		jdbcTemplate = new JdbcTemplate(dataSource);
-		repository = new JdbcRealtimeArrivalArchiveRepository(jdbcTemplate);
+		var target = new JdbcRealtimeArrivalArchiveRepository(jdbcTemplate);
+		var proxyFactory = new ProxyFactory(target);
+		proxyFactory.setProxyTargetClass(true);
+		proxyFactory.addAdvice(new TransactionInterceptor(
+			new DataSourceTransactionManager(dataSource),
+			new AnnotationTransactionAttributeSource()
+		));
+		repository = (JdbcRealtimeArrivalArchiveRepository) proxyFactory.getProxy();
 	}
 
 	@Test
@@ -98,6 +110,19 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("DB도 직접 쓰기에서 음수 ETA를 거부한다")
+	void databaseRejectsNegativeEta() {
+		repository.saveAll(List.of(observation(
+			Instant.parse("2026-06-26T08:00:00Z"),
+			Instant.parse("2026-07-26T08:00:00Z")
+		)));
+
+		assertThatThrownBy(() -> jdbcTemplate.update(
+			"UPDATE realtime_arrival_observations SET raw_eta_seconds = -1"
+		)).isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
 	@DisplayName("null 입력은 거부하고 빈 batch는 no-op 처리한다")
 	void validatesBatchInput() {
 		assertThatThrownBy(() -> repository.saveAll(null))
@@ -123,12 +148,25 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 	}
 
 	@Test
-	@DisplayName("archive batch는 transaction 경계를 선언한다")
-	void declaresTransactionalBatch() throws NoSuchMethodException {
+	@DisplayName("archive batch는 두 번째 row 실패 시 첫 번째 row도 rollback한다")
+	void rollsBackWholeBatchOnConstraintFailure() throws NoSuchMethodException {
 		assertThat(JdbcRealtimeArrivalArchiveRepository.class
 			.getMethod("saveAll", List.class)
 			.getAnnotation(Transactional.class))
 			.isNotNull();
+
+		RealtimeArrivalObservation invalid = new RealtimeArrivalObservation(
+			"x".repeat(81), "station-sangnoksu", "seoul-4", "1004", "1004000448", "4123",
+			Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-06-26T08:00:00Z"),
+			180, 160, null, null, Instant.parse("2026-07-26T08:00:00Z")
+		);
+
+		assertThatThrownBy(() -> repository.saveAll(List.of(
+			observation(Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-07-26T08:00:00Z")),
+			invalid
+		))).isInstanceOf(DataIntegrityViolationException.class);
+		assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM realtime_arrival_observations", Integer.class))
+			.isZero();
 	}
 
 	private RealtimeArrivalObservation observation(Instant backendReceivedAt, Instant retainedUntil) {
