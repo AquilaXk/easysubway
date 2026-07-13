@@ -1096,7 +1096,7 @@ body.admin-v3 {
 	border-top: 0;
 }
 
-.admin-form-section-title {
+.admin-panel .admin-form-section-title {
 	margin: 0;
 	font-size: 13px;
 	font-weight: var(--admin-w-strong);
