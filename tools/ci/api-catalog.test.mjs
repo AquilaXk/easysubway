@@ -87,7 +87,10 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
     ["tokenValue", "actual-token"],
     ["token", "actual-token"],
     ["apiKey", "actual-api-key"],
+    ["client_secret", "actual-client-secret"],
+    ["refresh_token", "actual-refresh-token"],
     ["secret", "actual-secret"],
+    ["x-api-key", "actual-header-api-key"],
   ]) {
     assert.throws(
       () =>

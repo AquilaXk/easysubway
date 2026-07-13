@@ -77,14 +77,16 @@ test("validate는 credential 값을 거부한다", () => {
 });
 
 test("validate는 nested auth credential 값도 거부한다", () => {
-  const operation = validOperation();
-  operation.auth.token = "actual-secret-value";
-  const invalid = candidate("a", { operation });
+  for (const field of ["token", "client_secret", "refresh_token", "x-api-key"]) {
+    const operation = validOperation();
+    operation.auth[field] = "actual-secret-value";
+    const invalid = candidate("a", { operation });
 
-  assert.throws(
-    () => validateOperation(invalid),
-    /credential values are forbidden/,
-  );
+    assert.throws(
+      () => validateOperation(invalid),
+      /credential values are forbidden/,
+    );
+  }
 });
 
 test("validate는 endpoint URL과 runner 문자열의 credential을 거부한다", () => {

@@ -44,7 +44,9 @@ function hasCredentialValue(value) {
   }
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
-    /^(?:accessKey|apiKey|credential|password|privateKey|secret|serviceKey|token)(?:Value)?$/i.test(key) ||
+    /^(?:accesskey|accesstoken|apikey|authorization|clientsecret|credential|password|privatekey|refreshtoken|secret|servicekey|token|xapikey)(?:value)?$/.test(
+      key.replace(/[^A-Za-z0-9]/g, "").toLowerCase(),
+    ) ||
     hasCredentialValue(child),
   );
 }
