@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile } from "node:fs/promises";
+import { appendFile, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 const CANDIDATES_URL = new URL("./source-candidates.json", import.meta.url);
@@ -107,10 +107,28 @@ export function validateProviderApproval(candidate, { today = new Date().toISOSt
     throw new Error(`${candidate.id}.providerApproval secret-like values are forbidden`);
   }
   requireAllowedKeys(approval, new Set([
-    "status", "serviceId", "operationId", "validFrom", "validTo", "renewalNoticeDays", "evidenceSource", "recordedAt",
+    "status", "approvalScope", "termsStatus", "quotaStatus", "productionUseAllowed",
+    "serviceId", "operationId", "validFrom", "validTo", "renewalNoticeDays", "evidenceReferences", "recordedAt",
   ]), `${candidate.id}.providerApproval`);
   if (!new Set(["APPROVED", "EXPIRED", "REVOKED"]).has(approval.status)) {
     throw new Error(`${candidate.id}.providerApproval.status is invalid`);
+  }
+  if (approval.approvalScope !== "API_CREDENTIAL") {
+    throw new Error(`${candidate.id}.providerApproval.approvalScope must be API_CREDENTIAL`);
+  }
+  const conditionStatuses = new Set(["APPROVED", "REVIEW_REQUIRED", "REJECTED", "NOT_APPLICABLE"]);
+  for (const field of ["termsStatus", "quotaStatus"]) {
+    if (!conditionStatuses.has(approval[field])) {
+      throw new Error(`${candidate.id}.providerApproval.${field} is invalid`);
+    }
+  }
+  if (typeof approval.productionUseAllowed !== "boolean") {
+    throw new Error(`${candidate.id}.providerApproval.productionUseAllowed must be a boolean`);
+  }
+  const productionUseAllowed = approval.status === "APPROVED"
+    && [approval.termsStatus, approval.quotaStatus].every((status) => new Set(["APPROVED", "NOT_APPLICABLE"]).has(status));
+  if (approval.productionUseAllowed !== productionUseAllowed) {
+    throw new Error(`${candidate.id}.providerApproval.productionUseAllowed must match credential, terms, and quota decisions`);
   }
   const serviceId = requiredText(approval.serviceId, `${candidate.id}.providerApproval.serviceId`);
   const operationId = requiredText(approval.operationId, `${candidate.id}.providerApproval.operationId`);
@@ -130,7 +148,24 @@ export function validateProviderApproval(candidate, { today = new Date().toISOSt
   if (validTo < validFrom) {
     throw new Error(`${candidate.id}.providerApproval.validTo must not precede validFrom`);
   }
-  requiredText(approval.evidenceSource, `${candidate.id}.providerApproval.evidenceSource`);
+  if (!Array.isArray(approval.evidenceReferences) || approval.evidenceReferences.length === 0) {
+    throw new Error(`${candidate.id}.providerApproval.evidenceReferences must be a non-empty array`);
+  }
+  const evidenceUrls = new Set();
+  for (const [index, evidence] of approval.evidenceReferences.entries()) {
+    if (evidence == null || typeof evidence !== "object" || Array.isArray(evidence)) {
+      throw new Error(`${candidate.id}.providerApproval.evidenceReferences[${index}] must be an object`);
+    }
+    requireAllowedKeys(evidence, new Set(["type", "url"]), `${candidate.id}.providerApproval.evidenceReferences[${index}]`);
+    if (!new Set(["OWNER_CONFIRMATION", "PROVIDER_PORTAL", "PROVIDER_DOCUMENT"]).has(evidence.type)) {
+      throw new Error(`${candidate.id}.providerApproval.evidenceReferences[${index}].type is invalid`);
+    }
+    const url = requiredHttpUrl(evidence.url, `${candidate.id}.providerApproval.evidenceReferences[${index}].url`).href;
+    if (evidenceUrls.has(url)) {
+      throw new Error(`${candidate.id}.providerApproval.evidenceReferences must not contain duplicate URLs`);
+    }
+    evidenceUrls.add(url);
+  }
   requiredDate(approval.recordedAt, `${candidate.id}.providerApproval.recordedAt`);
   requiredDate(today, "provider approval current date");
   if (approval.status === "APPROVED" && validTo < today) {
@@ -331,6 +366,10 @@ export function operationHumanSummary(summary) {
   if (summary.providerApproval) {
     lines.push(
       `provider approval: ${summary.providerApproval.status}`,
+      `provider approval scope: ${summary.providerApproval.approvalScope}`,
+      `provider terms: ${summary.providerApproval.termsStatus}`,
+      `provider quota: ${summary.providerApproval.quotaStatus}`,
+      `provider production use: ${summary.providerApproval.productionUseAllowed ? "allowed" : "not allowed"}`,
       `provider operation: ${summary.providerApproval.serviceId}/${summary.providerApproval.operationId}`,
       `approval valid: ${summary.providerApproval.validFrom}..${summary.providerApproval.validTo}`,
     );
@@ -361,7 +400,11 @@ export function operationHumanSummary(summary) {
 }
 
 async function main(args = process.argv.slice(2)) {
-  const [command, sourceId] = args.filter((arg) => arg !== "--json");
+  const githubOutputIndex = args.indexOf("--github-output");
+  const githubOutput = githubOutputIndex === -1 ? null : requiredText(args[githubOutputIndex + 1], "--github-output");
+  const positional = args.filter((arg, index) => arg !== "--json"
+    && (githubOutputIndex === -1 || (index !== githubOutputIndex && index !== githubOutputIndex + 1)));
+  const [command, sourceId] = positional;
   const json = args.includes("--json");
   const document = JSON.parse(await readFile(CANDIDATES_URL, "utf8"));
   const operations = listOperations(document);
@@ -393,10 +436,13 @@ async function main(args = process.argv.slice(2)) {
         console.log(`::warning title=Provider approval expiry::${approval.candidateId} expires in ${approval.daysUntilExpiry} days (${approval.validTo})`);
       }
     }
+    if (githubOutput) {
+      await appendFile(githubOutput, `status=${summary.status}\napproved_count=${summary.approvals.length}\n`);
+    }
     console.log(`provider approval expiry: ${summary.status} (${summary.approvals.length} approved)`);
     return;
   }
-  throw new Error("usage: source-operation.mjs list [--json] | show <source-id> [--json] | validate | check-approvals");
+  throw new Error("usage: source-operation.mjs list [--json] | show <source-id> [--json] | validate | check-approvals [--github-output <path>]");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

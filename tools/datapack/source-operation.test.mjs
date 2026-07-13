@@ -46,6 +46,27 @@ function validOperation(overrides = {}) {
   };
 }
 
+function providerApproval(overrides = {}) {
+  return {
+    status: "APPROVED",
+    approvalScope: "API_CREDENTIAL",
+    termsStatus: "REVIEW_REQUIRED",
+    quotaStatus: "REVIEW_REQUIRED",
+    productionUseAllowed: false,
+    serviceId: "handicapped",
+    operationId: "transferMovement",
+    validFrom: "2020-01-01",
+    validTo: FUTURE_APPROVAL_DATE,
+    renewalNoticeDays: 30,
+    evidenceReferences: [{
+      type: "OWNER_CONFIRMATION",
+      url: "https://github.com/AquilaXk/easysubway/issues/1397#issuecomment-4956908695",
+    }],
+    recordedAt: "2026-07-13",
+    ...overrides,
+  };
+}
+
 test("list는 requestUrl이 있는 source를 ID 순으로 반환한다", () => {
   const document = {
     candidates: [candidate("b"), { id: "local-file" }, candidate("a")],
@@ -76,15 +97,7 @@ test("source candidate 정본은 repository 경로와 구조화된 provider 승�
     source: "tools/datapack/source-candidates.json",
     updatedAt: "2026-07-13",
     candidates: [candidate("a", {
-      providerApproval: {
-        status: "APPROVED",
-        serviceId: "handicapped",
-        operationId: "transferMovement",
-        validFrom: "2020-01-01",
-        validTo: FUTURE_APPROVAL_DATE,
-        evidenceSource: "owner-confirmed",
-        recordedAt: "2026-07-13",
-      },
+      providerApproval: providerApproval(),
     })],
   };
 
@@ -99,15 +112,10 @@ test("provider 승인은 잘못된 기간과 secret-like field를 거부한다",
     source: "tools/datapack/source-candidates.json",
     updatedAt: "2026-07-13",
   };
-  const approval = {
-    status: "APPROVED",
-    serviceId: "handicapped",
-    operationId: "transferMovement",
+  const approval = providerApproval({
     validFrom: "2027-07-06",
     validTo: "2026-07-06",
-    evidenceSource: "owner-confirmed",
-    recordedAt: "2026-07-13",
-  };
+  });
 
   assert.throws(
     () => validateSourceCandidateDocument({ ...base, candidates: [candidate("a", { providerApproval: approval })] }),
@@ -126,6 +134,24 @@ test("provider 승인은 잘못된 기간과 secret-like field를 거부한다",
       candidates: [candidate("a", { providerApproval: { ...approval, validTo: "2028-07-06", recordedAt: "2026-02-31" } })],
     }),
     /recordedAt must be an ISO date/,
+  );
+  assert.throws(
+    () => validateSourceCandidateDocument({
+      ...base,
+      candidates: [candidate("a", {
+        providerApproval: providerApproval({ termsStatus: "APPROVED", quotaStatus: "APPROVED" }),
+      })],
+    }),
+    /productionUseAllowed must match credential, terms, and quota decisions/,
+  );
+  assert.throws(
+    () => validateSourceCandidateDocument({
+      ...base,
+      candidates: [candidate("a", {
+        providerApproval: providerApproval({ evidenceReferences: [{ type: "OWNER_CONFIRMATION", url: "chat-only" }] }),
+      })],
+    }),
+    /evidenceReferences\[0\]\.url must be a valid HTTP\(S\) URL/,
   );
   const expiredApproval = {
     ...approval,
@@ -161,16 +187,9 @@ test("provider 승인은 잘못된 기간과 secret-like field를 거부한다",
 test("summary는 provider 승인에 secret-like 값이 있으면 출력 전에 거부한다", () => {
   assert.throws(
     () => operationSummary(candidate("a", {
-      providerApproval: {
-        status: "APPROVED",
-        serviceId: "handicapped",
-        operationId: "transferMovement",
-        validFrom: "2020-01-01",
-        validTo: FUTURE_APPROVAL_DATE,
-        evidenceSource: "owner-confirmed",
-        recordedAt: "2026-07-13",
+      providerApproval: providerApproval({
         serviceKey: "actual-secret-value",
-      },
+      }),
     })),
     /secret-like values are forbidden/,
   );
@@ -178,15 +197,7 @@ test("summary는 provider 승인에 secret-like 값이 있으면 출력 전에 �
 
 test("provider 승인은 service와 operation이 endpoint 경로와 일치해야 한다", () => {
   const endpoint = "https://provider.example/handicapped/transferMovement";
-  const approval = {
-    status: "APPROVED",
-    serviceId: "handicapped",
-    operationId: "transferMovement",
-    validFrom: "2020-01-01",
-    validTo: FUTURE_APPROVAL_DATE,
-    evidenceSource: "owner-confirmed",
-    recordedAt: "2026-07-13",
-  };
+  const approval = providerApproval();
   const approvedCandidate = candidate("approved", {
     requestUrl: endpoint,
     operation: validOperation({ endpoint }),
@@ -228,16 +239,10 @@ test("provider 승인 만료 요약은 갱신 window부터 경고한다", () => 
     candidates: [candidate("approved", {
       requestUrl: endpoint,
       operation: validOperation({ endpoint }),
-      providerApproval: {
-        status: "APPROVED",
-        serviceId: "handicapped",
-        operationId: "transferMovement",
+      providerApproval: providerApproval({
         validFrom: "2026-07-06",
         validTo: "2027-07-06",
-        renewalNoticeDays: 30,
-        evidenceSource: "owner-confirmed",
-        recordedAt: "2026-07-13",
-      },
+      }),
     })],
   };
 
@@ -282,15 +287,7 @@ test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지�
 
 test("승인된 provider의 human 요약은 승인 범위와 기간을 표시한다", () => {
   const summary = operationSummary(candidate("a", {
-    providerApproval: {
-      status: "APPROVED",
-      serviceId: "handicapped",
-      operationId: "transferMovement",
-      validFrom: "2020-01-01",
-      validTo: FUTURE_APPROVAL_DATE,
-      evidenceSource: "owner-confirmed",
-      recordedAt: "2026-07-13",
-    },
+    providerApproval: providerApproval(),
   }));
 
   assert.match(sourceOperation.operationHumanSummary(summary), /^provider approval: APPROVED$/m);
@@ -303,15 +300,11 @@ test("승인된 provider의 human 요약은 승인 범위와 기간을 표시한
 
 test("list는 만료 상태 오류를 candidate에 남기고 다른 provider를 계속 반환한다", () => {
   const expired = candidate("expired", {
-    providerApproval: {
-      status: "APPROVED",
-      serviceId: "handicapped",
-      operationId: "transferMovement",
+    providerApproval: providerApproval({
       validFrom: "2020-01-01",
       validTo: "2020-12-31",
-      evidenceSource: "owner-confirmed",
       recordedAt: "2020-01-01",
-    },
+    }),
   });
 
   const invalidOperation = candidate("invalid-operation", {

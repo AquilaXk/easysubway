@@ -306,12 +306,19 @@ test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 �
 
   assert.deepEqual(entry.providerApproval, {
     status: "APPROVED",
+    approvalScope: "API_CREDENTIAL",
+    termsStatus: "REVIEW_REQUIRED",
+    quotaStatus: "REVIEW_REQUIRED",
+    productionUseAllowed: false,
     serviceId: "handicapped",
     operationId: "transferMovement",
     validFrom: "2026-07-06",
     validTo: "2027-07-06",
     renewalNoticeDays: 30,
-    evidenceSource: "owner-confirmed",
+    evidenceReferences: [{
+      type: "OWNER_CONFIRMATION",
+      url: "https://github.com/AquilaXk/easysubway/issues/1397#issuecomment-4956908695",
+    }],
     recordedAt: "2026-07-13",
   });
   assert.equal(entry.operation.auth.env, "KRIC_SERVICE_KEY");

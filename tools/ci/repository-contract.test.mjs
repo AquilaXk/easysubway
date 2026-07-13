@@ -7221,12 +7221,19 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
   assert.deepEqual(candidate.providerApproval, {
     status: "APPROVED",
+    approvalScope: "API_CREDENTIAL",
+    termsStatus: "REVIEW_REQUIRED",
+    quotaStatus: "REVIEW_REQUIRED",
+    productionUseAllowed: false,
     serviceId: "handicapped",
     operationId: "transferMovement",
     validFrom: "2026-07-06",
     validTo: "2027-07-06",
     renewalNoticeDays: 30,
-    evidenceSource: "owner-confirmed",
+    evidenceReferences: [{
+      type: "OWNER_CONFIRMATION",
+      url: "https://github.com/AquilaXk/easysubway/issues/1397#issuecomment-4956908695",
+    }],
     recordedAt: "2026-07-13",
   });
   assert.deepEqual(candidate.operation, {
@@ -13856,6 +13863,8 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.match(workflow, /node tools\/datapack\/source-operation\.mjs check-approvals/);
   assert.match(workflow, /^  provider-approval-expiry:\s*$/m);
   assert.match(workflow, /^    name: Provider Approval Expiry$/m);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*id:\s*check[\s\S]*GITHUB_OUTPUT/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*steps\.check\.outputs\.status == 'WARNING'[\s\S]*slackapi\/slack-github-action@/);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);
 
