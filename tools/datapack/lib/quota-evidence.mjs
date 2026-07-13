@@ -1,5 +1,5 @@
 const requiredKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
-const optionalKeys = ["documentedMonthlyLimit"];
+const optionalKeys = ["documentedMonthlyLimit", "runtimeDailyHardLimit", "runtimePerMinuteHardLimit"];
 
 export function validateQuotaEvidence(quotaEvidence, label) {
   if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
@@ -23,6 +23,18 @@ export function validateQuotaEvidence(quotaEvidence, label) {
     (!Number.isInteger(quotaEvidence.documentedMonthlyLimit) || quotaEvidence.documentedMonthlyLimit <= 0)
   ) {
     throw new Error(`${label}.documentedMonthlyLimit must be a positive integer`);
+  }
+  for (const key of ["runtimeDailyHardLimit", "runtimePerMinuteHardLimit"]) {
+    if (key in quotaEvidence && (!Number.isInteger(quotaEvidence[key]) || quotaEvidence[key] <= 0)) {
+      throw new Error(`${label}.${key} must be a positive integer`);
+    }
+  }
+  if (
+    Number.isInteger(quotaEvidence.defaultDailyLimit) &&
+    Number.isInteger(quotaEvidence.runtimeDailyHardLimit) &&
+    quotaEvidence.runtimeDailyHardLimit > quotaEvidence.defaultDailyLimit
+  ) {
+    throw new Error(`${label}.runtimeDailyHardLimit must not exceed defaultDailyLimit`);
   }
   if (quotaEvidence.defaultDailyLimit === null && !("documentedMonthlyLimit" in quotaEvidence)) {
     throw new Error(`${label}.defaultDailyLimit null requires documentedMonthlyLimit`);

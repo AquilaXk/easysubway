@@ -370,7 +370,7 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
   assert.deepEqual(issueNumbers.toSorted((left, right) => left - right), [
     1210, 1230, 1392, 1393, 1394, 1395, 1396, 1397, 1398, 1399, 1400, 1401,
     1402, 1403, 1404, 1405, 1406, 1407, 1408, 1409, 1410, 1411, 1412, 1413,
-    1415, 1416, 1417, 1418, 1620, 1621,
+    1415, 1417, 1418, 1620, 1621,
   ]);
   assert.ok(tracker.requiredChildIssues.every((issue) => issue.releaseBlocker === true));
   assert.equal(tracker.completionCriteria.allRequiredChildIssuesClosed, true);
@@ -5714,9 +5714,8 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     assert.ok(realtime.rateLimitStatus, `${source.id}.realtime.rateLimitStatus must be explicit`);
     if (realtime.liveEtaEligible) {
       assert.equal(realtime.productionUseAllowed, true, `${source.id}.realtime live ETA must be approved for production use`);
-      assert.equal(
-        realtime.rateLimitStatus,
-        "COMPATIBLE",
+      assert.ok(
+        ["COMPATIBLE", "GUARDED_DEFAULT_DAILY_LIMIT"].includes(realtime.rateLimitStatus),
         `${source.id}.realtime live ETA requires compatible provider terms and rate limits`,
       );
     }
@@ -5736,9 +5735,9 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   );
 
   const realtimeArrivalSource = inventory.sources.find((source) => source.id === "seoul-realtime-arrival-station-info");
-  assert.equal(realtimeArrivalSource.capabilities.realtime.status, "CANDIDATE");
-  assert.equal(realtimeArrivalSource.capabilities.realtime.liveEtaEligible, false);
-  assert.equal(realtimeArrivalSource.capabilities.realtime.rateLimitStatus, "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA");
+  assert.equal(realtimeArrivalSource.capabilities.realtime.status, "SUPPORTED");
+  assert.equal(realtimeArrivalSource.capabilities.realtime.liveEtaEligible, true);
+  assert.equal(realtimeArrivalSource.capabilities.realtime.rateLimitStatus, "GUARDED_DEFAULT_DAILY_LIMIT");
 });
 
 test("#2052 전국 coverage 분모 증거는 공식 snapshot과 exact-set 결과에 고정된다", () => {
@@ -6879,7 +6878,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   }
 });
 
-test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분리를 고정한다", () => {
+test("서울 TOPIS 실시간 source는 backend-only key 경계와 guarded production을 고정한다", () => {
   const inventory = readJson("tools/datapack/source-inventory.json");
   const candidates = readJson("tools/datapack/source-candidates.json");
   const topisCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("seoul-topis-realtime-"));
@@ -6894,7 +6893,7 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
     assert.equal(candidate.licenseEvidenceStatus, "confirmed_attribution");
     assert.equal(candidate.sampleEvidenceStatus, "validated_live_sample");
     assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
-    assert.equal(candidate.productionInventoryRelationship.includes("candidate"), true);
+    assert.match(candidate.productionInventoryRelationship, /production_approved_with_guarded_default_quota/);
     assert.equal(candidate.serviceKeyHandling, "backend_secret_only");
     assert.equal(candidate.mobileEmbeddingAllowed, false);
     assert.equal(candidate.dataRetentionPolicy, "provider_does_not_offer_past_realtime_data");
@@ -6904,10 +6903,10 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
       "realtime",
       "schedule",
     ]);
-    assert.equal(candidate.capabilities.realtime.status, "CANDIDATE");
-    assert.equal(candidate.capabilities.realtime.productionUseAllowed, false);
-    assert.equal(candidate.capabilities.realtime.liveEtaEligible, false);
-    assert.equal(candidate.capabilities.realtime.rateLimitStatus, "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA");
+    assert.equal(candidate.capabilities.realtime.status, "SUPPORTED");
+    assert.equal(candidate.capabilities.realtime.productionUseAllowed, true);
+    assert.equal(candidate.capabilities.realtime.liveEtaEligible, true);
+    assert.equal(candidate.capabilities.realtime.rateLimitStatus, "GUARDED_DEFAULT_DAILY_LIMIT");
     assert.match(candidate.detailUrl, /^https:\/\/data\.seoul\.go\.kr\/dataList\/OA-/);
     assert.match(candidate.requestUrl, /^http:\/\/swopenapi\.seoul\.go\.kr\/api\/subway\/\{serviceKey\}\/json\/realtime/);
     assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
@@ -6932,14 +6931,16 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
       quotaEvidence: {
         portal: "서울 열린데이터광장",
         defaultDailyLimit: 1000,
-        unlockStatus: "pending_gallery_review",
-        productionUseAllowed: false,
+        runtimeDailyHardLimit: 800,
+        runtimePerMinuteHardLimit: 1,
+        unlockStatus: "guarded_default_quota_gallery_review_pending",
+        productionUseAllowed: true,
       },
     });
     assert.ok(candidate.evidence.coverageLimitations.length >= 2);
     assert.ok(candidate.evidence.outputFields.includes("recptnDt"));
-    assert.deepEqual(candidate.evidence.missingEvidence, ["providerTermsOrQuotaApproval"]);
-    assert.equal(candidate.capabilities.realtime.coverageStatus, "PROVIDER_TERMS_OR_QUOTA_REQUIRED");
+    assert.deepEqual(candidate.evidence.missingEvidence, []);
+    assert.equal(candidate.capabilities.realtime.coverageStatus, "SUPPORTED_WITHIN_PROVIDER_SCOPE");
     assert.ok(candidate.nextAction);
 
     const productionSource = inventory.sources.find(({ id }) => id === candidate.productionInventoryReferenceId);
@@ -6955,15 +6956,17 @@ test("서울 TOPIS 실시간 후보는 backend-only key 경계와 production 분
       );
     }
     assert.equal(productionSource.requiredForProductionPack, false);
-    assert.equal(productionSource.capabilities.realtime.status, "CANDIDATE");
-    assert.equal(productionSource.capabilities.realtime.productionUseAllowed, false);
-    assert.equal(productionSource.capabilities.realtime.liveEtaEligible, false);
-    assert.equal(productionSource.capabilities.realtime.rateLimitStatus, "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA");
+    assert.equal(productionSource.capabilities.realtime.status, "SUPPORTED");
+    assert.equal(productionSource.capabilities.realtime.productionUseAllowed, true);
+    assert.equal(productionSource.capabilities.realtime.liveEtaEligible, true);
+    assert.equal(productionSource.capabilities.realtime.rateLimitStatus, "GUARDED_DEFAULT_DAILY_LIMIT");
     assert.equal(productionSource.admissionEvidence.candidateId, candidate.id);
     assert.equal(productionSource.admissionEvidence.decision, "APPROVED");
     assert.equal(productionSource.admissionEvidence.sampleEvidenceHash, candidate.evidence.liveSampleEvidenceHash);
     assert.equal(productionSource.admissionEvidence.quotaEvidence.defaultDailyLimit, 1000);
-    assert.equal(productionSource.admissionEvidence.quotaEvidence.productionUseAllowed, false);
+    assert.equal(productionSource.admissionEvidence.quotaEvidence.runtimeDailyHardLimit, 800);
+    assert.equal(productionSource.admissionEvidence.quotaEvidence.runtimePerMinuteHardLimit, 1);
+    assert.equal(productionSource.admissionEvidence.quotaEvidence.productionUseAllowed, true);
     // Admission hashes are immutable evidence captured at admission time.
     assert.equal(
       productionSource.admissionEvidence.sourceInventorySha256,

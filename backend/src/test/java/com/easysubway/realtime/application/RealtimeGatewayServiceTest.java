@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.realtime.adapter.out.persistence.InMemoryRealtimeMappingPort;
+import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
 import com.easysubway.realtime.application.port.out.RealtimeMappingPort;
+import com.easysubway.realtime.domain.RealtimeArrivalObservation;
 import com.easysubway.realtime.domain.RealtimeMapping;
 import com.easysubway.realtime.domain.RealtimeArrival;
 import com.easysubway.realtime.domain.RealtimeTrainPosition;
@@ -78,6 +80,57 @@ class RealtimeGatewayServiceTest {
 		assertThat(first.status()).hasToString("FRESH");
 		assertThat(second.status()).hasToString("FRESH");
 		assertThat(provider.arrivalCalls).hasValue(1);
+	}
+
+	@Test
+	@DisplayName("fresh provider 도착 관측은 한 번 보존하고 cache hit에서는 추가 저장하지 않는다")
+	void archivesFreshArrivalsWithoutExtraProviderCalls() {
+		CountingProvider provider = new CountingProvider();
+		CapturingArrivalArchive archive = new CapturingArrivalArchive();
+		RealtimeGatewayService service = service(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC),
+			InMemoryRealtimeMappingPort.seededFixture(),
+			archive
+		);
+
+		RealtimeArrivalResult first = service.arrivals(sangnoksuQuery());
+		RealtimeArrivalResult cached = service.arrivals(sangnoksuQuery());
+
+		assertThat(first.status()).hasToString("FRESH");
+		assertThat(cached.status()).hasToString("FRESH");
+		assertThat(provider.arrivalCalls).hasValue(1);
+		assertThat(archive.saveCalls).hasValue(1);
+		assertThat(archive.observations).singleElement().satisfies((observation) -> {
+			assertThat(observation.providerId()).isEqualTo("seoul-topis");
+			assertThat(observation.stationId()).isEqualTo("station-sangnoksu");
+			assertThat(observation.lineId()).isEqualTo("seoul-4");
+			assertThat(observation.providerLineId()).isEqualTo("1004");
+			assertThat(observation.providerStationId()).isEqualTo("1004000448");
+			assertThat(observation.trainNo()).isEqualTo("4123");
+			assertThat(observation.rawEtaSeconds()).isEqualTo(180);
+			assertThat(observation.adjustedEtaSeconds()).isEqualTo(180);
+			assertThat(observation.retainedUntil()).isEqualTo(Instant.parse("2026-07-26T08:00:00Z"));
+		});
+	}
+
+	@Test
+	@DisplayName("도착 관측 archive 실패는 fresh 응답을 막지 않고 health counter에 기록한다")
+	void archiveFailureDoesNotBreakFreshResponse() {
+		RealtimeArrivalArchivePort failingArchive = (observations) -> {
+			throw new IllegalStateException("archive unavailable");
+		};
+		RealtimeGatewayService service = service(
+			new CountingProvider(),
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC),
+			InMemoryRealtimeMappingPort.seededFixture(),
+			failingArchive
+		);
+
+		RealtimeArrivalResult result = service.arrivals(sangnoksuQuery());
+
+		assertThat(result.status()).hasToString("FRESH");
+		assertThat(service.providerHealthSnapshot().archiveFailureCount()).isEqualTo(1);
 	}
 
 	@Test
@@ -998,6 +1051,15 @@ class RealtimeGatewayServiceTest {
 		RealtimeProvider provider,
 		Clock clock,
 		RealtimeMappingPort mappingPort,
+		RealtimeArrivalArchivePort archivePort
+	) {
+		return new RealtimeGatewayService(provider, clock, mappingPort, archivePort);
+	}
+
+	private RealtimeGatewayService service(
+		RealtimeProvider provider,
+		Clock clock,
+		RealtimeMappingPort mappingPort,
 		RealtimeProviderControl control
 	) {
 		return new RealtimeGatewayService(provider, clock, mappingPort, control);
@@ -1153,6 +1215,17 @@ class RealtimeGatewayServiceTest {
 				"당고개",
 				providerReceivedAt
 			));
+		}
+	}
+
+	private static final class CapturingArrivalArchive implements RealtimeArrivalArchivePort {
+		private final AtomicInteger saveCalls = new AtomicInteger();
+		private List<RealtimeArrivalObservation> observations = List.of();
+
+		@Override
+		public void saveAll(List<RealtimeArrivalObservation> observations) {
+			saveCalls.incrementAndGet();
+			this.observations = List.copyOf(observations);
 		}
 	}
 

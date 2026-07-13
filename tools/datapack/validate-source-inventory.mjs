@@ -167,11 +167,19 @@ function validateCapability(capability, source, sourceId, name) {
     throw new TypeError(`${sourceId}.capabilities.realtime.liveEtaEligible must be boolean`);
   }
   const rateLimitStatus = assertString(capability.rateLimitStatus, `${sourceId}.capabilities.realtime.rateLimitStatus`);
+  const compatibleRateLimitStatuses = new Set(["COMPATIBLE", "GUARDED_DEFAULT_DAILY_LIMIT"]);
   if (
     capability.liveEtaEligible &&
-    (capability.productionUseAllowed !== true || rateLimitStatus !== "COMPATIBLE")
+    (capability.productionUseAllowed !== true || !compatibleRateLimitStatuses.has(rateLimitStatus))
   ) {
     throw new Error(`${sourceId}.capabilities.realtime live ETA requires compatible provider terms and rate limits`);
+  }
+  if (capability.liveEtaEligible && rateLimitStatus === "GUARDED_DEFAULT_DAILY_LIMIT") {
+    const quotaEvidence = source.admissionEvidence?.quotaEvidence;
+    validateQuotaEvidence(quotaEvidence, `${sourceId}.admissionEvidence.quotaEvidence`);
+    if (!Number.isInteger(quotaEvidence.runtimeDailyHardLimit) || !Number.isInteger(quotaEvidence.runtimePerMinuteHardLimit)) {
+      throw new Error(`${sourceId}.guarded realtime requires runtime daily and per-minute hard limits`);
+    }
   }
 }
 
