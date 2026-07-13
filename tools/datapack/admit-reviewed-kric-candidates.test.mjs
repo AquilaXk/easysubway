@@ -13,10 +13,15 @@ async function readJson(path) {
 test("KRIC live sample 8건은 admin review 후 provenance 전용 inventory source로 승격한다", async () => {
   const candidates = await readJson("tools/datapack/source-candidates.json");
   const inventory = await readJson("tools/datapack/source-inventory.json");
-  const fixture = await readJson("tools/datapack/fixtures/catalog-fixture.json");
-  const overrides = await readJson("tools/datapack/fixtures/admin-review-overrides.json");
+  const baseInventory = structuredClone(inventory);
+  baseInventory.sources = baseInventory.sources.filter(({ id }) => !REVIEWED_KRIC_CANDIDATE_IDS.includes(id));
 
-  const result = buildReviewedKricAdmission({ candidates, inventory, fixture, overrides });
+  const result = buildReviewedKricAdmission({ candidates, inventory: baseInventory });
+  const expectedScopes = {
+    "kric-subway-route-info": { regionIds: ["capital"], operatorIds: ["airport-railroad"] },
+    "kric-station-info": { regionIds: ["capital"], operatorIds: ["korail"] },
+    "kric-train-operation-organ": { regionIds: ["daejeon"], operatorIds: ["daejeon-transportation"] },
+  };
 
   assert.equal(REVIEWED_KRIC_CANDIDATE_IDS.length, 8);
   for (const candidateId of REVIEWED_KRIC_CANDIDATE_IDS) {
@@ -31,6 +36,7 @@ test("KRIC live sample 8건은 admin review 후 provenance 전용 inventory sour
     assert.equal(candidate.evidence.adminReview.decision, "APPROVED");
     assert.equal(candidate.evidence.adminReview.approvedBy, "AquilaXk");
     assert.equal(source.requiredForProductionPack, false);
+    assert.equal(source.productionUseAllowed, false);
     assert.equal(source.admissionEvidence.issue, 1397);
     assert.equal(source.admissionEvidence.sampleEvidenceHash, candidate.evidence.liveSampleEvidenceHash);
     assert.equal(source.admissionEvidence.rawSha256, candidate.evidence.liveSampleRawSha256);
@@ -38,6 +44,15 @@ test("KRIC live sample 8건은 admin review 후 provenance 전용 inventory sour
     assert.equal(source.admissionEvidence.quotaEvidence.productionUseAllowed, false);
     assert.equal(source.admissionEvidence.quotaEvidence.defaultDailyLimit, "unlimited");
     assert.ok(Object.values(source.capabilities).every(({ productionUseAllowed }) => productionUseAllowed === false));
+    if (expectedScopes[candidateId]) {
+      assert.deepEqual(
+        {
+          regionIds: source.coverageScope.regionIds,
+          operatorIds: source.coverageScope.operatorIds,
+        },
+        expectedScopes[candidateId],
+      );
+    }
   }
 
   const standard = result.candidates.candidates.find(({ id }) => id === "kric-transfer-movement-standard");
@@ -55,4 +70,22 @@ test("KRIC live sample 8건은 admin review 후 provenance 전용 inventory sour
     result,
     "동일한 admin review를 재적용해도 admission hash와 inventory가 바뀌면 안 된다",
   );
+
+  const admissionHashes = REVIEWED_KRIC_CANDIDATE_IDS.map(
+    (candidateId) => result.inventory.sources.find(({ id }) => id === candidateId)
+      .admissionEvidence.sourceInventorySha256,
+  );
+  assert.equal(
+    new Set(admissionHashes).size,
+    1,
+    "같은 batch로 admit한 8개 source는 동일한 canonical inventory hash를 공유한다",
+  );
+
+  const changedBaseInventory = structuredClone(baseInventory);
+  changedBaseInventory.sources[0].coverage = `${changedBaseInventory.sources[0].coverage} 변경`;
+  const changed = buildReviewedKricAdmission({ candidates, inventory: changedBaseInventory });
+  const changedHash = changed.inventory.sources.find(
+    ({ id }) => id === REVIEWED_KRIC_CANDIDATE_IDS[0],
+  ).admissionEvidence.sourceInventorySha256;
+  assert.notEqual(changedHash, admissionHashes[0], "기존 inventory 내용이 달라지면 admission hash도 달라져야 한다");
 });

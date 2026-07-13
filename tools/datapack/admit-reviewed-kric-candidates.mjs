@@ -33,6 +33,49 @@ const INVENTORY_DOMAIN_BY_CANDIDATE_DOMAIN = Object.freeze({
   transfer_structure: "route_graph_topology",
 });
 
+const VERIFIED_SAMPLE_SCOPE_BY_CANDIDATE_ID = Object.freeze({
+  "kric-subway-route-info": {
+    regionIds: ["capital"],
+    operatorIds: ["airport-railroad"],
+    query: { mreaWideCd: "01", lnCd: "A1" },
+  },
+  "kric-station-info": {
+    regionIds: ["capital"],
+    operatorIds: ["korail"],
+    query: { railOprIsttCd: "KR", stinNm: "용산" },
+  },
+  "kric-train-operation-organ": {
+    regionIds: ["daejeon"],
+    operatorIds: ["daejeon-transportation"],
+    query: { railOprIsttCd: "DJ" },
+  },
+  "kric-station-transfer-info": {
+    regionIds: ["capital"],
+    operatorIds: ["seoul-metro"],
+    query: { railOprIsttCd: "S1" },
+  },
+  "kric-station-platform": {
+    regionIds: ["capital"],
+    operatorIds: ["seoul-metro"],
+    query: { railOprIsttCd: "S1" },
+  },
+  "kric-station-movement-standard": {
+    regionIds: ["capital"],
+    operatorIds: ["seoul-metro"],
+    query: { railOprIsttCd: "S1" },
+  },
+  "kric-station-movement-detailed": {
+    regionIds: ["capital"],
+    operatorIds: ["seoul-metro"],
+    query: { railOprIsttCd: "S1" },
+  },
+  "kric-station-convenience-standard": {
+    regionIds: ["capital"],
+    operatorIds: ["seoul-metro"],
+    query: { railOprIsttCd: "S1" },
+  },
+});
+
 function buildReviewedKricAdmission({ candidates, inventory }) {
   const nextCandidates = structuredClone(candidates);
   const nextInventory = structuredClone(inventory);
@@ -41,10 +84,15 @@ function buildReviewedKricAdmission({ candidates, inventory }) {
   for (const candidateId of REVIEWED_KRIC_CANDIDATE_IDS) {
     const candidate = requireCandidate(nextCandidates, candidateId);
     assertValidatedLiveSample(candidate);
-    const source = buildInventorySource({ candidate, inventory: nextInventory, ledgerEvidence });
+    const source = buildInventorySource({ candidate, ledgerEvidence });
     nextInventory.sources = nextInventory.sources.filter(({ id }) => id !== candidateId);
     nextInventory.sources.push(source);
     applyApprovedReview(candidate, source);
+  }
+  const sourceInventorySha256 = canonicalBatchInventoryHash(nextInventory);
+  for (const candidateId of REVIEWED_KRIC_CANDIDATE_IDS) {
+    const source = nextInventory.sources.find(({ id }) => id === candidateId);
+    source.admissionEvidence.sourceInventorySha256 = sourceInventorySha256;
   }
 
   const standard = requireCandidate(nextCandidates, "kric-transfer-movement-standard");
@@ -62,7 +110,7 @@ function buildReviewedKricAdmission({ candidates, inventory }) {
   return { candidates: nextCandidates, inventory: nextInventory };
 }
 
-function buildInventorySource({ candidate, inventory, ledgerEvidence }) {
+function buildInventorySource({ candidate, ledgerEvidence }) {
   const license = {
     type: "KOGL-1",
     name: "공공누리 1유형",
@@ -83,12 +131,9 @@ function buildInventorySource({ candidate, inventory, ledgerEvidence }) {
     datasetUrl: candidate.detailUrl,
     datasetKind: "open-api",
     coverage: COVERAGE_BY_DOMAIN[candidate.domain] ?? `${candidate.displayName} 공식 OpenAPI`,
-    coverageScope: {
-      regionIds: ["capital"],
-      operatorIds: ["seoul-metro"],
-      sourceDomains: [INVENTORY_DOMAIN_BY_CANDIDATE_DOMAIN[candidate.domain] ?? candidate.domain],
-    },
+    coverageScope: verifiedSampleCoverageScope(candidate),
     requiredForProductionPack: false,
+    productionUseAllowed: false,
     updateFrequency: "provider documented; production cadence not admitted",
     observedDataUpdatedAt: retrievedAt,
     retrievedAt,
@@ -114,11 +159,6 @@ function buildInventorySource({ candidate, inventory, ledgerEvidence }) {
     sampleEvidenceHash: candidate.evidence.liveSampleEvidenceHash,
     licenseEvidenceHash: sha256(JSON.stringify(sortJson(license))),
   };
-  const inventoryBasis = {
-    existingSourceIds: inventory.sources.map(({ id }) => id).sort(),
-    source: baseSource,
-    review: reviewBasis,
-  };
   return {
     ...baseSource,
     admissionEvidence: {
@@ -134,7 +174,6 @@ function buildInventorySource({ candidate, inventory, ledgerEvidence }) {
       rawSha256: candidate.evidence.liveSampleRawSha256,
       schemaFingerprint: candidate.evidence.liveSampleSchemaFingerprint,
       sourceSnapshotSetHash: sha256(JSON.stringify(sortJson(snapshotBasis))),
-      sourceInventorySha256: sha256(JSON.stringify(sortJson(inventoryBasis))),
       adminReviewRecordHash: sha256(JSON.stringify(sortJson(reviewBasis))),
       licenseEvidenceHash: reviewBasis.licenseEvidenceHash,
       aliasLedgerHash: ledgerEvidence.aliasLedgerHash,
@@ -152,6 +191,32 @@ function buildInventorySource({ candidate, inventory, ledgerEvidence }) {
       productionUseNoteKo: "오너 admin review(2026-07-13)로 inventory provenance에만 승격했다. consumer별 coverage·약관·품질 evidence가 확인되기 전에는 production pack과 runtime 호출에 사용하지 않는다.",
     },
   };
+}
+
+function verifiedSampleCoverageScope(candidate) {
+  const scope = VERIFIED_SAMPLE_SCOPE_BY_CANDIDATE_ID[candidate.id];
+  if (!scope) throw new Error(`${candidate.id} verified sample coverage scope is missing`);
+  const sampleUrl = new URL(candidate.evidence.sampleUrl);
+  for (const [name, expected] of Object.entries(scope.query)) {
+    if (sampleUrl.searchParams.get(name) !== expected) {
+      throw new Error(`${candidate.id}.evidence.sampleUrl ${name} must be ${expected}`);
+    }
+  }
+  return {
+    regionIds: [...scope.regionIds],
+    operatorIds: [...scope.operatorIds],
+    sourceDomains: [INVENTORY_DOMAIN_BY_CANDIDATE_DOMAIN[candidate.domain] ?? candidate.domain],
+  };
+}
+
+function canonicalBatchInventoryHash(inventory) {
+  const basis = structuredClone(inventory);
+  for (const source of basis.sources) {
+    if (REVIEWED_KRIC_CANDIDATE_IDS.includes(source.id)) {
+      delete source.admissionEvidence.sourceInventorySha256;
+    }
+  }
+  return sha256(JSON.stringify(sortJson(basis)));
 }
 
 function buildCapabilities(candidate) {
