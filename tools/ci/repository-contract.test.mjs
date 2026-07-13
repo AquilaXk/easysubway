@@ -4333,7 +4333,10 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     ],
   );
   assert.deepEqual(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.remainingBlockers, []);
-  assert.match(operationsEvidence.backendControlPlane.latestQaEvidenceStatus.closingDecisionKo, /#1017/);
+  assert.equal(
+    operationsEvidence.backendControlPlane.latestQaEvidenceStatus.closingDecisionKo,
+    "#1017 범위인 production environment와 배포·복구 준비는 main artifact, 로컬 prod-like readiness/rollback, 네 종류 restore와 security/admin 검증으로 완료한다. 실제 production 변경은 수행하지 않았으며 최종 실행은 #1020 GO/NO-GO에서 판정한다.",
+  );
   assert.equal(
     operationsEvidence.backendControlPlane.latestQaEvidenceStatus.productionExecutionGate.status,
     "DEFERRED_OUT_OF_SCOPE",
