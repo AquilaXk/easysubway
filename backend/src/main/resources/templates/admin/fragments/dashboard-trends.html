@@ -23,14 +23,16 @@
 
 	<div class="trend-charts">
 		<section th:each="trend : ${trends}" class="admin-panel trend-chart-panel">
-			<h2 th:text="${trend.title}">추이</h2>
+			<div class="admin-panel-head">
+				<h2 th:text="${trend.title}">추이</h2>
+			</div>
 			<div class="trend-canvas-wrap">
 				<canvas th:id="${trend.id}" class="trend-canvas" role="img"
 				        th:attr="aria-label=|${trend.title} 최근 ${trendDays}일 추이|,data-chart=${trend.json}"></canvas>
 			</div>
 			<details class="dashboard-details">
 				<summary>데이터 표로 보기</summary>
-				<table>
+				<table class="static-table">
 					<thead>
 					<tr>
 						<th scope="col">날짜</th>

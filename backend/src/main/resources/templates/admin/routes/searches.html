@@ -21,30 +21,35 @@
 		</div>
 	</header>
 
-	<div class="metric-grid" aria-label="경로 검색 요약">
-		<div class="metric">
-			<span>전체 검색</span>
-			<strong th:text="${summary.totalCount}">0</strong>
+	<section class="admin-panel" aria-labelledby="route-search-metric-title">
+		<div class="admin-panel-head">
+			<h2 id="route-search-metric-title">경로 검색 요약</h2>
 		</div>
-		<div class="metric">
-			<span>경로 찾음</span>
-			<strong th:text="${summary.foundCount}">0</strong>
+		<div class="metric-grid">
+			<div class="metric metric-cell">
+				<span>전체 검색</span>
+				<strong class="cell-num" th:text="${summary.totalCount}">0</strong>
+			</div>
+			<div class="metric metric-cell">
+				<span>경로 찾음</span>
+				<strong class="cell-num" th:text="${summary.foundCount}">0</strong>
+			</div>
+			<div class="metric metric-cell">
+				<span>경로 차단</span>
+				<strong class="cell-num" th:text="${summary.blockedCount}">0</strong>
+			</div>
+			<div class="metric metric-cell">
+				<span>경로 차단율</span>
+				<strong class="cell-num" th:text="${summary.blockedRateLabel}">0.0%</strong>
+				<em>전체 검색 중 차단 비율</em>
+			</div>
+			<div class="metric metric-cell">
+				<span>route_not_found_rate</span>
+				<strong class="cell-num" th:text="${summary.routeNotFoundRateLabel}">0.0%</strong>
+				<em>route graph·strict 접근성 차단 비율</em>
+			</div>
 		</div>
-		<div class="metric">
-			<span>경로 차단</span>
-			<strong th:text="${summary.blockedCount}">0</strong>
-		</div>
-		<div class="metric">
-			<span>경로 차단율</span>
-			<strong th:text="${summary.blockedRateLabel}">0.0%</strong>
-			<em>전체 검색 중 차단 비율</em>
-		</div>
-		<div class="metric">
-			<span>route_not_found_rate</span>
-			<strong th:text="${summary.routeNotFoundRateLabel}">0.0%</strong>
-			<em>route graph·strict 접근성 차단 비율</em>
-		</div>
-	</div>
+	</section>
 
 	<div class="alert" th:classappend="${summary.blockedAlertClass}">
 		<strong>운영 상태: <span th:text="${summary.blockedAlertLabel}">정상</span></strong>
@@ -66,13 +71,18 @@
 			   download>CSV 내보내기</a>
 		</p>
 
-		<div class="metric-grid" aria-label="전 기간 대비 증감">
-			<div th:each="card : ${comparisons}" class="metric" th:classappend="${'tone-' + card.tone}">
-				<span th:text="${card.label}">지표</span>
-				<strong th:text="${card.currentLabel}">0</strong>
-				<em th:text="${'직전 ' + card.previousLabel + ' · ' + card.deltaPercentLabel}">직전 대비</em>
+		<section class="admin-panel" aria-labelledby="route-search-comparison-title">
+			<div class="admin-panel-head">
+				<h2 id="route-search-comparison-title">전 기간 대비 증감</h2>
 			</div>
-		</div>
+			<div class="metric-grid">
+				<div th:each="card : ${comparisons}" class="metric metric-cell" th:classappend="${'tone-' + card.tone}">
+					<span th:text="${card.label}">지표</span>
+					<strong class="cell-num" th:text="${card.currentLabel}">0</strong>
+					<em th:text="${'직전 ' + card.previousLabel + ' · ' + card.deltaPercentLabel}">직전 대비</em>
+				</div>
+			</div>
+		</section>
 
 		<div class="trend-charts">
 			<section class="admin-panel trend-chart-panel">
@@ -83,7 +93,7 @@
 				</div>
 				<details class="dashboard-details">
 					<summary>데이터 표로 보기</summary>
-					<table>
+					<table class="static-table">
 						<thead>
 						<tr>
 							<th scope="col">날짜</th>
@@ -129,7 +139,7 @@
 
 	<section>
 		<h2>이동 프로필별 검색</h2>
-		<table>
+		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">이동 프로필</th>
@@ -147,7 +157,7 @@
 
 	<section>
 		<h2>지역별 사용량</h2>
-		<table>
+		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">지역</th>
@@ -167,7 +177,7 @@
 
 	<section>
 		<h2>차단 사유별 현황</h2>
-		<table>
+		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">차단 사유</th>
@@ -185,7 +195,7 @@
 
 	<section>
 		<h2>ETA source 현황</h2>
-		<table>
+		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">ETA source</th>
@@ -205,7 +215,7 @@
 
 	<section>
 		<h2>fallback 사유별 현황</h2>
-		<table>
+		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">fallback 사유</th>
@@ -225,7 +235,7 @@
 
 	<section>
 		<h2>품질 신호 구분</h2>
-		<table>
+		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">신호</th>
@@ -245,7 +255,7 @@
 
 	<section>
 		<h2>알림 기준</h2>
-		<table>
+		<table class="static-table">
 			<thead>
 			<tr>
 				<th scope="col">metric</th>
