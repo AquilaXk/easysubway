@@ -36,6 +36,7 @@ function contract(decisions = [
     publicApiAudit: {
       targetCount: 2,
       credentialSafeCallCount: 2,
+      uniqueQueryCount: 2,
       supportedCount: 0,
       explicitNoDataCount: 1,
       falsePositiveClassifiedCount: 1,
@@ -160,6 +161,16 @@ test("SUPPORTED 결정은 providerId와 fallback NONE 계약을 지킨다", () =
       },
     }),
     /supported fallback must be NONE/,
+  );
+});
+
+test("public API 감사의 uniqueQueryCount는 음이 아닌 정수다", () => {
+  const invalidContract = contract();
+  invalidContract.publicApiAudit.uniqueQueryCount = -1;
+
+  assert.throws(
+    () => buildRegionalRealtimeProviderDecisionReport({ targets, contract: invalidContract }),
+    /publicApiAudit.uniqueQueryCount must be a non-negative integer/,
   );
 });
 

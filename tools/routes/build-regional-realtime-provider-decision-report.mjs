@@ -138,6 +138,7 @@ function validatePublicApiAudit(audit, scopeCount, supportedDecisionCount) {
   for (const field of [
     "targetCount",
     "credentialSafeCallCount",
+    "uniqueQueryCount",
     "supportedCount",
     "explicitNoDataCount",
     "falsePositiveClassifiedCount",
