@@ -58,8 +58,11 @@ document.addEventListener('alpine:init', function () {
 			toggle: function () {
 				this.open = !this.open;
 			},
+			// Esc·외부 클릭으로 닫힐 때 포커스를 트리거로 되돌린다(#2049 리뷰). 패널 내부(로그아웃 버튼)에
+			// 포커스가 있는 채 닫히면 포커스가 display:none 요소에 남아 키보드 탐색이 처음으로 튕기는 문제 방지.
 			close: function () {
 				this.open = false;
+				this.$refs.trigger?.focus();
 			},
 		};
 	});

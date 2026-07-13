@@ -104,7 +104,7 @@
 			-->
 			<div class="admin-user-menu" x-data="userMenu"
 			     x-on:keydown.escape.window="close" x-on:click.outside="close">
-				<button type="button" class="admin-user-menu-trigger"
+				<button type="button" class="admin-user-menu-trigger" x-ref="trigger"
 				        x-on:click="toggle" aria-haspopup="dialog"
 				        x-bind:aria-expanded="ariaExpanded" aria-controls="admin-user-menu-panel"
 				        aria-label="사용자 메뉴">
@@ -112,7 +112,7 @@
 					<span class="admin-user-menu-role" th:text="${adminShell != null ? adminShell.rolesLabel : '권한 없음'}">admin.view</span>
 					<span class="admin-user-menu-caret" aria-hidden="true"></span>
 				</button>
-				<div id="admin-user-menu-panel" class="admin-user-menu-panel" x-cloak x-show="open">
+				<div id="admin-user-menu-panel" class="admin-user-menu-panel" x-show="open">
 					<dl class="admin-user-menu-info">
 						<dt>계정</dt>
 						<dd th:text="${adminShell != null ? adminShell.username : 'anonymous'}">admin</dd>

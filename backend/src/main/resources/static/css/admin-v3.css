@@ -1936,6 +1936,13 @@ body.admin-v3 {
 	box-shadow: none;
 }
 
+/* no-JS 폴백(#2049 리뷰): x-cloak 대신 has-js 초기화 창에서만 패널을 숨긴다. JS가 있으면
+   alpine:initialized 이후 x-show(open)의 인라인 display가 전담하고, JS가 없으면(has-js 미부착)
+   이 규칙이 걸리지 않아 계정 정보·로그아웃 폼이 그대로 노출된다(bulk-actionbar와 동일 패턴). */
+.admin-v3.has-js:not(.has-js-ready) .admin-user-menu-panel {
+	display: none;
+}
+
 .admin-user-menu-info {
 	display: grid;
 	grid-template-columns: max-content 1fr;
