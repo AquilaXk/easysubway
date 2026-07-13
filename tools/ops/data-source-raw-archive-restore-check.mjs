@@ -22,6 +22,7 @@ for (const name of ["archive_id", "run_id", "payload_sha256"]) {
   assert.ok(Number.isInteger(rawIndex[name]), `raw-archives.csv missing ${name}`);
 }
 const runIds = new Set(collectionRuns.map((row) => row[collectionRunIndex]));
+assert.equal(runIds.size, collectionRuns.length, "collection run IDs must be unique");
 const archives = new Map(rawArchives.map((row) => [row[rawIndex.archive_id], row]));
 assert.equal(archives.size, rawArchives.length, "raw archive IDs must be unique");
 const materializedArchiveIds = manifest.materialized.map((record) => record.archiveId);

@@ -8338,6 +8338,16 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
 
   const collectionRunsPath = path.join(fixtureDir, "collection-runs.csv");
   const collectionRunsContent = readFileSync(collectionRunsPath);
+  await writeFile(
+    collectionRunsPath,
+    `${collectionRunsContent.toString("utf8")}\nrun-1,SYNTHETIC,COMPLETED,duplicate,2026-07-13T00:00:00Z,2026-07-13T00:00:01Z,1,,false,archive`,
+  );
+  assert.throws(
+    () => restoreArchive(fixtureDir, "pipe"),
+    /Command failed/,
+  );
+  await writeFile(collectionRunsPath, collectionRunsContent);
+
   const outsideMetadataDir = await mkdtemp(path.join(tmpdir(), "easysubway-source-metadata-outside-"));
   const outsideCollectionRunsPath = path.join(outsideMetadataDir, "collection-runs.csv");
   await writeFile(outsideCollectionRunsPath, collectionRunsContent);
