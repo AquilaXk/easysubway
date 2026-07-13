@@ -5443,6 +5443,10 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(cyberstationCandidate.domain, "route_map_positions");
   assert.equal(cyberstationCandidate.admissionStatus, "admitted_to_production_inventory");
   assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /P0 후보 전용 카운트/);
+  assert.match(
+    targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo,
+    new RegExp(`P0 source candidate ${p0SourceCandidates.length}건 중`),
+  );
   assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /seoulmetro-cyberstation-route-map/);
   // #1397 capital admission 8종 per-source admission 해시는 순차 admission 체인(선행 admit 결과가
   // 다음 인벤토리에 포함됨)에서 산출한 immutable evidence로 고정한다. run-source-admission-pipeline.mjs가

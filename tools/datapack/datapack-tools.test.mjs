@@ -14245,9 +14245,16 @@ test("official OD fare admin review는 sanitized admission만 생성한다", asy
       "fareStationLineMappingLedgerHash", "quoteCount", "quoteSetHash", "schemaVersion", "snapshotId", "sourceId",
     ].sort());
     assert.equal(admission.artifactKind, "official-od-fare-admission");
-    assert.equal(admission.quoteCount, 3);
+    assert.equal(admission.quoteCount, 2);
     assert.match(admission.quoteSetHash, /^[0-9a-f]{64}$/);
     assert.match(admission.fareStationLineMappingLedgerHash, /^[0-9a-f]{64}$/);
+    const generatedBundlePath = path.join(workspace, "generated-bundle.json");
+    await writeFile(generatedBundlePath, stdout);
+    await execFileAsync(process.execPath, [
+      "tools/datapack/apply-official-od-fares-to-bundled-pack.mjs",
+      "--admission", generatedBundlePath,
+      "--check",
+    ], { cwd: root });
 
     const unsafeReview = { ...review, rawPath: "/tmp/provider.json" };
     const unsafeReviewPath = path.join(workspace, "unsafe-review.json");
@@ -14586,6 +14593,37 @@ test("bundled 공식 OD quote 재적용은 SQLite와 gzip hash를 변경하지 �
 
     assert.equal(sha256(await readFile(packPath)), sha256(firstPack));
     assert.equal(sha256(await readFile(indexPath)), sha256(firstIndex));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("bundled 공식 OD quote no-op도 catalog user_version 16을 강제한다", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-user-version-"));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  try {
+    await writeFile(
+      sqlitePath,
+      gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
+    );
+    const database = new DatabaseSync(sqlitePath);
+    database.exec("PRAGMA user_version = 15");
+    database.close();
+    await writeFile(packPath, gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 }));
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+
+    await execFileAsync(process.execPath, [
+      "tools/datapack/apply-official-od-fares-to-bundled-pack.mjs",
+      "--pack", packPath,
+      "--index", indexPath,
+    ], { cwd: root });
+
+    await writeFile(sqlitePath, gunzipSync(await readFile(packPath)));
+    const updated = new DatabaseSync(sqlitePath, { readOnly: true });
+    assert.equal(updated.prepare("PRAGMA user_version").get().user_version, 16);
+    updated.close();
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
