@@ -495,7 +495,7 @@ function tagoStationIds(input) {
     // discovery(GetKwrdFndSubwaySttnList)로 확인된 실제 provider station id를 formula보다 우선한다.
     // 운영기관 prefix가 다르므로(코레일 MTRKR vs 서울교통공사 MTRS1) formula는 사당 등 비-코레일 역에서 틀린다.
     if (row.providerStationId) {
-      const stationCode = row.stationCode ?? row.providerStationId;
+      const stationCode = row.stationCode || row.providerStationId;
       const current = stationIdsByCode.get(stationCode);
       if (current?.explicit && current.stationId !== row.providerStationId) {
         throw new Error(`Conflicting providerStationId for stationCode: ${stationCode}`);

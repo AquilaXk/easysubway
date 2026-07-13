@@ -6,16 +6,16 @@
     "ttlSeconds": 3600,
     "activePack": {
       "id": "capital",
-      "version": "1"
+      "version": "2"
     }
   },
   "packs": [
     {
       "id": "capital",
-      "version": "1",
+      "version": "2",
       "artifactKind": "production",
       "schemaVersion": "1",
-      "url": "https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/capital-v1.sqlite.gz",
+      "url": "https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o/catalog/capital-v2.sqlite.gz",
       "sourceInventory": [
         {
           "id": "molit-urban-rail-full-route",

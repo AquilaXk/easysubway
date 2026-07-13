@@ -165,8 +165,14 @@ void main() {
       expect(requestedBodies.single, containsPair('maxTransfers', 3));
       expect(requestedBodies.single, containsPair('alternativeCount', 3));
       // 프리셋은 v2 body에 실리고, mobilityType은 하위호환으로 함께 전송된다.
-      expect(requestedBodies.single, containsPair('mobilityPreset', 'STEP_FREE'));
-      expect(requestedBodies.single, containsPair('mobilityType', 'WHEELCHAIR'));
+      expect(
+        requestedBodies.single,
+        containsPair('mobilityPreset', 'STEP_FREE'),
+      );
+      expect(
+        requestedBodies.single,
+        containsPair('mobilityType', 'WHEELCHAIR'),
+      );
       expect(requestedBodies.single['departureTime'], isA<String>());
       expect(result.routeSearchId, 'route-v2');
       expect(result.originStationName, '상록수');
@@ -550,10 +556,7 @@ void main() {
     int walkingMinutes(RouteSearchResult result) => result.steps
         .where((step) => step.stepType != 'ride')
         .fold<int>(0, (sum, step) => sum + step.estimatedMinutes);
-    expect(
-      walkingMinutes(slow),
-      greaterThan(walkingMinutes(standard)),
-    );
+    expect(walkingMinutes(slow), greaterThan(walkingMinutes(standard)));
   });
 
   test('STEP_FREE 프리셋은 STANDARD 대비 승강기 대기 60초만 더한다', () async {
@@ -2231,6 +2234,7 @@ void main() {
       destinationStationId: 'station-c',
       mobilityType: 'STROLLER',
     );
+    final waypointResult = await repository.searchRoute(waypointRequest);
     final waypointCapability = await repository.routeCapability(
       waypointRequest,
     );
@@ -2239,6 +2243,8 @@ void main() {
     expect(endpointResult.status, isNot('FOUND'));
     expect(await repository.canSearchRoute(endpointRequest), isFalse);
     expect(endpointCapability.stationExists, isFalse);
+    expect(waypointResult.status, 'UNSUPPORTED');
+    expect(waypointResult.blockedReasons, contains('지원 범위 밖 경로는 안내하지 않아요.'));
     expect(await repository.canSearchRoute(waypointRequest), isFalse);
     expect(waypointCapability.stationExists, isFalse);
   });

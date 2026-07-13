@@ -16594,7 +16594,9 @@ test("official OD fare release candidate는 승인된 두 방향 quote와 proven
       ["tools/datapack/build-datapack.mjs", "--build-spec", "tools/datapack/release/candidate-build-spec.json", "--output", outputDir],
       { cwd: root, env: productionEnv },
     );
-    const database = new DatabaseSync(path.join(outputDir, "catalog/capital-v1.sqlite"));
+    const database = new DatabaseSync(
+      path.join(outputDir, `catalog/capital-v${candidateFixture.packs[0].version}.sqlite`),
+    );
     let rows;
     try {
       rows = database.prepare(`SELECT origin_station_id AS originStationId,

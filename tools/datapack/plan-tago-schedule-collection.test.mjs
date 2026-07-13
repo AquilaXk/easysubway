@@ -59,6 +59,18 @@ test("TAGO 시간표 수집 plan은 명시된 providerStationId를 formula보다
   );
 });
 
+test("TAGO 시간표 수집 plan은 빈 stationCode 대신 providerStationId를 key로 사용한다", () => {
+  const plan = buildTagoScheduleCollectionPlan(
+    {
+      stationLineRows: [{ stationCode: "", lineId: "seoul-4", providerStationId: "MTRS14433" }],
+    },
+    { completedRequestKeys: [] },
+    12,
+  );
+  assert.equal(plan.stationCount, 1);
+  assert.ok(plan.batches.flatMap((batch) => batch.requests).every((request) => request.requestKey.startsWith("MTRS14433|")));
+});
+
 test("TAGO 시간표 수집 plan은 providerStationId 없으면 seoul-4 formula로 폴백한다", () => {
   const plan = buildTagoScheduleCollectionPlan(
     { stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }] },
@@ -90,6 +102,38 @@ test("TAGO 시간표 수집 plan은 명시적으로 빈 공개 역 scope를 전�
       }),
     /stationLineRows must contain at least one providerStationId or stationCode/,
   );
+});
+
+test("TAGO 시간표 수집 plan은 공개 scope와 일치하는 역만 유지한다", () => {
+  const plan = buildTagoScheduleCollectionPlan({
+    supportedV1Scope: { includedStationIds: ["station-sangnoksu"] },
+    stationMappings: [
+      {
+        sourceId: "kric-subway-timetable",
+        sourceStationCode: "448",
+        lineId: "seoul-4",
+        stationId: "station-sangnoksu",
+      },
+    ],
+    stationLineRows: [
+      {
+        sourceId: "kric-subway-timetable",
+        sourceStationCode: "448",
+        stationCode: "448",
+        lineId: "seoul-4",
+      },
+      {
+        sourceId: "kric-subway-timetable",
+        sourceStationCode: "433",
+        stationCode: "433",
+        lineId: "seoul-4",
+      },
+    ],
+  });
+
+  assert.equal(plan.stationCount, 1);
+  assert.equal(plan.totalRequestCount, 6);
+  assert.ok(plan.batches.flatMap((batch) => batch.requests).every((request) => request.requestKey.startsWith("MTRKR4448|")));
 });
 
 test("TAGO 시간표 수집 plan은 MTRKR 형식이어도 seoul-4가 아닌 노선을 거부한다", () => {

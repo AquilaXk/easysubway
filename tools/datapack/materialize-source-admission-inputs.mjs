@@ -59,6 +59,18 @@ async function finalizeSourceAdmission(args) {
   const source = inventory.sources?.find((entry) => entry.id === sourceId);
   const candidate = candidates.candidates?.find((entry) => entry.id === sourceId);
   if (!source || !candidate) throw new Error(`source/candidate not found: ${sourceId}`);
+  if (!candidate.evidence || typeof candidate.evidence !== "object") {
+    throw new Error(`${sourceId}.candidate.evidence is required`);
+  }
+  if (!candidate.evidence.reconstructionValidation || typeof candidate.evidence.reconstructionValidation !== "object") {
+    throw new Error(`${sourceId}.candidate.evidence.reconstructionValidation is required`);
+  }
+  if (!hashEvidence.officialOdFareEvidence?.sourceId) {
+    throw new Error("hashEvidence.officialOdFareEvidence.sourceId is required");
+  }
+  if (!Array.isArray(hashEvidence.perSourceEvidence)) {
+    throw new Error("hashEvidence.perSourceEvidence must be an array");
+  }
 
   source.retrievedAt = snapshot.retrievedAt.slice(0, 10);
   source.admissionEvidence = {
@@ -134,14 +146,17 @@ async function finalizeSourceAdmission(args) {
   const fareSourceId = hashEvidence.officialOdFareEvidence.sourceId;
   const fareSource = inventory.sources.find((entry) => entry.id === fareSourceId);
   if (!fareSource) throw new Error(`official OD fare source not found: ${fareSourceId}`);
+  if (typeof fareSource.license?.redistributionAllowed !== "boolean") {
+    throw new Error(`${fareSourceId}.license.redistributionAllowed must be boolean`);
+  }
   fixture.packs[0].sourceInventory = fixture.packs[0].sourceInventory.filter((entry) => entry.id !== fareSourceId);
   fixture.packs[0].sourceInventory.push({
     id: fareSource.id,
     owner: fareSource.owner,
     url: fareSource.datasetUrl,
     license: fareSource.license.name,
-    licenseStatus: "redistributable",
-    redistributionAllowed: true,
+    licenseStatus: fareSource.license.redistributionAllowed ? "redistributable" : "restricted",
+    redistributionAllowed: fareSource.license.redistributionAllowed,
     updateFrequency: fareSource.updateFrequency,
     updatedAt: `${fareSource.observedDataUpdatedAt}T00:00:00.000Z`,
     fields: fareSource.fieldsProvided,
