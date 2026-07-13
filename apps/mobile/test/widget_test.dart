@@ -36,6 +36,7 @@ import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_pol
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
+import 'package:easysubway_mobile/search_field.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
@@ -1124,6 +1125,167 @@ void main() {
     expect(searchField.maxLines, 1);
     expect(searchField.expands, isFalse);
   });
+
+  testWidgets(
+    '#2090 공용 검색 필드는 시스템 글자 배율에 비례해 입력 텍스트가 커지고 잘리지 않는다',
+    (tester) async {
+      // #2090: 이전 구현은 안쪽 고정 높이(SizedBox 48) tight constraint 탓에
+      // textScaler 1.0/2.0/3.0에서 입력 텍스트 렌더 높이가 18px로 고정돼(WCAG
+      // 1.4.4 위반) 배율을 키워도 글자가 커지지 않았다. 배율별로 입력 텍스트
+      // 렌더 높이가 비례해 커지고 예외·잘림이 없음을 고정한다.
+      final measured = <double, double>{};
+      for (final scale in const [1.0, 2.0, 3.0]) {
+        final controller = TextEditingController();
+        addTearDown(controller.dispose);
+        await tester.pumpWidget(
+          MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: MaterialApp(
+              home: Scaffold(
+                body: Center(
+                  child: SizedBox(
+                    width: 320,
+                    child: EasySubwaySearchField(
+                      controller: controller,
+                      hintText: '역 이름을 입력해 주세요',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('stationSearchInput')),
+          '상록수',
+        );
+        await tester.pumpAndSettle();
+
+        // 렌더 중 오버플로 등 예외가 없어야 한다(잘림 금지 우선).
+        expect(tester.takeException(), isNull, reason: 'scale $scale');
+
+        // 입력 텍스트 렌더 높이가 배율에 비례해 커진다(더 이상 18px 고정 아님).
+        final textHeight = tester.getSize(find.text('상록수')).height;
+        measured[scale] = textHeight;
+      }
+
+      // 배율이 커질수록 입력 텍스트 렌더 높이가 엄격히 증가한다.
+      expect(measured[2.0]!, greaterThan(measured[1.0]!));
+      expect(measured[3.0]!, greaterThan(measured[2.0]!));
+      // 배율에 대략 비례한다(2.0에서 최소 1.5배 이상 커짐 — 고정 18px 회귀 방지).
+      expect(measured[2.0]!, greaterThan(measured[1.0]! * 1.5));
+    },
+  );
+
+  testWidgets(
+    '#2090 배율 3.0에서 역 검색 화면 필드가 툴바 안에서 잘리지 않는다',
+    (tester) async {
+      // Finding 2: 툴바 높이 보정 상수가 새 필드 메트릭과 정합돼 큰 배율에서도
+      // 필드가 AppBar 세로 범위 안에 온전히 들어가야 한다.
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(3.0)),
+          child: MaterialApp(
+            home: StationSearchScreen(
+              repository: FakeStationSearchRepository(),
+              reportRepository: FakeFacilityReportRepository(),
+              locationProvider: FakeCurrentLocationProvider(),
+              pickSlot: RouteDraftSlot.origin,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+
+      final inputFinder = find.byKey(const Key('stationSearchInput'));
+      final appBarFinder = find.ancestor(
+        of: inputFinder,
+        matching: find.byType(AppBar),
+      );
+      final appBar = tester.widget<AppBar>(appBarFinder);
+      expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
+
+      final appBarRect = tester.getRect(appBarFinder);
+      final boxRect = tester.getRect(
+        find.byKey(const Key('heroStationSearchInputBox')),
+      );
+      // 시각 박스가 툴바 세로 범위 안에 온전히 들어간다(위/아래로 잘리지 않음).
+      expect(boxRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
+      expect(boxRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
+    },
+  );
+
+  testWidgets(
+    '#2090 역 검색 필드는 입력 후에도 슬롯 맥락 semantics 라벨을 유지한다',
+    (tester) async {
+      // Finding 3: 이전 floating label이 유지하던 "출발역 이름을 입력해 주세요"
+      // 맥락이 입력 후에도 스크린리더 semantics 트리에 남아야 한다.
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.origin,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 입력 전: 슬롯 맥락 라벨이 semantics 트리에 있다(hint 노드 + 라벨 래퍼
+      // 노드가 중첩돼 하나 이상 존재한다).
+      expect(find.bySemanticsLabel('출발역 이름을 입력해 주세요'), findsWidgets);
+
+      // 입력 후: hint는 InputDecorator가 지우지만 슬롯 맥락 라벨은 유지된다.
+      // 이전 floating label 없이도 맥락이 남아야 한다(#2090 Finding 3).
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.pumpAndSettle();
+      // 정확히 한 노드(라벨 래퍼)가 슬롯 맥락 라벨을 유지한다. 입력 필드 노드는
+      // 입력값(상록수)을 value로 갖고 라벨은 상위 래퍼 노드가 보존한다.
+      expect(find.bySemanticsLabel('출발역 이름을 입력해 주세요'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testWidgets(
+    '#2090 도착역 슬롯은 도착역 맥락 semantics 라벨을 노출한다',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.destination,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '사당',
+      );
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('도착역 이름을 입력해 주세요'), findsOneWidget);
+      // 출발역 맥락이 새어 나오지 않는다.
+      expect(find.bySemanticsLabel('출발역 이름을 입력해 주세요'), findsNothing);
+      handle.dispose();
+    },
+  );
 
   testWidgets('#2003 상단 내비게이션(검색바·메뉴·힌트 텍스트)이 확대된 안 B 치수를 갖는다', (tester) async {
     await tester.pumpWidget(
