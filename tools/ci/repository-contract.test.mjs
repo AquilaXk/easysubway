@@ -5553,6 +5553,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "seoulmetro-cyberstation-route-map",
     "seoulmetro-station-line-info",
   ]);
+  assert.equal(
+    sourceCandidates.candidates.find(({ id }) => id === "seoul-metro-official-od-fare-canary")
+      .serviceKeyHandling,
+    "offline_probe_secret_only",
+  );
 
   for (const source of inventory.sources) {
     assert.equal(typeof source.requiredForProductionPack, "boolean", `${source.id} must declare production required flag`);

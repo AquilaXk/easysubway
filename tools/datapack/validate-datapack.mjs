@@ -280,6 +280,11 @@ function validateOfficialOdFareQuotes(database, pack, admissions) {
   const rows = database.prepare("SELECT * FROM official_od_fare_quotes").all();
   if (rows.length === 0) return;
   const sourceIds = new Set(pack.sourceInventory.map((source) => source.id));
+  validateOfficialOdFareQuoteRows(rows, sourceIds, admissions, pack);
+  validateOfficialOdFareQuoteSets(rows, admissions, pack);
+}
+
+function validateOfficialOdFareQuoteRows(rows, sourceIds, admissions, pack) {
   for (const row of rows) {
     const admission = admissions?.get(row.source_id);
     if (admission?.decision !== "APPROVED") {
@@ -310,6 +315,9 @@ function validateOfficialOdFareQuotes(database, pack, admissions) {
       }
     }
   }
+}
+
+function validateOfficialOdFareQuoteSets(rows, admissions, pack) {
   for (const sourceId of new Set(rows.map((row) => row.source_id))) {
     const admission = admissions.get(sourceId);
     const sourceRows = rows.filter((row) => row.source_id === sourceId);

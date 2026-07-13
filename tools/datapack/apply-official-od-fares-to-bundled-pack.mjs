@@ -143,6 +143,7 @@ function assertStoredQuotes(sqlitePath, quotes) {
     if (database.prepare("PRAGMA user_version").get().user_version !== BUNDLED_CATALOG_USER_VERSION) {
       throw new Error(`bundled catalog user_version must be ${BUNDLED_CATALOG_USER_VERSION}`);
     }
+    assertIntegrity(database);
     if (JSON.stringify(storedQuotes(database)) !== JSON.stringify(canonicalQuotes(quotes))) {
       throw new Error("bundled official OD fare rows are stale");
     }

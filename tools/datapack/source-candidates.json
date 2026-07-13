@@ -2322,6 +2322,7 @@
       "licenseEvidenceStatus": "confirmed_free_use",
       "sampleEvidenceStatus": "sanitized_ci_probe_admitted",
       "admissionStatus": "official_od_fare_admitted_to_production_inventory",
+      "serviceKeyHandling": "offline_probe_secret_only",
       "mobileEmbeddingAllowed": false,
       "productionInventoryReferenceId": "seoul-metro-official-od-fare-canary",
       "evidence": {

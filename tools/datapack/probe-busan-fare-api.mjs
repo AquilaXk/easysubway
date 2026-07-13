@@ -4,7 +4,10 @@ import { chmod, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { validateOfficialOdFareEvidence } from "./lib/official-od-fare-evidence.mjs";
+import {
+  REQUIRED_FARE_FIELDS,
+  validateOfficialOdFareEvidence,
+} from "./lib/official-od-fare-evidence.mjs";
 
 const FARE_TABLE_URL = "https://www2.humetro.busan.kr/homepage/chs/page/subLocation.do?menu_no=1001010501";
 const ROUTE_URL = "https://www2.humetro.busan.kr/homepage/cyberstation/map.do";
@@ -25,12 +28,20 @@ function sleep(milliseconds) {
   return milliseconds > 0 ? new Promise((resolve) => setTimeout(resolve, milliseconds)) : Promise.resolve();
 }
 
+function shouldRetryResponse(status, attempt) {
+  return attempt < MAX_ATTEMPTS && (status === 429 || status >= 500);
+}
+
+function shouldRetryError(error, attempt) {
+  return attempt < MAX_ATTEMPTS && !/ HTTP \d+$/.test(error instanceof Error ? error.message : "");
+}
+
 async function fetchTextWithRetry({ fetchImpl, input, init, label, retryDelayMs, timeoutMs }) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
       const response = await fetchImpl(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
       if (!response.ok) {
-        if (attempt < MAX_ATTEMPTS && (response.status === 429 || response.status >= 500)) {
+        if (shouldRetryResponse(response.status, attempt)) {
           await sleep(retryDelayMs);
           continue;
         }
@@ -38,7 +49,7 @@ async function fetchTextWithRetry({ fetchImpl, input, init, label, retryDelayMs,
       }
       return { attempts: attempt, text: await response.text() };
     } catch (error) {
-      if (attempt < MAX_ATTEMPTS && !/ HTTP \d+$/.test(error instanceof Error ? error.message : "")) {
+      if (shouldRetryError(error, attempt)) {
         await sleep(retryDelayMs);
         continue;
       }
@@ -155,7 +166,7 @@ export async function probeOfficialBusanOdFares({
       },
       providerMappings: TARGETS.map((target) => ({ ...target })),
       quotes,
-      fieldNames: ["childCardFare", "childCashFare", "gnrlCardFare", "gnrlCashFare", "yungCardFare", "yungCashFare"],
+      fieldNames: [...REQUIRED_FARE_FIELDS].sort((left, right) => left < right ? -1 : 1),
       attemptCounts,
     };
     validateOfficialOdFareEvidence(evidence);

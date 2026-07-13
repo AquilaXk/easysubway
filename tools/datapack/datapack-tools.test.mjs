@@ -14246,7 +14246,10 @@ test("official OD fare admission bundle은 source별 승인만 선택한다", as
   const trackedBundle = JSON.parse(
     await readFile(path.join(root, "tools/datapack/official-od-fare-admission.json"), "utf8"),
   );
-  const admission = trackedBundle.admissions[0];
+  const admission = trackedBundle.admissions.find(
+    ({ sourceId }) => sourceId === "seoul-metro-official-od-fares",
+  );
+  assert.ok(admission);
   const busan = {
     ...admission,
     sourceId: "busan-transportation-official-od-fares",

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { requiredArray, requiredString } from "./ledger-admission-cli.mjs";
 
-const REQUIRED_FARE_FIELDS = [
+export const REQUIRED_FARE_FIELDS = [
   "childCardFare",
   "childCashFare",
   "gnrlCardFare",
@@ -122,30 +122,34 @@ export function officialOdFareAdmissionsBySource(bundle) {
   }
   const admissions = new Map();
   for (const admission of requiredArray(bundle.admissions, "official OD fare admission bundle.admissions")) {
-    assertObject(admission, "official OD fare admission");
-    assertExactKeys(admission, ADMISSION_KEYS, "official OD fare admission");
-    if (admission.schemaVersion !== 1) throw new Error("official OD fare admission schemaVersion must be 1");
-    if (admission.artifactKind !== "official-od-fare-admission") {
-      throw new Error("official OD fare admission artifactKind must be official-od-fare-admission");
-    }
-    if (admission.decision !== "APPROVED") throw new Error('admission decision must be "APPROVED"');
+    validateAdmission(admission);
     const sourceId = requiredString(admission.sourceId, "official OD fare admission.sourceId");
-    requiredString(admission.snapshotId, "official OD fare admission.snapshotId");
-    requiredString(admission.approvedBy, "official OD fare admission.approvedBy");
-    requiredString(admission.approvedAt, "official OD fare admission.approvedAt");
-    for (const field of ["evidenceHash", "quoteSetHash", "fareStationLineMappingLedgerHash"]) {
-      if (typeof admission[field] !== "string" || !/^[0-9a-f]{64}$/.test(admission[field])) {
-        throw new Error(`official OD fare admission.${field} must be a sha256 hex string`);
-      }
-    }
-    if (!Number.isSafeInteger(admission.quoteCount) || admission.quoteCount < 1) {
-      throw new Error("official OD fare admission.quoteCount must be a positive safe integer");
-    }
     if (admissions.has(sourceId)) throw new Error(`duplicate official OD fare admission sourceId: ${sourceId}`);
     admissions.set(sourceId, admission);
   }
   if (admissions.size === 0) throw new Error("official OD fare admission bundle.admissions must not be empty");
   return admissions;
+}
+
+function validateAdmission(admission) {
+  assertObject(admission, "official OD fare admission");
+  assertExactKeys(admission, ADMISSION_KEYS, "official OD fare admission");
+  if (admission.schemaVersion !== 1) throw new Error("official OD fare admission schemaVersion must be 1");
+  if (admission.artifactKind !== "official-od-fare-admission") {
+    throw new Error("official OD fare admission artifactKind must be official-od-fare-admission");
+  }
+  if (admission.decision !== "APPROVED") throw new Error('admission decision must be "APPROVED"');
+  requiredString(admission.snapshotId, "official OD fare admission.snapshotId");
+  requiredString(admission.approvedBy, "official OD fare admission.approvedBy");
+  requiredString(admission.approvedAt, "official OD fare admission.approvedAt");
+  for (const field of ["evidenceHash", "quoteSetHash", "fareStationLineMappingLedgerHash"]) {
+    if (typeof admission[field] !== "string" || !/^[0-9a-f]{64}$/.test(admission[field])) {
+      throw new Error(`official OD fare admission.${field} must be a sha256 hex string`);
+    }
+  }
+  if (!Number.isSafeInteger(admission.quoteCount) || admission.quoteCount < 1) {
+    throw new Error("official OD fare admission.quoteCount must be a positive safe integer");
+  }
 }
 
 export function validateOfficialOdFareEvidence(evidence) {
