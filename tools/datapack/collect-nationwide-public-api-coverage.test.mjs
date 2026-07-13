@@ -192,6 +192,23 @@ test("공공기관 API 정상 0건만 공식 미지원 resolution을 생성한�
   assert.doesNotMatch(JSON.stringify(resolutions), new RegExp(secret));
 });
 
+test("공식 미지원 provider ID는 locale 순서로 고정한다", async () => {
+  const resolutions = await collectNationwidePublicApiCoverage({
+    searchPlan: plan([{
+      ...target,
+      queries: [
+        { ...target.queries[0], providerId: "Zulu" },
+        { ...target.queries[0], providerId: "alpha" },
+      ],
+    }]),
+    credentials: { KRIC_SERVICE_KEY: "key" },
+    fetchImpl: async () => xmlResponse(),
+    now: new Date("2026-07-13T00:00:00.000Z"),
+  });
+
+  assert.deepEqual(resolutions.entries[0].requiredProviderIds, ["alpha", "Zulu"]);
+});
+
 test("공공데이터포털 검색 API를 POST로 실제 조회해 전체 검색 건수를 판정한다", async () => {
   const searchTarget = {
     ...target,

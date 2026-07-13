@@ -172,7 +172,7 @@ export async function collectNationwidePublicApiCoverage({
       reviewedAt: checkedAt,
       reviewerRole: "AUTOMATED_PUBLIC_API_AUDIT",
       nextReviewAt: nextReviewAt.toISOString(),
-      requiredProviderIds: [...new Set(target.queries.map(({ providerId }) => providerId))].sort(),
+      requiredProviderIds: [...new Set(target.queries.map(({ providerId }) => providerId))].sort(alphabeticalCompare),
       publicApiQueries: results,
       evidenceHash: sha256(JSON.stringify(results)),
     });
@@ -209,7 +209,7 @@ function indexKnownProviderCandidates(sourceCandidates) {
   }
   for (const [domain, candidates] of indexed) {
     indexed.set(domain, [...new Map(candidates.map((candidate) => [candidate.id, candidate])).values()]
-      .sort((a, b) => a.id.localeCompare(b.id)));
+      .sort((a, b) => alphabeticalCompare(a.id, b.id)));
   }
   return indexed;
 }
@@ -490,7 +490,12 @@ function jsonShape(value, depth = 0) {
   if (value === null) return "null";
   if (typeof value !== "object") return typeof value;
   if (depth >= 4) return "object";
-  return Object.fromEntries(Object.keys(value).sort().slice(0, 50).map((key) => [key, jsonShape(value[key], depth + 1)]));
+  return Object.fromEntries(Object.keys(value).sort(alphabeticalCompare).slice(0, 50)
+    .map((key) => [key, jsonShape(value[key], depth + 1)]));
+}
+
+function alphabeticalCompare(left, right) {
+  return left.localeCompare(right, "en");
 }
 
 function validatePlan(plan) {
