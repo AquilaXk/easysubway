@@ -45,6 +45,25 @@ document.addEventListener('alpine:init', function () {
 		};
 	});
 
+	// 사용자 메뉴 드롭다운(#2047): 상단바 우측 트리거를 누르면 계정 정보·로그아웃을 담은
+	// 드롭다운이 열린다. sidebarToggle/alertCenter와 동일한 명명 컴포넌트 패턴 — CSP 빌드라
+	// 메서드·게터 이름만 디렉티브에 넣는다. 진화형 향상: JS가 없으면 트리거는 계정 페이지 링크로
+	// 동작하고 로그아웃 폼은 드롭다운 안에 그대로 렌더되어 접근 가능하다.
+	Alpine.data('userMenu', function () {
+		return {
+			open: false,
+			get ariaExpanded() {
+				return this.open ? 'true' : 'false';
+			},
+			toggle: function () {
+				this.open = !this.open;
+			},
+			close: function () {
+				this.open = false;
+			},
+		};
+	});
+
 	// 관리자 플래시/토스트 알림: JS가 있으면 닫기 버튼으로 사라진다. 없으면 그대로 표시된다.
 	Alpine.data('dismissibleAlert', function () {
 		return {
