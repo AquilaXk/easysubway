@@ -58,10 +58,20 @@ document.addEventListener('alpine:init', function () {
 			toggle: function () {
 				this.open = !this.open;
 			},
-			// Esc·외부 클릭으로 닫힐 때 포커스를 트리거로 되돌린다(#2049 리뷰). 패널 내부(로그아웃 버튼)에
-			// 포커스가 있는 채 닫히면 포커스가 display:none 요소에 남아 키보드 탐색이 처음으로 튕기는 문제 방지.
+			// close()는 상태만 닫고 포커스는 건드리지 않는다. 외부 클릭(x-on:click.outside)은 이
+			// close()만 호출하므로, 사용자가 메뉴 밖의 다른 입력란을 눌러 닫힐 때 포커스를 트리거로
+			// 빼앗지 않는다(#2049 리뷰: 포커스 도둑질 방지).
 			close: function () {
 				this.open = false;
+			},
+			// Esc(x-on:keydown.escape.window)로 닫을 때만 트리거로 포커스를 복원한다. 열려 있을 때만
+			// 동작해 이미 닫힌 상태의 전역 Esc가 포커스를 트리거로 끌어오지 않게 하고, 패널 내부(로그아웃
+			// 버튼)에 포커스가 남은 채 닫혀 display:none 요소에 포커스가 갇히는 문제를 키보드 경로에서만 막는다.
+			closeFromKeyboard: function () {
+				if (!this.open) {
+					return;
+				}
+				this.close();
 				this.$refs.trigger?.focus();
 			},
 		};

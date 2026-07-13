@@ -103,7 +103,7 @@
 			  no-JS: 트리거는 계정 링크로 동작하고 폼은 항상 렌더되어 접근 가능하다.
 			-->
 			<div class="admin-user-menu" x-data="userMenu"
-			     x-on:keydown.escape.window="close" x-on:click.outside="close">
+			     x-on:keydown.escape.window="closeFromKeyboard" x-on:click.outside="close">
 				<button type="button" class="admin-user-menu-trigger" x-ref="trigger"
 				        x-on:click="toggle" aria-haspopup="dialog"
 				        x-bind:aria-expanded="ariaExpanded" aria-controls="admin-user-menu-panel"
@@ -112,7 +112,8 @@
 					<span class="admin-user-menu-role" th:text="${adminShell != null ? adminShell.rolesLabel : '권한 없음'}">admin.view</span>
 					<span class="admin-user-menu-caret" aria-hidden="true"></span>
 				</button>
-				<div id="admin-user-menu-panel" class="admin-user-menu-panel" x-show="open">
+				<div id="admin-user-menu-panel" class="admin-user-menu-panel" x-show="open"
+				     role="dialog" aria-label="사용자 메뉴">
 					<dl class="admin-user-menu-info">
 						<dt>계정</dt>
 						<dd th:text="${adminShell != null ? adminShell.username : 'anonymous'}">admin</dd>
