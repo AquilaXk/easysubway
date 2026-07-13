@@ -17,8 +17,8 @@
       "operator": "오너 자작(self-drawn)",
       "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v2.svg",
       "route_map_strategy": {
-        "rendering_strategy": "self-drawn-schematic",
-        "bundled_svg_role": "review-reference-only",
+        "rendering_strategy": "self-drawn-hybrid-basemap",
+        "bundled_svg_role": "hybrid-basemap-source",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -44,7 +44,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear schematic, not the raw SVG. Line colors follow the official Seoul Metropolitan Government route-color PDF (GTX-A retained from the source SVG). The SVG itself is retained only as a coordinate-review reference and is not distributed as the render source."
+        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear schematic, not the raw SVG. Line colors follow the official Seoul Metropolitan Government route-color PDF (GTX-A retained from the source SVG). The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap asset itself is not yet bundled offline (offline.included stays false in this PR) and is scheduled to ship in a follow-up PR."
       }
     },
     {
@@ -54,8 +54,8 @@
       "operator": "부산교통공사",
       "source_url": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
       "route_map_strategy": {
-        "rendering_strategy": "self-drawn-schematic",
-        "bundled_svg_role": "review-reference-only",
+        "rendering_strategy": "self-drawn-hybrid-basemap",
+        "bundled_svg_role": "hybrid-basemap-source",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -81,7 +81,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Busan schematic (easy-subway-busan-v1), not the raw SVG. The SVG itself is retained only as a coordinate-review reference and is not distributed as the render source."
+        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Busan schematic (easy-subway-busan-v1), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap asset itself is not yet bundled offline (offline.included stays false in this PR) and is scheduled to ship in a follow-up PR."
       }
     },
     {
@@ -91,8 +91,8 @@
       "operator": "오너 자작(self-drawn)",
       "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-gwangju-v1.svg",
       "route_map_strategy": {
-        "rendering_strategy": "self-drawn-schematic",
-        "bundled_svg_role": "review-reference-only",
+        "rendering_strategy": "self-drawn-hybrid-basemap",
+        "bundled_svg_role": "hybrid-basemap-source",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -117,7 +117,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "Attribution contract transition (not removal): the previously bundled CC BY-SA 2.0 KR route-map asset (kiwitree, ShareAlike) is superseded by the owner's self-drawn 8-linear Gwangju schematic (easy-subway-gwangju-v1). App rendering uses structured coordinates (route_map_positions) derived from the self-drawn schematic, not the CC BY-SA SVG, so the ShareAlike/attribution chain no longer attaches to the distributed render. Only line-1 catalog stations are mapped; line 2 drawn in the schematic is excluded. The self-drawn SVG is retained only as a coordinate-review reference and is not distributed as the render source."
+        "changes": "Attribution contract transition (not removal): the previously bundled CC BY-SA 2.0 KR route-map asset (kiwitree, ShareAlike) is superseded by the owner's self-drawn 8-linear Gwangju schematic (easy-subway-gwangju-v1). App rendering uses structured coordinates (route_map_positions) derived from the self-drawn schematic, not the CC BY-SA SVG, so the ShareAlike/attribution chain no longer attaches to the distributed render. Only line-1 catalog stations are mapped; line 2 drawn in the schematic is excluded. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap asset itself is not yet bundled offline (offline.included stays false in this PR) and is scheduled to ship in a follow-up PR."
       }
     },
     {
@@ -127,8 +127,8 @@
       "operator": "오너 자작(self-drawn)",
       "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daegu-v1.svg",
       "route_map_strategy": {
-        "rendering_strategy": "self-drawn-schematic",
-        "bundled_svg_role": "review-reference-only",
+        "rendering_strategy": "self-drawn-hybrid-basemap",
+        "bundled_svg_role": "hybrid-basemap-source",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -154,7 +154,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daegu schematic (easy-subway-daegu-v1), not the raw SVG. The SVG itself is retained only as a coordinate-review reference and is not distributed as the render source."
+        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daegu schematic (easy-subway-daegu-v1), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap asset itself is not yet bundled offline (offline.included stays false in this PR) and is scheduled to ship in a follow-up PR."
       }
     },
     {
@@ -164,8 +164,8 @@
       "operator": "오너 자작(self-drawn)",
       "source_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-daejeon-v1.svg",
       "route_map_strategy": {
-        "rendering_strategy": "self-drawn-schematic",
-        "bundled_svg_role": "review-reference-only",
+        "rendering_strategy": "self-drawn-hybrid-basemap",
+        "bundled_svg_role": "hybrid-basemap-source",
         "commercial_production_ready": true,
         "decision_ref": "tools/route-map/route-map-license-decision.json"
       },
@@ -191,7 +191,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daejeon schematic (easy-subway-daejeon-v1), not the raw SVG. Only line-1 catalog stations are mapped; unopened lines drawn in the schematic (circular line 2, Chungcheong regional rail) are excluded. The SVG itself is retained only as a coordinate-review reference and is not distributed as the render source."
+        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daejeon schematic (easy-subway-daejeon-v1), not the raw SVG. Only line-1 catalog stations are mapped; unopened lines drawn in the schematic (circular line 2, Chungcheong regional rail) are excluded. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap asset itself is not yet bundled offline (offline.included stays false in this PR) and is scheduled to ship in a follow-up PR."
       }
     }
   ]
