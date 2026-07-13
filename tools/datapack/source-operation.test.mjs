@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -74,6 +75,17 @@ test("validate는 credential 값을 거부한다", () => {
   );
 });
 
+test("validate는 nested auth credential 값도 거부한다", () => {
+  const operation = validOperation();
+  operation.auth.tokenValue = "actual-secret-value";
+  const invalid = candidate("a", { operation });
+
+  assert.throws(
+    () => validateOperation(invalid),
+    /credential values are forbidden/,
+  );
+});
+
 test("validate는 operation endpoint mismatch를 거부한다", () => {
   const invalid = candidate("a", {
     operation: validOperation({ endpoint: "https://provider.example/wrong" }),
@@ -82,5 +94,40 @@ test("validate는 operation endpoint mismatch를 거부한다", () => {
   assert.throws(
     () => validateOperation(invalid),
     /endpoint must match requestUrl/,
+  );
+});
+
+test("공식 OD fare source는 재현 가능한 operation과 조회 명령을 고정한다", async () => {
+  const candidates = JSON.parse(
+    await readFile(new URL("./source-candidates.json", import.meta.url), "utf8"),
+  );
+  const runbook = JSON.parse(
+    await readFile(new URL("./source-admission-runbook.json", import.meta.url), "utf8"),
+  );
+  const fare = candidates.candidates.find(
+    (entry) => entry.id === "seoul-metro-official-od-fares",
+  );
+
+  assert.deepEqual(fare.operation.auth, {
+    env: "DATA_GO_KR_SERVICE_KEY",
+    placement: "query",
+    parameter: "serviceKey",
+  });
+  assert.deepEqual(fare.operation.requiredParameters, [
+    "serviceKey",
+    "pageNo",
+    "numOfRows",
+    "dataType",
+    "dptreStnNm",
+    "arvlStnNm",
+  ]);
+  assert.equal(fare.operation.responseEnvelope, "response.body.items.item");
+  assert.deepEqual(fare.operation.runner, {
+    command: "node tools/datapack/probe-seoul-fare-api.mjs",
+    requiredEnv: ["DATA_GO_KR_SERVICE_KEY", "FARE_API_PROBE_OUTPUT"],
+  });
+  assert.equal(
+    runbook.operationLookupCommand,
+    "node tools/api/api-catalog.mjs show provider:<sourceId>",
   );
 });

@@ -21,6 +21,15 @@ function stringList(value, label) {
   return value;
 }
 
+function hasCredentialValue(value) {
+  if (Array.isArray(value)) return value.some(hasCredentialValue);
+  if (value == null || typeof value !== "object") return false;
+  return Object.entries(value).some(([key, child]) =>
+    /(?:credential|secret|serviceKey|apiKey|token|password).*value/i.test(key) ||
+    hasCredentialValue(child),
+  );
+}
+
 export function validateOperation(candidate, { allowMissing = false } = {}) {
   const operation = candidate?.operation;
   if (operation == null) {
@@ -30,10 +39,7 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (typeof operation !== "object" || Array.isArray(operation)) {
     throw new Error(`${candidate.id}.operation must be an object`);
   }
-  const forbiddenKeys = Object.keys(operation).filter((key) =>
-    /(?:credential|secret|serviceKey|apiKey).*value/i.test(key),
-  );
-  if (forbiddenKeys.length > 0) {
+  if (hasCredentialValue(operation)) {
     throw new Error(`${candidate.id}.operation credential values are forbidden`);
   }
   if (!new Set(["GET", "POST"]).has(operation.method)) {
