@@ -48,8 +48,7 @@ export function buildRegionalRealtimeProviderDecisionReport({ targets, contract 
     if (!decision) throw new Error(`missing regional realtime decision: ${key}`);
     return decision;
   });
-  const supportedDecisionCount = decisions.filter(({ state }) => state === "SUPPORTED").length;
-  validatePublicApiAudit(contract.publicApiAudit, scopes.length, supportedDecisionCount);
+  validatePublicApiAudit(contract.publicApiAudit, scopes.length, decisions);
 
   const regionIds = [...new Set(scopes.map(({ regionId }) => regionId))]
     .sort((left, right) => left.localeCompare(right, "en"));
@@ -131,7 +130,7 @@ function validateOfficialSources(value) {
   });
 }
 
-function validatePublicApiAudit(audit, scopeCount, supportedDecisionCount) {
+function validatePublicApiAudit(audit, scopeCount, decisions) {
   if (!audit || typeof audit !== "object" || Array.isArray(audit)) {
     throw new Error("publicApiAudit is required");
   }
@@ -152,8 +151,19 @@ function validatePublicApiAudit(audit, scopeCount, supportedDecisionCount) {
     || audit.supportedCount + audit.explicitNoDataCount + audit.falsePositiveClassifiedCount !== scopeCount) {
     throw new Error("publicApiAudit counts must resolve every regional scope");
   }
+  const supportedDecisionCount = decisions.filter(({ state }) => state === "SUPPORTED").length;
+  const explicitNoDataDecisionCount = decisions.filter(({ reasonCode }) => reasonCode === "PUBLIC_API_NO_DATA").length;
+  const falsePositiveDecisionCount = decisions.filter(
+    ({ reasonCode }) => reasonCode === "PUBLIC_API_FALSE_POSITIVE_SCHEDULE_ONLY",
+  ).length;
   if (audit.supportedCount !== supportedDecisionCount) {
     throw new Error("publicApiAudit.supportedCount must match supported decisions");
+  }
+  if (audit.explicitNoDataCount !== explicitNoDataDecisionCount) {
+    throw new Error("publicApiAudit.explicitNoDataCount must match no-data decisions");
+  }
+  if (audit.falsePositiveClassifiedCount !== falsePositiveDecisionCount) {
+    throw new Error("publicApiAudit.falsePositiveClassifiedCount must match false-positive decisions");
   }
   if (audit.credentialSafeCallCount < audit.targetCount) {
     throw new Error("publicApiAudit credential-safe calls must cover every target");
@@ -172,23 +182,30 @@ function validateDecision(decision, index, sourcesById) {
   if (!new Set(["SUPPORTED", "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE"]).has(normalized.state)) {
     throw new Error(`${label}.state must be terminal`);
   }
+  normalized.evidenceRefs = uniqueStrings(decision.evidenceRefs, `${label}.evidenceRefs`);
+  for (const evidenceRef of normalized.evidenceRefs) {
+    if (!sourcesById.has(evidenceRef)) throw new Error(`${label} has unknown evidence ref: ${evidenceRef}`);
+  }
   if (normalized.state === "SUPPORTED") {
     normalized.providerId = requiredString(decision.providerId, `${label}.providerId`);
     if (normalized.fallback !== "NONE") throw new Error(`${label} supported fallback must be NONE`);
+    if (normalized.evidenceRefs.some((evidenceRef) => sourcesById.get(evidenceRef).decision !== "REALTIME_SUPPORTED")) {
+      throw new Error(`${label} supported evidence must use realtime-supporting official sources`);
+    }
   } else {
     if (normalized.fallback === "REALTIME") throw new Error(`${label} unsupported fallback must not be REALTIME`);
     if (normalized.routeFallbackCapability !== "PLANNED") {
       throw new Error(`${label}.routeFallbackCapability must be PLANNED`);
     }
+    normalized.reasonCode = requiredString(decision.reasonCode, `${label}.reasonCode`);
+    if (!new Set(["PUBLIC_API_NO_DATA", "PUBLIC_API_FALSE_POSITIVE_SCHEDULE_ONLY"]).has(normalized.reasonCode)) {
+      throw new Error(`${label}.reasonCode is not an allowed unsupported classification`);
+    }
   }
   if (/(coverage|provider|승격|게이트|검증|pilot)/iu.test(normalized.userMessageKo)) {
     throw new Error(`${label}.userMessageKo contains internal release vocabulary`);
   }
-  normalized.evidenceRefs = uniqueStrings(decision.evidenceRefs, `${label}.evidenceRefs`);
-  for (const evidenceRef of normalized.evidenceRefs) {
-    if (!sourcesById.has(evidenceRef)) throw new Error(`${label} has unknown evidence ref: ${evidenceRef}`);
-  }
-  for (const field of ["evidenceHash", "reviewedAt", "nextReviewAt", "reasonCode"]) {
+  for (const field of ["evidenceHash", "reviewedAt", "nextReviewAt"]) {
     if (decision[field] !== undefined) normalized[field] = requiredString(decision[field], `${label}.${field}`);
   }
   if (normalized.evidenceHash && !/^[a-f0-9]{64}$/.test(normalized.evidenceHash)) {

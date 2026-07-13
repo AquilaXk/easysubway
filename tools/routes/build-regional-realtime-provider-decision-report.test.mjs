@@ -19,11 +19,16 @@ const officialSources = [
     url: "https://www.data.go.kr/data/15000522/openapi.do",
     decision: "SCHEDULE_ONLY_NOT_REALTIME",
   },
+  {
+    id: "approved-realtime-source",
+    url: "https://www.data.go.kr/data/15000000/openapi.do",
+    decision: "REALTIME_SUPPORTED",
+  },
 ];
 
 function contract(decisions = [
   decision("busan", "busan-transportation", "busan-1"),
-  decision("daejeon", "daejeon-transportation", "daejeon-1"),
+  decision("daejeon", "daejeon-transportation", "daejeon-1", "PUBLIC_API_FALSE_POSITIVE_SCHEDULE_ONLY"),
 ]) {
   return {
     schemaVersion: 1,
@@ -47,7 +52,7 @@ function contract(decisions = [
   };
 }
 
-function decision(regionId, operatorId, lineId) {
+function decision(regionId, operatorId, lineId, reasonCode = "PUBLIC_API_NO_DATA") {
   return {
     regionId,
     operatorId,
@@ -57,6 +62,7 @@ function decision(regionId, operatorId, lineId) {
     routeFallbackCapability: "PLANNED",
     userMessageKo: "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
     evidenceRefs: ["public-api-audit"],
+    reasonCode,
   };
 }
 
@@ -70,7 +76,7 @@ function supportedDecision(regionId, operatorId, lineId) {
     routeFallbackCapability: "PLANNED",
     providerId: "approved-provider",
     userMessageKo: "실시간 도착 정보를 제공해요.",
-    evidenceRefs: ["public-api-audit"],
+    evidenceRefs: ["approved-realtime-source"],
   };
 }
 
@@ -130,7 +136,7 @@ test("SUPPORTED 결정은 providerId와 fallback NONE 계약을 지킨다", () =
   const supported = supportedDecision("busan", "busan-transportation", "busan-1");
   const supportedContract = contract([
     supported,
-    decision("daejeon", "daejeon-transportation", "daejeon-1"),
+    decision("daejeon", "daejeon-transportation", "daejeon-1", "PUBLIC_API_FALSE_POSITIVE_SCHEDULE_ONLY"),
   ]);
   supportedContract.publicApiAudit = {
     ...supportedContract.publicApiAudit,
@@ -161,6 +167,53 @@ test("SUPPORTED 결정은 providerId와 fallback NONE 계약을 지킨다", () =
       },
     }),
     /supported fallback must be NONE/,
+  );
+  assert.throws(
+    () => buildRegionalRealtimeProviderDecisionReport({
+      targets,
+      contract: {
+        ...supportedContract,
+        decisions: [{ ...supported, evidenceRefs: ["public-api-audit"] }, supportedContract.decisions[1]],
+      },
+    }),
+    /supported evidence must use realtime-supporting official sources/,
+  );
+  assert.throws(
+    () => buildRegionalRealtimeProviderDecisionReport({
+      targets,
+      contract: {
+        ...supportedContract,
+        publicApiAudit: {
+          ...supportedContract.publicApiAudit,
+          supportedCount: 0,
+          explicitNoDataCount: 1,
+          falsePositiveClassifiedCount: 1,
+        },
+      },
+    }),
+    /supportedCount must match supported decisions/,
+  );
+});
+
+test("public API 감사 분류 수는 decision reasonCode별 실제 수와 일치한다", () => {
+  const mismatchedContract = contract([
+    decision("busan", "busan-transportation", "busan-1"),
+    decision("daejeon", "daejeon-transportation", "daejeon-1"),
+  ]);
+
+  assert.throws(
+    () => buildRegionalRealtimeProviderDecisionReport({ targets, contract: mismatchedContract }),
+    /explicitNoDataCount must match no-data decisions/,
+  );
+  assert.throws(
+    () => buildRegionalRealtimeProviderDecisionReport({
+      targets,
+      contract: contract([
+        { ...decision("busan", "busan-transportation", "busan-1"), reasonCode: "OTHER" },
+        decision("daejeon", "daejeon-transportation", "daejeon-1", "PUBLIC_API_FALSE_POSITIVE_SCHEDULE_ONLY"),
+      ]),
+    }),
+    /reasonCode is not an allowed unsupported classification/,
   );
 });
 
