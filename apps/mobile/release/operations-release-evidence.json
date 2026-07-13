@@ -119,7 +119,7 @@
           "scaleOutProhibitedRunbook": "분산 limiter 구현 전 backend service scale-out 금지; 후속 #1022",
           "owner": "AquilaXk",
           "untilDate": "2026-10-13",
-          "postLaunchAbuseMonitoringThreshold": "report API 429 비율과 duplicate/orphan cleanup 실패를 운영 대시보드에서 감시",
+          "postLaunchAbuseMonitoringThreshold": "최근 5분 report API 요청 중 429 비율이 5%를 초과하거나 duplicate/orphan cleanup 실패가 1회 발생하면 신규 신고 트래픽을 제한하고 운영 담당자에게 즉시 경보",
           "distributedLimiterFollowUpIssue": 1022
         }
       },

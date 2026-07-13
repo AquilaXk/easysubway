@@ -16,6 +16,10 @@ for (const name of ["archive_id", "run_id", "source", "storage_uri", "payload_sh
   assert.ok(Number.isInteger(index[name]), `raw archive CSV missing ${name}`);
 }
 assert.ok(rows.length > 0, "source archive must contain at least one raw archive row");
+for (const row of rows) {
+  assert.ok(row[index.archive_id]?.trim(), "archive_id must not be empty");
+  assert.ok(row[index.run_id]?.trim(), "run_id must not be empty");
+}
 const archiveIds = rows.map((row) => row[index.archive_id]);
 assert.equal(new Set(archiveIds).size, archiveIds.length, "raw archive IDs must be unique");
 

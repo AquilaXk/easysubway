@@ -21,6 +21,13 @@ assert.ok(collectionRunIndex >= 0, "collection-runs.csv missing run_id");
 for (const name of ["archive_id", "run_id", "payload_sha256"]) {
   assert.ok(Number.isInteger(rawIndex[name]), `raw-archives.csv missing ${name}`);
 }
+for (const row of collectionRuns) {
+  assert.ok(row[collectionRunIndex]?.trim(), "run_id must not be empty");
+}
+for (const row of rawArchives) {
+  assert.ok(row[rawIndex.archive_id]?.trim(), "archive_id must not be empty");
+  assert.ok(row[rawIndex.run_id]?.trim(), "run_id must not be empty");
+}
 const runIds = new Set(collectionRuns.map((row) => row[collectionRunIndex]));
 assert.equal(runIds.size, collectionRuns.length, "collection run IDs must be unique");
 const archives = new Map(rawArchives.map((row) => [row[rawIndex.archive_id], row]));
@@ -42,6 +49,8 @@ assert.deepEqual(
 );
 
 for (const record of manifest.materialized) {
+  assert.ok(record.archiveId?.trim(), "materialized archiveId must not be empty");
+  assert.ok(record.runId?.trim(), "materialized runId must not be empty");
   const row = archives.get(record.archiveId);
   assert.ok(row, `materialized archive missing from raw-archives.csv: ${record.archiveId}`);
   assert.ok(runIds.has(record.runId), `materialized archive run missing from collection-runs.csv: ${record.runId}`);

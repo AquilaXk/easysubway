@@ -4365,7 +4365,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       scaleOutProhibitedRunbook: "분산 limiter 구현 전 backend service scale-out 금지; 후속 #1022",
       owner: "AquilaXk",
       untilDate: "2026-10-13",
-      postLaunchAbuseMonitoringThreshold: "report API 429 비율과 duplicate/orphan cleanup 실패를 운영 대시보드에서 감시",
+      postLaunchAbuseMonitoringThreshold: "최근 5분 report API 요청 중 429 비율이 5%를 초과하거나 duplicate/orphan cleanup 실패가 1회 발생하면 신규 신고 트래픽을 제한하고 운영 담당자에게 즉시 경보",
       distributedLimiterFollowUpIssue: 1022,
     },
   );
@@ -8298,6 +8298,24 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   await rm(emptyFixtureDir, { recursive: true, force: true });
 
   await writeFile(payloadPath, payload);
+  const emptyIdFixtureDir = await mkdtemp(path.join(tmpdir(), "easysubway-empty-id-source-archive-"));
+  await writeFile(
+    path.join(emptyIdFixtureDir, "raw-archives.csv"),
+    [
+      "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at",
+      `,,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:01Z`,
+    ].join("\n"),
+  );
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [materializePath, path.join(emptyIdFixtureDir, "raw-archives.csv"), emptyIdFixtureDir],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /Command failed/,
+  );
+  await rm(emptyIdFixtureDir, { recursive: true, force: true });
+
   await writeFile(
     path.join(fixtureDir, "collection-runs.csv"),
     [
@@ -8316,6 +8334,10 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   assert.match(archiveScript, /data-source-raw-archive-materialize\.mjs/);
   assert.match(materializeScript, /unsupported storage_uri for self-contained archive/);
   assert.match(materializeScript, /source archive must contain at least one raw archive row/);
+  assert.match(materializeScript, /archive_id must not be empty/);
+  assert.match(materializeScript, /run_id must not be empty/);
+  assert.match(restoreCheckScript, /archive_id must not be empty/);
+  assert.match(restoreCheckScript, /run_id must not be empty/);
   assert.match(materializeScript, /payload hash mismatch/);
   assert.match(materializeScript, /payload-manifest\.json/);
   assert.doesNotMatch(materializeScript, /\bcopyFile\b/);
@@ -8504,7 +8526,7 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   const sourceArchiveTarget = backupTargets.get("datapack_source_inventory");
   assert.equal(
     sourceArchiveTarget.restoreRehearsalCommand,
-    'node tools/ops/data-source-raw-archive-restore-check.mjs && node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json',
+    'EASYSUBWAY_DATA_SOURCE_RESTORE_DIR="$RESTORED_ARCHIVE_DIR" node tools/ops/data-source-raw-archive-restore-check.mjs && node tools/datapack/validate-source-inventory.mjs --inventory tools/datapack/source-inventory.json',
   );
   assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-materialize.mjs"));
   assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-restore-check.mjs"));
