@@ -4,10 +4,10 @@
   "candidateId": "capital-pilot-candidate-20260712",
   "productionScopeId": "capital_pilot_android_v1",
   "fixturePath": "tools/datapack/release/capital-production-reviewed-pack.json",
+  "fixtureSha256": "659797e5d56dbe5f5b9feaf75d1de7f68ceee76085501a088137eb493a0cff8e",
   "sourceSnapshotIds": [
     "molit-urban-rail-full-route-capital-admission-20260712",
     "seoulmetro-station-line-info-capital-admission-20260712",
-    "seoulmetro-cyberstation-route-map-capital-admission-20260712",
     "kric-station-elevator-capital-admission-20260712",
     "kric-station-elevator-movement-capital-admission-20260712",
     "kric-station-escalator-capital-admission-20260712",
@@ -40,20 +40,6 @@
       "licenseStatus": "PASS",
       "redistributionAllowed": true,
       "adminReviewRecordHash": "c64feb8bd9bf6db8be936f11d7fe3e8d5a867b16be6e037f13bf55da01e2be4d",
-      "snapshotStatus": "LOCKED",
-      "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
-    },
-    {
-      "snapshotId": "seoulmetro-cyberstation-route-map-capital-admission-20260712",
-      "sourceId": "seoulmetro-cyberstation-route-map",
-      "rawObjectUri": "s3://easysubway-datapack-sources/seoulmetro-cyberstation-route-map/20260712.json",
-      "rawSha256": "738a8bc8523a1ff408a78ea5777577b9daa8cc556a8522d864e99953ab650608",
-      "redactedRequestFingerprint": "65aa48cbac712c535244716d5cd8b5457ec884f810e2696071d78ad09dd93f86",
-      "schemaFingerprint": "3ef53470a34e1d44db931b0bc2b7ac333fb2640f3e297902c4ee554688ef9052",
-      "licenseStatus": "PASS",
-      "redistributionAllowed": true,
-      "adminReviewRecordHash": "4ea77265d144baa6b06e8f10152743420006f7581b24ffd68b21367341aa1b6c",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
       "freshnessExpiresAt": "2099-08-01T00:00:00Z"
@@ -143,13 +129,13 @@
       "freshnessExpiresAt": "2099-08-01T00:00:00Z"
     }
   ],
-  "sourceSnapshotSetHash": "845b5a8f54f5c09277c2e7e6468fd8baab4da74210512f3b83be12d3bdcad75e",
+  "sourceSnapshotSetHash": "ae226bf151f5a7820650078badb6cbcca73f3d94611b3c4e92064e15ecd7d654",
   "approvedAliasLedgerHash": "9a74e31d64e53f38ab575d6a7731f72138523dd34f1f6756dbed8573e3bdeabc",
   "facilityEvidenceLedgerHash": "b3ffc88b4a9ce3515340366885beaace718c70058608567513f378e198935981",
   "routeEvidenceLedgerHash": "da884d0ff0138e009587753ec541997c29da57370e056dd8d3f6ad2687ad9fa9",
   "approvedOverrideSetHash": "ee5364319442d0bb4590d83e149631635c65ab59f1f3254fdbf196e04ec0f3cd",
-  "sourceInventorySha256": "61eddcd3a086938b3992fa69418da6e7dd026fc4cc486ae65b80c384613c33b5",
-  "builderGitSha": "4fc68131b397c0468d68728683bb6c79b7a42a39",
+  "sourceInventorySha256": "a74bf0913a9ff954e111924eb214a874aaba98cb3fbc142062373eb030b39f08",
+  "builderGitSha": "95b14efd9259a2b8839e6151d49fd825fee7101e",
   "builderVersion": "build-datapack.mjs@1",
   "officialOdFareEvidence": {
     "sourceId": "seoul-metro-official-od-fares",

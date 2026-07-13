@@ -4,6 +4,7 @@
   "candidateId": "capital-pilot-candidate-fixture",
   "productionScopeId": "capital_pilot_android_v1",
   "fixturePath": "tools/datapack/fixtures/catalog-fixture.json",
+  "fixtureSha256": "71fe7b63e962d38f84f4c9c24fd52f5f07302f36d8cd50ed99293dfbf9b58021",
   "sourceSnapshotIds": [
     "snapshot-molit-urban-rail-full-route-fixture",
     "snapshot-seoulmetro-station-line-info-fixture"

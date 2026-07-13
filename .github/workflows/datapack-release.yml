@@ -174,9 +174,10 @@ jobs:
             if (buildSpec.artifactKind !== "datapack-candidate-build-spec") throw new Error("buildSpec.artifactKind must be datapack-candidate-build-spec");
             if (marker.test(buildSpec.fixturePath ?? "")) throw new Error("release mode cannot use fixture input");
             if (!Array.isArray(buildSpec.sourceSnapshotIds) || buildSpec.sourceSnapshotIds.length === 0) throw new Error("buildSpec.sourceSnapshotIds must not be empty");
-            for (const field of ["sourceSnapshotSetHash", "approvedAliasLedgerHash", "facilityEvidenceLedgerHash", "routeEvidenceLedgerHash", "approvedOverrideSetHash", "sourceInventorySha256"]) {
+            for (const field of ["fixtureSha256", "sourceSnapshotSetHash", "approvedAliasLedgerHash", "facilityEvidenceLedgerHash", "routeEvidenceLedgerHash", "approvedOverrideSetHash", "sourceInventorySha256"]) {
               requireHash(buildSpec[field], `buildSpec.${field}`);
             }
+            if (buildSpec.fixtureSha256 !== sha256(buildSpec.fixturePath)) throw new Error("buildSpec.fixtureSha256 mismatch");
             if (releaseRequestPath) {
               const request = JSON.parse(fs.readFileSync(releaseRequestPath, "utf8"));
               if (request.artifactKind !== "datapack-release-request") throw new Error("release request artifactKind must be datapack-release-request");

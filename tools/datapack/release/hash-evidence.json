@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "artifactKind": "datapack-build-spec-hash-evidence",
-  "issue": 1996,
-  "builderGitSha": "4fc68131b397c0468d68728683bb6c79b7a42a39",
+  "issue": 1400,
+  "builderGitSha": "95b14efd9259a2b8839e6151d49fd825fee7101e",
   "productionScopeId": "capital_pilot_android_v1",
   "truthfulnessRule": "모든 값은 (a) 커밋 데이터에서 결정적 재산출, 또는 (b) #1992·#1996 admission 실행 산출물의 byte-exact 재생성·검증본에서만 채웠다. 임의 합성값 없음. 사당·상록수 4호선 접근성 상태는 실측 그대로(UNDER_MAINTENANCE/NO_OFFICIAL_FEED) 기록 — 거짓 AVAILABLE 위장 없음.",
   "ledgerHashes": {
@@ -35,33 +35,30 @@
     ]
   },
   "sourceSnapshots": {
-    "note": "source-snapshots.json은 admission 실행(9종, snapshot -capital-admission-20260712)의 snapshot 객체를 커밋 원천 데이터에서 byte-exact 재생성한 것. #1996에서 seoul-metro-accessibility(P0 accessibility_facilities)를 9번째로 추가 admit. 재생성본 검증: 각 snapshot에 대해 sha256(JSON.stringify([snapshot])) == 해당 source의 admissionEvidence.sourceSnapshotSetHash (9/9 PASS).",
-    "order": "admission chain 순서(source-candidates.json 순): molit-urban-rail-full-route → seoulmetro-station-line-info → seoulmetro-cyberstation-route-map → kric-station-elevator → kric-station-elevator-movement → kric-station-escalator → kric-wheelchair-lift-location → kric-wheelchair-lift-movement → seoul-metro-accessibility",
+    "note": "source-snapshots.json은 현재 reviewed pack이 계속 사용하는 admission 8종의 snapshot 객체다. 제거된 seoulmetro-cyberstation-route-map admission은 새 자작 노선도 근거로 대체되어 release snapshot set에서도 제외했다. 각 snapshot의 admissionEvidence 일치 검증은 8/8 PASS다.",
+    "order": "admission chain 순서: molit-urban-rail-full-route → seoulmetro-station-line-info → kric-station-elevator → kric-station-elevator-movement → kric-station-escalator → kric-wheelchair-lift-location → kric-wheelchair-lift-movement → seoul-metro-accessibility",
     "committedVerificationCommand": "node -e \"const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),i=require('./tools/datapack/source-inventory.json');for(const n of s){const e=i.sources.find(x=>x.id===n.sourceId).admissionEvidence;console.log(n.sourceId,c.createHash('sha256').update(JSON.stringify([n])).digest('hex')===e.sourceSnapshotSetHash)}\"",
     "specRowRawSha256Note": "build-spec sourceSnapshots[].rawSha256는 admissionEvidence.rawSha256(=raw 바이트 해시, fixture 주석 선례 'admission sample.rawSha256')를 기입. snapshot 객체 내부 rawSha256는 canonical(minified·key정렬) raw 해시로 값이 다르며 source-snapshots.json에 보존됨."
   },
   "sourceSnapshotSetHash": {
-    "value": "845b5a8f54f5c09277c2e7e6468fd8baab4da74210512f3b83be12d3bdcad75e",
-    "contract": "run-source-admission-pipeline.mjs 60행 공식 sha256(JSON.stringify([snapshot...]))을 9-snapshot 배열로 일반화(배열=source-snapshots.json 그대로, 위 order). build-datapack·워크플로는 이 값을 재계산하지 않고 build-spec↔release-request 상호 일치만 강제(workflow 187행).",
+    "value": "ae226bf151f5a7820650078badb6cbcca73f3d94611b3c4e92064e15ecd7d654",
+    "contract": "run-source-admission-pipeline.mjs 60행 공식 sha256(JSON.stringify([snapshot...]))을 8-snapshot 배열에 적용한다. 새 production publish는 이 build spec hash와 일치하는 별도 release request 승인이 필요하다.",
     "reproductionCommand": "node -e \"const c=require('crypto');console.log(c.createHash('sha256').update(JSON.stringify(require('./tools/datapack/release/source-snapshots.json'))).digest('hex'))\""
   },
   "sourceInventorySha256": {
-    "value": "61eddcd3a086938b3992fa69418da6e7dd026fc4cc486ae65b80c384613c33b5",
+    "value": "a74bf0913a9ff954e111924eb214a874aaba98cb3fbc142062373eb030b39f08",
     "contract": "run-source-admission-pipeline.mjs 61행 공식 sha256(JSON.stringify(admittedInventory)). #1769 official OD fare source admit 후 현행 브랜치의 tools/datapack/source-inventory.json이 최종 admitted inventory이며 워크플로 빌드가 실제로 소비하는 인벤토리(workflow 331행)와 동일 파일.",
     "reproductionCommand": "node -e \"const c=require('crypto'),fs=require('fs');console.log(c.createHash('sha256').update(JSON.stringify(JSON.parse(fs.readFileSync('tools/datapack/source-inventory.json','utf8')))).digest('hex'))\""
   },
   "fixturePath": {
     "value": "tools/datapack/release/capital-production-reviewed-pack.json",
-    "contract": "워크플로 production 게이트 체인(330~337행)을 현행 브랜치에서 그대로 실행한 산출물을 커밋. pack.artifactKind=production, 소비 소스 10종(9종+seoul-metro-accessibility). 사당 UNDER_MAINTENANCE·상록수 NO_OFFICIAL_FEED edge 포함."
+    "sha256": "659797e5d56dbe5f5b9feaf75d1de7f68ceee76085501a088137eb493a0cff8e",
+    "contract": "build spec과 release workflow가 reviewed fixture raw bytes SHA-256을 재계산해 일치하지 않으면 차단한다. pack.artifactKind=production이며 4호선 상록수-사당 graph를 포함한다."
   },
   "identifiers": {
     "candidateId": {
       "value": "capital-pilot-candidate-20260712",
-      "note": "파일 기반 경로는 backend candidate 행을 우회하므로 리포에 고정 명명 계약 없음. fixture 선례(capital-pilot-candidate-fixture)+snapshot 날짜 관례로 명명. release-request.candidateId와 동일(자체 정합)."
-    },
-    "approvalId": {
-      "value": "release-request-2026-07-12-01",
-      "note": "파일 기반 경로 임의 고유 문자열 허용(workflow 183행은 modeArgs.releaseRequestId와 일치만 강제). 선행 조사 문서의 날짜+연번 관례."
+      "note": "파일 기반 candidate 식별자다. 변경된 build spec에 대한 production release request는 아직 승인되지 않았다."
     }
   },
   "perSourceEvidence": [
@@ -78,13 +75,6 @@
       "rawSha256": "e6664cf8c7ba22d983534b9c38f62550f0b675c0e0b32127e7e8476ce43a0fd3",
       "adminReviewRecordHash": "c64feb8bd9bf6db8be936f11d7fe3e8d5a867b16be6e037f13bf55da01e2be4d",
       "perSourceSnapshotSetHash": "7cd9209bd79399731bc3f5d4aa34b1467755a38072eafbfd6a5f172ad99bcda5"
-    },
-    {
-      "sourceId": "seoulmetro-cyberstation-route-map",
-      "snapshotId": "seoulmetro-cyberstation-route-map-capital-admission-20260712",
-      "rawSha256": "738a8bc8523a1ff408a78ea5777577b9daa8cc556a8522d864e99953ab650608",
-      "adminReviewRecordHash": "4ea77265d144baa6b06e8f10152743420006f7581b24ffd68b21367341aa1b6c",
-      "perSourceSnapshotSetHash": "f66882ed69618b8c7e0d3e3746d914ef122ce7889c0ae015730b92bc6e51e19b"
     },
     {
       "sourceId": "kric-station-elevator",

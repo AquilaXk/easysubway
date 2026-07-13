@@ -1042,71 +1042,71 @@ void main() {
     expect(edge.read<int>('reliability_score'), 30);
   });
 
-  test('데이터팩 UNDER_MAINTENANCE edge는 표시 경로에서 가용이 아니라 보수중으로 차단된다 (#1996)', () async {
-    // 백엔드 게이트가 확정한 network_edges.accessibility_status='UNDER_MAINTENANCE'가
-    // 앱 표시 경로까지 도달하면서, available로 렌더되지 않고 '보수중' 사유로
-    // 정직하게 구분 표시되는지 end-to-end로 검증한다.
-    final database = CatalogDatabase.memory();
-    addTearDown(database.close);
-    await database.seedBaselineIfEmpty();
-    await database.customStatement('''
+  test(
+    '데이터팩 UNDER_MAINTENANCE edge는 표시 경로에서 가용이 아니라 보수중으로 차단된다 (#1996)',
+    () async {
+      // 백엔드 게이트가 확정한 network_edges.accessibility_status='UNDER_MAINTENANCE'가
+      // 앱 표시 경로까지 도달하면서, available로 렌더되지 않고 '보수중' 사유로
+      // 정직하게 구분 표시되는지 end-to-end로 검증한다.
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      await database.customStatement('''
       UPDATE network_edges
       SET accessibility_status = 'UNDER_MAINTENANCE'
       WHERE id = 'entry-sangnoksu-seoul-4'
     ''');
-    final repository = LocalRouteRepository(catalogDatabase: database);
+      final repository = LocalRouteRepository(catalogDatabase: database);
 
-    final result = await repository.searchRoute(
-      const RouteSearchRequest(
-        originStationId: 'station-sangnoksu',
-        destinationStationId: 'station-sadang',
-        mobilityType: 'WHEELCHAIR',
-      ),
-    );
+      final result = await repository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
 
-    // 가용으로 렌더되면 안 된다: FOUND가 아니라 차단이어야 한다.
-    expect(result.status, 'BLOCKED');
-    expect(result.steps, isEmpty);
-    // 확인 불가가 아니라 실측 보수중 사유로 구분 표시된다.
-    expect(result.blockedReasons, contains('지금은 보수중이라 이용하기 어려워요.'));
-    // 보수중 문구는 available·확인 불가 문구와 겹치지 않는다.
-    expect(
-      result.blockedReasons,
-      isNot(contains('엘리베이터·통로 상태를 확인하고 있어요.')),
-    );
-  });
+      // 가용으로 렌더되면 안 된다: FOUND가 아니라 차단이어야 한다.
+      expect(result.status, 'BLOCKED');
+      expect(result.steps, isEmpty);
+      // 확인 불가가 아니라 실측 보수중 사유로 구분 표시된다.
+      expect(result.blockedReasons, contains('지금은 보수중이라 이용하기 어려워요.'));
+      // 보수중 문구는 available·확인 불가 문구와 겹치지 않는다.
+      expect(result.blockedReasons, isNot(contains('엘리베이터·통로 상태를 확인하고 있어요.')));
+    },
+  );
 
-  test('데이터팩 NO_OFFICIAL_FEED edge는 표시 경로에서 확인 불가(unknown)로 취급된다 (#1996)', () async {
-    // 상록수형: 공식 상태 피드 부재. available로 매핑되면 안 되고 확인 불가로
-    // 취급되어, 휠체어 strict 프로필에서는 UNKNOWN으로 남는다.
-    final database = CatalogDatabase.memory();
-    addTearDown(database.close);
-    await database.seedBaselineIfEmpty();
-    await database.customStatement('''
+  test(
+    '데이터팩 NO_OFFICIAL_FEED edge는 표시 경로에서 확인 불가(unknown)로 취급된다 (#1996)',
+    () async {
+      // 상록수형: 공식 상태 피드 부재. available로 매핑되면 안 되고 확인 불가로
+      // 취급되어, 휠체어 strict 프로필에서는 UNKNOWN으로 남는다.
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      await database.customStatement('''
       UPDATE network_edges
       SET accessibility_status = 'NO_OFFICIAL_FEED'
       WHERE id = 'entry-sangnoksu-seoul-4'
     ''');
-    final repository = LocalRouteRepository(catalogDatabase: database);
+      final repository = LocalRouteRepository(catalogDatabase: database);
 
-    final result = await repository.searchRoute(
-      const RouteSearchRequest(
-        originStationId: 'station-sangnoksu',
-        destinationStationId: 'station-sadang',
-        mobilityType: 'WHEELCHAIR',
-      ),
-    );
+      final result = await repository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
 
-    // available로 오인되어 FOUND가 되면 안 된다. 확인 불가는 UNKNOWN 계열이다.
-    expect(result.status, 'UNKNOWN');
-    expect(result.steps, isEmpty);
-    // 확인 불가 문구로 안내하고, 보수중 문구는 쓰지 않는다.
-    expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
-    expect(
-      result.blockedReasons,
-      isNot(contains('지금은 보수중이라 이용하기 어려워요.')),
-    );
-  });
+      // available로 오인되어 FOUND가 되면 안 된다. 확인 불가는 UNKNOWN 계열이다.
+      expect(result.status, 'UNKNOWN');
+      expect(result.steps, isEmpty);
+      // 확인 불가 문구로 안내하고, 보수중 문구는 쓰지 않는다.
+      expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
+      expect(result.blockedReasons, isNot(contains('지금은 보수중이라 이용하기 어려워요.')));
+    },
+  );
 
   test('기존 baseline edge provenance를 보강해 strict 경로를 유지한다', () async {
     final database = CatalogDatabase.memory();
@@ -2038,6 +2038,70 @@ void main() {
     expect(result.steps, isEmpty);
     expect(result.blockedReasons, contains('검증 근거가 부족해 계단 없는 경로로 안내하지 않아요.'));
     expect(result.warnings, isEmpty);
+  });
+
+  test('통과 전용 역은 경로 내부에서는 사용하지만 출발점으로 사용할 수 없다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    await database.customStatement('''
+      INSERT INTO catalog_metadata (key, value, updated_at)
+      VALUES ('transitPassThroughStationIds', '["station-b"]', 1781827200)
+    ''');
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'entry-a',
+      fromNodeId: 'station-a',
+      toNodeId: 'station-a:line-test',
+      edgeType: 'ENTRY',
+      durationSeconds: 30,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 60,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-b-c',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-c:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 60,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'exit-c',
+      fromNodeId: 'station-c:line-test',
+      toNodeId: 'station-c',
+      edgeType: 'EXIT',
+      durationSeconds: 30,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final throughResult = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-c',
+        mobilityType: 'STROLLER',
+      ),
+    );
+    final endpointResult = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-b',
+        destinationStationId: 'station-c',
+        mobilityType: 'STROLLER',
+      ),
+    );
+
+    expect(throughResult.status, 'FOUND');
+    expect(endpointResult.status, isNot('FOUND'));
   });
 
   test('구형 catalog의 network_edges는 미확인 접근성 상태로 안전하게 차단한다', () async {

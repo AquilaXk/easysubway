@@ -1304,6 +1304,44 @@ test("데이터팩 생성기는 buildSpec 요청으로 candidate provenance를 �
   );
 });
 
+test("데이터팩 생성기는 buildSpec과 다른 fixture bytes를 거부한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-fixture-hash-"));
+  try {
+    const buildSpec = JSON.parse(await readFile("tools/datapack/fixtures/candidate-build-spec.json", "utf8"));
+    buildSpec.fixtureSha256 = "f".repeat(64);
+    const buildSpecPath = path.join(workspace, "candidate-build-spec.json");
+    await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["tools/datapack/build-datapack.mjs", "--build-spec", buildSpecPath, "--output", path.join(workspace, "output")],
+        { cwd: root, env: productionEnv },
+      ),
+      /buildSpec\.fixtureSha256 must match fixture bytes/,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("tracked production buildSpec은 현재 reviewed fixture와 provenance에 묶인다", async () => {
+  const buildSpec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
+  const fixtureBytes = await readFile(buildSpec.fixturePath);
+  const sourceInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
+  const sourceSnapshots = JSON.parse(await readFile("tools/datapack/release/source-snapshots.json", "utf8"));
+
+  assert.equal(buildSpec.fixtureSha256, sha256(fixtureBytes));
+  assert.equal(buildSpec.sourceInventorySha256, sha256(Buffer.from(JSON.stringify(sourceInventory))));
+  assert.deepEqual(buildSpec.sourceSnapshotIds, sourceSnapshots.map((snapshot) => snapshot.snapshotId));
+  assert.deepEqual(
+    buildSpec.sourceSnapshots.map(({ snapshotId, sourceId }) => ({ snapshotId, sourceId })),
+    sourceSnapshots.map(({ snapshotId, sourceId }) => ({ snapshotId, sourceId })),
+  );
+  assert.equal(buildSpec.sourceSnapshotSetHash, sha256(Buffer.from(JSON.stringify(sourceSnapshots))));
+  assert.ok(!sourceSnapshots.some((snapshot) => snapshot.sourceId === "seoulmetro-cyberstation-route-map"));
+});
+
 test("데이터팩 생성기는 만료된 source snapshot buildSpec을 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-build-spec-expired-output-${Date.now()}`);
   const buildSpecDir = path.join(root, "tmp", `easysubway-datapack-build-spec-expired-${process.pid}-${Date.now()}`);

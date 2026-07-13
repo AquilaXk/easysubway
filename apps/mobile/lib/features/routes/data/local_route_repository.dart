@@ -1035,6 +1035,7 @@ class _RouteCatalogSnapshot {
     required this.sourceUpdatedAt,
     required this.realtimeStationLineKeysByProvider,
     required this.plannedStationLineKeys,
+    required this.transitPassThroughStationIds,
   });
 
   final Map<String, String> stationsById;
@@ -1047,6 +1048,7 @@ class _RouteCatalogSnapshot {
   final String sourceUpdatedAt;
   final Map<String, Set<String>> realtimeStationLineKeysByProvider;
   final Set<String> plannedStationLineKeys;
+  final Set<String> transitPassThroughStationIds;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final sourceUpdatedAtRow = await database.customSelect('''
@@ -1063,6 +1065,11 @@ class _RouteCatalogSnapshot {
           SELECT station_id, line_id, line_sequence
           FROM station_lines
           ORDER BY line_id, line_sequence
+          ''').get();
+    final transitPassThroughRows = await database.customSelect('''
+          SELECT CAST(pass_through.value AS TEXT) AS station_id
+          FROM catalog_metadata metadata, json_each(metadata.value) pass_through
+          WHERE metadata.key = 'transitPassThroughStationIds'
           ''').get();
     final outOfStationTransferPolicy = await _OutOfStationTransferPolicy.load(
       database,
@@ -1399,6 +1406,10 @@ class _RouteCatalogSnapshot {
       ),
       realtimeStationLineKeysByProvider: realtimeStationLineKeysByProvider,
       plannedStationLineKeys: plannedStationLineKeys,
+      transitPassThroughStationIds: {
+        for (final row in transitPassThroughRows)
+          row.read<String>('station_id'),
+      },
     );
   }
 
@@ -1610,6 +1621,9 @@ class _RouteCatalogSnapshot {
             lineId: nodeKey.lineId,
           ),
         );
+        if (transitPassThroughStationIds.contains(stationLine.stationId)) {
+          continue;
+        }
         final accessEdgeSuffix = nodeKey.accessEdgeSuffix;
         if (!explicitAccessPairs.contains(
           _edgePairKey(stationLine.stationId, nodeKey.nodeId),

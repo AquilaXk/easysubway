@@ -28,6 +28,7 @@ const productionMinimumTableRowNames = [
 ];
 const candidateBuildSpecArtifactKind = "datapack-candidate-build-spec";
 const candidateBuildSpecHashFields = [
+  "fixtureSha256",
   "sourceSnapshotSetHash",
   "approvedAliasLedgerHash",
   "facilityEvidenceLedgerHash",
@@ -177,10 +178,12 @@ async function loadBuildInput(args, officialOdFareAdmission, officialOdFareAdmis
   const buildSpecPath = await resolveBuildInputPath(buildSpecArg, "buildSpec");
   const buildSpecBytes = await readFile(buildSpecPath);
   const buildSpec = JSON.parse(buildSpecBytes);
-  const fixture = JSON.parse(await readFile(await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8"));
+  const fixtureBytes = await readFile(await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"));
+  const fixture = JSON.parse(fixtureBytes);
   const officialOdFareEvidence = await validateCandidateBuildSpec(
     buildSpec,
     fixture,
+    fixtureBytes,
     officialOdFareAdmission,
     officialOdFareAdmissionBytes,
   );
@@ -190,7 +193,7 @@ async function loadBuildInput(args, officialOdFareAdmission, officialOdFareAdmis
   };
 }
 
-async function validateCandidateBuildSpec(buildSpec, fixture, admission, admissionBytes) {
+async function validateCandidateBuildSpec(buildSpec, fixture, fixtureBytes, admission, admissionBytes) {
   if (!buildSpec || typeof buildSpec !== "object" || Array.isArray(buildSpec)) {
     throw new Error("buildSpec must be an object");
   }
@@ -208,6 +211,9 @@ async function validateCandidateBuildSpec(buildSpec, fixture, admission, admissi
   assertSourceSnapshotSet(buildSpec.sourceSnapshotIds, sourceSnapshots);
   for (const field of candidateBuildSpecHashFields) {
     sha256HexString(buildSpec[field], `buildSpec.${field}`);
+  }
+  if (buildSpec.fixtureSha256 !== sha256(fixtureBytes)) {
+    throw new Error("buildSpec.fixtureSha256 must match fixture bytes");
   }
   const builderGitSha = requiredString(buildSpec.builderGitSha, "buildSpec.builderGitSha");
   if (!/^[a-f0-9]{7,40}$/i.test(builderGitSha)) {
@@ -228,6 +234,7 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvid
     candidateId: requiredString(buildSpec.candidateId, "buildSpec.candidateId"),
     productionScopeId: requiredString(buildSpec.productionScopeId, "buildSpec.productionScopeId"),
     buildSpecSha256,
+    fixtureSha256: normalizedHashes.fixtureSha256,
     sourceSnapshotIds: requiredStringArray(buildSpec.sourceSnapshotIds, "buildSpec.sourceSnapshotIds"),
     sourceSnapshots: requiredSourceSnapshots(buildSpec.sourceSnapshots, "buildSpec.sourceSnapshots"),
     sourceSnapshotSetHash: normalizedHashes.sourceSnapshotSetHash,

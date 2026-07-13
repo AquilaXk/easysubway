@@ -615,7 +615,16 @@ class DriftStationRepository
   Future<List<_LocalStationSummary>> _readStationSummaries({
     String? stationId,
   }) async {
-    final stationFilter = stationId == null ? '' : 'WHERE s.id = ?';
+    final stationFilter =
+        '''
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM catalog_metadata metadata, json_each(metadata.value) pass_through
+        WHERE metadata.key = 'transitPassThroughStationIds'
+          AND pass_through.value = s.id
+      )
+      ${stationId == null ? '' : 'AND s.id = ?'}
+    ''';
     final rows = await database
         .customSelect(
           '''

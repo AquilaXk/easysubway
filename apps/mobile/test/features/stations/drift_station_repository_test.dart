@@ -21,6 +21,20 @@ void main() {
     }
   });
 
+  test('통과 전용 역은 로컬 역 검색에서 제외한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO catalog_metadata (key, value, updated_at)
+      VALUES ('transitPassThroughStationIds', '["station-sangnoksu"]', 1781827200)
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    expect(await repository.searchStations('상록수'), isEmpty);
+    expect(await repository.searchStations('사당'), hasLength(1));
+  });
+
   test('로컬 역 검색은 부역명(name_sub)으로도 역을 찾는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

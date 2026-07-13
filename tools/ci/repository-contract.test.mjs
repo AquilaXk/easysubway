@@ -5083,6 +5083,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.equal(candidateBuildSpec.fixturePath, "tools/datapack/fixtures/catalog-fixture.json");
   assert.ok(Array.isArray(candidateBuildSpec.sourceSnapshotIds) && candidateBuildSpec.sourceSnapshotIds.length > 0);
   for (const field of [
+    "fixtureSha256",
     "sourceSnapshotSetHash",
     "approvedAliasLedgerHash",
     "facilityEvidenceLedgerHash",
