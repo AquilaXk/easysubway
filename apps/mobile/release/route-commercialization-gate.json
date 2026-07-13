@@ -23,7 +23,8 @@
   "realtimeCoverage": {
     "supportedStationLinePairsMin": 100,
     "providerFreshnessSecondsMax": 90,
-    "staleFallbackRequired": true
+    "staleFallbackRequired": true,
+    "requireTerminalRegionalResolution": true
   },
   "accessibility": {
     "strictStepFreeKnownStairFalsePositiveAllowed": 0,

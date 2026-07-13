@@ -228,6 +228,7 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.equal(gate.realtimeCoverage.supportedStationLinePairsMin, 100);
   assert.equal(gate.realtimeCoverage.providerFreshnessSecondsMax, 90);
   assert.equal(gate.realtimeCoverage.staleFallbackRequired, true);
+  assert.equal(gate.realtimeCoverage.requireTerminalRegionalResolution, true);
   assert.equal(gate.accessibility.strictStepFreeKnownStairFalsePositiveAllowed, 0);
   assert.equal(gate.accessibility.generatedConnectorAsVerifiedAllowed, false);
   assert.equal(gate.accessibility.unknownAccessibilityMustBeLabeled, true);
@@ -302,6 +303,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   assert.deepEqual(gate.requiredArtifacts, {
     routeAccuracyReport: "artifacts/route-accuracy-report.json",
     realtimeProviderCoverageReport: "artifacts/realtime-provider-coverage-report.json",
+    regionalRealtimeProviderDecisionReport: "tools/realtime/regional-realtime-provider-decision-report.json",
     routeAccessibilityRegressionReport: "artifacts/route-accessibility-regression-report.json",
     routeGraphCoverageReport: "artifacts/route-graph-coverage-report.json",
     routeV2ContractReport: "artifacts/route-v2-contract-report.json",
@@ -319,6 +321,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
   );
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("validate-datapack.mjs --require-production")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-coverage-report.mjs")));
+  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-regional-realtime-provider-decision-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-topology-report.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
   assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("itx-cheongchun-coverage-contract.test.mjs")));
@@ -382,6 +385,7 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
     "artifacts/route-accuracy-report.json",
     "artifacts/route-accessibility-regression-report.json",
     "artifacts/realtime-provider-coverage-report.json",
+    "tools/realtime/regional-realtime-provider-decision-report.json",
     "artifacts/route-graph-coverage-report.json",
     "artifacts/route-v2-contract-report.json",
   ]);
