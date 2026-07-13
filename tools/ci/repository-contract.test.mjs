@@ -9110,8 +9110,9 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(shellFragment, /th:fragment="contentStart"/);
   assert.match(shellFragment, /id="admin-content"/);
   assert.match(shellFragment, /admin-env-badge/);
-  assert.match(shellFragment, /revision/);
-  assert.match(shellFragment, /master data/);
+  // #2047 상단바 재설계: 상태 스트립 라벨을 한국어로 표기한다(revision→리비전, master data→마스터데이터).
+  assert.match(shellFragment, /리비전/);
+  assert.match(shellFragment, /마스터데이터/);
   assert.match(shellFragment, /th:action="@\{\/admin\/logout\}"/);
   assert.match(shellFragment, /aria-label="관리자 로그아웃"/);
   assert.match(shellFragment, /th:fragment="flash"/);
