@@ -1911,26 +1911,39 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       controller: _queryController,
       focusNode: _searchFocusNode,
       hintText: _searchInputHint,
+      // #2090: hint는 입력이 있으면 InputDecorator가 지워 "출발/도착/경유역 이름을
+      // 입력해 주세요" 슬롯 맥락이 입력 후 스크린리더에서 소실된다. floating label
+      // 회귀(#1933) 없이 맥락을 유지하도록 동일 문구를 semantics 라벨로 전달해
+      // 필드를 감싼다. 홈 검색은 이 파라미터를 쓰지 않아 라벨 이중 낭독이 없다.
+      semanticsLabel: _searchInputHint,
       autofocus: !isNearbyEntry,
       onSubmitted: _submit,
       onClear: _queryController.clear,
     );
-    // 공용 필드는 56 터치타겟 안에 46px 시각 박스를 고정 배치하고, 그 안 고정
-    // 높이(48) 단일 줄 TextField가 입력 텍스트(fontSize 17, 폰트 기본 라인 높이)를
-    // 세로 contentPadding으로 감싼다. AppBar 기본 toolbarHeight(56)에 그대로 넣으면
-    // 시스템 글자 크기를 키웠을 때 필드가 세로로 잘리므로, 확대된 입력 줄 높이
-    // (글자 배율 × 라인 높이)에 상하 패딩을 더한 값을 기본 높이(56)와 함께 clamp
-    // 한다. 축소는 하지 않아 기본 배율의 레이아웃은 불변이고, titleSpacing·즉시
-    // 입력·뒤로가기 leading 동작은 유지된다.
+    // 공용 필드는 56 터치타겟 안에 46px 시각 박스를 배치하고, 그 안 단일 줄
+    // TextField가 입력 텍스트(fontSize 17)를 세로 contentPadding으로 감싼다. AppBar
+    // 기본 toolbarHeight(56)에 그대로 넣으면 시스템 글자 크기를 키웠을 때 필드가
+    // 세로로 잘리므로 필드 실제 렌더 높이에 맞춰 툴바를 키운다. 축소는 하지 않아
+    // 기본 배율의 레이아웃은 불변이고, titleSpacing·즉시 입력·뒤로가기 leading
+    // 동작은 유지된다.
     final textScaler = MediaQuery.textScalerOf(context);
-    // 입력 style은 height 미지정이라 폰트 기본 라인 높이(대략 fontSize의 1.2배)를
-    // 따른다. 확대 시 세로 잘림을 막기 위해 이 실효 라인 높이에 세로
-    // contentPadding(상 21 + 하 9 = 30)을 더해 필요한 높이를 구한다.
-    final scaledInputHeight = textScaler.scale(17 * 1.2) + 30.0;
-    final toolbarHeight = math.max(
-      kToolbarHeight,
-      math.max(EasySubwayTouchTarget.general, scaledInputHeight),
+    // #2090: 공용 필드(EasySubwaySearchField)는 배율에 비례해 바깥 터치타겟(56),
+    // 시각 박스(46), 입력 필드(48)를 함께 키운다. 필드가 실제로 차지하는 세로
+    // 높이는 이 셋의 최댓값이며 항상 터치타겟(56*배율)이 지배한다. 이전
+    // 보정 상수(scale(17*1.2)+30)는 새 필드 메트릭을 과소평가해 확대 시 필드가
+    // 툴바 아래로 잘렸으므로, 공용 위젯이 쓰는 것과 동일한 상수·산식으로 필드
+    // 높이를 재도출해 정합한다.
+    final scaledFieldHeight = math.max(
+      math.max(
+        EasySubwayTouchTarget.general,
+        textScaler.scale(EasySubwayTouchTarget.general),
+      ),
+      math.max(
+        easySubwaySearchFieldVisualHeight,
+        textScaler.scale(easySubwaySearchFieldVisualHeight),
+      ),
     );
+    final toolbarHeight = math.max(kToolbarHeight, scaledFieldHeight);
     final recentSearchSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
