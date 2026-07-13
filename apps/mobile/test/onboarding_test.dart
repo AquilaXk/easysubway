@@ -90,12 +90,12 @@ void main() {
     semanticsHandle.dispose();
   });
 
-  testWidgets('시작 화면 타이틀은 2행("갈 수 있는 길을")만 시그니처 브랜드 색이고 1·3행은 잉크 토큰이다', (
+  testWidgets('시작 화면 타이틀은 "갈 수 있는 길"까지만 브랜드 색이고 조사 "을"·1·3행은 잉크 토큰이다', (
     tester,
   ) async {
-    // #2089: 시그니처 브랜드 색 1차 적용 — 강조는 2행 한 행에만 고정한다.
-    // Text.rich 전환 후에도 스크린리더가 읽는 전체 문자열은 그대로 유지되고,
-    // span별 색만 브랜드/잉크로 갈린다.
+    // #2089(오너 실기기 검수): 강조는 2행 중 "갈 수 있는 길"까지로 고정하고
+    // 조사 "을"은 잉크로 남긴다. Text.rich 전환 후에도 스크린리더가 읽는 전체
+    // 문자열은 그대로 유지되고, span별 색만 브랜드/잉크로 갈린다.
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
     final titleWidget = tester.widget<Text>(
@@ -111,19 +111,20 @@ void main() {
     // 1행: 브랜드 색을 쓰지 않는다(루트 스타일의 잉크 토큰 상속).
     expect(children[0].text, '빠른 길보다\n');
     expect(children[0].style?.color, isNull);
-    // 2행: 시그니처 브랜드 색.
-    expect(children[1].text, '갈 수 있는 길을');
+    // 2행 강조: "갈 수 있는 길"까지만 시그니처 브랜드 색.
+    expect(children[1].text, '갈 수 있는 길');
     expect(children[1].style?.color, EasySubwayAccessibleColors.brandSignature);
-    // 3행: 브랜드 색을 쓰지 않는다.
-    expect(children[2].text, '\n안내합니다');
+    // 조사 "을"과 3행: 브랜드 색을 쓰지 않는다.
+    expect(children[2].text, '을\n안내합니다');
     expect(children[2].style?.color, isNull);
 
     // 루트 스타일은 기존 잉크 토큰을 유지한다.
     expect(titleWidget.style?.color, EasySubwayAccessibleColors.text);
   });
 
-  testWidgets('시작 화면 CTA는 시그니처 브랜드 색 채움 + 흰 글자다', (tester) async {
+  testWidgets('시작 화면 CTA는 시그니처 브랜드 색 채움 + 흰 글자 + 키운 라벨이다', (tester) async {
     // #2089: '시작하기' CTA만 브랜드 색으로 채우고 글자는 흰색(대비 5.7:1, AA).
+    // 오너 실기기 검수로 라벨을 키운다(20/w700).
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
     final button = tester.widget<FilledButton>(
@@ -138,6 +139,10 @@ void main() {
       style.foregroundColor?.resolve(<WidgetState>{}),
       EasySubwayAccessibleColors.surface,
     );
+    // 라벨을 키워 58px 버튼과 균형을 맞춘다.
+    final textStyle = style.textStyle?.resolve(<WidgetState>{});
+    expect(textStyle?.fontSize, 20);
+    expect(textStyle?.fontWeight, FontWeight.w700);
   });
 
   testWidgets('시작 화면은 소형 화면(320×568)에서도 카피 3행과 CTA를 오버플로 없이 렌더한다', (
@@ -222,10 +227,11 @@ void main() {
       find.byKey(const Key('startScreenStartButton')),
     );
 
-    // SafeArea 인셋(34) + 앱 토큰 여백(xxl)만 기대한다. 이중 가산 금지.
+    // SafeArea 인셋(34) + 앱 토큰 여백(xxl*2)만 기대한다. 이중 가산 금지.
+    // #2089: 오너 실기기 검수로 CTA 하단 여백을 xxl*2로 올렸다.
     expect(
       screenBottom - buttonRect.bottom,
-      closeTo(34 + EasySubwaySpacing.xxl, 0.5),
+      closeTo(34 + EasySubwaySpacing.xxl * 2, 0.5),
     );
   });
 
