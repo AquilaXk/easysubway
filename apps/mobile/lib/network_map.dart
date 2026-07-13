@@ -605,6 +605,13 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   Future<_NetworkMapLoadResult> _loadMap() async {
     final data = await widget.repository.getNetworkMap(region: _selectedRegion);
+    // #2082/#2083 후속: 저장된(persisted) 지역이 있는 사용자는 세션 중
+    // 지역 선택기를 조작하지 않는 한 _selectedRegion이 계속 null이라, 로드된
+    // 실제 지역(data.selectedRegion)을 여기서 동기화해둔다. 사용자가 이미
+    // _reload(region: ...)로 _selectedRegion을 명시 설정한 경우는 그 값이
+    // 그대로 리포지토리 요청에 반영되어 data.selectedRegion과 같아지므로
+    // 값이 보존된다(덮어써도 동일).
+    _selectedRegion = data.selectedRegion;
     final viewport = await widget.viewportRepository?.loadViewport(
       _displayRegionName(data.selectedRegion),
     );

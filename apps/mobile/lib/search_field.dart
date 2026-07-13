@@ -157,14 +157,14 @@ class EasySubwaySearchField extends StatelessWidget {
                   const SizedBox(width: easySubwaySearchFieldIconGap),
                   Expanded(
                     // 바깥(56·배율확대)이 터치타겟 높이를 차지하고, 그 안 Center가
-                    // 고정 높이(48·배율확대) 단일 줄 TextField를 세로 중앙에 놓는다.
-                    // 필드 고정 높이 48로 히트/semantics 영역이 48px 게이트를 넘고,
-                    // 아래 비대칭 세로 패딩(21/9)의 정렬 보정이 두 화면에서 동일하게
-                    // 동작한다. #2090: 고정 SizedBox 높이를 배율에 비례해 키워
-                    // (배율 1.0에서 정확히 48/56) 확대 시 입력 줄이 세로로 자라도
-                    // 잘리지 않게 한다. 여러 줄(expands) 트릭을 쓰면 실기기에서 입력
-                    // 텍스트와 IME 조합 밑줄이 첫 줄로 렌더돼 박스 상단에 붙는 회귀가
-                    // 있어 단일 줄 필드를 유지한다.
+                    // 고유 높이 단일 줄 TextField를 세로 중앙에 놓는다(구현은 아래
+                    // 194~196행 SizedBox(touchTargetHeight) + Center 참고). 이
+                    // SizedBox 높이가 히트/semantics 영역을 48px 게이트 이상으로
+                    // 키운다. #2090: SizedBox 높이를 배율에 비례해 키워(배율 1.0에서
+                    // 정확히 48/56) 확대 시 입력 줄이 세로로 자라도 잘리지 않게 한다.
+                    // 여러 줄(expands) 트릭을 쓰면 실기기에서 입력 텍스트와 IME 조합
+                    // 밑줄이 첫 줄로 렌더돼 박스 상단에 붙는 회귀가 있어 단일 줄
+                    // 필드를 유지한다.
                     //
                     // #2090 Finding 3: semanticsLabel이 주어지면 입력 필드
                     // 서브트리(지우기 버튼 제외)를 MergeSemantics + Semantics(label)

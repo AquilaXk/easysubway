@@ -1922,6 +1922,42 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets(
+    '#2082 저장된 지역(부산)으로 로드된 뒤 역 검색을 열면 지역 표시가 부산을 따른다',
+    (tester) async {
+      // 회귀 방지: _currentRegionDisplayName이 _selectedRegion(세션 중 지역
+      // 선택기를 조작해야만 채워지는 상태)에만 의존하면, 저장된 지역이 부산인
+      // 사용자가 재시작 후 지역 선택기를 건드리지 않고 검색을 열 때 '수도권'이
+      // 잘못 표시된다. getNetworkMap(region: null) 호출이 저장된 지역(부산)을
+      // 반환하도록 페이크를 구성해, 로드 완료 후 지역 표시가 실제 로드된 지역을
+      // 따르는지 검증한다.
+      String? openedRegionLabel;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkMapScreen(
+            repository: FakeStationSearchRepository(
+              networkMapRegionNames: const ['부산'],
+            ),
+            routeDraftController: RouteDraftController(),
+            onOpenStationSearch: (regionLabel) {
+              openedRegionLabel = regionLabel;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('networkMapMenuStationSearchButton')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(openedRegionLabel, '부산');
+    },
+  );
+
   testWidgets('노선도 로드 실패는 재시도만 보여준다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
