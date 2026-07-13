@@ -55,6 +55,11 @@ while IFS= read -r file; do
       ios=true
       datapack=true
       ;;
+    .github/workflows/cd.yml)
+      ci=true
+      repository=true
+      deploy=true
+      ;;
     .github/workflows/*.yml|tools/ci/**|tools/repo/**|tools/qa/**)
       ci=true
       repository=true
