@@ -465,7 +465,7 @@ function workflowFiles() {
 
 function assertActionsEnvSecretPolicy(file, source) {
   const secretAccess = /secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
-  const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
+  const appVariableAccess = /vars(?:\.(EASYSUBWAY_[A-Z0-9_]+)|\[['"](EASYSUBWAY_[A-Z0-9_]+)['"]\])/g;
   const allowedExtraSecretsByFile = {
     ".github/workflows/cd.yml": new Set([
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
@@ -483,6 +483,13 @@ function assertActionsEnvSecretPolicy(file, source) {
     ]),
   };
   const allowedExtraSecrets = allowedExtraSecretsByFile[file] ?? new Set();
+  const allowedAppVariablesByFile = {
+    ".github/workflows/cd.yml": new Set([
+      "EASYSUBWAY_ADS_ASSET_ORIGIN",
+      "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+    ]),
+  };
+  const allowedAppVariables = allowedAppVariablesByFile[file] ?? new Set();
 
   for (const match of source.matchAll(secretAccess)) {
     const secretName = match[1] ?? match[2];
@@ -494,7 +501,14 @@ function assertActionsEnvSecretPolicy(file, source) {
       assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved scoped secrets`);
     }
   }
-  assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
+  const appVariables = new Set(
+    [...source.matchAll(appVariableAccess)].map((match) => match[1] ?? match[2]),
+  );
+  assert.deepEqual(
+    [...appVariables].sort(),
+    [...allowedAppVariables].sort(),
+    `${file} must not use GitHub Actions vars for app env except the approved allowlist`,
+  );
 }
 
 function assertMobileCatchPolicy(file, source) {
@@ -899,6 +913,35 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
   assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
+  const restoreStep = workflow.slice(
+    workflow.indexOf("CD Deploy / Restore GitHub Actions dotenv secret"),
+    workflow.indexOf("CD Deploy / Validate deployment dotenv contract"),
+  );
+  const adVariableNames = [
+    "EASYSUBWAY_ADS_ASSET_ORIGIN",
+    "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+  ];
+  for (const name of adVariableNames) {
+    assert.ok(
+      restoreStep.includes(`${name}: $` + `{{ vars.${name} }}`),
+      `${name} must come from a repository variable`,
+    );
+    assert.ok(restoreStep.includes(`drop["${name}"] = 1`), `${name} must replace a stale dotenv value`);
+  }
+  assert.ok(
+    restoreStep.includes('drop["EASYSUBWAY_BACKEND_BIND"] = 1'),
+    "CD must replace a stale backend bind",
+  );
+  assert.match(
+    restoreStep,
+    /printf 'EASYSUBWAY_BACKEND_BIND=127\.0\.0\.1\\n' >> "\$\{env_file\}"/,
+    "CD must force the production backend bind to loopback",
+  );
+  assert.match(
+    restoreStep,
+    /for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+if \[\[ -z "\$\{value\}" \|\| "\$\{value\}" == \*\$'\\n'\* \|\| "\$\{value\}" == \*\$'\\r'\* \]\]; then[\s\S]*?exit 1\s+fi\s+done[\s\S]*?for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+printf '%s=%s\\n' "\$\{name\}" "\$\{value\}" >> "\$\{env_file\}"\s+done/,
+    "invalid repository variables must exit before any approved value is written",
+  );
   assert.match(workflow, /CD Deploy \/ Validate deployment dotenv contract/);
   assert.match(workflow, /CD Plan \/ Detect deployment changes/);
   assert.match(workflow, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
@@ -5285,6 +5328,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const pubspec = read("apps/mobile/pubspec.yaml");
   const mobileMain = read("apps/mobile/lib/main.dart");
   const targets = readJson("tools/datapack/nationwide-coverage-targets.json");
+  const productionScope = readJson("apps/mobile/release/production-datapack-scope.json");
   const sourceCandidates = readJson("tools/datapack/source-candidates.json");
   const gapReporter = read("tools/datapack/report-coverage-gaps.mjs");
 
@@ -5301,8 +5345,20 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(inventory.artifactKind, "production-source-inventory");
   assert.ok(Array.isArray(inventory.sources));
   assert.ok(inventory.sources.length >= 6);
+  assert.equal(targets.schemaVersion, 2);
   assert.equal(targets.artifactKind, "nationwide-datapack-coverage-targets");
-  assert.equal(targets.targetVersion, "2026-07-02");
+  assert.equal(targets.targetVersion, "2026-07-13");
+  assert.equal(targets.activeLineScopes.length, 45);
+  assert.equal(new Set(targets.activeLineScopes.map(({ lineId }) => lineId)).size, 36);
+  assert.deepEqual(targets.activeLineScopeEvidence, {
+    serviceLifecycle: "ACTIVE",
+    effectiveFrom: "2026-04-02",
+    verifiedAt: "2026-07-13T00:00:00.000Z",
+    evidenceRef: "source:molit-urban-rail-full-route",
+  });
+  assert.deepEqual(targets.inactiveLineExclusions.map(({ lineId, status }) => ({ lineId, status })), [
+    { lineId: "line-cbe75f5287a1", status: "OUT_OF_ACTIVE_SCOPE" },
+  ]);
   assert.deepEqual(
     targets.requiredSourceDomains.map((domain) => domain.id),
     [
@@ -5314,6 +5370,29 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "route_map_positions",
       "demand_reference",
     ],
+  );
+  assert.deepEqual(
+    targets.requiredSourceDomains.filter(({ releaseTier }) => releaseTier === "LAUNCH_REQUIRED").map(({ id }) => id),
+    [
+      "station_line_membership",
+      "route_graph_topology",
+      "accessibility_facilities",
+      "realtime_arrivals",
+      "schedule_timetable",
+      "route_map_positions",
+    ],
+  );
+  assert.deepEqual(
+    targets.requiredSourceDomains.filter(({ releaseTier }) => releaseTier === "ENHANCEMENT").map(({ id }) => id),
+    ["demand_reference"],
+  );
+  assert.deepEqual(
+    productionScope.nationwideCoverageContract.activeLaunchRequiredDomains,
+    targets.requiredSourceDomains.filter(({ releaseTier }) => releaseTier === "LAUNCH_REQUIRED").map(({ id }) => id),
+  );
+  assert.deepEqual(
+    productionScope.nationwideCoverageContract.enhancementDomains,
+    targets.requiredSourceDomains.filter(({ releaseTier }) => releaseTier === "ENHANCEMENT").map(({ id }) => id),
   );
   assert.deepEqual(targets.knownSourceDomains, [
     "official_od_fares",
@@ -5351,6 +5430,14 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     assert.doesNotMatch(command, /\.\.\./);
   }
   assert.match(roadmapGateCommands.get("coverage_gap_report"), /report-coverage-gaps\.mjs/);
+  assert.match(
+    roadmapGateCommands.get("coverage_gap_report"),
+    /--manifest artifacts\/datapack\/current\.json/,
+  );
+  assert.match(
+    roadmapGateCommands.get("coverage_gap_report"),
+    /--provenance artifacts\/datapack\/current\.provenance\.json/,
+  );
   assert.match(roadmapGateCommands.get("source_inventory_validation"), /validate-source-inventory\.mjs/);
   assert.match(roadmapGateCommands.get("production_datapack_validation"), /validate-datapack\.mjs --manifest .+ --root .+ --require-production/);
   assert.match(
@@ -5377,7 +5464,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     [0, 1, 2, 3, 4, 5],
   );
   assert.ok(targets.expansionRoadmap.at(-1).operatorIds.includes("airport-railroad"));
-  assert.ok(targets.expansionRoadmap.at(-1).operatorIds.includes("gtx-c"));
+  assert.ok(targets.expansionRoadmap.at(-1).operatorIds.includes("gtx-a"));
   assert.equal(targets.expansionRoadmap[0].status, "CURRENT_NO_GO_UNTIL_PILOT_EVIDENCE_CLOSED");
   assert.ok(targets.expansionRoadmap.slice(1).every((stage) => stage.status === "NO_GO"));
   assert.ok(targets.expansionRoadmap.every((stage) => stage.conditionAxesRef === "roadmapConditionAxes"));
@@ -5638,6 +5725,48 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(realtimeArrivalSource.capabilities.realtime.rateLimitStatus, "BLOCKED_PENDING_PROVIDER_TERMS_OR_QUOTA");
 });
 
+test("#2052 전국 coverage 분모 증거는 공식 snapshot과 exact-set 결과에 고정된다", () => {
+  const evidence = readJson("tools/datapack/reports/nationwide-coverage-denominator-20260713.json");
+  assert.equal(evidence.artifactKind, "nationwide-coverage-denominator-evidence");
+  assert.equal(evidence.issue, 2052);
+  assert.equal(
+    evidence.inputs.targets.sha256,
+    createHash("sha256")
+      .update(readFileSync(path.join(root, evidence.inputs.targets.path)))
+      .digest("hex"),
+  );
+  assert.equal(
+    evidence.inputs.officialSnapshot.sha256,
+    createHash("sha256")
+      .update(readFileSync(path.join(root, evidence.inputs.officialSnapshot.path)))
+      .digest("hex"),
+  );
+  assert.deepEqual(evidence.before, {
+    aggregation: "region_operator_domain",
+    totalRequirements: 119,
+    coveredRequirements: 4,
+    missingRequirements: 115,
+  });
+  assert.deepEqual(evidence.after, {
+    aggregation: "active_line_operator_domain",
+    activeLineCount: 36,
+    activeLineOperatorScopeCount: 45,
+    launchRequiredCount: 270,
+    enhancementCount: 45,
+    launchRequiredCompletionRatio: 0,
+    enhancementProgressRatio: 0,
+    activeScopeCount: 45,
+    plannedScopeCount: 0,
+  });
+  assert.deepEqual(evidence.catalogTargetDiff, {
+    extra: [],
+    missing: [],
+    mappingMismatch: [],
+    inactiveExcluded: ["line-cbe75f5287a1"],
+  });
+  assert.equal(evidence.decision, "NO_GO_MISSING_REMAINS");
+});
+
 test("앱 bundled KRIC timetable 출처 표시는 bundled capital 시간표 row와 같이 간다", async () => {
   const inventory = readJson("apps/mobile/assets/datapacks/source-inventory.json");
   if (!inventory.sources.some((source) => source.id === "kric-subway-timetable")) {
@@ -5691,6 +5820,19 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.deepEqual(scope.supportScope.facilityCoverageDenominator, {
     kind: "station_line_x_required_facility_type",
     expectedRows: 6,
+  });
+  assert.deepEqual(scope.nationwideCoverageContract, {
+    targets: "tools/datapack/nationwide-coverage-targets.json",
+    activeLaunchRequiredDomains: [
+      "station_line_membership",
+      "route_graph_topology",
+      "accessibility_facilities",
+      "realtime_arrivals",
+      "schedule_timetable",
+      "route_map_positions",
+    ],
+    enhancementDomains: ["demand_reference"],
+    completionRule: "ACTIVE_LAUNCH_REQUIRED_MISSING_ZERO",
   });
   assert.deepEqual(productionInput.supportedV1Scope.includedOperatorIds, scope.supportScope.includedOperatorIds);
   assert.deepEqual(productionInput.supportedV1Scope.includedLineIds, scope.supportScope.includedLineIds);
@@ -6606,7 +6748,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
-  assert.equal(candidates.source, "easysubway_public_subway_api_inventory.xlsx");
+  assert.equal(candidates.source, "tools/datapack/source-candidates.json");
+  assert.equal(candidates.updatedAt, "2026-07-13");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
@@ -7184,6 +7327,44 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
+  assert.deepEqual(candidate.providerApproval, {
+    status: "APPROVED",
+    approvalScope: "API_CREDENTIAL",
+    termsStatus: "REVIEW_REQUIRED",
+    quotaStatus: "REVIEW_REQUIRED",
+    productionUseAllowed: false,
+    serviceId: "handicapped",
+    operationId: "transferMovement",
+    validFrom: "2026-07-06",
+    validTo: "2027-07-06",
+    renewalNoticeDays: 30,
+    evidenceReferences: [{
+      type: "OWNER_CONFIRMATION",
+      url: "https://github.com/AquilaXk/easysubway/issues/1397#issuecomment-4956908695",
+    }],
+    recordedAt: "2026-07-13",
+  });
+  assert.deepEqual(candidate.operation, {
+    method: "GET",
+    endpoint: "https://openapi.kric.go.kr/openapi/handicapped/transferMovement",
+    auth: {
+      env: "KRIC_SERVICE_KEY",
+      placement: "query",
+      parameter: "serviceKey",
+      valueEncoding: "url-search-params-once",
+      loadPolicy: "process-env-no-shell-parsing",
+    },
+    requiredParameters: [
+      "serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd", "prevStinCd", "chthTgtLn", "chtnNextStinCd",
+    ],
+    responseEnvelope: "root.body.items.item",
+    runner: {
+      command: "node tools/datapack/collect-kric-source-candidate-evidence.mjs",
+      arguments: ["--candidate", "kric-transfer-movement-standard"],
+      requiredEnv: ["KRIC_SERVICE_KEY", "RUNNER_TEMP"],
+    },
+    secretPolicy: "env-only-redacted-output",
+  });
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=428&service=handicapped&operation=transferMovement&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
@@ -13199,6 +13380,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
 
+  const cd = await classifyChangedFiles([".github/workflows/cd.yml"]);
+  assert.equal(cd.repository, "true");
+  assert.equal(cd.ci, "true");
+  assert.equal(cd.deploy, "true");
+
   const repoTool = await classifyChangedFiles(["tools/repo/check-split-readiness.mjs"]);
   assert.equal(repoTool.repository, "true");
   assert.equal(repoTool.ci, "true");
@@ -13756,9 +13942,13 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
 
   assert.match(workflow, /^name: Data Pack Expiry Alert$/m);
   assert.match(workflow, /schedule:[\s\S]*cron: "23 \*\/4 \* \* \*"/);
+  assert.match(workflow, /schedule:[\s\S]*cron: "41 0 \* \* \*"/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:\s*\n\s*contents: read/);
-  assert.match(workflow, /concurrency:\s*\n\s*group: /);
+  assert.match(
+    workflow,
+    /concurrency:\s*\n\s*group: datapack-expiry-alert-\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}-\$\{\{ github\.event\.schedule \|\| github\.event_name \}\}/,
+  );
 
   // 기존 데이터팩 릴리스 workflow와 동일하게 action SHA를 고정한다.
   const releaseWorkflow = read(".github/workflows/datapack-release.yml");
@@ -13782,6 +13972,14 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   // manifest 다운로드와 스크립트 호출부.
   assert.match(workflow, /curl -fsS --connect-timeout 10 --max-time 30 "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
   assert.match(workflow, /node tools\/datapack\/check-datapack-expiry-alert\.mjs/);
+  assert.match(workflow, /node tools\/datapack\/source-operation\.mjs check-approvals/);
+  assert.match(workflow, /^  provider-approval-expiry:\s*$/m);
+  assert.match(workflow, /^    name: Provider Approval Expiry$/m);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*id:\s*check[\s\S]*GITHUB_OUTPUT/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*github\.event\.schedule == '41 0 \* \* \*'/);
+  assert.match(workflow, /datapack-expiry-alert:[\s\S]*github\.event\.schedule == '23 \*\/4 \* \* \*'/);
+  assert.doesNotMatch(workflow, /notification_due/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*steps\.check\.outputs\.status == 'WARNING'[\s\S]*slackapi\/slack-github-action@/);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);
 

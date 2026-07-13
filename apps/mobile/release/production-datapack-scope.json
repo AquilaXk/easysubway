@@ -31,6 +31,19 @@
     },
     "storeListingPolicyKo": "대한민국 도시철도 전체 또는 전국 완전 지원처럼 검증 범위를 넘는 문구를 사용하지 않는다."
   },
+  "nationwideCoverageContract": {
+    "targets": "tools/datapack/nationwide-coverage-targets.json",
+    "activeLaunchRequiredDomains": [
+      "station_line_membership",
+      "route_graph_topology",
+      "accessibility_facilities",
+      "realtime_arrivals",
+      "schedule_timetable",
+      "route_map_positions"
+    ],
+    "enhancementDomains": ["demand_reference"],
+    "completionRule": "ACTIVE_LAUNCH_REQUIRED_MISSING_ZERO"
+  },
   "productionSourceSet": {
     "sourceInventory": "tools/datapack/source-inventory.json",
     "requiredSourceIds": [

@@ -45,9 +45,9 @@ void main() {
     expect(storage.deletedKeys, isEmpty);
   });
 
-  testWidgets('시작 화면은 부연 설명 문장 없이 핵심 가치 한 줄과 단일 CTA만 둔다', (tester) async {
-    // #1936: 장황한 중간 소개 화면(OnboardingIntroScreen)을 제거하고, 시작 화면은
-    // 가치 카피 한 줄 + "시작하기" CTA만 남겼다.
+  testWidgets('시작 화면은 부연 설명 문장 없이 핵심 가치 카피 3행과 단일 CTA만 둔다', (tester) async {
+    // #2081: 브랜드 심볼/워드마크를 걷어내고, 시작 화면은 가치 카피 3행 +
+    // "시작하기" CTA만 남긴다(카피 중심).
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -55,36 +55,160 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
-    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
+    expect(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'), findsOneWidget);
     expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
     expect(find.text('시작하기'), findsOneWidget);
-    // #1936(프리미엄 다듬기): 상단 무채색 브랜드 심볼/워드마크로 밋밋함을 해소한다.
-    expect(find.text('쉬운 지하철'), findsOneWidget);
+    // #2081: 상단 브랜드 심볼/워드마크는 제거됐다 — 시작 화면에는 워드마크가 없다.
+    expect(find.text('쉬운 지하철'), findsNothing);
+    expect(find.bySemanticsLabel('쉬운 지하철'), findsNothing);
     // 부연 설명 문장은 전면 삭제됐다(#1936).
     expect(find.textContaining('먼저 안내해요'), findsNothing);
     expect(find.textContaining('엘리베이터와 출구까지'), findsNothing);
     expect(find.text('계단 없는 길을\n먼저 찾습니다'), findsNothing);
   });
 
-  testWidgets('시작 화면 브랜드 심볼은 무채색 잉크 라인으로 그리고 워드마크와 함께 온다', (tester) async {
-    // #1936(프리미엄 다듬기): 텍스트+버튼만이라는 밋밋함을 해소하는 상단 앵커.
-    // 심볼은 색 없는 라인 아트(CustomPaint)로, 워드마크는 잉크 텍스트로 둔다.
+  testWidgets('시작 화면 가치 타이틀은 header 시맨틱스로 노출되는 카피 3행이다', (tester) async {
+    // #2081: 심볼 제거 후에도 가치 타이틀은 header 시맨틱스를 유지한다.
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    final semanticsHandle = tester.ensureSemantics();
+
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
-    // 라인 아트 심볼(CustomPaint)이 워드마크 위/좌측에 존재한다.
-    expect(find.byType(CustomPaint), findsWidgets);
-    // 워드마크는 심볼 앵커로 노출되고, 스크린리더에는 '쉬운 지하철'로 읽힌다.
-    expect(find.bySemanticsLabel('쉬운 지하철'), findsOneWidget);
+    // 가치 타이틀은 header 시맨틱스로 노출된다.
+    expect(
+      tester.getSemantics(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다')),
+      matchesSemantics(
+        label: '빠른 길보다\n갈 수 있는 길을\n안내합니다',
+        isHeader: true,
+      ),
+    );
 
-    // 심볼(워드마크)이 가치 타이틀보다 위에 배치되는 여백 리듬을 확인한다.
-    final markBottom = tester.getRect(find.text('쉬운 지하철')).bottom;
-    final titleTop = tester.getRect(find.text('빠른 길보다,\n갈 수 있는 길')).top;
-    expect(markBottom, lessThan(titleTop));
+    semanticsHandle.dispose();
+  });
+
+  testWidgets('시작 화면 타이틀은 "갈 수 있는 길"까지만 브랜드 색이고 조사 "을"·1·3행은 잉크 토큰이다', (
+    tester,
+  ) async {
+    // #2089(오너 실기기 검수): 강조는 2행 중 "갈 수 있는 길"까지로 고정하고
+    // 조사 "을"은 잉크로 남긴다. Text.rich 전환 후에도 스크린리더가 읽는 전체
+    // 문자열은 그대로 유지되고, span별 색만 브랜드/잉크로 갈린다.
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+
+    final titleWidget = tester.widget<Text>(
+      find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'),
+    );
+    final rootSpan = titleWidget.textSpan! as TextSpan;
+    final children = rootSpan.children!.cast<TextSpan>();
+
+    // 3개 span으로 나뉘고, 합친 평문은 기존 카피 3행과 동일하다.
+    expect(children, hasLength(3));
+    expect(rootSpan.toPlainText(), '빠른 길보다\n갈 수 있는 길을\n안내합니다');
+
+    // 1행: 브랜드 색을 쓰지 않는다(루트 스타일의 잉크 토큰 상속).
+    expect(children[0].text, '빠른 길보다\n');
+    expect(children[0].style?.color, isNull);
+    // 2행 강조: "갈 수 있는 길"까지만 시그니처 브랜드 색.
+    expect(children[1].text, '갈 수 있는 길');
+    expect(children[1].style?.color, EasySubwayAccessibleColors.brandSignature);
+    // 조사 "을"과 3행: 브랜드 색을 쓰지 않는다.
+    expect(children[2].text, '을\n안내합니다');
+    expect(children[2].style?.color, isNull);
+
+    // 루트 스타일은 기존 잉크 토큰을 유지한다.
+    expect(titleWidget.style?.color, EasySubwayAccessibleColors.text);
+  });
+
+  testWidgets('시작 화면 CTA는 시그니처 브랜드 색 채움 + 흰 글자 + 키운 라벨이다', (tester) async {
+    // #2089: '시작하기' CTA만 브랜드 색으로 채우고 글자는 흰색(대비 5.7:1, AA).
+    // 오너 실기기 검수 2차로 라벨을 더 키운다(22/w700).
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+
+    final button = tester.widget<FilledButton>(
+      find.byKey(const Key('startScreenStartButton')),
+    );
+    final style = button.style!;
+    expect(
+      style.backgroundColor?.resolve(<WidgetState>{}),
+      EasySubwayAccessibleColors.brandSignature,
+    );
+    expect(
+      style.foregroundColor?.resolve(<WidgetState>{}),
+      EasySubwayAccessibleColors.surface,
+    );
+    // 라벨을 키워 58px 버튼과 균형을 맞춘다.
+    final textStyle = style.textStyle?.resolve(<WidgetState>{});
+    expect(textStyle?.fontSize, 22);
+    expect(textStyle?.fontWeight, FontWeight.w700);
+  });
+
+  testWidgets('시작 화면은 소형 화면(320×568)에서도 카피 3행과 CTA를 오버플로 없이 렌더한다', (
+    tester,
+  ) async {
+    // #2081: 타이틀 확대(40)·카피 3행이 소형 화면에서 레이아웃 예외를 일으키지
+    // 않는지 확인한다(SingleChildScrollView 구조가 오버플로를 흡수한다).
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'), findsOneWidget);
+    expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
+  });
+
+  testWidgets('시작 화면은 소형 화면(320×568)+확대 텍스트에서도 스크롤로 CTA에 닿는다', (
+    tester,
+  ) async {
+    // #2081 리뷰 finding: 기본 배율(320×568)에서는 콘텐츠가 화면에 다 들어가
+    // maxScrollExtent가 0이라 SingleChildScrollView 구조가 제거돼도 이전
+    // 테스트가 green일 수 있었다. textScaler를 키워 실제로 오버플로가
+    // 발생하는 조건을 만든 뒤, Scrollable이 그 초과분을 흡수해 CTA까지
+    // 스크롤·탭할 수 있음을 직접 검증한다.
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: StartScreen(onStart: () => tapped = true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+
+    // 확대된 텍스트가 화면 높이를 넘어서 스크롤이 실제로 필요한 상태인지
+    // 먼저 확인한다(회귀 시 이 값이 0으로 떨어져 아래 단언들이 무의미해지는
+    // 것을 방지).
+    final scrollPosition = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position;
+    expect(scrollPosition.maxScrollExtent, greaterThan(0));
+
+    // ensureVisible로 스크롤해야 CTA를 탭할 수 있고, 탭이 실제로 콜백을
+    // 호출한다 — SingleChildScrollView 구조가 제거되면 오버플로 예외로
+    // 이 흐름 자체가 실패한다.
+    await tester.ensureVisible(
+      find.byKey(const Key('startScreenStartButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('startScreenStartButton')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(tapped, isTrue);
   });
 
   testWidgets('온보딩 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
@@ -103,10 +227,11 @@ void main() {
       find.byKey(const Key('startScreenStartButton')),
     );
 
-    // SafeArea 인셋(34) + 앱 토큰 여백(xxl)만 기대한다. 이중 가산 금지.
+    // SafeArea 인셋(34) + 앱 토큰 여백(xxl*2)만 기대한다. 이중 가산 금지.
+    // #2089: 오너 실기기 검수로 CTA 하단 여백을 xxl*2로 올렸다.
     expect(
       screenBottom - buttonRect.bottom,
-      closeTo(34 + EasySubwaySpacing.xxl, 0.5),
+      closeTo(34 + EasySubwaySpacing.xxl * 2, 0.5),
     );
   });
 

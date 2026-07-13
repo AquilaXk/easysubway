@@ -38,9 +38,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // 복원이 끝나면 로딩은 사라지고 시작 화면이 뜬다(#1936: 핵심 가치 한 줄).
+    // 복원이 끝나면 로딩은 사라지고 시작 화면이 뜬다(#2081: 핵심 가치 카피 3행).
     expect(find.byKey(const Key('startupLoadingScreen')), findsNothing);
-    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
+    expect(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'), findsOneWidget);
   });
 
   testWidgets('앱 시작 로딩 스피너는 온보딩 복원이 300ms 넘게 걸릴 때만 나타난다', (
@@ -89,7 +89,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
+    expect(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'), findsOneWidget);
     expect(find.text('이동약자를 위한 지하철 안내'), findsNothing);
     expect(find.text('계단과 고장 시설을 미리 확인하고'), findsNothing);
     expect(find.text('로그인 없이도 이용할 수 있어요'), findsNothing);
