@@ -96,8 +96,11 @@ test("KRIC provider 실패·schema mismatch·부분 수집을 성공 artifact로
     [{ trnNo: "2001" }],
   );
   assert.throws(
-    () => assertCompleteKricCollection(1, 25),
-    /failed requests: 1\/25/,
+    () => assertCompleteKricCollection(1, 25, [{
+      requestKey: "stationTimetable|KR|K115|8",
+      error: "KRIC timetable provider resultCode 30",
+    }]),
+    /failed requests: 1\/25; diagnostics=KRIC timetable provider resultCode 30/,
   );
 });
 

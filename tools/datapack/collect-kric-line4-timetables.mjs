@@ -122,9 +122,11 @@ export function validateKricTimetablePayload(payload) {
   return payload.body;
 }
 
-export function assertCompleteKricCollection(failedRequestCount, requestCount) {
+export function assertCompleteKricCollection(failedRequestCount, requestCount, perRequest = []) {
   if (failedRequestCount !== 0) {
-    throw new Error(`KRIC timetable collection failed requests: ${failedRequestCount}/${requestCount}`);
+    const diagnostics = [...new Set(perRequest.flatMap(({ error }) => error ? [error] : []))].slice(0, 10);
+    const suffix = diagnostics.length === 0 ? "" : `; diagnostics=${diagnostics.join(",")}`;
+    throw new Error(`KRIC timetable collection failed requests: ${failedRequestCount}/${requestCount}${suffix}`);
   }
 }
 
@@ -205,7 +207,7 @@ async function main() {
     }
   }
 
-  assertCompleteKricCollection(failed, plan.requestCount);
+  assertCompleteKricCollection(failed, plan.requestCount, perRequest);
   const evidenceDayCds = trainNumberEvidence ? evidenceServiceDayCds(trainNumberEvidence) : null;
   const reconstructionRows = trainNumberEvidence
     ? filterRowsByTrainNumbers(intermediate, trainNumberEvidence.trainNumbers)
