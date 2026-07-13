@@ -101,6 +101,9 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
     `${candidate.id}.operation.runner.requiredEnv`,
     { allowEmpty: true },
   );
+  if (requiredEnv.some((name) => !/^[A-Z][A-Z0-9_]*$/.test(name))) {
+    throw new Error(`${candidate.id}.operation.runner.requiredEnv must contain environment variable names`);
+  }
   if (authEnv != null && !requiredEnv.includes(authEnv)) {
     throw new Error(`${candidate.id}.operation.runner.requiredEnv must include auth.env`);
   }
@@ -131,7 +134,7 @@ export function listOperations(document) {
     .sort((left, right) => left.id.localeCompare(right.id, "en"));
 }
 
-function humanSummary(summary) {
+export function operationHumanSummary(summary) {
   const lines = [
     `id: ${summary.id}`,
     `status: ${summary.status ?? "unknown"}`,
@@ -141,7 +144,7 @@ function humanSummary(summary) {
   ];
   if (summary.operation) {
     lines.push(
-      `auth env: ${summary.operation.auth.env}`,
+      `auth env: ${summary.operation.auth.env ?? "not required"}`,
       `required params: ${summary.operation.requiredParameters.join(", ")}`,
       `response envelope: ${summary.operation.responseEnvelope}`,
       `runner: ${summary.operation.runner.command}`,
@@ -169,7 +172,7 @@ async function main(args = process.argv.slice(2)) {
   if (command === "show" && sourceId) {
     const summary = operations.find((entry) => entry.id === sourceId);
     if (!summary) throw new Error(`source operation not found: ${sourceId}`);
-    console.log(json ? JSON.stringify(summary, null, 2) : humanSummary(summary));
+    console.log(json ? JSON.stringify(summary, null, 2) : operationHumanSummary(summary));
     return;
   }
   if (command === "validate" && !sourceId) {

@@ -15,6 +15,8 @@ const KINDS = new Set(["contract", "integration", "internal", "provider"]);
 const HTTP_METHODS = new Set(["ANY", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]);
 const INTEGRATION_AUTH_DESCRIPTORS = new Set([
   "aws-sigv4-env",
+  "credential-free",
+  "response-provided-signed-headers",
   "signed-manifest-and-artifact-hash",
   "signed-manifest-verification",
 ]);
@@ -71,7 +73,7 @@ function containsForbiddenValue(value) {
   }
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
-    /^(?:apiKey|credential|password|secret|serviceKey|token)Value$/i.test(key) ||
+    /^(?:apiKey|credential|password|secret|serviceKey|token)(?:Value)?$/i.test(key) ||
     containsForbiddenValue(child),
   );
 }
@@ -93,8 +95,7 @@ export function validateCatalog(catalog) {
       if (!HTTP_METHODS.has(entry.method) || typeof entry.path !== "string" || !entry.path.startsWith("/")) {
         throw new Error(`${entry.id}: invalid internal method/path`);
       }
-      if (entry.path === "/api/catalog"
-        || entry.path.startsWith("/api/catalog/")
+      if (/(?:^|\/)api\/catalog(?:\/|$)/.test(entry.path)
         || entry.path.includes("/api-catalog")) {
         throw new Error(`${entry.id}: runtime catalog endpoint is forbidden`);
       }
@@ -103,7 +104,7 @@ export function validateCatalog(catalog) {
       throw new Error(`${entry.id}: invalid provider endpoint`);
     }
     if (entry.kind === "integration") {
-      if (!HTTP_METHODS.has(entry.method) || !/^(?:config|constant|manifest-entry):/.test(entry.endpointRef ?? "")) {
+      if (!HTTP_METHODS.has(entry.method) || !/^(?:config|constant|manifest-entry|response-field):/.test(entry.endpointRef ?? "")) {
         throw new Error(`${entry.id}: invalid integration operation`);
       }
       if (typeof entry.source !== "string" || entry.source.length === 0) {

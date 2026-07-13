@@ -7,6 +7,7 @@ import {
   operationSummary,
   validateOperation,
 } from "./source-operation.mjs";
+import * as sourceOperation from "./source-operation.mjs";
 
 function candidate(id, overrides = {}) {
   return {
@@ -112,6 +113,39 @@ test("validate는 operation endpoint mismatch를 거부한다", () => {
     () => validateOperation(invalid),
     /endpoint must match requestUrl/,
   );
+});
+
+test("validate는 requiredEnv의 실제 환경변수 이름만 허용한다", () => {
+  const invalid = candidate("a", {
+    operation: validOperation({
+      runner: {
+        command: "node tools/datapack/probe-provider.mjs",
+        requiredEnv: ["PROVIDER_SERVICE_KEY", "actual-secret-value"],
+      },
+    }),
+  });
+
+  assert.throws(
+    () => validateOperation(invalid),
+    /requiredEnv must contain environment variable names/,
+  );
+});
+
+test("credential-free operation human 출력은 auth env가 불필요함을 표시한다", () => {
+  assert.equal(typeof sourceOperation.operationHumanSummary, "function");
+  const summary = operationSummary(candidate("a", {
+    operation: validOperation({
+      auth: { placement: "none" },
+      requiredParameters: [],
+      runner: {
+        command: "node tools/datapack/probe-provider.mjs",
+        requiredEnv: [],
+      },
+      secretPolicy: "credential-free-output",
+    }),
+  }));
+
+  assert.match(sourceOperation.operationHumanSummary(summary), /^auth env: not required$/m);
 });
 
 test("공식 OD fare source는 재현 가능한 operation과 조회 명령을 고정한다", async () => {

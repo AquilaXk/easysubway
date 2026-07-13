@@ -83,21 +83,29 @@ test("list는 kind와 query로 검색한다", () => {
 
 test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () => {
   const catalog = fixtureCatalog();
-  assert.throws(
-    () =>
-      validateCatalog([
-        ...catalog,
-        {
-          id: "integration:bad-secret",
-          kind: "integration",
-          method: "GET",
-          endpointRef: "config:EXAMPLE_API",
-          source: "example.java",
-          tokenValue: "actual-token",
-        },
-      ]),
-    /secret-like values are forbidden/,
-  );
+  for (const [field, value] of [
+    ["tokenValue", "actual-token"],
+    ["token", "actual-token"],
+    ["apiKey", "actual-api-key"],
+    ["secret", "actual-secret"],
+  ]) {
+    assert.throws(
+      () =>
+        validateCatalog([
+          ...catalog,
+          {
+            id: `integration:bad-${field}`,
+            kind: "integration",
+            method: "GET",
+            endpointRef: "config:EXAMPLE_API",
+            auth: "env:EXAMPLE_API_TOKEN",
+            source: "example.java",
+            [field]: value,
+          },
+        ]),
+      /secret-like values are forbidden/,
+    );
+  }
   assert.throws(
     () =>
       validateCatalog([
@@ -111,6 +119,21 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
       ]),
     /runtime catalog endpoint is forbidden/,
   );
+  for (const path of ["/admin/api/catalog", "/operator/api/catalog/v1"]) {
+    assert.throws(
+      () =>
+        validateCatalog([
+          {
+            id: `internal:GET:${path}:example.CatalogController#get`,
+            kind: "internal",
+            method: "GET",
+            path,
+            surface: "ADMIN_API",
+          },
+        ]),
+      /runtime catalog endpoint is forbidden/,
+    );
+  }
   assert.throws(
     () =>
       validateCatalog([
@@ -205,6 +228,8 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.ok(catalog.some((entry) => entry.kind === "internal"));
   assert.ok(catalog.some((entry) => entry.id === "provider:seoul-topis-realtime-station-arrival"));
   assert.ok(catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"));
+  assert.ok(catalog.some((entry) => entry.id === "integration:mobile-ad-creative-image"));
+  assert.ok(catalog.some((entry) => entry.id === "integration:mobile-report-photo-upload"));
   assert.ok(catalog.some((entry) => entry.id === "contract:report-api"));
   assert.equal(
     findCatalogEntry(catalog, "integration:github-datapack-workflow-dispatch").endpointRef,

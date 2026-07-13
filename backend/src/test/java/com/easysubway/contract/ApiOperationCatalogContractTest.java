@@ -35,8 +35,7 @@ class ApiOperationCatalogContractTest {
 		ApiCatalog catalog = buildCatalog(handlerMapping.getHandlerMethods());
 		assertThat(catalog.operations())
 			.extracting(ApiOperation::path)
-			.noneMatch(path -> path.equals("/api/catalog")
-				|| path.startsWith("/api/catalog/")
+			.noneMatch(path -> path.matches("(?:.*/)?api/catalog(?:/.*)?")
 				|| path.contains("/api-catalog"));
 
 		String actual = catalogJson(catalog, new ObjectMapper());
