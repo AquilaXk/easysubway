@@ -10,6 +10,8 @@ import {
 } from "./source-operation.mjs";
 import * as sourceOperation from "./source-operation.mjs";
 
+const FUTURE_APPROVAL_DATE = new Date(Date.now() + (366 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+
 function candidate(id, overrides = {}) {
   return {
     id,
@@ -77,8 +79,8 @@ test("source candidate 정본은 repository 경로와 구조화된 provider 승�
         status: "APPROVED",
         serviceId: "handicapped",
         operationId: "transferMovement",
-        validFrom: "2026-07-06",
-        validTo: "2027-07-06",
+        validFrom: "2020-01-01",
+        validTo: FUTURE_APPROVAL_DATE,
         evidenceSource: "owner-confirmed",
         recordedAt: "2026-07-13",
       },
@@ -142,6 +144,17 @@ test("provider 승인은 잘못된 기간과 secret-like field를 거부한다",
       .candidates[0].providerApproval,
     historical,
   );
+  const futureStart = new Date(Date.now() + (366 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+  const futureEnd = new Date(Date.now() + (732 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+  assert.throws(
+    () => validateSourceCandidateDocument({
+      ...base,
+      candidates: [candidate("a", {
+        providerApproval: { ...approval, validFrom: futureStart, validTo: futureEnd },
+      })],
+    }),
+    /status is APPROVED but validFrom is in the future/,
+  );
 });
 
 test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지를 고정한다", () => {
@@ -173,8 +186,8 @@ test("승인된 provider의 human 요약은 승인 범위와 기간을 표시한
       status: "APPROVED",
       serviceId: "handicapped",
       operationId: "transferMovement",
-      validFrom: "2026-07-06",
-      validTo: "2027-07-06",
+      validFrom: "2020-01-01",
+      validTo: FUTURE_APPROVAL_DATE,
       evidenceSource: "owner-confirmed",
       recordedAt: "2026-07-13",
     },
@@ -182,7 +195,10 @@ test("승인된 provider의 human 요약은 승인 범위와 기간을 표시한
 
   assert.match(sourceOperation.operationHumanSummary(summary), /^provider approval: APPROVED$/m);
   assert.match(sourceOperation.operationHumanSummary(summary), /^provider operation: handicapped\/transferMovement$/m);
-  assert.match(sourceOperation.operationHumanSummary(summary), /^approval valid: 2026-07-06\.\.2027-07-06$/m);
+  assert.match(
+    sourceOperation.operationHumanSummary(summary),
+    new RegExp(`^approval valid: 2020-01-01\\.\\.${FUTURE_APPROVAL_DATE}$`, "m"),
+  );
 });
 
 test("list는 만료 상태 오류를 candidate에 남기고 다른 provider를 계속 반환한다", () => {
@@ -198,12 +214,17 @@ test("list는 만료 상태 오류를 candidate에 남기고 다른 provider를 
     },
   });
 
-  const rows = listOperations({ candidates: [candidate("active"), expired] });
+  const invalidOperation = candidate("invalid-operation", {
+    operation: validOperation({ endpoint: "https://provider.example/wrong" }),
+  });
+  const rows = listOperations({ candidates: [candidate("active"), expired, invalidOperation] });
 
-  assert.deepEqual(rows.map(({ id }) => id), ["active", "expired"]);
+  assert.deepEqual(rows.map(({ id }) => id), ["active", "expired", "invalid-operation"]);
   assert.equal(rows[0].providerApprovalValidationError, null);
   assert.match(rows[1].providerApprovalValidationError, /status is APPROVED but validTo has expired/);
   assert.match(sourceOperation.operationHumanSummary(rows[1]), /^provider approval validation: .*has expired$/m);
+  assert.match(rows[2].operationValidationError, /endpoint must match requestUrl/);
+  assert.match(sourceOperation.operationHumanSummary(rows[2]), /^operation validation: .*endpoint must match requestUrl$/m);
 });
 
 test("show는 operation이 없어도 sample URL credential을 출력 전에 거부한다", () => {

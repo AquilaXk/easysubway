@@ -7228,15 +7228,26 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
     evidenceSource: "owner-confirmed",
     recordedAt: "2026-07-13",
   });
-  assert.deepEqual(candidate.operation.auth, {
-    env: "KRIC_SERVICE_KEY",
-    placement: "query",
-    parameter: "serviceKey",
-    valueEncoding: "url-search-params-once",
-    loadPolicy: "process-env-no-shell-parsing",
+  assert.deepEqual(candidate.operation, {
+    method: "GET",
+    endpoint: "https://openapi.kric.go.kr/openapi/handicapped/transferMovement",
+    auth: {
+      env: "KRIC_SERVICE_KEY",
+      placement: "query",
+      parameter: "serviceKey",
+      valueEncoding: "url-search-params-once",
+      loadPolicy: "process-env-no-shell-parsing",
+    },
+    requiredParameters: [
+      "serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd", "prevStinCd", "chthTgtLn", "chtnNextStinCd",
+    ],
+    responseEnvelope: "root.body.items.item",
+    runner: {
+      command: "node tools/datapack/collect-kric-source-candidate-evidence.mjs",
+      requiredEnv: ["KRIC_SERVICE_KEY", "RUNNER_TEMP"],
+    },
+    secretPolicy: "env-only-redacted-output",
   });
-  assert.equal(candidate.operation.runner.command, "node tools/datapack/collect-kric-source-candidate-evidence.mjs");
-  assert.deepEqual(candidate.operation.runner.requiredEnv, ["KRIC_SERVICE_KEY", "RUNNER_TEMP"]);
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=428&service=handicapped&operation=transferMovement&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");

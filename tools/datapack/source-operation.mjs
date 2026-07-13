@@ -119,11 +119,15 @@ export function validateProviderApproval(candidate) {
   if (validTo < validFrom) {
     throw new Error(`${candidate.id}.providerApproval.validTo must not precede validFrom`);
   }
-  if (approval.status === "APPROVED" && validTo < new Date().toISOString().slice(0, 10)) {
-    throw new Error(`${candidate.id}.providerApproval.status is APPROVED but validTo has expired`);
-  }
   requiredText(approval.evidenceSource, `${candidate.id}.providerApproval.evidenceSource`);
   requiredDate(approval.recordedAt, `${candidate.id}.providerApproval.recordedAt`);
+  const today = new Date().toISOString().slice(0, 10);
+  if (approval.status === "APPROVED" && validTo < today) {
+    throw new Error(`${candidate.id}.providerApproval.status is APPROVED but validTo has expired`);
+  }
+  if (approval.status === "APPROVED" && validFrom > today) {
+    throw new Error(`${candidate.id}.providerApproval.status is APPROVED but validFrom is in the future`);
+  }
   return approval;
 }
 
@@ -247,7 +251,13 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
 }
 
 export function operationSummary(candidate) {
-  validateOperation(candidate, { allowMissing: true });
+  let operationValidationError = null;
+  try {
+    validateOperation(candidate, { allowMissing: true });
+  } catch (error) {
+    if (error instanceof Error && /credential values are forbidden/.test(error.message)) throw error;
+    operationValidationError = error instanceof Error ? error.message : "operation is invalid";
+  }
   let providerApprovalValidationError = null;
   try {
     validateProviderApproval(candidate);
@@ -263,6 +273,7 @@ export function operationSummary(candidate) {
     providerApproval: candidate.providerApproval ?? null,
     providerApprovalValidationError,
     operation: candidate.operation ?? null,
+    operationValidationError,
   };
 }
 
@@ -306,6 +317,9 @@ export function operationHumanSummary(summary) {
     );
   } else {
     lines.push("operation: not documented");
+  }
+  if (summary.operationValidationError) {
+    lines.push(`operation validation: ${summary.operationValidationError}`);
   }
   return lines.join("\n");
 }
