@@ -119,6 +119,9 @@ export function validateProviderApproval(candidate) {
   if (validTo < validFrom) {
     throw new Error(`${candidate.id}.providerApproval.validTo must not precede validFrom`);
   }
+  if (approval.status === "APPROVED" && validTo < new Date().toISOString().slice(0, 10)) {
+    throw new Error(`${candidate.id}.providerApproval.status is APPROVED but validTo has expired`);
+  }
   requiredText(approval.evidenceSource, `${candidate.id}.providerApproval.evidenceSource`);
   requiredDate(approval.recordedAt, `${candidate.id}.providerApproval.recordedAt`);
   return approval;

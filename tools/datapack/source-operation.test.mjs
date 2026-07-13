@@ -124,6 +124,24 @@ test("provider 승인은 잘못된 기간과 secret-like field를 거부한다",
     }),
     /recordedAt must be an ISO date/,
   );
+  const expiredApproval = {
+    ...approval,
+    validFrom: "2020-01-01",
+    validTo: "2020-12-31",
+  };
+  assert.throws(
+    () => validateSourceCandidateDocument({
+      ...base,
+      candidates: [candidate("a", { providerApproval: expiredApproval })],
+    }),
+    /status is APPROVED but validTo has expired/,
+  );
+  const historical = { ...expiredApproval, status: "EXPIRED" };
+  assert.equal(
+    validateSourceCandidateDocument({ ...base, candidates: [candidate("a", { providerApproval: historical })] })
+      .candidates[0].providerApproval,
+    historical,
+  );
 });
 
 test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지를 고정한다", () => {
