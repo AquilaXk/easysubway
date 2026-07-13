@@ -101,18 +101,13 @@ class EasySubwaySearchField extends StatelessWidget {
       EasySubwayTouchTarget.general,
       scaler.scale(EasySubwayTouchTarget.general),
     );
-    // 입력 필드 고정 높이: Center로 세로 중앙에 놓이는 단일 줄 필드의 높이.
-    // #2082 정렬(비대칭 21/9 패딩으로 편집 텍스트를 시각 박스 정중앙에 맞춤)은
-    // 필드를 48로 tight하게 두고 Center로 중앙에 놓을 때 성립한다. 배율에 비례해
-    // 확대하되 배율 1.0에서는 정확히 48을 유지해 #2082 정렬·픽셀을 보존한다.
-    // isDense 필드라 (라인 높이 + 21/9 패딩 = 50.4)이 48보다 소폭 커도 InputDecorator
-    // 가 흡수해 배율 1.0에서 글자가 잘리지 않는다(기존 #2082 동작 그대로). 배율
-    // 확대 시에는 48*배율이 확대된 입력 줄을 담아 잘림을 막는다.
-    final fieldHeight = math.max(
-      EasySubwayTouchTarget.iconOnly,
-      scaler.scale(EasySubwayTouchTarget.iconOnly),
-    );
-    // 시각 박스 높이: 기본 46, 배율에 비례해 확대. 배율 1.0에서 정확히 46.
+    // #2082 재작업: 편집 텍스트를 홈 idle 검색 필드와 동일한 폰트 메트릭 독립
+    // 방식으로 중앙 정렬한다. idle 필드는 Container(height 46) 안 Row가 고유 높이
+    // Text를 crossAxis 중앙에 놓아 실기기 Noto Sans KR에서도 오프셋 0으로
+    // 정합한다. 편집 필드도 TextField를 고유 높이(글자 줄)로 두고 Center로 시각
+    // 박스 중앙에 놓아, 절대값 비대칭 패딩(구 21/9) 없이 동일 정합을 얻는다.
+    // 비대칭 패딩은 FlutterTest 테스트 폰트 기준으로 맞춰 실기기 폰트에서는
+    // 편향됐다(#2082 실기기 QA). 시각 박스 높이: 기본 46, 배율에 비례해 확대.
     final visualBoxHeight = math.max(
       easySubwaySearchFieldVisualHeight,
       scaler.scale(easySubwaySearchFieldVisualHeight),
@@ -178,54 +173,48 @@ class EasySubwaySearchField extends StatelessWidget {
                     // 낭독된다. MergeSemantics로 hint 노드를 라벨 노드에 병합해 입력
                     // 전 라벨 이중 낭독을 막는다. 지우기 버튼은 형제라 별도 탭
                     // 타깃/semantics를 유지한다.
-                    child: _maybeWrapSemantics(
+                    child: MergeSemantics(
+                      child: _maybeWrapSemantics(
+                      // 터치타겟(56·배율확대) 안에서 단일 줄 필드를 세로 중앙에
+                      // 놓는다. TextField는 고유 높이(글자 줄 높이 + isDense 최소
+                      // 여백)로 두고 Center가 그 줄을 46px 시각 박스 중앙(=터치타겟
+                      // 중앙)에 정렬한다. idle 필드가 Container(46) 안 Row로 고유
+                      // 높이 Text를 중앙에 놓는 것과 같은 폰트 메트릭 독립 원리라,
+                      // 실기기 Noto Sans KR에서 hint·캐럿·입력 글자가 시각 박스
+                      // 중앙에 오프셋 0으로 정합함을 픽셀 판독으로 확인했다(정본 —
+                      // docs/2082-qa). 절대값 비대칭 패딩(구 21/9)·고정 높이 박스 +
+                      // textAlignVertical 조합은 실기기에서 입력 줄을 위/아래로
+                      // 편향시켜 버렸다.
+                      //
+                      // 입력 필드 자체(고유 높이)의 semantics 노드는 46 미만이지만,
+                      // 바깥 SizedBox(56)와 함께 MergeSemantics로 병합해 탭 타깃
+                      // semantics 노드가 터치타겟 높이(≥48)를 갖게 한다(접근성 최소
+                      // 탭 타깃). 지우기 버튼은 이 병합 밖 형제라 자체 탭 타깃·
+                      // semantics를 유지한다.
                       SizedBox(
-                      height: touchTargetHeight,
-                      child: Center(
-                        child: SizedBox(
-                          height: fieldHeight,
+                        height: touchTargetHeight,
+                        child: Center(
                           child: TextField(
                             key: const Key('stationSearchInput'),
                             controller: editController,
                             focusNode: focusNode,
                             autofocus: autofocus,
                             maxLines: 1,
-                            textAlignVertical: TextAlignVertical.center,
                             textInputAction: TextInputAction.search,
                             // #2082: 입력 텍스트 style을 hint style과 동일 glyph
                             // 메트릭(fontSize 17·w600·height 미지정)으로 두고 색만
                             // 본문색으로 바꾼다. 두 style이 다른 height를 가지면
                             // hint와 편집 텍스트의 glyph 중심이 어긋난다.
                             style: easySubwaySearchFieldInputStyle,
-                            // placeholder는 부유 라벨이 아니라 hintText로 박스 내부
-                            // 수직 중앙(idle의 '지하철역 검색'과 같은 위치·스타일)에
-                            // 렌더돼야 한다. isCollapsed는 필드를 텍스트 줄 높이로
-                            // 쪼그라뜨려 탭 타깃을 깨므로 쓰지 않는다.
-                            // floatingLabelBehavior를 지정하면 실기기에서 hint가
-                            // 라벨처럼 박스 상단 테두리 위로 떠오르는 회귀가 확인돼
-                            // 지정하지 않는다. #1933
-                            //
-                            // #2082: 편집 텍스트는 InputDecorator에서 line box의
-                            // ascent/descent 비대칭 탓에 대칭 세로 패딩만으로는 필드
-                            // 중앙보다 위로 뜬다(대칭 15 → 약 6px 위). 상단 패딩을
-                            // 6px 더 주고 하단을 6px 덜 줘(21/9) 필드 높이(48,
-                            // 탭 타깃)를 유지하면서 편집 텍스트 줄을 46px 시각 박스
-                            // 정중앙에 정렬한다. hint는 별도 배치 경로라 시각 박스
-                            // 중앙에서 소폭 남되 부유 라벨 회귀와는 규모가 다르다.
-                            // #2090: 배율 확대 시에도 동일 비율의 수직 정렬을
-                            // 유지하도록 상하 패딩을 배율에 비례해 재도출한다(배율
-                            // 1.0에서는 정확히 21/9). 확대된 입력 줄 높이 + 확대된
-                            // 패딩이 확대된 필드/시각 박스 안에 들어가 잘리지 않는다.
+                            // isDense + contentPadding 0 으로 필드 고유 높이를 글자
+                            // 줄 높이로 만들고 Center로 중앙 정렬한다. isCollapsed·
+                            // floatingLabelBehavior는 각각 탭 타깃·부유 라벨 회귀
+                            // (#1933)를 유발해 쓰지 않는다.
                             decoration: InputDecoration(
                               hintText: hintText,
                               hintStyle: easySubwaySearchFieldHintStyle,
                               isDense: true,
-                              contentPadding: EdgeInsets.fromLTRB(
-                                0,
-                                scaler.scale(21),
-                                0,
-                                scaler.scale(9),
-                              ),
+                              contentPadding: EdgeInsets.zero,
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,

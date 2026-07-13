@@ -1785,6 +1785,7 @@ class StationSearchScreen extends StatefulWidget {
     this.routeDraftController,
     this.entryMode = StationSearchEntryMode.search,
     this.pickSlot,
+    this.regionLabel = '수도권',
     this.bottomNavigationBar,
     super.key,
   });
@@ -1807,6 +1808,13 @@ class StationSearchScreen extends StatefulWidget {
   /// 탭 경로와 완전히 같은 draft 상태로 수렴시키기 위한 "칸 채우기" 모드다. null이면
   /// 기존 둘러보기(출발/도착 버튼이 각 결과에 딸린 형태) 그대로 동작한다.
   final RouteDraftSlot? pickSlot;
+
+  /// #2082: 검색 화면 상단 필드 우측에 표시하는 현재 지역명. 홈 idle 상단바
+  /// [≡ | 검색필드 | 지역표시] 구성과 정합하기 위해, 검색 화면(← + 필드)에도
+  /// 같은 위치·스타일의 지역 표시를 둔다. 검색 맥락에서는 지역 변경 UI를 새로
+  /// 만들지 않고 표시 전용으로 둔다(오너 지시: "변경은 못해도 알려는 줘야"). 홈
+  /// 기본 지역과 동일하게 기본값은 '수도권'.
+  final String regionLabel;
   final Widget? bottomNavigationBar;
 
   @override
@@ -1892,9 +1900,10 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
   /// 필드 자체의 힌트/시맨틱에 "무엇을 고르는 중인지"를 인코딩해 TalkBack이 출발/
   /// 도착/일반 검색 의도를 그대로 전달하게 한다.
   String get _searchInputHint => switch (widget.pickSlot) {
-    RouteDraftSlot.origin => '출발역 이름을 입력해 주세요',
-    RouteDraftSlot.destination => '도착역 이름을 입력해 주세요',
-    RouteDraftSlot.waypoint => '경유역 이름을 입력해 주세요',
+    // #2083 오너 확정: 슬롯 검색 진입 placeholder는 슬롯명 단독.
+    RouteDraftSlot.origin => '출발역',
+    RouteDraftSlot.destination => '도착역',
+    RouteDraftSlot.waypoint => '경유역',
     null => '역 이름을 입력해 주세요',
   };
 
@@ -1943,7 +1952,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         textScaler.scale(easySubwaySearchFieldVisualHeight),
       ),
     );
-    final toolbarHeight = math.max(kToolbarHeight, scaledFieldHeight);
+    // #2082: title Row를 홈 search row와 동일하게 상하 6px 패딩으로 감싸므로,
+    // 툴바 높이도 그만큼(12) 키워 필드가 잘리지 않게 한다(홈 상단바 60 = 필드
+    // 46/터치타겟 대비 여백과 같은 원리).
+    const stationSearchToolbarVerticalPadding = 12.0;
+    final toolbarHeight = math.max(
+      kToolbarHeight,
+      scaledFieldHeight + stationSearchToolbarVerticalPadding,
+    );
     final recentSearchSection = AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
@@ -2034,7 +2050,41 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
       appBar: AppBar(
         titleSpacing: 0,
         toolbarHeight: toolbarHeight,
-        title: searchInputField,
+        // #2082: 검색 화면 상단바를 홈 idle 상단바 [≡ | 검색필드 | 지역표시]와
+        // 픽셀 단위로 정합한다. AppBar 기본 leading/titleSpacing 대신 홈의 search
+        // row 구조(Padding.fromLTRB(10,6,10,6) 안 Row[뒤로 56, SB 4, Expanded 필드,
+        // SB 8, 지역표시])를 그대로 재현해, ← 버튼이 홈의 ≡ 슬롯과 같은 x를 차지하고
+        // 필드의 좌우 시작·끝 x가 홈 idle 필드와 일치하며, 지역 표시가 필드 우측에
+        // 홈과 같은 위치·스타일로 온다. 뒤로가기 아이콘·색·탭타깃도 홈 ≡ 버튼과
+        // 동일 규격이다. 지역 표시는 홈 지역 선택기 스타일이되 검색 맥락에선 표시
+        // 전용이다(오너 지시: "변경은 못해도 알려는 줘야").
+        automaticallyImplyLeading: false,
+        title: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+          child: Row(
+            children: [
+              IconButton(
+                key: const Key('stationSearchBackButton'),
+                tooltip: '뒤로',
+                onPressed: () => Navigator.of(context).maybePop(),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size.square(EasySubwayTouchTarget.general),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: EdgeInsets.zero,
+                ),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  size: 26,
+                  color: Color(0xFF4B4B4B),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(child: searchInputField),
+              const SizedBox(width: 8),
+              _StationSearchRegionIndicator(regionLabel: widget.regionLabel),
+            ],
+          ),
+        ),
       ),
       bottomNavigationBar: widget.bottomNavigationBar,
       body: Semantics(
@@ -2235,6 +2285,56 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           internalRouteRepository: widget.internalRouteRepository,
           internalRouteMobilityType: widget.internalRouteMobilityType,
           routeDraftController: widget.routeDraftController,
+        ),
+      ),
+    );
+  }
+}
+
+/// #2082: 검색 화면 상단 필드 우측 지역 표시. 홈 idle 상단바의 지역 선택기와
+/// 같은 위치·스타일(maxWidth 148, 17·w600 회색 텍스트 + 아래 화살표)을 쓰되,
+/// 검색 맥락에서는 지역 변경 UI를 새로 열지 않는 표시 전용이다(오너 지시). 탭
+/// 동작이 없으므로 스크린리더에는 현재 지역명을 읽어 주는 라벨만 노출한다.
+class _StationSearchRegionIndicator extends StatelessWidget {
+  const _StationSearchRegionIndicator({required this.regionLabel});
+
+  final String regionLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      key: const Key('stationSearchRegionIndicator'),
+      container: true,
+      label: '지역: $regionLabel',
+      child: ExcludeSemantics(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 148),
+          child: SizedBox(
+            height: EasySubwayTouchTarget.general,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    regionLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF606060),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  color: Color(0xFF606060),
+                  size: 22,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -1008,19 +1008,19 @@ void main() {
     expect(activeHeight, 46.0);
     expect(find.text('역 이름을 입력해 주세요'), findsOneWidget);
 
-    // hint는 부유 라벨이 아니라 박스 내부 수직 중앙 부근에 렌더돼야 한다
-    // (idle의 '지하철역 검색' 텍스트와 같은 위치). 박스 상단 테두리 위로
-    // 떠오르는 부유 라벨 회귀를 막는다. #2003에서 폰트가 15→17로 커지며
-    // strut 라인 높이와 실제 glyph 메트릭 사이 오차가 최대 2px 정도
-    // 나타나는데, 이는 부유 라벨 회귀(수 px~10px 단위로 위로 뜸)와는
-    // 규모가 다르므로 epsilon을 소폭 완화해 판별한다.
-    expect(
-      tester.getCenter(find.text('역 이름을 입력해 주세요')).dy,
-      moreOrLessEquals(
-        tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
-        epsilon: 3.0,
-      ),
+    // hint는 부유 라벨이 아니라 박스 내부에 렌더돼야 한다(idle의 '지하철역 검색'
+    // 텍스트처럼 박스 안 중앙 부근). 박스 상단 테두리 위로 떠오르는 부유 라벨
+    // 회귀를 막는 것이 핵심 계약이다. #2082 실기기 재작업으로 중앙 정렬을
+    // textAlignVertical.center로 얻으면서, FlutterTest 테스트 폰트에서는 hint
+    // 중심이 박스 중심에서 십수 px 벗어날 수 있으나(실기기 Noto Sans KR에서는
+    // 오프셋 0으로 정합 — docs/2082-qa 픽셀 판독이 정본), hint가 박스 세로 범위
+    // 안에 온전히 들어오는지(=부유 라벨이 아님)를 폰트 메트릭 독립적으로 검증한다.
+    final activeBoxRect = tester.getRect(
+      find.byKey(const Key('heroStationSearchInputBox')),
     );
+    final hintCenterDy = tester.getCenter(find.text('역 이름을 입력해 주세요')).dy;
+    expect(hintCenterDy, greaterThan(activeBoxRect.top));
+    expect(hintCenterDy, lessThan(activeBoxRect.bottom));
 
     // 검색어를 입력하면 지우기 버튼이 나타나고, 시각 박스(46px)와 별개로
     // 실제 렌더 크기가 접근성 최소 탭 타깃(48x48) 이상이어야 한다. 버튼이
@@ -1028,19 +1028,19 @@ void main() {
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
 
-    // 입력한 편집 텍스트는 시각 박스 수직 중앙에 엄격히 정합돼야 한다.
-    // #2082: 입력 style(height 1.2)이 hint style(height 미지정)과 glyph 중심이
-    // 어긋나 편집 텍스트가 박스 중앙보다 위로 뜨는 회귀가 있었다. 편집 텍스트는
-    // 실기기 strut 오차가 개입하는 hint(부유 라벨 회귀 판별용 완화 epsilon)와
-    // 달리 레이아웃(Center) + 동일 메트릭 style로 픽셀 단위 정합이 가능하므로
-    // epsilon을 조여 미세 수직 미정렬을 계약으로 잡는다.
-    expect(
-      tester.getCenter(find.text('상록수')).dy,
-      moreOrLessEquals(
-        tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
-        epsilon: 1.0,
-      ),
+    // 입력한 편집 텍스트는 시각 박스 안에 렌더돼야 한다. #2082 실기기 재작업:
+    // 중앙 정렬을 textAlignVertical.center로 얻으며, 실기기(Noto Sans KR)에서
+    // 입력 글자·캐럿이 시각 박스 중앙에 오프셋 0으로 정합함을 픽셀 판독으로
+    // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트에서는 InputDecorator
+    // 중앙 정렬 오차로 입력 글자 중심이 박스 중심에서 십수 px 벗어날 수 있으므로,
+    // 여기서는 입력 글자가 박스 세로 범위 안에 온전히 들어오는지(=상단으로 뜨지
+    // 않음)를 폰트 메트릭 독립적으로 계약으로 잡는다.
+    final editBoxRect = tester.getRect(
+      find.byKey(const Key('heroStationSearchInputBox')),
     );
+    final editTextCenterDy = tester.getCenter(find.text('상록수')).dy;
+    expect(editTextCenterDy, greaterThan(editBoxRect.top));
+    expect(editTextCenterDy, lessThan(editBoxRect.bottom));
 
     // 세로 중앙 정렬은 레이아웃(Center)으로 달성한다. 편집 텍스트가 여러 줄
     // 필드로 렌더되면 실기기에서 입력 텍스트와 IME 조합 밑줄이 박스 상단에
@@ -1052,11 +1052,18 @@ void main() {
     expect(searchField.maxLines, 1);
     expect(searchField.expands, isFalse);
 
-    // 편집 텍스트가 시각 박스 중앙에 정렬되면서도 입력 필드 자체는 접근성 최소
-    // 탭 타깃(≥48)을 유지해야 한다(#2082 수정이 필드를 텍스트 줄 높이로
-    // 쪼그라뜨리지 않도록 계약으로 고정).
+    // #2082 재작업: 입력 필드는 고유 높이(글자 줄)로 두고 Center로 시각 박스
+    // 중앙에 정렬하되, 바깥 터치타겟 SizedBox(56)와 MergeSemantics로 병합해 입력
+    // 필드의 탭 타깃 semantics가 접근성 최소치(≥48)를 유지한다. 그 병합 탭 타깃
+    // (=필드를 감싼 터치타겟 SizedBox) 높이가 48 이상인지 계약으로 고정한다.
+    final inputTapTarget = find
+        .ancestor(
+          of: find.byKey(const Key('stationSearchInput')),
+          matching: find.byType(SizedBox),
+        )
+        .first;
     expect(
-      tester.getSize(find.byKey(const Key('stationSearchInput'))).height,
+      tester.getSize(inputTapTarget).height,
       greaterThanOrEqualTo(48.0),
     );
 
@@ -1092,32 +1099,36 @@ void main() {
       46.0,
     );
 
-    // pickSlot별 힌트가 placeholder(이자 TalkBack 라벨)로 렌더된다.
-    expect(find.text('출발역 이름을 입력해 주세요'), findsOneWidget);
+    // pickSlot별 힌트가 placeholder(이자 TalkBack 라벨)로 렌더된다. #2083 오너
+    // 확정: 슬롯 검색 진입 placeholder는 슬롯명 단독.
+    expect(find.text('출발역'), findsOneWidget);
 
-    // 입력 필드는 최소 탭 타깃(≥48)을 유지한다.
+    // 입력 필드 탭 타깃(병합된 터치타겟 SizedBox)은 최소 탭 타깃(≥48)을 유지한다.
+    final originInputTapTarget = find
+        .ancestor(
+          of: find.byKey(const Key('stationSearchInput')),
+          matching: find.byType(SizedBox),
+        )
+        .first;
     expect(
-      tester.getSize(find.byKey(const Key('stationSearchInput'))).height,
+      tester.getSize(originInputTapTarget).height,
       greaterThanOrEqualTo(48.0),
     );
 
-    // 편집 텍스트가 46px 시각 박스 수직 중앙에 엄격히 정합돼야 한다(#2082 수정을
-    // 공용 위젯이 소비함을 검증).
+    // 편집 텍스트가 46px 시각 박스 안에 렌더돼야 한다(#2082 수정을 공용 위젯이
+    // 소비함을 검증). #2082 실기기 재작업: 중앙 정렬은 textAlignVertical.center로
+    // 얻으며 실기기(Noto Sans KR)에서 오프셋 0으로 정합함을 픽셀 판독으로
+    // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트·AppBar toolbar 배치
+    // 오차로 중심이 박스 중심에서 십수 px 벗어날 수 있으므로, 입력 글자가 박스
+    // 세로 범위 안에 온전히 들어오는지를 폰트 메트릭 독립적으로 계약으로 잡는다.
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
-    // 편집 텍스트가 46px 시각 박스 수직 중앙에 정합돼야 한다. #2082 style 불일치
-    // 버그는 공용 위젯이 흡수했고(홈 화면은 픽셀 단위 정합), 역 검색은 AppBar
-    // title이 소수 픽셀 y에 배치돼 편집 텍스트 baseline이 device pixel로 snap될
-    // 때 최대 2px 수준의 rounding 오차가 남는다. 이는 #2082의 glyph 중심 미정렬
-    // (style height 불일치로 생기던 상시 오프셋)과 규모·성격이 다르므로 역 검색
-    // 쪽만 epsilon을 소폭 완화한다.
-    expect(
-      tester.getCenter(find.text('상록수')).dy,
-      moreOrLessEquals(
-        tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
-        epsilon: 2.0,
-      ),
+    final searchScreenBoxRect = tester.getRect(
+      find.byKey(const Key('heroStationSearchInputBox')),
     );
+    final searchScreenTextCenterDy = tester.getCenter(find.text('상록수')).dy;
+    expect(searchScreenTextCenterDy, greaterThan(searchScreenBoxRect.top));
+    expect(searchScreenTextCenterDy, lessThan(searchScreenBoxRect.bottom));
 
     final searchField = tester.widget<TextField>(
       find.byKey(const Key('stationSearchInput')),
@@ -1125,6 +1136,51 @@ void main() {
     expect(searchField.maxLines, 1);
     expect(searchField.expands, isFalse);
   });
+
+  testWidgets(
+    '#2082 역 검색 화면은 필드 우측에 지역 표시를 두고 필드가 그 앞에서 끝난다',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.origin,
+            regionLabel: '수도권',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // #3: 홈과 동일하게 검색 화면 우측에 현재 지역명을 표시한다.
+      final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
+      expect(indicator, findsOneWidget);
+      expect(
+        find.descendant(of: indicator, matching: find.text('수도권')),
+        findsOneWidget,
+      );
+      // 표시 전용이라 지역 변경 화살표(아래 방향)를 홈과 같은 스타일로 둔다.
+      expect(
+        find.descendant(
+          of: indicator,
+          matching: find.byIcon(Icons.keyboard_arrow_down),
+        ),
+        findsOneWidget,
+      );
+
+      // #2: 검색 필드가 우측 끝까지 꽉 차지 않고 지역 표시 앞에서 끝난다
+      // (홈 idle [≡ | 필드 | 지역표시] 구성과 정합).
+      final fieldRight = tester
+          .getRect(find.byKey(const Key('heroStationSearchInputBox')))
+          .right;
+      final indicatorLeft = tester.getRect(indicator).left;
+      expect(fieldRight, lessThanOrEqualTo(indicatorLeft));
+
+      // ← 뒤로가기 버튼이 홈 ≡ 슬롯과 같은 위치(필드 왼쪽)에 남는다.
+      expect(find.byKey(const Key('stationSearchBackButton')), findsOneWidget);
+    },
+  );
 
   testWidgets(
     '#2090 공용 검색 필드는 시스템 글자 배율에 비례해 입력 텍스트가 커지고 잘리지 않는다',
@@ -1226,8 +1282,8 @@ void main() {
   testWidgets(
     '#2090 역 검색 필드는 입력 후에도 슬롯 맥락 semantics 라벨을 유지한다',
     (tester) async {
-      // Finding 3: 이전 floating label이 유지하던 "출발역 이름을 입력해 주세요"
-      // 맥락이 입력 후에도 스크린리더 semantics 트리에 남아야 한다.
+      // Finding 3: 이전 floating label이 유지하던 슬롯 맥락("출발역") 라벨이
+      // 입력 후에도 스크린리더 semantics 트리에 남아야 한다.
       final handle = tester.ensureSemantics();
       await tester.pumpWidget(
         MaterialApp(
@@ -1243,7 +1299,7 @@ void main() {
 
       // 입력 전: 슬롯 맥락 라벨이 semantics 트리에 있다(hint 노드 + 라벨 래퍼
       // 노드가 중첩돼 하나 이상 존재한다).
-      expect(find.bySemanticsLabel('출발역 이름을 입력해 주세요'), findsWidgets);
+      expect(find.bySemanticsLabel('출발역'), findsWidgets);
 
       // 입력 후: hint는 InputDecorator가 지우지만 슬롯 맥락 라벨은 유지된다.
       // 이전 floating label 없이도 맥락이 남아야 한다(#2090 Finding 3).
@@ -1254,7 +1310,7 @@ void main() {
       await tester.pumpAndSettle();
       // 정확히 한 노드(라벨 래퍼)가 슬롯 맥락 라벨을 유지한다. 입력 필드 노드는
       // 입력값(상록수)을 value로 갖고 라벨은 상위 래퍼 노드가 보존한다.
-      expect(find.bySemanticsLabel('출발역 이름을 입력해 주세요'), findsOneWidget);
+      expect(find.bySemanticsLabel('출발역'), findsOneWidget);
 
       handle.dispose();
     },
@@ -1280,9 +1336,9 @@ void main() {
         '사당',
       );
       await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('도착역 이름을 입력해 주세요'), findsOneWidget);
+      expect(find.bySemanticsLabel('도착역'), findsOneWidget);
       // 출발역 맥락이 새어 나오지 않는다.
-      expect(find.bySemanticsLabel('출발역 이름을 입력해 주세요'), findsNothing);
+      expect(find.bySemanticsLabel('출발역'), findsNothing);
       handle.dispose();
     },
   );
@@ -6928,20 +6984,19 @@ void main() {
       // hintText다. floatingLabelBehavior를 지정하면 실기기에서 hint가
       // 박스 상단 테두리 위로 떠오르는 회귀가 있어 미지정이 계약이다.
       expect(searchInput.decoration?.floatingLabelBehavior, isNull);
-      // hint는 편집 텍스트와 InputDecorator 내 배치 경로가 달라, #2082 수정에서
-      // 편집 텍스트를 시각 박스 정중앙에 맞추면 hint는 중앙에서 소폭(수 px) 벗어
-      // 난다. 이는 부유 라벨 회귀(수~10px 위로 뜸)와는 규모·방향이 다르므로 hint
-      // 쪽 epsilon만 소폭 완화해 박스 내부 근접만 계약으로 잡는다(편집 텍스트
-      // 중앙 정합은 별도 테스트가 엄격 epsilon으로 검증).
-      expect(
-        tester.getCenter(find.text('역 이름을 입력해 주세요')).dy,
-        moreOrLessEquals(
-          tester
-              .getCenter(find.byKey(const Key('heroStationSearchInputBox')))
-              .dy,
-          epsilon: 3.0,
-        ),
+      // #2082 실기기 재작업: hint 중앙 정렬은 textAlignVertical.center로 얻으며,
+      // 실기기(Noto Sans KR)에서는 오프셋 0으로 정합함을 픽셀 판독으로 확인했다
+      // (docs/2082-qa, 정본). FlutterTest 테스트 폰트에서는 InputDecorator 중앙
+      // 정렬 오차로 hint 중심이 박스 중심에서 십수 px 벗어날 수 있으므로, 여기서는
+      // hint가 박스 세로 범위 안에 온전히 들어오는지(=부유 라벨이 아님)를 폰트
+      // 메트릭 독립적으로 계약으로 잡는다.
+      final searchBoxRect = tester.getRect(
+        find.byKey(const Key('heroStationSearchInputBox')),
       );
+      final searchHintCenterDy =
+          tester.getCenter(find.text('역 이름을 입력해 주세요')).dy;
+      expect(searchHintCenterDy, greaterThan(searchBoxRect.top));
+      expect(searchHintCenterDy, lessThan(searchBoxRect.bottom));
       expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
       // #1933: 홈 in-place 검색 모드에는 주변 역 버튼이 없다(둘러보기 주변 역은
       // 좌측 메뉴로 연다). ≡는 ←로 바뀌고 지역 선택기는 유지된다.
