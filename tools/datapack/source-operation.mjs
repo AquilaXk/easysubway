@@ -260,11 +260,12 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (!runner || typeof runner !== "object" || Array.isArray(runner)) {
     throw new Error(`${candidate.id}.operation.runner must be an object`);
   }
-  requireAllowedKeys(runner, new Set(["command", "requiredEnv"]), `${candidate.id}.operation.runner`);
+  requireAllowedKeys(runner, new Set(["command", "arguments", "requiredEnv"]), `${candidate.id}.operation.runner`);
   const command = requiredText(runner.command, `${candidate.id}.operation.runner.command`);
   if (!/^node tools\/[A-Za-z0-9_./-]+\.mjs$/.test(command)) {
     throw new Error(`${candidate.id}.operation.runner.command must be a literal repository Node command`);
   }
+  stringList(runner.arguments ?? [], `${candidate.id}.operation.runner.arguments`, { allowEmpty: true });
   const requiredEnv = stringList(
     runner.requiredEnv,
     `${candidate.id}.operation.runner.requiredEnv`,
@@ -339,17 +340,18 @@ export function operationHumanSummary(summary) {
   if (summary.providerApprovalValidationError) {
     lines.push(`provider approval validation: ${summary.providerApprovalValidationError}`);
   }
-  if (summary.operation) {
+  if (summary.operation && !summary.operationValidationError) {
+    const runner = [summary.operation.runner.command, ...(summary.operation.runner.arguments ?? [])].join(" ");
     lines.push(
       `auth env: ${summary.operation.auth.env ?? "not required"}`,
       `auth value encoding: ${summary.operation.auth.valueEncoding ?? "provider default"}`,
       `auth load policy: ${summary.operation.auth.loadPolicy ?? "runtime default"}`,
       `required params: ${summary.operation.requiredParameters.join(", ")}`,
       `response envelope: ${summary.operation.responseEnvelope}`,
-      `runner: ${summary.operation.runner.command}`,
+      `runner: ${runner}`,
       `runner env: ${summary.operation.runner.requiredEnv.join(", ")}`,
     );
-  } else {
+  } else if (!summary.operation) {
     lines.push("operation: not documented");
   }
   if (summary.operationValidationError) {

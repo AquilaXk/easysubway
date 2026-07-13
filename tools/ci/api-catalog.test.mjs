@@ -210,6 +210,19 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
   }
 });
 
+test("validate는 격리된 provider operation 오류를 거부한다", () => {
+  assert.throws(
+    () => validateCatalog([{
+      id: "provider:invalid-operation",
+      kind: "provider",
+      endpoint: "https://provider.example/invalid",
+      operation: { method: "GET" },
+      operationValidationError: "invalid-operation.operation.auth must be an object",
+    }]),
+    /provider operation contract is invalid/,
+  );
+});
+
 test("integration auth는 credential reference 표현만 허용한다", () => {
   for (const auth of [
     "Basic dXNlcjpwYXNzd29yZA==",
@@ -305,6 +318,16 @@ test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 �
   assert.equal(entry.operation.auth.parameter, "serviceKey");
   assert.equal(entry.operation.auth.valueEncoding, "url-search-params-once");
   assert.equal(entry.operation.auth.loadPolicy, "process-env-no-shell-parsing");
+  assert.deepEqual(entry.operation.runner.arguments, ["--candidate", "kric-transfer-movement-standard"]);
+  const { stdout } = await execFileAsync(process.execPath, [
+    "tools/ci/api-catalog.mjs",
+    "show",
+    "provider:kric-transfer-movement-standard",
+  ]);
+  assert.match(
+    stdout,
+    /^runner: node tools\/datapack\/collect-kric-source-candidate-evidence\.mjs --candidate kric-transfer-movement-standard$/m,
+  );
 });
 
 test("catalog 운영 계약은 repository-local 전용과 source-of-truth 경계를 고정한다", async () => {

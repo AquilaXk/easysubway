@@ -327,6 +327,19 @@ test("list는 만료 상태 오류를 candidate에 남기고 다른 provider를 
   assert.match(sourceOperation.operationHumanSummary(rows[2]), /^operation validation: .*endpoint must match requestUrl$/m);
 });
 
+test("잘못된 operation human 요약은 TypeError 대신 validation 오류를 표시한다", () => {
+  const endpoint = "https://provider.example/invalid";
+  const summary = operationSummary(candidate("invalid", {
+    operation: validOperation({ endpoint, auth: null }),
+  }));
+
+  assert.doesNotThrow(() => sourceOperation.operationHumanSummary(summary));
+  assert.match(
+    sourceOperation.operationHumanSummary(summary),
+    /^operation validation: invalid\.operation\.auth must be an object$/m,
+  );
+});
+
 test("show는 operation이 없어도 sample URL credential을 출력 전에 거부한다", () => {
   for (const sampleUrl of [
     "https://provider.example/actual-secret/items",

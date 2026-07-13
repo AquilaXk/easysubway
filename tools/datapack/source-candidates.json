@@ -682,6 +682,10 @@
         "responseEnvelope": "root.body.items.item",
         "runner": {
           "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs",
+          "arguments": [
+            "--candidate",
+            "kric-transfer-movement-standard"
+          ],
           "requiredEnv": [
             "KRIC_SERVICE_KEY",
             "RUNNER_TEMP"

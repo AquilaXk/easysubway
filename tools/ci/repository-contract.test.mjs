@@ -7245,6 +7245,7 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
     responseEnvelope: "root.body.items.item",
     runner: {
       command: "node tools/datapack/collect-kric-source-candidate-evidence.mjs",
+      arguments: ["--candidate", "kric-transfer-movement-standard"],
       requiredEnv: ["KRIC_SERVICE_KEY", "RUNNER_TEMP"],
     },
     secretPolicy: "env-only-redacted-output",
@@ -13853,6 +13854,8 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.match(workflow, /curl -fsS --connect-timeout 10 --max-time 30 "\$\{[A-Z_]*BASE_URL[A-Z_]*\}\/catalog\/current\.json"/);
   assert.match(workflow, /node tools\/datapack\/check-datapack-expiry-alert\.mjs/);
   assert.match(workflow, /node tools\/datapack\/source-operation\.mjs check-approvals/);
+  assert.match(workflow, /^  provider-approval-expiry:\s*$/m);
+  assert.match(workflow, /^    name: Provider Approval Expiry$/m);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);
 

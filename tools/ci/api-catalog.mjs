@@ -142,6 +142,12 @@ export function validateCatalog(catalog) {
     }
     if (entry.kind === "provider") {
       if (!httpUrl(entry.endpoint)) throw new Error(`${entry.id}: invalid provider endpoint`);
+      if (entry.operationValidationError) {
+        throw new Error(`${entry.id}: provider operation contract is invalid: ${entry.operationValidationError}`);
+      }
+      if (entry.providerApprovalValidationError) {
+        throw new Error(`${entry.id}: provider approval contract is invalid: ${entry.providerApprovalValidationError}`);
+      }
       if (entry.sampleUrl != null && (!httpUrl(entry.sampleUrl)
         || hasConcretePathCredential(entry.endpoint, entry.sampleUrl))) {
         throw new Error(`${entry.id}: secret-like values are forbidden`);
@@ -247,7 +253,9 @@ function humanSummary(entry) {
   if (entry.source) lines.push(`source: ${entry.source}`);
   if (entry.documentationStatus) lines.push(`documentation: ${entry.documentationStatus}`);
   if (entry.responseFields?.length) lines.push(`response fields: ${entry.responseFields.join(", ")}`);
-  if (entry.operation?.runner?.command) lines.push(`runner: ${entry.operation.runner.command}`);
+  if (entry.operation?.runner?.command) {
+    lines.push(`runner: ${[entry.operation.runner.command, ...(entry.operation.runner.arguments ?? [])].join(" ")}`);
+  }
   if (entry.operation?.auth) lines.push(`auth env: ${entry.operation.auth.env ?? "not required"}`);
   return lines.join("\n");
 }
