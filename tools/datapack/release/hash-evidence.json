@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "artifactKind": "datapack-build-spec-hash-evidence",
   "issue": 1400,
-  "builderGitSha": "95b14efd9259a2b8839e6151d49fd825fee7101e",
+  "builderGitSha": "7d06c511e2ca30085d30acd875e8d2b13da70499",
   "productionScopeId": "capital_pilot_android_v1",
-  "truthfulnessRule": "모든 값은 (a) 커밋 데이터에서 결정적 재산출, 또는 (b) #1992·#1996 admission 실행 산출물의 byte-exact 재생성·검증본에서만 채웠다. 임의 합성값 없음. 사당·상록수 4호선 접근성 상태는 실측 그대로(UNDER_MAINTENANCE/NO_OFFICIAL_FEED) 기록 — 거짓 AVAILABLE 위장 없음.",
+  "truthfulnessRule": "모든 값은 tracked exporter·source admission pipeline·업로드된 immutable raw object의 실제 hash에서만 생성했다. 임의 합성값 없음.",
   "ledgerHashes": {
     "note": "export-ledger-hashes.mjs 산출값 == #1992 admissionEvidence 기록값(완전 일치 검증 PASS).",
     "approvedAliasLedgerHash": {
@@ -35,29 +35,29 @@
     ]
   },
   "sourceSnapshots": {
-    "note": "source-snapshots.json은 현재 reviewed pack이 계속 사용하는 admission 8종의 snapshot 객체다. 제거된 seoulmetro-cyberstation-route-map admission은 새 자작 노선도 근거로 대체되어 release snapshot set에서도 제외했다. 각 snapshot의 admissionEvidence 일치 검증은 8/8 PASS다.",
-    "order": "admission chain 순서: molit-urban-rail-full-route → seoulmetro-station-line-info → kric-station-elevator → kric-station-elevator-movement → kric-station-escalator → kric-wheelchair-lift-location → kric-wheelchair-lift-movement → seoul-metro-accessibility",
-    "committedVerificationCommand": "node -e \"const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),i=require('./tools/datapack/source-inventory.json');for(const n of s){const e=i.sources.find(x=>x.id===n.sourceId).admissionEvidence;console.log(n.sourceId,c.createHash('sha256').update(JSON.stringify([n])).digest('hex')===e.sourceSnapshotSetHash)}\"",
-    "specRowRawSha256Note": "build-spec sourceSnapshots[].rawSha256는 admissionEvidence.rawSha256(=raw 바이트 해시, fixture 주석 선례 'admission sample.rawSha256')를 기입. snapshot 객체 내부 rawSha256는 canonical(minified·key정렬) raw 해시로 값이 다르며 source-snapshots.json에 보존됨."
+    "note": "reviewed pack이 사용하는 admission 9종의 locked snapshot 객체다. KRIC 시각표 raw는 2026-07-13 immutable object storage 보존본과 byte hash가 일치한다.",
+    "order": "molit-urban-rail-full-route → seoulmetro-station-line-info → kric-station-elevator → kric-station-elevator-movement → kric-station-escalator → kric-wheelchair-lift-location → kric-wheelchair-lift-movement → seoul-metro-accessibility → kric-subway-timetable",
+    "committedVerificationCommand": "node --test --test-name-pattern='tracked production buildSpec은 현재 reviewed fixture와 provenance에 묶인다' tools/datapack/datapack-tools.test.mjs",
+    "specRowRawSha256Note": "build-spec sourceSnapshots[].rawSha256는 각 immutable raw object의 실제 bytes SHA-256이다."
   },
   "sourceSnapshotSetHash": {
-    "value": "ae226bf151f5a7820650078badb6cbcca73f3d94611b3c4e92064e15ecd7d654",
+    "value": "63ac0dd71ff3f0252f42d0db582401776f39ff9cf23094de4a083751089c2cd0",
     "contract": "run-source-admission-pipeline.mjs 60행 공식 sha256(JSON.stringify([snapshot...]))을 8-snapshot 배열에 적용한다. 새 production publish는 이 build spec hash와 일치하는 별도 release request 승인이 필요하다.",
-    "reproductionCommand": "node -e \"const c=require('crypto');console.log(c.createHash('sha256').update(JSON.stringify(require('./tools/datapack/release/source-snapshots.json'))).digest('hex'))\""
+    "reproductionCommand": "node --test --test-name-pattern='tracked production buildSpec은 현재 reviewed fixture와 provenance에 묶인다' tools/datapack/datapack-tools.test.mjs"
   },
   "sourceInventorySha256": {
-    "value": "24525c1bf2c0cad8fbb703eca28b21357d1d589810ba06f584b4e239539b21ef",
+    "value": "51c213ea980afa3601ada451666caaec7b7b1d9184bf29bd423ae06068aaab79",
     "contract": "run-source-admission-pipeline.mjs 61행 공식 sha256(JSON.stringify(admittedInventory)). #1769 official OD fare source admit 후 현행 브랜치의 tools/datapack/source-inventory.json이 최종 admitted inventory이며 워크플로 빌드가 실제로 소비하는 인벤토리(workflow 331행)와 동일 파일.",
-    "reproductionCommand": "node -e \"const c=require('crypto'),fs=require('fs');console.log(c.createHash('sha256').update(JSON.stringify(JSON.parse(fs.readFileSync('tools/datapack/source-inventory.json','utf8')))).digest('hex'))\""
+    "reproductionCommand": "node tools/datapack/validate-source-inventory.mjs"
   },
   "fixturePath": {
     "value": "tools/datapack/release/capital-production-reviewed-pack.json",
-    "sha256": "3c46fcb398ef4bc27a09b17deac33ed50c2edbfa3366dda6d35b120b161b209f",
+    "sha256": "109694614336609f5e5bca3342a3b8b84b465a9e11a1988894110081b2567320",
     "contract": "build spec과 release workflow가 reviewed fixture raw bytes SHA-256을 재계산해 일치하지 않으면 차단한다. pack.artifactKind=production이며 4호선 상록수-사당 graph를 포함한다."
   },
   "identifiers": {
     "candidateId": {
-      "value": "capital-pilot-candidate-20260712",
+      "value": "capital-pilot-candidate-20260713",
       "note": "파일 기반 candidate 식별자다. 변경된 build spec에 대한 production release request는 아직 승인되지 않았다."
     }
   },
@@ -117,18 +117,49 @@
       "rawSha256": "8a1fbdfbc55f2cd4bc8f54e616f515133f00ee528d078ab21cdd0c1de7ad6814",
       "adminReviewRecordHash": "9ccbf78e88d905207134ca3ad08ef7e99fbbdff16c4503b13c4ed925a99b5303",
       "perSourceSnapshotSetHash": "3f10026a5a7cc98b870073d9f795540be21e654f13e17a890c7a472849e3d7b3"
+    },
+    {
+      "sourceId": "kric-subway-timetable",
+      "snapshotId": "kric-subway-timetable-snapshot-20260713",
+      "rawSha256": "a20e79f1f4af59f1679ae5e9a73a9ef2e54306dcb56175d7c0a0fbbec07ff252",
+      "adminReviewRecordHash": "21981e70cee40f82462d2bcb2a8ca4d422101631a72c4259e9458bce5f9b4e59",
+      "perSourceSnapshotSetHash": "6b42b65c7e317765ff070d42c800cb5f8caac6e1a89fdd256a1b0dc6565eff29"
     }
   ],
   "officialOdFareEvidence": {
     "sourceId": "seoul-metro-official-od-fares",
     "snapshotId": "seoul-metro-official-od-fares-20260712",
     "evidenceHash": "e48551c7b2d112c268882843d98c1c928b2b0e8d5f0b9654f4159d19cd5272b7",
-      "admissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",
+    "admissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",
     "quoteSetHash": "4d38df07aa8d8e9c29e523df391d94ad6fc19d78cf2ad65e4201824ab1452106",
     "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
     "quotes": [
-      { "originStationId": "station-sangnoksu", "destinationStationId": "station-sadang", "sourceId": "seoul-metro-official-od-fares", "snapshotId": "seoul-metro-official-od-fares-20260712", "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a", "gnrlCardFare": 1950, "gnrlCashFare": 2050, "yungCardFare": 1220, "yungCashFare": 2050, "childCardFare": 750, "childCashFare": 750 },
-      { "originStationId": "station-sadang", "destinationStationId": "station-sangnoksu", "sourceId": "seoul-metro-official-od-fares", "snapshotId": "seoul-metro-official-od-fares-20260712", "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a", "gnrlCardFare": 1950, "gnrlCashFare": 2050, "yungCardFare": 1220, "yungCashFare": 2050, "childCardFare": 750, "childCashFare": 750 }
+      {
+        "originStationId": "station-sangnoksu",
+        "destinationStationId": "station-sadang",
+        "sourceId": "seoul-metro-official-od-fares",
+        "snapshotId": "seoul-metro-official-od-fares-20260712",
+        "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+        "gnrlCardFare": 1950,
+        "gnrlCashFare": 2050,
+        "yungCardFare": 1220,
+        "yungCashFare": 2050,
+        "childCardFare": 750,
+        "childCashFare": 750
+      },
+      {
+        "originStationId": "station-sadang",
+        "destinationStationId": "station-sangnoksu",
+        "sourceId": "seoul-metro-official-od-fares",
+        "snapshotId": "seoul-metro-official-od-fares-20260712",
+        "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+        "gnrlCardFare": 1950,
+        "gnrlCashFare": 2050,
+        "yungCardFare": 1220,
+        "yungCashFare": 2050,
+        "childCardFare": 750,
+        "childCashFare": 750
+      }
     ]
   },
   "buildDryRun": {

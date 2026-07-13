@@ -5,6 +5,7 @@ import {
   buildCollectionContext,
   credentialFreeRawArchiveRows,
   fetchWithRetry,
+  summarizeCollectionFailures,
   successfulKricRows,
 } from "./collect-kric-line4-timetables.mjs";
 import { normalizeKricSubwayTimetable } from "./normalize-kric-timetable.mjs";
@@ -87,6 +88,32 @@ test("KRIC provider 오류 응답은 빈 성공 데이터로 취급하지 않는
 test("KRIC 요청 실패가 하나라도 있으면 수집 완료로 처리하지 않는다", () => {
   assert.throws(() => assertCompleteCollection(1, 153), /KRIC collection incomplete: 1\/153 requests failed/);
   assert.doesNotThrow(() => assertCompleteCollection(0, 153));
+});
+
+test("KRIC 실패 진단은 sanitized 원인별 개수와 요청 표본만 요약한다", () => {
+  assert.deepEqual(
+    summarizeCollectionFailures([
+      { requestKey: "S1:4:433:7:express", error: "KRIC provider failure: resultCode=20, resultMsg=NO DATA" },
+      { requestKey: "S1:4:433:7:local", error: "KRIC provider failure: resultCode=20, resultMsg=NO DATA" },
+      { requestKey: "KR:4:448:8:local", error: "KRIC provider failure: resultCode=30, resultMsg=[KEY]" },
+      { requestKey: "KR:4:448:9:local", resultCode: "00", rows: 1 },
+    ]),
+    {
+      failedRequestCount: 3,
+      failures: [
+        {
+          error: "KRIC provider failure: resultCode=20, resultMsg=NO DATA",
+          count: 2,
+          sampleRequestKeys: ["S1:4:433:7:express", "S1:4:433:7:local"],
+        },
+        {
+          error: "KRIC provider failure: resultCode=30, resultMsg=[KEY]",
+          count: 1,
+          sampleRequestKeys: ["KR:4:448:8:local"],
+        },
+      ],
+    },
+  );
 });
 
 test("KRIC 수집 요청은 timeout 뒤 bounded retry로 중단한다", async () => {

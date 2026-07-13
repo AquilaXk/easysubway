@@ -10,13 +10,12 @@ const ROSTER = {
   ],
 };
 
-test("KRIC 수집 계획은 역×dayCd(3)로 subwayTimetableExp만 요청한다(일반의 상위집합)", () => {
+test("KRIC 4호선 수집 계획은 공식 데이터가 있는 평일·휴일만 요청한다", () => {
   const plan = buildKricLine4CollectionPlan(ROSTER);
   assert.equal(plan.stationCount, 2);
   assert.equal(plan.operation, "subwayTimetableExp");
-  assert.deepEqual(plan.dayCds, ["8", "7", "9"]);
-  // 2역 × 3 dayCd × 1 operation = 6 (일반+급행 중복 수집 없음)
-  assert.equal(plan.requestCount, 6);
+  assert.deepEqual(plan.dayCds, ["8", "9"]);
+  assert.equal(plan.requestCount, 4);
   assert.ok(plan.requests.every((r) => r.operation === "subwayTimetableExp"));
   const first = plan.requests[0];
   assert.equal(first.requestKey, "subwayTimetableExp|S1|433|8");

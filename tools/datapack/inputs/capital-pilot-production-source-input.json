@@ -560,7 +560,7 @@
       "stationCode": "448",
       "lineSequence": 43,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-448"
     },
@@ -575,7 +575,7 @@
       "stationCode": "433",
       "lineSequence": 28,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-433"
     },
@@ -622,7 +622,7 @@
       "stationCode": "433",
       "lineSequence": 28,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "433"
     },
@@ -637,7 +637,7 @@
       "stationCode": "448",
       "lineSequence": 43,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "448"
     },
@@ -652,7 +652,7 @@
       "stationCode": "434",
       "lineSequence": 29,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-434"
     },
@@ -667,7 +667,7 @@
       "stationCode": "434",
       "lineSequence": 29,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "434"
     },
@@ -682,7 +682,7 @@
       "stationCode": "435",
       "lineSequence": 30,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-435"
     },
@@ -697,7 +697,7 @@
       "stationCode": "435",
       "lineSequence": 30,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "435"
     },
@@ -712,7 +712,7 @@
       "stationCode": "436",
       "lineSequence": 31,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-436"
     },
@@ -727,7 +727,7 @@
       "stationCode": "436",
       "lineSequence": 31,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "436"
     },
@@ -742,7 +742,7 @@
       "stationCode": "437",
       "lineSequence": 32,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-437"
     },
@@ -757,7 +757,7 @@
       "stationCode": "437",
       "lineSequence": 32,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "437"
     },
@@ -772,7 +772,7 @@
       "stationCode": "438",
       "lineSequence": 33,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-438"
     },
@@ -787,7 +787,7 @@
       "stationCode": "438",
       "lineSequence": 33,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "438"
     },
@@ -802,7 +802,7 @@
       "stationCode": "439",
       "lineSequence": 34,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-439"
     },
@@ -817,7 +817,7 @@
       "stationCode": "439",
       "lineSequence": 34,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "439"
     },
@@ -832,7 +832,7 @@
       "stationCode": "440",
       "lineSequence": 35,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-440"
     },
@@ -847,7 +847,7 @@
       "stationCode": "440",
       "lineSequence": 35,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "440"
     },
@@ -862,7 +862,7 @@
       "stationCode": "441",
       "lineSequence": 36,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-441"
     },
@@ -877,7 +877,7 @@
       "stationCode": "441",
       "lineSequence": 36,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "441"
     },
@@ -892,7 +892,7 @@
       "stationCode": "442",
       "lineSequence": 37,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-442"
     },
@@ -907,7 +907,7 @@
       "stationCode": "442",
       "lineSequence": 37,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "442"
     },
@@ -922,7 +922,7 @@
       "stationCode": "443",
       "lineSequence": 38,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-443"
     },
@@ -937,7 +937,7 @@
       "stationCode": "443",
       "lineSequence": 38,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "443"
     },
@@ -952,7 +952,7 @@
       "stationCode": "444",
       "lineSequence": 39,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-444"
     },
@@ -967,7 +967,7 @@
       "stationCode": "444",
       "lineSequence": 39,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "444"
     },
@@ -982,7 +982,7 @@
       "stationCode": "445",
       "lineSequence": 40,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-445"
     },
@@ -997,7 +997,7 @@
       "stationCode": "445",
       "lineSequence": 40,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "445"
     },
@@ -1012,7 +1012,7 @@
       "stationCode": "446",
       "lineSequence": 41,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-446"
     },
@@ -1027,7 +1027,7 @@
       "stationCode": "446",
       "lineSequence": 41,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "446"
     },
@@ -1042,7 +1042,7 @@
       "stationCode": "447",
       "lineSequence": 42,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "molit-urban-rail-full-route",
       "sourceStationCode": "MOLIT-SEOUL-4-447"
     },
@@ -1057,7 +1057,7 @@
       "stationCode": "447",
       "lineSequence": 42,
       "platformInfo": "",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
       "sourceId": "kric-subway-timetable",
       "sourceStationCode": "447"
     }
@@ -1204,10 +1204,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "aa31ec63057304c35abb75650a5b624a60cb05bacc8b17a7e137634aa8c2434b",
-      "evidenceHash": "6b04eb6e37b70606af302791c12dfd4ae4f5a2b9b66c81028a0fb17d7542fd5a"
+      "evidenceHash": "ba88c4a58f20fb406d1351f4adc76106d95b356526ed0cee0a533f41f531e918"
     },
     {
       "id": "edge-seoul-4-448-447-down",
@@ -1234,10 +1234,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "eeefcf8d6f3a236f6c02907002bd1c8842a945b48e3476c66121254c54890b3a",
-      "evidenceHash": "a2be09a79bf94e2fa6448451560ee9441d5c56111eed3fb068a27d346a5a8ac0"
+      "evidenceHash": "1b8a1d20780cc71bea5d1bea8004919b094d9e58afef2419de4097e47deedc13"
     },
     {
       "id": "edge-seoul-4-434-433-down",
@@ -1264,10 +1264,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "7b27edca3d2bf176067d6729b2d077b353cda6103a1ab0aa3c816ae8d61e84a1",
-      "evidenceHash": "83f835b50da6869231e0519aeaeb28a5257f857ba19e0b5c7529b3a98c89f51a"
+      "evidenceHash": "55993f708436077d9d61deda15401af131c8ee553a65bb44f6b123e93f0baae3"
     },
     {
       "id": "edge-seoul-4-434-435-up",
@@ -1294,10 +1294,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "3268a8696509aa4991e34b82d9f7da841b563c2854a4d5a23553fde2af76ae2e",
-      "evidenceHash": "6052111e2e10cb6ff01beee245076ccba1688d132d1e5138b198d3bd3fdd4d98"
+      "evidenceHash": "82506d0a6383d128a4b97eb866636483b188c41a7a569dccec5452dc1e497f8c"
     },
     {
       "id": "edge-seoul-4-435-434-down",
@@ -1324,10 +1324,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "2b2d38e86b923c1330ed2083e8b03d823de60e96fb8fa02b71fe63b4ae1b2220",
-      "evidenceHash": "532bec7be68b9ffb94d74aee1df1b07a3aacbc0672ca4ed6bfd1038dd6c0fe64"
+      "evidenceHash": "fc1d143df3a575d0023292bd48e42c260165ee7eef7ad59dd4007c01bb839169"
     },
     {
       "id": "edge-seoul-4-435-436-up",
@@ -1354,10 +1354,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "d84b7dcb5df19bf8418eb7e34eef5f97a7a2372022bcd031cad52436dc8af004",
-      "evidenceHash": "3dd873806ec834f7006f0c1435a6a5f4e2f44486e728868c0a19021b99a0fa77"
+      "evidenceHash": "6f9065ee96b05555ea62d01c07944bce7d8af943ecd45aadfa5539d43a0a03ce"
     },
     {
       "id": "edge-seoul-4-436-435-down",
@@ -1384,10 +1384,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "d3d987fdbd8147f29385ed28c42f4fa6d07f0fdb9ca8f5cecfa17c35077c2226",
-      "evidenceHash": "67f2893c4509f1c3001c020f3a127a0f5b701f969d13047cd3b13d0f6e69ca3a"
+      "evidenceHash": "9f14fd392d0c810670133ab6dba455468e2aa0a152fa0b80f3d9d15b655df50b"
     },
     {
       "id": "edge-seoul-4-436-437-up",
@@ -1414,10 +1414,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "eebfd80aee91962a4e0b9dc4dcfe5f8f5d254444eaabd4658714dae3e7022ddb",
-      "evidenceHash": "a4ea80a993c1e4b27a4b4cc326b759d1ecf24d715ddf85bf04f8fb6d26a6159b"
+      "evidenceHash": "20e0ba9c886bf7b7e14d6b81e987754a99483165f822604c267a6a2f32b3de83"
     },
     {
       "id": "edge-seoul-4-437-436-down",
@@ -1444,10 +1444,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "3efe827123f002b27a20ce734b8a5dd275d2c478b9dc6610104d015dea25d961",
-      "evidenceHash": "ce10f171800dbd6927f1e9ced9c6afbcb5676b5020001c298a60b89f1c815d5a"
+      "evidenceHash": "19fc03941d58c7686a2ad5e3014993a7555780a15eaa81a6e91956a882859718"
     },
     {
       "id": "edge-seoul-4-437-438-up",
@@ -1474,10 +1474,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "8fd95165b46310d23f925cb2767a4bd7b6410cd200e7d7c86f475483f23b04a7",
-      "evidenceHash": "9fabfcf94b8f014c63e13b2a273373ef39d8c969327034b29dcb3056eda4bf64"
+      "evidenceHash": "1c9d8822317f965a83750d949d0c03b0c30727bc01d0982f98f25154b85ecd58"
     },
     {
       "id": "edge-seoul-4-438-437-down",
@@ -1504,10 +1504,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "df981d75d821ddb8bea9fa733b8487f65342000aa930c475e984cb3b49898aef",
-      "evidenceHash": "93bf90733d929cf4ffbde053589c6575f416fda92580418b6ba8b70925981e8f"
+      "evidenceHash": "8f7af7395cf2e8b0415bc4eecba0d7176cd03c10fe940dac20b2b5ada5aa041e"
     },
     {
       "id": "edge-seoul-4-438-439-up",
@@ -1534,10 +1534,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "e0ba0080fe169be6eb5aeb87e55079a9049195fc4329ae9bbe636fd60cbe92d1",
-      "evidenceHash": "0f265700fda408f3c01d9dd45e23a48b828787b056c5690ad4d3935cfee73e4c"
+      "evidenceHash": "ac07155d50635c6e49a8720624af5d9fdd30bd2a3881ea7036456819aea3df4a"
     },
     {
       "id": "edge-seoul-4-439-438-down",
@@ -1564,10 +1564,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "dd0d8e93b5f12f0b5f409010e3be8a9bd29b0457e9e7d4640c6a1b57ef23dc5b",
-      "evidenceHash": "275e63461c333dafd37e696c64d674d2fbfc0b9d6b5fad755a5037f91d9840df"
+      "evidenceHash": "237b1adf33b172a38df55255bfd607a4bcae132afe0238798c90cc28c1db181a"
     },
     {
       "id": "edge-seoul-4-439-440-up",
@@ -1594,10 +1594,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "54e3d649014cd449f2f85e2a4b51726a5237b2c637111d23f3c885166f3fd32e",
-      "evidenceHash": "a60ca34a7dd451227ffa282b65e925870a4715e4b2970a5bb4279f0cef0ddfa6"
+      "evidenceHash": "441c9772eccbd7f2b4d7fb273444c8bd2c786204f80686245606cd2a850fd0d1"
     },
     {
       "id": "edge-seoul-4-440-439-down",
@@ -1624,10 +1624,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "1fcb4a4320b7a428b526fd90f9207c748dc21fb9640cef9fcf62318619400730",
-      "evidenceHash": "a644bda19b5ccac6c3b4e910776057e993eb93a5397514d030e3777b9b18d483"
+      "evidenceHash": "af27f227e9cfea205e2b472c33cfb444ebbfc6083d4bbdee548ae60a669a0b5d"
     },
     {
       "id": "edge-seoul-4-440-441-up",
@@ -1654,10 +1654,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "7835d86906a444fa9a5edea3683cf90a7f7b60a126f0df3fbf03782b63dc1c67",
-      "evidenceHash": "8863d70424f257e41c0763499588373e61a6098ff91cd7a5c2f44f164fbddc2a"
+      "evidenceHash": "72d76e835eb08c5690e322322c76e8551e33c3bb9ba2efe002e2e09facf9e159"
     },
     {
       "id": "edge-seoul-4-441-440-down",
@@ -1684,10 +1684,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "a1d92f9a52da65055da3faeef4e5545ac7e81a5eb0fccd6ed01ff1de0e65e7af",
-      "evidenceHash": "8f0a5140c910947c4e677bc72064e7c43d63d266131a9ad8eea486dfe4356b13"
+      "evidenceHash": "e6bcacf70a156a87935de92ab70c60fb419a6d06daacae55f8c343c7acb1e1ee"
     },
     {
       "id": "edge-seoul-4-441-442-up",
@@ -1714,10 +1714,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "55cbeeb475f18b0193ae2393174723e17e442edfa486adb7facbcf64ec8ebbc6",
-      "evidenceHash": "ac6eb84536fd54d0c6fd95e788fa533491b57e78e1560ab392372658bbe1b60f"
+      "evidenceHash": "e47b8286531e03907a8600188c452d4c636b23be6fccc65824c447c4918154ac"
     },
     {
       "id": "edge-seoul-4-442-441-down",
@@ -1744,10 +1744,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "edd8e7731b03f106a552f0c8add84801309e2cb3d43ab1180e099b4a28914b1f",
-      "evidenceHash": "d38a2ee027627a566fb13033bf4c4a75b2e80343b24918fb859f86b638ec627e"
+      "evidenceHash": "4a96e0db278cef85b0600e24c78eaf4c522406664a0b454067ac7480055fcb37"
     },
     {
       "id": "edge-seoul-4-442-443-up",
@@ -1774,10 +1774,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "881ae75866e2b24ecde35e942438927989a972a4e582b643ebc56def9ff02148",
-      "evidenceHash": "d3cab2ac953630d68d1cf3aa6ca9676d9cda69705c63a2bd6479825753dabddb"
+      "evidenceHash": "1d7b1fb76438fe7be9c4fe74e5b871dd0f2dd55bc1c915147e7ad537cbde383a"
     },
     {
       "id": "edge-seoul-4-443-442-down",
@@ -1804,10 +1804,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "b18c58cf1cfc61716883da2133328d30be9c0eca57105a1e946b1ca09b908563",
-      "evidenceHash": "324e546c715d50ddbe1f552158d059bf1d14488dde1fc99f1862ebb40c15c643"
+      "evidenceHash": "ef39baedd772f0c2d7851cf22688ce92e3b0ecbf96b7096e0f9fa159afa23730"
     },
     {
       "id": "edge-seoul-4-443-444-up",
@@ -1834,10 +1834,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "8c83e75429d8b41d9dc007e61eb2b5ff111da5f2bb16ba11a0f3ad6d16a49c8e",
-      "evidenceHash": "e43e42435b1539d912ecf8daaf20ff3610d29125ba5513c310fbcba7a3e25077"
+      "evidenceHash": "27bb28b6bbacd3811692dd9f8814cf557450b731cb195bd7242a0def0d0ee590"
     },
     {
       "id": "edge-seoul-4-444-443-down",
@@ -1864,10 +1864,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "e753ebd4ea5aaf76be51e019dfcad30b8dc36abb9d97bc9c6d10cebcedcbe34e",
-      "evidenceHash": "46c05d329940370231722d5823b106e60b23af4be6d3a570ef9feb9bc80c1b46"
+      "evidenceHash": "cbaf7a06a77857fa97535dfc79cdfc3b19d757da71dc5709272cdf45cb117e25"
     },
     {
       "id": "edge-seoul-4-444-445-up",
@@ -1894,10 +1894,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "7a555b903d7987faaa3c5372a9f561ec313abbdfad971c74b273fa1d1624b848",
-      "evidenceHash": "4fcbeca96e662c94cf6d09ae3fbf3491e41c67f5715ac06f058ea63eb1cd7a01"
+      "evidenceHash": "1efe4f694f237efa548d8c1c825bcb146fdde72456a190a7ccc4f43b7d84af52"
     },
     {
       "id": "edge-seoul-4-445-444-down",
@@ -1924,10 +1924,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "38126545f1af50702593dc37f9fbe7b0b345e6b1e5c77726a9c1b764ab9898eb",
-      "evidenceHash": "a3c21e5599ee95cbb9dbb698715bbe61d218faefa6a5908f4b3eb232bca59b08"
+      "evidenceHash": "146d9577732dd7b413cee883c1ac2dcce97552877a363718b1b17448b43aabda"
     },
     {
       "id": "edge-seoul-4-445-446-up",
@@ -1954,10 +1954,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "753eb2e7ad7144ac165a89a5e93899b36dc429d3ee9ad8ed807328f58e5dd606",
-      "evidenceHash": "73b01225844574f8984c68347879ddc3ee9b31e39e057541a1ad4cf88b6e6fe3"
+      "evidenceHash": "92ec41cc4cb8c1fb4ea7cdb8bde1303cca18e4c28bf774b1354c771ac11721e3"
     },
     {
       "id": "edge-seoul-4-446-445-down",
@@ -1984,10 +1984,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "bb06174f13bdc1d6305607d3431da749c199aa77a122e3b796e04c28d94e7bd4",
-      "evidenceHash": "71d9bd3f713432a58ac9a93adceb2820930e7060128f70407de6bb4ea05c9e0e"
+      "evidenceHash": "124f31d0fd61d20323ae2f1a47c64e046653fb3baad299eb84013f0475b22551"
     },
     {
       "id": "edge-seoul-4-446-447-up",
@@ -2014,10 +2014,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "38abcbb99dfe891e13271d0c08672e53111cad72a6f8e8248df373700c8f903c",
-      "evidenceHash": "488e1e97b1397d584f8beaad9ef8b2183529a0084c9c0c8738547e4deb7e645e"
+      "evidenceHash": "f5ab1907362778c1602f1a888af6b615f97f95e2f3a0a8745280ed8f3bb71f92"
     },
     {
       "id": "edge-seoul-4-447-448-up",
@@ -2044,10 +2044,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "ca688521a272d15300308b6635a59530e007de32268c818b01137c34ac7fb40e",
-      "evidenceHash": "991461f5242177be9106a80170eba1237fe685fd65e2837472b7580e89913896"
+      "evidenceHash": "377cfbc28ce57dc1d7633e4a1d81d7c9b9f9464593a482caea9ffe557b15fa65"
     },
     {
       "id": "edge-seoul-4-447-446-down",
@@ -2074,10 +2074,10 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "VERIFIED",
-      "lastVerifiedAt": "2026-07-12T00:00:00.000Z",
-      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
+      "lastVerifiedAt": "2026-07-13T00:00:00.000Z",
+      "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
       "providerRecordHash": "10d3d86815f3731043b9aba8a4b8ec0e08cc61bf64b4f788e5f0b52efe6bdff9",
-      "evidenceHash": "481942b3be210ceaba5d1a0e98f6fa1184e5705d80d57d560119a4e6d58ff1cc"
+      "evidenceHash": "e1f3111757e59b9424417233bec61d4a2e37f6a6de36908d64f244b916ed2cf7"
     }
   ],
   "routeMapPositions": [
@@ -2119,8 +2119,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "사당",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2160,8 +2160,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "남태령",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2201,8 +2201,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "선바위",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2242,8 +2242,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "경마공원",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2283,8 +2283,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "대공원",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2324,8 +2324,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "과천",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2365,8 +2365,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "정부과천청사",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2406,8 +2406,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "인덕원",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2447,8 +2447,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "평촌",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2488,8 +2488,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "범계",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2529,8 +2529,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "금정",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2570,8 +2570,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "산본",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2611,8 +2611,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "수리산",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2652,8 +2652,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "대야미",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2693,8 +2693,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "반월",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     },
     {
       "sourceId": "easysubway-owner-route-map-capital",
@@ -2734,8 +2734,8 @@
       "commercialUseAllowed": true,
       "attributionRequired": false,
       "sourceLabel": "상록수",
-      "reviewedAt": "2026-07-12T00:00:00.000Z",
-      "updatedAt": "2026-07-12T00:00:00.000Z"
+      "reviewedAt": "2026-07-13T00:00:00.000Z",
+      "updatedAt": "2026-07-13T00:00:00.000Z"
     }
   ],
   "facilityRows": [
@@ -2973,10 +2973,10 @@
   "representativeRouteRegressions": [],
   "scheduleProvenance": {
     "sourceId": "kric-subway-timetable",
-    "sourceSnapshotId": "kric-subway-timetable-snapshot-20260712",
-    "providerRecordHash": "f10f6d299418c7b516bc4344c66bd8b4f5bcc51d5a034b206f5403963332c16b",
-    "evidenceHash": "193c2ffd3e731e398e741560b354d08017102de20cff850a8aed9c98d8e63f3d",
-    "retrievedAt": "2026-07-12T00:00:00.000Z"
+    "sourceSnapshotId": "kric-subway-timetable-snapshot-20260713",
+    "providerRecordHash": "4699e093520979be55527c4ebc4c8af52ab029c79970e107f44cd7ac4ebdbb10",
+    "evidenceHash": "29fceffea46538d4ce756feef4679d2dfbff2f59da9921b72db80a7418d71f49",
+    "retrievedAt": "2026-07-13T00:00:00.000Z"
   },
   "serviceCalendars": [
     {

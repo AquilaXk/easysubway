@@ -9393,7 +9393,7 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
       sourceId: "kric-subway-timetable",
       lineId: "seoul-4",
       capturedAt: "2026-07-09",
-      requestCount: 153,
+      requestCount: 102,
       failedRequestCount: 0,
       intermediateRowCount: 33062,
       transitTripCount: 895,
@@ -9474,7 +9474,7 @@ test("KRIC 4호선 pilot 시간표 transformer는 summary counter만 복사된 �
       sourceId: "kric-subway-timetable",
       lineId: "seoul-4",
       capturedAt: "2026-07-09",
-      requestCount: 153,
+      requestCount: 102,
       failedRequestCount: 0,
       intermediateRowCount: 33062,
       transitTripCount: 895,
@@ -9515,7 +9515,7 @@ test("KRIC 4호선 pilot 시간표 transformer는 부분 수집 artifact를 prod
       sourceId: "kric-subway-timetable",
       lineId: "seoul-4",
       capturedAt: "2026-07-09",
-      requestCount: 153,
+      requestCount: 102,
       failedRequestCount: 1,
       intermediateRowCount: 33062,
       transitTripCount: 895,
@@ -10513,7 +10513,7 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
         position.sourceId === "easysubway-owner-route-map-capital" &&
         position.sourceSha256 === "d1daed4d137d332b8e236c8c0019308f84068b575260febff07ac9c66c4fd838" &&
         position.labelPolygon.length === 4 &&
-        position.updatedAt === "2026-07-12T00:00:00.000Z",
+        position.updatedAt === "2026-07-13T00:00:00.000Z",
     ),
     true,
   );
@@ -15460,6 +15460,7 @@ test("admin review record 생성기는 runbook 필수 필드를 exporter 해시�
     const prodPath = path.join(workspace, "prod.json");
     await writeFile(prodPath, JSON.stringify({ id: "seoulmetro-station-line-info", displayName: "테스트" }));
 
+    const reviewOutputPath = path.join(workspace, "admin-review.json");
     const { stdout } = await runAdminReviewBuilder([
       "--candidate", "seoulmetro-station-line-info",
       "--source-id", "seoulmetro-station-line-info",
@@ -15476,8 +15477,10 @@ test("admin review record 생성기는 runbook 필수 필드를 exporter 해시�
       "--override-hash", path.relative(root, files.override),
       "--quota-evidence", path.relative(root, quotaPath),
       "--production-source", path.relative(root, prodPath),
+      "--output", reviewOutputPath,
     ]);
     const record = JSON.parse(stdout);
+    assert.deepEqual(JSON.parse(await readFile(reviewOutputPath, "utf8")), record);
     assert.equal(record.artifactKind, "source-admission-admin-review");
     assert.equal(record.decision, "APPROVED");
     assert.equal(record.sampleEvidenceHash, sampleEvidenceHash);

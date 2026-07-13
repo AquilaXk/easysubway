@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "artifactKind": "datapack-candidate-build-spec",
-  "candidateId": "capital-pilot-candidate-20260712",
+  "candidateId": "capital-pilot-candidate-20260713",
   "productionScopeId": "capital_pilot_android_v1",
   "fixturePath": "tools/datapack/release/capital-production-reviewed-pack.json",
-  "fixtureSha256": "3c46fcb398ef4bc27a09b17deac33ed50c2edbfa3366dda6d35b120b161b209f",
+  "fixtureSha256": "109694614336609f5e5bca3342a3b8b84b465a9e11a1988894110081b2567320",
   "sourceSnapshotIds": [
     "molit-urban-rail-full-route-capital-admission-20260712",
     "seoulmetro-station-line-info-capital-admission-20260712",
@@ -13,7 +13,8 @@
     "kric-station-escalator-capital-admission-20260712",
     "kric-wheelchair-lift-location-capital-admission-20260712",
     "kric-wheelchair-lift-movement-capital-admission-20260712",
-    "seoul-metro-accessibility-capital-admission-20260712"
+    "seoul-metro-accessibility-capital-admission-20260712",
+    "kric-subway-timetable-snapshot-20260713"
   ],
   "sourceSnapshots": [
     {
@@ -127,26 +128,64 @@
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
       "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+    },
+    {
+      "snapshotId": "kric-subway-timetable-snapshot-20260713",
+      "sourceId": "kric-subway-timetable",
+      "rawObjectUri": "s3://easysubway-datapack-sources/kric-subway-timetable/20260713.json",
+      "rawSha256": "a20e79f1f4af59f1679ae5e9a73a9ef2e54306dcb56175d7c0a0fbbec07ff252",
+      "redactedRequestFingerprint": "d7be6316e425dca96447eaaddaa66b9286218197621c4eda6ce5feadbb997601",
+      "schemaFingerprint": "60cb682c2ea9773d183ccbb7a1a333cdeb8681cc11e3d2c6cd4869f5b3ecdf9a",
+      "licenseStatus": "PASS",
+      "redistributionAllowed": true,
+      "adminReviewRecordHash": "21981e70cee40f82462d2bcb2a8ca4d422101631a72c4259e9458bce5f9b4e59",
+      "snapshotStatus": "LOCKED",
+      "credentialRedacted": true,
+      "freshnessExpiresAt": "2026-08-13T00:00:00Z"
     }
   ],
-  "sourceSnapshotSetHash": "ae226bf151f5a7820650078badb6cbcca73f3d94611b3c4e92064e15ecd7d654",
+  "sourceSnapshotSetHash": "63ac0dd71ff3f0252f42d0db582401776f39ff9cf23094de4a083751089c2cd0",
   "approvedAliasLedgerHash": "9a74e31d64e53f38ab575d6a7731f72138523dd34f1f6756dbed8573e3bdeabc",
   "facilityEvidenceLedgerHash": "b3ffc88b4a9ce3515340366885beaace718c70058608567513f378e198935981",
   "routeEvidenceLedgerHash": "da884d0ff0138e009587753ec541997c29da57370e056dd8d3f6ad2687ad9fa9",
   "approvedOverrideSetHash": "ee5364319442d0bb4590d83e149631635c65ab59f1f3254fdbf196e04ec0f3cd",
-  "sourceInventorySha256": "24525c1bf2c0cad8fbb703eca28b21357d1d589810ba06f584b4e239539b21ef",
-  "builderGitSha": "95b14efd9259a2b8839e6151d49fd825fee7101e",
+  "sourceInventorySha256": "51c213ea980afa3601ada451666caaec7b7b1d9184bf29bd423ae06068aaab79",
+  "builderGitSha": "7d06c511e2ca30085d30acd875e8d2b13da70499",
   "builderVersion": "build-datapack.mjs@1",
   "officialOdFareEvidence": {
     "sourceId": "seoul-metro-official-od-fares",
     "snapshotId": "seoul-metro-official-od-fares-20260712",
     "evidenceHash": "e48551c7b2d112c268882843d98c1c928b2b0e8d5f0b9654f4159d19cd5272b7",
-      "admissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",
+    "admissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",
     "quoteSetHash": "4d38df07aa8d8e9c29e523df391d94ad6fc19d78cf2ad65e4201824ab1452106",
     "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
     "quotes": [
-      { "originStationId": "station-sangnoksu", "destinationStationId": "station-sadang", "sourceId": "seoul-metro-official-od-fares", "snapshotId": "seoul-metro-official-od-fares-20260712", "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a", "gnrlCardFare": 1950, "gnrlCashFare": 2050, "yungCardFare": 1220, "yungCashFare": 2050, "childCardFare": 750, "childCashFare": 750 },
-      { "originStationId": "station-sadang", "destinationStationId": "station-sangnoksu", "sourceId": "seoul-metro-official-od-fares", "snapshotId": "seoul-metro-official-od-fares-20260712", "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a", "gnrlCardFare": 1950, "gnrlCashFare": 2050, "yungCardFare": 1220, "yungCashFare": 2050, "childCardFare": 750, "childCashFare": 750 }
+      {
+        "originStationId": "station-sangnoksu",
+        "destinationStationId": "station-sadang",
+        "sourceId": "seoul-metro-official-od-fares",
+        "snapshotId": "seoul-metro-official-od-fares-20260712",
+        "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+        "gnrlCardFare": 1950,
+        "gnrlCashFare": 2050,
+        "yungCardFare": 1220,
+        "yungCashFare": 2050,
+        "childCardFare": 750,
+        "childCashFare": 750
+      },
+      {
+        "originStationId": "station-sadang",
+        "destinationStationId": "station-sangnoksu",
+        "sourceId": "seoul-metro-official-od-fares",
+        "snapshotId": "seoul-metro-official-od-fares-20260712",
+        "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+        "gnrlCardFare": 1950,
+        "gnrlCashFare": 2050,
+        "yungCardFare": 1220,
+        "yungCashFare": 2050,
+        "childCardFare": 750,
+        "childCashFare": 750
+      }
     ]
   }
 }

@@ -4,7 +4,8 @@
 // 직결 열차(다른 기관 소속)도 함께 반환됨은 ①스파이크에서 확인(S1@사당이 KR 직결 열차 포함).
 // KRIC quota 무제한이지만 요청 수는 계측한다.
 
-const DAY_CODES = ["8", "7", "9"]; // 평일/토/휴일
+// KRIC 4호선은 dayCd=7 전 역에서 resultCode=03(데이터 없음)을 반환하며 토요일은 휴일 다이어를 사용한다.
+const DAY_CODES = ["8", "9"]; // 평일/휴일
 
 // subwayTimetableExp(급행 표시)는 subwayTimetable(일반)의 상위집합이다 — 같은 열차 전량 + row별 exptCd
 // (급행 표시). 따라서 이 endpoint 하나만 수집하면 일반·급행이 한 번에 잡히고 중복이 없다.

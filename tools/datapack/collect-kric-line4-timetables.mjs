@@ -57,6 +57,21 @@ export function assertCompleteCollection(failed, requestCount) {
   }
 }
 
+export function summarizeCollectionFailures(perRequest) {
+  const grouped = new Map();
+  for (const row of perRequest) {
+    if (!row.error) continue;
+    const group = grouped.get(row.error) ?? { error: row.error, count: 0, sampleRequestKeys: [] };
+    group.count += 1;
+    if (group.sampleRequestKeys.length < 3) group.sampleRequestKeys.push(row.requestKey);
+    grouped.set(row.error, group);
+  }
+  return {
+    failedRequestCount: [...grouped.values()].reduce((sum, group) => sum + group.count, 0),
+    failures: [...grouped.values()],
+  };
+}
+
 export function buildCollectionContext(roster, lineId) {
   const stationIdByProviderStation = {};
   const lineIdByProviderLine = {};
@@ -78,6 +93,11 @@ export function buildCollectionContext(roster, lineId) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args["diagnose-artifact"]) {
+    const artifact = JSON.parse(await readFile(args["diagnose-artifact"], "utf8"));
+    process.stdout.write(`${JSON.stringify(summarizeCollectionFailures(artifact.perRequest ?? []), null, 2)}\n`);
+    return;
+  }
   const roster = JSON.parse(await readFile(args.roster, "utf8"));
   const lineId = args["line-id"] ?? "seoul-4";
   const key = process.env.KRIC_SERVICE_KEY;

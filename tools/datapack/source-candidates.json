@@ -1171,22 +1171,23 @@
           "dptTm",
           "exptCd"
         ],
-        "liveSampleRetrievedAt": "2026-07-06T23:40:56Z",
-        "liveSampleRowCount": 473,
-        "liveSampleRawSha256": "7c8badc40b31498d71d5326c50df0f87ee349103b18e416a32c133363e22e8cc",
-        "liveSampleSchemaFingerprint": "44585c58909db0d14ed103ecf357291e4f337fc432e9e8938043a39097d904ff",
-        "liveSampleEvidenceHash": "918f97c9da55bf3279bfe280bf00beaa2902a7d20e8b3733a027471c4dff171e",
+        "liveSampleRetrievedAt": "2026-07-13T11:30:00Z",
+        "liveSampleRowCount": 33062,
+        "liveSampleRawSha256": "a20e79f1f4af59f1679ae5e9a73a9ef2e54306dcb56175d7c0a0fbbec07ff252",
+        "liveSampleSchemaFingerprint": "60cb682c2ea9773d183ccbb7a1a333cdeb8681cc11e3d2c6cd4869f5b3ecdf9a",
+        "liveSampleEvidenceHash": "a7ea4124ce00d90bb205d8ebb48d577e330376cc0cb3827053ecbde6251c1c4e",
         "liveSampleFields": [
           "arvTm",
           "dayCd",
           "dayNm",
           "dptTm",
+          "exptCd",
           "lnCd",
           "railOprIsttCd",
           "stinCd",
           "trnNo"
         ],
-        "liveSampleNote": "subwayTimetable base operation 라이브 응답(4호선 stinCd=433·dayCd=8) 해시. exptCd는 subwayTimetableExp에서만 반환되어 base 샘플 필드에는 없다(outputFields는 문서화 상위집합). 원본은 커밋하지 않음(rawCollectionArtifactCommitted:false와 동일 정책) — 해시로 재현 검증.",
+        "liveSampleNote": "2026-07-13 4호선 pilot 전량 수집 raw를 immutable object storage에 보존하고 실제 bytes·schema·row hash로 재승인했다.",
         "collectionOperations": [
           {
             "operation": "subwayTimetable",
@@ -1210,17 +1211,17 @@
           "normalizer": "tools/datapack/normalize-kric-timetable.mjs",
           "collectionPlanner": "tools/datapack/plan-kric-line4-collection.mjs",
           "collector": "tools/datapack/collect-kric-line4-timetables.mjs",
-          "capturedAt": "2026-07-09",
+          "capturedAt": "2026-07-13",
           "lineId": "4",
           "stationRosterArtifact": "tools/datapack/sources/kric-line4-route-roster-20260706.json",
-          "requestCount": 153,
+          "requestCount": 102,
           "failureCount": 0,
           "tripCount": 895,
           "stopTimesCount": 33062,
           "monotoneLineSequenceEnforced": true,
           "committedProofOfShapeArtifact": "backend/src/test/resources/timetable/line4-corridor-slice-seed.sql",
           "rawCollectionArtifactCommitted": false,
-          "reproductionNote": "전량 원본 응답은 커밋하지 않음(KRIC quota 무제한 재수집 가능). 재현: collect-kric-line4-timetables.mjs + .env KRIC_SERVICE_KEY. 지속 증거는 backend 코리도 슬라이스 seed로 커밋."
+          "reproductionNote": "tracked collector를 node --env-file로 실행한다. KRIC dayCd=7은 공식 resultCode=03(데이터 없음)이므로 default plan은 평일(8)·휴일(9) 102요청이며 토요일은 휴일 시각표를 사용한다. raw는 object storage에 보존한다."
         },
         "scheduleImporterValidation": {
           "status": "validated_via_kric_trip_reconstruction",
@@ -2268,7 +2269,7 @@
         "liveSampleRowCount": 2,
         "liveSampleEvidenceHash": "e48551c7b2d112c268882843d98c1c928b2b0e8d5f0b9654f4159d19cd5272b7",
         "snapshotId": "seoul-metro-official-od-fares-20260712",
-      "officialOdFareAdmissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",
+        "officialOdFareAdmissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",
         "fareStationLineMappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
         "coverageLimitations": [
           "상록수→사당 및 사당→상록수 두 방향의 승인된 2026-07-12 offline snapshot만 사용",
@@ -2313,10 +2314,27 @@
       "operation": {
         "method": "GET",
         "endpoint": "https://apis.data.go.kr/B553766/fare2/getRltmFare2",
-        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey" },
-        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "dataType", "dptreStnNm", "arvlStnNm"],
+        "auth": {
+          "env": "DATA_GO_KR_SERVICE_KEY",
+          "placement": "query",
+          "parameter": "serviceKey"
+        },
+        "requiredParameters": [
+          "serviceKey",
+          "pageNo",
+          "numOfRows",
+          "dataType",
+          "dptreStnNm",
+          "arvlStnNm"
+        ],
         "responseEnvelope": "response.body.items.item",
-        "runner": { "command": "node tools/datapack/probe-seoul-fare-api.mjs", "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "FARE_API_PROBE_OUTPUT"] },
+        "runner": {
+          "command": "node tools/datapack/probe-seoul-fare-api.mjs",
+          "requiredEnv": [
+            "DATA_GO_KR_SERVICE_KEY",
+            "FARE_API_PROBE_OUTPUT"
+          ]
+        },
         "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_free_use",
@@ -2326,7 +2344,16 @@
       "mobileEmbeddingAllowed": false,
       "productionInventoryReferenceId": "seoul-metro-official-od-fare-canary",
       "evidence": {
-        "outputFields": ["dptreStnCd", "arvlStnCd", "gnrlCardFare", "gnrlCashFare", "yungCardFare", "yungCashFare", "childCardFare", "childCashFare"],
+        "outputFields": [
+          "dptreStnCd",
+          "arvlStnCd",
+          "gnrlCardFare",
+          "gnrlCashFare",
+          "yungCardFare",
+          "yungCashFare",
+          "childCardFare",
+          "childCashFare"
+        ],
         "liveSampleEvidenceHash": "a0d24e1e454f4165e879d74fdb352afd48e09c93af843aad97ddc0263031422d",
         "snapshotId": "seoul-metro-official-od-fare-canary-run-29085674167",
         "officialOdFareAdmissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",
@@ -2343,10 +2370,19 @@
       "operation": {
         "method": "GET",
         "endpoint": "https://www2.humetro.busan.kr/homepage/chs/page/subLocation.do?menu_no=1001010501",
-        "auth": { "placement": "none" },
-        "requiredParameters": ["menu_no"],
+        "auth": {
+          "placement": "none"
+        },
+        "requiredParameters": [
+          "menu_no"
+        ],
         "responseEnvelope": "HTML 운임표 tbody의 1구간·2구간 rows",
-        "runner": { "command": "node tools/datapack/probe-busan-fare-api.mjs", "requiredEnv": ["BUSAN_FARE_API_PROBE_OUTPUT"] },
+        "runner": {
+          "command": "node tools/datapack/probe-busan-fare-api.mjs",
+          "requiredEnv": [
+            "BUSAN_FARE_API_PROBE_OUTPUT"
+          ]
+        },
         "secretPolicy": "credential-free-output"
       },
       "licenseEvidenceStatus": "confirmed_free_use",
@@ -2354,7 +2390,12 @@
       "admissionStatus": "evidence_recorded_linked_to_busan_official_od_fares",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "outputFields": ["1구간", "2구간", "교통카드", "QR승차권"]
+        "outputFields": [
+          "1구간",
+          "2구간",
+          "교통카드",
+          "QR승차권"
+        ]
       }
     },
     {
@@ -2367,10 +2408,21 @@
       "operation": {
         "method": "POST",
         "endpoint": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
-        "auth": { "placement": "none" },
-        "requiredParameters": ["mo_scode_s", "mo_scode_e", "cyber_kinds"],
+        "auth": {
+          "placement": "none"
+        },
+        "requiredParameters": [
+          "mo_scode_s",
+          "mo_scode_e",
+          "cyber_kinds"
+        ],
         "responseEnvelope": "HTML .result-2 .discountCard/.discountMoney",
-        "runner": { "command": "node tools/datapack/probe-busan-fare-api.mjs", "requiredEnv": ["BUSAN_FARE_API_PROBE_OUTPUT"] },
+        "runner": {
+          "command": "node tools/datapack/probe-busan-fare-api.mjs",
+          "requiredEnv": [
+            "BUSAN_FARE_API_PROBE_OUTPUT"
+          ]
+        },
         "secretPolicy": "credential-free-output"
       },
       "licenseEvidenceStatus": "confirmed_free_use",
@@ -2379,7 +2431,10 @@
       "mobileEmbeddingAllowed": false,
       "productionInventoryReferenceId": "busan-transportation-official-od-fares",
       "evidence": {
-        "outputFields": ["discountCard", "discountMoney"],
+        "outputFields": [
+          "discountCard",
+          "discountMoney"
+        ],
         "liveSampleEvidenceHash": "a4939a97b2c503ff2344f05f9928d71dee3414967bb284e28da48f754a04b6d4",
         "snapshotId": "busan-transportation-official-od-fares-20260713",
         "officialOdFareAdmissionHash": "d7e93521cb3323f55789a14ce963828fb3bd9ac24ee1101e07fc763426f9082c",

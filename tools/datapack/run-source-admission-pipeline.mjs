@@ -227,7 +227,10 @@ function admitSource({ inventory, productionSource }) {
 }
 
 async function execNode(args) {
-  return execFileAsync(process.execPath, args, { cwd: root });
+  return execFileAsync(process.execPath, args, {
+    cwd: root,
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 async function readJson(filePath) {
@@ -274,4 +277,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   }
 }
 
-export { sortJson };
+export { execNode, sortJson };

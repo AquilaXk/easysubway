@@ -7057,11 +7057,11 @@ test("KRIC subwayTimetable 후보는 pilot schedule production source로 승인�
   assert.match(candidate.evidence.liveSampleEvidenceHash, /^[0-9a-f]{64}$/);
   assert.ok(Number.isInteger(candidate.evidence.liveSampleRowCount) && candidate.evidence.liveSampleRowCount > 0);
   assert.match(candidate.evidence.liveSampleRetrievedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
-  // base subwayTimetable 샘플 필드는 trip 재구성 축(trnNo)+시각(arvTm/dptTm)을 포함하되 exptCd는 없다(Exp 전용).
+  // full subwayTimetableExp 수집 샘플은 trip 재구성 축·시각과 급행 구분 exptCd를 함께 포함한다.
   assert.ok(candidate.evidence.liveSampleFields.includes("trnNo"));
   assert.ok(candidate.evidence.liveSampleFields.includes("arvTm"));
   assert.ok(candidate.evidence.liveSampleFields.includes("dptTm"));
-  assert.equal(candidate.evidence.liveSampleFields.includes("exptCd"), false);
+  assert.equal(candidate.evidence.liveSampleFields.includes("exptCd"), true);
 
   assert.equal(candidate.admissionStatus, "admitted_to_production_inventory");
   assert.equal(candidate.productionInventoryReferenceId, "kric-subway-timetable");
@@ -7102,7 +7102,7 @@ test("KRIC subwayTimetable 후보는 pilot schedule production source로 승인�
   assert.equal(reconstruction.tool, "tools/datapack/reconstruct-transit-trips.mjs");
   assert.equal(reconstruction.tripCount, 895);
   assert.equal(reconstruction.stopTimesCount, 33062);
-  assert.equal(reconstruction.requestCount, 153);
+  assert.equal(reconstruction.requestCount, 102);
   assert.equal(reconstruction.failureCount, 0);
   assert.equal(reconstruction.monotoneLineSequenceEnforced, true);
   assert.match(read(reconstruction.stationRosterArtifact), /"sourceId": "kric-subway-route-info"/);
