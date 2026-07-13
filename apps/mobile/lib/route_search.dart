@@ -4359,20 +4359,26 @@ class _OfficialOdFareSection extends StatelessWidget {
     if (quote == null) {
       return Semantics(
         container: true,
-        label: '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다.',
+        label:
+            '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다. 연락운송 경계 등 승인되지 않은 경로는 요금을 임의로 계산하지 않습니다.',
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [Text('공식 OD 요금 정보 없음'), Text('오프라인 공식 자료에 없는 경로입니다.')],
+          children: [
+            Text('공식 OD 요금 정보 없음'),
+            Text('오프라인 공식 자료에 없는 경로입니다.'),
+            Text('연락운송 경계 등 승인되지 않은 경로는 요금을 임의로 계산하지 않습니다.'),
+          ],
         ),
       );
     }
+    final alternativeFareMedium = quote.alternativeFareMediumLabel;
     final values = [
       ('일반 카드', quote.gnrlCardFare),
-      ('일반 현금', quote.gnrlCashFare),
+      ('일반 $alternativeFareMedium', quote.gnrlCashFare),
       ('청소년 카드', quote.yungCardFare),
-      ('청소년 현금', quote.yungCashFare),
+      ('청소년 $alternativeFareMedium', quote.yungCashFare),
       ('어린이 카드', quote.childCardFare),
-      ('어린이 현금', quote.childCashFare),
+      ('어린이 $alternativeFareMedium', quote.childCashFare),
     ];
     return Semantics(
       container: true,
@@ -5727,11 +5733,7 @@ class _RouteTimelineBadge extends StatelessWidget {
               color: EasySubwayAccessibleColors.mutedText,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.more_horiz,
-              size: 12,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.more_horiz, size: 12, color: Colors.white),
           ),
         ),
       );

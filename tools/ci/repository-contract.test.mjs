@@ -5443,6 +5443,10 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(cyberstationCandidate.domain, "route_map_positions");
   assert.equal(cyberstationCandidate.admissionStatus, "admitted_to_production_inventory");
   assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /P0 후보 전용 카운트/);
+  assert.match(
+    targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo,
+    new RegExp(`P0 source candidate ${p0SourceCandidates.length}건 중`),
+  );
   assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /seoulmetro-cyberstation-route-map/);
   // #1397 capital admission 8종 per-source admission 해시는 순차 admission 체인(선행 admit 결과가
   // 다음 인벤토리에 포함됨)에서 산출한 immutable evidence로 고정한다. run-source-admission-pipeline.mjs가
@@ -5521,6 +5525,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
   const sourceIds = inventory.sources.map((source) => source.id).sort();
   assert.deepEqual(sourceIds, [
+    "busan-transportation-official-od-fares",
     "busan-transportation-urban-rail-station-info",
     "kric-braille-displays",
     "kric-disabled-toilet",
@@ -5539,6 +5544,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "molit-urban-rail-full-route",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
+    "seoul-metro-official-od-fare-canary",
     "seoul-metro-official-od-fares",
     "seoul-metro-transfer-distance-duration",
     "seoul-realtime-arrival-station-info",
@@ -5547,6 +5553,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "seoulmetro-cyberstation-route-map",
     "seoulmetro-station-line-info",
   ]);
+  assert.equal(
+    sourceCandidates.candidates.find(({ id }) => id === "seoul-metro-official-od-fare-canary")
+      .serviceKeyHandling,
+    "offline_probe_secret_only",
+  );
 
   for (const source of inventory.sources) {
     assert.equal(typeof source.requiredForProductionPack, "boolean", `${source.id} must declare production required flag`);
