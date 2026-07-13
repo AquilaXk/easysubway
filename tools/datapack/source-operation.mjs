@@ -11,9 +11,10 @@ function requiredText(value, label) {
   return value;
 }
 
-function stringList(value, label) {
-  if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== "string" || !item)) {
-    throw new Error(`${label} must be a non-empty string array`);
+function stringList(value, label, { allowEmpty = false } = {}) {
+  if (!Array.isArray(value) || (!allowEmpty && value.length === 0)
+    || value.some((item) => typeof item !== "string" || !item)) {
+    throw new Error(`${label} must be a${allowEmpty ? "" : " non-empty"} string array`);
   }
   if (new Set(value).size !== value.length) {
     throw new Error(`${label} must not contain duplicates`);
@@ -25,9 +26,14 @@ function hasCredentialValue(value) {
   if (Array.isArray(value)) return value.some(hasCredentialValue);
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
-    /(?:credential|secret|serviceKey|apiKey|token|password).*value/i.test(key) ||
+    /^(?:accessKey|apiKey|credential|password|privateKey|secret|serviceKey|token)(?:Value)?$/i.test(key) ||
     hasCredentialValue(child),
   );
+}
+
+function requireAllowedKeys(value, allowed, label) {
+  const unknown = Object.keys(value).filter((key) => !allowed.has(key));
+  if (unknown.length > 0) throw new Error(`${label} has unsupported fields: ${unknown.join(", ")}`);
 }
 
 export function validateOperation(candidate, { allowMissing = false } = {}) {
@@ -42,6 +48,9 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (hasCredentialValue(operation)) {
     throw new Error(`${candidate.id}.operation credential values are forbidden`);
   }
+  requireAllowedKeys(operation, new Set([
+    "method", "endpoint", "auth", "requiredParameters", "responseEnvelope", "runner", "secretPolicy",
+  ]), `${candidate.id}.operation`);
   if (!new Set(["GET", "POST"]).has(operation.method)) {
     throw new Error(`${candidate.id}.operation.method must be GET or POST`);
   }
@@ -53,19 +62,28 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
     throw new Error(`${candidate.id}.operation.auth must be an object`);
   }
-  const authEnv = requiredText(auth.env, `${candidate.id}.operation.auth.env`);
-  if (!/^[A-Z][A-Z0-9_]*$/.test(authEnv)) {
-    throw new Error(`${candidate.id}.operation.auth.env must be an environment variable name`);
-  }
   if (!new Set(["query", "path", "header", "none"]).has(auth.placement)) {
     throw new Error(`${candidate.id}.operation.auth.placement is invalid`);
   }
-  const authParameter = requiredText(auth.parameter, `${candidate.id}.operation.auth.parameter`);
+  const credentialFree = auth.placement === "none";
+  requireAllowedKeys(
+    auth,
+    credentialFree ? new Set(["placement"]) : new Set(["env", "placement", "parameter"]),
+    `${candidate.id}.operation.auth`,
+  );
+  const authEnv = credentialFree ? null : requiredText(auth.env, `${candidate.id}.operation.auth.env`);
+  if (authEnv != null && !/^[A-Z][A-Z0-9_]*$/.test(authEnv)) {
+    throw new Error(`${candidate.id}.operation.auth.env must be an environment variable name`);
+  }
+  const authParameter = credentialFree
+    ? null
+    : requiredText(auth.parameter, `${candidate.id}.operation.auth.parameter`);
   const requiredParameters = stringList(
     operation.requiredParameters,
     `${candidate.id}.operation.requiredParameters`,
+    { allowEmpty: true },
   );
-  if (auth.placement !== "none" && !requiredParameters.includes(authParameter)) {
+  if (authParameter != null && !requiredParameters.includes(authParameter)) {
     throw new Error(`${candidate.id}.operation.requiredParameters must include the auth parameter`);
   }
   requiredText(operation.responseEnvelope, `${candidate.id}.operation.responseEnvelope`);
@@ -73,15 +91,21 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (!runner || typeof runner !== "object" || Array.isArray(runner)) {
     throw new Error(`${candidate.id}.operation.runner must be an object`);
   }
+  requireAllowedKeys(runner, new Set(["command", "requiredEnv"]), `${candidate.id}.operation.runner`);
   const command = requiredText(runner.command, `${candidate.id}.operation.runner.command`);
   if (!command.startsWith("node tools/") || /[;&|`$]/.test(command)) {
     throw new Error(`${candidate.id}.operation.runner.command must be a literal repository Node command`);
   }
-  const requiredEnv = stringList(runner.requiredEnv, `${candidate.id}.operation.runner.requiredEnv`);
-  if (!requiredEnv.includes(authEnv)) {
+  const requiredEnv = stringList(
+    runner.requiredEnv,
+    `${candidate.id}.operation.runner.requiredEnv`,
+    { allowEmpty: true },
+  );
+  if (authEnv != null && !requiredEnv.includes(authEnv)) {
     throw new Error(`${candidate.id}.operation.runner.requiredEnv must include auth.env`);
   }
-  if (operation.secretPolicy !== "env-only-redacted-output") {
+  const expectedSecretPolicy = credentialFree ? "credential-free-output" : "env-only-redacted-output";
+  if (operation.secretPolicy !== expectedSecretPolicy) {
     throw new Error(`${candidate.id}.operation.secretPolicy is invalid`);
   }
   return operation;

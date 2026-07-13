@@ -50,6 +50,20 @@ export function buildCatalog({
 
 function containsForbiddenValue(value) {
   if (Array.isArray(value)) return value.some(containsForbiddenValue);
+  if (typeof value === "string") {
+    let decoded = value;
+    try {
+      decoded = decodeURIComponent(value);
+    } catch {
+      // Invalid URL encoding is handled by the structural validators.
+    }
+    if (/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(decoded)) return true;
+    if (/\bBearer\s+(?!\[|\{|env:)[A-Za-z0-9._~-]+/i.test(decoded)) return true;
+    for (const match of decoded.matchAll(/[?&](?:accessKey|apiKey|password|secret|serviceKey|token)=([^&#]*)/gi)) {
+      if (!/^(?:\[[^\]]+\]|\{[^}]+\}|\$\{[^}]+\})$/.test(match[1])) return true;
+    }
+    return false;
+  }
   if (value == null || typeof value !== "object") return false;
   return Object.entries(value).some(([key, child]) =>
     /^(?:apiKey|credential|password|secret|serviceKey|token)Value$/i.test(key) ||

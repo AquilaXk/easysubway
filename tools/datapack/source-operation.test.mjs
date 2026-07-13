@@ -77,12 +77,29 @@ test("validate는 credential 값을 거부한다", () => {
 
 test("validate는 nested auth credential 값도 거부한다", () => {
   const operation = validOperation();
-  operation.auth.tokenValue = "actual-secret-value";
+  operation.auth.token = "actual-secret-value";
   const invalid = candidate("a", { operation });
 
   assert.throws(
     () => validateOperation(invalid),
     /credential values are forbidden/,
+  );
+});
+
+test("validate는 credential-free operation을 명시적으로 허용한다", () => {
+  const publicOperation = validOperation({
+    auth: { placement: "none" },
+    requiredParameters: [],
+    runner: {
+      command: "node tools/datapack/probe-provider.mjs",
+      requiredEnv: [],
+    },
+    secretPolicy: "credential-free-output",
+  });
+
+  assert.equal(
+    validateOperation(candidate("a", { operation: publicOperation })),
+    publicOperation,
   );
 });
 

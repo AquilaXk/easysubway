@@ -106,6 +106,25 @@ test("validate는 secret 값과 runtime catalog endpoint를 거부한다", () =>
       ]),
     /runtime catalog endpoint is forbidden/,
   );
+  for (const leaked of [
+    {
+      id: "integration:leaked-query-token",
+      kind: "integration",
+      method: "GET",
+      endpointRef: "constant:https://api.example/x?token=actual-secret",
+      source: "example.java",
+    },
+    {
+      id: "provider:leaked-service-key",
+      kind: "provider",
+      endpoint: "https://api.example/x?serviceKey=actual-secret",
+    },
+  ]) {
+    assert.throws(
+      () => validateCatalog([leaked]),
+      /secret-like values are forbidden/,
+    );
+  }
 });
 
 test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", async () => {
@@ -116,6 +135,10 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.ok(catalog.some((entry) => entry.id === "provider:seoul-topis-realtime-station-arrival"));
   assert.ok(catalog.some((entry) => entry.id === "integration:github-datapack-workflow-dispatch"));
   assert.ok(catalog.some((entry) => entry.id === "contract:report-api"));
+  assert.equal(
+    findCatalogEntry(catalog, "integration:github-datapack-workflow-dispatch").endpointRef,
+    "config:easysubway.datapack.github-api-base-url(default=https://api.github.com)/repos/AquilaXk/easysubway/actions/workflows/datapack-release.yml/dispatches",
+  );
 });
 
 test("catalog 운영 계약은 repository-local 전용과 source-of-truth 경계를 고정한다", async () => {
