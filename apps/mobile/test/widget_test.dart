@@ -36,6 +36,7 @@ import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_pol
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
+import 'package:easysubway_mobile/search_field.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
@@ -1007,19 +1008,19 @@ void main() {
     expect(activeHeight, 46.0);
     expect(find.text('역 이름을 입력해 주세요'), findsOneWidget);
 
-    // hint는 부유 라벨이 아니라 박스 내부 수직 중앙 부근에 렌더돼야 한다
-    // (idle의 '지하철역 검색' 텍스트와 같은 위치). 박스 상단 테두리 위로
-    // 떠오르는 부유 라벨 회귀를 막는다. #2003에서 폰트가 15→17로 커지며
-    // strut 라인 높이와 실제 glyph 메트릭 사이 오차가 최대 2px 정도
-    // 나타나는데, 이는 부유 라벨 회귀(수 px~10px 단위로 위로 뜸)와는
-    // 규모가 다르므로 epsilon을 소폭 완화해 판별한다.
-    expect(
-      tester.getCenter(find.text('역 이름을 입력해 주세요')).dy,
-      moreOrLessEquals(
-        tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
-        epsilon: 3.0,
-      ),
+    // hint는 부유 라벨이 아니라 박스 내부에 렌더돼야 한다(idle의 '지하철역 검색'
+    // 텍스트처럼 박스 안 중앙 부근). 박스 상단 테두리 위로 떠오르는 부유 라벨
+    // 회귀를 막는 것이 핵심 계약이다. #2082 실기기 재작업으로 중앙 정렬을
+    // 고유 높이 필드 + Center 위젯으로 얻으면서, FlutterTest 테스트 폰트에서는 hint
+    // 중심이 박스 중심에서 십수 px 벗어날 수 있으나(실기기 Noto Sans KR에서는
+    // 오프셋 0으로 정합 — docs/2082-qa 픽셀 판독이 정본), hint가 박스 세로 범위
+    // 안에 온전히 들어오는지(=부유 라벨이 아님)를 폰트 메트릭 독립적으로 검증한다.
+    final activeBoxRect = tester.getRect(
+      find.byKey(const Key('heroStationSearchInputBox')),
     );
+    final hintCenterDy = tester.getCenter(find.text('역 이름을 입력해 주세요')).dy;
+    expect(hintCenterDy, greaterThan(activeBoxRect.top));
+    expect(hintCenterDy, lessThan(activeBoxRect.bottom));
 
     // 검색어를 입력하면 지우기 버튼이 나타나고, 시각 박스(46px)와 별개로
     // 실제 렌더 크기가 접근성 최소 탭 타깃(48x48) 이상이어야 한다. 버튼이
@@ -1027,16 +1028,19 @@ void main() {
     await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
     await tester.pumpAndSettle();
 
-    // 입력한 편집 텍스트도 hint와 마찬가지로 시각 박스 수직 중앙 부근에
-    // 놓여야 한다(박스 상단에 붙는 회귀 방지). epsilon 근거는 위 hint
-    // 주석과 동일.
-    expect(
-      tester.getCenter(find.text('상록수')).dy,
-      moreOrLessEquals(
-        tester.getCenter(find.byKey(const Key('heroStationSearchInputBox'))).dy,
-        epsilon: 3.0,
-      ),
+    // 입력한 편집 텍스트는 시각 박스 안에 렌더돼야 한다. #2082 실기기 재작업:
+    // 중앙 정렬을 고유 높이 필드 + Center 위젯으로 얻으며, 실기기(Noto Sans KR)에서
+    // 입력 글자·캐럿이 시각 박스 중앙에 오프셋 0으로 정합함을 픽셀 판독으로
+    // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트에서는 InputDecorator
+    // 중앙 정렬 오차로 입력 글자 중심이 박스 중심에서 십수 px 벗어날 수 있으므로,
+    // 여기서는 입력 글자가 박스 세로 범위 안에 온전히 들어오는지(=상단으로 뜨지
+    // 않음)를 폰트 메트릭 독립적으로 계약으로 잡는다.
+    final editBoxRect = tester.getRect(
+      find.byKey(const Key('heroStationSearchInputBox')),
     );
+    final editTextCenterDy = tester.getCenter(find.text('상록수')).dy;
+    expect(editTextCenterDy, greaterThan(editBoxRect.top));
+    expect(editTextCenterDy, lessThan(editBoxRect.bottom));
 
     // 세로 중앙 정렬은 레이아웃(Center)으로 달성한다. 편집 텍스트가 여러 줄
     // 필드로 렌더되면 실기기에서 입력 텍스트와 IME 조합 밑줄이 박스 상단에
@@ -1048,6 +1052,21 @@ void main() {
     expect(searchField.maxLines, 1);
     expect(searchField.expands, isFalse);
 
+    // #2082 재작업: 입력 필드는 고유 높이(글자 줄)로 두고 Center로 시각 박스
+    // 중앙에 정렬하되, 바깥 터치타겟 SizedBox(56)와 MergeSemantics로 병합해 입력
+    // 필드의 탭 타깃 semantics가 접근성 최소치(≥48)를 유지한다. 그 병합 탭 타깃
+    // (=필드를 감싼 터치타겟 SizedBox) 높이가 48 이상인지 계약으로 고정한다.
+    final inputTapTarget = find
+        .ancestor(
+          of: find.byKey(const Key('stationSearchInput')),
+          matching: find.byType(SizedBox),
+        )
+        .first;
+    expect(
+      tester.getSize(inputTapTarget).height,
+      greaterThanOrEqualTo(48.0),
+    );
+
     final clearButtonSize = tester.getSize(
       find.widgetWithIcon(IconButton, Icons.close),
     );
@@ -1058,6 +1077,309 @@ void main() {
       46.0,
     );
   });
+
+  testWidgets('#2083 역 검색 화면은 홈 편집 모드와 같은 46px 시각 박스·중앙 정렬 입력 필드를 렌더한다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          pickSlot: RouteDraftSlot.origin,
+          regionLabel: '수도권',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 홈 편집 모드와 동일한 공용 시각 박스(46px)를 렌더한다.
+    expect(
+      tester.getSize(find.byKey(const Key('heroStationSearchInputBox'))).height,
+      46.0,
+    );
+
+    // pickSlot별 힌트가 placeholder(이자 TalkBack 라벨)로 렌더된다. #2083 오너
+    // 확정: 슬롯 검색 진입 placeholder는 슬롯명 단독.
+    expect(find.text('출발역'), findsOneWidget);
+
+    // 입력 필드 탭 타깃(병합된 터치타겟 SizedBox)은 최소 탭 타깃(≥48)을 유지한다.
+    final originInputTapTarget = find
+        .ancestor(
+          of: find.byKey(const Key('stationSearchInput')),
+          matching: find.byType(SizedBox),
+        )
+        .first;
+    expect(
+      tester.getSize(originInputTapTarget).height,
+      greaterThanOrEqualTo(48.0),
+    );
+
+    // 편집 텍스트가 46px 시각 박스 안에 렌더돼야 한다(#2082 수정을 공용 위젯이
+    // 소비함을 검증). #2082 실기기 재작업: 중앙 정렬은 고유 높이 필드 + Center
+    // 위젯으로 얻으며 실기기(Noto Sans KR)에서 오프셋 0으로 정합함을 픽셀 판독으로
+    // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트·AppBar toolbar 배치
+    // 오차로 중심이 박스 중심에서 십수 px 벗어날 수 있으므로, 입력 글자가 박스
+    // 세로 범위 안에 온전히 들어오는지를 폰트 메트릭 독립적으로 계약으로 잡는다.
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    final searchScreenBoxRect = tester.getRect(
+      find.byKey(const Key('heroStationSearchInputBox')),
+    );
+    final searchScreenTextCenterDy = tester.getCenter(find.text('상록수')).dy;
+    expect(searchScreenTextCenterDy, greaterThan(searchScreenBoxRect.top));
+    expect(searchScreenTextCenterDy, lessThan(searchScreenBoxRect.bottom));
+
+    final searchField = tester.widget<TextField>(
+      find.byKey(const Key('stationSearchInput')),
+    );
+    expect(searchField.maxLines, 1);
+    expect(searchField.expands, isFalse);
+  });
+
+  testWidgets(
+    '#2082 역 검색 화면은 필드 우측에 지역 표시를 두고 필드가 그 앞에서 끝난다',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.origin,
+            regionLabel: '수도권',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // #3: 홈과 동일하게 검색 화면 우측에 현재 지역명을 표시한다.
+      final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
+      expect(indicator, findsOneWidget);
+      expect(
+        find.descendant(of: indicator, matching: find.text('수도권')),
+        findsOneWidget,
+      );
+      // 표시 전용이라 지역 변경 화살표(아래 방향)를 홈과 같은 스타일로 둔다.
+      expect(
+        find.descendant(
+          of: indicator,
+          matching: find.byIcon(Icons.keyboard_arrow_down),
+        ),
+        findsOneWidget,
+      );
+
+      // #2: 검색 필드가 우측 끝까지 꽉 차지 않고 지역 표시 앞에서 끝난다
+      // (홈 idle [≡ | 필드 | 지역표시] 구성과 정합).
+      final fieldRight = tester
+          .getRect(find.byKey(const Key('heroStationSearchInputBox')))
+          .right;
+      final indicatorLeft = tester.getRect(indicator).left;
+      expect(fieldRight, lessThanOrEqualTo(indicatorLeft));
+
+      // ← 뒤로가기 버튼이 홈 ≡ 슬롯과 같은 위치(필드 왼쪽)에 남는다.
+      expect(find.byKey(const Key('stationSearchBackButton')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    '#2090 수도권 외 지역(부산) 선택 상태에서 열어도 검색 화면 지역 표시가 실제 선택 지역을 따른다',
+    (tester) async {
+      // 회귀 방지: 직전 구현은 regionLabel 기본값이 '수도권' 고정이고 호출부가
+      // 실제 선택 지역을 주입하지 않아, 부산 선택 상태에서 검색을 열어도
+      // '수도권'이 잘못 표시됐다. 이제 호출부(main.dart)가 NetworkMapScreen의
+      // 현재 선택 지역 표시명을 regionLabel로 넘기므로, 여기서는 그 배선의
+      // 최종 결과(regionLabel이 실제로 화면에 반영되는지)를 검증한다.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.origin,
+            regionLabel: '부산',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
+      expect(indicator, findsOneWidget);
+      expect(
+        find.descendant(of: indicator, matching: find.text('부산')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: indicator, matching: find.text('수도권')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    '#2090 공용 검색 필드는 시스템 글자 배율에 비례해 입력 텍스트가 커지고 잘리지 않는다',
+    (tester) async {
+      // #2090: 이전 구현은 안쪽 고정 높이(SizedBox 48) tight constraint 탓에
+      // textScaler 1.0/2.0/3.0에서 입력 텍스트 렌더 높이가 18px로 고정돼(WCAG
+      // 1.4.4 위반) 배율을 키워도 글자가 커지지 않았다. 배율별로 입력 텍스트
+      // 렌더 높이가 비례해 커지고 예외·잘림이 없음을 고정한다.
+      final measured = <double, double>{};
+      for (final scale in const [1.0, 2.0, 3.0]) {
+        final controller = TextEditingController();
+        addTearDown(controller.dispose);
+        await tester.pumpWidget(
+          MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: MaterialApp(
+              home: Scaffold(
+                body: Center(
+                  child: SizedBox(
+                    width: 320,
+                    child: EasySubwaySearchField(
+                      controller: controller,
+                      hintText: '역 이름을 입력해 주세요',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const Key('stationSearchInput')),
+          '상록수',
+        );
+        await tester.pumpAndSettle();
+
+        // 렌더 중 오버플로 등 예외가 없어야 한다(잘림 금지 우선).
+        expect(tester.takeException(), isNull, reason: 'scale $scale');
+
+        // 입력 텍스트 렌더 높이가 배율에 비례해 커진다(더 이상 18px 고정 아님).
+        final textHeight = tester.getSize(find.text('상록수')).height;
+        measured[scale] = textHeight;
+      }
+
+      // 배율이 커질수록 입력 텍스트 렌더 높이가 엄격히 증가한다.
+      expect(measured[2.0]!, greaterThan(measured[1.0]!));
+      expect(measured[3.0]!, greaterThan(measured[2.0]!));
+      // 배율에 대략 비례한다(2.0에서 최소 1.5배 이상 커짐 — 고정 18px 회귀 방지).
+      expect(measured[2.0]!, greaterThan(measured[1.0]! * 1.5));
+    },
+  );
+
+  testWidgets(
+    '#2090 배율 3.0에서 역 검색 화면 필드가 툴바 안에서 잘리지 않는다',
+    (tester) async {
+      // Finding 2: 툴바 높이 보정 상수가 새 필드 메트릭과 정합돼 큰 배율에서도
+      // 필드가 AppBar 세로 범위 안에 온전히 들어가야 한다.
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(3.0)),
+          child: MaterialApp(
+            home: StationSearchScreen(
+              repository: FakeStationSearchRepository(),
+              reportRepository: FakeFacilityReportRepository(),
+              locationProvider: FakeCurrentLocationProvider(),
+              pickSlot: RouteDraftSlot.origin,
+              regionLabel: '수도권',
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+
+      final inputFinder = find.byKey(const Key('stationSearchInput'));
+      final appBarFinder = find.ancestor(
+        of: inputFinder,
+        matching: find.byType(AppBar),
+      );
+      final appBar = tester.widget<AppBar>(appBarFinder);
+      expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
+
+      final appBarRect = tester.getRect(appBarFinder);
+      final boxRect = tester.getRect(
+        find.byKey(const Key('heroStationSearchInputBox')),
+      );
+      // 시각 박스가 툴바 세로 범위 안에 온전히 들어간다(위/아래로 잘리지 않음).
+      expect(boxRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
+      expect(boxRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
+    },
+  );
+
+  testWidgets(
+    '#2090 역 검색 필드는 입력 후에도 슬롯 맥락 semantics 라벨을 유지한다',
+    (tester) async {
+      // Finding 3: 이전 floating label이 유지하던 슬롯 맥락("출발역") 라벨이
+      // 입력 후에도 스크린리더 semantics 트리에 남아야 한다.
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.origin,
+            regionLabel: '수도권',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 입력 전: 슬롯 맥락 라벨이 semantics 트리에 있다(hint 노드 + 라벨 래퍼
+      // 노드가 중첩돼 하나 이상 존재한다).
+      expect(find.bySemanticsLabel('출발역'), findsWidgets);
+
+      // 입력 후: hint는 InputDecorator가 지우지만 슬롯 맥락 라벨은 유지된다.
+      // 이전 floating label 없이도 맥락이 남아야 한다(#2090 Finding 3).
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '상록수',
+      );
+      await tester.pumpAndSettle();
+      // 정확히 한 노드(라벨 래퍼)가 슬롯 맥락 라벨을 유지한다. 입력 필드 노드는
+      // 입력값(상록수)을 value로 갖고 라벨은 상위 래퍼 노드가 보존한다.
+      expect(find.bySemanticsLabel('출발역'), findsOneWidget);
+
+      handle.dispose();
+    },
+  );
+
+  testWidgets(
+    '#2090 도착역 슬롯은 도착역 맥락 semantics 라벨을 노출한다',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StationSearchScreen(
+            repository: FakeStationSearchRepository(),
+            reportRepository: FakeFacilityReportRepository(),
+            locationProvider: FakeCurrentLocationProvider(),
+            pickSlot: RouteDraftSlot.destination,
+            regionLabel: '수도권',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('stationSearchInput')),
+        '사당',
+      );
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('도착역'), findsOneWidget);
+      // 출발역 맥락이 새어 나오지 않는다.
+      expect(find.bySemanticsLabel('출발역'), findsNothing);
+      handle.dispose();
+    },
+  );
 
   testWidgets('#2003 상단 내비게이션(검색바·메뉴·힌트 텍스트)이 확대된 안 B 치수를 갖는다', (tester) async {
     await tester.pumpWidget(
@@ -1119,13 +1441,16 @@ void main() {
         .height;
     expect(activeHeight, idleHeight);
 
-    // in-place 입력 TextField의 스타일을 검증한다(폰트 크기 17, 줄 높이 1.2,
-    // #2003 안 B 검색 모드 텍스트 스타일).
+    // in-place 입력 TextField의 스타일을 검증한다(폰트 크기 17, w600). #2082:
+    // 입력 style은 hint style과 동일 glyph 메트릭을 갖도록 height를 지정하지
+    // 않는다(height 1.2를 주면 hint와 편집 텍스트 glyph 중심이 어긋나 편집
+    // 텍스트가 시각 박스 중앙보다 위로 뜬다).
     final activeField = tester.widget<TextField>(
       find.byKey(const Key('stationSearchInput')),
     );
     expect(activeField.style?.fontSize, 17);
-    expect(activeField.style?.height, 1.2);
+    expect(activeField.style?.height, isNull);
+    expect(activeField.style?.fontWeight, FontWeight.w600);
 
     // 검색 모드에서 뒤로가기 아이콘 크기는 26이어야 한다(메뉴 아이콘과 같은
     // 슬롯이라 전환 시 크기 점프를 없애는 정합, #2003).
@@ -1597,6 +1922,42 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets(
+    '#2082 저장된 지역(부산)으로 로드된 뒤 역 검색을 열면 지역 표시가 부산을 따른다',
+    (tester) async {
+      // 회귀 방지: _currentRegionDisplayName이 _selectedRegion(세션 중 지역
+      // 선택기를 조작해야만 채워지는 상태)에만 의존하면, 저장된 지역이 부산인
+      // 사용자가 재시작 후 지역 선택기를 건드리지 않고 검색을 열 때 '수도권'이
+      // 잘못 표시된다. getNetworkMap(region: null) 호출이 저장된 지역(부산)을
+      // 반환하도록 페이크를 구성해, 로드 완료 후 지역 표시가 실제 로드된 지역을
+      // 따르는지 검증한다.
+      String? openedRegionLabel;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: NetworkMapScreen(
+            repository: FakeStationSearchRepository(
+              networkMapRegionNames: const ['부산'],
+            ),
+            routeDraftController: RouteDraftController(),
+            onOpenStationSearch: (regionLabel) {
+              openedRegionLabel = regionLabel;
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('networkMapMenuStationSearchButton')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(openedRegionLabel, '부산');
+    },
+  );
+
   testWidgets('노선도 로드 실패는 재시도만 보여준다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -1605,7 +1966,7 @@ void main() {
             networkMapError: StateError('map failed'),
           ),
           routeDraftController: RouteDraftController(),
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -1662,7 +2023,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -1728,7 +2089,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -1774,11 +2135,11 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
           // main.dart의 openStationSearchForSlot 대역: 실제 앱에서는 역 검색을 열어
           // 결과 탭 시 같은 controller에 slot을 설정한다. 여기선 그 계약(어떤 slot을
           // 채우려 열렸는지 + 같은 controller로 수렴)만 검증한다.
-          onPickStationForSlot: (slot) {
+          onPickStationForSlot: (slot, _) {
             pickedSlots.add(slot);
             switch (slot) {
               case RouteDraftSlot.origin:
@@ -1857,8 +2218,8 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
-          onPickStationForSlot: (slot) {
+          onOpenStationSearch: (_) {},
+          onPickStationForSlot: (slot, _) {
             switch (slot) {
               case RouteDraftSlot.origin:
                 routeDraftController.setOrigin(
@@ -1966,7 +2327,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -1997,7 +2358,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2027,7 +2388,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2056,7 +2417,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2090,7 +2451,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2121,7 +2482,7 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
+          onOpenStationSearch: (_) {},
         ),
       ),
     );
@@ -2143,8 +2504,8 @@ void main() {
         home: NetworkMapScreen(
           repository: FakeStationSearchRepository(),
           routeDraftController: routeDraftController,
-          onOpenStationSearch: () {},
-          onPickStationForSlot: (slot) {},
+          onOpenStationSearch: (_) {},
+          onPickStationForSlot: (slot, _) {},
         ),
       ),
     );
@@ -6697,15 +7058,19 @@ void main() {
       // hintText다. floatingLabelBehavior를 지정하면 실기기에서 hint가
       // 박스 상단 테두리 위로 떠오르는 회귀가 있어 미지정이 계약이다.
       expect(searchInput.decoration?.floatingLabelBehavior, isNull);
-      expect(
-        tester.getCenter(find.text('역 이름을 입력해 주세요')).dy,
-        moreOrLessEquals(
-          tester
-              .getCenter(find.byKey(const Key('heroStationSearchInputBox')))
-              .dy,
-          epsilon: 1.0,
-        ),
+      // #2082 실기기 재작업: hint 중앙 정렬은 고유 높이 필드 + Center 위젯으로
+      // 얻으며, 실기기(Noto Sans KR)에서는 오프셋 0으로 정합함을 픽셀 판독으로 확인했다
+      // (docs/2082-qa, 정본). FlutterTest 테스트 폰트에서는 InputDecorator 중앙
+      // 정렬 오차로 hint 중심이 박스 중심에서 십수 px 벗어날 수 있으므로, 여기서는
+      // hint가 박스 세로 범위 안에 온전히 들어오는지(=부유 라벨이 아님)를 폰트
+      // 메트릭 독립적으로 계약으로 잡는다.
+      final searchBoxRect = tester.getRect(
+        find.byKey(const Key('heroStationSearchInputBox')),
       );
+      final searchHintCenterDy =
+          tester.getCenter(find.text('역 이름을 입력해 주세요')).dy;
+      expect(searchHintCenterDy, greaterThan(searchBoxRect.top));
+      expect(searchHintCenterDy, lessThan(searchBoxRect.bottom));
       expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
       // #1933: 홈 in-place 검색 모드에는 주변 역 버튼이 없다(둘러보기 주변 역은
       // 좌측 메뉴로 연다). ≡는 ←로 바뀌고 지역 선택기는 유지된다.
