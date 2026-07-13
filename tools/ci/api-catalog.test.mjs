@@ -335,6 +335,11 @@ test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 �
     stdout,
     /^runner: node tools\/datapack\/collect-kric-source-candidate-evidence\.mjs --candidate kric-transfer-movement-standard$/m,
   );
+  assert.match(stdout, /^provider credential: APPROVED$/m);
+  assert.match(stdout, /^provider approval scope: API_CREDENTIAL$/m);
+  assert.match(stdout, /^provider terms: REVIEW_REQUIRED$/m);
+  assert.match(stdout, /^provider quota: REVIEW_REQUIRED$/m);
+  assert.match(stdout, /^provider production use: not allowed$/m);
 });
 
 test("catalog 운영 계약은 repository-local 전용과 source-of-truth 경계를 고정한다", async () => {
