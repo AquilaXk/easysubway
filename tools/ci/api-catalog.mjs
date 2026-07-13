@@ -264,6 +264,7 @@ function humanSummary(entry) {
   }
   if (entry.operation?.runner?.command) {
     lines.push(`runner: ${[entry.operation.runner.command, ...(entry.operation.runner.arguments ?? [])].join(" ")}`);
+    lines.push(`runner env: ${(entry.operation.runner.requiredEnv ?? []).join(", ") || "none"}`);
   }
   if (entry.operation?.auth) lines.push(`auth env: ${entry.operation.auth.env ?? "not required"}`);
   return lines.join("\n");

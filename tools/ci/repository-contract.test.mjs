@@ -13945,7 +13945,10 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.match(workflow, /schedule:[\s\S]*cron: "41 0 \* \* \*"/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:\s*\n\s*contents: read/);
-  assert.match(workflow, /concurrency:\s*\n\s*group: /);
+  assert.match(
+    workflow,
+    /concurrency:\s*\n\s*group: datapack-expiry-alert-\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}-\$\{\{ github\.event\.schedule \|\| github\.event_name \}\}/,
+  );
 
   // 기존 데이터팩 릴리스 workflow와 동일하게 action SHA를 고정한다.
   const releaseWorkflow = read(".github/workflows/datapack-release.yml");
