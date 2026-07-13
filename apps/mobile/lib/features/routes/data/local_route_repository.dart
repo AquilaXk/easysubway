@@ -1081,6 +1081,23 @@ class RouteSearchOnlineFirstMetrics {
   }
 }
 
+/// line_sequence 증가 방향이 KRIC upbdnbSe(UP/DOWN) 어느 쪽에 대응하는지의
+/// 노선별 규약. line_sequence↔UP/DOWN 매핑은 어떤 데이터 계약으로도 보장되지
+/// 않으므로(모바일 catalog 스키마에 방향 규약·순환/wrap 플래그가 전파되지 않음),
+/// 규약이 명시적으로 검증된 노선에서만 방향을 유추한다.
+// ascendingIsUp: 현재 allowlist에 대응 노선이 없지만, 규약 검증된 노선이
+// 오름차순=상행일 때를 위해 매핑 값으로 보존한다.
+// ignore: unused_field
+enum _SeqDirectionConvention { ascendingIsDown, ascendingIsUp }
+
+/// 규약이 검증된 노선의 (증가방향→direction) 매핑. 여기에 없는 노선은
+/// line_sequence 델타로 방향을 유추하지 않는다(방향 있는 hint 미매칭).
+/// - seoul-4: 오이도 방면=큰 line_sequence=하행 → 오름차순=DOWN, 내림차순=UP.
+///   (근거: datapack reconstruct-transit-trips.test.mjs의 오이도 방면 규약)
+const Map<String, _SeqDirectionConvention> _carDoorSeqConventionByLine = {
+  'seoul-4': _SeqDirectionConvention.ascendingIsDown,
+};
+
 class _RouteCatalogSnapshot {
   const _RouteCatalogSnapshot({
     required this.stationsById,
@@ -1547,7 +1564,9 @@ class _RouteCatalogSnapshot {
   }
 
   /// 빠른 하차 안내(#2066): 승차 step의 (from,to,line)에 맞는 하차 칸-문을 고른다.
-  /// 방향은 station_lines의 line_sequence로 유추한다(감소=UP, 증가=DOWN).
+  /// 규약이 검증된 노선(_carDoorSeqConventionByLine)에 한해 station_lines의
+  /// line_sequence 델타를 노선별 규약으로 방향(UP/DOWN)으로 변환하고, 미검증
+  /// 노선은 방향을 유추하지 않아 방향 있는 hint를 매칭하지 않는다.
   /// direction 게이트: 값 방향은 유추 방향과 일치할 때만, 빈 direction은 방향 무관.
   /// 후보가 여럿이면 시설 우선순위(ELEVATOR>ESCALATOR>STAIR>TRANSFER), 이어서
   /// carNumber·doorNumber 오름차순으로 결정적으로 하나를 고른다.
@@ -1567,12 +1586,19 @@ class _RouteCatalogSnapshot {
     }
     final fromSeq = _lineSequenceFor(fromStationId, lineId);
     final toSeq = _lineSequenceFor(toStationId, lineId);
+    final convention = _carDoorSeqConventionByLine[lineId];
     String? inferredDirection;
-    if (fromSeq != null && toSeq != null) {
+    if (convention != null && fromSeq != null && toSeq != null) {
       if (toSeq > fromSeq) {
-        inferredDirection = 'DOWN';
+        inferredDirection =
+            convention == _SeqDirectionConvention.ascendingIsDown
+                ? 'DOWN'
+                : 'UP';
       } else if (toSeq < fromSeq) {
-        inferredDirection = 'UP';
+        inferredDirection =
+            convention == _SeqDirectionConvention.ascendingIsDown
+                ? 'UP'
+                : 'DOWN';
       }
     }
     final matches = candidates.where((hint) {

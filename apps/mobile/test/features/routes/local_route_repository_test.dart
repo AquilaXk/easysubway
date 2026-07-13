@@ -4205,6 +4205,81 @@ void main() {
     expect(ride.carDoorFacilityType, 'ELEVATOR');
     expect(ride.carDoorCarNumber, 3);
   });
+
+  test('빠른 하차 안내: 규약 미검증 노선은 방향 hint를 매칭하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    // line-test는 _carDoorSeqConventionByLine에 없는 미검증 노선이다. seq 1→2
+    // 오름차순이라도 방향(UP/DOWN)을 유추하지 않으므로 DOWN hint는 매칭하지 않는다.
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-unverified-line', 'station-b', 'line-test', 'DOWN', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, isNull);
+    expect(ride.hasCarDoorHint, isFalse);
+  });
+
+  test('빠른 하차 안내: 규약 미검증 노선도 빈 direction hint는 매칭한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    // 빈 direction hint는 방향 무관이므로 미검증 노선에서도 매칭된다.
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-unverified-empty', 'station-b', 'line-test', '', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, 3);
+    expect(ride.carDoorDoorNumber, 4);
+  });
 }
 
 Map<String, Object?> _routeV2Payload({
