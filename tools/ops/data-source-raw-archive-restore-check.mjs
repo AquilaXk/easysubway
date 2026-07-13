@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
+import { parseCsv } from "./data-source-raw-archive-csv.mjs";
 
-const archiveDir = path.resolve(process.argv[2] ?? "");
-assert.ok(process.argv[2], "usage: data-source-raw-archive-restore-check.mjs <archive-dir>");
+const archiveDir = resolveArchiveDirectory(process.argv[2]);
 
 const collectionRuns = parseCsv(readFileSync(path.join(archiveDir, "collection-runs.csv"), "utf8"));
 const rawArchives = parseCsv(readFileSync(path.join(archiveDir, "raw-archives.csv"), "utf8"));
@@ -35,8 +35,10 @@ assert.equal(
   rawArchives.length,
   "every raw archive row must have a materialized payload",
 );
-assert.deepEqual(materializedArchiveIds.toSorted(), [...archives.keys()].toSorted());
-const realArchiveDir = realpathSync(archiveDir);
+assert.deepEqual(
+  materializedArchiveIds.toSorted(compareStrings),
+  [...archives.keys()].toSorted(compareStrings),
+);
 
 for (const record of manifest.materialized) {
   const row = archives.get(record.archiveId);
@@ -52,7 +54,7 @@ for (const record of manifest.materialized) {
   assert.equal(objectStatus.isSymbolicLink(), false, `materialized payload must not be a symlink: ${record.objectPath}`);
   assert.equal(objectStatus.isFile(), true, `materialized payload must be a regular file: ${record.objectPath}`);
   const realObjectPath = realpathSync(objectPath);
-  assert.ok(realObjectPath.startsWith(`${realArchiveDir}${path.sep}`), "materialized payload must stay inside archive");
+  assert.ok(realObjectPath.startsWith(`${archiveDir}${path.sep}`), "materialized payload must stay inside archive");
   assert.equal(statSync(realObjectPath).size, record.sizeBytes);
   assert.equal(createHash("sha256").update(readFileSync(realObjectPath)).digest("hex"), record.sha256);
 }
@@ -63,40 +65,15 @@ function assertSafeRelativePath(value) {
   assert.equal(value.split(/[\\/]/).includes(".."), false, "objectPath must not contain traversal");
 }
 
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let quoted = false;
-  for (let offset = 0; offset < text.length; offset += 1) {
-    const character = text[offset];
-    if (quoted) {
-      if (character === '"' && text[offset + 1] === '"') {
-        field += '"';
-        offset += 1;
-      } else if (character === '"') {
-        quoted = false;
-      } else {
-        field += character;
-      }
-    } else if (character === '"') {
-      quoted = true;
-    } else if (character === ",") {
-      row.push(field);
-      field = "";
-    } else if (character === "\n") {
-      row.push(field.replace(/\r$/, ""));
-      if (row.some((value) => value !== "")) rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += character;
-    }
-  }
-  if (field !== "" || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  assert.equal(quoted, false, "unterminated quoted CSV field");
-  return rows;
+function resolveArchiveDirectory(value) {
+  assert.ok(value, "usage: data-source-raw-archive-restore-check.mjs <archive-dir>");
+  const resolved = path.resolve(value);
+  const status = lstatSync(resolved);
+  if (status.isSymbolicLink()) throw new Error("archive directory must not be a symlink");
+  if (!status.isDirectory()) throw new Error("archive directory must be a directory");
+  return realpathSync(resolved);
+}
+
+function compareStrings(left, right) {
+  return left.localeCompare(right);
 }

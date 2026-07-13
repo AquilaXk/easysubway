@@ -8294,6 +8294,7 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   assert.match(restoreCheckScript, /materialized payload missing/);
   assert.match(restoreCheckScript, /materialized archive IDs must be unique/);
   assert.match(restoreCheckScript, /materialized payload must not be a symlink/);
+  assert.match(restoreCheckScript, /archive directory must not be a symlink/);
 
   execFileSync(process.execPath, [materializePath, path.join(fixtureDir, "raw-archives.csv"), fixtureDir], {
     cwd: root,
@@ -8301,6 +8302,19 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   });
   const result = execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8" });
   assert.match(result, /data source archive restore rehearsal ok: 1 payload/);
+
+  const linkedArchiveParent = await mkdtemp(path.join(tmpdir(), "easysubway-source-archive-link-"));
+  const linkedArchiveDir = path.join(linkedArchiveParent, "archive");
+  await symlink(fixtureDir, linkedArchiveDir, "dir");
+  assert.throws(
+    () => execFileSync(process.execPath, [restoreCheckPath, linkedArchiveDir], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: "pipe",
+    }),
+    /Command failed/,
+  );
+  await rm(linkedArchiveParent, { recursive: true, force: true });
 
   await writeFile(
     path.join(fixtureDir, "raw-archives.csv"),
@@ -8366,6 +8380,25 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   await rm(fixtureDir, { recursive: true, force: true });
 });
 
+test("source raw archive 도구는 공용 CSV parser와 명시적 문자열 정렬을 사용한다", async () => {
+  const csvParserPath = "tools/ops/data-source-raw-archive-csv.mjs";
+  const materializeScript = read("tools/ops/data-source-raw-archive-materialize.mjs");
+  const restoreCheckScript = read("tools/ops/data-source-raw-archive-restore-check.mjs");
+
+  assert.ok(existsSync(path.join(root, csvParserPath)), "shared source archive CSV parser must exist");
+  assert.match(materializeScript, /import \{ parseCsv \} from "\.\/data-source-raw-archive-csv\.mjs"/);
+  assert.match(restoreCheckScript, /import \{ parseCsv \} from "\.\/data-source-raw-archive-csv\.mjs"/);
+  assert.doesNotMatch(materializeScript, /function parseCsv\(/);
+  assert.doesNotMatch(restoreCheckScript, /function parseCsv\(/);
+  assert.match(restoreCheckScript, /localeCompare/);
+
+  const { parseCsv } = await import(pathToFileURL(path.join(root, csvParserPath)));
+  assert.deepEqual(
+    parseCsv('archive_id,description\narchive-1,"comma, quote ""value"""\n'),
+    [["archive_id", "description"], ["archive-1", 'comma, quote "value"']],
+  );
+});
+
 test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검증 명령을 고정한다", () => {
   const gatePath = "apps/mobile/release/backup-restore-rehearsal-gate.json";
   const checkScriptPath = "tools/ops/backup-restore-rehearsal-check.mjs";
@@ -8421,6 +8454,7 @@ test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검
   );
   assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-materialize.mjs"));
   assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-restore-check.mjs"));
+  assert.ok(sourceArchiveTarget.linkedArtifacts.includes("tools/ops/data-source-raw-archive-csv.mjs"));
   assert.match(sourceArchiveTarget.successEvidence, /payload hash·size·ID 검증/);
 
   assert.match(gate.rehearsalPolicy.frequencyKo, /월 1회|릴리즈/);

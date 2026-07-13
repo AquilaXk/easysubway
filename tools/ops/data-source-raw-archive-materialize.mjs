@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseCsv } from "./data-source-raw-archive-csv.mjs";
 
 const [csvPath, archiveDir] = process.argv.slice(2);
 assert.ok(csvPath && archiveDir, "usage: data-source-raw-archive-materialize.mjs <raw-archives.csv> <archive-dir>");
@@ -53,42 +54,4 @@ console.log(`data source payloads materialized: ${materialized.length}`);
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let field = "";
-  let quoted = false;
-  for (let offset = 0; offset < text.length; offset += 1) {
-    const character = text[offset];
-    if (quoted) {
-      if (character === '"' && text[offset + 1] === '"') {
-        field += '"';
-        offset += 1;
-      } else if (character === '"') {
-        quoted = false;
-      } else {
-        field += character;
-      }
-    } else if (character === '"') {
-      quoted = true;
-    } else if (character === ",") {
-      row.push(field);
-      field = "";
-    } else if (character === "\n") {
-      row.push(field.replace(/\r$/, ""));
-      if (row.some((value) => value !== "")) rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += character;
-    }
-  }
-  if (field !== "" || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-  assert.equal(quoted, false, "unterminated quoted CSV field");
-  return rows;
 }

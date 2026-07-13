@@ -57,6 +57,7 @@
       ],
       "linkedArtifacts": [
         "tools/ops/data-source-raw-archive.sh",
+        "tools/ops/data-source-raw-archive-csv.mjs",
         "tools/ops/data-source-raw-archive-materialize.mjs",
         "tools/ops/data-source-raw-archive-restore-check.mjs",
         "tools/datapack/source-inventory.json",
