@@ -28,6 +28,8 @@ public record RealtimeArrivalObservation(
 		providerObservedAt = Objects.requireNonNull(providerObservedAt, "providerObservedAt must not be null");
 		backendReceivedAt = Objects.requireNonNull(backendReceivedAt, "backendReceivedAt must not be null");
 		retainedUntil = Objects.requireNonNull(retainedUntil, "retainedUntil must not be null");
+		requireNonNegative(rawEtaSeconds, "rawEtaSeconds");
+		requireNonNegative(adjustedEtaSeconds, "adjustedEtaSeconds");
 		if (!retainedUntil.isAfter(backendReceivedAt)) {
 			throw new IllegalArgumentException("retainedUntil must be after backendReceivedAt");
 		}
@@ -38,5 +40,11 @@ public record RealtimeArrivalObservation(
 			throw new IllegalArgumentException(field + " must not be blank");
 		}
 		return value;
+	}
+
+	private static void requireNonNegative(Integer value, String field) {
+		if (value != null && value < 0) {
+			throw new IllegalArgumentException(field + " must be zero or greater");
+		}
 	}
 }

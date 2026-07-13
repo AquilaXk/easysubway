@@ -1,5 +1,5 @@
 const requiredKeys = ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"];
-const optionalKeys = ["documentedMonthlyLimit", "runtimeDailyHardLimit", "runtimePerMinuteHardLimit"];
+const optionalKeys = ["documentedMonthlyLimit", "runtimeDailyHardLimit", "runtimePerMinuteHardLimit", "sharedQuotaStore"];
 
 export function validateQuotaEvidence(quotaEvidence, label) {
   if (!quotaEvidence || typeof quotaEvidence !== "object" || Array.isArray(quotaEvidence)) {
@@ -31,6 +31,9 @@ export function validateQuotaEvidence(quotaEvidence, label) {
     if (key in quotaEvidence && quotaEvidence[key] <= 0) {
       throw new Error(`${label}.${key} must be a positive integer`);
     }
+  }
+  if ("sharedQuotaStore" in quotaEvidence) {
+    requiredText(quotaEvidence.sharedQuotaStore, `${label}.sharedQuotaStore`);
   }
   if (
     Number.isInteger(quotaEvidence.defaultDailyLimit) &&

@@ -86,6 +86,18 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("ETA는 null 또는 0 이상이어야 한다")
+	void rejectsNegativeEta() {
+		assertThatThrownBy(() -> new RealtimeArrivalObservation(
+			"seoul-topis", "station-sangnoksu", "seoul-4", "1004", "1004000448", "4123",
+			Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-06-26T08:00:00Z"),
+			-1, 0, null, null, Instant.parse("2026-07-26T08:00:00Z")
+		))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("rawEtaSeconds");
+	}
+
+	@Test
 	@DisplayName("null 입력은 거부하고 빈 batch는 no-op 처리한다")
 	void validatesBatchInput() {
 		assertThatThrownBy(() -> repository.saveAll(null))

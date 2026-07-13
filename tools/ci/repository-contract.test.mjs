@@ -6933,6 +6933,7 @@ test("서울 TOPIS 실시간 source는 backend-only key 경계와 guarded produc
         defaultDailyLimit: 1000,
         runtimeDailyHardLimit: 800,
         runtimePerMinuteHardLimit: 1,
+        sharedQuotaStore: "realtime_provider_call_quota_state",
         unlockStatus: "guarded_default_quota_gallery_review_pending",
         productionUseAllowed: true,
       },

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.easysubway.realtime.adapter.out.persistence.InMemoryRealtimeMappingPort;
 import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
 import com.easysubway.realtime.application.port.out.RealtimeMappingPort;
+import com.easysubway.realtime.application.port.out.RealtimeProviderCallQuotaPort;
 import com.easysubway.realtime.domain.RealtimeArrivalObservation;
 import com.easysubway.realtime.domain.RealtimeMapping;
 import com.easysubway.realtime.domain.RealtimeArrival;
@@ -131,6 +132,59 @@ class RealtimeGatewayServiceTest {
 
 		assertThat(result.status()).hasToString("FRESH");
 		assertThat(service.providerHealthSnapshot().archiveFailureCount()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("archive 관측 생성 실패는 fresh 응답과 cache를 막지 않는다")
+	void archiveObservationFailureDoesNotBreakFreshResponse() {
+		RealtimeProvider provider = query -> List.of(new RealtimeArrival(
+			"4", "상록수", "당고개", "상행", "", 180, "3분 후", "전역 출발", "2026-06-26T08:00:00Z"
+		));
+		CapturingArrivalArchive archive = new CapturingArrivalArchive();
+		RealtimeGatewayService service = service(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC),
+			InMemoryRealtimeMappingPort.seededFixture(),
+			archive
+		);
+
+		RealtimeArrivalResult first = service.arrivals(sangnoksuQuery());
+		RealtimeArrivalResult cached = service.arrivals(sangnoksuQuery());
+
+		assertThat(first.status()).hasToString("FRESH");
+		assertThat(cached.status()).hasToString("FRESH");
+		assertThat(first.arrivals()).hasSize(1);
+		assertThat(archive.saveCalls).hasValue(0);
+		assertThat(service.providerHealthSnapshot().archiveFailureCount()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("quota store 장애는 provider를 호출하지 않고 unavailable로 닫는다")
+	void quotaStoreFailureFailsClosedWithoutProviderCall() {
+		CountingProvider provider = new CountingProvider();
+		RealtimeProviderCallQuotaPort failingQuota = (providerId, now, zone, perMinute, perDay) -> {
+			throw new IllegalStateException("quota store unavailable");
+		};
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC),
+			InMemoryRealtimeMappingPort.seededFixture(),
+			new RealtimeProviderControl(),
+			RealtimeArrivalArchivePort.NO_OP,
+			failingQuota,
+			1,
+			800
+		);
+
+		RealtimeArrivalResult arrivals = service.arrivals(sangnoksuQuery());
+		RealtimeTrainPositionResult positions = service.trainPositions(line4Query());
+
+		assertThat(arrivals.status()).hasToString("UNAVAILABLE");
+		assertThat(arrivals.fallbackCode()).isEqualTo("PROVIDER_UNAVAILABLE");
+		assertThat(positions.status()).hasToString("UNAVAILABLE");
+		assertThat(positions.fallbackCode()).isEqualTo("PROVIDER_UNAVAILABLE");
+		assertThat(provider.arrivalCalls).hasValue(0);
+		assertThat(provider.trainPositionCalls).hasValue(0);
 	}
 
 	@Test

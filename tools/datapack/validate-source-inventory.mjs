@@ -69,6 +69,21 @@ function validateInventory(inventory) {
     }
     ids.add(source.id);
   }
+  validateSharedQuotaStores(inventory.sources);
+}
+
+function validateSharedQuotaStores(sources) {
+  const limitsByStore = new Map();
+  for (const source of sources) {
+    const quota = source.admissionEvidence?.quotaEvidence;
+    if (!quota?.sharedQuotaStore) continue;
+    const limits = `${quota.runtimeDailyHardLimit}:${quota.runtimePerMinuteHardLimit}`;
+    const existing = limitsByStore.get(quota.sharedQuotaStore);
+    if (existing !== undefined && existing !== limits) {
+      throw new Error(`shared quota store ${quota.sharedQuotaStore} must use identical runtime hard limits`);
+    }
+    limitsByStore.set(quota.sharedQuotaStore, limits);
+  }
 }
 
 function validateSource(source, label) {

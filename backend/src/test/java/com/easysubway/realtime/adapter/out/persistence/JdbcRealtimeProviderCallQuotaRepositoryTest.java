@@ -50,12 +50,11 @@ class JdbcRealtimeProviderCallQuotaRepositoryTest {
 
 	@Test
 	@DisplayName("분당 quota도 공유 상태에서 원자적으로 제한한다")
-	void enforcesSharedMinuteQuota() {
+	void usesDatabaseTimeForSharedMinuteQuota() {
 		Instant now = Instant.parse("2026-07-13T01:00:00Z");
 		ZoneId providerZone = ZoneId.of("Asia/Seoul");
 		assertThat(repository.tryAcquire("seoul-topis", now, providerZone, 1, 800)).isTrue();
-		assertThat(repository.tryAcquire("seoul-topis", now.plusSeconds(30), providerZone, 1, 800)).isFalse();
-		assertThat(repository.tryAcquire("seoul-topis", now.plusSeconds(60), providerZone, 1, 800)).isTrue();
+		assertThat(repository.tryAcquire("seoul-topis", now.plusSeconds(60), providerZone, 1, 800)).isFalse();
 	}
 
 	@Test

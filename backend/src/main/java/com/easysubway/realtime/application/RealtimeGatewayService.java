@@ -27,10 +27,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class RealtimeGatewayService {
+	private static final Logger log = LoggerFactory.getLogger(RealtimeGatewayService.class);
 
 	private static final Duration CACHE_TTL = Duration.ofSeconds(20);
 	private static final Duration STALE_TTL = Duration.ofSeconds(120);
@@ -229,10 +232,14 @@ public class RealtimeGatewayService {
 			return recordArrivalResult(joinArrival(existing));
 		}
 		try {
-			if (!tryAcquireProviderCall()) {
+			ProviderCallQuotaDecision quotaDecision = tryAcquireProviderCall();
+			if (quotaDecision != ProviderCallQuotaDecision.ACQUIRED) {
+				String fallbackCode = quotaDecision == ProviderCallQuotaDecision.UNAVAILABLE
+					? "PROVIDER_UNAVAILABLE"
+					: "PROVIDER_RATE_LIMITED";
 				RealtimeArrivalResult result = cached != null && isStaleUsable(cached.cachedAt())
 					? cached.result().stale()
-					: RealtimeArrivalResult.unavailable("PROVIDER_RATE_LIMITED");
+					: RealtimeArrivalResult.unavailable(fallbackCode);
 				request.complete(result);
 				return recordArrivalResult(result);
 			}
@@ -311,10 +318,14 @@ public class RealtimeGatewayService {
 			return recordTrainPositionResult(joinTrainPosition(existing));
 		}
 		try {
-			if (!tryAcquireProviderCall()) {
+			ProviderCallQuotaDecision quotaDecision = tryAcquireProviderCall();
+			if (quotaDecision != ProviderCallQuotaDecision.ACQUIRED) {
+				String fallbackCode = quotaDecision == ProviderCallQuotaDecision.UNAVAILABLE
+					? "PROVIDER_UNAVAILABLE"
+					: "PROVIDER_RATE_LIMITED";
 				RealtimeTrainPositionResult result = cached != null && isStaleUsable(cached.cachedAt())
 					? cached.result().stale()
-					: RealtimeTrainPositionResult.unavailable("PROVIDER_RATE_LIMITED");
+					: RealtimeTrainPositionResult.unavailable(fallbackCode);
 				request.complete(result);
 				return recordTrainPositionResult(result);
 			}
@@ -398,14 +409,19 @@ public class RealtimeGatewayService {
 		return RealtimeTrainPositionResult.unavailable(fallbackCode);
 	}
 
-	private boolean tryAcquireProviderCall() {
-		return providerCallQuotaPort.tryAcquire(
-			PROVIDER_ID,
-			clock.instant(),
-			PROVIDER_ZONE,
-			providerCallLimitPerMinute,
-			providerCallLimitPerDay
-		);
+	private ProviderCallQuotaDecision tryAcquireProviderCall() {
+		try {
+			return providerCallQuotaPort.tryAcquire(
+				PROVIDER_ID,
+				clock.instant(),
+				PROVIDER_ZONE,
+				providerCallLimitPerMinute,
+				providerCallLimitPerDay
+			) ? ProviderCallQuotaDecision.ACQUIRED : ProviderCallQuotaDecision.DENIED;
+		} catch (RuntimeException exception) {
+			log.warn("Realtime provider quota store unavailable. providerId={}", PROVIDER_ID, exception);
+			return ProviderCallQuotaDecision.UNAVAILABLE;
+		}
 	}
 
 	private ProcessedArrivals freshArrivals(
@@ -426,30 +442,49 @@ public class RealtimeGatewayService {
 			RealtimeArrival adjusted = adjustArrivalEta(normalized, providerReceivedAt, receivedAt);
 			RealtimeArrival canonical = canonicalizeArrival(adjusted, normalizedQuery.query());
 			freshArrivals.add(canonical);
-			observations.add(new RealtimeArrivalObservation(
-				PROVIDER_ID,
-				normalizedQuery.query().stationId(),
-				normalizedQuery.query().lineId(),
-				normalizedQuery.query().providerLineId(),
-				normalizedQuery.providerStationId(),
-				arrival.trainNo(),
-				providerReceivedAt,
-				receivedAt,
-				arrival.etaSeconds(),
-				canonical.etaSeconds(),
-				arrival.rawDirection(),
-				arrival.rawDestination(),
-				receivedAt.plus(ARRIVAL_ARCHIVE_RETENTION)
-			));
+			try {
+				observations.add(new RealtimeArrivalObservation(
+					PROVIDER_ID,
+					normalizedQuery.query().stationId(),
+					normalizedQuery.query().lineId(),
+					normalizedQuery.query().providerLineId(),
+					normalizedQuery.providerStationId(),
+					arrival.trainNo(),
+					providerReceivedAt,
+					receivedAt,
+					arrival.etaSeconds(),
+					canonical.etaSeconds(),
+					arrival.rawDirection(),
+					arrival.rawDestination(),
+					receivedAt.plus(ARRIVAL_ARCHIVE_RETENTION)
+				));
+			} catch (RuntimeException exception) {
+				providerMetrics.recordArchiveFailure();
+				log.warn(
+					"Realtime arrival observation rejected. providerId={}, stationId={}",
+					PROVIDER_ID,
+					normalizedQuery.query().stationId(),
+					exception
+				);
+			}
 		}
 		return new ProcessedArrivals(List.copyOf(freshArrivals), List.copyOf(observations));
 	}
 
 	private void archiveArrivals(List<RealtimeArrivalObservation> observations) {
+		if (observations.isEmpty()) {
+			return;
+		}
 		try {
 			arrivalArchivePort.saveAll(observations);
 		} catch (RuntimeException exception) {
 			providerMetrics.recordArchiveFailure();
+			log.warn(
+				"Realtime arrival archive failed. providerId={}, observationCount={}",
+				PROVIDER_ID,
+				observations.size(),
+				exception
+			);
 		}
 	}
 
@@ -757,6 +792,12 @@ public class RealtimeGatewayService {
 		List<RealtimeArrival> arrivals,
 		List<RealtimeArrivalObservation> observations
 	) {
+	}
+
+	private enum ProviderCallQuotaDecision {
+		ACQUIRED,
+		DENIED,
+		UNAVAILABLE
 	}
 
 	private record NormalizedRealtimeQuery(

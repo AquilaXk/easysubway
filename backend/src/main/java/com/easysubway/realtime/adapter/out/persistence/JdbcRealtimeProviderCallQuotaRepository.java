@@ -40,7 +40,7 @@ public class JdbcRealtimeProviderCallQuotaRepository implements RealtimeProvider
 		Objects.requireNonNull(providerZone, "providerZone must not be null");
 		QuotaState state = jdbcTemplate.queryForObject(
 			"""
-				SELECT minute_window, minute_calls, day_window, daily_calls
+				SELECT minute_window, minute_calls, day_window, daily_calls, CURRENT_TIMESTAMP AS database_now
 				FROM realtime_provider_call_quota_state
 				WHERE provider_id = ?
 				FOR UPDATE
@@ -49,12 +49,13 @@ public class JdbcRealtimeProviderCallQuotaRepository implements RealtimeProvider
 				rs.getLong("minute_window"),
 				rs.getInt("minute_calls"),
 				rs.getLong("day_window"),
-				rs.getInt("daily_calls")
+				rs.getInt("daily_calls"),
+				rs.getTimestamp("database_now").toInstant()
 			),
 			providerId
 		);
-		long minuteWindow = now.getEpochSecond() / 60;
-		long dayWindow = now.atZone(providerZone).toLocalDate().toEpochDay();
+		long minuteWindow = state.databaseNow().getEpochSecond() / 60;
+		long dayWindow = state.databaseNow().atZone(providerZone).toLocalDate().toEpochDay();
 		int minuteCalls = state.minuteWindow() == minuteWindow ? state.minuteCalls() : 0;
 		int dailyCalls = state.dayWindow() == dayWindow ? state.dailyCalls() : 0;
 		if (minuteCalls >= limitPerMinute || dailyCalls >= limitPerDay) {
@@ -75,6 +76,12 @@ public class JdbcRealtimeProviderCallQuotaRepository implements RealtimeProvider
 		return true;
 	}
 
-	private record QuotaState(long minuteWindow, int minuteCalls, long dayWindow, int dailyCalls) {
+	private record QuotaState(
+		long minuteWindow,
+		int minuteCalls,
+		long dayWindow,
+		int dailyCalls,
+		Instant databaseNow
+	) {
 	}
 }

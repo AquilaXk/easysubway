@@ -1,5 +1,5 @@
 CREATE TABLE realtime_arrival_observations (
-  id BIGSERIAL PRIMARY KEY,
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   provider_id VARCHAR(80) NOT NULL,
   station_id VARCHAR(120) NOT NULL,
   line_id VARCHAR(80) NOT NULL,

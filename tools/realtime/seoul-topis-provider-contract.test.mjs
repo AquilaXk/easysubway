@@ -63,6 +63,7 @@ test("서울 TOPIS는 공식 기본 quota 안의 hard cap으로 guarded producti
       defaultDailyLimit: 1000,
       runtimeDailyHardLimit: 800,
       runtimePerMinuteHardLimit: 1,
+      sharedQuotaStore: "realtime_provider_call_quota_state",
       unlockStatus: "guarded_default_quota_gallery_review_pending",
       productionUseAllowed: true,
     });
@@ -95,8 +96,9 @@ test("서울 TOPIS는 공식 기본 quota 안의 hard cap으로 guarded producti
       assert.equal(source.capabilities.realtime.liveEtaEligible, true);
       assert.equal(source.admissionEvidence.issue, 1416);
       assert.equal(source.admissionEvidence.quotaEvidence.defaultDailyLimit, 1000);
-      assert.equal(source.admissionEvidence.quotaEvidence.runtimeDailyHardLimit, 800);
-      assert.equal(source.admissionEvidence.quotaEvidence.runtimePerMinuteHardLimit, 1);
+    assert.equal(source.admissionEvidence.quotaEvidence.runtimeDailyHardLimit, 800);
+    assert.equal(source.admissionEvidence.quotaEvidence.runtimePerMinuteHardLimit, 1);
+    assert.equal(source.admissionEvidence.quotaEvidence.sharedQuotaStore, "realtime_provider_call_quota_state");
       assert.equal(source.admissionEvidence.quotaEvidence.productionUseAllowed, true);
     }
   }
@@ -121,7 +123,8 @@ test("#1416 production evidence는 quota·freshness·archive·fallback을 PASS�
   assert.equal(evidence.runtime.staleCacheTtlSeconds, 120);
   assert.equal(evidence.runtime.requestCoalescing, true);
   assert.equal(evidence.archive.retentionDays, 30);
-  assert.equal(evidence.archive.purgeSchedule, "0 20 3 * * * UTC");
+  assert.equal(evidence.archive.purgeSchedule, "0 20 3 * * *");
+  assert.equal(evidence.archive.purgeZone, "UTC");
   assert.equal(evidence.archive.extraProviderCallsForArchive, 0);
   assert.equal(evidence.archive.table, "realtime_arrival_observations");
   assert.equal(evidence.fallback.outOfProviderScopeEtaSource, "PLANNED");
