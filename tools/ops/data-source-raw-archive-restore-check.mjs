@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
 
 const archiveDir = path.resolve(process.argv[2] ?? "");
@@ -23,11 +23,20 @@ for (const name of ["archive_id", "run_id", "payload_sha256"]) {
 }
 const runIds = new Set(collectionRuns.map((row) => row[collectionRunIndex]));
 const archives = new Map(rawArchives.map((row) => [row[rawIndex.archive_id], row]));
+assert.equal(archives.size, rawArchives.length, "raw archive IDs must be unique");
+const materializedArchiveIds = manifest.materialized.map((record) => record.archiveId);
+assert.equal(
+  new Set(materializedArchiveIds).size,
+  materializedArchiveIds.length,
+  "materialized archive IDs must be unique",
+);
 assert.equal(
   manifest.materialized.length,
   rawArchives.length,
   "every raw archive row must have a materialized payload",
 );
+assert.deepEqual(materializedArchiveIds.toSorted(), [...archives.keys()].toSorted());
+const realArchiveDir = realpathSync(archiveDir);
 
 for (const record of manifest.materialized) {
   const row = archives.get(record.archiveId);
@@ -39,8 +48,13 @@ for (const record of manifest.materialized) {
   const objectPath = path.resolve(archiveDir, record.objectPath);
   assert.ok(objectPath.startsWith(`${archiveDir}${path.sep}`));
   assert.ok(existsSync(objectPath), `materialized payload missing: ${record.objectPath}`);
-  assert.equal(statSync(objectPath).size, record.sizeBytes);
-  assert.equal(createHash("sha256").update(readFileSync(objectPath)).digest("hex"), record.sha256);
+  const objectStatus = lstatSync(objectPath);
+  assert.equal(objectStatus.isSymbolicLink(), false, `materialized payload must not be a symlink: ${record.objectPath}`);
+  assert.equal(objectStatus.isFile(), true, `materialized payload must be a regular file: ${record.objectPath}`);
+  const realObjectPath = realpathSync(objectPath);
+  assert.ok(realObjectPath.startsWith(`${realArchiveDir}${path.sep}`), "materialized payload must stay inside archive");
+  assert.equal(statSync(realObjectPath).size, record.sizeBytes);
+  assert.equal(createHash("sha256").update(readFileSync(realObjectPath)).digest("hex"), record.sha256);
 }
 console.log(`data source archive restore rehearsal ok: ${manifest.materialized.length} payload(s)`);
 

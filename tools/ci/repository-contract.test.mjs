@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8253,6 +8253,21 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   const payloadPath = path.join(fixtureDir, "source-payload.json");
   const payload = Buffer.from('{"provider":"synthetic","items":[1]}\n');
   const payloadSha256 = createHash("sha256").update(payload).digest("hex");
+  const emptyFixtureDir = await mkdtemp(path.join(tmpdir(), "easysubway-empty-source-archive-"));
+
+  await writeFile(
+    path.join(emptyFixtureDir, "raw-archives.csv"),
+    "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at\n",
+  );
+  assert.throws(
+    () => execFileSync(
+      process.execPath,
+      [materializePath, path.join(emptyFixtureDir, "raw-archives.csv"), emptyFixtureDir],
+      { cwd: root, encoding: "utf8", stdio: "pipe" },
+    ),
+    /Command failed/,
+  );
+  await rm(emptyFixtureDir, { recursive: true, force: true });
 
   await writeFile(payloadPath, payload);
   await writeFile(
@@ -8272,10 +8287,13 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
 
   assert.match(archiveScript, /data-source-raw-archive-materialize\.mjs/);
   assert.match(materializeScript, /unsupported storage_uri for self-contained archive/);
+  assert.match(materializeScript, /source archive must contain at least one raw archive row/);
   assert.match(materializeScript, /payload hash mismatch/);
   assert.match(materializeScript, /payload-manifest\.json/);
   assert.match(restoreCheckScript, /objectPath must not contain traversal/);
   assert.match(restoreCheckScript, /materialized payload missing/);
+  assert.match(restoreCheckScript, /materialized archive IDs must be unique/);
+  assert.match(restoreCheckScript, /materialized payload must not be a symlink/);
 
   execFileSync(process.execPath, [materializePath, path.join(fixtureDir, "raw-archives.csv"), fixtureDir], {
     cwd: root,
@@ -8305,18 +8323,46 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
     /Command failed/,
   );
 
-  await writeFile(
-    path.join(fixtureDir, "raw-archives.csv"),
-    [
-      "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at",
-      `archive-1,run-1,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:01Z`,
-    ].join("\n"),
-  );
-  await writeFile(path.join(fixtureDir, "objects", `${payloadSha256}.payload`), Buffer.from("tampered"));
+  const twoRowCsv = [
+    "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at",
+    `archive-1,run-1,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:01Z`,
+    `archive-2,run-1,SYNTHETIC,https://example.invalid/source-2,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:02Z`,
+  ].join("\n");
+  await writeFile(path.join(fixtureDir, "raw-archives.csv"), twoRowCsv);
+  execFileSync(process.execPath, [materializePath, path.join(fixtureDir, "raw-archives.csv"), fixtureDir], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const duplicateManifest = JSON.parse(readFileSync(path.join(fixtureDir, "payload-manifest.json"), "utf8"));
+  duplicateManifest.materialized[1].archiveId = duplicateManifest.materialized[0].archiveId;
+  await writeFile(path.join(fixtureDir, "payload-manifest.json"), `${JSON.stringify(duplicateManifest)}\n`);
   assert.throws(
     () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
     /Command failed/,
   );
+
+  execFileSync(process.execPath, [materializePath, path.join(fixtureDir, "raw-archives.csv"), fixtureDir], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const objectPath = path.join(fixtureDir, "objects", `${payloadSha256}.payload`);
+  const outsideDir = await mkdtemp(path.join(tmpdir(), "easysubway-source-payload-outside-"));
+  const outsidePayloadPath = path.join(outsideDir, "payload");
+  await writeFile(outsidePayloadPath, payload);
+  await rm(objectPath);
+  await symlink(outsidePayloadPath, objectPath);
+  assert.throws(
+    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    /Command failed/,
+  );
+
+  await rm(objectPath);
+  await writeFile(objectPath, Buffer.from("tampered"));
+  assert.throws(
+    () => execFileSync(process.execPath, [restoreCheckPath, fixtureDir], { cwd: root, encoding: "utf8", stdio: "pipe" }),
+    /Command failed/,
+  );
+  await rm(outsideDir, { recursive: true, force: true });
   await rm(fixtureDir, { recursive: true, force: true });
 });
 

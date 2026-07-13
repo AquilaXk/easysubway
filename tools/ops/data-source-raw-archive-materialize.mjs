@@ -14,6 +14,9 @@ const index = Object.fromEntries(header.map((name, column) => [name, column]));
 for (const name of ["archive_id", "run_id", "source", "storage_uri", "payload_sha256"]) {
   assert.ok(Number.isInteger(index[name]), `raw archive CSV missing ${name}`);
 }
+assert.ok(rows.length > 0, "source archive must contain at least one raw archive row");
+const archiveIds = rows.map((row) => row[index.archive_id]);
+assert.equal(new Set(archiveIds).size, archiveIds.length, "raw archive IDs must be unique");
 
 const objectsDir = path.join(archiveDir, "objects");
 await mkdir(objectsDir, { recursive: true, mode: 0o700 });
