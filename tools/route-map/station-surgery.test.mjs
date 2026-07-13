@@ -62,7 +62,7 @@ function seedDb() {
      INSERT INTO station_pathway_nodes VALUES ('path-a','a','L1');
      INSERT INTO station_aliases VALUES ('a','옛역명','옛역명');
      INSERT INTO station_exits VALUES ('exit-a','a');
-     INSERT INTO transfer_rules VALUES ('transfer-a','a','b');
+     INSERT INTO transfer_rules VALUES ('transfer-from','a','b'),('transfer-to','b','a');
      INSERT INTO network_edges VALUES ('e1','a:L1:EXPRESS','n:L1','RIDE'),('e2','n:L1','a:L1:EXPRESS','RIDE');`,
   );
   return db;
@@ -108,9 +108,11 @@ test("reparentStation은 station FK와 흡수 ID alias를 대표 역으로 옮�
 
   assert.equal(db.prepare("PRAGMA foreign_key_check").all().length, 0);
   assert.equal(db.prepare("SELECT station_id FROM station_exits WHERE id='exit-a'").get().station_id, "b");
-  const transfer = db.prepare("SELECT from_station_id, to_station_id FROM transfer_rules").get();
-  assert.equal(transfer.from_station_id, "b");
-  assert.equal(transfer.to_station_id, "b");
+  const transfers = db
+    .prepare("SELECT id, from_station_id, to_station_id FROM transfer_rules ORDER BY id")
+    .all();
+  assert.equal(transfers[0].from_station_id, "b");
+  assert.equal(transfers[1].to_station_id, "b");
   assert.deepEqual(
     db.prepare("SELECT alias FROM station_aliases WHERE station_id='b' ORDER BY alias").all().map((row) => row.alias),
     ["a", "옛역명"],

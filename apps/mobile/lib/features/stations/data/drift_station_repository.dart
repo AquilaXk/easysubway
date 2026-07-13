@@ -43,6 +43,7 @@ class DriftStationRepository
     required StationTimetableDayType dayType,
     required DateTime referenceDate,
   }) async {
+    stationId = await _canonicalStationId(stationId);
     final catalogDayType = switch (dayType) {
       StationTimetableDayType.weekday => CatalogTimetableDayType.weekday,
       StationTimetableDayType.saturday => CatalogTimetableDayType.saturday,
@@ -69,6 +70,7 @@ class DriftStationRepository
     required String lineId,
     required DateTime date,
   }) async {
+    stationId = await _canonicalStationId(stationId);
     final timetable = await CatalogStationTimetableQuery(
       database,
     ).loadDeparturesForDate(stationId: stationId, lineId: lineId, date: date);

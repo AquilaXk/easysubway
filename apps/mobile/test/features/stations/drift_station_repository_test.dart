@@ -282,6 +282,35 @@ void main() {
     expect(sadang.lastDeparture.semanticLabel, '사당 방면, 다음 날 00시 25분 출발');
   });
 
+  test('흡수된 station ID로도 대표 역 시간표를 반환한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    await database.customStatement('''
+      INSERT INTO station_aliases (station_id, alias, normalized_alias)
+      VALUES ('station-sadang', 'station-sadang-old', 'station-sadang-old')
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    final selectedDay = await repository.loadStationTimetable(
+      stationId: 'station-sadang-old',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.weekday,
+      referenceDate: DateTime(2026, 7, 12),
+    );
+    final automaticDay = await repository.loadStationTimetableForDate(
+      stationId: 'station-sadang-old',
+      lineId: 'seoul-4',
+      date: DateTime(2026, 7, 7),
+    );
+
+    expect(selectedDay.stationId, 'station-sadang');
+    expect(selectedDay.isAvailable, isTrue);
+    expect(automaticDay.stationId, 'station-sadang');
+    expect(automaticDay.isAvailable, isTrue);
+  });
+
   test('로컬 역 시간표는 토요일과 일요일·공휴일 calendar를 분리하고 미지원 역을 강등한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

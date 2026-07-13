@@ -30,9 +30,37 @@ class LocalRouteRepository implements RouteSearchRepository {
   Future<RouteSearchRequest> canonicalRequest(
     RouteSearchRequest request,
   ) async {
-    return (await _RouteCatalogSnapshot.load(
-      catalogDatabase,
-    )).canonicalRequest(request);
+    final waypoint = request.waypointStationId?.trim();
+    return RouteSearchRequest(
+      originStationId: await _canonicalStationId(
+        request.originStationId.trim(),
+      ),
+      destinationStationId: await _canonicalStationId(
+        request.destinationStationId.trim(),
+      ),
+      mobilityType: request.mobilityType,
+      constraintMode: request.constraintMode,
+      waypointStationId: waypoint == null || waypoint.isEmpty
+          ? waypoint
+          : await _canonicalStationId(waypoint),
+      mobilityPreset: request.mobilityPreset,
+    );
+  }
+
+  Future<String> _canonicalStationId(String stationId) async {
+    final rows = await catalogDatabase
+        .customSelect(
+          '''
+      SELECT DISTINCT station_id
+      FROM station_aliases
+      WHERE alias = ? AND alias LIKE 'station-%'
+      ''',
+          variables: [Variable.withString(stationId)],
+        )
+        .get();
+    return rows.length == 1
+        ? rows.single.read<String>('station_id')
+        : stationId;
   }
 
   Future<RouteCapabilityMetadata> routeCapability(
