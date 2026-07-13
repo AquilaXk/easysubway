@@ -3301,8 +3301,14 @@ const _maxMapScale = 4.8;
 /// 좁혀 항상 그만큼 확대되게 한다. 절대 픽셀 하한(구 860px) 대신 초기 화면 대비
 /// 비율을 쓰는 이유: 수도권처럼 지도 폭이 작은 지역에서는 절대 하한이 초기 화면
 /// 폭보다 커져 focus가 pan만 되고 확대가 사라졌다(#2062). 두 축을 같은 비율로
-/// 줄이므로 contain-fit scale은 정확히 1/비율 배 확대되어 지역 크기와 무관하게
-/// 일정한 확대율을 보장한다.
+/// 줄이므로 contain-fit scale은 정확히 1/비율(≈2.38) 배 확대되어 지역 크기와
+/// 무관하게 일정한 확대율을 보장한다 — 단, `_maxMapScale`(4.8) 상한 이하 범위
+/// 한정. 초기 scale이 이미 4.8/0.42 ≈ 2.02를 넘는 초소형 지역(고배율 초기 화면)은
+/// focus scale이 4.8에서 saturate돼 실제 확대율이 2.38배보다 작아지고, 초기
+/// scale이 이미 4.8이면(초기 화면 자체가 상한에서 시작) focus도 4.8로 saturate돼
+/// 확대율이 1.0(순수 pan)까지 줄어들 수 있다. 이 경우도 focus scale이 초기 scale
+/// 아래로 내려가진 않는다(둘 다 같은 상한을 공유하므로) — pan-only로 완전히
+/// 퇴행하진 않되, 극단적으로 작은 지역에서는 확대가 체감되지 않을 수 있다.
 const _stationFocusInitialBoundsFraction = 0.42;
 const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 1100);
 const _routeMapGestureMaxTranslationDriftFraction = 1.35;
