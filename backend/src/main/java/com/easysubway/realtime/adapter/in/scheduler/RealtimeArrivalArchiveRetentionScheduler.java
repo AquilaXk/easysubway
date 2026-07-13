@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 @Profile("prod | staging | release | prod-like")
 public class RealtimeArrivalArchiveRetentionScheduler {
 	private static final Logger log = LoggerFactory.getLogger(RealtimeArrivalArchiveRetentionScheduler.class);
+	private static final String PROVIDER_ID = "seoul-topis";
+	private static final String PURGE_OPERATION = "delete-expired";
 
 	private final RealtimeArrivalArchivePort archivePort;
 	private final Counter purgeFailureCounter;
@@ -24,8 +26,8 @@ public class RealtimeArrivalArchiveRetentionScheduler {
 	) {
 		this.archivePort = archivePort;
 		this.purgeFailureCounter = Counter.builder("easysubway.realtime.archive.purge.failures")
-			.tag("provider", "seoul-topis")
-			.tag("operation", "delete-expired")
+			.tag("provider", PROVIDER_ID)
+			.tag("operation", PURGE_OPERATION)
 			.register(meterRegistry);
 	}
 
@@ -41,8 +43,8 @@ public class RealtimeArrivalArchiveRetentionScheduler {
 			purgeFailureCounter.increment();
 			log.error(
 				"Realtime arrival archive retention purge failed. providerId={} operation={} exceptionType={}",
-				"seoul-topis",
-				"delete-expired",
+				PROVIDER_ID,
+				PURGE_OPERATION,
 				exception.getClass().getSimpleName(),
 				exception
 			);

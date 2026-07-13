@@ -31,6 +31,8 @@ public class DevelopmentRealtimeSafetyPorts implements RealtimeArrivalArchivePor
 		int limitPerDay
 	) {
 		Objects.requireNonNull(providerId, "providerId must not be null");
+		Objects.requireNonNull(now, "now must not be null");
+		Objects.requireNonNull(providerZone, "providerZone must not be null");
 		QuotaState state = statesByProvider.computeIfAbsent(providerId, ignored -> new QuotaState());
 		long minute = now.getEpochSecond() / 60;
 		long day = now.atZone(providerZone).toLocalDate().toEpochDay();
