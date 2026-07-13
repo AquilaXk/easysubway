@@ -1,0 +1,294 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "regional-realtime-provider-decisions",
+  "issue": 1621,
+  "targetVersion": "2026-07-13",
+  "verifiedAt": "2026-07-13T17:50:29.249Z",
+  "scope": {
+    "excludedRegionIds": [
+      "capital"
+    ]
+  },
+  "officialSources": [
+    {
+      "id": "public-api-live-search",
+      "url": "https://www.data.go.kr/tcs/dss/selectDataSetList.do",
+      "decision": "CREDENTIAL_SAFE_LIVE_SEARCH_COMPLETED",
+      "notes": "DATA_GO_KR_SERVICE_KEY를 Node process.env에서만 읽는 tracked collector로 12개 active line scope를 검색했다. 비밀 값과 원문 응답은 저장하지 않았다."
+    },
+    {
+      "id": "busan-standard-timetable",
+      "url": "https://www.data.go.kr/data/15000522/openapi.do",
+      "decision": "SCHEDULE_ONLY_NOT_REALTIME",
+      "operations": [
+        "부산 도시철도 열차시각표 조회 서비스"
+      ],
+      "notes": "요일·상하행·검색시각·역코드로 표준 도착시각을 조회하며 공식 설명이 실제 도착시각과 다를 수 있음을 명시한다."
+    },
+    {
+      "id": "tago-subway-information-scope",
+      "url": "https://www.data.go.kr/data/15098554/openapi.do",
+      "decision": "STATION_EXIT_TIMETABLE_ONLY",
+      "operations": [
+        "지하철역 목록",
+        "역별 출구 목록",
+        "출구별 버스노선 목록",
+        "역별 시간표 목록"
+      ]
+    },
+    {
+      "id": "molit-realtime-service-ended",
+      "url": "https://www.data.go.kr/bbs/ntc/selectNotice.do?originId=NOTICE_0000000002723",
+      "decision": "ENDED_WITHOUT_REPLACEMENT",
+      "notes": "국토교통부 지하철실시간정보 서비스는 공식 공지에서 대체 서비스 없이 종료됐다."
+    },
+    {
+      "id": "daejeon-timetable-operations",
+      "url": "https://www.data.go.kr/data/15159278/openapi.do",
+      "decision": "SCHEDULE_ONLY_FALSE_POSITIVE",
+      "operations": [
+        "GET /getAllTimeTable",
+        "GET /getTimeTable"
+      ],
+      "notes": "검색 설명의 활용 예시에 실시간 앱이 포함되지만 제공 operation은 전역·역별 열차시각표뿐이다."
+    }
+  ],
+  "publicApiAudit": {
+    "targetCount": 12,
+    "credentialSafeCallCount": 28,
+    "uniqueQueryCount": 14,
+    "supportedCount": 0,
+    "explicitNoDataCount": 11,
+    "falsePositiveClassifiedCount": 1,
+    "boundedRetryCount": 1,
+    "searchPlanSha256": "92d7716ea6c9fd091a0d341b2925848ab99587c667574266c25a9560246fbbd3",
+    "sanitizedResponseSha256": [
+      "2b756f69a7b1c66b1efe76063e3161948bcdfcaed0ed87fea9ef0295406450a5",
+      "53f118273057e81d0e2d9fe4fcaea7a7cbc548327808f696bf4d8fc8d1fbf4c9",
+      "7984e8110a9ac1ad480ac9a8e6b013eda1923ee4279c28901a295845ec5164a1",
+      "8229950dabec9e32c553108514f67a674363165c16dcf6b26722b9347fee9b54"
+    ],
+    "initialTransient": {
+      "reasonCode": "PUBLIC_API_HTTP_FAILURE",
+      "httpStatus": 500,
+      "resolvedByBoundedRetry": true
+    }
+  },
+  "decisions": [
+    {
+      "regionId": "busan",
+      "operatorId": "busan-transportation",
+      "lineId": "line-ab1a041f6266",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "busan-standard-timetable",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "39e5ac670983dceea3b5ef1be7fce7053834cd0b3651ae9950c5068f68d2521a",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "busan",
+      "operatorId": "busan-transportation",
+      "lineId": "line-d74614a04530",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "busan-standard-timetable",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "eaf9ce3f2aa90375b20dc19c4a1355a9bedc2839466c017f3e1a8689949046c6",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "busan",
+      "operatorId": "busan-transportation",
+      "lineId": "line-d812a5bc1e5f",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "busan-standard-timetable",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "2ec447f46b42605a8e7c888a272bc09930994358110cae2da1002d03dd908376",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "busan",
+      "operatorId": "busan-transportation",
+      "lineId": "line-eb7b47920390",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "busan-standard-timetable",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "df4ddf98d3fa8cd5b64c2d16eee35f72d0af42602992bc3218e524de1b209984",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "busan",
+      "operatorId": "korail",
+      "lineId": "line-f52eb59d8497",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "tago-subway-information-scope",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "23aa2d1bb609c95981e1be41ff8ad411fff181d7e4162acbd811e9830e4f3535",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "busan",
+      "operatorId": "operator-72566d06475a",
+      "lineId": "line-e4cce88f0d7f",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "tago-subway-information-scope",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "46ac5b59646790e6685b70a8189f3fd9c4499f1e29b0501a46bf58b6e400d68c",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "daegu",
+      "operatorId": "daegu-transportation",
+      "lineId": "line-0ffaa95b1b5d",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "tago-subway-information-scope",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "b4a59315d19a0652bfb5ec81ff1bc32e29779fe8af6eee8896f5dfb16361f19d",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "daegu",
+      "operatorId": "daegu-transportation",
+      "lineId": "line-5b8d9b05e7e6",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "tago-subway-information-scope",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "86dc342bbbb17039d06d7fbb789e5eda3918f7a343f087aa0613509d293906fe",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "daegu",
+      "operatorId": "daegu-transportation",
+      "lineId": "line-e2938a4cc492",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "tago-subway-information-scope",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "7a1b2d0d90cceefa43390311bd78c9ef03accfd04eeda14325025f23e6b63510",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "daegu",
+      "operatorId": "korail",
+      "lineId": "line-8f7ed01f290a",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "tago-subway-information-scope",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "b10f2419021585ddeb30a81d13076e6443986655bfe0457fc034a927827bc86e",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "daejeon",
+      "operatorId": "daejeon-transportation",
+      "lineId": "line-7051a9c2525c",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "daejeon-timetable-operations",
+        "molit-realtime-service-ended"
+      ],
+      "reasonCode": "PUBLIC_API_FALSE_POSITIVE_SCHEDULE_ONLY",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    },
+    {
+      "regionId": "gwangju",
+      "operatorId": "gwangju-metropolitan-rapid-transit",
+      "lineId": "line-e57a361e8892",
+      "state": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "fallback": "UNSUPPORTED_REGION",
+      "routeFallbackCapability": "PLANNED",
+      "userMessageKo": "이 지역은 실시간 도착 정보를 아직 제공하지 않아요.",
+      "evidenceRefs": [
+        "public-api-live-search",
+        "tago-subway-information-scope",
+        "molit-realtime-service-ended"
+      ],
+      "evidenceHash": "ed21a8b33890dec5c882307524442431ae23115a699ffba2c8d3723382049d85",
+      "reasonCode": "PUBLIC_API_NO_DATA",
+      "reviewedAt": "2026-07-13T17:50:29.249Z",
+      "nextReviewAt": "2026-10-11T17:50:29.249Z"
+    }
+  ]
+}
