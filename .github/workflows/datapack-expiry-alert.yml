@@ -3,6 +3,7 @@ name: Data Pack Expiry Alert
 on:
   schedule:
     - cron: "23 */4 * * *"
+    - cron: "41 0 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -14,6 +15,7 @@ permissions:
 
 jobs:
   provider-approval-expiry:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '41 0 * * *' }}
     name: Provider Approval Expiry
     runs-on: ubuntu-latest
     permissions:
@@ -36,11 +38,11 @@ jobs:
         run: node tools/datapack/source-operation.mjs check-approvals --github-output "${GITHUB_OUTPUT}"
 
       - name: Provider Approval Expiry / Skip missing Slack webhook
-        if: ${{ steps.check.outputs.status == 'WARNING' && (github.event_name == 'workflow_dispatch' || steps.check.outputs.notification_due == 'true') && env.SLACK_RELEASE_WEBHOOK_URL == '' }}
+        if: ${{ steps.check.outputs.status == 'WARNING' && env.SLACK_RELEASE_WEBHOOK_URL == '' }}
         run: echo "::notice title=Provider approval notification::SLACK_RELEASE_WEBHOOK_URL is not configured."
 
       - name: Provider Approval Expiry / Notify Slack on renewal window
-        if: ${{ steps.check.outputs.status == 'WARNING' && (github.event_name == 'workflow_dispatch' || steps.check.outputs.notification_due == 'true') && env.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        if: ${{ steps.check.outputs.status == 'WARNING' && env.SLACK_RELEASE_WEBHOOK_URL != '' }}
         uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
         with:
           webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
@@ -58,6 +60,7 @@ jobs:
                     • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>
 
   datapack-expiry-alert:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '23 */4 * * *' }}
     name: Data Pack Expiry Alert
     runs-on: ubuntu-latest
     permissions:

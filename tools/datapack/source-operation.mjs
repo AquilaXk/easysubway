@@ -221,13 +221,6 @@ export function providerApprovalExpirySummary(document, { today = new Date().toI
   };
 }
 
-export function providerApprovalNotificationDue(summary, { now = new Date() } = {}) {
-  if (!(now instanceof Date) || Number.isNaN(now.valueOf())) {
-    throw new Error("provider approval notification time must be a valid Date");
-  }
-  return summary?.status === "WARNING" && now.getUTCHours() === 0;
-}
-
 export function validateOperation(candidate, { allowMissing = false } = {}) {
   const requestUrl = requiredHttpUrl(candidate?.requestUrl, `${candidate?.id ?? "candidate"}.requestUrl`);
   if (hasCredentialValue(candidate.requestUrl)) {
@@ -307,7 +300,17 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (!/^node tools\/[A-Za-z0-9_./-]+\.mjs$/.test(command)) {
     throw new Error(`${candidate.id}.operation.runner.command must be a literal repository Node command`);
   }
-  stringList(runner.arguments ?? [], `${candidate.id}.operation.runner.arguments`, { allowEmpty: true });
+  const runnerArguments = stringList(
+    runner.arguments ?? [],
+    `${candidate.id}.operation.runner.arguments`,
+    { allowEmpty: true },
+  );
+  if (runnerArguments.some((argument) => {
+    const option = /^--([^=]+)(?:=|$)/.exec(argument);
+    return option && CREDENTIAL_NAME.test(normalizedName(option[1]));
+  })) {
+    throw new Error(`${candidate.id}.operation.runner.arguments must not include credential options`);
+  }
   const requiredEnv = stringList(
     runner.requiredEnv,
     `${candidate.id}.operation.runner.requiredEnv`,
@@ -444,10 +447,9 @@ async function main(args = process.argv.slice(2)) {
       }
     }
     if (githubOutput) {
-      const notificationDue = providerApprovalNotificationDue(summary);
       await appendFile(
         githubOutput,
-        `status=${summary.status}\napproved_count=${summary.approvals.length}\nnotification_due=${notificationDue}\n`,
+        `status=${summary.status}\napproved_count=${summary.approvals.length}\n`,
       );
     }
     console.log(`provider approval expiry: ${summary.status} (${summary.approvals.length} approved)`);

@@ -6,7 +6,6 @@ import {
   listOperations,
   operationSummary,
   providerApprovalExpirySummary,
-  providerApprovalNotificationDue,
   validateOperation,
   validateSourceCandidateDocument,
 } from "./source-operation.mjs";
@@ -263,14 +262,6 @@ test("provider 승인 만료 요약은 갱신 window부터 경고한다", () => 
   );
 });
 
-test("provider 승인 갱신 알림은 scheduled 실행에서 UTC 하루 한 번만 허용한다", () => {
-  const warning = { status: "WARNING" };
-
-  assert.equal(providerApprovalNotificationDue(warning, { now: new Date("2027-06-06T00:23:00Z") }), true);
-  assert.equal(providerApprovalNotificationDue(warning, { now: new Date("2027-06-06T04:23:00Z") }), false);
-  assert.equal(providerApprovalNotificationDue({ status: "OK" }, { now: new Date("2027-06-06T00:23:00Z") }), false);
-});
-
 test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지를 고정한다", () => {
   const operation = validOperation({
     auth: {
@@ -417,6 +408,27 @@ test("validate는 endpoint URL과 runner 문자열의 credential을 거부한다
     assert.throws(
       () => validateOperation(candidate("a", { requestUrl: operation.endpoint, operation })),
       /credential values are forbidden|literal repository Node command/,
+    );
+  }
+});
+
+test("validate는 structured runner 인수의 credential option을 거부한다", () => {
+  for (const arguments_ of [
+    ["--token", "actual-secret-value"],
+    ["--service-key=actual-secret-value"],
+    ["--client_secret", "actual-secret-value"],
+  ]) {
+    assert.throws(
+      () => validateOperation(candidate("a", {
+        operation: validOperation({
+          runner: {
+            command: "node tools/datapack/probe-provider.mjs",
+            arguments: arguments_,
+            requiredEnv: ["PROVIDER_SERVICE_KEY"],
+          },
+        }),
+      })),
+      /runner\.arguments must not include credential options/,
     );
   }
 });

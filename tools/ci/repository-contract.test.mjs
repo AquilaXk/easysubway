@@ -13834,6 +13834,7 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
 
   assert.match(workflow, /^name: Data Pack Expiry Alert$/m);
   assert.match(workflow, /schedule:[\s\S]*cron: "23 \*\/4 \* \* \*"/);
+  assert.match(workflow, /schedule:[\s\S]*cron: "41 0 \* \* \*"/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:\s*\n\s*contents: read/);
   assert.match(workflow, /concurrency:\s*\n\s*group: /);
@@ -13864,8 +13865,9 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.match(workflow, /^  provider-approval-expiry:\s*$/m);
   assert.match(workflow, /^    name: Provider Approval Expiry$/m);
   assert.match(workflow, /provider-approval-expiry:[\s\S]*id:\s*check[\s\S]*GITHUB_OUTPUT/);
-  assert.match(workflow, /provider-approval-expiry:[\s\S]*notification_due/);
-  assert.match(workflow, /provider-approval-expiry:[\s\S]*github\.event_name == 'workflow_dispatch'/);
+  assert.match(workflow, /provider-approval-expiry:[\s\S]*github\.event\.schedule == '41 0 \* \* \*'/);
+  assert.match(workflow, /datapack-expiry-alert:[\s\S]*github\.event\.schedule == '23 \*\/4 \* \* \*'/);
+  assert.doesNotMatch(workflow, /notification_due/);
   assert.match(workflow, /provider-approval-expiry:[\s\S]*steps\.check\.outputs\.status == 'WARNING'[\s\S]*slackapi\/slack-github-action@/);
   assert.match(workflow, /--manifest\s+"/);
   assert.match(workflow, /--output\s+"/);
