@@ -200,6 +200,9 @@ function validateGuardedRealtimeQuota(source, sourceId) {
   if (!Number.isInteger(quotaEvidence.runtimeDailyHardLimit) || !Number.isInteger(quotaEvidence.runtimePerMinuteHardLimit)) {
     throw new TypeError(`${sourceId}.guarded realtime requires integer runtime daily and per-minute hard limits`);
   }
+  if (typeof quotaEvidence.sharedQuotaStore !== "string" || quotaEvidence.sharedQuotaStore.trim() === "") {
+    throw new TypeError(`${sourceId}.guarded realtime requires sharedQuotaStore`);
+  }
 }
 
 function validateProductionScope(inventory, scope) {
