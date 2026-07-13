@@ -15,6 +15,7 @@
     { "file": "get-off-alarm-policy.json", "scope": "mobile", "area": "mobile-feature" },
     { "file": "issue-1075-async-state-audit.json", "scope": "mobile", "area": "mobile-qa" },
     { "file": "issue-1075-final-qa-evidence.json", "scope": "mobile", "area": "mobile-qa" },
+    { "file": "mobility-profile-policy.json", "scope": "product", "area": "route" },
     { "file": "operations-observability-gate.json", "scope": "product", "area": "ops" },
     { "file": "operations-release-evidence.json", "scope": "product", "area": "ops" },
     { "file": "play-generated-apk-device-matrix-gate.json", "scope": "mobile", "area": "store" },
