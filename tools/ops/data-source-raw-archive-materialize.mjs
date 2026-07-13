@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseCsv } from "./data-source-raw-archive-csv.mjs";
@@ -34,13 +34,13 @@ for (const row of rows) {
   const bytes = await readFile(sourcePath);
   assert.equal(sha256(bytes), expectedSha256.toLowerCase(), `payload hash mismatch: ${row[index.archive_id]}`);
   const objectPath = path.posix.join("objects", `${expectedSha256.toLowerCase()}.payload`);
-  await copyFile(sourcePath, path.join(archiveDir, objectPath));
+  await writeFile(path.join(archiveDir, objectPath), bytes, { mode: 0o600 });
   materialized.push({
     archiveId: row[index.archive_id],
     runId: row[index.run_id],
     source: row[index.source],
     sha256: expectedSha256.toLowerCase(),
-    sizeBytes: (await stat(sourcePath)).size,
+    sizeBytes: bytes.length,
     objectPath,
   });
 }

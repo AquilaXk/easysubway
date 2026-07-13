@@ -4125,6 +4125,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
 
   const gate = readJson(gatePath);
   const operationsEvidencePath = "apps/mobile/release/operations-release-evidence.json";
+  const productionReadinessValidatorPath = "tools/ops/validate-production-readiness-evidence.mjs";
   const operationsEvidence = readJson(operationsEvidencePath);
   const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
   const backupRestoreGate = readJson("apps/mobile/release/backup-restore-rehearsal-gate.json");
@@ -4138,6 +4139,14 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.equal(gate.releaseGate, "operations-observability");
   assert.equal(gate.releaseBlockerPolicy, true);
   assert.equal(gate.releaseEvidenceManifest, operationsEvidencePath);
+  assert.ok(
+    existsSync(path.join(root, productionReadinessValidatorPath)),
+    "production readiness evidence validator must exist",
+  );
+  execFileSync(process.execPath, [productionReadinessValidatorPath, "--evidence", operationsEvidencePath], {
+    cwd: root,
+    encoding: "utf8",
+  });
   assert.equal(gate.signalEvidencePolicy.allowedResolutionKinds.includes("dashboard-url"), true);
   assert.equal(gate.signalEvidencePolicy.allowedResolutionKinds.includes("alert-route"), true);
   assert.equal(gate.signalEvidencePolicy.allowedResolutionKinds.includes("runbook"), true);
@@ -8281,7 +8290,7 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
     path.join(fixtureDir, "raw-archives.csv"),
     [
       "archive_id,run_id,source,source_url,storage_uri,payload_sha256,content_type,captured_at",
-      `archive-1,run-1,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256},application/json,2026-07-13T00:00:01Z`,
+      `archive-1,run-1,SYNTHETIC,https://example.invalid/source,${pathToFileURL(payloadPath)},${payloadSha256.toUpperCase()},application/json,2026-07-13T00:00:01Z`,
     ].join("\n"),
   );
 
@@ -8290,6 +8299,9 @@ test("source raw archive는 file payload를 self-contained 산출물로 만들�
   assert.match(materializeScript, /source archive must contain at least one raw archive row/);
   assert.match(materializeScript, /payload hash mismatch/);
   assert.match(materializeScript, /payload-manifest\.json/);
+  assert.doesNotMatch(materializeScript, /\bcopyFile\b/);
+  assert.doesNotMatch(materializeScript, /\bstat\(/);
+  assert.match(materializeScript, /sizeBytes: bytes\.length/);
   assert.match(restoreCheckScript, /objectPath must not contain traversal/);
   assert.match(restoreCheckScript, /materialized payload missing/);
   assert.match(restoreCheckScript, /materialized archive IDs must be unique/);

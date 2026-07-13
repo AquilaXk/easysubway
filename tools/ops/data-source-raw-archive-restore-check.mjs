@@ -45,7 +45,9 @@ for (const record of manifest.materialized) {
   assert.ok(row, `materialized archive missing from raw-archives.csv: ${record.archiveId}`);
   assert.ok(runIds.has(record.runId), `materialized archive run missing from collection-runs.csv: ${record.runId}`);
   assert.equal(row[rawIndex.run_id], record.runId);
-  assert.equal(row[rawIndex.payload_sha256], record.sha256);
+  const rawSha256 = row[rawIndex.payload_sha256];
+  assert.match(rawSha256, /^[a-f0-9]{64}$/i, "raw archive payload_sha256 must be hex");
+  assert.equal(rawSha256.toLowerCase(), record.sha256);
   assertSafeRelativePath(record.objectPath);
   const objectPath = path.resolve(archiveDir, record.objectPath);
   assert.ok(objectPath.startsWith(`${archiveDir}${path.sep}`));
