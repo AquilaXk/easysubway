@@ -89,6 +89,9 @@ function requireAllowedKeys(value, allowed, label) {
 
 export function validateOperation(candidate, { allowMissing = false } = {}) {
   const requestUrl = requiredHttpUrl(candidate?.requestUrl, `${candidate?.id ?? "candidate"}.requestUrl`);
+  if (hasCredentialValue(candidate.requestUrl)) {
+    throw new Error(`${candidate.id}.requestUrl credential values are forbidden`);
+  }
   const sampleValue = candidate?.evidence?.sampleUrl;
   if (sampleValue != null) {
     const sampleUrl = requiredHttpUrl(sampleValue, `${candidate.id}.evidence.sampleUrl`);

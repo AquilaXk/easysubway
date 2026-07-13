@@ -82,6 +82,21 @@ test("show는 operation이 없어도 sample URL credential을 출력 전에 거�
   }
 });
 
+test("show는 operation이 없어도 request URL credential을 출력 전에 거부한다", () => {
+  for (const requestUrl of [
+    "https://provider.example/items?serviceKey=actual-secret",
+    "https://user:password@provider.example/items",
+  ]) {
+    assert.throws(
+      () => operationSummary(candidate("a", {
+        requestUrl,
+        evidence: { outputFields: ["fieldA"] },
+      })),
+      /credential values are forbidden/,
+    );
+  }
+});
+
 test("validate는 credential 값을 거부한다", () => {
   const invalid = candidate("a", {
     operation: validOperation({ credentialValue: "actual-secret-value" }),
