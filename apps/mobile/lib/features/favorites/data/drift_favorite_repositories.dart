@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../../../core/database/catalog/canonical_station_id.dart';
 import '../../../core/database/catalog/catalog_database.dart';
 import '../../../core/database/user/user_database.dart' as user_db;
 import '../../../favorite_facility.dart';
@@ -34,8 +35,25 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
         .get();
 
     final favorites = <FavoriteStation>[];
+    final seenStationIds = <String>{};
     for (final favoriteRow in favoriteRows) {
-      final stationId = favoriteRow.read<String>('station_id');
+      final storedStationId = favoriteRow.read<String>('station_id');
+      final stationId = await catalogDatabase.findCanonicalStationId(
+        storedStationId,
+      );
+      if (stationId == null) {
+        continue;
+      }
+      if (stationId != storedStationId) {
+        await _migrateFavoriteStationId(
+          storedStationId,
+          stationId,
+          favoriteRow.read<int>('added_at_value'),
+        );
+      }
+      if (!seenStationIds.add(stationId)) {
+        continue;
+      }
       final stationRows = await catalogDatabase
           .customSelect(
             '''
@@ -103,26 +121,58 @@ class DriftFavoriteStationRepository implements FavoriteStationRepository {
   @override
   Future<FavoriteStation> saveFavoriteStation(String stationId) async {
     final trimmedStationId = stationId.trim();
-    await _ensureStationExists(trimmedStationId);
+    final canonicalStationId = await catalogDatabase.findCanonicalStationId(
+      trimmedStationId,
+    );
+    if (canonicalStationId == null) {
+      throw const FavoriteStationException('즐겨찾기 역을 저장하지 못했어요.');
+    }
+    await _ensureStationExists(canonicalStationId);
     await userDatabase
         .into(userDatabase.favoriteStations)
         .insertOnConflictUpdate(
           user_db.FavoriteStationsCompanion.insert(
-            stationId: trimmedStationId,
+            stationId: canonicalStationId,
             addedAt: DateTime.now().toUtc(),
           ),
         );
     return (await listFavoriteStations()).singleWhere(
-      (favorite) => favorite.stationId == trimmedStationId,
+      (favorite) => favorite.stationId == canonicalStationId,
     );
   }
 
   @override
   Future<void> removeFavoriteStation(String stationId) async {
-    await userDatabase.customStatement(
-      'DELETE FROM favorite_stations WHERE station_id = ?',
-      [stationId.trim()],
+    final trimmedStationId = stationId.trim();
+    final canonicalStationId = await catalogDatabase.findCanonicalStationId(
+      trimmedStationId,
     );
+    await userDatabase.customStatement(
+      'DELETE FROM favorite_stations WHERE station_id = ? OR station_id = ?',
+      [trimmedStationId, canonicalStationId ?? trimmedStationId],
+    );
+  }
+
+  Future<void> _migrateFavoriteStationId(
+    String storedStationId,
+    String canonicalStationId,
+    int addedAt,
+  ) async {
+    await userDatabase.transaction(() async {
+      await userDatabase.customStatement(
+        '''
+        INSERT INTO favorite_stations (station_id, added_at)
+        VALUES (?, ?)
+        ON CONFLICT(station_id) DO UPDATE SET
+          added_at = MAX(favorite_stations.added_at, excluded.added_at)
+        ''',
+        [canonicalStationId, addedAt],
+      );
+      await userDatabase.customStatement(
+        'DELETE FROM favorite_stations WHERE station_id = ?',
+        [storedStationId],
+      );
+    });
   }
 
   Future<void> _ensureStationExists(String stationId) async {

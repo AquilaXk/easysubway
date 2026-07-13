@@ -3,6 +3,7 @@ import 'package:sqlite3/common.dart' show SqliteException;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../core/database/catalog/canonical_station_id.dart';
 import '../../core/database/catalog/catalog_database.dart';
 import '../../core/database/catalog/station_timetable_query.dart';
 import '../../core/database/user/user_database.dart';
@@ -77,9 +78,14 @@ class NextTrainWidgetRepository {
     if (favorites.isEmpty) {
       return const [];
     }
-    final stationIds = favorites
-        .map((row) => row.read<String>('station_id'))
-        .toList(growable: false);
+    final stationIds = <String>{};
+    for (final favorite in favorites) {
+      final stationId = await catalogDatabase.findCanonicalStationId(
+        favorite.read<String>('station_id'),
+      );
+      if (stationId != null) stationIds.add(stationId);
+    }
+    if (stationIds.isEmpty) return const [];
     final placeholders = List.filled(stationIds.length, '?').join(',');
     final rows = await catalogDatabase.customSelect('''
           SELECT DISTINCT
@@ -119,6 +125,18 @@ class NextTrainWidgetRepository {
     WidgetStationSelection selection,
     DateTime now,
   ) async {
+    final canonicalStationId = await catalogDatabase.findCanonicalStationId(
+      selection.stationId,
+    );
+    if (canonicalStationId != null &&
+        canonicalStationId != selection.stationId) {
+      selection = WidgetStationSelection(
+        stationId: canonicalStationId,
+        lineId: selection.lineId,
+        stationName: selection.stationName,
+        lineName: selection.lineName,
+      );
+    }
     final serviceNow = tz.TZDateTime.from(now, _seoulLocation);
     final feedEndDate = await _feedEndDate();
     if (feedEndDate == null) {
