@@ -287,6 +287,25 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   );
 });
 
+test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 제공한다", async () => {
+  const catalog = await loadProjectCatalog();
+  const entry = findCatalogEntry(catalog, "provider:kric-transfer-movement-standard");
+
+  assert.deepEqual(entry.providerApproval, {
+    status: "APPROVED",
+    serviceId: "handicapped",
+    operationId: "transferMovement",
+    validFrom: "2026-07-06",
+    validTo: "2027-07-06",
+    evidenceSource: "owner-confirmed",
+    recordedAt: "2026-07-13",
+  });
+  assert.equal(entry.operation.auth.env, "KRIC_SERVICE_KEY");
+  assert.equal(entry.operation.auth.parameter, "serviceKey");
+  assert.equal(entry.operation.auth.valueEncoding, "url-search-params-once");
+  assert.equal(entry.operation.auth.loadPolicy, "process-env-no-shell-parsing");
+});
+
 test("catalog 운영 계약은 repository-local 전용과 source-of-truth 경계를 고정한다", async () => {
   const policy = await loadCatalogPolicy();
 

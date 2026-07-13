@@ -6,6 +6,7 @@ import {
   listOperations,
   operationSummary,
   validateOperation,
+  validateSourceCandidateDocument,
 } from "./source-operation.mjs";
 import * as sourceOperation from "./source-operation.mjs";
 
@@ -63,6 +64,107 @@ test("show는 operation이 없어도 기존 endpoint와 response fields를 반�
   );
   assert.deepEqual(summary.responseFields, ["fieldA"]);
   assert.equal(summary.operation, null);
+});
+
+test("source candidate 정본은 repository 경로와 구조화된 provider 승인을 검증한다", () => {
+  const document = {
+    schemaVersion: 1,
+    artifactKind: "production-source-candidates",
+    source: "tools/datapack/source-candidates.json",
+    updatedAt: "2026-07-13",
+    candidates: [candidate("a", {
+      providerApproval: {
+        status: "APPROVED",
+        serviceId: "handicapped",
+        operationId: "transferMovement",
+        validFrom: "2026-07-06",
+        validTo: "2027-07-06",
+        evidenceSource: "owner-confirmed",
+        recordedAt: "2026-07-13",
+      },
+    })],
+  };
+
+  assert.equal(validateSourceCandidateDocument(document), document);
+  assert.deepEqual(operationSummary(document.candidates[0]).providerApproval, document.candidates[0].providerApproval);
+});
+
+test("provider 승인은 잘못된 기간과 secret-like field를 거부한다", () => {
+  const base = {
+    schemaVersion: 1,
+    artifactKind: "production-source-candidates",
+    source: "tools/datapack/source-candidates.json",
+    updatedAt: "2026-07-13",
+  };
+  const approval = {
+    status: "APPROVED",
+    serviceId: "handicapped",
+    operationId: "transferMovement",
+    validFrom: "2027-07-06",
+    validTo: "2026-07-06",
+    evidenceSource: "owner-confirmed",
+    recordedAt: "2026-07-13",
+  };
+
+  assert.throws(
+    () => validateSourceCandidateDocument({ ...base, candidates: [candidate("a", { providerApproval: approval })] }),
+    /validTo must not precede validFrom/,
+  );
+  assert.throws(
+    () => validateSourceCandidateDocument({
+      ...base,
+      candidates: [candidate("a", { providerApproval: { ...approval, validTo: "2028-07-06", serviceKey: "secret" } })],
+    }),
+    /secret-like values are forbidden/,
+  );
+  assert.throws(
+    () => validateSourceCandidateDocument({
+      ...base,
+      candidates: [candidate("a", { providerApproval: { ...approval, validTo: "2028-07-06", recordedAt: "2026-02-31" } })],
+    }),
+    /recordedAt must be an ISO date/,
+  );
+});
+
+test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지를 고정한다", () => {
+  const operation = validOperation({
+    auth: {
+      env: "KRIC_SERVICE_KEY",
+      placement: "query",
+      parameter: "serviceKey",
+      valueEncoding: "url-search-params-once",
+      loadPolicy: "process-env-no-shell-parsing",
+    },
+    runner: {
+      command: "node tools/datapack/probe-provider.mjs",
+      requiredEnv: ["KRIC_SERVICE_KEY"],
+    },
+  });
+
+  assert.equal(validateOperation(candidate("a", { operation })), operation);
+  const summary = operationSummary(candidate("a", { operation }));
+  assert.match(summary.operation.auth.loadPolicy, /no-shell-parsing/);
+  assert.match(sourceOperation.operationHumanSummary(summary), /^provider approval: none$/m);
+  assert.match(sourceOperation.operationHumanSummary(summary), /^auth value encoding: url-search-params-once$/m);
+  assert.match(sourceOperation.operationHumanSummary(summary), /^auth load policy: process-env-no-shell-parsing$/m);
+});
+
+test("승인된 provider의 human 요약은 승인 범위와 기간을 표시한다", () => {
+  const summary = operationSummary(candidate("a", {
+    providerApproval: {
+      status: "APPROVED",
+      serviceId: "handicapped",
+      operationId: "transferMovement",
+      validFrom: "2026-07-06",
+      validTo: "2027-07-06",
+      evidenceSource: "owner-confirmed",
+      recordedAt: "2026-07-13",
+    },
+  }));
+
+  assert.match(sourceOperation.operationHumanSummary(summary), /^provider approval: APPROVED$/m);
+  assert.match(sourceOperation.operationHumanSummary(summary), /^provider operation: handicapped\/transferMovement$/m);
+  assert.match(sourceOperation.operationHumanSummary(summary), /^approval valid: 2026-07-06\.\.2027-07-06$/m);
 });
 
 test("show는 operation이 없어도 sample URL credential을 출력 전에 거부한다", () => {

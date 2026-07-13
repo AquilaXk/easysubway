@@ -6640,7 +6640,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
-  assert.equal(candidates.source, "easysubway_public_subway_api_inventory.xlsx");
+  assert.equal(candidates.source, "tools/datapack/source-candidates.json");
+  assert.equal(candidates.updatedAt, "2026-07-13");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
@@ -7218,6 +7219,24 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(candidate.sampleEvidenceStatus, "sample_url_documented_key_required");
   assert.equal(candidate.admissionStatus, "evidence_recorded_admin_review_required");
   assert.equal(candidate.automaticRouteGraphEdgeAllowed, false);
+  assert.deepEqual(candidate.providerApproval, {
+    status: "APPROVED",
+    serviceId: "handicapped",
+    operationId: "transferMovement",
+    validFrom: "2026-07-06",
+    validTo: "2027-07-06",
+    evidenceSource: "owner-confirmed",
+    recordedAt: "2026-07-13",
+  });
+  assert.deepEqual(candidate.operation.auth, {
+    env: "KRIC_SERVICE_KEY",
+    placement: "query",
+    parameter: "serviceKey",
+    valueEncoding: "url-search-params-once",
+    loadPolicy: "process-env-no-shell-parsing",
+  });
+  assert.equal(candidate.operation.runner.command, "node tools/datapack/collect-kric-source-candidate-evidence.mjs");
+  assert.deepEqual(candidate.operation.runner.requiredEnv, ["KRIC_SERVICE_KEY", "RUNNER_TEMP"]);
   assert.equal(candidate.detailUrl, "https://data.kric.go.kr/rips/M_01_02/detail.do?id=428&service=handicapped&operation=transferMovement&page=2");
   assert.equal(candidate.evidence.detailPageUrl, candidate.detailUrl);
   assert.equal(candidate.evidence.usePermissionRange, "저작권표시");
