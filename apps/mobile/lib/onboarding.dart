@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 
 import 'accessible_design.dart';
 import 'design_tokens.dart';
-import 'mobility_profile.dart';
+import 'features/mobility_profile/mobility_preset_labels.dart';
+import 'features/mobility_profile/mobility_preset_picker.dart'
+    show MobilityPresetRow, mobilityPresetSheetOrder;
+import 'features/mobility_profile/mobility_profile_policy.dart';
 import 'mobile_error_reporter.dart';
 import 'notification_settings.dart';
 import 'secure_key_value_storage.dart';
@@ -129,22 +132,21 @@ class OnboardingViewPreferences {
 }
 
 class OnboardingResult {
-  const OnboardingResult({required this.profile, required this.preferences});
+  const OnboardingResult({required this.preset, required this.preferences});
 
   factory OnboardingResult.fromJson(Map<String, Object?> json) {
-    final profileId = json['profileId'];
     final preferences = json['preferences'];
-    if (profileId is! String || preferences is! Map<String, Object?>) {
+    if (preferences is! Map<String, Object?>) {
       throw const FormatException('Invalid onboarding storage payload');
     }
 
-    final profile = mobilityProfileOptions.firstWhere(
-      (option) => option.id == profileId,
-      orElse: () => throw const FormatException('Invalid onboarding profile'),
-    );
+    final preset = _readPreset(json);
+    if (preset == null) {
+      throw const FormatException('Invalid onboarding preset');
+    }
 
     return OnboardingResult(
-      profile: profile,
+      preset: preset,
       preferences: OnboardingViewPreferences.fromJson(preferences),
     );
   }
@@ -157,15 +159,35 @@ class OnboardingResult {
     return OnboardingResult.fromJson(decoded);
   }
 
-  final MobilityProfileOption profile;
+  final MobilityPreset preset;
   final OnboardingViewPreferences preferences;
 
+  /// 프리셋 대표 이동 유형 문자열(요청·설정에 공급).
+  String get mobilityType =>
+      mobilityPresetRepresentativeMobilityType(preset);
+
   Map<String, Object?> toJson() {
-    return {'profileId': profile.id, 'preferences': preferences.toJson()};
+    return {
+      'preset': mobilityPresetServerString(preset),
+      'preferences': preferences.toJson(),
+    };
   }
 
   String encode() {
     return jsonEncode(toJson());
+  }
+
+  /// 신규 `preset`(server string) 우선, 없으면 구 `profileId`를 승계한다(데이터 소실 금지).
+  static MobilityPreset? _readPreset(Map<String, Object?> json) {
+    final preset = json['preset'];
+    if (preset is String) {
+      return mobilityPresetFromServerString(preset);
+    }
+    final profileId = json['profileId'];
+    if (profileId is String) {
+      return mobilityPresetFromLegacyProfileId(profileId);
+    }
+    return null;
   }
 }
 
@@ -539,8 +561,8 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  // #1936: 첫 프리셋을 기본 선택으로 두어 "이대로 시작"으로 빠르게 통과할 수 있게 한다.
-  MobilityProfileOption? _selectedProfile = mobilityProfileOptions.first;
+  // #1936: 기본 선택(표준 보행)을 두어 "이대로 시작"으로 빠르게 통과할 수 있게 한다.
+  MobilityPreset _selectedPreset = MobilityPreset.standard;
   // 온보딩에서는 보기 설정(고대비·간편 보기)을 다루지 않는다. 기본값으로 완료하고,
   // 상세 설정은 더보기·설정 화면에서 바꾼다(#1563).
   final OnboardingViewPreferences _preferences =
@@ -552,31 +574,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedProfile = _selectedProfile;
     final textTheme = Theme.of(context).textTheme;
     // 알림 기능 가용 여부의 단일 소스: 알림 권한 provider가 주입됐는지(#1579).
     // 더보기 알림 섹션(notificationRepository)과 함께 켜지고 꺼진다.
     final notificationAvailable = widget.notificationPermissionProvider != null;
-    final profileOptions = [
-      mobilityProfileOptions.firstWhere((profile) => profile.id == 'elderly'),
-      mobilityProfileOptions.firstWhere(
-        (profile) => profile.id == 'wheelchair',
-      ),
-      mobilityProfileOptions.firstWhere((profile) => profile.id == 'stroller'),
-      mobilityProfileOptions.firstWhere((profile) => profile.id == 'pregnant'),
-      mobilityProfileOptions.firstWhere((profile) => profile.id == 'injured'),
-      mobilityProfileOptions.firstWhere((profile) => profile.id == 'luggage'),
-    ];
 
-    final onNext = selectedProfile == null
-        ? null
-        : () {
-            if (_currentStep == 0) {
-              setState(() => _currentStep = 1);
-              return;
-            }
-            _completeOnboarding();
-          };
+    // 프리셋은 항상 기본값이 선택돼 있어 CTA는 늘 활성이다(#1703).
+    void onNext() {
+      if (_currentStep == 0) {
+        setState(() => _currentStep = 1);
+        return;
+      }
+      _completeOnboarding();
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -626,7 +636,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     header: true,
                     child: Text(
                       // 질문 한 줄, 설명 문장 없음(#1936).
-                      '어떻게 이동하세요?',
+                      '어떻게 걸으세요?',
                       style: textTheme.titleLarge?.copyWith(
                         color: EasySubwayAccessibleColors.text,
                         fontWeight: FontWeight.w800,
@@ -636,19 +646,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const SizedBox(height: EasySubwaySpacing.xl),
-                  for (var i = 0; i < profileOptions.length; i++) ...[
+                  for (
+                    var i = 0;
+                    i < mobilityPresetSheetOrder.length;
+                    i++
+                  ) ...[
                     if (i != 0)
                       const Divider(
                         height: 1,
                         thickness: 1,
                         color: EasySubwayAccessibleColors.line,
                       ),
-                    _OnboardingProfileRow(
-                      profile: profileOptions[i],
-                      selected: profileOptions[i].id == selectedProfile?.id,
+                    MobilityPresetRow(
+                      preset: mobilityPresetSheetOrder[i],
+                      selected: mobilityPresetSheetOrder[i] == _selectedPreset,
+                      // 온보딩 step0은 각 행 아래 부가설명도 노출한다(#1703).
+                      showDescription: true,
                       onTap: () {
                         setState(() {
-                          _selectedProfile = profileOptions[i];
+                          _selectedPreset = mobilityPresetSheetOrder[i];
                         });
                       },
                     ),
@@ -802,12 +818,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _completeOnboarding() {
-    final selectedProfile = _selectedProfile;
-    if (selectedProfile == null) {
-      return;
-    }
     widget.onCompleted(
-      OnboardingResult(profile: selectedProfile, preferences: _preferences),
+      OnboardingResult(preset: _selectedPreset, preferences: _preferences),
     );
   }
 
@@ -886,84 +898,5 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       setState(() => _showNotificationPermissionFailureNextAction = true);
     }
     return false;
-  }
-}
-
-/// #1936: 이동 방식 프리셋 행 — 무채색 라인 아이콘 + 라벨 + 우측 선택 표시.
-///
-/// personalization-first 리스트로서 프리미엄 리듬을 위해 좌측에 무채색 라인
-/// 아이콘을 둔다(색 없음 — 선택 여부와 무관하게 잉크 톤). 박스 아님(행 + Divider는
-/// 부모가 그림). 설명 문장 없음. 선택 시 우측에 체크 표시. 탭 스플래시 사각형이
-/// 생기지 않도록 GestureDetector를 쓰고, 높이는 접근성 터치 기준(≥56)을 지킨다.
-class _OnboardingProfileRow extends StatelessWidget {
-  const _OnboardingProfileRow({
-    required this.profile,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final MobilityProfileOption profile;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Semantics(
-      label: profile.semanticsLabel(selected),
-      selected: selected,
-      button: true,
-      onTap: onTap,
-      child: ExcludeSemantics(
-        child: GestureDetector(
-          key: Key('onboardingProfileCard-${profile.id}'),
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 60),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                children: [
-                  // 무채색 라인 아이콘 — 시각 리듬만. 선택 시 잉크를 진하게 해
-                  // 색 없이도 선택 위계를 준다(초록/틴트 금지).
-                  Icon(
-                    profile.icon,
-                    size: 24,
-                    color: selected
-                        ? EasySubwayAccessibleColors.text
-                        : EasySubwayAccessibleColors.mutedText,
-                  ),
-                  const SizedBox(width: EasySubwaySpacing.lg),
-                  Expanded(
-                    child: Text(
-                      // 라벨만 노출한다. 상세 요약은 홈 설정에서 확인(#1936).
-                      profile.title,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: EasySubwayAccessibleColors.text,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
-                        fontSize: 18,
-                        height: 1.25,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: EasySubwaySpacing.md),
-                  if (selected)
-                    const Icon(
-                      Icons.check,
-                      size: 22,
-                      color: EasySubwayAccessibleColors.primary,
-                    )
-                  else
-                    const SizedBox(width: 22),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

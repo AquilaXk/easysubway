@@ -5,6 +5,8 @@ import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
 import '../../fare/official_od_fare_quote.dart';
 import '../../fare/official_od_fare_repository.dart';
+import '../../mobility_profile/mobility_preset_labels.dart';
+import '../../mobility_profile/mobility_profile_policy.dart';
 import '../application/network_graph.dart' as graph;
 import '../application/route_engine.dart';
 import '../domain/route_request.dart' as local;
@@ -181,7 +183,23 @@ class LocalRouteRepository implements RouteSearchRepository {
     final lineIds = result.lineIds;
     final primaryLineId = lineIds.isEmpty ? '' : lineIds.first;
     final primaryLineName = catalog.lineName(primaryLineId);
-    final steps = _toSteps(result, catalog, plannedArrivals: plannedArrivals);
+    // 이 검색에 적용할 보행 프리셋을 한 번 판정해 스텝 보정과 STEP_FREE 가산에
+    // 재사용한다: 서버 문자열 우선, 없으면 대표 이동유형, 그래도 없으면 표준.
+    final preset = _mobilityPresetFor(request);
+    final steps = _toSteps(
+      result,
+      catalog,
+      plannedArrivals: plannedArrivals,
+      preset: preset,
+    );
+    // 스텝 표시분의 합(60초 단위)을 총 소요시간으로 쓴다. STEP_FREE는 승강기
+    // 대기를 엔진 elevator 스텝 개수와 무관하게 경로당 정확히 1회만 가산해
+    // backend ProfileWalkTimeCalculator(ceil(baseline*speedFactor) + STEP_FREE
+    // 60초 1회)와 정합시킨다.
+    var estimatedDurationSeconds = _estimatedDurationSeconds(steps);
+    if (preset == MobilityPreset.stepFree) {
+      estimatedDurationSeconds += MobilityProfilePolicy.stepFreeElevatorWaitSeconds;
+    }
 
     return RouteSearchResult(
       routeSearchId:
@@ -197,7 +215,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       lineName: primaryLineName,
       score: result.accessibilityScore,
       burdenCost: result.generalizedCost,
-      estimatedDurationSeconds: _estimatedDurationSeconds(steps),
+      estimatedDurationSeconds: estimatedDurationSeconds,
       walkingDistanceMeters: _walkingDistanceMeters(steps),
       transferCount: _transferCount(steps),
       evidenceSummary: _evidenceSummary(result),
@@ -222,6 +240,20 @@ class LocalRouteRepository implements RouteSearchRepository {
     );
   }
 
+  /// 요청의 보행 프리셋을 판정한다: v2 서버 문자열(mobilityPreset)이 있으면 우선,
+  /// 없거나 매핑 실패면 대표 이동유형(mobilityType)으로, 그래도 없으면 표준으로 폴백.
+  MobilityPreset _mobilityPresetFor(RouteSearchRequest request) {
+    final serverPreset = request.mobilityPreset;
+    if (serverPreset != null) {
+      final mapped = mobilityPresetFromServerString(serverPreset);
+      if (mapped != null) {
+        return mapped;
+      }
+    }
+    return mobilityPresetFromRepresentativeMobilityType(request.mobilityType) ??
+        MobilityPreset.standard;
+  }
+
   String _routeStatus(local.RouteStatus status) {
     return switch (status) {
       local.RouteStatus.found => 'FOUND',
@@ -236,10 +268,21 @@ class LocalRouteRepository implements RouteSearchRepository {
     local.LocalRouteResult result,
     _RouteCatalogSnapshot catalog, {
     required Map<int, String> plannedArrivals,
+    required MobilityPreset preset,
   }) {
+    final speedFactor = MobilityProfilePolicy.presets[preset]!.speedFactor;
     return _collapseConsecutiveRideSteps(result.steps).indexed
         .map((entry) {
           final (index, step) = entry;
+          // speedFactor는 보행 성분에만 곱한다. 주행 성분(ride/waypoint)의
+          // durationSeconds는 실제 시간표 기반이므로 절대 보정하지 않는다.
+          final isWalking =
+              step.type != route_step.RouteStepType.ride &&
+              step.type != route_step.RouteStepType.waypoint;
+          final adjustedDurationSeconds =
+              (isWalking && step.durationSeconds > 0)
+              ? (step.durationSeconds * speedFactor).ceil()
+              : step.durationSeconds;
           final fromStationId = catalog.stationIdForNode(step.fromNodeId);
           final toStationId = catalog.stationIdForNode(step.toNodeId);
           final fromName = catalog.stationName(fromStationId);
@@ -255,7 +298,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             lineName: lineName,
             fromStationId: fromStationId,
             toStationId: toStationId,
-            estimatedMinutes: _estimatedMinutesFor(step.durationSeconds),
+            estimatedMinutes: _estimatedMinutesFor(adjustedDurationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
             stairAccessState: step.stairAccessState,
@@ -601,6 +644,11 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   local.MobilityType _mobilityType(String mobilityType) {
     return switch (mobilityType) {
+      // STANDARD는 계단 회피 없는 표준 보행이나 local enum에 직접 대응이 없어,
+      // preferStepFree(strict 아님)라 blocksStairOnlyAccess=false인 senior로 폴백한다.
+      // speedFactor STANDARD=1.0이라 무보정이고, 이 폴백은 offline 결과의 mobilityType
+      // 표기에만 영향을 줄 뿐 실제 필터링은 preferStepFree라 동일하다.
+      'STANDARD' => local.MobilityType.senior,
       'SENIOR' => local.MobilityType.senior,
       'STROLLER' => local.MobilityType.stroller,
       'WHEELCHAIR' => local.MobilityType.wheelchair,

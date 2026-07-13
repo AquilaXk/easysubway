@@ -11325,7 +11325,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /stationSearchFailureNextAction/);
   assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
-  assert.match(main, /initialMobilityType: onboardingResult\?\.profile\.mobilityType/);
+  assert.match(main, /initialMobilityType: onboardingResult\?\.mobilityType/);
   assert.match(main, /initialMobilityType: initialMobilityType/);
   assert.match(main, /_OnboardingPreferenceScope/);
   assert.doesNotMatch(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
@@ -11352,8 +11352,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboarding, /class OnboardingResult/);
   assert.match(onboarding, /class OnboardingState/);
   assert.match(onboarding, /class OnboardingScreen extends StatefulWidget/);
-  // #1936: 온보딩 재설계로 대체된 현행 이동 조건 선택 안내 카피
-  assert.match(onboarding, /어떻게 이동하세요\?/);
+  // #1703: 보행 프리셋 온보딩으로 대체된 현행 이동 조건 선택 안내 카피
+  assert.match(onboarding, /어떻게 걸으세요\?/);
   assert.doesNotMatch(onboarding, /큰 글자/);
   assert.match(onboarding, /고대비/);
   assert.match(onboarding, /간편 보기/);
@@ -11361,11 +11361,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /final String initialMobilityType/);
   assert.match(routeSearch, /final bool simpleViewEnabled/);
   assert.match(routeSearch, /_resolveInitialMobilityType/);
-  assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
-  // #1933: 결과-우선 정리로 대체된 현행 이동 조건 변경 진입점
-  assert.match(routeSearch, /_RouteConditionChips\([\s\S]*mobilityType: _selectedMobilityType[\s\S]*onChangeMobility: _showMobilityTypePicker/);
+  assert.match(routeSearch, /_applyPresetDerivedState\(_selectedPreset\)/);
+  // #1703: 프리셋 칩·시트로 정리된 현행 이동 조건 변경 진입점
+  assert.match(routeSearch, /_RouteConditionChips\([\s\S]*preset: _selectedPreset[\s\S]*onChangePreset: _showMobilityPresetPicker/);
   assert.match(routeSearch, /routeConditionMobilityChip/);
-  assert.match(routeSearch, /routeMobilityOption-\$\{option\.mobilityType\}/);
+  assert.match(routeSearch, /showMobilityPresetSheet\([\s\S]*current: _selectedPreset/);
   assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);

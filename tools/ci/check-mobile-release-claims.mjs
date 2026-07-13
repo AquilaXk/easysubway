@@ -11,10 +11,16 @@ async function main() {
   const supportedClaimKo = scope.supportScope?.supportedClaimKo;
   if (!supportedClaimKo) throw new Error("production scope supportedClaimKo missing");
 
+  const allowedPhrasesKo = config.allowedPhrasesKo ?? [];
   const failures = [];
   for (const target of config.scanTargets ?? []) {
     for (const file of await targetFiles(root, target)) {
-      const text = await scanText(file, target);
+      const rawText = await scanText(file, target);
+      // 허용 구절(시설명 등)을 먼저 전부 치환 제거한 뒤 남은 텍스트에서 금지 표현을 검사한다.
+      let text = rawText;
+      for (const phrase of allowedPhrasesKo) {
+        text = text.split(phrase).join("");
+      }
       for (const claim of config.forbiddenClaimsKo ?? []) {
         if (text.includes(claim)) failures.push(`${path.relative(root, file)} contains forbidden release claim: ${claim}`);
       }
