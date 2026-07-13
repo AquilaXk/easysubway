@@ -505,13 +505,13 @@ function tagoStationIds(input) {
     }
     if (!row.stationCode) continue;
     if (stationIdsByCode.get(row.stationCode)?.explicit) continue;
+    if (row.lineId !== "seoul-4") {
+      throw new Error(`Unsupported lineId for pilot mapping: ${row.lineId}`);
+    }
     // seoul-4 코레일 구간 한정 폴백. 비-코레일 역은 providerStationId를 명시해야 한다.
     if (row.stationCode.startsWith("MTRKR")) {
       stationIdsByCode.set(row.stationCode, { stationId: row.stationCode, explicit: false });
       continue;
-    }
-    if (row.lineId !== "seoul-4") {
-      throw new Error(`Unsupported lineId for pilot mapping: ${row.lineId}`);
     }
     stationIdsByCode.set(row.stationCode, { stationId: `MTRKR4${row.stationCode}`, explicit: false });
   }
@@ -522,10 +522,11 @@ function tagoStationIds(input) {
 }
 
 function scopedStationLineRows(input) {
-  const publicStationIds = new Set(input.supportedV1Scope?.includedStationIds ?? []);
-  if (publicStationIds.size === 0) {
+  const includedStationIds = input.supportedV1Scope?.includedStationIds;
+  if (!Array.isArray(includedStationIds)) {
     return input.stationLineRows ?? [];
   }
+  const publicStationIds = new Set(includedStationIds);
   const publicMappingKeys = new Set(
     (input.stationMappings ?? [])
       .filter((mapping) => publicStationIds.has(mapping.stationId))

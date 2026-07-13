@@ -5677,6 +5677,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   const scope = readJson("apps/mobile/release/production-datapack-scope.json");
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const productionInput = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const reviewedPack = readJson("tools/datapack/release/capital-production-reviewed-pack.json").packs[0];
   const inventory = readJson("tools/datapack/source-inventory.json");
   const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
 
@@ -5726,10 +5727,21 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(productionInput.routeRegressionScope, undefined);
   assert.deepEqual(productionInput.routeGraphTopologyPolicy, { summaryRideEdges: "fixture-only" });
   assert.ok(productionInput.sourceIds.includes("kric-subway-timetable"));
-  assert.ok(productionInput.transitTrips.length >= 400);
-  assert.ok(productionInput.transitStopTimes.length >= 900);
+  assert.ok(productionInput.transitTrips.length >= 460);
+  assert.ok(productionInput.transitStopTimes.length >= 7400);
   assert.deepEqual(productionInput.transitFeedInfo, [{ feedEndDate: "20261231" }]);
   assert.equal(productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE").length, 30);
+  const accessibilitySnapshotId = inventorySources.get("seoul-metro-accessibility")
+    .admissionEvidence.snapshotId;
+  const accessibilityRows = [
+    ...reviewedPack.networkEdges,
+    ...reviewedPack.stationFacilityEvidence,
+  ].filter((row) => row.sourceId === "seoul-metro-accessibility");
+  assert.equal(accessibilityRows.length, 6);
+  assert.ok(
+    accessibilityRows.every((row) => row.sourceSnapshotId === accessibilitySnapshotId),
+    "accessibility rows must reference the admitted snapshot",
+  );
   assert.deepEqual(productionInput.representativeRouteRegressions, []);
   for (const edge of productionInput.routeEdges.filter((routeEdge) => routeEdge.edgeType === "RIDE")) {
     assert.ok(edge.durationSeconds > 0, `${edge.id} must have a positive timetable-derived duration`);

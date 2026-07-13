@@ -92,6 +92,22 @@ class LocalRouteRepository implements RouteSearchRepository {
             catalog.hasStation(waypointStationId));
   }
 
+  bool _hasTransitPassThroughEndpoint(
+    _RouteCatalogSnapshot catalog,
+    RouteSearchRequest request,
+  ) {
+    final waypointStationId = request.waypointStationId?.trim();
+    return catalog.transitPassThroughStationIds.contains(
+          request.originStationId,
+        ) ||
+        catalog.transitPassThroughStationIds.contains(
+          request.destinationStationId,
+        ) ||
+        (waypointStationId != null &&
+            waypointStationId.isNotEmpty &&
+            catalog.transitPassThroughStationIds.contains(waypointStationId));
+  }
+
   @override
   Future<RouteSearchResult> searchRoute(RouteSearchRequest request) async {
     final catalog = await _RouteCatalogSnapshot.load(catalogDatabase);
@@ -105,7 +121,15 @@ class LocalRouteRepository implements RouteSearchRepository {
         blocksStairOnly && !catalog.strictEvidenceSupported;
     final waypointStationId = request.waypointStationId?.trim();
     final local.LocalRouteResult result;
-    if (waypointStationId == null || waypointStationId.isEmpty) {
+    if (_hasTransitPassThroughEndpoint(catalog, request)) {
+      result = const local.LocalRouteResult(
+        status: local.RouteStatus.unsupported,
+        totalCost: 0,
+        steps: [],
+        warnings: [],
+        blockedReasonCodes: ['BLOCKED_UNSUPPORTED_SCOPE'],
+      );
+    } else if (waypointStationId == null || waypointStationId.isEmpty) {
       result = blocksStrictGlobally
           ? local.LocalRouteResult.unknown(const [
               'STRICT_EVIDENCE_UNSUPPORTED',

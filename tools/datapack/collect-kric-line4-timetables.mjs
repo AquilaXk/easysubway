@@ -39,6 +39,24 @@ export function credentialFreeRawArchiveRows(rows) {
   });
 }
 
+export function successfulKricRows(payload) {
+  const code = String(payload?.header?.resultCode ?? "");
+  if (code !== "00") {
+    const message = String(payload?.header?.resultMsg ?? "unknown");
+    throw new Error(`KRIC provider failure: resultCode=${code || "missing"}, resultMsg=${message}`);
+  }
+  if (!Array.isArray(payload.body)) {
+    throw new Error("KRIC provider success body must be an array");
+  }
+  return payload.body;
+}
+
+export function assertCompleteCollection(failed, requestCount) {
+  if (failed > 0) {
+    throw new Error(`KRIC collection incomplete: ${failed}/${requestCount} requests failed`);
+  }
+}
+
 export function buildCollectionContext(roster, lineId) {
   const stationIdByProviderStation = {};
   const lineIdByProviderLine = {};
@@ -80,14 +98,13 @@ async function main() {
     const url = `${request.endpoint}?serviceKey=${encodeURIComponent(key)}&format=json&railOprIsttCd=${request.params.railOprIsttCd}&dayCd=${request.params.dayCd}&lnCd=${request.params.lnCd}&stinCd=${request.params.stinCd}`;
     try {
       const payload = JSON.parse(await fetchWithRetry(url));
-      const code = payload?.header?.resultCode;
-      const rows = Array.isArray(payload.body) ? payload.body : [];
+      const rows = successfulKricRows(payload);
       // servicePattern은 normalizer가 row별 exptCd로 도출한다(급행 표시 시각표).
-      const successfulRows = code === "00" ? credentialFreeRawArchiveRows(rows) : [];
-      const normalized = code === "00" ? normalizeKricSubwayTimetable(rows, context) : [];
+      const successfulRows = credentialFreeRawArchiveRows(rows);
+      const normalized = normalizeKricSubwayTimetable(rows, context);
       rawArchiveRows.push(...successfulRows);
       intermediate.push(...normalized);
-      perRequest.push({ requestKey: request.requestKey, resultCode: code, rows: rows.length, normalized: normalized.length });
+      perRequest.push({ requestKey: request.requestKey, resultCode: "00", rows: rows.length, normalized: normalized.length });
     } catch (error) {
       failed += 1;
       perRequest.push({ requestKey: request.requestKey, error: redactKey(String(error.message), key) });
@@ -112,6 +129,7 @@ async function main() {
   if (args.output) {
     await writeFile(args.output, `${JSON.stringify(artifact, null, 2)}\n`);
   }
+  assertCompleteCollection(failed, plan.requestCount);
   if (args["raw-output"]) {
     await writeFile(args["raw-output"], `${JSON.stringify(rawArchiveRows, null, 2)}\n`);
   }

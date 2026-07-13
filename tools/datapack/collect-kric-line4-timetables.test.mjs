@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  assertCompleteCollection,
   buildCollectionContext,
   credentialFreeRawArchiveRows,
   fetchWithRetry,
+  successfulKricRows,
 } from "./collect-kric-line4-timetables.mjs";
 import { normalizeKricSubwayTimetable } from "./normalize-kric-timetable.mjs";
 import { reconstructTransitTrips } from "./reconstruct-transit-trips.mjs";
@@ -73,6 +75,18 @@ test("KRIC raw archive는 문서화된 provider 필드만 보존한다", () => {
       exptCd: "0",
     },
   ]);
+});
+
+test("KRIC provider 오류 응답은 빈 성공 데이터로 취급하지 않는다", () => {
+  assert.throws(
+    () => successfulKricRows({ header: { resultCode: "30", resultMsg: "등록되지 않은 서비스키입니다." } }),
+    /resultCode=30/,
+  );
+});
+
+test("KRIC 요청 실패가 하나라도 있으면 수집 완료로 처리하지 않는다", () => {
+  assert.throws(() => assertCompleteCollection(1, 153), /KRIC collection incomplete: 1\/153 requests failed/);
+  assert.doesNotThrow(() => assertCompleteCollection(0, 153));
 });
 
 test("KRIC 수집 요청은 timeout 뒤 bounded retry로 중단한다", async () => {

@@ -2069,6 +2069,14 @@ void main() {
     );
     await _insertVerifiedNetworkEdge(
       database,
+      id: 'entry-b',
+      fromNodeId: 'station-b',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'ENTRY',
+      durationSeconds: 30,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
       id: 'ride-b-c',
       fromNodeId: 'station-b:line-test',
       toNodeId: 'station-c:line-test',

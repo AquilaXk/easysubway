@@ -81,6 +81,27 @@ test("TAGO 시간표 수집 plan은 파일럿 매핑 대상이 아닌 lineId를 
   );
 });
 
+test("TAGO 시간표 수집 plan은 명시적으로 빈 공개 역 scope를 전체 역으로 확장하지 않는다", () => {
+  assert.throws(
+    () =>
+      buildTagoScheduleCollectionPlan({
+        supportedV1Scope: { includedStationIds: [] },
+        stationLineRows: [{ stationCode: "448", lineId: "seoul-4" }],
+      }),
+    /stationLineRows must contain at least one providerStationId or stationCode/,
+  );
+});
+
+test("TAGO 시간표 수집 plan은 MTRKR 형식이어도 seoul-4가 아닌 노선을 거부한다", () => {
+  assert.throws(
+    () =>
+      buildTagoScheduleCollectionPlan({
+        stationLineRows: [{ stationCode: "MTRKR113", lineId: "busan-1" }],
+      }),
+    /Unsupported lineId for pilot mapping: busan-1/,
+  );
+});
+
 test("TAGO 시간표 수집 plan CLI는 checkpoint와 output을 적용한다", async (t) => {
   const dir = await mkdtemp(path.join(os.tmpdir(), "tago-plan-"));
   t.after(async () => {

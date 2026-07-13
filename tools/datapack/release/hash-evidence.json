@@ -52,7 +52,7 @@
   },
   "fixturePath": {
     "value": "tools/datapack/release/capital-production-reviewed-pack.json",
-    "sha256": "659797e5d56dbe5f5b9feaf75d1de7f68ceee76085501a088137eb493a0cff8e",
+    "sha256": "3c46fcb398ef4bc27a09b17deac33ed50c2edbfa3366dda6d35b120b161b209f",
     "contract": "build spec과 release workflow가 reviewed fixture raw bytes SHA-256을 재계산해 일치하지 않으면 차단한다. pack.artifactKind=production이며 4호선 상록수-사당 graph를 포함한다."
   },
   "identifiers": {
