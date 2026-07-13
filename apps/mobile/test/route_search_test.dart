@@ -1489,7 +1489,7 @@ void main() {
     expect(requestedAuthorizations, everyElement(startsWith('Basic ')));
     expect(favorites.single.summaryTitle, '상록수에서 사당까지');
     expect(saved.favoriteRouteId, 'route-1');
-    expect(saved.mobilityLabel, '천천히 이동');
+    expect(saved.mobilityLabel, '천천히');
     // 플레이스홀더(score/이동·접근성 메트릭) 문구는 카드·시맨틱에서 제거됐다(#1488).
     expect(saved.semanticLabel, contains('상록수에서 사당까지'));
     expect(saved.semanticLabel, isNot(contains('92점')));

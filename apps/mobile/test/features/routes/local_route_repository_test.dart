@@ -10,6 +10,7 @@ import 'package:easysubway_mobile/features/routes/data/local_route_repository.da
 import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_mapping.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -82,6 +83,25 @@ void main() {
     },
   );
 
+  test('offline 로컬 경로는 STANDARD 프리셋 대표 이동 유형을 지원한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'STANDARD',
+          ),
+        );
+
+    // STANDARD는 senior로 폴백해 계단 회피 없는 표준 보행(preferStepFree)으로 안내된다.
+    expect(result.status, 'FOUND');
+    expect(result.isLocalResult, isTrue);
+  });
+
   test(
     'online-first repository는 flag가 켜지면 V2 backend itinerary를 우선 사용한다',
     () async {
@@ -136,6 +156,7 @@ void main() {
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
           mobilityType: 'WHEELCHAIR',
+          mobilityPreset: 'STEP_FREE',
         ),
       );
 
@@ -143,6 +164,9 @@ void main() {
       expect(requestedBodies.single, containsPair('useRealtime', true));
       expect(requestedBodies.single, containsPair('maxTransfers', 3));
       expect(requestedBodies.single, containsPair('alternativeCount', 3));
+      // 프리셋은 v2 body에 실리고, mobilityType은 하위호환으로 함께 전송된다.
+      expect(requestedBodies.single, containsPair('mobilityPreset', 'STEP_FREE'));
+      expect(requestedBodies.single, containsPair('mobilityType', 'WHEELCHAIR'));
       expect(requestedBodies.single['departureTime'], isA<String>());
       expect(result.routeSearchId, 'route-v2');
       expect(result.originStationName, '상록수');
@@ -428,12 +452,15 @@ void main() {
     expect(result.isLocalResult, isTrue);
     expect(result.score, inInclusiveRange(0, 100));
     expect(result.burdenCost, greaterThan(result.score));
+    // WHEELCHAIR는 STEP_FREE 프리셋이라 총 소요시간은 스텝 표시분 합에 경로당
+    // 1회 승강기 대기(60초)가 더해진 값이다.
     expect(
       result.estimatedDurationSeconds,
       result.steps.fold<int>(
-        0,
-        (sum, step) => sum + step.estimatedMinutes * 60,
-      ),
+            0,
+            (sum, step) => sum + step.estimatedMinutes * 60,
+          ) +
+          MobilityProfilePolicy.stepFreeElevatorWaitSeconds,
     );
     expect(
       result.walkingDistanceMeters,
@@ -480,6 +507,89 @@ void main() {
     final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
     expect(ride.plannedArrivalTimeIso, '2026-07-10T08:12:00+09:00');
     expect(result.etaSource, 'STATIC_LOCAL');
+  });
+
+  test('SLOW 프리셋은 보행 스텝 시간을 늘리고 ride 스텝은 그대로 둔다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final standard = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    final slow = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    expect(standard.status, 'FOUND');
+    expect(slow.status, 'FOUND');
+
+    // SLOW(speedFactor 1.35)는 보행 성분 시간을 늘려 총 소요시간이 STANDARD보다 크다.
+    expect(
+      slow.estimatedDurationSeconds,
+      greaterThan(standard.estimatedDurationSeconds),
+    );
+
+    // ride 스텝은 실제 시간표 기반이라 프리셋과 무관하게 동일해야 한다.
+    final standardRide = standard.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    final slowRide = slow.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(slowRide.estimatedMinutes, standardRide.estimatedMinutes);
+
+    // 보행 스텝(ride 제외)의 표시분 합은 SLOW가 STANDARD 이상이어야 한다.
+    int walkingMinutes(RouteSearchResult result) => result.steps
+        .where((step) => step.stepType != 'ride')
+        .fold<int>(0, (sum, step) => sum + step.estimatedMinutes);
+    expect(
+      walkingMinutes(slow),
+      greaterThan(walkingMinutes(standard)),
+    );
+  });
+
+  test('STEP_FREE 프리셋은 STANDARD 대비 승강기 대기 60초만 더한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final standard = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'STANDARD',
+      ),
+    );
+    final stepFree = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(standard.status, 'FOUND');
+    expect(stepFree.status, 'FOUND');
+
+    // STEP_FREE는 speedFactor 1.0이라 보행 스텝 표시분 자체는 STANDARD와 동일하고,
+    // 경로당 1회 승강기 대기(60초)만 총 소요시간에 가산된다.
+    expect(
+      stepFree.steps.map((step) => step.estimatedMinutes).toList(),
+      standard.steps.map((step) => step.estimatedMinutes).toList(),
+    );
+    expect(
+      stepFree.estimatedDurationSeconds - standard.estimatedDurationSeconds,
+      MobilityProfilePolicy.stepFreeElevatorWaitSeconds,
+    );
   });
 
   test('연속된 동일 노선·패턴 ride는 양 끝을 포함하는 한 trip과 도착 알림 하나로 묶는다', () async {
@@ -4046,6 +4156,223 @@ void main() {
       expect(result.steps, isEmpty);
     },
   );
+
+  test('빠른 하차 안내: 방향(UP) 일치하면 승차 step에 칸-문·시설을 채운다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-a', 'station-sadang', 'seoul-4', 'UP', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, 3);
+    expect(ride.carDoorDoorNumber, 4);
+    expect(ride.carDoorFacilityType, 'ELEVATOR');
+    expect(ride.hasCarDoorHint, isTrue);
+  });
+
+  test('빠른 하차 안내: 반대 방향(DOWN)만 있으면 매칭하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-down', 'station-sadang', 'seoul-4', 'DOWN', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, isNull);
+    expect(ride.hasCarDoorHint, isFalse);
+  });
+
+  test('빠른 하차 안내: direction이 비면 방향 무관하게 매칭한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-anydir', 'station-sadang', 'seoul-4', '', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, 3);
+    expect(ride.carDoorDoorNumber, 4);
+  });
+
+  test('빠른 하차 안내: 미검증(UNKNOWN) 힌트는 게이트에서 제외된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-unknown', 'station-sadang', 'seoul-4', 'UP', 'ELEVATOR',
+        3, 4, 'UNKNOWN'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, isNull);
+  });
+
+  test('빠른 하차 안내: 후보가 여럿이면 시설 우선순위로 엘리베이터를 고른다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES
+        ('cardoor-stair', 'station-sadang', 'seoul-4', 'UP', 'STAIR',
+          1, 1, 'OFFICIAL'),
+        ('cardoor-elev', 'station-sadang', 'seoul-4', 'UP', 'ELEVATOR',
+          3, 4, 'OFFICIAL')
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorFacilityType, 'ELEVATOR');
+    expect(ride.carDoorCarNumber, 3);
+  });
+
+  test('빠른 하차 안내: 규약 미검증 노선은 방향 hint를 매칭하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    // line-test는 _carDoorSeqConventionByLine에 없는 미검증 노선이다. seq 1→2
+    // 오름차순이라도 방향(UP/DOWN)을 유추하지 않으므로 DOWN hint는 매칭하지 않는다.
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-unverified-line', 'station-b', 'line-test', 'DOWN', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, isNull);
+    expect(ride.hasCarDoorHint, isFalse);
+  });
+
+  test('빠른 하차 안내: 규약 미검증 노선도 빈 direction hint는 매칭한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-line-test',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 90,
+    );
+    // 빈 direction hint는 방향 무관이므로 미검증 노선에서도 매칭된다.
+    await database.customStatement('''
+      INSERT INTO station_car_door_hints (
+        id, station_id, line_id, direction, target_facility_type,
+        car_number, door_number, verification_status
+      ) VALUES (
+        'cardoor-unverified-empty', 'station-b', 'line-test', '', 'ELEVATOR',
+        3, 4, 'OFFICIAL'
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    final ride = result.steps.firstWhere((s) => s.stepType == 'ride');
+    expect(ride.carDoorCarNumber, 3);
+    expect(ride.carDoorDoorNumber, 4);
+  });
 }
 
 Map<String, Object?> _routeV2Payload({

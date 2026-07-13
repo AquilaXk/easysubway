@@ -465,7 +465,7 @@ function workflowFiles() {
 
 function assertActionsEnvSecretPolicy(file, source) {
   const secretAccess = /secrets(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
-  const disallowedVarsAccess = /vars(?:\.EASYSUBWAY_[A-Z0-9_]+|\[['"]EASYSUBWAY_[A-Z0-9_]+['"]\])/;
+  const appVariableAccess = /vars(?:\.(EASYSUBWAY_[A-Z0-9_]+)|\[['"](EASYSUBWAY_[A-Z0-9_]+)['"]\])/g;
   const allowedExtraSecretsByFile = {
     ".github/workflows/cd.yml": new Set([
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
@@ -483,6 +483,13 @@ function assertActionsEnvSecretPolicy(file, source) {
     ]),
   };
   const allowedExtraSecrets = allowedExtraSecretsByFile[file] ?? new Set();
+  const allowedAppVariablesByFile = {
+    ".github/workflows/cd.yml": new Set([
+      "EASYSUBWAY_ADS_ASSET_ORIGIN",
+      "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+    ]),
+  };
+  const allowedAppVariables = allowedAppVariablesByFile[file] ?? new Set();
 
   for (const match of source.matchAll(secretAccess)) {
     const secretName = match[1] ?? match[2];
@@ -494,7 +501,14 @@ function assertActionsEnvSecretPolicy(file, source) {
       assert.fail(`${file} must use only secrets.EASYSUBWAY_ENV or approved scoped secrets`);
     }
   }
-  assert.doesNotMatch(source, disallowedVarsAccess, `${file} must not use GitHub Actions vars for app env`);
+  const appVariables = new Set(
+    [...source.matchAll(appVariableAccess)].map((match) => match[1] ?? match[2]),
+  );
+  assert.deepEqual(
+    [...appVariables].sort(),
+    [...allowedAppVariables].sort(),
+    `${file} must not use GitHub Actions vars for app env except the approved allowlist`,
+  );
 }
 
 function assertMobileCatchPolicy(file, source) {
@@ -899,6 +913,35 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
   assert.match(workflow, /printf '%s' "\$\{EASYSUBWAY_ENV_SECRET\}" > "\$\{env_file\}"/);
   assert.doesNotMatch(workflow, /printf '%s\\n' "\$\{EASYSUBWAY_ENV_SECRET\}"/);
+  const restoreStep = workflow.slice(
+    workflow.indexOf("CD Deploy / Restore GitHub Actions dotenv secret"),
+    workflow.indexOf("CD Deploy / Validate deployment dotenv contract"),
+  );
+  const adVariableNames = [
+    "EASYSUBWAY_ADS_ASSET_ORIGIN",
+    "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+  ];
+  for (const name of adVariableNames) {
+    assert.ok(
+      restoreStep.includes(`${name}: $` + `{{ vars.${name} }}`),
+      `${name} must come from a repository variable`,
+    );
+    assert.ok(restoreStep.includes(`drop["${name}"] = 1`), `${name} must replace a stale dotenv value`);
+  }
+  assert.ok(
+    restoreStep.includes('drop["EASYSUBWAY_BACKEND_BIND"] = 1'),
+    "CD must replace a stale backend bind",
+  );
+  assert.match(
+    restoreStep,
+    /printf 'EASYSUBWAY_BACKEND_BIND=127\.0\.0\.1\\n' >> "\$\{env_file\}"/,
+    "CD must force the production backend bind to loopback",
+  );
+  assert.match(
+    restoreStep,
+    /for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+if \[\[ -z "\$\{value\}" \|\| "\$\{value\}" == \*\$'\\n'\* \|\| "\$\{value\}" == \*\$'\\r'\* \]\]; then[\s\S]*?exit 1\s+fi\s+done[\s\S]*?for name in EASYSUBWAY_ADS_ASSET_ORIGIN EASYSUBWAY_ADS_EVENT_DAILY_CAP; do\s+value="\$\{!name\}"\s+printf '%s=%s\\n' "\$\{name\}" "\$\{value\}" >> "\$\{env_file\}"\s+done/,
+    "invalid repository variables must exit before any approved value is written",
+  );
   assert.match(workflow, /CD Deploy \/ Validate deployment dotenv contract/);
   assert.match(workflow, /CD Plan \/ Detect deployment changes/);
   assert.match(workflow, /bash tools\/ci\/detect-changed-paths\.sh changed-files\.txt/);
@@ -5444,6 +5487,10 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.equal(cyberstationCandidate.domain, "route_map_positions");
   assert.equal(cyberstationCandidate.admissionStatus, "admitted_to_production_inventory");
   assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /P0 후보 전용 카운트/);
+  assert.match(
+    targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo,
+    new RegExp(`P0 source candidate ${p0SourceCandidates.length}건 중`),
+  );
   assert.match(targets.roadmapEvidenceLedger.sourceCandidateAdmission.productionClaimImpactKo, /seoulmetro-cyberstation-route-map/);
   // #1397 capital admission 8종 per-source admission 해시는 순차 admission 체인(선행 admit 결과가
   // 다음 인벤토리에 포함됨)에서 산출한 immutable evidence로 고정한다. run-source-admission-pipeline.mjs가
@@ -5522,6 +5569,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
   const sourceIds = inventory.sources.map((source) => source.id).sort();
   assert.deepEqual(sourceIds, [
+    "busan-transportation-official-od-fares",
     "busan-transportation-urban-rail-station-info",
     "easysubway-owner-route-map-capital",
     "kric-braille-displays",
@@ -5541,6 +5589,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "molit-urban-rail-full-route",
     "seoul-metro-accessibility",
     "seoul-metro-fast-exit-car-door",
+    "seoul-metro-official-od-fare-canary",
     "seoul-metro-official-od-fares",
     "seoul-metro-transfer-distance-duration",
     "seoul-realtime-arrival-station-info",
@@ -5553,6 +5602,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     (source) => source.id === "easysubway-owner-route-map-capital",
   );
   assert.deepEqual(ownerRouteMapSource.coverageScope.operatorIds, ["seoul-metro", "korail"]);
+  assert.equal(
+    sourceCandidates.candidates.find(({ id }) => id === "seoul-metro-official-od-fare-canary")
+      .serviceKeyHandling,
+    "offline_probe_secret_only",
+  );
 
   for (const source of inventory.sources) {
     assert.equal(typeof source.requiredForProductionPack, "boolean", `${source.id} must declare production required flag`);
@@ -9160,8 +9214,9 @@ test("관리자 v3 공통 shell은 접근성 chrome과 inline style 제한을 �
   assert.match(shellFragment, /th:fragment="contentStart"/);
   assert.match(shellFragment, /id="admin-content"/);
   assert.match(shellFragment, /admin-env-badge/);
-  assert.match(shellFragment, /revision/);
-  assert.match(shellFragment, /master data/);
+  // #2047 상단바 재설계: 상태 스트립 라벨을 한국어로 표기한다(revision→리비전, master data→마스터데이터).
+  assert.match(shellFragment, /리비전/);
+  assert.match(shellFragment, /마스터데이터/);
   assert.match(shellFragment, /th:action="@\{\/admin\/logout\}"/);
   assert.match(shellFragment, /aria-label="관리자 로그아웃"/);
   assert.match(shellFragment, /th:fragment="flash"/);
@@ -11375,7 +11430,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationSearch, /stationSearchFailureNextAction/);
   assert.match(stationSearch, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
   assert.match(widgetTest, /역명으로 검색하면 현재 위치를 쓰지 않아도 계속 이용할 수 있습니다\./);
-  assert.match(main, /initialMobilityType: onboardingResult\?\.profile\.mobilityType/);
+  assert.match(main, /initialMobilityType: onboardingResult\?\.mobilityType/);
   assert.match(main, /initialMobilityType: initialMobilityType/);
   assert.match(main, /_OnboardingPreferenceScope/);
   assert.doesNotMatch(main, /mediaQuery\.textScaler\.clamp\(minScaleFactor: 1\.18\)/);
@@ -11402,8 +11457,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(onboarding, /class OnboardingResult/);
   assert.match(onboarding, /class OnboardingState/);
   assert.match(onboarding, /class OnboardingScreen extends StatefulWidget/);
-  // #1936: 온보딩 재설계로 대체된 현행 이동 조건 선택 안내 카피
-  assert.match(onboarding, /어떻게 이동하세요\?/);
+  // #1703: 보행 프리셋 온보딩으로 대체된 현행 이동 조건 선택 안내 카피
+  assert.match(onboarding, /어떻게 걸으세요\?/);
   assert.doesNotMatch(onboarding, /큰 글자/);
   assert.match(onboarding, /고대비/);
   assert.match(onboarding, /간편 보기/);
@@ -11411,11 +11466,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(routeSearch, /final String initialMobilityType/);
   assert.match(routeSearch, /final bool simpleViewEnabled/);
   assert.match(routeSearch, /_resolveInitialMobilityType/);
-  assert.match(routeSearch, /_selectedMobilityType = widget\.initialMobilityType/);
-  // #1933: 결과-우선 정리로 대체된 현행 이동 조건 변경 진입점
-  assert.match(routeSearch, /_RouteConditionChips\([\s\S]*mobilityType: _selectedMobilityType[\s\S]*onChangeMobility: _showMobilityTypePicker/);
+  assert.match(routeSearch, /_applyPresetDerivedState\(_selectedPreset\)/);
+  // #1703: 프리셋 칩·시트로 정리된 현행 이동 조건 변경 진입점
+  assert.match(routeSearch, /_RouteConditionChips\([\s\S]*preset: _selectedPreset[\s\S]*onChangePreset: _showMobilityPresetPicker/);
   assert.match(routeSearch, /routeConditionMobilityChip/);
-  assert.match(routeSearch, /routeMobilityOption-\$\{option\.mobilityType\}/);
+  assert.match(routeSearch, /showMobilityPresetSheet\([\s\S]*current: _selectedPreset/);
   assert.doesNotMatch(widgetTest, /첫 실행 앱은 온보딩을 완료한 뒤 홈으로 이동한다/);
   assert.match(widgetTest, /온보딩 이동 조건은 경로 검색 기본값으로 이어진다/);
   assert.match(widgetTest, /온보딩 보기 설정은 완료 뒤 홈 UI에 적용된다/);
@@ -13237,6 +13292,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   assert.equal(ci.repository, "true");
   assert.equal(ci.ci, "true");
 
+  const cd = await classifyChangedFiles([".github/workflows/cd.yml"]);
+  assert.equal(cd.repository, "true");
+  assert.equal(cd.ci, "true");
+  assert.equal(cd.deploy, "true");
+
   const repoTool = await classifyChangedFiles(["tools/repo/check-split-readiness.mjs"]);
   assert.equal(repoTool.repository, "true");
   assert.equal(repoTool.ci, "true");
@@ -13916,4 +13976,173 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
   assert.match(uploadBlock, /hashes\.json/);
   assert.doesNotMatch(uploadBlock, /\braw\b|response|\.env|dotenv/i);
   assert.doesNotMatch(workflow, /github\.event\.inputs\.(?:url|host|ref|command|output|path)/i);
+});
+
+test("#1702 보행 프로필 프리셋 정책 JSON은 프리셋 계수·시설 제약·유형 매핑을 고정한다", () => {
+  const policyPath = "apps/mobile/release/mobility-profile-policy.json";
+  assert.equal(existsSync(path.join(root, policyPath)), true, "mobility-profile-policy JSON must exist");
+
+  const policy = readJson(policyPath);
+  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.artifactKind, "mobility-profile-policy");
+  assert.equal(policy.anchorWalkSpeedMps, 1.2);
+
+  // 프리셋 4종 계수·시설 제약. speedFactor 1.0 = 표준 속도(회귀 불변).
+  assert.equal(policy.presets.STANDARD.speedFactor, 1.0);
+  assert.equal(policy.presets.STANDARD.facilityConstraint, "NONE");
+  assert.equal(policy.presets.SLOW.speedFactor, 1.35);
+  assert.equal(policy.presets.SLOW.facilityConstraint, "NONE");
+  assert.equal(policy.presets.NO_STAIRS.speedFactor, 1.2);
+  assert.equal(policy.presets.NO_STAIRS.facilityConstraint, "NO_STAIRS");
+  assert.equal(policy.presets.STEP_FREE.speedFactor, 1.0);
+  assert.equal(policy.presets.STEP_FREE.facilityConstraint, "ELEVATOR_ONLY");
+  assert.equal(policy.presets.STEP_FREE.elevatorWaitSeconds, 60);
+
+  // 이동 유형 → 기본 프리셋 매핑 6종.
+  assert.deepEqual(policy.mobilityTypeMapping, {
+    SENIOR: "SLOW",
+    PREGNANT: "SLOW",
+    TEMPORARY_INJURY: "SLOW",
+    LUGGAGE: "NO_STAIRS",
+    STROLLER: "STEP_FREE",
+    WHEELCHAIR: "STEP_FREE",
+  });
+});
+
+test("#1702 backend ProfileWalkTimeCalculator enum은 정책 JSON 계수·매핑과 동기화된다", () => {
+  const policy = readJson("apps/mobile/release/mobility-profile-policy.json");
+  const source = read("backend/src/main/java/com/easysubway/route/domain/ProfileWalkTimeCalculator.java");
+
+  // backend는 정수 speedFactorPercent, JSON은 소수 speedFactor. Math.round(factor*100)로 상호 고정.
+  const percentByPreset = {};
+  for (const match of source.matchAll(/\b(STANDARD|SLOW|NO_STAIRS|STEP_FREE)\((\d+)\)/g)) {
+    percentByPreset[match[1]] = Number(match[2]);
+  }
+  assert.deepEqual(percentByPreset, {
+    STANDARD: 100,
+    SLOW: 135,
+    NO_STAIRS: 120,
+    STEP_FREE: 100,
+  });
+  for (const preset of ["STANDARD", "SLOW", "NO_STAIRS", "STEP_FREE"]) {
+    assert.equal(
+      Math.round(policy.presets[preset].speedFactor * 100),
+      percentByPreset[preset],
+      `${preset} JSON speedFactor must match backend speedFactorPercent`,
+    );
+  }
+
+  // STEP_FREE 승강기 대기 초는 backend 상수와 JSON이 일치한다.
+  assert.match(source, /STEP_FREE_FACILITY_WAIT_SECONDS\s*=\s*60\b/);
+  assert.equal(policy.presets.STEP_FREE.elevatorWaitSeconds, 60);
+
+  // presetFor switch 매핑이 JSON mobilityTypeMapping과 일치한다. case 라벨 나열 순서는 의미에 영향을 주지 않으므로
+  // 라벨 집합을 정렬해 비교한다(선언 순서가 바뀌어도 계약이 깨지지 않도록).
+  const assertCaseLabels = (presetName, expectedLabels) => {
+    const match = source.match(
+      new RegExp(`case\\s+([A-Z_,\\s]+?)\\s*->\\s*MobilityPreset\\.${presetName}\\s*;`),
+    );
+    assert.ok(match, `presetFor switch must have a case clause mapping to MobilityPreset.${presetName}`);
+    const actualLabels = match[1].split(",").map((label) => label.trim()).sort();
+    assert.deepEqual(actualLabels, [...expectedLabels].sort());
+  };
+  assertCaseLabels("SLOW", ["SENIOR", "PREGNANT", "TEMPORARY_INJURY"]);
+  assertCaseLabels("NO_STAIRS", ["LUGGAGE"]);
+  assertCaseLabels("STEP_FREE", ["STROLLER", "WHEELCHAIR"]);
+  assert.equal(policy.mobilityTypeMapping.SENIOR, "SLOW");
+  assert.equal(policy.mobilityTypeMapping.PREGNANT, "SLOW");
+  assert.equal(policy.mobilityTypeMapping.TEMPORARY_INJURY, "SLOW");
+  assert.equal(policy.mobilityTypeMapping.LUGGAGE, "NO_STAIRS");
+  assert.equal(policy.mobilityTypeMapping.STROLLER, "STEP_FREE");
+  assert.equal(policy.mobilityTypeMapping.WHEELCHAIR, "STEP_FREE");
+});
+
+test("#1702 mobile 파생 상수 Dart는 정책 JSON 계수·매핑과 동기화된다", () => {
+  const policy = readJson("apps/mobile/release/mobility-profile-policy.json");
+  const dartPath = "apps/mobile/lib/features/mobility_profile/mobility_profile_policy.dart";
+  assert.equal(existsSync(path.join(root, dartPath)), true, "mobility_profile_policy.dart must exist");
+  const dart = read(dartPath);
+
+  // anchor 속도·승강기 대기 초.
+  assert.match(dart, /anchorWalkSpeedMps\s*=\s*1\.2\b/);
+  assert.equal(policy.anchorWalkSpeedMps, 1.2);
+  assert.match(dart, /stepFreeElevatorWaitSeconds\s*=\s*60\b/);
+  assert.equal(policy.presets.STEP_FREE.elevatorWaitSeconds, 60);
+
+  // 프리셋 4종 speedFactor·시설 제약이 Dart const map과 JSON에서 일치한다.
+  const specByPreset = {
+    standard: { key: "STANDARD", constraint: "FacilityConstraint.none" },
+    slow: { key: "SLOW", constraint: "FacilityConstraint.none" },
+    noStairs: { key: "NO_STAIRS", constraint: "FacilityConstraint.noStairs" },
+    stepFree: { key: "STEP_FREE", constraint: "FacilityConstraint.elevatorOnly" },
+  };
+  for (const [enumName, spec] of Object.entries(specByPreset)) {
+    const factor = policy.presets[spec.key].speedFactor;
+    const factorLiteral = Number.isInteger(factor) ? `${factor}\\.0` : `${factor}`;
+    const block = dart.match(
+      new RegExp(`MobilityPreset\\.${enumName}:\\s*MobilityPresetSpec\\(([\\s\\S]*?)\\)`),
+    )?.[1];
+    assert.ok(block, `Dart preset spec for ${enumName} must exist`);
+    assert.match(block, new RegExp(`speedFactor:\\s*${factorLiteral}\\b`));
+    assert.match(block, new RegExp(`facilityConstraint:\\s*${spec.constraint.replace(".", "\\.")}\\b`));
+  }
+
+  // 이동 유형 매핑 6종이 Dart const map과 JSON에서 일치한다.
+  const dartTypeToEnum = {
+    SENIOR: "senior",
+    PREGNANT: "pregnant",
+    TEMPORARY_INJURY: "temporaryInjury",
+    LUGGAGE: "luggage",
+    STROLLER: "stroller",
+    WHEELCHAIR: "wheelchair",
+  };
+  const presetToEnum = {
+    STANDARD: "standard",
+    SLOW: "slow",
+    NO_STAIRS: "noStairs",
+    STEP_FREE: "stepFree",
+  };
+  for (const [jsonType, preset] of Object.entries(policy.mobilityTypeMapping)) {
+    assert.match(
+      dart,
+      new RegExp(`MobilityType\\.${dartTypeToEnum[jsonType]}:\\s*MobilityPreset\\.${presetToEnum[preset]}\\b`),
+    );
+  }
+});
+
+test("#1702 STANDARD 환승 parity 리포트는 재현 가능하고 ±10% 이내 편차를 고정한다", async () => {
+  const trackedPath = "tools/datapack/reports/mobility-standard-transfer-parity-report.json";
+  assert.equal(existsSync(path.join(root, trackedPath)), true, "parity report must be tracked");
+
+  const outputDir = await mkdtemp(path.join(tmpdir(), "mobility-parity-"));
+  const output = path.join(outputDir, "mobility-standard-transfer-parity-report.json");
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-mobility-standard-transfer-parity-report.mjs",
+    "--baseline",
+    "tools/datapack/reports/baseline-ingestion-gate-report.json",
+    "--policy",
+    "apps/mobile/release/mobility-profile-policy.json",
+    "--output",
+    output,
+  ], { cwd: root });
+
+  // 재현성: 재생성 결과가 tracked 산출물과 바이트 단위로 동일해야 한다.
+  assert.equal(readFileSync(output, "utf8"), read(trackedPath));
+
+  const report = JSON.parse(readFileSync(output, "utf8"));
+  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.artifactKind, "mobility-standard-transfer-parity-report");
+  assert.equal(report.issue, 1702);
+  assert.equal(report.standardPreset.speedFactorPercent, 100);
+  assert.equal(report.toleranceProfile.maxDeviationPercent, 10);
+  // STANDARD는 speedFactor 1.0이므로 baseline과 0% 편차, 모두 ±10% 이내.
+  assert.equal(report.summary.maxAbsoluteDeviationPercent, 0);
+  assert.equal(report.summary.allWithinTolerance, true);
+  assert.ok(report.directionPairs.length >= 2);
+  for (const pair of report.directionPairs) {
+    assert.equal(pair.standardPresetSeconds, pair.baselineTransferSeconds);
+    assert.equal(pair.deviationPercent, 0);
+    assert.equal(pair.withinTolerance, true);
+    assert.ok(Math.abs(pair.deviationPercent) <= report.toleranceProfile.maxDeviationPercent);
+  }
 });

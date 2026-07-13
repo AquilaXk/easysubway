@@ -30,8 +30,10 @@ import 'package:easysubway_mobile/features/service_notice/data/notice_repository
 import 'package:easysubway_mobile/features/service_notice/domain/service_notice.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:easysubway_mobile/internal_route.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_preset_labels.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_preset_picker.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/legacy_credential_cleanup.dart';
-import 'package:easysubway_mobile/mobility_profile.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
@@ -49,12 +51,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'fake_secure_key_value_storage.dart';
 import 'user_copy_guard.dart';
 
-OnboardingState _completedOnboardingState({String profileId = 'elderly'}) {
+OnboardingState _completedOnboardingState({
+  MobilityPreset preset = MobilityPreset.slow,
+}) {
   return OnboardingState.completed(
     result: OnboardingResult(
-      profile: mobilityProfileOptions.firstWhere(
-        (option) => option.id == profileId,
-      ),
+      preset: preset,
       preferences: const OnboardingViewPreferences.defaults(),
     ),
   );
@@ -62,13 +64,11 @@ OnboardingState _completedOnboardingState({String profileId = 'elderly'}) {
 
 OnboardingState _completedOnboardingStateWithPreferences({
   required OnboardingViewPreferences preferences,
-  String profileId = 'elderly',
+  MobilityPreset preset = MobilityPreset.slow,
 }) {
   return OnboardingState.completed(
     result: OnboardingResult(
-      profile: mobilityProfileOptions.firstWhere(
-        (option) => option.id == profileId,
-      ),
+      preset: preset,
       preferences: preferences,
     ),
   );
@@ -192,27 +192,23 @@ Future<void> _openStationSearchScreenViaMenu(WidgetTester tester) async {
 Future<void> _openSettingsScreen(WidgetTester tester) async {
   final homeContext = tester.element(find.byType(HomeScreen));
   final home = tester.widget<HomeScreen>(find.byType(HomeScreen));
-  final currentProfile = mobilityProfileOptions.firstWhere(
-    (option) => option.mobilityType == home.initialMobilityType,
-    orElse: () => mobilityProfileOptions.first,
-  );
+  final currentPreset =
+      mobilityPresetFromRepresentativeMobilityType(home.initialMobilityType) ??
+      MobilityPreset.standard;
   unawaited(
     Navigator.of(homeContext).push(
       MaterialPageRoute<void>(
         builder: (_) => AppSettingsScreen(
-          currentProfile: currentProfile,
+          currentPreset: currentPreset,
           viewPreferences: home.viewPreferences,
           notificationRepository: home.notificationRepository,
           notificationPermissionProvider: home.notificationPermissionProvider,
           onViewPreferencesChanged: home.onViewPreferencesChanged,
           onOpenMobilityProfile: () async {
-            final selected = await Navigator.of(homeContext)
-                .push<MobilityProfileOption>(
-                  MaterialPageRoute<MobilityProfileOption>(
-                    builder: (_) =>
-                        MobilityProfileScreen(initialSelection: currentProfile),
-                  ),
-                );
+            final selected = await showMobilityPresetSheet(
+              homeContext,
+              current: currentPreset,
+            );
             if (selected != null) {
               try {
                 await home.onMobilityProfileChanged?.call(selected);
@@ -480,7 +476,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
-    expect(find.text('어떻게 이동하세요?'), findsNothing);
+    expect(find.text('어떻게 걸으세요?'), findsNothing);
   });
 
   testWidgets('기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다', (tester) async {
@@ -589,9 +585,7 @@ void main() {
         routeRepository: routeRepository,
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(
-          profileId: 'wheelchair',
-        ),
+        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.stepFree),
       ),
     );
 
@@ -675,10 +669,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1단계: 이동 방식 프리셋 (#1936: 진행은 점 2개로만 표시, 텍스트 카운터 없음)
-    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
+    expect(find.text('어떻게 걸으세요?'), findsOneWidget);
     expect(find.text('이대로 시작'), findsOneWidget);
     expect(find.text('1 / 2'), findsNothing);
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -694,7 +688,7 @@ void main() {
     // 뒤로가기 → 프리셋 단계로 복귀.
     await tester.tap(find.byTooltip('이전 단계'));
     await tester.pumpAndSettle();
-    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
+    expect(find.text('어떻게 걸으세요?'), findsOneWidget);
   });
 
   testWidgets('노선도 첫 화면은 핵심 이동 행동과 보조 행동을 지도 위에 제공한다', (tester) async {
@@ -1327,7 +1321,7 @@ void main() {
           favorites: [_favoriteRoute(mobilityType: 'WHEELCHAIR')],
         ),
         notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(profileId: 'elderly'),
+        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.slow),
       ),
     );
     await tester.pumpAndSettle();
@@ -1978,9 +1972,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final originRow = find.byKey(
-      const Key('networkMapRouteDraftOriginRow'),
-    );
+    final originRow = find.byKey(const Key('networkMapRouteDraftOriginRow'));
     final destinationRow = find.byKey(
       const Key('networkMapRouteDraftDestinationRow'),
     );
@@ -2011,9 +2003,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final originRow = find.byKey(
-      const Key('networkMapRouteDraftOriginRow'),
-    );
+    final originRow = find.byKey(const Key('networkMapRouteDraftOriginRow'));
     final waypointRow = find.byKey(
       const Key('networkMapRouteDraftWaypointRow'),
     );
@@ -2043,9 +2033,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final originRow = find.byKey(
-      const Key('networkMapRouteDraftOriginRow'),
-    );
+    final originRow = find.byKey(const Key('networkMapRouteDraftOriginRow'));
     final destinationRow = find.byKey(
       const Key('networkMapRouteDraftDestinationRow'),
     );
@@ -2109,10 +2097,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final node = tester.getSemantics(
-      find.descendant(
-        of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
-        matching: find.byType(Semantics),
-      ).first,
+      find
+          .descendant(
+            of: find.byKey(const Key('networkMapRouteDraftOriginRow')),
+            matching: find.byType(Semantics),
+          )
+          .first,
     );
     final labels = node
         .getSemanticsData()
@@ -4538,11 +4528,11 @@ void main() {
     expect(find.text('상록수역'), findsOneWidget);
   });
 
-  testWidgets('홈 이동 조건 pill은 모든 이동 유형에 맞는 아이콘을 보여준다', (tester) async {
-    for (final option in mobilityProfileOptions) {
+  testWidgets('홈 이동 조건 pill은 모든 프리셋에 맞는 표시명을 보여준다', (tester) async {
+    for (final preset in MobilityPreset.values) {
       await tester.pumpWidget(
         EasySubwayApp(
-          key: ValueKey('home-profile-${option.id}'),
+          key: ValueKey('home-preset-${preset.name}'),
           repository: FakeStationSearchRepository(),
           reportRepository: FakeFacilityReportRepository(),
           routeRepository: FakeRouteSearchRepository(),
@@ -4550,16 +4540,14 @@ void main() {
           favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
           favoriteRouteRepository: FakeFavoriteRouteRepository(),
           notificationRepository: FakeNotificationSettingsRepository(),
-          initialOnboardingState: _completedOnboardingState(
-            profileId: option.id,
-          ),
+          initialOnboardingState: _completedOnboardingState(preset: preset),
         ),
       );
       await tester.pumpAndSettle();
 
       await _openSettingsScreen(tester);
 
-      expect(find.text(option.appliedConditionLabel), findsOneWidget);
+      expect(find.text(mobilityPresetDisplayName(preset)), findsWidgets);
       expect(find.byIcon(Icons.directions_walk), findsOneWidget);
     }
   });
@@ -4815,8 +4803,8 @@ void main() {
       expect(find.text('경로 찾기'), findsNothing);
       // '저장된 안내'(인터넷 없이 이용·데이터 출처) 섹션은 제거됐다(#1570).
       expect(find.text('저장된 안내'), findsNothing);
-      expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
-      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
+      expect(find.text('천천히'), findsWidgets);
+      expect(find.text('여유 있는 걸음 속도로 시간을 계산해요'), findsOneWidget);
       expect(find.text('큰 글자'), findsNothing);
       expect(find.text('고대비'), findsOneWidget);
       expect(find.text('간편 보기'), findsOneWidget);
@@ -4827,7 +4815,7 @@ void main() {
       expect(find.byKey(const Key('mobilityProfileButton')), findsOneWidget);
       expect(
         settingsActionSemantics(
-          '계단 피하기 · 환승 줄이기 적용 중, 계단을 피하고 쉬운 환승을 우선해요',
+          '천천히, 여유 있는 걸음 속도로 시간을 계산해요',
         ).getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
       );
@@ -4845,13 +4833,11 @@ void main() {
       );
       await tester.tap(find.byKey(const Key('mobilityProfileButton')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+      await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
       await tester.pumpAndSettle();
 
-      expect(find.text('계단 피하기 · 엘리베이터 이동 적용 중'), findsOneWidget);
-      expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+      expect(find.text('휠체어 이용'), findsWidgets);
+      expect(find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'), findsOneWidget);
 
       await tester.scrollUntilVisible(
         find.byKey(const Key('notificationSettingsButton')),
@@ -4992,7 +4978,7 @@ void main() {
   testWidgets('설정 화면 보기 옵션은 변경값을 저장하고 다시 실행해도 유지한다', (tester) async {
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: false,
@@ -5077,7 +5063,7 @@ void main() {
     addTearDown(() => FlutterError.onError = previousOnError);
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: false,
@@ -5125,7 +5111,7 @@ void main() {
     addTearDown(() => FlutterError.onError = previousOnError);
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences.defaults(),
       ),
       saveError: StateError('save failed'),
@@ -5145,15 +5131,11 @@ void main() {
     await _openSettingsScreen(tester);
     await tester.tap(find.byKey(const Key('mobilityProfileButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
     expect(onboardingStore.saveCount, 1);
-    expect(onboardingStore.savedResult?.profile.id, 'elderly');
-    expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
-    expect(find.text('계단 없는 길만 안내해요'), findsNothing);
+    // 저장 실패로 이전 프리셋(천천히)으로 되돌아간다 — 새 프리셋(휠체어 이용)은 저장되지 않는다.
     expect(find.text('이동 조건을 저장하지 못했어요. 이전 조건으로 되돌렸어요.'), findsOneWidget);
   });
 
@@ -5162,7 +5144,7 @@ void main() {
     final latestSave = Completer<void>();
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: false,
@@ -5226,7 +5208,7 @@ void main() {
     final latestSave = Completer<void>();
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: false,
@@ -5290,7 +5272,7 @@ void main() {
     final latestSave = Completer<void>();
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: false,
@@ -5356,7 +5338,7 @@ void main() {
     final latestSave = Completer<void>();
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: false,
@@ -5409,7 +5391,7 @@ void main() {
     final latestSave = Completer<void>();
     final onboardingStore = MemoryOnboardingResultStore(
       initialResult: OnboardingResult(
-        profile: mobilityProfileOptions.first,
+        preset: MobilityPreset.slow,
         preferences: const OnboardingViewPreferences(
           largeTextEnabled: false,
           highContrastEnabled: false,
@@ -5437,13 +5419,10 @@ void main() {
 
     await tester.tap(find.byKey(const Key('mobilityProfileButton')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
     expect(onboardingStore.saveCount, 1);
-    expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
 
     firstSave.complete();
     await tester.pump();
@@ -5451,8 +5430,8 @@ void main() {
     latestSave.complete();
     await tester.pumpAndSettle();
 
-    expect(onboardingStore.savedResult?.profile.id, 'wheelchair');
-    expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+    expect(onboardingStore.savedResult?.preset, MobilityPreset.stepFree);
+    expect(find.text('휠체어 이용'), findsWidgets);
     expect(onboardingStore.savedResult?.preferences.largeTextEnabled, isFalse);
     expect(
       onboardingStore.savedResult?.preferences.highContrastEnabled,
@@ -5502,7 +5481,7 @@ void main() {
     await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
   });
 
-  testWidgets('홈 이동 조건 요약은 현재 profile과 변경 결과를 보여준다', (tester) async {
+  testWidgets('홈 이동 조건 요약은 현재 프리셋과 변경 결과를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     await tester.pumpWidget(
@@ -5522,14 +5501,12 @@ void main() {
     expect(find.byKey(const Key('homeTripControlPanel')), findsNothing);
     await _openSettingsScreen(tester);
 
-    expect(find.text('계단 피하기 · 환승 줄이기 적용 중'), findsOneWidget);
+    expect(find.text('여유 있는 걸음 속도로 시간을 계산해요'), findsOneWidget);
 
     await _openMobilityProfileFromSettings(tester);
-    await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
-    await tester.pumpAndSettle();
-    expect(find.text('계단 피하기 · 엘리베이터 이동 적용 중'), findsOneWidget);
+    expect(find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'), findsOneWidget);
     semanticsHandle.dispose();
   });
 
@@ -6672,7 +6649,7 @@ void main() {
         favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
         favoriteRouteRepository: favoriteRouteRepository,
         notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(profileId: 'elderly'),
+        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.slow),
       ),
     );
 
@@ -7192,14 +7169,16 @@ void main() {
     );
 
     // #1933 C/D: 출발·도착이 이미 채워진 draft로 진입하면 자동 검색이 한 번 돈다.
-    // 결과-우선 화면에서는 하단 "길찾기" 버튼이 없고, 계단 없는 길만 칩을 켜면
-    // 그 자리에서 STRICT_STEP_FREE로 바로 재검색한다.
+    // 결과-우선 화면에서는 하단 "길찾기" 버튼이 없고, 프리셋 칩으로 휠체어 이용 프리셋을
+    // 고르면 그 자리에서 WHEELCHAIR·STRICT_STEP_FREE로 바로 재검색한다.
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('routeSearchSubmitButton')), findsNothing);
-    await tester.tap(find.byKey(const Key('routeConditionStepFreeChip')));
+    await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
-    expect(routeRepository.requests.last.mobilityType, 'SENIOR');
+    expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
     expect(
       routeRepository.requests.last.effectiveConstraintMode,
       'STRICT_STEP_FREE',
@@ -7448,10 +7427,10 @@ void main() {
     expect(find.byKey(const Key('routeSearchSubmitButton')), findsNothing);
     expect(find.widgetWithText(FilledButton, '길찾기'), findsNothing);
 
-    // 2) 이동 조건·계단 토글은 조용한 칩으로 강등된다(폼 헤더·드롭다운·스위치 없음).
+    // 2) 보행 프리셋은 조용한 칩 한 개로 강등된다(폼 헤더·드롭다운·계단 토글 없음).
     expect(find.byKey(const Key('routeConditionChips')), findsOneWidget);
     expect(find.byKey(const Key('routeConditionMobilityChip')), findsOneWidget);
-    expect(find.byKey(const Key('routeConditionStepFreeChip')), findsOneWidget);
+    expect(find.byKey(const Key('routeConditionStepFreeChip')), findsNothing);
     expect(find.byKey(const Key('routeMobilityTypeInput')), findsNothing);
     expect(find.byKey(const Key('routeStrictStepFreeSwitch')), findsNothing);
     expect(find.text('최근 도착지'), findsNothing);
@@ -7468,6 +7447,89 @@ void main() {
       find.byKey(const Key('routeDestinationPointButton')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('#2066 승차 step에 빠른 하차 칸-문·시설 안내 줄을 그린다', (tester) async {
+    final routeRepository = FakeRouteSearchRepository(
+      result: _sampleRouteSearchResult(
+        steps: const [
+          RouteSearchStep(
+            sequence: 1,
+            stepType: 'entry',
+            title: '상록수 승강장 접근',
+            description: '승강장까지 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sangnoksu',
+            estimatedMinutes: 6,
+            distanceMeters: 180,
+            includesStairs: false,
+            requiresAccessibilityCheck: true,
+          ),
+          RouteSearchStep(
+            sequence: 2,
+            stepType: 'ride',
+            title: '상록수에서 사당까지 이동',
+            description: '열차를 이용해 이동합니다.',
+            lineId: 'seoul-4',
+            lineName: '수도권 4호선',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            estimatedMinutes: 32,
+            distanceMeters: 13500,
+            includesStairs: false,
+            requiresAccessibilityCheck: false,
+            carDoorCarNumber: 3,
+            carDoorDoorNumber: 4,
+            carDoorFacilityType: 'ELEVATOR',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(
+            favorites: [_favoriteRoute()],
+          ),
+          initialMobilityType: 'SENIOR',
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 11),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 승차 step에만 빠른 하차 안내 줄이 나온다.
+    expect(find.byKey(const Key('routeStepCarDoor-2')), findsOneWidget);
+    expect(find.textContaining('빠른 하차 3-4칸'), findsWidgets);
+    expect(find.textContaining('엘리베이터'), findsWidgets);
+    // 데이터 없는 entry step(sequence 1)에는 줄을 그리지 않는다.
+    expect(find.byKey(const Key('routeStepCarDoor-1')), findsNothing);
+
+    // 스크린리더용 시맨틱 라벨은 "번 칸/번 문" 형태로 풀어 읽는다.
+    final semanticsHandle = tester.ensureSemantics();
+    final node = tester.getSemantics(
+      find.byKey(const Key('routeStepCarDoor-2')),
+    );
+    expect(node.label, contains('3번 칸'));
+    expect(node.label, contains('4번 문'));
+    expect(node.label, contains('엘리베이터'));
+    semanticsHandle.dispose();
   });
 
   testWidgets('#1948 타임라인은 경유 스텝을 무채색 경유 노드로 그리고 요약을 왜곡하지 않는다', (tester) async {
@@ -7572,10 +7634,7 @@ void main() {
     expect(find.byKey(const Key('routeStepNumber-3')), findsOneWidget);
 
     // #1948: 경유 스텝은 0값 placeholder burdenLabel을 렌더하지 않는다.
-    expect(
-      find.text('시간을 확인하고 있어요 · 거리를 확인하고 있어요'),
-      findsNothing,
-    );
+    expect(find.text('시간을 확인하고 있어요 · 거리를 확인하고 있어요'), findsNothing);
     expect(find.textContaining('시간을 확인하고 있어요'), findsNothing);
     // #1948: 경유 스텝은 보일러플레이트 기본 안내 문장 대신 간결 카피를 쓴다.
     expect(find.text('안내된 순서대로 이동합니다.'), findsNothing);
@@ -9612,9 +9671,7 @@ void main() {
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         internalRouteRepository: internalRouteRepository,
-        initialOnboardingState: _completedOnboardingState(
-          profileId: 'wheelchair',
-        ),
+        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.stepFree),
       ),
     );
 
@@ -9889,7 +9946,7 @@ void main() {
     );
   });
 
-  testWidgets('이동 조건 화면은 큰 선택 카드로 사용자 상황을 고를 수 있다', (tester) async {
+  testWidgets('이동 조건 프리셋 시트는 4개 프리셋을 표시명·부가설명과 함께 고를 수 있다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
@@ -9905,23 +9962,22 @@ void main() {
 
       await _openMobilityProfileFromSettings(tester);
 
-      expect(find.text('이동 조건'), findsOneWidget);
-      expect(find.text('천천히 이동'), findsOneWidget);
-      expect(find.text('유모차 이용'), findsOneWidget);
-      expect(find.text('휠체어 이용'), findsOneWidget);
-      expect(find.text('임신 중'), findsOneWidget);
-      expect(find.text('부상·회복 중'), findsOneWidget);
-      expect(find.text('큰 짐이 있음'), findsOneWidget);
-      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
-      expect(find.text('엘리베이터와 넓은 길을 우선해요'), findsOneWidget);
-      expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
+      expect(find.text('보통 걸음'), findsWidgets);
+      expect(find.text('천천히'), findsWidgets);
+      expect(find.text('계단 없이'), findsWidgets);
+      expect(find.text('휠체어 이용'), findsWidgets);
+      // 시트에만 나타나는 프리셋 부가설명(설정 행 뒤 기본값은 천천히라 별개).
+      expect(find.text('계단 대신 에스컬레이터·엘리베이터로 안내해요'), findsOneWidget);
+      expect(find.text('일반적인 걸음 속도로 안내해요'), findsOneWidget);
 
       expect(
         tester.getSemantics(
-          find.bySemanticsLabel('휠체어 이용 선택 가능, 계단 없는 길만 안내해요'),
+          find.bySemanticsLabel(
+            '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
+          ),
         ),
         isSemantics(
-          label: '휠체어 이용 선택 가능, 계단 없는 길만 안내해요',
+          label: '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
           isButton: true,
           hasTapAction: true,
         ),
@@ -9931,28 +9987,23 @@ void main() {
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
 
-      final wheelchairCard = find.byKey(
-        const Key('mobilityProfileCard-wheelchair'),
+      final wheelchairRow = find.byKey(
+        const Key('mobilityPresetRow-stepFree'),
       );
-      expect(wheelchairCard, findsOneWidget);
-      expect(tester.getSize(wheelchairCard).height, greaterThanOrEqualTo(76));
+      expect(wheelchairRow, findsOneWidget);
+      expect(tester.getSize(wheelchairRow).height, greaterThanOrEqualTo(48));
 
-      await tester.tap(wheelchairCard);
+      await tester.tap(wheelchairRow);
       await tester.pumpAndSettle();
 
-      expect(
-        find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
-        findsOneWidget,
-      );
-      // 선택 상태는 카드 '선택됨' 시맨틱이 알리므로 문장형 헤더는 제거됐다(#1568).
-      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsNothing);
-      expect(find.bySemanticsLabel('선택 완료'), findsOneWidget);
+      // 프리셋 시트는 선택 즉시 닫히고, 설정 행 제목이 새 표시명으로 갱신된다.
+      expect(find.text('휠체어 이용'), findsWidgets);
     } finally {
       semanticsHandle.dispose();
     }
   });
 
-  testWidgets('홈 이동 조건 화면은 저장된 profile을 선택 상태로 연다', (tester) async {
+  testWidgets('이동 조건 프리셋 시트는 저장된 프리셋을 선택 상태로 연다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
 
     try {
@@ -9963,7 +10014,7 @@ void main() {
           routeRepository: FakeRouteSearchRepository(),
           favoriteRepository: FakeFavoriteStationRepository(),
           initialOnboardingState: _completedOnboardingState(
-            profileId: 'wheelchair',
+            preset: MobilityPreset.stepFree,
           ),
         ),
       );
@@ -9971,10 +10022,13 @@ void main() {
       await _openMobilityProfileFromSettings(tester);
 
       expect(
-        find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
-        findsOneWidget,
+        tester.getSemantics(
+          find.bySemanticsLabel(
+            '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
+          ),
+        ),
+        isSemantics(isSelected: true),
       );
-      expect(find.text('휠체어 이용 조건을 선택했습니다'), findsNothing);
     } finally {
       semanticsHandle.dispose();
     }
@@ -10004,12 +10058,10 @@ void main() {
     );
 
     await _openMobilityProfileFromSettings(tester);
-    await tester.tap(find.byKey(const Key('mobilityProfileCard-wheelchair')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('mobilityProfileDoneButton')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
-    expect(onboardingStore.savedResult?.profile.mobilityType, 'WHEELCHAIR');
+    expect(onboardingStore.savedResult?.mobilityType, 'WHEELCHAIR');
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -10088,7 +10140,7 @@ void main() {
       expect(find.text('상록수 → 사당'), findsNothing);
       // 폼 요약의 조건 요약 부제는 제거됐다(#1568). 조건명만 노출.
       expect(find.text('계단 피하기 · 환승 줄이기'), findsNothing);
-      expect(find.text('천천히 이동'), findsWidgets);
+      expect(find.textContaining('천천히'), findsWidgets);
       expect(find.text('계단 여부를 확인하고 있어요'), findsWidgets);
       expect(find.text('계단 없음'), findsNothing);
       expect(find.text('엘리베이터 이용'), findsNothing);
@@ -10369,7 +10421,7 @@ void main() {
     );
 
     // #1933 요구 3: 별도 폼(이동 조건 드롭다운)을 없앴다. 노선도 팝오버로 출발·도착을
-    // 정해 결과에 도달한 뒤, 결과-우선 화면의 조용한 이동 조건 칩으로 조건을 바꾸면
+    // 정해 결과에 도달한 뒤, 결과-우선 화면의 조용한 프리셋 칩으로 프리셋을 바꾸면
     // 그 자리에서 바로 재검색한다.
     await _openRouteSearchScreen(tester);
 
@@ -10378,18 +10430,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('routeMobilityOption-WHEELCHAIR')),
-      120,
-      scrollable: find.descendant(
-        of: find.byKey(const Key('routeMobilityOptionsList')),
-        matching: find.byType(Scrollable),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeMobilityOption-WHEELCHAIR')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
     expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
@@ -10415,7 +10456,7 @@ void main() {
     );
 
     // #1933 요구 3: 노선도 팝오버로 출발·도착을 정해 결과에 도달한 뒤, 결과-우선
-    // 화면의 이동 조건 칩(→ 이동 조건 시트)으로 조건을 바꾼다. 폼·제출 버튼은 없다.
+    // 화면의 프리셋 칩(→ 프리셋 시트)으로 프리셋을 바꾼다. 폼·제출 버튼은 없다.
     await _openRouteSearchScreen(tester);
 
     expect(find.byType(DropdownButton<String>), findsNothing);
@@ -10424,35 +10465,16 @@ void main() {
     await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('routeMobilityOptionsList')), findsOneWidget);
-    expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsOneWidget);
-    expect(find.byKey(const Key('routeMobilityApplyButton')), findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('routeMobilityOption-WHEELCHAIR')),
-      120,
-      scrollable: find.descendant(
-        of: find.byKey(const Key('routeMobilityOptionsList')),
-        matching: find.byType(Scrollable),
+    expect(find.byKey(const Key('mobilityPresetRow-standard')), findsOneWidget);
+    expect(find.text('계단 대신 에스컬레이터·엘리베이터로 안내해요'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(
+        '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
       ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('계단 없는 길만 안내해요'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('휠체어 이용 선택 가능, 계단 없는 길만 안내해요, 계단 피하기 · 엘리베이터 이동'),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const Key('routeMobilityOption-WHEELCHAIR')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('routeMobilityApplyButton')), findsOneWidget);
-    expect(
-      find.bySemanticsLabel('휠체어 이용 현재 선택, 계단 없는 길만 안내해요, 계단 피하기 · 엘리베이터 이동'),
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
     expect(routeRepository.requests.last.mobilityType, 'WHEELCHAIR');
@@ -10472,14 +10494,14 @@ void main() {
         ),
       );
 
-      // #1933 요구 3: 폼의 이동 조건 요약 대신, 결과-우선 화면의 조용한 이동 조건
-      // 칩이 스크린리더에서 "이동 조건 바꾸기" 버튼으로 남는다.
+      // #1933 요구 3: 폼의 이동 조건 요약 대신, 결과-우선 화면의 조용한 프리셋 칩이
+      // 스크린리더에서 "경로 시간 기준, <표시명>" 버튼으로 남는다.
       await _openRouteSearchScreen(tester);
 
       expect(
-        tester.getSemantics(find.bySemanticsLabel('이동 조건 바꾸기, 현재 천천히 이동')),
+        tester.getSemantics(find.bySemanticsLabel('경로 시간 기준, 천천히')),
         isSemantics(
-          label: '이동 조건 바꾸기, 현재 천천히 이동',
+          label: '경로 시간 기준, 천천히',
           isButton: true,
           hasTapAction: true,
         ),
@@ -10596,6 +10618,54 @@ void main() {
     }
   });
 
+  testWidgets('부산 공식 OD의 대체 운임은 QR승차권으로 표시한다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(
+              officialOdFareQuote: const OfficialOdFareQuote(
+                originStationId: 'station-1fc7a7c971c8',
+                destinationStationId: 'station-6b611916f76a',
+                sourceId: 'busan-transportation-official-od-fares',
+                snapshotId: 'busan-transportation-official-od-fares-20260713',
+                mappingLedgerHash:
+                    '9c327840275be5c4583fc9e9cfdd16d2e4ecc06f660d08fd682bf9fe27d72390',
+                gnrlCardFare: 1800,
+                gnrlCashFare: 1900,
+                yungCardFare: 1200,
+                yungCashFare: 1300,
+                childCardFare: 0,
+                childCashFare: 800,
+              ),
+            ),
+          ),
+          stationRepository: FakeStationSearchRepository(),
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-1fc7a7c971c8',
+              nameKo: '서면',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-6b611916f76a',
+              nameKo: '장산',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 13),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openFirstRouteResultDetail(tester);
+
+    for (final label in const ['일반 QR승차권', '청소년 QR승차권', '어린이 QR승차권']) {
+      expect(find.text(label, skipOffstage: false), findsOneWidget);
+    }
+    expect(find.text('일반 현금', skipOffstage: false), findsNothing);
+    expect(find.text('청소년 현금', skipOffstage: false), findsNothing);
+    expect(find.text('어린이 현금', skipOffstage: false), findsNothing);
+  });
+
   testWidgets('공식 OD 요금이 없으면 unavailable 상태를 알린다', (tester) async {
     final catalogDatabase = CatalogDatabase.memory();
     addTearDown(catalogDatabase.close);
@@ -10635,6 +10705,10 @@ void main() {
 
       expect(find.text('공식 OD 요금 정보 없음'), findsOneWidget);
       expect(find.text('오프라인 공식 자료에 없는 경로입니다.'), findsOneWidget);
+      expect(
+        find.text('연락운송 경계 등 승인되지 않은 경로는 요금을 임의로 계산하지 않습니다.'),
+        findsOneWidget,
+      );
       expect(find.bySemanticsLabel(RegExp('공식 OD 요금 정보 없음')), findsOneWidget);
       expect(apiBaseReads, 0);
     } finally {
@@ -11631,9 +11705,11 @@ void main() {
     );
     notifier.reset();
 
-    // 결과-우선 화면에서 이동 조건 칩(계단 없는 길만)을 켜면 그 자리에서 재검색이
+    // 결과-우선 화면에서 프리셋 칩으로 다른 프리셋을 고르면 그 자리에서 재검색이
     // 돌아 활성 하차 알림을 취소한다.
-    await tester.tap(find.byKey(const Key('routeConditionStepFreeChip')));
+    await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
     expect(notifier.cancelCalls, 1);
@@ -11720,19 +11796,17 @@ void main() {
     await _enableSampleGetOffAlarm(controller);
     notifier.reset();
 
-    // #1933 D: 결과-우선 화면에서 이동 조건 칩으로 조건을 바꾸면 활성 하차 알림을
+    // #1933 D: 결과-우선 화면에서 프리셋 칩으로 프리셋을 바꾸면 활성 하차 알림을
     // 취소하고 그 자리에서 새 조건으로 재검색한다(결과는 비우지 않고 갱신).
     await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
-    final wheelchairOption = find.byKey(
-      const Key('routeMobilityOption-WHEELCHAIR'),
+    final wheelchairRow = find.byKey(
+      const Key('mobilityPresetRow-stepFree'),
       skipOffstage: false,
     );
-    await tester.ensureVisible(wheelchairOption);
+    await tester.ensureVisible(wheelchairRow);
     await tester.pumpAndSettle();
-    await tester.tap(wheelchairOption);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
+    await tester.tap(wheelchairRow);
     await tester.pumpAndSettle();
 
     expect(notifier.cancelCalls, 1);
@@ -11764,13 +11838,11 @@ void main() {
     await _enableSampleGetOffAlarm(controller);
     notifier.reset();
 
-    // #1933 D: 결과-우선 화면에서 계단 없는 길만 칩을 켜면 활성 하차 알림을 취소하고
-    // STRICT_STEP_FREE로 재검색한다(결과는 비우지 않고 갱신).
-    await tester.ensureVisible(
-      find.byKey(const Key('routeConditionStepFreeChip')),
-    );
+    // #1933 D: 결과-우선 화면에서 프리셋 칩으로 휠체어 이용 프리셋을 고르면 활성 하차
+    // 알림을 취소하고 STRICT_STEP_FREE로 재검색한다(결과는 비우지 않고 갱신).
+    await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeConditionStepFreeChip')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-stepFree')));
     await tester.pumpAndSettle();
 
     expect(notifier.cancelCalls, 1);
@@ -11808,20 +11880,18 @@ void main() {
     notifier.cancelError = cancelError;
     final reports = <FlutterErrorDetails>[];
 
-    // #1933 D: 결과-우선 화면에서 이동 조건 칩으로 조건을 바꾸려다 하차 알림 취소가
-    // 실패하면 조건 변경·재검색을 하지 않고 기존 조건·경로·알림을 유지한다.
+    // #1933 D: 결과-우선 화면에서 프리셋 칩으로 프리셋을 바꾸려다 하차 알림 취소가
+    // 실패하면 프리셋 변경·재검색을 하지 않고 기존 조건·경로·알림을 유지한다.
     await runWithMobileErrorReporter(reports.add, () async {
       await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
       await tester.pumpAndSettle();
-      final wheelchairOption = find.byKey(
-        const Key('routeMobilityOption-WHEELCHAIR'),
+      final wheelchairRow = find.byKey(
+        const Key('mobilityPresetRow-stepFree'),
         skipOffstage: false,
       );
-      await tester.ensureVisible(wheelchairOption);
+      await tester.ensureVisible(wheelchairRow);
       await tester.pumpAndSettle();
-      await tester.tap(wheelchairOption);
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
+      await tester.tap(wheelchairRow);
       await tester.pumpAndSettle();
     });
 
@@ -11829,11 +11899,11 @@ void main() {
     expect(find.text('하차 알림을 취소하지 못했어요. 다시 시도해 주세요.'), findsOneWidget);
     expect(controller.state.enabled, isTrue);
     expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
-    // 조건은 SENIOR(천천히 이동) 그대로다 — 이동 조건 칩 라벨로 확인한다.
+    // 프리셋은 보통 걸음(STANDARD) 그대로다 — 프리셋 칩 라벨로 확인한다.
     expect(
       find.descendant(
         of: find.byKey(const Key('routeConditionMobilityChip')),
-        matching: find.text('천천히 이동'),
+        matching: find.text('보통 걸음 기준'),
       ),
       findsOneWidget,
     );
@@ -11862,11 +11932,11 @@ void main() {
     await _enableSampleGetOffAlarm(controller);
     notifier.reset();
 
-    // #1933 D: 결과-우선 화면에서 이동 조건 칩을 열어 같은 조건을 다시 적용하면
+    // #1933 D: 결과-우선 화면에서 프리셋 칩을 열어 같은 프리셋을 다시 고르면
     // 조건이 바뀌지 않아 재검색·알림 취소 없이 활성 알림과 경로를 유지한다.
     await tester.tap(find.byKey(const Key('routeConditionMobilityChip')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('routeMobilityApplyButton')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-standard')));
     await tester.pumpAndSettle();
 
     expect(notifier.cancelCalls, 0);

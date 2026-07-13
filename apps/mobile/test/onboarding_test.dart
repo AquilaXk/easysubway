@@ -1,6 +1,7 @@
 import 'package:easysubway_mobile/accessible_design.dart';
 import 'package:easysubway_mobile/design_tokens.dart';
-import 'package:easysubway_mobile/mobility_profile.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_preset_labels.dart';
+import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/notification_settings.dart';
 import 'package:easysubway_mobile/onboarding.dart';
@@ -44,9 +45,9 @@ void main() {
     expect(storage.deletedKeys, isEmpty);
   });
 
-  testWidgets('시작 화면은 부연 설명 문장 없이 핵심 가치 한 줄과 단일 CTA만 둔다', (tester) async {
-    // #1936: 장황한 중간 소개 화면(OnboardingIntroScreen)을 제거하고, 시작 화면은
-    // 가치 카피 한 줄 + "시작하기" CTA만 남겼다.
+  testWidgets('시작 화면은 부연 설명 문장 없이 핵심 가치 카피 3행과 단일 CTA만 둔다', (tester) async {
+    // #2081: 브랜드 심볼/워드마크를 걷어내고, 시작 화면은 가치 카피 3행 +
+    // "시작하기" CTA만 남긴다(카피 중심).
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -54,36 +55,105 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
-    expect(find.text('빠른 길보다,\n갈 수 있는 길'), findsOneWidget);
+    expect(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'), findsOneWidget);
     expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
     expect(find.text('시작하기'), findsOneWidget);
-    // #1936(프리미엄 다듬기): 상단 무채색 브랜드 심볼/워드마크로 밋밋함을 해소한다.
-    expect(find.text('쉬운 지하철'), findsOneWidget);
+    // #2081: 상단 브랜드 심볼/워드마크는 제거됐다 — 시작 화면에는 워드마크가 없다.
+    expect(find.text('쉬운 지하철'), findsNothing);
+    expect(find.bySemanticsLabel('쉬운 지하철'), findsNothing);
     // 부연 설명 문장은 전면 삭제됐다(#1936).
     expect(find.textContaining('먼저 안내해요'), findsNothing);
     expect(find.textContaining('엘리베이터와 출구까지'), findsNothing);
     expect(find.text('계단 없는 길을\n먼저 찾습니다'), findsNothing);
   });
 
-  testWidgets('시작 화면 브랜드 심볼은 무채색 잉크 라인으로 그리고 워드마크와 함께 온다', (tester) async {
-    // #1936(프리미엄 다듬기): 텍스트+버튼만이라는 밋밋함을 해소하는 상단 앵커.
-    // 심볼은 색 없는 라인 아트(CustomPaint)로, 워드마크는 잉크 텍스트로 둔다.
+  testWidgets('시작 화면 가치 타이틀은 header 시맨틱스로 노출되는 카피 3행이다', (tester) async {
+    // #2081: 심볼 제거 후에도 가치 타이틀은 header 시맨틱스를 유지한다.
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    final semanticsHandle = tester.ensureSemantics();
+
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
-    // 라인 아트 심볼(CustomPaint)이 워드마크 위/좌측에 존재한다.
-    expect(find.byType(CustomPaint), findsWidgets);
-    // 워드마크는 심볼 앵커로 노출되고, 스크린리더에는 '쉬운 지하철'로 읽힌다.
-    expect(find.bySemanticsLabel('쉬운 지하철'), findsOneWidget);
+    // 가치 타이틀은 header 시맨틱스로 노출된다.
+    expect(
+      tester.getSemantics(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다')),
+      matchesSemantics(
+        label: '빠른 길보다\n갈 수 있는 길을\n안내합니다',
+        isHeader: true,
+      ),
+    );
 
-    // 심볼(워드마크)이 가치 타이틀보다 위에 배치되는 여백 리듬을 확인한다.
-    final markBottom = tester.getRect(find.text('쉬운 지하철')).bottom;
-    final titleTop = tester.getRect(find.text('빠른 길보다,\n갈 수 있는 길')).top;
-    expect(markBottom, lessThan(titleTop));
+    semanticsHandle.dispose();
+  });
+
+  testWidgets('시작 화면은 소형 화면(320×568)에서도 카피 3행과 CTA를 오버플로 없이 렌더한다', (
+    tester,
+  ) async {
+    // #2081: 타이틀 확대(40)·카피 3행이 소형 화면에서 레이아웃 예외를 일으키지
+    // 않는지 확인한다(SingleChildScrollView 구조가 오버플로를 흡수한다).
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('빠른 길보다\n갈 수 있는 길을\n안내합니다'), findsOneWidget);
+    expect(find.byKey(const Key('startScreenStartButton')), findsOneWidget);
+  });
+
+  testWidgets('시작 화면은 소형 화면(320×568)+확대 텍스트에서도 스크롤로 CTA에 닿는다', (
+    tester,
+  ) async {
+    // #2081 리뷰 finding: 기본 배율(320×568)에서는 콘텐츠가 화면에 다 들어가
+    // maxScrollExtent가 0이라 SingleChildScrollView 구조가 제거돼도 이전
+    // 테스트가 green일 수 있었다. textScaler를 키워 실제로 오버플로가
+    // 발생하는 조건을 만든 뒤, Scrollable이 그 초과분을 흡수해 CTA까지
+    // 스크롤·탭할 수 있음을 직접 검증한다.
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+          child: StartScreen(onStart: () => tapped = true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+
+    // 확대된 텍스트가 화면 높이를 넘어서 스크롤이 실제로 필요한 상태인지
+    // 먼저 확인한다(회귀 시 이 값이 0으로 떨어져 아래 단언들이 무의미해지는
+    // 것을 방지).
+    final scrollPosition = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position;
+    expect(scrollPosition.maxScrollExtent, greaterThan(0));
+
+    // ensureVisible로 스크롤해야 CTA를 탭할 수 있고, 탭이 실제로 콜백을
+    // 호출한다 — SingleChildScrollView 구조가 제거되면 오버플로 예외로
+    // 이 흐름 자체가 실패한다.
+    await tester.ensureVisible(
+      find.byKey(const Key('startScreenStartButton')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('startScreenStartButton')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(tapped, isTrue);
   });
 
   testWidgets('온보딩 시작 버튼은 Android 시스템 내비게이션 바와 여백을 둔다', (tester) async {
@@ -127,14 +197,13 @@ void main() {
       );
 
       expect(find.text('쉬운 지하철'), findsOneWidget);
-      expect(find.text('어떻게 이동하세요?'), findsOneWidget);
-      expect(find.text('천천히 이동'), findsOneWidget);
+      expect(find.text('어떻게 걸으세요?'), findsOneWidget);
+      expect(find.text('보통 걸음'), findsOneWidget);
       expect(find.text('휠체어 이용'), findsOneWidget);
-      // #1936: 프리셋은 라벨만 노출한다(설명 문장 제거). 상세 요약은 홈 설정으로.
-      expect(find.text('계단을 피하고 쉬운 환승을 우선해요'), findsNothing);
-      expect(find.text('계단 없는 길만 안내해요'), findsNothing);
+      // #1703: 온보딩 step0은 표시명과 부가설명을 함께 노출한다.
+      expect(find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'), findsOneWidget);
 
-      // #1936: 첫 프리셋이 기본 선택이라 '이대로 시작'으로 바로 통과할 수 있다.
+      // #1703: 기본 선택(보통 걸음)이라 '이대로 시작'으로 바로 통과할 수 있다.
       final doneButton = tester.widget<FilledButton>(
         find.byKey(const Key('onboardingDoneButton')),
       );
@@ -142,11 +211,13 @@ void main() {
       expect(find.text('이대로 시작'), findsOneWidget);
 
       await tester.tap(
-        find.byKey(const Key('onboardingProfileCard-wheelchair')),
+        find.byKey(const Key('mobilityPresetRow-stepFree')),
       );
       await tester.pumpAndSettle();
       expect(
-        find.bySemanticsLabel('휠체어 이용 선택됨, 계단 없는 길만 안내해요'),
+        find.bySemanticsLabel(
+          '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
+        ),
         findsOneWidget,
       );
 
@@ -164,8 +235,8 @@ void main() {
       await tester.tap(find.byKey(const Key('onboardingPermissionSkipButton')));
       await tester.pumpAndSettle();
 
-      expect(completedResult?.profile.id, 'wheelchair');
-      expect(completedResult?.profile.mobilityType, 'WHEELCHAIR');
+      expect(completedResult?.preset, MobilityPreset.stepFree);
+      expect(completedResult?.mobilityType, 'WHEELCHAIR');
       // 보기 설정은 온보딩에서 더는 고르지 않으므로 기본값이 반환된다(#1563).
       expect(completedResult?.preferences.largeTextEnabled, isFalse);
       expect(completedResult?.preferences.highContrastEnabled, isFalse);
@@ -191,7 +262,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -233,19 +304,17 @@ void main() {
       MaterialApp(home: OnboardingScreen(onCompleted: (_) {})),
     );
 
-    // 기본 선택(천천히 이동)의 프리셋 행에는 라벨 옆에 프로필 아이콘이 있다.
-    final elderly = mobilityProfileOptions.firstWhere(
-      (option) => option.id == 'elderly',
-    );
-    final rowFinder = find.byKey(const Key('onboardingProfileCard-elderly'));
+    // 프리셋 행에는 라벨 옆에 무채색 라인 아이콘이 있다.
+    final slowIcon = mobilityPresetIcon(MobilityPreset.slow);
+    final rowFinder = find.byKey(const Key('mobilityPresetRow-slow'));
     expect(
-      find.descendant(of: rowFinder, matching: find.byIcon(elderly.icon)),
+      find.descendant(of: rowFinder, matching: find.byIcon(slowIcon)),
       findsOneWidget,
     );
 
     // 아이콘 색은 무채색 잉크 토큰만 쓴다(초록/민트/틴트 금지).
     final icon = tester.widget<Icon>(
-      find.descendant(of: rowFinder, matching: find.byIcon(elderly.icon)),
+      find.descendant(of: rowFinder, matching: find.byIcon(slowIcon)),
     );
     expect(
       icon.color,
@@ -272,7 +341,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -283,7 +352,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(completedResult, isNotNull);
-    expect(completedResult?.profile.id, 'elderly');
+    expect(completedResult?.preset, MobilityPreset.slow);
     expect(locationProvider.requestCount, 0);
     expect(notificationPermissionProvider.requestCount, 0);
   });
@@ -304,7 +373,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -317,7 +386,7 @@ void main() {
 
     expect(locationProvider.requestCount, 1);
     expect(notificationPermissionProvider.requestCount, 1);
-    expect(completedResult?.profile.id, 'elderly');
+    expect(completedResult?.preset, MobilityPreset.slow);
   });
 
   testWidgets('온보딩 권한 단계는 알림만 켜면 알림 provider만 호출한다', (tester) async {
@@ -344,7 +413,7 @@ void main() {
 
     expect(locationProvider.requestCount, 0);
     expect(notificationPermissionProvider.requestCount, 1);
-    expect(completedResult?.profile.id, 'elderly');
+    expect(completedResult?.preset, MobilityPreset.slow);
   });
 
   testWidgets('온보딩 권한 단계는 위치만 켜면 위치 provider만 호출한다', (tester) async {
@@ -371,7 +440,7 @@ void main() {
 
     expect(locationProvider.requestCount, 1);
     expect(notificationPermissionProvider.requestCount, 0);
-    expect(completedResult?.profile.id, 'elderly');
+    expect(completedResult?.preset, MobilityPreset.slow);
   });
 
   testWidgets('온보딩은 알림 권한 요청 실패 도움말을 안내한다', (tester) async {
@@ -423,7 +492,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -432,7 +501,7 @@ void main() {
     expect(find.text('위치와 알림은 나중에도 켤 수 있어요'), findsOneWidget);
     await tester.tap(find.byTooltip('이전 단계'));
     await tester.pumpAndSettle();
-    expect(find.text('어떻게 이동하세요?'), findsOneWidget);
+    expect(find.text('어떻게 걸으세요?'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -451,7 +520,7 @@ void main() {
     final firstStepList = tester.widget<ListView>(find.byType(ListView));
     expect(firstStepList.padding?.resolve(TextDirection.ltr).bottom, 104);
 
-    await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+    await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('onboardingDoneButton')));
     await tester.pumpAndSettle();
@@ -484,11 +553,9 @@ void main() {
     );
   });
 
-  test('온보딩 완료 결과는 선택한 이동 조건과 보기 설정을 함께 담는다', () {
+  test('온보딩 완료 결과는 선택한 프리셋과 보기 설정을 함께 담는다', () {
     final result = OnboardingResult(
-      profile: mobilityProfileOptions.firstWhere(
-        (option) => option.id == 'pregnant',
-      ),
+      preset: MobilityPreset.slow,
       preferences: const OnboardingViewPreferences(
         largeTextEnabled: false,
         highContrastEnabled: true,
@@ -496,7 +563,8 @@ void main() {
       ),
     );
 
-    expect(result.profile.title, '임신 중');
+    expect(result.preset, MobilityPreset.slow);
+    expect(result.mobilityType, 'SENIOR');
     expect(result.preferences.largeTextEnabled, isFalse);
     expect(result.preferences.highContrastEnabled, isTrue);
     expect(result.preferences.simpleViewEnabled, isFalse);
@@ -504,9 +572,7 @@ void main() {
 
   test('온보딩 완료 결과는 로컬 저장용 문자열로 변환하고 다시 읽는다', () {
     final result = OnboardingResult(
-      profile: mobilityProfileOptions.firstWhere(
-        (option) => option.id == 'wheelchair',
-      ),
+      preset: MobilityPreset.stepFree,
       preferences: const OnboardingViewPreferences(
         largeTextEnabled: false,
         highContrastEnabled: true,
@@ -516,11 +582,37 @@ void main() {
 
     final decoded = OnboardingResult.decode(result.encode());
 
-    expect(decoded.profile.id, 'wheelchair');
-    expect(decoded.profile.mobilityType, 'WHEELCHAIR');
+    expect(decoded.preset, MobilityPreset.stepFree);
+    expect(decoded.mobilityType, 'WHEELCHAIR');
     expect(decoded.preferences.largeTextEnabled, isFalse);
     expect(decoded.preferences.highContrastEnabled, isTrue);
     expect(decoded.preferences.simpleViewEnabled, isFalse);
+  });
+
+  test('온보딩 완료 결과는 새 preset 저장 포맷을 그대로 복원한다', () {
+    final decoded = OnboardingResult.decode(
+      '{"preset":"NO_STAIRS","preferences":{"largeTextEnabled":false,"highContrastEnabled":false,"simpleViewEnabled":true}}',
+    );
+
+    expect(decoded.preset, MobilityPreset.noStairs);
+    expect(decoded.mobilityType, 'LUGGAGE');
+  });
+
+  test('온보딩 완료 결과는 구 profileId 저장값을 프리셋으로 승계한다(데이터 소실 없음)', () {
+    const migrations = <String, MobilityPreset>{
+      'elderly': MobilityPreset.slow,
+      'pregnant': MobilityPreset.slow,
+      'injured': MobilityPreset.slow,
+      'luggage': MobilityPreset.noStairs,
+      'stroller': MobilityPreset.stepFree,
+      'wheelchair': MobilityPreset.stepFree,
+    };
+    migrations.forEach((profileId, expectedPreset) {
+      final decoded = OnboardingResult.decode(
+        '{"profileId":"$profileId","preferences":{"largeTextEnabled":false,"highContrastEnabled":false,"simpleViewEnabled":true}}',
+      );
+      expect(decoded.preset, expectedPreset, reason: profileId);
+    });
   });
 
   test('온보딩 완료 결과는 알 수 없는 이동 조건 저장값을 거부한다', () {
@@ -530,18 +622,24 @@ void main() {
       ),
       throwsA(isA<FormatException>()),
     );
+    expect(
+      () => OnboardingResult.decode(
+        '{"preset":"UNKNOWN","preferences":{"largeTextEnabled":true,"highContrastEnabled":false,"simpleViewEnabled":true}}',
+      ),
+      throwsA(isA<FormatException>()),
+    );
   });
 
   test('온보딩 완료 결과는 손상된 보기 설정 저장값을 거부한다', () {
     expect(
       () => OnboardingResult.decode(
-        '{"profileId":"elderly","preferences":{"largeTextEnabled":"yes","highContrastEnabled":false,"simpleViewEnabled":true}}',
+        '{"preset":"SLOW","preferences":{"largeTextEnabled":"yes","highContrastEnabled":false,"simpleViewEnabled":true}}',
       ),
       throwsA(isA<FormatException>()),
     );
 
     expect(
-      () => OnboardingResult.decode('{"profileId":"elderly","preferences":{}}'),
+      () => OnboardingResult.decode('{"preset":"SLOW","preferences":{}}'),
       throwsA(isA<FormatException>()),
     );
   });
@@ -549,7 +647,7 @@ void main() {
 
 Future<void> _moveToPermissionStep(WidgetTester tester) async {
   // 2단계 흐름(#1563): 프로필 → '다음' 한 번이면 바로 권한 단계.
-  await tester.tap(find.byKey(const Key('onboardingProfileCard-elderly')));
+  await tester.tap(find.byKey(const Key('mobilityPresetRow-slow')));
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('onboardingDoneButton')));
   await tester.pumpAndSettle();

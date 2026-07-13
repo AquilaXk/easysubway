@@ -18,7 +18,9 @@ import 'mobile_error_reporter.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
 import 'features/get_off_alarm/get_off_alarm_route_mapping.dart';
 import 'features/get_off_alarm/get_off_alarm_toggle.dart';
-import 'mobility_profile.dart';
+import 'features/mobility_profile/mobility_preset_labels.dart';
+import 'features/mobility_profile/mobility_preset_picker.dart';
+import 'features/mobility_profile/mobility_profile_policy.dart';
 import 'route_hedge_labels.dart';
 import 'station_search.dart';
 
@@ -47,17 +49,13 @@ const _routeSearchMediumRadius = BorderRadius.all(Radius.circular(8));
 const _routeSearchPickerRadius = BorderRadius.all(Radius.circular(8));
 const _routeSearchPillRadius = BorderRadius.all(Radius.circular(8));
 const _routePointRailWidth = 30.0;
-const _routeMobilitySheetHeaderPadding = EdgeInsets.fromLTRB(20, 8, 20, 0);
-const _routeMobilitySheetListPadding = EdgeInsets.fromLTRB(20, 0, 20, 8);
-const _routeMobilitySheetActionPadding = EdgeInsets.fromLTRB(20, 8, 20, 20);
 const _routePointSelectorPadding = EdgeInsets.fromLTRB(4, 4, 12, 4);
 const _routeResultSectionPadding = EdgeInsets.fromLTRB(1, 0, 1, 11);
 
 String _mobilityLabelFor(String mobilityType) {
-  for (final option in mobilityProfileOptions) {
-    if (option.mobilityType == mobilityType) {
-      return option.title;
-    }
+  final preset = mobilityPresetFromRepresentativeMobilityType(mobilityType);
+  if (preset != null) {
+    return mobilityPresetDisplayName(preset);
   }
   return '이동 조건을 다시 선택해 주세요';
 }
@@ -767,6 +765,7 @@ class RouteSearchRequest {
     required this.mobilityType,
     this.constraintMode,
     this.waypointStationId,
+    this.mobilityPreset,
   });
 
   final String originStationId;
@@ -774,6 +773,9 @@ class RouteSearchRequest {
   final String mobilityType;
   final String? constraintMode;
   final String? waypointStationId;
+
+  /// v2 요청에만 실리는 보행 프리셋 서버 문자열(하위호환으로 mobilityType도 유지).
+  final String? mobilityPreset;
 
   String get effectiveConstraintMode =>
       constraintMode ?? _defaultConstraintMode(mobilityType);
@@ -785,6 +787,7 @@ class RouteSearchRequest {
       mobilityType: mobilityType,
       constraintMode: constraintMode?.trim(),
       waypointStationId: waypointStationId?.trim(),
+      mobilityPreset: mobilityPreset?.trim(),
     );
   }
 
@@ -799,8 +802,11 @@ class RouteSearchRequest {
   }
 
   Map<String, Object?> toV2Json() {
+    final trimmedPreset = mobilityPreset?.trim();
     return {
       ...toJson(),
+      if (trimmedPreset != null && trimmedPreset.isNotEmpty)
+        'mobilityPreset': trimmedPreset,
       'departureTime': _routeV2DepartureTimeNow(),
       'useRealtime': true,
       'maxTransfers': 3,
@@ -1799,6 +1805,16 @@ String _routeV2LegTitle(RouteSearchV2Leg leg) {
   };
 }
 
+String _carDoorFacilityLabel(String facilityType) {
+  return switch (facilityType.toUpperCase()) {
+    'STAIR' => '계단 가까움',
+    'ELEVATOR' => '엘리베이터 가까움',
+    'ESCALATOR' => '에스컬레이터 가까움',
+    'TRANSFER' => '빠른 환승',
+    _ => '',
+  };
+}
+
 class RouteSearchStep {
   const RouteSearchStep({
     required this.sequence,
@@ -1823,6 +1839,9 @@ class RouteSearchStep {
     this.confidenceLabel = '',
     this.plannedArrivalTimeIso = '',
     this.realtimeArrivalTimeIso = '',
+    this.carDoorCarNumber,
+    this.carDoorDoorNumber,
+    this.carDoorFacilityType = '',
   });
 
   factory RouteSearchStep.fromJson(Map<String, Object?> json) {
@@ -1931,6 +1950,12 @@ class RouteSearchStep {
   final String distanceSource;
   final String confidenceLabel;
 
+  /// 오프라인 로컬 catalog의 빠른 하차 안내(#2066)용. 로컬 승차 step에서만 채워지고,
+  /// 데이터가 없으면 null(칸·문)·빈 문자열(시설)로 남아 안내 줄을 그리지 않는다.
+  final int? carDoorCarNumber;
+  final int? carDoorDoorNumber;
+  final String carDoorFacilityType;
+
   RouteSearchStep withDisplayLabels({
     required String title,
     required String lineName,
@@ -1963,6 +1988,9 @@ class RouteSearchStep {
           plannedArrivalTimeIso ?? this.plannedArrivalTimeIso,
       realtimeArrivalTimeIso:
           realtimeArrivalTimeIso ?? this.realtimeArrivalTimeIso,
+      carDoorCarNumber: carDoorCarNumber,
+      carDoorDoorNumber: carDoorDoorNumber,
+      carDoorFacilityType: carDoorFacilityType,
     );
   }
 
@@ -1982,6 +2010,21 @@ class RouteSearchStep {
       if (requiresAccessibilityCheck) '엘리베이터 안내 준비 중',
     ];
     return labels.join(' · ');
+  }
+
+  bool get hasCarDoorHint =>
+      carDoorCarNumber != null && carDoorDoorNumber != null;
+
+  String get carDoorHintLabel {
+    final suffix = _carDoorFacilityLabel(carDoorFacilityType);
+    final base = '빠른 하차 $carDoorCarNumber-$carDoorDoorNumber칸';
+    return suffix.isEmpty ? base : '$base · $suffix';
+  }
+
+  String get carDoorHintSemanticLabel {
+    final suffix = _carDoorFacilityLabel(carDoorFacilityType);
+    final base = '빠른 하차 $carDoorCarNumber번 칸 $carDoorDoorNumber번 문';
+    return suffix.isEmpty ? base : '$base, $suffix';
   }
 
   String get semanticGuidanceLabel {
@@ -2459,18 +2502,16 @@ class RouteSearchScreen extends StatefulWidget {
 }
 
 String _resolveInitialMobilityType(String? mobilityType) {
+  const standardMobilityType = 'STANDARD';
   if (mobilityType == null) {
-    return mobilityProfileOptions.first.mobilityType;
+    return standardMobilityType;
   }
 
-  final isKnownMobilityType = mobilityProfileOptions.any(
-    (option) => option.mobilityType == mobilityType,
-  );
-
-  // 서버에 보내는 이동 조건은 화면 드롭다운에 있는 값으로만 제한한다.
-  return isKnownMobilityType
-      ? mobilityType
-      : mobilityProfileOptions.first.mobilityType;
+  // 서버에 보내는 이동 조건은 프리셋 대표 이동 유형으로만 제한한다.
+  final preset = mobilityPresetFromRepresentativeMobilityType(mobilityType);
+  return preset == null
+      ? standardMobilityType
+      : mobilityPresetRepresentativeMobilityType(preset);
 }
 
 class _RouteSearchScreenState extends State<RouteSearchScreen>
@@ -2480,6 +2521,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
   StationSearchResult? _destinationStation;
   StationSearchResult? _waypointStation;
   _RouteStationRole? _activeStationPicker;
+  late MobilityPreset _selectedPreset;
   late String _selectedMobilityType;
   late String _selectedConstraintMode;
   String _validationMessage = '';
@@ -2520,10 +2562,12 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _originStation = _stationFromDraft(widget.initialDraft?.origin);
     _destinationStation = _stationFromDraft(widget.initialDraft?.destination);
     _waypointStation = _stationFromDraft(widget.initialDraft?.waypoint);
-    _selectedMobilityType = widget.initialMobilityType;
-    _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
-      _selectedMobilityType,
-    );
+    _selectedPreset =
+        mobilityPresetFromRepresentativeMobilityType(
+          widget.initialMobilityType,
+        ) ??
+        MobilityPreset.standard;
+    _applyPresetDerivedState(_selectedPreset);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeAutoSearchFromDraft();
     });
@@ -2805,14 +2849,11 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
                       ),
                       const SizedBox(height: 16),
                     ],
-                    // 이동 조건·계단 토글은 언제나 조용한 칩 한 줄로만 노출한다.
+                    // 현재 보행 프리셋은 언제나 조용한 칩 한 개로만 노출한다.
                     // 바꾸면 그 자리에서 바로 재검색한다(별도 폼·버튼 없음).
                     _RouteConditionChips(
-                      mobilityType: _selectedMobilityType,
-                      strictStepFree:
-                          _selectedConstraintMode == 'STRICT_STEP_FREE',
-                      onChangeMobility: _showMobilityTypePicker,
-                      onToggleStepFree: _updateConstraintMode,
+                      preset: _selectedPreset,
+                      onChangePreset: _showMobilityPresetPicker,
                     ),
                     _RouteSearchBody(
                       state: _controller.state,
@@ -2924,6 +2965,7 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         mobilityType: _selectedMobilityType,
         constraintMode: _selectedConstraintMode,
         waypointStationId: _waypointStation?.id,
+        mobilityPreset: mobilityPresetServerString(_selectedPreset),
       ),
     );
   }
@@ -3006,123 +3048,39 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     _controller.reset();
   }
 
-  Future<void> _updateConstraintMode(bool strictStepFree) async {
-    final constraintMode = strictStepFree
-        ? 'STRICT_STEP_FREE'
-        : 'PREFER_STEP_FREE';
-    if (constraintMode == _selectedConstraintMode ||
-        !await _disableActiveGetOffAlarm()) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    setState(() => _selectedConstraintMode = constraintMode);
-    await _rerunOrResetAfterConditionChange();
+  /// 프리셋에서 서버로 보내는 이동 유형·시설 제약을 파생한다. STANDARD는 계단
+  /// 회피가 아니므로 constraintMode가 PREFER_STEP_FREE(WHEELCHAIR 프리셋만 STRICT).
+  void _applyPresetDerivedState(MobilityPreset preset) {
+    _selectedMobilityType = mobilityPresetRepresentativeMobilityType(preset);
+    _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
+      _selectedMobilityType,
+    );
   }
 
-  /// #1933 D: 결과가 이미 보이는 상태(결과-우선 화면)에서 이동 조건·계단 토글을
-  /// 바꾸면 별도 버튼 없이 그 자리에서 바로 재검색한다. 아직 결과가 없는 입력 상태
-  /// 에서는 기존처럼 초기화만 하고, 사용자가 출발·도착을 마저 채우게 둔다.
+  /// #1933 D: 결과가 이미 보이는 상태(결과-우선 화면)에서 프리셋을 바꾸면 별도 버튼
+  /// 없이 그 자리에서 바로 재검색한다. 아직 결과가 없는 입력 상태에서는 기존처럼
+  /// 초기화만 하고, 사용자가 출발·도착을 마저 채우게 둔다.
   Future<void> _rerunOrResetAfterConditionChange() async {
     if (_hasResult && _originStation != null && _destinationStation != null) {
       // 자동 검색 서명을 새 조건으로 갱신해 재검색이 조용히 무시되지 않게 한다.
       _autoSearchedSignature = _draftSignature();
-      // 호출자(_updateMobilityType/_updateConstraintMode)가 이미 활성 하차 알림을
-      // 취소했으니 _submit에서 다시 취소하지 않는다(이중 취소 방지).
+      // 호출자가 이미 활성 하차 알림을 취소했으니 _submit에서 다시 취소하지 않는다.
       await _submit(alarmAlreadyDisabled: true);
       return;
     }
     _controller.reset();
   }
 
-  Future<void> _showMobilityTypePicker() async {
-    final selectedMobilityType = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        var pendingMobilityType = _selectedMobilityType;
-        return SafeArea(
-          child: StatefulBuilder(
-            builder: (context, setSheetState) {
-              return FractionallySizedBox(
-                heightFactor: 0.78,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: _routeMobilitySheetHeaderPadding,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            '이동 조건',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  color: EasySubwayAccessibleColors.text,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.25,
-                                ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '상황에 맞는 이동 조건을 고른 뒤 적용해 주세요.',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: EasySubwayAccessibleColors.mutedText,
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.35,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Expanded(
-                      child: ListView(
-                        key: const Key('routeMobilityOptionsList'),
-                        padding: _routeMobilitySheetListPadding,
-                        children: [
-                          for (final option in mobilityProfileOptions)
-                            _RouteMobilityTypeOptionButton(
-                              key: Key(
-                                'routeMobilityOption-${option.mobilityType}',
-                              ),
-                              option: option,
-                              selected:
-                                  option.mobilityType == pendingMobilityType,
-                              onSelected: () {
-                                setSheetState(() {
-                                  pendingMobilityType = option.mobilityType;
-                                });
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: _routeMobilitySheetActionPadding,
-                      child: FilledButton.icon(
-                        key: const Key('routeMobilityApplyButton'),
-                        onPressed: () =>
-                            Navigator.of(context).pop(pendingMobilityType),
-                        icon: const Icon(Icons.check),
-                        label: const Text('적용'),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
+  Future<void> _showMobilityPresetPicker() async {
+    final selectedPreset = await showMobilityPresetSheet(
+      context,
+      current: _selectedPreset,
     );
 
-    if (!mounted || selectedMobilityType == null) {
+    if (!mounted || selectedPreset == null) {
       return;
     }
-    if (selectedMobilityType == _selectedMobilityType) {
+    if (selectedPreset == _selectedPreset) {
       return;
     }
     if (!await _disableActiveGetOffAlarm()) {
@@ -3131,21 +3089,13 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     if (!mounted) {
       return;
     }
-    final hadResult = _hasResult;
     setState(() {
-      _selectedMobilityType = selectedMobilityType;
-      _selectedConstraintMode = RouteSearchRequest._defaultConstraintMode(
-        selectedMobilityType,
-      );
+      _selectedPreset = selectedPreset;
+      _applyPresetDerivedState(selectedPreset);
     });
-    // #1933 D: 결과-우선 화면에서 이동 조건을 바꾸면 그 자리에서 바로 재검색한다.
-    // 활성 하차 알림은 위에서 이미 취소했으므로 _submit에서 다시 취소하지 않는다.
-    if (hadResult && _originStation != null && _destinationStation != null) {
-      _autoSearchedSignature = _draftSignature();
-      await _submit(alarmAlreadyDisabled: true);
-      return;
-    }
-    _controller.reset();
+    // 결과-우선 화면에서 프리셋을 바꾸면 그 자리에서 바로 재검색한다. 활성 하차
+    // 알림은 위에서 이미 취소했으므로 _submit에서 다시 취소하지 않는다.
+    await _rerunOrResetAfterConditionChange();
   }
 }
 
@@ -3454,95 +3404,6 @@ bool _showsRouteDataQualityLabel(String dataQualityLevel) {
   return dataQualityLevel == 'LEVEL_2' ||
       dataQualityLevel == 'LEVEL_3' ||
       dataQualityLevel == 'LEVEL_4';
-}
-
-class _RouteMobilityTypeOptionButton extends StatelessWidget {
-  const _RouteMobilityTypeOptionButton({
-    required this.option,
-    required this.selected,
-    required this.onSelected,
-    super.key,
-  });
-
-  final MobilityProfileOption option;
-  final bool selected;
-  final VoidCallback onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = selected
-        ? FilledButton.styleFrom(minimumSize: const Size.fromHeight(64))
-        : OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(64));
-    final label = Row(
-      children: [
-        Icon(option.icon),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                option.title,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                option.summary,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _routeMobilityConditionLabel(option),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.25,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (selected)
-          const Padding(
-            padding: EdgeInsets.only(left: 6),
-            child: Icon(Icons.check_circle),
-          ),
-      ],
-    );
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Semantics(
-        label: _routeMobilityOptionSemanticsLabel(option, selected),
-        button: true,
-        selected: selected,
-        child: selected
-            ? FilledButton(onPressed: onSelected, style: style, child: label)
-            : OutlinedButton(onPressed: onSelected, style: style, child: label),
-      ),
-    );
-  }
-}
-
-MobilityProfileOption _mobilityOptionFor(String mobilityType) {
-  return mobilityProfileOptions.firstWhere(
-    (option) => option.mobilityType == mobilityType,
-    orElse: () => mobilityProfileOptions.first,
-  );
-}
-
-String _routeMobilityConditionLabel(MobilityProfileOption option) {
-  return option.conditionSummary;
-}
-
-String _routeMobilityOptionSemanticsLabel(
-  MobilityProfileOption option,
-  bool selected,
-) {
-  final state = selected ? '현재 선택' : '선택 가능';
-  return '${option.title} $state, ${option.summary}, ${_routeMobilityConditionLabel(option)}';
 }
 
 class _RouteStationPicker extends StatefulWidget {
@@ -4535,20 +4396,26 @@ class _OfficialOdFareSection extends StatelessWidget {
     if (quote == null) {
       return Semantics(
         container: true,
-        label: '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다.',
+        label:
+            '공식 OD 요금 정보 없음, 오프라인 공식 자료에 없는 경로입니다. 연락운송 경계 등 승인되지 않은 경로는 요금을 임의로 계산하지 않습니다.',
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [Text('공식 OD 요금 정보 없음'), Text('오프라인 공식 자료에 없는 경로입니다.')],
+          children: [
+            Text('공식 OD 요금 정보 없음'),
+            Text('오프라인 공식 자료에 없는 경로입니다.'),
+            Text('연락운송 경계 등 승인되지 않은 경로는 요금을 임의로 계산하지 않습니다.'),
+          ],
         ),
       );
     }
+    final alternativeFareMedium = quote.alternativeFareMediumLabel;
     final values = [
       ('일반 카드', quote.gnrlCardFare),
-      ('일반 현금', quote.gnrlCashFare),
+      ('일반 $alternativeFareMedium', quote.gnrlCashFare),
       ('청소년 카드', quote.yungCardFare),
-      ('청소년 현금', quote.yungCashFare),
+      ('청소년 $alternativeFareMedium', quote.yungCashFare),
       ('어린이 카드', quote.childCardFare),
-      ('어린이 현금', quote.childCashFare),
+      ('어린이 $alternativeFareMedium', quote.childCashFare),
     ];
     return Semantics(
       container: true,
@@ -5186,10 +5053,14 @@ String _routeGuidanceMobilityHeaderLabel(RouteSearchResult result) {
   if (mobilityLabel == '이동 조건을 다시 선택해 주세요') {
     return mobilityLabel;
   }
-  final condition = _routeMobilityConditionLabel(
-    _mobilityOptionFor(result.mobilityType),
+  final preset = mobilityPresetFromRepresentativeMobilityType(
+    result.mobilityType,
   );
-  return condition.isEmpty ? mobilityLabel : '$mobilityLabel · $condition';
+  if (preset == null) {
+    return mobilityLabel;
+  }
+  final description = mobilityPresetDescription(preset);
+  return description.isEmpty ? mobilityLabel : '$mobilityLabel · $description';
 }
 
 bool _isRecommendedRoute(RouteSearchResult result) {
@@ -5323,25 +5194,22 @@ class _RouteSummaryChip {
   final IconData icon;
 }
 
-/// #1933 D: 결과-우선 화면 상단의 조용한 이동 조건 칩 한 줄. 폼(드롭다운 + 스위치)
-/// 대신 결과 위에 얇게 얹히고, 어느 쪽을 바꿔도 그 자리에서 바로 재검색한다.
-/// (별도 "길찾기" 버튼 없음.)
+/// #1933 D: 결과-우선 화면 상단의 조용한 프리셋 칩 한 개. 폼(드롭다운 + 스위치)
+/// 대신 결과 위에 얇게 얹히고, 다른 프리셋을 고르면 그 자리에서 바로 재검색한다.
+/// (별도 "길찾기" 버튼 없음.) 프리셋이 이동 유형·시설 제약을 모두 결정하므로 계단
+/// 토글 칩은 두지 않는다(#1703).
 class _RouteConditionChips extends StatelessWidget {
   const _RouteConditionChips({
-    required this.mobilityType,
-    required this.strictStepFree,
-    required this.onChangeMobility,
-    required this.onToggleStepFree,
+    required this.preset,
+    required this.onChangePreset,
   });
 
-  final String mobilityType;
-  final bool strictStepFree;
-  final VoidCallback onChangeMobility;
-  final ValueChanged<bool> onToggleStepFree;
+  final MobilityPreset preset;
+  final VoidCallback onChangePreset;
 
   @override
   Widget build(BuildContext context) {
-    final option = _mobilityOptionFor(mobilityType);
+    final displayName = mobilityPresetDisplayName(preset);
     return Padding(
       key: const Key('routeConditionChips'),
       padding: const EdgeInsets.only(bottom: 16),
@@ -5351,21 +5219,11 @@ class _RouteConditionChips extends StatelessWidget {
         children: [
           _RouteConditionChipButton(
             buttonKey: const Key('routeConditionMobilityChip'),
-            icon: Icons.accessible_forward,
-            label: option.title,
-            semanticLabel: '이동 조건 바꾸기, 현재 ${option.title}',
+            icon: mobilityPresetIcon(preset),
+            label: '$displayName 기준',
+            semanticLabel: '경로 시간 기준, $displayName',
             active: false,
-            onTap: onChangeMobility,
-          ),
-          _RouteConditionChipButton(
-            buttonKey: const Key('routeConditionStepFreeChip'),
-            icon: Icons.stairs_outlined,
-            label: '계단 없는 길만',
-            semanticLabel: strictStepFree
-                ? '계단 없는 길만, 켜짐. 두 번 누르면 끕니다.'
-                : '계단 없는 길만, 꺼짐. 두 번 누르면 켭니다.',
-            active: strictStepFree,
-            onTap: () => onToggleStepFree(!strictStepFree),
+            onTap: onChangePreset,
           ),
         ],
       ),
@@ -5728,7 +5586,8 @@ const double _routeTimelineWaypointNodeSize = 16;
 /// 세로 타임라인 한 스텝. 좌측(시각·노선색 배지·연결선) + 우측(역명·구간 요약).
 ///
 /// 데이터 경계(#1704): 노선색·역명·구간 요약·(있을 때만) 시각만 그린다.
-/// 빠른 환승 칸번호·내리는 문·빠른 하차는 모델에 필드가 없어 줄 자체를 그리지 않는다.
+/// 빠른 하차 칸-문 안내(#2066)는 오프라인 로컬 catalog에 데이터가 있을 때만 그린다.
+/// 빠른 환승 칸번호·내리는 문은 여전히 데이터 경계로 줄 자체를 그리지 않는다.
 class _RouteStepTile extends StatelessWidget {
   const _RouteStepTile({required this.step, this.isLast = false});
 
@@ -5840,6 +5699,22 @@ class _RouteStepTile extends StatelessWidget {
               ),
             ),
           ],
+          // 빠른 하차 칸-문 안내(#2066): 오프라인 로컬 catalog에 데이터가 있을 때만.
+          if (step.stepType == 'ride' && step.hasCarDoorHint) ...[
+            const SizedBox(height: 4),
+            Semantics(
+              label: step.carDoorHintSemanticLabel,
+              child: Text(
+                step.carDoorHintLabel,
+                key: Key('routeStepCarDoor-${step.sequence}'),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: EasySubwayAccessibleColors.secondaryText,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 4),
           Text(
             step.userDescription,
@@ -5912,11 +5787,7 @@ class _RouteTimelineBadge extends StatelessWidget {
               color: EasySubwayAccessibleColors.mutedText,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.more_horiz,
-              size: 12,
-              color: Colors.white,
-            ),
+            child: const Icon(Icons.more_horiz, size: 12, color: Colors.white),
           ),
         ),
       );

@@ -5,6 +5,8 @@ import '../../../route_hedge_labels.dart';
 import '../../../route_search.dart';
 import '../../fare/official_od_fare_quote.dart';
 import '../../fare/official_od_fare_repository.dart';
+import '../../mobility_profile/mobility_preset_labels.dart';
+import '../../mobility_profile/mobility_profile_policy.dart';
 import '../application/network_graph.dart' as graph;
 import '../application/route_engine.dart';
 import '../domain/route_request.dart' as local;
@@ -214,7 +216,23 @@ class LocalRouteRepository implements RouteSearchRepository {
     final lineIds = result.lineIds;
     final primaryLineId = lineIds.isEmpty ? '' : lineIds.first;
     final primaryLineName = catalog.lineName(primaryLineId);
-    final steps = _toSteps(result, catalog, plannedArrivals: plannedArrivals);
+    // 이 검색에 적용할 보행 프리셋을 한 번 판정해 스텝 보정과 STEP_FREE 가산에
+    // 재사용한다: 서버 문자열 우선, 없으면 대표 이동유형, 그래도 없으면 표준.
+    final preset = _mobilityPresetFor(request);
+    final steps = _toSteps(
+      result,
+      catalog,
+      plannedArrivals: plannedArrivals,
+      preset: preset,
+    );
+    // 스텝 표시분의 합(60초 단위)을 총 소요시간으로 쓴다. STEP_FREE는 승강기
+    // 대기를 엔진 elevator 스텝 개수와 무관하게 경로당 정확히 1회만 가산해
+    // backend ProfileWalkTimeCalculator(ceil(baseline*speedFactor) + STEP_FREE
+    // 60초 1회)와 정합시킨다.
+    var estimatedDurationSeconds = _estimatedDurationSeconds(steps);
+    if (preset == MobilityPreset.stepFree) {
+      estimatedDurationSeconds += MobilityProfilePolicy.stepFreeElevatorWaitSeconds;
+    }
 
     return RouteSearchResult(
       routeSearchId:
@@ -230,7 +248,7 @@ class LocalRouteRepository implements RouteSearchRepository {
       lineName: primaryLineName,
       score: result.accessibilityScore,
       burdenCost: result.generalizedCost,
-      estimatedDurationSeconds: _estimatedDurationSeconds(steps),
+      estimatedDurationSeconds: estimatedDurationSeconds,
       walkingDistanceMeters: _walkingDistanceMeters(steps),
       transferCount: _transferCount(steps),
       evidenceSummary: _evidenceSummary(result),
@@ -255,6 +273,20 @@ class LocalRouteRepository implements RouteSearchRepository {
     );
   }
 
+  /// 요청의 보행 프리셋을 판정한다: v2 서버 문자열(mobilityPreset)이 있으면 우선,
+  /// 없거나 매핑 실패면 대표 이동유형(mobilityType)으로, 그래도 없으면 표준으로 폴백.
+  MobilityPreset _mobilityPresetFor(RouteSearchRequest request) {
+    final serverPreset = request.mobilityPreset;
+    if (serverPreset != null) {
+      final mapped = mobilityPresetFromServerString(serverPreset);
+      if (mapped != null) {
+        return mapped;
+      }
+    }
+    return mobilityPresetFromRepresentativeMobilityType(request.mobilityType) ??
+        MobilityPreset.standard;
+  }
+
   String _routeStatus(local.RouteStatus status) {
     return switch (status) {
       local.RouteStatus.found => 'FOUND',
@@ -269,15 +301,33 @@ class LocalRouteRepository implements RouteSearchRepository {
     local.LocalRouteResult result,
     _RouteCatalogSnapshot catalog, {
     required Map<int, String> plannedArrivals,
+    required MobilityPreset preset,
   }) {
+    final speedFactor = MobilityProfilePolicy.presets[preset]!.speedFactor;
     return _collapseConsecutiveRideSteps(result.steps).indexed
         .map((entry) {
           final (index, step) = entry;
+          // speedFactor는 보행 성분에만 곱한다. 주행 성분(ride/waypoint)의
+          // durationSeconds는 실제 시간표 기반이므로 절대 보정하지 않는다.
+          final isWalking =
+              step.type != route_step.RouteStepType.ride &&
+              step.type != route_step.RouteStepType.waypoint;
+          final adjustedDurationSeconds =
+              (isWalking && step.durationSeconds > 0)
+              ? (step.durationSeconds * speedFactor).ceil()
+              : step.durationSeconds;
           final fromStationId = catalog.stationIdForNode(step.fromNodeId);
           final toStationId = catalog.stationIdForNode(step.toNodeId);
           final fromName = catalog.stationName(fromStationId);
           final toName = catalog.stationName(toStationId);
           final lineName = catalog.lineName(step.lineId);
+          final carDoorHint = step.type.name == 'ride'
+              ? catalog.carDoorHintFor(
+                  fromStationId: fromStationId,
+                  toStationId: toStationId,
+                  lineId: step.lineId,
+                )
+              : null;
 
           return RouteSearchStep(
             sequence: index + 1,
@@ -288,7 +338,7 @@ class LocalRouteRepository implements RouteSearchRepository {
             lineName: lineName,
             fromStationId: fromStationId,
             toStationId: toStationId,
-            estimatedMinutes: _estimatedMinutesFor(step.durationSeconds),
+            estimatedMinutes: _estimatedMinutesFor(adjustedDurationSeconds),
             distanceMeters: step.distanceMeters,
             includesStairs: step.includesStairs,
             stairAccessState: step.stairAccessState,
@@ -307,6 +357,9 @@ class LocalRouteRepository implements RouteSearchRepository {
             distanceSource: step.distanceSource,
             confidenceLabel: step.confidenceLabel,
             plannedArrivalTimeIso: plannedArrivals[step.sequence] ?? '',
+            carDoorCarNumber: carDoorHint?.carNumber,
+            carDoorDoorNumber: carDoorHint?.doorNumber,
+            carDoorFacilityType: carDoorHint?.facilityType ?? '',
           );
         })
         .toList(growable: false);
@@ -634,6 +687,11 @@ class LocalRouteRepository implements RouteSearchRepository {
 
   local.MobilityType _mobilityType(String mobilityType) {
     return switch (mobilityType) {
+      // STANDARD는 계단 회피 없는 표준 보행이나 local enum에 직접 대응이 없어,
+      // preferStepFree(strict 아님)라 blocksStairOnlyAccess=false인 senior로 폴백한다.
+      // speedFactor STANDARD=1.0이라 무보정이고, 이 폴백은 offline 결과의 mobilityType
+      // 표기에만 영향을 줄 뿐 실제 필터링은 preferStepFree라 동일하다.
+      'STANDARD' => local.MobilityType.senior,
       'SENIOR' => local.MobilityType.senior,
       'STROLLER' => local.MobilityType.stroller,
       'WHEELCHAIR' => local.MobilityType.wheelchair,
@@ -1056,6 +1114,23 @@ class RouteSearchOnlineFirstMetrics {
   }
 }
 
+/// line_sequence 증가 방향이 KRIC upbdnbSe(UP/DOWN) 어느 쪽에 대응하는지의
+/// 노선별 규약. line_sequence↔UP/DOWN 매핑은 어떤 데이터 계약으로도 보장되지
+/// 않으므로(모바일 catalog 스키마에 방향 규약·순환/wrap 플래그가 전파되지 않음),
+/// 규약이 명시적으로 검증된 노선에서만 방향을 유추한다.
+// ascendingIsUp: 현재 allowlist에 대응 노선이 없지만, 규약 검증된 노선이
+// 오름차순=상행일 때를 위해 매핑 값으로 보존한다.
+// ignore: unused_field
+enum _SeqDirectionConvention { ascendingIsDown, ascendingIsUp }
+
+/// 규약이 검증된 노선의 (증가방향→direction) 매핑. 여기에 없는 노선은
+/// line_sequence 델타로 방향을 유추하지 않는다(방향 있는 hint 미매칭).
+/// - seoul-4: 오이도 방면=큰 line_sequence=하행 → 오름차순=DOWN, 내림차순=UP.
+///   (근거: datapack reconstruct-transit-trips.test.mjs의 오이도 방면 규약)
+const Map<String, _SeqDirectionConvention> _carDoorSeqConventionByLine = {
+  'seoul-4': _SeqDirectionConvention.ascendingIsDown,
+};
+
 class _RouteCatalogSnapshot {
   const _RouteCatalogSnapshot({
     required this.stationsById,
@@ -1069,6 +1144,7 @@ class _RouteCatalogSnapshot {
     required this.realtimeStationLineKeysByProvider,
     required this.plannedStationLineKeys,
     required this.transitPassThroughStationIds,
+    required this.carDoorHintsByStationLine,
   });
 
   final Map<String, String> stationsById;
@@ -1082,6 +1158,10 @@ class _RouteCatalogSnapshot {
   final Map<String, Set<String>> realtimeStationLineKeysByProvider;
   final Set<String> plannedStationLineKeys;
   final Set<String> transitPassThroughStationIds;
+
+  /// 키=_stationLineKey(stationId, lineId). 빠른 하차 안내(#2066)용, 오프라인
+  /// 로컬 catalog에 station_car_door_hints가 있을 때만 채워진다.
+  final Map<String, List<_CarDoorHintSnapshot>> carDoorHintsByStationLine;
 
   static Future<_RouteCatalogSnapshot> load(CatalogDatabase database) async {
     final sourceUpdatedAtRow = await database.customSelect('''
@@ -1139,6 +1219,33 @@ class _RouteCatalogSnapshot {
           row.read<String>('line_id'),
         ),
     };
+    final carDoorHintsByStationLine = <String, List<_CarDoorHintSnapshot>>{};
+    if (await _tableExists(database, 'station_car_door_hints')) {
+      final carDoorRows = await database.customSelect('''
+            SELECT station_id, line_id, direction, target_facility_type,
+              car_number, door_number
+            FROM station_car_door_hints
+            WHERE UPPER(verification_status) IN ('OFFICIAL', 'VERIFIED')
+            ''').get();
+      for (final row in carDoorRows) {
+        carDoorHintsByStationLine
+            .putIfAbsent(
+              _stationLineKey(
+                row.read<String>('station_id'),
+                row.read<String>('line_id'),
+              ),
+              () => <_CarDoorHintSnapshot>[],
+            )
+            .add(
+              _CarDoorHintSnapshot(
+                direction: row.read<String>('direction'),
+                facilityType: row.read<String>('target_facility_type'),
+                carNumber: row.read<int>('car_number'),
+                doorNumber: row.read<int>('door_number'),
+              ),
+            );
+      }
+    }
     final networkEdgeColumns = await database
         .customSelect('PRAGMA table_info(network_edges)')
         .get();
@@ -1443,6 +1550,7 @@ class _RouteCatalogSnapshot {
         for (final row in transitPassThroughRows)
           row.read<String>('station_id'),
       },
+      carDoorHintsByStationLine: carDoorHintsByStationLine,
     );
   }
 
@@ -1497,6 +1605,87 @@ class _RouteCatalogSnapshot {
       (keys) =>
           originKeys.any(keys.contains) && destinationKeys.any(keys.contains),
     );
+  }
+
+  /// 빠른 하차 안내(#2066): 승차 step의 (from,to,line)에 맞는 하차 칸-문을 고른다.
+  /// 규약이 검증된 노선(_carDoorSeqConventionByLine)에 한해 station_lines의
+  /// line_sequence 델타를 노선별 규약으로 방향(UP/DOWN)으로 변환하고, 미검증
+  /// 노선은 방향을 유추하지 않아 방향 있는 hint를 매칭하지 않는다.
+  /// direction 게이트: 값 방향은 유추 방향과 일치할 때만, 빈 direction은 방향 무관.
+  /// 후보가 여럿이면 시설 우선순위(ELEVATOR>ESCALATOR>STAIR>TRANSFER), 이어서
+  /// carNumber·doorNumber 오름차순으로 결정적으로 하나를 고른다.
+  ({int carNumber, int doorNumber, String facilityType})? carDoorHintFor({
+    required String fromStationId,
+    required String toStationId,
+    required String lineId,
+  }) {
+    if (toStationId.isEmpty || lineId.isEmpty) {
+      return null;
+    }
+    final candidates =
+        carDoorHintsByStationLine[_stationLineKey(toStationId, lineId)] ??
+        const <_CarDoorHintSnapshot>[];
+    if (candidates.isEmpty) {
+      return null;
+    }
+    final fromSeq = _lineSequenceFor(fromStationId, lineId);
+    final toSeq = _lineSequenceFor(toStationId, lineId);
+    final convention = _carDoorSeqConventionByLine[lineId];
+    String? inferredDirection;
+    if (convention != null && fromSeq != null && toSeq != null) {
+      if (toSeq > fromSeq) {
+        inferredDirection =
+            convention == _SeqDirectionConvention.ascendingIsDown
+                ? 'DOWN'
+                : 'UP';
+      } else if (toSeq < fromSeq) {
+        inferredDirection =
+            convention == _SeqDirectionConvention.ascendingIsDown
+                ? 'UP'
+                : 'DOWN';
+      }
+    }
+    final matches = candidates.where((hint) {
+      final direction = hint.direction.toUpperCase();
+      if (direction.isEmpty) {
+        return true;
+      }
+      if (direction == 'UP' || direction == 'DOWN') {
+        return inferredDirection != null && inferredDirection == direction;
+      }
+      return false;
+    }).toList(growable: false);
+    if (matches.isEmpty) {
+      return null;
+    }
+    matches.sort((a, b) {
+      final priority = _carDoorFacilityPriority(a.facilityType).compareTo(
+        _carDoorFacilityPriority(b.facilityType),
+      );
+      if (priority != 0) {
+        return priority;
+      }
+      final byCar = a.carNumber.compareTo(b.carNumber);
+      if (byCar != 0) {
+        return byCar;
+      }
+      return a.doorNumber.compareTo(b.doorNumber);
+    });
+    final best = matches.first;
+    return (
+      carNumber: best.carNumber,
+      doorNumber: best.doorNumber,
+      facilityType: best.facilityType,
+    );
+  }
+
+  int? _lineSequenceFor(String stationId, String lineId) {
+    for (final stationLine in stationLines) {
+      if (stationLine.stationId == stationId && stationLine.lineId == lineId) {
+        return stationLine.sequence;
+      }
+    }
+    return null;
   }
 
   List<String> regionsFor(String originStationId, String destinationStationId) {
@@ -1958,6 +2147,16 @@ String _stationLineKey(String stationId, String lineId) {
   return '$stationId:$lineId';
 }
 
+int _carDoorFacilityPriority(String facilityType) {
+  return switch (facilityType.toUpperCase()) {
+    'ELEVATOR' => 0,
+    'ESCALATOR' => 1,
+    'STAIR' => 2,
+    'TRANSFER' => 3,
+    _ => 4,
+  };
+}
+
 graph.RouteEdge _toGraphRouteEdge(
   _NetworkEdgeSnapshot networkEdge,
   graph.RouteEdgeType routeEdgeType, {
@@ -2073,6 +2272,20 @@ class _StationLineSnapshot {
 
   _RouteNodeKey get routeNodeKey =>
       _RouteNodeKey(stationId: stationId, lineId: lineId, servicePattern: '');
+}
+
+class _CarDoorHintSnapshot {
+  const _CarDoorHintSnapshot({
+    required this.direction,
+    required this.facilityType,
+    required this.carNumber,
+    required this.doorNumber,
+  });
+
+  final String direction;
+  final String facilityType;
+  final int carNumber;
+  final int doorNumber;
 }
 
 class _FacilitySnapshot {
