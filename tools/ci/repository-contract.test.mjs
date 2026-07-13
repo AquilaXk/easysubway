@@ -7424,14 +7424,14 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.equal(sampleUrl.searchParams.get("railOprIsttCd"), "S1");
   assert.equal(sampleUrl.searchParams.get("lnCd"), "3");
   assert.equal(sampleUrl.searchParams.get("stinCd"), "331");
-  assert.equal(sampleUrl.searchParams.get("prevStinCd"), "132");
+  assert.equal(sampleUrl.searchParams.get("prevStinCd"), "422");
   assert.equal(sampleUrl.searchParams.get("chthTgtLn"), "4");
-  assert.equal(sampleUrl.searchParams.get("chtnNextStinCd"), "425");
+  assert.equal(sampleUrl.searchParams.get("chtnNextStinCd"), "424");
   assert.match(
     candidate.evidence.liveSampleNote,
     /2026-07-11.*29155976812 \(head 3bbb27594a38ef26f04aad5c5c5f6a423fcf1b5f\).*prevStinCd=422.*chtnNextStinCd=424.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*sampleResponse evidence가 아님/,
   );
-  assert.match(candidate.evidence.liveSampleNote, /공식 요청변수 표에서 가져온 미검증 tuple/);
+  assert.match(candidate.evidence.liveSampleNote, /공식 KRIC 현재 목록의 sample URL tuple.*422\/424.*정본/);
   assert.match(
     candidate.evidence.liveSampleNote,
     /2026-07-12.*29177451688 \(head 3c3567b524a14f39a0bbe20a774259b7ba405694\).*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0.*sanitized sample artifact가 생성되지 않음/,
@@ -7444,8 +7444,12 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
     candidate.evidence.liveSampleNote,
     /2026-07-13.*29201341520 \(head e451fbdf352fef74dc376c9f16d476aca287b492\).*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0/,
   );
+  assert.match(
+    candidate.evidence.liveSampleNote,
+    /2026-07-13.*29251592781 \(head c711a081b418b87aa47752c2ba5ce29a2c5c0716\).*prevStinCd=132.*chtnNextStinCd=425.*HTTP 200.*application\/xml.*resultCode=03.*classification=no-data.*itemCount=0.*artifactCount=0/,
+  );
   assert.match(candidate.evidence.liveSampleNote, /resultCode=03의 공식 의미 매핑은 공개 문서에서 확인되지 않음/);
-  assert.match(candidate.evidence.liveSampleNote, /공식 상세 페이지 sample URL.*422\/424.*요청변수 표.*132\/425.*불일치/);
+  assert.match(candidate.evidence.liveSampleNote, /132\/425.*폐기/);
   assert.deepEqual(candidate.evidence.formats.sort(), ["JSON", "XML"]);
   assert.deepEqual(candidate.evidence.outputFields.sort(), [
     "chtnMvTpOrdr",
@@ -7470,7 +7474,7 @@ test("KRIC 환승 이동경로 표준 후보는 상세 페이지 라이선스와
   assert.match(candidate.nextAction, /distance and duration evidence/);
   assert.match(candidate.nextAction, /admin review/);
   assert.match(candidate.nextAction, /automatic route graph edge/);
-  assert.match(candidate.nextAction, /three times.*29177451688.*29190982462.*29201341520/);
+  assert.match(candidate.nextAction, /documented tuple.*prevStinCd=422.*chtnNextStinCd=424.*tracked workflow/);
 });
 
 test("data.go.kr 환승역거리 소요시간 후보는 확정된 odcloud endpoint를 고정한다", () => {
@@ -13995,7 +13999,10 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   assert.match(workflow, /schedule:[\s\S]*cron: "41 0 \* \* \*"/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:\s*\n\s*contents: read/);
-  assert.match(workflow, /concurrency:\s*\n\s*group: /);
+  assert.match(
+    workflow,
+    /concurrency:\s*\n\s*group: datapack-expiry-alert-\$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}-\$\{\{ github\.event\.schedule \|\| github\.event_name \}\}/,
+  );
 
   // 기존 데이터팩 릴리스 workflow와 동일하게 action SHA를 고정한다.
   const releaseWorkflow = read(".github/workflows/datapack-release.yml");

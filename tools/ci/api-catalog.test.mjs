@@ -335,6 +335,7 @@ test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 �
     stdout,
     /^runner: node tools\/datapack\/collect-kric-source-candidate-evidence\.mjs --candidate kric-transfer-movement-standard$/m,
   );
+  assert.match(stdout, /^runner env: KRIC_SERVICE_KEY, RUNNER_TEMP$/m);
   assert.match(stdout, /^provider credential: APPROVED$/m);
   assert.match(stdout, /^provider approval scope: API_CREDENTIAL$/m);
   assert.match(stdout, /^provider terms: REVIEW_REQUIRED$/m);
