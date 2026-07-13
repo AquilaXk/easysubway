@@ -3,6 +3,7 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { validateQuotaEvidence } from "../datapack/lib/quota-evidence.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const contractPath = path.join(root, "tools/realtime/seoul-topis-provider-contract.json");
@@ -102,6 +103,21 @@ test("서울 TOPIS는 공식 기본 quota 안의 hard cap으로 guarded producti
       assert.equal(source.admissionEvidence.quotaEvidence.productionUseAllowed, true);
     }
   }
+});
+
+test("quota evidence는 runtime 일일·분당 hard limit을 함께 요구한다", () => {
+  const quotaEvidence = {
+    portal: "서울 열린데이터광장",
+    defaultDailyLimit: 1000,
+    runtimeDailyHardLimit: 800,
+    unlockStatus: "guarded_default_quota_gallery_review_pending",
+    productionUseAllowed: true,
+  };
+
+  assert.throws(
+    () => validateQuotaEvidence(quotaEvidence, "quotaEvidence"),
+    /runtimeDailyHardLimit and runtimePerMinuteHardLimit together/,
+  );
 });
 
 test("#1416 production evidence는 quota·freshness·archive·fallback을 PASS로 묶는다", async () => {

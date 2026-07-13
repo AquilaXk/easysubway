@@ -32,6 +32,11 @@ export function validateQuotaEvidence(quotaEvidence, label) {
       throw new Error(`${label}.${key} must be a positive integer`);
     }
   }
+  const hasRuntimeDailyHardLimit = "runtimeDailyHardLimit" in quotaEvidence;
+  const hasRuntimePerMinuteHardLimit = "runtimePerMinuteHardLimit" in quotaEvidence;
+  if (hasRuntimeDailyHardLimit !== hasRuntimePerMinuteHardLimit) {
+    throw new Error(`${label} must include runtimeDailyHardLimit and runtimePerMinuteHardLimit together`);
+  }
   if ("sharedQuotaStore" in quotaEvidence) {
     requiredText(quotaEvidence.sharedQuotaStore, `${label}.sharedQuotaStore`);
   }

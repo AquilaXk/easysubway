@@ -111,6 +111,8 @@ class RealtimeGatewayServiceTest {
 			assertThat(observation.trainNo()).isEqualTo("4123");
 			assertThat(observation.rawEtaSeconds()).isEqualTo(180);
 			assertThat(observation.adjustedEtaSeconds()).isEqualTo(180);
+			assertThat(observation.providerObservedAt()).isEqualTo(Instant.parse("2026-06-26T08:00:00Z"));
+			assertThat(observation.backendReceivedAt()).isEqualTo(Instant.parse("2026-06-26T08:00:00Z"));
 			assertThat(observation.retainedUntil()).isEqualTo(Instant.parse("2026-07-26T08:00:00Z"));
 		});
 	}
