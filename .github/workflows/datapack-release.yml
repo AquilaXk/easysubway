@@ -578,6 +578,7 @@ jobs:
             gzipSha256: gzipFile ? hashFile(path.join(catalogDir, gzipFile)) : zeroHash,
             manifestSha256: hashFile(manifestPath),
             coverageSummarySha256: hashFile(process.env.EASYSUBWAY_COVERAGE_GAP_REPORT),
+            itxCheongchunCoverageSha256: hashFile("tools/datapack/itx-cheongchun-coverage-contract.json"),
             routeMapPositionCoverageSha256: hashFile(process.env.EASYSUBWAY_ROUTE_MAP_AUDIT_REPORT),
             routeGraphTopologySha256: hashFile(process.env.EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT),
             headwayReportSha256: hashFile(process.env.EASYSUBWAY_HEADWAY_REPORT),
