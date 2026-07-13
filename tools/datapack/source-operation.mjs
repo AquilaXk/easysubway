@@ -1,0 +1,159 @@
+#!/usr/bin/env node
+import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
+
+const CANDIDATES_URL = new URL("./source-candidates.json", import.meta.url);
+
+function requiredText(value, label) {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${label} is required`);
+  }
+  return value;
+}
+
+function stringList(value, label) {
+  if (!Array.isArray(value) || value.length === 0 || value.some((item) => typeof item !== "string" || !item)) {
+    throw new Error(`${label} must be a non-empty string array`);
+  }
+  if (new Set(value).size !== value.length) {
+    throw new Error(`${label} must not contain duplicates`);
+  }
+  return value;
+}
+
+export function validateOperation(candidate, { allowMissing = false } = {}) {
+  const operation = candidate?.operation;
+  if (operation == null) {
+    if (allowMissing) return null;
+    throw new Error(`${candidate?.id ?? "candidate"}.operation is required`);
+  }
+  if (typeof operation !== "object" || Array.isArray(operation)) {
+    throw new Error(`${candidate.id}.operation must be an object`);
+  }
+  const forbiddenKeys = Object.keys(operation).filter((key) =>
+    /(?:credential|secret|serviceKey|apiKey).*value/i.test(key),
+  );
+  if (forbiddenKeys.length > 0) {
+    throw new Error(`${candidate.id}.operation credential values are forbidden`);
+  }
+  if (!new Set(["GET", "POST"]).has(operation.method)) {
+    throw new Error(`${candidate.id}.operation.method must be GET or POST`);
+  }
+  const requestUrl = requiredText(candidate.requestUrl, `${candidate.id}.requestUrl`);
+  if (requiredText(operation.endpoint, `${candidate.id}.operation.endpoint`) !== requestUrl) {
+    throw new Error(`${candidate.id}.operation endpoint must match requestUrl`);
+  }
+  const auth = operation.auth;
+  if (!auth || typeof auth !== "object" || Array.isArray(auth)) {
+    throw new Error(`${candidate.id}.operation.auth must be an object`);
+  }
+  const authEnv = requiredText(auth.env, `${candidate.id}.operation.auth.env`);
+  if (!/^[A-Z][A-Z0-9_]*$/.test(authEnv)) {
+    throw new Error(`${candidate.id}.operation.auth.env must be an environment variable name`);
+  }
+  if (!new Set(["query", "path", "header", "none"]).has(auth.placement)) {
+    throw new Error(`${candidate.id}.operation.auth.placement is invalid`);
+  }
+  const authParameter = requiredText(auth.parameter, `${candidate.id}.operation.auth.parameter`);
+  const requiredParameters = stringList(
+    operation.requiredParameters,
+    `${candidate.id}.operation.requiredParameters`,
+  );
+  if (auth.placement !== "none" && !requiredParameters.includes(authParameter)) {
+    throw new Error(`${candidate.id}.operation.requiredParameters must include the auth parameter`);
+  }
+  requiredText(operation.responseEnvelope, `${candidate.id}.operation.responseEnvelope`);
+  const runner = operation.runner;
+  if (!runner || typeof runner !== "object" || Array.isArray(runner)) {
+    throw new Error(`${candidate.id}.operation.runner must be an object`);
+  }
+  const command = requiredText(runner.command, `${candidate.id}.operation.runner.command`);
+  if (!command.startsWith("node tools/") || /[;&|`$]/.test(command)) {
+    throw new Error(`${candidate.id}.operation.runner.command must be a literal repository Node command`);
+  }
+  const requiredEnv = stringList(runner.requiredEnv, `${candidate.id}.operation.runner.requiredEnv`);
+  if (!requiredEnv.includes(authEnv)) {
+    throw new Error(`${candidate.id}.operation.runner.requiredEnv must include auth.env`);
+  }
+  if (operation.secretPolicy !== "env-only-redacted-output") {
+    throw new Error(`${candidate.id}.operation.secretPolicy is invalid`);
+  }
+  return operation;
+}
+
+export function operationSummary(candidate) {
+  validateOperation(candidate, { allowMissing: true });
+  return {
+    id: requiredText(candidate.id, "candidate.id"),
+    status: candidate.admissionStatus ?? null,
+    endpoint: requiredText(candidate.requestUrl, `${candidate.id}.requestUrl`),
+    sampleUrl: candidate.evidence?.sampleUrl ?? null,
+    responseFields: candidate.evidence?.outputFields ?? [],
+    operation: candidate.operation ?? null,
+  };
+}
+
+export function listOperations(document) {
+  const candidates = Array.isArray(document?.candidates) ? document.candidates : [];
+  return candidates
+    .filter((candidate) => typeof candidate.requestUrl === "string")
+    .map(operationSummary)
+    .sort((left, right) => left.id.localeCompare(right.id, "en"));
+}
+
+function humanSummary(summary) {
+  const lines = [
+    `id: ${summary.id}`,
+    `status: ${summary.status ?? "unknown"}`,
+    `endpoint: ${summary.endpoint}`,
+    `sample: ${summary.sampleUrl ?? "not documented"}`,
+    `response fields: ${summary.responseFields.join(", ") || "not documented"}`,
+  ];
+  if (summary.operation) {
+    lines.push(
+      `auth env: ${summary.operation.auth.env}`,
+      `required params: ${summary.operation.requiredParameters.join(", ")}`,
+      `response envelope: ${summary.operation.responseEnvelope}`,
+      `runner: ${summary.operation.runner.command}`,
+      `runner env: ${summary.operation.runner.requiredEnv.join(", ")}`,
+    );
+  } else {
+    lines.push("operation: not documented");
+  }
+  return lines.join("\n");
+}
+
+async function main(args = process.argv.slice(2)) {
+  const [command, sourceId] = args.filter((arg) => arg !== "--json");
+  const json = args.includes("--json");
+  const document = JSON.parse(await readFile(CANDIDATES_URL, "utf8"));
+  const operations = listOperations(document);
+  if (command === "list") {
+    console.log(
+      json
+        ? JSON.stringify(operations, null, 2)
+        : operations.map((entry) => `${entry.id}\t${entry.status ?? "unknown"}\t${entry.endpoint}`).join("\n"),
+    );
+    return;
+  }
+  if (command === "show" && sourceId) {
+    const summary = operations.find((entry) => entry.id === sourceId);
+    if (!summary) throw new Error(`source operation not found: ${sourceId}`);
+    console.log(json ? JSON.stringify(summary, null, 2) : humanSummary(summary));
+    return;
+  }
+  if (command === "validate" && !sourceId) {
+    const candidates = document.candidates.filter((candidate) => candidate.operation != null);
+    for (const candidate of candidates) validateOperation(candidate);
+    console.log(`source operation contracts valid: ${candidates.length}`);
+    return;
+  }
+  throw new Error("usage: source-operation.mjs list [--json] | show <source-id> [--json] | validate");
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : "source operation failed");
+    process.exitCode = 1;
+  });
+}
