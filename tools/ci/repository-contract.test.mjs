@@ -2181,11 +2181,12 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(playProductionAccessGate.releaseGate, "play-production-access-closed-test");
   assert.equal(playProductionAccessGate.issue, 1016);
   assert.equal(playProductionAccessGate.parentEvidenceManifest, androidRcEvidencePath);
-  assert.equal(playProductionAccessGate.status, "BLOCKED_EXTERNAL");
-  assert.equal(playProductionAccessGate.latestApiAccessCheck.qaEvidenceDateKst, "2026-06-29");
+  assert.equal(playProductionAccessGate.status, "IN_PROGRESS");
+  assert.equal(playProductionAccessGate.goNoGoDecision, "NO_GO");
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.qaEvidenceDateKst, "2026-07-13");
   assert.equal(playProductionAccessGate.latestApiAccessCheck.result, "PASS");
   assert.equal(playProductionAccessGate.latestApiAccessCheck.packageName, "com.easysubway.app");
-  assert.equal(playProductionAccessGate.latestApiAccessCheck.latestVersionCodeEnv, 10001);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.latestVersionCodeEnv, 10004);
   assert.equal(playProductionAccessGate.latestApiAccessCheck.editInsertReady, true);
   assert.equal(playProductionAccessGate.latestApiAccessCheck.tracksListReady, true);
   assert.deepEqual(playProductionAccessGate.latestApiAccessCheck.tracks, [
@@ -2194,8 +2195,17 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "internal",
     "production",
   ]);
-  assert.equal(playProductionAccessGate.latestApiAccessCheck.tracksMaxVersionCode, 10001);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.tracksMaxVersionCode, 10004);
   assert.equal(playProductionAccessGate.latestApiAccessCheck.latestVersionCodeCoversTrackMax, true);
+  assert.deepEqual(playProductionAccessGate.latestApiAccessCheck.trackReleases, {
+    alpha: { releaseState: "completed", versionCodes: [10003] },
+    beta: { releaseState: "empty", versionCodes: [] },
+    internal: { releaseState: "completed", versionCodes: [10004] },
+    production: { releaseState: "empty", versionCodes: [] },
+  });
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.generatedApksListReady, true);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.generatedUniversalApkReady, true);
+  assert.equal(playProductionAccessGate.latestApiAccessCheck.generatedSplitApkCount, 235);
   assert.equal(playProductionAccessGate.latestApiAccessCheck.editValidateReady, true);
   assert.equal(playProductionAccessGate.latestApiAccessCheck.editDeleteReady, true);
   assert.equal(playProductionAccessGate.latestApiAccessCheck.uploadAttempted, false);
@@ -2203,8 +2213,25 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(playProductionAccessGate.latestApiAccessCheck.secretValuesPrinted, false);
   assert.match(
     playProductionAccessGate.latestApiAccessCheck.localOnlyEvidence,
-    /\.codex\/evidence\/release\/play-production-access\/1016-api-recheck-20260629\//,
+    /\.codex\/evidence\/release\/play-production-access\/1016-api-track-testers-20260713\//,
   );
+  assert.equal(playProductionAccessGate.accountEvidence.accountType, "personal");
+  assert.equal(playProductionAccessGate.accountEvidence.createdAtMonth, "2026-06");
+  assert.equal(playProductionAccessGate.accountEvidence.identityVerification, "READY");
+  assert.equal(playProductionAccessGate.accountEvidence.twoFactorAuthentication, "READY");
+  assert.equal(playProductionAccessGate.accountEvidence.leastPrivilegeConsoleUsers, "READY");
+  assert.equal(playProductionAccessGate.closedTestProgress.lastConsoleEvidenceDateKst, "2026-07-05");
+  assert.equal(playProductionAccessGate.closedTestProgress.lastKnownOptedInTesterCount, 0);
+  assert.equal(playProductionAccessGate.closedTestProgress.optedInTesterCountAvailableFromApi, false);
+  assert.equal(playProductionAccessGate.closedTestProgress.continuousOptInDaysAvailableFromApi, false);
+  assert.equal(playProductionAccessGate.productionAccess.accessState, "NOT_APPLIED_REQUIREMENTS_INCOMPLETE");
+  assert.equal(playProductionAccessGate.physicalDeviceEvidence.androidVersion, 16);
+  assert.equal(playProductionAccessGate.physicalDeviceEvidence.verifiedBoot, "green");
+  assert.equal(playProductionAccessGate.physicalDeviceEvidence.bootloaderLocked, true);
+  assert.equal(playProductionAccessGate.physicalDeviceEvidence.playConsoleAppInstalled, false);
+  assert.equal(playProductionAccessGate.physicalDeviceEvidence.playInstalledBuildVerified, false);
+  assert.equal(playProductionAccessGate.physicalDeviceEvidence.currentSigningCertificateMatchesPlay, false);
+  assert.equal(playProductionAccessGate.physicalDeviceEvidence.playInstallRequiresCurrentAppUninstall, true);
   assert.equal(playProductionAccessGate.officialPolicy.closedTestMinimumOptedInTesters, 12);
   assert.equal(playProductionAccessGate.officialPolicy.closedTestContinuousOptInDays, 14);
   assert.match(playProductionAccessGate.officialPolicy.source, /^https:\/\/support\.google\.com\/googleplay\/android-developer\/answer\/14151465/);
@@ -2249,7 +2276,21 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   }
   assert.equal(playGeneratedApkDeviceMatrixGate.releaseGate, "play-generated-apk-device-matrix");
   assert.equal(playGeneratedApkDeviceMatrixGate.issue, 1016);
+  assert.equal(playGeneratedApkDeviceMatrixGate.status, "IN_PROGRESS");
+  assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoDecision, "NO_GO");
   assert.equal(playGeneratedApkDeviceMatrixGate.androidRcEvidenceManifest, androidRcEvidencePath);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPlayGeneratedArtifact.versionCode, 10004);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPlayGeneratedArtifact.packageId, "com.easysubway.app");
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPlayGeneratedArtifact.versionName, "1.0.3");
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPlayGeneratedArtifact.signatureVerified, true);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPlayGeneratedArtifact.generatedUniversalApk, true);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPlayGeneratedArtifact.generatedSplitApkCount, 235);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPlayGeneratedArtifact.secretValuesPrinted, false);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPhysicalDevice.androidVersion, 16);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPhysicalDevice.playStoreInstalled, true);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPhysicalDevice.playInstallerProvenanceVerified, false);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPhysicalDevice.currentSigningCertificateMatchesPlay, false);
+  assert.equal(playGeneratedApkDeviceMatrixGate.latestPhysicalDevice.playInstallRequiresCurrentAppUninstall, true);
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("internal-app-sharing"));
   assert.ok(playGeneratedApkDeviceMatrixGate.acceptedArtifactSources.includes("play-installed-build"));
   assert.ok(playGeneratedApkDeviceMatrixGate.requiredArtifactEvidence.includes("play-generated-split-apk-install-log"));
