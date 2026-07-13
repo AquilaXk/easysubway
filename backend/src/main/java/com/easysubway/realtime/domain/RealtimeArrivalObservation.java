@@ -51,7 +51,7 @@ public record RealtimeArrivalObservation(
 	}
 
 	private static String requireMaxLength(String value, String field, int maxLength) {
-		if (value != null && value.length() > maxLength) {
+		if (value != null && value.codePointCount(0, value.length()) > maxLength) {
 			throw new IllegalArgumentException(field + " must not exceed " + maxLength + " characters");
 		}
 		return value;

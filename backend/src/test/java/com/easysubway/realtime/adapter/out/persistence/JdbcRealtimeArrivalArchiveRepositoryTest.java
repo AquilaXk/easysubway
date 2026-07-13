@@ -1,6 +1,7 @@
 package com.easysubway.realtime.adapter.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.realtime.domain.RealtimeArrivalObservation;
@@ -112,6 +113,11 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 	@Test
 	@DisplayName("provider 원문 방향과 종착지는 DB 길이 한도를 넘을 수 없다")
 	void rejectsOversizedRawLabelsBeforePersistence() {
+		assertThatCode(() -> new RealtimeArrivalObservation(
+			"seoul-topis", "station-sangnoksu", "seoul-4", "1004", "1004000448", "4123",
+			Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-06-26T08:00:00Z"),
+			180, 160, "😀".repeat(120), "😀".repeat(120), Instant.parse("2026-07-26T08:00:00Z")
+		)).doesNotThrowAnyException();
 		assertThatThrownBy(() -> new RealtimeArrivalObservation(
 			"seoul-topis", "station-sangnoksu", "seoul-4", "1004", "1004000448", "4123",
 			Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-06-26T08:00:00Z"),
@@ -126,6 +132,15 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 		))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessage("rawDestination must not exceed 120 characters");
+	}
+
+	@Test
+	@DisplayName("DB migration도 원문 방향·종착지 120문자는 허용하고 121문자는 거부한다")
+	void databaseEnforcesRawLabelLength() {
+		assertThatCode(() -> insertRawLabels("x".repeat(120), "y".repeat(120)))
+			.doesNotThrowAnyException();
+		assertThatThrownBy(() -> insertRawLabels("x".repeat(121), "y".repeat(121)))
+			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
@@ -203,6 +218,21 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 			"상행",
 			"당고개",
 			retainedUntil
+		);
+	}
+
+	private void insertRawLabels(String rawDirection, String rawDestination) {
+		jdbcTemplate.update(
+			"""
+				INSERT INTO realtime_arrival_observations (
+					provider_id, station_id, line_id, provider_line_id, provider_station_id,
+					train_no, provider_observed_at, backend_received_at,
+					raw_eta_seconds, adjusted_eta_seconds, raw_direction, raw_destination, retained_until
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				""",
+			"seoul-topis", "station-sangnoksu", "seoul-4", "1004", "1004000448", "4123",
+			Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-06-26T08:00:00Z"),
+			180, 160, rawDirection, rawDestination, Instant.parse("2026-07-26T08:00:00Z")
 		);
 	}
 }
