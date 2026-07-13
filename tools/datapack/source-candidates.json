@@ -2511,7 +2511,7 @@
         "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_attribution",
-      "sampleEvidenceStatus": "registration_requested_owner_action_pending",
+      "sampleEvidenceStatus": "application_complete_activation_pending",
       "admissionStatus": "missing_live_schema_result_code_30",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
@@ -2521,10 +2521,10 @@
         "outputFields": ["arvTm", "dayCd", "dayNm", "dptTm", "lnCd", "orgStinCd", "railOprIsttCd", "stinCd", "tmnStinCd", "trnNo"],
         "coverageLimitations": [
           "2026-07-13 K2 25역 credential-safe call은 provider resultCode 30으로 거절",
-          "활용신청 활성화와 live schema 확인 전 ITX-청춘 schedule_timetable은 MISSING"
+          "활용신청 완료 후 provider 활성화와 live schema 확인 전 ITX-청춘 schedule_timetable은 MISSING"
         ]
       },
-      "nextAction": "오너가 KRIC 활용신청을 완료한 뒤 K2 25역을 재수집하고 TAGO ITX train number와 trip/stop join을 재검증한다"
+      "nextAction": "KRIC 활용신청 활성화 전파 후 K2 25역을 재수집하고 TAGO ITX train number와 trip/stop join을 재검증한다"
     },
     {
       "id": "tago-train-city-codes",
@@ -2552,6 +2552,11 @@
       "id": "tago-train-stations",
       "priority": "P0",
       "domain": "station_line_membership",
+      "coverageScope": {
+        "regionIds": ["capital"],
+        "operatorIds": ["korail"],
+        "lineIds": ["line-54a7b980b7c3"]
+      },
       "displayName": "TAGO 시도별 기차역 목록",
       "detailUrl": "https://www.data.go.kr/data/15098552/openapi.do",
       "requestUrl": "https://apis.data.go.kr/1613000/TrainInfo/GetCtyAcctoTrainSttnList",
@@ -2601,6 +2606,11 @@
       "id": "tago-train-schedule-fares",
       "priority": "P0",
       "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": ["capital"],
+        "operatorIds": ["korail"],
+        "lineIds": ["line-54a7b980b7c3"]
+      },
       "displayName": "TAGO 출도착지 기반 열차 시간표·운임",
       "detailUrl": "https://www.data.go.kr/data/15098552/openapi.do",
       "requestUrl": "https://apis.data.go.kr/1613000/TrainInfo/GetStrtpntAlocFndTrainInfo",
@@ -2632,6 +2642,11 @@
       "id": "daejeon-train-timetable",
       "priority": "P0",
       "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": ["daejeon"],
+        "operatorIds": ["daejeon-transportation"],
+        "lineIds": ["line-7051a9c2525c"]
+      },
       "displayName": "대전교통공사_열차시각표 조회 서비스",
       "detailUrl": "https://www.data.go.kr/data/15159278/openapi.do",
       "requestUrl": "https://apis.data.go.kr/B554695/TimeTableSVC/getAllTimeTable",
@@ -2670,6 +2685,11 @@
       "id": "daejeon-station-distance-fare",
       "priority": "P0",
       "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": ["daejeon"],
+        "operatorIds": ["daejeon-transportation"],
+        "lineIds": ["line-7051a9c2525c"]
+      },
       "displayName": "대전교통공사_대전도시철도 1호선 역간 소요시간·거리·요금",
       "detailUrl": "https://www.data.go.kr/data/15082979/fileData.do",
       "requestUrl": "https://api.odcloud.kr/api/15082979/v1/uddi:bdfe4740-2e2b-4663-94af-b86de0e6e9de",
@@ -2707,6 +2727,11 @@
       "id": "daejeon-braille-guide-map",
       "priority": "P1",
       "domain": "accessibility_facilities",
+      "coverageScope": {
+        "regionIds": ["daejeon"],
+        "operatorIds": ["daejeon-transportation"],
+        "lineIds": ["line-7051a9c2525c"]
+      },
       "displayName": "대전교통공사_역사 점자 안내도 현황",
       "detailUrl": "https://www.data.go.kr/data/15044677/fileData.do",
       "requestUrl": "https://api.odcloud.kr/api/15044677/v1/uddi:6d7ceef4-f258-47ea-ab28-c3c7ef005c2c",

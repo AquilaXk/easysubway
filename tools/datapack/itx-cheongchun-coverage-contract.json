@@ -86,7 +86,7 @@
       "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationTimetable",
       "providerResultCode": "30",
       "observedDate": "2026-07-13",
-      "status": "MISSING_PROVIDER_AUTHORIZATION",
+      "status": "APPLICATION_COMPLETE_ACTIVATION_PENDING",
       "expectedFields": ["arvTm", "dayCd", "dayNm", "dptTm", "lnCd", "orgStinCd", "railOprIsttCd", "stinCd", "tmnStinCd", "trnNo"]
     }
   },
@@ -99,7 +99,7 @@
   "freshness": {
     "status": "MISSING",
     "nextReviewAt": "2026-07-20T00:00:00.000Z",
-    "eventTrigger": "KRIC stationTimetable 활용신청 활성화 또는 대체 공식 station-level timetable 발견"
+    "eventTrigger": "KRIC stationTimetable 활성화 전파 또는 대체 공식 station-level timetable 발견"
   },
   "claimGate": {
     "claim": "지하철 + 기차",

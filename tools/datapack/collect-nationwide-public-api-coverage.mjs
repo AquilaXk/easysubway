@@ -59,7 +59,7 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
   if (!Array.isArray(targets?.activeLineScopes) || domains.length === 0) {
     throw new Error("nationwide targets active scopes and launch domains are required");
   }
-  const knownProviderCandidateIdsByDomain = indexKnownProviderCandidates(sourceCandidates);
+  const knownProviderCandidatesByDomain = indexKnownProviderCandidates(sourceCandidates);
   const entries = targets.activeLineScopes.flatMap((scope) => domains.map((sourceDomain) => {
     const domain = SOURCE_DOMAIN_SEARCH[sourceDomain];
     if (!domain) throw new Error(`unsupported launch source domain: ${sourceDomain}`);
@@ -71,7 +71,9 @@ export function buildNationwidePublicApiSearchPlan({ targets, fixture, sourceCan
       sourceDomain,
       fallback: domain.fallback,
       userMessageKo: domain.userMessageKo,
-      knownProviderCandidateIds: knownProviderCandidateIdsByDomain.get(sourceDomain) ?? [],
+      knownProviderCandidateIds: (knownProviderCandidatesByDomain.get(sourceDomain) ?? [])
+        .filter((candidate) => candidateAppliesToScope(candidate.coverageScope, scope))
+        .map(({ id }) => id),
       queries: lineTerms.map((keyword) => ({
         providerId: "data-go-search",
         endpoint: "https://api.odcloud.kr/api/GetSearchDataList/v1/searchData",
@@ -187,12 +189,13 @@ export async function collectNationwidePublicApiCoverage({
 
 function indexKnownProviderCandidates(sourceCandidates) {
   const indexed = new Map();
-  for (const candidate of sourceCandidates?.candidates ?? []) {
+  for (const [index, candidate] of (sourceCandidates?.candidates ?? []).entries()) {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
     const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
     const domain = typeof candidate.domain === "string" ? candidate.domain.trim() : "";
-    const endpointValue = candidate.operation?.endpoint;
+    const endpointValue = candidate.operation?.endpoint ?? candidate.requestUrl;
     if (!id || !domain || typeof endpointValue !== "string") continue;
+    validateCoverageScope(candidate.coverageScope, `source candidates[${index}].coverageScope`);
     let endpoint;
     try {
       endpoint = new URL(endpointValue);
@@ -200,12 +203,38 @@ function indexKnownProviderCandidates(sourceCandidates) {
       continue;
     }
     if (!PUBLIC_API_ORIGINS.has(endpoint.origin) || domain === "provider_discovery") continue;
-    const ids = indexed.get(domain) ?? [];
-    ids.push(id);
-    indexed.set(domain, ids);
+    const candidates = indexed.get(domain) ?? [];
+    candidates.push({ id, coverageScope: candidate.coverageScope });
+    indexed.set(domain, candidates);
   }
-  for (const [domain, ids] of indexed) indexed.set(domain, [...new Set(ids)].sort());
+  for (const [domain, candidates] of indexed) {
+    indexed.set(domain, [...new Map(candidates.map((candidate) => [candidate.id, candidate])).values()]
+      .sort((a, b) => a.id.localeCompare(b.id)));
+  }
   return indexed;
+}
+
+function validateCoverageScope(scope, label) {
+  if (scope === undefined) return;
+  if (!scope || typeof scope !== "object" || Array.isArray(scope)) throw new Error(`${label} is invalid`);
+  const allowedFields = new Set(["regionIds", "operatorIds", "lineIds"]);
+  if (Object.keys(scope).some((field) => !allowedFields.has(field))) throw new Error(`${label} is invalid`);
+  for (const field of allowedFields) {
+    if (scope[field] !== undefined && (
+      !Array.isArray(scope[field])
+      || scope[field].length === 0
+      || scope[field].some((id) => typeof id !== "string" || id.trim() === "")
+      || new Set(scope[field]).size !== scope[field].length
+    )) throw new Error(`${label}.${field} is invalid`);
+  }
+}
+
+function candidateAppliesToScope(coverageScope, targetScope) {
+  return coverageScope === undefined || [
+    ["regionIds", "regionId"],
+    ["operatorIds", "operatorId"],
+    ["lineIds", "lineId"],
+  ].every(([ids, id]) => coverageScope[ids] === undefined || coverageScope[ids].includes(targetScope[id]));
 }
 
 async function runQuery(query, credentials, fetchImpl, requestCache) {

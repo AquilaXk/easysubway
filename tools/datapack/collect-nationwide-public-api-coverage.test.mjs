@@ -113,6 +113,47 @@ test("전국 공통 provider 후보가 있으면 운영기관 catalog 0건을 �
   });
 });
 
+test("지역 전용 provider 후보는 다른 지역의 공식 미지원 판정을 막지 않는다", () => {
+  const searchPlan = buildNationwidePublicApiSearchPlan({
+    targets: {
+      targetVersion: "2026-07-13",
+      activeLineScopes: [
+        { regionId: "busan", operatorId: "busan-transportation", lineId: "busan-1" },
+        { regionId: "daejeon", operatorId: "daejeon-transportation", lineId: "daejeon-1" },
+      ],
+      requiredSourceDomains: [{ id: "route_graph_topology", releaseTier: "LAUNCH_REQUIRED" }],
+    },
+    fixture: {
+      packs: [{
+        operators: [
+          { id: "busan-transportation", nameKo: "부산교통공사" },
+          { id: "daejeon-transportation", nameKo: "대전교통공사" },
+        ],
+        lines: [
+          { id: "busan-1", nameKo: "부산 1호선" },
+          { id: "daejeon-1", nameKo: "대전 1호선" },
+        ],
+      }],
+    },
+    sourceCandidates: {
+      candidates: [{
+        id: "daejeon-station-distance-fare",
+        domain: "route_graph_topology",
+        requestUrl: "https://api.odcloud.kr/api/15082979/v1/example",
+        coverageScope: { lineIds: ["daejeon-1"] },
+      }],
+    },
+  });
+
+  assert.deepEqual(searchPlan.entries.map(({ lineId, knownProviderCandidateIds }) => ({
+    lineId,
+    knownProviderCandidateIds,
+  })), [
+    { lineId: "busan-1", knownProviderCandidateIds: [] },
+    { lineId: "daejeon-1", knownProviderCandidateIds: ["daejeon-station-distance-fare"] },
+  ]);
+});
+
 test("공공데이터 검색이 거부하는 GTX-A 문장부호는 안전한 alias로 정규화한다", () => {
   const searchPlan = buildNationwidePublicApiSearchPlan({
     targets: {
