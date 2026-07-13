@@ -2058,6 +2058,16 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         // 홈과 같은 위치·스타일로 온다. 뒤로가기 아이콘·색·탭타깃도 홈 ≡ 버튼과
         // 동일 규격이다. 지역 표시는 홈 지역 선택기 스타일이되 검색 맥락에선 표시
         // 전용이다(오너 지시: "변경은 못해도 알려는 줘야").
+        //
+        // automaticallyImplyLeading: false + 커스텀 IconButton(아래)을 쓰는 이유:
+        // ① 이 앱은 한국어 한정 서비스라(오너 결정) 자동 BackButton이 제공하는
+        // MaterialLocalizations 지역화 툴팁("Back" 등)이 불필요하고, 커스텀
+        // IconButton으로 한글 tooltip('뒤로')을 직접 지정하는 편이 맥락에 맞는다.
+        // ② 자동 BackButton은 크기·패딩이 Material 기본 규격을 따라 위 홈 ≡ 슬롯
+        // (56 정사각 탭타깃)과 폭이 정합되지 않는다. 여기서는 minimumSize·
+        // tapTargetSize·padding을 홈 ≡ 버튼과 동일 규격으로 명시 통제해야 위 주석의
+        // 픽셀 정합이 성립한다. "코드 정리" 목적으로 automaticallyImplyLeading을
+        // true로 되돌리거나 IconButton을 BackButton으로 바꾸면 이 폭 정합이 깨진다.
         automaticallyImplyLeading: false,
         title: Padding(
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),

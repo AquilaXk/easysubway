@@ -1011,7 +1011,7 @@ void main() {
     // hint는 부유 라벨이 아니라 박스 내부에 렌더돼야 한다(idle의 '지하철역 검색'
     // 텍스트처럼 박스 안 중앙 부근). 박스 상단 테두리 위로 떠오르는 부유 라벨
     // 회귀를 막는 것이 핵심 계약이다. #2082 실기기 재작업으로 중앙 정렬을
-    // textAlignVertical.center로 얻으면서, FlutterTest 테스트 폰트에서는 hint
+    // 고유 높이 필드 + Center 위젯으로 얻으면서, FlutterTest 테스트 폰트에서는 hint
     // 중심이 박스 중심에서 십수 px 벗어날 수 있으나(실기기 Noto Sans KR에서는
     // 오프셋 0으로 정합 — docs/2082-qa 픽셀 판독이 정본), hint가 박스 세로 범위
     // 안에 온전히 들어오는지(=부유 라벨이 아님)를 폰트 메트릭 독립적으로 검증한다.
@@ -1029,7 +1029,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 입력한 편집 텍스트는 시각 박스 안에 렌더돼야 한다. #2082 실기기 재작업:
-    // 중앙 정렬을 textAlignVertical.center로 얻으며, 실기기(Noto Sans KR)에서
+    // 중앙 정렬을 고유 높이 필드 + Center 위젯으로 얻으며, 실기기(Noto Sans KR)에서
     // 입력 글자·캐럿이 시각 박스 중앙에 오프셋 0으로 정합함을 픽셀 판독으로
     // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트에서는 InputDecorator
     // 중앙 정렬 오차로 입력 글자 중심이 박스 중심에서 십수 px 벗어날 수 있으므로,
@@ -1117,8 +1117,8 @@ void main() {
     );
 
     // 편집 텍스트가 46px 시각 박스 안에 렌더돼야 한다(#2082 수정을 공용 위젯이
-    // 소비함을 검증). #2082 실기기 재작업: 중앙 정렬은 textAlignVertical.center로
-    // 얻으며 실기기(Noto Sans KR)에서 오프셋 0으로 정합함을 픽셀 판독으로
+    // 소비함을 검증). #2082 실기기 재작업: 중앙 정렬은 고유 높이 필드 + Center
+    // 위젯으로 얻으며 실기기(Noto Sans KR)에서 오프셋 0으로 정합함을 픽셀 판독으로
     // 확인했다(docs/2082-qa, 정본). FlutterTest 테스트 폰트·AppBar toolbar 배치
     // 오차로 중심이 박스 중심에서 십수 px 벗어날 수 있으므로, 입력 글자가 박스
     // 세로 범위 안에 온전히 들어오는지를 폰트 메트릭 독립적으로 계약으로 잡는다.
@@ -7022,8 +7022,8 @@ void main() {
       // hintText다. floatingLabelBehavior를 지정하면 실기기에서 hint가
       // 박스 상단 테두리 위로 떠오르는 회귀가 있어 미지정이 계약이다.
       expect(searchInput.decoration?.floatingLabelBehavior, isNull);
-      // #2082 실기기 재작업: hint 중앙 정렬은 textAlignVertical.center로 얻으며,
-      // 실기기(Noto Sans KR)에서는 오프셋 0으로 정합함을 픽셀 판독으로 확인했다
+      // #2082 실기기 재작업: hint 중앙 정렬은 고유 높이 필드 + Center 위젯으로
+      // 얻으며, 실기기(Noto Sans KR)에서는 오프셋 0으로 정합함을 픽셀 판독으로 확인했다
       // (docs/2082-qa, 정본). FlutterTest 테스트 폰트에서는 InputDecorator 중앙
       // 정렬 오차로 hint 중심이 박스 중심에서 십수 px 벗어날 수 있으므로, 여기서는
       // hint가 박스 세로 범위 안에 온전히 들어오는지(=부유 라벨이 아님)를 폰트
