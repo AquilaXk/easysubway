@@ -3296,6 +3296,14 @@ class _NetworkMapCanvas extends StatefulWidget {
 
 const _minMapScale = 0.08;
 const _maxMapScale = 4.8;
+
+/// 역 focus 시 카메라 bounds를 지역 초기 화면(축소 하한, #1789) bounds의 이 비율로
+/// 좁혀 항상 그만큼 확대되게 한다. 절대 픽셀 하한(구 860px) 대신 초기 화면 대비
+/// 비율을 쓰는 이유: 수도권처럼 지도 폭이 작은 지역에서는 절대 하한이 초기 화면
+/// 폭보다 커져 focus가 pan만 되고 확대가 사라졌다(#2062). 두 축을 같은 비율로
+/// 줄이므로 contain-fit scale은 정확히 1/비율 배 확대되어 지역 크기와 무관하게
+/// 일정한 확대율을 보장한다.
+const _stationFocusInitialBoundsFraction = 0.42;
 const _routeMapGestureRendererCommitInterval = Duration(milliseconds: 1100);
 const _routeMapGestureMaxTranslationDriftFraction = 1.35;
 const _routeMapGestureMaxScaleRatio = 3.4;
@@ -3991,6 +3999,31 @@ MapCameraState networkMapInitialCameraForRegion({
   );
 }
 
+/// 역 focus 카메라(contain-fit)를 만든다(테스트용). 프로덕션 focus 분기와 같은
+/// bounds 규칙([_stationFocusBounds])·같은 [_cameraForBounds] contain-fit을 써서
+/// focus가 지역 초기 화면보다 확대되는지 회귀 테스트가 가드하게 한다(#2062).
+@visibleForTesting
+MapCameraState networkMapStationFocusCameraForRegion({
+  required Rect initialBounds,
+  required Offset stationCenter,
+  required Rect fullBounds,
+  required Size viewport,
+  double? initialScaleOverride,
+}) {
+  return _cameraForBounds(
+    _stationFocusBounds(
+      initialBounds: initialBounds,
+      center: stationCenter,
+      sourceWidth: fullBounds.width,
+      sourceHeight: fullBounds.height,
+    ),
+    BoxConstraints.tightFor(width: viewport.width, height: viewport.height),
+    sourceBounds: fullBounds,
+    contain: true,
+    initialScaleOverride: initialScaleOverride,
+  );
+}
+
 @visibleForTesting
 MapCameraState networkMapCameraWithMonotonicRevision({
   required MapCameraState current,
@@ -4206,20 +4239,39 @@ Rect networkMapInitialOriginalAssetBounds({
 }
 
 Rect _stationFocusBoundsFor(NetworkMapStation station, _MapGeometry geometry) {
-  final width = math.min(
-    geometry.width,
-    math.max(860.0, geometry.width * 0.28),
-  );
-  final height = math.min(
-    geometry.height,
-    math.max(860.0, geometry.height * 0.28),
-  );
-  return _sourceCenteredBounds(
+  return _stationFocusBounds(
+    initialBounds: geometry.initialBounds,
     center: Offset(geometry.x(station), geometry.y(station)),
-    width: width,
-    height: height,
     sourceWidth: geometry.width,
     sourceHeight: geometry.height,
+  );
+}
+
+/// 역 focus 카메라의 source bounds를 계산한다. 지역 초기 화면 bounds를
+/// [_stationFocusInitialBoundsFraction]만큼 두 축 동일 비율로 좁혀 focus가 항상
+/// 초기 화면보다 확대되도록 한다(#2062). 좁힌 bounds가 지도 크기를 넘지 않도록만
+/// clamp하며(focus는 항상 초기 화면보다 작으므로 실제로는 걸리지 않음), edge 역은
+/// _sourceCenteredBounds가 지도 안으로 이동시킨다.
+Rect _stationFocusBounds({
+  required Rect initialBounds,
+  required Offset center,
+  required double sourceWidth,
+  required double sourceHeight,
+}) {
+  final width = math.min(
+    sourceWidth,
+    initialBounds.width * _stationFocusInitialBoundsFraction,
+  );
+  final height = math.min(
+    sourceHeight,
+    initialBounds.height * _stationFocusInitialBoundsFraction,
+  );
+  return _sourceCenteredBounds(
+    center: center,
+    width: width,
+    height: height,
+    sourceWidth: sourceWidth,
+    sourceHeight: sourceHeight,
   );
 }
 
