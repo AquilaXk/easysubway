@@ -35,6 +35,9 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Provider Approval Expiry / Check repository approvals
+        run: node tools/datapack/source-operation.mjs check-approvals
+
       - name: Data Pack Expiry Alert / Configure temp paths
         run: |
           set -euo pipefail

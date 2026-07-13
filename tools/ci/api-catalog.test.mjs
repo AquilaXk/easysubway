@@ -297,6 +297,7 @@ test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 �
     operationId: "transferMovement",
     validFrom: "2026-07-06",
     validTo: "2027-07-06",
+    renewalNoticeDays: 30,
     evidenceSource: "owner-confirmed",
     recordedAt: "2026-07-13",
   });

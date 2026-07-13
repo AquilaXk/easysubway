@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   listOperations,
   operationSummary,
+  providerApprovalExpirySummary,
   validateOperation,
   validateSourceCandidateDocument,
 } from "./source-operation.mjs";
@@ -215,6 +216,45 @@ test("provider 승인은 service와 operation이 endpoint 경로와 일치해야
       /providerApproval serviceId\/operationId must match operation endpoint path/,
     );
   }
+});
+
+test("provider 승인 만료 요약은 갱신 window부터 경고한다", () => {
+  const endpoint = "https://provider.example/handicapped/transferMovement";
+  const document = {
+    schemaVersion: 1,
+    artifactKind: "production-source-candidates",
+    source: "tools/datapack/source-candidates.json",
+    updatedAt: "2026-07-13",
+    candidates: [candidate("approved", {
+      requestUrl: endpoint,
+      operation: validOperation({ endpoint }),
+      providerApproval: {
+        status: "APPROVED",
+        serviceId: "handicapped",
+        operationId: "transferMovement",
+        validFrom: "2026-07-06",
+        validTo: "2027-07-06",
+        renewalNoticeDays: 30,
+        evidenceSource: "owner-confirmed",
+        recordedAt: "2026-07-13",
+      },
+    })],
+  };
+
+  assert.equal(providerApprovalExpirySummary(document, { today: "2027-06-05" }).status, "OK");
+  assert.deepEqual(providerApprovalExpirySummary(document, { today: "2027-06-06" }), {
+    status: "WARNING",
+    approvals: [{
+      candidateId: "approved",
+      validTo: "2027-07-06",
+      daysUntilExpiry: 30,
+      renewalNoticeDays: 30,
+    }],
+  });
+  assert.throws(
+    () => providerApprovalExpirySummary(document, { today: "2027-07-07" }),
+    /status is APPROVED but validTo has expired/,
+  );
 });
 
 test("KRIC key 계약은 URLSearchParams 1회 인코딩과 shell parsing 금지를 고정한다", () => {

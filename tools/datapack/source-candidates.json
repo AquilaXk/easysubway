@@ -655,6 +655,7 @@
         "operationId": "transferMovement",
         "validFrom": "2026-07-06",
         "validTo": "2027-07-06",
+        "renewalNoticeDays": 30,
         "evidenceSource": "owner-confirmed",
         "recordedAt": "2026-07-13"
       },

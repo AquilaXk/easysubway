@@ -97,7 +97,7 @@ function requiredDate(value, label) {
   return text;
 }
 
-export function validateProviderApproval(candidate) {
+export function validateProviderApproval(candidate, { today = new Date().toISOString().slice(0, 10) } = {}) {
   const approval = candidate?.providerApproval;
   if (approval == null) return null;
   if (typeof approval !== "object" || Array.isArray(approval)) {
@@ -107,7 +107,7 @@ export function validateProviderApproval(candidate) {
     throw new Error(`${candidate.id}.providerApproval secret-like values are forbidden`);
   }
   requireAllowedKeys(approval, new Set([
-    "status", "serviceId", "operationId", "validFrom", "validTo", "evidenceSource", "recordedAt",
+    "status", "serviceId", "operationId", "validFrom", "validTo", "renewalNoticeDays", "evidenceSource", "recordedAt",
   ]), `${candidate.id}.providerApproval`);
   if (!new Set(["APPROVED", "EXPIRED", "REVOKED"]).has(approval.status)) {
     throw new Error(`${candidate.id}.providerApproval.status is invalid`);
@@ -123,12 +123,16 @@ export function validateProviderApproval(candidate) {
   }
   const validFrom = requiredDate(approval.validFrom, `${candidate.id}.providerApproval.validFrom`);
   const validTo = requiredDate(approval.validTo, `${candidate.id}.providerApproval.validTo`);
+  if (approval.renewalNoticeDays != null
+    && (!Number.isInteger(approval.renewalNoticeDays) || approval.renewalNoticeDays < 1)) {
+    throw new Error(`${candidate.id}.providerApproval.renewalNoticeDays must be a positive integer`);
+  }
   if (validTo < validFrom) {
     throw new Error(`${candidate.id}.providerApproval.validTo must not precede validFrom`);
   }
   requiredText(approval.evidenceSource, `${candidate.id}.providerApproval.evidenceSource`);
   requiredDate(approval.recordedAt, `${candidate.id}.providerApproval.recordedAt`);
-  const today = new Date().toISOString().slice(0, 10);
+  requiredDate(today, "provider approval current date");
   if (approval.status === "APPROVED" && validTo < today) {
     throw new Error(`${candidate.id}.providerApproval.status is APPROVED but validTo has expired`);
   }
@@ -138,7 +142,7 @@ export function validateProviderApproval(candidate) {
   return approval;
 }
 
-export function validateSourceCandidateDocument(document) {
+export function validateSourceCandidateDocument(document, options = {}) {
   if (!document || typeof document !== "object" || Array.isArray(document)) {
     throw new Error("source candidate document must be an object");
   }
@@ -155,9 +159,31 @@ export function validateSourceCandidateDocument(document) {
     const id = requiredText(candidate?.id, "candidate.id");
     if (ids.has(id)) throw new Error(`duplicate candidate id: ${id}`);
     ids.add(id);
-    validateProviderApproval(candidate);
+    validateProviderApproval(candidate, options);
   }
   return document;
+}
+
+export function providerApprovalExpirySummary(document, { today = new Date().toISOString().slice(0, 10) } = {}) {
+  validateSourceCandidateDocument(document, { today });
+  const todayMillis = Date.parse(`${today}T00:00:00Z`);
+  const approvals = document.candidates
+    .filter((candidate) => candidate.providerApproval?.status === "APPROVED")
+    .map((candidate) => {
+      const approval = candidate.providerApproval;
+      return {
+        candidateId: candidate.id,
+        validTo: approval.validTo,
+        daysUntilExpiry: Math.floor((Date.parse(`${approval.validTo}T00:00:00Z`) - todayMillis) / 86_400_000),
+        renewalNoticeDays: approval.renewalNoticeDays ?? 30,
+      };
+    });
+  return {
+    status: approvals.some((approval) => approval.daysUntilExpiry <= approval.renewalNoticeDays)
+      ? "WARNING"
+      : "OK",
+    approvals,
+  };
 }
 
 export function validateOperation(candidate, { allowMissing = false } = {}) {
@@ -358,7 +384,17 @@ async function main(args = process.argv.slice(2)) {
     console.log(`source operation contracts valid: ${candidates.length}`);
     return;
   }
-  throw new Error("usage: source-operation.mjs list [--json] | show <source-id> [--json] | validate");
+  if (command === "check-approvals" && !sourceId) {
+    const summary = providerApprovalExpirySummary(document);
+    for (const approval of summary.approvals) {
+      if (approval.daysUntilExpiry <= approval.renewalNoticeDays) {
+        console.log(`::warning title=Provider approval expiry::${approval.candidateId} expires in ${approval.daysUntilExpiry} days (${approval.validTo})`);
+      }
+    }
+    console.log(`provider approval expiry: ${summary.status} (${summary.approvals.length} approved)`);
+    return;
+  }
+  throw new Error("usage: source-operation.mjs list [--json] | show <source-id> [--json] | validate | check-approvals");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
