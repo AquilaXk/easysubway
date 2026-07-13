@@ -124,7 +124,7 @@ void main() {
 
   testWidgets('시작 화면 CTA는 시그니처 브랜드 색 채움 + 흰 글자 + 키운 라벨이다', (tester) async {
     // #2089: '시작하기' CTA만 브랜드 색으로 채우고 글자는 흰색(대비 5.7:1, AA).
-    // 오너 실기기 검수로 라벨을 키운다(20/w700).
+    // 오너 실기기 검수 2차로 라벨을 더 키운다(22/w700).
     await tester.pumpWidget(MaterialApp(home: StartScreen(onStart: () {})));
 
     final button = tester.widget<FilledButton>(
@@ -141,7 +141,7 @@ void main() {
     );
     // 라벨을 키워 58px 버튼과 균형을 맞춘다.
     final textStyle = style.textStyle?.resolve(<WidgetState>{});
-    expect(textStyle?.fontSize, 20);
+    expect(textStyle?.fontSize, 22);
     expect(textStyle?.fontWeight, FontWeight.w700);
   });
 

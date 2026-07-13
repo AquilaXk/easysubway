@@ -283,10 +283,10 @@ class StartScreen extends StatelessWidget {
                               foregroundColor:
                                   EasySubwayAccessibleColors.surface,
                               minimumSize: const Size.fromHeight(58),
-                              // #2089(오너 실기기 검수): 58px 버튼 대비 라벨이 작아
-                              // 보여 글자를 키운다(20/w700, 가독 우선).
+                              // #2089(오너 실기기 검수 2차): 58px 버튼 대비 라벨이
+                              // 여전히 작아 보여 글자를 더 키운다(22/w700, 가독 우선).
                               textStyle: const TextStyle(
-                                fontSize: 20,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w700,
                               ),
                               shape: RoundedRectangleBorder(
