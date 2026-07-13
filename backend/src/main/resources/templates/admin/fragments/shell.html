@@ -105,7 +105,7 @@
 			<div class="admin-user-menu" x-data="userMenu"
 			     x-on:keydown.escape.window="close" x-on:click.outside="close">
 				<button type="button" class="admin-user-menu-trigger"
-				        x-on:click="toggle" aria-haspopup="menu"
+				        x-on:click="toggle" aria-haspopup="dialog"
 				        x-bind:aria-expanded="ariaExpanded" aria-controls="admin-user-menu-panel"
 				        aria-label="사용자 메뉴">
 					<span class="admin-user-menu-name" th:text="${adminShell != null ? adminShell.username : 'anonymous'}">admin</span>
