@@ -19,13 +19,16 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +66,7 @@ public class RealtimeGatewayService {
 	private final Clock clock;
 	private final RealtimeProviderControl providerControl;
 	private final RealtimeProviderCallQuotaPort providerCallQuotaPort;
+	private final Executor archiveExecutor;
 	private final int providerCallLimitPerMinute;
 	private final int providerCallLimitPerDay;
 	private final ProviderMetrics providerMetrics = new ProviderMetrics();
@@ -79,6 +83,7 @@ public class RealtimeGatewayService {
 		RealtimeProviderControl providerControl,
 		RealtimeArrivalArchivePort arrivalArchivePort,
 		RealtimeProviderCallQuotaPort providerCallQuotaPort,
+		@Qualifier("realtimeArchiveExecutor") Executor archiveExecutor,
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE:1}") int providerCallLimitPerMinute,
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY:800}") int providerCallLimitPerDay
 	) {
@@ -90,7 +95,8 @@ public class RealtimeGatewayService {
 			arrivalArchivePort,
 			providerCallQuotaPort,
 			providerCallLimitPerMinute,
-			providerCallLimitPerDay
+			providerCallLimitPerDay,
+			archiveExecutor
 		);
 	}
 
@@ -184,12 +190,37 @@ public class RealtimeGatewayService {
 		int providerCallLimitPerMinute,
 		int providerCallLimitPerDay
 	) {
+		this(
+			provider,
+			clock,
+			mappingPort,
+			providerControl,
+			arrivalArchivePort,
+			providerCallQuotaPort,
+			providerCallLimitPerMinute,
+			providerCallLimitPerDay,
+			Runnable::run
+		);
+	}
+
+	RealtimeGatewayService(
+		RealtimeProvider provider,
+		Clock clock,
+		RealtimeMappingPort mappingPort,
+		RealtimeProviderControl providerControl,
+		RealtimeArrivalArchivePort arrivalArchivePort,
+		RealtimeProviderCallQuotaPort providerCallQuotaPort,
+		int providerCallLimitPerMinute,
+		int providerCallLimitPerDay,
+		Executor archiveExecutor
+	) {
 		this.provider = provider;
 		this.clock = clock;
 		this.mappingPort = mappingPort;
 		this.providerControl = providerControl;
 		this.arrivalArchivePort = arrivalArchivePort;
 		this.providerCallQuotaPort = providerCallQuotaPort;
+		this.archiveExecutor = Objects.requireNonNull(archiveExecutor, "archiveExecutor must not be null");
 		this.providerCallLimitPerMinute = Math.min(
 			MAX_PROVIDER_CALL_LIMIT_PER_MINUTE,
 			Math.max(1, providerCallLimitPerMinute)
@@ -267,7 +298,7 @@ public class RealtimeGatewayService {
 			if (processed.arrivals().isEmpty()) {
 				return staleArrivalOrUnavailable(cached, "PROVIDER_ERROR");
 			}
-			archiveArrivals(processed.observations());
+			dispatchArchiveArrivals(processed.observations());
 			RealtimeArrivalResult result = RealtimeArrivalResult.fresh(
 				receivedAt.toString(),
 				processed.arrivals()
@@ -481,6 +512,23 @@ public class RealtimeGatewayService {
 			providerMetrics.recordArchiveFailure();
 			log.warn(
 				"Realtime arrival archive failed. providerId={}, observationCount={}",
+				PROVIDER_ID,
+				observations.size(),
+				exception
+			);
+		}
+	}
+
+	private void dispatchArchiveArrivals(List<RealtimeArrivalObservation> observations) {
+		if (observations.isEmpty()) {
+			return;
+		}
+		try {
+			archiveExecutor.execute(() -> archiveArrivals(observations));
+		} catch (RuntimeException exception) {
+			providerMetrics.recordArchiveFailure();
+			log.warn(
+				"Realtime arrival archive dispatch failed. providerId={}, observationCount={}",
 				PROVIDER_ID,
 				observations.size(),
 				exception

@@ -18,18 +18,21 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @DisplayName("실시간 gateway cache와 fallback 정책")
 class RealtimeGatewayServiceTest {
@@ -37,10 +40,15 @@ class RealtimeGatewayServiceTest {
 	@Test
 	@DisplayName("Spring constructor는 archive와 shared quota 포트를 필수 의존성으로 받는다")
 	void springConstructorRequiresProductionSafetyPorts() {
-		var parameterTypes = List.of(RealtimeGatewayService.class.getConstructors()[0].getParameterTypes());
+		var parameterTypes = Arrays.stream(RealtimeGatewayService.class.getConstructors())
+			.filter(constructor -> constructor.isAnnotationPresent(Autowired.class))
+			.findFirst()
+			.map(constructor -> List.of(constructor.getParameterTypes()))
+			.orElseThrow();
 
 		assertThat(parameterTypes)
 			.contains(RealtimeArrivalArchivePort.class, RealtimeProviderCallQuotaPort.class)
+			.contains(Executor.class)
 			.doesNotContain(Optional.class);
 	}
 
@@ -128,10 +136,69 @@ class RealtimeGatewayServiceTest {
 	}
 
 	@Test
+	@DisplayName("운영 archive 저장은 fresh 응답 경로와 분리된다")
+	void dispatchesArchiveWithoutBlockingFreshResponse() {
+		CountingProvider provider = new CountingProvider();
+		CapturingArrivalArchive archive = new CapturingArrivalArchive();
+		CapturingExecutor executor = new CapturingExecutor();
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC),
+			InMemoryRealtimeMappingPort.seededFixture(),
+			new RealtimeProviderControl(),
+			archive,
+			(providerId, now, zone, perMinute, perDay) -> true,
+			1,
+			800,
+			executor
+		);
+
+		RealtimeArrivalResult result = service.arrivals(sangnoksuQuery());
+
+		assertThat(result.status()).hasToString("FRESH");
+		assertThat(archive.saveCalls).hasValue(0);
+		executor.runPending();
+		assertThat(archive.saveCalls).hasValue(1);
+	}
+
+	@Test
+	@DisplayName("archive executor가 작업을 거부해도 fresh 응답과 cache는 유지된다")
+	void archiveDispatchRejectionDoesNotBreakFreshResponse() {
+		CountingProvider provider = new CountingProvider();
+		RealtimeGatewayService service = new RealtimeGatewayService(
+			provider,
+			Clock.fixed(Instant.parse("2026-06-26T08:00:00Z"), ZoneOffset.UTC),
+			InMemoryRealtimeMappingPort.seededFixture(),
+			new RealtimeProviderControl(),
+			new CapturingArrivalArchive(),
+			(providerId, now, zone, perMinute, perDay) -> true,
+			1,
+			800,
+			command -> { throw new IllegalStateException("archive executor unavailable"); }
+		);
+
+		RealtimeArrivalResult first = service.arrivals(sangnoksuQuery());
+		RealtimeArrivalResult cached = service.arrivals(sangnoksuQuery());
+
+		assertThat(first.status()).hasToString("FRESH");
+		assertThat(cached.status()).hasToString("FRESH");
+		assertThat(provider.arrivalCalls).hasValue(1);
+		assertThat(service.providerHealthSnapshot().archiveFailureCount()).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("도착 관측 archive 실패는 fresh 응답을 막지 않고 health counter에 기록한다")
 	void archiveFailureDoesNotBreakFreshResponse() {
-		RealtimeArrivalArchivePort failingArchive = (observations) -> {
-			throw new IllegalStateException("archive unavailable");
+		RealtimeArrivalArchivePort failingArchive = new RealtimeArrivalArchivePort() {
+			@Override
+			public void saveAll(List<RealtimeArrivalObservation> observations) {
+				throw new IllegalStateException("archive unavailable");
+			}
+
+			@Override
+			public int deleteExpired(Instant now) {
+				return 0;
+			}
 		};
 		RealtimeGatewayService service = service(
 			new CountingProvider(),
@@ -1292,6 +1359,25 @@ class RealtimeGatewayServiceTest {
 		public void saveAll(List<RealtimeArrivalObservation> observations) {
 			saveCalls.incrementAndGet();
 			this.observations = List.copyOf(observations);
+		}
+
+		@Override
+		public int deleteExpired(Instant now) {
+			return 0;
+		}
+	}
+
+	private static final class CapturingExecutor implements Executor {
+		private Runnable pending;
+
+		@Override
+		public void execute(Runnable command) {
+			pending = command;
+		}
+
+		private void runPending() {
+			assertThat(pending).isNotNull();
+			pending.run();
 		}
 	}
 

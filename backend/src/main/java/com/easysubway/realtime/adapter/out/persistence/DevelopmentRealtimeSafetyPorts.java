@@ -23,6 +23,12 @@ public class DevelopmentRealtimeSafetyPorts implements RealtimeArrivalArchivePor
 	}
 
 	@Override
+	public int deleteExpired(Instant now) {
+		Objects.requireNonNull(now, "now must not be null");
+		return 0;
+	}
+
+	@Override
 	public synchronized boolean tryAcquire(
 		String providerId,
 		Instant now,
@@ -33,6 +39,12 @@ public class DevelopmentRealtimeSafetyPorts implements RealtimeArrivalArchivePor
 		Objects.requireNonNull(providerId, "providerId must not be null");
 		Objects.requireNonNull(now, "now must not be null");
 		Objects.requireNonNull(providerZone, "providerZone must not be null");
+		if (limitPerMinute <= 0) {
+			throw new IllegalArgumentException("limitPerMinute must be positive");
+		}
+		if (limitPerDay <= 0) {
+			throw new IllegalArgumentException("limitPerDay must be positive");
+		}
 		QuotaState state = statesByProvider.computeIfAbsent(providerId, ignored -> new QuotaState());
 		long minute = now.getEpochSecond() / 60;
 		long day = now.atZone(providerZone).toLocalDate().toEpochDay();

@@ -3,7 +3,8 @@ package com.easysubway.realtime.adapter.in.scheduler;
 import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.time.Instant;
+import java.time.Clock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -19,12 +20,23 @@ public class RealtimeArrivalArchiveRetentionScheduler {
 
 	private final RealtimeArrivalArchivePort archivePort;
 	private final Counter purgeFailureCounter;
+	private final Clock clock;
 
+	@Autowired
 	public RealtimeArrivalArchiveRetentionScheduler(
 		RealtimeArrivalArchivePort archivePort,
 		MeterRegistry meterRegistry
 	) {
+		this(archivePort, meterRegistry, Clock.systemUTC());
+	}
+
+	RealtimeArrivalArchiveRetentionScheduler(
+		RealtimeArrivalArchivePort archivePort,
+		MeterRegistry meterRegistry,
+		Clock clock
+	) {
 		this.archivePort = archivePort;
+		this.clock = clock;
 		this.purgeFailureCounter = Counter.builder("easysubway.realtime.archive.purge.failures")
 			.tag("provider", PROVIDER_ID)
 			.tag("operation", PURGE_OPERATION)
@@ -37,7 +49,7 @@ public class RealtimeArrivalArchiveRetentionScheduler {
 	)
 	void purgeExpiredObservations() {
 		try {
-			int deleted = archivePort.deleteExpired(Instant.now());
+			int deleted = archivePort.deleteExpired(clock.instant());
 			log.info("Realtime arrival archive retention purge completed. deletedRows={}", deleted);
 		} catch (RuntimeException exception) {
 			purgeFailureCounter.increment();

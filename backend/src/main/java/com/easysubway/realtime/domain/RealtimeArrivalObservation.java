@@ -25,6 +25,8 @@ public record RealtimeArrivalObservation(
 		providerLineId = requireText(providerLineId, "providerLineId");
 		providerStationId = requireText(providerStationId, "providerStationId");
 		trainNo = requireText(trainNo, "trainNo");
+		rawDirection = requireMaxLength(rawDirection, "rawDirection", 120);
+		rawDestination = requireMaxLength(rawDestination, "rawDestination", 120);
 		providerObservedAt = Objects.requireNonNull(providerObservedAt, "providerObservedAt must not be null");
 		backendReceivedAt = Objects.requireNonNull(backendReceivedAt, "backendReceivedAt must not be null");
 		retainedUntil = Objects.requireNonNull(retainedUntil, "retainedUntil must not be null");
@@ -46,5 +48,12 @@ public record RealtimeArrivalObservation(
 		if (value != null && value < 0) {
 			throw new IllegalArgumentException(field + " must be zero or greater");
 		}
+	}
+
+	private static String requireMaxLength(String value, String field, int maxLength) {
+		if (value != null && value.length() > maxLength) {
+			throw new IllegalArgumentException(field + " must not exceed " + maxLength + " characters");
+		}
+		return value;
 	}
 }

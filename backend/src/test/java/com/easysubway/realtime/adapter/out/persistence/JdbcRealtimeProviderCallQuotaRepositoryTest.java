@@ -5,6 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,6 +65,41 @@ class JdbcRealtimeProviderCallQuotaRepositoryTest {
 		ZoneId providerZone = ZoneId.of("Asia/Seoul");
 		assertThat(repository.tryAcquire("seoul-topis", now, providerZone, 1, 800)).isTrue();
 		assertThat(repository.tryAcquire("seoul-topis", now.plusSeconds(60), providerZone, 1, 800)).isFalse();
+	}
+
+	@Test
+	@DisplayName("동시 호출도 공유 quota 한도를 초과하지 않는다")
+	void serializesConcurrentAcquisitions() throws InterruptedException {
+		int callers = 8;
+		int limit = 3;
+		Instant now = Instant.parse("2026-07-13T01:00:00Z");
+		ZoneId providerZone = ZoneId.of("Asia/Seoul");
+		CountDownLatch ready = new CountDownLatch(callers);
+		CountDownLatch start = new CountDownLatch(1);
+		AtomicInteger acquired = new AtomicInteger();
+		AtomicInteger completed = new AtomicInteger();
+		ExecutorService executor = Executors.newFixedThreadPool(callers);
+		try {
+			for (int index = 0; index < callers; index++) {
+				executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					if (repository.tryAcquire("seoul-topis", now, providerZone, limit, limit)) {
+						acquired.incrementAndGet();
+					}
+					completed.incrementAndGet();
+					return null;
+				});
+			}
+			assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+			start.countDown();
+			executor.shutdown();
+			assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+			assertThat(completed).hasValue(callers);
+			assertThat(acquired).hasValue(limit);
+		} finally {
+			executor.shutdownNow();
+		}
 	}
 
 	@Test

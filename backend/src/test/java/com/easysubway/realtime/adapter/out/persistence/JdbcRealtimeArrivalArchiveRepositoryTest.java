@@ -110,6 +110,25 @@ class JdbcRealtimeArrivalArchiveRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("provider 원문 방향과 종착지는 DB 길이 한도를 넘을 수 없다")
+	void rejectsOversizedRawLabelsBeforePersistence() {
+		assertThatThrownBy(() -> new RealtimeArrivalObservation(
+			"seoul-topis", "station-sangnoksu", "seoul-4", "1004", "1004000448", "4123",
+			Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-06-26T08:00:00Z"),
+			180, 160, "x".repeat(121), null, Instant.parse("2026-07-26T08:00:00Z")
+		))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("rawDirection must not exceed 120 characters");
+		assertThatThrownBy(() -> new RealtimeArrivalObservation(
+			"seoul-topis", "station-sangnoksu", "seoul-4", "1004", "1004000448", "4123",
+			Instant.parse("2026-06-26T08:00:00Z"), Instant.parse("2026-06-26T08:00:00Z"),
+			180, 160, null, "x".repeat(121), Instant.parse("2026-07-26T08:00:00Z")
+		))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("rawDestination must not exceed 120 characters");
+	}
+
+	@Test
 	@DisplayName("DB도 직접 쓰기에서 음수 ETA를 거부한다")
 	void databaseRejectsNegativeEta() {
 		repository.saveAll(List.of(observation(

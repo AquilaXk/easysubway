@@ -67,5 +67,11 @@ class DevelopmentRealtimeSafetyPortsTest {
 		assertThatThrownBy(() -> ports.tryAcquire("seoul-topis", now, null, 1, 1))
 			.isInstanceOf(NullPointerException.class)
 			.hasMessage("providerZone must not be null");
+		assertThatThrownBy(() -> ports.tryAcquire("seoul-topis", now, providerZone, 0, 1))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("limitPerMinute must be positive");
+		assertThatThrownBy(() -> ports.tryAcquire("seoul-topis", now, providerZone, 1, 0))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessage("limitPerDay must be positive");
 	}
 }

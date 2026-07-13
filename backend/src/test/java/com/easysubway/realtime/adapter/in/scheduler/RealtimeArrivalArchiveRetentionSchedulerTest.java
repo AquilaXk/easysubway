@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
 import com.easysubway.realtime.domain.RealtimeArrivalObservation;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,6 +36,7 @@ class RealtimeArrivalArchiveRetentionSchedulerTest {
 
 		assertThat(scheduled.cron()).isEqualTo("${easysubway.realtime.archive.purge.cron:0 20 3 * * *}");
 		assertThat(scheduled.zone()).isEqualTo("UTC");
+		assertThat(RealtimeArrivalArchivePort.class.getMethod("deleteExpired", Instant.class).isDefault()).isFalse();
 	}
 
 	@Test
@@ -74,13 +77,17 @@ class RealtimeArrivalArchiveRetentionSchedulerTest {
 		loggerConfig.addAppender(appender, Level.INFO, null);
 		loggingConfiguration.addLogger(loggerName, loggerConfig);
 		loggerContext.updateLoggers();
-		Instant before = Instant.now();
+		Instant now = Instant.parse("2026-07-13T03:20:00Z");
 
 		try {
-			new RealtimeArrivalArchiveRetentionScheduler(archivePort, new SimpleMeterRegistry())
+			new RealtimeArrivalArchiveRetentionScheduler(
+				archivePort,
+				new SimpleMeterRegistry(),
+				Clock.fixed(now, ZoneOffset.UTC)
+			)
 				.purgeExpiredObservations();
 
-			assertThat(deletedAt.get()).isBetween(before, Instant.now());
+			assertThat(deletedAt.get()).isEqualTo(now);
 			assertThat(messages)
 				.contains("Realtime arrival archive retention purge completed. deletedRows=7");
 		} finally {
@@ -113,7 +120,11 @@ class RealtimeArrivalArchiveRetentionSchedulerTest {
 		};
 		SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 		RealtimeArrivalArchiveRetentionScheduler scheduler =
-			new RealtimeArrivalArchiveRetentionScheduler(archivePort, meterRegistry);
+			new RealtimeArrivalArchiveRetentionScheduler(
+				archivePort,
+				meterRegistry,
+				Clock.fixed(Instant.parse("2026-07-13T03:20:00Z"), ZoneOffset.UTC)
+			);
 
 		scheduler.purgeExpiredObservations();
 		scheduler.purgeExpiredObservations();
