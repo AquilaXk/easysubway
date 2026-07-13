@@ -3,13 +3,16 @@ package com.easysubway.realtime.adapter.out.persistence;
 import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
 import com.easysubway.realtime.domain.RealtimeArrivalObservation;
 import java.sql.Types;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Profile("prod | staging | release | prod-like")
@@ -27,7 +30,12 @@ public class JdbcRealtimeArrivalArchiveRepository implements RealtimeArrivalArch
 	}
 
 	@Override
+	@Transactional
 	public void saveAll(List<RealtimeArrivalObservation> observations) {
+		Objects.requireNonNull(observations, "observations must not be null");
+		if (observations.isEmpty()) {
+			return;
+		}
 		jdbcTemplate.batchUpdate(
 			"""
 				INSERT INTO realtime_arrival_observations (
@@ -54,6 +62,16 @@ public class JdbcRealtimeArrivalArchiveRepository implements RealtimeArrivalArch
 				statement.setString(12, observation.rawDestination());
 				statement.setObject(13, observation.retainedUntil().atOffset(ZoneOffset.UTC));
 			}
+			);
+	}
+
+	@Override
+	@Transactional
+	public int deleteExpired(Instant now) {
+		Objects.requireNonNull(now, "now must not be null");
+		return jdbcTemplate.update(
+			"DELETE FROM realtime_arrival_observations WHERE retained_until <= ?",
+			now.atOffset(ZoneOffset.UTC)
 		);
 	}
 }

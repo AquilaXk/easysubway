@@ -48,12 +48,14 @@ test("서울 TOPIS는 공식 기본 quota 안의 hard cap으로 guarded producti
     providerDefaultDailyLimit: 1000,
     runtimeDailyHardLimit: 800,
     runtimePerMinuteHardLimit: 1,
-    galleryUnlockStatus: "pending_gallery_review_not_required_for_guarded_use",
+    galleryReviewStatus: "PENDING_CAPACITY_ENHANCEMENT_NOT_REQUIRED_FOR_GUARDED_USE",
+    sharedQuotaStore: "realtime_provider_call_quota_state",
     productionUseAllowed: true,
   });
 
   const candidates = await readJson(path.join(root, "tools/datapack/source-candidates.json"));
   const topisCandidates = candidates.candidates.filter((candidate) => candidate.id.startsWith("seoul-topis-realtime-"));
+  assert.equal(topisCandidates.length, 2);
   for (const candidate of topisCandidates) {
     assert.deepEqual(candidate.evidence.missingEvidence, []);
     assert.deepEqual(candidate.evidence.adminReview.quotaEvidence, {
@@ -119,6 +121,7 @@ test("#1416 production evidence는 quota·freshness·archive·fallback을 PASS�
   assert.equal(evidence.runtime.staleCacheTtlSeconds, 120);
   assert.equal(evidence.runtime.requestCoalescing, true);
   assert.equal(evidence.archive.retentionDays, 30);
+  assert.equal(evidence.archive.purgeSchedule, "0 20 3 * * * UTC");
   assert.equal(evidence.archive.extraProviderCallsForArchive, 0);
   assert.equal(evidence.archive.table, "realtime_arrival_observations");
   assert.equal(evidence.fallback.outOfProviderScopeEtaSource, "PLANNED");

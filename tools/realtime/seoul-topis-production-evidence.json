@@ -50,6 +50,8 @@
   "archive": {
     "table": "realtime_arrival_observations",
     "retentionDays": 30,
+    "purgeSchedule": "0 20 3 * * * UTC",
+    "purgeImplementation": "backend/src/main/java/com/easysubway/realtime/adapter/in/scheduler/RealtimeArrivalArchiveRetentionScheduler.java",
     "extraProviderCallsForArchive": 0,
     "rawResponseStored": false,
     "credentialStored": false,

@@ -22,3 +22,18 @@ CREATE INDEX idx_realtime_arrival_provider_train_time
 
 CREATE INDEX idx_realtime_arrival_retained_until
   ON realtime_arrival_observations (retained_until);
+
+CREATE TABLE realtime_provider_call_quota_state (
+  provider_id VARCHAR(80) PRIMARY KEY,
+  minute_window BIGINT NOT NULL,
+  minute_calls INTEGER NOT NULL,
+  day_window BIGINT NOT NULL,
+  daily_calls INTEGER NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL,
+  CONSTRAINT chk_realtime_provider_quota_counts
+    CHECK (minute_calls >= 0 AND daily_calls >= 0)
+);
+
+INSERT INTO realtime_provider_call_quota_state (
+  provider_id, minute_window, minute_calls, day_window, daily_calls, updated_at
+) VALUES ('seoul-topis', -1, 0, -1, 0, CURRENT_TIMESTAMP);

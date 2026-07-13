@@ -175,11 +175,15 @@ function validateCapability(capability, source, sourceId, name) {
     throw new Error(`${sourceId}.capabilities.realtime live ETA requires compatible provider terms and rate limits`);
   }
   if (capability.liveEtaEligible && rateLimitStatus === "GUARDED_DEFAULT_DAILY_LIMIT") {
-    const quotaEvidence = source.admissionEvidence?.quotaEvidence;
-    validateQuotaEvidence(quotaEvidence, `${sourceId}.admissionEvidence.quotaEvidence`);
-    if (!Number.isInteger(quotaEvidence.runtimeDailyHardLimit) || !Number.isInteger(quotaEvidence.runtimePerMinuteHardLimit)) {
-      throw new Error(`${sourceId}.guarded realtime requires runtime daily and per-minute hard limits`);
-    }
+    validateGuardedRealtimeQuota(source, sourceId);
+  }
+}
+
+function validateGuardedRealtimeQuota(source, sourceId) {
+  const quotaEvidence = source.admissionEvidence?.quotaEvidence;
+  validateQuotaEvidence(quotaEvidence, `${sourceId}.admissionEvidence.quotaEvidence`);
+  if (!Number.isInteger(quotaEvidence.runtimeDailyHardLimit) || !Number.isInteger(quotaEvidence.runtimePerMinuteHardLimit)) {
+    throw new TypeError(`${sourceId}.guarded realtime requires integer runtime daily and per-minute hard limits`);
   }
 }
 

@@ -2,6 +2,7 @@ package com.easysubway.realtime.application;
 
 import com.easysubway.realtime.application.port.out.RealtimeArrivalArchivePort;
 import com.easysubway.realtime.application.port.out.RealtimeMappingPort;
+import com.easysubway.realtime.application.port.out.RealtimeProviderCallQuotaPort;
 import com.easysubway.realtime.domain.RealtimeArrival;
 import com.easysubway.realtime.domain.RealtimeArrivalObservation;
 import com.easysubway.realtime.domain.RealtimeMapping;
@@ -58,7 +59,9 @@ public class RealtimeGatewayService {
 	private final RealtimeArrivalArchivePort arrivalArchivePort;
 	private final Clock clock;
 	private final RealtimeProviderControl providerControl;
-	private final ProviderCallRateLimiter providerCallRateLimiter;
+	private final RealtimeProviderCallQuotaPort providerCallQuotaPort;
+	private final int providerCallLimitPerMinute;
+	private final int providerCallLimitPerDay;
 	private final ProviderMetrics providerMetrics = new ProviderMetrics();
 	private final Map<String, CachedArrival> arrivalCache = new ConcurrentHashMap<>();
 	private final Map<String, CachedTrainPosition> trainPositionCache = new ConcurrentHashMap<>();
@@ -72,6 +75,7 @@ public class RealtimeGatewayService {
 		RealtimeMappingPort mappingPort,
 		RealtimeProviderControl providerControl,
 		Optional<RealtimeArrivalArchivePort> arrivalArchivePort,
+		Optional<RealtimeProviderCallQuotaPort> providerCallQuotaPort,
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_MINUTE:1}") int providerCallLimitPerMinute,
 		@Value("${EASYSUBWAY_SEOUL_TOPIS_CALL_LIMIT_PER_DAY:800}") int providerCallLimitPerDay
 	) {
@@ -81,6 +85,7 @@ public class RealtimeGatewayService {
 			mappingPort,
 			providerControl,
 			arrivalArchivePort.orElse(RealtimeArrivalArchivePort.NO_OP),
+			providerCallQuotaPort.orElseGet(ProviderCallRateLimiter::new),
 			providerCallLimitPerMinute,
 			providerCallLimitPerDay
 		);
@@ -154,12 +159,39 @@ public class RealtimeGatewayService {
 		int providerCallLimitPerMinute,
 		int providerCallLimitPerDay
 	) {
+		this(
+			provider,
+			clock,
+			mappingPort,
+			providerControl,
+			arrivalArchivePort,
+			new ProviderCallRateLimiter(),
+			providerCallLimitPerMinute,
+			providerCallLimitPerDay
+		);
+	}
+
+	RealtimeGatewayService(
+		RealtimeProvider provider,
+		Clock clock,
+		RealtimeMappingPort mappingPort,
+		RealtimeProviderControl providerControl,
+		RealtimeArrivalArchivePort arrivalArchivePort,
+		RealtimeProviderCallQuotaPort providerCallQuotaPort,
+		int providerCallLimitPerMinute,
+		int providerCallLimitPerDay
+	) {
 		this.provider = provider;
 		this.clock = clock;
 		this.mappingPort = mappingPort;
 		this.providerControl = providerControl;
 		this.arrivalArchivePort = arrivalArchivePort;
-		this.providerCallRateLimiter = new ProviderCallRateLimiter(providerCallLimitPerMinute, providerCallLimitPerDay);
+		this.providerCallQuotaPort = providerCallQuotaPort;
+		this.providerCallLimitPerMinute = Math.min(
+			MAX_PROVIDER_CALL_LIMIT_PER_MINUTE,
+			Math.max(1, providerCallLimitPerMinute)
+		);
+		this.providerCallLimitPerDay = Math.min(MAX_PROVIDER_CALL_LIMIT_PER_DAY, Math.max(1, providerCallLimitPerDay));
 	}
 
 	public RealtimeArrivalResult arrivals(RealtimeQuery query) {
@@ -197,7 +229,7 @@ public class RealtimeGatewayService {
 			return recordArrivalResult(joinArrival(existing));
 		}
 		try {
-			if (!providerCallRateLimiter.tryAcquire(clock.instant())) {
+			if (!tryAcquireProviderCall()) {
 				RealtimeArrivalResult result = cached != null && isStaleUsable(cached.cachedAt())
 					? cached.result().stale()
 					: RealtimeArrivalResult.unavailable("PROVIDER_RATE_LIMITED");
@@ -279,7 +311,7 @@ public class RealtimeGatewayService {
 			return recordTrainPositionResult(joinTrainPosition(existing));
 		}
 		try {
-			if (!providerCallRateLimiter.tryAcquire(clock.instant())) {
+			if (!tryAcquireProviderCall()) {
 				RealtimeTrainPositionResult result = cached != null && isStaleUsable(cached.cachedAt())
 					? cached.result().stale()
 					: RealtimeTrainPositionResult.unavailable("PROVIDER_RATE_LIMITED");
@@ -364,6 +396,16 @@ public class RealtimeGatewayService {
 			return cached.result().stale();
 		}
 		return RealtimeTrainPositionResult.unavailable(fallbackCode);
+	}
+
+	private boolean tryAcquireProviderCall() {
+		return providerCallQuotaPort.tryAcquire(
+			PROVIDER_ID,
+			clock.instant(),
+			PROVIDER_ZONE,
+			providerCallLimitPerMinute,
+			providerCallLimitPerDay
+		);
 	}
 
 	private ProcessedArrivals freshArrivals(
@@ -591,22 +633,22 @@ public class RealtimeGatewayService {
 		return fallbackCode != null && SAFE_FALLBACK_CODES.contains(fallbackCode) ? fallbackCode : "PROVIDER_ERROR";
 	}
 
-	private static final class ProviderCallRateLimiter {
-		private final int limitPerMinute;
-		private final int limitPerDay;
+	private static final class ProviderCallRateLimiter implements RealtimeProviderCallQuotaPort {
 		private long windowMinute = Long.MIN_VALUE;
 		private long windowDay = Long.MIN_VALUE;
 		private int calls;
 		private int dailyCalls;
 
-		private ProviderCallRateLimiter(int limitPerMinute, int limitPerDay) {
-			this.limitPerMinute = Math.min(MAX_PROVIDER_CALL_LIMIT_PER_MINUTE, Math.max(1, limitPerMinute));
-			this.limitPerDay = Math.min(MAX_PROVIDER_CALL_LIMIT_PER_DAY, Math.max(1, limitPerDay));
-		}
-
-		private synchronized boolean tryAcquire(Instant now) {
+		@Override
+		public synchronized boolean tryAcquire(
+			String providerId,
+			Instant now,
+			ZoneId providerZone,
+			int limitPerMinute,
+			int limitPerDay
+		) {
 			long minute = now.getEpochSecond() / 60;
-			long day = now.atZone(PROVIDER_ZONE).toLocalDate().toEpochDay();
+			long day = now.atZone(providerZone).toLocalDate().toEpochDay();
 			if (minute != windowMinute) {
 				windowMinute = minute;
 				calls = 0;

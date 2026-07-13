@@ -8,7 +8,8 @@
     "providerDefaultDailyLimit": 1000,
     "runtimeDailyHardLimit": 800,
     "runtimePerMinuteHardLimit": 1,
-    "galleryUnlockStatus": "pending_gallery_review_not_required_for_guarded_use",
+    "galleryReviewStatus": "PENDING_CAPACITY_ENHANCEMENT_NOT_REQUIRED_FOR_GUARDED_USE",
+    "sharedQuotaStore": "realtime_provider_call_quota_state",
     "productionUseAllowed": true
   },
   "officialSources": [

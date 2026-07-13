@@ -1,6 +1,7 @@
 package com.easysubway.realtime.domain;
 
 import java.time.Instant;
+import java.util.Objects;
 
 public record RealtimeArrivalObservation(
 	String providerId,
@@ -17,4 +18,25 @@ public record RealtimeArrivalObservation(
 	String rawDestination,
 	Instant retainedUntil
 ) {
+	public RealtimeArrivalObservation {
+		providerId = requireText(providerId, "providerId");
+		stationId = requireText(stationId, "stationId");
+		lineId = requireText(lineId, "lineId");
+		providerLineId = requireText(providerLineId, "providerLineId");
+		providerStationId = requireText(providerStationId, "providerStationId");
+		trainNo = requireText(trainNo, "trainNo");
+		providerObservedAt = Objects.requireNonNull(providerObservedAt, "providerObservedAt must not be null");
+		backendReceivedAt = Objects.requireNonNull(backendReceivedAt, "backendReceivedAt must not be null");
+		retainedUntil = Objects.requireNonNull(retainedUntil, "retainedUntil must not be null");
+		if (!retainedUntil.isAfter(backendReceivedAt)) {
+			throw new IllegalArgumentException("retainedUntil must be after backendReceivedAt");
+		}
+	}
+
+	private static String requireText(String value, String field) {
+		if (value == null || value.isBlank()) {
+			throw new IllegalArgumentException(field + " must not be blank");
+		}
+		return value;
+	}
 }

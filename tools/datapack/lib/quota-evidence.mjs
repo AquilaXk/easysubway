@@ -25,7 +25,10 @@ export function validateQuotaEvidence(quotaEvidence, label) {
     throw new Error(`${label}.documentedMonthlyLimit must be a positive integer`);
   }
   for (const key of ["runtimeDailyHardLimit", "runtimePerMinuteHardLimit"]) {
-    if (key in quotaEvidence && (!Number.isInteger(quotaEvidence[key]) || quotaEvidence[key] <= 0)) {
+    if (key in quotaEvidence && !Number.isInteger(quotaEvidence[key])) {
+      throw new TypeError(`${label}.${key} must be an integer`);
+    }
+    if (key in quotaEvidence && quotaEvidence[key] <= 0) {
       throw new Error(`${label}.${key} must be a positive integer`);
     }
   }
