@@ -471,8 +471,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   String? _nearbyLookupMessage;
   Timer? _nearbyLookupMessageTimer;
   bool _initialNearbyFocusStarted = false;
+  int _selectionClearRevision = 0;
+  int _nearestStationRequestToken = 0;
   RealtimeSnapshot _nearbyRealtime = const RealtimeSnapshot.loading();
-  int _nearbyRealtimeToken = 0;
   late Future<_NetworkMapLoadResult> _future = _loadMap();
 
   // #1933/#1915 홈 노선도 위 in-place 역 검색 모드. 모드 플래그만 이 화면에
@@ -604,49 +605,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     );
   }
 
-  Future<void> _loadNearbyRealtime(StationSearchResult station) async {
-    final repository = widget.realtimeRepository;
-    final firstLine = station.lines.isEmpty ? null : station.lines.first;
-    final token = ++_nearbyRealtimeToken;
-    if (repository == null || firstLine == null) {
-      setState(() {
-        _nearbyRealtime = const RealtimeSnapshot(
-          status: RealtimeSnapshotStatus.unsupported,
-          fallbackCode: 'LINE_MAPPING_MISSING',
-          message: '이 노선은 아직 실시간 열차 안내가 어려워요.',
-        );
-      });
-      return;
-    }
-    setState(() => _nearbyRealtime = const RealtimeSnapshot.loading());
-    RealtimeSnapshot snapshot;
-    try {
-      snapshot = await repository.arrivals(
-        RealtimeStationQuery(
-          stationId: station.id,
-          lineId: firstLine.id,
-          providerLineId: firstLine.stationCode.isEmpty
-              ? firstLine.id
-              : firstLine.stationCode,
-          stationQueryName: station.nameKo,
-        ),
-      );
-    } on RealtimeException {
-      snapshot = const RealtimeSnapshot.unavailable();
-    } catch (error, stackTrace) {
-      reportMobileError(
-        error,
-        stackTrace,
-        context: '노선도 주변역 실시간 조회 중 예외가 발생했습니다.',
-      );
-      snapshot = const RealtimeSnapshot.unavailable();
-    }
-    if (!mounted || token != _nearbyRealtimeToken) {
-      return;
-    }
-    setState(() => _nearbyRealtime = snapshot);
-  }
-
   @override
   void dispose() {
     _nearbyLookupMessageTimer?.cancel();
@@ -671,14 +629,22 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     return _NetworkMapLoadResult(data: data, initialViewport: viewport);
   }
 
+  Future<_NetworkMapLoadResult> _loadMapForRegion(String region) async {
+    final data = await widget.repository.getNetworkMap(region: region);
+    final viewport = await widget.viewportRepository?.loadViewport(
+      _displayRegionName(data.selectedRegion),
+    );
+    return _NetworkMapLoadResult(data: data, initialViewport: viewport);
+  }
+
   void _reload({String? region}) {
+    _nearestStationRequestToken++;
     setState(() {
       _selectedRegion = region ?? _selectedRegion;
       _nearbySelectedStationId = null;
       _nearbyPanelVisible = false;
       _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
       _nearbyRealtime = const RealtimeSnapshot.loading();
-      _nearbyRealtimeToken++;
       _initialNearbyFocusStarted = false;
       _future = _loadMap();
     });
@@ -725,7 +691,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 realtime: _nearbyRealtime,
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
-                onCurrentLocationTap: _showNearbyPanel,
+                onCurrentLocationTap: _showNearestStationFanMenu,
                 onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
                 routeDraftController: widget.routeDraftController,
@@ -772,7 +738,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 realtime: _nearbyRealtime,
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
-                onCurrentLocationTap: _showNearbyPanel,
+                onCurrentLocationTap: _showNearestStationFanMenu,
                 onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
                 routeDraftController: widget.routeDraftController,
@@ -827,7 +793,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               realtime: _nearbyRealtime,
               nearbyLookupMessage: _nearbyLookupMessage,
               adjacentStations: _adjacentStationsFor(data),
-              onCurrentLocationTap: _showNearbyPanel,
+              onCurrentLocationTap: _showNearestStationFanMenu,
               onOpenNearbyStations: _openNearbyStationsWithRegion,
               onCloseNearbyPanel: _hideNearbyPanel,
               routeDraftController: widget.routeDraftController,
@@ -860,6 +826,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     selectedStationId:
                         _searchFanMenuStationId ??
                         (_nearbyPanelVisible ? _nearbySelectedStationId : null),
+                    selectionClearRevision: _selectionClearRevision,
                     onSelectionDismissed: _dismissSearchFanMenu,
                     originStationId:
                         widget.routeDraftController.draft.origin?.id,
@@ -889,19 +856,27 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     );
   }
 
-  Future<void> _showNearbyPanel() async {
-    if (_nearbyPanelData.status == _NetworkMapNearbyPanelStatus.loading) {
-      return;
-    }
+  Future<void> _showNearestStationFanMenu() async {
+    final requestToken = ++_nearestStationRequestToken;
+    _nearbyLookupMessageTimer?.cancel();
+    _nearbyLookupMessageTimer = null;
     setState(() {
-      _nearbySelectedStationId = null;
-      _nearbyPanelVisible = false;
+      _nearbyLookupMessage = null;
+      _searchFanMenuStationId = null;
+      _selectionClearRevision++;
+      _resetNearbyPanelState();
       _nearbyPanelData = const _NetworkMapNearbyPanelData.loading();
+      // 이 setState로 rebuild되는 동안 자동 초기 위치 조회가 중복 실행되지 않게
+      // 한다. GPS 요청이 다른 지역을 로드한 뒤에도 이 값은 유지한다.
+      _initialNearbyFocusStarted = true;
     });
+    bool isCurrentRequest() =>
+        mounted && requestToken == _nearestStationRequestToken;
+
     final locationProvider = widget.locationProvider;
     final stationRepository = widget.stationSearchRepository;
     if (locationProvider == null || stationRepository == null) {
-      if (!mounted) {
+      if (!isCurrentRequest()) {
         return;
       }
       _showNearbyLookupMessage('현재 위치를 확인하지 못했어요.');
@@ -909,38 +884,72 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     }
     try {
       final location = await locationProvider.currentLocation();
+      if (!isCurrentRequest()) {
+        return;
+      }
       final blockedMessage = location.nearbySearchBlockedMessage();
       if (blockedMessage != null) {
-        if (!mounted) {
-          return;
-        }
         _showNearbyLookupMessage(blockedMessage);
         return;
       }
       final results = await stationRepository.searchNearbyStations(
         location,
-        limit: 4,
+        limit: 1,
       );
-      if (!mounted) {
+      if (!isCurrentRequest()) {
         return;
       }
       if (results.isEmpty) {
         _showNearbyLookupMessage('주변 역을 찾지 못했어요.');
         return;
       }
+
+      final pendingResult = results.first;
+      var targetMap = await _future;
+      var regionChanged = false;
+      if (!isCurrentRequest()) {
+        return;
+      }
+
+      if (_displayRegionName(targetMap.data.selectedRegion) !=
+          pendingResult.region) {
+        final matchingRegions = targetMap.data.regions
+            .where((region) => region.displayName == pendingResult.region)
+            .toList(growable: false);
+        if (matchingRegions.length != 1) {
+          _showNearbyLookupMessage('주변 역을 불러오지 못했어요.');
+          return;
+        }
+        targetMap = await _loadMapForRegion(matchingRegions.single.name);
+        if (!isCurrentRequest()) {
+          return;
+        }
+        regionChanged = true;
+      }
+
+      if (!targetMap.data.stations.any(
+        (station) => station.id == pendingResult.id,
+      )) {
+        _showNearbyLookupMessage('주변 역을 불러오지 못했어요.');
+        return;
+      }
+
       setState(() {
-        _nearbyPanelVisible = true;
-        _nearbySelectedStationId = results.first.id;
-        _nearbyPanelData = _NetworkMapNearbyPanelData.success(results);
+        if (regionChanged) {
+          _selectedRegion = targetMap.data.selectedRegion;
+          _future = Future.value(targetMap);
+          _initialNearbyFocusStarted = true;
+        }
+        _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+        _searchFanMenuStationId = pendingResult.id;
       });
-      unawaited(_loadNearbyRealtime(results.first));
     } on CurrentLocationException catch (error) {
-      if (!mounted) {
+      if (!isCurrentRequest()) {
         return;
       }
       _showNearbyLookupMessage(error.message);
     } on StationSearchException catch (error) {
-      if (!mounted) {
+      if (!isCurrentRequest()) {
         return;
       }
       _showNearbyLookupMessage(error.message);
@@ -950,7 +959,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         stackTrace,
         context: '노선도 주변 역 확인 중 예외가 발생했습니다.',
       );
-      if (!mounted) {
+      if (!isCurrentRequest()) {
         return;
       }
       _showNearbyLookupMessage('주변 역을 불러오지 못했어요.');
@@ -1043,7 +1052,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     _nearbySelectedStationId = null;
     _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
     _nearbyRealtime = const RealtimeSnapshot.loading();
-    _nearbyRealtimeToken++;
   }
 
   void _hideNearbyPanel() => setState(_resetNearbyPanelState);
@@ -2176,7 +2184,7 @@ class _NetworkMapCurrentLocationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: '현재 위치로 주변 역 찾기',
+      label: '현재 위치에서 가장 가까운 역 찾기',
       onTap: onTap,
       child: ExcludeSemantics(
         child: Material(
@@ -2218,9 +2226,6 @@ class _NetworkMapNearbyPanelData {
 
   const _NetworkMapNearbyPanelData.loading()
     : this._(status: _NetworkMapNearbyPanelStatus.loading);
-
-  const _NetworkMapNearbyPanelData.success(List<StationSearchResult> results)
-    : this._(status: _NetworkMapNearbyPanelStatus.success, results: results);
 
   final _NetworkMapNearbyPanelStatus status;
   final List<StationSearchResult> results;
@@ -3188,6 +3193,7 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.initialViewport,
     required this.focusedStationId,
     required this.selectedStationId,
+    required this.selectionClearRevision,
     required this.onSetOrigin,
     required this.onSetWaypoint,
     required this.onSetDestination,
@@ -3205,6 +3211,7 @@ class _NetworkMapCanvas extends StatefulWidget {
   final Rect? initialViewport;
   final String? focusedStationId;
   final String? selectedStationId;
+  final int selectionClearRevision;
 
   /// #1948: draft 핀을 그릴 지정 역 id (없으면 null).
   final String? originStationId;
@@ -3357,6 +3364,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   @override
   void didUpdateWidget(covariant _NetworkMapCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.selectionClearRevision != oldWidget.selectionClearRevision) {
+      _selectedStation = null;
+    }
     final selectedId = widget.selectedStationId;
     if (selectedId != null && selectedId != oldWidget.selectedStationId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

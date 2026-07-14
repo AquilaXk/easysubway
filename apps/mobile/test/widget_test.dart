@@ -183,6 +183,26 @@ Future<void> _pumpStationDetailForTest(
   }
 }
 
+Future<void> _pumpNetworkMapForGpsTest(
+  WidgetTester tester, {
+  required FakeStationSearchRepository repository,
+  required CurrentLocationProvider locationProvider,
+  NetworkMapViewportRepository? viewportRepository,
+}) async {
+  await tester.pumpWidget(
+    EasySubwayApp(
+      repository: repository,
+      reportRepository: FakeFacilityReportRepository(),
+      routeRepository: FakeRouteSearchRepository(),
+      favoriteRepository: FakeFavoriteStationRepository(),
+      locationProvider: locationProvider,
+      networkMapViewportRepository: viewportRepository,
+      initialOnboardingState: _completedOnboardingState(),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 // #2109: 노선도 역 액션 메뉴가 다크 텍스트 팝오버에서 부채꼴(방사형) 팬 메뉴로
 // 교체됐다. 라벨은 CustomPaint로 그려져 find.text로는 잡히지 않으므로, 각 섹터의
 // 접근성 Semantics 라벨로 존재를 확인하고, 히트테스트는 섹터 아이콘 중심(design
@@ -4669,12 +4689,13 @@ void main() {
     expect(find.text('최근 경로를 불러오지 못했어요'), findsNothing);
   });
 
-  testWidgets('노선도 현재위치 버튼은 지도 위 액션 탭과 하단 주변역 패널을 보여준다', (tester) async {
+  testWidgets('노선도 현재위치 버튼은 최근접 역 팬 메뉴를 바로 보여준다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
       needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
       nearbyResults: [
         _stationResult(
           id: 'station-sangnoksu',
@@ -4684,42 +4705,286 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        locationProvider: locationProvider,
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: locationProvider,
     );
-    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('networkMapNearbyStationPanel')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('networkMapBottomAdBanner')), findsNothing);
+    expect(repository.requestedNearbyLimits, [1]);
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
-    final requested = repository.requestedNearbyLocations.single;
-    expect(requested.latitude, closeTo(37.3028, 0.0001));
-    expect(requested.longitude, closeTo(126.8665, 0.0001));
-    // 실시간 미연동(UnavailableRealtimeRepository) 상태에서는 "실시간" 뱃지와
-    // "-" 자리표시 대신 한 줄 안내만 보여준다.
-    expect(find.text('실시간'), findsNothing);
-    expect(find.text('상록수'), findsOneWidget);
-    expect(find.textContaining('반월'), findsOneWidget);
-    expect(find.textContaining('한대앞'), findsOneWidget);
-    expect(find.textContaining('이용할 수 있습니다'), findsOneWidget);
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+    expect(find.byKey(const Key('networkMapBottomAdBanner')), findsOneWidget);
+  });
+
+  testWidgets('GPS 탭은 지도 직접 선택을 즉시 해제하고 카메라를 유지한다', (tester) async {
+    final nearbyCompleter = Completer<List<StationSearchResult>>();
+    final repository = FakeStationSearchRepository(
+      nearbyCompleter: nearbyCompleter,
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+
+    final station = find.byKey(
+      const Key('networkMapStation-sangnoksu-seoul-4'),
+    );
+    await tester.tap(station);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    final stationCenterBeforeGps = tester.getCenter(station);
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.byKey(const Key('networkMapSurface')), findsOneWidget);
+    expect(tester.getCenter(station), stationCenterBeforeGps);
+
+    nearbyCompleter.complete(const []);
+    await tester.pump();
+  });
+
+  testWidgets('GPS 재시도는 이전 오류 메시지와 timer를 즉시 지운다', (tester) async {
+    var locationAttempts = 0;
+    final locationProvider = FakeCurrentLocationProvider(
+      needsPermissionRequest: false,
+      locationLoader: () async {
+        locationAttempts++;
+        if (locationAttempts == 1) {
+          throw const CurrentLocationException('현재 위치를 확인하지 못했어요.');
+        }
+        return _freshCurrentLocation();
+      },
+    );
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: locationProvider,
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('현재 위치를 확인하지 못했어요.'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
+  });
+
+  testWidgets('GPS 최근접 역은 표시 지역명을 정규화한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['부산권'],
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapRegions, [null]);
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+  });
+
+  testWidgets('GPS 다른 지역 결과는 지도와 역을 검증한 뒤에만 팬 메뉴를 연다', (tester) async {
+    final busanMap = Completer<NetworkMapData>();
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권', '부산권'],
+      networkMapCompletersByRegion: {'부산권': busanMap},
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+
+    expect(repository.requestedNetworkMapRegions, [null, '부산권']);
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+
+    busanMap.complete(
+      _gpsNetworkMapData(selectedRegion: '부산권', regions: const ['수도권', '부산권']),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+  });
+
+  testWidgets('GPS 지역 지도 load 실패는 팬 메뉴를 열지 않는다', (tester) async {
+    final busanMap = Completer<NetworkMapData>();
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권', '부산권'],
+      networkMapCompletersByRegion: {'부산권': busanMap},
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    busanMap.completeError(StateError('부산 지도 load 실패'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isA<StateError>());
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.text('주변 역을 불러오지 못했어요.'), findsOneWidget);
+  });
+
+  testWidgets('GPS 지역 지도에 최근접 역 ID가 없으면 팬 메뉴를 열지 않는다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권', '부산권'],
+      networkMapDataByRegion: {
+        '부산권': _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+          includeNearestStation: false,
+        ),
+      },
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.text('주변 역을 불러오지 못했어요.'), findsOneWidget);
+  });
+
+  testWidgets('GPS의 오래된 비동기 결과는 일반 지역 전환을 되돌리지 않는다', (tester) async {
+    final nearbyCompleter = Completer<List<StationSearchResult>>();
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권', '대구권', '부산권'],
+      nearbyCompleter: nearbyCompleter,
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    expect(repository.requestedNetworkMapRegions, [null]);
+
+    await tester.tap(find.byKey(const Key('networkMapRegionDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('networkMapRegionMenuRow_대구권')));
+    await tester.pumpAndSettle();
+    expect(repository.requestedNetworkMapRegions, [null, '대구권']);
+
+    nearbyCompleter.complete([
+      _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapRegions, [null, '대구권']);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapRegionDropdown')),
+        matching: find.text('대구'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+  });
+
+  testWidgets('GPS 지역 전환은 자동 위치 조회를 다시 시작하지 않는다', (tester) async {
+    var permissionChecks = 0;
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequestLoader: () async {
+        permissionChecks++;
+        return permissionChecks == 1;
+      },
+    );
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권', '부산권'],
+      networkMapDataByRegion: {
+        '부산권': _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+        ),
+      },
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: locationProvider,
+      viewportRepository: FakeNetworkMapViewportRepository(),
+    );
+
+    expect(locationProvider.permissionCheckCount, 1);
+    expect(locationProvider.requestCount, 0);
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapRegions, [null, '부산권']);
+    expect(locationProvider.permissionCheckCount, 1);
+    expect(locationProvider.requestCount, 1);
+    expect(repository.requestedNearbyLocations, hasLength(1));
+    expect(repository.requestedNearbyLimits, [1]);
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
   testWidgets('노선도 좌측 메뉴 하단에 광고 슬롯이 있다', (tester) async {
@@ -4783,16 +5048,6 @@ void main() {
       ).scale(15),
       closeTo(30, 0.01),
     );
-
-    await tester.tap(find.byKey(const Key('nearbyStationButton')));
-    await tester.pumpAndSettle();
-
-    expect(
-      MediaQuery.textScalerOf(
-        tester.element(find.byKey(const Key('networkMapNearbyStationPanel'))),
-      ).scale(12),
-      closeTo(24, 0.01),
-    );
   });
 
   testWidgets('노선도 현재위치 실패는 하단 패널 대신 임시 메시지만 보여준다', (tester) async {
@@ -4833,54 +5088,6 @@ void main() {
 
     expect(find.text('현재 위치를 확인하지 못했어요.'), findsNothing);
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
-  });
-
-  testWidgets('노선도 주변역 패널은 실시간 도착 정보를 방향별로 보여준다', (tester) async {
-    final locationProvider = FakeCurrentLocationProvider(
-      location: _freshCurrentLocation(),
-      needsPermissionRequest: false,
-    );
-    final repository = FakeStationSearchRepository(
-      nearbyResults: [
-        _stationResult(
-          id: 'station-sangnoksu',
-          name: '상록수',
-          distanceMeters: 230,
-        ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        locationProvider: locationProvider,
-        realtimeRepository: const _FreshNearbyRealtimeRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('nearbyStationButton')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const Key('networkMapNearbyStationPanel')),
-      findsOneWidget,
-    );
-    // FRESH 상태에서만 "실시간" 뱃지가 노출되고, 도착 정보가 방향별로 표시된다.
-    expect(find.text('실시간'), findsOneWidget);
-    expect(find.text('상행'), findsOneWidget);
-    expect(find.text('하행'), findsOneWidget);
-    expect(find.text('한대앞행'), findsOneWidget);
-    expect(find.text('사당행'), findsOneWidget);
-    expect(find.text('약 3분'), findsOneWidget);
-    expect(find.text('약 5분'), findsOneWidget);
   });
 
   testWidgets('노선도는 위치 권한이 이미 있으면 가까운 역 중심 viewport를 저장한다', (tester) async {
@@ -4958,6 +5165,7 @@ void main() {
       needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
       queryResults: {
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
       },
@@ -7613,22 +7821,24 @@ void main() {
     expect(find.bySemanticsLabel('상록수역 상세 보기'), findsNothing);
   });
 
-  testWidgets('#2109 주변 역 패널이 열린 채 풀페이지 검색 결과 탭 → 패널은 닫히고 팬 메뉴만 남는다', (
-    tester,
-  ) async {
-    // #2109 Fix: 현재 위치 버튼으로 주변 역 패널을 연 뒤 햄버거 검색 결과를 탭하면
-    // 팬 메뉴로 수렴한다. 이때 주변 역 패널이 함께 닫혀야 한다(둘이 동시에 떠서
-    // bottomNavigationBar가 계속 억제되는 잔상 방지).
+  testWidgets('#2109 GPS 팬 메뉴 뒤 풀페이지 검색 결과 탭 → 팬 메뉴 하나로 수렴한다', (tester) async {
+    // GPS와 풀페이지 검색은 모두 팬 메뉴 채널로 수렴한다. GPS가 먼저 연 팬 메뉴
+    // 뒤 검색 결과를 탭해도 목록 패널이나 중복 팬 메뉴가 남지 않아야 한다.
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
       needsPermissionRequest: false,
     );
     final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
       queryResults: {
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
       },
       nearbyResults: [
-        _stationResult(id: 'station-banwol', name: '반월', distanceMeters: 180),
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 180,
+        ),
       ],
     );
 
@@ -7644,13 +7854,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 주변 역 패널 열기.
+    // GPS는 주변 역 목록이 아니라 최근접 역 팬 메뉴를 바로 연다.
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('networkMapNearbyStationPanel')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
 
     // 햄버거 → 역 검색 → 결과 탭.
     await _openStationSearchScreenViaMenu(tester);
@@ -7663,7 +7871,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 팬 메뉴는 뜨고, 주변 역 패널은 닫힌다.
+    // 검색 결과도 같은 단일 팬 메뉴로 수렴하고 목록 패널은 생기지 않는다.
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
@@ -15358,6 +15566,9 @@ class FakeStationSearchRepository
   FakeStationSearchRepository({
     this.nextResults = const [],
     this.nearbyResults = const [],
+    this.nearbyCompleter,
+    this.networkMapDataByRegion = const {},
+    this.networkMapCompletersByRegion = const {},
     this.queryResults = const {},
     this.lineOptions = const [],
     this.networkMapRegionNames = const ['테스트권'],
@@ -15375,6 +15586,9 @@ class FakeStationSearchRepository
 
   final List<StationSearchResult> nextResults;
   final List<StationSearchResult> nearbyResults;
+  final Completer<List<StationSearchResult>>? nearbyCompleter;
+  final Map<String, NetworkMapData> networkMapDataByRegion;
+  final Map<String, Completer<NetworkMapData>> networkMapCompletersByRegion;
   final Map<String, List<StationSearchResult>> queryResults;
   final List<SubwayLineOption> lineOptions;
   final List<String> networkMapRegionNames;
@@ -15389,6 +15603,7 @@ class FakeStationSearchRepository
   final requestedQueries = <String>[];
   final requestedLineIds = <String?>[];
   final requestedNearbyLocations = <CurrentLocation>[];
+  final requestedNearbyLimits = <int>[];
   final requestedDetailStationIds = <String>[];
   final requestedExitStationIds = <String>[];
   final requestedFacilityStationIds = <String>[];
@@ -15432,7 +15647,11 @@ class FakeStationSearchRepository
     int limit = 10,
   }) async {
     requestedNearbyLocations.add(location);
-    return nearbyResults;
+    requestedNearbyLimits.add(limit);
+    final results = nearbyCompleter == null
+        ? nearbyResults
+        : await nearbyCompleter!.future;
+    return results.take(limit).toList(growable: false);
   }
 
   @override
@@ -15463,6 +15682,14 @@ class FakeStationSearchRepository
   Future<NetworkMapData> getNetworkMap({String? region, String? lineId}) async {
     requestedNetworkMapRegions.add(region);
     requestedNetworkMapLineIds.add(lineId);
+    final completer = networkMapCompletersByRegion[region];
+    if (completer != null) {
+      return completer.future;
+    }
+    final regional = networkMapDataByRegion[region];
+    if (regional != null) {
+      return regional;
+    }
     final mapError = networkMapError;
     if (mapError != null) {
       throw mapError;
@@ -16467,16 +16694,76 @@ class ControlledRouteSearchRepository implements RouteSearchRepository {
   }
 }
 
+NetworkMapData _gpsNetworkMapData({
+  required String selectedRegion,
+  required List<String> regions,
+  bool includeNearestStation = true,
+}) {
+  const sourceId = 'fixture-gps-nearest-station';
+  const lineId = 'gps-test-line';
+  return NetworkMapData(
+    regions: [for (final region in regions) NetworkMapRegion(name: region)],
+    selectedRegion: selectedRegion,
+    lines: [
+      NetworkMapLine(
+        id: lineId,
+        name: '$selectedRegion 테스트선',
+        color: '#00A5DE',
+        region: selectedRegion,
+      ),
+    ],
+    stations: includeNearestStation
+        ? [
+            NetworkMapStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+              nameEn: 'Sangnoksu',
+              region: selectedRegion,
+              lineId: lineId,
+              stationCode: '448',
+              sequence: 1,
+              position: const NetworkMapPosition(
+                x: 200,
+                y: 200,
+                labelDx: 0,
+                labelDy: 0,
+                upPath: '',
+                downPath: '',
+                sourceId: sourceId,
+              ),
+            ),
+          ]
+        : const [],
+    edges: const [],
+    positionSources: const [
+      NetworkMapPositionSource(
+        id: sourceId,
+        name: 'GPS 최근접 역 테스트',
+        licenseStatus: 'fixture-only',
+      ),
+    ],
+    stationLineMemberships: includeNearestStation
+        ? const [
+            NetworkMapStationLineMembership(
+              stationId: 'station-sangnoksu',
+              lineId: lineId,
+            ),
+          ]
+        : const [],
+  );
+}
+
 StationSearchResult _stationResult({
   required String id,
   required String name,
+  String region = '수도권',
   int? distanceMeters,
 }) {
   return StationSearchResult(
     id: id,
     nameKo: name,
     nameEn: id,
-    region: '수도권',
+    region: region,
     dataQualityLevel: 'LEVEL_1',
     dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
@@ -16527,38 +16814,6 @@ class _RetryRealtimeRepository implements RealtimeRepository {
           trainNo: '2002',
           message: '곧 도착',
           etaSeconds: 120,
-        ),
-      ],
-    );
-  }
-}
-
-class _FreshNearbyRealtimeRepository implements RealtimeRepository {
-  const _FreshNearbyRealtimeRepository();
-
-  @override
-  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
-    return const RealtimeSnapshot(
-      status: RealtimeSnapshotStatus.fresh,
-      receivedAt: '방금',
-      arrivals: [
-        RealtimeArrival(
-          lineId: 'seoul-2',
-          stationName: '상록수',
-          destination: '한대앞',
-          direction: '상행',
-          trainNo: '2001',
-          message: '',
-          etaSeconds: 180,
-        ),
-        RealtimeArrival(
-          lineId: 'seoul-2',
-          stationName: '상록수',
-          destination: '사당',
-          direction: '하행',
-          trainNo: '2002',
-          message: '',
-          etaSeconds: 300,
         ),
       ],
     );
