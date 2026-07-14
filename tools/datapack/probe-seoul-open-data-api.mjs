@@ -121,8 +121,10 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : "Seoul open data API probe failed");
     process.exitCode = 1;
-  });
+  }
 }
