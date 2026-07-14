@@ -461,9 +461,10 @@ class _StationFanMenuPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..color = color;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
+      RRect.fromRectXY(
         Rect.fromLTWH(origin.dx - 24, origin.dy - 28, 48, 48),
-        const Radius.circular(9),
+        9,
+        9,
       ),
       outerStroke,
     );

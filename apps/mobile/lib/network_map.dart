@@ -2520,7 +2520,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                               : '시간표',
                           style: const TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
