@@ -18,6 +18,10 @@ void main() {
     // 상호 배제: 출발 아이콘 중심은 도착 섹터에 없다.
     expect(geo.arrival.contains(const Offset(175, 173)), isFalse);
     expect(geo.departure.contains(const Offset(525, 173)), isFalse);
+    expect(geo.departure.contains(const Offset(350, 127)), isFalse);
+    expect(geo.arrival.contains(const Offset(350, 127)), isFalse);
+    expect(geo.waypoint.contains(const Offset(175, 173)), isFalse);
+    expect(geo.waypoint.contains(const Offset(525, 173)), isFalse);
     // 닫기 노치 중심은 출발/도착 섹터 밖.
     expect(geo.departure.contains(const Offset(350, 277)), isFalse);
     expect(geo.arrival.contains(const Offset(350, 277)), isFalse);

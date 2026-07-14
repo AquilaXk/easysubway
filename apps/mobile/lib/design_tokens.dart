@@ -157,6 +157,7 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
 /// 옮긴 화면 로컬 톤이라 [EasySubwayTokens] 의미 토큰으로 수렴하지 않는다
 /// (design_guard_test.dart 로컬 색 상수 ratchet 해소 경로).
 abstract final class EasySubwayFanMenuColors {
+  static const disabledOpacity = 0.4;
   static const departure = Color(0xFF176FD1);
   static const departureSoft = Color(0xFFEAF3FF);
   static const waypoint = Color(0xFFF57C00);

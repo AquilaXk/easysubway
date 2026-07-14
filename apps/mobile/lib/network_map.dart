@@ -512,11 +512,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         // 있던 상태(현재 위치 버튼 → 패널 → 햄버거 검색 → 결과 탭 경로)면 팬 메뉴와
         // 패널이 동시에 뜨고 bottomNavigationBar도 계속 억제된다. 팬 메뉴로
         // 수렴하므로 주변 역 패널을 함께 닫아 상호배제한다.
-        _nearbyPanelVisible = false;
-        _nearbySelectedStationId = null;
-        _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
-        _nearbyRealtime = const RealtimeSnapshot.loading();
-        _nearbyRealtimeToken++;
+        _resetNearbyPanelState();
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.onFocusStationRequestHandled?.call();
@@ -591,6 +587,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   void _openStationDetailFromMap(NetworkMapStation station) {
     final searchRepository = widget.stationSearchRepository;
     final reportRepository = widget.reportRepository;
+    assert(
+      searchRepository != null && reportRepository != null,
+      '역 상세 진입에는 stationSearchRepository와 reportRepository가 필요합니다.',
+    );
     if (searchRepository == null || reportRepository == null) {
       return;
     }
@@ -1074,15 +1074,15 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     );
   }
 
-  void _hideNearbyPanel() {
-    setState(() {
-      _nearbyPanelVisible = false;
-      _nearbySelectedStationId = null;
-      _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
-      _nearbyRealtime = const RealtimeSnapshot.loading();
-      _nearbyRealtimeToken++;
-    });
+  void _resetNearbyPanelState() {
+    _nearbyPanelVisible = false;
+    _nearbySelectedStationId = null;
+    _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+    _nearbyRealtime = const RealtimeSnapshot.loading();
+    _nearbyRealtimeToken++;
   }
+
+  void _hideNearbyPanel() => setState(_resetNearbyPanelState);
 
   /// 현재 선택 지역의 표시명(예: '수도권', '부산'). 역 검색 화면을 열 때
   /// [StationSearchScreen.regionLabel]로 그대로 넘긴다(#2090 배선).
@@ -3509,9 +3509,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                         if (!_gestureActive) {
                           setState(() {
                             _gestureActive = true;
-                            _selectedStation = null;
+                            _clearSelectionAndNotify();
                           });
-                          widget.onSelectionDismissed();
                         }
                         _gestureStartCamera = camera;
                         _gestureStartFocalPoint = details.localFocalPoint;
@@ -3600,6 +3599,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     // (카메라 최소 패닝 _panCameraToRevealFanMenu와 동일 규칙 소비).
                     final placement = fanMenuPlacement(
                       stationPoint: stationPoint,
+                      labelHeight: _fanMenuLabelHeight(
+                        selectedStation.displayName,
+                      ),
                       viewport: Size(
                         constraints.maxWidth,
                         constraints.maxHeight,
@@ -3630,9 +3632,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                       children: [
                         Positioned(
                           key: const Key('networkMapFanMenuStationLabel'),
-                          left: stationPoint.dx - 60,
+                          left:
+                              stationPoint.dx - (_fanMenuStationLabelWidth / 2),
                           bottom: labelBottom,
-                          width: 120,
+                          width: _fanMenuStationLabelWidth,
                           child: Center(
                             child: GestureDetector(
                               // #2109 Fix: 라벨 탭(상세 진입)도 섹터 액션과
@@ -3650,8 +3653,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                                 label: '${selectedStation.displayName} 상세 보기',
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
+                                    horizontal:
+                                        _fanMenuStationLabelHorizontalPadding,
+                                    vertical:
+                                        _fanMenuStationLabelVerticalPadding,
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
@@ -3663,11 +3668,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                                   child: Text(
                                     selectedStation.displayName,
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: EasySubwayFanMenuColors.ink,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                    ),
+                                    style: _fanMenuStationLabelStyle,
                                   ),
                                 ),
                               ),
@@ -3922,10 +3923,18 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   /// 팬 메뉴를 닫는다: 내부 선택과 함께, prop([selectedStationId])으로 열린
   /// 경우 부모 선택 상태도 비우도록 알린다(그렇지 않으면 prop이 다시 띄운다).
-  void _dismissSelection() {
-    setState(() => _selectedStation = null);
+  void _clearSelectionAndNotify() {
+    _selectedStation = null;
     widget.onSelectionDismissed();
   }
+
+  void _dismissSelection() => setState(_clearSelectionAndNotify);
+
+  double _fanMenuLabelHeight(String text) => fanMenuStationLabelHeight(
+    text: text,
+    textScaler: MediaQuery.textScalerOf(context),
+    style: DefaultTextStyle.of(context).style.merge(_fanMenuStationLabelStyle),
+  );
 
   void _selectStation(NetworkMapStation station) {
     setState(() => _selectedStation = station);
@@ -3954,7 +3963,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     // 패닝은 클램프 없는(viewport 미전달) 이상적 배치로 최대한 노출을 시도하고,
     // 패닝이 .clamped() 한계로 다 못 드러내는 잔여는 build 경로의 viewport 클램프
     // 폴백이 처리한다.
-    final menuRect = fanMenuPlacement(stationPoint: stationPoint).revealBounds;
+    final menuRect = fanMenuPlacement(
+      stationPoint: stationPoint,
+      labelHeight: _fanMenuLabelHeight(station.displayName),
+    ).revealBounds;
     final viewport = Offset.zero & camera.viewportSize;
     var dx = 0.0;
     var dy = 0.0;
@@ -5613,6 +5625,34 @@ class _NetworkMapDraftPin extends StatelessWidget {
 /// 함수가 화면 안으로 클램프할 여백. 카메라 최소 패닝(_panCameraToRevealFanMenu)의
 /// margin과 동일 값이라 두 경로가 같은 여백을 본다.
 const double kFanMenuViewportMargin = 12.0;
+const double _fanMenuStationLabelWidth = 120.0;
+const double _fanMenuStationLabelHorizontalPadding = 10.0;
+const double _fanMenuStationLabelVerticalPadding = 4.0;
+const TextStyle _fanMenuStationLabelStyle = TextStyle(
+  color: EasySubwayFanMenuColors.ink,
+  fontWeight: FontWeight.w700,
+  fontSize: 13,
+);
+
+@visibleForTesting
+double fanMenuStationLabelHeight({
+  required String text,
+  required TextScaler textScaler,
+  TextStyle style = _fanMenuStationLabelStyle,
+}) {
+  final painter =
+      TextPainter(
+        text: TextSpan(text: text, style: style),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        textScaler: textScaler,
+      )..layout(
+        maxWidth:
+            _fanMenuStationLabelWidth -
+            (_fanMenuStationLabelHorizontalPadding * 2),
+      );
+  return painter.height + (_fanMenuStationLabelVerticalPadding * 2);
+}
 
 class FanMenuPlacement {
   const FanMenuPlacement({
@@ -5635,7 +5675,7 @@ class FanMenuPlacement {
   final double menuWidth;
   final double menuHeight;
 
-  /// 역명 라벨의 추정 높이(bottom 앵커 라벨이 화면 밖으로 밀리지 않게 패닝 bbox에 포함).
+  /// 역명 라벨의 실측 높이(bottom 앵커 라벨이 화면 밖으로 밀리지 않게 패닝 bbox에 포함).
   final double labelHeight;
 
   /// 라벨을 메뉴 위(true)에 두는지 아래(false)에 두는지. placeBelow=true면 메뉴가
@@ -5657,7 +5697,7 @@ class FanMenuPlacement {
 /// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다.
 /// 기본은 노드 위쪽에 메뉴 하단(닫기 노치)이 오도록 배치하되, 지도 상단 경계에
 /// 붙은 역은 위쪽 공간이 부족하므로 노드 아래로 뒤집어 항상 화면 안에 들어오게
-/// 한다(#2109). 라벨은 bottom 앵커라 커져도 위로만 자라므로 추정 높이만큼
+/// 한다(#2109). 라벨은 bottom 앵커라 커져도 위로만 자라므로 실측 높이만큼
 /// 패닝 bbox 상단에 여유를 둔다.
 ///
 /// [viewport]가 주어지면 카메라 패닝이 `.clamped()` 한계에 걸려 메뉴를 다 못
@@ -5668,14 +5708,16 @@ class FanMenuPlacement {
 @visibleForTesting
 FanMenuPlacement fanMenuPlacement({
   required Offset stationPoint,
+  required double labelHeight,
   Size? viewport,
 }) {
   const menuWidth = 260.0;
   final menuHeight = menuWidth * (380.0 / 700.0); // ≈ 141
-  const labelHeight = 28.0;
   var left = stationPoint.dx - menuWidth / 2;
   final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
-  var top = placeBelow ? stationPoint.dy + 28 : stationPoint.dy - menuHeight - 8;
+  var top = placeBelow
+      ? stationPoint.dy + 28
+      : stationPoint.dy - menuHeight - 8;
   // 메뉴가 노드 위면 라벨은 메뉴 위, 노드 아래로 뒤집혔으면 라벨은 메뉴 아래.
   final labelAbove = !placeBelow;
   if (viewport != null) {
