@@ -326,6 +326,27 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
       "provider:tago-train-stations",
     ],
   );
+  for (const [id, fields] of [
+    ["provider:korail-train-operation-codes", ["code", "type", "value"]],
+    ["provider:korail-traveler-train-run-plan", [
+      "run_ymd", "trn_no", "dptre_stn_cd", "dptre_stn_nm", "arvl_stn_cd", "arvl_stn_nm",
+      "trn_plan_dptre_dt", "trn_plan_arvl_dt",
+    ]],
+    ["provider:korail-traveler-train-run-info", [
+      "run_ymd", "trn_no", "trn_run_sn", "stn_cd", "stn_nm", "mrnt_cd", "mrnt_nm",
+      "uppln_dn_se_cd", "stop_se_cd", "stop_se_nm", "trn_dptre_dt", "trn_arvl_dt",
+    ]],
+  ]) {
+    const entry = findCatalogEntry(catalog, id);
+    assert.equal(entry.documentationStatus, "reproducible-operation");
+    assert.equal(entry.status, "validated_live_sample_materialization_pending");
+    assert.deepEqual(entry.responseFields, fields);
+    assert.equal(entry.operation.method, "GET");
+    assert.equal(entry.operation.runner.command, "node tools/datapack/probe-korail-train-operation-api.mjs");
+  }
+  const kricStationTimetable = findCatalogEntry(catalog, "provider:kric-station-timetable");
+  assert.equal(kricStationTimetable.status, "validated_live_sample_non_itx_urban_rail_only");
+  assert.ok(kricStationTimetable.searchTerms.includes("ITX_CHEONGCHUN"));
   assert.equal(
     findCatalogEntry(catalog, "provider:busan-transportation-official-od-fares").operation.method,
     "POST",
