@@ -1243,7 +1243,7 @@ export async function runKorailItxCompletenessCli({
     artifact = await collectImpl({ serviceKey, serviceDates, packPath, now, replay });
   } catch (error) {
     artifact = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       artifactKind: "korail-itx-cheongchun-completeness-evidence",
       serviceId: "ITX_CHEONGCHUN",
       observedAt: now.toISOString(),
@@ -1253,7 +1253,7 @@ export async function runKorailItxCompletenessCli({
       admissionStatus: "MISSING",
       admissionEligible: false,
       failureReasonCode: completenessFailureReason(error),
-      allowedConsumerIssues: ["#1400", "#2098", "#2099"],
+      allowedConsumerIssues: ["#1400", "#2098", "#2099", "#2058", "#2137"],
       legacyDaejeonRowCount: 0,
       legacyYongsanDaejeonTripCount: 0,
       serviceDays: [],

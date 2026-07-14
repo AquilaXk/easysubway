@@ -384,6 +384,57 @@ test("TAGO ITX roster는 OD 일부 실패를 count한 뒤 admission이 거부할
   assert.deepEqual(artifact.trainNumbers, ["2001"]);
 });
 
+test("TAGO ITX roster는 non-retryable 4xx를 HTTP failure로 기록한다", async () => {
+  const fallback = validFetch();
+  const artifact = await collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: canonicalRosterStations(),
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("GetStrtpntAlocFndTrainInfo")
+        && parsed.searchParams.get("depPlaceId") === "NAT140873") {
+        return new Response("not found", { status: 404 });
+      }
+      return fallback(url);
+    },
+  });
+
+  assert.equal(artifact.failedOdCount, 1);
+  assert.equal(artifact.failedOds[0].reasonCode, "PROVIDER_HTTP_FAILURE");
+  assert.equal(
+    artifact.failedOds[0].failureContext,
+    "operation=GetStrtpntAlocFndTrainInfo,httpStatus=404",
+  );
+});
+
+test("TAGO content-type mismatch는 응답 body를 취소한다", async () => {
+  const fallback = validFetch();
+  let cancellations = 0;
+  const artifact = await collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: canonicalRosterStations(),
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("GetStrtpntAlocFndTrainInfo")
+        && parsed.searchParams.get("depPlaceId") === "NAT140873") {
+        return new Response(new ReadableStream({
+          start(controller) { controller.enqueue(new TextEncoder().encode("not-json")); },
+          cancel() { cancellations += 1; },
+        }), { status: 200, headers: { "content-type": "text/plain" } });
+      }
+      return fallback(url);
+    },
+  });
+
+  assert.equal(cancellations, 1);
+  assert.equal(artifact.failedOdCount, 1);
+  assert.equal(artifact.failedOds[0].reasonCode, "PROVIDER_SCHEMA_FAILURE");
+});
+
 test("TAGO ITX roster는 공식 totalCount가 없는 OD 응답을 완료로 세지 않는다", async () => {
   const fallback = validFetch();
   const artifact = await collectTagoItxCheongchunRoster({

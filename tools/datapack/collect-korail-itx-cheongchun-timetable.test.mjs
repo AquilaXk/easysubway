@@ -387,6 +387,8 @@ test("ITX CLI는 runtime 실패를 MISSING artifact로 저장하고 non-zero를 
     assert.equal(result.exitCode, 1);
     assert.equal(artifact.admissionStatus, "MISSING");
     assert.equal(artifact.admissionEligible, false);
+    assert.equal(artifact.schemaVersion, 2);
+    assert.deepEqual(artifact.allowedConsumerIssues, ["#1400", "#2098", "#2099", "#2058", "#2137"]);
     assert.equal(artifact.failureReasonCode, "PROVIDER_HTTP_FAILURE");
     assert.doesNotMatch(JSON.stringify(artifact), /503|secret/);
   } finally {

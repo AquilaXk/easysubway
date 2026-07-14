@@ -481,7 +481,10 @@ async function fetchAll(operation, query, key, fetchImpl) {
       throw new Error(`TAGO ${operation} HTTP ${response.status}`);
     }
     const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
-    if (contentType !== "application/json") throw new Error(`TAGO ${operation} schema mismatch: content-type`);
+    if (contentType !== "application/json") {
+      if (response.body) await response.body.cancel().catch(() => {});
+      throw new Error(`TAGO ${operation} schema mismatch: content-type`);
+    }
     const raw = await response.text();
     rawHashes.push(sha256(raw));
     let json;
@@ -637,7 +640,7 @@ function operationEvidence({ operation, endpoint, pageCount, requestCount, total
 
 function tagoOdFailure(error) {
   const message = error instanceof Error ? error.message : "";
-  const httpStatus = /^TAGO GetStrtpntAlocFndTrainInfo HTTP (408|429|[5-9]\d\d)$/.exec(message)?.[1];
+  const httpStatus = /^TAGO GetStrtpntAlocFndTrainInfo HTTP (\d{3})$/.exec(message)?.[1];
   if (httpStatus) {
     return {
       reasonCode: "PROVIDER_HTTP_FAILURE",
