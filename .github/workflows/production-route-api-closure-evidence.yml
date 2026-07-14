@@ -1,0 +1,154 @@
+name: Production route API closure evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "현재 production에 배포돼 있어야 하는 40자 commit SHA"
+        required: true
+        type: string
+      expected_image_digest:
+        description: "현재 production에 배포돼 있어야 하는 sha256 image digest"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify production route API closure
+    runs-on:
+      - self-hosted
+      - easysubway-production
+    environment:
+      name: production
+    timeout-minutes: 5
+    concurrency:
+      group: production-route-api-closure-evidence
+      cancel-in-progress: false
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      EXPECTED_IMAGE_DIGEST: ${{ inputs.expected_image_digest }}
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+
+    steps:
+      - name: Verify deployed revision, origin denial, and row invariance
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "expected_sha must be a 40-character lowercase commit SHA" >&2
+            exit 1
+          fi
+          if [[ ! "${EXPECTED_IMAGE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "expected_image_digest must be a sha256 digest" >&2
+            exit 1
+          fi
+
+          DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
+          if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
+            echo "DEPLOY_ROOT is invalid" >&2
+            exit 1
+          fi
+
+          current_sha="$(<"${DEPLOY_ROOT}/shared/current-sha")"
+          current_digest="$(<"${DEPLOY_ROOT}/shared/current-image-digest")"
+          if [[ "${current_sha}" != "${EXPECTED_SHA}" ]]; then
+            echo "deployed SHA does not match the approved PR1 SHA" >&2
+            exit 1
+          fi
+          if [[ "${current_digest}" != "${EXPECTED_IMAGE_DIGEST}" ]]; then
+            echo "deployed image digest does not match the approved PR1 digest" >&2
+            exit 1
+          fi
+
+          expected_runtime_image="easysubway-backend:${EXPECTED_SHA}"
+          for container in easysubway-backend easysubway-back-worker; do
+            runtime_image="$(docker inspect --format '{{.Config.Image}}' "${container}")"
+            if [[ "${runtime_image}" != "${expected_runtime_image}" ]]; then
+              echo "${container} does not use the approved PR1 image tag" >&2
+              exit 1
+            fi
+          done
+
+          backend_port="$(
+            docker inspect \
+              --format '{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}' \
+              easysubway-backend
+          )"
+          if [[ ! "${backend_port}" =~ ^[0-9]{1,5}$ ]]; then
+            echo "could not resolve the loopback backend port" >&2
+            exit 1
+          fi
+
+          route_row_count() {
+            docker exec easysubway-postgres sh -lc \
+              'psql -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT count(*) FROM route_search_results;"' \
+              | tr -d '[:space:]'
+          }
+
+          origin_status() {
+            local path="${1:?path is required}"
+            local request_body="${2:?request body is required}"
+            local status
+            if ! status="$(
+              curl -sS \
+                --connect-timeout 2 \
+                --max-time 5 \
+                --output /dev/null \
+                --write-out '%{http_code}' \
+                --request POST \
+                --header 'content-type: application/json' \
+                --data-binary "${request_body}" \
+                "http://127.0.0.1:${backend_port}${path}"
+            )"; then
+              status="network-error"
+            fi
+            printf '%s\n' "${status}"
+          }
+
+          row_count_before="$(route_row_count)"
+          if [[ ! "${row_count_before}" =~ ^[0-9]+$ ]]; then
+            echo "route_search_results pre-request count was not numeric" >&2
+            exit 1
+          fi
+
+          v1_status="$(origin_status \
+            /api/v1/routes/search \
+            '{"originStationId":"closure-probe","destinationStationId":"closure-probe","mobilityType":"SENIOR"}')"
+          v2_status="$(origin_status \
+            /api/v2/routes/search \
+            '{"originStationId":"closure-probe","destinationStationId":"closure-probe","departureTime":"2026-07-15T09:15:00+09:00","mobilityType":"SENIOR","constraintMode":"ALLOW_WITH_WARNINGS","useRealtime":false,"maxTransfers":3,"alternativeCount":1}')"
+          refresh_status="$(origin_status \
+            /api/v2/routes/closure-probe/refresh \
+            '{}')"
+
+          row_count_after="$(route_row_count)"
+          if [[ ! "${row_count_after}" =~ ^[0-9]+$ ]]; then
+            echo "route_search_results post-request count was not numeric" >&2
+            exit 1
+          fi
+
+          {
+            echo "### Production route API closure evidence"
+            echo "- deployed SHA: \`${current_sha}\`"
+            echo "- image digest: \`${current_digest}\`"
+            echo "- origin POST /api/v1/routes/search: \`${v1_status}\`"
+            echo "- origin POST /api/v2/routes/search: \`${v2_status}\`"
+            echo "- origin POST /api/v2/routes/closure-probe/refresh: \`${refresh_status}\`"
+            echo "- route_search_results rows before: \`${row_count_before}\`"
+            echo "- route_search_results rows after: \`${row_count_after}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          for status in "${v1_status}" "${v2_status}" "${refresh_status}"; do
+            if [[ "${status}" != "403" ]]; then
+              echo "every origin route endpoint must return exactly 403; observed ${status}" >&2
+              exit 1
+            fi
+          done
+          if [[ "${row_count_before}" != "${row_count_after}" ]]; then
+            echo "route_search_results changed during the closure probe" >&2
+            exit 1
+          fi
