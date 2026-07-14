@@ -155,6 +155,33 @@ void main() {
         painter.height + 10, // (4px padding + 1px border) * 2
       );
     });
+
+    test('실측 라벨 높이는 Text와 같은 MediaQuery spacing override를 반영한다', () {
+      const style = TextStyle(fontSize: 13, height: 1);
+      const text = '동대문 역사문화공원';
+      final painter = TextPainter(
+        text: TextSpan(
+          text: text,
+          style: style.merge(
+            const TextStyle(height: 2, letterSpacing: 4, wordSpacing: 3),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: 98);
+
+      expect(
+        fanMenuStationLabelHeight(
+          text: text,
+          textScaler: TextScaler.noScaling,
+          style: style,
+          lineHeightScaleFactorOverride: 2,
+          letterSpacingOverride: 4,
+          wordSpacingOverride: 3,
+        ),
+        painter.height + 10,
+      );
+    });
   });
 
   test('selectedSlots: 선택 역 id가 배정된 슬롯만 포함', () {

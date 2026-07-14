@@ -3935,6 +3935,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     text: text,
     textScaler: MediaQuery.textScalerOf(context),
     style: DefaultTextStyle.of(context).style.merge(_fanMenuStationLabelStyle),
+    lineHeightScaleFactorOverride:
+        MediaQuery.maybeLineHeightScaleFactorOverrideOf(context),
+    letterSpacingOverride: MediaQuery.maybeLetterSpacingOverrideOf(context),
+    wordSpacingOverride: MediaQuery.maybeWordSpacingOverrideOf(context),
   );
 
   void _selectStation(NetworkMapStation station) {
@@ -5642,10 +5646,20 @@ double fanMenuStationLabelHeight({
   required String text,
   required TextScaler textScaler,
   TextStyle style = _fanMenuStationLabelStyle,
+  double? lineHeightScaleFactorOverride,
+  double? letterSpacingOverride,
+  double? wordSpacingOverride,
 }) {
+  final effectiveStyle = style.merge(
+    TextStyle(
+      height: lineHeightScaleFactorOverride,
+      letterSpacing: letterSpacingOverride,
+      wordSpacing: wordSpacingOverride,
+    ),
+  );
   final painter =
       TextPainter(
-        text: TextSpan(text: text, style: style),
+        text: TextSpan(text: text, style: effectiveStyle),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         textScaler: textScaler,
