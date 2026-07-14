@@ -42,13 +42,16 @@ export async function collectKorailItxCheongchunCompleteness({
   const serviceDays = [];
   for (const dayCd of ["8", "7", "9"]) {
     const serviceDate = selectedServiceDates[dayCd];
+    let failureStage = "ROSTER";
+    let roster;
     try {
-      const roster = await collectRosterImpl({
+      roster = await collectRosterImpl({
         serviceKey, serviceDate, kricServiceDayCode: dayCd, canonicalStations, fetchImpl, now,
       });
       if (roster.completedOdCount !== roster.expectedOdCount || roster.failedOdCount !== 0) {
         throw new Error("TAGO ITX OD matrix evidence is incomplete");
       }
+      failureStage = "TIMETABLE";
       const timetable = await collectTimetableImpl({
         serviceKey,
         runDate: serviceDate,
@@ -70,14 +73,24 @@ export async function collectKorailItxCheongchunCompleteness({
         roster,
         timetable,
       });
-    } catch {
+    } catch (error) {
+      const failureContext = completenessFailureContext(error);
       serviceDays.push({
         dayCd,
         serviceDate,
         status: "MISSING",
-        failureReasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
+        failureStage,
+        failureReasonCode: completenessFailureReason(error),
+        ...(roster ? {
+          expectedOdCount: roster.expectedOdCount,
+          completedOdCount: roster.completedOdCount,
+          failedOdCount: roster.failedOdCount,
+          stationSetHash: roster.stationSetHash,
+          odMatrixHash: roster.odMatrixHash,
+          roster,
+        } : {}),
+        ...(failureContext ? { failureContext } : {}),
       });
-      break;
     }
   }
   const complete = serviceDays.length === 3 && serviceDays.every(({ status }) => status === "SUPPORTED");
@@ -579,6 +592,36 @@ function sameSet(left, right) {
   return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
+function completenessFailureReason(error) {
+  const message = error instanceof Error ? error.message : "";
+  if (/HTTP \d+/.test(message)) return "PROVIDER_HTTP_FAILURE";
+  if (/transport failure/.test(message)) return "PROVIDER_TRANSPORT_FAILURE";
+  if (/pagination incomplete/.test(message)) return "PROVIDER_PAGINATION_INCOMPLETE";
+  if (/schema mismatch/.test(message)) return "PROVIDER_SCHEMA_FAILURE";
+  if (/provider resultCode/.test(message)) return "PROVIDER_RESULT_FAILURE";
+  if (/train grade is missing or ambiguous/.test(message)) return "TRAIN_GRADE_MAPPING_INCOMPLETE";
+  if (/station mapping/.test(message)) return "STATION_MAPPING_INCOMPLETE";
+  if (/roster stations must be unique/.test(message)) return "ROSTER_STATION_SET_INVALID";
+  if (/roster returned zero rows/.test(message)) return "ROSTER_EMPTY";
+  if (/run plan returned zero rows/.test(message)) return "OFFICIAL_RUN_PLAN_EMPTY";
+  if (/run info returned zero rows/.test(message)) return "OFFICIAL_RUN_INFO_EMPTY";
+  if (/OD matrix/.test(message)) return "OD_MATRIX_INCOMPLETE";
+  if (/both directions/.test(message)) return "PARTIAL_DIRECTION";
+  if (/timestamp missing/.test(message)) return "PLANNED_TIME_MISSING";
+  return "PROVIDER_OR_SCHEMA_FAILURE";
+}
+
+function completenessFailureContext(error) {
+  const message = error instanceof Error ? error.message : "";
+  const station = /station mapping is missing or ambiguous: (.+)$/.exec(message)?.[1];
+  if (station) return safeLabel(station);
+  const pagination = /pagination incomplete: (operation=[A-Za-z0-9]+,collected=\d+,total=(?:\d+|UNKNOWN),pages=\d+)$/.exec(message)?.[1];
+  if (pagination) return pagination;
+  if (/run plan returned zero rows/.test(message)) return "operation=travelerTrainRunPlan2,total=0";
+  if (/run info returned zero rows/.test(message)) return "operation=travelerTrainRunInfo2,total=0";
+  return null;
+}
+
 function isoServiceSeconds(value, runDate, label) {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\+09:00$/.exec(String(value ?? ""));
   if (!match) throw new Error(`${label} must use Asia/Seoul ISO timestamp`);
@@ -662,6 +705,7 @@ function validateLineSequenceOnly(rows, trainNumber) {
 }
 
 async function fetchAll({ endpoint, query, expectedFields, key, fetchImpl }) {
+  const operation = new URL(endpoint).pathname.split("/").at(-1);
   const rows = [];
   const hashes = [];
   let totalCount = null;
@@ -685,10 +729,14 @@ async function fetchAll({ endpoint, query, expectedFields, key, fetchImpl }) {
     if (totalCount !== page.totalCount) throw new Error("Korail train operation API schema mismatch: totalCount changed");
     rows.push(...page.rows);
     if (rows.length >= totalCount) break;
-    if (page.rows.length === 0) throw new Error("Korail train operation API pagination incomplete");
+    if (page.rows.length === 0) {
+      throw new Error(
+        `Korail train operation API pagination incomplete: operation=${safeToken(operation)},` +
+        `collected=${rows.length},total=${totalCount ?? "UNKNOWN"},pages=${hashes.length}`,
+      );
+    }
   }
-  if (rows.length !== totalCount || rows.length === 0) {
-    const operation = new URL(endpoint).pathname.split("/").at(-1);
+  if (rows.length !== totalCount) {
     throw new Error(
       `Korail train operation API pagination incomplete: operation=${safeToken(operation)},` +
       `collected=${rows.length},total=${totalCount ?? "UNKNOWN"},pages=${hashes.length}`,
@@ -843,7 +891,7 @@ export async function runKorailItxCompletenessCli({
   let artifact;
   try {
     artifact = await collectImpl({ serviceKey, serviceDates, packPath, now, replay });
-  } catch {
+  } catch (error) {
     artifact = {
       schemaVersion: 1,
       artifactKind: "korail-itx-cheongchun-completeness-evidence",
@@ -854,7 +902,7 @@ export async function runKorailItxCompletenessCli({
       selectedServiceDates: serviceDates,
       admissionStatus: "MISSING",
       admissionEligible: false,
-      failureReasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
+      failureReasonCode: completenessFailureReason(error),
       allowedConsumerIssues: ["#1400", "#2098", "#2099"],
       legacyDaejeonRowCount: 0,
       legacyYongsanDaejeonTripCount: 0,

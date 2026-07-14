@@ -115,6 +115,27 @@ test("TAGO ITX roster는 canonical 역의 양방향 OD 전체를 수집한다", 
   assert.doesNotMatch(JSON.stringify(artifact), /never-print-data-key/);
 });
 
+test("TAGO roster matrix는 provider station catalog와 canonical 경춘선의 교집합을 증명한다", async () => {
+  const artifact = await collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [
+      { canonicalStationId: "station-x", nameKo: "회기" },
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    fetchImpl: validFetch(),
+  });
+
+  assert.equal(artifact.canonicalStationCount, 3);
+  assert.equal(artifact.rosterStationCount, 2);
+  assert.deepEqual(artifact.excludedCanonicalStations, [
+    { canonicalStationId: "station-x", nameKo: "회기", reasonCode: "NOT_IN_TAGO_TRAIN_STATION_CATALOG" },
+  ]);
+  assert.equal(artifact.expectedOdCount, 2);
+});
+
 test("TAGO ITX-청춘 probe는 grade·station·OD를 연결하고 secret을 제거한다", async () => {
   const secret = "never-print-data-key";
   const artifact = await collectTagoItxCheongchunOd({

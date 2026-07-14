@@ -29,7 +29,7 @@
 - Produces: `buildItxOdMatrix(date, stations)` returning `{ rows, expectedOdCount, stationSetHash, odMatrixHash }`
 - Produces: `collectTagoItxCheongchunRoster(options)`
 
-- [ ] **Step 1: Write failing date and canonical hash tests**
+- [x] **Step 1: Write failing date and canonical hash tests**
 
 ```js
 assert.deepEqual(validateItxServiceDates(
@@ -58,13 +58,13 @@ assert.equal(matrix.odMatrixHash, sha256(JSON.stringify([
 
 `odMatrixHash`의 canonical serialization은 `(date, depStationId, arrStationId)`로 정렬한 tuple 배열의 공백 없는 `JSON.stringify` UTF-8 bytes다.
 
-- [ ] **Step 2: Run the focused tests and confirm RED**
+- [x] **Step 2: Run the focused tests and confirm RED**
 
 Run: `node --test tools/datapack/collect-tago-itx-cheongchun-od.test.mjs`
 
 Expected: FAIL because the three exports do not exist.
 
-- [ ] **Step 3: Implement the minimal stdlib validation and matrix builder**
+- [x] **Step 3: Implement the minimal stdlib validation and matrix builder**
 
 ```js
 export function buildItxOdMatrix(date, stations) {
@@ -83,7 +83,7 @@ export function buildItxOdMatrix(date, stations) {
 
 `validateItxServiceDates`는 KST 현재 날짜를 `Intl.DateTimeFormat`으로 구하고 UTC calendar arithmetic으로 inclusive 0~6일과 요일(8=월~금, 7=토, 9=일)을 검사한다. `replay`일 때만 freshness를 건너뛴다.
 
-- [ ] **Step 4: Extend the existing TAGO collector to full OD roster**
+- [x] **Step 4: Extend the existing TAGO collector to full OD roster**
 
 `collectTagoItxCheongchunRoster`는 기존 grade/city/station fetch를 한 번만 수행하고 canonical 경춘선 역 이름을 TAGO station ID로 유일 mapping한다. `buildItxOdMatrix`의 각 row를 기존 `fetchAll("GetStrtpntAlocFndTrainInfo", ...)`에 전달하고 전 페이지 결과를 합쳐 다음 값을 반환한다.
 
@@ -101,7 +101,7 @@ export function buildItxOdMatrix(date, stations) {
 }
 ```
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 Run: `node --test tools/datapack/collect-tago-itx-cheongchun-od.test.mjs`
 
@@ -122,7 +122,7 @@ git commit -m "feat: collect complete ITX roster matrix"
 - Consumes: `tago-itx-cheongchun-roster-evidence`
 - Produces: 날짜별 artifact의 `directions`, `terminalVariants`, `trainNumberSets`, `materialization`
 
-- [ ] **Step 1: Write failing full-trip and rejection tests**
+- [x] **Step 1: Write failing full-trip and rejection tests**
 
 ```js
 assert.deepEqual(
@@ -134,21 +134,21 @@ assert.throws(() => materializeKorailItxRows({ ...base, trainNumbers: ["2001", "
 assert.throws(() => materializeKorailItxRows({ ...base, infoRows: missingInteriorDeparture }), /planned timestamp missing/);
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `node --test tools/datapack/collect-korail-itx-cheongchun-timetable.test.mjs`
 
 Expected: FAIL because 용산·옥수·왕십리 are dropped and completeness fields are absent.
 
-- [ ] **Step 3: Map every passenger stop without fake line membership**
+- [x] **Step 3: Map every passenger stop without fake line membership**
 
 Change the pack query to load all canonical stations by normalized name plus the existing Gyeongchun `line_sequence`. `selectPassengerStops` maps every passenger row through the all-station map, retains nullable Gyeongchun sequence, and rejects any unmapped row. The Gyeongchun-only subsequence remains monotonic.
 
-- [ ] **Step 4: Materialize directly from provider order**
+- [x] **Step 4: Materialize directly from provider order**
 
 Build `transitTrips` and `transitStopTimes` from each trip's sorted `trn_run_sn`. Derive `directionId` from its Gyeongchun subsequence, preserve the provider direction code, require plan endpoints to equal the first/last passenger stops, and require all applicable timestamps. Do not add outside stations to `station_lines`.
 
-- [ ] **Step 5: Enforce exact set and direction completeness**
+- [x] **Step 5: Enforce exact set and direction completeness**
 
 ```js
 assertSameSet("roster/plan", rosterTrainNumbers, matchedPlanTrainNumbers);
@@ -157,7 +157,7 @@ assertSameSet("roster/materialized", rosterTrainNumbers, materializedTrainNumber
 if (!directions.has("U") || !directions.has("D")) throw new Error("Korail ITX roster must include both directions");
 ```
 
-- [ ] **Step 6: Run GREEN and commit**
+- [x] **Step 6: Run GREEN and commit**
 
 Run: `node --test tools/datapack/collect-korail-itx-cheongchun-timetable.test.mjs`
 
@@ -178,7 +178,7 @@ git commit -m "feat: enforce complete ITX trips"
 - Produces: `collectKorailItxCheongchunCompleteness({ serviceKey, serviceDates, packPath, fetchImpl, now, replay })`
 - CLI: `--day8-date`, `--day7-date`, `--day9-date`, optional `--replay`, `--canonical-pack`, `--output`
 
-- [ ] **Step 1: Write failing orchestration tests**
+- [x] **Step 1: Write failing orchestration tests**
 
 Test that all three dates are called once, one incomplete direction makes the overall artifact `MISSING`, replay is `REPLAY_ONLY`, and a provider exception produces a redacted failure artifact.
 
@@ -191,21 +191,21 @@ assert.equal(exitCode, 1);
 assert.equal(savedArtifact.admissionStatus, "MISSING");
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `node --test tools/datapack/collect-korail-itx-cheongchun-timetable.test.mjs`
 
 Expected: FAIL because the three-date API and failure artifact path do not exist.
 
-- [ ] **Step 3: Implement the smallest sequential orchestrator**
+- [x] **Step 3: Implement the smallest sequential orchestrator**
 
-Validate dates once, process day codes in `8,7,9` order, stop on the first failed day, and retain requested dates plus completed per-day evidence. No parallel calls or retry layer beyond existing bounded provider retry.
+Validate dates once, process day codes in `8,7,9` order, record each failed day without substituting dates, and retain requested dates plus all per-day evidence. No parallel calls or retry layer beyond existing bounded provider retry.
 
-- [ ] **Step 4: Make CLI failure deterministic**
+- [x] **Step 4: Make CLI failure deterministic**
 
 After validating `--output`, wrap collection in `try/catch`; on runtime failure write mode `0600` JSON with `admissionStatus: "MISSING"`, `admissionEligible: false`, a sanitized reason code, and `credentialRedacted: true`, then set `process.exitCode = 1`.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 Run: `node --test tools/datapack/collect-korail-itx-cheongchun-timetable.test.mjs`
 
@@ -230,7 +230,7 @@ git commit -m "feat: gate ITX completeness across service days"
 - Consumes: three-date completeness artifact
 - Produces: #2116 fail-closed coverage contract without #2094 wiring
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 ```js
 assert.equal(Object.hasOwn(contract.searchScopePolicy, "trainSearch"), false);
@@ -241,17 +241,17 @@ assert.equal(contract.legacyDaejeonRowCount, 0);
 assert.equal(contract.legacyYongsanDaejeonTripCount, 0);
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `node --test tools/datapack/itx-cheongchun-coverage-contract.test.mjs tools/datapack/datapack-tools.test.mjs`
 
 Expected: FAIL on the existing `trainSearch`/`trainSearchCoverage` fields.
 
-- [ ] **Step 3: Remove only the direct train-search wiring and update validation**
+- [x] **Step 3: Remove only the direct train-search wiring and update validation**
 
 Delete `searchScopePolicy.trainSearch`, the ITX target's `trainSearchCoverage`, and the corresponding `report-coverage-gaps.mjs` requirement. Keep `trainSearchOnly.services` unchanged because it already excludes `ITX_CHEONGCHUN`. Remove #2094 wording from the KORAIL source candidate.
 
-- [ ] **Step 4: Run the full local gate**
+- [x] **Step 4: Run the full local gate**
 
 Run:
 
@@ -265,7 +265,7 @@ node --test \
 
 Expected: PASS.
 
-- [ ] **Step 5: Run credential-safe live validation**
+- [x] **Step 5: Run credential-safe live validation**
 
 ```sh
 node --env-file=/Users/aquila/easysubway/.env tools/datapack/collect-korail-itx-cheongchun-timetable.mjs \
@@ -278,7 +278,7 @@ node --env-file=/Users/aquila/easysubway/.env tools/datapack/collect-korail-itx-
 
 Expected: exit 0 only when all completeness checks pass; otherwise a credential-free `MISSING` artifact and non-zero exit. Commit only sanitized evidence.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```sh
 git add tools/datapack/itx-cheongchun-coverage-contract.json \

@@ -73,14 +73,27 @@ export async function collectTagoItxCheongchunRoster({
     stationOperations.push(operation);
     stationRows.push(...operation.rows);
   }
-  const stations = canonicalStations.map(({ canonicalStationId, nameKo }) => {
-    const provider = uniqueStation(stationRows, requiredString(nameKo, "canonicalStations.nameKo"));
-    return {
-      providerStationId: requiredString(provider.nodeid, `${nameKo}.nodeid`),
-      providerStationName: provider.nodename,
-      canonicalStationId: requiredString(canonicalStationId, "canonicalStations.canonicalStationId"),
-    };
-  });
+  const stations = [];
+  const excludedCanonicalStations = [];
+  for (const { canonicalStationId, nameKo } of canonicalStations) {
+    const canonicalId = requiredString(canonicalStationId, "canonicalStations.canonicalStationId");
+    const canonicalName = requiredString(nameKo, "canonicalStations.nameKo");
+    const matches = stationRows.filter((row) => normalize(row.nodename) === normalize(canonicalName));
+    if (matches.length === 0) {
+      excludedCanonicalStations.push({
+        canonicalStationId: canonicalId,
+        nameKo: canonicalName,
+        reasonCode: "NOT_IN_TAGO_TRAIN_STATION_CATALOG",
+      });
+      continue;
+    }
+    if (matches.length !== 1) throw new Error(`TAGO station mapping is missing or ambiguous: ${canonicalName}`);
+    stations.push({
+      providerStationId: requiredString(matches[0].nodeid, `${canonicalName}.nodeid`),
+      providerStationName: matches[0].nodename,
+      canonicalStationId: canonicalId,
+    });
+  }
   const matrix = buildItxOdMatrix(serviceDate, stations);
   const stationByProviderId = new Map(stations.map((station) => [station.providerStationId, station]));
   const odOperations = [];
@@ -110,6 +123,9 @@ export async function collectTagoItxCheongchunRoster({
     serviceDate,
     kricServiceDayCode,
     trainGrade: { code: String(grade.vehiclekndid), name: grade.vehiclekndnm, serviceId: "ITX_CHEONGCHUN" },
+    canonicalStationCount: canonicalStations.length,
+    rosterStationCount: stations.length,
+    excludedCanonicalStations: excludedCanonicalStations.sort((left, right) => naturalCompare(left.nameKo, right.nameKo)),
     stations: stations.sort((left, right) => left.providerStationId.localeCompare(right.providerStationId)),
     expectedOdCount: matrix.expectedOdCount,
     completedOdCount: odOperations.length,
@@ -119,7 +135,9 @@ export async function collectTagoItxCheongchunRoster({
     operations: [trainGrades, cities, ...stationOperations, ...odOperations].map(operationEvidence),
     trainNumbers,
     itineraries,
-    evidenceHash: sha256(JSON.stringify({ serviceDate, kricServiceDayCode, stations, matrix, trainNumbers, itineraries })),
+    evidenceHash: sha256(JSON.stringify({
+      serviceDate, kricServiceDayCode, stations, excludedCanonicalStations, matrix, trainNumbers, itineraries,
+    })),
     credentialRedacted: true,
   };
 }

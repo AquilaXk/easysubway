@@ -22,7 +22,7 @@
 
 각 날짜는 다음 흐름을 독립 실행한다.
 
-1. roster 탐색용으로 canonical pack의 현재 경춘선 역 집합과 검증된 TAGO station ID mapping을 읽는다. 탐색 역 하나라도 mapping이 없으면 `MISSING`으로 판정한다.
+1. roster 탐색용 역은 canonical pack의 현재 경춘선 역 집합과 TAGO 공식 열차역 카탈로그의 교집합으로 정한다. TAGO 카탈로그에 없는 canonical 역은 `excludedCanonicalStations`에 사유와 함께 기록하며 조용히 누락하지 않는다. 교집합이 비어 있거나 provider 역 이름이 둘 이상 mapping되는 경우 `MISSING`으로 판정한다.
 2. TAGO `GetStrtpntAlocFndTrainInfo`를 ITX-청춘 등급 코드 `09`로 roster 탐색 역의 모든 순서 있는 OD 쌍에 대해 조회한다.
 3. 각 OD 응답의 `totalCount`까지 전 페이지를 수집하고 당일 열차번호를 합집합·중복 제거해 공식 roster를 만든다.
 4. KORAIL `codes2`, `travelerTrainRunPlan2`, `travelerTrainRunInfo2`도 당일 범위를 전 페이지 수집한다. `mrnt_cd=경춘선` 이외의 운행정보는 거부한다.
@@ -55,6 +55,7 @@ roster 탐색 역의 모든 OD를 조회하는 방식은 고정 시종착 목록
 - `selectedServiceDates`: `{ "8": "YYYYMMDD", "7": "YYYYMMDD", "9": "YYYYMMDD" }`
 - `admissionStatus`, `admissionEligible`
 - 날짜별 provider operation, page 수, row 수, sanitized response hash
+- 날짜별 canonical 역 수, roster 탐색 역 수, 제외된 canonical 역과 사유
 - 날짜별 `expectedOdCount`, `completedOdCount`, `failedOdCount`, `stationSetHash`, 정렬된 `odMatrixHash`
 - 날짜별 roster/train plan/train info/materialized train-number 집합과 불일치 집합
 - 날짜별 방향 집합, 시발·종착 조합, trip 수, 정차 row 수, 시각 누락 수
@@ -64,9 +65,9 @@ roster 탐색 역의 모든 OD를 조회하는 방식은 고정 시종착 목록
 - `legacyDaejeonRowCount: 0`, `legacyYongsanDaejeonTripCount: 0`
 - 입력과 결과를 포함한 결정적 `evidenceHash`, `credentialRedacted: true`
 
-정렬된 탐색 역이 `n`개면 `expectedOdCount`는 `n * (n - 1)`이다. admission에는 `completedOdCount === expectedOdCount`, `failedOdCount === 0` 및 실행 전 결정한 station set·OD matrix hash 일치가 필요하다.
+정렬된 교집합 탐색 역이 `n`개면 `expectedOdCount`는 `n * (n - 1)`이다. admission에는 `completedOdCount === expectedOdCount`, `failedOdCount === 0` 및 실행 전 결정한 station set·OD matrix hash 일치가 필요하다.
 
-CLI 인자와 output 경로 검증이 끝난 뒤 발생한 provider HTTP/schema/result code 오류, roster 0건, completeness 실패는 sanitized 진단을 포함한 `MISSING` artifact를 저장한 다음 non-zero로 종료한다. 성공한 세 날짜만 `admissionStatus: SUPPORTED`와 exit 0을 허용한다.
+CLI 인자와 output 경로 검증이 끝난 뒤 발생한 provider HTTP/schema/result code 오류, roster 0건, completeness 실패는 해당 날짜를 `MISSING`으로 기록하되 나머지 두 날짜를 대체 없이 독립 검증한다. 세 날짜의 sanitized 진단을 포함한 artifact를 저장한 다음 non-zero로 종료한다. 성공한 세 날짜만 `admissionStatus: SUPPORTED`와 exit 0을 허용한다.
 
 ## 구현 경계
 
@@ -91,6 +92,7 @@ node --env-file=/Users/aquila/easysubway/.env tools/datapack/collect-korail-itx-
 
 ```sh
 node --test \
+  tools/datapack/collect-tago-itx-cheongchun-od.test.mjs \
   tools/datapack/collect-korail-itx-cheongchun-timetable.test.mjs \
   tools/datapack/itx-cheongchun-coverage-contract.test.mjs
 ```
@@ -103,6 +105,7 @@ node --test \
 - 세 service day 독립 수집과 artifact 날짜 고정
 - provider 오류·빈 roster 발생 시 날짜 대체 없이 실패
 - 모든 operation의 full pagination, roster deduplication, OD count·station set/OD matrix hash 검증
+- canonical 경춘선과 TAGO 열차역 카탈로그 교집합 및 제외역 증거 검증
 - 양방향·모든 시종착 변형 완전 성공
 - 한 방향 누락, 일부 편성, plan/info/trip 열차번호 집합 불일치 거부
 - 경춘선 밖 여객 정차역을 포함한 용산~춘천 전체 trip 보존

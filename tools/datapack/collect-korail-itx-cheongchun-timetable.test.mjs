@@ -187,16 +187,68 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
   });
 
   await context.test("provider 오류", async () => {
+    const attemptedDates = [];
     const artifact = await collectKorailItxCheongchunCompleteness({
       serviceKey: "key", serviceDates, packPath: PACK_PATH,
       now: new Date("2026-07-14T00:00:00.000Z"),
-      collectRosterImpl: async () => { throw new Error("TAGO GetStrtpntAlocFndTrainInfo HTTP 503"); },
+      collectRosterImpl: async ({ serviceDate }) => {
+        attemptedDates.push(serviceDate);
+        throw new Error("TAGO GetStrtpntAlocFndTrainInfo HTTP 503");
+      },
       collectTimetableImpl: async () => assert.fail("must not run"),
     });
     assert.equal(artifact.admissionStatus, "MISSING");
     assert.equal(artifact.admissionEligible, false);
-    assert.equal(artifact.serviceDays[0].failureReasonCode, "PROVIDER_OR_SCHEMA_FAILURE");
+    assert.equal(artifact.serviceDays[0].failureStage, "ROSTER");
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "PROVIDER_HTTP_FAILURE");
+    assert.deepEqual(attemptedDates, ["20260715", "20260718", "20260719"]);
+    assert.equal(artifact.serviceDays.length, 3);
     assert.doesNotMatch(JSON.stringify(artifact), /503/);
+  });
+
+  await context.test("station mapping 오류", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectRosterImpl: async () => { throw new Error("TAGO station mapping is missing or ambiguous: 갈매"); },
+      collectTimetableImpl: async () => assert.fail("must not run"),
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "STATION_MAPPING_INCOMPLETE");
+    assert.equal(artifact.serviceDays[0].failureContext, "갈매");
+  });
+
+  await context.test("timetable 오류에도 완료된 OD evidence를 보존", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"), collectRosterImpl: roster,
+      collectTimetableImpl: async () => {
+        throw new Error(
+          "Korail train operation API pagination incomplete: " +
+          "operation=travelerTrainRunInfo2,collected=1000,total=1500,pages=2",
+        );
+      },
+    });
+    assert.equal(artifact.serviceDays[0].failureStage, "TIMETABLE");
+    assert.equal(artifact.serviceDays[0].expectedOdCount, 2);
+    assert.equal(artifact.serviceDays[0].completedOdCount, 2);
+    assert.equal(artifact.serviceDays[0].failedOdCount, 0);
+    assert.equal(artifact.serviceDays[0].stationSetHash, "b".repeat(64));
+    assert.equal(artifact.serviceDays[0].odMatrixHash, "c".repeat(64));
+    assert.equal(artifact.serviceDays[0].roster.evidenceHash, "a".repeat(64));
+    assert.equal(
+      artifact.serviceDays[0].failureContext,
+      "operation=travelerTrainRunInfo2,collected=1000,total=1500,pages=2",
+    );
+  });
+
+  await context.test("공식 run info 0건", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"), collectRosterImpl: roster,
+      collectTimetableImpl: async () => { throw new Error("Korail ITX run info returned zero rows"); },
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "OFFICIAL_RUN_INFO_EMPTY");
+    assert.equal(artifact.serviceDays[0].failureContext, "operation=travelerTrainRunInfo2,total=0");
   });
 });
 
@@ -220,7 +272,7 @@ test("ITX CLI는 runtime 실패를 MISSING artifact로 저장하고 non-zero를 
     assert.equal(result.exitCode, 1);
     assert.equal(artifact.admissionStatus, "MISSING");
     assert.equal(artifact.admissionEligible, false);
-    assert.equal(artifact.failureReasonCode, "PROVIDER_OR_SCHEMA_FAILURE");
+    assert.equal(artifact.failureReasonCode, "PROVIDER_HTTP_FAILURE");
     assert.doesNotMatch(JSON.stringify(artifact), /503|secret/);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -565,7 +617,24 @@ test("Korail ITX collector는 provider/schema/pagination 오류를 fail closed�
       fetchImpl: async (url) => url.searchParams.get("pageNo") === "1"
         ? apiResponse([{ code: "GJ", type: "mrnt_cd", value: "경춘선" }], { totalCount: 2 })
         : apiResponse([], { totalCount: 2, pageNo: 2 }),
-    }), /pagination incomplete/);
+    }), /pagination incomplete: operation=codes2,collected=1,total=2,pages=2/);
+  });
+
+  await context.test("공식 totalCount 0은 pagination 오류로 오분류하지 않음", async () => {
+    const { plans } = fixtureRows();
+    await assert.rejects(collectKorailItxCheongchunTimetable({
+      ...base,
+      fetchImpl: async (url) => {
+        if (url.pathname.endsWith("codes2")) {
+          return url.searchParams.get("cond[type::EQ]") === "mrnt_cd"
+            ? apiResponse([{ code: "GJ", type: "mrnt_cd", value: "경춘선" }])
+            : apiResponse([{ code: "11", type: "stop_se_cd", value: "여객승하차" }]);
+        }
+        return url.pathname.endsWith("travelerTrainRunPlan2")
+          ? apiResponse(plans)
+          : apiResponse([], { totalCount: 0 });
+      },
+    }), /run info returned zero rows/);
   });
 
   await context.test("페이지 사이 totalCount 변경", async () => {
