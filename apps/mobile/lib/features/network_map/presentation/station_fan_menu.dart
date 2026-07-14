@@ -59,6 +59,7 @@ class StationFanMenu extends StatefulWidget {
     required this.disabledSlots,
     required this.onAction,
     required this.onClose,
+    this.fontFamily,
   });
 
   final double width;
@@ -66,6 +67,7 @@ class StationFanMenu extends StatefulWidget {
   final Set<RouteDraftSlot> disabledSlots;
   final ValueChanged<RouteDraftSlot> onAction;
   final VoidCallback onClose;
+  final String? fontFamily;
 
   @override
   State<StationFanMenu> createState() => _StationFanMenuState();
@@ -138,6 +140,7 @@ class _StationFanMenuState extends State<StationFanMenu> {
                 selectedSlots: widget.selectedSlots,
                 disabledSlots: widget.disabledSlots,
                 pressed: _pressed,
+                fontFamily: widget.fontFamily,
               ),
             ),
           ),
@@ -180,13 +183,31 @@ class _StationFanMenuPainter extends CustomPainter {
     required this.selectedSlots,
     required this.disabledSlots,
     required this.pressed,
-  });
+    required this.fontFamily,
+  }) {
+    _labelPainters = {
+      _FanSector.departure: _buildLabelPainter(
+        '출발',
+        _labelColor(_FanSector.departure, EasySubwayFanMenuColors.departure),
+      ),
+      _FanSector.waypoint: _buildLabelPainter(
+        '경유',
+        _labelColor(_FanSector.waypoint, EasySubwayFanMenuColors.waypoint),
+      ),
+      _FanSector.arrival: _buildLabelPainter(
+        '도착',
+        _labelColor(_FanSector.arrival, EasySubwayFanMenuColors.arrival),
+      ),
+    };
+  }
 
   final StationFanMenuGeometry geometry;
   final double scale;
   final Set<RouteDraftSlot> selectedSlots;
   final Set<RouteDraftSlot> disabledSlots;
   final _FanSector? pressed;
+  final String? fontFamily;
+  late final Map<_FanSector, TextPainter> _labelPainters;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -254,7 +275,9 @@ class _StationFanMenuPainter extends CustomPainter {
     }
     final paint = Paint()
       ..style = PaintingStyle.fill
-      ..color = _disabled(sector) ? fill.withValues(alpha: 0.4) : fill;
+      ..color = _disabled(sector)
+          ? fill.withValues(alpha: EasySubwayFanMenuColors.disabledOpacity)
+          : fill;
     canvas.drawPath(path, paint);
   }
 
@@ -271,6 +294,30 @@ class _StationFanMenuPainter extends CustomPainter {
   }
 
   void _paintBorders(Canvas canvas) {
+    canvas.saveLayer(Offset.zero & kFanMenuDesignSize, Paint());
+    _drawBorders(canvas);
+    final disabledBorders = Path();
+    for (final sector in _FanSector.values) {
+      if (_disabled(sector)) {
+        disabledBorders.addPath(_pathFor(sector), Offset.zero);
+      }
+    }
+    if (!disabledBorders.getBounds().isEmpty) {
+      canvas.drawPath(
+        disabledBorders,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4
+          ..color = Colors.white.withValues(
+            alpha: EasySubwayFanMenuColors.disabledOpacity,
+          )
+          ..blendMode = BlendMode.dstIn,
+      );
+    }
+    canvas.restore();
+  }
+
+  void _drawBorders(Canvas canvas) {
     canvas.drawPath(
       geometry.silhouette,
       Paint()
@@ -305,30 +352,17 @@ class _StationFanMenuPainter extends CustomPainter {
       _iconColor(_FanSector.arrival, EasySubwayFanMenuColors.arrival),
     );
     _paintCloseIcon(canvas);
-    _paintLabel(
-      canvas,
-      '출발',
-      const Offset(175, 243),
-      _labelColor(_FanSector.departure, EasySubwayFanMenuColors.departure),
-    );
-    _paintLabel(
-      canvas,
-      '경유',
-      const Offset(350, 195),
-      _labelColor(_FanSector.waypoint, EasySubwayFanMenuColors.waypoint),
-    );
-    _paintLabel(
-      canvas,
-      '도착',
-      const Offset(525, 243),
-      _labelColor(_FanSector.arrival, EasySubwayFanMenuColors.arrival),
-    );
+    _paintLabel(canvas, _FanSector.departure, const Offset(175, 243));
+    _paintLabel(canvas, _FanSector.waypoint, const Offset(350, 195));
+    _paintLabel(canvas, _FanSector.arrival, const Offset(525, 243));
   }
 
   Color _iconColor(_FanSector sector, Color base) {
     if (_selected(sector)) return Colors.white;
     final c = base;
-    return _disabled(sector) ? c.withValues(alpha: 0.4) : c;
+    return _disabled(sector)
+        ? c.withValues(alpha: EasySubwayFanMenuColors.disabledOpacity)
+        : c;
   }
 
   Color _labelColor(_FanSector sector, Color base) => _iconColor(sector, base);
@@ -409,22 +443,27 @@ class _StationFanMenuPainter extends CustomPainter {
     );
   }
 
-  void _paintLabel(Canvas canvas, String text, Offset baseline, Color color) {
-    final tp = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color,
-          fontSize: 34,
-          fontWeight: FontWeight.w700,
-        ),
+  TextPainter _buildLabelPainter(String text, Color color) => TextPainter(
+    text: TextSpan(
+      text: text,
+      style: TextStyle(
+        color: color,
+        fontSize: 34,
+        fontWeight: FontWeight.w700,
+        fontFamily: fontFamily,
       ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    // SVG y는 baseline. TextPainter는 top 기준이라 대략 fontSize만큼 위로 올린다.
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+
+  void _paintLabel(Canvas canvas, _FanSector sector, Offset baseline) {
+    final tp = _labelPainters[sector]!;
+    final alphabeticBaseline = tp.computeDistanceToActualBaseline(
+      TextBaseline.alphabetic,
+    );
     tp.paint(
       canvas,
-      Offset(baseline.dx - tp.width / 2, baseline.dy - tp.height),
+      Offset(baseline.dx - tp.width / 2, baseline.dy - alphabeticBaseline),
     );
   }
 
@@ -432,6 +471,7 @@ class _StationFanMenuPainter extends CustomPainter {
   bool shouldRepaint(_StationFanMenuPainter old) =>
       old.scale != scale ||
       old.pressed != pressed ||
+      old.fontFamily != fontFamily ||
       !setEquals(old.selectedSlots, selectedSlots) ||
       !setEquals(old.disabledSlots, disabledSlots);
 }

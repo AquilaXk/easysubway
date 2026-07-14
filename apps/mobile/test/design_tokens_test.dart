@@ -83,4 +83,8 @@ void main() {
       expect(EasySubwayRadius.sheet, 16.0);
     });
   });
+
+  test('팬 메뉴 disabled 투명도는 채움·아이콘·라벨·경계선이 공유한다', () {
+    expect(EasySubwayFanMenuColors.disabledOpacity, 0.4);
+  });
 }
