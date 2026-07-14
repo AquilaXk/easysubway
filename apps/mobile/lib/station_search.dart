@@ -2228,12 +2228,12 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     Navigator.of(context).pop(station);
   }
 
-  /// #2109 둘러보기(비픽) 모드: 결과를 탭하면 상세를 밀지 않고 선택한 역 id를
-  /// 반환하며 화면을 닫는다. 호출부(main.dart openStationSearch)가 이 id를
-  /// 받아 노선도 focus + 팬 메뉴를 트리거한다(임베디드 검색과 동일한 흐름으로
-  /// 수렴). 상세 진입은 팬 메뉴 앵커의 역명 라벨 탭으로 옮겨졌다.
+  /// #2109 둘러보기(비픽) 모드: 결과를 탭하면 상세를 밀지 않고 선택한 역 결과를
+  /// 반환하며 화면을 닫는다. 호출부(main.dart openStationSearch)가 이 결과를
+  /// 받아 노선도 focus + 팬 메뉴 + 해당 역 하단 패널을 트리거한다(임베디드
+  /// 검색과 동일한 흐름으로 수렴).
   void _returnStationToMap(StationSearchResult result) {
-    Navigator.of(context).pop(result.id);
+    Navigator.of(context).pop(result);
   }
 
   void _setRouteOrigin(StationSearchResult result) {

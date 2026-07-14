@@ -101,7 +101,7 @@ void main() {
       expect(menuSemantics.hasAction(SemanticsAction.tap), isTrue);
       expect(stationSearchSemantics.label, contains('지하철역 검색'));
       expect(stationSearchSemantics.hasAction(SemanticsAction.tap), isTrue);
-      expect(nearbyStationSemantics.label, contains('현재 위치로 주변 역 찾기'));
+      expect(nearbyStationSemantics.label, contains('현재 위치에서 가장 가까운 역 찾기'));
       expect(nearbyStationSemantics.hasAction(SemanticsAction.tap), isTrue);
 
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));

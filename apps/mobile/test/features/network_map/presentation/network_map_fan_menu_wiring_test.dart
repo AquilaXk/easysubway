@@ -12,7 +12,7 @@ import 'package:easysubway_mobile/network_map.dart'
         fanMenuSelectedSlots,
         fanMenuDisabledSlots,
         fanMenuShouldClear,
-        fanMenuStationLabelHeight,
+        fanMenuWidthForViewport,
         fanMenuPlacement;
 
 void main() {
@@ -21,60 +21,25 @@ void main() {
       // 상단 경계에서 충분히 떨어진 역: 위쪽에 메뉴 하단이 오도록 배치.
       final placement = fanMenuPlacement(
         stationPoint: const Offset(200, 400),
-        labelHeight: 28,
+        viewport: const Size(400, 800),
+        clampPosition: false,
       );
       expect(placement.placeBelow, isFalse);
       // top = dy - menuHeight - 8 (menuHeight ≈ 141.14).
       expect(placement.top, closeTo(400 - placement.menuHeight - 8, 0.001));
-      // 라벨 포함 bbox 상단이 메뉴 top보다 labelHeight + 8px 간격만큼 위.
-      expect(
-        placement.revealBounds.top,
-        closeTo(placement.top - placement.labelHeight - 8, 0.001),
-      );
+      expect(placement.revealBounds.top, placement.top);
     });
 
     test('상단 경계 인근이면 메뉴를 노드 아래로 뒤집는다(placeBelow=true)', () {
       // 위쪽 공간 부족(dy - menuHeight - 8 < 8): 노드 아래 배치로 전환.
       final placement = fanMenuPlacement(
         stationPoint: const Offset(200, 10),
-        labelHeight: 28,
+        viewport: const Size(400, 800),
+        clampPosition: false,
       );
       expect(placement.placeBelow, isTrue);
       expect(placement.top, closeTo(10 + 28, 0.001));
-      // 라벨을 포함한 bbox 높이 = menuHeight + 8px 간격 + labelHeight.
-      expect(
-        placement.revealBounds.height,
-        closeTo(placement.menuHeight + 8 + placement.labelHeight, 0.001),
-      );
-    });
-
-    test('#2109 placeBelow면 라벨을 메뉴 아래로 배치한다(라벨이 노드/메뉴 상단을 덮지 않음)', () {
-      // 노드 위면 라벨은 메뉴 위(labelAbove=true), 노드 아래로 뒤집히면 라벨도
-      // 메뉴 아래로 내려간다(labelAbove=false).
-      final above = fanMenuPlacement(
-        stationPoint: const Offset(200, 400),
-        labelHeight: 28,
-      );
-      expect(above.labelAbove, isTrue);
-      // 메뉴 위 라벨: bottom = viewportHeight - top + 8 (메뉴 상단 위에서 자람).
-      expect(above.labelBottom(800), closeTo(800 - above.top + 8, 0.001));
-
-      final below = fanMenuPlacement(
-        stationPoint: const Offset(200, 10),
-        labelHeight: 28,
-      );
-      expect(below.labelAbove, isFalse);
-      // 메뉴 아래 라벨: bottom 앵커가 메뉴 하단(top+menuHeight) 아래 labelHeight만큼
-      // 더 내려간 지점 기준 → 라벨은 그 위(메뉴 하단 아래)에서 자란다.
-      expect(
-        below.labelBottom(800),
-        closeTo(
-          800 - (below.top + below.menuHeight + 8 + below.labelHeight),
-          0.001,
-        ),
-      );
-      // placeBelow 라벨의 reveal bbox는 메뉴 top부터 시작(위로 확장하지 않음).
-      expect(below.revealBounds.top, closeTo(below.top, 0.001));
+      expect(placement.revealBounds.height, placement.menuHeight);
     });
 
     test('#2109 뷰포트를 주면 좁은 화면 경계에서 left를 화면 안으로 클램프한다', () {
@@ -84,7 +49,7 @@ void main() {
       final clamped = fanMenuPlacement(
         stationPoint: const Offset(355, 400),
         viewport: viewport,
-        labelHeight: 28,
+        clampPosition: true,
       );
       const margin = 12.0;
       final maxLeft = viewport.width - margin - clamped.menuWidth;
@@ -100,87 +65,69 @@ void main() {
       final leftClamped = fanMenuPlacement(
         stationPoint: const Offset(5, 400),
         viewport: viewport,
-        labelHeight: 28,
+        clampPosition: true,
       );
       expect(leftClamped.left, greaterThanOrEqualTo(margin - 0.001));
     });
 
-    test('viewport 미전달(카메라 패닝 경로)이면 클램프 없이 이상적 배치를 낸다', () {
-      // 패닝은 이상적(클램프 없는) revealBounds로 최대한 노출을 시도해야 하므로,
-      // viewport를 주지 않으면 left가 중심 정렬 그대로 유지된다.
+    test('카메라 패닝 경로는 같은 viewport에서 클램프 없이 이상적 배치를 낸다', () {
+      // 패닝은 같은 viewport에서 이상적(클램프 없는) revealBounds로 최대한
+      // 노출을 시도해야 하므로 left가 중심 정렬 그대로 유지된다.
       final unclamped = fanMenuPlacement(
         stationPoint: const Offset(355, 400),
-        labelHeight: 28,
+        viewport: const Size(360, 800),
+        clampPosition: false,
       );
       expect(unclamped.left, closeTo(355 - unclamped.menuWidth / 2, 0.001));
     });
 
-    test('대형 textScale은 실측 라벨 높이와 reveal bounds를 함께 늘린다', () {
-      final normalHeight = fanMenuStationLabelHeight(
-        text: '동대문역사문화공원',
-        textScaler: TextScaler.noScaling,
-      );
-      final largeHeight = fanMenuStationLabelHeight(
-        text: '동대문역사문화공원',
-        textScaler: const TextScaler.linear(2),
-      );
-      final placement = fanMenuPlacement(
-        stationPoint: const Offset(200, 400),
-        labelHeight: largeHeight,
-      );
-
-      expect(largeHeight, greaterThan(normalHeight));
-      expect(placement.labelHeight, largeHeight);
-      expect(
-        placement.revealBounds.height,
-        closeTo(placement.menuHeight + 8 + largeHeight, 0.001),
-      );
+    test('320/360/364/390dp에서 메뉴 너비를 단일 규칙으로 계산한다', () {
+      expect(fanMenuWidthForViewport(320), 220);
+      expect(fanMenuWidthForViewport(360), 220);
+      expect(fanMenuWidthForViewport(364), 220);
+      expect(fanMenuWidthForViewport(390), 220);
     });
 
-    test('실측 라벨 높이는 1px border가 추가하는 장식 padding까지 포함한다', () {
-      const style = TextStyle(fontSize: 13, height: 1);
-      const text = '동대문역사문화공원';
-      final painter = TextPainter(
-        text: const TextSpan(text: text, style: style),
-        textDirection: TextDirection.ltr,
-        textAlign: TextAlign.center,
-      )..layout(maxWidth: 98); // 120 - (10px padding + 1px border) * 2
-
-      expect(
-        fanMenuStationLabelHeight(
-          text: text,
-          textScaler: TextScaler.noScaling,
-          style: style,
-        ),
-        painter.height + 10, // (4px padding + 1px border) * 2
+    test('clamp 여부와 무관하게 같은 viewport는 같은 menu size를 사용한다', () {
+      const viewport = Size(360, 800);
+      final renderPlacement = fanMenuPlacement(
+        stationPoint: const Offset(355, 400),
+        viewport: viewport,
+        clampPosition: true,
       );
+      final cameraPlacement = fanMenuPlacement(
+        stationPoint: const Offset(355, 400),
+        viewport: viewport,
+        clampPosition: false,
+      );
+
+      expect(renderPlacement.menuWidth, cameraPlacement.menuWidth);
+      expect(renderPlacement.menuHeight, cameraPlacement.menuHeight);
+      expect(renderPlacement.menuWidth, 220);
+      expect(renderPlacement.left, isNot(cameraPlacement.left));
     });
 
-    test('실측 라벨 높이는 Text와 같은 MediaQuery spacing override를 반영한다', () {
-      const style = TextStyle(fontSize: 13, height: 1);
-      const text = '동대문 역사문화공원';
-      final painter = TextPainter(
-        text: TextSpan(
-          text: text,
-          style: style.merge(
-            const TextStyle(height: 2, letterSpacing: 4, wordSpacing: 3),
+    test('reveal bounds는 팬 메뉴 자체만 포함한다', () {
+      for (final stationPoint in const [
+        Offset(5, 10),
+        Offset(200, 400),
+        Offset(395, 790),
+      ]) {
+        final placement = fanMenuPlacement(
+          stationPoint: stationPoint,
+          viewport: const Size(400, 800),
+          clampPosition: true,
+        );
+        expect(
+          placement.revealBounds,
+          Rect.fromLTWH(
+            placement.left,
+            placement.top,
+            placement.menuWidth,
+            placement.menuHeight,
           ),
-        ),
-        textDirection: TextDirection.ltr,
-        textAlign: TextAlign.center,
-      )..layout(maxWidth: 98);
-
-      expect(
-        fanMenuStationLabelHeight(
-          text: text,
-          textScaler: TextScaler.noScaling,
-          style: style,
-          lineHeightScaleFactorOverride: 2,
-          letterSpacingOverride: 4,
-          wordSpacingOverride: 3,
-        ),
-        painter.height + 10,
-      );
+        );
+      }
     });
   });
 
