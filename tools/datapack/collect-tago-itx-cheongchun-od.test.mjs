@@ -128,6 +128,49 @@ test("TAGO ITX roster는 canonical 역의 양방향 OD 전체를 수집한다", 
   assert.doesNotMatch(JSON.stringify(artifact), /never-print-data-key/);
 });
 
+test("TAGO ITX roster는 일시적 HTTP 응답을 OD 실패 확정 전에 한 번 재시도한다", async () => {
+  let forwardAttempts = 0;
+  const artifact = await collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    now: new Date("2026-07-14T00:00:00.000Z"),
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("GetVhcleKndList")) {
+        return tagoResponse([{ vehiclekndid: "07", vehiclekndnm: "ITX-청춘" }]);
+      }
+      if (parsed.pathname.endsWith("GetCtyCodeList")) {
+        return tagoResponse([{ citycode: "11", cityname: "서울" }, { citycode: "32", cityname: "강원" }]);
+      }
+      if (parsed.pathname.endsWith("GetCtyAcctoTrainSttnList")) {
+        return parsed.searchParams.get("cityCode") === "11"
+          ? tagoResponse([{ nodeid: "NAT130126", nodename: "청량리" }])
+          : tagoResponse([{ nodeid: "NAT140873", nodename: "춘천" }]);
+      }
+      const forward = parsed.searchParams.get("depPlaceId") === "NAT130126";
+      if (forward && ++forwardAttempts === 1) return new Response("temporary", { status: 503 });
+      return tagoResponse([{
+        trainno: forward ? "2001" : "2002",
+        traingradename: "ITX-청춘",
+        depplandtime: forward ? "20260715083000" : "20260715103000",
+        arrplandtime: forward ? "20260715095000" : "20260715115000",
+        depplacename: forward ? "청량리" : "춘천",
+        arrplacename: forward ? "춘천" : "청량리",
+        adultcharge: "9800",
+      }]);
+    },
+  });
+
+  assert.equal(forwardAttempts, 2);
+  assert.equal(artifact.completedOdCount, 2);
+  assert.equal(artifact.failedOdCount, 0);
+});
+
 test("TAGO ITX roster는 OD 일부 실패를 count한 뒤 admission이 거부할 evidence를 반환한다", async () => {
   const fallback = validFetch();
   const artifact = await collectTagoItxCheongchunRoster({

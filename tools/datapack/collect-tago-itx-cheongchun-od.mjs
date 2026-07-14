@@ -266,8 +266,18 @@ async function fetchAll(operation, query, key, fetchImpl) {
 
 async function fetchWithRetry(url, fetchImpl) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    try { return await fetchImpl(url, { redirect: "error", signal: AbortSignal.timeout(15_000), headers: { accept: "application/json" } }); }
-    catch (error) { if (attempt === 1) throw new Error("TAGO transport failure", { cause: error }); }
+    try {
+      const response = await fetchImpl(url, {
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+        headers: { accept: "application/json" },
+      });
+      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === 1) return response;
+      if (response.body) await response.body.cancel().catch(() => {});
+    } catch (error) {
+      if (attempt === 1) throw new Error("TAGO transport failure", { cause: error });
+    }
   }
   throw new Error("TAGO transport failure");
 }
