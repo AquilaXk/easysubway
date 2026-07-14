@@ -58,7 +58,7 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
   );
 
   const calendars = deriveCalendars(trips, dayMap, startDate, endDate);
-  const routes = deriveRoutes(trips, lineId);
+  const routes = deriveRoutes(trips, lineId, artifact?.transitRoutes);
 
   const statements = [
     feedInfoInsert(feedEndDate),
@@ -222,18 +222,37 @@ function deriveCalendars(trips, dayMap, startDate, endDate) {
   });
 }
 
-function deriveRoutes(trips, lineId) {
+function deriveRoutes(trips, lineId, routeRows) {
+  if (routeRows !== undefined && !Array.isArray(routeRows)) {
+    throw new Error("transitRoutes must be an array");
+  }
+  const declaredRoutes = new Map();
+  for (const row of routeRows ?? []) {
+    const id = requireString(row.id, "transitRoutes.id");
+    if (declaredRoutes.has(id)) {
+      throw new Error(`transitRoutes duplicate id: ${id}`);
+    }
+    declaredRoutes.set(id, row);
+  }
   const byId = new Map();
   for (const trip of trips) {
     const id = requireString(trip.routeId, "transitTrips.routeId");
+    const declared = declaredRoutes.get(id);
+    if (routeRows !== undefined && !declared) {
+      throw new Error(`transitTrips routeId is missing from transitRoutes: ${id}`);
+    }
     if (!byId.has(id)) {
+      const declaredLineId = declared ? requireString(declared.lineId, `transitRoutes.${id}.lineId`) : null;
+      if (lineId && declaredLineId && lineId !== declaredLineId) {
+        throw new Error(`transitRoutes lineId does not match --line-id: ${id}`);
+      }
       byId.set(id, {
         id,
-        lineId: lineId ?? deriveLineIdFromRouteId(id),
-        directionName: trip.directionId ?? "",
-        shortName: "",
-        longName: "",
-        timezone: DEFAULT_TIMEZONE,
+        lineId: lineId ?? declaredLineId ?? deriveLineIdFromRouteId(id),
+        directionName: optionalString(declared?.directionName, `transitRoutes.${id}.directionName`, trip.directionId ?? ""),
+        shortName: optionalString(declared?.routeShortName, `transitRoutes.${id}.routeShortName`),
+        longName: optionalString(declared?.routeLongName, `transitRoutes.${id}.routeLongName`),
+        timezone: optionalString(declared?.timezone, `transitRoutes.${id}.timezone`, DEFAULT_TIMEZONE),
       });
     }
   }
@@ -323,6 +342,16 @@ function bool(value) {
 function requireString(value, label) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${label} must be a non-empty string`);
+  }
+  return value;
+}
+
+function optionalString(value, label, fallback = "") {
+  if (value == null) {
+    return fallback;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
   }
   return value;
 }

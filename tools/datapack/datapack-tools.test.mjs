@@ -5507,6 +5507,57 @@ test("데이터팩 검증기는 WALKWAY edge를 route graph 연결성으로 인�
   );
 });
 
+test("데이터팩 검증기는 ITX edge를 SUBWAY representative route 연결성으로 인정하지 않는다", async () => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-itx-only-route-"));
+  try {
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        "tools/datapack/fixtures/catalog-fixture.json",
+        "--output",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    );
+
+    const manifestPath = path.join(outputDir, "current.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    const pack = manifest.packs[0];
+    const sqlitePath = path.join(outputDir, "catalog", "capital-v1.sqlite");
+    const database = new DatabaseSync(sqlitePath);
+    try {
+      database.prepare("UPDATE network_edges SET service_class = 'ITX_CHEONGCHUN' WHERE edge_type = 'RIDE'").run();
+    } finally {
+      database.close();
+    }
+    const sqliteBytes = await readFile(sqlitePath);
+    const compressedBytes = gzipSync(sqliteBytes);
+    await writeFile(path.join(outputDir, "catalog", "capital-v1.sqlite.gz"), compressedBytes);
+    pack.sizeBytes = compressedBytes.length;
+    pack.sha256 = sha256(compressedBytes);
+    pack.sqliteSha256 = sha256(sqliteBytes);
+    const fixturePayload = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+    pack.signature.value = sha256(Buffer.from(fixturePayload));
+    pack.representativeRouteRegressionSignature.value = sha256(
+      Buffer.from(`${fixturePayload}:${representativeRouteRegressionPayload(pack.representativeRouteRegressions)}`),
+    );
+    await writeFile(manifestPath, JSON.stringify(manifest));
+
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        ["tools/datapack/validate-datapack.mjs", "--manifest", manifestPath, "--root", outputDir],
+        { cwd: root, env: productionEnv },
+      ),
+      /representativeRouteRegressions required edge missing|station-line node is isolated from route graph|route graph has unreachable directed path/,
+    );
+  } finally {
+    await rm(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("데이터팩 검증기는 unknown network edge_type을 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-unknown-edge-type-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");
