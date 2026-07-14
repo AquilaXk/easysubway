@@ -17,6 +17,7 @@
 // easysubway.timetable.seed.enabled)가 startup(Flyway 이후)에 TransactionTemplate으로 all-or-nothing 적재한다.
 // Flyway 데이터 마이그레이션을 쓰지 않는 이유: 배포 시 자동 적용이라 flag 게이트가 불가하고 ~67개 @SpringBootTest DB를
 // 오염시키며 버전 번호 경합이 있다. feed_end_date는 seed에 포함(--feed-end-date, 기본=--end-date; STALE 안전장치).
+import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 
 const SECONDS_LIMIT_EXCLUSIVE = 108000; // V29 CHECK: arrival/departure BETWEEN 0 AND 107999
@@ -51,6 +52,7 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
     artifact?.routeServiceArtifactEvidence ?? [],
     trips,
     options.buildNow ?? new Date(),
+    options.timetableArtifactSha256,
   );
 
   const calendars = deriveCalendars(trips, dayMap, startDate, endDate);
@@ -98,7 +100,7 @@ function validateTrips(trips) {
   return ids;
 }
 
-function validateRouteServiceEvidence(rows, trips, buildNow) {
+function validateRouteServiceEvidence(rows, trips, buildNow, timetableArtifactSha256) {
   if (!Array.isArray(rows) || rows.length > 1) {
     throw new Error("routeServiceArtifactEvidence must contain at most one row");
   }
@@ -117,6 +119,13 @@ function validateRouteServiceEvidence(rows, trips, buildNow) {
   const freshUntil = new Date(evidence.freshUntil);
   if (Number.isNaN(freshUntil.getTime()) || freshUntil <= buildNow) {
     throw new Error("ITX_CHEONGCHUN route service evidence must be fresh");
+  }
+  if (
+    typeof timetableArtifactSha256 !== "string"
+    || !/^[a-f0-9]{64}$/.test(timetableArtifactSha256)
+    || evidence.timetableArtifactSha256 !== timetableArtifactSha256
+  ) {
+    throw new Error("ITX_CHEONGCHUN timetable artifact SHA-256 identity mismatch");
   }
   return rows;
 }
@@ -290,12 +299,14 @@ function requireInteger(value, label) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const artifact = JSON.parse(await readFile(args.input, "utf8"));
+  const artifactBytes = await readFile(args.input);
+  const artifact = JSON.parse(artifactBytes.toString("utf8"));
   const seed = buildBackendTimetableSeed(artifact, {
     lineId: args["line-id"],
     startDate: args["start-date"],
     endDate: args["end-date"],
     feedEndDate: args["feed-end-date"],
+    timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
   });
   if (args.output) {
     await writeFile(args.output, seed.sql);

@@ -146,6 +146,31 @@ test("MISSING admission pack에 ITX data row가 섞이면 build를 거부한다"
   );
 });
 
+test("self-declared ADMITTED evidence가 있는 직접 ITX row도 검증된 artifact materializer 없이는 거부한다", async (context) => {
+  const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-self-declared-"));
+  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/catalog-fixture.json", import.meta.url), "utf8"));
+  fixture.packs[0].routeServiceArtifactEvidence = [{
+    ...missingItxEvidence(),
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+  }];
+  fixture.packs[0].transitTrips[0].serviceClass = "ITX_CHEONGCHUN";
+  const fixturePath = path.join(temporaryDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      path.join(temporaryDir, "output"),
+    ], { cwd: root }),
+    /validated admission artifact materializer/,
+  );
+});
+
 test("test-only ADMITTED timetable은 ITX trip·stop·EXPRESS edge를 materialize한다", async (context) => {
   const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-admitted-"));
   context.after(() => rm(temporaryDir, { recursive: true, force: true }));
@@ -203,7 +228,9 @@ test("test-only ADMITTED timetable은 ITX trip·stop·EXPRESS edge를 materializ
   try {
     assert.equal(database.prepare("SELECT count(*) AS count FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN' AND service_pattern = 'EXPRESS'").get().count, 1);
     assert.equal(database.prepare("SELECT count(*) AS count FROM transit_stop_times WHERE trip_id = 'test-only-itx-cheongchun-2001'").get().count, 2);
-    assert.deepEqual({ ...database.prepare("SELECT edge_type, service_pattern, service_class, duration_seconds FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN'").get() }, {
+    assert.deepEqual({ ...database.prepare("SELECT from_node_id, to_node_id, edge_type, service_pattern, service_class, duration_seconds FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN'").get() }, {
+      from_node_id: "station-b819702fa7d9:line-54a7b980b7c3:EXPRESS",
+      to_node_id: "station-dd14cfb89cbc:line-54a7b980b7c3:EXPRESS",
       edge_type: "RIDE",
       service_pattern: "EXPRESS",
       service_class: "ITX_CHEONGCHUN",

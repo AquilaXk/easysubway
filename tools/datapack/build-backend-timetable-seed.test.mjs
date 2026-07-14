@@ -99,6 +99,7 @@ test("ITX seed는 test-only timetable·canonical pack identity evidence를 같�
   const { sql } = buildBackendTimetableSeed(artifact, {
     ...OPTIONS,
     lineId: artifact.canonicalLineId,
+    timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
     serviceCalendarDayMap: Object.fromEntries(artifact.serviceCalendars.map((calendar) => [
       calendar.serviceId,
       calendar,
@@ -110,6 +111,36 @@ test("ITX seed는 test-only timetable·canonical pack identity evidence를 같�
   assert.match(sql, new RegExp(artifact.canonicalPackIdentity.sha256));
   assert.match(sql, new RegExp(artifact.canonicalPackIdentity.sqliteSha256));
   assert.match(sql, /'EXPRESS', 'ITX_CHEONGCHUN', 0/);
+});
+
+test("ITX seed evidence hash가 입력 timetable artifact bytes identity와 다르면 거부한다", async () => {
+  const artifactBytes = await readFile(new URL("./fixtures/test-only-itx-cheongchun-admitted.json", import.meta.url));
+  const artifact = JSON.parse(artifactBytes);
+  artifact.routeServiceArtifactEvidence = [{
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: artifact.timetableArtifactIdentity.id,
+    timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+    canonicalPackId: artifact.canonicalPackIdentity.id,
+    canonicalPackSha256: artifact.canonicalPackIdentity.sha256,
+    canonicalPackSqliteSha256: artifact.canonicalPackIdentity.sqliteSha256,
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil: artifact.freshness.freshUntil,
+    sourceIssue: 2116,
+  }];
+
+  assert.throws(
+    () => buildBackendTimetableSeed(artifact, {
+      ...OPTIONS,
+      lineId: artifact.canonicalLineId,
+      timetableArtifactSha256: "0".repeat(64),
+      serviceCalendarDayMap: Object.fromEntries(artifact.serviceCalendars.map((calendar) => [
+        calendar.serviceId,
+        calendar,
+      ])),
+    }),
+    /timetable artifact SHA-256 identity mismatch/,
+  );
 });
 
 test("stale ITX evidence는 seed 생성 단계에서 거부한다", () => {

@@ -22,6 +22,7 @@ import {
 } from "./lib/official-od-fare-evidence.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
+const validatedItxAdmissionPacks = new WeakSet();
 const productionMinimumTableRowNames = [
   "stations",
   "station_lines",
@@ -300,8 +301,8 @@ async function materializeTestOnlyItxAdmission(fixture, admission, admissionByte
       }
       edges.push({
         id: `itx-cheongchun:${trip.id}:${from.stopSequence}-${to.stopSequence}`,
-        fromNodeId: `${from.stationId}:${lineId}`,
-        toNodeId: `${to.stationId}:${lineId}`,
+        fromNodeId: `${from.stationId}:${lineId}:EXPRESS`,
+        toNodeId: `${to.stationId}:${lineId}:EXPRESS`,
         durationSeconds,
         distanceMeters: 0,
         edgeType: "RIDE",
@@ -333,6 +334,7 @@ async function materializeTestOnlyItxAdmission(fixture, admission, admissionByte
     freshUntil,
     sourceIssue: 2116,
   }];
+  validatedItxAdmissionPacks.add(pack);
 }
 
 function rejectTestOnlyBuildInput(fixture) {
@@ -2132,6 +2134,9 @@ function validateRouteServiceAdmission(pack) {
   ].filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN").length;
   if (itxRowCount > 0 && (evidence?.admissionStatus !== "ADMITTED" || evidence?.admissionEligible !== true)) {
     throw new Error("ITX_CHEONGCHUN rows require ADMITTED evidence");
+  }
+  if (itxRowCount > 0 && !validatedItxAdmissionPacks.has(pack)) {
+    throw new Error("ITX_CHEONGCHUN rows require a validated admission artifact materializer");
   }
 }
 
