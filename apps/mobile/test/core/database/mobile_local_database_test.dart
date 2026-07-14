@@ -124,7 +124,7 @@ void main() {
   });
 
   test(
-    'catalog DB migration은 schema 16 station car door hint를 보존하고 official OD fare table을 만든다',
+    'catalog DB migration은 schema 16 station car door hint를 보존하고 v17-v18 table을 만든다',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'easysubway-catalog-v16-',
@@ -167,14 +167,14 @@ void main() {
           .customSelect('SELECT id FROM station_car_door_hints')
           .getSingle();
 
-      expect(catalogDatabaseSchemaVersion, 17);
+      expect(catalogDatabaseSchemaVersion, 18);
       expect(fareCount.read<int>('count'), 0);
       expect(hint.read<String>('id'), 'kept-hint');
     },
   );
 
   test(
-    'catalog DB migration은 schema 15 데이터를 보존하고 두 v16-v17 table을 만든다',
+    'catalog DB migration은 schema 15 데이터를 보존하고 v16-v18 table을 만든다',
     () async {
       final directory = await Directory.systemTemp.createTemp(
         'easysubway-catalog-v15-',
@@ -199,10 +199,55 @@ void main() {
           .customSelect('SELECT value FROM preserved_rows')
           .getSingle();
 
-      expect(catalogDatabaseSchemaVersion, 17);
+      expect(catalogDatabaseSchemaVersion, 18);
       expect(fareCount.read<int>('count'), 0);
       expect(hintCount.read<int>('count'), 0);
       expect(preserved.read<String>('value'), 'kept');
+    },
+  );
+
+  test(
+    'catalog DB migration은 v17 route row를 보존하고 v18 service identity를 추가한다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-catalog-v17-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/catalog.sqlite');
+      final legacy = sqlite.sqlite3.open(file.path);
+      legacy.execute(
+        'CREATE TABLE transit_trips (id TEXT NOT NULL PRIMARY KEY)',
+      );
+      legacy.execute(
+        'CREATE TABLE network_edges (id TEXT NOT NULL PRIMARY KEY)',
+      );
+      legacy.execute("INSERT INTO transit_trips VALUES ('trip-kept')");
+      legacy.execute("INSERT INTO network_edges VALUES ('edge-kept')");
+      legacy.execute('PRAGMA user_version = 17');
+      legacy.close();
+
+      final database = CatalogDatabase.file(file);
+      addTearDown(database.close);
+      final trip = await database
+          .customSelect(
+            "SELECT id, service_class FROM transit_trips WHERE id = 'trip-kept'",
+          )
+          .getSingle();
+      final edge = await database
+          .customSelect(
+            "SELECT id, service_class FROM network_edges WHERE id = 'edge-kept'",
+          )
+          .getSingle();
+      final evidenceCount = await database
+          .customSelect(
+            'SELECT COUNT(*) AS count FROM route_service_artifact_evidence',
+          )
+          .getSingle();
+
+      expect(catalogDatabaseSchemaVersion, 18);
+      expect(trip.read<String>('service_class'), 'SUBWAY');
+      expect(edge.read<String>('service_class'), 'SUBWAY');
+      expect(evidenceCount.read<int>('count'), 0);
     },
   );
 
@@ -543,37 +588,34 @@ void main() {
     expect((additionalSteps[8] as Map)['distanceMeters'], 8000);
   });
 
-  test(
-    '기존 baseline에 남은 구버전 단일 단계 fare rule을 9단계로 갱신한다(#1911)',
-    () async {
-      final database = CatalogDatabase.memory();
-      addTearDown(database.close);
+  test('기존 baseline에 남은 구버전 단일 단계 fare rule을 9단계로 갱신한다(#1911)', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
 
-      await database.seedBaselineIfEmpty();
-      await database.customStatement('''
+    await database.seedBaselineIfEmpty();
+    await database.customStatement('''
       UPDATE fare_rules
       SET additional_steps_json =
         '[{"distanceMeters":5000,"cardFare":100,"cashFare":100}]'
       WHERE id = 'capital-integrated-standard'
       ''');
 
-      await database.seedBaselineIfEmpty();
+    await database.seedBaselineIfEmpty();
 
-      final fareRule = await database.customSelect('''
+    final fareRule = await database.customSelect('''
       SELECT additional_steps_json
       FROM fare_rules
       WHERE id = 'capital-integrated-standard'
       ''').getSingle();
-      final additionalSteps =
-          jsonDecode(fareRule.read<String>('additional_steps_json')) as List;
+    final additionalSteps =
+        jsonDecode(fareRule.read<String>('additional_steps_json')) as List;
 
-      expect(additionalSteps, hasLength(9));
-      for (var index = 0; index < 8; index += 1) {
-        expect((additionalSteps[index] as Map)['distanceMeters'], 5000);
-      }
-      expect((additionalSteps[8] as Map)['distanceMeters'], 8000);
-    },
-  );
+    expect(additionalSteps, hasLength(9));
+    for (var index = 0; index < 8; index += 1) {
+      expect((additionalSteps[index] as Map)['distanceMeters'], 5000);
+    }
+    expect((additionalSteps[8] as Map)['distanceMeters'], 8000);
+  });
 
   test('내장 데이터팩은 로컬 역 검색 repository에서 역 번호 검색을 제공한다', () async {
     final directory = await Directory.systemTemp.createTemp(

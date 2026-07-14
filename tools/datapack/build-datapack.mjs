@@ -1166,6 +1166,7 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
           "trip_headsign",
           "direction_id",
           "service_pattern",
+          "service_class",
           "service_day_start_seconds",
         ],
         pack.transitTrips ?? [],
@@ -1176,6 +1177,7 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
           row.tripHeadsign ?? "",
           row.directionId ?? "",
           row.servicePattern ?? "LOCAL",
+          row.serviceClass ?? "SUBWAY",
           row.serviceDayStartSeconds ?? 0,
         ],
       );
@@ -1223,6 +1225,35 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
         ["id", "feed_end_date"],
         pack.transitFeedInfo ?? [],
         (row) => [1, serviceDate(row.feedEndDate, "transitFeedInfo.feedEndDate")],
+      );
+      insertRows(
+        database,
+        "route_service_artifact_evidence",
+        [
+          "service_class",
+          "timetable_artifact_id",
+          "timetable_artifact_sha256",
+          "canonical_pack_id",
+          "canonical_pack_sha256",
+          "canonical_pack_sqlite_sha256",
+          "admission_status",
+          "admission_eligible",
+          "fresh_until",
+          "source_issue",
+        ],
+        pack.routeServiceArtifactEvidence ?? [],
+        (row) => [
+          requiredString(row.serviceClass, "routeServiceArtifactEvidence.serviceClass"),
+          requiredString(row.timetableArtifactId, "routeServiceArtifactEvidence.timetableArtifactId"),
+          requiredString(row.timetableArtifactSha256, "routeServiceArtifactEvidence.timetableArtifactSha256"),
+          requiredString(row.canonicalPackId, "routeServiceArtifactEvidence.canonicalPackId"),
+          requiredString(row.canonicalPackSha256, "routeServiceArtifactEvidence.canonicalPackSha256"),
+          requiredString(row.canonicalPackSqliteSha256, "routeServiceArtifactEvidence.canonicalPackSqliteSha256"),
+          requiredString(row.admissionStatus, "routeServiceArtifactEvidence.admissionStatus"),
+          boolFlag(row.admissionEligible, "routeServiceArtifactEvidence.admissionEligible"),
+          row.freshUntil ?? null,
+          requiredInteger(row.sourceIssue, "routeServiceArtifactEvidence.sourceIssue"),
+        ],
       );
       insertRows(
         database,
@@ -1354,6 +1385,7 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
           "distance_meters",
           "edge_type",
           "service_pattern",
+          "service_class",
           "includes_stairs",
           "stair_access_state",
           "accessibility_status",
@@ -1383,6 +1415,7 @@ function buildSqlitePack(sqlitePath, schema, pack, officialOdFareAdmissions) {
             row.distanceMeters ?? 0,
             row.edgeType ?? "WALKWAY",
             row.servicePattern ?? "",
+            row.serviceClass ?? "SUBWAY",
             stairAccessState === "STAIR_ONLY" ? 1 : 0,
             stairAccessState,
             accessibilityStatus,
@@ -1929,6 +1962,7 @@ function validateFixture(fixture) {
   }
   for (const pack of fixture.packs) {
     validatePackIdentity(pack, "pack");
+    validateRouteServiceAdmission(pack);
     const artifactKind = pack.artifactKind ?? "fixture";
     if (artifactKind !== "fixture" && artifactKind !== "production") {
       throw new Error("pack.artifactKind must be fixture or production");
@@ -1953,6 +1987,18 @@ function validateFixture(fixture) {
       throw new Error(`${pack.id} requiredTables must be a non-empty array`);
     }
     validateMinimumTableRows(pack, artifactKind);
+  }
+}
+
+function validateRouteServiceAdmission(pack) {
+  const evidence = (pack.routeServiceArtifactEvidence ?? [])
+    .find(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN");
+  const itxRowCount = [
+    ...(pack.transitTrips ?? []),
+    ...(pack.networkEdges ?? []),
+  ].filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN").length;
+  if (itxRowCount > 0 && (evidence?.admissionStatus !== "ADMITTED" || evidence?.admissionEligible !== true)) {
+    throw new Error("ITX_CHEONGCHUN rows require ADMITTED evidence");
   }
 }
 

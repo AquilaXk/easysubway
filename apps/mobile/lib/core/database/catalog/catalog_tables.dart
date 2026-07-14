@@ -166,6 +166,8 @@ class TransitTrips extends Table {
       text().named('direction_id').withDefault(const Constant(''))();
   TextColumn get servicePattern =>
       text().named('service_pattern').withDefault(const Constant('LOCAL'))();
+  TextColumn get serviceClass =>
+      text().named('service_class').withDefault(const Constant('SUBWAY'))();
   IntColumn get serviceDayStartSeconds => integer()
       .named('service_day_start_seconds')
       .withDefault(const Constant(0))();
@@ -339,6 +341,27 @@ class OfficialOdFareQuotes extends Table {
   ];
 }
 
+class RouteServiceArtifactEvidence extends Table {
+  @override
+  String get tableName => 'route_service_artifact_evidence';
+
+  TextColumn get serviceClass => text().named('service_class')();
+  TextColumn get timetableArtifactId => text().named('timetable_artifact_id')();
+  TextColumn get timetableArtifactSha256 =>
+      text().named('timetable_artifact_sha256')();
+  TextColumn get canonicalPackId => text().named('canonical_pack_id')();
+  TextColumn get canonicalPackSha256 => text().named('canonical_pack_sha256')();
+  TextColumn get canonicalPackSqliteSha256 =>
+      text().named('canonical_pack_sqlite_sha256')();
+  TextColumn get admissionStatus => text().named('admission_status')();
+  BoolColumn get admissionEligible => boolean().named('admission_eligible')();
+  TextColumn get freshUntil => text().named('fresh_until').nullable()();
+  IntColumn get sourceIssue => integer().named('source_issue')();
+
+  @override
+  Set<Column> get primaryKey => {serviceClass};
+}
+
 class RealtimeProviderLineMappings extends Table {
   @override
   String get tableName => 'realtime_provider_line_mappings';
@@ -424,6 +447,8 @@ class NetworkEdges extends Table {
       text().named('edge_type').withDefault(const Constant('WALK'))();
   TextColumn get servicePattern =>
       text().named('service_pattern').withDefault(const Constant(''))();
+  TextColumn get serviceClass =>
+      text().named('service_class').withDefault(const Constant('SUBWAY'))();
   BoolColumn get includesStairs =>
       boolean().named('includes_stairs').withDefault(const Constant(false))();
   TextColumn get stairAccessState => text()

@@ -63,8 +63,18 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
     const stationLines = database.prepare("SELECT station_id, line_id, line_sequence FROM station_lines ORDER BY line_id, line_sequence, station_id").all();
+    const hasServiceClass = database
+      .prepare("PRAGMA table_info(network_edges)")
+      .all()
+      .some(({ name }) => name === "service_class");
     const edges = database
-      .prepare("SELECT id, from_node_id, to_node_id, edge_type, service_pattern, duration_seconds, distance_meters FROM network_edges ORDER BY id")
+      .prepare(`
+        SELECT id, from_node_id, to_node_id, edge_type, service_pattern,
+               ${hasServiceClass ? "service_class" : "'SUBWAY' AS service_class"},
+               duration_seconds, distance_meters
+        FROM network_edges
+        ORDER BY id
+      `)
       .all();
     const stationLineByNode = new Map(
       stationLines.map((row) => [stationLineNodeId(row.station_id, row.line_id), row]),
@@ -82,6 +92,7 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
     };
     const edgeCountsByType = {};
     const rideCountsByServicePattern = {};
+    const rideCountsByServiceClass = {};
 
     addGeneratedStationTransferEdges(stationLines, routeGraphNodes, adjacency, undirected);
     for (const edge of edges) {
@@ -90,6 +101,8 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
       edgeCountsByType[edgeType] = (edgeCountsByType[edgeType] ?? 0) + 1;
       if (edgeType === "RIDE") {
         rideCountsByServicePattern[servicePattern] = (rideCountsByServicePattern[servicePattern] ?? 0) + 1;
+        const serviceClass = String(edge.service_class || "SUBWAY").toUpperCase();
+        rideCountsByServiceClass[serviceClass] = (rideCountsByServiceClass[serviceClass] ?? 0) + 1;
         const speedKmh = speed(edge.distance_meters, edge.duration_seconds);
         if (speedKmh !== null && (speedKmh < 15 || speedKmh > 110)) {
           violations.rideSpeed.push({ edgeId: edge.id, speedKmh });
@@ -147,6 +160,8 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
       networkEdgeCount: edges.length,
       edgeCountsByType,
       rideCountsByServicePattern,
+      rideCountsByServiceClass,
+      itxServiceLayerSegmentCount: rideCountsByServiceClass.ITX_CHEONGCHUN ?? 0,
       violations,
     };
   } finally {

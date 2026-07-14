@@ -1,0 +1,146 @@
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import test from "node:test";
+import { promisify } from "node:util";
+import { gunzipSync } from "node:zlib";
+
+const schema = await readFile(new URL("./schema/catalog-schema.sql", import.meta.url), "utf8");
+const root = path.resolve(import.meta.dirname, "../..");
+const execFileAsync = promisify(execFile);
+const missingItxEvidence = () => ({
+  serviceClass: "ITX_CHEONGCHUN",
+  timetableArtifactId: "itx-cheongchun-completeness-admission-20260714T083544292Z",
+  timetableArtifactSha256: "347aec507ec951dde65c10a1c4bff9f94454f762d76a5a74064a40662008336c",
+  canonicalPackId: "capital",
+  canonicalPackSha256: "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
+  canonicalPackSqliteSha256: "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
+  admissionStatus: "MISSING",
+  admissionEligible: false,
+  freshUntil: "2026-07-20T00:00:00.000Z",
+  sourceIssue: 2116,
+});
+
+test("production source pack은 #2116 MISSING identity를 기록하고 ITX data row를 포함하지 않는다", async () => {
+  const production = JSON.parse(await readFile(
+    new URL("./release/capital-production-reviewed-pack.json", import.meta.url),
+    "utf8",
+  ));
+  const pack = production.packs.find(({ id }) => id === "capital");
+  assert.deepEqual(pack.routeServiceArtifactEvidence, [{
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: "itx-cheongchun-completeness-admission-20260714T083544292Z",
+    timetableArtifactSha256: "347aec507ec951dde65c10a1c4bff9f94454f762d76a5a74064a40662008336c",
+    canonicalPackId: "capital",
+    canonicalPackSha256: "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
+    canonicalPackSqliteSha256: "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
+    admissionStatus: "MISSING",
+    admissionEligible: false,
+    freshUntil: "2026-07-20T00:00:00.000Z",
+    sourceIssue: 2116,
+  }]);
+  assert.equal((pack.transitTrips ?? []).filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN").length, 0);
+  assert.equal((pack.networkEdges ?? []).filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN").length, 0);
+});
+
+test("catalog schema는 service class와 admission evidence identity를 보존한다", () => {
+  const database = new DatabaseSync(":memory:");
+  try {
+    database.exec(schema);
+
+    assert.equal(database.prepare("PRAGMA user_version").get().user_version, 18);
+    for (const table of ["transit_trips", "network_edges"]) {
+      const serviceClass = database
+        .prepare(`PRAGMA table_info(${table})`)
+        .all()
+        .find(({ name }) => name === "service_class");
+      assert.deepEqual(
+        { notNull: serviceClass?.notnull, defaultValue: serviceClass?.dflt_value },
+        { notNull: 1, defaultValue: "'SUBWAY'" },
+      );
+    }
+
+    const evidenceColumns = database
+      .prepare("PRAGMA table_info(route_service_artifact_evidence)")
+      .all()
+      .map(({ name }) => name);
+    assert.deepEqual(evidenceColumns, [
+      "service_class",
+      "timetable_artifact_id",
+      "timetable_artifact_sha256",
+      "canonical_pack_id",
+      "canonical_pack_sha256",
+      "canonical_pack_sqlite_sha256",
+      "admission_status",
+      "admission_eligible",
+      "fresh_until",
+      "source_issue",
+    ]);
+  } finally {
+    database.close();
+  }
+});
+
+test("MISSING admission은 identity row만 적재하고 production ITX row를 0건으로 유지한다", async (context) => {
+  const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-missing-"));
+  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/catalog-fixture.json", import.meta.url), "utf8"));
+  fixture.packs[0].routeServiceArtifactEvidence = [missingItxEvidence()];
+  const fixturePath = path.join(temporaryDir, "fixture.json");
+  const outputDir = path.join(temporaryDir, "output");
+  await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs",
+    "--fixture",
+    fixturePath,
+    "--output",
+    outputDir,
+  ], { cwd: root });
+
+  const sqlitePath = path.join(temporaryDir, "capital.sqlite");
+  await writeFile(sqlitePath, gunzipSync(await readFile(path.join(outputDir, "catalog/capital-v1.sqlite.gz"))));
+  const database = new DatabaseSync(sqlitePath, { readOnly: true });
+  try {
+    assert.equal(database.prepare("SELECT count(*) AS count FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'").get().count, 0);
+    assert.equal(database.prepare("SELECT count(*) AS count FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN'").get().count, 0);
+    assert.deepEqual({ ...database.prepare("SELECT * FROM route_service_artifact_evidence").get() }, {
+      service_class: "ITX_CHEONGCHUN",
+      timetable_artifact_id: "itx-cheongchun-completeness-admission-20260714T083544292Z",
+      timetable_artifact_sha256: "347aec507ec951dde65c10a1c4bff9f94454f762d76a5a74064a40662008336c",
+      canonical_pack_id: "capital",
+      canonical_pack_sha256: "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
+      canonical_pack_sqlite_sha256: "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
+      admission_status: "MISSING",
+      admission_eligible: 0,
+      fresh_until: "2026-07-20T00:00:00.000Z",
+      source_issue: 2116,
+    });
+  } finally {
+    database.close();
+  }
+});
+
+test("MISSING admission pack에 ITX data row가 섞이면 build를 거부한다", async (context) => {
+  const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-missing-row-"));
+  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/catalog-fixture.json", import.meta.url), "utf8"));
+  fixture.packs[0].routeServiceArtifactEvidence = [missingItxEvidence()];
+  fixture.packs[0].transitTrips[0].serviceClass = "ITX_CHEONGCHUN";
+  const fixturePath = path.join(temporaryDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture",
+      fixturePath,
+      "--output",
+      path.join(temporaryDir, "output"),
+    ], { cwd: root }),
+    /ITX_CHEONGCHUN rows require ADMITTED evidence/,
+  );
+});
