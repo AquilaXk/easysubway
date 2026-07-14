@@ -4,6 +4,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+// 서울 열린데이터 공식 endpoint는 HTTPS를 지원하지 않는다. path service key가 평문 transport로
+// 전송되므로 이 tracked runner는 offline evidence 수집에만 사용하고 mobile/runtime에 포함하지 않는다.
 export const SEOUL_OPEN_DATA_APIS = Object.freeze({
   "seoul-topis-realtime-station-arrival": Object.freeze({
     endpoint: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
@@ -28,12 +30,12 @@ export const SEOUL_OPEN_DATA_APIS = Object.freeze({
   }),
 });
 
-export async function probeSeoulOpenDataApi({ sourceId, serviceKey, fetchImpl = fetch } = {}) {
+export async function probeSeoulOpenDataApi({ sourceId, serviceKey, fetchImpl = fetch, sleepImpl = delay } = {}) {
   const operation = SEOUL_OPEN_DATA_APIS[sourceId];
   if (!operation) throw new Error(`unsupported Seoul open data source: ${safeToken(sourceId)}`);
   const key = requiredString(serviceKey, operation.keyEnv);
   const url = new URL(`${operation.endpoint.replace("{serviceKey}", encodeURIComponent(key))}/${operation.suffix.map(encodeURIComponent).join("/")}`);
-  const response = await fetchWithRetry(url, fetchImpl);
+  const response = await fetchWithRetry(url, fetchImpl, sleepImpl);
   if (!response.ok) throw new Error(`Seoul open data API HTTP ${response.status}`);
   const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
   if (contentType !== "application/json") throw new Error(`Seoul open data API schema mismatch: content-type ${safeToken(contentType)}`);
@@ -54,18 +56,23 @@ export async function probeSeoulOpenDataApi({ sourceId, serviceKey, fetchImpl = 
   };
 }
 
-async function fetchWithRetry(url, fetchImpl) {
+async function fetchWithRetry(url, fetchImpl, sleepImpl) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const response = await fetchImpl(url, { redirect: "error", signal: AbortSignal.timeout(15_000), headers: { accept: "application/json" } });
       const retryable = [408, 429].includes(response.status) || response.status >= 500;
       if (!retryable || attempt === 1) return response;
       await response.body?.cancel().catch(() => {});
+      await sleepImpl(500);
     } catch (error) {
       if (attempt === 1) throw new Error("Seoul open data API transport failure", { cause: error });
     }
   }
   throw new Error("Seoul open data API transport failure");
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function parsePayload(raw, operation) {

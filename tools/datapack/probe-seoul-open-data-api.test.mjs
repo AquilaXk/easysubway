@@ -25,6 +25,28 @@ test("서울시 path-key API probe는 key를 URL에만 넣고 sanitized schema e
   assert.doesNotMatch(JSON.stringify(evidence), new RegExp(secret));
 });
 
+test("서울시 path-key API probe는 retryable 응답 뒤 bounded backoff를 적용한다", async () => {
+  const delays = [];
+  let attempts = 0;
+  const evidence = await probeSeoulOpenDataApi({
+    sourceId: "seoul-topis-realtime-station-arrival",
+    serviceKey: "key",
+    sleepImpl: async (milliseconds) => delays.push(milliseconds),
+    fetchImpl: async () => {
+      attempts += 1;
+      if (attempts === 1) return new Response("", { status: 429 });
+      return new Response(JSON.stringify({
+        errorMessage: { status: 200, code: "INFO-000" },
+        realtimeArrivalList: [{ statnId: "1004000432", statnNm: "사당" }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    },
+  });
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(delays, [500]);
+  assert.equal(evidence.rowCount, 1);
+});
+
 test("서울시 path-key API probe는 Sheet envelope와 provider/schema 오류를 fail closed한다", async (t) => {
   let requestedUrl;
   const sheet = await probeSeoulOpenDataApi({

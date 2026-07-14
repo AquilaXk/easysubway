@@ -98,6 +98,13 @@ test("operation raw response fields는 normalized evidence fields보다 API cata
   assert.deepEqual(operationSummary(source).responseFields, ["providerField"]);
 });
 
+test("operation raw response fields는 중복과 빈 값을 거부한다", () => {
+  for (const responseFields of [["fieldA", "fieldA"], [""], []]) {
+    const source = candidate("a", { operation: validOperation({ responseFields }) });
+    assert.throws(() => validateOperation(source), /operation\.responseFields/);
+  }
+});
+
 test("source candidate 정본은 repository 경로와 구조화된 provider 승인을 검증한다", () => {
   const document = {
     schemaVersion: 1,
