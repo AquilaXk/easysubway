@@ -120,7 +120,7 @@ function parseJsonEvidence(raw, expectedFields) {
     throw new Error("Korail train operation API schema mismatch: item must be an object");
   }
   for (const [index, row] of rows.entries()) {
-    const observedFields = Object.keys(row).sort();
+    const observedFields = Object.keys(row).sort((left, right) => left.localeCompare(right, "en"));
     const missingFields = expectedFields.filter((field) => !Object.hasOwn(row, field));
     if (missingFields.length > 0) {
       throw new Error(
@@ -138,7 +138,7 @@ function parseJsonEvidence(raw, expectedFields) {
 function objectValue(value, label, parent) {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
     const observed = parent && typeof parent === "object" && !Array.isArray(parent)
-      ? Object.keys(parent).map(safeToken).sort().join(",")
+      ? Object.keys(parent).map(safeToken).sort((left, right) => left.localeCompare(right, "en")).join(",")
       : "none";
     throw new Error(`Korail train operation API schema mismatch: ${label}; observed=${observed}`);
   }
