@@ -128,7 +128,7 @@ test("TAGO ITX roster는 canonical 역의 양방향 OD 전체를 수집한다", 
   assert.doesNotMatch(JSON.stringify(artifact), /never-print-data-key/);
 });
 
-test("TAGO ITX roster는 일시적 HTTP 응답을 OD 실패 확정 전에 한 번 재시도한다", async () => {
+test("TAGO ITX roster는 일시적 HTTP 응답을 OD 실패 확정 전에 최대 두 번 재시도한다", async () => {
   let forwardAttempts = 0;
   const artifact = await collectTagoItxCheongchunRoster({
     serviceKey: "key",
@@ -153,7 +153,7 @@ test("TAGO ITX roster는 일시적 HTTP 응답을 OD 실패 확정 전에 한 �
           : tagoResponse([{ nodeid: "NAT140873", nodename: "춘천" }]);
       }
       const forward = parsed.searchParams.get("depPlaceId") === "NAT130126";
-      if (forward && ++forwardAttempts === 1) return new Response("temporary", { status: 503 });
+      if (forward && ++forwardAttempts < 3) return new Response("temporary", { status: 503 });
       return tagoResponse([{
         trainno: forward ? "2001" : "2002",
         traingradename: "ITX-청춘",
@@ -166,7 +166,7 @@ test("TAGO ITX roster는 일시적 HTTP 응답을 OD 실패 확정 전에 한 �
     },
   });
 
-  assert.equal(forwardAttempts, 2);
+  assert.equal(forwardAttempts, 3);
   assert.equal(artifact.completedOdCount, 2);
   assert.equal(artifact.failedOdCount, 0);
 });
@@ -237,6 +237,27 @@ test("TAGO ITX roster는 공식 totalCount가 없는 OD 응답을 완료로 세�
     reasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
   }]);
   assert.deepEqual(artifact.trainNumbers, ["2001"]);
+});
+
+test("TAGO schema mismatch는 값 없이 정렬된 body field만 진단한다", async () => {
+  await assert.rejects(collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    fetchImpl: async () => {
+      const response = tagoResponse([{ vehiclekndid: "07", vehiclekndnm: "ITX-청춘" }]);
+      const payload = await response.json();
+      delete payload.response.body.totalCount;
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  }), /schema mismatch: totalCount bodyFields=items,numOfRows,pageNo/);
 });
 
 test("TAGO ITX roster는 요청과 다른 OD·날짜 응답을 완료로 세지 않는다", async (context) => {

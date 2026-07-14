@@ -236,6 +236,22 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.serviceDays[0].failureContext, "갈매");
   });
 
+  await context.test("TAGO schema 오류 context", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectRosterImpl: async () => {
+        throw new Error("TAGO GetVhcleKndList schema mismatch: totalCount bodyFields=items,numOfRows,pageNo");
+      },
+      collectTimetableImpl: async () => assert.fail("must not run"),
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "PROVIDER_SCHEMA_FAILURE");
+    assert.equal(
+      artifact.serviceDays[0].failureContext,
+      "operation=GetVhcleKndList,reason=schema_mismatch,totalCount,bodyFields=items,numOfRows,pageNo",
+    );
+  });
+
   await context.test("canonical passenger-stop mapping 오류", async () => {
     const artifact = await collectKorailItxCheongchunCompleteness({
       serviceKey: "key", serviceDates, packPath: PACK_PATH,
@@ -790,6 +806,18 @@ test("Korail ITX collector는 provider/schema/pagination 오류를 fail closed�
         headers: { "content-type": "application/json" },
       }),
     }), /provider resultCode 30/);
+  });
+
+  await context.test("transport 오류는 최대 두 번 재시도", async () => {
+    let attempts = 0;
+    await assert.rejects(collectKorailItxCheongchunTimetable({
+      ...base,
+      fetchImpl: async () => {
+        attempts += 1;
+        throw new Error("socket unavailable");
+      },
+    }), /transport failure/);
+    assert.equal(attempts, 3);
   });
 
   await context.test("schema mismatch", async () => {

@@ -249,7 +249,11 @@ async function fetchAll(operation, query, key, fetchImpl) {
       throw new Error(`TAGO ${operation} schema mismatch: item`);
     }
     if (body.totalCount === undefined || body.totalCount === null || body.totalCount === "") {
-      throw new Error(`TAGO ${operation} schema mismatch: totalCount`);
+      const bodyFields = Object.keys(body)
+        .filter((field) => /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(field))
+        .sort()
+        .join(",") || "NONE";
+      throw new Error(`TAGO ${operation} schema mismatch: totalCount bodyFields=${bodyFields}`);
     }
     const pageTotal = Number(body.totalCount);
     if (!Number.isInteger(pageTotal) || pageTotal < 0 || (totalCount !== null && totalCount !== pageTotal)) {
@@ -265,7 +269,7 @@ async function fetchAll(operation, query, key, fetchImpl) {
 }
 
 async function fetchWithRetry(url, fetchImpl) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const response = await fetchImpl(url, {
         redirect: "error",
@@ -273,10 +277,10 @@ async function fetchWithRetry(url, fetchImpl) {
         headers: { accept: "application/json" },
       });
       const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
-      if (!retryable || attempt === 1) return response;
+      if (!retryable || attempt === 2) return response;
       if (response.body) await response.body.cancel().catch(() => {});
     } catch (error) {
-      if (attempt === 1) throw new Error("TAGO transport failure", { cause: error });
+      if (attempt === 2) throw new Error("TAGO transport failure", { cause: error });
     }
   }
   throw new Error("TAGO transport failure");

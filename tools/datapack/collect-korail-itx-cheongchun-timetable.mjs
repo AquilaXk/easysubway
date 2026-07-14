@@ -725,6 +725,11 @@ function completenessFailureContext(error) {
   const message = error instanceof Error ? error.message : "";
   const station = /station mapping is missing or ambiguous: (.+)$/.exec(message)?.[1];
   if (station) return safeLabel(station);
+  const tagoSchema = /^TAGO ([A-Za-z0-9]+) schema mismatch: ([A-Za-z0-9._-]+)(?: bodyFields=([A-Za-z0-9_,.-]+))?$/.exec(message);
+  if (tagoSchema) {
+    return `operation=${tagoSchema[1]},reason=schema_mismatch,${tagoSchema[2]}`
+      + (tagoSchema[3] ? `,bodyFields=${tagoSchema[3]}` : "");
+  }
   const pagination = /pagination incomplete: (operation=[A-Za-z0-9]+,collected=\d+,total=(?:\d+|UNKNOWN),pages=\d+)$/.exec(message)?.[1];
   if (pagination) return pagination;
   if (/run plan returned zero rows/.test(message)) return "operation=travelerTrainRunPlan2,total=0";
@@ -885,7 +890,7 @@ function parsePage(raw, expectedFields) {
 }
 
 async function fetchWithRetry(url, fetchImpl) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const response = await fetchImpl(url, {
         redirect: "error",
@@ -893,10 +898,10 @@ async function fetchWithRetry(url, fetchImpl) {
         headers: { accept: "application/json" },
       });
       const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
-      if (!retryable || attempt === 1) return response;
+      if (!retryable || attempt === 2) return response;
       if (response.body) await response.body.cancel().catch(() => {});
     } catch (error) {
-      if (attempt === 1) throw new Error("Korail train operation API transport failure", { cause: error });
+      if (attempt === 2) throw new Error("Korail train operation API transport failure", { cause: error });
     }
   }
   throw new Error("Korail train operation API transport failure");
@@ -1051,7 +1056,9 @@ async function main() {
   const totalFailedOdCount = artifact.serviceDays.reduce((total, day) => total + (day.failedOdCount ?? 0), 0);
   const failureCodes = artifact.serviceDays
     .filter(({ status }) => status !== "SUPPORTED")
-    .map(({ dayCd, failureStage, failureReasonCode }) => `${dayCd}:${failureStage}:${failureReasonCode}`)
+    .map(({ dayCd, failureStage, failureReasonCode, failureContext }) => (
+      `${dayCd}:${failureStage}:${failureReasonCode}${failureContext ? `(${failureContext})` : ""}`
+    ))
     .join(",");
   console.log(
     `sanitized Korail ITX-청춘 completeness evidence ready: status=${artifact.admissionStatus},` +
