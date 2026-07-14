@@ -98,10 +98,10 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
     for (const edge of edges) {
       const edgeType = String(edge.edge_type ?? "").toUpperCase();
       const servicePattern = String(edge.service_pattern || "LOCAL").toUpperCase();
+      const serviceClass = String(edge.service_class || "SUBWAY").toUpperCase();
       edgeCountsByType[edgeType] = (edgeCountsByType[edgeType] ?? 0) + 1;
       if (edgeType === "RIDE") {
         rideCountsByServicePattern[servicePattern] = (rideCountsByServicePattern[servicePattern] ?? 0) + 1;
-        const serviceClass = String(edge.service_class || "SUBWAY").toUpperCase();
         rideCountsByServiceClass[serviceClass] = (rideCountsByServiceClass[serviceClass] ?? 0) + 1;
         const speedKmh = speed(edge.distance_meters, edge.duration_seconds);
         if (speedKmh !== null && (speedKmh < 15 || speedKmh > 110)) {
@@ -113,7 +113,13 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
       const from = stationLineByNode.get(fromNode);
       const to = stationLineByNode.get(toNode);
       if (edgeType === "RIDE" && from && to) {
-        if (from.line_id !== to.line_id || Math.abs(from.line_sequence - to.line_sequence) !== 1) {
+        const isItxSkipStop = serviceClass === "ITX_CHEONGCHUN"
+          && servicePattern === "EXPRESS"
+          && from.line_id === to.line_id;
+        if (
+          from.line_id !== to.line_id
+          || (Math.abs(from.line_sequence - to.line_sequence) !== 1 && !isItxSkipStop)
+        ) {
           const violation = {
             edgeId: edge.id,
             fromNode,

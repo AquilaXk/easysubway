@@ -88,7 +88,7 @@ test("route graph topology report는 ITX service layer row를 별도 집계한�
   const sqlitePath = createTopologySqlite({
     stationLines: [
       ["station-a", "line-k2", 1],
-      ["station-b", "line-k2", 2],
+      ["station-b", "line-k2", 24],
     ],
     edges: [
       ["edge-a-b-itx", "station-a:line-k2:EXPRESS", "station-b:line-k2:EXPRESS", "RIDE", "EXPRESS", 300, 6000, "ITX_CHEONGCHUN"],
@@ -103,6 +103,7 @@ test("route graph topology report는 ITX service layer row를 별도 집계한�
 
   assert.deepEqual(report.rideCountsByServiceClass, { ITX_CHEONGCHUN: 1 });
   assert.equal(report.itxServiceLayerSegmentCount, 1);
+  assert.deepEqual(report.violations.nonAdjacentExpressRide, []);
 });
 
 test("route graph topology report CLI writes artifact json", async () => {
