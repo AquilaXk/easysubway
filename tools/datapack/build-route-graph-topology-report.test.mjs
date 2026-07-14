@@ -106,6 +106,31 @@ test("route graph topology report는 ITX service layer row를 별도 집계한�
   assert.deepEqual(report.violations.nonAdjacentExpressRide, []);
 });
 
+test("route graph topology report는 SUBWAY 연결성을 ITX edge로 보완하지 않는다", () => {
+  const sqlitePath = createTopologySqlite({
+    stationLines: [
+      ["station-a", "line-k2", 1],
+      ["station-b", "line-k2", 2],
+      ["station-c", "line-k2", 3],
+    ],
+    edges: [
+      ["subway-a-b", "station-a:line-k2:LOCAL", "station-b:line-k2:LOCAL", "RIDE", "LOCAL", 120, 1000],
+      ["subway-b-a", "station-b:line-k2:LOCAL", "station-a:line-k2:LOCAL", "RIDE", "LOCAL", 120, 1000],
+      ["itx-b-c", "station-b:line-k2:EXPRESS", "station-c:line-k2:EXPRESS", "RIDE", "EXPRESS", 120, 1000, "ITX_CHEONGCHUN"],
+      ["itx-c-b", "station-c:line-k2:EXPRESS", "station-b:line-k2:EXPRESS", "RIDE", "EXPRESS", 120, 1000, "ITX_CHEONGCHUN"],
+    ],
+  });
+
+  const report = buildRouteGraphTopologyReport(sqlitePath, {
+    id: "capital",
+    version: "1",
+    artifactKind: "fixture",
+  });
+
+  assert.deepEqual(report.violations.disconnectedNodes, ["station-c:line-k2"]);
+  assert.equal(report.violations.unreachableDirectedPairs.length, 4);
+});
+
 test("route graph topology report CLI writes artifact json", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "route-graph-topology-report-"));
   await mkdir(path.join(dir, "catalog"), { recursive: true });

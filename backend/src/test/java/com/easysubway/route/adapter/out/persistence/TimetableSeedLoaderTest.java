@@ -141,6 +141,24 @@ class TimetableSeedLoaderTest {
 	}
 
 	@Test
+	void rejectsItxSeedWhenIncludesItxConfigurationIsDisabled() {
+		assertThatThrownBy(() -> loader(itxSeed(
+			"ADMITTED", true, OffsetDateTime.now().plusDays(1).toString()), false).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("includes-itx");
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isZero();
+	}
+
+	@Test
+	void rejectsExistingItxWhenIncludesItxConfigurationIsDisabled() {
+		loader(itxSeed("ADMITTED", true, OffsetDateTime.now().plusDays(1).toString()), true).run(null);
+
+		assertThatThrownBy(() -> loader(new ClassPathResource("timetable/test-line4-seed.sql"), false).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("includes-itx");
+	}
+
+	@Test
 	void rejectsIncludesItxConfigurationWhenSeedContainsNoItxRowsAndRollsBack() {
 		var subwayOnlySeed = new ClassPathResource("timetable/test-line4-seed.sql");
 

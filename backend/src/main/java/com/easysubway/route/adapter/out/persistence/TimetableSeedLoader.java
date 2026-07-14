@@ -69,6 +69,10 @@ public class TimetableSeedLoader implements ApplicationRunner {
 				throw new IllegalStateException(
 					"additive ITX timetable seed is not supported while another timetable is present");
 			}
+			if (!includesItxSeed && existingItx) {
+				throw new IllegalStateException(
+					"easysubway.timetable.seed.includes-itx=false cannot activate existing ITX-청춘 rows");
+			}
 			log.info("transit timetable already present; skipping seed load");
 			return;
 		}
@@ -77,18 +81,21 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			transactionTemplate.executeWithoutResult(status -> {
 				executeBatch(statements);
 				boolean loadedItx = validateRouteServiceAdmission();
-				if (includesItxSeed && !loadedItx) {
+				if (includesItxSeed != loadedItx) {
 					throw new IllegalStateException(
-						"easysubway.timetable.seed.includes-itx=true requires ITX-청춘 timetable rows");
+						"easysubway.timetable.seed.includes-itx=" + includesItxSeed
+							+ " must match ITX-청춘 timetable rows");
 				}
 			});
 		} catch (RuntimeException exception) {
 			// 다중 replica 동시 배포 경쟁: 다른 인스턴스가 먼저 적재하면 이 배치는 PK/싱글턴 충돌로 실패한다.
 			// 실패 후 이미 적재됐으면(경쟁 loser) 관용 처리한다(부팅 crash loop 방지). 아니면 실제 오류로 재던진다.
-			if (routeTimetablePort.hasRouteTimetable()
-					&& (!includesItxSeed || validateRouteServiceAdmission())) {
-				log.info("transit timetable was seeded concurrently by another instance; batch failure is benign");
-				return;
+			if (routeTimetablePort.hasRouteTimetable()) {
+				boolean concurrentlyLoadedItx = validateRouteServiceAdmission();
+				if (includesItxSeed == concurrentlyLoadedItx) {
+					log.info("transit timetable was seeded concurrently by another instance; batch failure is benign");
+					return;
+				}
 			}
 			throw exception;
 		}

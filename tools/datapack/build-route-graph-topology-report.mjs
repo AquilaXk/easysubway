@@ -134,7 +134,12 @@ export function buildRouteGraphTopologyReport(sqlitePath, pack = {}) {
           }
         }
       }
-      if (!isRouteGraphEdge(edgeType) || !routeGraphNodes.has(fromNode) || !routeGraphNodes.has(toNode)) {
+      if (
+        serviceClass !== "SUBWAY"
+        || !isRouteGraphEdge(edgeType)
+        || !routeGraphNodes.has(fromNode)
+        || !routeGraphNodes.has(toNode)
+      ) {
         continue;
       }
       addEdge(adjacency, fromNode, toNode);
