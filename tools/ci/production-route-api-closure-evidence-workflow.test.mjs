@@ -25,6 +25,7 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   assert.match(workflow, /\/api\/v1\/routes\/search/);
   assert.match(workflow, /\/api\/v2\/routes\/search/);
   assert.match(workflow, /\/api\/v2\/routes\/closure-probe\/refresh/);
+  assert.match(workflow, /--noproxy '\*'/);
   assert.match(workflow, /status[^\n]+!= "403"/);
   assert.doesNotMatch(workflow, /retry|acceptedStatuses|404/);
 

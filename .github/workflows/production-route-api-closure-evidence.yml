@@ -108,6 +108,7 @@ jobs:
             local status
             if ! status="$(
               curl -sS \
+                --noproxy '*' \
                 --connect-timeout 2 \
                 --max-time 5 \
                 --output /dev/null \
