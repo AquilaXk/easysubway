@@ -35,6 +35,7 @@
     { "file": "signed-release-artifact-gate.json", "scope": "mobile", "area": "release" },
     { "file": "store-privacy-inventory.json", "scope": "mobile", "area": "store" },
     { "file": "store-submission-readiness.json", "scope": "mobile", "area": "store" },
-    { "file": "support-incident-response-gate.json", "scope": "product", "area": "ops" }
+    { "file": "support-incident-response-gate.json", "scope": "product", "area": "ops" },
+    { "file": "train-search-itx-exclusion-gate.json", "scope": "product", "area": "release" }
   ]
 }

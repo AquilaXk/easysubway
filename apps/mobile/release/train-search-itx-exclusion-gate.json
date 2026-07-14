@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "train-search-itx-exclusion-gate",
+  "sourceIssue": 2136,
+  "status": "SATISFIED",
+  "evidenceClass": "DETERMINISTIC_CONTRACT",
+  "providerLiveCallPerformed": false,
+  "supportedTrainTypes": [
+    "KTX",
+    "KTX_SANCHEON",
+    "SRT",
+    "ITX_MAUM",
+    "ITX_SAEMAEUL",
+    "SAEMAEUL",
+    "MUGUNGHWA",
+    "NURIRO"
+  ],
+  "excludedTrainTypes": ["ITX_CHEONGCHUN"],
+  "rejectionContract": {
+    "endpoints": ["/api/v1/trains/stations", "/api/v1/trains/search"],
+    "httpStatus": 400,
+    "code": "TRAIN_SEARCH_UNSUPPORTED_TRAIN_TYPE"
+  },
+  "negativeCounts": {
+    "currentProviderRowsReturned": 0,
+    "legacyYongsanDaejeonRowsReturned": 0,
+    "cacheRows": 0,
+    "stationCatalogRows": 0,
+    "mobileFilterEntries": 0
+  },
+  "daejeonSupportedTrainType": "KTX",
+  "daejeonSupportedTrainTypePreserved": true,
+  "routeV2ItxConsumerUnchanged": true,
+  "issue2135ArtifactConsumedByTrainSearch": false,
+  "issue2094RoadmapRequiredForThisGate": false,
+  "runtimeImplementationStatus": "DEFERRED_TO_2094",
+  "verification": {
+    "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",
+    "mobile": "cd apps/mobile && flutter test test/features/train_search",
+    "crossLayer": "node --test tools/ci/train-search-itx-exclusion-contract.test.mjs"
+  }
+}
