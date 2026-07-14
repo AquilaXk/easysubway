@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "artifactKind": "korail-itx-cheongchun-timetable-evidence",
+  "artifactKind": "korail-itx-cheongchun-station-sequence-evidence",
   "serviceId": "ITX_CHEONGCHUN",
   "canonicalLineId": "line-54a7b980b7c3",
   "servicePattern": "EXPRESS",

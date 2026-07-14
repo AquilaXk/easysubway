@@ -91,7 +91,7 @@ export async function collectKorailItxCheongchunTimetable({
 
   return {
     schemaVersion: 1,
-    artifactKind: "korail-itx-cheongchun-timetable-evidence",
+    artifactKind: "korail-itx-cheongchun-station-sequence-evidence",
     serviceId: "ITX_CHEONGCHUN",
     canonicalLineId: LINE_ID,
     servicePattern: "EXPRESS",

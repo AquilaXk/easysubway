@@ -168,7 +168,7 @@ test(
   `live evidence는 TAGO 18편을 Korail canonical sequence로 검증하고 빈 시각을 거부한다 ` +
     `(sequences=${LIVE_EVIDENCE.stationSequenceRowCount},missing=${LIVE_EVIDENCE.materialization.missingTimestampStopCount})`,
   () => {
-    assert.equal(LIVE_EVIDENCE.artifactKind, "korail-itx-cheongchun-timetable-evidence");
+    assert.equal(LIVE_EVIDENCE.artifactKind, "korail-itx-cheongchun-station-sequence-evidence");
     assert.equal(LIVE_EVIDENCE.trainCount, 18);
     assert.equal(LIVE_TAGO_EVIDENCE.trainNumbers.length, 18);
     assert.equal(LIVE_TAGO_EVIDENCE.evidenceHash, LIVE_EVIDENCE.trainNumberFilter.evidenceHash);
