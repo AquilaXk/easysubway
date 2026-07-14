@@ -435,6 +435,89 @@ test("TAGO content-type mismatch는 응답 body를 취소한다", async () => {
   assert.equal(artifact.failedOds[0].reasonCode, "PROVIDER_SCHEMA_FAILURE");
 });
 
+test("TAGO 공유 quota는 paginated OD의 실제 retry attempt마다 차감한다", async () => {
+  const fallback = validFetch();
+  const attempts = new Map();
+  let actualRequestCount = 0;
+  await assert.rejects(collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: canonicalRosterStations(),
+    requestBudget: { limit: 10, remaining: 10 },
+    fetchImpl: async (url) => {
+      actualRequestCount += 1;
+      const parsed = new URL(url);
+      if (!parsed.pathname.endsWith("GetStrtpntAlocFndTrainInfo")
+        || parsed.searchParams.get("depPlaceId") !== "NAT130126") return fallback(url);
+      const pageNo = parsed.searchParams.get("pageNo");
+      const count = (attempts.get(pageNo) ?? 0) + 1;
+      attempts.set(pageNo, count);
+      if (count < 3) return new Response("retry", { status: 503 });
+      const row = {
+        trainno: "2001", traingradename: "ITX-청춘",
+        depplandtime: "20260715083000", arrplandtime: "20260715095000",
+        depplacename: "청량리", arrplacename: "춘천", adultcharge: "9800",
+      };
+      return tagoResponse(pageNo === "1" ? Array.from({ length: 100 }, () => row) : [row], 101);
+    },
+  }), /TAGO OD quota budget exceeded/);
+  assert.equal(actualRequestCount, 10);
+  assert.deepEqual([...attempts.values()], [3, 3]);
+});
+
+test("TAGO materialization 실패는 완료된 OD matrix evidence를 error에 보존한다", async () => {
+  const names = new Map([["A", "청량리"], ["B", "평내호평"], ["C", "춘천"]]);
+  const times = new Map([
+    ["A:B", ["080000", "090000"]],
+    ["A:C", ["080100", "100000"]],
+    ["B:C", ["090500", "100000"]],
+    ["C:B", ["110000", "120000"]],
+    ["C:A", ["110000", "130000"]],
+    ["B:A", ["120500", "130000"]],
+  ]);
+  await assert.rejects(collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [...names].map(([canonicalStationId, nameKo], index) => ({
+      canonicalStationId, nameKo, corridorSequence: index + 1, lineId: "line-54a7b980b7c3",
+    })),
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("GetVhcleKndList")) {
+        return tagoCatalogResponse([{ vehiclekndid: "07", vehiclekndnm: "ITX-청춘" }]);
+      }
+      if (parsed.pathname.endsWith("GetCtyCodeList")) {
+        return tagoCatalogResponse([{ citycode: "11", cityname: "수도권" }]);
+      }
+      if (parsed.pathname.endsWith("GetCtyAcctoTrainSttnList")) {
+        return tagoResponse([...names].map(([nodeid, nodename]) => ({ nodeid, nodename })));
+      }
+      const departure = parsed.searchParams.get("depPlaceId");
+      const arrival = parsed.searchParams.get("arrPlaceId");
+      const [departureTime, arrivalTime] = times.get(`${departure}:${arrival}`);
+      return tagoResponse([{
+        trainno: departure < arrival ? "2001" : "2002",
+        traingradename: "ITX-청춘",
+        depplandtime: `20260715${departureTime}`,
+        arrplandtime: `20260715${arrivalTime}`,
+        depplacename: names.get(departure),
+        arrplacename: names.get(arrival),
+        adultcharge: "9800",
+      }]);
+    },
+  }), (error) => {
+    assert.match(error.message, /TAGO_OD_TIME_CONFLICT/);
+    assert.equal(error.rosterEvidence.expectedOdCount, 6);
+    assert.equal(error.rosterEvidence.completedOdCount, 6);
+    assert.equal(error.rosterEvidence.failedOdCount, 0);
+    assert.match(error.rosterEvidence.stationSetHash, /^[a-f0-9]{64}$/);
+    assert.match(error.rosterEvidence.odMatrixHash, /^[a-f0-9]{64}$/);
+    return true;
+  });
+});
+
 test("TAGO ITX roster는 공식 totalCount가 없는 OD 응답을 완료로 세지 않는다", async () => {
   const fallback = validFetch();
   const artifact = await collectTagoItxCheongchunRoster({

@@ -50,6 +50,7 @@ export async function collectKorailItxCheongchunCompleteness({
   const canonicalStations = canonical.rosterStations;
   canonical.close();
   const serviceDays = [];
+  const tagoRequestBudget = { limit: 10_000, remaining: 10_000 };
   for (const dayCd of ["8", "7", "9"]) {
     const serviceDate = selectedServiceDates[dayCd];
     let failureStage = "ROSTER";
@@ -57,6 +58,7 @@ export async function collectKorailItxCheongchunCompleteness({
     try {
       roster = await collectRosterImpl({
         serviceKey, serviceDate, kricServiceDayCode: dayCd, canonicalStations, fetchImpl, now,
+        requestBudget: tagoRequestBudget,
       });
       if (roster.completedOdCount !== roster.expectedOdCount || roster.failedOdCount !== 0) {
         throw new Error("TAGO ITX OD matrix evidence is incomplete");
@@ -103,6 +105,13 @@ export async function collectKorailItxCheongchunCompleteness({
         timetable,
       });
     } catch (error) {
+      if (!roster && error?.rosterEvidence?.schemaVersion === 2
+        && error.rosterEvidence.artifactKind === "tago-itx-cheongchun-roster-evidence"
+        && error.rosterEvidence.serviceDate === serviceDate
+        && error.rosterEvidence.kricServiceDayCode === dayCd
+        && error.rosterEvidence.credentialRedacted === true) {
+        roster = error.rosterEvidence;
+      }
       const failureContext = completenessFailureContext(error) ?? rosterOdFailureContext(roster);
       const failureReasonCode = completenessFailureReason(error);
       const classifiedFailureStage = failureReasonCode.startsWith("TAGO_OD_")
@@ -484,10 +493,13 @@ export function validateKorailItxPlans({ plans, materialized, runDate }) {
     }
     selectedPlans.push({ ...plan, normalizedTrainNumber: trainNumber });
   }
+  const selectedTrainNumbers = selectedPlans
+    .map(({ normalizedTrainNumber }) => normalizedTrainNumber)
+    .sort(naturalCompare);
   return {
-    trainNumbers,
+    trainNumbers: selectedTrainNumbers,
     selectedPlans,
-    trainSetHash: sha256(JSON.stringify(trainNumbers)),
+    trainSetHash: sha256(JSON.stringify(selectedTrainNumbers)),
   };
 }
 

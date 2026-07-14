@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -121,13 +122,15 @@ function trainNumberEvidence() {
 test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission artifact로 묶는다", async () => {
   const calls = [];
   const corridorInputs = [];
+  const requestBudgets = [];
   const artifact = await collectKorailItxCheongchunCompleteness({
     serviceKey: "secret",
     serviceDates: { "8": "20260715", "7": "20260718", "9": "20260719" },
     packPath: PACK_PATH,
     now: new Date("2026-07-14T00:00:00.000Z"),
-    collectRosterImpl: async ({ serviceDate, kricServiceDayCode, canonicalStations }) => {
+    collectRosterImpl: async ({ serviceDate, kricServiceDayCode, canonicalStations, requestBudget }) => {
       corridorInputs.push(canonicalStations);
+      requestBudgets.push(requestBudget);
       return { ...trainNumberEvidence(), serviceDate, kricServiceDayCode };
     },
     collectTimetableImpl: async ({ runDate, kricServiceDayCode }) => {
@@ -145,6 +148,8 @@ test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission ar
 
   assert.deepEqual(calls, [["8", "20260715"], ["7", "20260718"], ["9", "20260719"]]);
   assert.equal(corridorInputs.length, 3);
+  assert.equal(new Set(requestBudgets).size, 1);
+  assert.deepEqual(requestBudgets[0], { limit: 10_000, remaining: 10_000 });
   assert.equal(corridorInputs[0].length, 28);
   assert.deepEqual(corridorInputs[0].slice(0, 3), [
     { canonicalStationId: "station-8aa315864466", nameKo: "용산", corridorSequence: 1, lineId: "line-6e39be0cb6e2" },
@@ -247,6 +252,33 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
       artifact.serviceDays[0].failureContext,
       "operation=GetStrtpntAlocFndTrainInfo,httpStatus=503,departureStationId=station-a,arrivalStationId=station-b",
     );
+  });
+
+  await context.test("OD materialization 실패 evidence 보존", async () => {
+    const partialRoster = {
+      ...trainNumberEvidence(),
+      schemaVersion: 2,
+      expectedOdCount: 6,
+      completedOdCount: 6,
+      failedOdCount: 0,
+      credentialRedacted: true,
+    };
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectRosterImpl: async ({ serviceDate, kricServiceDayCode }) => {
+        const error = new Error("TAGO_OD_TIME_CONFLICT: 2001");
+        error.rosterEvidence = { ...partialRoster, serviceDate, kricServiceDayCode };
+        throw error;
+      },
+      collectTimetableImpl: async () => assert.fail("must not run"),
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "TAGO_OD_TIME_CONFLICT");
+    assert.equal(artifact.serviceDays[0].failureStage, "OD_MATERIALIZATION");
+    assert.equal(artifact.serviceDays[0].expectedOdCount, 6);
+    assert.equal(artifact.serviceDays[0].completedOdCount, 6);
+    assert.equal(artifact.serviceDays[0].roster.serviceDate, "20260715");
+    assert.equal(artifact.serviceDays[0].roster.expectedOdCount, 6);
   });
 
   await context.test("KORAIL plan 누락 context", async () => {
@@ -984,7 +1016,8 @@ test("KORAIL plan은 TAGO materialized 열차별 exact 1행만 선택해 endpoin
   assert.deepEqual(selected.trainNumbers, ["2001"]);
   assert.equal(selected.selectedPlans.length, 1);
   assert.equal(selected.selectedPlans[0].normalizedTrainNumber, "2001");
-  assert.match(selected.trainSetHash, /^[a-f0-9]{64}$/);
+  assert.deepEqual(selected.trainNumbers, selected.selectedPlans.map(({ normalizedTrainNumber }) => normalizedTrainNumber));
+  assert.equal(selected.trainSetHash, createHash("sha256").update(JSON.stringify(selected.trainNumbers)).digest("hex"));
 });
 
 test("fresh KORAIL admission은 travelerTrainRunPlan2만 호출하고 future info를 호출하지 않는다", async () => {
