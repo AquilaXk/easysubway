@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _goldenFontFamily = 'NanumGothicGolden';
 const _menuBoundaryKey = ValueKey('station-fan-menu-golden-boundary');
-const _menuWidth = 340.0;
+const _menuWidth = 260.0;
 
 Future<void> _pumpMenu(
   WidgetTester tester, {
@@ -67,7 +67,7 @@ void main() {
     );
   }, skip: skipReason);
 
-  testWidgets('최소 너비 296dp 기본 상태', (tester) async {
+  testWidgets('비교 너비 296dp 기본 상태', (tester) async {
     await _pumpMenu(tester, width: 296);
     await expectLater(
       find.byKey(_menuBoundaryKey),
