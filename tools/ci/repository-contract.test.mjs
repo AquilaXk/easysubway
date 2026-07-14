@@ -1776,7 +1776,7 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(widgetTest, /find\.byKey\(const Key\('homeBottomNavigationBar'\)\), findsNothing/);
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavHome'\)\), findsNothing/);
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavSaved'\)\), findsNothing/);
-  assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다/);
+  assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 인라인 오류 없이 넘긴다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도만 보여준다/);
   assert.doesNotMatch(main, /class _HomeHero/);
   assert.doesNotMatch(main, /class _HomeAdaptiveContent/);
