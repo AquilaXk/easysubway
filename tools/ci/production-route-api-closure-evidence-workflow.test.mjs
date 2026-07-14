@@ -11,7 +11,7 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   assert.match(workflow, /expected_sha:/);
   assert.match(workflow, /expected_image_digest:/);
   assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
-  assert.match(workflow, /environment:\n\s+name: production/);
+  assert.doesNotMatch(workflow, /environment:\n\s+name: production/);
   assert.match(workflow, /permissions:\n\s+contents: read/);
   assert.match(workflow, /group: cd-production-deploy/);
 
