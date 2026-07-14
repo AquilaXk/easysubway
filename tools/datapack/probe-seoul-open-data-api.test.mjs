@@ -93,6 +93,28 @@ test("서울시 path-key API probe는 HTTP와 schema 및 transport 오류를 fai
   });
 });
 
+test("서울시 path-key API probe는 train-position schema와 입력 경계를 검증한다", async () => {
+  const evidence = await probeSeoulOpenDataApi({
+    sourceId: "seoul-topis-realtime-train-position",
+    serviceKey: "key",
+    fetchImpl: async () => new Response(JSON.stringify({
+      errorMessage: { status: 200, code: "INFO-000" },
+      realtimePositionList: [{ trainNo: "K1234", statnId: "1001000133" }],
+    }), { status: 200, headers: { "content-type": "application/json" } }),
+  });
+
+  assert.equal(evidence.rowCount, 1);
+  assert.deepEqual(evidence.outputFields, ["trainNo", "statnId"]);
+  await assert.rejects(
+    probeSeoulOpenDataApi({ sourceId: "unsupported", serviceKey: "key" }),
+    /unsupported Seoul open data source/,
+  );
+  await assert.rejects(
+    probeSeoulOpenDataApi({ sourceId: "seoul-topis-realtime-train-position" }),
+    /EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY is required/,
+  );
+});
+
 test("서울시 path-key API probe는 Sheet envelope와 provider/schema 오류를 fail closed한다", async (t) => {
   let requestedUrl;
   const sheet = await probeSeoulOpenDataApi({

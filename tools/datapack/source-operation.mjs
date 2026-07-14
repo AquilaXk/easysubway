@@ -333,6 +333,9 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
 }
 
 export function operationSummary(candidate) {
+  if (candidate.apiCatalog != null && typeof candidate.apiCatalog !== "boolean") {
+    throw new Error(`${candidate.id}.apiCatalog must be a boolean`);
+  }
   let operationValidationError = null;
   try {
     validateOperation(candidate, { allowMissing: true });

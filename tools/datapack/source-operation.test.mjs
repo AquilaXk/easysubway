@@ -109,6 +109,10 @@ test("apiCatalog는 false만 API catalog 제외로 해석한다", () => {
   assert.equal(operationSummary(candidate("a")).apiCatalog, true);
   assert.equal(operationSummary(candidate("a", { apiCatalog: true })).apiCatalog, true);
   assert.equal(operationSummary(candidate("a", { apiCatalog: false })).apiCatalog, false);
+  assert.throws(
+    () => operationSummary(candidate("a", { apiCatalog: "false" })),
+    /apiCatalog must be a boolean/,
+  );
 });
 
 test("source candidate 정본은 repository 경로와 구조화된 provider 승인을 검증한다", () => {
