@@ -725,9 +725,10 @@ function completenessFailureContext(error) {
   const message = error instanceof Error ? error.message : "";
   const station = /station mapping is missing or ambiguous: (.+)$/.exec(message)?.[1];
   if (station) return safeLabel(station);
-  const tagoSchema = /^TAGO ([A-Za-z0-9]+) schema mismatch: ([A-Za-z0-9._-]+)(?: bodyFields=([A-Za-z0-9_,.-]+))?$/.exec(message);
+  const tagoSchema = /^TAGO ([A-Za-z0-9]+) schema mismatch: (content-type|invalid JSON|body|item|totalCount)(?: bodyFields=([A-Za-z0-9_,.-]+))?$/.exec(message);
   if (tagoSchema) {
-    return `operation=${tagoSchema[1]},reason=schema_mismatch,${tagoSchema[2]}`
+    const reason = tagoSchema[2] === "invalid JSON" ? "invalid-json" : tagoSchema[2];
+    return `operation=${tagoSchema[1]},reason=schema_mismatch,${reason}`
       + (tagoSchema[3] ? `,bodyFields=${tagoSchema[3]}` : "");
   }
   const pagination = /pagination incomplete: (operation=[A-Za-z0-9]+,collected=\d+,total=(?:\d+|UNKNOWN),pages=\d+)$/.exec(message)?.[1];
@@ -845,7 +846,10 @@ async function fetchAll({ endpoint, query, expectedFields, key, fetchImpl }) {
       ...query,
     })) url.searchParams.set(name, value);
     const response = await fetchWithRetry(url, fetchImpl);
-    if (!response.ok) throw new Error(`Korail train operation API HTTP ${response.status}`);
+    if (!response.ok) {
+      if (response.body) await response.body.cancel().catch(() => {});
+      throw new Error(`Korail train operation API HTTP ${response.status}`);
+    }
     const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() ?? "";
     if (contentType !== "application/json") throw new Error(`Korail train operation API schema mismatch: content-type ${safeToken(contentType)}`);
     const raw = await response.text();

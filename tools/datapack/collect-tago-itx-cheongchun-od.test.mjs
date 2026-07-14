@@ -18,6 +18,13 @@ function tagoResponse(items, totalCount = items.length) {
   } }), { status: 200, headers: { "content-type": "application/json" } });
 }
 
+function tagoCatalogResponse(items) {
+  return new Response(JSON.stringify({ response: {
+    header: { resultCode: "00", resultMsg: "NORMAL SERVICE." },
+    body: { items: { item: items } },
+  } }), { status: 200, headers: { "content-type": "application/json" } });
+}
+
 test("ITX admission 날짜는 KST 오늘~6일과 dayCd 요일을 검증한다", () => {
   const serviceDates = { "8": "20260715", "7": "20260718", "9": "20260719" };
   assert.deepEqual(validateItxServiceDates(serviceDates, {
@@ -128,6 +135,54 @@ test("TAGO ITX roster는 canonical 역의 양방향 OD 전체를 수집한다", 
   assert.doesNotMatch(JSON.stringify(artifact), /never-print-data-key/);
 });
 
+test("TAGO catalog는 non-paginated로 한 번만 수집하고 station·OD는 strict pagination을 유지한다", async () => {
+  const catalogCalls = new Map();
+  const artifact = await collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      const operation = parsed.pathname.split("/").at(-1);
+      if (["GetVhcleKndList", "GetCtyCodeList"].includes(operation)) {
+        catalogCalls.set(operation, (catalogCalls.get(operation) ?? 0) + 1);
+        assert.equal(parsed.searchParams.has("pageNo"), false);
+        assert.equal(parsed.searchParams.has("numOfRows"), false);
+        return tagoCatalogResponse(operation === "GetVhcleKndList"
+          ? [{ vehiclekndid: "07", vehiclekndnm: "ITX-청춘" }]
+          : [{ citycode: "11", cityname: "서울" }, { citycode: "32", cityname: "강원" }]);
+      }
+      assert.equal(parsed.searchParams.get("pageNo"), "1");
+      assert.equal(parsed.searchParams.get("numOfRows"), "100");
+      if (operation === "GetCtyAcctoTrainSttnList") {
+        return parsed.searchParams.get("cityCode") === "11"
+          ? tagoResponse([{ nodeid: "NAT130126", nodename: "청량리" }])
+          : tagoResponse([{ nodeid: "NAT140873", nodename: "춘천" }]);
+      }
+      const reverse = parsed.searchParams.get("depPlaceId") === "NAT140873";
+      return tagoResponse([{
+        trainno: reverse ? "2002" : "2001",
+        traingradename: "ITX-청춘",
+        depplandtime: reverse ? "20260715103000" : "20260715083000",
+        arrplandtime: reverse ? "20260715115000" : "20260715095000",
+        depplacename: reverse ? "춘천" : "청량리",
+        arrplacename: reverse ? "청량리" : "춘천",
+        adultcharge: "9800",
+      }]);
+    },
+  });
+
+  assert.deepEqual(Object.fromEntries(catalogCalls), {
+    GetVhcleKndList: 1,
+    GetCtyCodeList: 1,
+  });
+  assert.equal(artifact.completedOdCount, 2);
+});
+
 test("TAGO ITX roster는 일시적 HTTP 응답을 OD 실패 확정 전에 최대 두 번 재시도한다", async () => {
   let forwardAttempts = 0;
   const artifact = await collectTagoItxCheongchunRoster({
@@ -169,6 +224,46 @@ test("TAGO ITX roster는 일시적 HTTP 응답을 OD 실패 확정 전에 최대
   assert.equal(forwardAttempts, 3);
   assert.equal(artifact.completedOdCount, 2);
   assert.equal(artifact.failedOdCount, 0);
+});
+
+test("TAGO retry는 최종 503 body를 정리하고 3회에서 종료한다", async () => {
+  let attempts = 0;
+  let cancellations = 0;
+  await assert.rejects(collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    fetchImpl: async () => {
+      attempts += 1;
+      return new Response(new ReadableStream({
+        cancel() { cancellations += 1; },
+      }), { status: 503 });
+    },
+  }), /^Error: TAGO GetVhcleKndList HTTP 503$/);
+  assert.equal(attempts, 3);
+  assert.equal(cancellations, 3);
+});
+
+test("TAGO retry는 최종 transport 실패까지 3회에서 종료한다", async () => {
+  let attempts = 0;
+  await assert.rejects(collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    fetchImpl: async () => {
+      attempts += 1;
+      throw new Error("socket unavailable");
+    },
+  }), /^Error: TAGO transport failure$/);
+  assert.equal(attempts, 3);
 });
 
 test("TAGO ITX roster는 OD 일부 실패를 count한 뒤 admission이 거부할 evidence를 반환한다", async () => {
@@ -239,7 +334,8 @@ test("TAGO ITX roster는 공식 totalCount가 없는 OD 응답을 완료로 세�
   assert.deepEqual(artifact.trainNumbers, ["2001"]);
 });
 
-test("TAGO schema mismatch는 값 없이 정렬된 body field만 진단한다", async () => {
+test("TAGO paginated schema mismatch는 값 없이 정렬된 body field만 진단한다", async () => {
+  const fallback = validFetch();
   await assert.rejects(collectTagoItxCheongchunRoster({
     serviceKey: "key",
     serviceDate: "20260715",
@@ -248,8 +344,10 @@ test("TAGO schema mismatch는 값 없이 정렬된 body field만 진단한다", 
       { canonicalStationId: "station-a", nameKo: "청량리" },
       { canonicalStationId: "station-b", nameKo: "춘천" },
     ],
-    fetchImpl: async () => {
-      const response = tagoResponse([{ vehiclekndid: "07", vehiclekndnm: "ITX-청춘" }]);
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      const response = await fallback(url);
+      if (!parsed.pathname.endsWith("GetCtyAcctoTrainSttnList")) return response;
       const payload = await response.json();
       delete payload.response.body.totalCount;
       return new Response(JSON.stringify(payload), {
@@ -257,7 +355,7 @@ test("TAGO schema mismatch는 값 없이 정렬된 body field만 진단한다", 
         headers: { "content-type": "application/json" },
       });
     },
-  }), /schema mismatch: totalCount bodyFields=items,numOfRows,pageNo/);
+  }), /^Error: TAGO GetCtyAcctoTrainSttnList schema mismatch: totalCount bodyFields=items,numOfRows,pageNo$/);
 });
 
 test("TAGO ITX roster는 요청과 다른 OD·날짜 응답을 완료로 세지 않는다", async (context) => {

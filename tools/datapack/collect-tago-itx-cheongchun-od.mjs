@@ -8,6 +8,8 @@ import { pathToFileURL } from "node:url";
 
 const BASE = "https://apis.data.go.kr/1613000/TrainInfo";
 const DETAIL_URL = "https://www.data.go.kr/data/15098552/openapi.do";
+const NON_PAGINATED_OPERATIONS = new Set(["GetVhcleKndList", "GetCtyCodeList"]);
+const PAGINATED_OPERATIONS = new Set(["GetCtyAcctoTrainSttnList", "GetStrtpntAlocFndTrainInfo"]);
 const CANONICAL_STATIONS = Object.freeze({
   "청량리": "station-b819702fa7d9",
   "춘천": "station-dd14cfb89cbc",
@@ -222,16 +224,25 @@ export async function collectTagoItxCheongchunOd({
 }
 
 async function fetchAll(operation, query, key, fetchImpl) {
+  const paginated = PAGINATED_OPERATIONS.has(operation);
+  if (!paginated && !NON_PAGINATED_OPERATIONS.has(operation)) {
+    throw new Error(`TAGO operation is unsupported: ${safeCode(operation)}`);
+  }
   const all = [];
   const rawHashes = [];
   let totalCount = null;
-  for (let pageNo = 1; pageNo <= 100; pageNo += 1) {
+  const maxPages = paginated ? 100 : 1;
+  for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
     const url = new URL(`${BASE}/${operation}`);
-    for (const [name, value] of Object.entries({ serviceKey: key, _type: "json", pageNo: String(pageNo), numOfRows: "100", ...query })) {
+    const pagination = paginated ? { pageNo: String(pageNo), numOfRows: "100" } : {};
+    for (const [name, value] of Object.entries({ serviceKey: key, _type: "json", ...pagination, ...query })) {
       url.searchParams.set(name, String(value));
     }
     const response = await fetchWithRetry(url, fetchImpl);
-    if (!response.ok) throw new Error(`TAGO ${operation} HTTP ${response.status}`);
+    if (!response.ok) {
+      if (response.body) await response.body.cancel().catch(() => {});
+      throw new Error(`TAGO ${operation} HTTP ${response.status}`);
+    }
     const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
     if (contentType !== "application/json") throw new Error(`TAGO ${operation} schema mismatch: content-type`);
     const raw = await response.text();
@@ -244,9 +255,17 @@ async function fetchAll(operation, query, key, fetchImpl) {
     const body = root?.body;
     if (!body || typeof body !== "object") throw new Error(`TAGO ${operation} schema mismatch: body`);
     const items = body.items?.item;
+    if (!paginated && (items == null || typeof items !== "object")) {
+      throw new Error(`TAGO ${operation} schema mismatch: item`);
+    }
     const rows = items == null ? [] : Array.isArray(items) ? items : [items];
     if (rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
       throw new Error(`TAGO ${operation} schema mismatch: item`);
+    }
+    if (!paginated) {
+      all.push(...rows);
+      totalCount = rows.length;
+      break;
     }
     if (body.totalCount === undefined || body.totalCount === null || body.totalCount === "") {
       const bodyFields = Object.keys(body)
