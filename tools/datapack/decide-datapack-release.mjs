@@ -119,7 +119,9 @@ function canonicalize(value) {
 }
 
 function compareStrings(left, right) {
-  return left < right ? -1 : left > right ? 1 : 0;
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function validApproval({ buildSpec, buildSpecSha256, releaseRequest }) {
