@@ -1,6 +1,7 @@
 ALTER TABLE transit_trips ADD COLUMN service_class VARCHAR(40) NOT NULL DEFAULT 'SUBWAY';
 ALTER TABLE transit_trips ADD CONSTRAINT chk_transit_trips_service_class
-  CHECK (service_class IN ('SUBWAY', 'ITX_CHEONGCHUN'));
+  CHECK (service_class IN ('SUBWAY', 'ITX_CHEONGCHUN')) NOT VALID;
+ALTER TABLE transit_trips VALIDATE CONSTRAINT chk_transit_trips_service_class;
 
 CREATE TABLE route_service_artifact_evidence (
   service_class VARCHAR(40) NOT NULL PRIMARY KEY,

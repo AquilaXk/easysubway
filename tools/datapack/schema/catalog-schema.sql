@@ -228,7 +228,10 @@ CREATE TABLE route_service_artifact_evidence (
   CHECK (length(canonical_pack_sqlite_sha256) = 64 AND canonical_pack_sqlite_sha256 NOT GLOB '*[^0-9a-f]*'),
   CHECK (admission_status IN ('MISSING', 'ADMITTED')),
   CHECK (admission_eligible IN (0, 1)),
-  CHECK ((admission_status = 'ADMITTED') = (admission_eligible = 1)),
+  CHECK (
+    (admission_status = 'ADMITTED' AND admission_eligible = 1 AND fresh_until IS NOT NULL)
+    OR (admission_status = 'MISSING' AND admission_eligible = 0)
+  ),
   CHECK (source_issue = 2116)
 );
 

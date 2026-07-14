@@ -91,6 +91,40 @@ class TimetableSeedLoaderTest {
 	}
 
 	@Test
+	void refreshesItxAdmissionAfterCompetingItxSeedWon() {
+		String freshUntil = OffsetDateTime.now().plusDays(1).toString();
+		var racingPort = new com.easysubway.route.application.port.out.LoadRouteTimetablePort() {
+			private boolean seeded;
+
+			@Override
+			public boolean hasRouteTimetable() {
+				if (!seeded) {
+					seeded = true;
+					loader(itxSeed("ADMITTED", true, freshUntil), true).run(null);
+				}
+				return true;
+			}
+
+			@Override
+			public RouteTimetable loadRouteTimetable() {
+				return RouteTimetable.empty();
+			}
+		};
+		var loser = new TimetableSeedLoader(
+			racingPort,
+			dataSource,
+			new DataSourceTransactionManager(dataSource),
+			itxSeed("ADMITTED", true, freshUntil),
+			true
+		);
+
+		loser.run(null);
+
+		assertThat(jdbc.queryForObject(
+			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'", Integer.class)).isOne();
+	}
+
+	@Test
 	void rollsBackOnMidScriptFailureLeavingNoPartialData() {
 		// trips 성공 후 stop_times FK 위반으로 실패 → all-or-nothing 롤백(부분 적재 없음).
 		var bad = new ByteArrayResource((

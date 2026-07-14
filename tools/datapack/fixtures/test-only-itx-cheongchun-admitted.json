@@ -10,7 +10,7 @@
   "freshness": {
     "status": "FRESH",
     "observedAt": "2026-07-14T00:00:00.000Z",
-    "freshUntil": "2026-07-21T00:00:00.000Z"
+    "freshUntil": "2099-01-01T00:00:00.000Z"
   },
   "timetableArtifactIdentity": {
     "id": "test-only-itx-cheongchun-admitted-v1",

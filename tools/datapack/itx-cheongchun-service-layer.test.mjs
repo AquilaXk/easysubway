@@ -80,9 +80,57 @@ test("catalog schema는 service class와 admission evidence identity를 보존�
       "fresh_until",
       "source_issue",
     ]);
+    assert.throws(() => database.prepare(`
+      INSERT INTO route_service_artifact_evidence (
+        service_class, timetable_artifact_id, timetable_artifact_sha256,
+        canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+        admission_status, admission_eligible, fresh_until, source_issue
+      ) VALUES ('ITX_CHEONGCHUN', 'test', ?, 'capital', ?, ?, 'ADMITTED', 1, NULL, 2116)
+    `).run("a".repeat(64), "b".repeat(64), "c".repeat(64)));
   } finally {
     database.close();
   }
+});
+
+test("ADMITTED evidence는 ITX row 없이 단독 게시할 수 없다", async (context) => {
+  const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-admitted-without-rows-"));
+  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/catalog-fixture.json", import.meta.url), "utf8"));
+  fixture.packs[0].routeServiceArtifactEvidence = [{
+    ...missingItxEvidence(),
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil: "2099-01-01T00:00:00.000Z",
+  }];
+  const fixturePath = path.join(temporaryDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture", fixturePath,
+      "--output", path.join(temporaryDir, "output"),
+    ], { cwd: root }),
+    /ADMITTED evidence requires ITX_CHEONGCHUN rows/,
+  );
+});
+
+test("ITX service evidence는 pack마다 정확히 한 행이어야 한다", async (context) => {
+  const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-duplicate-evidence-"));
+  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/catalog-fixture.json", import.meta.url), "utf8"));
+  fixture.packs[0].routeServiceArtifactEvidence = [missingItxEvidence(), missingItxEvidence()];
+  const fixturePath = path.join(temporaryDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture", fixturePath,
+      "--output", path.join(temporaryDir, "output"),
+    ], { cwd: root }),
+    /exactly one ITX_CHEONGCHUN evidence row/,
+  );
 });
 
 test("MISSING admission은 identity row만 적재하고 production ITX row를 0건으로 유지한다", async (context) => {

@@ -245,6 +245,23 @@ class DatabaseMigrationContainerTest {
 	}
 
 	@Test
+	@DisplayName("H2 migration도 route service artifact hash 형식을 차단한다")
+	void h2MigrationRejectsUnsafeRouteServiceIdentityHashes() {
+		var dataSource = new DriverManagerDataSource(
+			"jdbc:h2:mem:route-service-identity-hashes;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+			"sa",
+			""
+		);
+		Flyway.configure()
+			.dataSource(dataSource)
+			.locations("classpath:db/migration/h2")
+			.load()
+			.migrate();
+
+		assertRouteServiceIdentityHashGuards(new JdbcTemplate(dataSource));
+	}
+
+	@Test
 	@DisplayName("H2 migration도 normalization run과 output ledger guard를 차단한다")
 	void h2MigrationRejectsUnsafeNormalizationRuns() {
 		var dataSource = new DriverManagerDataSource(
@@ -860,6 +877,16 @@ class DatabaseMigrationContainerTest {
 			.isInstanceOf(DataAccessException.class);
 		assertThatThrownBy(() -> insertRouteServiceIdentity(
 			jdbcTemplate, "g".repeat(64), validHash, validHash))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertRouteServiceIdentity(jdbcTemplate, validHash, "short", validHash))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertRouteServiceIdentity(
+			jdbcTemplate, validHash, "g".repeat(64), validHash))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertRouteServiceIdentity(jdbcTemplate, validHash, validHash, "short"))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertRouteServiceIdentity(
+			jdbcTemplate, validHash, validHash, "g".repeat(64)))
 			.isInstanceOf(DataAccessException.class);
 	}
 

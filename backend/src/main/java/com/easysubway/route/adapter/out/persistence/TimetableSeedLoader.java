@@ -65,6 +65,7 @@ public class TimetableSeedLoader implements ApplicationRunner {
 	public void run(ApplicationArguments args) {
 		boolean existingItx = validateRouteServiceAdmission();
 		if (routeTimetablePort.hasRouteTimetable()) {
+			existingItx = validateRouteServiceAdmission();
 			if (includesItxSeed && !existingItx) {
 				throw new IllegalStateException(
 					"additive ITX timetable seed is not supported while another timetable is present");

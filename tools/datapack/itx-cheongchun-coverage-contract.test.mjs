@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { gunzipSync } from "node:zlib";
 
 const contract = JSON.parse(await readFile(new URL("./itx-cheongchun-coverage-contract.json", import.meta.url), "utf8"));
 const targets = JSON.parse(await readFile(new URL("./nationwide-coverage-targets.json", import.meta.url), "utf8"));
@@ -40,6 +41,7 @@ test("deterministic ADMITTED fixture는 test-only이며 production evidence에 �
   const forbiddenProductionSurfaces = [
     "./source-inventory.json",
     "./release/candidate-build-spec.json",
+    "./release/capital-production-reviewed-pack.json",
     "../../apps/mobile/assets/datapacks/source-inventory.json",
     "../../apps/mobile/assets/datapacks/index.json",
     "../../apps/mobile/release/production-datapack-scope.json",
@@ -47,6 +49,8 @@ test("deterministic ADMITTED fixture는 test-only이며 production evidence에 �
   for (const relativePath of forbiddenProductionSurfaces) {
     const productionText = await readFile(new URL(relativePath, import.meta.url), "utf8");
     assert.doesNotMatch(productionText, /test-only-itx-cheongchun-admitted\.json/);
+    assert.equal(productionText.includes(fixture.timetableArtifactIdentity.id), false,
+      `${relativePath}에 test-only fixture artifact ID가 연결됐다`);
     assert.equal(productionText.includes(fixtureSha256), false, `${relativePath}에 test-only fixture hash가 연결됐다`);
   }
 });
@@ -199,11 +203,14 @@ test("ITX-청춘 admission evidence는 #2097 canonical bundled pack bytes에 결
     import.meta.url,
   ));
   const canonicalPackSha256 = createHash("sha256").update(canonicalPackBytes).digest("hex");
+  const canonicalPackSqliteSha256 = createHash("sha256")
+    .update(gunzipSync(canonicalPackBytes))
+    .digest("hex");
   assert.deepEqual(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
     id: "capital",
     sourceIssue: 2097,
     sha256: canonicalPackSha256,
-    sqliteSha256: "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
+    sqliteSha256: canonicalPackSqliteSha256,
   });
   assert.equal(
     contract.officialEvidence.korailCompletenessAdmission.artifactId,

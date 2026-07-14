@@ -215,6 +215,43 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
 }
 
 async function materializeTestOnlyItxAdmission(fixture, admission, admissionBytes) {
+  const freshUntil = validateTestOnlyItxAdmission(admission);
+  const canonicalIdentity = await validateTestOnlyItxCanonicalIdentity(admission);
+  const pack = testOnlyItxTargetPack(fixture, canonicalIdentity);
+  const lineId = requiredString(admission.canonicalLineId, "testOnlyItxAdmission.canonicalLineId");
+  const admittedStationIds = validateTestOnlyItxStations(pack, admission, lineId);
+  const timetableHash = sha256(admissionBytes);
+  const { trips, stopTimes, edges } = deriveTestOnlyItxRows(
+    admission,
+    lineId,
+    admittedStationIds,
+    timetableHash,
+  );
+
+  pack.serviceCalendars = [...(pack.serviceCalendars ?? []), ...(admission.serviceCalendars ?? [])];
+  pack.transitRoutes = [...(pack.transitRoutes ?? []), ...(admission.transitRoutes ?? [])];
+  pack.transitTrips = [...(pack.transitTrips ?? []), ...trips];
+  pack.transitStopTimes = [...(pack.transitStopTimes ?? []), ...stopTimes];
+  pack.networkEdges = [...(pack.networkEdges ?? []), ...edges];
+  pack.routeServiceArtifactEvidence = [{
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: requiredString(
+      admission.timetableArtifactIdentity?.id,
+      "testOnlyItxAdmission.timetableArtifactIdentity.id",
+    ),
+    timetableArtifactSha256: timetableHash,
+    canonicalPackId: canonicalIdentity.id,
+    canonicalPackSha256: canonicalIdentity.sha256,
+    canonicalPackSqliteSha256: canonicalIdentity.sqliteSha256,
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil,
+    sourceIssue: 2116,
+  }];
+  validatedItxAdmissionPacks.add(pack);
+}
+
+function validateTestOnlyItxAdmission(admission) {
   if (
     admission?.fixtureClass !== "TEST_ONLY"
     || admission?.artifactKind !== "deterministic-itx-cheongchun-admission-fixture"
@@ -237,6 +274,10 @@ async function materializeTestOnlyItxAdmission(fixture, admission, admissionByte
   if (Date.parse(freshUntil) <= candidateBuildNow().getTime()) {
     throw new Error("test-only ITX admission freshness must be in the future");
   }
+  return freshUntil;
+}
+
+async function validateTestOnlyItxCanonicalIdentity(admission) {
   const canonicalIdentity = admission.canonicalPackIdentity;
   const canonicalGzipBytes = await readFile(
     path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"),
@@ -251,12 +292,18 @@ async function materializeTestOnlyItxAdmission(fixture, admission, admissionByte
   if (admission.timetableArtifactIdentity?.sha256Source !== "FIXTURE_FILE_BYTES") {
     throw new Error("test-only ITX timetable identity must hash fixture file bytes");
   }
+  return canonicalIdentity;
+}
 
+function testOnlyItxTargetPack(fixture, canonicalIdentity) {
   const pack = fixture.packs?.find(({ id }) => id === canonicalIdentity.id);
   if (!pack || (pack.artifactKind ?? "fixture") !== "fixture") {
     throw new Error("test-only ITX admission can materialize only into a fixture pack");
   }
-  const lineId = requiredString(admission.canonicalLineId, "testOnlyItxAdmission.canonicalLineId");
+  return pack;
+}
+
+function validateTestOnlyItxStations(pack, admission, lineId) {
   const stationIds = new Set((pack.stations ?? []).map(({ id }) => id));
   const routeMapMembers = new Set((pack.routeMapPositions ?? [])
     .filter(({ lineId: memberLineId, region }) => memberLineId === lineId && region === "수도권")
@@ -272,8 +319,10 @@ async function materializeTestOnlyItxAdmission(fixture, admission, admissionByte
       throw new Error(`test-only ITX canonical station membership is missing: ${stationId}`);
     }
   }
+  return admittedStationIds;
+}
 
-  const timetableHash = sha256(admissionBytes);
+function deriveTestOnlyItxRows(admission, lineId, admittedStationIds, timetableHash) {
   const trips = admission.transitTrips ?? [];
   const stopTimes = admission.transitStopTimes ?? [];
   const edges = [];
@@ -313,28 +362,7 @@ async function materializeTestOnlyItxAdmission(fixture, admission, admissionByte
       });
     }
   }
-
-  pack.serviceCalendars = [...(pack.serviceCalendars ?? []), ...(admission.serviceCalendars ?? [])];
-  pack.transitRoutes = [...(pack.transitRoutes ?? []), ...(admission.transitRoutes ?? [])];
-  pack.transitTrips = [...(pack.transitTrips ?? []), ...trips];
-  pack.transitStopTimes = [...(pack.transitStopTimes ?? []), ...stopTimes];
-  pack.networkEdges = [...(pack.networkEdges ?? []), ...edges];
-  pack.routeServiceArtifactEvidence = [{
-    serviceClass: "ITX_CHEONGCHUN",
-    timetableArtifactId: requiredString(
-      admission.timetableArtifactIdentity?.id,
-      "testOnlyItxAdmission.timetableArtifactIdentity.id",
-    ),
-    timetableArtifactSha256: timetableHash,
-    canonicalPackId: canonicalIdentity.id,
-    canonicalPackSha256: canonicalIdentity.sha256,
-    canonicalPackSqliteSha256: canonicalIdentity.sqliteSha256,
-    admissionStatus: "ADMITTED",
-    admissionEligible: true,
-    freshUntil,
-    sourceIssue: 2116,
-  }];
-  validatedItxAdmissionPacks.add(pack);
+  return { trips, stopTimes, edges };
 }
 
 function rejectTestOnlyBuildInput(fixture) {
@@ -2126,12 +2154,19 @@ function validateFixture(fixture) {
 }
 
 function validateRouteServiceAdmission(pack) {
-  const evidence = (pack.routeServiceArtifactEvidence ?? [])
-    .find(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN");
+  const evidenceRows = (pack.routeServiceArtifactEvidence ?? [])
+    .filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN");
+  if (evidenceRows.length > 1) {
+    throw new Error("pack must contain exactly one ITX_CHEONGCHUN evidence row");
+  }
+  const evidence = evidenceRows[0];
   const itxRowCount = [
     ...(pack.transitTrips ?? []),
     ...(pack.networkEdges ?? []),
   ].filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN").length;
+  if (evidence?.admissionStatus === "ADMITTED" && itxRowCount === 0) {
+    throw new Error("ADMITTED evidence requires ITX_CHEONGCHUN rows");
+  }
   if (itxRowCount > 0 && (evidence?.admissionStatus !== "ADMITTED" || evidence?.admissionEligible !== true)) {
     throw new Error("ITX_CHEONGCHUN rows require ADMITTED evidence");
   }

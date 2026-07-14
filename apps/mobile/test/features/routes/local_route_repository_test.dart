@@ -535,15 +535,30 @@ void main() {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
     await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'itx-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 60,
+      servicePattern: 'EXPRESS',
+    );
+
+    final subwayResult = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+    expect(subwayResult.status, 'FOUND');
+
     await database.customStatement('''
-      INSERT INTO network_edges (
-        id, from_node_id, to_node_id, duration_seconds, edge_type,
-        service_pattern, service_class, stair_access_state,
-        accessibility_status, reliability_score
-      ) VALUES (
-        'itx-edge-a-b', 'station-a:line-test', 'station-b:line-test', 60,
-        'RIDE', 'EXPRESS', 'ITX_CHEONGCHUN', 'STEP_FREE', 'AVAILABLE', 100
-      )
+      UPDATE network_edges
+      SET service_class = 'ITX_CHEONGCHUN'
+      WHERE id = 'itx-edge-a-b'
     ''');
 
     final result = await LocalRouteRepository(catalogDatabase: database)
@@ -4763,6 +4778,7 @@ Future<void> _insertVerifiedNetworkEdge(
   required int durationSeconds,
   int distanceMeters = 0,
   String servicePattern = '',
+  String serviceClass = 'SUBWAY',
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
   int lastVerifiedAtSeconds = 1781827200,
@@ -4773,11 +4789,11 @@ Future<void> _insertVerifiedNetworkEdge(
     '''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, distance_meters, edge_type,
-        service_pattern, stair_access_state, accessibility_status, reliability_score,
+        service_pattern, service_class, stair_access_state, accessibility_status, reliability_score,
         source_id, source_snapshot_id, provider_record_hash, provenance_kind,
         verification_status, last_verified_at, evidence_hash
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
         'test-source-snapshot',
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         ?, ?, ?, ?)
@@ -4790,6 +4806,7 @@ Future<void> _insertVerifiedNetworkEdge(
       distanceMeters,
       edgeType,
       servicePattern,
+      serviceClass,
       provenanceKind,
       verificationStatus,
       lastVerifiedAtSeconds,
