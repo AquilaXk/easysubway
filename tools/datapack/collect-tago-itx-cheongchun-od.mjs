@@ -241,7 +241,10 @@ async function fetchAll(operation, query, key, fetchImpl) {
     if (rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
       throw new Error(`TAGO ${operation} schema mismatch: item`);
     }
-    const pageTotal = Number(body.totalCount ?? rows.length);
+    if (body.totalCount === undefined || body.totalCount === null || body.totalCount === "") {
+      throw new Error(`TAGO ${operation} schema mismatch: totalCount`);
+    }
+    const pageTotal = Number(body.totalCount);
     if (!Number.isInteger(pageTotal) || pageTotal < 0 || (totalCount !== null && totalCount !== pageTotal)) {
       throw new Error(`TAGO ${operation} schema mismatch: totalCount`);
     }

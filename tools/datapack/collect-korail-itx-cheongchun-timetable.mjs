@@ -515,6 +515,16 @@ function validateCanonicalTrip(stops, ordered, trainNumber, plan, runDate) {
   const planDepartureSeconds = timestampSeconds(plan.trn_plan_dptre_dt, runDate, `plan departure[${safeToken(trainNumber)}]`);
   const planArrivalSeconds = timestampSeconds(plan.trn_plan_arvl_dt, runDate, `plan arrival[${safeToken(trainNumber)}]`);
   if (planDepartureSeconds > planArrivalSeconds) throw new Error(`Korail ITX plan arrival must follow departure: ${safeToken(trainNumber)}`);
+  if (stops[0].departureTimestamp !== null
+    && timestampSeconds(stops[0].departureTimestamp, runDate, `first stop departure[${safeToken(trainNumber)}]`)
+      !== planDepartureSeconds) {
+    throw new Error(`Korail ITX plan departure does not match first stop departure: ${safeToken(trainNumber)}`);
+  }
+  if (stops.at(-1).arrivalTimestamp !== null
+    && timestampSeconds(stops.at(-1).arrivalTimestamp, runDate, `last stop arrival[${safeToken(trainNumber)}]`)
+      !== planArrivalSeconds) {
+    throw new Error(`Korail ITX plan arrival does not match last stop arrival: ${safeToken(trainNumber)}`);
+  }
   if (normalizeStationName(stops[0].providerStationName) !== normalizeStationName(plan.dptre_stn_nm)
     || normalizeStationName(stops.at(-1).providerStationName) !== normalizeStationName(plan.arvl_stn_nm)) {
     throw new Error(`Korail ITX plan endpoint mismatch: ${safeToken(trainNumber)}`);
@@ -526,6 +536,7 @@ function materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate)
   const transitTrips = [];
   const transitStopTimes = [];
   const serviceId = { "8": "weekday-kric", "7": "saturday-kric", "9": "holiday-kric" }[kricServiceDayCode];
+  if (serviceId === undefined) throw new Error("kricServiceDayCode must be 7, 8, or 9");
   for (const trip of analyzed.stationSequences) {
     const rows = trip.stops.map((stop) => {
       const timestampContext = `${safeToken(trip.trainNumber)}/${safeLabel(stop.providerStationName)}/${safeLabel(stop.stopCode)}`;

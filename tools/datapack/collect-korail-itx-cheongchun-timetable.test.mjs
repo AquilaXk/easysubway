@@ -609,7 +609,7 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
     assert.throws(() => materializeKorailItxRows({
       ...base,
       infoRows: info.filter(({ stn_nm }) => stn_nm !== "춘천"),
-    }), /at least 2 canonical stops|plan endpoint/);
+    }), /at least 2 canonical stops|plan endpoint|plan arrival/);
   });
 
   await context.test("중복 정차", () => {
@@ -655,6 +655,33 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
     assert.throws(() => materializeKorailItxRows({ ...base, plans: wrongPlanDate }), /runDate or the immediately following date/);
   });
 
+  await context.test("plan 출발시각과 첫 정차 출발시각 불일치", () => {
+    const mismatchedPlanDeparture = plans.map((row) => row.trn_no === "02001"
+      ? { ...row, trn_plan_dptre_dt: "20260713060100" }
+      : row);
+    assert.throws(() => materializeKorailItxRows({
+      ...base,
+      plans: mismatchedPlanDeparture,
+    }), /plan departure.*first stop departure/);
+  });
+
+  await context.test("plan 도착시각과 마지막 정차 도착시각 불일치", () => {
+    const mismatchedPlanArrival = plans.map((row) => row.trn_no === "02001"
+      ? { ...row, trn_plan_arvl_dt: "20260713075900" }
+      : row);
+    assert.throws(() => materializeKorailItxRows({
+      ...base,
+      plans: mismatchedPlanArrival,
+    }), /plan arrival.*last stop arrival/);
+  });
+
+  await context.test("지원하지 않는 service day", () => {
+    assert.throws(() => materializeKorailItxRows({
+      ...base,
+      kricServiceDayCode: "6",
+    }), /kricServiceDayCode must be 7, 8, or 9/);
+  });
+
   await context.test("canonical mapping이 없는 여객 정차", () => {
     const withInteriorGap = info.map((row) => {
       if (row.trn_no !== "02001" || row.trn_run_sn < 3) return row;
@@ -684,7 +711,14 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
       if (row.stn_nm === "춘천") return { ...row, trn_arvl_dt: "20260714010000", trn_dptre_dt: "-" };
       return row;
     });
-    const materialized = materializeKorailItxRows({ ...base, infoRows: overnight });
+    const overnightPlans = plans.map((row) => row.trn_no === "02001"
+      ? { ...row, trn_plan_arvl_dt: "20260714010000" }
+      : row);
+    const materialized = materializeKorailItxRows({
+      ...base,
+      plans: overnightPlans,
+      infoRows: overnight,
+    });
     assert.ok(materialized.transitStopTimes
       .filter(({ tripId }) => tripId.includes("-2001-"))
       .at(-1).arrivalSeconds > 86_400);
