@@ -4186,6 +4186,10 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
   const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const routeSearchController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java",
+  );
+  const internalApiIndex = readJson("contracts/api/internal-api-index.json");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -4480,6 +4484,11 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     true,
   );
   assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.securityMatcherComparisonRequired, true);
+  const closedRouteEndpoints = [
+    "/api/v1/routes/search",
+    "/api/v2/routes/search",
+    "/api/v2/routes/{routeSearchId}/refresh",
+  ];
   assert.deepEqual(
     operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicEndpoints,
     [
@@ -4492,9 +4501,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/reports",
       "/api/v1/reports/{reportId}",
       "/api/v1/reports/{reportId}/confirm",
-      "/api/v1/routes/search",
-      "/api/v2/routes/search",
-      "/api/v2/routes/{routeSearchId}/refresh",
       "/api/v1/trains/stations",
       "/api/v1/trains/search",
       "/api/v1/realtime/arrivals",
@@ -4512,9 +4518,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/reports",
       "/api/v1/reports/*",
       "/api/v1/reports/*/confirm",
-      "/api/v1/routes/search",
-      "/api/v2/routes/search",
-      "/api/v2/routes/*/refresh",
       "/api/ads/events",
       "/api/v1/trains/stations",
       "/api/v1/trains/search",
@@ -4527,13 +4530,47 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/ads/active",
     ],
   );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.publicApiSurface.closedProductionEndpoints,
+    closedRouteEndpoints,
+  );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.publicApiSurface.closedProductionEndpointPolicy,
+    {
+      strategy: "NON_PRODUCTION_ONLY",
+      issue: 1913,
+      androidRouteMode: "LOCAL_FIRST",
+    },
+  );
+  for (const endpoint of closedRouteEndpoints) {
+    assert.ok(
+      internalApiIndex.operations.some((operation) => operation.method === "POST" && operation.path === endpoint),
+      `internal API source catalog must retain ${endpoint}`,
+    );
+    assert.ok(
+      !operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicEndpoints.includes(endpoint),
+      `production public endpoints must exclude ${endpoint}`,
+    );
+  }
+  assert.match(
+    routeSearchController,
+    /@Profile\("!prod & !staging & !release & !prod-like"\)[\s\S]*@RestController/,
+  );
+  assert.match(
+    securityConfig,
+    /@Profile\("!prod & !staging & !release & !prod-like"\)[\s\S]*SecurityFilterChain routeSearchSecurityFilterChain/,
+  );
+  const reportApiMatcherScope = securityConfig.match(
+    /SecurityFilterChain reportSecurityFilterChain[\s\S]*?\.build\(\)/,
+  );
   const publicApiMatcherScope = securityConfig.match(
-    /reportSecurityFilterChain[\s\S]*?publicSecurityFilterChain[\s\S]*?\.anyRequest\(\)\.denyAll\(\)/,
+    /SecurityFilterChain publicSecurityFilterChain[\s\S]*?\.anyRequest\(\)\.denyAll\(\)/,
   );
+  assert.ok(reportApiMatcherScope, "report API security matcher scope must be readable");
   assert.ok(publicApiMatcherScope, "public API security matcher scope must be readable");
-  const publicApiMatchers = Array.from(publicApiMatcherScope[0].matchAll(/"([^"]+)"/g), (match) => match[1]).filter(
-    (matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"),
-  );
+  const publicApiMatchers = [reportApiMatcherScope[0], publicApiMatcherScope[0]]
+    .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
+    .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"));
   assert.deepEqual(
     publicApiMatchers,
     operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicSecurityMatchers,
