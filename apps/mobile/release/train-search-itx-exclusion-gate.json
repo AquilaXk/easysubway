@@ -35,8 +35,8 @@
   "issue2094RoadmapRequiredForThisGate": false,
   "runtimeImplementationStatus": "DEFERRED_TO_2094",
   "verification": {
-    "backend": "./backend/gradlew test --tests '*TrainSearch*'",
-    "mobile": "flutter test apps/mobile/test/features/train_search",
+    "backend": "./backend/gradlew -p backend test --tests '*TrainSearch*'",
+    "mobile": "cd apps/mobile && flutter test test/features/train_search",
     "crossLayer": "node --test tools/ci/train-search-itx-exclusion-contract.test.mjs"
   }
 }

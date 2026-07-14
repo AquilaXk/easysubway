@@ -72,6 +72,8 @@ test("negative report는 request·provider·cache·catalog·Mobile에서 ITX 0�
   assert.equal(report.routeV2ItxConsumerUnchanged, true);
   assert.equal(report.issue2135ArtifactConsumedByTrainSearch, false);
   assert.equal(report.issue2094RoadmapRequiredForThisGate, false);
+  assert.equal(report.verification.backend, "./backend/gradlew -p backend test --tests '*TrainSearch*'");
+  assert.equal(report.verification.mobile, "cd apps/mobile && flutter test test/features/train_search");
 });
 
 test("수도권 Route V2 ITX consumer는 train-search exclusion과 독립적으로 유지된다", () => {
