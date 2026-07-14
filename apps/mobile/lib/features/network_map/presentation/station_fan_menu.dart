@@ -1,20 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../design_tokens.dart';
 import '../../route_draft/domain/route_draft.dart';
 import 'station_fan_menu_geometry.dart';
-
-const _departureColor = Color(0xFF176FD1);
-const _departureSoft = Color(0xFFEAF3FF);
-const _waypointColor = Color(0xFFF57C00);
-const _waypointSoft = Color(0xFFFFF3E6);
-const _arrivalColor = Color(0xFFEE2C35);
-const _arrivalSoft = Color(0xFFFFF0F1);
-const _closeSurface = Color(0xFFF1F3F6);
-const _closePressed = Color(0xFFE4E7EC);
-const _closeInk = Color(0xFF343A43);
-const _borderColor = Color(0xFFD5DAE2);
-const _outlineColor = Color(0xFFC9D0DA);
 
 /// 팬 메뉴의 논리 섹터. 닫기는 슬롯이 아니므로 별도 값으로 둔다.
 enum _FanSector { departure, waypoint, arrival, close }
@@ -180,9 +169,24 @@ class _StationFanMenuPainter extends CustomPainter {
     canvas.save();
     canvas.scale(scale);
     _paintShadow(canvas);
-    _paintSector(canvas, _FanSector.departure, _departureColor, _departureSoft);
-    _paintSector(canvas, _FanSector.waypoint, _waypointColor, _waypointSoft);
-    _paintSector(canvas, _FanSector.arrival, _arrivalColor, _arrivalSoft);
+    _paintSector(
+      canvas,
+      _FanSector.departure,
+      EasySubwayFanMenuColors.departure,
+      EasySubwayFanMenuColors.departureSoft,
+    );
+    _paintSector(
+      canvas,
+      _FanSector.waypoint,
+      EasySubwayFanMenuColors.waypoint,
+      EasySubwayFanMenuColors.waypointSoft,
+    );
+    _paintSector(
+      canvas,
+      _FanSector.arrival,
+      EasySubwayFanMenuColors.arrival,
+      EasySubwayFanMenuColors.arrivalSoft,
+    );
     _paintClose(canvas);
     _paintBorders(canvas);
     _paintIconsAndLabels(canvas);
@@ -222,12 +226,7 @@ class _StationFanMenuPainter extends CustomPainter {
     return slot != null && selectedSlots.contains(slot);
   }
 
-  void _paintSector(
-    Canvas canvas,
-    _FanSector sector,
-    Color color,
-    Color soft,
-  ) {
+  void _paintSector(Canvas canvas, _FanSector sector, Color color, Color soft) {
     final path = _pathFor(sector);
     final Color fill;
     if (_selected(sector)) {
@@ -244,7 +243,9 @@ class _StationFanMenuPainter extends CustomPainter {
   }
 
   void _paintClose(Canvas canvas) {
-    final fill = pressed == _FanSector.close ? _closePressed : _closeSurface;
+    final fill = pressed == _FanSector.close
+        ? EasySubwayFanMenuColors.closePressed
+        : EasySubwayFanMenuColors.closeSurface;
     canvas.drawPath(
       geometry.close,
       Paint()
@@ -259,7 +260,7 @@ class _StationFanMenuPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.4
-        ..color = _outlineColor,
+        ..color = EasySubwayFanMenuColors.outline,
     );
     // 섹터 간 경계선(스펙 §비주얼: #D5DAE2). 인접 섹터 경계 line 세그먼트만
     // 재현한다. 섹터 Path 스트로크로 대체하면 공유 경계가 겹쳐 진해지므로,
@@ -267,7 +268,7 @@ class _StationFanMenuPainter extends CustomPainter {
     final border = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.4
-      ..color = _borderColor;
+      ..color = EasySubwayFanMenuColors.border;
     canvas.drawPath(geometry.departure, border);
     canvas.drawPath(geometry.waypoint, border);
     canvas.drawPath(geometry.arrival, border);
@@ -277,28 +278,34 @@ class _StationFanMenuPainter extends CustomPainter {
   void _paintIconsAndLabels(Canvas canvas) {
     _paintDepartureIcon(
       canvas,
-      _iconColor(_FanSector.departure, _departureColor),
+      _iconColor(_FanSector.departure, EasySubwayFanMenuColors.departure),
     );
-    _paintWaypointIcon(canvas, _iconColor(_FanSector.waypoint, _waypointColor));
-    _paintArrivalIcon(canvas, _iconColor(_FanSector.arrival, _arrivalColor));
+    _paintWaypointIcon(
+      canvas,
+      _iconColor(_FanSector.waypoint, EasySubwayFanMenuColors.waypoint),
+    );
+    _paintArrivalIcon(
+      canvas,
+      _iconColor(_FanSector.arrival, EasySubwayFanMenuColors.arrival),
+    );
     _paintCloseIcon(canvas);
     _paintLabel(
       canvas,
       '출발',
       const Offset(175, 243),
-      _labelColor(_FanSector.departure, _departureColor),
+      _labelColor(_FanSector.departure, EasySubwayFanMenuColors.departure),
     );
     _paintLabel(
       canvas,
       '경유',
       const Offset(350, 195),
-      _labelColor(_FanSector.waypoint, _waypointColor),
+      _labelColor(_FanSector.waypoint, EasySubwayFanMenuColors.waypoint),
     );
     _paintLabel(
       canvas,
       '도착',
       const Offset(525, 243),
-      _labelColor(_FanSector.arrival, _arrivalColor),
+      _labelColor(_FanSector.arrival, EasySubwayFanMenuColors.arrival),
     );
   }
 
@@ -372,7 +379,7 @@ class _StationFanMenuPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 9
       ..strokeCap = StrokeCap.round
-      ..color = _closeInk;
+      ..color = EasySubwayFanMenuColors.closeInk;
     const o = Offset(350, 277);
     canvas.drawLine(
       Offset(o.dx - 17, o.dy - 17),
@@ -399,7 +406,10 @@ class _StationFanMenuPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
     // SVG y는 baseline. TextPainter는 top 기준이라 대략 fontSize만큼 위로 올린다.
-    tp.paint(canvas, Offset(baseline.dx - tp.width / 2, baseline.dy - tp.height));
+    tp.paint(
+      canvas,
+      Offset(baseline.dx - tp.width / 2, baseline.dy - tp.height),
+    );
   }
 
   @override

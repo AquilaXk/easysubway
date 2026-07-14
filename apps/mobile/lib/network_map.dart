@@ -795,8 +795,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                   : _pickWaypointStation,
               // #1933: _setOriginStation은 routeDraftController만 갱신하고 이
               // State에서 setState를 호출하지 않으므로, canvas를 좁게
-              // ListenableBuilder로 감싸 draft 변경 시 hasOrigin이 다시
-              // 계산되게 한다(그래야 다음 팝오버의 [도착] 강조가 즉시 반영됨).
+              // ListenableBuilder로 감싸 draft 변경 시 하위 트리가 다시
+              // 계산되게 한다(그래야 슬롯 배정 상태가 즉시 반영됨).
               child: ListenableBuilder(
                 listenable: widget.routeDraftController,
                 builder: (context, _) {
@@ -807,7 +807,6 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     selectedStationId: _nearbyPanelVisible
                         ? _nearbySelectedStationId
                         : null,
-                    hasOrigin: widget.routeDraftController.draft.origin != null,
                     originStationId:
                         widget.routeDraftController.draft.origin?.id,
                     waypointStationId:
@@ -3134,7 +3133,6 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.initialViewport,
     required this.focusedStationId,
     required this.selectedStationId,
-    required this.hasOrigin,
     required this.onSetOrigin,
     required this.onSetWaypoint,
     required this.onSetDestination,
@@ -3157,8 +3155,6 @@ class _NetworkMapCanvas extends StatefulWidget {
   final String? waypointStationId;
   final String? destinationStationId;
 
-  /// #1933-3: 출발이 이미 정해졌으면 다음 역 팝오버는 [도착]을 강조한다.
-  final bool hasOrigin;
   final ValueChanged<NetworkMapStation> onSetOrigin;
   final ValueChanged<NetworkMapStation> onSetWaypoint;
   final ValueChanged<NetworkMapStation> onSetDestination;

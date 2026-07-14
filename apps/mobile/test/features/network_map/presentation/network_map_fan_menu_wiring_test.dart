@@ -1,4 +1,6 @@
+import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 // NOTE: 노선도 캔버스는 network_map.dart의 private 위젯이라 직접 pump가 어렵다.
 // 이 테스트는 StationFanMenu가 노선도에 마운트됨을 보장하기보다, onAction의
@@ -61,5 +63,86 @@ void main() {
     // destEnabled = sX!=null(origin) && sX!=waypoint(sX) → false → dest dim.
     // waypointEnabled = sX!=null && sX!=null → true → waypoint 자기 슬롯, dim 아님.
     expect(disabled, {RouteDraftSlot.origin, RouteDraftSlot.destination});
+  });
+
+  group('재탭 clear 분기 (network_map.dart _NetworkMapCanvas onAction 배선 재현)', () {
+    // network_map.dart의 실제 onAction 클로저(3507행 부근)는
+    //   selectedSlots.contains(slot) ? clear : set
+    // 로 분기한다. _NetworkMapCanvas는 private이라 직접 pump할 수 없으므로,
+    // 동일 분기 로직을 이 헬퍼로 재현해 콜백 배선 회귀를 잡는다.
+    Future<void> pumpWithWiring(
+      WidgetTester tester, {
+      required Set<RouteDraftSlot> selectedSlots,
+      required void Function(RouteDraftSlot) onSet,
+      required void Function(RouteDraftSlot) onClear,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: StationFanMenu(
+                width: 700, // design 1:1 스케일이라 design 좌표=위젯 좌표
+                selectedSlots: selectedSlots,
+                disabledSlots: const {},
+                onAction: (slot) {
+                  if (selectedSlots.contains(slot)) {
+                    onClear(slot);
+                  } else {
+                    onSet(slot);
+                  }
+                },
+                onClose: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // station_fan_menu_test.dart와 동일하게, width=700이면 위젯 로컬 좌표가
+    // design 좌표와 1:1이라 Center 배치의 좌상단 오프셋만 더해 글로벌 좌표로
+    // 변환한다. Semantics onTap 경로(투명 버튼 오버레이)를 탭 좌표로 태운다.
+    Offset globalOf(WidgetTester tester, Offset design) {
+      final topLeft = tester.getTopLeft(find.byType(StationFanMenu));
+      return topLeft + design;
+    }
+
+    testWidgets('이미 origin으로 배정된 섹터를 재탭하면 clear만 불리고 set은 불리지 않는다', (
+      tester,
+    ) async {
+      final setCalls = <RouteDraftSlot>[];
+      final clearCalls = <RouteDraftSlot>[];
+      await pumpWithWiring(
+        tester,
+        selectedSlots: {RouteDraftSlot.origin},
+        onSet: setCalls.add,
+        onClear: clearCalls.add,
+      );
+
+      // "출발역으로 설정" 섹터(아이콘 중심 175,173)를 재탭.
+      await tester.tapAt(globalOf(tester, const Offset(175, 173)));
+      await tester.pump();
+
+      expect(clearCalls, [RouteDraftSlot.origin]);
+      expect(setCalls, isEmpty);
+    });
+
+    testWidgets('배정되지 않은 섹터를 탭하면 set만 불리고 clear는 불리지 않는다', (tester) async {
+      final setCalls = <RouteDraftSlot>[];
+      final clearCalls = <RouteDraftSlot>[];
+      await pumpWithWiring(
+        tester,
+        selectedSlots: {RouteDraftSlot.origin},
+        onSet: setCalls.add,
+        onClear: clearCalls.add,
+      );
+
+      // "도착역으로 설정" 섹터(아이콘 중심 525,173)는 미배정.
+      await tester.tapAt(globalOf(tester, const Offset(525, 173)));
+      await tester.pump();
+
+      expect(setCalls, [RouteDraftSlot.destination]);
+      expect(clearCalls, isEmpty);
+    });
   });
 }
