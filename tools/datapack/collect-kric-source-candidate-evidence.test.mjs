@@ -137,6 +137,39 @@ test("migrated KRIC runner는 legacy evidence와 분리된 operation sample을 �
   }
 });
 
+test("migrated KRIC runner는 responseFields가 없어도 operation endpoint provenance를 기록한다", async () => {
+  const migrated = {
+    id: "kric-station-elevator",
+    requestUrl: "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
+    operation: {
+      endpoint: "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
+      sampleUrl: "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+    },
+    evidence: {
+      endpoint: "https://apis.data.go.kr/B551181/stationElevatorInfo/getStationElevatorList",
+      formats: ["JSON"],
+      outputFields: ["providerField"],
+    },
+  };
+  const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-migrated-no-fields-"));
+  try {
+    const outputs = await collectKricSourceCandidateEvidence({
+      candidateId: migrated.id,
+      candidatesDocument: { candidates: [migrated] },
+      runnerTemp,
+      serviceKey: "key",
+      fetchImpl: async () => new Response(JSON.stringify([{ providerField: "value" }]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    });
+    const sample = JSON.parse(await readFile(outputs.sample, "utf8"));
+    assert.equal(sample.endpoint, migrated.operation.endpoint);
+  } finally {
+    await rm(runnerTemp, { recursive: true, force: true });
+  }
+});
+
 test("KRIC evidence collector는 raw를 제거하고 sanitized sample/report/hashes만 남긴다", async () => {
   const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-evidence-"));
   const serviceKey = "test-kric-service-key";

@@ -103,16 +103,18 @@ export async function collectKricSourceCandidateEvidence({
   const request = resolveKricCandidateRequest(document, candidateId);
   const effectiveDocument = {
     ...document,
-    candidates: document.candidates.map((candidate) => candidate.id !== candidateId || !candidate.operation?.responseFields
+    candidates: document.candidates.map((candidate) => candidate.id !== candidateId
       ? candidate
       : {
           ...candidate,
           evidence: {
             ...candidate.evidence,
-            ...(candidate.operation.sampleUrl
+            ...(candidate.operation?.sampleUrl
               ? { endpoint: candidate.operation.endpoint, sampleUrl: candidate.operation.sampleUrl }
               : {}),
-            outputFields: candidate.operation.responseFields,
+            ...(candidate.operation?.responseFields
+              ? { outputFields: candidate.operation.responseFields }
+              : {}),
           },
         }),
   };
