@@ -9,6 +9,15 @@ const stationSequenceEvidence = JSON.parse(await readFile(
 ));
 
 test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원으로 과장하지 않는다", () => {
+  assert.deepEqual(contract.searchScopePolicy, {
+    partitionKey: "CANONICAL_OD_STATION_MEMBERSHIP",
+    trainSearch: "FULL_ITX_CHEONGCHUN_NETWORK",
+    metropolitanRouteSearch: {
+      SUBWAY: "EXCLUDED",
+      SUBWAY_AND_TRAIN: "ALL_OD_STATIONS_IN_CAPITAL_METROPOLITAN_NETWORK",
+    },
+    duplicatePhysicalStationAllowed: false,
+  });
   assert.deepEqual(contract.coverageStates, {
     station_line_membership: "SUPPORTED",
     route_graph_topology: "MISSING",
@@ -28,6 +37,10 @@ test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원
     stationSequenceEvidence.stationSequenceRowCount);
   assert.equal(contract.officialEvidence.korailStationSequence.missingTimestampStopCount,
     stationSequenceEvidence.materialization.missingTimestampStopCount);
+  assert.deepEqual(contract.officialEvidence.korailStationSequence.stationTimeCapability,
+    { ...stationSequenceEvidence.materialization.stationTimeCapability,
+      verifiedAt: "2026-07-14T06:36:22.122Z",
+      travelerTrainRunInfo2RawSha256: "ff64cf6683de1fbc089dde751af198b4745bbd71260b3867cef69f615bafce4c" });
   assert.equal(contract.officialEvidence.korailStationSequence.disposition, "SUPPORTED_FOR_CANONICAL_STOP_SEQUENCE_ONLY");
   assert.equal(contract.materialization.status, "MISSING_STATION_TIMES");
   assert.equal(contract.claimGate.supportClaimAllowed, false);

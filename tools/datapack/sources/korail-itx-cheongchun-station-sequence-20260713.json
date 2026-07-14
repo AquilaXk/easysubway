@@ -1461,7 +1461,13 @@
   ],
   "materialization": {
     "status": "MISSING_STATION_TIMES",
-    "missingTimestampStopCount": 113
+    "missingTimestampStopCount": 113,
+    "stationTimeCapability": {
+      "status": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      "reasonCode": "OFFICIAL_OPERATION_FIELDS_EMPTY",
+      "checkedStopCount": 113,
+      "populatedTimestampStopCount": 0
+    }
   },
   "operations": [
     {

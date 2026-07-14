@@ -161,7 +161,16 @@ test("Korail station row의 시각이 비면 sequence evidence만 보존하고 t
     },
   });
 
-  assert.deepEqual(artifact.materialization, { status: "MISSING_STATION_TIMES", missingTimestampStopCount: 1 });
+  assert.deepEqual(artifact.materialization, {
+    status: "MISSING_STATION_TIMES",
+    missingTimestampStopCount: 1,
+    stationTimeCapability: {
+      status: "MISSING",
+      reasonCode: "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY",
+      checkedStopCount: 3,
+      populatedTimestampStopCount: 2,
+    },
+  });
   assert.equal(artifact.stationSequences.length, 1);
   assert.equal(artifact.stationSequences[0].stops.length, 3);
   assert.deepEqual(artifact.transitTrips, []);
@@ -181,6 +190,12 @@ test(
     assert.equal(LIVE_EVIDENCE.stationSequences.length, 18);
     assert.equal(LIVE_EVIDENCE.materialization.status, "MISSING_STATION_TIMES");
     assert.ok(LIVE_EVIDENCE.materialization.missingTimestampStopCount > 0);
+    assert.deepEqual(LIVE_EVIDENCE.materialization.stationTimeCapability, {
+      status: "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+      reasonCode: "OFFICIAL_OPERATION_FIELDS_EMPTY",
+      checkedStopCount: 113,
+      populatedTimestampStopCount: 0,
+    });
     assert.deepEqual(LIVE_EVIDENCE.transitTrips, []);
     assert.deepEqual(LIVE_EVIDENCE.transitStopTimes, []);
     assert.match(LIVE_EVIDENCE.evidenceHash, /^[a-f0-9]{64}$/);

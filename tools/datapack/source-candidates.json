@@ -3175,14 +3175,22 @@
           "tagoTrainCount": 18,
           "canonicalStationSequenceRowCount": 113,
           "missingTimestampStopCount": 113,
-          "status": "MISSING_STATION_TIMES"
+          "status": "MISSING_STATION_TIMES",
+          "stationTimeCapability": {
+            "status": "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE",
+            "reasonCode": "OFFICIAL_OPERATION_FIELDS_EMPTY",
+            "checkedStopCount": 113,
+            "populatedTimestampStopCount": 0,
+            "verifiedAt": "2026-07-14T06:36:22.122Z",
+            "rawSha256": "ff64cf6683de1fbc089dde751af198b4745bbd71260b3867cef69f615bafce4c"
+          }
         },
         "coverageLimitations": [
           "TAGO ITX 18편의 trn_run_sn·canonical 정차순서 113건은 검증됨",
           "113건 모두 trn_dptre_dt·trn_arvl_dt 값이 비어 timetable trip/stop/time은 생성하지 않음"
         ]
       },
-      "nextAction": "provider가 station time 값을 제공하면 같은 collector로 재검증하고, 그 전에는 topology sequence로만 사용한다"
+      "nextAction": "provider가 station time 값을 제공하면 같은 collector로 재검증한다. 그 전에는 수도권 광역 노선도 canonical station 구간의 topology sequence와 기차검색 열차번호 근거로만 사용한다"
     },
     {
       "id": "daejeon-train-timetable",

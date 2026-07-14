@@ -88,6 +88,8 @@ export async function collectKorailItxCheongchunTimetable({
   if (analyzed.missingTimestampStopCount === 0) {
     validateTagoOdJoin(materialized, trainNumberEvidence, kricServiceDayCode, runDate);
   }
+  const checkedStopCount = analyzed.stationSequences.reduce((total, trip) => total + trip.stops.length, 0);
+  const populatedTimestampStopCount = checkedStopCount - analyzed.missingTimestampStopCount;
 
   return {
     schemaVersion: 1,
@@ -109,7 +111,7 @@ export async function collectKorailItxCheongchunTimetable({
       evidenceHash: trainNumberEvidence.evidenceHash,
     },
     trainCount: analyzed.trainNumbers.length,
-    stationSequenceRowCount: analyzed.stationSequences.reduce((total, trip) => total + trip.stops.length, 0),
+    stationSequenceRowCount: checkedStopCount,
     stopTimeCount: materialized.transitStopTimes.length,
     trainNumbers: analyzed.trainNumbers,
     stationMappings: analyzed.stationMappings,
@@ -117,6 +119,18 @@ export async function collectKorailItxCheongchunTimetable({
     materialization: {
       status: analyzed.missingTimestampStopCount === 0 ? "SUPPORTED" : "MISSING_STATION_TIMES",
       missingTimestampStopCount: analyzed.missingTimestampStopCount,
+      stationTimeCapability: {
+        status: analyzed.missingTimestampStopCount === 0
+          ? "SUPPORTED"
+          : populatedTimestampStopCount === 0 ? "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE" : "MISSING",
+        reasonCode: analyzed.missingTimestampStopCount === 0
+          ? "OFFICIAL_OPERATION_FIELDS_POPULATED"
+          : populatedTimestampStopCount === 0
+            ? "OFFICIAL_OPERATION_FIELDS_EMPTY"
+            : "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY",
+        checkedStopCount,
+        populatedTimestampStopCount,
+      },
     },
     operations: [
       operationEvidence("codes2", codes),
