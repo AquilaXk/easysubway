@@ -202,9 +202,6 @@
         "/api/v1/reports",
         "/api/v1/reports/{reportId}",
         "/api/v1/reports/{reportId}/confirm",
-        "/api/v1/routes/search",
-        "/api/v2/routes/search",
-        "/api/v2/routes/{routeSearchId}/refresh",
         "/api/v1/trains/stations",
         "/api/v1/trains/search",
         "/api/v1/realtime/arrivals",
@@ -219,9 +216,6 @@
         "/api/v1/reports",
         "/api/v1/reports/*",
         "/api/v1/reports/*/confirm",
-        "/api/v1/routes/search",
-        "/api/v2/routes/search",
-        "/api/v2/routes/*/refresh",
         "/api/ads/events",
         "/api/v1/trains/stations",
         "/api/v1/trains/search",
@@ -233,6 +227,16 @@
         "/api/notices/active",
         "/api/ads/active"
       ],
+      "closedProductionEndpoints": [
+        "/api/v1/routes/search",
+        "/api/v2/routes/search",
+        "/api/v2/routes/{routeSearchId}/refresh"
+      ],
+      "closedProductionEndpointPolicy": {
+        "strategy": "NON_PRODUCTION_ONLY",
+        "issue": 1913,
+        "androidRouteMode": "LOCAL_FIRST"
+      },
       "requiredEvidence": [
         "backend-public-api-surface-inventory",
         "default-deny-public-chain-test-output",
