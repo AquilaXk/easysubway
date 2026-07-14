@@ -3,6 +3,7 @@ import 'dart:ui' show SemanticsAction;
 import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show OrdinalSortKey;
 import 'package:flutter_test/flutter_test.dart';
 
 Future<void> _pump(
@@ -109,6 +110,16 @@ void main() {
     expect(find.bySemanticsLabel('경유지로 추가'), findsOneWidget);
     expect(find.bySemanticsLabel('도착역으로 설정'), findsOneWidget);
     expect(find.bySemanticsLabel('메뉴 닫기'), findsOneWidget);
+  });
+
+  testWidgets('Semantics 탐색 순서는 출발·경유·도착·닫기다', (tester) async {
+    await _pump(tester, onAction: (_) {}, onClose: () {});
+    final orders = ['출발역으로 설정', '경유지로 추가', '도착역으로 설정', '메뉴 닫기'].map((label) {
+      final sortKey = tester.getSemantics(find.bySemanticsLabel(label)).sortKey;
+      return (sortKey! as OrdinalSortKey).order;
+    });
+
+    expect(orders, [0, 1, 2, 3]);
   });
 
   testWidgets('#2109 4개 섹터 Semantics 노드 rect는 상호 배제된다(겹침 면적 0)', (

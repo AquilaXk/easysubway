@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show OrdinalSortKey;
 
 import '../../../design_tokens.dart';
 import '../../route_draft/domain/route_draft.dart';
@@ -199,6 +200,7 @@ class _StationFanMenuState extends State<StationFanMenu> {
         button: true,
         enabled: !_disabled(sector),
         label: _semanticsLabel(sector),
+        sortKey: OrdinalSortKey(sector.index.toDouble()),
         onTap: _disabled(sector) ? null : () => _handleTapUp(sector),
         child: const SizedBox.expand(),
       ),
