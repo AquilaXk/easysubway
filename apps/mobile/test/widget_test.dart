@@ -12,6 +12,7 @@ import 'package:easysubway_mobile/favorite_facility.dart';
 import 'package:easysubway_mobile/core/external/kakao_map_launcher.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart'
     hide InternalRouteNode;
+import 'package:easysubway_mobile/core/datapack/bundled_data_pack_freshness.dart';
 import 'package:easysubway_mobile/core/network/api_client.dart';
 import 'package:easysubway_mobile/features/ads/active_ad_banner.dart';
 import 'package:easysubway_mobile/features/ads/ad_repository.dart';
@@ -619,7 +620,14 @@ void main() {
         routeRepository: FakeRouteSearchRepository(),
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
-        bundledDataPackStaleLabel: '저장된 데이터 기준 · 갱신 필요',
+        bundledDataPackFreshness: BundledDataPackFreshness(
+          status: 'STALE',
+          freshnessExpiresAt: DateTime.now().toUtc().subtract(
+            const Duration(seconds: 1),
+          ),
+          reasonCode: 'BUNDLED_PACK_EXPIRED',
+          labelKo: BundledDataPackFreshness.staleLabelKo,
+        ),
         initialOnboardingState: _completedOnboardingState(),
       ),
     );
@@ -627,6 +635,77 @@ void main() {
 
     expect(find.byKey(const Key('bundledDataPackStaleBanner')), findsOneWidget);
     expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
+    final sharedSafeArea = find
+        .ancestor(
+          of: find.byKey(const Key('bundledDataPackStaleBanner')),
+          matching: find.byType(SafeArea),
+        )
+        .first;
+    expect(
+      find.descendant(
+        of: sharedSafeArea,
+        matching: find.byKey(const Key('networkMapScreen')),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('bundled datapack은 앱 실행 중 expiry 경계를 지나면 stale 안내를 표시한다', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        bundledDataPackFreshness: BundledDataPackFreshness(
+          status: 'FRESH',
+          freshnessExpiresAt: DateTime.now().toUtc().add(
+            const Duration(milliseconds: 100),
+          ),
+          reasonCode: 'NONE',
+          labelKo: '',
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    expect(find.byKey(const Key('bundledDataPackStaleBanner')), findsNothing);
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byKey(const Key('bundledDataPackStaleBanner')), findsOneWidget);
+  });
+
+  testWidgets('stale bundled datapack 안내는 경로 검색 탭에서도 유지된다', (tester) async {
+    final stationRepository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        bundledDataPackFreshness: BundledDataPackFreshness(
+          status: 'STALE',
+          freshnessExpiresAt: DateTime.now().toUtc().subtract(
+            const Duration(seconds: 1),
+          ),
+          reasonCode: 'BUNDLED_PACK_EXPIRED',
+          labelKo: BundledDataPackFreshness.staleLabelKo,
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await _openRouteSearchScreen(tester);
+
+    expect(find.byType(RouteSearchScreen), findsOneWidget);
+    expect(find.byKey(const Key('bundledDataPackStaleBanner')), findsOneWidget);
   });
 
   testWidgets('기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다', (tester) async {

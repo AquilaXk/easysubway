@@ -164,9 +164,11 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			new ReleaseReadinessRow("Source coverage", statusFor(sourceBlockers), sourceBlockers, sourceNote(aliasBlockers, quarantineBlockers)),
 			new ReleaseReadinessRow(
 				"Source freshness",
-				statusFor(sourceFreshnessBlockers),
+				candidate.isEmpty() ? "확인 필요" : statusFor(sourceFreshnessBlockers),
 				sourceFreshnessBlockers,
-				sourceFreshnessBlockers > 0 ? "SOURCE_SNAPSHOT_EXPIRED" : "latest source snapshots"
+				candidate.isEmpty()
+					? "source snapshot 없음"
+					: sourceFreshnessBlockers > 0 ? "SOURCE_SNAPSHOT_EXPIRED" : "latest source snapshots"
 			),
 			new ReleaseReadinessRow("Validator", statusFor(validatorBlockers), validatorBlockers, "SQLite integrity / validator gates"),
 			new ReleaseReadinessRow("Facility evidence", statusFor(facilityBlockers), facilityBlockers, "strict route eligible facility evidence"),

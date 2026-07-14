@@ -185,6 +185,11 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	@DisplayName("데이터팩 근거가 없으면 release readiness는 집계 전 상태를 보여준다")
 	void releaseReadinessFallsBackWhenDatapackEvidenceIsEmpty() throws Exception {
 		clearDatapackTables();
+		var summary = blockerSummaryUseCase.summarize();
+		var sourceFreshness = summary.readinessRows().stream()
+			.filter(row -> "Source freshness".equals(row.label()))
+			.findFirst()
+			.orElseThrow();
 
 		String dashboardHtml = getAdminHtml("/admin/dashboard/page");
 		String qualityHtml = getAdminHtml("/admin/data-quality/page");
@@ -206,6 +211,8 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.contains("확인 필요 0건")
 			.contains("집계 전")
 			.doesNotContain("PASS 0건");
+		assertThat(sourceFreshness.status()).isEqualTo("확인 필요");
+		assertThat(sourceFreshness.note()).isEqualTo("source snapshot 없음");
 	}
 
 	@Test

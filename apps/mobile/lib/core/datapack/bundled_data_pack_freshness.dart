@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 class BundledDataPackFreshness {
+  static const staleLabelKo = '저장된 데이터 기준 · 갱신 필요';
+
   const BundledDataPackFreshness({
     required this.status,
     required this.freshnessExpiresAt,
@@ -39,7 +41,7 @@ class BundledDataPackFreshness {
     if (status == 'STALE') {
       if (reasonCode != 'BUNDLED_PACK_EXPIRED' ||
           labelKo is! String ||
-          labelKo.trim().isEmpty) {
+          labelKo != staleLabelKo) {
         throw const FormatException('Invalid stale bundled data pack state.');
       }
     } else if (status != 'FRESH' || reasonCode != 'NONE' || labelKo != '') {
@@ -57,6 +59,12 @@ class BundledDataPackFreshness {
   final DateTime freshnessExpiresAt;
   final String reasonCode;
   final String labelKo;
+
+  bool isStaleAt(DateTime evaluationAt) =>
+      !evaluationAt.toUtc().isBefore(freshnessExpiresAt.toUtc());
+
+  String? staleLabelAt(DateTime evaluationAt) =>
+      isStaleAt(evaluationAt) ? staleLabelKo : null;
 
   String? get staleLabel => status == 'STALE' ? labelKo : null;
 }
