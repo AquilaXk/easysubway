@@ -305,13 +305,14 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   for (const [id, method, authEnv] of [
     ["provider:daejeon-train-timetable", "GET", "DATA_GO_KR_SERVICE_KEY"],
     ["provider:daejeon-station-distance-fare", "GET", "DATA_GO_KR_SERVICE_KEY"],
-    ["provider:daejeon-braille-guide-map", "GET", "DATA_GO_KR_SERVICE_KEY"],
   ]) {
     const entry = findCatalogEntry(catalog, id);
     assert.equal(entry.operation.method, method);
     assert.equal(entry.operation.auth.env, authEnv);
     assert.equal(entry.operation.runner.command, "node tools/datapack/probe-daejeon-coverage-api.mjs");
   }
+  const removedDaejeonId = ["provider:daejeon", "braille-guide-map"].join("-");
+  assert.equal(catalog.some(({ id }) => id === removedDaejeonId), false);
   const daejeonDistanceFare = findCatalogEntry(catalog, "provider:daejeon-station-distance-fare");
   assert.equal(daejeonDistanceFare.detailUrl, "https://www.data.go.kr/data/15158794/openapi.do");
   assert.equal(daejeonDistanceFare.endpoint, "https://apis.data.go.kr/B554695/TimeDistSVC/getTimeDist01");
@@ -323,7 +324,6 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.deepEqual(daejeonDistanceFare.responseFields, ["distfloat", "fee", "min", "sec"]);
   const daejeonSearchIds = new Set(listCatalog(catalog, { kind: "provider", query: "대전" }).map(({ id }) => id));
   for (const id of [
-    "provider:daejeon-braille-guide-map",
     "provider:daejeon-station-distance-fare",
     "provider:daejeon-train-timetable",
   ]) assert.ok(daejeonSearchIds.has(id));
@@ -384,7 +384,7 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
 test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
   const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
 
-  assert.equal(providers.length, 41);
+  assert.equal(providers.length, 40);
   assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
   assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
