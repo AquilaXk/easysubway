@@ -531,6 +531,110 @@ void main() {
     expect(result.etaSource, 'STATIC_LOCAL');
   });
 
+  test('Mobile 로컬 planner는 ITX topology를 직접 소비하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'itx-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 60,
+      servicePattern: 'EXPRESS',
+    );
+
+    final subwayResult = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+    expect(subwayResult.status, 'FOUND');
+
+    await database.customStatement('''
+      UPDATE network_edges
+      SET service_class = 'ITX_CHEONGCHUN'
+      WHERE id = 'itx-edge-a-b'
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    expect(result.status, isNot('FOUND'));
+    expect(
+      result.steps.expand((step) => step.evidenceSources),
+      isNot(contains('edge:itx-edge-a-b')),
+    );
+  });
+
+  test('Mobile 로컬 planner는 ITX timetable row를 직접 소비하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'subway-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 600,
+      servicePattern: 'EXPRESS',
+    );
+    await database.customStatement('''
+      INSERT INTO service_calendars (
+        service_id, monday, tuesday, wednesday, thursday, friday,
+        saturday, sunday, start_date, end_date
+      ) VALUES (
+        'itx-weekday', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_routes (id, line_id, route_short_name)
+      VALUES ('itx-route', 'line-test', 'ITX-청춘')
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, service_pattern, service_class
+      ) VALUES (
+        'itx-trip', 'itx-route', 'itx-weekday', 'EXPRESS', 'ITX_CHEONGCHUN'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds
+      ) VALUES
+        ('itx-trip', 1, 'station-a', 'line-test', 28770, 28800),
+        ('itx-trip', 2, 'station-b', 'line-test', 29400, 29430)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(result.status, 'FOUND');
+    expect(ride.plannedArrivalTimeIso, isEmpty);
+  });
+
   test('SLOW 프리셋은 보행 스텝 시간을 늘리고 ride 스텝은 그대로 둔다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -4674,6 +4778,7 @@ Future<void> _insertVerifiedNetworkEdge(
   required int durationSeconds,
   int distanceMeters = 0,
   String servicePattern = '',
+  String serviceClass = 'SUBWAY',
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
   int lastVerifiedAtSeconds = 1781827200,
@@ -4684,11 +4789,11 @@ Future<void> _insertVerifiedNetworkEdge(
     '''
       INSERT INTO network_edges (
         id, from_node_id, to_node_id, duration_seconds, distance_meters, edge_type,
-        service_pattern, stair_access_state, accessibility_status, reliability_score,
+        service_pattern, service_class, stair_access_state, accessibility_status, reliability_score,
         source_id, source_snapshot_id, provider_record_hash, provenance_kind,
         verification_status, last_verified_at, evidence_hash
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'STEP_FREE', 'AVAILABLE', 95, 'test-source',
         'test-source-snapshot',
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         ?, ?, ?, ?)
@@ -4701,6 +4806,7 @@ Future<void> _insertVerifiedNetworkEdge(
       distanceMeters,
       edgeType,
       servicePattern,
+      serviceClass,
       provenanceKind,
       verificationStatus,
       lastVerifiedAtSeconds,

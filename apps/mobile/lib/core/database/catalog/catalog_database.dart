@@ -7,7 +7,7 @@ import 'catalog_tables.dart';
 
 part 'catalog_database.g.dart';
 
-const catalogDatabaseSchemaVersion = 17;
+const catalogDatabaseSchemaVersion = 18;
 
 /// 수도권 통합요금 기본거리(10km) 초과분 요금 단계(#1911).
 ///
@@ -45,6 +45,7 @@ const capitalIntegratedAdditionalStepsJson =
     FareDiscounts,
     StationFareZones,
     OfficialOdFareQuotes,
+    RouteServiceArtifactEvidence,
     RealtimeProviderLineMappings,
     RealtimeProviderStationMappings,
     NetworkEdges,
@@ -154,6 +155,19 @@ class CatalogDatabase extends _$CatalogDatabase {
         }
         if (from < 17) {
           await migrator.createTable(officialOdFareQuotes);
+        }
+        if (from < 18) {
+          await _addColumnIfTableExists(
+            'transit_trips',
+            'service_class',
+            "TEXT NOT NULL DEFAULT 'SUBWAY'",
+          );
+          await _addColumnIfTableExists(
+            'network_edges',
+            'service_class',
+            "TEXT NOT NULL DEFAULT 'SUBWAY'",
+          );
+          await migrator.createTable(routeServiceArtifactEvidence);
         }
       },
       beforeOpen: (_) async {
@@ -1330,6 +1344,21 @@ class CatalogDatabase extends _$CatalogDatabase {
     await customStatement(
       'ALTER TABLE $tableName ADD COLUMN $columnName $definition',
     );
+  }
+
+  Future<void> _addColumnIfTableExists(
+    String tableName,
+    String columnName,
+    String definition,
+  ) async {
+    final table = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      variables: [Variable<String>(tableName)],
+    ).getSingleOrNull();
+    if (table == null) {
+      return;
+    }
+    await _addColumnIfMissing(tableName, columnName, definition);
   }
 }
 
