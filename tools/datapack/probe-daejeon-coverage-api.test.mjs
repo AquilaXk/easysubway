@@ -11,6 +11,9 @@ const sourceCandidates = JSON.parse(await readFile(new URL("./source-candidates.
 const timetableEvidence = JSON.parse(await readFile(
   new URL("./sources/daejeon-train-timetable-20260714.json", import.meta.url), "utf8",
 ));
+const distanceFareEvidence = JSON.parse(await readFile(
+  new URL("./sources/daejeon-station-distance-fare-20260714.json", import.meta.url), "utf8",
+));
 
 test("대전 coverage probe는 시간표 XML을 검증하고 credential을 제거한다", async () => {
   const secret = "never-print-this-key";
@@ -113,6 +116,25 @@ test("대전 열차시각표 candidate는 live XML schema만 admission하고 cov
   assert.equal(timetableEvidence.sourceId, candidate.id);
   assert.equal(timetableEvidence.rawSha256, candidate.evidence.liveValidation.rawSha256);
   assert.deepEqual(timetableEvidence.outputFields, candidate.evidence.outputFields);
+});
+
+test("대전 역간 candidate는 official XML만 active로 admission하고 topology는 MISSING이다", () => {
+  const candidate = sourceCandidates.candidates.find(({ id }) => id === "daejeon-station-distance-fare");
+  assert.equal(candidate.detailUrl, "https://www.data.go.kr/data/15158794/openapi.do");
+  assert.equal(candidate.requestUrl, "https://apis.data.go.kr/B554695/TimeDistSVC/getTimeDist01");
+  assert.equal(candidate.admissionStatus, "validated_live_schema_admitted");
+  assert.equal(candidate.evidence.liveValidation.rowCount > 0, true);
+  assert.equal(candidate.evidence.coverageAssessment.state, "MISSING");
+  assert.equal(candidate.evidence.historicalSources[0].reasonCode, "SUPERSEDED_FOR_LIVE_PROBE");
+  assert.equal(candidate.evidence.historicalSources[0].runtimeEligible, false);
+  assert.equal(candidate.nextAction,
+    "전체 OD와 canonical station mapping을 별도 이슈에서 검증한 뒤 topology materialization을 판정한다.");
+  assert.equal(distanceFareEvidence.rawSha256, candidate.evidence.liveValidation.rawSha256);
+  assert.equal(distanceFareEvidence.rawBytes > 0, true);
+  assert.equal(distanceFareEvidence.observedAt.startsWith("2026-07-14"), true);
+  assert.equal("rows" in distanceFareEvidence, false);
+  assert.equal("raw" in distanceFareEvidence, false);
+  assert.equal("body" in distanceFareEvidence, false);
 });
 
 test("대전 coverage probe는 provider/schema 오류를 fail closed한다", async (context) => {
