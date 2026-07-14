@@ -47,12 +47,18 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
 
   const tripIds = validateTrips(trips);
   validateStopTimes(stopTimes, tripIds);
+  const evidence = validateRouteServiceEvidence(
+    artifact?.routeServiceArtifactEvidence ?? [],
+    trips,
+    options.buildNow ?? new Date(),
+  );
 
   const calendars = deriveCalendars(trips, dayMap, startDate, endDate);
   const routes = deriveRoutes(trips, lineId);
 
   const statements = [
     feedInfoInsert(feedEndDate),
+    ...evidence.map(routeServiceEvidenceInsert),
     ...calendars.map(calendarInsert),
     ...routes.map(routeInsert),
     ...trips.map(tripInsert),
@@ -64,6 +70,7 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
 }
 
 const ALLOWED_SERVICE_PATTERNS = new Set(["LOCAL", "EXPRESS"]);
+const ALLOWED_SERVICE_CLASSES = new Set(["SUBWAY", "ITX_CHEONGCHUN"]);
 
 // trip 행이 V29 제약(id PK 유일, service_pattern CHECK, service_day_start_seconds 범위)을 만족하는지
 // 생성 단계에서 검증한다(로드-시점 FK/CHECK 실패를 앞당김). trip id 집합을 stop_times FK 검증용으로 반환.
@@ -79,12 +86,39 @@ function validateTrips(trips) {
     if (!ALLOWED_SERVICE_PATTERNS.has(pattern)) {
       throw new Error(`transit_trips service_pattern must be LOCAL or EXPRESS: ${id}:${pattern}`);
     }
+    const serviceClass = trip.serviceClass ?? "SUBWAY";
+    if (!ALLOWED_SERVICE_CLASSES.has(serviceClass)) {
+      throw new Error(`transit_trips service_class must be SUBWAY or ITX_CHEONGCHUN: ${id}:${serviceClass}`);
+    }
     const dayStart = trip.serviceDayStartSeconds ?? 0;
     if (!Number.isInteger(dayStart) || dayStart < 0 || dayStart >= SECONDS_LIMIT_EXCLUSIVE) {
       throw new Error(`transit_trips service_day_start_seconds out of range [0,${SECONDS_LIMIT_EXCLUSIVE}): ${id}:${dayStart}`);
     }
   }
   return ids;
+}
+
+function validateRouteServiceEvidence(rows, trips, buildNow) {
+  if (!Array.isArray(rows) || rows.length > 1) {
+    throw new Error("routeServiceArtifactEvidence must contain at most one row");
+  }
+  const hasItxTrips = trips.some(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN");
+  if (!hasItxTrips) {
+    return rows;
+  }
+  const evidence = rows[0];
+  if (
+    evidence?.serviceClass !== "ITX_CHEONGCHUN"
+    || evidence.admissionStatus !== "ADMITTED"
+    || evidence.admissionEligible !== true
+  ) {
+    throw new Error("ITX_CHEONGCHUN seed requires ADMITTED route service evidence");
+  }
+  const freshUntil = new Date(evidence.freshUntil);
+  if (Number.isNaN(freshUntil.getTime()) || freshUntil <= buildNow) {
+    throw new Error("ITX_CHEONGCHUN route service evidence must be fresh");
+  }
+  return rows;
 }
 
 function validateStopTimes(stopTimes, tripIds) {
@@ -183,10 +217,34 @@ function routeInsert(r) {
 
 function tripInsert(t) {
   return (
-    "INSERT INTO transit_trips (id, route_id, service_id, service_pattern, service_day_start_seconds, trip_headsign, direction_id) VALUES (" +
+    "INSERT INTO transit_trips (id, route_id, service_id, service_pattern, service_class, service_day_start_seconds, trip_headsign, direction_id) VALUES (" +
     `${quote(requireString(t.id, "transitTrips.id"))}, ${quote(requireString(t.routeId, "transitTrips.routeId"))}, ` +
     `${quote(requireString(t.serviceId, "transitTrips.serviceId"))}, ${quote(t.servicePattern ?? "LOCAL")}, ` +
-    `${t.serviceDayStartSeconds ?? 0}, ${quote(t.tripHeadsign ?? "")}, ${quote(t.directionId ?? "")});`
+    `${quote(t.serviceClass ?? "SUBWAY")}, ${t.serviceDayStartSeconds ?? 0}, ${quote(t.tripHeadsign ?? "")}, ${quote(t.directionId ?? "")});`
+  );
+}
+
+function routeServiceEvidenceInsert(row) {
+  const hashes = [
+    [row.timetableArtifactSha256, "timetableArtifactSha256"],
+    [row.canonicalPackSha256, "canonicalPackSha256"],
+    [row.canonicalPackSqliteSha256, "canonicalPackSqliteSha256"],
+  ];
+  for (const [value, label] of hashes) {
+    if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) {
+      throw new Error(`routeServiceArtifactEvidence.${label} must be a lowercase sha256`);
+    }
+  }
+  if (row.sourceIssue !== 2116) {
+    throw new Error("routeServiceArtifactEvidence.sourceIssue must be 2116");
+  }
+  return (
+    "INSERT INTO route_service_artifact_evidence (service_class, timetable_artifact_id, timetable_artifact_sha256, canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256, admission_status, admission_eligible, fresh_until, source_issue) VALUES (" +
+    `${quote(requireString(row.serviceClass, "routeServiceArtifactEvidence.serviceClass"))}, ` +
+    `${quote(requireString(row.timetableArtifactId, "routeServiceArtifactEvidence.timetableArtifactId"))}, ` +
+    `${quote(row.timetableArtifactSha256)}, ${quote(requireString(row.canonicalPackId, "routeServiceArtifactEvidence.canonicalPackId"))}, ` +
+    `${quote(row.canonicalPackSha256)}, ${quote(row.canonicalPackSqliteSha256)}, ${quote(row.admissionStatus)}, ` +
+    `${bool(row.admissionEligible)}, ${row.freshUntil == null ? "NULL" : quote(row.freshUntil)}, ${row.sourceIssue});`
   );
 }
 

@@ -3,6 +3,7 @@ package com.easysubway.route.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.OffsetDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
@@ -25,6 +26,7 @@ class TimetableSeedLoaderTest {
 		jdbc.execute("DROP ALL OBJECTS");
 		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V29__canonical_transit_schedule.sql'");
 		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V37__transit_feed_info.sql'");
+		jdbc.execute("RUNSCRIPT FROM 'src/main/resources/db/migration/h2/V50__route_service_identity.sql'");
 	}
 
 	private TimetableSeedLoader loader(Resource seed) {
@@ -97,5 +99,53 @@ class TimetableSeedLoaderTest {
 		};
 		assertThatThrownBy(() -> loader(bad).run(null)).isInstanceOf(RuntimeException.class);
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isZero();
+	}
+
+	@Test
+	void rejectsItxRowsWithoutAdmittedIdentityAndRollsBack() {
+		var seed = itxSeed("MISSING", false, "2026-07-21T00:00:00.000Z");
+
+		assertThatThrownBy(() -> loader(seed).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("ITX-청춘 timetable seed requires ADMITTED evidence");
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isZero();
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM route_service_artifact_evidence", Integer.class)).isZero();
+	}
+
+	@Test
+	void rejectsStaleAdmittedItxIdentityAndRollsBack() {
+		assertThatThrownBy(() -> loader(itxSeed("ADMITTED", true, "2000-01-01T00:00:00.000Z")).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("valid freshness");
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isZero();
+	}
+
+	@Test
+	void acceptsFreshAdmittedItxIdentity() {
+		String freshUntil = OffsetDateTime.now().plusDays(1).toString();
+		loader(itxSeed("ADMITTED", true, freshUntil)).run(null);
+
+		assertThat(jdbc.queryForObject(
+			"SELECT service_class FROM transit_trips WHERE id = 'itx-1'", String.class))
+			.isEqualTo("ITX_CHEONGCHUN");
+		assertThat(jdbc.queryForObject(
+			"SELECT canonical_pack_id FROM route_service_artifact_evidence", String.class))
+			.isEqualTo("capital");
+	}
+
+	private Resource itxSeed(String admissionStatus, boolean admissionEligible, String freshUntil) {
+		return new ByteArrayResource((
+			"INSERT INTO service_calendars (service_id, start_date, end_date, timezone, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES ('itx-weekday','20260714','20260721','Asia/Seoul',TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE);\n"
+			+ "INSERT INTO transit_routes (id, timezone, line_id, route_short_name, route_long_name, direction_name) VALUES ('itx-down','Asia/Seoul','line-54a7b980b7c3','ITX-청춘','','down');\n"
+			+ "INSERT INTO route_service_artifact_evidence (service_class, timetable_artifact_id, timetable_artifact_sha256, canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256, admission_status, admission_eligible, fresh_until, source_issue) VALUES ('ITX_CHEONGCHUN','test-only-itx','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','capital','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','"
+			+ admissionStatus + "'," + admissionEligible + ",'" + freshUntil + "',2116);\n"
+			+ "INSERT INTO transit_trips (id, route_id, service_id, service_pattern, service_class, service_day_start_seconds, trip_headsign, direction_id) VALUES ('itx-1','itx-down','itx-weekday','EXPRESS','ITX_CHEONGCHUN',0,'춘천','down');\n"
+			+ "INSERT INTO transit_stop_times (trip_id, stop_sequence, station_id, line_id, pickup_type, drop_off_type, arrival_seconds, departure_seconds) VALUES ('itx-1',1,'station-b819702fa7d9','line-54a7b980b7c3',0,0,28800,28860);\n"
+		).getBytes()) {
+			@Override
+			public String getFilename() {
+				return "itx-seed.sql";
+			}
+		};
 	}
 }

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { buildBackendTimetableSeed } from "./build-backend-timetable-seed.mjs";
 
@@ -29,7 +31,12 @@ const ARTIFACT = {
   ],
 };
 
-const OPTIONS = { lineId: "seoul-4", startDate: "20260101", endDate: "20261231" };
+const OPTIONS = {
+  lineId: "seoul-4",
+  startDate: "20260101",
+  endDate: "20261231",
+  buildNow: new Date("2026-07-14T00:00:00.000Z"),
+};
 
 test("service_calendar는 토요일을 휴일 다이어로 매핑한다 (holiday-kric=토·일, weekday-kric=월~금)", () => {
   const seed = buildBackendTimetableSeed(ARTIFACT, OPTIONS);
@@ -63,6 +70,60 @@ test("SQL은 FK 순서(calendars→routes→trips→stop_times)로 INSERT를 낸
   const iTrip = sql.indexOf("INSERT INTO transit_trips");
   const iStop = sql.indexOf("INSERT INTO transit_stop_times");
   assert.ok(iCal >= 0 && iRoute > iCal && iTrip > iRoute && iStop > iTrip, `순서 위반: ${[iCal, iRoute, iTrip, iStop]}`);
+});
+
+test("trip seed는 service_class를 명시하고 기본 SUBWAY를 보존한다", () => {
+  const { sql } = buildBackendTimetableSeed(ARTIFACT, OPTIONS);
+  assert.match(
+    sql,
+    /INSERT INTO transit_trips \(id, route_id, service_id, service_pattern, service_class, service_day_start_seconds, trip_headsign, direction_id\)/,
+  );
+  assert.match(sql, /'LOCAL', 'SUBWAY', 0/);
+});
+
+test("ITX seed는 test-only timetable·canonical pack identity evidence를 같은 SQL에 고정한다", async () => {
+  const artifactBytes = await readFile(new URL("./fixtures/test-only-itx-cheongchun-admitted.json", import.meta.url));
+  const artifact = JSON.parse(artifactBytes);
+  artifact.routeServiceArtifactEvidence = [{
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: artifact.timetableArtifactIdentity.id,
+    timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+    canonicalPackId: artifact.canonicalPackIdentity.id,
+    canonicalPackSha256: artifact.canonicalPackIdentity.sha256,
+    canonicalPackSqliteSha256: artifact.canonicalPackIdentity.sqliteSha256,
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil: artifact.freshness.freshUntil,
+    sourceIssue: 2116,
+  }];
+  const { sql } = buildBackendTimetableSeed(artifact, {
+    ...OPTIONS,
+    lineId: artifact.canonicalLineId,
+    serviceCalendarDayMap: Object.fromEntries(artifact.serviceCalendars.map((calendar) => [
+      calendar.serviceId,
+      calendar,
+    ])),
+  });
+
+  assert.match(sql, /INSERT INTO route_service_artifact_evidence/);
+  assert.match(sql, new RegExp(artifact.routeServiceArtifactEvidence[0].timetableArtifactSha256));
+  assert.match(sql, new RegExp(artifact.canonicalPackIdentity.sha256));
+  assert.match(sql, new RegExp(artifact.canonicalPackIdentity.sqliteSha256));
+  assert.match(sql, /'EXPRESS', 'ITX_CHEONGCHUN', 0/);
+});
+
+test("stale ITX evidence는 seed 생성 단계에서 거부한다", () => {
+  const artifact = {
+    ...ARTIFACT,
+    transitTrips: ARTIFACT.transitTrips.map((trip) => ({ ...trip, serviceClass: "ITX_CHEONGCHUN" })),
+    routeServiceArtifactEvidence: [{
+      serviceClass: "ITX_CHEONGCHUN",
+      admissionStatus: "ADMITTED",
+      admissionEligible: true,
+      freshUntil: "2026-07-13T00:00:00.000Z",
+    }],
+  };
+  assert.throws(() => buildBackendTimetableSeed(artifact, OPTIONS), /must be fresh/);
 });
 
 test("stop_time 행을 스키마 컬럼으로 직역한다 (pickup/drop_off 기본 0)", () => {
