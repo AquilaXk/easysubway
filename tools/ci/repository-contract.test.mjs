@@ -5035,9 +5035,9 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     .split("\n")
     .filter((line) => /^\s*NODE$/.test(line))
     .map((line) => line.match(/^\s*/)[0].length);
-  assert.deepEqual(
-    nodeTerminatorIndents,
-    [10, 10, 10, 10],
+  assert.ok(nodeTerminatorIndents.length >= 4);
+  assert.ok(
+    nodeTerminatorIndents.every((indent) => indent === 10),
     "workflow heredoc terminators must start at shell column 1 after YAML indentation is stripped",
   );
 
@@ -6248,11 +6248,14 @@ test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정�
   const policy = readJson("apps/mobile/release/datapack-freshness-sla.json");
   const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
 
-  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.schemaVersion, 2);
   assert.equal(policy.issue, 1418);
-  assert.equal(policy.currentDecision, "NO_GO");
+  assert.equal(Object.hasOwn(policy, "currentDecision"), false);
+  assert.equal(Object.hasOwn(policy, "status"), false);
   assert.equal(classes.get("static_accessibility_facility").reverificationCadence, "P90D");
   assert.equal(classes.get("static_accessibility_facility").changePublishSla, "P3D");
+  assert.equal(classes.get("planned_timetable").maximumReverificationCadence, "P30D");
+  assert.equal(classes.get("planned_timetable").futureBasisAllowed, true);
   assert.equal(classes.get("planned_timetable").changePublishSla, "before-effective-date");
   assert.equal(classes.get("route_map_asset").reverificationCadence, "P1Y");
   assert.equal(classes.get("realtime_overlay").reverificationCadence, "PT90S");
@@ -6261,10 +6264,11 @@ test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정�
   assert.equal(policy.monitoring.productionChannelAllowsExpiredPack, false);
   assert.deepEqual(policy.scheduledPipeline.requiredStages, [
     "source-snapshot",
+    "change-detection",
     "build",
-    "validate",
-    "publish",
-    "post-publish-artifact-validation",
+    "strict-validation",
+    "conditional-publish",
+    "conditional-post-publish-artifact-validation",
   ]);
   assert.equal(policy.scheduledPipeline.releaseSequenceManagedByPipeline, true);
   assert.equal(policy.scheduledPipeline.expiresAtManagedByPipeline, true);

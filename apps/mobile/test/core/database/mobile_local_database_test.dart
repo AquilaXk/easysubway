@@ -9,6 +9,8 @@ import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
+import 'package:easysubway_mobile/core/datapack/bundled_data_pack_freshness.dart';
+import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_updater.dart';
 import 'package:easysubway_mobile/core/datapack/emergency_override_repository.dart';
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
@@ -504,6 +506,46 @@ void main() {
     );
   });
 
+  test('내장 데이터팩은 실제 open 경로에서 expiry 경계의 stale 상태를 기록한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-stale-bundled-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    final opener = CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      now: () => DateTime.utc(2026, 8, 11),
+    );
+    final database = await opener.open();
+    expect(opener.openedBundledDataPack, isTrue);
+    final installedPack = File('${directory.path}/datapacks/capital.sqlite');
+    final firstHash = sha256.convert(await installedPack.readAsBytes());
+    await database.close();
+    final state =
+        jsonDecode(
+              await File(
+                '${directory.path}/datapacks/bundled-freshness.json',
+              ).readAsString(),
+            )
+            as Map<String, Object?>;
+
+    expect(state['status'], 'STALE');
+    expect(state['reasonCode'], 'BUNDLED_PACK_EXPIRED');
+    expect(state['labelKo'], '저장된 데이터 기준 · 갱신 필요');
+    expect(state['freshnessExpiresAt'], '2026-08-11T00:00:00.000Z');
+    final freshness = await BundledDataPackFreshness.read(directory);
+    expect(freshness.staleLabel, '저장된 데이터 기준 · 갱신 필요');
+
+    final reopened = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      now: () => DateTime.utc(2026, 8, 11),
+    ).open();
+    addTearDown(reopened.close);
+    expect(sha256.convert(await installedPack.readAsBytes()), firstHash);
+  });
+
   test('기존 baseline 노선도 출처에 남은 fixture 문구를 정리한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -697,10 +739,11 @@ void main() {
       }),
     );
 
-    final database = await CatalogDatabaseOpener(
+    final opener = CatalogDatabaseOpener(
       databaseDirectory: directory,
       assetBundle: rootBundle,
-    ).open();
+    );
+    final database = await opener.open();
     addTearDown(database.close);
 
     final metadata = await database.customSelect('''
@@ -710,6 +753,7 @@ void main() {
           ''').getSingle();
 
     expect(metadata.read<String>('value'), 'capital-v18');
+    expect(opener.openedBundledDataPack, isFalse);
   });
 
   test('catalog opener는 설치된 current pack의 제거된 access edge를 보존한다', () async {
@@ -1141,6 +1185,62 @@ void main() {
 
     expect(metadata.read<String>('value'), '1');
     finishUpdate.complete();
+  });
+
+  test('앱 부트스트랩은 설치된 current pack의 manifest expiry를 stale 상태로 전달한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-bootstrap-installed-stale-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final catalogDirectory = Directory('${directory.path}/catalog');
+    await catalogDirectory.create(recursive: true);
+    final installedPack = File('${catalogDirectory.path}/capital-v20.sqlite');
+    final installedDatabase = CatalogDatabase.file(installedPack);
+    await installedDatabase.seedBaselineIfEmpty();
+    await installedDatabase.close();
+    await File('${catalogDirectory.path}/current.json').writeAsString(
+      jsonEncode({
+        'id': 'capital',
+        'version': '20',
+        'path': installedPack.path,
+        'sha256': sha256.convert(await installedPack.readAsBytes()).toString(),
+      }),
+    );
+    final userDatabase = await UserDatabaseOpener(
+      databaseDirectory: Directory('${directory.path}/user'),
+    ).open();
+    await DataPackUpdateStateRepository(
+      userDatabase: userDatabase,
+    ).saveManifestCache(
+      etag: 'installed-v20',
+      checkedAt: DateTime.utc(2000, 1, 1),
+      ttl: const Duration(hours: 1),
+      expiresAt: DateTime.utc(2000, 1, 2),
+    );
+    await userDatabase.close();
+
+    final bootstrap = await AppBootstrap.initialize(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      dataPackUpdateRunner:
+          ({
+            required supportDirectory,
+            required userDatabase,
+            required trigger,
+          }) async {},
+      enablePushNotifications: false,
+    );
+    addTearDown(bootstrap.close);
+
+    expect(bootstrap.bundledDataPackFreshness, isA<BundledDataPackFreshness>());
+    expect(
+      bootstrap.bundledDataPackFreshness!.reasonCode,
+      'PACK_PUBLISH_FRESHNESS_EXPIRED',
+    );
+    expect(
+      bootstrap.bundledDataPackFreshness!.isStaleAt(DateTime.now()),
+      isTrue,
+    );
   });
 
   test('앱 부트스트랩은 시작과 resume 데이터팩 update trigger를 구분한다', () async {

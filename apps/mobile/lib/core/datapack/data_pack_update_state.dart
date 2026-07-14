@@ -192,7 +192,12 @@ class DataPackUpdateStateRepository {
   bool isFresh(DataPackManifestCache cache) {
     final now = _now().toUtc();
     final expiresAt = cache.expiresAt;
-    if (expiresAt != null && !now.isBefore(expiresAt)) {
+    if (expiresAt != null &&
+        evaluateDataPackFreshness(
+              evaluationAt: now,
+              freshnessExpiresAt: expiresAt,
+            ) ==
+            DataPackFreshnessState.stale) {
       return false;
     }
     return !now.isAfter(cache.checkedAt.add(cache.ttl));
@@ -255,6 +260,15 @@ class DataPackUpdateStateRepository {
         );
   }
 }
+
+enum DataPackFreshnessState { fresh, stale }
+
+DataPackFreshnessState evaluateDataPackFreshness({
+  required DateTime evaluationAt,
+  required DateTime freshnessExpiresAt,
+}) => !evaluationAt.toUtc().isBefore(freshnessExpiresAt.toUtc())
+    ? DataPackFreshnessState.stale
+    : DataPackFreshnessState.fresh;
 
 String _acceptedSequenceKey(String channel) =>
     '${DataPackUpdateStateRepository._acceptedSequencePrefix}$channel';

@@ -330,6 +330,23 @@ void main() {
     expect(cache?.expiresAt, DateTime.utc(2026, 6, 25, 12, 5));
   });
 
+  test('evaluationAt이 expiry와 같으면 bundled pack은 stale이다', () {
+    expect(
+      evaluateDataPackFreshness(
+        evaluationAt: DateTime.utc(2026, 8, 11),
+        freshnessExpiresAt: DateTime.utc(2026, 8, 11),
+      ),
+      DataPackFreshnessState.stale,
+    );
+    expect(
+      evaluateDataPackFreshness(
+        evaluationAt: DateTime.utc(2026, 8, 10, 23, 59, 59, 999),
+        freshnessExpiresAt: DateTime.utc(2026, 8, 11),
+      ),
+      DataPackFreshnessState.fresh,
+    );
+  });
+
   test('manifest client는 v2 replay floor를 cache보다 먼저 저장한다', () async {
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(userDatabase.close);
