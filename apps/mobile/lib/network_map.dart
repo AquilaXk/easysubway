@@ -3389,6 +3389,28 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     super.dispose();
   }
 
+  /// #2109 Fix: 검색 채널(인플레이스 `_focusStationFromSearch` + 풀페이지
+  /// `focusStationRequestId` 소비)로 팬 메뉴가 [selectedStationId] prop을 통해
+  /// 열릴 때도, 지도 탭(`_selectStation`)과 동일하게 화면 경계에서 메뉴가 잘리면
+  /// 카메라를 최소 패닝해 전부 노출한다. prop이 null→역 id로 전이하는 순간을
+  /// 감지해 카메라 focus가 확정되는 다음 프레임에 패닝을 예약한다.
+  @override
+  void didUpdateWidget(covariant _NetworkMapCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final selectedId = widget.selectedStationId;
+    if (selectedId != null && selectedId != oldWidget.selectedStationId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || widget.selectedStationId != selectedId) {
+          return;
+        }
+        final station = _stationById(widget.data.stations, selectedId);
+        if (station != null) {
+          _panCameraToRevealFanMenu(station);
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -3578,6 +3600,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     // (카메라 최소 패닝 _panCameraToRevealFanMenu와 동일 규칙 소비).
                     final placement = fanMenuPlacement(
                       stationPoint: stationPoint,
+                      viewport: Size(
+                        constraints.maxWidth,
+                        constraints.maxHeight,
+                      ),
                     );
                     final left = placement.left;
                     final menuWidth = placement.menuWidth;
@@ -3631,14 +3657,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
-                                      color: const Color(0xFFC9D0DA),
+                                      color: EasySubwayFanMenuColors.outline,
                                     ),
                                   ),
                                   child: Text(
                                     selectedStation.displayName,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                      color: Color(0xFF20262E),
+                                      color: EasySubwayFanMenuColors.ink,
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13,
                                     ),
@@ -3922,9 +3948,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     final stationPoint = camera.sourceToViewportPoint(
       Offset(geometry.x(station), geometry.y(station)),
     );
-    const margin = 12.0;
+    const margin = kFanMenuViewportMargin;
     // #2109: 배치·라벨 포함 bbox는 build와 동일하게 fanMenuPlacement가 계산한다
     // (규칙 중복 제거 — 한쪽만 바뀌어 패닝 bbox와 렌더 위치가 어긋나는 것 방지).
+    // 패닝은 클램프 없는(viewport 미전달) 이상적 배치로 최대한 노출을 시도하고,
+    // 패닝이 .clamped() 한계로 다 못 드러내는 잔여는 build 경로의 viewport 클램프
+    // 폴백이 처리한다.
     final menuRect = fanMenuPlacement(stationPoint: stationPoint).revealBounds;
     final viewport = Offset.zero & camera.viewportSize;
     var dx = 0.0;
@@ -5580,6 +5609,11 @@ class _NetworkMapDraftPin extends StatelessWidget {
 /// 패닝(_panCameraToRevealFanMenu)이 같은 규칙을 소비하도록 단일 함수로 계산한다.
 /// 두 경로가 배치식을 각각 하드코딩하면 한쪽만 바뀌었을 때 패닝 bbox와 실제
 /// 렌더 위치가 어긋난다.
+/// 팬 메뉴가 지도 소스 경계 등으로 카메라 패닝만으로 다 드러나지 않을 때, 배치
+/// 함수가 화면 안으로 클램프할 여백. 카메라 최소 패닝(_panCameraToRevealFanMenu)의
+/// margin과 동일 값이라 두 경로가 같은 여백을 본다.
+const double kFanMenuViewportMargin = 12.0;
+
 class FanMenuPlacement {
   const FanMenuPlacement({
     required this.placeBelow,
@@ -5588,6 +5622,7 @@ class FanMenuPlacement {
     required this.menuWidth,
     required this.menuHeight,
     required this.labelHeight,
+    required this.labelAbove,
     required this.revealBounds,
   });
 
@@ -5603,11 +5638,20 @@ class FanMenuPlacement {
   /// 역명 라벨의 추정 높이(bottom 앵커 라벨이 화면 밖으로 밀리지 않게 패닝 bbox에 포함).
   final double labelHeight;
 
+  /// 라벨을 메뉴 위(true)에 두는지 아래(false)에 두는지. placeBelow=true면 메뉴가
+  /// 노드 아래로 뒤집혀 위쪽에 라벨을 두면 노드/메뉴 상단을 덮으므로 메뉴 하단
+  /// 아래로 배치한다(#2109 리뷰).
+  final bool labelAbove;
+
   /// 라벨까지 포함해 화면 안에 들여야 하는 뷰포트 bbox(카메라 패닝 대상).
   final Rect revealBounds;
 
-  /// build에서 라벨을 bottom 앵커로 놓기 위한 bottom 값.
-  double labelBottom(double viewportHeight) => viewportHeight - top + 8;
+  /// build에서 라벨을 bottom 앵커로 놓기 위한 bottom 값. 라벨은 항상 bottom
+  /// 앵커라 시스템 글자 확대에도 위로만 자란다. 메뉴 위면 메뉴 상단 위, 메뉴
+  /// 아래면 메뉴 하단 아래(라벨 높이만큼 더 내려)에서 자란다.
+  double labelBottom(double viewportHeight) => labelAbove
+      ? viewportHeight - top + 8
+      : viewportHeight - (top + menuHeight + labelHeight) + 8;
 }
 
 /// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다.
@@ -5615,22 +5659,43 @@ class FanMenuPlacement {
 /// 붙은 역은 위쪽 공간이 부족하므로 노드 아래로 뒤집어 항상 화면 안에 들어오게
 /// 한다(#2109). 라벨은 bottom 앵커라 커져도 위로만 자라므로 추정 높이만큼
 /// 패닝 bbox 상단에 여유를 둔다.
+///
+/// [viewport]가 주어지면 카메라 패닝이 `.clamped()` 한계에 걸려 메뉴를 다 못
+/// 드러내는 극단 경계에서도 메뉴가 잘리지 않도록, left(및 필요 시 top)를 화면
+/// 안(여백 [kFanMenuViewportMargin])으로 클램프한다. 이 클램프를 배치 함수
+/// 하나에 두어 build·패닝이 동일 결과를 보게 한다(노치 앵커가 어긋나는 것은
+/// 극단 경계에서만 나타나는 수용된 절충).
 @visibleForTesting
-FanMenuPlacement fanMenuPlacement({required Offset stationPoint}) {
+FanMenuPlacement fanMenuPlacement({
+  required Offset stationPoint,
+  Size? viewport,
+}) {
   const menuWidth = 260.0;
   final menuHeight = menuWidth * (380.0 / 700.0); // ≈ 141
   const labelHeight = 28.0;
-  final left = stationPoint.dx - menuWidth / 2;
+  var left = stationPoint.dx - menuWidth / 2;
   final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
-  final top = placeBelow
-      ? stationPoint.dy + 28
-      : stationPoint.dy - menuHeight - 8;
-  final revealBounds = Rect.fromLTWH(
-    left,
-    top - labelHeight,
-    menuWidth,
-    menuHeight + labelHeight,
-  );
+  var top = placeBelow ? stationPoint.dy + 28 : stationPoint.dy - menuHeight - 8;
+  // 메뉴가 노드 위면 라벨은 메뉴 위, 노드 아래로 뒤집혔으면 라벨은 메뉴 아래.
+  final labelAbove = !placeBelow;
+  if (viewport != null) {
+    const margin = kFanMenuViewportMargin;
+    final maxLeft = viewport.width - margin - menuWidth;
+    if (maxLeft >= margin) {
+      left = left.clamp(margin, maxLeft).toDouble();
+    }
+    // 라벨을 포함한 세로 범위(메뉴 위/아래 라벨)를 화면 안으로 클램프.
+    final topExtent = labelAbove ? labelHeight : 0.0;
+    final bottomExtent = labelAbove ? 0.0 : labelHeight;
+    final minTop = margin + topExtent;
+    final maxTop = viewport.height - margin - menuHeight - bottomExtent;
+    if (maxTop >= minTop) {
+      top = top.clamp(minTop, maxTop).toDouble();
+    }
+  }
+  final revealTop = labelAbove ? top - labelHeight : top;
+  final revealHeight = menuHeight + labelHeight;
+  final revealBounds = Rect.fromLTWH(left, revealTop, menuWidth, revealHeight);
   return FanMenuPlacement(
     placeBelow: placeBelow,
     left: left,
@@ -5638,6 +5703,7 @@ FanMenuPlacement fanMenuPlacement({required Offset stationPoint}) {
     menuWidth: menuWidth,
     menuHeight: menuHeight,
     labelHeight: labelHeight,
+    labelAbove: labelAbove,
     revealBounds: revealBounds,
   );
 }

@@ -173,6 +173,46 @@ Future<void> _tapStationByLabel(WidgetTester tester, String label) async {
   await tester.pump();
 }
 
+/// #2109: 풀페이지 검색 결과 탭이 focusStationRequestId(null→역 id)를 전이시키는
+/// 프로덕션 시퀀스를 모사하기 위한 host. NetworkMapScreen을 마운트한 뒤 setState로
+/// id를 채워 부모 didUpdateWidget → 팬 메뉴 채널 수렴 경로를 태운다.
+class _FocusRequestHost extends StatefulWidget {
+  const _FocusRequestHost({
+    required this.repository,
+    required this.routeDraftController,
+    required this.onHandled,
+  });
+
+  final NetworkMapRepository repository;
+  final RouteDraftController routeDraftController;
+  final VoidCallback onHandled;
+
+  @override
+  State<_FocusRequestHost> createState() => _FocusRequestHostState();
+}
+
+class _FocusRequestHostState extends State<_FocusRequestHost> {
+  String? _requestId;
+
+  void requestFocus(String stationId) {
+    setState(() => _requestId = stationId);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NetworkMapScreen(
+      repository: widget.repository,
+      routeDraftController: widget.routeDraftController,
+      onOpenStationSearch: (_) {},
+      focusStationRequestId: _requestId,
+      onFocusStationRequestHandled: () {
+        widget.onHandled();
+        setState(() => _requestId = null);
+      },
+    );
+  }
+}
+
 /// #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 노선도 홈에서 결과 화면에 이르는
 /// 정당한 흐름은 "역 탭 팝오버로 출발·도착 지정 → 자동 결과"뿐이다. 이 헬퍼는 기본
 /// 노선도(상록수/사당)에서 그 흐름을 그대로 태워 결과 탭까지 데려간다.
@@ -2033,6 +2073,52 @@ void main() {
     expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
     expect(find.bySemanticsLabel(_fanDestinationLabel), findsOneWidget);
   });
+
+  testWidgets(
+    '#2109 검색 채널(focusStationRequestId)로 열린 팬 메뉴도 지도 탭과 같은 앵커·패닝 경로를 탄다',
+    (tester) async {
+      // 회귀 방지: 검색 결과 탭 → focusStationRequestId(null→역 id) 소비 → 팬
+      // 메뉴 채널로 수렴할 때, 지도 탭(_selectStation)과 동일하게 팬 메뉴가
+      // 뜨고(앵커 라벨 포함) 카메라 anti-clip 패닝 콜백
+      // (_NetworkMapCanvas.didUpdateWidget)이 예외 없이 도는지 검증한다. 이전엔
+      // 패닝이 _selectStation 경로에서만 예약돼 검색 채널로 열린 메뉴는 경계에서
+      // 잘린 채 남을 수 있었다. 프로덕션과 같이 마운트 후 prop이 전이되도록 host
+      // StatefulWidget으로 감싸 setState로 id를 채운다.
+      final controller = RouteDraftController();
+      var handled = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: _FocusRequestHost(
+            repository: FakeStationSearchRepository(),
+            routeDraftController: controller,
+            onHandled: () => handled = true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // 초기엔 요청 없음 → 팬 메뉴 미표시.
+      expect(handled, isFalse);
+      expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+
+      // 검색 결과 탭을 모사: focusStationRequestId를 역 id로 전이.
+      final hostState = tester.state<_FocusRequestHostState>(
+        find.byType(_FocusRequestHost),
+      );
+      hostState.requestFocus('station-sangnoksu');
+      await tester.pumpAndSettle();
+
+      // 검색 채널 요청이 소비되고(부모 통지) 팬 메뉴가 떴다.
+      expect(handled, isTrue);
+      expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      // 앵커 역명 라벨(상세 진입)도 지도 탭과 동일하게 형제로 얹힌다.
+      expect(
+        find.byKey(const Key('networkMapFanMenuStationLabel')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+    },
+  );
 
   testWidgets('노선도 팝오버 출발 선택은 상단바를 출발/도착 입력으로 변신시키고 지우기로 검색바로 돌아온다', (
     tester,

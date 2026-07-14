@@ -40,6 +40,59 @@ void main() {
         closeTo(placement.menuHeight + placement.labelHeight, 0.001),
       );
     });
+
+    test('#2109 placeBelow면 라벨을 메뉴 아래로 배치한다(라벨이 노드/메뉴 상단을 덮지 않음)', () {
+      // 노드 위면 라벨은 메뉴 위(labelAbove=true), 노드 아래로 뒤집히면 라벨도
+      // 메뉴 아래로 내려간다(labelAbove=false).
+      final above = fanMenuPlacement(stationPoint: const Offset(200, 400));
+      expect(above.labelAbove, isTrue);
+      // 메뉴 위 라벨: bottom = viewportHeight - top + 8 (메뉴 상단 위에서 자람).
+      expect(above.labelBottom(800), closeTo(800 - above.top + 8, 0.001));
+
+      final below = fanMenuPlacement(stationPoint: const Offset(200, 10));
+      expect(below.labelAbove, isFalse);
+      // 메뉴 아래 라벨: bottom 앵커가 메뉴 하단(top+menuHeight) 아래 labelHeight만큼
+      // 더 내려간 지점 기준 → 라벨은 그 위(메뉴 하단 아래)에서 자란다.
+      expect(
+        below.labelBottom(800),
+        closeTo(800 - (below.top + below.menuHeight + below.labelHeight) + 8, 0.001),
+      );
+      // placeBelow 라벨의 reveal bbox는 메뉴 top부터 시작(위로 확장하지 않음).
+      expect(below.revealBounds.top, closeTo(below.top, 0.001));
+    });
+
+    test('#2109 뷰포트를 주면 좁은 화면 경계에서 left를 화면 안으로 클램프한다', () {
+      // 우측 경계에 붙은 역: 패닝이 .clamped() 한계로 다 못 드러낼 때를 위한
+      // 위젯 레벨 클램프 폴백. left는 여백(12) ~ (width - 12 - menuWidth) 안으로.
+      const viewport = Size(360, 800);
+      final clamped = fanMenuPlacement(
+        stationPoint: const Offset(355, 400),
+        viewport: viewport,
+      );
+      const margin = 12.0;
+      final maxLeft = viewport.width - margin - clamped.menuWidth;
+      expect(clamped.left, lessThanOrEqualTo(maxLeft + 0.001));
+      expect(clamped.left, greaterThanOrEqualTo(margin - 0.001));
+      // 우측이 화면 안(오른쪽 여백 이내).
+      expect(
+        clamped.left + clamped.menuWidth,
+        lessThanOrEqualTo(viewport.width - margin + 0.001),
+      );
+
+      // 좌측 경계에 붙은 역: left가 여백 이상으로 밀린다.
+      final leftClamped = fanMenuPlacement(
+        stationPoint: const Offset(5, 400),
+        viewport: viewport,
+      );
+      expect(leftClamped.left, greaterThanOrEqualTo(margin - 0.001));
+    });
+
+    test('viewport 미전달(카메라 패닝 경로)이면 클램프 없이 이상적 배치를 낸다', () {
+      // 패닝은 이상적(클램프 없는) revealBounds로 최대한 노출을 시도해야 하므로,
+      // viewport를 주지 않으면 left가 중심 정렬 그대로 유지된다.
+      final unclamped = fanMenuPlacement(stationPoint: const Offset(355, 400));
+      expect(unclamped.left, closeTo(355 - unclamped.menuWidth / 2, 0.001));
+    });
   });
 
   test('selectedSlots: 선택 역 id가 배정된 슬롯만 포함', () {
