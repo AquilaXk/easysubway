@@ -157,18 +157,22 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
 /// 옮긴 화면 로컬 톤이라 [EasySubwayTokens] 의미 토큰으로 수렴하지 않는다
 /// (design_guard_test.dart 로컬 색 상수 ratchet 해소 경로).
 abstract final class EasySubwayFanMenuColors {
-  static const disabledOpacity = 0.4;
+  static const disabledOpacity = 0.40;
+  static const pressedOpacity = 0.84;
   static const departure = Color(0xFF176FD1);
-  static const departureSoft = Color(0xFFEAF3FF);
-  static const waypoint = Color(0xFFF57C00);
-  static const waypointSoft = Color(0xFFFFF3E6);
-  static const arrival = Color(0xFFEE2C35);
-  static const arrivalSoft = Color(0xFFFFF0F1);
-  static const closeSurface = Color(0xFFF1F3F6);
-  static const closePressed = Color(0xFFE4E7EC);
-  static const closeInk = Color(0xFF343A43);
-  static const border = Color(0xFFD5DAE2);
-  static const outline = Color(0xFFC9D0DA);
+  static const departureSurface = Color(0xFFF7FAFF);
+  static const departurePressed = Color(0xFFEAF3FF);
+  static const waypoint = Color(0xFFBF5700);
+  static const waypointSurface = Color(0xFFFFFAF4);
+  static const waypointPressed = Color(0xFFFFF0DE);
+  static const arrival = Color(0xFFD9252E);
+  static const arrivalSurface = Color(0xFFFFF8F8);
+  static const arrivalPressed = Color(0xFFFFECEE);
+  static const closeSurface = Color(0xFFF5F7FA);
+  static const closePressed = Color(0xFFE9EDF2);
+  static const closeInk = Color(0xFF475467);
+  static const border = Color(0xFFCBD2DC);
+  static const outline = Color(0xFFBCC5D2);
 
   /// 팬 메뉴 앵커 역명 라벨의 텍스트 잉크.
   static const ink = Color(0xFF20262E);

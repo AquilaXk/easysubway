@@ -2,15 +2,19 @@ import 'dart:io' show File, Platform;
 import 'dart:typed_data' show ByteData;
 
 import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu_geometry.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 
 const _goldenFontFamily = 'NanumGothicGolden';
+const _menuBoundaryKey = ValueKey('station-fan-menu-golden-boundary');
+const _menuWidth = 220.0;
 
 Future<void> _pumpMenu(
   WidgetTester tester, {
+  double width = _menuWidth,
   Set<RouteDraftSlot> selected = const {},
   Set<RouteDraftSlot> disabled = const {},
 }) async {
@@ -19,13 +23,19 @@ Future<void> _pumpMenu(
       home: Scaffold(
         backgroundColor: const Color(0xFFF4F7F7),
         body: Center(
-          child: StationFanMenu(
-            width: 350,
-            selectedSlots: selected,
-            disabledSlots: disabled,
-            fontFamily: _goldenFontFamily,
-            onAction: (_) {},
-            onClose: () {},
+          child: RepaintBoundary(
+            key: _menuBoundaryKey,
+            child: ColoredBox(
+              color: const Color(0xFFF4F7F7),
+              child: StationFanMenu(
+                width: width,
+                selectedSlots: selected,
+                disabledSlots: disabled,
+                fontFamily: _goldenFontFamily,
+                onAction: (_) {},
+                onClose: () {},
+              ),
+            ),
           ),
         ),
       ),
@@ -52,15 +62,23 @@ void main() {
   testWidgets('기본 상태', (tester) async {
     await _pumpMenu(tester);
     await expectLater(
-      find.byType(StationFanMenu),
+      find.byKey(_menuBoundaryKey),
       matchesGoldenFile('goldens/station_fan_menu_default.png'),
+    );
+  }, skip: skipReason);
+
+  testWidgets('비교 너비 296dp 기본 상태', (tester) async {
+    await _pumpMenu(tester, width: 296);
+    await expectLater(
+      find.byKey(_menuBoundaryKey),
+      matchesGoldenFile('goldens/station_fan_menu_default_296.png'),
     );
   }, skip: skipReason);
 
   testWidgets('출발 selected', (tester) async {
     await _pumpMenu(tester, selected: const {RouteDraftSlot.origin});
     await expectLater(
-      find.byType(StationFanMenu),
+      find.byKey(_menuBoundaryKey),
       matchesGoldenFile('goldens/station_fan_menu_origin_selected.png'),
     );
   }, skip: skipReason);
@@ -68,7 +86,7 @@ void main() {
   testWidgets('도착 selected', (tester) async {
     await _pumpMenu(tester, selected: const {RouteDraftSlot.destination});
     await expectLater(
-      find.byType(StationFanMenu),
+      find.byKey(_menuBoundaryKey),
       matchesGoldenFile('goldens/station_fan_menu_destination_selected.png'),
     );
   }, skip: skipReason);
@@ -76,8 +94,24 @@ void main() {
   testWidgets('도착 disabled', (tester) async {
     await _pumpMenu(tester, disabled: const {RouteDraftSlot.destination});
     await expectLater(
-      find.byType(StationFanMenu),
+      find.byKey(_menuBoundaryKey),
       matchesGoldenFile('goldens/station_fan_menu_destination_disabled.png'),
+    );
+  }, skip: skipReason);
+
+  testWidgets('출발 pressed', (tester) async {
+    await _pumpMenu(tester);
+    final menu = find.byType(StationFanMenu);
+    final topLeft = tester.getTopLeft(menu);
+    final gesture = await tester.startGesture(
+      topLeft +
+          const Offset(175, 168) * (_menuWidth / kFanMenuDesignSize.width),
+    );
+    addTearDown(gesture.cancel);
+    await tester.pump();
+    await expectLater(
+      find.byKey(_menuBoundaryKey),
+      matchesGoldenFile('goldens/station_fan_menu_departure_pressed.png'),
     );
   }, skip: skipReason);
 }

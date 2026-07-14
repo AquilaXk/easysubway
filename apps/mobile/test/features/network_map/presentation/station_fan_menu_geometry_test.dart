@@ -34,4 +34,24 @@ void main() {
     expect(geo.silhouette.contains(const Offset(525, 173)), isTrue);
     expect(geo.silhouette.contains(const Offset(350, 277)), isTrue);
   });
+
+  test('v2 닫기 섹터와 silhouette는 원본 좌표를 포함한다', () {
+    final geo = buildStationFanMenuGeometry();
+    expect(geo.close.contains(const Offset(350, 250.93905)), isTrue);
+    expect(geo.close.contains(const Offset(350, 302.93903)), isTrue);
+    expect(geo.silhouette.contains(const Offset(350, 302.93903)), isTrue);
+  });
+
+  test('내부 구분선은 SVG의 세 contour만 가진다', () {
+    final geo = buildStationFanMenuGeometry();
+    expect(geo.dividers.computeMetrics().length, 3);
+  });
+
+  test('방사형 공유 경계 양쪽은 각각 인접 섹터에 포함된다', () {
+    final geo = buildStationFanMenuGeometry();
+    expect(geo.departure.contains(const Offset(255, 150)), isTrue);
+    expect(geo.waypoint.contains(const Offset(262, 150)), isTrue);
+    expect(geo.waypoint.contains(const Offset(438, 150)), isTrue);
+    expect(geo.arrival.contains(const Offset(445, 150)), isTrue);
+  });
 }
