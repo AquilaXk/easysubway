@@ -5,12 +5,19 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
@@ -20,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 	"easysubway.admin.password=admin-test-password"
 })
 @AutoConfigureMockMvc
+@Import(DatapackReleaseBlockerSummaryAdminPageTest.FixedClockConfig.class)
 @DisplayName("관리자 데이터팩 release blocker 요약")
 class DatapackReleaseBlockerSummaryAdminPageTest {
 
@@ -228,6 +236,29 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	@Test
+	@DisplayName("source snapshot이 평가 시각에 만료되면 저장 상태와 무관하게 release를 차단한다")
+	void sourceSnapshotExpiryBoundaryBlocksRelease() throws Exception {
+		jdbcTemplate.update("""
+			UPDATE data_source_snapshots
+			SET freshness_expires_at = '2026-07-06 03:00:00'
+			WHERE snapshot_id = 'snapshot-release-blocked'
+			""");
+
+		String dashboardHtml = getAdminHtml("/admin/dashboard/page");
+		String qualityHtml = getAdminHtml("/admin/data-quality/page");
+
+		assertThat(dashboardHtml)
+			.contains("production promote 차단: blocker 10건")
+			.contains("전체 blocker 10건")
+			.doesNotContain("production promote 가능")
+			.doesNotContain(">READY</span>");
+		assertThat(qualityHtml)
+			.contains("Source freshness")
+			.contains("SOURCE_SNAPSHOT_EXPIRED")
+			.contains("FAIL");
+	}
+
+	@Test
 	@DisplayName("역 상세 화면은 역 단위 release readiness를 보여준다")
 	void stationDetailShowsStationReleaseReadiness() throws Exception {
 		String html = getAdminHtml("/admin/stations/station-sangnoksu/page");
@@ -289,7 +320,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 				'snapshot-release-blocked', 'kric-station-elevator', 'KRIC',
 				'2026-06-29 03:00:00', '2026-06-28 03:00:00', 10, ?, 's3://raw/snapshot',
 				?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE,
-				'2026-07-06 03:00:00', '2026-09-29 03:00:00'
+				'2026-07-07 03:00:00', '2026-09-29 03:00:00'
 			)
 			""", SHA_A, SHA_B, SHA_C);
 	}
@@ -435,7 +466,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 				'WHEELCHAIR_LIFT', 'UNKNOWN_PENDING_REVIEW', 'kric-station-elevator',
 				'snapshot-release-blocked', ?, 'STATIC_LOCATION', 'UNKNOWN',
 				'UNKNOWN', '2026-06-29 03:34:00', '2026-06-29 03:34:00',
-				'2026-07-06 03:34:00', 40, FALSE, 'UNKNOWN_PENDING_REVIEW',
+				'2026-07-07 03:34:00', 40, FALSE, 'UNKNOWN_PENDING_REVIEW',
 				'NONE', '2026-06-29 03:34:00')
 			""", SHA_A);
 		jdbcTemplate.update("""
@@ -450,5 +481,15 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 				'GENERATED', 'GENERATED', '2026-06-29 03:35:00', ?, FALSE,
 				'GENERATED_CONNECTOR', '2026-06-29 03:35:00')
 			""", SHA_B);
+	}
+
+	@TestConfiguration
+	static class FixedClockConfig {
+
+		@Bean
+		@Primary
+		Clock datapackFreshnessTestClock() {
+			return Clock.fixed(Instant.parse("2026-07-06T03:00:00Z"), ZoneOffset.UTC);
+		}
 	}
 }
