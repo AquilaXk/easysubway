@@ -7364,13 +7364,13 @@ void main() {
     expect(inputRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
   });
 
-  testWidgets('#1933 홈 in-place 검색 결과 탭은 역을 지도에서 포커스하고 하단 팝오버를 연다', (
+  testWidgets('#2109 홈 in-place 검색 결과 탭은 역을 지도에서 포커스하고 팬 메뉴를 연다', (
     tester,
   ) async {
-    // #1933: 홈 노선도 상단바 인플레이스 검색에서는 결과 행에 인라인 출발/도착
+    // #2109: 홈 노선도 상단바 인플레이스 검색에서는 결과 행에 인라인 출발/도착
     // 역할 버튼을 두지 않는다. 결과 행을 탭하면 상세를 밀지 않고 검색을 닫은 뒤
-    // 해당 역을 지도에서 포커스하고 하단 주변 역 패널(팝오버)을 띄운다. 출발/도착
-    // 지정은 지도 역 탭 팝오버로 수렴한다(역할 버튼 IA는 결과 행에서 제거됨).
+    // 해당 역을 지도에서 포커스하고 부채꼴 팬 메뉴(역 액션 메뉴)를 띄운다. 출발/
+    // 도착 지정은 이 팬 메뉴로 수렴한다(역할 버튼 IA는 결과 행에서 제거됨).
     final repository = FakeStationSearchRepository(
       queryResults: {
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -7409,7 +7409,7 @@ void main() {
     );
     expect(find.bySemanticsLabel('상록수역을 출발역으로 설정'), findsNothing);
 
-    // 결과 행 탭 = 검색 종료 + 역 포커스 + 하단 팝오버.
+    // 결과 행 탭 = 검색 종료 + 역 포커스 + 팬 메뉴.
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
@@ -7419,11 +7419,56 @@ void main() {
     expect(find.byKey(const Key('stationSearchInput')), findsNothing);
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
-    // 포커스한 역의 하단 주변 역 패널(팝오버)이 나타난다.
+    // 포커스한 역의 부채꼴 팬 메뉴가 나타난다(주변 역 패널이 아니다).
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(
       find.byKey(const Key('networkMapNearbyStationPanel')),
-      findsOneWidget,
+      findsNothing,
     );
+  });
+
+  testWidgets('#2109 팬 메뉴 앵커 역명 라벨을 탭하면 역 상세로 진입한다', (tester) async {
+    // #2109: 팬 메뉴가 뜬 상태에서 중심 위 역명 라벨을 탭하면 해당 역의
+    // StationDetailScreen으로 진입한다(팬 메뉴는 출발/도착 지정, 라벨은 상세 진입).
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(find.byType(StationDetailScreen), findsNothing);
+
+    // 팬 메뉴 앵커의 역명 라벨을 탭 → 역 상세 진입.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StationDetailScreen), findsOneWidget);
   });
 
   testWidgets('경로 검색 첫 화면은 v3 출발 도착 입력 구조를 보여준다', (tester) async {

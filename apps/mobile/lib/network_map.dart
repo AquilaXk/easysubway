@@ -448,6 +448,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   _NetworkMapNearbyPanelData _nearbyPanelData =
       const _NetworkMapNearbyPanelData.idle();
   String? _nearbySelectedStationId;
+  // #2109: 인플레이스 검색 결과 탭으로 연 팬 메뉴의 대상 역 id. 캔버스의
+  // selectedStationId(팬 메뉴)와 focusedStationId(카메라 이동)에 함께 실린다.
+  String? _searchFanMenuStationId;
   String? _nearbyLookupMessage;
   Timer? _nearbyLookupMessageTimer;
   bool _initialNearbyFocusStarted = false;
@@ -509,21 +512,56 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     widget.onStationSearchClosed?.call();
   }
 
-  /// 일반(비픽) 모드의 인플레이스 검색 결과 탭: 검색을 닫고 해당 역을 노선도에서
-  /// 포커스한 뒤 하단 주변 역 패널(팝오버)을 띄운다.
+  /// #2109 일반(비픽) 모드의 인플레이스 검색 결과 탭: 검색을 닫고 해당 역으로
+  /// 카메라를 이동한 뒤 부채꼴 팬 메뉴(역 액션 메뉴)를 띄운다. 상세를 즉시 밀지
+  /// 않는다(상세 진입은 팬 메뉴 앵커의 역명 라벨 탭으로 수렴한다).
   void _focusStationFromSearch(StationSearchResult result) {
-    // _exitSearchMode 가 이미 setState 로 검색을 닫으므로, 패널 상태는 그 뒤
+    // _exitSearchMode 가 이미 setState 로 검색을 닫으므로, 팬 메뉴 상태는 그 뒤
     // 별도 setState 로 세팅해 검색 종료에 덮이지 않도록 한다.
     _exitSearchMode();
     if (!mounted) {
       return;
     }
     setState(() {
-      _nearbyPanelVisible = true;
-      _nearbySelectedStationId = result.id;
-      _nearbyPanelData = _NetworkMapNearbyPanelData.success([result]);
+      _searchFanMenuStationId = result.id;
     });
-    unawaited(_loadNearbyRealtime(result));
+  }
+
+  /// #2109 검색 결과 탭으로 연 팬 메뉴가 닫히면(액션 선택·닫기·배경 탭·팬) 이
+  /// 화면이 들고 있는 대상 역 id도 비운다. 그러지 않으면 canvas의
+  /// selectedStationId prop이 계속 팬 메뉴를 다시 띄운다.
+  void _dismissSearchFanMenu() {
+    if (_searchFanMenuStationId == null) {
+      return;
+    }
+    setState(() => _searchFanMenuStationId = null);
+  }
+
+  /// #2109 팬 메뉴 앵커의 역명 라벨 탭 → 해당 역의 상세 화면으로 진입한다.
+  /// 검색 결과 탭 → 상세 push였던 흐름의 상세 진입 지점을 팬 메뉴로 옮긴 것으로,
+  /// 상세 화면이 필요로 하는 저장소는 이 화면이 이미 주입받고 있다(#1933 주석 참조).
+  void _openStationDetailFromMap(NetworkMapStation station) {
+    final searchRepository = widget.stationSearchRepository;
+    final reportRepository = widget.reportRepository;
+    if (searchRepository == null || reportRepository == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StationDetailScreen(
+          repository: searchRepository,
+          reportRepository: reportRepository,
+          favoriteRepository: widget.favoriteRepository,
+          realtimeRepository: widget.realtimeRepository,
+          locationProvider: widget.locationProvider,
+          stationId: station.id,
+          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
+          internalRouteRepository: widget.internalRouteRepository,
+          internalRouteMobilityType: widget.internalRouteMobilityType,
+          routeDraftController: widget.routeDraftController,
+        ),
+      ),
+    );
   }
 
   /// 상단바 편집 필드의 제출(엔터/검색 액션)을 검색 세션으로 위임한다.
@@ -803,10 +841,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                   return _NetworkMapCanvas(
                     data: visibleData,
                     initialViewport: loadResult.initialViewport,
-                    focusedStationId: _nearbySelectedStationId,
-                    selectedStationId: _nearbyPanelVisible
-                        ? _nearbySelectedStationId
-                        : null,
+                    focusedStationId:
+                        _searchFanMenuStationId ?? _nearbySelectedStationId,
+                    selectedStationId: _searchFanMenuStationId ??
+                        (_nearbyPanelVisible ? _nearbySelectedStationId : null),
+                    onOpenStationDetail: _openStationDetailFromMap,
+                    onSelectionDismissed: _dismissSearchFanMenu,
                     originStationId:
                         widget.routeDraftController.draft.origin?.id,
                     waypointStationId:
@@ -3140,6 +3180,8 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.onClearWaypoint,
     required this.onClearDestination,
     required this.onViewportChanged,
+    required this.onOpenStationDetail,
+    required this.onSelectionDismissed,
     this.originStationId,
     this.waypointStationId,
     this.destinationStationId,
@@ -3165,6 +3207,14 @@ class _NetworkMapCanvas extends StatefulWidget {
   final VoidCallback onClearWaypoint;
   final VoidCallback onClearDestination;
   final ValueChanged<Rect> onViewportChanged;
+
+  /// #2109 팬 메뉴 앵커의 역명 라벨 탭 → 해당 역 상세 진입.
+  final ValueChanged<NetworkMapStation> onOpenStationDetail;
+
+  /// #2109 팬 메뉴가 부모(검색 결과 탭 등)에서 [selectedStationId]로 열린 경우,
+  /// 메뉴가 닫힐 때(액션 선택·닫기·배경 탭) 부모의 선택 상태도 비워야 한다.
+  /// 내부 [_selectedStation]만 null로 두면 prop이 다시 메뉴를 띄운다.
+  final VoidCallback onSelectionDismissed;
 
   @override
   State<_NetworkMapCanvas> createState() => _NetworkMapCanvasState();
@@ -3388,6 +3438,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                             _gestureActive = true;
                             _selectedStation = null;
                           });
+                          widget.onSelectionDismissed();
                         }
                         _gestureStartCamera = camera;
                         _gestureStartFocalPoint = details.localFocalPoint;
@@ -3490,45 +3541,91 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                       waypointStationId: widget.waypointStationId,
                       destinationStationId: widget.destinationStationId,
                     );
-                    return Positioned(
-                      key: const Key('networkMapStationSheet'),
-                      left: left,
-                      top: top,
-                      width: menuWidth,
-                      child: StationFanMenu(
-                        width: menuWidth,
-                        selectedSlots: selectedSlots,
-                        disabledSlots: fanMenuDisabledSlots(
-                          stationId: selectedStation.id,
-                          originStationId: widget.originStationId,
-                          waypointStationId: widget.waypointStationId,
-                          destinationStationId: widget.destinationStationId,
+                    // #2109 팬 메뉴 위(아래 배치 시에도 메뉴 상단 바깥)에 역명 라벨을
+                    // 형제로 얹고, 탭 시 역 상세로 진입한다. 팬 메뉴는 출발/도착
+                    // 지정, 라벨은 상세 진입으로 역할을 나눈다.
+                    final labelTop = top - 28;
+                    return Stack(
+                      children: [
+                        Positioned(
+                          key: const Key('networkMapFanMenuStationLabel'),
+                          left: stationPoint.dx - 60,
+                          top: labelTop,
+                          width: 120,
+                          child: Center(
+                            child: GestureDetector(
+                              onTap: () =>
+                                  widget.onOpenStationDetail(selectedStation),
+                              child: Semantics(
+                                button: true,
+                                label: '${selectedStation.displayName} 상세 보기',
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFFC9D0DA),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    selectedStation.displayName,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Color(0xFF20262E),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        onAction: (slot) {
-                          if (fanMenuShouldClear(slot, selectedSlots)) {
-                            // 재탭 → 해당 슬롯 해제.
-                            switch (slot) {
-                              case RouteDraftSlot.origin:
-                                widget.onClearOrigin();
-                              case RouteDraftSlot.waypoint:
-                                widget.onClearWaypoint();
-                              case RouteDraftSlot.destination:
-                                widget.onClearDestination();
-                            }
-                          } else {
-                            switch (slot) {
-                              case RouteDraftSlot.origin:
-                                widget.onSetOrigin(selectedStation);
-                              case RouteDraftSlot.waypoint:
-                                widget.onSetWaypoint(selectedStation);
-                              case RouteDraftSlot.destination:
-                                widget.onSetDestination(selectedStation);
-                            }
-                          }
-                          setState(() => _selectedStation = null);
-                        },
-                        onClose: () => setState(() => _selectedStation = null),
-                      ),
+                        Positioned(
+                          key: const Key('networkMapStationSheet'),
+                          left: left,
+                          top: top,
+                          width: menuWidth,
+                          child: StationFanMenu(
+                            width: menuWidth,
+                            selectedSlots: selectedSlots,
+                            disabledSlots: fanMenuDisabledSlots(
+                              stationId: selectedStation.id,
+                              originStationId: widget.originStationId,
+                              waypointStationId: widget.waypointStationId,
+                              destinationStationId: widget.destinationStationId,
+                            ),
+                            onAction: (slot) {
+                              if (fanMenuShouldClear(slot, selectedSlots)) {
+                                // 재탭 → 해당 슬롯 해제.
+                                switch (slot) {
+                                  case RouteDraftSlot.origin:
+                                    widget.onClearOrigin();
+                                  case RouteDraftSlot.waypoint:
+                                    widget.onClearWaypoint();
+                                  case RouteDraftSlot.destination:
+                                    widget.onClearDestination();
+                                }
+                              } else {
+                                switch (slot) {
+                                  case RouteDraftSlot.origin:
+                                    widget.onSetOrigin(selectedStation);
+                                  case RouteDraftSlot.waypoint:
+                                    widget.onSetWaypoint(selectedStation);
+                                  case RouteDraftSlot.destination:
+                                    widget.onSetDestination(selectedStation);
+                                }
+                              }
+                              _dismissSelection();
+                            },
+                            onClose: _dismissSelection,
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -3732,6 +3829,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       return;
     }
     _selectStation(station);
+  }
+
+  /// 팬 메뉴를 닫는다: 내부 선택과 함께, prop([selectedStationId])으로 열린
+  /// 경우 부모 선택 상태도 비우도록 알린다(그렇지 않으면 prop이 다시 띄운다).
+  void _dismissSelection() {
+    setState(() => _selectedStation = null);
+    widget.onSelectionDismissed();
   }
 
   void _selectStation(NetworkMapStation station) {
