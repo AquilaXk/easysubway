@@ -13,6 +13,117 @@ const CANONICAL_STATIONS = Object.freeze({
   "춘천": "station-dd14cfb89cbc",
 });
 
+export function validateItxServiceDates(serviceDates, { now = new Date(), replay = false } = {}) {
+  const result = {};
+  const today = calendarDate(kstDate(now));
+  for (const [dayCd, expectedDay] of [["8", "weekday"], ["7", "Saturday"], ["9", "Sunday"]]) {
+    const value = requiredString(serviceDates?.[dayCd], `dayCd ${dayCd} date`);
+    const date = calendarDate(value);
+    const weekday = date.getUTCDay();
+    const validDay = dayCd === "8" ? weekday >= 1 && weekday <= 5 : weekday === (dayCd === "7" ? 6 : 0);
+    if (!validDay) throw new Error(`dayCd ${dayCd} must be a ${expectedDay}`);
+    const offset = Math.round((date - today) / 86_400_000);
+    if (!replay && (offset < 0 || offset > 6)) throw new Error("ITX admission dates must be today through 6 days in Asia/Seoul");
+    result[dayCd] = value;
+  }
+  return result;
+}
+
+export function buildItxOdMatrix(date, stations) {
+  calendarDate(date);
+  const ids = (stations ?? []).map(({ providerStationId }) => requiredString(providerStationId, "providerStationId")).sort();
+  if (ids.length < 2 || new Set(ids).size !== ids.length) throw new Error("ITX roster stations must be unique and contain at least 2 stations");
+  const rows = ids.flatMap((depStationId) => ids
+    .filter((arrStationId) => arrStationId !== depStationId)
+    .map((arrStationId) => ({ date, depStationId, arrStationId })));
+  return {
+    rows,
+    expectedOdCount: ids.length * (ids.length - 1),
+    stationSetHash: sha256(JSON.stringify(ids)),
+    odMatrixHash: sha256(JSON.stringify(rows.map(({ date: serviceDate, depStationId, arrStationId }) => (
+      [serviceDate, depStationId, arrStationId]
+    )))),
+  };
+}
+
+export async function collectTagoItxCheongchunRoster({
+  serviceKey,
+  serviceDate,
+  kricServiceDayCode,
+  canonicalStations,
+  fetchImpl = fetch,
+  now = new Date(),
+} = {}) {
+  const key = decodedServiceKey(requiredString(serviceKey, "DATA_GO_KR_SERVICE_KEY"));
+  calendarDate(serviceDate);
+  if (!["7", "8", "9"].includes(kricServiceDayCode)) throw new Error("kricServiceDayCode must be 7, 8, or 9");
+  if (!Array.isArray(canonicalStations) || canonicalStations.length < 2) throw new Error("canonicalStations must contain at least 2 stations");
+
+  const trainGrades = await fetchAll("GetVhcleKndList", {}, key, fetchImpl);
+  const gradeRows = trainGrades.rows.filter((row) => normalize(row.vehiclekndnm) === "itx청춘");
+  if (gradeRows.length !== 1) throw new Error("TAGO ITX-청춘 train grade is missing or ambiguous");
+  const grade = gradeRows[0];
+  const cities = await fetchAll("GetCtyCodeList", {}, key, fetchImpl);
+  const stationOperations = [];
+  const stationRows = [];
+  for (const city of cities.rows) {
+    const operation = await fetchAll("GetCtyAcctoTrainSttnList", {
+      cityCode: requiredString(city.citycode, "citycode"),
+    }, key, fetchImpl);
+    stationOperations.push(operation);
+    stationRows.push(...operation.rows);
+  }
+  const stations = canonicalStations.map(({ canonicalStationId, nameKo }) => {
+    const provider = uniqueStation(stationRows, requiredString(nameKo, "canonicalStations.nameKo"));
+    return {
+      providerStationId: requiredString(provider.nodeid, `${nameKo}.nodeid`),
+      providerStationName: provider.nodename,
+      canonicalStationId: requiredString(canonicalStationId, "canonicalStations.canonicalStationId"),
+    };
+  });
+  const matrix = buildItxOdMatrix(serviceDate, stations);
+  const stationByProviderId = new Map(stations.map((station) => [station.providerStationId, station]));
+  const odOperations = [];
+  const itineraries = [];
+  for (const { depStationId, arrStationId } of matrix.rows) {
+    const operation = await fetchAll("GetStrtpntAlocFndTrainInfo", {
+      depPlaceId: depStationId,
+      arrPlaceId: arrStationId,
+      depPlandTime: serviceDate,
+      trainGradeCode: grade.vehiclekndid,
+    }, key, fetchImpl);
+    odOperations.push(operation);
+    itineraries.push(...operation.rows.map((row, index) => ({
+      ...normalizeItinerary(row, index),
+      departureStationId: stationByProviderId.get(depStationId).canonicalStationId,
+      arrivalStationId: stationByProviderId.get(arrStationId).canonicalStationId,
+    })));
+  }
+  const trainNumbers = [...new Set(itineraries.map(({ trainNumber }) => trainNumber))].sort(naturalCompare);
+  if (trainNumbers.length === 0) throw new Error("TAGO ITX-청춘 roster returned zero rows");
+  return {
+    schemaVersion: 1,
+    artifactKind: "tago-itx-cheongchun-roster-evidence",
+    serviceId: "ITX_CHEONGCHUN",
+    officialSourceUrl: DETAIL_URL,
+    observedAt: now.toISOString(),
+    serviceDate,
+    kricServiceDayCode,
+    trainGrade: { code: String(grade.vehiclekndid), name: grade.vehiclekndnm, serviceId: "ITX_CHEONGCHUN" },
+    stations: stations.sort((left, right) => left.providerStationId.localeCompare(right.providerStationId)),
+    expectedOdCount: matrix.expectedOdCount,
+    completedOdCount: odOperations.length,
+    failedOdCount: 0,
+    stationSetHash: matrix.stationSetHash,
+    odMatrixHash: matrix.odMatrixHash,
+    operations: [trainGrades, cities, ...stationOperations, ...odOperations].map(operationEvidence),
+    trainNumbers,
+    itineraries,
+    evidenceHash: sha256(JSON.stringify({ serviceDate, kricServiceDayCode, stations, matrix, trainNumbers, itineraries })),
+    credentialRedacted: true,
+  };
+}
+
 export async function collectTagoItxCheongchunOd({
   serviceKey,
   departureDate,
@@ -161,6 +272,21 @@ function providerTimestamp(value, label) {
   const epoch = Date.parse(iso);
   if (!Number.isFinite(epoch)) throw new Error(`${label} is invalid`);
   return { iso, epoch };
+}
+
+function kstDate(value) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(value).map(({ type, value: part }) => [type, part]));
+  return `${parts.year}${parts.month}${parts.day}`;
+}
+
+function calendarDate(value) {
+  if (!/^\d{8}$/.test(value ?? "")) throw new Error("service date must be YYYYMMDD");
+  const date = new Date(Date.UTC(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8))));
+  const actual = `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
+  if (actual !== value) throw new Error("service date must be a valid calendar date");
+  return date;
 }
 
 function operationEvidence({ operation, endpoint, pageCount, totalCount, rawResponseSha256 }) {
