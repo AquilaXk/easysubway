@@ -4789,7 +4789,13 @@ void main() {
     expect(realtimeRepository.queries.last.lineId, 'seoul-4');
   });
 
-  testWidgets('GPS 하단 패널은 실시간에서 시간표로 전환해 방면과 시간을 구분한다', (tester) async {
+  testWidgets('GPS 하단 패널 시간표는 같은 방면의 다음 두 열차를 각각 한 줄로 표시한다', (tester) async {
+    tester.view.physicalSize = const Size(320, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     final now = DateTime.now();
     final departure = StationTimetableDeparture(
       directionName: '오이도',
@@ -4798,6 +4804,10 @@ void main() {
           now.minute * Duration.secondsPerMinute +
           now.second +
           120,
+    );
+    final secondDeparture = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds: departure.seconds + 300,
     );
     final repository = FakeTimetableStationRepository(
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
@@ -4808,7 +4818,10 @@ void main() {
           dayType: _stationTimetable(
             dayType,
             directions: [
-              StationTimetableDirection(name: '오이도', departures: [departure]),
+              StationTimetableDirection(
+                name: '오이도',
+                departures: [departure, secondDeparture],
+              ),
             ],
           ),
       },
@@ -4840,10 +4853,24 @@ void main() {
     await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
     await tester.pumpAndSettle();
 
-    expect(find.text('오이도 방면'), findsOneWidget);
-    final timeText = tester.widget<Text>(find.text(departure.timeLabel));
-    expect(timeText.style?.color, const Color(0xFFE23D3D));
-    expect(find.bySemanticsLabel(departure.semanticLabel), findsOneWidget);
+    final directionTexts = find.text('오이도 방면');
+    expect(directionTexts, findsNWidgets(2));
+    for (final (index, item) in [departure, secondDeparture].indexed) {
+      final timeFinder = find.text(item.timeLabel);
+      expect(timeFinder, findsOneWidget);
+      expect(
+        tester.getCenter(directionTexts.at(index)).dy,
+        closeTo(tester.getCenter(timeFinder).dy, 0.5),
+      );
+      expect(
+        tester.widget<Text>(timeFinder).style?.color,
+        const Color(0xFFE23D3D),
+      );
+      expect(
+        find.bySemanticsLabel(RegExp(RegExp.escape(item.semanticLabel))),
+        findsOneWidget,
+      );
+    }
     expect(
       find.descendant(
         of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
@@ -7927,9 +7954,13 @@ void main() {
     expect(find.byKey(const Key('stationSearchInput')), findsNothing);
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
-    // 포커스한 역의 부채꼴 팬 메뉴가 나타난다(주변 역 패널이 아니다).
+    // 포커스한 역의 부채꼴 팬 메뉴와 해당 역 하단 정보 패널이 함께 나타난다.
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    expect(find.text('상록수'), findsOneWidget);
   });
 
   testWidgets('#2109 팬 메뉴에 역명 라벨과 상세 진입이 없다', (tester) async {
@@ -8003,12 +8034,17 @@ void main() {
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    expect(find.text('상록수'), findsOneWidget);
     expect(find.bySemanticsLabel('상록수역 상세 보기'), findsNothing);
   });
 
-  testWidgets('#2109 GPS 팬 메뉴 뒤 풀페이지 검색 결과 탭 → 팬 메뉴 하나로 수렴한다', (tester) async {
-    // GPS와 풀페이지 검색은 모두 팬 메뉴 채널로 수렴한다. GPS가 먼저 연 팬 메뉴
-    // 뒤 검색 결과를 탭해도 목록 패널이나 중복 팬 메뉴가 남지 않아야 한다.
+  testWidgets('#2109 GPS 패널 뒤 풀페이지 검색 결과 탭은 해당 역 패널로 교체한다', (tester) async {
+    // GPS와 풀페이지 검색은 모두 팬 메뉴·하단 패널 채널로 수렴한다. GPS가 먼저
+    // 연 상록수 패널 뒤 사당 검색 결과를 탭하면 같은 패널이 사당 정보로 바뀐다.
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
       needsPermissionRequest: false,
@@ -8016,7 +8052,7 @@ void main() {
     final repository = FakeStationSearchRepository(
       networkMapRegionNames: const ['수도권'],
       queryResults: {
-        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
       },
       nearbyResults: [
         _stationResult(
@@ -8050,18 +8086,23 @@ void main() {
 
     // 햄버거 → 역 검색 → 결과 탭.
     await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pumpAndSettle();
     await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+      find.byKey(const Key('stationSearchResult-station-sadang')),
     );
     await tester.pumpAndSettle();
 
-    // 검색 결과도 같은 단일 팬 메뉴로 수렴하고 목록 패널은 생기지 않는다.
+    // 검색 결과도 같은 단일 팬 메뉴로 수렴하고 하단 패널은 사당으로 교체된다.
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    expect(find.text('사당'), findsOneWidget);
+    expect(find.text('상록수'), findsNothing);
   });
 
   testWidgets('경로 검색 첫 화면은 v3 출발 도착 입력 구조를 보여준다', (tester) async {

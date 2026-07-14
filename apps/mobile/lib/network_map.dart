@@ -389,6 +389,7 @@ class NetworkMapScreen extends StatefulWidget {
     this.notificationAction,
     this.disruptionBanner,
     this.bottomNavigationBar,
+    this.focusStationRequest,
     this.focusStationRequestId,
     this.onFocusStationRequestHandled,
     super.key,
@@ -444,6 +445,10 @@ class NetworkMapScreen extends StatefulWidget {
   /// 상단 disruption 공지 1줄 배너. 표시할 공지가 없으면 스스로 빈 위젯이 된다.
   final Widget? disruptionBanner;
   final Widget? bottomNavigationBar;
+
+  /// 풀페이지 검색 결과를 노선도에 전달하는 채널. 역 ID뿐 아니라 노선 정보를
+  /// 보존해 팬 메뉴와 해당 역 하단 정보 패널을 함께 갱신한다.
+  final StationSearchResult? focusStationRequest;
 
   /// #2109 풀페이지 검색(햄버거 메뉴 경유) 결과 탭으로 반환된 역 id. 설정되면
   /// 노선도가 그 역으로 카메라를 이동하고 팬 메뉴를 띄운다. 임베디드 검색의
@@ -510,6 +515,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   @override
   void didUpdateWidget(covariant NetworkMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final request = widget.focusStationRequest;
+    if (request != null && request != oldWidget.focusStationRequest) {
+      _showStationPanelFromSearch(request);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onFocusStationRequestHandled?.call();
+      });
+      return;
+    }
     final requestId = widget.focusStationRequestId;
     if (requestId != null && requestId != oldWidget.focusStationRequestId) {
       setState(() {
@@ -561,17 +574,36 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   }
 
   /// #2109 일반(비픽) 모드의 인플레이스 검색 결과 탭: 검색을 닫고 해당 역으로
-  /// 카메라를 이동한 뒤 부채꼴 팬 메뉴(역 액션 메뉴)를 띄운다.
+  /// 카메라를 이동한 뒤 부채꼴 팬 메뉴와 해당 역 하단 정보 패널을 띄운다.
   void _focusStationFromSearch(StationSearchResult result) {
-    // _exitSearchMode 가 이미 setState 로 검색을 닫으므로, 팬 메뉴 상태는 그 뒤
+    // _exitSearchMode 가 이미 setState 로 검색을 닫으므로, 선택 역 상태는 그 뒤
     // 별도 setState 로 세팅해 검색 종료에 덮이지 않도록 한다.
     _exitSearchMode();
     if (!mounted) {
       return;
     }
+    _showStationPanelFromSearch(result);
+  }
+
+  void _showStationPanelFromSearch(StationSearchResult result) {
+    final firstLine = result.lines.firstOrNull;
     setState(() {
+      _nearbyDataRequestToken++;
+      _nearbyPanelVisible = true;
+      _nearbySelectedStationId = result.id;
+      _nearbySelectedLineId = firstLine?.id;
+      _nearbyPanelData = _NetworkMapNearbyPanelData.success([result]);
+      _nearbyRealtime = firstLine == null
+          ? const RealtimeSnapshot(status: RealtimeSnapshotStatus.unsupported)
+          : const RealtimeSnapshot.loading();
+      _nearbyDataSource = _NearbyPanelDataSource.realtime;
+      _nearbyTimetable = null;
+      _nearbyTimetableLoading = false;
       _searchFanMenuStationId = result.id;
     });
+    if (firstLine != null) {
+      unawaited(_loadNearbyRealtime(result, firstLine));
+    }
   }
 
   /// #2109 검색 결과 탭으로 연 팬 메뉴가 닫히면(액션 선택·닫기·배경 탭·팬) 이
@@ -2950,6 +2982,15 @@ class _SubwayTimetablePanel extends StatelessWidget {
     if (departures.isEmpty) {
       return const _SubwayDataUnavailable();
     }
+    final columns = <List<_NextTimetableDeparture>>[];
+    for (final departure in departures) {
+      if (columns.isEmpty ||
+          columns.last.first.directionLabel != departure.directionLabel) {
+        columns.add([departure]);
+      } else {
+        columns.last.add(departure);
+      }
+    }
     return Semantics(
       liveRegion: true,
       excludeSemantics: true,
@@ -2957,15 +2998,24 @@ class _SubwayTimetablePanel extends StatelessWidget {
           .map((entry) => entry.departure.semanticLabel)
           .join(', '),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var index = 0; index < departures.length; index++) ...[
+          for (var index = 0; index < columns.length; index++) ...[
             if (index > 0)
               const SizedBox(
                 height: 46,
                 child: VerticalDivider(color: Color(0xFFE0E0E0), width: 30),
               ),
             Expanded(
-              child: _SubwayTimetableDepartureView(data: departures[index]),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var row = 0; row < columns[index].length; row++) ...[
+                    if (row > 0) const SizedBox(height: 4),
+                    _SubwayTimetableDepartureView(data: columns[index][row]),
+                  ],
+                ],
+              ),
             ),
           ],
         ],
@@ -2996,23 +3046,28 @@ List<_NextTimetableDeparture> _nextTimetableDepartures(
       now.minute * Duration.secondsPerMinute +
       now.second;
   final result = <_NextTimetableDeparture>[];
+  var visibleDirectionCount = 0;
   for (final direction in timetable.directions) {
-    final departure = direction.departures
+    final departures = direction.departures
         .where((candidate) => candidate.seconds >= currentSeconds)
-        .firstOrNull;
-    if (departure == null) {
+        .take(2)
+        .toList(growable: false);
+    if (departures.isEmpty) {
       continue;
     }
     final rawDirection = direction.name.trim().isEmpty
-        ? departure.directionName.trim()
+        ? departures.first.directionName.trim()
         : direction.name.trim();
     final label = rawDirection.endsWith('방면')
         ? rawDirection
         : '$rawDirection 방면';
-    result.add(
-      _NextTimetableDeparture(directionLabel: label, departure: departure),
-    );
-    if (result.length == 2) {
+    for (final departure in departures) {
+      result.add(
+        _NextTimetableDeparture(directionLabel: label, departure: departure),
+      );
+    }
+    visibleDirectionCount++;
+    if (visibleDirectionCount == 2) {
       break;
     }
   }
@@ -3026,20 +3081,23 @@ class _SubwayTimetableDepartureView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          data.directionLabel,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Color(0xFF2F2F2F),
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
+        Flexible(
+          child: Text(
+            data.directionLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF2F2F2F),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(width: 6),
         Text(
           data.departure.timeLabel,
           style: const TextStyle(
