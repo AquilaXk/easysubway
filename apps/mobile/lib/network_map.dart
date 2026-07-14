@@ -506,7 +506,18 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     super.didUpdateWidget(oldWidget);
     final requestId = widget.focusStationRequestId;
     if (requestId != null && requestId != oldWidget.focusStationRequestId) {
-      setState(() => _searchFanMenuStationId = requestId);
+      setState(() {
+        _searchFanMenuStationId = requestId;
+        // #2109 Fix: 풀페이지 검색으로 팬 메뉴를 여는데 하단 주변 역 패널이 열려
+        // 있던 상태(현재 위치 버튼 → 패널 → 햄버거 검색 → 결과 탭 경로)면 팬 메뉴와
+        // 패널이 동시에 뜨고 bottomNavigationBar도 계속 억제된다. 팬 메뉴로
+        // 수렴하므로 주변 역 패널을 함께 닫아 상호배제한다.
+        _nearbyPanelVisible = false;
+        _nearbySelectedStationId = null;
+        _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+        _nearbyRealtime = const RealtimeSnapshot.loading();
+        _nearbyRealtimeToken++;
+      });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.onFocusStationRequestHandled?.call();
       });
@@ -881,7 +892,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     initialViewport: loadResult.initialViewport,
                     focusedStationId:
                         _searchFanMenuStationId ?? _nearbySelectedStationId,
-                    selectedStationId: _searchFanMenuStationId ??
+                    selectedStationId:
+                        _searchFanMenuStationId ??
                         (_nearbyPanelVisible ? _nearbySelectedStationId : null),
                     onOpenStationDetail: _openStationDetailFromMap,
                     onSelectionDismissed: _dismissSearchFanMenu,
@@ -1882,8 +1894,9 @@ class _NetworkMapSearchField extends StatelessWidget {
                       borderRadius: easySubwaySearchFieldRadius,
                     ),
                     padding: EdgeInsets.symmetric(
-                      horizontal:
-                          compact ? 0 : easySubwaySearchFieldHorizontalPadding,
+                      horizontal: compact
+                          ? 0
+                          : easySubwaySearchFieldHorizontalPadding,
                     ),
                     child: compact
                         ? const SizedBox.shrink()
@@ -3561,18 +3574,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                         geometry.y(selectedStation),
                       ),
                     );
-                    const menuWidth = 260.0;
-                    final menuHeight = menuWidth * (380.0 / 700.0); // ≈ 141
-                    // 기본은 역 노드 위쪽에 메뉴 하단(닫기 노치)이 오도록 배치.
-                    // 좌우 잘림은 _selectStation의 카메라 최소 패닝이 담당한다.
-                    // 다만 지도 상단 경계에 붙은 역은 카메라를 위로 더 패닝할 수
-                    // 없어(#2109) 위쪽 공간이 부족하므로, 이 경우 메뉴를 노드
-                    // 아래로 뒤집어 항상 화면 안에 들어오게 한다.
-                    final left = stationPoint.dx - menuWidth / 2;
-                    final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
-                    final top = placeBelow
-                        ? stationPoint.dy + 28
-                        : stationPoint.dy - menuHeight - 8;
+                    // #2109: 배치 규칙은 fanMenuPlacement 단일 함수가 소유한다
+                    // (카메라 최소 패닝 _panCameraToRevealFanMenu와 동일 규칙 소비).
+                    final placement = fanMenuPlacement(
+                      stationPoint: stationPoint,
+                    );
+                    final left = placement.left;
+                    final menuWidth = placement.menuWidth;
+                    final top = placement.top;
                     final selectedSlots = fanMenuSelectedSlots(
                       stationId: selectedStation.id,
                       originStationId: widget.originStationId,
@@ -3588,7 +3597,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     // 겹치고, 뒤에 그려지는 팬 메뉴가 라벨 탭 영역을 가리는 결함이
                     // 있었다. bottom 앵커는 라벨이 커져도 항상 위로만 자라 메뉴와
                     // 겹치지 않는다.
-                    final labelBottom = constraints.maxHeight - top + 8;
+                    final labelBottom = placement.labelBottom(
+                      constraints.maxHeight,
+                    );
                     return Stack(
                       children: [
                         Positioned(
@@ -3598,8 +3609,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                           width: 120,
                           child: Center(
                             child: GestureDetector(
-                              onTap: () =>
-                                  widget.onOpenStationDetail(selectedStation),
+                              // #2109 Fix: 라벨 탭(상세 진입)도 섹터 액션과
+                              // 동일하게 팬 메뉴를 닫는다. _dismissSelection이
+                              // 내부 선택 해제 + onSelectionDismissed 통지로 검색
+                              // 채널(_searchFanMenuStationId)까지 비워, 상세에서
+                              // 돌아왔을 때 메뉴가 잔존하지 않게 한다. 상세 push는
+                              // 유지한다.
+                              onTap: () {
+                                widget.onOpenStationDetail(selectedStation);
+                                _dismissSelection();
+                              },
                               child: Semantics(
                                 button: true,
                                 label: '${selectedStation.displayName} 상세 보기',
@@ -3903,25 +3922,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     final stationPoint = camera.sourceToViewportPoint(
       Offset(geometry.x(station), geometry.y(station)),
     );
-    const menuWidth = 260.0;
-    final menuHeight = menuWidth * (380.0 / 700.0);
     const margin = 12.0;
-    // build와 동일한 배치 규칙: 위쪽 공간이 부족하면 노드 아래로 뒤집는다.
-    final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
-    final menuTop = placeBelow
-        ? stationPoint.dy + 28
-        : stationPoint.dy - menuHeight - 8;
-    // #2109 Fix: 팬 메뉴 위(또는 아래 배치 시 메뉴 위)에 얹히는 역명 라벨(build에서
-    // bottom 앵커로 배치, 최소 높이 추정치 28px)도 카메라가 화면 안에 들어오도록
-    // 패닝 대상 bbox에 포함시킨다. 그러지 않으면 화면 상단 경계에 가까운 역에서
-    // 라벨이 화면 밖으로 밀려날 수 있다.
-    const labelHeight = 28.0;
-    final menuRect = Rect.fromLTWH(
-      stationPoint.dx - menuWidth / 2,
-      menuTop - labelHeight,
-      menuWidth,
-      menuHeight + labelHeight,
-    );
+    // #2109: 배치·라벨 포함 bbox는 build와 동일하게 fanMenuPlacement가 계산한다
+    // (규칙 중복 제거 — 한쪽만 바뀌어 패닝 bbox와 렌더 위치가 어긋나는 것 방지).
+    final menuRect = fanMenuPlacement(stationPoint: stationPoint).revealBounds;
     final viewport = Offset.zero & camera.viewportSize;
     var dx = 0.0;
     var dy = 0.0;
@@ -5473,9 +5477,8 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
         container: true,
         customSemanticsActions: <CustomSemanticsAction, VoidCallback>{
           for (final target in reorderTargets)
-            CustomSemanticsAction(
-              label: '${target.displayLabel}으로 이동',
-            ): () => onReorder(slot, target),
+            CustomSemanticsAction(label: '${target.displayLabel}으로 이동'): () =>
+                onReorder(slot, target),
         },
         child: content,
       );
@@ -5571,6 +5574,72 @@ class _NetworkMapDraftPin extends StatelessWidget {
       ),
     );
   }
+}
+
+/// #2109 팬 메뉴 배치 결과. build 경로(라벨·메뉴 Positioned)와 카메라 최소
+/// 패닝(_panCameraToRevealFanMenu)이 같은 규칙을 소비하도록 단일 함수로 계산한다.
+/// 두 경로가 배치식을 각각 하드코딩하면 한쪽만 바뀌었을 때 패닝 bbox와 실제
+/// 렌더 위치가 어긋난다.
+class FanMenuPlacement {
+  const FanMenuPlacement({
+    required this.placeBelow,
+    required this.left,
+    required this.top,
+    required this.menuWidth,
+    required this.menuHeight,
+    required this.labelHeight,
+    required this.revealBounds,
+  });
+
+  /// 위쪽 공간이 부족해 메뉴를 노드 아래로 뒤집었는지.
+  final bool placeBelow;
+
+  /// 팬 메뉴 Positioned의 left/top.
+  final double left;
+  final double top;
+  final double menuWidth;
+  final double menuHeight;
+
+  /// 역명 라벨의 추정 높이(bottom 앵커 라벨이 화면 밖으로 밀리지 않게 패닝 bbox에 포함).
+  final double labelHeight;
+
+  /// 라벨까지 포함해 화면 안에 들여야 하는 뷰포트 bbox(카메라 패닝 대상).
+  final Rect revealBounds;
+
+  /// build에서 라벨을 bottom 앵커로 놓기 위한 bottom 값.
+  double labelBottom(double viewportHeight) => viewportHeight - top + 8;
+}
+
+/// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다.
+/// 기본은 노드 위쪽에 메뉴 하단(닫기 노치)이 오도록 배치하되, 지도 상단 경계에
+/// 붙은 역은 위쪽 공간이 부족하므로 노드 아래로 뒤집어 항상 화면 안에 들어오게
+/// 한다(#2109). 라벨은 bottom 앵커라 커져도 위로만 자라므로 추정 높이만큼
+/// 패닝 bbox 상단에 여유를 둔다.
+@visibleForTesting
+FanMenuPlacement fanMenuPlacement({required Offset stationPoint}) {
+  const menuWidth = 260.0;
+  final menuHeight = menuWidth * (380.0 / 700.0); // ≈ 141
+  const labelHeight = 28.0;
+  final left = stationPoint.dx - menuWidth / 2;
+  final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
+  final top = placeBelow
+      ? stationPoint.dy + 28
+      : stationPoint.dy - menuHeight - 8;
+  final revealBounds = Rect.fromLTWH(
+    left,
+    top - labelHeight,
+    menuWidth,
+    menuHeight + labelHeight,
+  );
+  return FanMenuPlacement(
+    placeBelow: placeBelow,
+    left: left,
+    top: top,
+    menuWidth: menuWidth,
+    menuHeight: menuHeight,
+    labelHeight: labelHeight,
+    revealBounds: revealBounds,
+  );
 }
 
 /// 팬 메뉴 배선용: 탭한 역이 이미 배정된 슬롯 집합(진한 채움 selected).

@@ -8,9 +8,40 @@ import 'package:flutter_test/flutter_test.dart';
 // @visibleForTesting으로 노출).
 
 import 'package:easysubway_mobile/network_map.dart'
-    show fanMenuSelectedSlots, fanMenuDisabledSlots, fanMenuShouldClear;
+    show
+        fanMenuSelectedSlots,
+        fanMenuDisabledSlots,
+        fanMenuShouldClear,
+        fanMenuPlacement;
 
 void main() {
+  group('fanMenuPlacement 배치 규칙(build·카메라 패닝 공유)', () {
+    test('위쪽 공간이 충분하면 메뉴를 노드 위에 놓는다(placeBelow=false)', () {
+      // 상단 경계에서 충분히 떨어진 역: 위쪽에 메뉴 하단이 오도록 배치.
+      final placement = fanMenuPlacement(stationPoint: const Offset(200, 400));
+      expect(placement.placeBelow, isFalse);
+      // top = dy - menuHeight - 8 (menuHeight ≈ 141.14).
+      expect(placement.top, closeTo(400 - placement.menuHeight - 8, 0.001));
+      // 라벨 포함 bbox 상단이 메뉴 top보다 labelHeight만큼 위.
+      expect(
+        placement.revealBounds.top,
+        closeTo(placement.top - placement.labelHeight, 0.001),
+      );
+    });
+
+    test('상단 경계 인근이면 메뉴를 노드 아래로 뒤집는다(placeBelow=true)', () {
+      // 위쪽 공간 부족(dy - menuHeight - 8 < 8): 노드 아래 배치로 전환.
+      final placement = fanMenuPlacement(stationPoint: const Offset(200, 10));
+      expect(placement.placeBelow, isTrue);
+      expect(placement.top, closeTo(10 + 28, 0.001));
+      // 라벨을 포함한 bbox 높이 = menuHeight + labelHeight.
+      expect(
+        placement.revealBounds.height,
+        closeTo(placement.menuHeight + placement.labelHeight, 0.001),
+      );
+    });
+  });
+
   test('selectedSlots: 선택 역 id가 배정된 슬롯만 포함', () {
     final selected = fanMenuSelectedSlots(
       stationId: 's1',

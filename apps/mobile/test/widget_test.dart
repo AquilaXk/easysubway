@@ -7513,6 +7513,113 @@ void main() {
     expect(find.byType(StationDetailScreen), findsOneWidget);
   });
 
+  testWidgets('#2109 팬 메뉴 라벨 탭 → 상세 push → 복귀하면 팬 메뉴가 남지 않는다', (
+    tester,
+  ) async {
+    // #2109 Fix: 검색 채널로 열린 팬 메뉴의 역명 라벨을 탭하면 상세로 진입하되,
+    // 섹터 액션과 동일하게 팬 메뉴를 닫는다. 그렇지 않으면 selectedStationId
+    // prop(_searchFanMenuStationId)이 살아 있어 상세에서 pop 복귀했을 때 팬 메뉴가
+    // 그대로 재표시된다.
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await _openStationSearchScreenViaMenu(tester);
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+
+    // 라벨 탭 → 상세 push.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
+    expect(find.byType(StationDetailScreen), findsOneWidget);
+
+    // 상세에서 pop 복귀.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // 노선도로 돌아왔고 팬 메뉴는 남아 있지 않다.
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+  });
+
+  testWidgets('#2109 주변 역 패널이 열린 채 풀페이지 검색 결과 탭 → 패널은 닫히고 팬 메뉴만 남는다', (
+    tester,
+  ) async {
+    // #2109 Fix: 현재 위치 버튼으로 주변 역 패널을 연 뒤 햄버거 검색 결과를 탭하면
+    // 팬 메뉴로 수렴한다. 이때 주변 역 패널이 함께 닫혀야 한다(둘이 동시에 떠서
+    // bottomNavigationBar가 계속 억제되는 잔상 방지).
+    final locationProvider = FakeCurrentLocationProvider(
+      location: _freshCurrentLocation(),
+      needsPermissionRequest: false,
+    );
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+      nearbyResults: [
+        _stationResult(id: 'station-banwol', name: '반월', distanceMeters: 180),
+      ],
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: locationProvider,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 주변 역 패널 열기.
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+
+    // 햄버거 → 역 검색 → 결과 탭.
+    await _openStationSearchScreenViaMenu(tester);
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    // 팬 메뉴는 뜨고, 주변 역 패널은 닫힌다.
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsNothing,
+    );
+  });
+
   testWidgets('경로 검색 첫 화면은 v3 출발 도착 입력 구조를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
