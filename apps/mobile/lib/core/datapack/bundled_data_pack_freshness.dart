@@ -13,6 +13,22 @@ class BundledDataPackFreshness {
     required this.labelKo,
   });
 
+  factory BundledDataPackFreshness.fromExpiry({
+    required DateTime freshnessExpiresAt,
+    required String staleReasonCode,
+    DateTime? evaluationAt,
+  }) {
+    final stale = !(evaluationAt ?? DateTime.now()).toUtc().isBefore(
+      freshnessExpiresAt.toUtc(),
+    );
+    return BundledDataPackFreshness(
+      status: stale ? 'STALE' : 'FRESH',
+      freshnessExpiresAt: freshnessExpiresAt.toUtc(),
+      reasonCode: stale ? staleReasonCode : 'NONE',
+      labelKo: stale ? staleLabelKo : '',
+    );
+  }
+
   static Future<BundledDataPackFreshness> read(
     Directory databaseDirectory,
   ) async {

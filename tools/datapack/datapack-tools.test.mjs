@@ -1583,6 +1583,39 @@ test("source snapshot command는 policy에서 파생되지 않은 임의 만료 
   }
 });
 
+test("source snapshot command는 source가 속하지 않은 freshness class를 거부한다", async () => {
+  const workDir = path.join(tmpdir(), `easysubway-source-snapshot-class-${process.pid}-${Date.now()}`);
+  const rawPath = path.join(workDir, "raw.csv");
+  await rm(workDir, { recursive: true, force: true });
+  await mkdir(workDir, { recursive: true });
+  await writeFile(rawPath, "station\nSadang\n");
+
+  try {
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/build-source-snapshot.mjs",
+          "--input", rawPath,
+          "--output", path.join(workDir, "snapshot.json"),
+          "--snapshot-id", "snapshot-kric-wrong-class",
+          "--source-id", "kric-station-elevator",
+          "--provider", "국가철도공단",
+          "--source-class-id", "static_network_metadata",
+          "--retrieved-at", "2026-06-30T03:00:00Z",
+          "--raw-object-uri", "s3://bucket/snapshot.json",
+          "--freshness-expires-at", "2026-07-30T03:00:00Z",
+          "--raw-retention-expires-at", "2026-09-30T03:00:00Z",
+        ],
+        { cwd: root },
+      ),
+      /SOURCE_FRESHNESS_POLICY_MISSING: kric-station-elevator source class/,
+    );
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("source snapshot command는 정책 basis와 provider validity 필드를 보존한다", async () => {
   const workDir = path.join(tmpdir(), `easysubway-source-snapshot-planned-${process.pid}-${Date.now()}`);
   const rawPath = path.join(workDir, "raw.csv");
@@ -1595,6 +1628,7 @@ test("source snapshot command는 정책 basis와 provider validity 필드를 보
     clockSkewSeconds: 300,
     sourceClasses: [{
       id: "planned_timetable",
+      sourceIds: ["planned-a"],
       basisField: "serviceEffectiveAt",
       maximumReverificationCadence: "P30D",
       providerValidityEndField: "serviceEffectiveUntil",

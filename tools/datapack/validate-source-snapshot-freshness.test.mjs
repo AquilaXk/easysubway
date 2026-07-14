@@ -78,10 +78,20 @@ test("build spec의 snapshot ID와 evidence가 다르면 fail closed한다", () 
 
 test("build provenance와 검증 evidence의 snapshot 내용이 다르면 fail closed한다", () => {
   const value = input();
-  value.buildSpec.sourceSnapshots[0].rawSha256 = "d".repeat(64);
+  value.buildSpec.sourceSnapshots[0].rawObjectUri = "s3://bucket/other.json";
 
   assert.throws(
     () => validateSourceSnapshotFreshness(value),
     /source snapshot provenance/,
   );
+});
+
+test("build admission hash와 canonical snapshot hash는 의미가 달라도 freshness를 검증한다", () => {
+  const value = input();
+  value.buildSpec.sourceSnapshots[0].rawSha256 = "d".repeat(64);
+  value.buildSpec.sourceSnapshots[0].schemaFingerprint = "e".repeat(64);
+
+  const result = validateSourceSnapshotFreshness(value);
+
+  assert.equal(result.results[0].status, "FRESH");
 });

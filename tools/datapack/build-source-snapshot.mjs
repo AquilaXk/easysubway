@@ -51,7 +51,12 @@ async function validateFreshnessPolicy(snapshot, args) {
   const policyPath = path.resolve(args["freshness-policy"] ?? DEFAULT_FRESHNESS_POLICY);
   const policy = JSON.parse(await readFile(policyPath, "utf8"));
   const sourceClassId = requireArg(args, "source-class-id");
-  const sourceClass = policy.sourceClasses?.find((entry) => entry.id === sourceClassId);
+  const sourceId = requireArg(args, "source-id");
+  const sourceClasses = policy.sourceClasses?.filter((entry) => entry.sourceIds?.includes(sourceId)) ?? [];
+  if (sourceClasses.length !== 1 || sourceClasses[0].id !== sourceClassId) {
+    throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${sourceId} source class`);
+  }
+  const sourceClass = sourceClasses[0];
   const basisAt = args["freshness-basis-at"]
     ?? (sourceClass?.basisField === "retrievedAt" ? snapshot.retrievedAt : null);
   if (sourceClass?.basisField && basisAt) {

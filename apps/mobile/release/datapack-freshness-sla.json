@@ -9,7 +9,7 @@
   "sourceClasses": [
     {
       "id": "static_network_metadata",
-      "sourceIds": ["molit-urban-rail-full-route", "seoulmetro-station-line-info"],
+      "sourceIds": ["molit-urban-rail-full-route", "seoulmetro-station-line-info", "kric-train-operation-organ"],
       "examples": ["station", "line", "operator identity"],
       "basisField": "retrievedAt",
       "reverificationCadence": "P30D",

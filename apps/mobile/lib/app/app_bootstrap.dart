@@ -93,7 +93,7 @@ class AppBootstrap {
       final bundledDataPackFreshness =
           catalogDatabaseOpener.openedBundledDataPack
           ? await BundledDataPackFreshness.read(supportDirectory)
-          : null;
+          : await _installedDataPackFreshness(userDatabase);
       final runner = dataPackUpdateRunner ?? _defaultDataPackUpdateRunner;
       dataPackUpdate = _runDataPackUpdateSafely(
         supportDirectory: supportDirectory,
@@ -152,6 +152,22 @@ class AppBootstrap {
     await catalogDatabase.close();
     await userDatabase.close();
   }
+}
+
+Future<BundledDataPackFreshness?> _installedDataPackFreshness(
+  UserDatabase userDatabase,
+) async {
+  final cache = await DataPackUpdateStateRepository(
+    userDatabase: userDatabase,
+  ).readManifestCache();
+  final expiresAt = cache?.expiresAt;
+  if (expiresAt == null) {
+    return null;
+  }
+  return BundledDataPackFreshness.fromExpiry(
+    freshnessExpiresAt: expiresAt,
+    staleReasonCode: 'PACK_PUBLISH_FRESHNESS_EXPIRED',
+  );
 }
 
 Future<void> _runDataPackUpdateSafely({
