@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -9,6 +10,45 @@ const stationSequenceEvidence = JSON.parse(await readFile(
   new URL("./sources/korail-itx-cheongchun-station-sequence-20260713.json", import.meta.url),
   "utf8",
 ));
+const admittedFixtureUrl = new URL("./fixtures/test-only-itx-cheongchun-admitted.json", import.meta.url);
+
+test("deterministic ADMITTED fixture는 test-only이며 production evidence에 연결되지 않는다", async () => {
+  let fixtureBytes = null;
+  try {
+    fixtureBytes = await readFile(admittedFixtureUrl);
+  } catch {
+    // 아래 assertion이 누락된 fixture를 계약 실패로 보고한다.
+  }
+  assert.ok(fixtureBytes, "test-only ITX-청춘 ADMITTED fixture가 필요하다");
+
+  const fixture = JSON.parse(fixtureBytes);
+  const fixtureSha256 = createHash("sha256").update(fixtureBytes).digest("hex");
+  assert.equal(fixture.fixtureClass, "TEST_ONLY");
+  assert.equal(fixture.serviceClass, "ITX_CHEONGCHUN");
+  assert.equal(fixture.admissionStatus, "ADMITTED");
+  assert.equal(fixture.admissionEligible, true);
+  assert.deepEqual(fixture.timetableArtifactIdentity, {
+    id: "test-only-itx-cheongchun-admitted-v1",
+    sha256Source: "FIXTURE_FILE_BYTES",
+  });
+  assert.deepEqual(fixture.canonicalPackIdentity, {
+    id: "test-only-capital-canonical-v1",
+    sha256Source: "GENERATED_TEST_PACK_BYTES",
+  });
+
+  const forbiddenProductionSurfaces = [
+    "./source-inventory.json",
+    "./release/candidate-build-spec.json",
+    "../../apps/mobile/assets/datapacks/source-inventory.json",
+    "../../apps/mobile/assets/datapacks/index.json",
+    "../../apps/mobile/release/production-datapack-scope.json",
+  ];
+  for (const relativePath of forbiddenProductionSurfaces) {
+    const productionText = await readFile(new URL(relativePath, import.meta.url), "utf8");
+    assert.doesNotMatch(productionText, /test-only-itx-cheongchun-admitted\.json/);
+    assert.equal(productionText.includes(fixtureSha256), false, `${relativePath}에 test-only fixture hash가 연결됐다`);
+  }
+});
 
 test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원으로 과장하지 않는다", () => {
   assert.deepEqual(contract.searchScopePolicy, {

@@ -177,8 +177,10 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
     throw new Error("exactly one of --fixture or --build-spec is required");
   }
   if (fixtureArg != null) {
+    const fixture = JSON.parse(await readFile(path.resolve(root, fixtureArg), "utf8"));
+    rejectTestOnlyBuildInput(fixture);
     return {
-      fixture: JSON.parse(await readFile(path.resolve(root, fixtureArg), "utf8")),
+      fixture,
       candidateBuild: null,
     };
   }
@@ -187,6 +189,7 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
   const buildSpecBytes = await readFile(buildSpecPath);
   const buildSpec = JSON.parse(buildSpecBytes);
   const fixture = JSON.parse(await readFile(await resolveBuildInputPath(buildSpec.fixturePath, "buildSpec.fixturePath"), "utf8"));
+  rejectTestOnlyBuildInput(fixture);
   const officialOdFareEvidence = await validateCandidateBuildSpec(
     buildSpec,
     fixture,
@@ -197,6 +200,12 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
     fixture,
     candidateBuild: candidateBuildProvenance(buildSpec, sha256(buildSpecBytes), officialOdFareEvidence),
   };
+}
+
+function rejectTestOnlyBuildInput(fixture) {
+  if (fixture?.fixtureClass === "TEST_ONLY") {
+    throw new Error("TEST_ONLY artifact cannot be used as datapack build input");
+  }
 }
 
 async function validateCandidateBuildSpec(buildSpec, fixture, admissions, admissionBytes) {

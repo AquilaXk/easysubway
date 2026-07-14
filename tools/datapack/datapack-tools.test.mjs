@@ -57,6 +57,25 @@ const productionEnv = {
   EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: testPublicKeyPem,
 };
 
+test("데이터팩 생성기는 TEST_ONLY admission fixture를 build input으로 거부한다", async (context) => {
+  const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-test-only-"));
+  context.after(() => rm(outputDir, { recursive: true, force: true }));
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture",
+        "tools/datapack/fixtures/test-only-itx-cheongchun-admitted.json",
+        "--output",
+        outputDir,
+      ],
+      { cwd: root, env: productionEnv },
+    ),
+    /TEST_ONLY artifact cannot be used as datapack build input/,
+  );
+});
+
 test("데이터팩 생성기는 fixture로 원격 manifest와 gzip SQLite pack을 만든다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-${Date.now()}`);
   await rm(outputDir, { recursive: true, force: true });
