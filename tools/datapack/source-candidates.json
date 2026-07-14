@@ -3,7 +3,7 @@
   "artifactKind": "production-source-candidates",
   "source": "tools/datapack/source-candidates.json",
   "retrievedAt": "2026-06-22",
-  "updatedAt": "2026-07-13",
+  "updatedAt": "2026-07-14",
   "candidates": [
     {
       "id": "kric-subway-route-info",
@@ -120,6 +120,15 @@
       "displayName": "역사별 정보",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=183&service=convenientInfo&operation=stationInfo&page=2",
       "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationInfo",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationInfo",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd", "stinNm"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-info"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -235,6 +244,15 @@
       "displayName": "열차운영기관정보",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266&service=convenientInfo&operation=trainOperationOrgan&page=3",
       "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/trainOperationOrgan",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/trainOperationOrgan",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "railOprIsttNm"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-train-operation-organ"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -321,6 +339,15 @@
       "displayName": "역사별 환승정보",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=181&service=convenientInfo&operation=stationTransferInfo&page=2",
       "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationTransferInfo",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationTransferInfo",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-transfer-info"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -417,6 +444,15 @@
       "displayName": "역사별 승강장 정보",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=433&service=convenientInfo&operation=stPlf&page=1",
       "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stPlf",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stPlf",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-platform"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -525,6 +561,15 @@
       "displayName": "출입구-승강장 이동경로(표준)",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=429&service=handicapped&operation=stationMovement&page=1",
       "requestUrl": "https://openapi.kric.go.kr/openapi/handicapped/stationMovement",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/handicapped/stationMovement",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd", "nextStinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-movement-standard"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -627,6 +672,15 @@
       "displayName": "출입구-승강장 이동경로",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=306&service=vulnerableUserInfo&operation=stationMovement&page=2",
       "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationMovement",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationMovement",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd", "nextStinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-movement-detailed"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -862,6 +916,15 @@
       "displayName": "환승 이동경로",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=307&operation=transferMovement&service=vulnerableUserInfo",
       "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/transferMovement",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd", "prevStinCd", "chthTgtLn", "chtnNextStinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-transfer-movement-detailed"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -951,6 +1014,15 @@
       "displayName": "편의정보(표준)",
       "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=430&service=handicapped&operation=stationCnvFacl&page=1",
       "requestUrl": "https://openapi.kric.go.kr/openapi/handicapped/stationCnvFacl",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/handicapped/stationCnvFacl",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-convenience-standard"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1047,6 +1119,15 @@
       "displayName": "서울교통공사_교통약자이용정보",
       "detailUrl": "https://www.data.go.kr/data/15143843/openapi.do",
       "requestUrl": "https://apis.data.go.kr/B553766/wksn/getWksnElvtr",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/B553766/wksn/getWksnElvtr",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "dataType"],
+        "responseEnvelope": "response.header + response.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-datago-source-candidate-evidence.mjs", "arguments": ["--candidate", "seoul-metro-accessibility"], "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "credential_free_snapshot_recorded",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1135,6 +1216,15 @@
       "displayName": "서울교통공사_편의시설위치정보",
       "detailUrl": "https://www.data.go.kr/data/15143841/openapi.do",
       "requestUrl": "https://apis.data.go.kr/B553766/facility/getFcElvtr",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/B553766/facility/getFcElvtr",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "dataType"],
+        "responseEnvelope": "response.header + response.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-datago-source-candidate-evidence.mjs", "arguments": ["--candidate", "seoul-metro-facility-location"], "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "sample_url_documented_key_required",
       "admissionStatus": "evidence_recorded_admin_review_required",
@@ -1195,6 +1285,15 @@
       "displayName": "국토교통부_(TAGO)_지하철정보",
       "detailUrl": "https://www.data.go.kr/data/15098554/openapi.do",
       "requestUrl": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/1613000/SubwayInfo/GetSubwaySttnAcctoSchdulList",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "_type", "subwayStationId", "dailyTypeCode", "upDownTypeCode"],
+        "responseEnvelope": "response.header + response.body.items.item + totalCount",
+        "runner": { "command": "node tools/datapack/validate-tago-schedule-sample.mjs", "arguments": ["--collect", "--input", "tools/datapack/inputs/capital-pilot-production-source-input.json", "--daily-limit", "1", "--output", ".codex/evidence/tago-schedule-collection.json", "--quiet"], "requiredEnv": ["DATA_GO_KR_SERVICE_KEY"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1452,6 +1551,15 @@
       "displayName": "서울시 지하철 실시간 도착정보",
       "detailUrl": "https://data.seoul.go.kr/dataList/OA-12764/F/1/datasetView.do",
       "requestUrl": "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
+      "operation": {
+        "method": "GET",
+        "endpoint": "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
+        "auth": { "env": "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY", "placement": "path", "parameter": "serviceKey", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "startIndex", "endIndex", "stationQueryName"],
+        "responseEnvelope": "errorMessage + realtimeArrivalList[]",
+        "runner": { "command": "node tools/datapack/probe-seoul-open-data-api.mjs", "requiredEnv": ["EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY", "SEOUL_OPEN_DATA_API_SOURCE_ID", "SEOUL_OPEN_DATA_API_OUTPUT"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1546,6 +1654,15 @@
       "displayName": "서울시 지하철 실시간 열차 위치정보",
       "detailUrl": "https://data.seoul.go.kr/dataList/OA-12601/A/1/datasetView.do",
       "requestUrl": "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimePosition",
+      "operation": {
+        "method": "GET",
+        "endpoint": "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimePosition",
+        "auth": { "env": "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY", "placement": "path", "parameter": "serviceKey", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "startIndex", "endIndex", "lineName"],
+        "responseEnvelope": "errorMessage + realtimePositionList[]",
+        "runner": { "command": "node tools/datapack/probe-seoul-open-data-api.mjs", "requiredEnv": ["EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY", "SEOUL_OPEN_DATA_API_SOURCE_ID", "SEOUL_OPEN_DATA_API_OUTPUT"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1635,6 +1752,7 @@
     },
     {
       "id": "molit-urban-rail-full-route",
+      "apiCatalog": false,
       "priority": "P0",
       "domain": "station_line_membership",
       "displayName": "국토교통부_도시철도 전체노선",
@@ -1715,6 +1833,16 @@
       "displayName": "서울교통공사_노선별 지하철역 정보",
       "detailUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do",
       "requestUrl": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo",
+      "operation": {
+        "method": "GET",
+        "endpoint": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo",
+        "auth": { "env": "SEOUL_OPENAPI_KEY", "placement": "path", "parameter": "serviceKey", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "startIndex", "endIndex", "stationCode", "stationName", "lineName"],
+        "responseEnvelope": "SearchSTNBySubwayLineInfo.{RESULT,row[]}",
+        "responseFields": ["STATION_CD", "STATION_NM", "STATION_NM_ENG", "LINE_NUM", "FR_CODE", "STATION_NM_CHN", "STATION_NM_JPN"],
+        "runner": { "command": "node tools/datapack/probe-seoul-open-data-api.mjs", "requiredEnv": ["SEOUL_OPENAPI_KEY", "SEOUL_OPEN_DATA_API_SOURCE_ID", "SEOUL_OPEN_DATA_API_OUTPUT"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1724,6 +1852,7 @@
         "detailPageUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do",
         "retrievedAt": "2026-06-21",
         "endpoint": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo",
+        "sampleUrl": "http://openapi.seoul.go.kr:8088/[서비스키값]/json/SearchSTNBySubwayLineInfo/1/5///4호선",
         "usePermissionRange": "공공누리 1유형",
         "formats": [
           "JSON"
@@ -1776,6 +1905,7 @@
     },
     {
       "id": "seoulmetro-cyberstation-route-map",
+      "apiCatalog": false,
       "priority": "P1",
       "domain": "route_map_positions",
       "displayName": "서울교통공사 사이버스테이션 노선도",
@@ -1848,7 +1978,18 @@
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 엘리베이터 현황",
       "detailUrl": "https://www.data.go.kr/data/15041682/openapi.do",
-      "requestUrl": "https://apis.data.go.kr/B551181/stationElevatorInfo/getStationElevatorList",
+      "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "responseFields": ["dtlLoc", "exitNo", "grndDvNmFr", "grndDvNmTo", "lnCd", "railOprIsttCd", "rglnPsno", "rglnWgt", "runStinFlorFr", "runStinFlorTo", "stinCd"],
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-elevator"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1885,7 +2026,15 @@
           "station_code",
           "station_name"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증.",
+        "operationLiveValidation": {
+          "observedAt": "2026-07-14",
+          "httpStatus": 200,
+          "providerResultCode": "30",
+          "schemaStatus": "AUTHORIZATION_REQUIRED",
+          "credentialRedacted": true,
+          "note": "현재 공식 KRIC LINK operation은 provider 권한 승인 전까지 row schema를 검증할 수 없다."
+        }
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -1922,7 +2071,18 @@
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 엘리베이터 이동동선",
       "detailUrl": "https://www.data.go.kr/data/15041689/openapi.do",
-      "requestUrl": "https://apis.data.go.kr/B551181/stationElevatorMovement/getStationElevatorMovementList",
+      "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "responseFields": ["lnCd", "mvContDtl", "mvDst", "mvPathDvCd", "mvPathDvNm", "mvPathMgNo", "mvTpOrdr", "railOprIsttCd", "stinCd"],
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-elevator-movement"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -1961,7 +2121,7 @@
           "station_name",
           "to_location"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -1998,7 +2158,18 @@
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 에스컬레이터 현황",
       "detailUrl": "https://www.data.go.kr/data/15041683/openapi.do",
-      "requestUrl": "https://apis.data.go.kr/B551181/stationEscalatorInfo/getStationEscalatorList",
+      "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "responseFields": ["dtlLoc", "exitNo", "grndDvNmFr", "grndDvNmTo", "lnCd", "railOprIsttCd", "runStinFlorFr", "runStinFlorTo", "stinCd", "updnDvNm"],
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-station-escalator"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -2033,7 +2204,7 @@
           "station_code",
           "station_name"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -2070,7 +2241,18 @@
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 휠체어리프트 위치",
       "detailUrl": "https://www.data.go.kr/data/15041686/openapi.do",
-      "requestUrl": "https://apis.data.go.kr/B551181/wheelchairLiftLocation/getWheelchairLiftLocationList",
+      "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=6&stinCd=2613",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "responseFields": ["bndWgt", "dtlLoc", "exitNo", "grndDvNmFr", "grndDvNmTo", "len", "lnCd", "railOprIsttCd", "runStinFlorFr", "runStinFlorTo", "stinCd", "wd"],
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-wheelchair-lift-location"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -2103,7 +2285,7 @@
           "station_code",
           "station_name"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -2140,7 +2322,18 @@
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 휠체어리프트 이동동선",
       "detailUrl": "https://www.data.go.kr/data/15041690/openapi.do",
-      "requestUrl": "https://apis.data.go.kr/B551181/wheelchairLiftMovement/getWheelchairLiftMovementList",
+      "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "responseFields": ["lnCd", "mvContDtl", "mvDst", "mvPathDvCd", "mvPathDvNm", "mvPathMgNo", "mvTpOrdr", "railOprIsttCd", "stinCd"],
+        "runner": { "command": "node tools/datapack/collect-kric-source-candidate-evidence.mjs", "arguments": ["--candidate", "kric-wheelchair-lift-movement"], "requiredEnv": ["KRIC_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -2179,7 +2372,7 @@
           "station_name",
           "to_location"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -2217,6 +2410,15 @@
       "displayName": "서울교통공사_환승역거리 소요시간",
       "detailUrl": "https://www.data.go.kr/data/15044419/fileData.do",
       "requestUrl": "https://api.odcloud.kr/api/15044419/v1/uddi:7008c675-928f-41d6-9a01-b3541f78466b",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://api.odcloud.kr/api/15044419/v1/uddi:7008c675-928f-41d6-9a01-b3541f78466b",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "page", "perPage", "returnType"],
+        "responseEnvelope": "{currentCount,data[],matchCount,page,perPage,totalCount}",
+        "runner": { "command": "node tools/datapack/collect-datago-source-candidate-evidence.mjs", "arguments": ["--candidate", "seoul-metro-transfer-distance-duration"], "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -2300,6 +2502,15 @@
       "displayName": "서울교통공사_빠른하차정보",
       "detailUrl": "https://www.data.go.kr/data/15143840/openapi.do",
       "requestUrl": "https://apis.data.go.kr/B553766/inout/getFstExit",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/B553766/inout/getFstExit",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "dataType"],
+        "responseEnvelope": "response.header + response.body.items.item",
+        "runner": { "command": "node tools/datapack/collect-datago-source-candidate-evidence.mjs", "arguments": ["--candidate", "seoul-metro-fast-exit-car-door"], "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "RUNNER_TEMP"] },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
@@ -2674,20 +2885,20 @@
         "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_attribution",
-      "sampleEvidenceStatus": "application_complete_activation_pending",
-      "admissionStatus": "missing_live_schema_result_code_30",
+      "sampleEvidenceStatus": "validated_live_sample",
+      "admissionStatus": "validated_live_sample_non_itx_urban_rail_only",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "retrievedAt": "2026-07-13",
+        "retrievedAt": "2026-07-14",
         "searchTerms": ["ITX-청춘", "ITX_CHEONGCHUN", "경춘선", "역사별시각표"],
         "outputFields": ["arvTm", "dayCd", "dayNm", "dptTm", "lnCd", "orgStinCd", "railOprIsttCd", "stinCd", "tmnStinCd", "trnNo"],
         "coverageLimitations": [
-          "2026-07-13 K2 25역 credential-safe call은 provider resultCode 30으로 거절",
-          "활용신청 완료 후 provider 활성화와 live schema 확인 전 ITX-청춘 schedule_timetable은 MISSING"
+          "2026-07-14 K2 25역 credential-safe call은 모두 provider resultCode 00과 expected body schema를 반환",
+          "실제 열차번호는 K8001~K8405 도시철도이며 TAGO ITX-청춘 02001~02035와 join 0건이므로 ITX trip/stop materialization에는 사용할 수 없음"
         ]
       },
-      "nextAction": "KRIC 활용신청 활성화 전파 후 K2 25역을 재수집하고 TAGO ITX train number와 trip/stop join을 재검증한다"
+      "nextAction": "도시철도 station timetable source로만 유지하고 ITX-청춘은 한국철도공사 여객열차 운행계획·운행정보의 activation과 live schema를 별도로 검증한다"
     },
     {
       "id": "tago-train-city-codes",
@@ -2800,6 +3011,162 @@
         ]
       },
       "nextAction": "#2094 기차 검색에는 사용 가능하나 #2053 route timetable은 station-level source와 교차검증 전 MISSING 유지"
+    },
+    {
+      "id": "korail-train-operation-codes",
+      "priority": "P0",
+      "domain": "train_operation_code_catalog",
+      "displayName": "한국철도공사 열차운행 코드정보",
+      "detailUrl": "https://www.data.go.kr/data/15125762/openapi.do",
+      "requestUrl": "https://apis.data.go.kr/B551457/run/v2/codes2",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/B551457/run/v2/codes2",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey" },
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "returnType", "cond[type::EQ]"],
+        "responseEnvelope": "response.header + response.body.items.item + totalCount",
+        "runner": {
+          "command": "node tools/datapack/probe-korail-train-operation-api.mjs",
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "KORAIL_TRAIN_OPERATION_API_SOURCE_ID", "KORAIL_TRAIN_OPERATION_API_OUTPUT"]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      },
+      "licenseEvidenceStatus": "confirmed_free_use",
+      "sampleEvidenceStatus": "validated_live_sample",
+      "admissionStatus": "validated_live_sample_materialization_pending",
+      "serviceKeyHandling": "offline_probe_secret_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-07-14",
+        "searchTerms": ["한국철도공사", "ITX-청춘", "ITX_CHEONGCHUN", "운행코드", "정차구분"],
+        "endpoint": "https://apis.data.go.kr/B551457/run/v2/codes2",
+        "usePermissionRange": "이용허락범위 제한 없음",
+        "formats": ["JSON", "XML"],
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "returnType", "cond[type::EQ]", "cond[code::EQ]", "cond[value::LIKE]"],
+        "outputFields": ["code", "type", "value"],
+        "liveValidation": {
+          "requestScope": "cond[type::EQ]=mrnt_cd, pageNo=1, numOfRows=10, returnType=JSON",
+          "httpStatus": 200,
+          "providerResultCode": "0",
+          "rowCount": 10,
+          "totalCount": 164,
+          "schemaStatus": "EXPECTED",
+          "rawSha256": "5fb12853e3e5c67fc479befc9b69ceadf9757c70279cadd8ddb2afe26503b7fc"
+        },
+        "coverageLimitations": [
+          "mrnt_cd, stn_cd, stop_se_cd, uppln_dn_se_cd 해석용 코드표이며 timetable row 자체는 제공하지 않음",
+          "2026-07-14 live 검증은 mrnt_cd 첫 10건이며 전체 type과 pagination materialization은 아직 수행하지 않음"
+        ]
+      },
+      "nextAction": "tracked Node collector로 필요한 코드 type을 수집하고 timetable row의 station·line·direction·stop 값을 canonical contract에 매핑한다"
+    },
+    {
+      "id": "korail-traveler-train-run-plan",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": ["capital"],
+        "operatorIds": ["korail"],
+        "lineIds": ["line-54a7b980b7c3"]
+      },
+      "displayName": "한국철도공사 여객열차 운행계획",
+      "detailUrl": "https://www.data.go.kr/data/15125762/openapi.do",
+      "requestUrl": "https://apis.data.go.kr/B551457/run/v2/travelerTrainRunPlan2",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/B551457/run/v2/travelerTrainRunPlan2",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey" },
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "returnType", "cond[run_ymd::GTE]", "cond[run_ymd::LTE]"],
+        "responseEnvelope": "response.header + response.body.items.item + totalCount",
+        "runner": {
+          "command": "node tools/datapack/probe-korail-train-operation-api.mjs",
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "KORAIL_TRAIN_OPERATION_API_SOURCE_ID", "KORAIL_TRAIN_OPERATION_RUN_DATE", "KORAIL_TRAIN_OPERATION_API_OUTPUT"]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      },
+      "licenseEvidenceStatus": "confirmed_free_use",
+      "sampleEvidenceStatus": "validated_live_sample",
+      "admissionStatus": "validated_live_sample_materialization_pending",
+      "serviceKeyHandling": "offline_probe_secret_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-07-14",
+        "searchTerms": ["한국철도공사", "ITX-청춘", "ITX_CHEONGCHUN", "여객열차 운행계획"],
+        "endpoint": "https://apis.data.go.kr/B551457/run/v2/travelerTrainRunPlan2",
+        "usePermissionRange": "이용허락범위 제한 없음",
+        "formats": ["JSON", "XML"],
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "returnType", "cond[run_ymd::GTE]", "cond[run_ymd::LTE]", "cond[dptre_stn_cd::EQ]", "cond[dptre_stn_nm::EQ]", "cond[arvl_stn_cd::EQ]", "cond[arvl_stn_nm::EQ]"],
+        "outputFields": ["run_ymd", "trn_no", "dptre_stn_cd", "dptre_stn_nm", "arvl_stn_cd", "arvl_stn_nm", "trn_plan_dptre_dt", "trn_plan_arvl_dt"],
+        "retentionWindow": "과거 3개월부터 미래 1개월",
+        "liveValidation": {
+          "requestScope": "run_ymd=20260714, pageNo=1, numOfRows=10, returnType=JSON",
+          "httpStatus": 200,
+          "providerResultCode": "0",
+          "rowCount": 10,
+          "totalCount": 247,
+          "schemaStatus": "EXPECTED",
+          "rawSha256": "f1cbef88be0cf47da569876d95b5f9118e8bf7b42fbdeb8a2c84ecff3e9bae86"
+        },
+        "coverageLimitations": [
+          "열차별 양 끝역과 계획 출도착시각을 제공하지만 중간 정차역 sequence는 제공하지 않음",
+          "2026-07-14 live schema는 검증했지만 ITX-청춘 train type 식별과 전체 pagination materialization은 아직 수행하지 않음"
+        ]
+      },
+      "nextAction": "tracked Node collector로 ITX 열차번호·양 끝역·계획시간을 검증하고 여객열차 운행정보의 station rows와 교차검증한다"
+    },
+    {
+      "id": "korail-traveler-train-run-info",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": ["capital"],
+        "operatorIds": ["korail"],
+        "lineIds": ["line-54a7b980b7c3"]
+      },
+      "displayName": "한국철도공사 여객열차 운행정보",
+      "detailUrl": "https://www.data.go.kr/data/15125762/openapi.do",
+      "requestUrl": "https://apis.data.go.kr/B551457/run/v2/travelerTrainRunInfo2",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/B551457/run/v2/travelerTrainRunInfo2",
+        "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey" },
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "returnType", "cond[run_ymd::GTE]", "cond[run_ymd::LTE]"],
+        "responseEnvelope": "response.header + response.body.items.item + totalCount",
+        "runner": {
+          "command": "node tools/datapack/probe-korail-train-operation-api.mjs",
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "KORAIL_TRAIN_OPERATION_API_SOURCE_ID", "KORAIL_TRAIN_OPERATION_RUN_DATE", "KORAIL_TRAIN_OPERATION_API_OUTPUT"]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      },
+      "licenseEvidenceStatus": "confirmed_free_use",
+      "sampleEvidenceStatus": "validated_live_sample",
+      "admissionStatus": "validated_live_sample_materialization_pending",
+      "serviceKeyHandling": "offline_probe_secret_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-07-14",
+        "searchTerms": ["한국철도공사", "ITX-청춘", "ITX_CHEONGCHUN", "여객열차 운행정보", "정차순서"],
+        "endpoint": "https://apis.data.go.kr/B551457/run/v2/travelerTrainRunInfo2",
+        "usePermissionRange": "이용허락범위 제한 없음",
+        "formats": ["JSON", "XML"],
+        "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "returnType", "cond[run_ymd::GTE]", "cond[run_ymd::LTE]", "cond[stn_cd::EQ]", "cond[stn_nm::EQ]", "cond[mrnt_cd::EQ]", "cond[mrnt_nm::EQ]"],
+        "outputFields": ["run_ymd", "trn_no", "trn_run_sn", "stn_cd", "stn_nm", "mrnt_cd", "mrnt_nm", "uppln_dn_se_cd", "stop_se_cd", "stop_se_nm", "trn_dptre_dt", "trn_arvl_dt"],
+        "retentionWindow": "과거 3개월부터 전일",
+        "liveValidation": {
+          "requestScope": "run_ymd=20260713, pageNo=1, numOfRows=10, returnType=JSON",
+          "httpStatus": 200,
+          "providerResultCode": "0",
+          "rowCount": 10,
+          "totalCount": 8549,
+          "schemaStatus": "EXPECTED",
+          "rawSha256": "109278d79ebab9cf8c520e3dfc75b8f19f7ccaee9eaaf012b0f69148ad627123"
+        },
+        "coverageLimitations": [
+          "실제 운행 row이므로 미래 계획 timetable을 단독으로 대체하지 않음",
+          "2026-07-13 live schema는 검증했지만 ITX-청춘 row filter, 전체 pagination, trn_run_sn 순서와 stop_se_cd 의미 검증은 아직 수행하지 않음"
+        ]
+      },
+      "nextAction": "tracked Node collector로 ITX station rows를 수집하고 codes2·canonical station·운행계획과 결합해 정차 순서와 시각을 fail-closed 검증한다"
     },
     {
       "id": "daejeon-train-timetable",

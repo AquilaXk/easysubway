@@ -36,6 +36,12 @@ function fixtureCatalog() {
           requestUrl: "https://provider.example/stations",
           admissionStatus: "admitted_to_production_inventory",
         },
+        {
+          id: "official-route-map-reference",
+          requestUrl: "https://provider.example/route-map",
+          apiCatalog: false,
+          admissionStatus: "admitted_to_production_inventory",
+        },
       ],
     },
     integrationsDocument: {
@@ -64,6 +70,7 @@ test("catalog는 internal/provider/integration/OpenAPI reference를 한 목록�
     findCatalogEntry(catalog, "provider:official-stations").endpoint,
     "https://provider.example/stations",
   );
+  assert.equal(catalog.some((entry) => entry.id === "provider:official-route-map-reference"), false);
 });
 
 test("list는 kind와 query로 검색한다", () => {
@@ -326,6 +333,27 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
       "provider:tago-train-stations",
     ],
   );
+  for (const [id, fields] of [
+    ["provider:korail-train-operation-codes", ["code", "type", "value"]],
+    ["provider:korail-traveler-train-run-plan", [
+      "run_ymd", "trn_no", "dptre_stn_cd", "dptre_stn_nm", "arvl_stn_cd", "arvl_stn_nm",
+      "trn_plan_dptre_dt", "trn_plan_arvl_dt",
+    ]],
+    ["provider:korail-traveler-train-run-info", [
+      "run_ymd", "trn_no", "trn_run_sn", "stn_cd", "stn_nm", "mrnt_cd", "mrnt_nm",
+      "uppln_dn_se_cd", "stop_se_cd", "stop_se_nm", "trn_dptre_dt", "trn_arvl_dt",
+    ]],
+  ]) {
+    const entry = findCatalogEntry(catalog, id);
+    assert.equal(entry.documentationStatus, "reproducible-operation");
+    assert.equal(entry.status, "validated_live_sample_materialization_pending");
+    assert.deepEqual(entry.responseFields, fields);
+    assert.equal(entry.operation.method, "GET");
+    assert.equal(entry.operation.runner.command, "node tools/datapack/probe-korail-train-operation-api.mjs");
+  }
+  const kricStationTimetable = findCatalogEntry(catalog, "provider:kric-station-timetable");
+  assert.equal(kricStationTimetable.status, "validated_live_sample_non_itx_urban_rail_only");
+  assert.ok(kricStationTimetable.searchTerms.includes("ITX_CHEONGCHUN"));
   assert.equal(
     findCatalogEntry(catalog, "provider:busan-transportation-official-od-fares").operation.method,
     "POST",
@@ -341,6 +369,34 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
   assert.equal(
     findCatalogEntry(catalog, "integration:github-datapack-workflow-dispatch").endpointRef,
     "config:easysubway.datapack.github-api-base-url(default=https://api.github.com)/repos/AquilaXk/easysubway/actions/workflows/datapack-release.yml/dispatches",
+  );
+});
+
+test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
+  const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
+
+  assert.equal(providers.length, 41);
+  assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
+  assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
+  assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
+
+  const kricElevator = providers.find((entry) => entry.id === "provider:kric-station-elevator");
+  assert.equal(kricElevator.endpoint, "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator");
+  assert.match(kricElevator.sampleUrl, /^https:\/\/openapi\.kric\.go\.kr\/openapi\/convenientInfo\/stationElevator\?/);
+  assert.deepEqual(kricElevator.responseFields, [
+    "dtlLoc", "exitNo", "grndDvNmFr", "grndDvNmTo", "lnCd", "railOprIsttCd",
+    "rglnPsno", "rglnWgt", "runStinFlorFr", "runStinFlorTo", "stinCd",
+  ]);
+
+  const stationLine = providers.find((entry) => entry.id === "provider:seoulmetro-station-line-info");
+  assert.deepEqual(stationLine.operation.requiredParameters, [
+    "serviceKey", "startIndex", "endIndex", "stationCode", "stationName", "lineName",
+  ]);
+  assert.match(stationLine.sampleUrl, /\/1\/5\/\/\/4호선$/);
+
+  assert.deepEqual(
+    providers.find((entry) => entry.id === "provider:seoul-topis-realtime-station-arrival").responseFields,
+    ["arvlCd", "arvlMsg2", "arvlMsg3", "barvlDt", "bstatnNm", "btrainNo", "recptnDt", "statnId", "statnNm", "subwayId", "trainLineNm", "updnLine"],
   );
 });
 

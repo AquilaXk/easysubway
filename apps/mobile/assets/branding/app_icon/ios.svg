@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Transit iOS app icon source</title>
+  <desc id="desc">A blue transit bus with a turquoise route loop, three route nodes, a pale sky ring, and a yellow sun.</desc>
+
+  <defs>
+    <linearGradient id="bgGradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#FBFCFE"/>
+      <stop offset="1" stop-color="#F3F5F9"/>
+    </linearGradient>
+    <radialGradient id="bgVignette" cx="50%" cy="38%" r="72%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.7" stop-color="#EAF0F8" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#C8D4E3" stop-opacity="0.20"/>
+    </radialGradient>
+    <linearGradient id="skyRing" x1="0.12" y1="0.08" x2="0.88" y2="0.86">
+      <stop offset="0" stop-color="#79BDF0" stop-opacity="0.95"/>
+      <stop offset="0.48" stop-color="#A8D9F7" stop-opacity="0.77"/>
+      <stop offset="0.78" stop-color="#D8F0FC" stop-opacity="0.56"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.18"/>
+    </linearGradient>
+    <linearGradient id="routeGradient" x1="0" y1="0.35" x2="1" y2="0.65">
+      <stop offset="0" stop-color="#00C5A5"/>
+      <stop offset="0.48" stop-color="#06BFB8"/>
+      <stop offset="0.72" stop-color="#04A5EA"/>
+      <stop offset="1" stop-color="#0587EA"/>
+    </linearGradient>
+    <radialGradient id="sunGradient" cx="34%" cy="25%" r="78%">
+      <stop offset="0" stop-color="#FFF55A"/>
+      <stop offset="0.48" stop-color="#FFD129"/>
+      <stop offset="1" stop-color="#FFAD05"/>
+    </radialGradient>
+    <linearGradient id="chassisGradient" x1="0.18" y1="0" x2="0.76" y2="1">
+      <stop offset="0" stop-color="#0A2E87"/>
+      <stop offset="0.42" stop-color="#073A9E"/>
+      <stop offset="0.78" stop-color="#0C5CD1"/>
+      <stop offset="1" stop-color="#0A45B1"/>
+    </linearGradient>
+    <linearGradient id="chassisHighlight" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#1A77EA" stop-opacity="0.02"/>
+      <stop offset="0.48" stop-color="#56A8FF" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#0F4CB9" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bodyGradient" x1="0.12" y1="0" x2="0.88" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.54" stop-color="#FCFCFD"/>
+      <stop offset="1" stop-color="#EDF1F6"/>
+    </linearGradient>
+    <linearGradient id="windowFrameGradient" x1="0.1" y1="0" x2="0.82" y2="1">
+      <stop offset="0" stop-color="#0E5FC5"/>
+      <stop offset="0.38" stop-color="#0A48AF"/>
+      <stop offset="0.77" stop-color="#062A7E"/>
+      <stop offset="1" stop-color="#041E68"/>
+    </linearGradient>
+    <linearGradient id="windshieldGradient" x1="0.08" y1="0" x2="0.86" y2="1">
+      <stop offset="0" stop-color="#8CD4F8"/>
+      <stop offset="0.35" stop-color="#56B2ED"/>
+      <stop offset="0.66" stop-color="#177FD8"/>
+      <stop offset="1" stop-color="#0757BA"/>
+    </linearGradient>
+    <linearGradient id="windshieldShade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#001F63" stop-opacity="0.14"/>
+    </linearGradient>
+    <linearGradient id="silverRing" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#AABCD3"/>
+      <stop offset="0.44" stop-color="#EAF2FB"/>
+      <stop offset="0.72" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#B7C6D8"/>
+    </linearGradient>
+    <radialGradient id="lampGradient" cx="38%" cy="28%" r="74%">
+      <stop offset="0" stop-color="#FFF98B"/>
+      <stop offset="0.46" stop-color="#FFD22E"/>
+      <stop offset="1" stop-color="#FF9D00"/>
+    </radialGradient>
+    <linearGradient id="nodeLeft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00CFB0"/>
+      <stop offset="1" stop-color="#009D9C"/>
+    </linearGradient>
+    <linearGradient id="nodeCenter" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08B9EF"/>
+      <stop offset="1" stop-color="#056ACC"/>
+    </linearGradient>
+    <linearGradient id="nodeRight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0CB6F5"/>
+      <stop offset="1" stop-color="#0873DC"/>
+    </linearGradient>
+    <clipPath id="windshieldClip">
+      <rect x="304" y="345" width="414" height="194" rx="43"/>
+    </clipPath>
+    <clipPath id="iosPreviewClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="188"/>
+    </clipPath>
+
+    <filter id="shadowLarge" x="-35%" y="-35%" width="170%" height="190%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="20" result="blur"/>
+      <feOffset in="blur" dx="0" dy="18" result="offsetBlur"/>
+      <feFlood flood-color="#002A66" flood-opacity="0.24" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="offsetBlur" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadowMedium" x="-35%" y="-35%" width="170%" height="190%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="11" result="blur"/>
+      <feOffset in="blur" dx="0" dy="9" result="offsetBlur"/>
+      <feFlood flood-color="#00337D" flood-opacity="0.22" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="offsetBlur" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadowSmall" x="-45%" y="-45%" width="190%" height="210%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feOffset in="blur" dx="0" dy="6" result="offsetBlur"/>
+      <feFlood flood-color="#00337D" flood-opacity="0.25" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="offsetBlur" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="sunGlow" x="-70%" y="-70%" width="240%" height="240%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur"/>
+      <feOffset in="blur" dx="0" dy="10" result="offsetBlur"/>
+      <feFlood flood-color="#FFB400" flood-opacity="0.24" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="offsetBlur" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="innerWindow" x="-25%" y="-25%" width="150%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feOffset in="blur" dx="0" dy="5" result="offsetBlur"/>
+      <feFlood flood-color="#00194D" flood-opacity="0.26" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="offsetBlur" operator="in" result="shadow"/>
+      <feMerge><feMergeNode in="shadow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+  </defs>
+
+
+
+  <g id="background">
+    <rect width="1024" height="1024" fill="url(#bgGradient)"/>
+    <rect width="1024" height="1024" fill="url(#bgVignette)"/>
+  </g>
+
+
+  <g id="artwork">
+    <g id="skyRing">
+      <circle cx="510" cy="431" r="309" fill="none" stroke="url(#skyRing)" stroke-width="118"/>
+    </g>
+
+    <g id="sun" filter="url(#sunGlow)">
+      <circle cx="753" cy="246" r="82" fill="url(#sunGradient)"/>
+      <circle cx="727" cy="217" r="24" fill="#FFFFFF" opacity="0.12"/>
+    </g>
+
+    <g id="route" filter="url(#shadowMedium)">
+      <rect x="106" y="405" width="786" height="479" rx="198" fill="none" stroke="url(#routeGradient)" stroke-width="44"/>
+    </g>
+
+    <g id="bus" filter="url(#shadowLarge)">
+      <path id="chassis" d="M322 262H702C756 262 790 305 790 360V702C790 760 758 796 706 802H318C266 796 234 760 234 702V360C234 305 268 262 322 262Z" fill="url(#chassisGradient)"/>
+      <path d="M254 720C332 748 687 749 768 719C763 763 740 786 704 792H320C283 786 260 763 254 720Z" fill="url(#chassisHighlight)"/>
+
+      <path id="whiteBody" d="M331 226H696C751 226 788 270 788 326V638C788 681 767 705 725 713C595 727 430 727 300 713C258 705 238 681 238 638V326C238 270 275 226 331 226Z" fill="url(#bodyGradient)" stroke="#FFFFFF" stroke-width="8"/>
+      <path d="M263 310C274 262 303 241 349 241H680C724 241 753 260 766 304" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" opacity="0.65"/>
+
+      <g id="windowFrame" filter="url(#innerWindow)">
+        <rect x="277" y="267" width="470" height="298" rx="65" fill="url(#windowFrameGradient)" stroke="#082A74" stroke-width="3"/>
+      </g>
+      <rect x="304" y="345" width="414" height="194" rx="43" fill="url(#windshieldGradient)"/>
+      <rect x="304" y="345" width="414" height="194" rx="43" fill="url(#windshieldShade)"/>
+      <g clip-path="url(#windshieldClip)" id="windshieldReflections">
+        <path d="M430 552L571 330H637L494 552Z" fill="#FFFFFF" opacity="0.17"/>
+        <path d="M521 552L660 330H685L548 552Z" fill="#FFFFFF" opacity="0.10"/>
+      </g>
+      <path d="M326 365C338 352 351 348 371 348H689" fill="none" stroke="#D8F2FF" stroke-width="4" stroke-linecap="round" opacity="0.22"/>
+
+      <g id="destinationPill" filter="url(#shadowSmall)">
+        <rect x="451" y="296" width="121" height="29" rx="14.5" fill="#FFFFFF"/>
+        <rect x="454" y="299" width="115" height="23" rx="11.5" fill="#F8F9FC"/>
+      </g>
+
+      <g id="headlights">
+        <g id="leftHeadlight" filter="url(#shadowSmall)">
+          <circle cx="335" cy="640" r="47" fill="url(#silverRing)"/>
+          <circle cx="335" cy="640" r="39" fill="#F9FCFF"/>
+          <circle cx="335" cy="640" r="32" fill="url(#lampGradient)" stroke="#F39B00" stroke-width="5"/>
+          <circle cx="324" cy="627" r="9" fill="#FFFFFF" opacity="0.28"/>
+        </g>
+        <g id="rightHeadlight" filter="url(#shadowSmall)">
+          <circle cx="686" cy="640" r="47" fill="url(#silverRing)"/>
+          <circle cx="686" cy="640" r="39" fill="#F9FCFF"/>
+          <circle cx="686" cy="640" r="32" fill="url(#lampGradient)" stroke="#F39B00" stroke-width="5"/>
+          <circle cx="675" cy="627" r="9" fill="#FFFFFF" opacity="0.28"/>
+        </g>
+      </g>
+
+      <path id="lowerBumper" d="M372 756H651C670 756 679 766 687 785L695 802H329L337 785C345 766 354 756 372 756Z" fill="#062867" opacity="0.95"/>
+      <path d="M363 762H661" stroke="#174A99" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+    </g>
+
+
+    <g id="routeNodes">
+      <g id="leftNode" filter="url(#shadowSmall)">
+        <circle cx="134" cy="665" r="54" fill="url(#nodeLeft)"/>
+        <circle cx="134" cy="665" r="29" fill="#F8FAFD"/>
+        <circle cx="134" cy="665" r="28" fill="#FFFFFF" opacity="0.92"/>
+      </g>
+      <g id="rightNode" filter="url(#shadowSmall)">
+        <circle cx="891" cy="671" r="54" fill="url(#nodeRight)"/>
+        <circle cx="891" cy="671" r="29" fill="#F8FAFD"/>
+        <circle cx="891" cy="671" r="28" fill="#FFFFFF" opacity="0.92"/>
+      </g>
+      <g id="bottomNode" filter="url(#shadowSmall)">
+        <circle cx="507" cy="881" r="56" fill="url(#nodeCenter)"/>
+        <circle cx="507" cy="881" r="30" fill="#F8FAFD"/>
+        <circle cx="507" cy="881" r="29" fill="#FFFFFF" opacity="0.92"/>
+      </g>
+    </g>
+
+  </g>
+
+
+</svg>

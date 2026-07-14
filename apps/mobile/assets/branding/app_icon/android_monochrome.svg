@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108" role="img" aria-labelledby="title desc">
+  <title id="title">Transit themed icon monochrome layer</title>
+  <desc id="desc">Single-color transparent artwork for Android themed icons.</desc>
+  <defs>
+    <mask id="busCutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="108" height="108">
+      <rect width="108" height="108" fill="black"/>
+      <g transform="translate(8.64 8.64) scale(0.08859375)">
+        <path d="M322 262H702C756 262 790 305 790 360V702C790 760 758 796 706 802H318C266 796 234 760 234 702V360C234 305 268 262 322 262Z" fill="white"/>
+        <path d="M331 226H696C751 226 788 270 788 326V638C788 681 767 705 725 713C595 727 430 727 300 713C258 705 238 681 238 638V326C238 270 275 226 331 226Z" fill="white"/>
+        <rect x="304" y="345" width="414" height="194" rx="43" fill="black"/>
+        <rect x="451" y="296" width="121" height="29" rx="14.5" fill="black"/>
+        <circle cx="335" cy="640" r="31" fill="black"/>
+        <circle cx="686" cy="640" r="31" fill="black"/>
+        <path d="M372 756H651C670 756 679 766 687 785L695 802H329L337 785C345 766 354 756 372 756Z" fill="black"/>
+      </g>
+    </mask>
+    <mask id="routeNodeCutouts" maskUnits="userSpaceOnUse" x="0" y="0" width="108" height="108">
+      <rect width="108" height="108" fill="white"/>
+      <g transform="translate(8.64 8.64) scale(0.08859375)">
+        <circle cx="134" cy="665" r="29" fill="black"/>
+        <circle cx="891" cy="671" r="29" fill="black"/>
+        <circle cx="507" cy="881" r="30" fill="black"/>
+      </g>
+    </mask>
+  </defs>
+  <g fill="currentColor" stroke="currentColor">
+    <g transform="translate(8.64 8.64) scale(0.08859375)">
+      <circle cx="510" cy="431" r="309" fill="none" stroke-width="80" opacity="0.50"/>
+      <circle cx="753" cy="246" r="82" stroke="none"/>
+      <rect x="106" y="405" width="786" height="479" rx="198" fill="none" stroke-width="44"/>
+    </g>
+    <rect width="108" height="108" fill="currentColor" stroke="none" mask="url(#busCutouts)"/>
+    <g mask="url(#routeNodeCutouts)" transform="translate(8.64 8.64) scale(0.08859375)" stroke="none">
+      <circle cx="134" cy="665" r="54"/>
+      <circle cx="891" cy="671" r="54"/>
+      <circle cx="507" cy="881" r="56"/>
+    </g>
+  </g>
+</svg>

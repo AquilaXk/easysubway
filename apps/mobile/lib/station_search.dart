@@ -2031,7 +2031,7 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
           // 칸 채우기 모드에서는 결과 한 번 탭 = 해당 칸 설정 후 닫기. 지도 탭과 동일
           // 하게 "출발역 선택 → 도착역 선택" UX로 수렴시킨다. 둘러보기 모드에서는
           // 종전대로 역 상세로 이동한다.
-          onResultTap: isPicking ? _pickStation : _openStationDetail,
+          onResultTap: isPicking ? _pickStation : _returnStationToMap,
           onSetOrigin: isPicking || widget.routeDraftController == null
               ? null
               : _setRouteOrigin,
@@ -2228,6 +2228,14 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
     Navigator.of(context).pop(station);
   }
 
+  /// #2109 둘러보기(비픽) 모드: 결과를 탭하면 상세를 밀지 않고 선택한 역 id를
+  /// 반환하며 화면을 닫는다. 호출부(main.dart openStationSearch)가 이 id를
+  /// 받아 노선도 focus + 팬 메뉴를 트리거한다(임베디드 검색과 동일한 흐름으로
+  /// 수렴). 상세 진입은 팬 메뉴 앵커의 역명 라벨 탭으로 옮겨졌다.
+  void _returnStationToMap(StationSearchResult result) {
+    Navigator.of(context).pop(result.id);
+  }
+
   void _setRouteOrigin(StationSearchResult result) {
     final station = RouteDraftStation(id: result.id, nameKo: result.nameKo);
     widget.routeDraftController?.setOrigin(station);
@@ -2278,26 +2286,6 @@ class _StationSearchScreenState extends State<StationSearchScreen> {
         setState(() => _isOpeningLocationSettings = false);
       }
     }
-  }
-
-  void _openStationDetail(StationSearchResult result) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => StationDetailScreen(
-          repository: widget.repository,
-          reportRepository: widget.reportRepository,
-          favoriteRepository: widget.favoriteRepository,
-          adRepository: widget.adRepository,
-          realtimeRepository: widget.realtimeRepository,
-          locationProvider: widget.locationProvider,
-          stationId: result.id,
-          facilityReportDraftTargetStore: widget.facilityReportDraftTargetStore,
-          internalRouteRepository: widget.internalRouteRepository,
-          internalRouteMobilityType: widget.internalRouteMobilityType,
-          routeDraftController: widget.routeDraftController,
-        ),
-      ),
-    );
   }
 }
 
