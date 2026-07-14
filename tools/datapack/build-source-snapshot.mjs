@@ -62,8 +62,8 @@ async function validateFreshnessPolicy(snapshot, args) {
   if (sourceClass?.basisField && basisAt) {
     snapshot[sourceClass.basisField] = basisAt;
   }
-  if (sourceClass?.providerValidityEndField && args["provider-valid-until"]) {
-    snapshot[sourceClass.providerValidityEndField] = args["provider-valid-until"];
+  if (sourceClass?.providerValidityEndField) {
+    snapshot[sourceClass.providerValidityEndField] = requireArg(args, "provider-valid-until");
   }
   deriveFreshness({
     policy,

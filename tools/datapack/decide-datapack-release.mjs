@@ -102,20 +102,24 @@ function stableManifestIdentity(manifest) {
         ...source,
         id: requiredString(source.id, "source.id"),
         updatedAt: requiredString(source.updatedAt, "source.updatedAt"),
-        fields: [...(source.fields ?? [])].sort(),
-      })).sort((left, right) => left.id.localeCompare(right.id));
+        fields: [...(source.fields ?? [])].sort(compareStrings),
+      })).sort((left, right) => compareStrings(left.id, right.id));
     }
     return normalized;
-  }).sort((left, right) => left.id.localeCompare(right.id) || left.version.localeCompare(right.version));
+  }).sort((left, right) => compareStrings(left.id, right.id) || compareStrings(left.version, right.version));
   return JSON.stringify(canonicalize(stable));
 }
 
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+    return Object.fromEntries(Object.keys(value).sort(compareStrings).map((key) => [key, canonicalize(value[key])]));
   }
   return value;
+}
+
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function validApproval({ buildSpec, buildSpecSha256, releaseRequest }) {
