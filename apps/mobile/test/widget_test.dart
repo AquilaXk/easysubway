@@ -188,6 +188,7 @@ Future<void> _pumpNetworkMapForGpsTest(
   required FakeStationSearchRepository repository,
   required CurrentLocationProvider locationProvider,
   NetworkMapViewportRepository? viewportRepository,
+  RealtimeRepository? realtimeRepository,
 }) async {
   await tester.pumpWidget(
     EasySubwayApp(
@@ -197,6 +198,7 @@ Future<void> _pumpNetworkMapForGpsTest(
       favoriteRepository: FakeFavoriteStationRepository(),
       locationProvider: locationProvider,
       networkMapViewportRepository: viewportRepository,
+      realtimeRepository: realtimeRepository,
       initialOnboardingState: _completedOnboardingState(),
     ),
   );
@@ -4689,7 +4691,7 @@ void main() {
     expect(find.text('최근 경로를 불러오지 못했어요'), findsNothing);
   });
 
-  testWidgets('노선도 현재위치 버튼은 최근접 역 팬 메뉴를 바로 보여준다', (tester) async {
+  testWidgets('노선도 현재위치 버튼은 최근접 역 팬 메뉴와 하단 패널을 보여준다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
       needsPermissionRequest: false,
@@ -4717,10 +4719,186 @@ void main() {
     expect(repository.requestedNearbyLimits, [1]);
     expect(locationProvider.requestCount, 1);
     expect(repository.requestedNearbyLocations, hasLength(1));
-    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    expect(find.text('상록수'), findsOneWidget);
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
-    expect(find.byKey(const Key('networkMapBottomAdBanner')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapBottomAdBanner')), findsNothing);
+  });
+
+  testWidgets('GPS 하단 패널은 환승 호선을 탭으로 구분하고 선택 호선을 재조회한다', (tester) async {
+    const lines = [
+      StationSearchLine(
+        id: 'seoul-2',
+        name: '수도권 2호선',
+        color: '#00A84D',
+        stationCode: '222',
+      ),
+      StationSearchLine(
+        id: 'seoul-4',
+        name: '수도권 4호선',
+        color: '#00A5DE',
+        stationCode: '454',
+      ),
+    ];
+    final realtimeRepository = _RecordingRealtimeRepository();
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', lines: lines),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: realtimeRepository,
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    expect(find.text('상록수'), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapNearbyLineTab-seoul-2')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('networkMapNearbyLineTab-seoul-4')),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSize(find.byKey(const Key('networkMapNearbyLineTab-seoul-2'))),
+      const Size(48, 48),
+    );
+    expect(realtimeRepository.queries.last.lineId, 'seoul-2');
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyLineTab-seoul-4')));
+    await tester.pumpAndSettle();
+
+    expect(realtimeRepository.queries.last.lineId, 'seoul-4');
+  });
+
+  testWidgets('GPS 하단 패널은 실시간에서 시간표로 전환해 방면과 시간을 구분한다', (tester) async {
+    final now = DateTime.now();
+    final departure = StationTimetableDeparture(
+      directionName: '오이도',
+      seconds:
+          now.hour * Duration.secondsPerHour +
+          now.minute * Duration.secondsPerMinute +
+          now.second +
+          120,
+    );
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(
+            dayType,
+            directions: [
+              StationTimetableDirection(name: '오이도', departures: [departure]),
+            ],
+          ),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _RecordingRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Text>(
+            find.descendant(
+              of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+              matching: find.text('실시간'),
+            ),
+          )
+          .data,
+      '실시간',
+    );
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('오이도 방면'), findsOneWidget);
+    final timeText = tester.widget<Text>(find.text(departure.timeLabel));
+    expect(timeText.style?.color, const Color(0xFFE23D3D));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('시간표'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .getSize(find.byKey(const Key('networkMapNearbyDataSourceToggle')))
+          .height,
+      greaterThanOrEqualTo(48),
+    );
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),
+        matching: find.text('실시간'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('GPS 하단 패널은 선택한 데이터가 없으면 검정 대시 하나만 보여준다', (tester) async {
+    final repository = FakeTimetableStationRepository(
+      stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      timetables: {
+        for (final dayType in StationTimetableDayType.values)
+          dayType: _stationTimetable(dayType, directions: const []),
+      },
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _RecordingRealtimeRepository(),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('-'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('-')).style?.color,
+      const Color(0xFF2F2F2F),
+    );
+
+    await tester.tap(find.byKey(const Key('networkMapNearbyDataSourceToggle')));
+    await tester.pumpAndSettle();
+    expect(find.text('-'), findsOneWidget);
   });
 
   testWidgets('GPS 탭은 지도 직접 선택을 즉시 해제하고 카메라를 유지한다', (tester) async {
@@ -4842,7 +5020,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('GPS 지역 지도 load 실패는 팬 메뉴를 열지 않는다', (tester) async {
@@ -4984,7 +5165,10 @@ void main() {
     expect(repository.requestedNearbyLocations, hasLength(1));
     expect(repository.requestedNearbyLimits, [1]);
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('노선도 좌측 메뉴 하단에 광고 슬롯이 있다', (tester) async {
@@ -7854,11 +8038,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // GPS는 주변 역 목록이 아니라 최근접 역 팬 메뉴를 바로 연다.
+    // GPS는 최근접 역 하나의 팬 메뉴와 하단 패널을 함께 연다.
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
 
     // 햄버거 → 역 검색 → 결과 탭.
     await _openStationSearchScreenViaMenu(tester);
@@ -15855,6 +16042,8 @@ class FakeTimetableStationRepository extends FakeStationSearchRepository
     implements StationTimetableRepository {
   FakeTimetableStationRepository({
     required super.stationDetail,
+    super.nearbyResults,
+    super.networkMapRegionNames,
     required this.timetables,
     this.timetableLineId = 'seoul-2',
   });
@@ -16758,6 +16947,7 @@ StationSearchResult _stationResult({
   required String name,
   String region = '수도권',
   int? distanceMeters,
+  List<StationSearchLine>? lines,
 }) {
   return StationSearchResult(
     id: id,
@@ -16768,14 +16958,16 @@ StationSearchResult _stationResult({
     dataSourceType: 'OFFICIAL_FILE',
     lastVerifiedAt: '2026-06-13',
     distanceMeters: distanceMeters,
-    lines: const [
-      StationSearchLine(
-        id: 'seoul-2',
-        name: '수도권 2호선',
-        color: '#00A84D',
-        stationCode: '222',
-      ),
-    ],
+    lines:
+        lines ??
+        const [
+          StationSearchLine(
+            id: 'seoul-2',
+            name: '수도권 2호선',
+            color: '#00A84D',
+            stationCode: '222',
+          ),
+        ],
   );
 }
 
@@ -16816,6 +17008,19 @@ class _RetryRealtimeRepository implements RealtimeRepository {
           etaSeconds: 120,
         ),
       ],
+    );
+  }
+}
+
+class _RecordingRealtimeRepository implements RealtimeRepository {
+  final queries = <RealtimeStationQuery>[];
+
+  @override
+  Future<RealtimeSnapshot> arrivals(RealtimeStationQuery query) async {
+    queries.add(query);
+    return const RealtimeSnapshot(
+      status: RealtimeSnapshotStatus.fresh,
+      arrivals: [],
     );
   }
 }

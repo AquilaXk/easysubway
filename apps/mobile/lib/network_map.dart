@@ -465,6 +465,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   _NetworkMapNearbyPanelData _nearbyPanelData =
       const _NetworkMapNearbyPanelData.idle();
   String? _nearbySelectedStationId;
+  String? _nearbySelectedLineId;
   // #2109: 인플레이스 검색 결과 탭으로 연 팬 메뉴의 대상 역 id. 캔버스의
   // selectedStationId(팬 메뉴)와 focusedStationId(카메라 이동)에 함께 실린다.
   String? _searchFanMenuStationId;
@@ -473,7 +474,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   bool _initialNearbyFocusStarted = false;
   int _selectionClearRevision = 0;
   int _nearestStationRequestToken = 0;
+  int _nearbyDataRequestToken = 0;
   RealtimeSnapshot _nearbyRealtime = const RealtimeSnapshot.loading();
+  _NearbyPanelDataSource _nearbyDataSource = _NearbyPanelDataSource.realtime;
+  StationTimetable? _nearbyTimetable;
+  bool _nearbyTimetableLoading = false;
   late Future<_NetworkMapLoadResult> _future = _loadMap();
 
   // #1933/#1915 홈 노선도 위 in-place 역 검색 모드. 모드 플래그만 이 화면에
@@ -641,10 +646,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     _nearestStationRequestToken++;
     setState(() {
       _selectedRegion = region ?? _selectedRegion;
-      _nearbySelectedStationId = null;
-      _nearbyPanelVisible = false;
-      _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
-      _nearbyRealtime = const RealtimeSnapshot.loading();
+      _resetNearbyPanelState();
       _initialNearbyFocusStarted = false;
       _future = _loadMap();
     });
@@ -689,11 +691,17 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 nearbyPanelVisible: _nearbyPanelVisible,
                 nearbyPanelData: _nearbyPanelData,
                 realtime: _nearbyRealtime,
+                nearbySelectedLineId: _nearbySelectedLineId,
+                nearbyDataSource: _nearbyDataSource,
+                nearbyTimetable: _nearbyTimetable,
+                nearbyTimetableLoading: _nearbyTimetableLoading,
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
                 onCurrentLocationTap: _showNearestStationFanMenu,
                 onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
+                onNearbyLineSelected: _selectNearbyLine,
+                onNearbyDataSourceToggle: _toggleNearbyDataSource,
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
@@ -736,11 +744,17 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                 nearbyPanelVisible: _nearbyPanelVisible,
                 nearbyPanelData: _nearbyPanelData,
                 realtime: _nearbyRealtime,
+                nearbySelectedLineId: _nearbySelectedLineId,
+                nearbyDataSource: _nearbyDataSource,
+                nearbyTimetable: _nearbyTimetable,
+                nearbyTimetableLoading: _nearbyTimetableLoading,
                 nearbyLookupMessage: _nearbyLookupMessage,
                 adjacentStations: const _NetworkMapAdjacentStations(),
                 onCurrentLocationTap: _showNearestStationFanMenu,
                 onOpenNearbyStations: _openNearbyStationsWithRegion,
                 onCloseNearbyPanel: _hideNearbyPanel,
+                onNearbyLineSelected: _selectNearbyLine,
+                onNearbyDataSourceToggle: _toggleNearbyDataSource,
                 routeDraftController: widget.routeDraftController,
                 onClearOrigin: _clearOriginStation,
                 onClearDestination: _clearDestinationStation,
@@ -791,11 +805,17 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               nearbyPanelVisible: _nearbyPanelVisible,
               nearbyPanelData: _nearbyPanelData,
               realtime: _nearbyRealtime,
+              nearbySelectedLineId: _nearbySelectedLineId,
+              nearbyDataSource: _nearbyDataSource,
+              nearbyTimetable: _nearbyTimetable,
+              nearbyTimetableLoading: _nearbyTimetableLoading,
               nearbyLookupMessage: _nearbyLookupMessage,
               adjacentStations: _adjacentStationsFor(data),
               onCurrentLocationTap: _showNearestStationFanMenu,
               onOpenNearbyStations: _openNearbyStationsWithRegion,
               onCloseNearbyPanel: _hideNearbyPanel,
+              onNearbyLineSelected: _selectNearbyLine,
+              onNearbyDataSourceToggle: _toggleNearbyDataSource,
               routeDraftController: widget.routeDraftController,
               onClearOrigin: _clearOriginStation,
               onClearDestination: _clearDestinationStation,
@@ -823,9 +843,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     initialViewport: loadResult.initialViewport,
                     focusedStationId:
                         _searchFanMenuStationId ?? _nearbySelectedStationId,
-                    selectedStationId:
-                        _searchFanMenuStationId ??
-                        (_nearbyPanelVisible ? _nearbySelectedStationId : null),
+                    selectedStationId: _searchFanMenuStationId,
                     selectionClearRevision: _selectionClearRevision,
                     onSelectionDismissed: _dismissSearchFanMenu,
                     originStationId:
@@ -940,9 +958,25 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           _future = Future.value(targetMap);
           _initialNearbyFocusStarted = true;
         }
-        _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+        _nearbyPanelVisible = true;
+        _nearbySelectedStationId = pendingResult.id;
+        _nearbySelectedLineId = pendingResult.lines.firstOrNull?.id;
+        _nearbyDataSource = _NearbyPanelDataSource.realtime;
+        _nearbyTimetable = null;
+        _nearbyTimetableLoading = false;
+        _nearbyPanelData = _NetworkMapNearbyPanelData.success([pendingResult]);
         _searchFanMenuStationId = pendingResult.id;
       });
+      final firstLine = pendingResult.lines.firstOrNull;
+      if (firstLine == null) {
+        setState(() {
+          _nearbyRealtime = const RealtimeSnapshot(
+            status: RealtimeSnapshotStatus.unsupported,
+          );
+        });
+      } else {
+        unawaited(_loadNearbyRealtime(pendingResult, firstLine));
+      }
     } on CurrentLocationException catch (error) {
       if (!isCurrentRequest()) {
         return;
@@ -969,9 +1003,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   void _showNearbyLookupMessage(String message) {
     _nearbyLookupMessageTimer?.cancel();
     setState(() {
-      _nearbyPanelVisible = false;
-      _nearbySelectedStationId = null;
-      _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
+      _resetNearbyPanelState();
       _nearbyLookupMessage = message;
     });
     _nearbyLookupMessageTimer = Timer(const Duration(seconds: 4), () {
@@ -1048,10 +1080,149 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   }
 
   void _resetNearbyPanelState() {
+    _nearbyDataRequestToken++;
     _nearbyPanelVisible = false;
     _nearbySelectedStationId = null;
+    _nearbySelectedLineId = null;
     _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
     _nearbyRealtime = const RealtimeSnapshot.loading();
+    _nearbyDataSource = _NearbyPanelDataSource.realtime;
+    _nearbyTimetable = null;
+    _nearbyTimetableLoading = false;
+  }
+
+  Future<void> _loadNearbyRealtime(
+    StationSearchResult station,
+    StationSearchLine line,
+  ) async {
+    final requestToken = ++_nearbyDataRequestToken;
+    final repository = widget.realtimeRepository;
+    if (repository == null) {
+      if (mounted && requestToken == _nearbyDataRequestToken) {
+        setState(() => _nearbyRealtime = const RealtimeSnapshot.unavailable());
+      }
+      return;
+    }
+    try {
+      final snapshot = await repository.arrivals(
+        RealtimeStationQuery(
+          stationId: station.id,
+          lineId: line.id,
+          providerLineId: line.stationCode.isEmpty ? line.id : line.stationCode,
+          stationQueryName: station.nameKo,
+        ),
+      );
+      if (mounted && requestToken == _nearbyDataRequestToken) {
+        setState(() => _nearbyRealtime = snapshot);
+      }
+    } on RealtimeException catch (error) {
+      if (mounted && requestToken == _nearbyDataRequestToken) {
+        setState(() {
+          _nearbyRealtime = RealtimeSnapshot(
+            status: RealtimeSnapshotStatus.unavailable,
+            message: error.message,
+          );
+        });
+      }
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 최근접 역 실시간 정보 조회 중 예외가 발생했습니다.',
+      );
+      if (mounted && requestToken == _nearbyDataRequestToken) {
+        setState(() => _nearbyRealtime = const RealtimeSnapshot.unavailable());
+      }
+    }
+  }
+
+  Future<void> _loadNearbyTimetable(
+    StationSearchResult station,
+    StationSearchLine line,
+  ) async {
+    final requestToken = ++_nearbyDataRequestToken;
+    final repository = widget.stationSearchRepository;
+    if (repository is! StationTimetableRepository) {
+      if (mounted && requestToken == _nearbyDataRequestToken) {
+        setState(() {
+          _nearbyTimetable = null;
+          _nearbyTimetableLoading = false;
+        });
+      }
+      return;
+    }
+    final timetableRepository = repository as StationTimetableRepository;
+    try {
+      final timetable = await timetableRepository.loadStationTimetableForDate(
+        stationId: station.id,
+        lineId: line.id,
+        date: DateTime.now(),
+      );
+      if (mounted && requestToken == _nearbyDataRequestToken) {
+        setState(() {
+          _nearbyTimetable = timetable;
+          _nearbyTimetableLoading = false;
+        });
+      }
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 최근접 역 시간표 조회 중 예외가 발생했습니다.',
+      );
+      if (mounted && requestToken == _nearbyDataRequestToken) {
+        setState(() {
+          _nearbyTimetable = null;
+          _nearbyTimetableLoading = false;
+        });
+      }
+    }
+  }
+
+  void _selectNearbyLine(StationSearchLine line) {
+    if (_nearbySelectedLineId == line.id || _nearbyPanelData.results.isEmpty) {
+      return;
+    }
+    final station = _nearbyPanelData.results.first;
+    setState(() {
+      _nearbySelectedLineId = line.id;
+      _nearbyRealtime = const RealtimeSnapshot.loading();
+      _nearbyTimetable = null;
+      _nearbyTimetableLoading =
+          _nearbyDataSource == _NearbyPanelDataSource.timetable;
+    });
+    if (_nearbyDataSource == _NearbyPanelDataSource.realtime) {
+      unawaited(_loadNearbyRealtime(station, line));
+    } else {
+      unawaited(_loadNearbyTimetable(station, line));
+    }
+  }
+
+  void _toggleNearbyDataSource() {
+    if (_nearbyPanelData.results.isEmpty) {
+      return;
+    }
+    final station = _nearbyPanelData.results.first;
+    final line = station.lines
+        .where((candidate) => candidate.id == _nearbySelectedLineId)
+        .firstOrNull;
+    if (line == null) {
+      return;
+    }
+    final next = _nearbyDataSource == _NearbyPanelDataSource.realtime
+        ? _NearbyPanelDataSource.timetable
+        : _NearbyPanelDataSource.realtime;
+    setState(() {
+      _nearbyDataSource = next;
+      _nearbyRealtime = const RealtimeSnapshot.loading();
+      _nearbyTimetable = null;
+      _nearbyTimetableLoading = next == _NearbyPanelDataSource.timetable;
+    });
+    if (next == _NearbyPanelDataSource.realtime) {
+      unawaited(_loadNearbyRealtime(station, line));
+    } else {
+      unawaited(_loadNearbyTimetable(station, line));
+    }
   }
 
   void _hideNearbyPanel() => setState(_resetNearbyPanelState);
@@ -1181,12 +1352,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     if (selectedStationId == null) {
       return const _NetworkMapAdjacentStations();
     }
-    final primaryResult = _nearbyPanelData.results.isEmpty
-        ? null
-        : _nearbyPanelData.results.first;
-    final primaryLineId = primaryResult == null || primaryResult.lines.isEmpty
-        ? null
-        : primaryResult.lines.first.id;
+    final primaryLineId = _nearbySelectedLineId;
     final selectedStations = data.stations
         .where((station) => station.id == selectedStationId)
         .toList(growable: false);
@@ -1264,11 +1430,17 @@ class _NetworkMapChrome extends StatelessWidget {
     required this.nearbyPanelVisible,
     required this.nearbyPanelData,
     required this.realtime,
+    required this.nearbySelectedLineId,
+    required this.nearbyDataSource,
+    required this.nearbyTimetable,
+    required this.nearbyTimetableLoading,
     required this.nearbyLookupMessage,
     required this.adjacentStations,
     required this.onCurrentLocationTap,
     required this.onOpenNearbyStations,
     required this.onCloseNearbyPanel,
+    required this.onNearbyLineSelected,
+    required this.onNearbyDataSourceToggle,
     required this.routeDraftController,
     required this.onClearOrigin,
     required this.onClearDestination,
@@ -1301,11 +1473,17 @@ class _NetworkMapChrome extends StatelessWidget {
   final bool nearbyPanelVisible;
   final _NetworkMapNearbyPanelData nearbyPanelData;
   final RealtimeSnapshot realtime;
+  final String? nearbySelectedLineId;
+  final _NearbyPanelDataSource nearbyDataSource;
+  final StationTimetable? nearbyTimetable;
+  final bool nearbyTimetableLoading;
   final String? nearbyLookupMessage;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback onCurrentLocationTap;
   final VoidCallback? onOpenNearbyStations;
   final VoidCallback onCloseNearbyPanel;
+  final ValueChanged<StationSearchLine> onNearbyLineSelected;
+  final VoidCallback onNearbyDataSourceToggle;
   final RouteDraftController routeDraftController;
   final VoidCallback onClearOrigin;
   final VoidCallback onClearDestination;
@@ -1398,9 +1576,15 @@ class _NetworkMapChrome extends StatelessWidget {
             child: _NetworkMapNearbyStationPanel(
               data: nearbyPanelData,
               realtime: realtime,
+              selectedLineId: nearbySelectedLineId,
+              dataSource: nearbyDataSource,
+              timetable: nearbyTimetable,
+              timetableLoading: nearbyTimetableLoading,
               adjacentStations: adjacentStations,
               onClose: onCloseNearbyPanel,
               onRetry: onCurrentLocationTap,
+              onLineSelected: onNearbyLineSelected,
+              onDataSourceToggle: onNearbyDataSourceToggle,
             ),
           ),
         if (nearbyLookupMessage != null && !inSearchMode)
@@ -2215,6 +2399,8 @@ class _NetworkMapCurrentLocationButton extends StatelessWidget {
 
 enum _NetworkMapNearbyPanelStatus { idle, loading, success }
 
+enum _NearbyPanelDataSource { realtime, timetable }
+
 class _NetworkMapNearbyPanelData {
   const _NetworkMapNearbyPanelData._({
     required this.status,
@@ -2226,6 +2412,9 @@ class _NetworkMapNearbyPanelData {
 
   const _NetworkMapNearbyPanelData.loading()
     : this._(status: _NetworkMapNearbyPanelStatus.loading);
+
+  const _NetworkMapNearbyPanelData.success(List<StationSearchResult> results)
+    : this._(status: _NetworkMapNearbyPanelStatus.success, results: results);
 
   final _NetworkMapNearbyPanelStatus status;
   final List<StationSearchResult> results;
@@ -2242,23 +2431,32 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
   const _NetworkMapNearbyStationPanel({
     required this.data,
     required this.realtime,
+    required this.selectedLineId,
+    required this.dataSource,
+    required this.timetable,
+    required this.timetableLoading,
     required this.adjacentStations,
     required this.onClose,
     required this.onRetry,
+    required this.onLineSelected,
+    required this.onDataSourceToggle,
   });
 
   final _NetworkMapNearbyPanelData data;
   final RealtimeSnapshot realtime;
+  final String? selectedLineId;
+  final _NearbyPanelDataSource dataSource;
+  final StationTimetable? timetable;
+  final bool timetableLoading;
   final _NetworkMapAdjacentStations adjacentStations;
   final VoidCallback onClose;
   final VoidCallback onRetry;
+  final ValueChanged<StationSearchLine> onLineSelected;
+  final VoidCallback onDataSourceToggle;
 
   @override
   Widget build(BuildContext context) {
     final primary = data.results.isEmpty ? null : data.results.first;
-    final primaryLine = primary == null || primary.lines.isEmpty
-        ? null
-        : primary.lines.first;
     return Material(
       key: const Key('networkMapNearbyStationPanel'),
       color: Colors.white,
@@ -2273,47 +2471,68 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 44,
+                height: 52,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     const SizedBox(width: 14),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 7),
-                      child: _SubwayLinePanelTab(line: primaryLine),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            for (final line
+                                in primary?.lines ??
+                                    const <StationSearchLine>[])
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: _SubwayLinePanelTab(
+                                  line: line,
+                                  selected: line.id == selectedLineId,
+                                  onTap: () => onLineSelected(line),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const Spacer(),
-                    if (realtime.status == RealtimeSnapshotStatus.fresh)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Container(
-                          height: 24,
-                          alignment: Alignment.center,
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: TextButton(
+                        key: const Key('networkMapNearbyDataSourceToggle'),
+                        onPressed: primary?.lines.isEmpty ?? true
+                            ? null
+                            : onDataSourceToggle,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(58, 48),
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: EasySubwayAccessibleColors.mintBorder,
-                            ),
+                          foregroundColor: EasySubwayAccessibleColors.mint,
+                          side: const BorderSide(
+                            color: EasySubwayAccessibleColors.mintBorder,
+                          ),
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(3),
                           ),
-                          child: const Text(
-                            '실시간',
-                            style: TextStyle(
-                              color: EasySubwayAccessibleColors.mint,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
+                        ),
+                        child: Text(
+                          dataSource == _NearbyPanelDataSource.realtime
+                              ? '실시간'
+                              : '시간표',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
+                    ),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
+                      padding: const EdgeInsets.only(bottom: 2),
                       child: IconButton(
                         tooltip: '다시 찾기',
                         onPressed: onRetry,
                         constraints: const BoxConstraints.tightFor(
-                          width: 38,
-                          height: 38,
+                          width: 48,
+                          height: 48,
                         ),
                         padding: EdgeInsets.zero,
                         icon: const Icon(
@@ -2324,14 +2543,14 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
+                      padding: const EdgeInsets.only(bottom: 2),
                       child: IconButton(
                         key: const Key('networkMapNearbyPanelCloseButton'),
                         tooltip: '닫기',
                         onPressed: onClose,
                         constraints: const BoxConstraints.tightFor(
-                          width: 38,
-                          height: 38,
+                          width: 48,
+                          height: 48,
                         ),
                         padding: EdgeInsets.zero,
                         icon: const Icon(
@@ -2341,7 +2560,7 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 22),
+                    const SizedBox(width: 10),
                   ],
                 ),
               ),
@@ -2349,6 +2568,9 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
               _NetworkMapNearbyPanelBody(
                 data: data,
                 realtime: realtime,
+                dataSource: dataSource,
+                timetable: timetable,
+                timetableLoading: timetableLoading,
                 adjacentStations: adjacentStations,
               ),
             ],
@@ -2363,11 +2585,17 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
   const _NetworkMapNearbyPanelBody({
     required this.data,
     required this.realtime,
+    required this.dataSource,
+    required this.timetable,
+    required this.timetableLoading,
     required this.adjacentStations,
   });
 
   final _NetworkMapNearbyPanelData data;
   final RealtimeSnapshot realtime;
+  final _NearbyPanelDataSource dataSource;
+  final StationTimetable? timetable;
+  final bool timetableLoading;
   final _NetworkMapAdjacentStations adjacentStations;
 
   @override
@@ -2381,6 +2609,9 @@ class _NetworkMapNearbyPanelBody extends StatelessWidget {
       _NetworkMapNearbyPanelStatus.success => _NetworkMapNearbySuccessList(
         results: data.results,
         realtime: realtime,
+        dataSource: dataSource,
+        timetable: timetable,
+        timetableLoading: timetableLoading,
         adjacentStations: adjacentStations,
       ),
     };
@@ -2391,11 +2622,17 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
   const _NetworkMapNearbySuccessList({
     required this.results,
     required this.realtime,
+    required this.dataSource,
+    required this.timetable,
+    required this.timetableLoading,
     required this.adjacentStations,
   });
 
   final List<StationSearchResult> results;
   final RealtimeSnapshot realtime;
+  final _NearbyPanelDataSource dataSource;
+  final StationTimetable? timetable;
+  final bool timetableLoading;
   final _NetworkMapAdjacentStations adjacentStations;
 
   @override
@@ -2473,7 +2710,12 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
         const SizedBox(height: 17),
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-          child: _SubwayArrivalPanel(snapshot: realtime),
+          child: dataSource == _NearbyPanelDataSource.realtime
+              ? _SubwayArrivalPanel(snapshot: realtime)
+              : _SubwayTimetablePanel(
+                  timetable: timetable,
+                  loading: timetableLoading,
+                ),
         ),
       ],
     );
@@ -2481,40 +2723,66 @@ class _NetworkMapNearbySuccessList extends StatelessWidget {
 }
 
 class _SubwayLinePanelTab extends StatelessWidget {
-  const _SubwayLinePanelTab({required this.line});
+  const _SubwayLinePanelTab({
+    required this.line,
+    required this.selected,
+    required this.onTap,
+  });
 
-  final StationSearchLine? line;
+  final StationSearchLine line;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final label = line?.badgeText ?? '';
-    return SizedBox(
-      width: 36,
-      height: 33,
-      child: Column(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: line?.badgeColor ?? const Color(0xFF8D8D8D),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.clip,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${line.name} 선택',
+      child: InkWell(
+        key: Key('networkMapNearbyLineTab-${line.id}'),
+        onTap: onTap,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: SizedBox(
+              width: 36,
+              height: 33,
+              child: Column(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: line.badgeColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      line.badgeText,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    width: 30,
+                    height: 2,
+                    color: selected
+                        ? const Color(0xFF5A5A5A)
+                        : Colors.transparent,
+                  ),
+                ],
               ),
             ),
           ),
-          const Spacer(),
-          Container(width: 30, height: 2, color: const Color(0xFF5A5A5A)),
-        ],
+        ),
       ),
     );
   }
@@ -2538,8 +2806,8 @@ String _arrivalDirectionLabel(RealtimeArrival arrival) {
   return destination.isEmpty ? '' : '$destination 방면';
 }
 
-/// 주변역 패널의 도착 정보 영역. 실시간 스냅샷 상태에 따라 방향별 도착을
-/// 표시하거나, 미지원·실패 시 "-" 대신 한 줄 안내를 보여준다.
+/// 주변역 패널의 실시간 도착 정보. 선택 호선에 표시할 데이터가
+/// 없으면 상태 문구를 늘리지 않고 검정 대시 하나로 수렴한다.
 class _SubwayArrivalPanel extends StatelessWidget {
   const _SubwayArrivalPanel({required this.snapshot});
 
@@ -2562,14 +2830,11 @@ class _SubwayArrivalPanel extends StatelessWidget {
         );
       case RealtimeSnapshotStatus.unsupported:
       case RealtimeSnapshotStatus.unavailable:
-        final message = snapshot.message.trim().isEmpty
-            ? '실시간 도착 정보를 준비하고 있어요.'
-            : snapshot.message.trim();
-        return _SubwayArrivalNotice(message: message);
+        return const _SubwayDataUnavailable();
       case RealtimeSnapshotStatus.fresh:
       case RealtimeSnapshotStatus.stale:
         if (snapshot.arrivals.isEmpty) {
-          return const _SubwayArrivalNotice(message: '표시할 도착 정보가 없어요.');
+          return const _SubwayDataUnavailable();
         }
         final groups = <String, List<RealtimeArrival>>{};
         for (final arrival in snapshot.arrivals) {
@@ -2633,29 +2898,159 @@ class _SubwayArrivalPanel extends StatelessWidget {
   }
 }
 
-class _SubwayArrivalNotice extends StatelessWidget {
-  const _SubwayArrivalNotice({required this.message});
-
-  final String message;
+class _SubwayDataUnavailable extends StatelessWidget {
+  const _SubwayDataUnavailable();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 46,
-      child: Center(
-        child: Text(
-          message,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: EasySubwayAccessibleColors.mutedText,
-            fontSize: 13,
-            height: 1.3,
-            fontWeight: FontWeight.w600,
+    return Semantics(
+      liveRegion: true,
+      label: '정보 없음',
+      excludeSemantics: true,
+      child: const SizedBox(
+        height: 46,
+        child: Center(
+          child: Text(
+            '-',
+            key: Key('networkMapNearbyDataUnavailable'),
+            style: TextStyle(
+              color: Color(0xFF2F2F2F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SubwayTimetablePanel extends StatelessWidget {
+  const _SubwayTimetablePanel({required this.timetable, required this.loading});
+
+  final StationTimetable? timetable;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const SizedBox(
+        key: Key('networkMapNearbyTimetableLoading'),
+        height: 46,
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+    final departures = _nextTimetableDepartures(timetable, DateTime.now());
+    if (departures.isEmpty) {
+      return const _SubwayDataUnavailable();
+    }
+    return Semantics(
+      liveRegion: true,
+      label: departures
+          .map(
+            (entry) =>
+                '${entry.directionLabel}, ${entry.departure.semanticLabel}',
+          )
+          .join(', '),
+      child: Row(
+        children: [
+          for (var index = 0; index < departures.length; index++) ...[
+            if (index > 0)
+              const SizedBox(
+                height: 46,
+                child: VerticalDivider(color: Color(0xFFE0E0E0), width: 30),
+              ),
+            Expanded(
+              child: _SubwayTimetableDepartureView(data: departures[index]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _NextTimetableDeparture {
+  const _NextTimetableDeparture({
+    required this.directionLabel,
+    required this.departure,
+  });
+
+  final String directionLabel;
+  final StationTimetableDeparture departure;
+}
+
+List<_NextTimetableDeparture> _nextTimetableDepartures(
+  StationTimetable? timetable,
+  DateTime now,
+) {
+  if (timetable == null) {
+    return const [];
+  }
+  final currentSeconds =
+      now.hour * Duration.secondsPerHour +
+      now.minute * Duration.secondsPerMinute +
+      now.second;
+  final result = <_NextTimetableDeparture>[];
+  for (final direction in timetable.directions) {
+    final departure = direction.departures
+        .where((candidate) => candidate.seconds >= currentSeconds)
+        .firstOrNull;
+    if (departure == null) {
+      continue;
+    }
+    final rawDirection = direction.name.trim().isEmpty
+        ? departure.directionName.trim()
+        : direction.name.trim();
+    final label = rawDirection.endsWith('방면')
+        ? rawDirection
+        : '$rawDirection 방면';
+    result.add(
+      _NextTimetableDeparture(directionLabel: label, departure: departure),
+    );
+    if (result.length == 2) {
+      break;
+    }
+  }
+  return result;
+}
+
+class _SubwayTimetableDepartureView extends StatelessWidget {
+  const _SubwayTimetableDepartureView({required this.data});
+
+  final _NextTimetableDeparture data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          data.directionLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF2F2F2F),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          data.departure.timeLabel,
+          style: const TextStyle(
+            color: Color(0xFFE23D3D),
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 }
