@@ -8,21 +8,21 @@ import { pathToFileURL } from "node:url";
 // 전송되므로 이 tracked runner는 offline evidence 수집에만 사용하고 mobile/runtime에 포함하지 않는다.
 export const SEOUL_OPEN_DATA_APIS = Object.freeze({
   "seoul-topis-realtime-station-arrival": Object.freeze({
-    endpoint: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
+    endpoint: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival", // NOSONAR -- 공식 HTTP-only provider, offline evidence 전용
     suffix: ["0", "5", "서울"],
     rows: "realtimeArrivalList",
     fields: ["arvlCd", "arvlMsg2", "arvlMsg3", "barvlDt", "bstatnNm", "btrainNo", "recptnDt", "statnId", "statnNm", "subwayId", "trainLineNm", "updnLine"],
     keyEnv: "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
   }),
   "seoul-topis-realtime-train-position": Object.freeze({
-    endpoint: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimePosition",
+    endpoint: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimePosition", // NOSONAR -- 공식 HTTP-only provider, offline evidence 전용
     suffix: ["0", "5", "1호선"],
     rows: "realtimePositionList",
     fields: ["directAt", "lastRecptnDt", "recptnDt", "statnId", "statnNm", "statnTid", "statnTnm", "subwayId", "subwayNm", "trainNo", "trainSttus", "updnLine"],
     keyEnv: "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
   }),
   "seoulmetro-station-line-info": Object.freeze({
-    endpoint: "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo",
+    endpoint: "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo", // NOSONAR -- 공식 HTTP-only provider, offline evidence 전용
     suffix: ["1", "5", "", "", "4호선"],
     envelope: "SearchSTNBySubwayLineInfo",
     fields: ["STATION_CD", "STATION_NM", "STATION_NM_ENG", "LINE_NUM", "FR_CODE", "STATION_NM_CHN", "STATION_NM_JPN"],
