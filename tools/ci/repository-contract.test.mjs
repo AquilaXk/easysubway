@@ -4998,9 +4998,9 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     .split("\n")
     .filter((line) => /^\s*NODE$/.test(line))
     .map((line) => line.match(/^\s*/)[0].length);
-  assert.deepEqual(
-    nodeTerminatorIndents,
-    [10, 10, 10, 10],
+  assert.ok(nodeTerminatorIndents.length >= 4);
+  assert.ok(
+    nodeTerminatorIndents.every((indent) => indent === 10),
     "workflow heredoc terminators must start at shell column 1 after YAML indentation is stripped",
   );
 

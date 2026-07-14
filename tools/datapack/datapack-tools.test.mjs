@@ -2587,6 +2587,7 @@ test("데이터팩 remote publish env exporter는 object storage와 signing 값�
   assert.match(stdout, /^::add-mask::private-key\\nline$/m);
   assert.match(stdout, /^::add-mask::private-key%0Aline$/m);
   assert.match(exported, /^EASYSUBWAY_DATAPACK_REMOTE_PUBLISH=enabled$/m);
+  assert.match(exported, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/cdn\.example\.com\/easysubway-datapacks$/m);
   assert.match(exported, /^EASYSUBWAY_OBJECT_STORAGE_ENDPOINT=https:\/\/object-storage\.example\.com$/m);
   assert.match(exported, /^EASYSUBWAY_OBJECT_STORAGE_ACCESS_KEY=access-key$/m);
   assert.match(exported, /^EASYSUBWAY_OBJECT_STORAGE_SECRET_KEY=secret-key$/m);
@@ -2636,6 +2637,7 @@ test("데이터팩 remote publish env exporter는 PAR URL을 secret publish targ
   const exported = await readFile(githubEnvFile, "utf8");
   assert.match(stdout, /^::add-mask::https:\/\/objectstorage\.example\.com\/p\/token\/n\/ns\/b\/bucket\/o\/$/m);
   assert.match(exported, /^EASYSUBWAY_DATAPACK_REMOTE_PUBLISH=enabled$/m);
+  assert.match(exported, /^EASYSUBWAY_DATA_PACK_BASE_URL=https:\/\/cdn\.example\.com\/easysubway-datapacks$/m);
   assert.match(
     exported,
     /^EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL=https:\/\/objectstorage\.example\.com\/p\/token\/n\/ns\/b\/bucket\/o\/$/m,

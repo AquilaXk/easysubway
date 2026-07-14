@@ -96,6 +96,15 @@ test("schedule decision은 publish write를 승인 evidence와 strict pass 뒤�
     approvalValid: true,
     strictValidationPassed: true,
     publishRequired: true,
+    publishAttempted: false,
+    remoteValidationPassed: false,
+  }), { outcome: "PUBLISH_REQUIRED", productionWriteAllowed: true });
+
+  assert.deepEqual(decideScheduledRun({
+    materialChange: true,
+    approvalValid: true,
+    strictValidationPassed: true,
+    publishRequired: true,
     publishAttempted: true,
     remoteValidationPassed: true,
   }), { outcome: "PUBLISHED_AND_VERIFIED", productionWriteAllowed: true });

@@ -51,7 +51,7 @@ export function decideScheduledRun({
 }) {
   if (!strictValidationPassed) return decision("FAILED", false);
   if (materialChange && !approvalValid) return decision("CHANGE_BLOCKED", false);
-  if (publishRequired && !publishAttempted) return decision("PUBLISH_REQUIRED", false);
+  if (publishRequired && !publishAttempted) return decision("PUBLISH_REQUIRED", approvalValid);
   if (publishAttempted) {
     if (!approvalValid) return decision("FAILED", false);
     return remoteValidationPassed

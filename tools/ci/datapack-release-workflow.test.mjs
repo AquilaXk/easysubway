@@ -87,3 +87,26 @@ test("워크플로는 rollout-update 모드·publish-rollout 스텝을 가지고
   assert.match(yml, /is-pointer-only/);            // 빌드 스텝 게이팅 output
   assert.doesNotMatch(yml, /mode != 'rollback'/);  // 구 게이트가 pointer-only로 통합됨
 });
+
+test("production publish는 canonical decision의 write 허용 뒤에만 실행된다", () => {
+  assert.match(yml, /id:\s*release-decision/);
+  assert.match(yml, /node tools\/datapack\/decide-datapack-release\.mjs/);
+  const publishStep = yml.match(/- name: Data Pack Release \/ Publish staged data packs to object storage[\s\S]*?\n\s+- name:/)?.[0];
+  assert.ok(publishStep, "production publish 스텝을 찾지 못함");
+  assert.match(publishStep, /steps\.release-decision\.outputs\.productionWriteAllowed == 'true'/);
+});
+
+test("publish run은 remote artifact validation 뒤 최종 decision과 callback을 만든다", () => {
+  assert.match(yml, /validate-remote-datapack-artifact\.mjs/);
+  assert.match(yml, /id:\s*final-release-decision/);
+  assert.match(yml, /PUBLISHED_AND_VERIFIED/);
+  assert.match(yml, /Upload release decision artifact/);
+  assert.match(yml, /GITHUB_STEP_SUMMARY/);
+});
+
+test("expiry alert는 publish 없이 같은 decision engine을 소비한다", () => {
+  const expiryWorkflow = readFileSync(path.join(root, ".github/workflows/datapack-expiry-alert.yml"), "utf8");
+  assert.match(expiryWorkflow, /decide-datapack-release\.mjs/);
+  assert.match(expiryWorkflow, /--current-manifest/);
+  assert.doesNotMatch(expiryWorkflow, /productionWriteAllowed == 'true'/);
+});
