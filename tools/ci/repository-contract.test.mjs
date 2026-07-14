@@ -13772,6 +13772,35 @@ test("Android 런처 아이콘은 원형 마스크 안전 여백을 가진다", 
   }
 });
 
+test("Android와 iOS 시작 화면은 새 앱 아이콘을 중앙에 표시한다", () => {
+  for (const relativePath of [
+    "apps/mobile/android/app/src/main/res/drawable/launch_background.xml",
+    "apps/mobile/android/app/src/main/res/drawable-v21/launch_background.xml",
+  ]) {
+    const launchBackground = read(relativePath);
+    assert.match(launchBackground, /android:drawable="@mipmap\/ic_launcher"/);
+    assert.match(launchBackground, /android:gravity="center"/);
+    assert.match(launchBackground, /android:height="120dp"/);
+    assert.match(launchBackground, /android:width="120dp"/);
+  }
+
+  for (const [filename, size] of [
+    ["LaunchImage.png", 120],
+    ["LaunchImage@2x.png", 240],
+    ["LaunchImage@3x.png", 360],
+  ]) {
+    const info = readPngPixelBounds(
+      `apps/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/${filename}`,
+    );
+    assert.equal(info.width, size, `${filename} width must match its asset scale`);
+    assert.equal(info.height, size, `${filename} height must match its asset scale`);
+    assert.equal(info.hasAlpha, false, `${filename} must be opaque`);
+  }
+
+  const launchScreen = read("apps/mobile/ios/Runner/Base.lproj/LaunchScreen.storyboard");
+  assert.match(launchScreen, /<image name="LaunchImage" width="120" height="120"\/>/);
+});
+
 test("경로 분류기는 README를 문서 전용 변경으로 처리한다", async () => {
   const outputs = await classifyChangedFiles(["README.md"]);
 
