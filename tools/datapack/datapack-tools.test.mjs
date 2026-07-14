@@ -8406,7 +8406,9 @@ test("전국 coverage target은 공식 snapshot의 현재 catalog 노선과 정�
         lineId: "line-54a7b980b7c3",
         servicePattern: "EXPRESS",
         representation: "SERVICE_PATTERN_ON_EXISTING_LINE",
-        trainSearchCoverage: "FULL_ITX_CHEONGCHUN_NETWORK",
+        operatingRoute: "GYEONGCHUN_LINE_ONLY",
+        legacyDaejeonData: "REJECT",
+        trainSearchCoverage: "FULL_CURRENT_GYEONGCHUN_ITX_CHEONGCHUN_NETWORK",
         metropolitanRouteSearchCoverage: "CANONICAL_OD_STATIONS_IN_CAPITAL_METROPOLITAN_NETWORK",
         coverageContract: "tools/datapack/itx-cheongchun-coverage-contract.json",
         coverageStates: {

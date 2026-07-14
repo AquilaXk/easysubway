@@ -7,8 +7,10 @@
   "servicePattern": "EXPRESS",
   "timezone": "Asia/Seoul",
   "searchScopePolicy": {
+    "operatingRoute": "GYEONGCHUN_LINE_ONLY",
+    "legacyDaejeonData": "REJECT",
     "partitionKey": "CANONICAL_OD_STATION_MEMBERSHIP",
-    "trainSearch": "FULL_ITX_CHEONGCHUN_NETWORK",
+    "trainSearch": "FULL_CURRENT_GYEONGCHUN_ITX_CHEONGCHUN_NETWORK",
     "metropolitanRouteSearch": {
       "SUBWAY": "EXCLUDED",
       "SUBWAY_AND_TRAIN": "ALL_OD_STATIONS_IN_CAPITAL_METROPOLITAN_NETWORK"

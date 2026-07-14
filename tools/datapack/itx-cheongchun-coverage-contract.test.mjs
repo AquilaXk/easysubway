@@ -10,8 +10,10 @@ const stationSequenceEvidence = JSON.parse(await readFile(
 
 test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원으로 과장하지 않는다", () => {
   assert.deepEqual(contract.searchScopePolicy, {
+    operatingRoute: "GYEONGCHUN_LINE_ONLY",
+    legacyDaejeonData: "REJECT",
     partitionKey: "CANONICAL_OD_STATION_MEMBERSHIP",
-    trainSearch: "FULL_ITX_CHEONGCHUN_NETWORK",
+    trainSearch: "FULL_CURRENT_GYEONGCHUN_ITX_CHEONGCHUN_NETWORK",
     metropolitanRouteSearch: {
       SUBWAY: "EXCLUDED",
       SUBWAY_AND_TRAIN: "ALL_OD_STATIONS_IN_CAPITAL_METROPOLITAN_NETWORK",

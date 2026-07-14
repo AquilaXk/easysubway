@@ -838,7 +838,9 @@ function validateRailProductScope(scope, activeLineScopeKeys) {
   const itx = routeServices.get("ITX_CHEONGCHUN");
   const itxStates = itx.coverageStates;
   const allowedStates = new Set(["SUPPORTED", "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE", "MISSING"]);
-  if (itx.trainSearchCoverage !== "FULL_ITX_CHEONGCHUN_NETWORK"
+  if (itx.operatingRoute !== "GYEONGCHUN_LINE_ONLY"
+    || itx.legacyDaejeonData !== "REJECT"
+    || itx.trainSearchCoverage !== "FULL_CURRENT_GYEONGCHUN_ITX_CHEONGCHUN_NETWORK"
     || itx.metropolitanRouteSearchCoverage !== "CANONICAL_OD_STATIONS_IN_CAPITAL_METROPOLITAN_NETWORK"
     || itx.coverageContract !== "tools/datapack/itx-cheongchun-coverage-contract.json"
     || !itxStates || ["station_line_membership", "route_graph_topology", "schedule_timetable"]
