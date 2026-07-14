@@ -81,9 +81,7 @@ async function main(argv) {
   );
   const root = process.cwd();
   const resolvedEvidencePath = path.resolve(root, snapshotsPath);
-  if (path.relative(root, resolvedEvidencePath).startsWith("..")) {
-    throw new Error("buildSpec.sourceSnapshotEvidencePath must stay within the repository");
-  }
+  assertRepositoryRelativePath(path.relative(root, resolvedEvidencePath));
   const [snapshots, policy] = await Promise.all([
     readFile(resolvedEvidencePath, "utf8").then(JSON.parse),
     readFile(policyPath, "utf8").then(JSON.parse),
@@ -99,6 +97,12 @@ async function main(argv) {
     sourceSnapshotSetHash: result.snapshotSetHash,
     snapshotCount: result.results.length,
   })}\n`);
+}
+
+export function assertRepositoryRelativePath(relativePath) {
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error("buildSpec.sourceSnapshotEvidencePath must stay within the repository");
+  }
 }
 
 function parseArgs(argv) {

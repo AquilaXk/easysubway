@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import { validateSourceSnapshotFreshness } from "./validate-source-snapshot-freshness.mjs";
+import {
+  assertRepositoryRelativePath,
+  validateSourceSnapshotFreshness,
+} from "./validate-source-snapshot-freshness.mjs";
 
 const evaluationAt = "2026-07-15T00:00:00.000Z";
 const policy = {
@@ -60,6 +63,13 @@ test("source snapshot ID·hash·policy 파생 freshness가 맞으면 통과한�
 
   assert.equal(result.results.length, 1);
   assert.equal(result.results[0].status, "FRESH");
+});
+
+test("source snapshot evidence의 absolute relative-result를 거부한다", () => {
+  assert.throws(
+    () => assertRepositoryRelativePath("/other-drive/snapshots.json"),
+    /must stay within the repository/,
+  );
 });
 
 test("저장된 far-future expiry는 fail closed한다", () => {
