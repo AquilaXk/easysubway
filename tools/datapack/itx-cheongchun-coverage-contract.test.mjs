@@ -3,6 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const contract = JSON.parse(await readFile(new URL("./itx-cheongchun-coverage-contract.json", import.meta.url), "utf8"));
+const stationSequenceEvidence = JSON.parse(await readFile(
+  new URL("./sources/korail-itx-cheongchun-station-sequence-20260713.json", import.meta.url),
+  "utf8",
+));
 
 test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원으로 과장하지 않는다", () => {
   assert.deepEqual(contract.coverageStates, {
@@ -17,9 +21,13 @@ test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원
   assert.equal(contract.officialEvidence.kricUrbanTimetable.trainNumberJoinCount, 0);
   assert.equal(contract.officialEvidence.kricStationTimetable.providerResultCode, "00");
   assert.equal(contract.officialEvidence.kricStationTimetable.tagoTrainNumberJoinCount, 0);
-  assert.equal(contract.officialEvidence.korailStationSequence.trainCount, 18);
-  assert.equal(contract.officialEvidence.korailStationSequence.stationSequenceRowCount, 113);
-  assert.equal(contract.officialEvidence.korailStationSequence.missingTimestampStopCount, 113);
+  assert.deepEqual(contract.officialEvidence.korailStationSequence.routeCodeMapping,
+    stationSequenceEvidence.routeCodeMapping);
+  assert.equal(contract.officialEvidence.korailStationSequence.trainCount, stationSequenceEvidence.trainCount);
+  assert.equal(contract.officialEvidence.korailStationSequence.stationSequenceRowCount,
+    stationSequenceEvidence.stationSequenceRowCount);
+  assert.equal(contract.officialEvidence.korailStationSequence.missingTimestampStopCount,
+    stationSequenceEvidence.materialization.missingTimestampStopCount);
   assert.equal(contract.officialEvidence.korailStationSequence.disposition, "SUPPORTED_FOR_CANONICAL_STOP_SEQUENCE_ONLY");
   assert.equal(contract.materialization.status, "MISSING_STATION_TIMES");
   assert.equal(contract.claimGate.supportClaimAllowed, false);

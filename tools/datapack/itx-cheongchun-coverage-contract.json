@@ -101,7 +101,7 @@
       "schemaStatus": "EXPECTED",
       "observedDate": "2026-07-14",
       "runDate": "2026-07-13",
-      "routeCodeMapping": { "providerCode": "GJ", "providerName": "경춘선" },
+      "routeCodeMapping": { "providerCode": "14", "providerName": "경춘선" },
       "trainNumberSource": "tools/datapack/sources/tago-itx-cheongchun-od-20260714.json",
       "evidenceArtifact": "tools/datapack/sources/korail-itx-cheongchun-station-sequence-20260713.json",
       "trainCount": 18,

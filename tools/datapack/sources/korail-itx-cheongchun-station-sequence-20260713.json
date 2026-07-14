@@ -5,7 +5,7 @@
   "canonicalLineId": "line-54a7b980b7c3",
   "servicePattern": "EXPRESS",
   "officialSourceUrl": "https://www.data.go.kr/data/15125762/openapi.do",
-  "observedAt": "2026-07-14T05:36:47.290Z",
+  "observedAt": "2026-07-14T06:17:17.510Z",
   "runDate": "20260713",
   "kricServiceDayCode": "8",
   "providerResultCode": "0",
@@ -1503,6 +1503,6 @@
   ],
   "transitTrips": [],
   "transitStopTimes": [],
-  "evidenceHash": "df9281f5e030122c2c0c094e905f43460c25ee643e18361ba60c9fe49fbfce0b",
+  "evidenceHash": "5a5c2d511bb1d3a624ada2ac9ef20681592b73304f9dab19af061d26c858e26e",
   "credentialRedacted": true
 }
