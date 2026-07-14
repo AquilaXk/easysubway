@@ -6,9 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show OrdinalSortKey;
 import 'package:flutter_test/flutter_test.dart';
 
+const double _designWidth = 700;
+
 Future<void> _pump(
   WidgetTester tester, {
-  double width = 700,
+  double width = _designWidth,
   Set<RouteDraftSlot> selected = const {},
   Set<RouteDraftSlot> disabled = const {},
   required void Function(RouteDraftSlot) onAction,
@@ -34,11 +36,22 @@ Future<void> _pump(
 // design 좌표를 현재 메뉴 폭에 맞춰 위젯 글로벌 좌표로 변환한다.
 Offset _global(WidgetTester tester, Offset design) {
   final topLeft = tester.getTopLeft(find.byType(StationFanMenu));
-  final scale = tester.getSize(find.byType(StationFanMenu)).width / 700;
+  final scale =
+      tester.getSize(find.byType(StationFanMenu)).width / _designWidth;
   return topLeft + design * scale;
 }
 
 void main() {
+  testWidgets('220dp 메뉴도 design 좌표를 실제 pointer hit 좌표로 변환한다', (tester) async {
+    final actions = <RouteDraftSlot>[];
+    await _pump(tester, width: 220, onAction: actions.add, onClose: () {});
+
+    await tester.tapAt(_global(tester, const Offset(175, 173)));
+    await tester.pump();
+
+    expect(actions, [RouteDraftSlot.origin]);
+  });
+
   testWidgets('각 섹터 아이콘 중심 탭은 올바른 슬롯을 onAction으로 보낸다', (tester) async {
     final actions = <RouteDraftSlot>[];
     var closed = 0;
