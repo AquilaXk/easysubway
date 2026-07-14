@@ -565,3 +565,30 @@ test("공식 OD fare source는 재현 가능한 operation과 조회 명령을 �
     "node tools/ci/api-catalog.mjs show provider:<sourceId>",
   );
 });
+
+test("migrated KRIC evidence provenance와 TAGO output 경로를 보존한다", async () => {
+  const document = JSON.parse(
+    await readFile(new URL("./source-candidates.json", import.meta.url), "utf8"),
+  );
+  const migratedKricIds = [
+    "kric-station-elevator",
+    "kric-station-elevator-movement",
+    "kric-station-escalator",
+    "kric-wheelchair-lift-location",
+    "kric-wheelchair-lift-movement",
+  ];
+
+  for (const id of migratedKricIds) {
+    const source = document.candidates.find((entry) => entry.id === id);
+    assert.match(source.operation.endpoint, /^https:\/\/openapi\.kric\.go\.kr\//);
+    assert.match(source.evidence.endpoint, /^https:\/\/apis\.data\.go\.kr\/B551181\//);
+    assert.match(source.evidence.liveSampleNote, /legacy data\.go\.kr endpoint/);
+  }
+
+  const tago = document.candidates.find((entry) => entry.id === "molit-tago-subway-info");
+  assert.deepEqual(tago.operation.runner.arguments.slice(-3), [
+    "--output",
+    ".codex/evidence/tago-schedule-collection.json",
+    "--quiet",
+  ]);
+});

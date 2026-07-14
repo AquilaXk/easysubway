@@ -1291,7 +1291,7 @@
         "auth": { "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
         "requiredParameters": ["serviceKey", "pageNo", "numOfRows", "_type", "subwayStationId", "dailyTypeCode", "upDownTypeCode"],
         "responseEnvelope": "response.header + response.body.items.item + totalCount",
-        "runner": { "command": "node tools/datapack/validate-tago-schedule-sample.mjs", "arguments": ["--collect", "--input", "tools/datapack/inputs/capital-pilot-production-source-input.json", "--daily-limit", "1", "--quiet"], "requiredEnv": ["DATA_GO_KR_SERVICE_KEY"] },
+        "runner": { "command": "node tools/datapack/validate-tago-schedule-sample.mjs", "arguments": ["--collect", "--input", "tools/datapack/inputs/capital-pilot-production-source-input.json", "--daily-limit", "1", "--output", ".codex/evidence/tago-schedule-collection.json", "--quiet"], "requiredEnv": ["DATA_GO_KR_SERVICE_KEY"] },
         "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_attribution",
@@ -1997,12 +1997,10 @@
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15041682/openapi.do",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
-        "sampleUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator?serviceKey=[서비스키값]&format=xml&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "endpoint": "https://apis.data.go.kr/B551181/stationElevatorInfo/getStationElevatorList",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
-          "JSON",
-          "XML"
+          "JSON"
         ],
         "outputFields": [
           "capacity",
@@ -2027,7 +2025,7 @@
           "station_code",
           "station_name"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증.",
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증.",
         "operationLiveValidation": {
           "observedAt": "2026-07-14",
           "httpStatus": 200,
@@ -2091,12 +2089,10 @@
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15041689/openapi.do",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement",
-        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement?serviceKey=[서비스키값]&format=xml&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "endpoint": "https://apis.data.go.kr/B551181/stationElevatorMovement/getStationElevatorMovementList",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
-          "JSON",
-          "XML"
+          "JSON"
         ],
         "outputFields": [
           "facility_type",
@@ -2123,7 +2119,7 @@
           "station_name",
           "to_location"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -2179,12 +2175,10 @@
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15041683/openapi.do",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator",
-        "sampleUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "endpoint": "https://apis.data.go.kr/B551181/stationEscalatorInfo/getStationEscalatorList",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
-          "JSON",
-          "XML"
+          "JSON"
         ],
         "outputFields": [
           "direction",
@@ -2207,7 +2201,7 @@
           "station_code",
           "station_name"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -2263,12 +2257,10 @@
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15041686/openapi.do",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation",
-        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=6&stinCd=2613",
+        "endpoint": "https://apis.data.go.kr/B551181/wheelchairLiftLocation/getWheelchairLiftLocationList",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
-          "JSON",
-          "XML"
+          "JSON"
         ],
         "outputFields": [
           "floor_from",
@@ -2289,7 +2281,7 @@
           "station_code",
           "station_name"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
@@ -2345,12 +2337,10 @@
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15041690/openapi.do",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement",
-        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "endpoint": "https://apis.data.go.kr/B551181/wheelchairLiftMovement/getWheelchairLiftMovementList",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
-          "JSON",
-          "XML"
+          "JSON"
         ],
         "outputFields": [
           "facility_type",
@@ -2377,7 +2367,7 @@
           "station_name",
           "to_location"
         ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
+        "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
       "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
       "capabilities": {
