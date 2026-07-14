@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _goldenFontFamily = 'NanumGothicGolden';
 const _menuBoundaryKey = ValueKey('station-fan-menu-golden-boundary');
-const _menuWidth = 260.0;
+const _menuWidth = 220.0;
 
 Future<void> _pumpMenu(
   WidgetTester tester, {

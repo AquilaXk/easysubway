@@ -30,10 +30,10 @@ String _semanticsLabel(_FanSector sector) => switch (sector) {
 /// 히트테스트(Listener + path.contains)는 이 값을 쓰지 않으므로 정확한 부채꼴
 /// 경계를 그대로 유지한다.
 const Map<_FanSector, Rect> _sectorSemanticsCore = {
-  _FanSector.departure: Rect.fromLTWH(92, 122, 130, 130),
-  _FanSector.waypoint: Rect.fromLTWH(285, 62, 130, 130),
-  _FanSector.arrival: Rect.fromLTWH(478, 122, 130, 130),
-  _FanSector.close: Rect.fromLTWH(285, 232, 130, 130),
+  _FanSector.departure: Rect.fromLTWH(92, 122, 153, 153),
+  _FanSector.waypoint: Rect.fromLTWH(285, 62, 153, 153),
+  _FanSector.arrival: Rect.fromLTWH(478, 122, 153, 153),
+  _FanSector.close: Rect.fromLTWH(285, 232, 153, 153),
 };
 
 /// State(히트테스트)와 Painter(렌더)가 같은 섹터→Path 매핑을 공유하도록

@@ -5561,7 +5561,7 @@ class FanMenuPlacement {
 /// 끈 이상적 배치의 [FanMenuPlacement.revealBounds]를 노출 대상으로 사용한다.
 @visibleForTesting
 double fanMenuWidthForViewport(double viewportWidth) => math.min(
-  260.0,
+  220.0,
   math.max(0.0, viewportWidth - (kFanMenuViewportMargin * 2)),
 );
 
