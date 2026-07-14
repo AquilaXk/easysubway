@@ -446,6 +446,7 @@ class LocalRouteRepository implements RouteSearchRepository {
               AND removed.date = ?
               AND removed.exception_type = 2
           )
+          AND trip.service_class = 'SUBWAY'
           AND route.line_id = ?
           $servicePatternSql
           AND board.station_id = ?
@@ -1207,8 +1208,10 @@ class _RouteCatalogSnapshot {
           );
     }
     final plannedRows = await database.customSelect('''
-          SELECT DISTINCT station_id, line_id
-          FROM transit_stop_times
+          SELECT DISTINCT stop.station_id, stop.line_id
+          FROM transit_stop_times stop
+          INNER JOIN transit_trips trip ON trip.id = stop.trip_id
+          WHERE trip.service_class = 'SUBWAY'
           ''').get();
     final plannedStationLineKeys = {
       for (final row in plannedRows)
@@ -1324,6 +1327,10 @@ class _RouteCatalogSnapshot {
       'facility_id',
       'NULL',
     );
+    final localPlannerServiceClassFilter =
+        networkEdgeColumnNames.contains('service_class')
+        ? "WHERE service_class = 'SUBWAY'"
+        : '';
     final facilityColumns = await database
         .customSelect('PRAGMA table_info(facilities)')
         .get();
@@ -1423,6 +1430,7 @@ class _RouteCatalogSnapshot {
                  $evidenceHashSql AS evidence_hash,
                  $facilityIdSql AS facility_id
           FROM network_edges
+          $localPlannerServiceClassFilter
           ORDER BY id
           ''').get();
     final networkEdges = networkEdgeRows

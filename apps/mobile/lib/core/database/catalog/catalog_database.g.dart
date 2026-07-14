@@ -3627,6 +3627,18 @@ class $TransitTripsTable extends TransitTrips
     requiredDuringInsert: false,
     defaultValue: const Constant('LOCAL'),
   );
+  static const VerificationMeta _serviceClassMeta = const VerificationMeta(
+    'serviceClass',
+  );
+  @override
+  late final GeneratedColumn<String> serviceClass = GeneratedColumn<String>(
+    'service_class',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('SUBWAY'),
+  );
   static const VerificationMeta _serviceDayStartSecondsMeta =
       const VerificationMeta('serviceDayStartSeconds');
   @override
@@ -3646,6 +3658,7 @@ class $TransitTripsTable extends TransitTrips
     tripHeadsign,
     directionId,
     servicePattern,
+    serviceClass,
     serviceDayStartSeconds,
   ];
   @override
@@ -3708,6 +3721,15 @@ class $TransitTripsTable extends TransitTrips
         ),
       );
     }
+    if (data.containsKey('service_class')) {
+      context.handle(
+        _serviceClassMeta,
+        serviceClass.isAcceptableOrUnknown(
+          data['service_class']!,
+          _serviceClassMeta,
+        ),
+      );
+    }
     if (data.containsKey('service_day_start_seconds')) {
       context.handle(
         _serviceDayStartSecondsMeta,
@@ -3750,6 +3772,10 @@ class $TransitTripsTable extends TransitTrips
         DriftSqlType.string,
         data['${effectivePrefix}service_pattern'],
       )!,
+      serviceClass: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_class'],
+      )!,
       serviceDayStartSeconds: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}service_day_start_seconds'],
@@ -3770,6 +3796,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
   final String tripHeadsign;
   final String directionId;
   final String servicePattern;
+  final String serviceClass;
   final int serviceDayStartSeconds;
   const TransitTrip({
     required this.id,
@@ -3778,6 +3805,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
     required this.tripHeadsign,
     required this.directionId,
     required this.servicePattern,
+    required this.serviceClass,
     required this.serviceDayStartSeconds,
   });
   @override
@@ -3789,6 +3817,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
     map['trip_headsign'] = Variable<String>(tripHeadsign);
     map['direction_id'] = Variable<String>(directionId);
     map['service_pattern'] = Variable<String>(servicePattern);
+    map['service_class'] = Variable<String>(serviceClass);
     map['service_day_start_seconds'] = Variable<int>(serviceDayStartSeconds);
     return map;
   }
@@ -3801,6 +3830,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
       tripHeadsign: Value(tripHeadsign),
       directionId: Value(directionId),
       servicePattern: Value(servicePattern),
+      serviceClass: Value(serviceClass),
       serviceDayStartSeconds: Value(serviceDayStartSeconds),
     );
   }
@@ -3817,6 +3847,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
       tripHeadsign: serializer.fromJson<String>(json['tripHeadsign']),
       directionId: serializer.fromJson<String>(json['directionId']),
       servicePattern: serializer.fromJson<String>(json['servicePattern']),
+      serviceClass: serializer.fromJson<String>(json['serviceClass']),
       serviceDayStartSeconds: serializer.fromJson<int>(
         json['serviceDayStartSeconds'],
       ),
@@ -3832,6 +3863,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
       'tripHeadsign': serializer.toJson<String>(tripHeadsign),
       'directionId': serializer.toJson<String>(directionId),
       'servicePattern': serializer.toJson<String>(servicePattern),
+      'serviceClass': serializer.toJson<String>(serviceClass),
       'serviceDayStartSeconds': serializer.toJson<int>(serviceDayStartSeconds),
     };
   }
@@ -3843,6 +3875,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
     String? tripHeadsign,
     String? directionId,
     String? servicePattern,
+    String? serviceClass,
     int? serviceDayStartSeconds,
   }) => TransitTrip(
     id: id ?? this.id,
@@ -3851,6 +3884,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
     tripHeadsign: tripHeadsign ?? this.tripHeadsign,
     directionId: directionId ?? this.directionId,
     servicePattern: servicePattern ?? this.servicePattern,
+    serviceClass: serviceClass ?? this.serviceClass,
     serviceDayStartSeconds:
         serviceDayStartSeconds ?? this.serviceDayStartSeconds,
   );
@@ -3868,6 +3902,9 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
       servicePattern: data.servicePattern.present
           ? data.servicePattern.value
           : this.servicePattern,
+      serviceClass: data.serviceClass.present
+          ? data.serviceClass.value
+          : this.serviceClass,
       serviceDayStartSeconds: data.serviceDayStartSeconds.present
           ? data.serviceDayStartSeconds.value
           : this.serviceDayStartSeconds,
@@ -3883,6 +3920,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
           ..write('tripHeadsign: $tripHeadsign, ')
           ..write('directionId: $directionId, ')
           ..write('servicePattern: $servicePattern, ')
+          ..write('serviceClass: $serviceClass, ')
           ..write('serviceDayStartSeconds: $serviceDayStartSeconds')
           ..write(')'))
         .toString();
@@ -3896,6 +3934,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
     tripHeadsign,
     directionId,
     servicePattern,
+    serviceClass,
     serviceDayStartSeconds,
   );
   @override
@@ -3908,6 +3947,7 @@ class TransitTrip extends DataClass implements Insertable<TransitTrip> {
           other.tripHeadsign == this.tripHeadsign &&
           other.directionId == this.directionId &&
           other.servicePattern == this.servicePattern &&
+          other.serviceClass == this.serviceClass &&
           other.serviceDayStartSeconds == this.serviceDayStartSeconds);
 }
 
@@ -3918,6 +3958,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
   final Value<String> tripHeadsign;
   final Value<String> directionId;
   final Value<String> servicePattern;
+  final Value<String> serviceClass;
   final Value<int> serviceDayStartSeconds;
   final Value<int> rowid;
   const TransitTripsCompanion({
@@ -3927,6 +3968,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
     this.tripHeadsign = const Value.absent(),
     this.directionId = const Value.absent(),
     this.servicePattern = const Value.absent(),
+    this.serviceClass = const Value.absent(),
     this.serviceDayStartSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -3937,6 +3979,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
     this.tripHeadsign = const Value.absent(),
     this.directionId = const Value.absent(),
     this.servicePattern = const Value.absent(),
+    this.serviceClass = const Value.absent(),
     this.serviceDayStartSeconds = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -3949,6 +3992,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
     Expression<String>? tripHeadsign,
     Expression<String>? directionId,
     Expression<String>? servicePattern,
+    Expression<String>? serviceClass,
     Expression<int>? serviceDayStartSeconds,
     Expression<int>? rowid,
   }) {
@@ -3959,6 +4003,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
       if (tripHeadsign != null) 'trip_headsign': tripHeadsign,
       if (directionId != null) 'direction_id': directionId,
       if (servicePattern != null) 'service_pattern': servicePattern,
+      if (serviceClass != null) 'service_class': serviceClass,
       if (serviceDayStartSeconds != null)
         'service_day_start_seconds': serviceDayStartSeconds,
       if (rowid != null) 'rowid': rowid,
@@ -3972,6 +4017,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
     Value<String>? tripHeadsign,
     Value<String>? directionId,
     Value<String>? servicePattern,
+    Value<String>? serviceClass,
     Value<int>? serviceDayStartSeconds,
     Value<int>? rowid,
   }) {
@@ -3982,6 +4028,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
       tripHeadsign: tripHeadsign ?? this.tripHeadsign,
       directionId: directionId ?? this.directionId,
       servicePattern: servicePattern ?? this.servicePattern,
+      serviceClass: serviceClass ?? this.serviceClass,
       serviceDayStartSeconds:
           serviceDayStartSeconds ?? this.serviceDayStartSeconds,
       rowid: rowid ?? this.rowid,
@@ -4009,6 +4056,9 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
     if (servicePattern.present) {
       map['service_pattern'] = Variable<String>(servicePattern.value);
     }
+    if (serviceClass.present) {
+      map['service_class'] = Variable<String>(serviceClass.value);
+    }
     if (serviceDayStartSeconds.present) {
       map['service_day_start_seconds'] = Variable<int>(
         serviceDayStartSeconds.value,
@@ -4029,6 +4079,7 @@ class TransitTripsCompanion extends UpdateCompanion<TransitTrip> {
           ..write('tripHeadsign: $tripHeadsign, ')
           ..write('directionId: $directionId, ')
           ..write('servicePattern: $servicePattern, ')
+          ..write('serviceClass: $serviceClass, ')
           ..write('serviceDayStartSeconds: $serviceDayStartSeconds, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7205,6 +7256,713 @@ class OfficialOdFareQuotesCompanion
   }
 }
 
+class $RouteServiceArtifactEvidenceTable extends RouteServiceArtifactEvidence
+    with
+        TableInfo<
+          $RouteServiceArtifactEvidenceTable,
+          RouteServiceArtifactEvidenceData
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RouteServiceArtifactEvidenceTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _serviceClassMeta = const VerificationMeta(
+    'serviceClass',
+  );
+  @override
+  late final GeneratedColumn<String> serviceClass = GeneratedColumn<String>(
+    'service_class',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _timetableArtifactIdMeta =
+      const VerificationMeta('timetableArtifactId');
+  @override
+  late final GeneratedColumn<String> timetableArtifactId =
+      GeneratedColumn<String>(
+        'timetable_artifact_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _timetableArtifactSha256Meta =
+      const VerificationMeta('timetableArtifactSha256');
+  @override
+  late final GeneratedColumn<String> timetableArtifactSha256 =
+      GeneratedColumn<String>(
+        'timetable_artifact_sha256',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _canonicalPackIdMeta = const VerificationMeta(
+    'canonicalPackId',
+  );
+  @override
+  late final GeneratedColumn<String> canonicalPackId = GeneratedColumn<String>(
+    'canonical_pack_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _canonicalPackSha256Meta =
+      const VerificationMeta('canonicalPackSha256');
+  @override
+  late final GeneratedColumn<String> canonicalPackSha256 =
+      GeneratedColumn<String>(
+        'canonical_pack_sha256',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _canonicalPackSqliteSha256Meta =
+      const VerificationMeta('canonicalPackSqliteSha256');
+  @override
+  late final GeneratedColumn<String> canonicalPackSqliteSha256 =
+      GeneratedColumn<String>(
+        'canonical_pack_sqlite_sha256',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _admissionStatusMeta = const VerificationMeta(
+    'admissionStatus',
+  );
+  @override
+  late final GeneratedColumn<String> admissionStatus = GeneratedColumn<String>(
+    'admission_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _admissionEligibleMeta = const VerificationMeta(
+    'admissionEligible',
+  );
+  @override
+  late final GeneratedColumn<bool> admissionEligible = GeneratedColumn<bool>(
+    'admission_eligible',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("admission_eligible" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _freshUntilMeta = const VerificationMeta(
+    'freshUntil',
+  );
+  @override
+  late final GeneratedColumn<String> freshUntil = GeneratedColumn<String>(
+    'fresh_until',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceIssueMeta = const VerificationMeta(
+    'sourceIssue',
+  );
+  @override
+  late final GeneratedColumn<int> sourceIssue = GeneratedColumn<int>(
+    'source_issue',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    serviceClass,
+    timetableArtifactId,
+    timetableArtifactSha256,
+    canonicalPackId,
+    canonicalPackSha256,
+    canonicalPackSqliteSha256,
+    admissionStatus,
+    admissionEligible,
+    freshUntil,
+    sourceIssue,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'route_service_artifact_evidence';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RouteServiceArtifactEvidenceData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('service_class')) {
+      context.handle(
+        _serviceClassMeta,
+        serviceClass.isAcceptableOrUnknown(
+          data['service_class']!,
+          _serviceClassMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_serviceClassMeta);
+    }
+    if (data.containsKey('timetable_artifact_id')) {
+      context.handle(
+        _timetableArtifactIdMeta,
+        timetableArtifactId.isAcceptableOrUnknown(
+          data['timetable_artifact_id']!,
+          _timetableArtifactIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_timetableArtifactIdMeta);
+    }
+    if (data.containsKey('timetable_artifact_sha256')) {
+      context.handle(
+        _timetableArtifactSha256Meta,
+        timetableArtifactSha256.isAcceptableOrUnknown(
+          data['timetable_artifact_sha256']!,
+          _timetableArtifactSha256Meta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_timetableArtifactSha256Meta);
+    }
+    if (data.containsKey('canonical_pack_id')) {
+      context.handle(
+        _canonicalPackIdMeta,
+        canonicalPackId.isAcceptableOrUnknown(
+          data['canonical_pack_id']!,
+          _canonicalPackIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_canonicalPackIdMeta);
+    }
+    if (data.containsKey('canonical_pack_sha256')) {
+      context.handle(
+        _canonicalPackSha256Meta,
+        canonicalPackSha256.isAcceptableOrUnknown(
+          data['canonical_pack_sha256']!,
+          _canonicalPackSha256Meta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_canonicalPackSha256Meta);
+    }
+    if (data.containsKey('canonical_pack_sqlite_sha256')) {
+      context.handle(
+        _canonicalPackSqliteSha256Meta,
+        canonicalPackSqliteSha256.isAcceptableOrUnknown(
+          data['canonical_pack_sqlite_sha256']!,
+          _canonicalPackSqliteSha256Meta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_canonicalPackSqliteSha256Meta);
+    }
+    if (data.containsKey('admission_status')) {
+      context.handle(
+        _admissionStatusMeta,
+        admissionStatus.isAcceptableOrUnknown(
+          data['admission_status']!,
+          _admissionStatusMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_admissionStatusMeta);
+    }
+    if (data.containsKey('admission_eligible')) {
+      context.handle(
+        _admissionEligibleMeta,
+        admissionEligible.isAcceptableOrUnknown(
+          data['admission_eligible']!,
+          _admissionEligibleMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_admissionEligibleMeta);
+    }
+    if (data.containsKey('fresh_until')) {
+      context.handle(
+        _freshUntilMeta,
+        freshUntil.isAcceptableOrUnknown(data['fresh_until']!, _freshUntilMeta),
+      );
+    }
+    if (data.containsKey('source_issue')) {
+      context.handle(
+        _sourceIssueMeta,
+        sourceIssue.isAcceptableOrUnknown(
+          data['source_issue']!,
+          _sourceIssueMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceIssueMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {serviceClass};
+  @override
+  RouteServiceArtifactEvidenceData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RouteServiceArtifactEvidenceData(
+      serviceClass: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_class'],
+      )!,
+      timetableArtifactId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}timetable_artifact_id'],
+      )!,
+      timetableArtifactSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}timetable_artifact_sha256'],
+      )!,
+      canonicalPackId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}canonical_pack_id'],
+      )!,
+      canonicalPackSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}canonical_pack_sha256'],
+      )!,
+      canonicalPackSqliteSha256: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}canonical_pack_sqlite_sha256'],
+      )!,
+      admissionStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}admission_status'],
+      )!,
+      admissionEligible: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}admission_eligible'],
+      )!,
+      freshUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fresh_until'],
+      ),
+      sourceIssue: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}source_issue'],
+      )!,
+    );
+  }
+
+  @override
+  $RouteServiceArtifactEvidenceTable createAlias(String alias) {
+    return $RouteServiceArtifactEvidenceTable(attachedDatabase, alias);
+  }
+}
+
+class RouteServiceArtifactEvidenceData extends DataClass
+    implements Insertable<RouteServiceArtifactEvidenceData> {
+  final String serviceClass;
+  final String timetableArtifactId;
+  final String timetableArtifactSha256;
+  final String canonicalPackId;
+  final String canonicalPackSha256;
+  final String canonicalPackSqliteSha256;
+  final String admissionStatus;
+  final bool admissionEligible;
+  final String? freshUntil;
+  final int sourceIssue;
+  const RouteServiceArtifactEvidenceData({
+    required this.serviceClass,
+    required this.timetableArtifactId,
+    required this.timetableArtifactSha256,
+    required this.canonicalPackId,
+    required this.canonicalPackSha256,
+    required this.canonicalPackSqliteSha256,
+    required this.admissionStatus,
+    required this.admissionEligible,
+    this.freshUntil,
+    required this.sourceIssue,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['service_class'] = Variable<String>(serviceClass);
+    map['timetable_artifact_id'] = Variable<String>(timetableArtifactId);
+    map['timetable_artifact_sha256'] = Variable<String>(
+      timetableArtifactSha256,
+    );
+    map['canonical_pack_id'] = Variable<String>(canonicalPackId);
+    map['canonical_pack_sha256'] = Variable<String>(canonicalPackSha256);
+    map['canonical_pack_sqlite_sha256'] = Variable<String>(
+      canonicalPackSqliteSha256,
+    );
+    map['admission_status'] = Variable<String>(admissionStatus);
+    map['admission_eligible'] = Variable<bool>(admissionEligible);
+    if (!nullToAbsent || freshUntil != null) {
+      map['fresh_until'] = Variable<String>(freshUntil);
+    }
+    map['source_issue'] = Variable<int>(sourceIssue);
+    return map;
+  }
+
+  RouteServiceArtifactEvidenceCompanion toCompanion(bool nullToAbsent) {
+    return RouteServiceArtifactEvidenceCompanion(
+      serviceClass: Value(serviceClass),
+      timetableArtifactId: Value(timetableArtifactId),
+      timetableArtifactSha256: Value(timetableArtifactSha256),
+      canonicalPackId: Value(canonicalPackId),
+      canonicalPackSha256: Value(canonicalPackSha256),
+      canonicalPackSqliteSha256: Value(canonicalPackSqliteSha256),
+      admissionStatus: Value(admissionStatus),
+      admissionEligible: Value(admissionEligible),
+      freshUntil: freshUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(freshUntil),
+      sourceIssue: Value(sourceIssue),
+    );
+  }
+
+  factory RouteServiceArtifactEvidenceData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RouteServiceArtifactEvidenceData(
+      serviceClass: serializer.fromJson<String>(json['serviceClass']),
+      timetableArtifactId: serializer.fromJson<String>(
+        json['timetableArtifactId'],
+      ),
+      timetableArtifactSha256: serializer.fromJson<String>(
+        json['timetableArtifactSha256'],
+      ),
+      canonicalPackId: serializer.fromJson<String>(json['canonicalPackId']),
+      canonicalPackSha256: serializer.fromJson<String>(
+        json['canonicalPackSha256'],
+      ),
+      canonicalPackSqliteSha256: serializer.fromJson<String>(
+        json['canonicalPackSqliteSha256'],
+      ),
+      admissionStatus: serializer.fromJson<String>(json['admissionStatus']),
+      admissionEligible: serializer.fromJson<bool>(json['admissionEligible']),
+      freshUntil: serializer.fromJson<String?>(json['freshUntil']),
+      sourceIssue: serializer.fromJson<int>(json['sourceIssue']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'serviceClass': serializer.toJson<String>(serviceClass),
+      'timetableArtifactId': serializer.toJson<String>(timetableArtifactId),
+      'timetableArtifactSha256': serializer.toJson<String>(
+        timetableArtifactSha256,
+      ),
+      'canonicalPackId': serializer.toJson<String>(canonicalPackId),
+      'canonicalPackSha256': serializer.toJson<String>(canonicalPackSha256),
+      'canonicalPackSqliteSha256': serializer.toJson<String>(
+        canonicalPackSqliteSha256,
+      ),
+      'admissionStatus': serializer.toJson<String>(admissionStatus),
+      'admissionEligible': serializer.toJson<bool>(admissionEligible),
+      'freshUntil': serializer.toJson<String?>(freshUntil),
+      'sourceIssue': serializer.toJson<int>(sourceIssue),
+    };
+  }
+
+  RouteServiceArtifactEvidenceData copyWith({
+    String? serviceClass,
+    String? timetableArtifactId,
+    String? timetableArtifactSha256,
+    String? canonicalPackId,
+    String? canonicalPackSha256,
+    String? canonicalPackSqliteSha256,
+    String? admissionStatus,
+    bool? admissionEligible,
+    Value<String?> freshUntil = const Value.absent(),
+    int? sourceIssue,
+  }) => RouteServiceArtifactEvidenceData(
+    serviceClass: serviceClass ?? this.serviceClass,
+    timetableArtifactId: timetableArtifactId ?? this.timetableArtifactId,
+    timetableArtifactSha256:
+        timetableArtifactSha256 ?? this.timetableArtifactSha256,
+    canonicalPackId: canonicalPackId ?? this.canonicalPackId,
+    canonicalPackSha256: canonicalPackSha256 ?? this.canonicalPackSha256,
+    canonicalPackSqliteSha256:
+        canonicalPackSqliteSha256 ?? this.canonicalPackSqliteSha256,
+    admissionStatus: admissionStatus ?? this.admissionStatus,
+    admissionEligible: admissionEligible ?? this.admissionEligible,
+    freshUntil: freshUntil.present ? freshUntil.value : this.freshUntil,
+    sourceIssue: sourceIssue ?? this.sourceIssue,
+  );
+  RouteServiceArtifactEvidenceData copyWithCompanion(
+    RouteServiceArtifactEvidenceCompanion data,
+  ) {
+    return RouteServiceArtifactEvidenceData(
+      serviceClass: data.serviceClass.present
+          ? data.serviceClass.value
+          : this.serviceClass,
+      timetableArtifactId: data.timetableArtifactId.present
+          ? data.timetableArtifactId.value
+          : this.timetableArtifactId,
+      timetableArtifactSha256: data.timetableArtifactSha256.present
+          ? data.timetableArtifactSha256.value
+          : this.timetableArtifactSha256,
+      canonicalPackId: data.canonicalPackId.present
+          ? data.canonicalPackId.value
+          : this.canonicalPackId,
+      canonicalPackSha256: data.canonicalPackSha256.present
+          ? data.canonicalPackSha256.value
+          : this.canonicalPackSha256,
+      canonicalPackSqliteSha256: data.canonicalPackSqliteSha256.present
+          ? data.canonicalPackSqliteSha256.value
+          : this.canonicalPackSqliteSha256,
+      admissionStatus: data.admissionStatus.present
+          ? data.admissionStatus.value
+          : this.admissionStatus,
+      admissionEligible: data.admissionEligible.present
+          ? data.admissionEligible.value
+          : this.admissionEligible,
+      freshUntil: data.freshUntil.present
+          ? data.freshUntil.value
+          : this.freshUntil,
+      sourceIssue: data.sourceIssue.present
+          ? data.sourceIssue.value
+          : this.sourceIssue,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RouteServiceArtifactEvidenceData(')
+          ..write('serviceClass: $serviceClass, ')
+          ..write('timetableArtifactId: $timetableArtifactId, ')
+          ..write('timetableArtifactSha256: $timetableArtifactSha256, ')
+          ..write('canonicalPackId: $canonicalPackId, ')
+          ..write('canonicalPackSha256: $canonicalPackSha256, ')
+          ..write('canonicalPackSqliteSha256: $canonicalPackSqliteSha256, ')
+          ..write('admissionStatus: $admissionStatus, ')
+          ..write('admissionEligible: $admissionEligible, ')
+          ..write('freshUntil: $freshUntil, ')
+          ..write('sourceIssue: $sourceIssue')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    serviceClass,
+    timetableArtifactId,
+    timetableArtifactSha256,
+    canonicalPackId,
+    canonicalPackSha256,
+    canonicalPackSqliteSha256,
+    admissionStatus,
+    admissionEligible,
+    freshUntil,
+    sourceIssue,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RouteServiceArtifactEvidenceData &&
+          other.serviceClass == this.serviceClass &&
+          other.timetableArtifactId == this.timetableArtifactId &&
+          other.timetableArtifactSha256 == this.timetableArtifactSha256 &&
+          other.canonicalPackId == this.canonicalPackId &&
+          other.canonicalPackSha256 == this.canonicalPackSha256 &&
+          other.canonicalPackSqliteSha256 == this.canonicalPackSqliteSha256 &&
+          other.admissionStatus == this.admissionStatus &&
+          other.admissionEligible == this.admissionEligible &&
+          other.freshUntil == this.freshUntil &&
+          other.sourceIssue == this.sourceIssue);
+}
+
+class RouteServiceArtifactEvidenceCompanion
+    extends UpdateCompanion<RouteServiceArtifactEvidenceData> {
+  final Value<String> serviceClass;
+  final Value<String> timetableArtifactId;
+  final Value<String> timetableArtifactSha256;
+  final Value<String> canonicalPackId;
+  final Value<String> canonicalPackSha256;
+  final Value<String> canonicalPackSqliteSha256;
+  final Value<String> admissionStatus;
+  final Value<bool> admissionEligible;
+  final Value<String?> freshUntil;
+  final Value<int> sourceIssue;
+  final Value<int> rowid;
+  const RouteServiceArtifactEvidenceCompanion({
+    this.serviceClass = const Value.absent(),
+    this.timetableArtifactId = const Value.absent(),
+    this.timetableArtifactSha256 = const Value.absent(),
+    this.canonicalPackId = const Value.absent(),
+    this.canonicalPackSha256 = const Value.absent(),
+    this.canonicalPackSqliteSha256 = const Value.absent(),
+    this.admissionStatus = const Value.absent(),
+    this.admissionEligible = const Value.absent(),
+    this.freshUntil = const Value.absent(),
+    this.sourceIssue = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RouteServiceArtifactEvidenceCompanion.insert({
+    required String serviceClass,
+    required String timetableArtifactId,
+    required String timetableArtifactSha256,
+    required String canonicalPackId,
+    required String canonicalPackSha256,
+    required String canonicalPackSqliteSha256,
+    required String admissionStatus,
+    required bool admissionEligible,
+    this.freshUntil = const Value.absent(),
+    required int sourceIssue,
+    this.rowid = const Value.absent(),
+  }) : serviceClass = Value(serviceClass),
+       timetableArtifactId = Value(timetableArtifactId),
+       timetableArtifactSha256 = Value(timetableArtifactSha256),
+       canonicalPackId = Value(canonicalPackId),
+       canonicalPackSha256 = Value(canonicalPackSha256),
+       canonicalPackSqliteSha256 = Value(canonicalPackSqliteSha256),
+       admissionStatus = Value(admissionStatus),
+       admissionEligible = Value(admissionEligible),
+       sourceIssue = Value(sourceIssue);
+  static Insertable<RouteServiceArtifactEvidenceData> custom({
+    Expression<String>? serviceClass,
+    Expression<String>? timetableArtifactId,
+    Expression<String>? timetableArtifactSha256,
+    Expression<String>? canonicalPackId,
+    Expression<String>? canonicalPackSha256,
+    Expression<String>? canonicalPackSqliteSha256,
+    Expression<String>? admissionStatus,
+    Expression<bool>? admissionEligible,
+    Expression<String>? freshUntil,
+    Expression<int>? sourceIssue,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (serviceClass != null) 'service_class': serviceClass,
+      if (timetableArtifactId != null)
+        'timetable_artifact_id': timetableArtifactId,
+      if (timetableArtifactSha256 != null)
+        'timetable_artifact_sha256': timetableArtifactSha256,
+      if (canonicalPackId != null) 'canonical_pack_id': canonicalPackId,
+      if (canonicalPackSha256 != null)
+        'canonical_pack_sha256': canonicalPackSha256,
+      if (canonicalPackSqliteSha256 != null)
+        'canonical_pack_sqlite_sha256': canonicalPackSqliteSha256,
+      if (admissionStatus != null) 'admission_status': admissionStatus,
+      if (admissionEligible != null) 'admission_eligible': admissionEligible,
+      if (freshUntil != null) 'fresh_until': freshUntil,
+      if (sourceIssue != null) 'source_issue': sourceIssue,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RouteServiceArtifactEvidenceCompanion copyWith({
+    Value<String>? serviceClass,
+    Value<String>? timetableArtifactId,
+    Value<String>? timetableArtifactSha256,
+    Value<String>? canonicalPackId,
+    Value<String>? canonicalPackSha256,
+    Value<String>? canonicalPackSqliteSha256,
+    Value<String>? admissionStatus,
+    Value<bool>? admissionEligible,
+    Value<String?>? freshUntil,
+    Value<int>? sourceIssue,
+    Value<int>? rowid,
+  }) {
+    return RouteServiceArtifactEvidenceCompanion(
+      serviceClass: serviceClass ?? this.serviceClass,
+      timetableArtifactId: timetableArtifactId ?? this.timetableArtifactId,
+      timetableArtifactSha256:
+          timetableArtifactSha256 ?? this.timetableArtifactSha256,
+      canonicalPackId: canonicalPackId ?? this.canonicalPackId,
+      canonicalPackSha256: canonicalPackSha256 ?? this.canonicalPackSha256,
+      canonicalPackSqliteSha256:
+          canonicalPackSqliteSha256 ?? this.canonicalPackSqliteSha256,
+      admissionStatus: admissionStatus ?? this.admissionStatus,
+      admissionEligible: admissionEligible ?? this.admissionEligible,
+      freshUntil: freshUntil ?? this.freshUntil,
+      sourceIssue: sourceIssue ?? this.sourceIssue,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (serviceClass.present) {
+      map['service_class'] = Variable<String>(serviceClass.value);
+    }
+    if (timetableArtifactId.present) {
+      map['timetable_artifact_id'] = Variable<String>(
+        timetableArtifactId.value,
+      );
+    }
+    if (timetableArtifactSha256.present) {
+      map['timetable_artifact_sha256'] = Variable<String>(
+        timetableArtifactSha256.value,
+      );
+    }
+    if (canonicalPackId.present) {
+      map['canonical_pack_id'] = Variable<String>(canonicalPackId.value);
+    }
+    if (canonicalPackSha256.present) {
+      map['canonical_pack_sha256'] = Variable<String>(
+        canonicalPackSha256.value,
+      );
+    }
+    if (canonicalPackSqliteSha256.present) {
+      map['canonical_pack_sqlite_sha256'] = Variable<String>(
+        canonicalPackSqliteSha256.value,
+      );
+    }
+    if (admissionStatus.present) {
+      map['admission_status'] = Variable<String>(admissionStatus.value);
+    }
+    if (admissionEligible.present) {
+      map['admission_eligible'] = Variable<bool>(admissionEligible.value);
+    }
+    if (freshUntil.present) {
+      map['fresh_until'] = Variable<String>(freshUntil.value);
+    }
+    if (sourceIssue.present) {
+      map['source_issue'] = Variable<int>(sourceIssue.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RouteServiceArtifactEvidenceCompanion(')
+          ..write('serviceClass: $serviceClass, ')
+          ..write('timetableArtifactId: $timetableArtifactId, ')
+          ..write('timetableArtifactSha256: $timetableArtifactSha256, ')
+          ..write('canonicalPackId: $canonicalPackId, ')
+          ..write('canonicalPackSha256: $canonicalPackSha256, ')
+          ..write('canonicalPackSqliteSha256: $canonicalPackSqliteSha256, ')
+          ..write('admissionStatus: $admissionStatus, ')
+          ..write('admissionEligible: $admissionEligible, ')
+          ..write('freshUntil: $freshUntil, ')
+          ..write('sourceIssue: $sourceIssue, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $RealtimeProviderLineMappingsTable extends RealtimeProviderLineMappings
     with
         TableInfo<
@@ -8566,6 +9324,18 @@ class $NetworkEdgesTable extends NetworkEdges
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _serviceClassMeta = const VerificationMeta(
+    'serviceClass',
+  );
+  @override
+  late final GeneratedColumn<String> serviceClass = GeneratedColumn<String>(
+    'service_class',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('SUBWAY'),
+  );
   static const VerificationMeta _includesStairsMeta = const VerificationMeta(
     'includesStairs',
   );
@@ -8721,6 +9491,7 @@ class $NetworkEdgesTable extends NetworkEdges
     distanceMeters,
     edgeType,
     servicePattern,
+    serviceClass,
     includesStairs,
     stairAccessState,
     accessibilityStatus,
@@ -8800,6 +9571,15 @@ class $NetworkEdgesTable extends NetworkEdges
         servicePattern.isAcceptableOrUnknown(
           data['service_pattern']!,
           _servicePatternMeta,
+        ),
+      );
+    }
+    if (data.containsKey('service_class')) {
+      context.handle(
+        _serviceClassMeta,
+        serviceClass.isAcceptableOrUnknown(
+          data['service_class']!,
+          _serviceClassMeta,
         ),
       );
     }
@@ -8942,6 +9722,10 @@ class $NetworkEdgesTable extends NetworkEdges
         DriftSqlType.string,
         data['${effectivePrefix}service_pattern'],
       )!,
+      serviceClass: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}service_class'],
+      )!,
       includesStairs: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}includes_stairs'],
@@ -9007,6 +9791,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
   final int distanceMeters;
   final String edgeType;
   final String servicePattern;
+  final String serviceClass;
   final bool includesStairs;
   final String stairAccessState;
   final String accessibilityStatus;
@@ -9027,6 +9812,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     required this.distanceMeters,
     required this.edgeType,
     required this.servicePattern,
+    required this.serviceClass,
     required this.includesStairs,
     required this.stairAccessState,
     required this.accessibilityStatus,
@@ -9050,6 +9836,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     map['distance_meters'] = Variable<int>(distanceMeters);
     map['edge_type'] = Variable<String>(edgeType);
     map['service_pattern'] = Variable<String>(servicePattern);
+    map['service_class'] = Variable<String>(serviceClass);
     map['includes_stairs'] = Variable<bool>(includesStairs);
     map['stair_access_state'] = Variable<String>(stairAccessState);
     map['accessibility_status'] = Variable<String>(accessibilityStatus);
@@ -9078,6 +9865,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       distanceMeters: Value(distanceMeters),
       edgeType: Value(edgeType),
       servicePattern: Value(servicePattern),
+      serviceClass: Value(serviceClass),
       includesStairs: Value(includesStairs),
       stairAccessState: Value(stairAccessState),
       accessibilityStatus: Value(accessibilityStatus),
@@ -9110,6 +9898,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       distanceMeters: serializer.fromJson<int>(json['distanceMeters']),
       edgeType: serializer.fromJson<String>(json['edgeType']),
       servicePattern: serializer.fromJson<String>(json['servicePattern']),
+      serviceClass: serializer.fromJson<String>(json['serviceClass']),
       includesStairs: serializer.fromJson<bool>(json['includesStairs']),
       stairAccessState: serializer.fromJson<String>(json['stairAccessState']),
       accessibilityStatus: serializer.fromJson<String>(
@@ -9141,6 +9930,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       'distanceMeters': serializer.toJson<int>(distanceMeters),
       'edgeType': serializer.toJson<String>(edgeType),
       'servicePattern': serializer.toJson<String>(servicePattern),
+      'serviceClass': serializer.toJson<String>(serviceClass),
       'includesStairs': serializer.toJson<bool>(includesStairs),
       'stairAccessState': serializer.toJson<String>(stairAccessState),
       'accessibilityStatus': serializer.toJson<String>(accessibilityStatus),
@@ -9164,6 +9954,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     int? distanceMeters,
     String? edgeType,
     String? servicePattern,
+    String? serviceClass,
     bool? includesStairs,
     String? stairAccessState,
     String? accessibilityStatus,
@@ -9184,6 +9975,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     distanceMeters: distanceMeters ?? this.distanceMeters,
     edgeType: edgeType ?? this.edgeType,
     servicePattern: servicePattern ?? this.servicePattern,
+    serviceClass: serviceClass ?? this.serviceClass,
     includesStairs: includesStairs ?? this.includesStairs,
     stairAccessState: stairAccessState ?? this.stairAccessState,
     accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
@@ -9216,6 +10008,9 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
       servicePattern: data.servicePattern.present
           ? data.servicePattern.value
           : this.servicePattern,
+      serviceClass: data.serviceClass.present
+          ? data.serviceClass.value
+          : this.serviceClass,
       includesStairs: data.includesStairs.present
           ? data.includesStairs.value
           : this.includesStairs,
@@ -9263,6 +10058,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           ..write('distanceMeters: $distanceMeters, ')
           ..write('edgeType: $edgeType, ')
           ..write('servicePattern: $servicePattern, ')
+          ..write('serviceClass: $serviceClass, ')
           ..write('includesStairs: $includesStairs, ')
           ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
@@ -9288,6 +10084,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
     distanceMeters,
     edgeType,
     servicePattern,
+    serviceClass,
     includesStairs,
     stairAccessState,
     accessibilityStatus,
@@ -9312,6 +10109,7 @@ class NetworkEdge extends DataClass implements Insertable<NetworkEdge> {
           other.distanceMeters == this.distanceMeters &&
           other.edgeType == this.edgeType &&
           other.servicePattern == this.servicePattern &&
+          other.serviceClass == this.serviceClass &&
           other.includesStairs == this.includesStairs &&
           other.stairAccessState == this.stairAccessState &&
           other.accessibilityStatus == this.accessibilityStatus &&
@@ -9334,6 +10132,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
   final Value<int> distanceMeters;
   final Value<String> edgeType;
   final Value<String> servicePattern;
+  final Value<String> serviceClass;
   final Value<bool> includesStairs;
   final Value<String> stairAccessState;
   final Value<String> accessibilityStatus;
@@ -9355,6 +10154,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.distanceMeters = const Value.absent(),
     this.edgeType = const Value.absent(),
     this.servicePattern = const Value.absent(),
+    this.serviceClass = const Value.absent(),
     this.includesStairs = const Value.absent(),
     this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
@@ -9377,6 +10177,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     this.distanceMeters = const Value.absent(),
     this.edgeType = const Value.absent(),
     this.servicePattern = const Value.absent(),
+    this.serviceClass = const Value.absent(),
     this.includesStairs = const Value.absent(),
     this.stairAccessState = const Value.absent(),
     this.accessibilityStatus = const Value.absent(),
@@ -9401,6 +10202,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Expression<int>? distanceMeters,
     Expression<String>? edgeType,
     Expression<String>? servicePattern,
+    Expression<String>? serviceClass,
     Expression<bool>? includesStairs,
     Expression<String>? stairAccessState,
     Expression<String>? accessibilityStatus,
@@ -9423,6 +10225,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       if (distanceMeters != null) 'distance_meters': distanceMeters,
       if (edgeType != null) 'edge_type': edgeType,
       if (servicePattern != null) 'service_pattern': servicePattern,
+      if (serviceClass != null) 'service_class': serviceClass,
       if (includesStairs != null) 'includes_stairs': includesStairs,
       if (stairAccessState != null) 'stair_access_state': stairAccessState,
       if (accessibilityStatus != null)
@@ -9449,6 +10252,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     Value<int>? distanceMeters,
     Value<String>? edgeType,
     Value<String>? servicePattern,
+    Value<String>? serviceClass,
     Value<bool>? includesStairs,
     Value<String>? stairAccessState,
     Value<String>? accessibilityStatus,
@@ -9471,6 +10275,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
       distanceMeters: distanceMeters ?? this.distanceMeters,
       edgeType: edgeType ?? this.edgeType,
       servicePattern: servicePattern ?? this.servicePattern,
+      serviceClass: serviceClass ?? this.serviceClass,
       includesStairs: includesStairs ?? this.includesStairs,
       stairAccessState: stairAccessState ?? this.stairAccessState,
       accessibilityStatus: accessibilityStatus ?? this.accessibilityStatus,
@@ -9510,6 +10315,9 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
     }
     if (servicePattern.present) {
       map['service_pattern'] = Variable<String>(servicePattern.value);
+    }
+    if (serviceClass.present) {
+      map['service_class'] = Variable<String>(serviceClass.value);
     }
     if (includesStairs.present) {
       map['includes_stairs'] = Variable<bool>(includesStairs.value);
@@ -9563,6 +10371,7 @@ class NetworkEdgesCompanion extends UpdateCompanion<NetworkEdge> {
           ..write('distanceMeters: $distanceMeters, ')
           ..write('edgeType: $edgeType, ')
           ..write('servicePattern: $servicePattern, ')
+          ..write('serviceClass: $serviceClass, ')
           ..write('includesStairs: $includesStairs, ')
           ..write('stairAccessState: $stairAccessState, ')
           ..write('accessibilityStatus: $accessibilityStatus, ')
@@ -19098,6 +19907,8 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
   );
   late final $OfficialOdFareQuotesTable officialOdFareQuotes =
       $OfficialOdFareQuotesTable(this);
+  late final $RouteServiceArtifactEvidenceTable routeServiceArtifactEvidence =
+      $RouteServiceArtifactEvidenceTable(this);
   late final $RealtimeProviderLineMappingsTable realtimeProviderLineMappings =
       $RealtimeProviderLineMappingsTable(this);
   late final $RealtimeProviderStationMappingsTable
@@ -19146,6 +19957,7 @@ abstract class _$CatalogDatabase extends GeneratedDatabase {
     fareDiscounts,
     stationFareZones,
     officialOdFareQuotes,
+    routeServiceArtifactEvidence,
     realtimeProviderLineMappings,
     realtimeProviderStationMappings,
     networkEdges,
@@ -21128,6 +21940,7 @@ typedef $$TransitTripsTableCreateCompanionBuilder =
       Value<String> tripHeadsign,
       Value<String> directionId,
       Value<String> servicePattern,
+      Value<String> serviceClass,
       Value<int> serviceDayStartSeconds,
       Value<int> rowid,
     });
@@ -21139,6 +21952,7 @@ typedef $$TransitTripsTableUpdateCompanionBuilder =
       Value<String> tripHeadsign,
       Value<String> directionId,
       Value<String> servicePattern,
+      Value<String> serviceClass,
       Value<int> serviceDayStartSeconds,
       Value<int> rowid,
     });
@@ -21179,6 +21993,11 @@ class $$TransitTripsTableFilterComposer
 
   ColumnFilters<String> get servicePattern => $composableBuilder(
     column: $table.servicePattern,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21227,6 +22046,11 @@ class $$TransitTripsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get serviceDayStartSeconds => $composableBuilder(
     column: $table.serviceDayStartSeconds,
     builder: (column) => ColumnOrderings(column),
@@ -21263,6 +22087,11 @@ class $$TransitTripsTableAnnotationComposer
 
   GeneratedColumn<String> get servicePattern => $composableBuilder(
     column: $table.servicePattern,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
     builder: (column) => column,
   );
 
@@ -21311,6 +22140,7 @@ class $$TransitTripsTableTableManager
                 Value<String> tripHeadsign = const Value.absent(),
                 Value<String> directionId = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
+                Value<String> serviceClass = const Value.absent(),
                 Value<int> serviceDayStartSeconds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransitTripsCompanion(
@@ -21320,6 +22150,7 @@ class $$TransitTripsTableTableManager
                 tripHeadsign: tripHeadsign,
                 directionId: directionId,
                 servicePattern: servicePattern,
+                serviceClass: serviceClass,
                 serviceDayStartSeconds: serviceDayStartSeconds,
                 rowid: rowid,
               ),
@@ -21331,6 +22162,7 @@ class $$TransitTripsTableTableManager
                 Value<String> tripHeadsign = const Value.absent(),
                 Value<String> directionId = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
+                Value<String> serviceClass = const Value.absent(),
                 Value<int> serviceDayStartSeconds = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransitTripsCompanion.insert(
@@ -21340,6 +22172,7 @@ class $$TransitTripsTableTableManager
                 tripHeadsign: tripHeadsign,
                 directionId: directionId,
                 servicePattern: servicePattern,
+                serviceClass: serviceClass,
                 serviceDayStartSeconds: serviceDayStartSeconds,
                 rowid: rowid,
               ),
@@ -23057,6 +23890,340 @@ typedef $$OfficialOdFareQuotesTableProcessedTableManager =
       OfficialOdFareQuoteRow,
       PrefetchHooks Function()
     >;
+typedef $$RouteServiceArtifactEvidenceTableCreateCompanionBuilder =
+    RouteServiceArtifactEvidenceCompanion Function({
+      required String serviceClass,
+      required String timetableArtifactId,
+      required String timetableArtifactSha256,
+      required String canonicalPackId,
+      required String canonicalPackSha256,
+      required String canonicalPackSqliteSha256,
+      required String admissionStatus,
+      required bool admissionEligible,
+      Value<String?> freshUntil,
+      required int sourceIssue,
+      Value<int> rowid,
+    });
+typedef $$RouteServiceArtifactEvidenceTableUpdateCompanionBuilder =
+    RouteServiceArtifactEvidenceCompanion Function({
+      Value<String> serviceClass,
+      Value<String> timetableArtifactId,
+      Value<String> timetableArtifactSha256,
+      Value<String> canonicalPackId,
+      Value<String> canonicalPackSha256,
+      Value<String> canonicalPackSqliteSha256,
+      Value<String> admissionStatus,
+      Value<bool> admissionEligible,
+      Value<String?> freshUntil,
+      Value<int> sourceIssue,
+      Value<int> rowid,
+    });
+
+class $$RouteServiceArtifactEvidenceTableFilterComposer
+    extends Composer<_$CatalogDatabase, $RouteServiceArtifactEvidenceTable> {
+  $$RouteServiceArtifactEvidenceTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get timetableArtifactId => $composableBuilder(
+    column: $table.timetableArtifactId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get timetableArtifactSha256 => $composableBuilder(
+    column: $table.timetableArtifactSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get canonicalPackId => $composableBuilder(
+    column: $table.canonicalPackId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get canonicalPackSha256 => $composableBuilder(
+    column: $table.canonicalPackSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get canonicalPackSqliteSha256 => $composableBuilder(
+    column: $table.canonicalPackSqliteSha256,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get admissionStatus => $composableBuilder(
+    column: $table.admissionStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get admissionEligible => $composableBuilder(
+    column: $table.admissionEligible,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get freshUntil => $composableBuilder(
+    column: $table.freshUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sourceIssue => $composableBuilder(
+    column: $table.sourceIssue,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RouteServiceArtifactEvidenceTableOrderingComposer
+    extends Composer<_$CatalogDatabase, $RouteServiceArtifactEvidenceTable> {
+  $$RouteServiceArtifactEvidenceTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get timetableArtifactId => $composableBuilder(
+    column: $table.timetableArtifactId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get timetableArtifactSha256 => $composableBuilder(
+    column: $table.timetableArtifactSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get canonicalPackId => $composableBuilder(
+    column: $table.canonicalPackId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get canonicalPackSha256 => $composableBuilder(
+    column: $table.canonicalPackSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get canonicalPackSqliteSha256 => $composableBuilder(
+    column: $table.canonicalPackSqliteSha256,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get admissionStatus => $composableBuilder(
+    column: $table.admissionStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get admissionEligible => $composableBuilder(
+    column: $table.admissionEligible,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get freshUntil => $composableBuilder(
+    column: $table.freshUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sourceIssue => $composableBuilder(
+    column: $table.sourceIssue,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RouteServiceArtifactEvidenceTableAnnotationComposer
+    extends Composer<_$CatalogDatabase, $RouteServiceArtifactEvidenceTable> {
+  $$RouteServiceArtifactEvidenceTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get timetableArtifactId => $composableBuilder(
+    column: $table.timetableArtifactId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get timetableArtifactSha256 => $composableBuilder(
+    column: $table.timetableArtifactSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get canonicalPackId => $composableBuilder(
+    column: $table.canonicalPackId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get canonicalPackSha256 => $composableBuilder(
+    column: $table.canonicalPackSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get canonicalPackSqliteSha256 => $composableBuilder(
+    column: $table.canonicalPackSqliteSha256,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get admissionStatus => $composableBuilder(
+    column: $table.admissionStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get admissionEligible => $composableBuilder(
+    column: $table.admissionEligible,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get freshUntil => $composableBuilder(
+    column: $table.freshUntil,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sourceIssue => $composableBuilder(
+    column: $table.sourceIssue,
+    builder: (column) => column,
+  );
+}
+
+class $$RouteServiceArtifactEvidenceTableTableManager
+    extends
+        RootTableManager<
+          _$CatalogDatabase,
+          $RouteServiceArtifactEvidenceTable,
+          RouteServiceArtifactEvidenceData,
+          $$RouteServiceArtifactEvidenceTableFilterComposer,
+          $$RouteServiceArtifactEvidenceTableOrderingComposer,
+          $$RouteServiceArtifactEvidenceTableAnnotationComposer,
+          $$RouteServiceArtifactEvidenceTableCreateCompanionBuilder,
+          $$RouteServiceArtifactEvidenceTableUpdateCompanionBuilder,
+          (
+            RouteServiceArtifactEvidenceData,
+            BaseReferences<
+              _$CatalogDatabase,
+              $RouteServiceArtifactEvidenceTable,
+              RouteServiceArtifactEvidenceData
+            >,
+          ),
+          RouteServiceArtifactEvidenceData,
+          PrefetchHooks Function()
+        > {
+  $$RouteServiceArtifactEvidenceTableTableManager(
+    _$CatalogDatabase db,
+    $RouteServiceArtifactEvidenceTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RouteServiceArtifactEvidenceTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$RouteServiceArtifactEvidenceTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$RouteServiceArtifactEvidenceTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> serviceClass = const Value.absent(),
+                Value<String> timetableArtifactId = const Value.absent(),
+                Value<String> timetableArtifactSha256 = const Value.absent(),
+                Value<String> canonicalPackId = const Value.absent(),
+                Value<String> canonicalPackSha256 = const Value.absent(),
+                Value<String> canonicalPackSqliteSha256 = const Value.absent(),
+                Value<String> admissionStatus = const Value.absent(),
+                Value<bool> admissionEligible = const Value.absent(),
+                Value<String?> freshUntil = const Value.absent(),
+                Value<int> sourceIssue = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RouteServiceArtifactEvidenceCompanion(
+                serviceClass: serviceClass,
+                timetableArtifactId: timetableArtifactId,
+                timetableArtifactSha256: timetableArtifactSha256,
+                canonicalPackId: canonicalPackId,
+                canonicalPackSha256: canonicalPackSha256,
+                canonicalPackSqliteSha256: canonicalPackSqliteSha256,
+                admissionStatus: admissionStatus,
+                admissionEligible: admissionEligible,
+                freshUntil: freshUntil,
+                sourceIssue: sourceIssue,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String serviceClass,
+                required String timetableArtifactId,
+                required String timetableArtifactSha256,
+                required String canonicalPackId,
+                required String canonicalPackSha256,
+                required String canonicalPackSqliteSha256,
+                required String admissionStatus,
+                required bool admissionEligible,
+                Value<String?> freshUntil = const Value.absent(),
+                required int sourceIssue,
+                Value<int> rowid = const Value.absent(),
+              }) => RouteServiceArtifactEvidenceCompanion.insert(
+                serviceClass: serviceClass,
+                timetableArtifactId: timetableArtifactId,
+                timetableArtifactSha256: timetableArtifactSha256,
+                canonicalPackId: canonicalPackId,
+                canonicalPackSha256: canonicalPackSha256,
+                canonicalPackSqliteSha256: canonicalPackSqliteSha256,
+                admissionStatus: admissionStatus,
+                admissionEligible: admissionEligible,
+                freshUntil: freshUntil,
+                sourceIssue: sourceIssue,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RouteServiceArtifactEvidenceTableProcessedTableManager =
+    ProcessedTableManager<
+      _$CatalogDatabase,
+      $RouteServiceArtifactEvidenceTable,
+      RouteServiceArtifactEvidenceData,
+      $$RouteServiceArtifactEvidenceTableFilterComposer,
+      $$RouteServiceArtifactEvidenceTableOrderingComposer,
+      $$RouteServiceArtifactEvidenceTableAnnotationComposer,
+      $$RouteServiceArtifactEvidenceTableCreateCompanionBuilder,
+      $$RouteServiceArtifactEvidenceTableUpdateCompanionBuilder,
+      (
+        RouteServiceArtifactEvidenceData,
+        BaseReferences<
+          _$CatalogDatabase,
+          $RouteServiceArtifactEvidenceTable,
+          RouteServiceArtifactEvidenceData
+        >,
+      ),
+      RouteServiceArtifactEvidenceData,
+      PrefetchHooks Function()
+    >;
 typedef $$RealtimeProviderLineMappingsTableCreateCompanionBuilder =
     RealtimeProviderLineMappingsCompanion Function({
       required String providerId,
@@ -23697,6 +24864,7 @@ typedef $$NetworkEdgesTableCreateCompanionBuilder =
       Value<int> distanceMeters,
       Value<String> edgeType,
       Value<String> servicePattern,
+      Value<String> serviceClass,
       Value<bool> includesStairs,
       Value<String> stairAccessState,
       Value<String> accessibilityStatus,
@@ -23720,6 +24888,7 @@ typedef $$NetworkEdgesTableUpdateCompanionBuilder =
       Value<int> distanceMeters,
       Value<String> edgeType,
       Value<String> servicePattern,
+      Value<String> serviceClass,
       Value<bool> includesStairs,
       Value<String> stairAccessState,
       Value<String> accessibilityStatus,
@@ -23776,6 +24945,11 @@ class $$NetworkEdgesTableFilterComposer
 
   ColumnFilters<String> get servicePattern => $composableBuilder(
     column: $table.servicePattern,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -23884,6 +25058,11 @@ class $$NetworkEdgesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get includesStairs => $composableBuilder(
     column: $table.includesStairs,
     builder: (column) => ColumnOrderings(column),
@@ -23980,6 +25159,11 @@ class $$NetworkEdgesTableAnnotationComposer
 
   GeneratedColumn<String> get servicePattern => $composableBuilder(
     column: $table.servicePattern,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get serviceClass => $composableBuilder(
+    column: $table.serviceClass,
     builder: (column) => column,
   );
 
@@ -24082,6 +25266,7 @@ class $$NetworkEdgesTableTableManager
                 Value<int> distanceMeters = const Value.absent(),
                 Value<String> edgeType = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
+                Value<String> serviceClass = const Value.absent(),
                 Value<bool> includesStairs = const Value.absent(),
                 Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
@@ -24103,6 +25288,7 @@ class $$NetworkEdgesTableTableManager
                 distanceMeters: distanceMeters,
                 edgeType: edgeType,
                 servicePattern: servicePattern,
+                serviceClass: serviceClass,
                 includesStairs: includesStairs,
                 stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
@@ -24126,6 +25312,7 @@ class $$NetworkEdgesTableTableManager
                 Value<int> distanceMeters = const Value.absent(),
                 Value<String> edgeType = const Value.absent(),
                 Value<String> servicePattern = const Value.absent(),
+                Value<String> serviceClass = const Value.absent(),
                 Value<bool> includesStairs = const Value.absent(),
                 Value<String> stairAccessState = const Value.absent(),
                 Value<String> accessibilityStatus = const Value.absent(),
@@ -24147,6 +25334,7 @@ class $$NetworkEdgesTableTableManager
                 distanceMeters: distanceMeters,
                 edgeType: edgeType,
                 servicePattern: servicePattern,
+                serviceClass: serviceClass,
                 includesStairs: includesStairs,
                 stairAccessState: stairAccessState,
                 accessibilityStatus: accessibilityStatus,
@@ -28799,6 +29987,12 @@ class $CatalogDatabaseManager {
       $$StationFareZonesTableTableManager(_db, _db.stationFareZones);
   $$OfficialOdFareQuotesTableTableManager get officialOdFareQuotes =>
       $$OfficialOdFareQuotesTableTableManager(_db, _db.officialOdFareQuotes);
+  $$RouteServiceArtifactEvidenceTableTableManager
+  get routeServiceArtifactEvidence =>
+      $$RouteServiceArtifactEvidenceTableTableManager(
+        _db,
+        _db.routeServiceArtifactEvidence,
+      );
   $$RealtimeProviderLineMappingsTableTableManager
   get realtimeProviderLineMappings =>
       $$RealtimeProviderLineMappingsTableTableManager(
