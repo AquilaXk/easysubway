@@ -48,6 +48,7 @@ export function validateJson(schemaPath, valuePath, errors) {
 }
 
 export function validateDatapackIndex(index, valuePath, errors) {
+  if (index == null || typeof index !== "object" || Array.isArray(index)) return;
   for (const field of ["builtAt", "qualityAsOf", "freshnessExpiresAt"]) {
     const value = index[field];
     const millis = typeof value === "string" ? Date.parse(value) : Number.NaN;

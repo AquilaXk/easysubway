@@ -56,4 +56,24 @@ void main() {
 
     expect(() => DataPackIndex.fromJson(decoded), throwsFormatException);
   });
+
+  test('freshnessExpiresAt은 qualityAsOf보다 뒤여야 한다', () {
+    final fixture =
+        jsonDecode(
+              File(
+                '../../apps/mobile/assets/datapacks/index.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, Object?>;
+
+    for (final expiresAt in [
+      '2026-07-12T00:00:00.000Z',
+      '2026-07-11T23:59:59.999Z',
+    ]) {
+      final decoded = Map<String, Object?>.from(fixture)
+        ..['freshnessExpiresAt'] = expiresAt;
+
+      expect(() => DataPackIndex.fromJson(decoded), throwsFormatException);
+    }
+  });
 }

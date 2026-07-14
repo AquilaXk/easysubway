@@ -250,6 +250,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 
 		String dashboardHtml = getAdminHtml("/admin/dashboard/page");
 		String qualityHtml = getAdminHtml("/admin/data-quality/page");
+		String pipelineHtml = getAdminHtml("/admin/datapack/pipeline/page");
 
 		assertThat(dashboardHtml)
 			.contains("production promote 차단: blocker 10건")
@@ -260,6 +261,9 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.contains("Source freshness")
 			.contains("SOURCE_SNAPSHOT_EXPIRED")
 			.contains("FAIL");
+		assertThat(pipelineHtml)
+			.contains("원천 스냅샷")
+			.contains("blocker 1건");
 		assertThat(blockerSummaryUseCase.summarize().sourceFreshnessBlockers()).isEqualTo(1);
 	}
 

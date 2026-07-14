@@ -722,6 +722,15 @@ jobs:
             --output "${EASYSUBWAY_DATAPACK_REMOTE_VALIDATION}" \
             --require-production
 
+      - name: Data Pack Release / Upload remote validation artifact
+        if: ${{ always() && steps.production-publish.outputs.manifestSha256 != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-datapack-remote-validation-${{ github.run_id }}
+          path: ${{ env.EASYSUBWAY_DATAPACK_REMOTE_VALIDATION }}
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Data Pack Release / Finalize published decision
         if: ${{ !cancelled() && steps.production-publish.outputs.manifestSha256 != '' }}
         id: final-release-decision

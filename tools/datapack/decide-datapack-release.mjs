@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { decideScheduledRun } from "./freshness-policy.mjs";
+import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 export function evaluateReleaseDecision({
   candidateManifest,
@@ -17,13 +18,13 @@ export function evaluateReleaseDecision({
   remoteValidationPassed,
   evaluationAt,
 }) {
-  const evaluatedMillis = requiredInstant(evaluationAt, "evaluationAt");
+  const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
   const candidateIdentity = stableManifestIdentity(candidateManifest);
   const currentIdentity = currentManifest == null ? null : stableManifestIdentity(currentManifest);
   const materialChange = currentManifest == null
     || candidateIdentity !== currentIdentity;
   const currentExpired = currentManifest != null
-    && evaluatedMillis >= requiredInstant(currentManifest.expiresAt, "currentManifest.expiresAt");
+    && evaluatedMillis >= requiredUtcInstant(currentManifest.expiresAt, "currentManifest.expiresAt");
   const publishRequired = materialChange || currentExpired;
   const approvalValid = validApproval({ buildSpec, buildSpecSha256, releaseRequest });
   const candidateSequenceValid = Number.isInteger(candidateManifest.releaseSequence)
@@ -44,7 +45,7 @@ export function evaluateReleaseDecision({
   });
   const reasonCodes = [];
   if (currentExpired) reasonCodes.push("PACK_PUBLISH_FRESHNESS_EXPIRED");
-  if (sequenceRequiredAndInvalid) reasonCodes.push("PUBLISH_SEQUENCE_NOT_INCREASING");
+  if (publishRequired && !sequenceValid) reasonCodes.push("PUBLISH_SEQUENCE_NOT_INCREASING");
   if (materialChange && !approvalValid) reasonCodes.push("MATERIAL_CHANGE_UNAPPROVED");
   if (scheduled.outcome === "PUBLISH_REQUIRED") reasonCodes.push("PUBLISH_REQUIRED_NOT_COMPLETED");
   if (publishAttempted && !remoteValidationPassed) reasonCodes.push("POST_PUBLISH_REMOTE_VALIDATION_FAILED");
@@ -114,10 +115,12 @@ async function main(argv) {
   const args = parseArgs(argv);
   const currentManifest = await optionalJson(args.get("current-manifest"));
   const alertOnly = args.has("alert-only");
+  if (alertOnly && !currentManifest) {
+    throw new Error("--current-manifest is required with --alert-only");
+  }
   const candidateManifest = alertOnly
     ? currentManifest
     : await requiredJson(args, "candidate-manifest");
-  if (!candidateManifest) throw new Error("--current-manifest is required with --alert-only");
 
   const buildSpecPath = args.get("build-spec");
   const buildSpecBytes = buildSpecPath ? await readFile(buildSpecPath) : null;
@@ -197,13 +200,6 @@ function requiredString(value, label) {
 function requiredSha256(value, label) {
   if (!isSha256(value)) throw new Error(`${label} must be sha256`);
   return value;
-}
-
-function requiredInstant(value, label) {
-  if (typeof value !== "string" || !value.endsWith("Z")) throw new Error(`${label} must be an RFC 3339 UTC timestamp`);
-  const millis = Date.parse(value);
-  if (!Number.isFinite(millis)) throw new Error(`${label} must be an RFC 3339 UTC timestamp`);
-  return millis;
 }
 
 function sha256(bytes) {

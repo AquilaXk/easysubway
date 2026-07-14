@@ -1,3 +1,5 @@
+import { requiredUtcInstant } from "./lib/utc-instant.mjs";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function deriveFreshness({
@@ -13,8 +15,8 @@ export function deriveFreshness({
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING");
   }
 
-  const evaluatedMillis = requiredInstant(evaluationAt, "evaluationAt");
-  const basisMillis = requiredInstant(basisAt, "basisAt");
+  const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
+  const basisMillis = requiredUtcInstant(basisAt, "basisAt");
   const clockSkewMillis = requiredNonNegativeInteger(
     sourceClass.clockSkewSeconds ?? policy.clockSkewSeconds ?? 0,
     "clockSkewSeconds",
@@ -26,9 +28,9 @@ export function deriveFreshness({
   const cadence = sourceClass.reverificationCadence ?? sourceClass.maximumReverificationCadence;
   let derivedMillis = addCadence(basisMillis, cadence);
   if (providerValidUntil != null) {
-    derivedMillis = Math.min(derivedMillis, requiredInstant(providerValidUntil, "providerValidUntil"));
+    derivedMillis = Math.min(derivedMillis, requiredUtcInstant(providerValidUntil, "providerValidUntil"));
   }
-  const storedMillis = requiredInstant(storedExpiresAt, "storedExpiresAt");
+  const storedMillis = requiredUtcInstant(storedExpiresAt, "storedExpiresAt");
   if (storedMillis !== derivedMillis) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH");
   }
@@ -56,7 +58,7 @@ export function decideScheduledRun({
     if (!approvalValid) return decision("FAILED", false);
     return remoteValidationPassed
       ? decision("PUBLISHED_AND_VERIFIED", true)
-      : decision("FAILED", true);
+      : decision("FAILED", false);
   }
   return decision("NO_CHANGE_VALID", false);
 }
@@ -76,17 +78,6 @@ function addCadence(basisMillis, cadence) {
   const seconds = /^PT([1-9][0-9]*)S$/.exec(cadence);
   if (seconds) return basisMillis + Number(seconds[1]) * 1_000;
   throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: unsupported cadence ${cadence}`);
-}
-
-function requiredInstant(value, label) {
-  if (typeof value !== "string" || !value.endsWith("Z")) {
-    throw new Error(`${label} must be an RFC 3339 UTC timestamp`);
-  }
-  const millis = Date.parse(value);
-  if (!Number.isFinite(millis)) {
-    throw new Error(`${label} must be an RFC 3339 UTC timestamp`);
-  }
-  return millis;
 }
 
 function requiredNonNegativeInteger(value, label) {

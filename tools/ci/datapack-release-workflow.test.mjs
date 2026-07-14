@@ -110,6 +110,13 @@ test("publish run은 remote artifact validation 뒤 최종 decision과 callback�
   assert.match(yml, /id:\s*final-release-decision/);
   assert.match(yml, /PUBLISHED_AND_VERIFIED/);
   assert.match(yml, /Upload release decision artifact/);
+  const remoteValidationArtifact = yml.match(
+    /- name: Data Pack Release \/ Upload remote validation artifact[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(remoteValidationArtifact, "remote validation artifact 업로드 스텝을 찾지 못함");
+  assert.match(remoteValidationArtifact, /always\(\)/);
+  assert.match(remoteValidationArtifact, /EASYSUBWAY_DATAPACK_REMOTE_VALIDATION/);
+  assert.match(remoteValidationArtifact, /if-no-files-found:\s*ignore/);
   assert.match(yml, /GITHUB_STEP_SUMMARY/);
 });
 

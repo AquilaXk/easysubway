@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   collectContractErrors,
   loadJson,
@@ -24,13 +26,30 @@ test("번들 datapack index는 실재하지 않는 UTC 시각을 거부한다", 
   validateDatapackIndex({
     builtAt: "2026-02-31T00:00:00.000Z",
     qualityAsOf: "2026-07-12T25:00:00.000Z",
-    freshnessExpiresAt: "2026-08-11T00:00:00.000Z",
+    freshnessExpiresAt: "2026-08-32T00:00:00.000Z",
   }, "index.json", errors);
 
   assert.deepEqual(errors, [
     "index.json: builtAt은 유효한 UTC 시각이어야 한다",
     "index.json: qualityAsOf은 유효한 UTC 시각이어야 한다",
+    "index.json: freshnessExpiresAt은 유효한 UTC 시각이어야 한다",
   ]);
+});
+
+test("번들 datapack index semantic 검증은 비객체 입력에서 schema 오류를 가리지 않는다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "datapack-index-invalid-"));
+  for (const [name, invalid] of [["null", null], ["array", []], ["string", "invalid"]]) {
+    const valuePath = join(directory, `${name}.json`);
+    writeFileSync(valuePath, JSON.stringify(invalid));
+    const errors = [];
+
+    assert.doesNotThrow(() => validateJson(
+      "contracts/datapack/datapack-index.schema.json",
+      valuePath,
+      errors,
+    ));
+    assert.ok(errors.length > 0, `${name} 입력의 schema 오류가 필요하다`);
+  }
 });
 
 test("번들 source-inventory 실물이 계약 스키마를 통과한다", () => {

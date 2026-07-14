@@ -101,6 +101,24 @@ test("schedule decision은 publish write를 승인 evidence와 strict pass 뒤�
   }), { outcome: "PUBLISH_REQUIRED", productionWriteAllowed: true });
 
   assert.deepEqual(decideScheduledRun({
+    materialChange: false,
+    approvalValid: false,
+    strictValidationPassed: true,
+    publishRequired: true,
+    publishAttempted: false,
+    remoteValidationPassed: false,
+  }), { outcome: "PUBLISH_REQUIRED", productionWriteAllowed: false });
+
+  assert.deepEqual(decideScheduledRun({
+    materialChange: false,
+    approvalValid: true,
+    strictValidationPassed: true,
+    publishRequired: true,
+    publishAttempted: false,
+    remoteValidationPassed: false,
+  }), { outcome: "PUBLISH_REQUIRED", productionWriteAllowed: true });
+
+  assert.deepEqual(decideScheduledRun({
     materialChange: true,
     approvalValid: true,
     strictValidationPassed: true,
@@ -108,6 +126,15 @@ test("schedule decision은 publish write를 승인 evidence와 strict pass 뒤�
     publishAttempted: true,
     remoteValidationPassed: true,
   }), { outcome: "PUBLISHED_AND_VERIFIED", productionWriteAllowed: true });
+
+  assert.deepEqual(decideScheduledRun({
+    materialChange: true,
+    approvalValid: true,
+    strictValidationPassed: true,
+    publishRequired: true,
+    publishAttempted: true,
+    remoteValidationPassed: false,
+  }), { outcome: "FAILED", productionWriteAllowed: false });
 });
 
 test("tracked freshness policy는 수동 decision 없이 파생 필드를 선언한다", async () => {

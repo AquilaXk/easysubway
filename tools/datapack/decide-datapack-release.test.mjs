@@ -92,7 +92,10 @@ test("변경은 있으나 승인 hash가 다르면 CHANGE_BLOCKED이고 write를
 
   assert.equal(result.outcome, "CHANGE_BLOCKED");
   assert.equal(result.productionWriteAllowed, false);
-  assert.deepEqual(result.reasonCodes, ["MATERIAL_CHANGE_UNAPPROVED"]);
+  assert.deepEqual(result.reasonCodes, [
+    "PUBLISH_SEQUENCE_NOT_INCREASING",
+    "MATERIAL_CHANGE_UNAPPROVED",
+  ]);
 });
 
 test("approval ID가 없으면 matching hash여도 승인으로 보지 않는다", () => {
@@ -147,16 +150,20 @@ test("expiry alert 경로는 승인 없이 PUBLISH_REQUIRED를 보고하되 writ
 
 test("publish 후 remote validation 결과로 최종 상태를 정한다", () => {
   const changed = manifest({ releaseSequence: 11, packs: [{ ...manifest().packs[0], sha256: hash("f") }] });
-  assert.equal(decide({
+  const verified = decide({
     candidateManifest: changed,
     publishAttempted: true,
     remoteValidationPassed: true,
-  }).outcome, "PUBLISHED_AND_VERIFIED");
-  assert.equal(decide({
+  });
+  assert.equal(verified.outcome, "PUBLISHED_AND_VERIFIED");
+  assert.equal(verified.productionWriteAllowed, true);
+  const failed = decide({
     candidateManifest: changed,
     publishAttempted: true,
     remoteValidationPassed: false,
-  }).outcome, "FAILED");
+  });
+  assert.equal(failed.outcome, "FAILED");
+  assert.equal(failed.productionWriteAllowed, false);
 });
 
 test("publish가 필요한 candidate sequence가 증가하지 않으면 fail closed한다", () => {
@@ -226,4 +233,21 @@ test("CLI는 secret 없는 JSON과 GitHub outputs를 기록한다", async () => 
   assert.equal(JSON.parse(await readFile(outputPath, "utf8")).outcome, "NO_CHANGE_VALID");
   assert.match(await readFile(githubOutputPath, "utf8"), /productionWriteAllowed=false/);
   assert.doesNotMatch(await readFile(outputPath, "utf8"), /release-approver|data-operator/);
+});
+
+test("CLI는 일반 실행과 alert-only의 manifest 누락을 구분한다", () => {
+  const normal = spawnSync(process.execPath, [
+    "tools/datapack/decide-datapack-release.mjs",
+    "--output", "unused.json",
+  ], { encoding: "utf8" });
+  const alertOnly = spawnSync(process.execPath, [
+    "tools/datapack/decide-datapack-release.mjs",
+    "--alert-only",
+    "--output", "unused.json",
+  ], { encoding: "utf8" });
+
+  assert.notEqual(normal.status, 0);
+  assert.match(normal.stderr, /--candidate-manifest is required/);
+  assert.notEqual(alertOnly.status, 0);
+  assert.match(alertOnly.stderr, /--current-manifest is required with --alert-only/);
 });
