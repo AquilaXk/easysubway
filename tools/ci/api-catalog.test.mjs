@@ -338,9 +338,11 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     ]],
   ]) {
     const entry = findCatalogEntry(catalog, id);
-    assert.equal(entry.documentationStatus, "metadata-only");
-    assert.equal(entry.status, "provider_activation_required_before_schema_admission");
+    assert.equal(entry.documentationStatus, "reproducible-operation");
+    assert.equal(entry.status, "validated_live_sample_materialization_pending");
     assert.deepEqual(entry.responseFields, fields);
+    assert.equal(entry.operation.method, "GET");
+    assert.equal(entry.operation.runner.command, "node tools/datapack/probe-korail-train-operation-api.mjs");
   }
   const kricStationTimetable = findCatalogEntry(catalog, "provider:kric-station-timetable");
   assert.equal(kricStationTimetable.status, "validated_live_sample_non_itx_urban_rail_only");
