@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { cleanupPackDir, openPack } from "../route-map/pack-io.mjs";
+import {
+  collectTagoItxCheongchunRoster,
+  validateItxServiceDates,
+} from "./collect-tago-itx-cheongchun-od.mjs";
 const API_ORIGIN = "https://apis.data.go.kr";
 const DETAIL_URL = "https://www.data.go.kr/data/15125762/openapi.do";
 const LINE_ID = "line-54a7b980b7c3";
@@ -19,6 +23,85 @@ const EXPECTED_FIELDS = Object.freeze({
     "uppln_dn_se_cd", "stop_se_cd", "stop_se_nm", "trn_dptre_dt", "trn_arvl_dt",
   ]),
 });
+
+export async function collectKorailItxCheongchunCompleteness({
+  serviceKey,
+  serviceDates,
+  packPath,
+  fetchImpl = fetch,
+  now = new Date(),
+  replay = false,
+  collectRosterImpl = collectTagoItxCheongchunRoster,
+  collectTimetableImpl = collectKorailItxCheongchunTimetable,
+} = {}) {
+  const selectedServiceDates = validateItxServiceDates(serviceDates, { now, replay });
+  requiredString(packPath, "packPath");
+  const canonical = readCanonicalLine(packPath);
+  const canonicalStations = canonical.rosterStations;
+  canonical.close();
+  const serviceDays = [];
+  for (const dayCd of ["8", "7", "9"]) {
+    const serviceDate = selectedServiceDates[dayCd];
+    try {
+      const roster = await collectRosterImpl({
+        serviceKey, serviceDate, kricServiceDayCode: dayCd, canonicalStations, fetchImpl, now,
+      });
+      if (roster.completedOdCount !== roster.expectedOdCount || roster.failedOdCount !== 0) {
+        throw new Error("TAGO ITX OD matrix evidence is incomplete");
+      }
+      const timetable = await collectTimetableImpl({
+        serviceKey,
+        runDate: serviceDate,
+        kricServiceDayCode: dayCd,
+        packPath,
+        trainNumberEvidence: roster,
+        fetchImpl,
+        now,
+      });
+      serviceDays.push({
+        dayCd,
+        serviceDate,
+        status: timetable.materialization?.status === "SUPPORTED" ? "SUPPORTED" : "MISSING",
+        expectedOdCount: roster.expectedOdCount,
+        completedOdCount: roster.completedOdCount,
+        failedOdCount: roster.failedOdCount,
+        stationSetHash: roster.stationSetHash,
+        odMatrixHash: roster.odMatrixHash,
+        roster,
+        timetable,
+      });
+    } catch {
+      serviceDays.push({
+        dayCd,
+        serviceDate,
+        status: "MISSING",
+        failureReasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
+      });
+      break;
+    }
+  }
+  const complete = serviceDays.length === 3 && serviceDays.every(({ status }) => status === "SUPPORTED");
+  const admissionStatus = complete ? (replay ? "REPLAY_ONLY" : "SUPPORTED") : "MISSING";
+  const artifact = {
+    schemaVersion: 1,
+    artifactKind: "korail-itx-cheongchun-completeness-evidence",
+    serviceId: "ITX_CHEONGCHUN",
+    observedAt: now.toISOString(),
+    timezone: "Asia/Seoul",
+    validationMode: replay ? "REPLAY" : "ADMISSION",
+    selectedServiceDates,
+    admissionStatus,
+    admissionEligible: admissionStatus === "SUPPORTED",
+    allowedConsumerIssues: ["#1400", "#2098", "#2099"],
+    legacyDaejeonRowCount: serviceDays.reduce((total, day) => total + (day.timetable?.legacyDaejeonRowCount ?? 0), 0),
+    legacyYongsanDaejeonTripCount: serviceDays.reduce((total, day) => total + (day.timetable?.legacyYongsanDaejeonTripCount ?? 0), 0),
+    serviceDays,
+    materialization: { status: complete ? "SUPPORTED" : "MISSING" },
+    credentialRedacted: true,
+  };
+  artifact.evidenceHash = sha256(JSON.stringify(artifact));
+  return artifact;
+}
 
 export async function collectKorailItxCheongchunTimetable({
   serviceKey,
@@ -96,6 +179,15 @@ export async function collectKorailItxCheongchunTimetable({
     || naturalCompare(left.originStationName, right.originStationName)
     || naturalCompare(left.destinationStationName, right.destinationStationName)
   ));
+  const legacyDaejeonRowCount = analyzed.stationSequences.reduce((total, trip) => total + trip.stops
+    .filter(({ providerStationName }) => normalizeStationName(providerStationName) === normalizeStationName("대전")).length, 0);
+  const legacyYongsanDaejeonTripCount = terminalVariants.filter(({ originStationName, destinationStationName }) => (
+    [originStationName, destinationStationName].map(normalizeStationName).includes(normalizeStationName("용산"))
+    && [originStationName, destinationStationName].map(normalizeStationName).includes(normalizeStationName("대전"))
+  )).length;
+  if (legacyDaejeonRowCount !== 0 || legacyYongsanDaejeonTripCount !== 0) {
+    throw new Error("Korail ITX legacy Daejeon data must be zero");
+  }
   const materialized = analyzed.missingTimestampStopCount === 0
     ? materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate)
     : { transitTrips: [], transitStopTimes: [], trainNumbers: [], stationMappings: analyzed.stationMappings };
@@ -140,6 +232,8 @@ export async function collectKorailItxCheongchunTimetable({
     stationSequences: analyzed.stationSequences,
     directions,
     terminalVariants,
+    legacyDaejeonRowCount,
+    legacyYongsanDaejeonTripCount,
     trainNumberSets: {
       roster: [...new Set(trainNumberEvidence.trainNumbers.map(normalizeTrainNumber))].sort(naturalCompare),
       plan: analyzed.trainNumbers,
@@ -523,6 +617,7 @@ function readCanonicalLine(packPath) {
     }
     return {
       byName,
+      rosterStations: lineRows.map((row) => ({ canonicalStationId: row.id, nameKo: row.name_ko })),
       close() {
         opened.db.close();
         cleanupPackDir(opened.dir);
@@ -716,25 +811,70 @@ function safeToken(value) { const text = String(value ?? "UNKNOWN"); return /^[A
 function safeLabel(value) { const text = String(value ?? "UNKNOWN"); return /^[\p{L}\p{N} ._()+/-]{1,64}$/u.test(text) ? text : "UNKNOWN"; }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function naturalCompare(left, right) { return String(left).localeCompare(String(right), "ko", { numeric: true }); }
-function parseArgs(argv) { const result = {}; for (let i = 0; i < argv.length; i += 2) result[argv[i]?.replace(/^--/, "")] = argv[i + 1]; return result; }
+function parseArgs(argv) {
+  const result = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const key = argv[index]?.replace(/^--/, "");
+    if (!key) continue;
+    if (argv[index + 1]?.startsWith("--") || argv[index + 1] === undefined) result[key] = true;
+    else result[key] = argv[index += 1];
+  }
+  return result;
+}
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+export async function runKorailItxCompletenessCli({
+  argv = process.argv.slice(2),
+  env = process.env,
+  now = new Date(),
+  collectImpl = collectKorailItxCheongchunCompleteness,
+} = {}) {
+  const args = parseArgs(argv);
   const output = requiredString(args.output, "--output");
   if (!path.isAbsolute(output)) throw new Error("--output must be absolute");
-  const trainNumberEvidence = JSON.parse(await readFile(requiredString(args["train-number-evidence"], "--train-number-evidence"), "utf8"));
-  const artifact = await collectKorailItxCheongchunTimetable({
-    serviceKey: process.env.DATA_GO_KR_SERVICE_KEY,
-    runDate: args.date,
-    kricServiceDayCode: args["kric-day-cd"],
-    packPath: args["canonical-pack"],
-    trainNumberEvidence,
-  });
+  const packPath = requiredString(args["canonical-pack"], "--canonical-pack");
+  const serviceKey = requiredString(env.DATA_GO_KR_SERVICE_KEY, "DATA_GO_KR_SERVICE_KEY");
+  const replay = args.replay === true;
+  const serviceDates = {
+    "8": args["day8-date"],
+    "7": args["day7-date"],
+    "9": args["day9-date"],
+  };
+  validateItxServiceDates(serviceDates, { now, replay });
+  let artifact;
+  try {
+    artifact = await collectImpl({ serviceKey, serviceDates, packPath, now, replay });
+  } catch {
+    artifact = {
+      schemaVersion: 1,
+      artifactKind: "korail-itx-cheongchun-completeness-evidence",
+      serviceId: "ITX_CHEONGCHUN",
+      observedAt: now.toISOString(),
+      timezone: "Asia/Seoul",
+      validationMode: replay ? "REPLAY" : "ADMISSION",
+      selectedServiceDates: serviceDates,
+      admissionStatus: "MISSING",
+      admissionEligible: false,
+      failureReasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
+      allowedConsumerIssues: ["#1400", "#2098", "#2099"],
+      legacyDaejeonRowCount: 0,
+      legacyYongsanDaejeonTripCount: 0,
+      serviceDays: [],
+      materialization: { status: "MISSING" },
+      credentialRedacted: true,
+    };
+    artifact.evidenceHash = sha256(JSON.stringify(artifact));
+  }
   await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
+  return { artifact, exitCode: artifact.admissionStatus === "SUPPORTED" ? 0 : 1 };
+}
+
+async function main() {
+  const { artifact, exitCode } = await runKorailItxCompletenessCli();
   console.log(
-    `sanitized Korail ITX-청춘 evidence ready: status=${artifact.materialization.status},` +
-    ` trains=${artifact.trainCount}, sequences=${artifact.stationSequenceRowCount}, stops=${artifact.stopTimeCount}`,
+    `sanitized Korail ITX-청춘 completeness evidence ready: status=${artifact.admissionStatus},` +
+    ` serviceDays=${artifact.serviceDays.length}`,
   );
+  process.exitCode = exitCode;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

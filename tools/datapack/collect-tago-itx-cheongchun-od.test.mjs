@@ -36,6 +36,15 @@ test("ITX admission 날짜는 KST 오늘~6일과 dayCd 요일을 검증한다", 
     now: new Date("2026-07-14T00:00:00.000Z"),
     replay: true,
   }), { "8": "20260713", "7": "20260718", "9": "20260719" });
+  assert.deepEqual(validateItxServiceDates({ "8": "20270101", "7": "20270102", "9": "20270103" }, {
+    now: new Date("2026-12-31T15:00:00.000Z"), replay: false,
+  }), { "8": "20270101", "7": "20270102", "9": "20270103" });
+  assert.deepEqual(validateItxServiceDates({ "8": "20280229", "7": "20280304", "9": "20280305" }, {
+    now: new Date("2028-02-27T15:00:00.000Z"), replay: false,
+  }), { "8": "20280229", "7": "20280304", "9": "20280305" });
+  assert.throws(() => validateItxServiceDates({ ...serviceDates, "8": "20260722" }, {
+    now: new Date("2026-07-14T00:00:00.000Z"), replay: false,
+  }), /today through 6 days/);
 });
 
 test("ITX OD matrix hash는 정렬된 date·depStationId·arrStationId tuple 직렬화로 결정된다", () => {

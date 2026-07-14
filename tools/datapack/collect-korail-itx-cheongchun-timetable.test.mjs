@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
+  collectKorailItxCheongchunCompleteness,
   collectKorailItxCheongchunTimetable,
   materializeKorailItxRows,
+  runKorailItxCompletenessCli,
 } from "./collect-korail-itx-cheongchun-timetable.mjs";
 
 const PACK_PATH = "apps/mobile/assets/datapacks/capital.sqlite.gz";
@@ -111,6 +115,117 @@ function trainNumberEvidence() {
     evidenceHash: "a".repeat(64),
   };
 }
+
+test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission artifact로 묶는다", async () => {
+  const calls = [];
+  const artifact = await collectKorailItxCheongchunCompleteness({
+    serviceKey: "secret",
+    serviceDates: { "8": "20260715", "7": "20260718", "9": "20260719" },
+    packPath: PACK_PATH,
+    now: new Date("2026-07-14T00:00:00.000Z"),
+    collectRosterImpl: async ({ serviceDate, kricServiceDayCode }) => ({
+      ...trainNumberEvidence(), serviceDate, kricServiceDayCode,
+    }),
+    collectTimetableImpl: async ({ runDate, kricServiceDayCode }) => {
+      calls.push([kricServiceDayCode, runDate]);
+      return {
+        runDate,
+        kricServiceDayCode,
+        materialization: { status: "SUPPORTED" },
+        legacyDaejeonRowCount: 0,
+        legacyYongsanDaejeonTripCount: 0,
+        credentialRedacted: true,
+      };
+    },
+  });
+
+  assert.deepEqual(calls, [["8", "20260715"], ["7", "20260718"], ["9", "20260719"]]);
+  assert.deepEqual(artifact.selectedServiceDates, { "8": "20260715", "7": "20260718", "9": "20260719" });
+  assert.equal(artifact.admissionStatus, "SUPPORTED");
+  assert.equal(artifact.admissionEligible, true);
+  assert.deepEqual(artifact.allowedConsumerIssues, ["#1400", "#2098", "#2099"]);
+  assert.equal(artifact.serviceDays.length, 3);
+  assert.match(artifact.evidenceHash, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(artifact), /secret/);
+});
+
+test("ITX completeness는 partial day·replay·provider 오류를 admission하지 않는다", async (context) => {
+  const serviceDates = { "8": "20260715", "7": "20260718", "9": "20260719" };
+  const roster = async ({ serviceDate, kricServiceDayCode }) => ({
+    ...trainNumberEvidence(), serviceDate, kricServiceDayCode,
+  });
+
+  await context.test("한 날짜 MISSING", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"), collectRosterImpl: roster,
+      collectTimetableImpl: async ({ kricServiceDayCode }) => ({
+        materialization: { status: kricServiceDayCode === "7" ? "MISSING_STATION_TIMES" : "SUPPORTED" },
+        legacyDaejeonRowCount: 0,
+        legacyYongsanDaejeonTripCount: 0,
+      }),
+    });
+    assert.equal(artifact.admissionStatus, "MISSING");
+    assert.equal(artifact.admissionEligible, false);
+    assert.equal(artifact.serviceDays.length, 3);
+  });
+
+  await context.test("replay", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key",
+      serviceDates: { "8": "20260713", "7": "20260711", "9": "20260712" },
+      packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"), replay: true, collectRosterImpl: roster,
+      collectTimetableImpl: async () => ({
+        materialization: { status: "SUPPORTED" },
+        legacyDaejeonRowCount: 0,
+        legacyYongsanDaejeonTripCount: 0,
+      }),
+    });
+    assert.equal(artifact.admissionStatus, "REPLAY_ONLY");
+    assert.equal(artifact.admissionEligible, false);
+  });
+
+  await context.test("provider 오류", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectRosterImpl: async () => { throw new Error("TAGO GetStrtpntAlocFndTrainInfo HTTP 503"); },
+      collectTimetableImpl: async () => assert.fail("must not run"),
+    });
+    assert.equal(artifact.admissionStatus, "MISSING");
+    assert.equal(artifact.admissionEligible, false);
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "PROVIDER_OR_SCHEMA_FAILURE");
+    assert.doesNotMatch(JSON.stringify(artifact), /503/);
+  });
+});
+
+test("ITX CLI는 runtime 실패를 MISSING artifact로 저장하고 non-zero를 반환한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-cli-test-"));
+  const output = path.join(dir, "evidence.json");
+  try {
+    const result = await runKorailItxCompletenessCli({
+      argv: [
+        "--day8-date", "20260715",
+        "--day7-date", "20260718",
+        "--day9-date", "20260719",
+        "--canonical-pack", PACK_PATH,
+        "--output", output,
+      ],
+      env: { DATA_GO_KR_SERVICE_KEY: "secret" },
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectImpl: async () => { throw new Error("provider HTTP 503 secret"); },
+    });
+    const artifact = JSON.parse(await readFile(output, "utf8"));
+    assert.equal(result.exitCode, 1);
+    assert.equal(artifact.admissionStatus, "MISSING");
+    assert.equal(artifact.admissionEligible, false);
+    assert.equal(artifact.failureReasonCode, "PROVIDER_OR_SCHEMA_FAILURE");
+    assert.doesNotMatch(JSON.stringify(artifact), /503|secret/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test("Korail ITX-청춘 collector는 공식 station rows를 canonical EXPRESS trip으로 만든다", async () => {
   const { plans, info } = fixtureRows();
