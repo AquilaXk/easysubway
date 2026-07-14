@@ -15,6 +15,7 @@ import 'facility_report.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
+import 'features/network_map/presentation/station_fan_menu.dart';
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -816,6 +817,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     onSetOrigin: _setOriginStation,
                     onSetWaypoint: _setWaypointStation,
                     onSetDestination: _setDestinationStation,
+                    onClearOrigin: _clearOriginStation,
+                    onClearWaypoint: _clearWaypointStation,
+                    onClearDestination: _clearDestinationStation,
                     onViewportChanged: (viewport) {
                       _saveRecentViewport(data.selectedRegion, viewport);
                     },
@@ -3134,6 +3138,9 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.onSetOrigin,
     required this.onSetWaypoint,
     required this.onSetDestination,
+    required this.onClearOrigin,
+    required this.onClearWaypoint,
+    required this.onClearDestination,
     required this.onViewportChanged,
     this.originStationId,
     this.waypointStationId,
@@ -3155,6 +3162,12 @@ class _NetworkMapCanvas extends StatefulWidget {
   final ValueChanged<NetworkMapStation> onSetOrigin;
   final ValueChanged<NetworkMapStation> onSetWaypoint;
   final ValueChanged<NetworkMapStation> onSetDestination;
+
+  /// #2109: 팬 메뉴에서 이미 지정된 슬롯을 재탭하면 해당 슬롯을 비운다. clear는
+  /// 슬롯 단위라 역 인자가 불필요(컨트롤러가 슬롯을 비운다).
+  final VoidCallback onClearOrigin;
+  final VoidCallback onClearWaypoint;
+  final VoidCallback onClearDestination;
   final ValueChanged<Rect> onViewportChanged;
 
   @override
@@ -3455,27 +3468,73 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   semanticSuffix: '도착 지정됨',
                 ),
               if (!_gestureActive && selectedStation != null)
-                _NetworkMapStationActionOverlay(
-                  station: selectedStation,
-                  geometry: geometry,
-                  camera: camera,
-                  emphasizeDestination: widget.hasOrigin,
-                  originStationId: widget.originStationId,
-                  waypointStationId: widget.waypointStationId,
-                  destinationStationId: widget.destinationStationId,
-                  onSetOrigin: () {
-                    widget.onSetOrigin(selectedStation);
-                    setState(() => _selectedStation = null);
+                Builder(
+                  builder: (context) {
+                    final stationPoint = camera.sourceToViewportPoint(
+                      Offset(
+                        geometry.x(selectedStation),
+                        geometry.y(selectedStation),
+                      ),
+                    );
+                    const menuWidth = 260.0;
+                    final menuHeight = menuWidth * (380.0 / 700.0); // ≈ 141
+                    // 기본은 역 노드 위쪽에 메뉴 하단(닫기 노치)이 오도록 배치.
+                    // 좌우 잘림은 _selectStation의 카메라 최소 패닝이 담당한다.
+                    // 다만 지도 상단 경계에 붙은 역은 카메라를 위로 더 패닝할 수
+                    // 없어(#2109) 위쪽 공간이 부족하므로, 이 경우 메뉴를 노드
+                    // 아래로 뒤집어 항상 화면 안에 들어오게 한다.
+                    final left = stationPoint.dx - menuWidth / 2;
+                    final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
+                    final top = placeBelow
+                        ? stationPoint.dy + 28
+                        : stationPoint.dy - menuHeight - 8;
+                    final selectedSlots = fanMenuSelectedSlots(
+                      stationId: selectedStation.id,
+                      originStationId: widget.originStationId,
+                      waypointStationId: widget.waypointStationId,
+                      destinationStationId: widget.destinationStationId,
+                    );
+                    return Positioned(
+                      key: const Key('networkMapStationSheet'),
+                      left: left,
+                      top: top,
+                      width: menuWidth,
+                      child: StationFanMenu(
+                        width: menuWidth,
+                        selectedSlots: selectedSlots,
+                        disabledSlots: fanMenuDisabledSlots(
+                          stationId: selectedStation.id,
+                          originStationId: widget.originStationId,
+                          waypointStationId: widget.waypointStationId,
+                          destinationStationId: widget.destinationStationId,
+                        ),
+                        onAction: (slot) {
+                          if (selectedSlots.contains(slot)) {
+                            // 재탭 → 해당 슬롯 해제.
+                            switch (slot) {
+                              case RouteDraftSlot.origin:
+                                widget.onClearOrigin();
+                              case RouteDraftSlot.waypoint:
+                                widget.onClearWaypoint();
+                              case RouteDraftSlot.destination:
+                                widget.onClearDestination();
+                            }
+                          } else {
+                            switch (slot) {
+                              case RouteDraftSlot.origin:
+                                widget.onSetOrigin(selectedStation);
+                              case RouteDraftSlot.waypoint:
+                                widget.onSetWaypoint(selectedStation);
+                              case RouteDraftSlot.destination:
+                                widget.onSetDestination(selectedStation);
+                            }
+                          }
+                          setState(() => _selectedStation = null);
+                        },
+                        onClose: () => setState(() => _selectedStation = null),
+                      ),
+                    );
                   },
-                  onSetWaypoint: () {
-                    widget.onSetWaypoint(selectedStation);
-                    setState(() => _selectedStation = null);
-                  },
-                  onSetDestination: () {
-                    widget.onSetDestination(selectedStation);
-                    setState(() => _selectedStation = null);
-                  },
-                  onClose: () => setState(() => _selectedStation = null),
                 ),
             ],
           );
@@ -3681,6 +3740,62 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   void _selectStation(NetworkMapStation station) {
     setState(() => _selectedStation = station);
+    // #2109: 화면 경계에서 팬 메뉴가 잘리면 카메라를 최소 거리만 패닝해 전체
+    // 노출한다. 다음 프레임(레이아웃 확정 후) 뷰포트 대비 메뉴 bbox를 계산한다.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _selectedStation?.id != station.id) {
+        return;
+      }
+      _panCameraToRevealFanMenu(station);
+    });
+  }
+
+  void _panCameraToRevealFanMenu(NetworkMapStation station) {
+    final camera = _pendingCamera ?? _camera;
+    if (camera == null) {
+      return;
+    }
+    final geometry = _geometryFor(widget.data);
+    final stationPoint = camera.sourceToViewportPoint(
+      Offset(geometry.x(station), geometry.y(station)),
+    );
+    const menuWidth = 260.0;
+    final menuHeight = menuWidth * (380.0 / 700.0);
+    const margin = 12.0;
+    // build와 동일한 배치 규칙: 위쪽 공간이 부족하면 노드 아래로 뒤집는다.
+    final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
+    final menuTop = placeBelow
+        ? stationPoint.dy + 28
+        : stationPoint.dy - menuHeight - 8;
+    final menuRect = Rect.fromLTWH(
+      stationPoint.dx - menuWidth / 2,
+      menuTop,
+      menuWidth,
+      menuHeight,
+    );
+    final viewport = Offset.zero & camera.viewportSize;
+    var dx = 0.0;
+    var dy = 0.0;
+    if (menuRect.left < viewport.left + margin) {
+      dx = (viewport.left + margin) - menuRect.left;
+    } else if (menuRect.right > viewport.right - margin) {
+      dx = (viewport.right - margin) - menuRect.right;
+    }
+    if (menuRect.top < viewport.top + margin) {
+      dy = (viewport.top + margin) - menuRect.top;
+    } else if (menuRect.bottom > viewport.bottom - margin) {
+      dy = (viewport.bottom - margin) - menuRect.bottom;
+    }
+    if (dx == 0 && dy == 0) {
+      return;
+    }
+    // 뷰포트 픽셀 이동 → source 좌표 center 이동(반대 방향).
+    final nextCenter = camera.center - Offset(dx, dy) / camera.scale;
+    _setCamera(
+      camera
+          .copyWith(center: nextCenter, revision: camera.revision + 1)
+          .clamped(),
+    );
   }
 
   // 구조화 canvas 렌더러(#1641)를 visual camera로 마운트한다. WebView와 달리
@@ -5227,123 +5342,6 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
   }
 }
 
-class _NetworkMapStationActionOverlay extends StatelessWidget {
-  const _NetworkMapStationActionOverlay({
-    required this.station,
-    required this.geometry,
-    required this.camera,
-    required this.onSetOrigin,
-    required this.onSetWaypoint,
-    required this.onSetDestination,
-    required this.onClose,
-    this.emphasizeDestination = false,
-    this.originStationId,
-    this.waypointStationId,
-    this.destinationStationId,
-  });
-
-  final NetworkMapStation station;
-  final _MapGeometry geometry;
-  final MapCameraState camera;
-  final VoidCallback onSetOrigin;
-  final VoidCallback onSetWaypoint;
-  final VoidCallback onSetDestination;
-  final VoidCallback onClose;
-
-  /// #1933-3: 출발이 이미 있으면 다음 역 팝오버는 [도착] 탭을 우선 강조한다.
-  final bool emphasizeDestination;
-
-  /// #1975: 현재 draft 슬롯에 지정된 역 id. 같은 역이 다른 슬롯에 이미 있으면
-  /// 그 탭을 비활성화한다(자기 슬롯 재지정은 허용).
-  final String? originStationId;
-  final String? waypointStationId;
-  final String? destinationStationId;
-
-  @override
-  Widget build(BuildContext context) {
-    final stationPoint = camera.sourceToViewportPoint(
-      Offset(geometry.x(station), geometry.y(station)),
-    );
-    const width = 200.0;
-    const height = 44.0;
-    final viewportWidth = camera.viewportSize.width;
-    final left = (stationPoint.dx - width / 2)
-        .clamp(12.0, math.max(12.0, viewportWidth - width - 12))
-        .toDouble();
-    final top = math.max(12.0, stationPoint.dy - height - 14);
-    final arrowLeft = (stationPoint.dx - left - 8).clamp(18.0, width - 34);
-    // #1975: 이 역이 다른 슬롯에 이미 있으면 그 탭을 비활성화한다. 자기 슬롯에
-    // 이미 있는 경우는 재지정 허용이므로 enabled를 유지한다.
-    final originEnabled =
-        station.id != waypointStationId && station.id != destinationStationId;
-    final waypointEnabled =
-        station.id != originStationId && station.id != destinationStationId;
-    final destinationEnabled =
-        station.id != originStationId && station.id != waypointStationId;
-    return Positioned(
-      key: const Key('networkMapStationSheet'),
-      left: left,
-      top: top,
-      width: width,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Material(
-            color: const Color(0xE8404445),
-            elevation: 0,
-            borderRadius: BorderRadius.circular(5),
-            child: SizedBox(
-              height: height,
-              child: Row(
-                children: [
-                  _NetworkMapStationActionTab(
-                    icon: Icons.north_east,
-                    label: '출발',
-                    onTap: onSetOrigin,
-                    enabled: originEnabled,
-                  ),
-                  _NetworkMapActionDivider(),
-                  _NetworkMapStationActionTab(
-                    icon: Icons.more_horiz,
-                    label: '경유',
-                    onTap: onSetWaypoint,
-                    enabled: waypointEnabled,
-                  ),
-                  _NetworkMapActionDivider(),
-                  _NetworkMapStationActionTab(
-                    icon: Icons.south_east,
-                    label: '도착',
-                    onTap: onSetDestination,
-                    emphasized: emphasizeDestination,
-                    enabled: destinationEnabled,
-                  ),
-                  _NetworkMapActionDivider(),
-                  _NetworkMapStationActionTab(
-                    icon: Icons.close,
-                    label: '닫기',
-                    onTap: onClose,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: EdgeInsets.only(left: arrowLeft),
-              child: const Icon(
-                Icons.arrow_drop_down,
-                size: 22,
-                color: Color(0xE8404445),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// #1948: 출발/경유/도착으로 지정된 역 위에 말풍선형 draft 핀을 표시한다.
 class _NetworkMapDraftPin extends StatelessWidget {
   const _NetworkMapDraftPin({
@@ -5426,88 +5424,42 @@ class _NetworkMapDraftPin extends StatelessWidget {
   }
 }
 
-class _NetworkMapActionDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 44,
-      child: VerticalDivider(width: 1, color: Color(0x665F6366)),
-    );
-  }
+/// 팬 메뉴 배선용: 탭한 역이 이미 배정된 슬롯 집합(진한 채움 selected).
+@visibleForTesting
+Set<RouteDraftSlot> fanMenuSelectedSlots({
+  required String stationId,
+  required String? originStationId,
+  required String? waypointStationId,
+  required String? destinationStationId,
+}) {
+  return {
+    if (stationId == originStationId) RouteDraftSlot.origin,
+    if (stationId == waypointStationId) RouteDraftSlot.waypoint,
+    if (stationId == destinationStationId) RouteDraftSlot.destination,
+  };
 }
 
-class _NetworkMapStationActionTab extends StatelessWidget {
-  const _NetworkMapStationActionTab({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.emphasized = false,
-    this.enabled = true,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  /// #1933-3: true면 흰 바탕 칩으로 우선순위를 드러낸다(무채색, 그림자 없음).
-  final bool emphasized;
-
-  /// #1975: 같은 역이 다른 슬롯에 이미 지정돼 있으면 false로 비활성화한다.
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    // 팝오버 배경(0xE8404445)은 이미 짙은 무채색이라 primary(0xFF2A2F31) 같은
-    // 어두운 잉크로 채우면 배경과 구분되지 않는다. 대비를 위해 강조 시에는
-    // 흰 배경 + 짙은 잉크(text)로 반전한다.
-    final iconColor = !enabled
-        ? EasySubwayAccessibleColors.mutedText
-        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
-    final textColor = !enabled
-        ? EasySubwayAccessibleColors.mutedText
-        : (emphasized ? EasySubwayAccessibleColors.text : Colors.white);
-    final content = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, color: iconColor, size: 16),
-        const SizedBox(height: 1),
-        Flexible(
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-    return Expanded(
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        splashFactory: NoSplash.splashFactory,
-        splashColor: Colors.transparent,
-        highlightColor: Colors.transparent,
-        child: emphasized
-            ? Container(
-                margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: EasySubwayAccessibleColors.surface,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: content,
-              )
-            : content,
-      ),
-    );
-  }
+/// 팬 메뉴 배선용: 같은 역이 다른 슬롯에 이미 있어 dim할 슬롯 집합.
+/// 구 액션 오버레이의 originEnabled/waypointEnabled/destinationEnabled 규칙을
+/// 그대로 이식(자기 슬롯 재지정은 dim 아님).
+@visibleForTesting
+Set<RouteDraftSlot> fanMenuDisabledSlots({
+  required String stationId,
+  required String? originStationId,
+  required String? waypointStationId,
+  required String? destinationStationId,
+}) {
+  final originEnabled =
+      stationId != waypointStationId && stationId != destinationStationId;
+  final waypointEnabled =
+      stationId != originStationId && stationId != destinationStationId;
+  final destinationEnabled =
+      stationId != originStationId && stationId != waypointStationId;
+  return {
+    if (!originEnabled) RouteDraftSlot.origin,
+    if (!waypointEnabled) RouteDraftSlot.waypoint,
+    if (!destinationEnabled) RouteDraftSlot.destination,
+  };
 }
 
 Map<String, List<NetworkMapLine>> _stationLinesById(NetworkMapData data) {

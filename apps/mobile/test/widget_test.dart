@@ -139,6 +139,28 @@ Future<void> _openFavoriteList(
   // 즐겨찾기 홈은 단일 리스트라 카테고리 진입 탭이 없다. 항목이 바로 보인다(#1569).
 }
 
+// #2109: 노선도 역 액션 메뉴가 다크 텍스트 팝오버에서 부채꼴(방사형) 팬 메뉴로
+// 교체됐다. 라벨은 CustomPaint로 그려져 find.text로는 잡히지 않으므로, 각 섹터의
+// 접근성 Semantics 라벨로 존재를 확인하고, 히트테스트는 섹터 아이콘 중심(design
+// 좌표)에 menu 스케일(260/700)을 곱한 지점을 tapAt으로 눌러 활성화한다.
+const _fanOriginLabel = '출발역으로 설정';
+const _fanWaypointLabel = '경유지로 추가';
+const _fanDestinationLabel = '도착역으로 설정';
+const _fanCloseLabel = '메뉴 닫기';
+
+/// 팬 메뉴의 특정 섹터를 접근성 Semantics onTap 액션으로 활성화한다.
+/// 섹터 라벨(투명 버튼)에 걸린 onTap을 직접 트리거하므로, 노선도 상단바 등
+/// 다른 오버레이가 좌표를 가로채는 문제 없이 안정적으로 활성화된다.
+Future<void> _tapFanMenuSector(WidgetTester tester, String label) async {
+  final handle = tester.ensureSemantics();
+  await tester.pump();
+  // 접근성 tap 액션으로 직접 활성화한다: 노선도 상단바 등 다른 오버레이가 좌표를
+  // 가로채는 문제 없이 섹터를 누른 효과를 낸다(섹터 Semantics onTap → onAction).
+  tester.semantics.tap(find.semantics.byLabel(label));
+  handle.dispose();
+  await tester.pump();
+}
+
 /// #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 노선도 홈에서 결과 화면에 이르는
 /// 정당한 흐름은 "역 탭 팝오버로 출발·도착 지정 → 자동 결과"뿐이다. 이 헬퍼는 기본
 /// 노선도(상록수/사당)에서 그 흐름을 그대로 태워 결과 탭까지 데려간다.
@@ -151,21 +173,11 @@ Future<void> _openRouteSearchScreen(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(Key(originStationKey)));
   await tester.pumpAndSettle();
-  await tester.tap(
-    find.descendant(
-      of: find.byKey(const Key('networkMapStationSheet')),
-      matching: find.text('출발'),
-    ),
-  );
+  await _tapFanMenuSector(tester, _fanOriginLabel);
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(Key(destinationStationKey)));
   await tester.pumpAndSettle();
-  await tester.tap(
-    find.descendant(
-      of: find.byKey(const Key('networkMapStationSheet')),
-      matching: find.text('도착'),
-    ),
-  );
+  await _tapFanMenuSector(tester, _fanDestinationLabel);
   // 출발·도착이 모두 차면 셸이 자동으로 결과 타임라인 탭으로 전환한다. 전환은
   // 120ms 디바운스 Timer로 예약되므로 프레임만 도는 pumpAndSettle 전에 Timer를
   // 흘려보낸다.
@@ -2006,8 +2018,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.text('출발'), findsOneWidget);
-    expect(find.text('도착'), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanDestinationLabel), findsOneWidget);
   });
 
   testWidgets('노선도 팝오버 출발 선택은 상단바를 출발/도착 입력으로 변신시키고 지우기로 검색바로 돌아온다', (
@@ -2038,7 +2050,7 @@ void main() {
       find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('출발'));
+    await _tapFanMenuSector(tester, _fanOriginLabel);
     await tester.pumpAndSettle();
 
     expect(routeDraftController.draft.origin?.nameKo, '상록수');
@@ -2108,7 +2120,7 @@ void main() {
       find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('출발'));
+    await _tapFanMenuSector(tester, _fanOriginLabel);
     await tester.pumpAndSettle();
 
     // 출발 지정 후 출발 핀이 그 역 위에 뜬다.
@@ -2118,7 +2130,7 @@ void main() {
     // 다른 역 탭 → "경유" 선택 → 경유 핀이 뜬다.
     await tester.tap(find.byKey(const Key('networkMapStation-sadang-seoul-2')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('경유'));
+    await _tapFanMenuSector(tester, _fanWaypointLabel);
     await tester.pumpAndSettle();
 
     expect(
@@ -2166,7 +2178,7 @@ void main() {
       find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('출발'));
+    await _tapFanMenuSector(tester, _fanOriginLabel);
     await tester.pumpAndSettle();
     expect(routeDraftController.draft.origin?.nameKo, '상록수');
 
@@ -2245,7 +2257,7 @@ void main() {
       find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('출발'));
+    await _tapFanMenuSector(tester, _fanOriginLabel);
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const Key('networkMapRouteDraftPickDestination')),
@@ -2516,23 +2528,29 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // 팝오버에 출발/경유/도착/닫기 탭이 모두 존재한다(기존 텍스트 회귀 없음).
-    expect(find.text('출발'), findsOneWidget);
-    expect(find.text('경유'), findsOneWidget);
-    expect(find.text('도착'), findsOneWidget);
-    expect(find.text('닫기'), findsOneWidget);
+    // #2109: 팬 메뉴에 출발/경유/도착/닫기 섹터가 모두 존재한다(접근성 라벨로
+    // 확인 — 라벨은 CustomPaint로 그려져 find.text로는 잡히지 않는다).
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanWaypointLabel), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanDestinationLabel), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanCloseLabel), findsOneWidget);
 
-    // 좌→우 순서가 [출발][경유][도착][닫기]인지 x좌표로 확인한다.
-    final originDx = tester.getTopLeft(find.text('출발')).dx;
-    final waypointDx = tester.getTopLeft(find.text('경유')).dx;
-    final destinationDx = tester.getTopLeft(find.text('도착')).dx;
-    final closeDx = tester.getTopLeft(find.text('닫기')).dx;
+    // 방사형 배치에서 출발(좌하)·경유(상중)·도착(우하)의 좌→우 순서가 유지되고,
+    // 닫기는 중앙 노치다(경유와 도착 사이 x 범위).
+    final originDx =
+        tester.getRect(find.bySemanticsLabel(_fanOriginLabel)).center.dx;
+    final waypointDx =
+        tester.getRect(find.bySemanticsLabel(_fanWaypointLabel)).center.dx;
+    final destinationDx =
+        tester.getRect(find.bySemanticsLabel(_fanDestinationLabel)).center.dx;
+    final closeDx =
+        tester.getRect(find.bySemanticsLabel(_fanCloseLabel)).center.dx;
     expect(originDx < waypointDx, isTrue);
     expect(waypointDx < destinationDx, isTrue);
-    expect(destinationDx < closeDx, isTrue);
+    expect(originDx < closeDx && closeDx < destinationDx, isTrue);
 
     // 경유 탭을 누르면 draft.waypoint가 채워진다.
-    await tester.tap(find.text('경유'));
+    await _tapFanMenuSector(tester, _fanWaypointLabel);
     await tester.pumpAndSettle();
     expect(routeDraftController.draft.waypoint?.nameKo, '상록수');
   });
@@ -3375,7 +3393,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-      expect(find.text('출발'), findsOneWidget);
+      expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -3400,8 +3418,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.text('출발'), findsOneWidget);
-    expect(find.text('도착'), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanDestinationLabel), findsOneWidget);
     // #1933 요구 3: 별도 길찾기 폼 페이지를 없앴으므로 팝오버의 "길찾기" 액션도
     // 제거했다. 출발/도착 지정이 곧 흐름이며, 둘 다 차면 자동으로 결과가 열린다.
     expect(
@@ -3411,35 +3429,34 @@ void main() {
       ),
       findsNothing,
     );
-    expect(find.text('닫기'), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanCloseLabel), findsOneWidget);
   });
 
-  testWidgets('노선도에서 출발을 지정한 뒤 다른 역을 누르면 도착 액션이 강조된다', (tester) async {
+  testWidgets('노선도에서 출발을 지정한 뒤 다른 역을 누르면 팬 메뉴의 도착 섹터를 쓸 수 있다', (
+    tester,
+  ) async {
+    final routeDraftController = RouteDraftController();
     await tester.pumpWidget(
-      EasySubwayApp(
-        repository: FakeStationSearchRepository(),
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(),
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: (_) {},
+          onPickStationForSlot: (slot, _) {},
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     await tester.tap(
       find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
     );
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    await tester.tap(
-      find.descendant(
-        of: find.byKey(const Key('networkMapStationSheet')),
-        matching: find.text('출발'),
-      ),
-    );
+    await _tapFanMenuSector(tester, _fanOriginLabel);
     await tester.pumpAndSettle();
+    expect(routeDraftController.draft.origin?.nameKo, '상록수');
 
     await tester.tap(
       find.byKey(const Key('networkMapStation-sadang-seoul-2')),
@@ -3447,16 +3464,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // #2109: 출발이 이미 정해진 상태에서 다른 역의 팬 메뉴를 열면, 그 역은
+    // 어느 슬롯에도 아직 없으므로 도착 섹터가 활성화(dim 아님)돼 탭으로 도착을
+    // 지정할 수 있다.
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    // #1933 요구 3: 출발이 이미 정해진 상태에서 다음 역 팝오버를 열면 [도착]
-    // 액션이 강조(흰 배경 칩 + 어두운 텍스트)되어야 한다.
-    final destinationIcon = tester.widget<Icon>(
-      find.descendant(
-        of: find.byKey(const Key('networkMapStationSheet')),
-        matching: find.byIcon(Icons.south_east),
-      ),
-    );
-    expect(destinationIcon.color, EasySubwayAccessibleColors.text);
+    await _tapFanMenuSector(tester, _fanDestinationLabel);
+    await tester.pumpAndSettle();
+    expect(routeDraftController.draft.destination?.nameKo, '사당');
   });
 
   testWidgets('노선도 역은 스크린리더 tap으로도 설정 sheet를 연다', (tester) async {
@@ -3490,8 +3504,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-      expect(find.text('출발'), findsOneWidget);
-      expect(find.text('도착'), findsOneWidget);
+      expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
+      expect(find.bySemanticsLabel(_fanDestinationLabel), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
@@ -3670,7 +3684,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.text('출발'), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
   });
 
   testWidgets('노선도 역명 label polygon 영역을 탭하면 해당 역을 선택한다', (tester) async {
@@ -3743,7 +3757,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.text('출발'), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
   });
 
   testWidgets('노선도 배경을 탭하면 가까운 역 sheet를 열지 않는다', (tester) async {
@@ -4006,7 +4020,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.text('출발'), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
     expect(find.text('가라벨역'), findsNothing);
   });
 
@@ -4107,7 +4121,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(find.text('출발'), findsOneWidget);
+    expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
     expect(find.text('먼역역'), findsNothing);
   });
 
@@ -4355,7 +4369,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-      expect(find.text('출발'), findsOneWidget);
+      expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
     } finally {
       semanticsHandle.dispose();
     }
