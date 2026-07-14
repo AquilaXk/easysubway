@@ -3,6 +3,17 @@ import test from "node:test";
 
 import { probeSeoulOpenDataApi } from "./probe-seoul-open-data-api.mjs";
 
+const arrivalRow = {
+  arvlCd: "1", arvlMsg2: "전역 출발", arvlMsg3: "", barvlDt: "60", bstatnNm: "당고개",
+  btrainNo: "K1234", recptnDt: "2026-07-14 12:00:00", statnId: "1004000432", statnNm: "사당",
+  subwayId: "1004", trainLineNm: "당고개행", updnLine: "상행",
+};
+const positionRow = {
+  directAt: "0", lastRecptnDt: "20260714120000", recptnDt: "2026-07-14 12:00:00",
+  statnId: "1001000133", statnNm: "서울역", statnTid: "1001000134", statnTnm: "시청",
+  subwayId: "1001", subwayNm: "1호선", trainNo: "K1234", trainSttus: "0", updnLine: "0",
+};
+
 test("서울시 path-key API probe는 key를 URL에만 넣고 sanitized schema evidence를 만든다", async () => {
   const secret = "never-print-seoul-key";
   let requestedUrl;
@@ -13,7 +24,7 @@ test("서울시 path-key API probe는 key를 URL에만 넣고 sanitized schema e
       requestedUrl = url;
       return new Response(JSON.stringify({
         errorMessage: { status: 200, code: "INFO-000" },
-        realtimeArrivalList: [{ statnId: "1004000432", statnNm: "사당" }],
+        realtimeArrivalList: [arrivalRow],
       }), { status: 200, headers: { "content-type": "application/json" } });
     },
   });
@@ -37,7 +48,7 @@ test("서울시 path-key API probe는 retryable 응답 뒤 bounded backoff를 �
       if (attempts === 1) return new Response("", { status: 429 });
       return new Response(JSON.stringify({
         errorMessage: { status: 200, code: "INFO-000" },
-        realtimeArrivalList: [{ statnId: "1004000432", statnNm: "사당" }],
+        realtimeArrivalList: [arrivalRow],
       }), { status: 200, headers: { "content-type": "application/json" } });
     },
   });
@@ -68,13 +79,25 @@ test("서울시 path-key API probe는 HTTP와 schema 및 transport 오류를 fai
   });
 
   await t.test("required row field missing", async () => {
+    const { statnNm: _omitted, ...row } = arrivalRow;
     await assert.rejects(probeSeoulOpenDataApi({
       ...base,
       fetchImpl: async () => new Response(JSON.stringify({
         errorMessage: { status: 200, code: "INFO-000" },
-        realtimeArrivalList: [{ statnId: "1004000432" }],
+        realtimeArrivalList: [row],
       }), { status: 200, headers: { "content-type": "application/json" } }),
     }), /schema mismatch: item\[0\] fields missing=statnNm/);
+  });
+
+  await t.test("documented non-key row field missing", async () => {
+    const { arvlCd: _omitted, ...row } = arrivalRow;
+    await assert.rejects(probeSeoulOpenDataApi({
+      ...base,
+      fetchImpl: async () => new Response(JSON.stringify({
+        errorMessage: { status: 200, code: "INFO-000" },
+        realtimeArrivalList: [row],
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    }), /schema mismatch: item\[0\] fields missing=.*arvlCd/);
   });
 
   await t.test("transport failure after bounded retry", async () => {
@@ -99,12 +122,15 @@ test("서울시 path-key API probe는 train-position schema와 입력 경계를 
     serviceKey: "key",
     fetchImpl: async () => new Response(JSON.stringify({
       errorMessage: { status: 200, code: "INFO-000" },
-      realtimePositionList: [{ trainNo: "K1234", statnId: "1001000133" }],
+      realtimePositionList: [positionRow],
     }), { status: 200, headers: { "content-type": "application/json" } }),
   });
 
   assert.equal(evidence.rowCount, 1);
-  assert.deepEqual(evidence.outputFields, ["trainNo", "statnId"]);
+  assert.deepEqual(evidence.outputFields, [
+    "directAt", "lastRecptnDt", "recptnDt", "statnId", "statnNm", "statnTid", "statnTnm",
+    "subwayId", "subwayNm", "trainNo", "trainSttus", "updnLine",
+  ]);
   await assert.rejects(
     probeSeoulOpenDataApi({ sourceId: "unsupported", serviceKey: "key" }),
     /unsupported Seoul open data source/,

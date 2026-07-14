@@ -105,6 +105,27 @@ test("operation raw response fields는 중복과 빈 값을 거부한다", () =>
   }
 });
 
+test("operation sample URL은 legacy evidence보다 우선하고 endpoint 밖 경로를 거부한다", () => {
+  const sampleUrl = "https://provider.example/a?serviceKey=[서비스키값]";
+  const source = candidate("a", {
+    operation: validOperation({ sampleUrl }),
+    evidence: {
+      endpoint: "https://legacy.example/a",
+      sampleUrl: "https://legacy.example/a?serviceKey=[서비스키값]",
+      outputFields: ["legacyField"],
+    },
+  });
+
+  assert.equal(validateOperation(source), source.operation);
+  assert.equal(operationSummary(source).sampleUrl, sampleUrl);
+  assert.throws(
+    () => validateOperation(candidate("a", {
+      operation: validOperation({ sampleUrl: "https://provider.example/other?serviceKey=[서비스키값]" }),
+    })),
+    /operation\.sampleUrl must use the operation endpoint/,
+  );
+});
+
 test("apiCatalog는 false만 API catalog 제외로 해석한다", () => {
   assert.equal(operationSummary(candidate("a")).apiCatalog, true);
   assert.equal(operationSummary(candidate("a", { apiCatalog: true })).apiCatalog, true);
@@ -581,6 +602,7 @@ test("migrated KRIC evidence provenance와 TAGO output 경로를 보존한다", 
   for (const id of migratedKricIds) {
     const source = document.candidates.find((entry) => entry.id === id);
     assert.match(source.operation.endpoint, /^https:\/\/openapi\.kric\.go\.kr\//);
+    assert.match(source.operation.sampleUrl, /^https:\/\/openapi\.kric\.go\.kr\//);
     assert.match(source.evidence.endpoint, /^https:\/\/apis\.data\.go\.kr\/B551181\//);
     assert.match(source.evidence.liveSampleNote, /legacy data\.go\.kr endpoint/);
   }

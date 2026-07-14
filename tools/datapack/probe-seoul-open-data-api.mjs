@@ -11,14 +11,14 @@ export const SEOUL_OPEN_DATA_APIS = Object.freeze({
     endpoint: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimeStationArrival",
     suffix: ["0", "5", "서울"],
     rows: "realtimeArrivalList",
-    fields: ["statnId", "statnNm"],
+    fields: ["arvlCd", "arvlMsg2", "arvlMsg3", "barvlDt", "bstatnNm", "btrainNo", "recptnDt", "statnId", "statnNm", "subwayId", "trainLineNm", "updnLine"],
     keyEnv: "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
   }),
   "seoul-topis-realtime-train-position": Object.freeze({
     endpoint: "http://swopenapi.seoul.go.kr/api/subway/{serviceKey}/json/realtimePosition",
     suffix: ["0", "5", "1호선"],
     rows: "realtimePositionList",
-    fields: ["trainNo", "statnId"],
+    fields: ["directAt", "lastRecptnDt", "recptnDt", "statnId", "statnNm", "statnTid", "statnTnm", "subwayId", "subwayNm", "trainNo", "trainSttus", "updnLine"],
     keyEnv: "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
   }),
   "seoulmetro-station-line-info": Object.freeze({

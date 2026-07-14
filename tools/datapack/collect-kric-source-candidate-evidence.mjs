@@ -48,12 +48,19 @@ export function resolveKricCandidateRequest(candidatesDocument, candidateId) {
   if (!candidate) {
     throw new Error(`tracked candidate metadata is missing: ${candidateId}`);
   }
-  const endpoint = new URL(requiredText(candidate.evidence?.endpoint, `${candidateId}.evidence.endpoint`));
+  const usesOperationSample = candidate.operation?.sampleUrl != null;
+  const endpoint = new URL(requiredText(
+    usesOperationSample ? candidate.operation?.endpoint : candidate.evidence?.endpoint,
+    usesOperationSample ? `${candidateId}.operation.endpoint` : `${candidateId}.evidence.endpoint`,
+  ));
   const requestUrl = new URL(requiredText(candidate.requestUrl, `${candidateId}.requestUrl`));
-  const sampleUrl = new URL(requiredText(candidate.evidence?.sampleUrl, `${candidateId}.evidence.sampleUrl`));
-  assertKricUrl(endpoint, `${candidateId}.evidence.endpoint`);
+  const sampleUrl = new URL(requiredText(
+    usesOperationSample ? candidate.operation?.sampleUrl : candidate.evidence?.sampleUrl,
+    usesOperationSample ? `${candidateId}.operation.sampleUrl` : `${candidateId}.evidence.sampleUrl`,
+  ));
+  assertKricUrl(endpoint, usesOperationSample ? `${candidateId}.operation.endpoint` : `${candidateId}.evidence.endpoint`);
   assertKricUrl(requestUrl, `${candidateId}.requestUrl`);
-  assertKricUrl(sampleUrl, `${candidateId}.evidence.sampleUrl`);
+  assertKricUrl(sampleUrl, usesOperationSample ? `${candidateId}.operation.sampleUrl` : `${candidateId}.evidence.sampleUrl`);
 
   if (requestUrl.href !== endpoint.href) {
     throw new Error(`${candidateId} requestUrl must match evidence endpoint`);
@@ -98,7 +105,16 @@ export async function collectKricSourceCandidateEvidence({
     ...document,
     candidates: document.candidates.map((candidate) => candidate.id !== candidateId || !candidate.operation?.responseFields
       ? candidate
-      : { ...candidate, evidence: { ...candidate.evidence, outputFields: candidate.operation.responseFields } }),
+      : {
+          ...candidate,
+          evidence: {
+            ...candidate.evidence,
+            ...(candidate.operation.sampleUrl
+              ? { endpoint: candidate.operation.endpoint, sampleUrl: candidate.operation.sampleUrl }
+              : {}),
+            outputFields: candidate.operation.responseFields,
+          },
+        }),
   };
   return collectSourceCandidateEvidence({
     candidateId,

@@ -1982,6 +1982,7 @@
       "operation": {
         "method": "GET",
         "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
         "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
         "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
         "responseEnvelope": "JSON array | XML root.body.items.item",
@@ -2074,6 +2075,7 @@
       "operation": {
         "method": "GET",
         "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
         "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
         "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
         "responseEnvelope": "JSON array | XML root.body.items.item",
@@ -2160,6 +2162,7 @@
       "operation": {
         "method": "GET",
         "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
         "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
         "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
         "responseEnvelope": "JSON array | XML root.body.items.item",
@@ -2242,6 +2245,7 @@
       "operation": {
         "method": "GET",
         "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=6&stinCd=2613",
         "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
         "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
         "responseEnvelope": "JSON array | XML root.body.items.item",
@@ -2322,6 +2326,7 @@
       "operation": {
         "method": "GET",
         "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
         "auth": { "env": "KRIC_SERVICE_KEY", "placement": "query", "parameter": "serviceKey", "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing" },
         "requiredParameters": ["serviceKey", "format", "railOprIsttCd", "lnCd", "stinCd"],
         "responseEnvelope": "JSON array | XML root.body.items.item",

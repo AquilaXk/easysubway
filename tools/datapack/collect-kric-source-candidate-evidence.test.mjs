@@ -97,6 +97,46 @@ test("KRIC evidence collector는 catalog 15개 allowlist와 tracked endpoint를 
   );
 });
 
+test("migrated KRIC runner는 legacy evidence와 분리된 operation sample을 사용한다", async () => {
+  const migrated = {
+    id: "kric-station-elevator",
+    requestUrl: "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
+    operation: {
+      endpoint: "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
+      sampleUrl: "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+      responseFields: ["providerField"],
+    },
+    evidence: {
+      endpoint: "https://apis.data.go.kr/B551181/stationElevatorInfo/getStationElevatorList",
+      formats: ["JSON"],
+    },
+  };
+
+  const request = resolveKricCandidateRequest({ candidates: [migrated] }, migrated.id);
+  assert.equal(request.endpoint, migrated.operation.endpoint);
+  assert.equal(decodeURI(request.sampleUrl.href), migrated.operation.sampleUrl);
+  assert.equal(request.format, "json");
+
+  const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-migrated-"));
+  try {
+    const outputs = await collectKricSourceCandidateEvidence({
+      candidateId: migrated.id,
+      candidatesDocument: { candidates: [migrated] },
+      runnerTemp,
+      serviceKey: "key",
+      fetchImpl: async () => new Response(JSON.stringify([{ providerField: "value" }]), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    });
+    const sample = JSON.parse(await readFile(outputs.sample, "utf8"));
+    assert.equal(sample.endpoint, migrated.operation.endpoint);
+    assert.deepEqual(sample.fields, ["providerField"]);
+  } finally {
+    await rm(runnerTemp, { recursive: true, force: true });
+  }
+});
+
 test("KRIC evidence collector는 raw를 제거하고 sanitized sample/report/hashes만 남긴다", async () => {
   const runnerTemp = await mkdtemp(path.join(tmpdir(), "easysubway-kric-evidence-"));
   const serviceKey = "test-kric-service-key";

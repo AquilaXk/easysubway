@@ -382,6 +382,7 @@ test("프로젝트 provider catalog는 비API source를 제외하고 모든 호�
 
   const kricElevator = providers.find((entry) => entry.id === "provider:kric-station-elevator");
   assert.equal(kricElevator.endpoint, "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator");
+  assert.match(kricElevator.sampleUrl, /^https:\/\/openapi\.kric\.go\.kr\/openapi\/convenientInfo\/stationElevator\?/);
   assert.deepEqual(kricElevator.responseFields, [
     "dtlLoc", "exitNo", "grndDvNmFr", "grndDvNmTo", "lnCd", "railOprIsttCd",
     "rglnPsno", "rglnWgt", "runStinFlorFr", "runStinFlorTo", "stinCd",
@@ -392,6 +393,11 @@ test("프로젝트 provider catalog는 비API source를 제외하고 모든 호�
     "serviceKey", "startIndex", "endIndex", "stationCode", "stationName", "lineName",
   ]);
   assert.match(stationLine.sampleUrl, /\/1\/5\/\/\/4호선$/);
+
+  assert.deepEqual(
+    providers.find((entry) => entry.id === "provider:seoul-topis-realtime-station-arrival").responseFields,
+    ["arvlCd", "arvlMsg2", "arvlMsg3", "barvlDt", "bstatnNm", "btrainNo", "recptnDt", "statnId", "statnNm", "subwayId", "trainLineNm", "updnLine"],
+  );
 });
 
 test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 제공한다", async () => {
