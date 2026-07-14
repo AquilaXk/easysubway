@@ -157,6 +157,16 @@ class TimetableSeedLoaderTest {
 			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'", Integer.class)).isZero();
 	}
 
+	@Test
+	void doesNotTreatMissingEvidenceOnlySeedAsAdditiveItxTrips() {
+		loader(new ClassPathResource("timetable/test-line4-seed.sql")).run(null);
+
+		loader(missingItxEvidenceOnlySeed()).run(null);
+
+		assertThat(jdbc.queryForObject(
+			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'", Integer.class)).isZero();
+	}
+
 	private Resource itxSeed(String admissionStatus, boolean admissionEligible, String freshUntil) {
 		return new ByteArrayResource((
 			"INSERT INTO service_calendars (service_id, start_date, end_date, timezone, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES ('itx-weekday','20260714','20260721','Asia/Seoul',TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE);\n"
@@ -169,6 +179,17 @@ class TimetableSeedLoaderTest {
 			@Override
 			public String getFilename() {
 				return "itx-seed.sql";
+			}
+		};
+	}
+
+	private Resource missingItxEvidenceOnlySeed() {
+		return new ByteArrayResource((
+			"INSERT INTO route_service_artifact_evidence (service_class, timetable_artifact_id, timetable_artifact_sha256, canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256, admission_status, admission_eligible, fresh_until, source_issue) VALUES ('ITX_CHEONGCHUN','missing-itx','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','capital','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','MISSING',FALSE,NULL,2116);\n"
+		).getBytes()) {
+			@Override
+			public String getFilename() {
+				return "missing-itx-evidence-only-seed.sql";
 			}
 		};
 	}

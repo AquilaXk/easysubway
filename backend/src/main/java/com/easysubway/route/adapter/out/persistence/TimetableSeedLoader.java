@@ -61,7 +61,7 @@ public class TimetableSeedLoader implements ApplicationRunner {
 	@Override
 	public void run(ApplicationArguments args) {
 		List<String> statements = readStatements(seedResource);
-		boolean includesItx = statements.stream().anyMatch(statement -> statement.contains("'ITX_CHEONGCHUN'"));
+		boolean includesItx = statements.stream().anyMatch(TimetableSeedLoader::isItxTripInsert);
 		if (routeTimetablePort.hasRouteTimetable()) {
 			boolean existingItx = validateRouteServiceAdmission();
 			if (includesItx && !existingItx) {
@@ -87,6 +87,12 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			throw exception;
 		}
 		log.info("transit timetable seeded from {} ({} statements)", seedResource, statements.size());
+	}
+
+	private static boolean isItxTripInsert(String statement) {
+		return statement.startsWith("INSERT INTO transit_trips ")
+			&& statement.contains("service_class")
+			&& statement.contains("'ITX_CHEONGCHUN'");
 	}
 
 	private boolean validateRouteServiceAdmission() {
