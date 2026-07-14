@@ -4843,6 +4843,7 @@ void main() {
     expect(find.text('오이도 방면'), findsOneWidget);
     final timeText = tester.widget<Text>(find.text(departure.timeLabel));
     expect(timeText.style?.color, const Color(0xFFE23D3D));
+    expect(find.bySemanticsLabel(departure.semanticLabel), findsOneWidget);
     expect(
       find.descendant(
         of: find.byKey(const Key('networkMapNearbyDataSourceToggle')),

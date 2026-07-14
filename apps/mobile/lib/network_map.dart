@@ -2952,11 +2952,9 @@ class _SubwayTimetablePanel extends StatelessWidget {
     }
     return Semantics(
       liveRegion: true,
+      excludeSemantics: true,
       label: departures
-          .map(
-            (entry) =>
-                '${entry.directionLabel}, ${entry.departure.semanticLabel}',
-          )
+          .map((entry) => entry.departure.semanticLabel)
           .join(', '),
       child: Row(
         children: [
