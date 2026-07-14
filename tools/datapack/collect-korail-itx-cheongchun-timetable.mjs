@@ -13,6 +13,11 @@ const API_ORIGIN = "https://apis.data.go.kr";
 const DETAIL_URL = "https://www.data.go.kr/data/15125762/openapi.do";
 const LINE_ID = "line-54a7b980b7c3";
 const CAPITAL_APPROACH_LINE_ID = "line-6e39be0cb6e2";
+const CAPITAL_APPROACH_STATIONS = Object.freeze([
+  Object.freeze({ canonicalStationId: "station-8aa315864466", nameKo: "용산", corridorSequence: 1, lineId: CAPITAL_APPROACH_LINE_ID }),
+  Object.freeze({ canonicalStationId: "station-c0679b9a6cf8", nameKo: "옥수", corridorSequence: 2, lineId: CAPITAL_APPROACH_LINE_ID }),
+  Object.freeze({ canonicalStationId: "station-e5cf592cf355", nameKo: "왕십리", corridorSequence: 3, lineId: CAPITAL_APPROACH_LINE_ID }),
+]);
 const EXPECTED_FIELDS = Object.freeze({
   codes: Object.freeze(["code", "type", "value"]),
   plan: Object.freeze([
@@ -33,9 +38,13 @@ export async function collectKorailItxCheongchunCompleteness({
   now = new Date(),
   replay = false,
   collectRosterImpl = collectTagoItxCheongchunRoster,
-  collectTimetableImpl = collectKorailItxCheongchunTimetable,
+  collectTimetableImpl = null,
 } = {}) {
   const selectedServiceDates = validateItxServiceDates(serviceDates, { now, replay });
+  const collectTimetable = collectTimetableImpl ?? (replay
+    ? collectKorailItxCheongchunTimetable
+    : collectKorailItxCheongchunPlan);
+  const usingDefaultAdmissionCollector = collectTimetableImpl === null && !replay;
   requiredString(packPath, "packPath");
   const canonical = readCanonicalLine(packPath);
   const canonicalStations = canonical.rosterStations;
@@ -52,8 +61,18 @@ export async function collectKorailItxCheongchunCompleteness({
       if (roster.completedOdCount !== roster.expectedOdCount || roster.failedOdCount !== 0) {
         throw new Error("TAGO ITX OD matrix evidence is incomplete");
       }
-      failureStage = "TIMETABLE";
-      const timetable = await collectTimetableImpl({
+      failureStage = "OD_MATERIALIZATION";
+      if (usingDefaultAdmissionCollector) {
+        const directions = new Set(roster.stationSequences?.map(({ directionId }) => directionId));
+        if (roster.schemaVersion !== 2 || !directions.has("up") || !directions.has("down")
+          || roster.reconstructionSummary?.conflictingTimestampCount !== 0
+          || roster.reconstructionSummary?.missingPairCount !== 0
+          || roster.reconstructionSummary?.duplicateOdCount !== 0) {
+          throw new Error("TAGO_OD_STOP_SEQUENCE_INVALID");
+        }
+      }
+      failureStage = "PLAN_VALIDATION";
+      const timetable = await collectTimetable({
         serviceKey,
         runDate: serviceDate,
         kricServiceDayCode: dayCd,
@@ -68,7 +87,7 @@ export async function collectKorailItxCheongchunCompleteness({
         serviceDate,
         status: timetableSupported ? "SUPPORTED" : "MISSING",
         ...(!timetableSupported ? {
-          failureStage: "TIMETABLE",
+          failureStage: "PLAN_VALIDATION",
           failureReasonCode: timetable.materialization?.status === "MISSING_STATION_TIMES"
             ? timetable.materialization?.stationTimeCapability?.reasonCode ?? "PLANNED_TIME_MISSING"
             : "TIMETABLE_MATERIALIZATION_INCOMPLETE",
@@ -78,17 +97,30 @@ export async function collectKorailItxCheongchunCompleteness({
         failedOdCount: roster.failedOdCount,
         stationSetHash: roster.stationSetHash,
         odMatrixHash: roster.odMatrixHash,
+        trainSetHashes: timetable.trainSetHashes ?? emptyTrainSetHashes(roster),
+        reconstructionSummary: roster.reconstructionSummary ?? emptyReconstructionSummary(),
         roster,
         timetable,
       });
     } catch (error) {
-      const failureContext = completenessFailureContext(error);
+      const failureContext = completenessFailureContext(error) ?? rosterOdFailureContext(roster);
+      const failureReasonCode = completenessFailureReason(error);
+      const classifiedFailureStage = failureReasonCode.startsWith("TAGO_OD_")
+        ? "OD_MATERIALIZATION"
+        : failureReasonCode.startsWith("KORAIL_PLAN_") ? "PLAN_VALIDATION" : failureStage;
       serviceDays.push({
         dayCd,
         serviceDate,
         status: "MISSING",
-        failureStage,
-        failureReasonCode: completenessFailureReason(error),
+        failureStage: classifiedFailureStage,
+        failureReasonCode,
+        expectedOdCount: roster?.expectedOdCount ?? 0,
+        completedOdCount: roster?.completedOdCount ?? 0,
+        failedOdCount: roster?.failedOdCount ?? 0,
+        stationSetHash: roster?.stationSetHash ?? sha256(JSON.stringify([])),
+        odMatrixHash: roster?.odMatrixHash ?? sha256(JSON.stringify([])),
+        trainSetHashes: emptyTrainSetHashes(roster),
+        reconstructionSummary: roster?.reconstructionSummary ?? emptyReconstructionSummary(),
         legacyDaejeonRowCount: Number.isInteger(error?.legacyDaejeonRowCount) ? error.legacyDaejeonRowCount : 0,
         legacyYongsanDaejeonTripCount: Number.isInteger(error?.legacyYongsanDaejeonTripCount)
           ? error.legacyYongsanDaejeonTripCount : 0,
@@ -107,7 +139,7 @@ export async function collectKorailItxCheongchunCompleteness({
   const complete = serviceDays.length === 3 && serviceDays.every(({ status }) => status === "SUPPORTED");
   const admissionStatus = complete ? (replay ? "REPLAY_ONLY" : "SUPPORTED") : "MISSING";
   const artifact = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     artifactKind: "korail-itx-cheongchun-completeness-evidence",
     serviceId: "ITX_CHEONGCHUN",
     observedAt: now.toISOString(),
@@ -116,7 +148,7 @@ export async function collectKorailItxCheongchunCompleteness({
     selectedServiceDates,
     admissionStatus,
     admissionEligible: admissionStatus === "SUPPORTED",
-    allowedConsumerIssues: ["#1400", "#2098", "#2099"],
+    allowedConsumerIssues: ["#1400", "#2098", "#2099", "#2058", "#2137"],
     legacyDaejeonRowCount: serviceDays.reduce((total, day) => (
       total + (day.timetable?.legacyDaejeonRowCount ?? day.legacyDaejeonRowCount ?? 0)
     ), 0),
@@ -125,6 +157,88 @@ export async function collectKorailItxCheongchunCompleteness({
     ), 0),
     serviceDays,
     materialization: { status: complete ? "SUPPORTED" : "MISSING" },
+    credentialRedacted: true,
+  };
+  artifact.evidenceHash = sha256(JSON.stringify(artifact));
+  return artifact;
+}
+
+export async function collectKorailItxCheongchunPlan({
+  serviceKey,
+  runDate,
+  kricServiceDayCode,
+  trainNumberEvidence,
+  fetchImpl = fetch,
+  now = new Date(),
+} = {}) {
+  const key = decodedServiceKey(requiredString(serviceKey, "DATA_GO_KR_SERVICE_KEY"));
+  if (!/^\d{8}$/.test(runDate ?? "")) throw new Error("runDate must be YYYYMMDD");
+  if (!["7", "8", "9"].includes(kricServiceDayCode)) throw new Error("kricServiceDayCode must be 7, 8, or 9");
+  if (trainNumberEvidence?.schemaVersion !== 2
+    || trainNumberEvidence?.artifactKind !== "tago-itx-cheongchun-roster-evidence"
+    || trainNumberEvidence.serviceDate !== runDate
+    || trainNumberEvidence.kricServiceDayCode !== kricServiceDayCode
+    || trainNumberEvidence.completedOdCount !== trainNumberEvidence.expectedOdCount
+    || trainNumberEvidence.failedOdCount !== 0) {
+    throw new Error("TAGO ITX materialized evidence is invalid");
+  }
+  const materialized = {
+    trainNumbers: trainNumberEvidence.trainNumbers,
+    stationSequences: trainNumberEvidence.stationSequences,
+    transitTrips: trainNumberEvidence.transitTrips,
+    transitStopTimes: trainNumberEvidence.transitStopTimes,
+  };
+  const plans = await fetchAll({
+    endpoint: `${API_ORIGIN}/B551457/run/v2/travelerTrainRunPlan2`,
+    query: {
+      "cond[run_ymd::GTE]": runDate,
+      "cond[run_ymd::LTE]": runDate,
+    },
+    expectedFields: EXPECTED_FIELDS.plan,
+    key,
+    fetchImpl,
+  });
+  const selected = validateKorailItxPlans({ plans: plans.rows, materialized, runDate });
+  const tagoOdTrainSetHash = sha256(JSON.stringify(materialized.trainNumbers.map(normalizeTrainNumber).sort(naturalCompare)));
+  const materializedTrainSetHash = sha256(JSON.stringify(
+    materialized.stationSequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)).sort(naturalCompare),
+  ));
+  if (tagoOdTrainSetHash !== selected.trainSetHash || selected.trainSetHash !== materializedTrainSetHash) {
+    throw new Error("KORAIL_PLAN_MISMATCH: train set");
+  }
+  const artifact = {
+    schemaVersion: 2,
+    artifactKind: "korail-itx-cheongchun-station-sequence-evidence",
+    serviceId: "ITX_CHEONGCHUN",
+    canonicalLineId: LINE_ID,
+    servicePattern: "EXPRESS",
+    officialSourceUrl: DETAIL_URL,
+    observedAt: now.toISOString(),
+    runDate,
+    kricServiceDayCode,
+    providerResultCode: "0",
+    schemaStatus: "EXPECTED",
+    requiredTrainNumberSets: ["TAGO_OD", "KORAIL_PLAN", "MATERIALIZED"],
+    trainNumbers: selected.trainNumbers,
+    trainNumberSets: {
+      tagoOd: materialized.trainNumbers.map(normalizeTrainNumber).sort(naturalCompare),
+      korailPlan: selected.trainNumbers,
+      materialized: materialized.stationSequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)).sort(naturalCompare),
+    },
+    trainSetHashes: {
+      tagoOd: tagoOdTrainSetHash,
+      korailPlan: selected.trainSetHash,
+      materialized: materializedTrainSetHash,
+    },
+    selectedPlans: selected.selectedPlans,
+    stationSequences: materialized.stationSequences,
+    transitTrips: materialized.transitTrips,
+    transitStopTimes: materialized.transitStopTimes,
+    reconstructionSummary: trainNumberEvidence.reconstructionSummary,
+    legacyDaejeonRowCount: 0,
+    legacyYongsanDaejeonTripCount: 0,
+    materialization: { status: "SUPPORTED" },
+    operations: [operationEvidence("travelerTrainRunPlan2", plans)],
     credentialRedacted: true,
   };
   artifact.evidenceHash = sha256(JSON.stringify(artifact));
@@ -327,6 +441,54 @@ export function materializeKorailItxRows({
   });
   if (analyzed.missingTimestampStopCount > 0) throw new Error("Korail ITX planned timestamp missing");
   return materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate);
+}
+
+export function validateKorailItxPlans({ plans, materialized, runDate }) {
+  if (!Array.isArray(plans)) throw new Error("KORAIL_PLAN_MISSING");
+  const trainNumbers = (materialized?.trainNumbers ?? []).map(normalizeTrainNumber).sort(naturalCompare);
+  if (trainNumbers.length === 0 || new Set(trainNumbers).size !== trainNumbers.length) {
+    throw new Error("KORAIL_PLAN_MISSING");
+  }
+  const stationSequences = new Map((materialized?.stationSequences ?? []).map((sequence) => (
+    [normalizeTrainNumber(sequence.trainNumber), sequence]
+  )));
+  const selectedPlans = [];
+  for (const trainNumber of trainNumbers) {
+    const matches = plans.filter((plan) => normalizeTrainNumber(plan?.trn_no) === trainNumber);
+    if (matches.length === 0) throw new Error(`KORAIL_PLAN_MISSING: ${safeToken(trainNumber)}`);
+    if (matches.length > 1) throw new Error(`KORAIL_PLAN_DUPLICATE: ${safeToken(trainNumber)}`);
+    const plan = matches[0];
+    const sequence = stationSequences.get(trainNumber);
+    const first = sequence?.stops?.[0];
+    const last = sequence?.stops?.at(-1);
+    if (String(plan.run_ymd) !== runDate || !first || !last
+      || normalizeStationName(plan.dptre_stn_nm) !== normalizeStationName(first.nameKo)
+      || normalizeStationName(plan.arvl_stn_nm) !== normalizeStationName(last.nameKo)
+      || [plan.dptre_stn_nm, plan.arvl_stn_nm].some((name) => normalizeStationName(name) === normalizeStationName("대전"))) {
+      throw new Error(`KORAIL_PLAN_MISMATCH: ${safeToken(trainNumber)}`);
+    }
+    let departureSeconds;
+    let arrivalSeconds;
+    try {
+      departureSeconds = timestampSeconds(
+        plan.trn_plan_dptre_dt, runDate, `plan departure[${safeToken(trainNumber)}]`,
+      );
+      arrivalSeconds = timestampSeconds(
+        plan.trn_plan_arvl_dt, runDate, `plan arrival[${safeToken(trainNumber)}]`,
+      );
+    } catch {
+      throw new Error(`KORAIL_PLAN_MISMATCH: ${safeToken(trainNumber)}`);
+    }
+    if (departureSeconds !== first.departureSeconds || arrivalSeconds !== last.arrivalSeconds) {
+      throw new Error(`KORAIL_PLAN_MISMATCH: ${safeToken(trainNumber)}`);
+    }
+    selectedPlans.push({ ...plan, normalizedTrainNumber: trainNumber });
+  }
+  return {
+    trainNumbers,
+    selectedPlans,
+    trainSetHash: sha256(JSON.stringify(trainNumbers)),
+  };
 }
 
 export function analyzeKorailItxRows({
@@ -686,6 +848,27 @@ function sameSet(left, right) {
   return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
+function emptyTrainSetHashes(roster) {
+  const emptyHash = sha256(JSON.stringify([]));
+  const tagoOd = Array.isArray(roster?.trainNumbers)
+    ? sha256(JSON.stringify(roster.trainNumbers.map(normalizeTrainNumber).sort(naturalCompare)))
+    : emptyHash;
+  const materialized = Array.isArray(roster?.stationSequences)
+    ? sha256(JSON.stringify(roster.stationSequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)).sort(naturalCompare)))
+    : emptyHash;
+  return { tagoOd, korailPlan: emptyHash, materialized };
+}
+
+function emptyReconstructionSummary() {
+  return {
+    trainCount: 0,
+    stopCount: 0,
+    conflictingTimestampCount: 0,
+    missingPairCount: 0,
+    duplicateOdCount: 0,
+  };
+}
+
 function legacyDaejeonCounts(plans, infoRows, trainNumbers) {
   const allowed = new Set(trainNumbers.map(normalizeTrainNumber));
   const isAllowed = (row) => allowed.has(normalizeTrainNumber(row.trn_no));
@@ -702,6 +885,15 @@ function legacyDaejeonCounts(plans, infoRows, trainNumbers) {
 
 function completenessFailureReason(error) {
   const message = error instanceof Error ? error.message : "";
+  for (const code of [
+    "TAGO_OD_DUPLICATE",
+    "TAGO_OD_PAIR_COVERAGE_INCOMPLETE",
+    "TAGO_OD_TIME_CONFLICT",
+    "TAGO_OD_STOP_SEQUENCE_INVALID",
+    "KORAIL_PLAN_MISSING",
+    "KORAIL_PLAN_DUPLICATE",
+    "KORAIL_PLAN_MISMATCH",
+  ]) if (message.startsWith(code)) return code;
   if (/HTTP \d+/.test(message)) return "PROVIDER_HTTP_FAILURE";
   if (/transport failure/.test(message)) return "PROVIDER_TRANSPORT_FAILURE";
   if (/pagination incomplete/.test(message)) return "PROVIDER_PAGINATION_INCOMPLETE";
@@ -725,6 +917,8 @@ function completenessFailureContext(error) {
   const message = error instanceof Error ? error.message : "";
   const station = /station mapping is missing or ambiguous: (.+)$/.exec(message)?.[1];
   if (station) return safeLabel(station);
+  const plan = /^(KORAIL_PLAN_(?:MISSING|DUPLICATE|MISMATCH)): ([0-9]+)$/.exec(message);
+  if (plan) return `reason=${plan[1]},trainNumber=${plan[2]}`;
   const tagoSchema = /^TAGO ([A-Za-z0-9]+) schema mismatch: (content-type|invalid JSON|body|item|totalCount)(?: bodyFields=([A-Za-z0-9_,.-]+))?$/.exec(message);
   if (tagoSchema) {
     const reason = tagoSchema[2] === "invalid JSON" ? "invalid-json" : tagoSchema[2];
@@ -736,6 +930,13 @@ function completenessFailureContext(error) {
   if (/run plan returned zero rows/.test(message)) return "operation=travelerTrainRunPlan2,total=0";
   if (/run info returned zero rows/.test(message)) return "operation=travelerTrainRunInfo2,total=0";
   return null;
+}
+
+function rosterOdFailureContext(roster) {
+  const failure = Array.isArray(roster?.failedOds) && roster.failedOds.length === 1 ? roster.failedOds[0] : null;
+  if (!failure || !/^[A-Za-z0-9=,._-]+$/.test(failure.failureContext ?? "")) return null;
+  return `${failure.failureContext},departureStationId=${safeToken(failure.departureStationId)},`
+    + `arrivalStationId=${safeToken(failure.arrivalStationId)}`;
 }
 
 function isoServiceSeconds(value, runDate, label) {
@@ -785,9 +986,21 @@ function readCanonicalLine(packPath) {
       });
       byName.set(name, matches);
     }
+    const rosterStations = [
+      ...CAPITAL_APPROACH_STATIONS,
+      ...lineRows.map((row) => ({
+        canonicalStationId: row.id,
+        nameKo: row.name_ko,
+        corridorSequence: Number(row.line_sequence) + 3,
+        lineId: LINE_ID,
+      })),
+    ];
+    if (rosterStations.length !== 28 || new Set(rosterStations.map(({ canonicalStationId }) => canonicalStationId)).size !== 28) {
+      throw new Error("canonical ITX corridor must contain exactly 28 unique stations");
+    }
     return {
       byName,
-      rosterStations: lineRows.map((row) => ({ canonicalStationId: row.id, nameKo: row.name_ko })),
+      rosterStations,
       close() {
         opened.db.close();
         cleanupPackDir(opened.dir);

@@ -30,19 +30,221 @@ export function validateItxServiceDates(serviceDates, { now = new Date(), replay
 
 export function buildItxOdMatrix(date, stations) {
   calendarDate(date);
-  const ids = (stations ?? []).map(({ providerStationId }) => requiredString(providerStationId, "providerStationId")).sort();
-  if (ids.length < 2 || new Set(ids).size !== ids.length) throw new Error("ITX roster stations must be unique and contain at least 2 stations");
-  const rows = ids.flatMap((depStationId) => ids
+  const ordered = (stations ?? []).map(({ providerStationId, canonicalStationId, corridorSequence }) => ({
+    providerStationId: requiredString(providerStationId, "providerStationId"),
+    stationId: requiredString(canonicalStationId ?? providerStationId, "canonicalStationId"),
+    corridorSequence: Number.isInteger(corridorSequence) ? corridorSequence : null,
+  })).sort((left, right) => (
+    (left.corridorSequence ?? Number.MAX_SAFE_INTEGER) - (right.corridorSequence ?? Number.MAX_SAFE_INTEGER)
+      || stringCompare(left.stationId, right.stationId)
+  ));
+  const providerIds = ordered.map(({ providerStationId }) => providerStationId);
+  const stationIds = ordered.map(({ stationId }) => stationId);
+  if (providerIds.length < 2 || new Set(providerIds).size !== providerIds.length || new Set(stationIds).size !== stationIds.length) {
+    throw new Error("ITX roster stations must be unique and contain at least 2 stations");
+  }
+  const rows = providerIds.flatMap((depStationId) => providerIds
     .filter((arrStationId) => arrStationId !== depStationId)
     .map((arrStationId) => ({ date, depStationId, arrStationId })));
+  const stationIdByProviderId = new Map(ordered.map(({ providerStationId, stationId }) => [providerStationId, stationId]));
+  const hashTuples = rows.map(({ depStationId, arrStationId }) => (
+    [date, stationIdByProviderId.get(depStationId), stationIdByProviderId.get(arrStationId)]
+  )).sort((left, right) => stringCompare(JSON.stringify(left), JSON.stringify(right)));
   return {
     rows,
-    expectedOdCount: ids.length * (ids.length - 1),
-    stationSetHash: sha256(JSON.stringify(ids)),
-    odMatrixHash: sha256(JSON.stringify(rows.map(({ date: serviceDate, depStationId, arrStationId }) => (
-      [serviceDate, depStationId, arrStationId]
-    )))),
+    expectedOdCount: providerIds.length * (providerIds.length - 1),
+    stationSetHash: sha256(JSON.stringify([...stationIds].sort(stringCompare))),
+    odMatrixHash: sha256(JSON.stringify(hashTuples)),
   };
+}
+
+export function materializeTagoItxOdRows({
+  itineraries,
+  corridorStations,
+  serviceDate,
+  kricServiceDayCode,
+}) {
+  const serviceId = { "8": "weekday-kric", "7": "saturday-kric", "9": "holiday-kric" }[kricServiceDayCode];
+  if (serviceId === undefined) throw new Error("kricServiceDayCode must be 7, 8, or 9");
+  validateServiceDay(serviceDate, kricServiceDayCode);
+  if (!Array.isArray(itineraries) || itineraries.length === 0) {
+    throw new Error("TAGO_OD_PAIR_COVERAGE_INCOMPLETE: no itineraries");
+  }
+  if (!Array.isArray(corridorStations) || corridorStations.length < 2) {
+    throw new Error("TAGO_OD_STOP_SEQUENCE_INVALID: corridor stations");
+  }
+
+  const stationsById = new Map();
+  for (const [index, station] of corridorStations.entries()) {
+    const stationId = requiredString(station?.stationId, `corridorStations[${index}].stationId`);
+    const nameKo = requiredString(station?.nameKo, `corridorStations[${index}].nameKo`);
+    const corridorSequence = Number(station?.corridorSequence);
+    const lineId = requiredString(station?.lineId, `corridorStations[${index}].lineId`);
+    if (!Number.isInteger(corridorSequence) || corridorSequence <= 0 || stationsById.has(stationId)
+      || !["line-6e39be0cb6e2", "line-54a7b980b7c3"].includes(lineId)) {
+      throw new Error("TAGO_OD_STOP_SEQUENCE_INVALID: corridor stations");
+    }
+    stationsById.set(stationId, { stationId, nameKo, corridorSequence, lineId });
+  }
+
+  const grouped = new Map();
+  const uniqueOdKeys = new Set();
+  for (const [index, itinerary] of itineraries.entries()) {
+    const trainNumber = normalizeTrainNumber(itinerary?.trainNumber);
+    let departureStationId;
+    let arrivalStationId;
+    try {
+      departureStationId = requiredString(itinerary?.departureStationId, `itineraries[${index}].departureStationId`);
+      arrivalStationId = requiredString(itinerary?.arrivalStationId, `itineraries[${index}].arrivalStationId`);
+    } catch {
+      throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+    }
+    if (!stationsById.has(departureStationId) || !stationsById.has(arrivalStationId)) {
+      throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+    }
+    const key = JSON.stringify([serviceDate, trainNumber, departureStationId, arrivalStationId]);
+    if (uniqueOdKeys.has(key)) throw new Error(`TAGO_OD_DUPLICATE: ${trainNumber}`);
+    uniqueOdKeys.add(key);
+    const rows = grouped.get(trainNumber) ?? [];
+    if (typeof itinerary?.departureAt !== "string" || itinerary.departureAt === ""
+      || typeof itinerary?.arrivalAt !== "string" || itinerary.arrivalAt === "") {
+      throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+    }
+    rows.push({
+      trainNumber,
+      departureStationId,
+      arrivalStationId,
+      departureAt: itinerary.departureAt,
+      arrivalAt: itinerary.arrivalAt,
+    });
+    grouped.set(trainNumber, rows);
+  }
+
+  const trainNumbers = [...grouped.keys()].sort(naturalCompare);
+  const stationSequences = [];
+  const transitTrips = [];
+  const transitStopTimes = [];
+  for (const trainNumber of trainNumbers) {
+    const rows = grouped.get(trainNumber);
+    const signs = new Set(rows.map((row) => Math.sign(
+      stationsById.get(row.arrivalStationId).corridorSequence
+        - stationsById.get(row.departureStationId).corridorSequence,
+    )));
+    if (signs.size !== 1 || signs.has(0)) throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+    const directionId = signs.has(1) ? "up" : "down";
+    const stopIds = [...new Set(rows.flatMap(({ departureStationId, arrivalStationId }) => (
+      [departureStationId, arrivalStationId]
+    )))].sort((left, right) => {
+      const difference = stationsById.get(left).corridorSequence - stationsById.get(right).corridorSequence;
+      return (directionId === "up" ? difference : -difference) || naturalCompare(left, right);
+    });
+    if (stopIds.length < 2) throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+    const usedSequences = stopIds.map((stationId) => stationsById.get(stationId).corridorSequence);
+    if (new Set(usedSequences).size !== usedSequences.length) {
+      throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+    }
+
+    const pairByEndpoints = new Map(rows.map((row) => [
+      `${row.departureStationId}\u0000${row.arrivalStationId}`,
+      row,
+    ]));
+    const missingPairs = [];
+    for (let from = 0; from < stopIds.length - 1; from += 1) {
+      for (let to = from + 1; to < stopIds.length; to += 1) {
+        if (!pairByEndpoints.has(`${stopIds[from]}\u0000${stopIds[to]}`)) {
+          missingPairs.push([stopIds[from], stopIds[to]]);
+        }
+      }
+    }
+    const expectedPairCount = stopIds.length * (stopIds.length - 1) / 2;
+    if (missingPairs.length > 0 || rows.length !== expectedPairCount) {
+      throw new Error(`TAGO_OD_PAIR_COVERAGE_INCOMPLETE: ${trainNumber}`);
+    }
+
+    const stops = stopIds.map((stationId, index) => {
+      const arrivals = new Set(rows.filter((row) => row.arrivalStationId === stationId).map(({ arrivalAt }) => arrivalAt));
+      const departures = new Set(rows.filter((row) => row.departureStationId === stationId).map(({ departureAt }) => departureAt));
+      if (arrivals.size > 1 || departures.size > 1
+        || (index > 0 && arrivals.size !== 1)
+        || (index < stopIds.length - 1 && departures.size !== 1)) {
+        throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+      }
+      const arrivalAt = index === 0 ? [...departures][0] : [...arrivals][0];
+      const departureAt = index === stopIds.length - 1 ? [...arrivals][0] : [...departures][0];
+      const arrivalSeconds = tagoServiceSeconds(arrivalAt, serviceDate, trainNumber);
+      const departureSeconds = tagoServiceSeconds(departureAt, serviceDate, trainNumber);
+      if (arrivalSeconds > departureSeconds) throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+      const station = stationsById.get(stationId);
+      return { ...station, arrivalAt, departureAt, arrivalSeconds, departureSeconds };
+    });
+    for (let index = 1; index < stops.length; index += 1) {
+      if (stops[index - 1].departureSeconds > stops[index].arrivalSeconds) {
+        throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+      }
+    }
+    for (let from = 0; from < stops.length - 1; from += 1) {
+      for (let to = from + 1; to < stops.length; to += 1) {
+        const pair = pairByEndpoints.get(`${stops[from].stationId}\u0000${stops[to].stationId}`);
+        if (pair.departureAt !== stops[from].departureAt || pair.arrivalAt !== stops[to].arrivalAt) {
+          throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+        }
+      }
+    }
+
+    const routeId = `route-line-54a7b980b7c3-${directionId}`;
+    const tripId = `${routeId}-${trainNumber}-${kricServiceDayCode}`;
+    transitTrips.push({
+      id: tripId,
+      routeId,
+      serviceId,
+      tripHeadsign: stops.at(-1).nameKo,
+      directionId,
+      servicePattern: "EXPRESS",
+    });
+    stops.forEach((stop, index) => transitStopTimes.push({
+      tripId,
+      stopSequence: index + 1,
+      stationId: stop.stationId,
+      lineId: stop.lineId,
+      arrivalSeconds: stop.arrivalSeconds,
+      departureSeconds: stop.departureSeconds,
+    }));
+    stationSequences.push({
+      trainNumber,
+      directionId,
+      originStationName: stops[0].nameKo,
+      destinationStationName: stops.at(-1).nameKo,
+      terminalVariant: `${stops[0].nameKo}→${stops.at(-1).nameKo}`,
+      observedOdCount: rows.length,
+      stopCount: stops.length,
+      conflictingTimestampCount: 0,
+      missingPairCount: 0,
+      duplicateOdCount: 0,
+      stops: stops.map((stop, index) => ({ ...stop, stopSequence: index + 1 })),
+    });
+  }
+
+  transitTrips.sort((left, right) => stringCompare(left.id, right.id));
+  transitStopTimes.sort((left, right) => stringCompare(left.tripId, right.tripId) || left.stopSequence - right.stopSequence);
+  return {
+    trainNumbers,
+    stationSequences,
+    transitTrips,
+    transitStopTimes,
+    reconstructionSummary: {
+      trainCount: trainNumbers.length,
+      stopCount: transitStopTimes.length,
+      conflictingTimestampCount: 0,
+      missingPairCount: 0,
+      duplicateOdCount: 0,
+    },
+  };
+}
+
+export function normalizeTrainNumber(value) {
+  const digits = String(value ?? "").replace(/\D+/g, "").replace(/^0+/, "");
+  if (digits === "") throw new Error("invalid train number");
+  return digits;
 }
 
 export async function collectTagoItxCheongchunRoster({
@@ -74,7 +276,7 @@ export async function collectTagoItxCheongchunRoster({
   }
   const stations = [];
   const excludedCanonicalStations = [];
-  for (const { canonicalStationId, nameKo } of canonicalStations) {
+  for (const { canonicalStationId, nameKo, corridorSequence, lineId } of canonicalStations) {
     const canonicalId = requiredString(canonicalStationId, "canonicalStations.canonicalStationId");
     const canonicalName = requiredString(nameKo, "canonicalStations.nameKo");
     const matches = stationRows.filter((row) => normalize(row.nodename) === normalize(canonicalName));
@@ -91,14 +293,35 @@ export async function collectTagoItxCheongchunRoster({
       providerStationId: requiredString(matches[0].nodeid, `${canonicalName}.nodeid`),
       providerStationName: matches[0].nodename,
       canonicalStationId: canonicalId,
+      nameKo: canonicalName,
+      corridorSequence: Number(corridorSequence),
+      lineId: requiredString(lineId, `${canonicalName}.lineId`),
     });
   }
+  const requiredStationNames = ["용산", "옥수", "왕십리", "청량리", "춘천"];
+  const excludedRequired = requiredStationNames.filter((name) => (
+    canonicalStations.some((station) => normalize(station.nameKo) === normalize(name))
+      && !stations.some((station) => normalize(station.nameKo) === normalize(name))
+  ));
+  if (excludedRequired.length > 0) {
+    throw new Error(`TAGO required station mapping is incomplete: ${excludedRequired.map(safeCode).join(",")}`);
+  }
+  stations.sort((left, right) => left.corridorSequence - right.corridorSequence
+    || stringCompare(left.canonicalStationId, right.canonicalStationId));
   const matrix = buildItxOdMatrix(serviceDate, stations);
+  const catalogRequestCount = [trainGrades, cities, ...stationOperations]
+    .reduce((total, operation) => total + operation.requestCount, 0);
+  const worstCaseOdRequestCount = matrix.expectedOdCount * 3;
+  if (catalogRequestCount + worstCaseOdRequestCount > 10_000) {
+    throw new Error("TAGO OD quota budget exceeded");
+  }
   const stationByProviderId = new Map(stations.map((station) => [station.providerStationId, station]));
   const odOperations = [];
   const itineraries = [];
   const failedOds = [];
   for (const { depStationId, arrStationId } of matrix.rows) {
+    const departureStation = stationByProviderId.get(depStationId);
+    const arrivalStation = stationByProviderId.get(arrStationId);
     try {
       const operation = await fetchAll("GetStrtpntAlocFndTrainInfo", {
         depPlaceId: depStationId,
@@ -106,8 +329,6 @@ export async function collectTagoItxCheongchunRoster({
         depPlandTime: serviceDate,
         trainGradeCode: grade.vehiclekndid,
       }, key, fetchImpl);
-      const departureStation = stationByProviderId.get(depStationId);
-      const arrivalStation = stationByProviderId.get(arrStationId);
       const normalizedItineraries = operation.rows.map((row, index) => ({
         ...normalizeItinerary(row, index, {
           serviceDate,
@@ -119,18 +340,27 @@ export async function collectTagoItxCheongchunRoster({
       }));
       odOperations.push(operation);
       itineraries.push(...normalizedItineraries);
-    } catch {
+    } catch (error) {
+      const failure = tagoOdFailure(error);
       failedOds.push({
-        departureStationId: depStationId,
-        arrivalStationId: arrStationId,
-        reasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
+        departureStationId: departureStation.canonicalStationId,
+        arrivalStationId: arrivalStation.canonicalStationId,
+        ...failure,
       });
     }
   }
-  const trainNumbers = [...new Set(itineraries.map(({ trainNumber }) => trainNumber))].sort(naturalCompare);
+  const trainNumbers = [...new Set(itineraries.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)))].sort(naturalCompare);
   if (trainNumbers.length === 0 && failedOds.length === 0) throw new Error("TAGO ITX-청춘 roster returned zero rows");
-  return {
-    schemaVersion: 1,
+  const materialized = failedOds.length === 0 ? materializeTagoItxOdRows({
+    itineraries,
+    corridorStations: stations.map(({ canonicalStationId, nameKo, corridorSequence, lineId }) => ({
+      stationId: canonicalStationId, nameKo, corridorSequence, lineId,
+    })),
+    serviceDate,
+    kricServiceDayCode,
+  }) : null;
+  const artifact = {
+    schemaVersion: 2,
     artifactKind: "tago-itx-cheongchun-roster-evidence",
     serviceId: "ITX_CHEONGCHUN",
     officialSourceUrl: DETAIL_URL,
@@ -141,22 +371,26 @@ export async function collectTagoItxCheongchunRoster({
     canonicalStationCount: canonicalStations.length,
     rosterStationCount: stations.length,
     excludedCanonicalStations: excludedCanonicalStations.sort((left, right) => naturalCompare(left.nameKo, right.nameKo)),
-    stations: stations.sort((left, right) => left.providerStationId.localeCompare(right.providerStationId)),
+    stations,
     expectedOdCount: matrix.expectedOdCount,
     completedOdCount: odOperations.length,
     failedOdCount: failedOds.length,
     ...(failedOds.length > 0 ? { failedOds } : {}),
     stationSetHash: matrix.stationSetHash,
     odMatrixHash: matrix.odMatrixHash,
+    quotaSummary: {
+      catalogRequestCount,
+      remainingInitialRequestBudget: 10_000 - catalogRequestCount,
+      worstCaseOdRequestCount,
+    },
     operations: [trainGrades, cities, ...stationOperations, ...odOperations].map(operationEvidence),
-    trainNumbers,
+    trainNumbers: materialized?.trainNumbers ?? trainNumbers,
     itineraries,
-    evidenceHash: sha256(JSON.stringify({
-      serviceDate, kricServiceDayCode, stations, excludedCanonicalStations, matrix,
-      ...(failedOds.length > 0 ? { failedOds } : {}), trainNumbers, itineraries,
-    })),
+    ...(materialized ? materialized : {}),
     credentialRedacted: true,
   };
+  artifact.evidenceHash = sha256(JSON.stringify(artifact));
+  return artifact;
 }
 
 export async function collectTagoItxCheongchunOd({
@@ -230,6 +464,7 @@ async function fetchAll(operation, query, key, fetchImpl) {
   }
   const all = [];
   const rawHashes = [];
+  let requestCount = 0;
   let totalCount = null;
   const maxPages = paginated ? 100 : 1;
   for (let pageNo = 1; pageNo <= maxPages; pageNo += 1) {
@@ -238,7 +473,9 @@ async function fetchAll(operation, query, key, fetchImpl) {
     for (const [name, value] of Object.entries({ serviceKey: key, _type: "json", ...pagination, ...query })) {
       url.searchParams.set(name, String(value));
     }
-    const response = await fetchWithRetry(url, fetchImpl);
+    const fetched = await fetchWithRetry(url, fetchImpl);
+    const response = fetched.response;
+    requestCount += fetched.attemptCount;
     if (!response.ok) {
       if (response.body) await response.body.cancel().catch(() => {});
       throw new Error(`TAGO ${operation} HTTP ${response.status}`);
@@ -284,7 +521,7 @@ async function fetchAll(operation, query, key, fetchImpl) {
     if (rows.length === 0) throw new Error(`TAGO ${operation} pagination incomplete`);
   }
   if (all.length !== totalCount) throw new Error(`TAGO ${operation} pagination incomplete`);
-  return { operation, endpoint: `${BASE}/${operation}`, pageCount: rawHashes.length, totalCount, rawResponseSha256: sha256(rawHashes.join("|")), rows: all };
+  return { operation, endpoint: `${BASE}/${operation}`, pageCount: rawHashes.length, requestCount, totalCount, rawResponseSha256: sha256(rawHashes.join("|")), rows: all };
 }
 
 async function fetchWithRetry(url, fetchImpl) {
@@ -296,7 +533,7 @@ async function fetchWithRetry(url, fetchImpl) {
         headers: { accept: "application/json" },
       });
       const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
-      if (!retryable || attempt === 2) return response;
+      if (!retryable || attempt === 2) return { response, attemptCount: attempt + 1 };
       if (response.body) await response.body.cancel().catch(() => {});
     } catch (error) {
       if (attempt === 2) throw new Error("TAGO transport failure", { cause: error });
@@ -352,6 +589,24 @@ function providerTimestamp(value, label) {
   return { iso, epoch };
 }
 
+function tagoServiceSeconds(value, serviceDate, trainNumber) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\+09:00$/.exec(String(value ?? ""));
+  if (!match) throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+  const timestampDate = `${match[1]}${match[2]}${match[3]}`;
+  const hours = Number(match[4]);
+  const minutes = Number(match[5]);
+  const seconds = Number(match[6]);
+  if (hours > 23 || minutes > 59 || seconds > 59) {
+    throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+  }
+  const next = calendarDate(serviceDate);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const nextServiceDate = `${next.getUTCFullYear()}${String(next.getUTCMonth() + 1).padStart(2, "0")}${String(next.getUTCDate()).padStart(2, "0")}`;
+  const offset = timestampDate === serviceDate ? 0 : timestampDate === nextServiceDate && hours <= 2 ? 86_400 : null;
+  if (offset === null) throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
+  return offset + hours * 3600 + minutes * 60 + seconds;
+}
+
 function kstDate(value) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en", {
     timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
@@ -376,8 +631,55 @@ function validateServiceDay(value, dayCd) {
   return date;
 }
 
-function operationEvidence({ operation, endpoint, pageCount, totalCount, rawResponseSha256 }) {
-  return { operation, endpoint, pageCount, totalCount, providerResultCode: "00", schemaStatus: "EXPECTED", rawResponseSha256 };
+function operationEvidence({ operation, endpoint, pageCount, requestCount, totalCount, rawResponseSha256 }) {
+  return { operation, endpoint, pageCount, requestCount, totalCount, providerResultCode: "00", schemaStatus: "EXPECTED", rawResponseSha256 };
+}
+
+function tagoOdFailure(error) {
+  const message = error instanceof Error ? error.message : "";
+  const httpStatus = /^TAGO GetStrtpntAlocFndTrainInfo HTTP (408|429|[5-9]\d\d)$/.exec(message)?.[1];
+  if (httpStatus) {
+    return {
+      reasonCode: "PROVIDER_HTTP_FAILURE",
+      failureContext: `operation=GetStrtpntAlocFndTrainInfo,httpStatus=${httpStatus}`,
+    };
+  }
+  const schema = /^TAGO GetStrtpntAlocFndTrainInfo schema mismatch: (content-type|invalid JSON|body|item|totalCount)(?: bodyFields=([A-Za-z0-9_,.-]+))?$/.exec(message);
+  if (schema) {
+    const reason = schema[1] === "invalid JSON" ? "invalid-json" : schema[1];
+    return {
+      reasonCode: "PROVIDER_SCHEMA_FAILURE",
+      failureContext: `operation=GetStrtpntAlocFndTrainInfo,reason=schema_mismatch,${reason}`
+        + (schema[2] ? `,bodyFields=${schema[2]}` : ""),
+    };
+  }
+  if (/^TAGO transport failure$/.test(message)) {
+    return { reasonCode: "PROVIDER_TRANSPORT_FAILURE", failureContext: "operation=GetStrtpntAlocFndTrainInfo" };
+  }
+  if (/provider resultCode/.test(message)) {
+    return { reasonCode: "PROVIDER_RESULT_FAILURE", failureContext: "operation=GetStrtpntAlocFndTrainInfo" };
+  }
+  if (/pagination incomplete/.test(message)) {
+    return {
+      reasonCode: "PROVIDER_PAGINATION_INCOMPLETE",
+      failureContext: "operation=GetStrtpntAlocFndTrainInfo,reason=pagination_incomplete",
+    };
+  }
+  for (const [pattern, reason] of [
+    [/station mismatch/, "station_mismatch"],
+    [/departure date mismatch/, "date_mismatch"],
+    [/train grade mismatch/, "train_grade_mismatch"],
+    [/arrival must follow departure/, "time_order_mismatch"],
+    [/must be YYYYMMDDHHMISS|is invalid|adultcharge is invalid/, "field_contract_mismatch"],
+  ]) {
+    if (pattern.test(message)) {
+      return {
+        reasonCode: "PROVIDER_SCHEMA_FAILURE",
+        failureContext: `operation=GetStrtpntAlocFndTrainInfo,reason=${reason}`,
+      };
+    }
+  }
+  return { reasonCode: "PROVIDER_OR_SCHEMA_FAILURE", failureContext: "operation=GetStrtpntAlocFndTrainInfo" };
 }
 
 function decodedServiceKey(value) {
@@ -390,6 +692,7 @@ function requiredString(value, label) { if (typeof value !== "string" || value.t
 function safeCode(value) { return /^[A-Za-z0-9._-]{1,32}$/.test(value) ? value : "UNKNOWN"; }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function naturalCompare(left, right) { return left.localeCompare(right, "ko", { numeric: true }); }
+function stringCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function parseArgs(argv) { const result = {}; for (let i = 0; i < argv.length; i += 2) result[argv[i]?.replace(/^--/, "")] = argv[i + 1]; return result; }
 
 async function main() {

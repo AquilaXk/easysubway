@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "artifactKind": "itx-cheongchun-coverage-contract",
   "serviceId": "ITX_CHEONGCHUN",
   "canonicalLineId": "line-54a7b980b7c3",
@@ -14,12 +14,16 @@
     "maxFutureDays": 6,
     "replayAdmissionAllowed": false,
     "serviceDayCodes": { "8": "WEEKDAY", "7": "SATURDAY", "9": "SUNDAY_OR_HOLIDAY" },
-    "rosterStationUniverse": "CANONICAL_GYEONGCHUN_INTERSECT_TAGO_TRAIN_STATION_CATALOG",
+    "rosterStationUniverse": "CANONICAL_ITX_CORRIDOR_28_INTERSECT_TAGO_TRAIN_STATION_CATALOG",
     "excludedStationEvidenceRequired": true,
     "odMatrixHashInput": ["date", "depStationId", "arrStationId"],
     "odMatrixCanonicalSerialization": "SORTED_TUPLE_ARRAY_JSON_UTF8",
-    "requiredDirections": ["D", "U"],
-    "requiredTrainNumberSets": ["ROSTER", "PLAN", "INFO", "MATERIALIZED"],
+    "requiredDirections": ["up", "down"],
+    "requiredTrainNumberSets": ["TAGO_OD", "KORAIL_PLAN", "MATERIALIZED"],
+    "operationResponseContracts": {
+      "nonPaginated": ["GetVhcleKndList", "GetCtyCodeList"],
+      "paginated": ["GetCtyAcctoTrainSttnList", "GetStrtpntAlocFndTrainInfo"]
+    },
     "incompleteStatus": "MISSING",
     "cliFailureExitCode": 1
   },

@@ -6,9 +6,11 @@ import test from "node:test";
 
 import {
   collectKorailItxCheongchunCompleteness,
+  collectKorailItxCheongchunPlan,
   collectKorailItxCheongchunTimetable,
   materializeKorailItxRows,
   runKorailItxCompletenessCli,
+  validateKorailItxPlans,
 } from "./collect-korail-itx-cheongchun-timetable.mjs";
 
 const PACK_PATH = "apps/mobile/assets/datapacks/capital.sqlite.gz";
@@ -118,14 +120,16 @@ function trainNumberEvidence() {
 
 test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission artifact로 묶는다", async () => {
   const calls = [];
+  const corridorInputs = [];
   const artifact = await collectKorailItxCheongchunCompleteness({
     serviceKey: "secret",
     serviceDates: { "8": "20260715", "7": "20260718", "9": "20260719" },
     packPath: PACK_PATH,
     now: new Date("2026-07-14T00:00:00.000Z"),
-    collectRosterImpl: async ({ serviceDate, kricServiceDayCode }) => ({
-      ...trainNumberEvidence(), serviceDate, kricServiceDayCode,
-    }),
+    collectRosterImpl: async ({ serviceDate, kricServiceDayCode, canonicalStations }) => {
+      corridorInputs.push(canonicalStations);
+      return { ...trainNumberEvidence(), serviceDate, kricServiceDayCode };
+    },
     collectTimetableImpl: async ({ runDate, kricServiceDayCode }) => {
       calls.push([kricServiceDayCode, runDate]);
       return {
@@ -140,10 +144,20 @@ test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission ar
   });
 
   assert.deepEqual(calls, [["8", "20260715"], ["7", "20260718"], ["9", "20260719"]]);
+  assert.equal(corridorInputs.length, 3);
+  assert.equal(corridorInputs[0].length, 28);
+  assert.deepEqual(corridorInputs[0].slice(0, 3), [
+    { canonicalStationId: "station-8aa315864466", nameKo: "용산", corridorSequence: 1, lineId: "line-6e39be0cb6e2" },
+    { canonicalStationId: "station-c0679b9a6cf8", nameKo: "옥수", corridorSequence: 2, lineId: "line-6e39be0cb6e2" },
+    { canonicalStationId: "station-e5cf592cf355", nameKo: "왕십리", corridorSequence: 3, lineId: "line-6e39be0cb6e2" },
+  ]);
+  assert.deepEqual(corridorInputs[0].slice(3).map(({ corridorSequence }) => corridorSequence), [
+    4, 5, 6, 7, 8, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+  ]);
   assert.deepEqual(artifact.selectedServiceDates, { "8": "20260715", "7": "20260718", "9": "20260719" });
   assert.equal(artifact.admissionStatus, "SUPPORTED");
   assert.equal(artifact.admissionEligible, true);
-  assert.deepEqual(artifact.allowedConsumerIssues, ["#1400", "#2098", "#2099"]);
+  assert.deepEqual(artifact.allowedConsumerIssues, ["#1400", "#2098", "#2099", "#2058", "#2137"]);
   assert.equal(artifact.serviceDays.length, 3);
   assert.match(artifact.evidenceHash, /^[a-f0-9]{64}$/);
   assert.doesNotMatch(JSON.stringify(artifact), /secret/);
@@ -168,7 +182,7 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.admissionStatus, "MISSING");
     assert.equal(artifact.admissionEligible, false);
     assert.equal(artifact.serviceDays.length, 3);
-    assert.equal(artifact.serviceDays[1].failureStage, "TIMETABLE");
+    assert.equal(artifact.serviceDays[1].failureStage, "PLAN_VALIDATION");
     assert.equal(artifact.serviceDays[1].failureReasonCode, "PLANNED_TIME_MISSING");
   });
 
@@ -216,6 +230,12 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
         ...trainNumberEvidence(), serviceDate, kricServiceDayCode,
         completedOdCount: 1,
         failedOdCount: 1,
+        failedOds: [{
+          departureStationId: "station-a",
+          arrivalStationId: "station-b",
+          reasonCode: "PROVIDER_HTTP_FAILURE",
+          failureContext: "operation=GetStrtpntAlocFndTrainInfo,httpStatus=503",
+        }],
       }),
       collectTimetableImpl: async () => assert.fail("must not run"),
     });
@@ -223,6 +243,21 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.serviceDays[0].completedOdCount, 1);
     assert.equal(artifact.serviceDays[0].failedOdCount, 1);
     assert.equal(artifact.admissionStatus, "MISSING");
+    assert.equal(
+      artifact.serviceDays[0].failureContext,
+      "operation=GetStrtpntAlocFndTrainInfo,httpStatus=503,departureStationId=station-a,arrivalStationId=station-b",
+    );
+  });
+
+  await context.test("KORAIL plan 누락 context", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"), collectRosterImpl: roster,
+      collectTimetableImpl: async () => { throw new Error("KORAIL_PLAN_MISSING: 2041"); },
+    });
+    assert.equal(artifact.serviceDays[0].failureStage, "PLAN_VALIDATION");
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "KORAIL_PLAN_MISSING");
+    assert.equal(artifact.serviceDays[0].failureContext, "reason=KORAIL_PLAN_MISSING,trainNumber=2041");
   });
 
   await context.test("station mapping 오류", async () => {
@@ -290,7 +325,7 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
         );
       },
     });
-    assert.equal(artifact.serviceDays[0].failureStage, "TIMETABLE");
+    assert.equal(artifact.serviceDays[0].failureStage, "PLAN_VALIDATION");
     assert.equal(artifact.serviceDays[0].expectedOdCount, 2);
     assert.equal(artifact.serviceDays[0].completedOdCount, 2);
     assert.equal(artifact.serviceDays[0].failedOdCount, 0);
@@ -933,3 +968,69 @@ test("Korail/TAGO timetable join은 service date가 다르면 거부한다", asy
     },
   }), /service date mismatch/);
 });
+
+test("KORAIL plan은 TAGO materialized 열차별 exact 1행만 선택해 endpoint 시각을 검증한다", () => {
+  const selected = validateKorailItxPlans({
+    plans: [
+      planRow("9999", "서울", "부산", "20260713050000", "20260713100000"),
+      planRow("02001", "용산", "춘천", "20260713060000", "20260713080000"),
+    ],
+    materialized: tagoMaterializedFixture(),
+    runDate: "20260713",
+  });
+
+  assert.deepEqual(selected.trainNumbers, ["2001"]);
+  assert.equal(selected.selectedPlans.length, 1);
+  assert.equal(selected.selectedPlans[0].normalizedTrainNumber, "2001");
+  assert.match(selected.trainSetHash, /^[a-f0-9]{64}$/);
+});
+
+test("fresh KORAIL admission은 travelerTrainRunPlan2만 호출하고 future info를 호출하지 않는다", async () => {
+  const requestedOperations = [];
+  const artifact = await collectKorailItxCheongchunPlan({
+    serviceKey: "key",
+    runDate: "20260713",
+    kricServiceDayCode: "8",
+    trainNumberEvidence: {
+      ...trainNumberEvidence(),
+      schemaVersion: 2,
+      ...tagoMaterializedFixture(),
+    },
+    fetchImpl: async (url) => {
+      requestedOperations.push(url.pathname.split("/").at(-1));
+      return apiResponse([planRow("02001", "용산", "춘천", "20260713060000", "20260713080000")]);
+    },
+  });
+
+  assert.deepEqual(requestedOperations, ["travelerTrainRunPlan2"]);
+  assert.equal(artifact.materialization.status, "SUPPORTED");
+  assert.deepEqual(artifact.requiredTrainNumberSets, ["TAGO_OD", "KORAIL_PLAN", "MATERIALIZED"]);
+});
+
+test("KORAIL plan selection은 missing·duplicate·date·endpoint·time mismatch를 구분한다", () => {
+  const materialized = tagoMaterializedFixture();
+  const valid = planRow("02001", "용산", "춘천", "20260713060000", "20260713080000");
+  const input = (plans) => ({ plans, materialized, runDate: "20260713" });
+
+  assert.throws(() => validateKorailItxPlans(input([])), /KORAIL_PLAN_MISSING/);
+  assert.throws(() => validateKorailItxPlans(input([valid, { ...valid }])), /KORAIL_PLAN_DUPLICATE/);
+  assert.throws(() => validateKorailItxPlans(input([{ ...valid, run_ymd: "20260714" }])), /KORAIL_PLAN_MISMATCH/);
+  assert.throws(() => validateKorailItxPlans(input([{ ...valid, arvl_stn_nm: "청량리" }])), /KORAIL_PLAN_MISMATCH/);
+  assert.throws(() => validateKorailItxPlans(input([{ ...valid, trn_plan_arvl_dt: "20260713080100" }])), /KORAIL_PLAN_MISMATCH/);
+  assert.throws(() => validateKorailItxPlans(input([
+    planRow("02001", "용산", "대전", "20260713060000", "20260713080000"),
+  ])), /KORAIL_PLAN_MISMATCH/);
+});
+
+function tagoMaterializedFixture() {
+  return {
+    trainNumbers: ["2001"],
+    stationSequences: [{
+      trainNumber: "2001",
+      stops: [
+        { nameKo: "용산", departureSeconds: 21_600 },
+        { nameKo: "춘천", arrivalSeconds: 28_800 },
+      ],
+    }],
+  };
+}
