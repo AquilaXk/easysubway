@@ -168,6 +168,8 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.admissionStatus, "MISSING");
     assert.equal(artifact.admissionEligible, false);
     assert.equal(artifact.serviceDays.length, 3);
+    assert.equal(artifact.serviceDays[1].failureStage, "TIMETABLE");
+    assert.equal(artifact.serviceDays[1].failureReasonCode, "PLANNED_TIME_MISSING");
   });
 
   await context.test("replay", async () => {
@@ -535,6 +537,14 @@ test("Korail ITX materialization은 경춘선 밖 역을 포함한 용산~춘천
     "station-f3d9c93ba7d6",
     "station-dd14cfb89cbc",
   ]);
+  assert.deepEqual(materialized.transitStopTimes.map(({ lineId }) => lineId), [
+    "line-6e39be0cb6e2",
+    "line-6e39be0cb6e2",
+    "line-6e39be0cb6e2",
+    "line-54a7b980b7c3",
+    "line-54a7b980b7c3",
+    "line-54a7b980b7c3",
+  ]);
 });
 
 test("Korail collector는 한 방향 roster를 timetable로 admission하지 않는다", async () => {
@@ -636,6 +646,13 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
       ? { ...row, trn_plan_dptre_dt: "" }
       : row);
     assert.throws(() => materializeKorailItxRows({ ...base, plans: missingPlanTime }), /plan timestamp missing/);
+  });
+
+  await context.test("plan 시각의 service date 불일치", () => {
+    const wrongPlanDate = plans.map((row) => row.trn_no === "02001"
+      ? { ...row, trn_plan_dptre_dt: "20260712060000" }
+      : row);
+    assert.throws(() => materializeKorailItxRows({ ...base, plans: wrongPlanDate }), /runDate or the immediately following date/);
   });
 
   await context.test("canonical mapping이 없는 여객 정차", () => {

@@ -12,6 +12,7 @@ import {
 const API_ORIGIN = "https://apis.data.go.kr";
 const DETAIL_URL = "https://www.data.go.kr/data/15125762/openapi.do";
 const LINE_ID = "line-54a7b980b7c3";
+const CAPITAL_APPROACH_LINE_ID = "line-6e39be0cb6e2";
 const EXPECTED_FIELDS = Object.freeze({
   codes: Object.freeze(["code", "type", "value"]),
   plan: Object.freeze([
@@ -61,10 +62,17 @@ export async function collectKorailItxCheongchunCompleteness({
         fetchImpl,
         now,
       });
+      const timetableSupported = timetable.materialization?.status === "SUPPORTED";
       serviceDays.push({
         dayCd,
         serviceDate,
-        status: timetable.materialization?.status === "SUPPORTED" ? "SUPPORTED" : "MISSING",
+        status: timetableSupported ? "SUPPORTED" : "MISSING",
+        ...(!timetableSupported ? {
+          failureStage: "TIMETABLE",
+          failureReasonCode: timetable.materialization?.status === "MISSING_STATION_TIMES"
+            ? timetable.materialization?.stationTimeCapability?.reasonCode ?? "PLANNED_TIME_MISSING"
+            : "TIMETABLE_MATERIALIZATION_INCOMPLETE",
+        } : {}),
         expectedOdCount: roster.expectedOdCount,
         completedOdCount: roster.completedOdCount,
         failedOdCount: roster.failedOdCount,
@@ -339,7 +347,7 @@ export function analyzeKorailItxRows({
   const canonical = readCanonicalLine(packPath);
   try {
     const grouped = groupKorailInfoRows({ infoRows, runDate, routeCode, allowed, planByTrain });
-    const sequenceAnalysis = analyzeStationSequences({ grouped, canonical, passengerStopCodes, planByTrain });
+    const sequenceAnalysis = analyzeStationSequences({ grouped, canonical, passengerStopCodes, planByTrain, runDate });
     return {
       trainNumbers: [...grouped.keys()].sort(naturalCompare),
       stationMappings: [...sequenceAnalysis.stationMappings.values()].sort((left, right) => (
@@ -373,7 +381,7 @@ function groupKorailInfoRows({ infoRows, runDate, routeCode, allowed, planByTrai
   return grouped;
 }
 
-function analyzeStationSequences({ grouped, canonical, passengerStopCodes, planByTrain }) {
+function analyzeStationSequences({ grouped, canonical, passengerStopCodes, planByTrain, runDate }) {
   const stationMappings = new Map();
   const stationSequences = [];
   let missingTimestampStopCount = 0;
@@ -382,15 +390,16 @@ function analyzeStationSequences({ grouped, canonical, passengerStopCodes, planB
     const directionCodes = new Set(ordered.map(({ row }) => requiredString(String(row.uppln_dn_se_cd), "uppln_dn_se_cd")));
     if (directionCodes.size !== 1) throw new Error(`Korail ITX direction mismatch: ${safeToken(trainNumber)}`);
     const selected = selectPassengerStops({ ordered, canonical, passengerStopCodes, stationMappings, trainNumber });
+    const stops = assignCanonicalLineIds(selected.stops, trainNumber);
     const plan = planByTrain.get(trainNumber);
-    validateCanonicalTrip(selected.stops, ordered, trainNumber, plan);
+    validateCanonicalTrip(stops, ordered, trainNumber, plan, runDate);
     missingTimestampStopCount += selected.missingTimestampStopCount;
     stationSequences.push({
       trainNumber,
       directionCode: [...directionCodes][0],
       originStationName: plan.dptre_stn_nm,
       destinationStationName: plan.arvl_stn_nm,
-      stops: selected.stops,
+      stops,
     });
   }
   return { stationMappings, stationSequences, missingTimestampStopCount };
@@ -438,6 +447,7 @@ function selectPassengerStops({ ordered, canonical, passengerStopCodes, stationM
       providerStationName: String(row.stn_nm),
       canonicalStationId: station.stationId,
       lineSequence: station.lineSequence,
+      lineMemberships: station.lineMemberships,
       stopCode,
       stopName: String(row.stop_se_nm),
       arrivalTimestamp,
@@ -447,7 +457,44 @@ function selectPassengerStops({ ordered, canonical, passengerStopCodes, stationM
   return { stops, missingTimestampStopCount };
 }
 
-function validateCanonicalTrip(stops, ordered, trainNumber, plan) {
+function assignCanonicalLineIds(stops, trainNumber) {
+  const resolved = stops.map((stop) => ({
+    ...stop,
+    canonicalLineId: Number.isInteger(stop.lineSequence) ? LINE_ID : null,
+  }));
+  const lineIndexes = resolved.flatMap((stop, index) => Number.isInteger(stop.lineSequence) ? [index] : []);
+  const firstLineIndex = lineIndexes[0];
+  const lastLineIndex = lineIndexes.at(-1);
+  if (firstLineIndex === undefined || lastLineIndex === undefined) {
+    throw new Error(`Korail ITX canonical line segment missing: ${safeToken(trainNumber)}`);
+  }
+  resolveOutsideSegmentLine(resolved, 0, firstLineIndex, trainNumber);
+  resolveOutsideSegmentLine(resolved, lastLineIndex, resolved.length - 1, trainNumber);
+  if (resolved.some(({ canonicalLineId }) => canonicalLineId === null)) {
+    throw new Error(`Korail ITX outside-line segment mapping is incomplete: ${safeToken(trainNumber)}`);
+  }
+  return resolved;
+}
+
+function resolveOutsideSegmentLine(stops, start, end, trainNumber) {
+  if (start === end || stops.slice(start, end + 1).every(({ canonicalLineId }) => canonicalLineId === LINE_ID)) return;
+  const common = stops.slice(start, end + 1).reduce((shared, stop) => {
+    const memberships = new Set(stop.lineMemberships.map(({ lineId }) => lineId));
+    return shared === null ? memberships : new Set([...shared].filter((lineId) => memberships.has(lineId)));
+  }, null);
+  const candidates = [...(common ?? [])].filter((lineId) => lineId !== LINE_ID).sort();
+  const selectedLineId = candidates.includes(CAPITAL_APPROACH_LINE_ID)
+    ? CAPITAL_APPROACH_LINE_ID
+    : candidates.length === 1 ? candidates[0] : null;
+  if (selectedLineId === null) {
+    throw new Error(`Korail ITX outside-line segment mapping is missing or ambiguous: ${safeToken(trainNumber)}`);
+  }
+  for (let index = start; index <= end; index += 1) {
+    if (stops[index].canonicalLineId === null) stops[index].canonicalLineId = selectedLineId;
+  }
+}
+
+function validateCanonicalTrip(stops, ordered, trainNumber, plan, runDate) {
   if (stops.length < 2) {
     const observed = ordered.slice(0, 30).map(({ row }) => (
       `${safeLabel(row.stn_nm)}:${safeLabel(row.stop_se_cd)}:${safeLabel(row.stop_se_nm)}`
@@ -465,6 +512,9 @@ function validateCanonicalTrip(stops, ordered, trainNumber, plan) {
   if (validProviderTimestamp(plan.trn_plan_dptre_dt) === null || validProviderTimestamp(plan.trn_plan_arvl_dt) === null) {
     throw new Error(`Korail ITX plan timestamp missing: ${safeToken(trainNumber)}`);
   }
+  const planDepartureSeconds = timestampSeconds(plan.trn_plan_dptre_dt, runDate, `plan departure[${safeToken(trainNumber)}]`);
+  const planArrivalSeconds = timestampSeconds(plan.trn_plan_arvl_dt, runDate, `plan arrival[${safeToken(trainNumber)}]`);
+  if (planDepartureSeconds > planArrivalSeconds) throw new Error(`Korail ITX plan arrival must follow departure: ${safeToken(trainNumber)}`);
   if (normalizeStationName(stops[0].providerStationName) !== normalizeStationName(plan.dptre_stn_nm)
     || normalizeStationName(stops.at(-1).providerStationName) !== normalizeStationName(plan.arvl_stn_nm)) {
     throw new Error(`Korail ITX plan endpoint mismatch: ${safeToken(trainNumber)}`);
@@ -492,7 +542,7 @@ function materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate)
       if (arrivalSeconds > departureSeconds) throw new Error(`Korail ITX arrival must precede departure: ${safeToken(trip.trainNumber)}`);
       return {
         stationId: stop.canonicalStationId,
-        lineId: LINE_ID,
+        lineId: stop.canonicalLineId,
         trnNo: trip.trainNumber,
         dayCd: kricServiceDayCode,
         arrivalSeconds,
@@ -671,16 +721,27 @@ function readCanonicalLine(packPath) {
     if (lineRows.length === 0) throw new Error(`canonical pack has no line: ${LINE_ID}`);
     const lineSequenceByStation = new Map(lineRows.map((row) => [row.id, row.line_sequence]));
     const rows = opened.db.prepare(`
-      SELECT id, name_ko
+      SELECT stations.id, stations.name_ko, station_lines.line_id, station_lines.line_sequence
       FROM stations
-      WHERE region = '수도권'
-      ORDER BY id
+      JOIN station_lines ON station_lines.station_id = stations.id
+      WHERE stations.region = '수도권'
+      ORDER BY stations.id, station_lines.line_id
     `).all();
-    const byName = new Map();
+    const stationsById = new Map();
     for (const row of rows) {
-      const name = normalizeStationName(row.name_ko);
+      const station = stationsById.get(row.id) ?? { stationId: row.id, nameKo: row.name_ko, lineMemberships: [] };
+      station.lineMemberships.push({ lineId: row.line_id, lineSequence: row.line_sequence });
+      stationsById.set(row.id, station);
+    }
+    const byName = new Map();
+    for (const station of stationsById.values()) {
+      const name = normalizeStationName(station.nameKo);
       const matches = byName.get(name) ?? [];
-      matches.push({ stationId: row.id, lineSequence: lineSequenceByStation.get(row.id) ?? null });
+      matches.push({
+        stationId: station.stationId,
+        lineSequence: lineSequenceByStation.get(station.stationId) ?? null,
+        lineMemberships: station.lineMemberships,
+      });
       byName.set(name, matches);
     }
     return {
@@ -943,9 +1004,18 @@ export async function runKorailItxCompletenessCli({
 
 async function main() {
   const { artifact, exitCode } = await runKorailItxCompletenessCli();
+  const totalExpectedOdCount = artifact.serviceDays.reduce((total, day) => total + (day.expectedOdCount ?? 0), 0);
+  const totalCompletedOdCount = artifact.serviceDays.reduce((total, day) => total + (day.completedOdCount ?? 0), 0);
+  const totalFailedOdCount = artifact.serviceDays.reduce((total, day) => total + (day.failedOdCount ?? 0), 0);
+  const failureCodes = artifact.serviceDays
+    .filter(({ status }) => status !== "SUPPORTED")
+    .map(({ dayCd, failureStage, failureReasonCode }) => `${dayCd}:${failureStage}:${failureReasonCode}`)
+    .join(",");
   console.log(
     `sanitized Korail ITX-청춘 completeness evidence ready: status=${artifact.admissionStatus},` +
-    ` serviceDays=${artifact.serviceDays.length}`,
+    ` serviceDays=${artifact.serviceDays.length}, expectedOd=${totalExpectedOdCount},` +
+    ` completedOd=${totalCompletedOdCount}, failedOd=${totalFailedOdCount},` +
+    ` failures=${failureCodes}, observedAt=${artifact.observedAt}, evidenceHash=${artifact.evidenceHash}`,
   );
   process.exitCode = exitCode;
 }

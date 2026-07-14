@@ -145,11 +145,11 @@ Expected: FAIL because 용산·옥수·왕십리 are dropped and completeness fi
 
 - [x] **Step 3: Map every passenger stop without fake line membership**
 
-Change the pack query to load all canonical stations by normalized name plus the existing Gyeongchun `line_sequence`. `selectPassengerStops` maps every passenger row through the all-station map, retains nullable Gyeongchun sequence, and rejects any unmapped row. The Gyeongchun-only subsequence remains monotonic.
+Change the pack query to load all canonical stations by normalized name plus their existing station-line memberships and the Gyeongchun `line_sequence`. `selectPassengerStops` maps every passenger row through the all-station map, uses the existing Gyeongui-Jungang membership for the Yongsan~Cheongnyangni approach segment, retains nullable Gyeongchun sequence, and rejects any unmapped or ambiguous segment. The Gyeongchun-only subsequence remains monotonic.
 
 - [x] **Step 4: Materialize directly from provider order**
 
-Build `transitTrips` and `transitStopTimes` from each trip's sorted `trn_run_sn`. Derive `directionId` from its Gyeongchun subsequence, preserve the provider direction code, require plan endpoints to equal the first/last passenger stops, and require all applicable timestamps. Do not add outside stations to `station_lines`.
+Build `transitTrips` and `transitStopTimes` from each trip's sorted `trn_run_sn`. Derive `directionId` from its Gyeongchun subsequence, preserve the provider direction code, require plan endpoints to equal the first/last passenger stops, and parse plan timestamps against `runDate` or its immediate next day. Do not add outside stations to `station_lines`; each stop references an already valid canonical station-line pair.
 
 - [x] **Step 5: Enforce exact set and direction completeness**
 

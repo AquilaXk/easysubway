@@ -27,7 +27,7 @@
 3. 각 OD 응답의 `totalCount`까지 전 페이지를 수집하고 당일 열차번호를 합집합·중복 제거해 공식 roster를 만든다.
 4. KORAIL `codes2`, `travelerTrainRunPlan2`, `travelerTrainRunInfo2`도 당일 범위를 전 페이지 수집한다. `mrnt_cd=경춘선` 이외의 운행정보는 거부한다.
 5. roster 열차번호로 KORAIL 계획과 운행정보를 결합하고, 계획의 실제 시발·종착 및 운행정보의 방향·전체 정차 순서를 확정한다.
-6. trip materialization은 탐색 역 집합과 분리한다. 용산·옥수·왕십리 등 경춘선 밖을 포함한 KORAIL 여객 정차 row 전부를 canonical station에 mapping하며, 하나라도 mapping하지 못하면 `MISSING`으로 판정한다.
+6. trip materialization은 탐색 역 집합과 분리한다. 용산·옥수·왕십리 등 경춘선 밖을 포함한 KORAIL 여객 정차 row 전부를 canonical station과 기존 실제 station-line membership에 mapping하며, 하나라도 mapping하지 못하면 `MISSING`으로 판정한다.
 
 roster 탐색 역의 모든 OD를 조회하는 방식은 고정 시종착 목록보다 호출 수가 많지만 현재 시·종착 변형을 누락하지 않는다. 고정 OD 목록은 시간이 지나면 새 변형을 놓치므로 채택하지 않는다. 열차번호 범위 추정도 공식 roster가 아니므로 사용하지 않는다.
 
@@ -73,7 +73,7 @@ CLI 인자와 output 경로 검증이 끝난 뒤 발생한 provider HTTP/schema/
 
 ## 구현 경계
 
-기존 `fetchAll`, KORAIL parser와 canonical pack reader를 재사용한다. 전체 trip의 stop_times는 collector 안에서 `trn_run_sn` 순서로 만들고, 경춘선 밖 역에 거짓 `station_line` membership을 추가하지 않는다. 기존 경춘선 line order는 topology projection 구간 검증에만 사용한다. 세 날짜 실행과 집합 비교를 담당하는 작은 orchestration 계층만 추가하며 새 runtime dependency나 product fallback은 추가하지 않는다.
+기존 `fetchAll`, KORAIL parser와 canonical pack reader를 재사용한다. 전체 trip의 stop_times는 collector 안에서 `trn_run_sn` 순서로 만들고, 용산~청량리 접근 구간은 canonical pack에 이미 존재하는 경의중앙선 membership을 사용하며 경춘선 밖 역에 거짓 `station_line` membership을 추가하지 않는다. 기존 경춘선 line order는 topology projection 구간 검증에만 사용한다. 세 날짜 실행과 집합 비교를 담당하는 작은 orchestration 계층만 추가하며 새 runtime dependency나 product fallback은 추가하지 않는다.
 
 현재 계약의 `trainSearch` 및 `trainSearchCoverage` 직접 연결 문구를 제거한다. artifact는 허용 scope만 선언한다. 실제 wiring 테스트는 `itx-cheongchun-coverage-contract.json`에 `trainSearch`가 없고, `nationwide-coverage-targets.json`의 ITX entry에 `trainSearchCoverage`가 없으며 `trainSearchOnly.services`가 `ITX_CHEONGCHUN`을 포함하지 않는지 검증한다.
 
