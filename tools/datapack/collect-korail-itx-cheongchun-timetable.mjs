@@ -5,8 +5,6 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { cleanupPackDir, openPack } from "../route-map/pack-io.mjs";
-import { reconstructTransitTrips } from "./reconstruct-transit-trips.mjs";
-
 const API_ORIGIN = "https://apis.data.go.kr";
 const DETAIL_URL = "https://www.data.go.kr/data/15125762/openapi.do";
 const LINE_ID = "line-54a7b980b7c3";
@@ -82,9 +80,25 @@ export async function collectKorailItxCheongchunTimetable({
     passengerStopCodes,
   };
   const analyzed = analyzeKorailItxRows(materializationInput);
+  const directions = [...new Set(analyzed.stationSequences.map(({ directionCode }) => directionCode))].sort();
+  if (!directions.includes("U") || !directions.includes("D")) {
+    throw new Error("Korail ITX roster must include both directions");
+  }
+  const terminalVariants = [...new Map(analyzed.stationSequences.map((trip) => {
+    const variant = {
+      directionCode: trip.directionCode,
+      originStationName: trip.originStationName,
+      destinationStationName: trip.destinationStationName,
+    };
+    return [JSON.stringify(variant), variant];
+  })).values()].sort((left, right) => (
+    left.directionCode.localeCompare(right.directionCode)
+    || naturalCompare(left.originStationName, right.originStationName)
+    || naturalCompare(left.destinationStationName, right.destinationStationName)
+  ));
   const materialized = analyzed.missingTimestampStopCount === 0
     ? materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate)
-    : { transitTrips: [], transitStopTimes: [], trainNumbers: analyzed.trainNumbers, stationMappings: analyzed.stationMappings };
+    : { transitTrips: [], transitStopTimes: [], trainNumbers: [], stationMappings: analyzed.stationMappings };
   if (analyzed.missingTimestampStopCount === 0) {
     validateTagoOdJoin(materialized, trainNumberEvidence, kricServiceDayCode, runDate);
   }
@@ -124,6 +138,14 @@ export async function collectKorailItxCheongchunTimetable({
     trainNumbers: analyzed.trainNumbers,
     stationMappings: analyzed.stationMappings,
     stationSequences: analyzed.stationSequences,
+    directions,
+    terminalVariants,
+    trainNumberSets: {
+      roster: [...new Set(trainNumberEvidence.trainNumbers.map(normalizeTrainNumber))].sort(naturalCompare),
+      plan: analyzed.trainNumbers,
+      info: analyzed.trainNumbers,
+      materialized: materialized.trainNumbers,
+    },
     materialization: {
       status: analyzed.missingTimestampStopCount === 0 ? "SUPPORTED" : "MISSING_STATION_TIMES",
       missingTimestampStopCount: analyzed.missingTimestampStopCount,
@@ -177,6 +199,7 @@ export function materializeKorailItxRows({
     routeCode,
     passengerStopCodes,
   });
+  if (analyzed.missingTimestampStopCount > 0) throw new Error("Korail ITX planned timestamp missing");
   return materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate);
 }
 
@@ -200,7 +223,7 @@ export function analyzeKorailItxRows({
   const canonical = readCanonicalLine(packPath);
   try {
     const grouped = groupKorailInfoRows({ infoRows, runDate, routeCode, allowed, planByTrain });
-    const sequenceAnalysis = analyzeStationSequences({ grouped, canonical, passengerStopCodes });
+    const sequenceAnalysis = analyzeStationSequences({ grouped, canonical, passengerStopCodes, planByTrain });
     return {
       trainNumbers: [...grouped.keys()].sort(naturalCompare),
       stationMappings: [...sequenceAnalysis.stationMappings.values()].sort((left, right) => (
@@ -208,10 +231,6 @@ export function analyzeKorailItxRows({
       )),
       stationSequences: sequenceAnalysis.stationSequences,
       missingTimestampStopCount: sequenceAnalysis.missingTimestampStopCount,
-      lineSequenceByStationLine: Object.fromEntries([...canonical.byName.values()].map((station) => [
-        `${station.stationId}|${LINE_ID}`,
-        station.lineSequence,
-      ])),
     };
   } finally {
     canonical.close();
@@ -238,16 +257,25 @@ function groupKorailInfoRows({ infoRows, runDate, routeCode, allowed, planByTrai
   return grouped;
 }
 
-function analyzeStationSequences({ grouped, canonical, passengerStopCodes }) {
+function analyzeStationSequences({ grouped, canonical, passengerStopCodes, planByTrain }) {
   const stationMappings = new Map();
   const stationSequences = [];
   let missingTimestampStopCount = 0;
   for (const [trainNumber, trainRows] of [...grouped.entries()].sort(([left], [right]) => naturalCompare(left, right))) {
     const ordered = orderedTrainRows(trainRows, trainNumber);
+    const directionCodes = new Set(ordered.map(({ row }) => requiredString(String(row.uppln_dn_se_cd), "uppln_dn_se_cd")));
+    if (directionCodes.size !== 1) throw new Error(`Korail ITX direction mismatch: ${safeToken(trainNumber)}`);
     const selected = selectPassengerStops({ ordered, canonical, passengerStopCodes, stationMappings, trainNumber });
-    validateCanonicalTrip(selected.stops, ordered, trainNumber);
+    const plan = planByTrain.get(trainNumber);
+    validateCanonicalTrip(selected.stops, ordered, trainNumber, plan);
     missingTimestampStopCount += selected.missingTimestampStopCount;
-    stationSequences.push({ trainNumber, stops: selected.stops });
+    stationSequences.push({
+      trainNumber,
+      directionCode: [...directionCodes][0],
+      originStationName: plan.dptre_stn_nm,
+      destinationStationName: plan.arvl_stn_nm,
+      stops: selected.stops,
+    });
   }
   return { stationMappings, stationSequences, missingTimestampStopCount };
 }
@@ -272,20 +300,16 @@ function selectPassengerStops({ ordered, canonical, passengerStopCodes, stationM
     if (normalize(expectedStopName) !== normalize(row.stop_se_nm)) {
       throw new Error(`Korail ITX passenger stop name mismatch: ${safeToken(trainNumber)}/${safeLabel(row.stn_nm)}`);
     }
-    const station = canonical.byName.get(normalizeStationName(row.stn_nm));
+    const matches = canonical.byName.get(normalizeStationName(row.stn_nm)) ?? [];
+    const station = matches.length === 1 ? matches[0] : null;
     return [{ row, sequence, index, station, stopCode }];
   });
-  const canonicalIndexes = passengerRows.filter(({ station }) => station).map(({ index }) => index);
-  const firstCanonicalIndex = Math.min(...canonicalIndexes);
-  const lastCanonicalIndex = Math.max(...canonicalIndexes);
-  for (const { row, sequence, index, station, stopCode } of passengerRows) {
-    if (!station && index > firstCanonicalIndex && index < lastCanonicalIndex) {
-      throw new Error(`Korail ITX passenger stop canonical mapping missing: ${safeToken(trainNumber)}/${safeLabel(row.stn_nm)}`);
-    }
-    if (!station) continue;
+  for (const [index, { row, sequence, station, stopCode }] of passengerRows.entries()) {
+    if (!station) throw new Error(`Korail ITX passenger stop canonical mapping missing: ${safeToken(trainNumber)}/${safeLabel(row.stn_nm)}`);
     const arrivalTimestamp = validProviderTimestamp(row.trn_arvl_dt);
     const departureTimestamp = validProviderTimestamp(row.trn_dptre_dt);
-    if (arrivalTimestamp === null && departureTimestamp === null) missingTimestampStopCount += 1;
+    if ((index > 0 && arrivalTimestamp === null)
+      || (index < passengerRows.length - 1 && departureTimestamp === null)) missingTimestampStopCount += 1;
     stationMappings.set(`${row.stn_cd}|${station.stationId}`, {
       providerStationCode: String(row.stn_cd),
       providerStationName: String(row.stn_nm),
@@ -307,7 +331,7 @@ function selectPassengerStops({ ordered, canonical, passengerStopCodes, stationM
   return { stops, missingTimestampStopCount };
 }
 
-function validateCanonicalTrip(stops, ordered, trainNumber) {
+function validateCanonicalTrip(stops, ordered, trainNumber, plan) {
   if (stops.length < 2) {
     const observed = ordered.slice(0, 30).map(({ row }) => (
       `${safeLabel(row.stn_nm)}:${safeLabel(row.stop_se_cd)}:${safeLabel(row.stop_se_nm)}`
@@ -320,14 +344,22 @@ function validateCanonicalTrip(stops, ordered, trainNumber) {
   if (new Set(stationIds).size !== stationIds.length) {
     throw new Error(`Korail ITX duplicate canonical stop: ${safeToken(trainNumber)}`);
   }
-  for (const endpoint of ["station-b819702fa7d9", "station-dd14cfb89cbc"]) {
-    if (!stationIds.includes(endpoint)) throw new Error(`Korail ITX canonical endpoint missing: ${safeToken(trainNumber)}`);
+  const lineStops = stops.filter(({ lineSequence }) => Number.isInteger(lineSequence));
+  if (lineStops.length < 2) throw new Error(`Korail ITX trip must have at least 2 canonical line stops: ${safeToken(trainNumber)}`);
+  if (validProviderTimestamp(plan.trn_plan_dptre_dt) === null || validProviderTimestamp(plan.trn_plan_arvl_dt) === null) {
+    throw new Error(`Korail ITX plan timestamp missing: ${safeToken(trainNumber)}`);
   }
-  validateLineSequenceOnly(stops, trainNumber);
+  if (normalizeStationName(stops[0].providerStationName) !== normalizeStationName(plan.dptre_stn_nm)
+    || normalizeStationName(stops.at(-1).providerStationName) !== normalizeStationName(plan.arvl_stn_nm)) {
+    throw new Error(`Korail ITX plan endpoint mismatch: ${safeToken(trainNumber)}`);
+  }
+  validateLineSequenceOnly(lineStops, trainNumber);
 }
 
 function materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate) {
-  const intermediate = [];
+  const transitTrips = [];
+  const transitStopTimes = [];
+  const serviceId = { "8": "weekday-kric", "7": "saturday-kric", "9": "holiday-kric" }[kricServiceDayCode];
   for (const trip of analyzed.stationSequences) {
     const rows = trip.stops.map((stop) => {
       const timestampContext = `${safeToken(trip.trainNumber)}/${safeLabel(stop.providerStationName)}/${safeLabel(stop.stopCode)}`;
@@ -354,18 +386,30 @@ function materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate)
       };
     });
     validateProviderOrder(rows, trip.trainNumber);
-    intermediate.push(...rows.map(({ lineSequence: _lineSequence, ...row }) => row));
+    const lineRows = rows.filter(({ lineSequence }) => Number.isInteger(lineSequence));
+    const directionId = lineRows.at(-1).lineSequence > lineRows[0].lineSequence ? "up" : "down";
+    const routeId = `route-${LINE_ID}-${directionId}`;
+    const tripId = `${routeId}-${trip.trainNumber}-${kricServiceDayCode}`;
+    transitTrips.push({
+      id: tripId,
+      routeId,
+      serviceId,
+      tripHeadsign: rows.at(-1).stationId,
+      directionId,
+      servicePattern: "EXPRESS",
+    });
+    rows.forEach((row, index) => transitStopTimes.push({
+      tripId,
+      stopSequence: index + 1,
+      stationId: row.stationId,
+      lineId: row.lineId,
+      arrivalSeconds: row.arrivalSeconds,
+      departureSeconds: row.departureSeconds,
+    }));
   }
-  const context = {
-    lineSequenceByStationLine: analyzed.lineSequenceByStationLine,
-    routeIdByLineDirection: {
-      [`${LINE_ID}|up`]: `route-${LINE_ID}-up`,
-      [`${LINE_ID}|down`]: `route-${LINE_ID}-down`,
-    },
-    serviceIdByDayCd: { "8": "weekday-kric", "7": "saturday-kric", "9": "holiday-kric" },
-  };
   return {
-    ...reconstructTransitTrips(intermediate, context),
+    transitTrips,
+    transitStopTimes,
     trainNumbers: analyzed.trainNumbers,
     stationMappings: analyzed.stationMappings,
   };
@@ -391,30 +435,39 @@ function passengerStopCodeMappings(rows) {
 }
 
 function validateTrainNumberEvidence(evidence, kricServiceDayCode) {
-  if (evidence?.artifactKind !== "tago-itx-cheongchun-od-evidence" || evidence?.serviceId !== "ITX_CHEONGCHUN") {
+  if (evidence?.artifactKind !== "tago-itx-cheongchun-roster-evidence" || evidence?.serviceId !== "ITX_CHEONGCHUN") {
     throw new Error("TAGO ITX train number evidence is invalid");
   }
   if (evidence.kricServiceDayCode !== kricServiceDayCode) throw new Error("TAGO/Korail service day code mismatch");
+  if (!Number.isInteger(evidence.expectedOdCount) || evidence.expectedOdCount <= 0
+    || evidence.completedOdCount !== evidence.expectedOdCount || evidence.failedOdCount !== 0) {
+    throw new Error("TAGO ITX OD matrix evidence is incomplete");
+  }
+  if (![evidence.stationSetHash, evidence.odMatrixHash, evidence.evidenceHash]
+    .every((value) => /^[a-f0-9]{64}$/.test(value ?? ""))) {
+    throw new Error("TAGO ITX roster hash is invalid");
+  }
   if (!Array.isArray(evidence.trainNumbers) || !Array.isArray(evidence.itineraries)
-    || evidence.trainNumbers.length === 0 || evidence.trainNumbers.length !== evidence.itineraries.length) {
+    || evidence.trainNumbers.length === 0 || evidence.itineraries.length === 0) {
     throw new Error("TAGO ITX train number evidence is incomplete");
   }
-  if (!/^[a-f0-9]{64}$/.test(evidence.evidenceHash ?? "")) throw new Error("TAGO ITX evidenceHash is invalid");
+  const roster = new Set(evidence.trainNumbers.map(normalizeTrainNumber));
+  const itineraryTrains = new Set(evidence.itineraries.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)));
+  if (roster.size !== evidence.trainNumbers.length || !sameSet(roster, itineraryTrains)) {
+    throw new Error("TAGO ITX roster/itinerary train number set mismatch");
+  }
 }
 
 function validateTagoOdJoin(materialized, evidence, dayCd, runDate) {
-  const departureStationId = evidence?.departureStation?.canonicalStationId;
-  const arrivalStationId = evidence?.arrivalStation?.canonicalStationId;
-  if (typeof departureStationId !== "string" || typeof arrivalStationId !== "string") {
-    throw new Error("TAGO ITX canonical endpoint mappings are required");
-  }
-  if (evidence.departureDate !== isoRunDate(runDate)) throw new Error("Korail/TAGO ITX service date mismatch");
+  if (evidence.serviceDate !== runDate) throw new Error("Korail/TAGO ITX service date mismatch");
   const tripsByNumber = new Map(materialized.trainNumbers.map((trainNumber) => [
     trainNumber,
     materialized.transitTrips.find(({ id }) => id.endsWith(`-${trainNumber}-${dayCd}`)),
   ]));
   for (const [index, itinerary] of evidence.itineraries.entries()) {
     const trainNumber = normalizeTrainNumber(itinerary.trainNumber);
+    const departureStationId = requiredString(itinerary.departureStationId, `itineraries[${index}].departureStationId`);
+    const arrivalStationId = requiredString(itinerary.arrivalStationId, `itineraries[${index}].arrivalStationId`);
     const trip = tripsByNumber.get(trainNumber);
     if (!trip) throw new Error(`Korail trip missing TAGO ITX train: ${safeToken(trainNumber)}`);
     const stops = materialized.transitStopTimes.filter(({ tripId }) => tripId === trip.id);
@@ -426,6 +479,10 @@ function validateTagoOdJoin(materialized, evidence, dayCd, runDate) {
       throw new Error(`Korail/TAGO ITX endpoint time mismatch: ${safeToken(trainNumber)}`);
     }
   }
+}
+
+function sameSet(left, right) {
+  return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
 function isoServiceSeconds(value, runDate, label) {
@@ -442,19 +499,27 @@ function isoServiceSeconds(value, runDate, label) {
 function readCanonicalLine(packPath) {
   const opened = openPack(packPath, "korail-itx-canonical-");
   try {
-    const rows = opened.db.prepare(`
+    const lineRows = opened.db.prepare(`
       SELECT stations.id, stations.name_ko, station_lines.line_sequence
       FROM station_lines
       JOIN stations ON stations.id = station_lines.station_id
       WHERE station_lines.line_id = ?
       ORDER BY station_lines.line_sequence, stations.id
     `).all(LINE_ID);
-    if (rows.length === 0) throw new Error(`canonical pack has no line: ${LINE_ID}`);
+    if (lineRows.length === 0) throw new Error(`canonical pack has no line: ${LINE_ID}`);
+    const lineSequenceByStation = new Map(lineRows.map((row) => [row.id, row.line_sequence]));
+    const rows = opened.db.prepare(`
+      SELECT id, name_ko
+      FROM stations
+      WHERE region = '수도권'
+      ORDER BY id
+    `).all();
     const byName = new Map();
     for (const row of rows) {
       const name = normalizeStationName(row.name_ko);
-      if (byName.has(name)) throw new Error(`canonical line has duplicate station name: ${name}`);
-      byName.set(name, { stationId: row.id, lineSequence: row.line_sequence });
+      const matches = byName.get(name) ?? [];
+      matches.push({ stationId: row.id, lineSequence: lineSequenceByStation.get(row.id) ?? null });
+      byName.set(name, matches);
     }
     return {
       byName,
@@ -482,17 +547,12 @@ function uniqueRowsByTrain(rows, runDate, label) {
 }
 
 function validateProviderOrder(rows, trainNumber) {
-  let direction = 0;
   for (let index = 1; index < rows.length; index += 1) {
     if (rows[index - 1].departureSeconds > rows[index].arrivalSeconds) {
       throw new Error(`Korail ITX stop time is not monotonic: ${safeToken(trainNumber)}`);
     }
-    const step = Math.sign(rows[index].lineSequence - rows[index - 1].lineSequence);
-    if (step === 0 || (direction !== 0 && step !== direction)) {
-      throw new Error(`Korail ITX stop order must follow canonical lineSequence: ${safeToken(trainNumber)}`);
-    }
-    direction ||= step;
   }
+  validateLineSequenceOnly(rows.filter(({ lineSequence }) => Number.isInteger(lineSequence)), trainNumber);
 }
 
 function validateLineSequenceOnly(rows, trainNumber) {

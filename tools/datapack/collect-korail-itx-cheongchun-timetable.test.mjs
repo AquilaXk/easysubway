@@ -69,10 +69,7 @@ function fixtureRows() {
       planRow("02002", "춘천", "청량리", "20260713070000", "20260713090000"),
     ],
     info: [
-      infoRow("02001", 1, "0104", "용산", "20260713060000", "20260713060000", {
-        stop_se_cd: "00",
-        stop_se_nm: "통과",
-      }),
+      infoRow("02001", 1, "0104", "용산", "20260713060000", "20260713060000"),
       infoRow("02001", 2, "130126", "청량리", "20260713062000", "20260713062100"),
       infoRow("02001", 3, "140701", "평내호평", "20260713071000", "20260713071100"),
       infoRow("02001", 4, "140873", "춘천", "20260713080000", "-"),
@@ -85,18 +82,32 @@ function fixtureRows() {
 
 function trainNumberEvidence() {
   return {
-    artifactKind: "tago-itx-cheongchun-od-evidence",
+    artifactKind: "tago-itx-cheongchun-roster-evidence",
     serviceId: "ITX_CHEONGCHUN",
     kricServiceDayCode: "8",
-    departureDate: "2026-07-13",
-    trainNumbers: ["02001"],
-    itineraries: [{
-      trainNumber: "02001",
-      departureAt: "2026-07-13T06:21:00+09:00",
-      arrivalAt: "2026-07-13T08:00:00+09:00",
-    }],
-    departureStation: { canonicalStationId: "station-b819702fa7d9" },
-    arrivalStation: { canonicalStationId: "station-dd14cfb89cbc" },
+    serviceDate: "20260713",
+    expectedOdCount: 2,
+    completedOdCount: 2,
+    failedOdCount: 0,
+    stationSetHash: "b".repeat(64),
+    odMatrixHash: "c".repeat(64),
+    trainNumbers: ["02001", "02002"],
+    itineraries: [
+      {
+        trainNumber: "02001",
+        departureStationId: "station-b819702fa7d9",
+        arrivalStationId: "station-dd14cfb89cbc",
+        departureAt: "2026-07-13T06:21:00+09:00",
+        arrivalAt: "2026-07-13T08:00:00+09:00",
+      },
+      {
+        trainNumber: "02002",
+        departureStationId: "station-dd14cfb89cbc",
+        arrivalStationId: "station-b819702fa7d9",
+        departureAt: "2026-07-13T07:00:00+09:00",
+        arrivalAt: "2026-07-13T09:00:00+09:00",
+      },
+    ],
     evidenceHash: "a".repeat(64),
   };
 }
@@ -128,13 +139,24 @@ test("Korail ITX-청춘 collector는 공식 station rows를 canonical EXPRESS tr
   assert.equal(requested[3].searchParams.get("cond[mrnt_cd::EQ]"), "GJ");
   assert.deepEqual(artifact.routeCodeMapping, { providerCode: "GJ", providerName: "경춘선" });
   assert.equal(artifact.providerResultCode, "0");
-  assert.equal(artifact.trainCount, 1);
-  assert.equal(artifact.transitTrips.length, 1);
-  assert.equal(artifact.transitStopTimes.length, 3);
+  assert.equal(artifact.trainCount, 2);
+  assert.equal(artifact.transitTrips.length, 2);
+  assert.equal(artifact.transitStopTimes.length, 7);
   assert.ok(artifact.transitTrips.every(({ servicePattern }) => servicePattern === "EXPRESS"));
+  assert.deepEqual(artifact.directions, ["D", "U"]);
+  assert.deepEqual(artifact.terminalVariants, [
+    { directionCode: "D", originStationName: "용산", destinationStationName: "춘천" },
+    { directionCode: "U", originStationName: "춘천", destinationStationName: "청량리" },
+  ]);
+  assert.deepEqual(artifact.trainNumberSets, {
+    roster: ["2001", "2002"],
+    plan: ["2001", "2002"],
+    info: ["2001", "2002"],
+    materialized: ["2001", "2002"],
+  });
   assert.deepEqual(
     artifact.transitStopTimes.filter(({ tripId }) => tripId.includes("-2001-")).map(({ stationId }) => stationId),
-    ["station-b819702fa7d9", "station-f3d9c93ba7d6", "station-dd14cfb89cbc"],
+    ["station-8aa315864466", "station-b819702fa7d9", "station-f3d9c93ba7d6", "station-dd14cfb89cbc"],
   );
   assert.equal(artifact.credentialRedacted, true);
   assert.doesNotMatch(JSON.stringify(artifact), /never-print-this-key/);
@@ -167,12 +189,12 @@ test("Korail station row의 시각이 비면 sequence evidence만 보존하고 t
     stationTimeCapability: {
       status: "MISSING",
       reasonCode: "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY",
-      checkedStopCount: 3,
-      populatedTimestampStopCount: 2,
+      checkedStopCount: 7,
+      populatedTimestampStopCount: 6,
     },
   });
-  assert.equal(artifact.stationSequences.length, 1);
-  assert.equal(artifact.stationSequences[0].stops.length, 3);
+  assert.equal(artifact.stationSequences.length, 2);
+  assert.equal(artifact.stationSequences[0].stops.length, 4);
   assert.deepEqual(artifact.transitTrips, []);
   assert.deepEqual(artifact.transitStopTimes, []);
 });
@@ -206,6 +228,85 @@ test(
   },
 );
 
+test("Korail ITX materialization은 경춘선 밖 역을 포함한 용산~춘천 전체 trip을 보존한다", () => {
+  const { plans, info } = fixtureRows();
+  const fullTrip = info
+    .filter(({ trn_no }) => trn_no === "02001")
+    .map((row) => ({ ...row, trn_run_sn: row.trn_run_sn + (row.trn_run_sn > 1 ? 2 : 0) }));
+  fullTrip[0] = { ...fullTrip[0], stop_se_cd: "11", stop_se_nm: "여객승하차" };
+  fullTrip.splice(
+    1,
+    0,
+    infoRow("02001", 2, "0106", "옥수", "20260713060800", "20260713060900"),
+    infoRow("02001", 3, "0111", "왕십리", "20260713061400", "20260713061500"),
+  );
+
+  const materialized = materializeKorailItxRows({
+    plans,
+    infoRows: fullTrip,
+    runDate: "20260713",
+    kricServiceDayCode: "8",
+    packPath: PACK_PATH,
+    trainNumbers: ["02001"],
+    routeCode: "GJ",
+    passengerStopCodes: new Map([["11", "여객승하차"]]),
+  });
+
+  assert.deepEqual(materialized.transitStopTimes.map(({ stationId }) => stationId), [
+    "station-8aa315864466",
+    "station-c0679b9a6cf8",
+    "station-e5cf592cf355",
+    "station-b819702fa7d9",
+    "station-f3d9c93ba7d6",
+    "station-dd14cfb89cbc",
+  ]);
+});
+
+test("Korail collector는 한 방향 roster를 timetable로 admission하지 않는다", async () => {
+  const { plans, info } = fixtureRows();
+  const roster = trainNumberEvidence();
+  await assert.rejects(collectKorailItxCheongchunTimetable({
+    serviceKey: "key",
+    runDate: "20260713",
+    kricServiceDayCode: "8",
+    packPath: PACK_PATH,
+    trainNumberEvidence: {
+      ...roster,
+      trainNumbers: ["02001"],
+      itineraries: [roster.itineraries[0]],
+    },
+    fetchImpl: async (url) => {
+      if (url.pathname.endsWith("codes2")) {
+        return url.searchParams.get("cond[type::EQ]") === "mrnt_cd"
+          ? apiResponse([{ code: "GJ", type: "mrnt_cd", value: "경춘선" }])
+          : apiResponse([{ code: "11", type: "stop_se_cd", value: "여객승하차" }]);
+      }
+      return apiResponse(url.pathname.endsWith("travelerTrainRunPlan2") ? plans : info);
+    },
+  }), /both directions/);
+});
+
+test("Korail materialization은 현재 시종착 변형을 plan endpoint 그대로 보존한다", () => {
+  const { info } = fixtureRows();
+  const materialized = materializeKorailItxRows({
+    plans: [planRow("02001", "용산", "평내호평", "20260713060000", "20260713071000")],
+    infoRows: info.filter(({ trn_no, stn_nm }) => trn_no === "02001" && stn_nm !== "춘천"),
+    runDate: "20260713",
+    kricServiceDayCode: "8",
+    packPath: PACK_PATH,
+    trainNumbers: ["02001"],
+    routeCode: "GJ",
+    passengerStopCodes: new Map([["11", "여객승하차"]]),
+  });
+
+  assert.equal(materialized.transitTrips[0].tripHeadsign, "station-f3d9c93ba7d6");
+  assert.deepEqual(materialized.transitStopTimes.map(({ stationId }) => stationId), [
+    "station-8aa315864466",
+    "station-b819702fa7d9",
+    "station-f3d9c93ba7d6",
+  ]);
+});
+
 test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거부한다", async (context) => {
   const { plans, info } = fixtureRows();
   const base = {
@@ -223,7 +324,7 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
     assert.throws(() => materializeKorailItxRows({
       ...base,
       infoRows: info.filter(({ stn_nm }) => stn_nm !== "춘천"),
-    }), /at least 2 canonical stops|canonical endpoint/);
+    }), /at least 2 canonical stops|plan endpoint/);
   });
 
   await context.test("중복 정차", () => {
@@ -246,6 +347,20 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
       ? { ...row, trn_arvl_dt: "20260713071200", trn_dptre_dt: "20260713071100" }
       : row);
     assert.throws(() => materializeKorailItxRows({ ...base, infoRows: reversedTime }), /arrival.*departure/);
+  });
+
+  await context.test("중간역 계획 출발시각 누락", () => {
+    const missingDeparture = info.map((row) => row.trn_no === "02001" && row.stn_nm === "평내호평"
+      ? { ...row, trn_dptre_dt: "" }
+      : row);
+    assert.throws(() => materializeKorailItxRows({ ...base, infoRows: missingDeparture }), /planned timestamp missing/);
+  });
+
+  await context.test("plan 출발시각 누락", () => {
+    const missingPlanTime = plans.map((row) => row.trn_no === "02001"
+      ? { ...row, trn_plan_dptre_dt: "" }
+      : row);
+    assert.throws(() => materializeKorailItxRows({ ...base, plans: missingPlanTime }), /plan timestamp missing/);
   });
 
   await context.test("canonical mapping이 없는 여객 정차", () => {
@@ -278,7 +393,9 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
       return row;
     });
     const materialized = materializeKorailItxRows({ ...base, infoRows: overnight });
-    assert.ok(materialized.transitStopTimes.at(-1).arrivalSeconds > 86_400);
+    assert.ok(materialized.transitStopTimes
+      .filter(({ tripId }) => tripId.includes("-2001-"))
+      .at(-1).arrivalSeconds > 86_400);
   });
 });
 
@@ -348,7 +465,7 @@ test("Korail ITX collector는 provider/schema/pagination 오류를 fail closed�
 
 test("Korail/TAGO timetable join은 service date가 다르면 거부한다", async () => {
   const { plans, info } = fixtureRows();
-  const mismatchedEvidence = { ...trainNumberEvidence(), departureDate: "2026-07-14" };
+  const mismatchedEvidence = { ...trainNumberEvidence(), serviceDate: "20260714" };
   await assert.rejects(collectKorailItxCheongchunTimetable({
     serviceKey: "key",
     runDate: "20260713",
