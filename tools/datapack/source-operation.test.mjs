@@ -90,6 +90,14 @@ test("show는 operation이 없어도 기존 endpoint와 response fields를 반�
   assert.equal(summary.operation, null);
 });
 
+test("operation raw response fields는 normalized evidence fields보다 API catalog에 우선한다", () => {
+  const operation = validOperation({ responseFields: ["providerField"] });
+  const source = candidate("a", { operation });
+
+  assert.equal(validateOperation(source), operation);
+  assert.deepEqual(operationSummary(source).responseFields, ["providerField"]);
+});
+
 test("source candidate 정본은 repository 경로와 구조화된 provider 승인을 검증한다", () => {
   const document = {
     schemaVersion: 1,

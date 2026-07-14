@@ -21,6 +21,11 @@ export const KRIC_SOURCE_CANDIDATE_IDS = Object.freeze([
   "kric-transfer-movement-standard",
   "kric-transfer-movement-detailed",
   "kric-station-convenience-standard",
+  "kric-station-elevator",
+  "kric-station-elevator-movement",
+  "kric-station-escalator",
+  "kric-wheelchair-lift-location",
+  "kric-wheelchair-lift-movement",
 ]);
 
 const KRIC_ORIGIN = "https://openapi.kric.go.kr";
@@ -43,13 +48,6 @@ export function resolveKricCandidateRequest(candidatesDocument, candidateId) {
   if (!candidate) {
     throw new Error(`tracked candidate metadata is missing: ${candidateId}`);
   }
-  if (candidate.sampleEvidenceStatus !== "sample_url_documented_key_required") {
-    throw new Error(`${candidateId} sample evidence status is not pending`);
-  }
-  if (candidate.admissionStatus !== "evidence_recorded_admin_review_required") {
-    throw new Error(`${candidateId} admission status no longer requires admin review`);
-  }
-
   const endpoint = new URL(requiredText(candidate.evidence?.endpoint, `${candidateId}.evidence.endpoint`));
   const requestUrl = new URL(requiredText(candidate.requestUrl, `${candidateId}.requestUrl`));
   const sampleUrl = new URL(requiredText(candidate.evidence?.sampleUrl, `${candidateId}.evidence.sampleUrl`));
@@ -96,9 +94,15 @@ export async function collectKricSourceCandidateEvidence({
   }
   const document = candidatesDocument ?? JSON.parse(await readFile(CANDIDATES_PATH, "utf8"));
   const request = resolveKricCandidateRequest(document, candidateId);
+  const effectiveDocument = {
+    ...document,
+    candidates: document.candidates.map((candidate) => candidate.id !== candidateId || !candidate.operation?.responseFields
+      ? candidate
+      : { ...candidate, evidence: { ...candidate.evidence, outputFields: candidate.operation.responseFields } }),
+  };
   return collectSourceCandidateEvidence({
     candidateId,
-    candidatesDocument,
+    candidatesDocument: effectiveDocument,
     fetchImpl,
     runnerTemp,
     serviceKey,
@@ -107,7 +111,7 @@ export async function collectKricSourceCandidateEvidence({
     request,
     requestFailureLabel: "KRIC request failed with HTTP",
     diagnosticLabel: "KRIC XML diagnostic:",
-    writeStagedCandidates: false,
+    writeStagedCandidates: true,
     buildScriptName: "build-source-candidate-sample-evidence.mjs",
     validateScriptName: "validate-source-candidate-sample.mjs",
   });

@@ -62,16 +62,25 @@ async function assertCollectorCleanup(runnerTemp) {
   assert.equal(existsSync(path.join(runnerTemp, "datago-source-candidate-evidence")), false);
 }
 
-test("Data.go.kr evidence collector는 정확한 2개 allowlist와 tracked endpoint를 강제한다", () => {
+test("Data.go.kr evidence collector는 catalog 4개 allowlist와 tracked endpoint를 강제한다", () => {
   assert.deepEqual(DATAGO_SOURCE_CANDIDATE_IDS, [
     "seoul-metro-transfer-distance-duration",
     "seoul-metro-fast-exit-car-door",
+    "seoul-metro-accessibility",
+    "seoul-metro-facility-location",
   ]);
 
   const request = resolveDatagoCandidateRequest({ candidates: [candidate] }, candidate.id);
   assert.equal(request.candidateId, candidate.id);
   assert.equal(request.endpoint, candidate.evidence.endpoint);
   assert.equal(request.format, "json");
+  assert.doesNotThrow(() => resolveDatagoCandidateRequest({
+    candidates: [{
+      ...candidate,
+      sampleEvidenceStatus: "sanitized_live_probe_admitted",
+      admissionStatus: "admitted_to_production_inventory",
+    }],
+  }, candidate.id));
 
   assert.throws(
     () => resolveDatagoCandidateRequest({ candidates: [candidate] }, "kric-subway-timetable"),

@@ -245,7 +245,7 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
     throw new Error(`${candidate.id}.operation credential values are forbidden`);
   }
   requireAllowedKeys(operation, new Set([
-    "method", "endpoint", "auth", "requiredParameters", "responseEnvelope", "runner", "secretPolicy",
+    "method", "endpoint", "auth", "requiredParameters", "responseEnvelope", "responseFields", "runner", "secretPolicy",
   ]), `${candidate.id}.operation`);
   if (!new Set(["GET", "POST"]).has(operation.method)) {
     throw new Error(`${candidate.id}.operation.method must be GET or POST`);
@@ -291,6 +291,9 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
     throw new Error(`${candidate.id}.operation.requiredParameters must include the auth parameter`);
   }
   requiredText(operation.responseEnvelope, `${candidate.id}.operation.responseEnvelope`);
+  if (operation.responseFields != null) {
+    stringList(operation.responseFields, `${candidate.id}.operation.responseFields`);
+  }
   const runner = operation.runner;
   if (!runner || typeof runner !== "object" || Array.isArray(runner)) {
     throw new Error(`${candidate.id}.operation.runner must be an object`);
@@ -346,6 +349,7 @@ export function operationSummary(candidate) {
   }
   return {
     id: requiredText(candidate.id, "candidate.id"),
+    apiCatalog: candidate.apiCatalog !== false,
     displayName: candidate.displayName ?? null,
     domain: candidate.domain ?? null,
     detailUrl: candidate.detailUrl ?? null,
@@ -353,7 +357,7 @@ export function operationSummary(candidate) {
     status: candidate.admissionStatus ?? null,
     endpoint: requiredText(candidate.requestUrl, `${candidate.id}.requestUrl`),
     sampleUrl: candidate.evidence?.sampleUrl ?? null,
-    responseFields: candidate.evidence?.outputFields ?? [],
+    responseFields: candidate.operation?.responseFields ?? candidate.evidence?.outputFields ?? [],
     providerApproval: candidate.providerApproval ?? null,
     providerApprovalValidationError,
     operation: candidate.operation ?? null,

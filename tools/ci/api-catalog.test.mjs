@@ -36,6 +36,12 @@ function fixtureCatalog() {
           requestUrl: "https://provider.example/stations",
           admissionStatus: "admitted_to_production_inventory",
         },
+        {
+          id: "official-route-map-reference",
+          requestUrl: "https://provider.example/route-map",
+          apiCatalog: false,
+          admissionStatus: "admitted_to_production_inventory",
+        },
       ],
     },
     integrationsDocument: {
@@ -64,6 +70,7 @@ test("catalog는 internal/provider/integration/OpenAPI reference를 한 목록�
     findCatalogEntry(catalog, "provider:official-stations").endpoint,
     "https://provider.example/stations",
   );
+  assert.equal(catalog.some((entry) => entry.id === "provider:official-route-map-reference"), false);
 });
 
 test("list는 kind와 query로 검색한다", () => {
@@ -363,6 +370,28 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     findCatalogEntry(catalog, "integration:github-datapack-workflow-dispatch").endpointRef,
     "config:easysubway.datapack.github-api-base-url(default=https://api.github.com)/repos/AquilaXk/easysubway/actions/workflows/datapack-release.yml/dispatches",
   );
+});
+
+test("프로젝트 provider catalog는 비API source를 제외하고 모든 호출 계약을 제공한다", async () => {
+  const providers = (await loadProjectCatalog()).filter((entry) => entry.kind === "provider");
+
+  assert.equal(providers.length, 41);
+  assert.equal(providers.some((entry) => entry.documentationStatus === "metadata-only"), false);
+  assert.equal(providers.some((entry) => entry.id === "provider:molit-urban-rail-full-route"), false);
+  assert.equal(providers.some((entry) => entry.id === "provider:seoulmetro-cyberstation-route-map"), false);
+
+  const kricElevator = providers.find((entry) => entry.id === "provider:kric-station-elevator");
+  assert.equal(kricElevator.endpoint, "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator");
+  assert.deepEqual(kricElevator.responseFields, [
+    "dtlLoc", "exitNo", "grndDvNmFr", "grndDvNmTo", "lnCd", "railOprIsttCd",
+    "rglnPsno", "rglnWgt", "runStinFlorFr", "runStinFlorTo", "stinCd",
+  ]);
+
+  const stationLine = providers.find((entry) => entry.id === "provider:seoulmetro-station-line-info");
+  assert.deepEqual(stationLine.operation.requiredParameters, [
+    "serviceKey", "startIndex", "endIndex", "stationCode", "stationName", "lineName",
+  ]);
+  assert.match(stationLine.sampleUrl, /\/1\/5\/\/\/4호선$/);
 });
 
 test("프로젝트 catalog는 KRIC 승인과 shell 없는 key 전달 양식을 제공한다", async () => {

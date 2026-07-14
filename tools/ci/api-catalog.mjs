@@ -66,7 +66,7 @@ export function buildCatalog({
     ...operation,
     kind: "internal",
   }));
-  const providers = listOperations(providerDocument).map((operation) => ({
+  const providers = listOperations(providerDocument).filter(({ apiCatalog }) => apiCatalog).map((operation) => ({
     ...operation,
     id: `provider:${operation.id}`,
     kind: "provider",
