@@ -82,13 +82,18 @@ export async function probeKorailTrainOperationApi({
 async function fetchWithRetry(url, fetchImpl) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      return await fetchImpl(url, {
+      const response = await fetchImpl(url, {
         redirect: "error",
         signal: AbortSignal.timeout(15_000),
         headers: { accept: "application/json" },
       });
+      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === 1) return response;
+      if (response.body) await response.body.cancel().catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 10));
     } catch (error) {
       if (attempt === 1) throw new Error("Korail train operation API transport failure", { cause: error });
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
   throw new Error("Korail train operation API transport failure");
@@ -114,12 +119,14 @@ function parseJsonEvidence(raw, expectedFields) {
   if (rows.some((row) => row == null || typeof row !== "object" || Array.isArray(row))) {
     throw new Error("Korail train operation API schema mismatch: item must be an object");
   }
-  const observedFields = [...new Set(rows.flatMap((row) => Object.keys(row)))].sort();
-  const missingFields = expectedFields.filter((field) => !observedFields.includes(field));
-  if (missingFields.length > 0) {
-    throw new Error(
-      `Korail train operation API schema mismatch: item fields missing=${missingFields.join(",")}; observed=${observedFields.map(safeToken).join(",")}`,
-    );
+  for (const [index, row] of rows.entries()) {
+    const observedFields = Object.keys(row).sort();
+    const missingFields = expectedFields.filter((field) => !Object.hasOwn(row, field));
+    if (missingFields.length > 0) {
+      throw new Error(
+        `Korail train operation API schema mismatch: item[${index}] fields missing=${missingFields.join(",")}; observed=${observedFields.map(safeToken).join(",")}`,
+      );
+    }
   }
   const totalCount = Number(body.totalCount);
   if (!Number.isInteger(totalCount) || totalCount < rows.length) {

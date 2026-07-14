@@ -6,6 +6,21 @@ import {
   probeKorailTrainOperationApi,
 } from "./probe-korail-train-operation-api.mjs";
 
+const INFO_FIELDS = KORAIL_TRAIN_OPERATION_APIS["korail-traveler-train-run-info"].expectedFields;
+
+function infoRow() {
+  return Object.fromEntries(INFO_FIELDS.map((field) => [field, field === "run_ymd" ? "20260713" : "value"]));
+}
+
+function infoResponse(rows) {
+  return new Response(JSON.stringify({
+    response: {
+      header: { resultCode: "0" },
+      body: { items: { item: rows }, numOfRows: 10, pageNo: 1, totalCount: rows.length },
+    },
+  }), { status: 200, headers: { "content-type": "application/json" } });
+}
+
 test("Korail 코드정보 probe는 공식 type 조건으로 호출한다", async () => {
   let requestedUrl;
   const evidence = await probeKorailTrainOperationApi({
@@ -117,6 +132,34 @@ test("Korail 열차운행정보 probe는 provider 오류·빈 row·schema mismat
           body: { items: { item: [{ run_ymd: "20260713" }] }, numOfRows: 10, pageNo: 1, totalCount: 1 },
         },
       }), { status: 200, headers: { "content-type": "application/json" } }),
-    }), /item fields/);
+    }), /item\[0\] fields/);
   });
+
+  await context.test("row별 누락은 다른 row의 field로 상쇄되지 않는다", async () => {
+    const first = infoRow();
+    const second = infoRow();
+    delete first.stn_nm;
+    delete second.trn_no;
+    await assert.rejects(probeKorailTrainOperationApi({
+      ...base,
+      fetchImpl: async () => infoResponse([first, second]),
+    }), /item\[0\] fields missing=stn_nm/);
+  });
+});
+
+test("Korail 열차운행정보 probe는 일시적 HTTP 오류를 한 번 재시도한다", async () => {
+  for (const status of [408, 429, 500, 503]) {
+    let calls = 0;
+    const evidence = await probeKorailTrainOperationApi({
+      sourceId: "korail-traveler-train-run-info",
+      runDate: "20260713",
+      serviceKey: "key",
+      fetchImpl: async () => {
+        calls += 1;
+        return calls === 1 ? new Response("", { status }) : infoResponse([infoRow()]);
+      },
+    });
+    assert.equal(calls, 2, `HTTP ${status}`);
+    assert.equal(evidence.schemaStatus, "EXPECTED");
+  }
 });
