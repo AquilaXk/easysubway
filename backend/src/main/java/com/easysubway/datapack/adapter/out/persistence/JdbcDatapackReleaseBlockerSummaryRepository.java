@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -45,7 +46,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			FROM source_quarantine_records
 			WHERE resolution_status = 'OPEN'
 			""");
-		long sourceFreshnessBlockers = countSourceFreshnessBlockers(evaluationAt);
+		long sourceFreshnessBlockers = countSourceFreshnessBlockers(candidate, evaluationAt);
 		long manualOverrideBlockers = countManualOverrideBlockers();
 		long facilityBlockers = countFacilityBlockers(null, evaluationAt);
 		long routeGateBlockers = countRouteGateBlockers(null);
@@ -223,20 +224,32 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			""");
 	}
 
-	private long countSourceFreshnessBlockers(LocalDateTime evaluationAt) {
-		return jdbcTemplate.query("""
-			SELECT freshness_expires_at
-			FROM (
-				SELECT freshness_expires_at,
-					ROW_NUMBER() OVER (
-						PARTITION BY source_id
-						ORDER BY retrieved_at DESC, snapshot_id DESC
-					) AS freshness_rank
-				FROM data_source_snapshots
-			) ranked_snapshots
-			WHERE freshness_rank = 1
-			""", (resultSet, rowNumber) -> resultSet.getTimestamp("freshness_expires_at").toLocalDateTime())
+	private long countSourceFreshnessBlockers(Optional<CandidateGateSummary> candidate, LocalDateTime evaluationAt) {
+		if (candidate.isEmpty()) {
+			return 0L;
+		}
+		List<String> snapshotIds = jdbcTemplate.query("""
+			SELECT source_snapshot_ids
+			FROM datapack_candidate_inputs
+			WHERE candidate_id = ?
+			""", (resultSet, rowNumber) -> resultSet.getString("source_snapshot_ids"), candidate.get().candidateId())
 			.stream()
+			.flatMap(value -> Arrays.stream(value.split(",")))
+			.map(String::trim)
+			.filter(value -> !value.isEmpty())
+			.distinct()
+			.toList();
+		if (snapshotIds.isEmpty()) {
+			return 0L;
+		}
+		String placeholders = String.join(", ", snapshotIds.stream().map(ignored -> "?").toList());
+		List<LocalDateTime> expiresAtValues = jdbcTemplate.query(
+			"SELECT freshness_expires_at FROM data_source_snapshots WHERE snapshot_id IN (" + placeholders + ")",
+			(resultSet, rowNumber) -> resultSet.getTimestamp("freshness_expires_at").toLocalDateTime(),
+			snapshotIds.toArray()
+		);
+		long missingSnapshotBlockers = snapshotIds.size() - expiresAtValues.size();
+		return missingSnapshotBlockers + expiresAtValues.stream()
 			.filter(expiresAt -> DatapackFreshness.isStale(evaluationAt, expiresAt))
 			.count();
 	}

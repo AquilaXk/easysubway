@@ -2,7 +2,10 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { deriveFreshness } from "./freshness-policy.mjs";
 import { requiredCredentialFreeObjectUri } from "./source-snapshot-policy.mjs";
+
+const DEFAULT_FRESHNESS_POLICY = "apps/mobile/release/datapack-freshness-sla.json";
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -35,12 +38,30 @@ async function main() {
     rawRetentionExpiresAt: requireArg(args, "raw-retention-expires-at"),
     providerRecordHashes: records.map((record) => sha256(JSON.stringify(record))),
   };
+  await validateFreshnessPolicy(snapshot, args);
   validateSnapshot(snapshot);
 
   if (args["raw-output"]) {
     await writeFileWithParents(args["raw-output"], canonicalRaw);
   }
   await writeFileWithParents(requireArg(args, "output"), `${JSON.stringify(snapshot, null, 2)}\n`);
+}
+
+async function validateFreshnessPolicy(snapshot, args) {
+  const policyPath = path.resolve(args["freshness-policy"] ?? DEFAULT_FRESHNESS_POLICY);
+  const policy = JSON.parse(await readFile(policyPath, "utf8"));
+  const sourceClassId = requireArg(args, "source-class-id");
+  const sourceClass = policy.sourceClasses?.find((entry) => entry.id === sourceClassId);
+  const basisAt = args["freshness-basis-at"]
+    ?? (sourceClass?.basisField === "retrievedAt" ? snapshot.retrievedAt : null);
+  deriveFreshness({
+    policy,
+    sourceClassId,
+    basisAt,
+    providerValidUntil: args["provider-valid-until"],
+    storedExpiresAt: snapshot.freshnessExpiresAt,
+    evaluationAt: snapshot.retrievedAt,
+  });
 }
 
 function parseArgs(argv) {

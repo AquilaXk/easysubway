@@ -94,6 +94,20 @@ test("production publish는 canonical decision의 write 허용 뒤에만 실행�
   const publishStep = yml.match(/- name: Data Pack Release \/ Publish staged data packs to object storage[\s\S]*?\n\s+- name:/)?.[0];
   assert.ok(publishStep, "production publish 스텝을 찾지 못함");
   assert.match(publishStep, /steps\.release-decision\.outputs\.productionWriteAllowed == 'true'/);
+  assert.match(yml, /production decision did not authorize executable run/);
+  assert.match(yml, /decision\.outcome === "NO_CHANGE_VALID"/);
+  assert.match(yml, /decision\.outcome === "PUBLISH_REQUIRED" && decision\.productionWriteAllowed === true/);
+});
+
+test("scheduled publish는 명시적 opt-in과 승인된 입력 경로 없이는 exploratory로 남는다", () => {
+  assert.match(yml, /EASYSUBWAY_DATAPACK_SCHEDULED_PUBLISH_ENABLED/);
+  assert.match(yml, /github\.event_name == 'schedule' && vars\.EASYSUBWAY_DATAPACK_SCHEDULED_PUBLISH_ENABLED == 'true'/);
+  assert.match(yml, /SCHEDULED_BUILD_SPEC_PATH/);
+  assert.match(yml, /SCHEDULED_RELEASE_REQUEST_ID/);
+  assert.match(yml, /SCHEDULED_ANDROID_EVIDENCE_PATH/);
+  assert.match(yml, /SCHEDULED_STRICT_ROUTE_REGRESSION_PATH/);
+  assert.match(yml, /scheduled production publish requires configured approval evidence/);
+  assert.match(yml, /steps\.release-mode\.outputs\.release_request_id/);
 });
 
 test("current manifest 조회는 404만 initial release로 허용한다", () => {
@@ -117,6 +131,16 @@ test("publish run은 remote artifact validation 뒤 최종 decision과 callback�
   assert.match(remoteValidationArtifact, /always\(\)/);
   assert.match(remoteValidationArtifact, /EASYSUBWAY_DATAPACK_REMOTE_VALIDATION/);
   assert.match(remoteValidationArtifact, /if-no-files-found:\s*ignore/);
+  assert.match(yml, /Verify published manifest identity/);
+  assert.match(yml, /steps\.production-publish\.outputs\.manifestSha256/);
+  assert.match(yml, /remote validation manifestSha256 mismatch/);
+  const finalDecision = yml.match(
+    /- name: Data Pack Release \/ Finalize published decision[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(finalDecision, "최종 release decision 스텝을 찾지 못함");
+  assert.match(finalDecision, /final_decision_args=\(/);
+  assert.match(finalDecision, /if \[\[ -f "\$\{EASYSUBWAY_DATAPACK_CURRENT_MANIFEST\}" \]\]; then/);
+  assert.match(finalDecision, /final_decision_args\+=\(--current-manifest/);
   assert.match(yml, /GITHUB_STEP_SUMMARY/);
 });
 

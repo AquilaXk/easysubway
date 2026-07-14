@@ -54,6 +54,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 		insertSourceSnapshot();
 		insertPreviousCandidate();
 		insertCandidate();
+		insertCandidateInput();
 		insertEvidenceBundle();
 		insertProductionChannel();
 		insertAliasQuarantineOverride();
@@ -268,6 +269,40 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	@Test
+	@DisplayName("latest candidate 입력이 아닌 만료 snapshot은 release freshness blocker에서 제외한다")
+	void unrelatedExpiredSnapshotDoesNotBlockLatestCandidate() {
+		jdbcTemplate.update("""
+			INSERT INTO data_source_snapshots (
+				snapshot_id, source_id, provider, retrieved_at, source_updated_at,
+				row_count, raw_sha256, raw_object_uri, redacted_request_fingerprint,
+				schema_fingerprint, snapshot_status, schema_status, license_status,
+				fetch_status, redistribution_allowed, credential_redacted,
+				freshness_expires_at, raw_retention_expires_at
+			)
+			VALUES (
+				'snapshot-unrelated-realtime', 'topis-arrival', 'TOPIS',
+				'2026-07-06 02:00:00', '2026-07-06 02:00:00', 10, ?, 's3://raw/unrelated',
+				?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', FALSE, TRUE,
+				'2026-07-06 02:01:30', '2026-07-07 02:00:00'
+			)
+			""", SHA_D, SHA_E, SHA_F);
+
+		assertThat(blockerSummaryUseCase.summarize().sourceFreshnessBlockers()).isZero();
+	}
+
+	@Test
+	@DisplayName("latest candidate가 존재하지 않는 snapshot을 참조하면 freshness를 fail closed한다")
+	void missingCandidateSnapshotBlocksRelease() {
+		jdbcTemplate.update("""
+			UPDATE datapack_candidate_inputs
+			SET source_snapshot_ids = 'snapshot-missing'
+			WHERE candidate_id = 'candidate-release-blocked'
+			""");
+
+		assertThat(blockerSummaryUseCase.summarize().sourceFreshnessBlockers()).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("역 상세 화면은 역 단위 release readiness를 보여준다")
 	void stationDetailShowsStationReleaseReadiness() throws Exception {
 		String html = getAdminHtml("/admin/stations/station-sangnoksu/page");
@@ -348,6 +383,18 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 				'FAIL', 'PASS', 'FAIL', 'PENDING', 'READY_FOR_APPROVAL',
 				'2026-06-29 03:30:00')
 			""", SHA_A, SHA_B, SHA_C, SHA_D, SHA_E, SHA_F, "1".repeat(64));
+	}
+
+	private void insertCandidateInput() {
+		jdbcTemplate.update("""
+			INSERT INTO datapack_candidate_inputs (
+				id, candidate_id, source_snapshot_ids, approved_alias_ledger_hash,
+				facility_evidence_ledger_hash, route_evidence_ledger_hash,
+				approved_override_set_hash, created_at
+			)
+			VALUES ('candidate-input-release-blocked', 'candidate-release-blocked',
+				'snapshot-release-blocked', ?, ?, ?, ?, '2026-06-29 03:31:00')
+			""", SHA_A, SHA_B, SHA_C, SHA_D);
 	}
 
 	private void insertPreviousCandidate() {
