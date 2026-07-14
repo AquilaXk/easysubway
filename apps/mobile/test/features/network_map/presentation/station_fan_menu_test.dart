@@ -153,7 +153,7 @@ void main() {
     }
   });
 
-  for (final width in [296.0, 336.0, 340.0]) {
+  for (final width in [260.0, 296.0, 340.0]) {
     testWidgets('$width dp 메뉴의 Semantics는 48dp 이상이고 겹치지 않는다', (tester) async {
       await _pump(tester, width: width, onAction: (_) {}, onClose: () {});
       final rects = [

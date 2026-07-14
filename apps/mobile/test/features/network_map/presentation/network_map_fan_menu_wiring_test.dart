@@ -153,10 +153,10 @@ void main() {
     });
 
     test('320/360/364/390dp에서 메뉴 너비를 단일 규칙으로 계산한다', () {
-      expect(fanMenuWidthForViewport(320), 296);
-      expect(fanMenuWidthForViewport(360), 336);
-      expect(fanMenuWidthForViewport(364), 340);
-      expect(fanMenuWidthForViewport(390), 340);
+      expect(fanMenuWidthForViewport(320), 260);
+      expect(fanMenuWidthForViewport(360), 260);
+      expect(fanMenuWidthForViewport(364), 260);
+      expect(fanMenuWidthForViewport(390), 260);
     });
 
     test('clamp 여부와 무관하게 같은 viewport는 같은 menu size를 사용한다', () {
@@ -176,7 +176,7 @@ void main() {
 
       expect(renderPlacement.menuWidth, cameraPlacement.menuWidth);
       expect(renderPlacement.menuHeight, cameraPlacement.menuHeight);
-      expect(renderPlacement.menuWidth, 336);
+      expect(renderPlacement.menuWidth, 260);
       expect(renderPlacement.left, isNot(cameraPlacement.left));
     });
 
