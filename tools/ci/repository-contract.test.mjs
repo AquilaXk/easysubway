@@ -5831,7 +5831,6 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.deepEqual(sourceIds, [
     "busan-transportation-official-od-fares",
     "busan-transportation-urban-rail-station-info",
-    "kric-braille-displays",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
     "kric-metropolitan-rail-station-info",
@@ -6124,7 +6123,6 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.ok(scope.productionSourceSet.excludedFromV1SupportClaims.includes("seoul-realtime-arrival-station-info"));
   assert.ok(scope.productionSourceSet.optionalAccessibilitySourceIds.includes("kric-disabled-toilet"));
   assert.deepEqual(scope.productionSourceSet.optionalAccessibilitySourceIds.sort(), [
-    "kric-braille-displays",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
     "kric-metropolitan-rail-station-info",
