@@ -170,6 +170,7 @@ void main() {
   for (final width in [220.0, 296.0, 340.0]) {
     testWidgets('$width dp 메뉴의 Semantics는 48dp 이상이고 겹치지 않는다', (tester) async {
       await _pump(tester, width: width, onAction: (_) {}, onClose: () {});
+      final menuRect = tester.getRect(find.byType(StationFanMenu));
       final rects = [
         '출발역으로 설정',
         '경유지로 추가',
@@ -180,6 +181,10 @@ void main() {
       for (final rect in rects) {
         expect(rect.width, greaterThanOrEqualTo(48));
         expect(rect.height, greaterThanOrEqualTo(48));
+        expect(rect.left, greaterThanOrEqualTo(menuRect.left - 0.001));
+        expect(rect.top, greaterThanOrEqualTo(menuRect.top - 0.001));
+        expect(rect.right, lessThanOrEqualTo(menuRect.right + 0.001));
+        expect(rect.bottom, lessThanOrEqualTo(menuRect.bottom + 0.001));
       }
       for (var i = 0; i < rects.length; i++) {
         for (var j = i + 1; j < rects.length; j++) {
