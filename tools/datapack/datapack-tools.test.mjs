@@ -16650,6 +16650,38 @@ test("bundled 공식 OD quote no-op도 catalog user_version 16을 강제한다",
   }
 });
 
+test("bundled 공식 OD quote 후처리기는 v18 catalog를 v16으로 낮추지 않는다", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bundled-official-od-newer-version-"));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  try {
+    await writeFile(
+      sqlitePath,
+      gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
+    );
+    const database = new DatabaseSync(sqlitePath);
+    database.exec("PRAGMA user_version = 18");
+    database.close();
+    const inputPack = gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 });
+    await writeFile(packPath, inputPack);
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/apply-official-od-fares-to-bundled-pack.mjs",
+        "--pack", packPath,
+        "--index", indexPath,
+      ], { cwd: root }),
+      /does not support catalog user_version 18 newer than 16/,
+    );
+
+    assert.equal(sha256(await readFile(packPath)), sha256(inputPack));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("수도권 bundled datapack은 빠른하차 차량·출입문 힌트 35건을 포함한다", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "bundled-car-door-hints-"));
   const databasePath = path.join(directory, "capital.sqlite");
@@ -16742,6 +16774,38 @@ test("bundled 차량·출입문 힌트 check는 catalog user_version 16을 요�
       ], { cwd: root }),
       /bundled catalog user_version must be 16/,
     );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("bundled 차량·출입문 힌트 후처리기는 v18 catalog를 v16으로 낮추지 않는다", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "bundled-car-door-hints-newer-version-"));
+  const packPath = path.join(directory, "capital.sqlite.gz");
+  const indexPath = path.join(directory, "index.json");
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  try {
+    await writeFile(
+      sqlitePath,
+      gunzipSync(await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"))),
+    );
+    const database = new DatabaseSync(sqlitePath);
+    database.exec("PRAGMA user_version = 18");
+    database.close();
+    const inputPack = gzipSync(await readFile(sqlitePath), { level: 9, mtime: 0 });
+    await writeFile(packPath, inputPack);
+    await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/apply-car-door-hints-to-bundled-pack.mjs",
+        "--pack", packPath,
+        "--index", indexPath,
+      ], { cwd: root }),
+      /does not support catalog user_version 18 newer than 16/,
+    );
+
+    assert.equal(sha256(await readFile(packPath)), sha256(inputPack));
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

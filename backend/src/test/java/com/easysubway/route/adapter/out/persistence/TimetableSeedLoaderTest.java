@@ -130,7 +130,7 @@ class TimetableSeedLoaderTest {
 	@Test
 	void acceptsFreshAdmittedItxIdentity() {
 		String freshUntil = OffsetDateTime.now().plusDays(1).toString();
-		loader(itxSeed("ADMITTED", true, freshUntil)).run(null);
+		loader(itxSeed("ADMITTED", true, freshUntil), true).run(null);
 
 		assertThat(jdbc.queryForObject(
 			"SELECT service_class FROM transit_trips WHERE id = 'itx-1'", String.class))
@@ -138,6 +138,16 @@ class TimetableSeedLoaderTest {
 		assertThat(jdbc.queryForObject(
 			"SELECT canonical_pack_id FROM route_service_artifact_evidence", String.class))
 			.isEqualTo("capital");
+	}
+
+	@Test
+	void rejectsIncludesItxConfigurationWhenSeedContainsNoItxRowsAndRollsBack() {
+		var subwayOnlySeed = new ClassPathResource("timetable/test-line4-seed.sql");
+
+		assertThatThrownBy(() -> loader(subwayOnlySeed, true).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("includes-itx=true");
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isZero();
 	}
 
 	@Test

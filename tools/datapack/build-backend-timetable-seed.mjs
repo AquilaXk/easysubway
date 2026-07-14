@@ -315,7 +315,15 @@ async function main() {
     feedEndDate: args["feed-end-date"],
     timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
     serviceCalendarDayMap: Array.isArray(artifact.serviceCalendars)
-      ? Object.fromEntries(artifact.serviceCalendars.map((calendar) => [calendar.serviceId, calendar]))
+      ? Object.fromEntries(artifact.serviceCalendars.map((calendar) => [calendar.serviceId, {
+        monday: calendar.monday,
+        tuesday: calendar.tuesday,
+        wednesday: calendar.wednesday,
+        thursday: calendar.thursday,
+        friday: calendar.friday,
+        saturday: calendar.saturday,
+        sunday: calendar.sunday,
+      }]))
       : undefined,
   });
   if (args.output) {

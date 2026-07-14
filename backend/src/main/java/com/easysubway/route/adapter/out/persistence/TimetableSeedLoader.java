@@ -76,7 +76,11 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		try {
 			transactionTemplate.executeWithoutResult(status -> {
 				executeBatch(statements);
-				validateRouteServiceAdmission();
+				boolean loadedItx = validateRouteServiceAdmission();
+				if (includesItxSeed && !loadedItx) {
+					throw new IllegalStateException(
+						"easysubway.timetable.seed.includes-itx=true requires ITX-청춘 timetable rows");
+				}
 			});
 		} catch (RuntimeException exception) {
 			// 다중 replica 동시 배포 경쟁: 다른 인스턴스가 먼저 적재하면 이 배치는 PK/싱글턴 충돌로 실패한다.

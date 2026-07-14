@@ -178,12 +178,17 @@ test("CLI는 timetable 원본과 분리된 evidence sidecar를 실제 input byte
     "--input", inputPath,
     "--route-service-evidence", evidencePath,
     "--line-id", artifact.canonicalLineId,
+    "--start-date", "20300101",
+    "--end-date", "20300131",
+    "--feed-end-date", "20300131",
     "--output", outputPath,
   ], { cwd: root });
 
   const sql = await readFile(outputPath, "utf8");
   assert.match(sql, new RegExp(timetableArtifactSha256));
   assert.match(sql, /'ITX_CHEONGCHUN'/);
+  assert.match(sql, /'20300101', '20300131', 'Asia\/Seoul'/);
+  assert.match(sql, /transit_feed_info \(id, feed_end_date\) VALUES \(1, '20300131'\)/);
 });
 
 test("stale ITX evidence는 seed 생성 단계에서 거부한다", () => {
