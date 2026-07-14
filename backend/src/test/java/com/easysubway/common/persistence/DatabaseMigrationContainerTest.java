@@ -120,6 +120,7 @@ class DatabaseMigrationContainerTest {
 		assertManualOverrideProductionGuards(jdbcTemplate);
 		assertRouteEdgeEvidenceStrictRouteGuards(jdbcTemplate);
 		assertDatapackPermissionMatrix(jdbcTemplate);
+		assertRouteServiceIdentityHashGuards(jdbcTemplate);
 	}
 
 	@Test
@@ -851,5 +852,31 @@ class DatabaseMigrationContainerTest {
 			strictRouteEligible,
 			blockerReason
 		);
+	}
+
+	private void assertRouteServiceIdentityHashGuards(JdbcTemplate jdbcTemplate) {
+		String validHash = "a".repeat(64);
+		assertThatThrownBy(() -> insertRouteServiceIdentity(jdbcTemplate, "short", validHash, validHash))
+			.isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> insertRouteServiceIdentity(
+			jdbcTemplate, "g".repeat(64), validHash, validHash))
+			.isInstanceOf(DataAccessException.class);
+	}
+
+	private void insertRouteServiceIdentity(
+		JdbcTemplate jdbcTemplate,
+		String timetableHash,
+		String canonicalPackHash,
+		String canonicalPackSqliteHash
+	) {
+		jdbcTemplate.update("""
+			INSERT INTO route_service_artifact_evidence (
+				service_class, timetable_artifact_id, timetable_artifact_sha256,
+				canonical_pack_id, canonical_pack_sha256, canonical_pack_sqlite_sha256,
+				admission_status, admission_eligible, fresh_until, source_issue
+			)
+			VALUES ('ITX_CHEONGCHUN', 'invalid-hash-test', ?, 'capital', ?, ?,
+				'MISSING', FALSE, NULL, 2116)
+			""", timetableHash, canonicalPackHash, canonicalPackSqliteHash);
 	}
 }

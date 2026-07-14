@@ -205,6 +205,59 @@ test("stale ITX evidence는 seed 생성 단계에서 거부한다", () => {
   assert.throws(() => buildBackendTimetableSeed(artifact, OPTIONS), /must be fresh/);
 });
 
+test("ITX trip 0건인 seed에는 ADMITTED evidence를 기록하지 않는다", () => {
+  const artifact = {
+    ...ARTIFACT,
+    routeServiceArtifactEvidence: [{
+      serviceClass: "ITX_CHEONGCHUN",
+      timetableArtifactId: "wrongly-admitted-subway-only",
+      timetableArtifactSha256: "a".repeat(64),
+      canonicalPackId: "capital",
+      canonicalPackSha256: "b".repeat(64),
+      canonicalPackSqliteSha256: "c".repeat(64),
+      admissionStatus: "ADMITTED",
+      admissionEligible: true,
+      freshUntil: "2999-01-01T00:00:00.000Z",
+      sourceIssue: 2116,
+    }],
+  };
+
+  assert.throws(
+    () => buildBackendTimetableSeed(artifact, {
+      ...OPTIONS,
+      timetableArtifactSha256: "a".repeat(64),
+    }),
+    /ADMITTED evidence requires ITX_CHEONGCHUN trips/,
+  );
+});
+
+test("ITX evidence freshUntil은 runtime loader가 읽는 offset ISO-8601 형식이어야 한다", () => {
+  const artifact = {
+    ...ARTIFACT,
+    transitTrips: ARTIFACT.transitTrips.map((trip) => ({ ...trip, serviceClass: "ITX_CHEONGCHUN" })),
+    routeServiceArtifactEvidence: [{
+      serviceClass: "ITX_CHEONGCHUN",
+      timetableArtifactId: "invalid-freshness-format",
+      timetableArtifactSha256: "a".repeat(64),
+      canonicalPackId: "capital",
+      canonicalPackSha256: "b".repeat(64),
+      canonicalPackSqliteSha256: "c".repeat(64),
+      admissionStatus: "ADMITTED",
+      admissionEligible: true,
+      freshUntil: "2999-01-01",
+      sourceIssue: 2116,
+    }],
+  };
+
+  assert.throws(
+    () => buildBackendTimetableSeed(artifact, {
+      ...OPTIONS,
+      timetableArtifactSha256: "a".repeat(64),
+    }),
+    /freshUntil must be offset ISO-8601/,
+  );
+});
+
 test("stop_time 행을 스키마 컬럼으로 직역한다 (pickup/drop_off 기본 0)", () => {
   const { sql } = buildBackendTimetableSeed(ARTIFACT, OPTIONS);
   assert.match(

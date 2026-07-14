@@ -73,6 +73,7 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
 
 const ALLOWED_SERVICE_PATTERNS = new Set(["LOCAL", "EXPRESS"]);
 const ALLOWED_SERVICE_CLASSES = new Set(["SUBWAY", "ITX_CHEONGCHUN"]);
+const OFFSET_ISO_8601 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 // trip 행이 V29 제약(id PK 유일, service_pattern CHECK, service_day_start_seconds 범위)을 만족하는지
 // 생성 단계에서 검증한다(로드-시점 FK/CHECK 실패를 앞당김). trip id 집합을 stop_times FK 검증용으로 반환.
@@ -106,6 +107,14 @@ function validateRouteServiceEvidence(rows, trips, buildNow, timetableArtifactSh
   }
   const hasItxTrips = trips.some(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN");
   if (!hasItxTrips) {
+    const evidence = rows[0];
+    if (evidence && (
+      evidence.serviceClass !== "ITX_CHEONGCHUN"
+      || evidence.admissionStatus !== "MISSING"
+      || evidence.admissionEligible !== false
+    )) {
+      throw new Error("ADMITTED evidence requires ITX_CHEONGCHUN trips");
+    }
     return rows;
   }
   const evidence = rows[0];
@@ -115,6 +124,9 @@ function validateRouteServiceEvidence(rows, trips, buildNow, timetableArtifactSh
     || evidence.admissionEligible !== true
   ) {
     throw new Error("ITX_CHEONGCHUN seed requires ADMITTED route service evidence");
+  }
+  if (typeof evidence.freshUntil !== "string" || !OFFSET_ISO_8601.test(evidence.freshUntil)) {
+    throw new Error("ITX_CHEONGCHUN freshUntil must be offset ISO-8601");
   }
   const freshUntil = new Date(evidence.freshUntil);
   if (Number.isNaN(freshUntil.getTime()) || freshUntil <= buildNow) {
