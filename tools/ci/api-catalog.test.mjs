@@ -312,6 +312,15 @@ test("프로젝트 catalog는 주요 API 종류를 모두 찾고 검증한다", 
     assert.equal(entry.operation.auth.env, authEnv);
     assert.equal(entry.operation.runner.command, "node tools/datapack/probe-daejeon-coverage-api.mjs");
   }
+  const daejeonDistanceFare = findCatalogEntry(catalog, "provider:daejeon-station-distance-fare");
+  assert.equal(daejeonDistanceFare.detailUrl, "https://www.data.go.kr/data/15158794/openapi.do");
+  assert.equal(daejeonDistanceFare.endpoint, "https://apis.data.go.kr/B554695/TimeDistSVC/getTimeDist01");
+  assert.deepEqual(daejeonDistanceFare.operation.requiredParameters, [
+    "serviceKey",
+    "strstnno",
+    "endstnno",
+  ]);
+  assert.deepEqual(daejeonDistanceFare.responseFields, ["distfloat", "fee", "min", "sec"]);
   const daejeonSearchIds = new Set(listCatalog(catalog, { kind: "provider", query: "대전" }).map(({ id }) => id));
   for (const id of [
     "provider:daejeon-braille-guide-map",
