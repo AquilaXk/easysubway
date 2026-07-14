@@ -5,6 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 
+import '../../datapack/data_pack_index.dart';
+import '../../datapack/data_pack_update_state.dart';
 import '../../datapack/emergency_override_repository.dart';
 import 'catalog_database.dart';
 
@@ -13,13 +15,15 @@ class CatalogDatabaseOpener {
     required this.databaseDirectory,
     required this.assetBundle,
     this.emergencyOverrideRepository,
-  });
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   static const indexAssetPath = 'assets/datapacks/index.json';
 
   final Directory databaseDirectory;
   final AssetBundle assetBundle;
   final EmergencyOverrideRepository? emergencyOverrideRepository;
+  final DateTime Function() _now;
 
   Future<CatalogDatabase> open() async {
     final installedDatabase = await _openInstalledCurrentDataPack();
@@ -31,12 +35,13 @@ class CatalogDatabaseOpener {
       p.join(databaseDirectory.path, 'datapacks'),
     );
     await datapackDirectory.create(recursive: true);
-    await _installBundledDataPacks(datapackDirectory);
+    final index = await _installBundledDataPacks(datapackDirectory);
 
     final database = CatalogDatabase.file(
       File(p.join(datapackDirectory.path, 'capital.sqlite')),
     );
     await database.seedBaselineIfEmpty();
+    await _writeBundledFreshness(database, index);
     return database;
   }
 
@@ -266,43 +271,33 @@ class CatalogDatabaseOpener {
     return schemaVersion != null;
   }
 
-  Future<void> _installBundledDataPacks(Directory datapackDirectory) async {
+  Future<DataPackIndex> _installBundledDataPacks(
+    Directory datapackDirectory,
+  ) async {
     final rawIndex = await assetBundle.loadString(indexAssetPath);
     final decoded = jsonDecode(rawIndex);
     if (decoded is! Map<String, Object?>) {
       throw const FormatException('Invalid data pack index.');
     }
-    final rawPacks = decoded['packs'];
-    if (rawPacks is! List<Object?>) {
-      throw const FormatException('Invalid data pack list.');
-    }
+    final index = DataPackIndex.fromJson(decoded);
 
-    for (final rawPack in rawPacks) {
-      if (rawPack is! Map<String, Object?>) {
-        throw const FormatException('Invalid data pack entry.');
-      }
-      await _installDataPack(rawPack, datapackDirectory);
+    for (final pack in index.packs) {
+      await _installDataPack(pack, datapackDirectory);
     }
+    return index;
   }
 
   Future<void> _installDataPack(
-    Map<String, Object?> pack,
+    DataPackIndexEntry pack,
     Directory datapackDirectory,
   ) async {
-    final id = pack['id'];
-    final asset = pack['asset'];
-    final expectedCompressedSha256 = pack['sha256'];
-    final expectedSqliteSha256 = pack['sqliteSha256'];
-    if (id is! String || asset is! String) {
-      throw const FormatException('Invalid data pack identity.');
-    }
+    final id = pack.id;
+    final asset = pack.asset;
+    final expectedCompressedSha256 = pack.sha256;
+    final expectedSqliteSha256 = pack.sqliteSha256;
 
     final target = File(p.join(datapackDirectory.path, '$id.sqlite'));
     if (await target.exists()) {
-      if (expectedSqliteSha256 is! String || expectedSqliteSha256.isEmpty) {
-        return;
-      }
-
       final installedBytes = await target.readAsBytes();
       if (sha256.convert(installedBytes).toString() == expectedSqliteSha256) {
         return;
@@ -314,21 +309,48 @@ class CatalogDatabaseOpener {
       byteData.offsetInBytes,
       byteData.lengthInBytes,
     );
-    if (expectedCompressedSha256 is String &&
-        expectedCompressedSha256.isNotEmpty &&
-        sha256.convert(compressedBytes).toString() !=
-            expectedCompressedSha256) {
+    if (sha256.convert(compressedBytes).toString() !=
+        expectedCompressedSha256) {
       throw const FormatException('Data pack checksum mismatch.');
     }
 
     final databaseBytes = gzip.decode(compressedBytes);
-    if (expectedSqliteSha256 is String &&
-        expectedSqliteSha256.isNotEmpty &&
-        sha256.convert(databaseBytes).toString() != expectedSqliteSha256) {
+    if (sha256.convert(databaseBytes).toString() != expectedSqliteSha256) {
       throw const FormatException('Data pack sqlite checksum mismatch.');
     }
 
     await _replaceInstalledDataPack(target, databaseBytes);
+  }
+
+  Future<void> _writeBundledFreshness(
+    CatalogDatabase database,
+    DataPackIndex index,
+  ) async {
+    final freshness = evaluateDataPackFreshness(
+      evaluationAt: _now().toUtc(),
+      freshnessExpiresAt: index.freshnessExpiresAt,
+    );
+    final stale = freshness == DataPackFreshnessState.stale;
+    await database.batch((batch) {
+      batch.insertAllOnConflictUpdate(database.catalogMetadata, [
+        CatalogMetadataCompanion.insert(
+          key: 'datapack.freshness.status',
+          value: stale ? 'STALE' : 'FRESH',
+        ),
+        CatalogMetadataCompanion.insert(
+          key: 'datapack.freshness.expiresAt',
+          value: index.freshnessExpiresAt.toIso8601String(),
+        ),
+        CatalogMetadataCompanion.insert(
+          key: 'datapack.freshness.reasonCode',
+          value: stale ? 'BUNDLED_PACK_EXPIRED' : 'NONE',
+        ),
+        CatalogMetadataCompanion.insert(
+          key: 'datapack.freshness.labelKo',
+          value: stale ? '저장된 데이터 기준 · 갱신 필요' : '',
+        ),
+      ]);
+    });
   }
 
   Future<void> _replaceInstalledDataPack(

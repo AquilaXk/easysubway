@@ -70,19 +70,44 @@ function stableManifestIdentity(manifest) {
   if (!manifest || !Array.isArray(manifest.packs) || manifest.packs.length === 0) {
     throw new Error("manifest.packs must be a non-empty array");
   }
-  const packs = manifest.packs.map((pack) => ({
-    id: requiredString(pack.id, "pack.id"),
-    version: requiredString(String(pack.version ?? ""), "pack.version"),
-    sha256: requiredSha256(pack.sha256, "pack.sha256"),
-    sqliteSha256: requiredSha256(pack.sqliteSha256, "pack.sqliteSha256"),
-    schemaVersion: requiredString(String(pack.schemaVersion ?? ""), "pack.schemaVersion"),
-    sourceInventory: (pack.sourceInventory ?? []).map((source) => ({
-      id: requiredString(source.id, "source.id"),
-      updatedAt: requiredString(source.updatedAt, "source.updatedAt"),
-      fields: [...(source.fields ?? [])].sort(),
-    })).sort((left, right) => left.id.localeCompare(right.id)),
-  })).sort((left, right) => left.id.localeCompare(right.id) || left.version.localeCompare(right.version));
-  return JSON.stringify(packs);
+  const {
+    releaseSequence: _releaseSequence,
+    publishedAt: _publishedAt,
+    expiresAt: _expiresAt,
+    signature: _signature,
+    ...stable
+  } = manifest;
+  stable.packs = manifest.packs.map((pack) => {
+    const normalized = {
+      ...pack,
+      id: requiredString(pack.id, "pack.id"),
+      version: requiredString(String(pack.version ?? ""), "pack.version"),
+      sha256: requiredSha256(pack.sha256, "pack.sha256"),
+      sqliteSha256: requiredSha256(pack.sqliteSha256, "pack.sqliteSha256"),
+      schemaVersion: requiredString(String(pack.schemaVersion ?? ""), "pack.schemaVersion"),
+    };
+    if (pack.sourceInventory != null) {
+      if (!Array.isArray(pack.sourceInventory)) {
+        throw new Error("pack.sourceInventory must be an array");
+      }
+      normalized.sourceInventory = pack.sourceInventory.map((source) => ({
+        ...source,
+        id: requiredString(source.id, "source.id"),
+        updatedAt: requiredString(source.updatedAt, "source.updatedAt"),
+        fields: [...(source.fields ?? [])].sort(),
+      })).sort((left, right) => left.id.localeCompare(right.id));
+    }
+    return normalized;
+  }).sort((left, right) => left.id.localeCompare(right.id) || left.version.localeCompare(right.version));
+  return JSON.stringify(canonicalize(stable));
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+  }
+  return value;
 }
 
 function validApproval({ buildSpec, buildSpecSha256, releaseRequest }) {

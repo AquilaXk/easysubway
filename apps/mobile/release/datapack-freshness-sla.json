@@ -9,6 +9,7 @@
   "sourceClasses": [
     {
       "id": "static_network_metadata",
+      "sourceIds": ["molit-urban-rail-full-route", "seoulmetro-station-line-info"],
       "examples": ["station", "line", "operator identity"],
       "basisField": "retrievedAt",
       "reverificationCadence": "P30D",
@@ -19,6 +20,7 @@
     },
     {
       "id": "static_accessibility_facility",
+      "sourceIds": ["kric-station-elevator", "kric-station-elevator-movement", "kric-station-escalator", "kric-wheelchair-lift-location", "kric-wheelchair-lift-movement", "seoul-metro-accessibility"],
       "examples": ["KRIC elevator", "KRIC escalator", "KRIC wheelchair lift"],
       "basisField": "retrievedAt",
       "reverificationCadence": "P90D",
@@ -29,6 +31,7 @@
     },
     {
       "id": "planned_timetable",
+      "sourceIds": [],
       "examples": ["service calendar", "trips", "stop_times", "headway"],
       "basisField": "serviceEffectiveAt",
       "maximumReverificationCadence": "P30D",
@@ -40,6 +43,7 @@
     },
     {
       "id": "route_map_asset",
+      "sourceIds": ["seoulmetro-cyberstation-route-map"],
       "examples": ["official cyber-station SVG", "route map label polygons"],
       "basisField": "retrievedAt",
       "reverificationCadence": "P1Y",
@@ -50,6 +54,7 @@
     },
     {
       "id": "realtime_overlay",
+      "sourceIds": [],
       "examples": ["Seoul TOPIS arrival", "provider train position"],
       "basisField": "observedAt",
       "reverificationCadence": "PT90S",

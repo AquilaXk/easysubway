@@ -120,6 +120,30 @@ test("승인된 material change는 preflight에서만 production write를 허용
   assert.deepEqual(result.reasonCodes, ["PUBLISH_REQUIRED_NOT_COMPLETED"]);
 });
 
+test("activePack·TTL·URL·license 변경도 material change로 판정한다", () => {
+  const current = manifest({
+    activePack: "capital",
+    ttlSeconds: 86_400,
+    packs: [{
+      ...manifest().packs[0],
+      url: "https://example.invalid/capital-v1.sqlite.gz",
+      license: "ODbL-1.0",
+    }],
+  });
+  const changes = [
+    { ...current, releaseSequence: 11, activePack: "capital-rescue" },
+    { ...current, releaseSequence: 11, ttlSeconds: 43_200 },
+    { ...current, releaseSequence: 11, packs: [{ ...current.packs[0], url: "https://example.invalid/capital-v2.sqlite.gz" }] },
+    { ...current, releaseSequence: 11, packs: [{ ...current.packs[0], license: "CC-BY-4.0" }] },
+  ];
+
+  for (const candidateManifest of changes) {
+    const result = decide({ candidateManifest, currentManifest: current });
+    assert.equal(result.materialChange, true);
+    assert.equal(result.outcome, "PUBLISH_REQUIRED");
+  }
+});
+
 test("current expiry와 같은 평가 시각은 변경이 없어도 PUBLISH_REQUIRED이다", () => {
   const expired = manifest({ expiresAt: evaluationAt });
   const result = decide({

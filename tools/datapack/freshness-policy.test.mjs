@@ -72,6 +72,16 @@ test("future basis가 clock skew를 넘으면 fail closed한다", () => {
   }), /SOURCE_FRESHNESS_DERIVATION_MISMATCH/);
 });
 
+test("존재하지 않는 UTC 날짜는 fail closed한다", () => {
+  assert.throws(() => deriveFreshness({
+    policy,
+    sourceClassId: "static_accessibility_facility",
+    basisAt: "2026-02-31T00:00:00Z",
+    storedExpiresAt: "2026-06-01T00:00:00Z",
+    evaluationAt: "2026-03-01T00:00:00Z",
+  }), /RFC 3339 UTC timestamp/);
+});
+
 test("schedule decision은 publish write를 승인 evidence와 strict pass 뒤에만 허용한다", () => {
   assert.deepEqual(decideScheduledRun({
     materialChange: false,

@@ -100,14 +100,30 @@ test("production publish는 canonical decision의 write 허용 뒤에만 실행�
 });
 
 test("scheduled publish는 명시적 opt-in과 승인된 입력 경로 없이는 exploratory로 남는다", () => {
-  assert.match(yml, /EASYSUBWAY_DATAPACK_SCHEDULED_PUBLISH_ENABLED/);
-  assert.match(yml, /github\.event_name == 'schedule' && vars\.EASYSUBWAY_DATAPACK_SCHEDULED_PUBLISH_ENABLED == 'true'/);
+  assert.match(yml, /DATAPACK_SCHEDULED_PUBLISH_ENABLED/);
+  assert.match(yml, /github\.event_name == 'schedule' && vars\.DATAPACK_SCHEDULED_PUBLISH_ENABLED == 'true'/);
+  assert.doesNotMatch(yml, /vars\.EASYSUBWAY_DATAPACK_SCHEDULED_/);
   assert.match(yml, /SCHEDULED_BUILD_SPEC_PATH/);
   assert.match(yml, /SCHEDULED_RELEASE_REQUEST_ID/);
   assert.match(yml, /SCHEDULED_ANDROID_EVIDENCE_PATH/);
   assert.match(yml, /SCHEDULED_STRICT_ROUTE_REGRESSION_PATH/);
   assert.match(yml, /scheduled production publish requires configured approval evidence/);
   assert.match(yml, /steps\.release-mode\.outputs\.release_request_id/);
+});
+
+test("release build는 source snapshot freshness를 build 전에 fail closed로 검증한다", () => {
+  const freshnessStep = yml.match(
+    /- name: Data Pack Release \/ Validate source snapshot freshness[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(freshnessStep, "source snapshot freshness 검증 스텝을 찾지 못함");
+  assert.match(freshnessStep, /validate-source-snapshot-freshness\.mjs/);
+  assert.match(freshnessStep, /--build-spec/);
+  assert.match(freshnessStep, /--snapshots tools\/datapack\/release\/source-snapshots\.json/);
+  assert.match(freshnessStep, /--policy apps\/mobile\/release\/datapack-freshness-sla\.json/);
+  assert.ok(
+    yml.indexOf("Validate source snapshot freshness") < yml.indexOf("Build data packs"),
+    "source snapshot freshness는 build 전에 검증해야 함",
+  );
 });
 
 test("current manifest 조회는 404만 initial release로 허용한다", () => {

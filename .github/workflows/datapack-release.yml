@@ -45,7 +45,7 @@ jobs:
     permissions:
       contents: read
     environment:
-      name: ${{ (github.event.inputs.mode == 'production-publish' || github.event.inputs.mode == 'rollback' || github.event.inputs.mode == 'rollout-update' || (github.event_name == 'schedule' && vars.EASYSUBWAY_DATAPACK_SCHEDULED_PUBLISH_ENABLED == 'true')) && 'production-datapack' || 'datapack-release-check' }}
+      name: ${{ (github.event.inputs.mode == 'production-publish' || github.event.inputs.mode == 'rollback' || github.event.inputs.mode == 'rollout-update' || (github.event_name == 'schedule' && vars.DATAPACK_SCHEDULED_PUBLISH_ENABLED == 'true')) && 'production-datapack' || 'datapack-release-check' }}
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
 
@@ -125,11 +125,11 @@ jobs:
           RELEASE_REQUEST_PATH_INPUT: ${{ steps.args.outputs.releaseRequestPath }}
           ANDROID_EVIDENCE_PATH_INPUT: ${{ steps.args.outputs.androidEvidencePath }}
           STRICT_ROUTE_REGRESSION_PATH_INPUT: ${{ steps.args.outputs.strictRouteRegressionPath }}
-          SCHEDULED_PUBLISH_ENABLED: ${{ vars.EASYSUBWAY_DATAPACK_SCHEDULED_PUBLISH_ENABLED }}
-          SCHEDULED_BUILD_SPEC_PATH: ${{ vars.EASYSUBWAY_DATAPACK_SCHEDULED_BUILD_SPEC_PATH }}
-          SCHEDULED_RELEASE_REQUEST_ID: ${{ vars.EASYSUBWAY_DATAPACK_SCHEDULED_RELEASE_REQUEST_ID }}
-          SCHEDULED_ANDROID_EVIDENCE_PATH: ${{ vars.EASYSUBWAY_DATAPACK_SCHEDULED_ANDROID_EVIDENCE_PATH }}
-          SCHEDULED_STRICT_ROUTE_REGRESSION_PATH: ${{ vars.EASYSUBWAY_DATAPACK_SCHEDULED_STRICT_ROUTE_REGRESSION_PATH }}
+          SCHEDULED_PUBLISH_ENABLED: ${{ vars.DATAPACK_SCHEDULED_PUBLISH_ENABLED }}
+          SCHEDULED_BUILD_SPEC_PATH: ${{ vars.DATAPACK_SCHEDULED_BUILD_SPEC_PATH }}
+          SCHEDULED_RELEASE_REQUEST_ID: ${{ vars.DATAPACK_SCHEDULED_RELEASE_REQUEST_ID }}
+          SCHEDULED_ANDROID_EVIDENCE_PATH: ${{ vars.DATAPACK_SCHEDULED_ANDROID_EVIDENCE_PATH }}
+          SCHEDULED_STRICT_ROUTE_REGRESSION_PATH: ${{ vars.DATAPACK_SCHEDULED_STRICT_ROUTE_REGRESSION_PATH }}
         run: |
           set -euo pipefail
           mode="${MODE_INPUT:-exploratory}"
@@ -239,6 +239,15 @@ jobs:
               echo "is-pointer-only=false"
             fi
           } >> "${GITHUB_OUTPUT}"
+
+      - name: Data Pack Release / Validate source snapshot freshness
+        if: ${{ steps.release-mode.outputs.mode == 'release-candidate' || steps.release-mode.outputs.mode == 'production-publish' }}
+        run: |
+          set -euo pipefail
+          node tools/datapack/validate-source-snapshot-freshness.mjs \
+            --build-spec "${EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH}" \
+            --snapshots tools/datapack/release/source-snapshots.json \
+            --policy apps/mobile/release/datapack-freshness-sla.json
 
       - name: Data Pack Release / Restore GitHub Actions dotenv secret
         env:

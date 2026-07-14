@@ -504,6 +504,37 @@ void main() {
     );
   });
 
+  test('내장 데이터팩은 실제 open 경로에서 expiry 경계의 stale 상태를 기록한다', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'easysubway-catalog-stale-bundled-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+
+    final database = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      now: () => DateTime.utc(2026, 8, 11),
+    ).open();
+    addTearDown(database.close);
+    final rows = await database.customSelect('''
+      SELECT key, value
+      FROM catalog_metadata
+      WHERE key LIKE 'datapack.freshness.%'
+    ''').get();
+    final metadata = {
+      for (final row in rows)
+        row.read<String>('key'): row.read<String>('value'),
+    };
+
+    expect(metadata['datapack.freshness.status'], 'STALE');
+    expect(metadata['datapack.freshness.reasonCode'], 'BUNDLED_PACK_EXPIRED');
+    expect(metadata['datapack.freshness.labelKo'], '저장된 데이터 기준 · 갱신 필요');
+    expect(
+      metadata['datapack.freshness.expiresAt'],
+      '2026-08-11T00:00:00.000Z',
+    );
+  });
+
   test('기존 baseline 노선도 출처에 남은 fixture 문구를 정리한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

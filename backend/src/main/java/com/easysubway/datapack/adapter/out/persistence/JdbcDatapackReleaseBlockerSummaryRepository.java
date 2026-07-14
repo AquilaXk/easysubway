@@ -240,7 +240,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			.distinct()
 			.toList();
 		if (snapshotIds.isEmpty()) {
-			return 0L;
+			return 1L;
 		}
 		String placeholders = String.join(", ", snapshotIds.stream().map(ignored -> "?").toList());
 		List<LocalDateTime> expiresAtValues = jdbcTemplate.query(

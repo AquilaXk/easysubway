@@ -303,6 +303,26 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 	}
 
 	@Test
+	@DisplayName("latest candidate 입력 row가 없으면 freshness를 fail closed한다")
+	void missingCandidateInputBlocksRelease() {
+		jdbcTemplate.update("DELETE FROM datapack_candidate_inputs WHERE candidate_id = 'candidate-release-blocked'");
+
+		assertThat(blockerSummaryUseCase.summarize().sourceFreshnessBlockers()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("latest candidate의 snapshot ID가 비어 있으면 freshness를 fail closed한다")
+	void emptyCandidateSnapshotIdsBlockRelease() {
+		jdbcTemplate.update("""
+			UPDATE datapack_candidate_inputs
+			SET source_snapshot_ids = ''
+			WHERE candidate_id = 'candidate-release-blocked'
+			""");
+
+		assertThat(blockerSummaryUseCase.summarize().sourceFreshnessBlockers()).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("역 상세 화면은 역 단위 release readiness를 보여준다")
 	void stationDetailShowsStationReleaseReadiness() throws Exception {
 		String html = getAdminHtml("/admin/stations/station-sangnoksu/page");
