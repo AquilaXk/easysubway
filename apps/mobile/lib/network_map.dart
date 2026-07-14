@@ -12,6 +12,7 @@ import 'accessible_design.dart';
 import 'ad_slot.dart';
 import 'design_tokens.dart';
 import 'facility_report.dart';
+import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
@@ -370,6 +371,7 @@ class NetworkMapScreen extends StatefulWidget {
     this.stationSearchRepository,
     this.reportRepository,
     this.favoriteRepository,
+    this.adRepository,
     this.searchHistoryRepository,
     this.facilityReportDraftTargetStore,
     this.internalRouteRepository,
@@ -385,6 +387,8 @@ class NetworkMapScreen extends StatefulWidget {
     this.notificationAction,
     this.disruptionBanner,
     this.bottomNavigationBar,
+    this.focusStationRequestId,
+    this.onFocusStationRequestHandled,
     super.key,
   });
 
@@ -415,6 +419,10 @@ class NetworkMapScreen extends StatefulWidget {
   /// 진입 가능하다.
   final FacilityReportRepository? reportRepository;
   final FavoriteStationRepository? favoriteRepository;
+
+  /// #2109 Fix: 팬 메뉴 앵커 역명 라벨 탭으로 여는 역 상세([_openStationDetailFromMap])에
+  /// 광고를 배선하기 위해 필요하다(다른 두 상세 진입점과 같은 repository로 수렴).
+  final AdRepository? adRepository;
   final SearchHistoryRepository? searchHistoryRepository;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
   final InternalRouteRepository? internalRouteRepository;
@@ -436,6 +444,15 @@ class NetworkMapScreen extends StatefulWidget {
   /// 상단 disruption 공지 1줄 배너. 표시할 공지가 없으면 스스로 빈 위젯이 된다.
   final Widget? disruptionBanner;
   final Widget? bottomNavigationBar;
+
+  /// #2109 풀페이지 검색(햄버거 메뉴 경유) 결과 탭으로 반환된 역 id. 설정되면
+  /// 노선도가 그 역으로 카메라를 이동하고 팬 메뉴를 띄운다. 임베디드 검색의
+  /// _searchFanMenuStationId와 같은 메커니즘을 재사용한다.
+  final String? focusStationRequestId;
+
+  /// [focusStationRequestId]를 소비했음을 부모에게 알린다(같은 id로 재요청되지
+  /// 않도록 부모가 필드를 비우게 한다).
+  final VoidCallback? onFocusStationRequestHandled;
 
   @override
   State<NetworkMapScreen> createState() => _NetworkMapScreenState();
@@ -476,6 +493,24 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   void initState() {
     super.initState();
     widget.routeDraftController.addListener(_handleDraftChangedForSearch);
+  }
+
+  /// #2109 Fix: 풀페이지 검색(햄버거 메뉴 경유) 결과 탭으로 반환된
+  /// [NetworkMapScreen.focusStationRequestId]를 인플레이스 검색과 같은 팬 메뉴
+  /// 채널(_searchFanMenuStationId)로 수렴시킨다. 부모([onFocusStationRequestHandled])의
+  /// setState를 이 build 사이클 안에서 직접 호출하면 "build 중 setState" 예외가
+  /// 나므로(부모가 이 위젯을 빌드하는 도중 didUpdateWidget이 실행됨), 다음
+  /// 프레임으로 미룬다.
+  @override
+  void didUpdateWidget(covariant NetworkMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final requestId = widget.focusStationRequestId;
+    if (requestId != null && requestId != oldWidget.focusStationRequestId) {
+      setState(() => _searchFanMenuStationId = requestId);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onFocusStationRequestHandled?.call();
+      });
+    }
   }
 
   /// 검색 모드 중 draft가 채워지면(출발/도착 설정 등) OD 상단바가 이겨야 하므로
@@ -540,6 +575,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   /// #2109 팬 메뉴 앵커의 역명 라벨 탭 → 해당 역의 상세 화면으로 진입한다.
   /// 검색 결과 탭 → 상세 push였던 흐름의 상세 진입 지점을 팬 메뉴로 옮긴 것으로,
   /// 상세 화면이 필요로 하는 저장소는 이 화면이 이미 주입받고 있다(#1933 주석 참조).
+  /// #2109 Fix: adRepository도 다른 두 상세 진입점(main.dart stationDetailBuilder,
+  /// _openStationDetailFromFavorite)과 같은 repository로 배선한다.
   void _openStationDetailFromMap(NetworkMapStation station) {
     final searchRepository = widget.stationSearchRepository;
     final reportRepository = widget.reportRepository;
@@ -552,6 +589,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           repository: searchRepository,
           reportRepository: reportRepository,
           favoriteRepository: widget.favoriteRepository,
+          adRepository: widget.adRepository,
           realtimeRepository: widget.realtimeRepository,
           locationProvider: widget.locationProvider,
           stationId: station.id,
@@ -3544,13 +3582,19 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     // #2109 팬 메뉴 위(아래 배치 시에도 메뉴 상단 바깥)에 역명 라벨을
                     // 형제로 얹고, 탭 시 역 상세로 진입한다. 팬 메뉴는 출발/도착
                     // 지정, 라벨은 상세 진입으로 역할을 나눈다.
-                    final labelTop = top - 28;
+                    // #2109 Fix: 라벨을 top(고정 28px 높이 가정)이 아니라 bottom
+                    // 앵커로 배치한다. top 앵커 + 컨텐츠 sizing 조합은 시스템 글자
+                    // 크기 확대(예: 2x)에서 라벨 박스가 아래로 부풀어 팬 메뉴 상단과
+                    // 겹치고, 뒤에 그려지는 팬 메뉴가 라벨 탭 영역을 가리는 결함이
+                    // 있었다. bottom 앵커는 라벨이 커져도 항상 위로만 자라 메뉴와
+                    // 겹치지 않는다.
+                    final labelBottom = constraints.maxHeight - top + 8;
                     return Stack(
                       children: [
                         Positioned(
                           key: const Key('networkMapFanMenuStationLabel'),
                           left: stationPoint.dx - 60,
-                          top: labelTop,
+                          bottom: labelBottom,
                           width: 120,
                           child: Center(
                             child: GestureDetector(
@@ -3867,11 +3911,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     final menuTop = placeBelow
         ? stationPoint.dy + 28
         : stationPoint.dy - menuHeight - 8;
+    // #2109 Fix: 팬 메뉴 위(또는 아래 배치 시 메뉴 위)에 얹히는 역명 라벨(build에서
+    // bottom 앵커로 배치, 최소 높이 추정치 28px)도 카메라가 화면 안에 들어오도록
+    // 패닝 대상 bbox에 포함시킨다. 그러지 않으면 화면 상단 경계에 가까운 역에서
+    // 라벨이 화면 밖으로 밀려날 수 있다.
+    const labelHeight = 28.0;
     final menuRect = Rect.fromLTWH(
       stationPoint.dx - menuWidth / 2,
-      menuTop,
+      menuTop - labelHeight,
       menuWidth,
-      menuHeight,
+      menuHeight + labelHeight,
     );
     final viewport = Offset.zero & camera.viewportSize;
     var dx = 0.0;

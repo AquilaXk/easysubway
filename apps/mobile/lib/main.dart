@@ -1482,6 +1482,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String? _autoRoutedDraftSignature;
   Timer? _autoRouteDebounce;
 
+  // #2109 Fix: 풀페이지 검색(햄버거 메뉴 경유) 결과 탭으로 반환된 역 id. 노선도에
+  // focus + 팬 메뉴를 요청하는 채널이다(임베디드 검색의 _searchFanMenuStationId와
+  // 같은 역할을 이 화면 쪽에서 중계).
+  String? _mapFocusStationRequestId;
+
   @override
   void initState() {
     super.initState();
@@ -1724,8 +1729,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       String regionLabel, [
       StationSearchEntryMode entryMode = StationSearchEntryMode.search,
     ]) async {
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
+      // #2109 Fix: 둘러보기 모드 결과 탭은 더 이상 즉시 상세를 밀지 않고
+      // 선택한 역 id를 pop으로 반환한다(_returnStationToMap). 여기서 그 id를
+      // 받아 노선도에 focus + 팬 메뉴를 요청한다(임베디드 검색과 동일한 흐름).
+      final stationId = await Navigator.of(context).push<String>(
+        MaterialPageRoute<String>(
           builder: (_) => StationSearchScreen(
             repository: repository,
             reportRepository: reportRepository,
@@ -1745,6 +1753,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
       if (!context.mounted) {
         return;
+      }
+      if (stationId != null) {
+        setState(() => _mapFocusStationRequestId = stationId);
       }
       await refreshHomeState();
     }
@@ -1825,6 +1836,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           stationSearchRepository: repository,
           reportRepository: reportRepository,
           favoriteRepository: favoriteRepository,
+          adRepository: adRepository,
           searchHistoryRepository: searchHistoryRepository,
           facilityReportDraftTargetStore: facilityReportDraftTargetStore,
           internalRouteRepository: internalRouteRepository,
@@ -1859,6 +1871,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     );
                   },
                 ),
+          focusStationRequestId: _mapFocusStationRequestId,
+          onFocusStationRequestHandled: () =>
+              setState(() => _mapFocusStationRequestId = null),
         ),
       );
     }

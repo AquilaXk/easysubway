@@ -7471,6 +7471,48 @@ void main() {
     expect(find.byType(StationDetailScreen), findsOneWidget);
   });
 
+  testWidgets('#2109 풀페이지 검색(햄버거 메뉴) 결과 탭도 노선도 복귀+팬 메뉴로 수렴한다', (
+    tester,
+  ) async {
+    // #2109 Fix: 좌측 햄버거 메뉴 "역 검색"으로 여는 풀페이지 StationSearchScreen의
+    // 일반(둘러보기) 결과 탭도 임베디드 검색과 동일하게 노선도 복귀 → 카메라
+    // 포커스 → 팬 메뉴 표시로 수렴해야 한다(오너 승인 스펙: "역을 검색하면 팬
+    // 메뉴가 나온다"가 진입점에 무관하게 적용).
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await _openStationSearchScreenViaMenu(tester);
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(StationDetailScreen), findsNothing);
+    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
+    expect(find.byType(StationDetailScreen), findsOneWidget);
+  });
+
   testWidgets('경로 검색 첫 화면은 v3 출발 도착 입력 구조를 보여준다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     try {
@@ -8859,6 +8901,10 @@ void main() {
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
       await tester.pumpAndSettle();
+      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+      await tester.pumpAndSettle();
 
       expect(repository.requestedDetailStationIds, ['station-sangnoksu']);
       expect(repository.requestedExitStationIds, ['station-sangnoksu']);
@@ -9066,6 +9112,10 @@ void main() {
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
 
     expect(
       find.byKey(const Key('stationDetailLargeScreenLayout')),
@@ -9193,6 +9243,10 @@ void main() {
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
       await tester.pumpAndSettle();
+      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+      await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('stationDetailList')), findsOneWidget);
@@ -9276,6 +9330,10 @@ void main() {
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
+    await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(
@@ -9377,6 +9435,10 @@ void main() {
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(
         const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
@@ -9450,6 +9512,10 @@ void main() {
       await tester.tap(
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
+      await tester.pumpAndSettle();
+      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
       await tester.pumpAndSettle();
 
       await tester.drag(find.byType(ListView), const Offset(0, -520));
@@ -10093,6 +10159,10 @@ void main() {
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
 
     expect(internalRouteRepository.nodeStationIds, ['station-sangnoksu']);
     expect(internalRouteRepository.requests, hasLength(1));
@@ -10172,6 +10242,10 @@ void main() {
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
       await tester.pumpAndSettle();
+      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+      await tester.pumpAndSettle();
 
       expect(find.widgetWithText(OutlinedButton, '저장'), findsOneWidget);
       expect(find.bySemanticsLabel('상록수역 즐겨찾기 저장'), findsOneWidget);
@@ -10228,6 +10302,10 @@ void main() {
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
 
     expect(find.widgetWithText(OutlinedButton, '저장됨'), findsOneWidget);
     expect(find.bySemanticsLabel('상록수역 즐겨찾기 해제'), findsOneWidget);
@@ -10260,6 +10338,10 @@ void main() {
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
+    await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pump();
@@ -13446,6 +13528,10 @@ void main() {
         find.byKey(const Key('stationSearchResult-station-sangnoksu')),
       );
       await tester.pumpAndSettle();
+      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+      await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -14646,6 +14732,10 @@ void main() {
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
@@ -14730,6 +14820,10 @@ void main() {
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
+    await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
@@ -14889,6 +14983,10 @@ void main() {
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
     await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
+    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
@@ -15031,6 +15129,10 @@ void main() {
     await tester.tap(
       find.byKey(const Key('stationSearchResult-station-sangnoksu')),
     );
+    await tester.pumpAndSettle();
+    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
+    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
+    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
