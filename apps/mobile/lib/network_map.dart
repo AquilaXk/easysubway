@@ -3663,6 +3663,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                                     borderRadius: BorderRadius.circular(6),
                                     border: Border.all(
                                       color: EasySubwayFanMenuColors.outline,
+                                      width: _fanMenuStationLabelBorderWidth,
                                     ),
                                   ),
                                   child: Text(
@@ -5628,6 +5629,8 @@ const double kFanMenuViewportMargin = 12.0;
 const double _fanMenuStationLabelWidth = 120.0;
 const double _fanMenuStationLabelHorizontalPadding = 10.0;
 const double _fanMenuStationLabelVerticalPadding = 4.0;
+const double _fanMenuStationLabelBorderWidth = 1.0;
+const double _fanMenuStationLabelGap = 8.0;
 const TextStyle _fanMenuStationLabelStyle = TextStyle(
   color: EasySubwayFanMenuColors.ink,
   fontWeight: FontWeight.w700,
@@ -5649,9 +5652,13 @@ double fanMenuStationLabelHeight({
       )..layout(
         maxWidth:
             _fanMenuStationLabelWidth -
-            (_fanMenuStationLabelHorizontalPadding * 2),
+            ((_fanMenuStationLabelHorizontalPadding +
+                    _fanMenuStationLabelBorderWidth) *
+                2),
       );
-  return painter.height + (_fanMenuStationLabelVerticalPadding * 2);
+  return painter.height +
+      ((_fanMenuStationLabelVerticalPadding + _fanMenuStationLabelBorderWidth) *
+          2);
 }
 
 class FanMenuPlacement {
@@ -5688,10 +5695,11 @@ class FanMenuPlacement {
 
   /// build에서 라벨을 bottom 앵커로 놓기 위한 bottom 값. 라벨은 항상 bottom
   /// 앵커라 시스템 글자 확대에도 위로만 자란다. 메뉴 위면 메뉴 상단 위, 메뉴
-  /// 아래면 메뉴 하단 아래(라벨 높이만큼 더 내려)에서 자란다.
+  /// 아래면 메뉴 하단에서 [_fanMenuStationLabelGap]만큼 띄워 배치한다.
   double labelBottom(double viewportHeight) => labelAbove
-      ? viewportHeight - top + 8
-      : viewportHeight - (top + menuHeight + labelHeight) + 8;
+      ? viewportHeight - top + _fanMenuStationLabelGap
+      : viewportHeight -
+            (top + menuHeight + _fanMenuStationLabelGap + labelHeight);
 }
 
 /// 역 노드의 뷰포트 좌표([stationPoint])로 팬 메뉴 배치를 계산한다.
@@ -5727,16 +5735,19 @@ FanMenuPlacement fanMenuPlacement({
       left = left.clamp(margin, maxLeft).toDouble();
     }
     // 라벨을 포함한 세로 범위(메뉴 위/아래 라벨)를 화면 안으로 클램프.
-    final topExtent = labelAbove ? labelHeight : 0.0;
-    final bottomExtent = labelAbove ? 0.0 : labelHeight;
+    final labelExtent = labelHeight + _fanMenuStationLabelGap;
+    final topExtent = labelAbove ? labelExtent : 0.0;
+    final bottomExtent = labelAbove ? 0.0 : labelExtent;
     final minTop = margin + topExtent;
     final maxTop = viewport.height - margin - menuHeight - bottomExtent;
     if (maxTop >= minTop) {
       top = top.clamp(minTop, maxTop).toDouble();
     }
   }
-  final revealTop = labelAbove ? top - labelHeight : top;
-  final revealHeight = menuHeight + labelHeight;
+  final revealTop = labelAbove
+      ? top - labelHeight - _fanMenuStationLabelGap
+      : top;
+  final revealHeight = menuHeight + _fanMenuStationLabelGap + labelHeight;
   final revealBounds = Rect.fromLTWH(left, revealTop, menuWidth, revealHeight);
   return FanMenuPlacement(
     placeBelow: placeBelow,

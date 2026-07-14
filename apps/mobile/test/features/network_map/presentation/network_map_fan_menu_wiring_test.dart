@@ -26,10 +26,10 @@ void main() {
       expect(placement.placeBelow, isFalse);
       // top = dy - menuHeight - 8 (menuHeight ≈ 141.14).
       expect(placement.top, closeTo(400 - placement.menuHeight - 8, 0.001));
-      // 라벨 포함 bbox 상단이 메뉴 top보다 labelHeight만큼 위.
+      // 라벨 포함 bbox 상단이 메뉴 top보다 labelHeight + 8px 간격만큼 위.
       expect(
         placement.revealBounds.top,
-        closeTo(placement.top - placement.labelHeight, 0.001),
+        closeTo(placement.top - placement.labelHeight - 8, 0.001),
       );
     });
 
@@ -41,10 +41,10 @@ void main() {
       );
       expect(placement.placeBelow, isTrue);
       expect(placement.top, closeTo(10 + 28, 0.001));
-      // 라벨을 포함한 bbox 높이 = menuHeight + labelHeight.
+      // 라벨을 포함한 bbox 높이 = menuHeight + 8px 간격 + labelHeight.
       expect(
         placement.revealBounds.height,
-        closeTo(placement.menuHeight + placement.labelHeight, 0.001),
+        closeTo(placement.menuHeight + 8 + placement.labelHeight, 0.001),
       );
     });
 
@@ -69,7 +69,7 @@ void main() {
       expect(
         below.labelBottom(800),
         closeTo(
-          800 - (below.top + below.menuHeight + below.labelHeight) + 8,
+          800 - (below.top + below.menuHeight + 8 + below.labelHeight),
           0.001,
         ),
       );
@@ -133,7 +133,26 @@ void main() {
       expect(placement.labelHeight, largeHeight);
       expect(
         placement.revealBounds.height,
-        closeTo(placement.menuHeight + largeHeight, 0.001),
+        closeTo(placement.menuHeight + 8 + largeHeight, 0.001),
+      );
+    });
+
+    test('실측 라벨 높이는 1px border가 추가하는 장식 padding까지 포함한다', () {
+      const style = TextStyle(fontSize: 13, height: 1);
+      const text = '동대문역사문화공원';
+      final painter = TextPainter(
+        text: const TextSpan(text: text, style: style),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: 98); // 120 - (10px padding + 1px border) * 2
+
+      expect(
+        fanMenuStationLabelHeight(
+          text: text,
+          textScaler: TextScaler.noScaling,
+          style: style,
+        ),
+        painter.height + 10, // (4px padding + 1px border) * 2
       );
     });
   });
