@@ -1,27 +1,27 @@
 import 'dart:ui' show SemanticsAction;
 
 import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu.dart';
+import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu_geometry.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart' show OrdinalSortKey;
 import 'package:flutter_test/flutter_test.dart';
 
-const double _designWidth = 700;
-
 Future<void> _pump(
   WidgetTester tester, {
-  double width = _designWidth,
+  double? width,
   Set<RouteDraftSlot> selected = const {},
   Set<RouteDraftSlot> disabled = const {},
   required void Function(RouteDraftSlot) onAction,
   required VoidCallback onClose,
 }) async {
+  final menuWidth = width ?? kFanMenuDesignSize.width;
   await tester.pumpWidget(
     MaterialApp(
       home: Scaffold(
         body: Center(
           child: StationFanMenu(
-            width: width,
+            width: menuWidth,
             selectedSlots: selected,
             disabledSlots: disabled,
             onAction: onAction,
@@ -37,7 +37,8 @@ Future<void> _pump(
 Offset _global(WidgetTester tester, Offset design) {
   final topLeft = tester.getTopLeft(find.byType(StationFanMenu));
   final scale =
-      tester.getSize(find.byType(StationFanMenu)).width / _designWidth;
+      tester.getSize(find.byType(StationFanMenu)).width /
+      kFanMenuDesignSize.width;
   return topLeft + design * scale;
 }
 
