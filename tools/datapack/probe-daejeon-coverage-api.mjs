@@ -53,7 +53,7 @@ export async function probeDaejeonCoverageApi({ sourceId, serviceKey, fetchImpl 
   }
   if (operation.format === "xml" && !new Set(["application/xml", "text/xml"]).has(contentType)) {
     throw new Error(`Daejeon coverage API schema mismatch: content-type ${contentType || "missing"}; `
-      + `observedAt=${now.toISOString()}; httpStatus=${response.status}; contentType=${contentType || "missing"}; `
+      + `observedAt=${now.toISOString()}; httpStatus=${response.status}; `
       + `rawBytes=${Buffer.byteLength(raw)}; rawSha256=${sha256(raw)}`);
   }
   if (operation.format === "json" && contentType !== "application/json") {
@@ -115,7 +115,7 @@ function parseXmlEvidence(raw, expectedFields, validateItem) {
     }
     validateItem?.(values);
   }
-  return { providerResultCode: "00", rowCount: items.length, outputFields: expectedFields };
+  return { providerResultCode: "00", rowCount: items.length, outputFields: [...expectedFields] };
 }
 
 function validateDistanceFareItem({ distfloat, fee, min, sec }) {

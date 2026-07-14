@@ -3332,8 +3332,7 @@
           }
         ],
         "coverageLimitations": [
-          "대전도시철도 1호선의 역간 소요시간·거리·요금 자료",
-          "2026-07-14 credential-safe probe와 bounded retry가 모두 HTTP 401로 종료됨"
+          "대전도시철도 1호선의 역간 소요시간·거리·요금 자료"
         ]
       },
       "nextAction": "전체 OD와 canonical station mapping을 별도 이슈에서 검증한 뒤 topology materialization을 판정한다."

@@ -62,6 +62,8 @@ test("대전 coverage probe는 공식 역간 거리·시간·요금 XML schema�
   assert.equal(evidence.rowCount, 1);
   assert.equal(evidence.rawBytes > 0, true);
   assert.deepEqual(evidence.outputFields, ["distfloat", "fee", "min", "sec"]);
+  assert.notEqual(evidence.outputFields,
+    DAEJEON_COVERAGE_OPERATIONS["daejeon-station-distance-fare"].expectedFields);
   assert.equal(evidence.schemaStatus, "EXPECTED");
 });
 
@@ -125,6 +127,9 @@ test("대전 역간 candidate는 official XML만 active로 admission하고 topol
   assert.equal(candidate.admissionStatus, "validated_live_schema_admitted");
   assert.equal(candidate.evidence.liveValidation.rowCount > 0, true);
   assert.equal(candidate.evidence.coverageAssessment.state, "MISSING");
+  assert.deepEqual(candidate.evidence.coverageLimitations, [
+    "대전도시철도 1호선의 역간 소요시간·거리·요금 자료",
+  ]);
   assert.equal(candidate.evidence.historicalSources[0].reasonCode, "SUPERSEDED_FOR_LIVE_PROBE");
   assert.equal(candidate.evidence.historicalSources[0].runtimeEligible, false);
   assert.equal(candidate.nextAction,
@@ -150,6 +155,7 @@ test("대전 coverage probe는 provider/schema 오류를 fail closed한다", asy
       }),
     }), (error) => {
       assert.match(error.message, /schema mismatch: content-type text\/plain/);
+      assert.equal(error.message.match(/text\/plain/g)?.length, 1);
       assert.match(error.message, /observedAt=2026-07-14T10:43:00.000Z/);
       assert.match(error.message, /rawBytes=\d+; rawSha256=[a-f0-9]{64}/);
       assert.doesNotMatch(error.message, new RegExp(secret));
