@@ -282,6 +282,51 @@ void main() {
     expect(sadang.lastDeparture.semanticLabel, '사당 방면, 다음 날 00시 25분 출발');
   });
 
+  test('로컬 역 시간표는 ITX trip을 지하철 출발로 노출하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    await _seedStationTimetable(database);
+    await database.customStatement('''
+      INSERT INTO transit_routes (
+        id, line_id, route_short_name, route_long_name, direction_name, timezone
+      ) VALUES (
+        'itx-route-1919', 'seoul-4', 'ITX-청춘', '청량리 → 춘천',
+        'ITX 춘천 방면', 'Asia/Seoul'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, trip_headsign, direction_id,
+        service_pattern, service_class, service_day_start_seconds
+      ) VALUES (
+        'itx-trip-1919', 'itx-route-1919', 'weekday-1919', '춘천', 'down',
+        'EXPRESS', 'ITX_CHEONGCHUN', 0
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds, pickup_type, drop_off_type
+      ) VALUES (
+        'itx-trip-1919', 1, 'station-sadang', 'seoul-4', 19140, 19140, 0, 0
+      )
+    ''');
+    final repository = DriftStationRepository(database: database);
+
+    final timetable = await repository.loadStationTimetable(
+      stationId: 'station-sadang',
+      lineId: 'seoul-4',
+      dayType: StationTimetableDayType.weekday,
+      referenceDate: DateTime(2026, 7, 12),
+    );
+
+    expect(
+      timetable.directions.map((direction) => direction.name),
+      isNot(contains('ITX 춘천 방면')),
+    );
+  });
+
   test('흡수된 station ID로도 대표 역 시간표를 반환한다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);

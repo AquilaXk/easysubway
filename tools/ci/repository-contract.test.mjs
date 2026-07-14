@@ -5414,7 +5414,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "workflowRunUrl",
   ]);
   assert.match(schema, /CREATE TABLE catalog_metadata/);
-  assert.match(schema, /PRAGMA user_version = 16/);
+  assert.match(schema, /PRAGMA user_version = 18/);
   assert.match(schema, /CREATE TABLE stations/);
   assert.match(schema, /CREATE TABLE transit_feed_info/);
   assert.match(schema, /CREATE TABLE station_facility_evidence/);
@@ -6599,7 +6599,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class FareZones extends Table/);
   assert.match(mobileTables, /class StationFareZones extends Table/);
   assert.match(mobileTables, /class FacilityStatusSnapshots extends Table/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 17/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 18/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /_createTransitScheduleIndexes/);
   assert.match(mobileDatabase, /_createStationPathwayIndexes/);
@@ -6615,7 +6615,7 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   assert.match(mobileTables, /class StationFacilityEvidence extends Table/);
   assert.match(mobileTables, /sourceSnapshotId[\s\S]+source_snapshot_id/);
   assert.match(mobileTables, /providerRecordHash[\s\S]+provider_record_hash/);
-  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 17/);
+  assert.match(mobileDatabase, /const catalogDatabaseSchemaVersion = 18/);
   assert.match(mobileDatabase, /int get schemaVersion => catalogDatabaseSchemaVersion/);
   assert.match(mobileDatabase, /StationFacilityEvidence/);
   assert.match(mobileDatabase, /FacilityStatusSnapshots/);

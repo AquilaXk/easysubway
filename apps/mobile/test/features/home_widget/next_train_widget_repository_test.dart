@@ -47,6 +47,47 @@ void main() {
     ]);
   });
 
+  test('홈 위젯은 ITX trip을 지하철 출발로 노출하지 않는다', () async {
+    await _seedSchedule(catalogDatabase);
+    await catalogDatabase.customStatement('''
+      INSERT INTO transit_routes (
+        id, line_id, route_short_name, route_long_name, direction_name, timezone
+      ) VALUES (
+        'itx-route', 'seoul-4', 'ITX-청춘', '청량리 → 춘천',
+        'ITX 춘천 방면', 'Asia/Seoul'
+      )
+    ''');
+    await catalogDatabase.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, trip_headsign, direction_id,
+        service_pattern, service_class, service_day_start_seconds
+      ) VALUES (
+        'itx-trip', 'itx-route', 'weekday', '춘천', 'down',
+        'EXPRESS', 'ITX_CHEONGCHUN', 0
+      )
+    ''');
+    await catalogDatabase.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds, pickup_type, drop_off_type
+      ) VALUES (
+        'itx-trip', 1, 'station-sadang', 'seoul-4', 18600, 18600, 0, 0
+      )
+    ''');
+
+    final data = await repository.load(
+      _sadangLine4,
+      tz.TZDateTime(tz.getLocation('Asia/Seoul'), 2026, 7, 10, 5),
+    );
+
+    expect(data.status, NextTrainWidgetStatus.available);
+    expect(data.directions.map((item) => item.name), ['상록수 방면', '사당 방면']);
+    expect(data.directions.map((item) => item.departureLabel), [
+      '05:20',
+      '05:25',
+    ]);
+  });
+
   test('흡수 station ID 즐겨찾기도 대표 station-line으로 선택한다', () async {
     await catalogDatabase.customStatement('''
       INSERT INTO station_aliases (station_id, alias, normalized_alias)
