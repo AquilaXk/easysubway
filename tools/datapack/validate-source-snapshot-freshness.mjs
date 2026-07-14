@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { deriveFreshness } from "./freshness-policy.mjs";
+import { validateLineage } from "./source-snapshot-policy.mjs";
 
 const buildProvenanceStringFields = [
   "snapshotId",
@@ -24,6 +25,7 @@ export function validateSourceSnapshotFreshness({ buildSpec, snapshots, policy, 
   if (!Array.isArray(snapshots) || snapshots.length === 0) {
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: source snapshots");
   }
+  validateLineage(snapshots);
   const expectedIds = [...buildSpec.sourceSnapshotIds].sort();
   const actualIds = snapshots.map((snapshot) => requiredString(snapshot.snapshotId, "snapshotId")).sort();
   if (new Set(actualIds).size !== actualIds.length || JSON.stringify(actualIds) !== JSON.stringify(expectedIds)) {

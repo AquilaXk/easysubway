@@ -29,7 +29,13 @@ async function main() {
   await writeFile(rawPath, raw);
 
   const sample = await buildSampleEvidence({ candidateId, rawPath, samplePath, args });
-  const snapshot = await buildSnapshot({ rawPath, canonicalRawPath, snapshotPath, args });
+  const snapshot = await buildSnapshot({
+    rawPath,
+    canonicalRawPath,
+    snapshotPath,
+    coverageCount: sample.providerRecordHashes.length,
+    args,
+  });
   const adminReview = await readJson(path.resolve(root, requireArg(args, "admin-review")));
   const adminReviewRecordHash = validateAdminReview({ adminReview, candidateId, sample, snapshot, args });
   const inventory = await readJson(path.resolve(root, requireArg(args, "inventory")));
@@ -141,7 +147,7 @@ async function buildSampleEvidence({ candidateId, rawPath, samplePath, args }) {
   return JSON.parse(stdout);
 }
 
-async function buildSnapshot({ rawPath, canonicalRawPath, snapshotPath, args }) {
+async function buildSnapshot({ rawPath, canonicalRawPath, snapshotPath, coverageCount, args }) {
   await execNode([
     "tools/datapack/build-source-snapshot.mjs",
     "--input",
@@ -154,6 +160,8 @@ async function buildSnapshot({ rawPath, canonicalRawPath, snapshotPath, args }) 
     requireArg(args, "snapshot-id"),
     "--source-id",
     requireArg(args, "source-id"),
+    "--coverage-count",
+    String(coverageCount),
     "--provider",
     requireArg(args, "provider"),
     "--source-class-id",
@@ -169,6 +177,7 @@ async function buildSnapshot({ rawPath, canonicalRawPath, snapshotPath, args }) 
     ...(args["freshness-basis-at"] ? ["--freshness-basis-at", args["freshness-basis-at"]] : []),
     ...(args["provider-valid-until"] ? ["--provider-valid-until", args["provider-valid-until"]] : []),
     ...(args["source-updated-at"] ? ["--source-updated-at", args["source-updated-at"]] : []),
+    ...(args["previous-snapshot"] ? ["--previous-snapshot", args["previous-snapshot"]] : []),
   ]);
   return readJson(snapshotPath);
 }

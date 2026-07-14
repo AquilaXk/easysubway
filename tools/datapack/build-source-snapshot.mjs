@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { deriveFreshness } from "./freshness-policy.mjs";
-import { requiredCredentialFreeObjectUri } from "./source-snapshot-policy.mjs";
+import {
+  buildSnapshotDiff,
+  requiredCredentialFreeObjectUri,
+} from "./source-snapshot-policy.mjs";
 
 const DEFAULT_FRESHNESS_POLICY = "apps/mobile/release/datapack-freshness-sla.json";
 
@@ -13,6 +16,12 @@ async function main() {
   assertNoCredential(raw);
   const canonicalRaw = canonicalizeRaw(raw);
   const records = rowsFromRaw(canonicalRaw);
+  const previousSnapshot = args["previous-snapshot"]
+    ? JSON.parse(await readFile(path.resolve(args["previous-snapshot"]), "utf8"))
+    : null;
+  if (args["previous-snapshot-id"] != null || args["diff-summary"] != null) {
+    throw new Error("previous snapshot identity and diff must be producer-generated");
+  }
   const snapshot = {
     schemaVersion: 1,
     artifactKind: "official-source-snapshot",
@@ -22,6 +31,7 @@ async function main() {
     retrievedAt: requireArg(args, "retrieved-at"),
     sourceUpdatedAt: args["source-updated-at"] ?? null,
     rowCount: records.length,
+    coverageCount: requiredNonNegativeInteger(args["coverage-count"], "--coverage-count"),
     rawSha256: sha256(canonicalRaw),
     rawObjectUri: requiredCredentialFreeObjectUri(args["raw-object-uri"], "--raw-object-uri"),
     redactedRequestFingerprint: sha256(redactedRequest(args)),
@@ -32,12 +42,19 @@ async function main() {
     fetchStatus: "SUCCESS",
     redistributionAllowed: true,
     credentialRedacted: true,
-    previousSnapshotId: args["previous-snapshot-id"] ?? null,
-    diffSummary: args["diff-summary"] ?? null,
+    previousSnapshotId: null,
+    diffSummary: null,
     freshnessExpiresAt: requireArg(args, "freshness-expires-at"),
     rawRetentionExpiresAt: requireArg(args, "raw-retention-expires-at"),
     providerRecordHashes: records.map((record) => sha256(JSON.stringify(record))),
   };
+  if (previousSnapshot != null) {
+    if (previousSnapshot.sourceId !== snapshot.sourceId) {
+      throw new Error("SOURCE_LINEAGE_BROKEN: previous snapshot source");
+    }
+    snapshot.previousSnapshotId = requiredText(previousSnapshot.snapshotId, "previousSnapshot.snapshotId");
+    snapshot.diffSummary = buildSnapshotDiff(previousSnapshot, snapshot);
+  }
   await validateFreshnessPolicy(snapshot, args);
   validateSnapshot(snapshot);
 
@@ -182,6 +199,12 @@ function requiredDate(value, label) {
     throw new Error(`${label} must be an ISO date-time`);
   }
   return millis;
+}
+
+function requiredNonNegativeInteger(value, label) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error(`${label} must be a non-negative integer`);
+  return parsed;
 }
 
 function requireArg(args, name) {
