@@ -25,7 +25,7 @@ jobs:
       name: production
     timeout-minutes: 5
     concurrency:
-      group: production-route-api-closure-evidence
+      group: cd-production-deploy
       cancel-in-progress: false
     env:
       EXPECTED_SHA: ${{ inputs.expected_sha }}
@@ -65,10 +65,23 @@ jobs:
           fi
 
           expected_runtime_image="easysubway-backend:${EXPECTED_SHA}"
+          approved_image_id="$(docker image inspect --format '{{.Id}}' "${expected_runtime_image}")"
+          approved_repo_digests="$(
+            docker image inspect --format '{{join .RepoDigests "\n"}}' "${expected_runtime_image}"
+          )"
+          if ! grep -Fxq "ghcr.io/aquilaxk/easysubway-backend@${EXPECTED_IMAGE_DIGEST}" <<< "${approved_repo_digests}"; then
+            echo "approved PR1 image tag is not associated with the approved digest" >&2
+            exit 1
+          fi
           for container in easysubway-backend easysubway-back-worker; do
             runtime_image="$(docker inspect --format '{{.Config.Image}}' "${container}")"
             if [[ "${runtime_image}" != "${expected_runtime_image}" ]]; then
               echo "${container} does not use the approved PR1 image tag" >&2
+              exit 1
+            fi
+            running_image_id="$(docker inspect --format '{{.Image}}' "${container}")"
+            if [[ "${running_image_id}" != "${approved_image_id}" ]]; then
+              echo "${container} does not run the approved PR1 image ID" >&2
               exit 1
             fi
           done

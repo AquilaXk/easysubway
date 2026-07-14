@@ -13,10 +13,13 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
   assert.match(workflow, /environment:\n\s+name: production/);
   assert.match(workflow, /permissions:\n\s+contents: read/);
+  assert.match(workflow, /group: cd-production-deploy/);
 
   assert.match(workflow, /shared\/current-sha/);
   assert.match(workflow, /shared\/current-image-digest/);
   assert.match(workflow, /\.Config\.Image/);
+  assert.match(workflow, /\.RepoDigests/);
+  assert.match(workflow, /--format '\{\{\.Image\}\}'/);
   assert.match(workflow, /easysubway-backend/);
   assert.match(workflow, /easysubway-back-worker/);
   assert.match(workflow, /\/api\/v1\/routes\/search/);
