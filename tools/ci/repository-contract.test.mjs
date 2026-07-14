@@ -737,10 +737,22 @@ function readPngPixelBounds(relativePath) {
     }
   }
 
+  const alphaBytesAt = (x, y) => {
+    const alphaOffset = y * stride + x * bytesPerPixel + (channels - 1) * bytesPerSample;
+    return pixels.subarray(alphaOffset, alphaOffset + bytesPerSample);
+  };
+  const transparentCorners = hasAlpha && [
+    [0, 0],
+    [width - 1, 0],
+    [0, height - 1],
+    [width - 1, height - 1],
+  ].every(([x, y]) => alphaBytesAt(x, y).every((value) => value === 0));
+
   return {
     width,
     height,
     hasAlpha,
+    transparentCorners,
     bounds: { minX, minY, maxX, maxY },
     maxCenterDistance,
   };
@@ -13770,6 +13782,52 @@ test("Android 런처 아이콘은 원형 마스크 안전 여백을 가진다", 
       0.18,
     );
   }
+});
+
+test("Android와 iOS 시작 화면은 새 앱 아이콘을 중앙에 표시한다", () => {
+  for (const relativePath of [
+    "apps/mobile/android/app/src/main/res/drawable/launch_background.xml",
+    "apps/mobile/android/app/src/main/res/drawable-v21/launch_background.xml",
+  ]) {
+    const launchBackground = read(relativePath);
+    assert.match(launchBackground, /android:drawable="@drawable\/splash_icon"/);
+    assert.match(launchBackground, /android:gravity="center"/);
+    assert.match(launchBackground, /android:height="120dp"/);
+    assert.match(launchBackground, /android:width="120dp"/);
+  }
+
+  for (const [density, size] of [
+    ["mdpi", 120],
+    ["hdpi", 180],
+    ["xhdpi", 240],
+    ["xxhdpi", 360],
+    ["xxxhdpi", 480],
+  ]) {
+    const info = readPngPixelBounds(
+      `apps/mobile/android/app/src/main/res/drawable-${density}/splash_icon.png`,
+    );
+    assert.equal(info.width, size, `${density} splash width must render at 120dp`);
+    assert.equal(info.height, size, `${density} splash height must render at 120dp`);
+    assert.equal(info.hasAlpha, true, `${density} splash must keep transparent corners`);
+    assert.equal(info.transparentCorners, true, `${density} splash corners must be transparent`);
+  }
+
+  for (const [filename, size] of [
+    ["LaunchImage.png", 120],
+    ["LaunchImage@2x.png", 240],
+    ["LaunchImage@3x.png", 360],
+  ]) {
+    const info = readPngPixelBounds(
+      `apps/mobile/ios/Runner/Assets.xcassets/LaunchImage.imageset/${filename}`,
+    );
+    assert.equal(info.width, size, `${filename} width must match its asset scale`);
+    assert.equal(info.height, size, `${filename} height must match its asset scale`);
+    assert.equal(info.hasAlpha, true, `${filename} must keep transparent corners`);
+    assert.equal(info.transparentCorners, true, `${filename} corners must be transparent`);
+  }
+
+  const launchScreen = read("apps/mobile/ios/Runner/Base.lproj/LaunchScreen.storyboard");
+  assert.match(launchScreen, /<image name="LaunchImage" width="120" height="120"\/>/);
 });
 
 test("경로 분류기는 README를 문서 전용 변경으로 처리한다", async () => {
