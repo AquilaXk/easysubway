@@ -84,7 +84,22 @@ void main() {
     });
   });
 
-  test('팬 메뉴 disabled 투명도는 채움·아이콘·라벨·경계선이 공유한다', () {
-    expect(EasySubwayFanMenuColors.disabledOpacity, 0.4);
+  test('부채꼴 메뉴 v2 색상과 opacity를 고정한다', () {
+    expect(EasySubwayFanMenuColors.disabledOpacity, 0.40);
+    expect(EasySubwayFanMenuColors.pressedOpacity, 0.84);
+    expect(EasySubwayFanMenuColors.departure, const Color(0xFF176FD1));
+    expect(EasySubwayFanMenuColors.departureSurface, const Color(0xFFF7FAFF));
+    expect(EasySubwayFanMenuColors.departurePressed, const Color(0xFFEAF3FF));
+    expect(EasySubwayFanMenuColors.waypoint, const Color(0xFFBF5700));
+    expect(EasySubwayFanMenuColors.waypointSurface, const Color(0xFFFFFAF4));
+    expect(EasySubwayFanMenuColors.waypointPressed, const Color(0xFFFFF0DE));
+    expect(EasySubwayFanMenuColors.arrival, const Color(0xFFD9252E));
+    expect(EasySubwayFanMenuColors.arrivalSurface, const Color(0xFFFFF8F8));
+    expect(EasySubwayFanMenuColors.arrivalPressed, const Color(0xFFFFECEE));
+    expect(EasySubwayFanMenuColors.closeSurface, const Color(0xFFF5F7FA));
+    expect(EasySubwayFanMenuColors.closePressed, const Color(0xFFE9EDF2));
+    expect(EasySubwayFanMenuColors.closeInk, const Color(0xFF475467));
+    expect(EasySubwayFanMenuColors.border, const Color(0xFFCBD2DC));
+    expect(EasySubwayFanMenuColors.outline, const Color(0xFFBCC5D2));
   });
 }

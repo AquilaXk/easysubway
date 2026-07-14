@@ -218,19 +218,19 @@ class _StationFanMenuPainter extends CustomPainter {
       canvas,
       _FanSector.departure,
       EasySubwayFanMenuColors.departure,
-      EasySubwayFanMenuColors.departureSoft,
+      EasySubwayFanMenuColors.departurePressed,
     );
     _paintSector(
       canvas,
       _FanSector.waypoint,
       EasySubwayFanMenuColors.waypoint,
-      EasySubwayFanMenuColors.waypointSoft,
+      EasySubwayFanMenuColors.waypointPressed,
     );
     _paintSector(
       canvas,
       _FanSector.arrival,
       EasySubwayFanMenuColors.arrival,
-      EasySubwayFanMenuColors.arrivalSoft,
+      EasySubwayFanMenuColors.arrivalPressed,
     );
     _paintClose(canvas);
     _paintBorders(canvas);

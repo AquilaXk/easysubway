@@ -13,6 +13,7 @@ class StationFanMenuGeometry {
     required this.arrival,
     required this.close,
     required this.silhouette,
+    required this.dividers,
   });
 
   final Path departure;
@@ -22,6 +23,9 @@ class StationFanMenuGeometry {
 
   /// 그림자·외곽선용 통합 실루엣(네 섹터를 잇는 연속 윤곽).
   final Path silhouette;
+
+  /// SVG의 방사형 2개와 닫기 arc 1개를 합친 내부 구분선.
+  final Path dividers;
 }
 
 // 정규화(원본 - (250,210)) 좌표. 스펙 §컴포넌트의 arc d 좌표에서 그대로 이식.
@@ -33,10 +37,8 @@ const Offset _depInnerStart = Offset(289.44, 222.32); // 539.44,432.32
 const Offset _arrInnerStart = Offset(410.56, 222.32); // 660.56,432.32
 const Offset _depInnerEnd = Offset(209.52, 299.49); //  459.52,509.49
 const Offset _arrInnerEnd = Offset(490.48, 299.49); //  740.48,509.49
-const Offset _closeInnerStart = Offset(240.40, 255.40); // 490.40,465.40
-const Offset _closeInnerEnd = Offset(459.60, 255.40); //  709.60,465.40
-const Offset _closeNotchRight = Offset(382.53, 332.47); // 632.53,542.47
-const Offset _closeNotchLeft = Offset(317.47, 332.47); //  567.47,542.47
+const Offset _closeNotchRight = Offset(391.69, 345.56); // 641.69,555.56
+const Offset _closeNotchLeft = Offset(308.31, 345.56); // 558.31,555.56
 
 const double _rOuter = 330;
 const double _rInner = 155;
@@ -87,11 +89,11 @@ StationFanMenuGeometry buildStationFanMenuGeometry() {
     innerStart: _arrInnerEnd,
     innerEnd: _arrInnerStart,
   );
-  // 닫기(하단 노치): M 490.40,465.40 A155 ...1 709.60,465.40 L 632.53,542.47 A46 ...0 567.47,542.47 Z
+  // 닫기(하단 노치): M 459.52,509.49 A155 ...1 740.48,509.49 L 641.69,555.56 A46 ...0 558.31,555.56 Z
   final close = Path()
-    ..moveTo(_closeInnerStart.dx, _closeInnerStart.dy)
+    ..moveTo(_depInnerEnd.dx, _depInnerEnd.dy)
     ..arcToPoint(
-      _closeInnerEnd,
+      _arrInnerEnd,
       radius: const Radius.circular(_rInner),
       clockwise: true,
     )
@@ -111,29 +113,30 @@ StationFanMenuGeometry buildStationFanMenuGeometry() {
       clockwise: true,
     )
     ..lineTo(_arrInnerEnd.dx, _arrInnerEnd.dy)
-    ..arcToPoint(
-      _closeInnerEnd,
-      radius: const Radius.circular(_rInner),
-      clockwise: false,
-    )
     ..lineTo(_closeNotchRight.dx, _closeNotchRight.dy)
     ..arcToPoint(
       _closeNotchLeft,
       radius: const Radius.circular(_rClose),
       clockwise: false,
     )
-    ..lineTo(_closeInnerStart.dx, _closeInnerStart.dy)
-    ..arcToPoint(
-      _depInnerEnd,
-      radius: const Radius.circular(_rInner),
-      clockwise: false,
-    )
     ..close();
+  final dividers = Path()
+    ..moveTo(_depInnerStart.dx, _depInnerStart.dy)
+    ..lineTo(_depOuterEnd.dx, _depOuterEnd.dy)
+    ..moveTo(_arrInnerStart.dx, _arrInnerStart.dy)
+    ..lineTo(_wayOuterEnd.dx, _wayOuterEnd.dy)
+    ..moveTo(_depInnerEnd.dx, _depInnerEnd.dy)
+    ..arcToPoint(
+      _arrInnerEnd,
+      radius: const Radius.circular(_rInner),
+      clockwise: true,
+    );
   return StationFanMenuGeometry(
     departure: departure,
     waypoint: waypoint,
     arrival: arrival,
     close: close,
     silhouette: silhouette,
+    dividers: dividers,
   );
 }
