@@ -1,17 +1,18 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "datapack-freshness-sla",
   "issue": 1418,
-  "status": "IN_PROGRESS",
-  "currentDecision": "NO_GO",
   "policyOwner": "QA",
+  "clockSkewSeconds": 300,
   "sourceClasses": [
     {
       "id": "static_accessibility_facility",
       "examples": ["KRIC elevator", "KRIC escalator", "KRIC wheelchair lift"],
+      "basisField": "retrievedAt",
       "reverificationCadence": "P90D",
+      "offlinePackEligible": true,
       "eventTriggers": ["operator construction notice", "facility outage notice", "field verification override"],
       "changePublishSla": "P3D",
       "freshnessMetric": "freshnessValidRatio"
@@ -19,7 +20,10 @@
     {
       "id": "planned_timetable",
       "examples": ["service calendar", "trips", "stop_times", "headway"],
-      "reverificationCadence": "event-based",
+      "basisField": "serviceEffectiveAt",
+      "maximumReverificationCadence": "P30D",
+      "providerValidityEndField": "serviceEffectiveUntil",
+      "offlinePackEligible": true,
       "eventTriggers": ["operator timetable revision", "service calendar expiry", "line extension opening"],
       "changePublishSla": "before-effective-date",
       "freshnessMetric": "plannedEtaCoverageRatio"
@@ -27,7 +31,9 @@
     {
       "id": "route_map_asset",
       "examples": ["official cyber-station SVG", "route map label polygons"],
+      "basisField": "retrievedAt",
       "reverificationCadence": "P1Y",
+      "offlinePackEligible": true,
       "eventTriggers": ["new station opening", "line extension opening", "official map revision"],
       "changePublishSla": "P14D",
       "freshnessMetric": "routeMapPositionFreshnessRatio"
@@ -35,7 +41,9 @@
     {
       "id": "realtime_overlay",
       "examples": ["Seoul TOPIS arrival", "provider train position"],
+      "basisField": "observedAt",
       "reverificationCadence": "PT90S",
+      "offlinePackEligible": false,
       "eventTriggers": ["provider stale", "mapping failure spike", "quota or terms change"],
       "changePublishSla": "online-overlay-only",
       "freshnessMetric": "providerFreshnessSecondsMax"
@@ -52,15 +60,25 @@
     "cadence": "P1D",
     "requiredStages": [
       "source-snapshot",
+      "change-detection",
       "build",
-      "validate",
-      "publish",
-      "post-publish-artifact-validation"
+      "strict-validation",
+      "conditional-publish",
+      "conditional-post-publish-artifact-validation"
     ],
     "releaseSequenceManagedByPipeline": true,
     "expiresAtManagedByPipeline": true,
     "reusesProductionValidationIssue": 1393
   },
+  "reasonCodes": [
+    "SOURCE_FRESHNESS_POLICY_MISSING",
+    "SOURCE_FRESHNESS_DERIVATION_MISMATCH",
+    "SOURCE_SNAPSHOT_EXPIRED",
+    "PACK_PUBLISH_FRESHNESS_EXPIRED",
+    "BUNDLED_PACK_EXPIRED",
+    "MATERIAL_CHANGE_UNAPPROVED",
+    "PUBLISH_REQUIRED_NOT_COMPLETED"
+  ],
   "staleExposurePolicy": {
     "expiredManifestAppBehavior": "continue-with-visible-stale-label",
     "expiredManifestEtaSource": "STALE",
