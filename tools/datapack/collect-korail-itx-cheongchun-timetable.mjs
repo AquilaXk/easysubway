@@ -491,7 +491,11 @@ export function validateKorailItxPlans({ plans, materialized, runDate }) {
     if (departureSeconds !== first.departureSeconds || arrivalSeconds !== last.arrivalSeconds) {
       throw new Error(`KORAIL_PLAN_MISMATCH: ${safeToken(trainNumber)}`);
     }
-    selectedPlans.push({ ...plan, normalizedTrainNumber: trainNumber });
+    const normalizedPlanTrainNumber = normalizeTrainNumber(plan.trn_no);
+    if (normalizedPlanTrainNumber !== trainNumber) {
+      throw new Error(`KORAIL_PLAN_MISMATCH: ${safeToken(trainNumber)}`);
+    }
+    selectedPlans.push({ ...plan, normalizedTrainNumber: normalizedPlanTrainNumber });
   }
   const selectedTrainNumbers = selectedPlans
     .map(({ normalizedTrainNumber }) => normalizedTrainNumber)
@@ -929,6 +933,8 @@ function completenessFailureContext(error) {
   const message = error instanceof Error ? error.message : "";
   const station = /station mapping is missing or ambiguous: (.+)$/.exec(message)?.[1];
   if (station) return safeLabel(station);
+  const requiredStations = /^TAGO required station mapping is incomplete: ([\p{L}\p{N},._-]+)$/u.exec(message)?.[1];
+  if (requiredStations) return `missingStations=${requiredStations}`;
   const plan = /^(KORAIL_PLAN_(?:MISSING|DUPLICATE|MISMATCH)): ([0-9]+)$/.exec(message);
   if (plan) return `reason=${plan[1]},trainNumber=${plan[2]}`;
   const tagoSchema = /^TAGO ([A-Za-z0-9]+) schema mismatch: (content-type|invalid JSON|body|item|totalCount)(?: bodyFields=([A-Za-z0-9_,.-]+))?$/.exec(message);

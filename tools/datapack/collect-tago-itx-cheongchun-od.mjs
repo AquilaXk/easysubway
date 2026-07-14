@@ -47,9 +47,8 @@ export function buildItxOdMatrix(date, stations) {
   const rows = providerIds.flatMap((depStationId) => providerIds
     .filter((arrStationId) => arrStationId !== depStationId)
     .map((arrStationId) => ({ date, depStationId, arrStationId })));
-  const stationIdByProviderId = new Map(ordered.map(({ providerStationId, stationId }) => [providerStationId, stationId]));
   const hashTuples = rows.map(({ depStationId, arrStationId }) => (
-    [date, stationIdByProviderId.get(depStationId), stationIdByProviderId.get(arrStationId)]
+    [date, depStationId, arrStationId]
   )).sort((left, right) => stringCompare(JSON.stringify(left), JSON.stringify(right)));
   return {
     rows,
@@ -60,6 +59,24 @@ export function buildItxOdMatrix(date, stations) {
 }
 
 export function materializeTagoItxOdRows({
+  itineraries,
+  corridorStations,
+  serviceDate,
+  kricServiceDayCode,
+}) {
+  try {
+    return materializeTagoItxOdRowsStrict({
+      itineraries, corridorStations, serviceDate, kricServiceDayCode,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      error.reconstructionSummary = reconstructionFailureSummary(error, itineraries);
+    }
+    throw error;
+  }
+}
+
+function materializeTagoItxOdRowsStrict({
   itineraries,
   corridorStations,
   serviceDate,
@@ -312,7 +329,7 @@ export async function collectTagoItxCheongchunRoster({
       && !stations.some((station) => normalize(station.nameKo) === normalize(name))
   ));
   if (excludedRequired.length > 0) {
-    throw new Error(`TAGO required station mapping is incomplete: ${excludedRequired.map(safeCode).join(",")}`);
+    throw new Error(`TAGO required station mapping is incomplete: ${excludedRequired.map(safeLabel).join(",")}`);
   }
   stations.sort((left, right) => left.corridorSequence - right.corridorSequence
     || stringCompare(left.canonicalStationId, right.canonicalStationId));
@@ -361,7 +378,7 @@ export async function collectTagoItxCheongchunRoster({
   }
   const trainNumbers = [...new Set(itineraries.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)))].sort(naturalCompare);
   if (trainNumbers.length === 0 && failedOds.length === 0) throw new Error("TAGO ITX-청춘 roster returned zero rows");
-  const buildArtifact = (materialized) => {
+  const buildArtifact = (materialized, reconstructionSummary = null) => {
     const artifact = {
       schemaVersion: 2,
       artifactKind: "tago-itx-cheongchun-roster-evidence",
@@ -390,6 +407,7 @@ export async function collectTagoItxCheongchunRoster({
       trainNumbers: materialized?.trainNumbers ?? trainNumbers,
       itineraries,
       ...(materialized ? materialized : {}),
+      ...(!materialized && reconstructionSummary ? { reconstructionSummary } : {}),
       credentialRedacted: true,
     };
     artifact.evidenceHash = sha256(JSON.stringify(artifact));
@@ -406,7 +424,7 @@ export async function collectTagoItxCheongchunRoster({
       kricServiceDayCode,
     }));
   } catch (error) {
-    if (error instanceof Error) error.rosterEvidence = buildArtifact(null);
+    if (error instanceof Error) error.rosterEvidence = buildArtifact(null, error.reconstructionSummary);
     throw error;
   }
 }
@@ -713,9 +731,24 @@ function decodedServiceKey(value) {
   try { return decodeURIComponent(value); } catch { return value; }
 }
 
+function reconstructionFailureSummary(error, itineraries) {
+  const trainCount = new Set((Array.isArray(itineraries) ? itineraries : []).flatMap((itinerary) => {
+    try { return [normalizeTrainNumber(itinerary?.trainNumber)]; } catch { return []; }
+  })).size;
+  const message = error instanceof Error ? error.message : "";
+  return {
+    trainCount,
+    stopCount: 0,
+    conflictingTimestampCount: message.startsWith("TAGO_OD_TIME_CONFLICT") ? 1 : 0,
+    missingPairCount: message.startsWith("TAGO_OD_PAIR_COVERAGE_INCOMPLETE") ? 1 : 0,
+    duplicateOdCount: message.startsWith("TAGO_OD_DUPLICATE") ? 1 : 0,
+  };
+}
+
 function normalize(value) { return String(value ?? "").toLocaleLowerCase("ko-KR").replace(/[^\p{L}\p{N}]+/gu, ""); }
 function requiredString(value, label) { if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} is required`); return value; }
 function safeCode(value) { return /^[A-Za-z0-9._-]{1,32}$/.test(value) ? value : "UNKNOWN"; }
+function safeLabel(value) { const text = String(value ?? "").normalize("NFC"); return /^[\p{L}\p{N}._-]{1,32}$/u.test(text) ? text : "UNKNOWN"; }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function naturalCompare(left, right) { return left.localeCompare(right, "ko", { numeric: true }); }
 function stringCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }

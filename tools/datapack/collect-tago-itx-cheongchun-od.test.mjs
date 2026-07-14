@@ -79,6 +79,21 @@ test("ITX OD matrix hash는 정렬된 date·depStationId·arrStationId tuple 직
   assert.equal(matrix.odMatrixHash, sha256(JSON.stringify(tuples)));
 });
 
+test("ITX OD matrix hash는 canonical ID가 같아도 실제 provider station ID가 바뀌면 달라진다", () => {
+  const canonical = ["station-a", "station-b"];
+  const first = buildItxOdMatrix("20260715", [
+    { providerStationId: "NAT-A1", canonicalStationId: canonical[0] },
+    { providerStationId: "NAT-B1", canonicalStationId: canonical[1] },
+  ]);
+  const second = buildItxOdMatrix("20260715", [
+    { providerStationId: "NAT-A2", canonicalStationId: canonical[0] },
+    { providerStationId: "NAT-B2", canonicalStationId: canonical[1] },
+  ]);
+
+  assert.equal(first.stationSetHash, second.stationSetHash);
+  assert.notEqual(first.odMatrixHash, second.odMatrixHash);
+});
+
 test("TAGO pairwise OD는 U/D 정차시각을 추정 없이 결정론적으로 materialize한다", () => {
   const materialized = materializeTagoItxOdRows({
     itineraries: [
@@ -141,13 +156,25 @@ test("TAGO OD materialization은 duplicate·pair 누락·시각 충돌·방향 �
     itineraries, corridorStations: stations, serviceDate: "20260715", kricServiceDayCode: "8",
   });
 
-  assert.throws(() => materializeTagoItxOdRows(input([...base, base[0]])), /TAGO_OD_DUPLICATE/);
-  assert.throws(() => materializeTagoItxOdRows(input(base.slice(0, 2))), /TAGO_OD_PAIR_COVERAGE_INCOMPLETE/);
+  assert.throws(() => materializeTagoItxOdRows(input([...base, base[0]])), (error) => {
+    assert.match(error.message, /TAGO_OD_DUPLICATE/);
+    assert.equal(error.reconstructionSummary.duplicateOdCount, 1);
+    return true;
+  });
+  assert.throws(() => materializeTagoItxOdRows(input(base.slice(0, 2))), (error) => {
+    assert.match(error.message, /TAGO_OD_PAIR_COVERAGE_INCOMPLETE/);
+    assert.equal(error.reconstructionSummary.missingPairCount, 1);
+    return true;
+  });
   assert.throws(() => materializeTagoItxOdRows(input([
     base[0],
     { ...base[1], departureAt: "2026-07-15T08:01:00+09:00" },
     base[2],
-  ])), /TAGO_OD_TIME_CONFLICT/);
+  ])), (error) => {
+    assert.match(error.message, /TAGO_OD_TIME_CONFLICT/);
+    assert.equal(error.reconstructionSummary.conflictingTimestampCount, 1);
+    return true;
+  });
   assert.throws(() => materializeTagoItxOdRows(input([
     ...base,
     od("2001", "C", "A", "2026-07-15T11:00:00+09:00", "2026-07-15T13:00:00+09:00"),
@@ -514,8 +541,42 @@ test("TAGO materialization 실패는 완료된 OD matrix evidence를 error에 �
     assert.equal(error.rosterEvidence.failedOdCount, 0);
     assert.match(error.rosterEvidence.stationSetHash, /^[a-f0-9]{64}$/);
     assert.match(error.rosterEvidence.odMatrixHash, /^[a-f0-9]{64}$/);
+    assert.deepEqual(error.rosterEvidence.reconstructionSummary, {
+      trainCount: 2,
+      stopCount: 0,
+      conflictingTimestampCount: 1,
+      missingPairCount: 0,
+      duplicateOdCount: 0,
+    });
     return true;
   });
+});
+
+test("TAGO 필수 역 mapping 누락은 Unicode-safe 역 이름을 보존한다", async () => {
+  await assert.rejects(collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: canonicalRosterStations(),
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("GetVhcleKndList")) {
+        return tagoCatalogResponse([{ vehiclekndid: "07", vehiclekndnm: "ITX-청춘" }]);
+      }
+      if (parsed.pathname.endsWith("GetCtyCodeList")) {
+        return tagoCatalogResponse([
+          { citycode: "11", cityname: "서울" },
+          { citycode: "32", cityname: "강원" },
+        ]);
+      }
+      if (parsed.pathname.endsWith("GetCtyAcctoTrainSttnList")) {
+        return parsed.searchParams.get("cityCode") === "11"
+          ? tagoResponse([{ nodeid: "NAT130126", nodename: "청량리" }])
+          : tagoResponse([]);
+      }
+      return assert.fail("OD provider must not be called");
+    },
+  }), /TAGO required station mapping is incomplete: 춘천/);
 });
 
 test("TAGO ITX roster는 공식 totalCount가 없는 OD 응답을 완료로 세지 않는다", async () => {

@@ -262,6 +262,13 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
       completedOdCount: 6,
       failedOdCount: 0,
       credentialRedacted: true,
+      reconstructionSummary: {
+        trainCount: 1,
+        stopCount: 0,
+        conflictingTimestampCount: 1,
+        missingPairCount: 0,
+        duplicateOdCount: 0,
+      },
     };
     const artifact = await collectKorailItxCheongchunCompleteness({
       serviceKey: "key", serviceDates, packPath: PACK_PATH,
@@ -279,6 +286,7 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.serviceDays[0].completedOdCount, 6);
     assert.equal(artifact.serviceDays[0].roster.serviceDate, "20260715");
     assert.equal(artifact.serviceDays[0].roster.expectedOdCount, 6);
+    assert.equal(artifact.serviceDays[0].reconstructionSummary.conflictingTimestampCount, 1);
   });
 
   await context.test("KORAIL plan 누락 context", async () => {
@@ -301,6 +309,19 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     });
     assert.equal(artifact.serviceDays[0].failureReasonCode, "STATION_MAPPING_INCOMPLETE");
     assert.equal(artifact.serviceDays[0].failureContext, "갈매");
+  });
+
+  await context.test("필수 station mapping 오류는 누락 역 이름을 보존", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectRosterImpl: async () => {
+        throw new Error("TAGO required station mapping is incomplete: 옥수,왕십리");
+      },
+      collectTimetableImpl: async () => assert.fail("must not run"),
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "STATION_MAPPING_INCOMPLETE");
+    assert.equal(artifact.serviceDays[0].failureContext, "missingStations=옥수,왕십리");
   });
 
   await context.test("TAGO schema 오류 context", async () => {
@@ -1007,7 +1028,7 @@ test("KORAIL plan은 TAGO materialized 열차별 exact 1행만 선택해 endpoin
   const selected = validateKorailItxPlans({
     plans: [
       planRow("9999", "서울", "부산", "20260713050000", "20260713100000"),
-      planRow("02001", "용산", "춘천", "20260713060000", "20260713080000"),
+      planRow("ITX-02001", "용산", "춘천", "20260713060000", "20260713080000"),
     ],
     materialized: tagoMaterializedFixture(),
     runDate: "20260713",
