@@ -76,15 +76,24 @@ async function checkReadiness(baseUrl, axis, timeoutMs) {
 }
 
 async function checkRouteApiClosure(baseUrl, axis, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
   for (const endpoint of axis.endpoints) {
-    const { status } = await httpRequest(joinUrl(baseUrl, endpoint.path), {
-      method: endpoint.method,
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(endpoint.request),
-      timeoutMs,
-    });
+    const context = `${endpoint.method} ${endpoint.path}`;
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) throw new Error(`${context} check failed: timeout budget exhausted`);
+    let status;
+    try {
+      ({ status } = await httpRequest(joinUrl(baseUrl, endpoint.path), {
+        method: endpoint.method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(endpoint.request),
+        timeoutMs: remainingMs,
+      }));
+    } catch (error) {
+      throw new Error(`${context} check failed: ${error.message}`, { cause: error });
+    }
     if (!axis.acceptedStatuses.includes(status)) {
-      throw new Error(`${endpoint.method} ${endpoint.path} returned HTTP ${status}`);
+      throw new Error(`${context} returned HTTP ${status}`);
     }
   }
 }

@@ -39,8 +39,8 @@ async function withServer(routes, fn) {
     }
     const chunks = [];
     req.on("data", (chunk) => chunks.push(chunk));
-    req.on("end", () => {
-      const out = handler(Buffer.concat(chunks).toString("utf8"));
+    req.on("end", async () => {
+      const out = await handler(Buffer.concat(chunks).toString("utf8"));
       const payload = out.raw ? out.body : JSON.stringify(out.body);
       res.writeHead(out.status, { "content-type": out.raw ? "text/html" : "application/json" }).end(payload);
     });
@@ -129,6 +129,26 @@ test("post-deploy smoke fails immediately when any closed route endpoint returns
     assert.equal(axis(report, "route-api-closure").result, "FAIL");
     assert.equal(axis(report, "route-api-closure").attempts, 1);
     assert.equal(calls, 1);
+  });
+});
+
+test("post-deploy smoke shares one timeout budget across closed route endpoints", async () => {
+  const routes = defaultRoutes();
+  const delayedForbidden = () => new Promise((resolve) => {
+    setTimeout(() => resolve({ status: 403, body: {} }), 900);
+  });
+  routes.routeV1Search = delayedForbidden;
+  routes.routeV2Search = delayedForbidden;
+  routes.routeRefresh = delayedForbidden;
+
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 1);
+    assert.equal(axis(report, "route-api-closure").result, "FAIL");
+    assert.match(
+      axis(report, "route-api-closure").detail,
+      /POST \/api\/v2\/routes\/closure-probe\/refresh check failed/,
+    );
   });
 });
 
