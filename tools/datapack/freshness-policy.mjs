@@ -21,7 +21,7 @@ export function deriveFreshness({
     sourceClass.clockSkewSeconds ?? policy.clockSkewSeconds ?? 0,
     "clockSkewSeconds",
   ) * 1_000;
-  if (basisMillis > evaluatedMillis + clockSkewMillis) {
+  if (sourceClass.futureBasisAllowed !== true && basisMillis > evaluatedMillis + clockSkewMillis) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: basisAt exceeds clock skew");
   }
 

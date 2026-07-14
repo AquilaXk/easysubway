@@ -24,8 +24,12 @@ class CatalogDatabaseOpener {
   final AssetBundle assetBundle;
   final EmergencyOverrideRepository? emergencyOverrideRepository;
   final DateTime Function() _now;
+  bool _openedBundledDataPack = false;
+
+  bool get openedBundledDataPack => _openedBundledDataPack;
 
   Future<CatalogDatabase> open() async {
+    _openedBundledDataPack = false;
     final installedDatabase = await _openInstalledCurrentDataPack();
     if (installedDatabase != null) {
       return installedDatabase;
@@ -42,6 +46,7 @@ class CatalogDatabaseOpener {
     );
     await database.seedBaselineIfEmpty();
     await _writeBundledFreshness(datapackDirectory, index);
+    _openedBundledDataPack = true;
     return database;
   }
 

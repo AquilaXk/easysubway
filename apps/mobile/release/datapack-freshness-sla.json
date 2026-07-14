@@ -35,6 +35,7 @@
       "examples": ["service calendar", "trips", "stop_times", "headway"],
       "basisField": "serviceEffectiveAt",
       "maximumReverificationCadence": "P30D",
+      "futureBasisAllowed": true,
       "providerValidityEndField": "serviceEffectiveUntil",
       "offlinePackEligible": true,
       "eventTriggers": ["operator timetable revision", "service calendar expiry", "line extension opening"],

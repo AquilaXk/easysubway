@@ -608,6 +608,25 @@ void main() {
 
     expect(find.byKey(const Key('stationSearchButton')), findsOneWidget);
     expect(find.text('어떻게 걸으세요?'), findsNothing);
+    expect(find.byKey(const Key('bundledDataPackStaleBanner')), findsNothing);
+  });
+
+  testWidgets('만료된 bundled datapack은 홈에 stale 안내를 표시한다', (tester) async {
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        notificationRepository: FakeNotificationSettingsRepository(),
+        bundledDataPackStaleLabel: '저장된 데이터 기준 · 갱신 필요',
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('bundledDataPackStaleBanner')), findsOneWidget);
+    expect(find.text('저장된 데이터 기준 · 갱신 필요'), findsOneWidget);
   });
 
   testWidgets('기본 앱은 저장소가 없어도 노선도 중심 첫 화면을 보여준다', (tester) async {

@@ -145,6 +145,8 @@ Future<void> main() async {
           ),
           onDataPackMeteredConsent: bootstrap.acceptMeteredDataPackUpdate,
           dataPackUpdate: bootstrap.dataPackUpdate,
+          bundledDataPackStaleLabel:
+              bootstrap.bundledDataPackFreshness?.staleLabel,
         ),
       ),
     ),
@@ -365,6 +367,7 @@ class EasySubwayApp extends StatelessWidget {
     DataPackUpdateStateRepository? dataPackUpdateStateRepository,
     Future<void> Function()? onDataPackMeteredConsent,
     Future<void>? dataPackUpdate,
+    String? bundledDataPackStaleLabel,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     GlobalKey<NavigatorState>? navigatorKey,
@@ -405,6 +408,7 @@ class EasySubwayApp extends StatelessWidget {
          dataPackUpdateStateRepository: dataPackUpdateStateRepository,
          onDataPackMeteredConsent: onDataPackMeteredConsent,
          dataPackUpdate: dataPackUpdate,
+         bundledDataPackStaleLabel: bundledDataPackStaleLabel,
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
@@ -426,6 +430,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.dataPackUpdateStateRepository,
     required this.onDataPackMeteredConsent,
     required this.dataPackUpdate,
+    required this.bundledDataPackStaleLabel,
     required this.recentRoutesFuture,
     this.navigatorKey,
     super.key,
@@ -479,6 +484,7 @@ class EasySubwayApp extends StatelessWidget {
   final DataPackUpdateStateRepository? dataPackUpdateStateRepository;
   final Future<void> Function()? onDataPackMeteredConsent;
   final Future<void>? dataPackUpdate;
+  final String? bundledDataPackStaleLabel;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
   final GlobalKey<NavigatorState>? navigatorKey;
 
@@ -586,6 +592,7 @@ class EasySubwayApp extends StatelessWidget {
           userDataDeletionRepository: userDataDeletionRepository,
           noticeRepository: noticeRepository,
           recentRoutesFuture: recentRoutesFuture,
+          bundledDataPackStaleLabel: bundledDataPackStaleLabel,
         ),
       ),
     );
@@ -787,6 +794,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.userDataDeletionRepository,
     required this.noticeRepository,
     required this.recentRoutesFuture,
+    required this.bundledDataPackStaleLabel,
   });
 
   final StationSearchRepository repository;
@@ -816,6 +824,7 @@ class _EasySubwayHome extends StatefulWidget {
   final UserDataDeletionRepository? userDataDeletionRepository;
   final NoticeRepository? noticeRepository;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
+  final String? bundledDataPackStaleLabel;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
@@ -920,6 +929,7 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         userDataDeletionRepository: widget.userDataDeletionRepository,
         noticeRepository: widget.noticeRepository,
         recentRoutesFuture: widget.recentRoutesFuture,
+        bundledDataPackStaleLabel: widget.bundledDataPackStaleLabel,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
         onViewPreferencesChanged: _saveViewPreferences,
@@ -1425,6 +1435,7 @@ class HomeScreen extends StatefulWidget {
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
+    this.bundledDataPackStaleLabel,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
@@ -1461,6 +1472,7 @@ class HomeScreen extends StatefulWidget {
   final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final String? bundledDataPackStaleLabel;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -1810,6 +1822,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     Widget rootTab(Widget child) {
+      final staleLabel = widget.bundledDataPackStaleLabel;
       return PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -1818,7 +1831,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
           openHomeTab();
         },
-        child: child,
+        child: staleLabel == null
+            ? child
+            : Column(
+                children: [
+                  SafeArea(
+                    bottom: false,
+                    child: Material(
+                      color: EasySubwayAccessibleColors.surface,
+                      child: Semantics(
+                        container: true,
+                        liveRegion: true,
+                        label: staleLabel,
+                        child: Container(
+                          key: const Key('bundledDataPackStaleBanner'),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: EasySubwayAccessibleColors.line,
+                              ),
+                            ),
+                          ),
+                          child: ExcludeSemantics(
+                            child: Text(
+                              staleLabel,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: EasySubwayAccessibleColors.text,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(child: child),
+                ],
+              ),
       );
     }
 

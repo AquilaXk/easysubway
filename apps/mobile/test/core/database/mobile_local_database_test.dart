@@ -9,6 +9,7 @@ import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database_opener.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database_opener.dart';
+import 'package:easysubway_mobile/core/datapack/bundled_data_pack_freshness.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_updater.dart';
 import 'package:easysubway_mobile/core/datapack/emergency_override_repository.dart';
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
@@ -510,11 +511,13 @@ void main() {
     );
     addTearDown(() => directory.delete(recursive: true));
 
-    final database = await CatalogDatabaseOpener(
+    final opener = CatalogDatabaseOpener(
       databaseDirectory: directory,
       assetBundle: rootBundle,
       now: () => DateTime.utc(2026, 8, 11),
-    ).open();
+    );
+    final database = await opener.open();
+    expect(opener.openedBundledDataPack, isTrue);
     final installedPack = File('${directory.path}/datapacks/capital.sqlite');
     final firstHash = sha256.convert(await installedPack.readAsBytes());
     await database.close();
@@ -530,6 +533,8 @@ void main() {
     expect(state['reasonCode'], 'BUNDLED_PACK_EXPIRED');
     expect(state['labelKo'], '저장된 데이터 기준 · 갱신 필요');
     expect(state['freshnessExpiresAt'], '2026-08-11T00:00:00.000Z');
+    final freshness = await BundledDataPackFreshness.read(directory);
+    expect(freshness.staleLabel, '저장된 데이터 기준 · 갱신 필요');
 
     final reopened = await CatalogDatabaseOpener(
       databaseDirectory: directory,
@@ -733,10 +738,11 @@ void main() {
       }),
     );
 
-    final database = await CatalogDatabaseOpener(
+    final opener = CatalogDatabaseOpener(
       databaseDirectory: directory,
       assetBundle: rootBundle,
-    ).open();
+    );
+    final database = await opener.open();
     addTearDown(database.close);
 
     final metadata = await database.customSelect('''
@@ -746,6 +752,7 @@ void main() {
           ''').getSingle();
 
     expect(metadata.read<String>('value'), 'capital-v18');
+    expect(opener.openedBundledDataPack, isFalse);
   });
 
   test('catalog opener는 설치된 current pack의 제거된 access edge를 보존한다', () async {

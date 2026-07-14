@@ -6,6 +6,19 @@ import { pathToFileURL } from "node:url";
 
 import { deriveFreshness } from "./freshness-policy.mjs";
 
+const buildProvenanceStringFields = [
+  "snapshotId",
+  "sourceId",
+  "rawObjectUri",
+  "rawSha256",
+  "redactedRequestFingerprint",
+  "schemaFingerprint",
+  "licenseStatus",
+  "snapshotStatus",
+  "freshnessExpiresAt",
+];
+const buildProvenanceBooleanFields = ["redistributionAllowed", "credentialRedacted"];
+
 export function validateSourceSnapshotFreshness({ buildSpec, snapshots, policy, evaluationAt }) {
   if (!Array.isArray(buildSpec?.sourceSnapshotIds) || buildSpec.sourceSnapshotIds.length === 0) {
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: buildSpec.sourceSnapshotIds");
@@ -17,6 +30,14 @@ export function validateSourceSnapshotFreshness({ buildSpec, snapshots, policy, 
   const actualIds = snapshots.map((snapshot) => requiredString(snapshot.snapshotId, "snapshotId")).sort();
   if (new Set(actualIds).size !== actualIds.length || JSON.stringify(actualIds) !== JSON.stringify(expectedIds)) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
+  }
+  const evidenceProvenance = canonicalBuildProvenance(snapshots, "snapshots");
+  const buildProvenance = canonicalBuildProvenance(
+    buildSpec.sourceSnapshots,
+    "buildSpec.sourceSnapshots",
+  );
+  if (JSON.stringify(evidenceProvenance) !== JSON.stringify(buildProvenance)) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot provenance");
   }
   const snapshotSetHash = sha256(JSON.stringify(snapshots));
   if (snapshotSetHash !== buildSpec.sourceSnapshotSetHash) {
@@ -104,6 +125,28 @@ function requiredString(value, label) {
     throw new Error(`${label} must be a non-empty string`);
   }
   return value;
+}
+
+function canonicalBuildProvenance(snapshots, label) {
+  if (!Array.isArray(snapshots) || snapshots.length === 0) {
+    throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}`);
+  }
+  return snapshots.map((snapshot, index) => {
+    if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+      throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}[${index}]`);
+    }
+    const canonical = Object.fromEntries(buildProvenanceStringFields.map((field) => [
+      field,
+      requiredString(snapshot[field], `${label}[${index}].${field}`),
+    ]));
+    for (const field of buildProvenanceBooleanFields) {
+      if (typeof snapshot[field] !== "boolean") {
+        throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}[${index}].${field}`);
+      }
+      canonical[field] = snapshot[field];
+    }
+    return canonical;
+  }).sort((left, right) => left.snapshotId.localeCompare(right.snapshotId));
 }
 
 function sha256(value) {

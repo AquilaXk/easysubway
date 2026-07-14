@@ -19,6 +19,14 @@ function input(overrides = {}) {
   const snapshots = [{
     snapshotId: "snapshot-a",
     sourceId: "source-a",
+    rawObjectUri: "s3://bucket/snapshot-a.json",
+    rawSha256: "a".repeat(64),
+    redactedRequestFingerprint: "b".repeat(64),
+    schemaFingerprint: "c".repeat(64),
+    licenseStatus: "PASS",
+    redistributionAllowed: true,
+    snapshotStatus: "LOCKED",
+    credentialRedacted: true,
     retrievedAt: "2026-07-12T00:00:00Z",
     freshnessExpiresAt: "2026-08-11T00:00:00Z",
     ...overrides,
@@ -27,6 +35,19 @@ function input(overrides = {}) {
     snapshots,
     buildSpec: {
       sourceSnapshotIds: ["snapshot-a"],
+      sourceSnapshots: snapshots.map((snapshot) => ({
+        snapshotId: snapshot.snapshotId,
+        sourceId: snapshot.sourceId,
+        rawObjectUri: snapshot.rawObjectUri,
+        rawSha256: snapshot.rawSha256,
+        redactedRequestFingerprint: snapshot.redactedRequestFingerprint,
+        schemaFingerprint: snapshot.schemaFingerprint,
+        licenseStatus: snapshot.licenseStatus,
+        redistributionAllowed: snapshot.redistributionAllowed,
+        snapshotStatus: snapshot.snapshotStatus,
+        credentialRedacted: snapshot.credentialRedacted,
+        freshnessExpiresAt: snapshot.freshnessExpiresAt,
+      })),
       sourceSnapshotSetHash: createHash("sha256").update(JSON.stringify(snapshots)).digest("hex"),
     },
     policy,
@@ -53,4 +74,14 @@ test("build spec의 snapshot ID와 evidence가 다르면 fail closed한다", () 
   value.buildSpec.sourceSnapshotIds = ["snapshot-other"];
 
   assert.throws(() => validateSourceSnapshotFreshness(value), /source snapshot IDs/);
+});
+
+test("build provenance와 검증 evidence의 snapshot 내용이 다르면 fail closed한다", () => {
+  const value = input();
+  value.buildSpec.sourceSnapshots[0].rawSha256 = "d".repeat(64);
+
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /source snapshot provenance/,
+  );
 });

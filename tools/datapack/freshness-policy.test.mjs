@@ -19,6 +19,7 @@ const policy = {
       id: "planned_timetable",
       basisField: "serviceEffectiveAt",
       maximumReverificationCadence: "P30D",
+      futureBasisAllowed: true,
     },
   ],
 };
@@ -70,6 +71,20 @@ test("future basis가 clock skew를 넘으면 fail closed한다", () => {
     storedExpiresAt: "2026-09-29T00:05:00.001Z",
     evaluationAt: "2026-07-01T00:00:00.000Z",
   }), /SOURCE_FRESHNESS_DERIVATION_MISMATCH/);
+});
+
+test("planned timetable은 미래 service effective basis를 허용한다", () => {
+  assert.deepEqual(deriveFreshness({
+    policy,
+    sourceClassId: "planned_timetable",
+    basisAt: "2026-07-10T00:00:00.000Z",
+    storedExpiresAt: "2026-08-09T00:00:00.000Z",
+    evaluationAt: "2026-07-01T00:00:00.000Z",
+  }), {
+    status: "FRESH",
+    freshnessExpiresAt: "2026-08-09T00:00:00.000Z",
+    reasonCodes: [],
+  });
 });
 
 test("존재하지 않는 UTC 날짜는 fail closed한다", () => {
