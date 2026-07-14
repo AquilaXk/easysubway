@@ -85,6 +85,7 @@ function validateOpenApiFixtures(errors) {
   for (const [docPath, paths] of Object.entries({
     "contracts/api/report-api.openapi.yaml": ["/api/v1/report-uploads", "/api/v1/reports", "/api/v1/reports/{reportId}"],
     "contracts/api/realtime-api.openapi.yaml": ["/api/v1/realtime/arrivals", "/api/v1/realtime/train-positions"],
+    "contracts/api/train-api.openapi.yaml": ["/api/v1/trains/stations", "/api/v1/trains/search"],
   })) {
     if (!existsSync(docPath)) {
       errors.push(`${docPath} 누락`);
