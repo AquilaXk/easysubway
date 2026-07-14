@@ -138,12 +138,11 @@ test("Korail 열차운행정보 probe는 provider 오류·빈 row·schema mismat
   await context.test("row별 누락은 다른 row의 field로 상쇄되지 않는다", async () => {
     const first = infoRow();
     const second = infoRow();
-    delete first.stn_nm;
     delete second.trn_no;
     await assert.rejects(probeKorailTrainOperationApi({
       ...base,
       fetchImpl: async () => infoResponse([first, second]),
-    }), /item\[0\] fields missing=stn_nm/);
+    }), /item\[1\] fields missing=trn_no/);
   });
 });
 
