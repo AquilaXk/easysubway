@@ -6965,7 +6965,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "tools/datapack/source-candidates.json");
-  assert.equal(candidates.updatedAt, "2026-07-13");
+  assert.equal(candidates.updatedAt, "2026-07-14");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [
