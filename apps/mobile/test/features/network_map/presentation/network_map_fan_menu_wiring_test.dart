@@ -13,6 +13,7 @@ import 'package:easysubway_mobile/network_map.dart'
         fanMenuDisabledSlots,
         fanMenuShouldClear,
         fanMenuStationLabelHeight,
+        fanMenuWidthForViewport,
         fanMenuPlacement;
 
 void main() {
@@ -22,6 +23,8 @@ void main() {
       final placement = fanMenuPlacement(
         stationPoint: const Offset(200, 400),
         labelHeight: 28,
+        viewport: const Size(400, 800),
+        clampPosition: false,
       );
       expect(placement.placeBelow, isFalse);
       // top = dy - menuHeight - 8 (menuHeight ≈ 141.14).
@@ -38,6 +41,8 @@ void main() {
       final placement = fanMenuPlacement(
         stationPoint: const Offset(200, 10),
         labelHeight: 28,
+        viewport: const Size(400, 800),
+        clampPosition: false,
       );
       expect(placement.placeBelow, isTrue);
       expect(placement.top, closeTo(10 + 28, 0.001));
@@ -54,6 +59,8 @@ void main() {
       final above = fanMenuPlacement(
         stationPoint: const Offset(200, 400),
         labelHeight: 28,
+        viewport: const Size(400, 800),
+        clampPosition: false,
       );
       expect(above.labelAbove, isTrue);
       // 메뉴 위 라벨: bottom = viewportHeight - top + 8 (메뉴 상단 위에서 자람).
@@ -62,6 +69,8 @@ void main() {
       final below = fanMenuPlacement(
         stationPoint: const Offset(200, 10),
         labelHeight: 28,
+        viewport: const Size(400, 800),
+        clampPosition: false,
       );
       expect(below.labelAbove, isFalse);
       // 메뉴 아래 라벨: bottom 앵커가 메뉴 하단(top+menuHeight) 아래 labelHeight만큼
@@ -85,6 +94,7 @@ void main() {
         stationPoint: const Offset(355, 400),
         viewport: viewport,
         labelHeight: 28,
+        clampPosition: true,
       );
       const margin = 12.0;
       final maxLeft = viewport.width - margin - clamped.menuWidth;
@@ -101,16 +111,19 @@ void main() {
         stationPoint: const Offset(5, 400),
         viewport: viewport,
         labelHeight: 28,
+        clampPosition: true,
       );
       expect(leftClamped.left, greaterThanOrEqualTo(margin - 0.001));
     });
 
-    test('viewport 미전달(카메라 패닝 경로)이면 클램프 없이 이상적 배치를 낸다', () {
-      // 패닝은 이상적(클램프 없는) revealBounds로 최대한 노출을 시도해야 하므로,
-      // viewport를 주지 않으면 left가 중심 정렬 그대로 유지된다.
+    test('카메라 패닝 경로는 같은 viewport에서 클램프 없이 이상적 배치를 낸다', () {
+      // 패닝은 같은 viewport에서 이상적(클램프 없는) revealBounds로 최대한
+      // 노출을 시도해야 하므로 left가 중심 정렬 그대로 유지된다.
       final unclamped = fanMenuPlacement(
         stationPoint: const Offset(355, 400),
         labelHeight: 28,
+        viewport: const Size(360, 800),
+        clampPosition: false,
       );
       expect(unclamped.left, closeTo(355 - unclamped.menuWidth / 2, 0.001));
     });
@@ -127,6 +140,8 @@ void main() {
       final placement = fanMenuPlacement(
         stationPoint: const Offset(200, 400),
         labelHeight: largeHeight,
+        viewport: const Size(400, 800),
+        clampPosition: false,
       );
 
       expect(largeHeight, greaterThan(normalHeight));
@@ -135,6 +150,34 @@ void main() {
         placement.revealBounds.height,
         closeTo(placement.menuHeight + 8 + largeHeight, 0.001),
       );
+    });
+
+    test('320/360/364/390dp에서 메뉴 너비를 단일 규칙으로 계산한다', () {
+      expect(fanMenuWidthForViewport(320), 296);
+      expect(fanMenuWidthForViewport(360), 336);
+      expect(fanMenuWidthForViewport(364), 340);
+      expect(fanMenuWidthForViewport(390), 340);
+    });
+
+    test('clamp 여부와 무관하게 같은 viewport는 같은 menu size를 사용한다', () {
+      const viewport = Size(360, 800);
+      final renderPlacement = fanMenuPlacement(
+        stationPoint: const Offset(355, 400),
+        labelHeight: 28,
+        viewport: viewport,
+        clampPosition: true,
+      );
+      final cameraPlacement = fanMenuPlacement(
+        stationPoint: const Offset(355, 400),
+        labelHeight: 28,
+        viewport: viewport,
+        clampPosition: false,
+      );
+
+      expect(renderPlacement.menuWidth, cameraPlacement.menuWidth);
+      expect(renderPlacement.menuHeight, cameraPlacement.menuHeight);
+      expect(renderPlacement.menuWidth, 336);
+      expect(renderPlacement.left, isNot(cameraPlacement.left));
     });
 
     test('실측 라벨 높이는 1px border가 추가하는 장식 padding까지 포함한다', () {

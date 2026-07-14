@@ -17,6 +17,8 @@ import 'features/network_map/domain/map_camera.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/structured_route_map.dart';
 import 'features/network_map/presentation/station_fan_menu.dart';
+import 'features/network_map/presentation/station_fan_menu_geometry.dart'
+    show kFanMenuDesignSize;
 import 'features/network_map/presentation/structured_route_map_painter.dart';
 import 'features/realtime/realtime_repository.dart';
 import 'features/route_draft/application/route_draft_controller.dart';
@@ -3606,6 +3608,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                         constraints.maxWidth,
                         constraints.maxHeight,
                       ),
+                      clampPosition: true,
                     );
                     final left = placement.left;
                     final menuWidth = placement.menuWidth;
@@ -3965,12 +3968,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     const margin = kFanMenuViewportMargin;
     // #2109: 배치·라벨 포함 bbox는 build와 동일하게 fanMenuPlacement가 계산한다
     // (규칙 중복 제거 — 한쪽만 바뀌어 패닝 bbox와 렌더 위치가 어긋나는 것 방지).
-    // 패닝은 클램프 없는(viewport 미전달) 이상적 배치로 최대한 노출을 시도하고,
+    // 패닝은 같은 viewport의 클램프 없는 이상적 배치로 최대한 노출을 시도하고,
     // 패닝이 .clamped() 한계로 다 못 드러내는 잔여는 build 경로의 viewport 클램프
     // 폴백이 처리한다.
     final menuRect = fanMenuPlacement(
       stationPoint: stationPoint,
       labelHeight: _fanMenuLabelHeight(station.displayName),
+      viewport: camera.viewportSize,
+      clampPosition: false,
     ).revealBounds;
     final viewport = Offset.zero & camera.viewportSize;
     var dx = 0.0;
@@ -5722,19 +5727,25 @@ class FanMenuPlacement {
 /// 한다(#2109). 라벨은 bottom 앵커라 커져도 위로만 자라므로 실측 높이만큼
 /// 패닝 bbox 상단에 여유를 둔다.
 ///
-/// [viewport]가 주어지면 카메라 패닝이 `.clamped()` 한계에 걸려 메뉴를 다 못
-/// 드러내는 극단 경계에서도 메뉴가 잘리지 않도록, left(및 필요 시 top)를 화면
-/// 안(여백 [kFanMenuViewportMargin])으로 클램프한다. 이 클램프를 배치 함수
-/// 하나에 두어 build·패닝이 동일 결과를 보게 한다(노치 앵커가 어긋나는 것은
-/// 극단 경계에서만 나타나는 수용된 절충).
+/// 렌더와 카메라 패닝이 같은 viewport 기반 메뉴 크기를 사용한다. 렌더 경로는
+/// [clampPosition]을 켜 극단 경계에서도 메뉴를 화면 안에 두고, 카메라 경로는
+/// 끈 이상적 배치의 [FanMenuPlacement.revealBounds]를 노출 대상으로 사용한다.
+@visibleForTesting
+double fanMenuWidthForViewport(double viewportWidth) => math.min(
+  340.0,
+  math.max(0.0, viewportWidth - (kFanMenuViewportMargin * 2)),
+);
+
 @visibleForTesting
 FanMenuPlacement fanMenuPlacement({
   required Offset stationPoint,
   required double labelHeight,
-  Size? viewport,
+  required Size viewport,
+  required bool clampPosition,
 }) {
-  const menuWidth = 260.0;
-  final menuHeight = menuWidth * (380.0 / 700.0); // ≈ 141
+  final menuWidth = fanMenuWidthForViewport(viewport.width);
+  final menuHeight =
+      menuWidth * (kFanMenuDesignSize.height / kFanMenuDesignSize.width);
   var left = stationPoint.dx - menuWidth / 2;
   final placeBelow = stationPoint.dy - menuHeight - 8 < 8;
   var top = placeBelow
@@ -5742,7 +5753,7 @@ FanMenuPlacement fanMenuPlacement({
       : stationPoint.dy - menuHeight - 8;
   // 메뉴가 노드 위면 라벨은 메뉴 위, 노드 아래로 뒤집혔으면 라벨은 메뉴 아래.
   final labelAbove = !placeBelow;
-  if (viewport != null) {
+  if (clampPosition) {
     const margin = kFanMenuViewportMargin;
     final maxLeft = viewport.width - margin - menuWidth;
     if (maxLeft >= margin) {
