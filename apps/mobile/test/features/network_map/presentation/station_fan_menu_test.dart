@@ -82,4 +82,41 @@ void main() {
     expect(find.bySemanticsLabel('도착역으로 설정'), findsOneWidget);
     expect(find.bySemanticsLabel('메뉴 닫기'), findsOneWidget);
   });
+
+  testWidgets('#2109 4개 섹터 Semantics 노드 rect는 상호 배제된다(겹침 면적 0)', (
+    tester,
+  ) async {
+    // 회귀 방지: 섹터 Path getBounds() 사각형은 인접 섹터끼리 크게 겹쳐
+    // explore-by-touch가 안내와 다른 섹터를 활성화할 수 있었다. 각 접근성 노드
+    // rect는 아이콘·라벨 코어 주변의 비겹침 사각형으로 좁혀야 한다.
+    await _pump(tester, onAction: (_) {}, onClose: () {});
+
+    Rect rectFor(String label) => tester.getRect(
+      find.descendant(
+        of: find.bySemanticsLabel(label),
+        matching: find.byType(SizedBox),
+      ),
+    );
+
+    final rects = <Rect>[
+      rectFor('출발역으로 설정'),
+      rectFor('경유지로 추가'),
+      rectFor('도착역으로 설정'),
+      rectFor('메뉴 닫기'),
+    ];
+
+    for (var i = 0; i < rects.length; i++) {
+      for (var j = i + 1; j < rects.length; j++) {
+        final overlap = rects[i].intersect(rects[j]);
+        final area = overlap.isEmpty
+            ? 0.0
+            : overlap.width * overlap.height;
+        expect(
+          area,
+          0.0,
+          reason: '노드 $i 와 $j 의 접근성 rect가 겹친다(겹침 면적 $area)',
+        );
+      }
+    }
+  });
 }

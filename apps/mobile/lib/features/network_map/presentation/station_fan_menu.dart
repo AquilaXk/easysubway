@@ -22,6 +22,35 @@ String _semanticsLabel(_FanSector sector) => switch (sector) {
   _FanSector.close => '메뉴 닫기',
 };
 
+/// 각 섹터 Semantics 노드의 활성 rect(design 좌표). 섹터 Path의 getBounds()
+/// 사각형은 인접 섹터끼리 크게 겹쳐 explore-by-touch가 안내와 다른 섹터를
+/// 실행할 수 있다(#2109 리뷰). 그래서 접근성 노드 rect는 각 섹터의
+/// 아이콘·라벨 코어 주변으로 좁힌 비겹침 사각형으로 둔다. 실제 포인터
+/// 히트테스트(Listener + path.contains)는 이 값을 쓰지 않으므로 정확한 부채꼴
+/// 경계를 그대로 유지한다.
+const Map<_FanSector, Rect> _sectorSemanticsCore = {
+  _FanSector.departure: Rect.fromLTRB(130, 150, 220, 250),
+  _FanSector.waypoint: Rect.fromLTRB(300, 100, 400, 210),
+  _FanSector.arrival: Rect.fromLTRB(480, 150, 570, 250),
+  _FanSector.close: Rect.fromLTRB(320, 252, 380, 302),
+};
+
+/// State(히트테스트)와 Painter(렌더)가 같은 섹터→Path 매핑을 공유하도록
+/// 단일 top-level 헬퍼로 둔다.
+Path _pathForSector(StationFanMenuGeometry geometry, _FanSector sector) =>
+    switch (sector) {
+      _FanSector.departure => geometry.departure,
+      _FanSector.waypoint => geometry.waypoint,
+      _FanSector.arrival => geometry.arrival,
+      _FanSector.close => geometry.close,
+    };
+
+/// 섹터가 비활성인지 판정(닫기는 슬롯이 없어 항상 활성). State·Painter 공유.
+bool _sectorDisabled(Set<RouteDraftSlot> disabledSlots, _FanSector sector) {
+  final slot = _slotFor(sector);
+  return slot != null && disabledSlots.contains(slot);
+}
+
 class StationFanMenu extends StatefulWidget {
   const StationFanMenu({
     super.key,
@@ -50,17 +79,10 @@ class _StationFanMenuState extends State<StationFanMenu> {
   double get _height =>
       widget.width * (kFanMenuDesignSize.height / kFanMenuDesignSize.width);
 
-  Path _pathFor(_FanSector sector) => switch (sector) {
-    _FanSector.departure => _geometry.departure,
-    _FanSector.waypoint => _geometry.waypoint,
-    _FanSector.arrival => _geometry.arrival,
-    _FanSector.close => _geometry.close,
-  };
+  Path _pathFor(_FanSector sector) => _pathForSector(_geometry, sector);
 
-  bool _disabled(_FanSector sector) {
-    final slot = _slotFor(sector);
-    return slot != null && widget.disabledSlots.contains(slot);
-  }
+  bool _disabled(_FanSector sector) =>
+      _sectorDisabled(widget.disabledSlots, sector);
 
   /// 글로벌이 아닌 위젯 로컬 좌표(px)를 design 좌표로 되돌려 히트테스트한다.
   _FanSector? _sectorAtLocal(Offset local) {
@@ -129,12 +151,14 @@ class _StationFanMenuState extends State<StationFanMenu> {
   }
 
   Widget _sectorSemantics(_FanSector sector) {
-    final bounds = _pathFor(sector).getBounds();
+    // 접근성 노드 rect는 겹치지 않도록 좁힌 코어 사각형을 스케일해 쓴다
+    // (#2109 리뷰: getBounds() 사각형은 인접 섹터끼리 겹쳐 오탭 유발).
+    final core = _sectorSemanticsCore[sector]!;
     final rect = Rect.fromLTRB(
-      bounds.left * _scale,
-      bounds.top * _scale,
-      bounds.right * _scale,
-      bounds.bottom * _scale,
+      core.left * _scale,
+      core.top * _scale,
+      core.right * _scale,
+      core.bottom * _scale,
     );
     return Positioned.fromRect(
       rect: rect,
@@ -209,17 +233,9 @@ class _StationFanMenuPainter extends CustomPainter {
     }
   }
 
-  Path _pathFor(_FanSector sector) => switch (sector) {
-    _FanSector.departure => geometry.departure,
-    _FanSector.waypoint => geometry.waypoint,
-    _FanSector.arrival => geometry.arrival,
-    _FanSector.close => geometry.close,
-  };
+  Path _pathFor(_FanSector sector) => _pathForSector(geometry, sector);
 
-  bool _disabled(_FanSector sector) {
-    final slot = _slotFor(sector);
-    return slot != null && disabledSlots.contains(slot);
-  }
+  bool _disabled(_FanSector sector) => _sectorDisabled(disabledSlots, sector);
 
   bool _selected(_FanSector sector) {
     final slot = _slotFor(sector);
