@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsAction;
+
 import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
 import 'package:flutter/material.dart';
@@ -75,6 +77,31 @@ void main() {
     expect(actions, isEmpty);
   });
 
+  testWidgets('disabled 섹터 Semantics는 비활성이고 접근성 tap을 무시한다', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final actions = <RouteDraftSlot>[];
+    await _pump(
+      tester,
+      disabled: const {RouteDraftSlot.destination},
+      onAction: actions.add,
+      onClose: () {},
+    );
+
+    final node = tester.getSemantics(find.bySemanticsLabel('도착역으로 설정'));
+    expect(
+      node,
+      matchesSemantics(
+        label: '도착역으로 설정',
+        isButton: true,
+        hasEnabledState: true,
+      ),
+    );
+    node.owner!.performAction(node.id, SemanticsAction.tap);
+    await tester.pump();
+    expect(actions, isEmpty);
+    semantics.dispose();
+  });
+
   testWidgets('4개 섹터 Semantics 버튼 라벨을 노출한다', (tester) async {
     await _pump(tester, onAction: (_) {}, onClose: () {});
     expect(find.bySemanticsLabel('출발역으로 설정'), findsOneWidget);
@@ -108,14 +135,8 @@ void main() {
     for (var i = 0; i < rects.length; i++) {
       for (var j = i + 1; j < rects.length; j++) {
         final overlap = rects[i].intersect(rects[j]);
-        final area = overlap.isEmpty
-            ? 0.0
-            : overlap.width * overlap.height;
-        expect(
-          area,
-          0.0,
-          reason: '노드 $i 와 $j 의 접근성 rect가 겹친다(겹침 면적 $area)',
-        );
+        final area = overlap.isEmpty ? 0.0 : overlap.width * overlap.height;
+        expect(area, 0.0, reason: '노드 $i 와 $j 의 접근성 rect가 겹친다(겹침 면적 $area)');
       }
     }
   });
