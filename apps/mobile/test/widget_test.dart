@@ -161,6 +161,18 @@ Future<void> _tapFanMenuSector(WidgetTester tester, String label) async {
   await tester.pump();
 }
 
+/// 역 노드를 접근성 Semantics onTap 액션으로 탭한다(_StationHitTarget의
+/// Semantics(button: true, label: station.displayName, onTap: ...)를 사용).
+/// draft pin이 지정된 역은 pin이 노드 바로 위에 겹쳐 그려져 좌표 tap(tester.tap)이
+/// pin의 Material에 가로채이므로, 역 재탭 시나리오는 좌표 대신 이 경로를 쓴다.
+Future<void> _tapStationByLabel(WidgetTester tester, String label) async {
+  final handle = tester.ensureSemantics();
+  await tester.pump();
+  tester.semantics.tap(find.semantics.byLabel(label));
+  handle.dispose();
+  await tester.pump();
+}
+
 /// #1933 요구 3: 별도 길찾기 폼 페이지를 없앴다. 노선도 홈에서 결과 화면에 이르는
 /// 정당한 흐름은 "역 탭 팝오버로 출발·도착 지정 → 자동 결과"뿐이다. 이 헬퍼는 기본
 /// 노선도(상록수/사당)에서 그 흐름을 그대로 태워 결과 탭까지 데려간다.
@@ -2137,6 +2149,47 @@ void main() {
       find.byKey(const Key('networkMapDraftPin-waypoint')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('#2109 팬 메뉴에서 출발 설정한 역을 재탭 → 같은 섹터 재탭하면 출발이 해제된다', (
+    tester,
+  ) async {
+    final routeDraftController = RouteDraftController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(),
+          routeDraftController: routeDraftController,
+          onOpenStationSearch: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 역 탭 → 팬 메뉴 → "출발" 선택 → draft.origin 설정 + 메뉴 닫힘.
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+    await _tapFanMenuSector(tester, _fanOriginLabel);
+    await tester.pumpAndSettle();
+
+    expect(routeDraftController.draft.origin?.nameKo, '상록수');
+    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+
+    // 같은 역을 다시 탭 → 팬 메뉴가 다시 뜬다(출발 섹터는 selected 상태).
+    // 주의: 이 시점엔 출발 draft pin이 역 노드 바로 위에 겹쳐 그려져 있어
+    // 좌표 tap(tester.tap)이 draft pin의 Material에 가로채인다. 접근성
+    // Semantics onTap 경로(_tapStationByLabel)로 직접 활성화한다.
+    await _tapStationByLabel(tester, '상록수역');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+
+    // 이미 배정된 출발 섹터를 재탭 → 해제(clear)되고 set은 일어나지 않는다.
+    await _tapFanMenuSector(tester, _fanOriginLabel);
+    await tester.pumpAndSettle();
+
+    expect(routeDraftController.draft.origin, isNull);
   });
 
   testWidgets('상단 오버레이 출발칸 검색 선택은 지도 탭과 같은 draft로 수렴한다(G4)', (tester) async {

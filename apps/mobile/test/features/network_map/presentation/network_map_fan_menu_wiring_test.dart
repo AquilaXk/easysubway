@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 // @visibleForTesting으로 노출).
 
 import 'package:easysubway_mobile/network_map.dart'
-    show fanMenuSelectedSlots, fanMenuDisabledSlots;
+    show fanMenuSelectedSlots, fanMenuDisabledSlots, fanMenuShouldClear;
 
 void main() {
   test('selectedSlots: 선택 역 id가 배정된 슬롯만 포함', () {
@@ -65,11 +65,20 @@ void main() {
     expect(disabled, {RouteDraftSlot.origin, RouteDraftSlot.destination});
   });
 
-  group('재탭 clear 분기 (network_map.dart _NetworkMapCanvas onAction 배선 재현)', () {
+  test('shouldClear: 이미 배정된 슬롯은 true(해제), 아니면 false(신규 배정)', () {
+    const selected = {RouteDraftSlot.origin};
+    expect(fanMenuShouldClear(RouteDraftSlot.origin, selected), isTrue);
+    expect(fanMenuShouldClear(RouteDraftSlot.waypoint, selected), isFalse);
+    expect(fanMenuShouldClear(RouteDraftSlot.destination, selected), isFalse);
+  });
+
+  group('재탭 clear 분기 (network_map.dart _NetworkMapCanvas onAction 실배선)', () {
     // network_map.dart의 실제 onAction 클로저(3507행 부근)는
-    //   selectedSlots.contains(slot) ? clear : set
+    //   fanMenuShouldClear(slot, selectedSlots) ? clear : set
     // 로 분기한다. _NetworkMapCanvas는 private이라 직접 pump할 수 없으므로,
-    // 동일 분기 로직을 이 헬퍼로 재현해 콜백 배선 회귀를 잡는다.
+    // 배선 로직을 사본으로 재현하는 대신 network_map.dart가 실제로 노출하는
+    // @visibleForTesting 순수 함수 fanMenuShouldClear를 그대로 호출해
+    // 콜백 배선 회귀를 잡는다(로직 사본 없음).
     Future<void> pumpWithWiring(
       WidgetTester tester, {
       required Set<RouteDraftSlot> selectedSlots,
@@ -85,7 +94,7 @@ void main() {
                 selectedSlots: selectedSlots,
                 disabledSlots: const {},
                 onAction: (slot) {
-                  if (selectedSlots.contains(slot)) {
+                  if (fanMenuShouldClear(slot, selectedSlots)) {
                     onClear(slot);
                   } else {
                     onSet(slot);

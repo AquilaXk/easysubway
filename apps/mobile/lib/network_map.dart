@@ -3505,7 +3505,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                           destinationStationId: widget.destinationStationId,
                         ),
                         onAction: (slot) {
-                          if (selectedSlots.contains(slot)) {
+                          if (fanMenuShouldClear(slot, selectedSlots)) {
                             // 재탭 → 해당 슬롯 해제.
                             switch (slot) {
                               case RouteDraftSlot.origin:
@@ -5433,6 +5433,17 @@ Set<RouteDraftSlot> fanMenuSelectedSlots({
     if (stationId == waypointStationId) RouteDraftSlot.waypoint,
     if (stationId == destinationStationId) RouteDraftSlot.destination,
   };
+}
+
+/// 팬 메뉴 배선용: 탭한 섹터의 슬롯을 재탭(해제)할지 신규 배정할지 판정.
+/// 탭한 역이 이미 그 슬롯에 배정돼 있으면([selectedSlots]에 포함) 재탭으로
+/// 간주해 true(해제)를, 아니면 false(신규 배정)를 반환한다.
+@visibleForTesting
+bool fanMenuShouldClear(
+  RouteDraftSlot slot,
+  Set<RouteDraftSlot> selectedSlots,
+) {
+  return selectedSlots.contains(slot);
 }
 
 /// 팬 메뉴 배선용: 같은 역이 다른 슬롯에 이미 있어 dim할 슬롯 집합.
