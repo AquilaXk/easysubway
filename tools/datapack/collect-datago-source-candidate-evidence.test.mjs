@@ -82,6 +82,21 @@ test("Data.go.kr evidence collector는 catalog 4개 allowlist와 tracked endpoin
     }],
   }, candidate.id));
 
+  for (const field of ["sampleUrl", "endpoint"]) {
+    const evidence = { ...candidate.evidence };
+    delete evidence[field];
+    assert.throws(
+      () => resolveDatagoCandidateRequest({ candidates: [{ ...candidate, evidence }] }, candidate.id),
+      /endpoint not yet confirmed/,
+    );
+  }
+  const candidateWithoutRequestUrl = { ...candidate };
+  delete candidateWithoutRequestUrl.requestUrl;
+  assert.throws(
+    () => resolveDatagoCandidateRequest({ candidates: [candidateWithoutRequestUrl] }, candidate.id),
+    /endpoint not yet confirmed/,
+  );
+
   assert.throws(
     () => resolveDatagoCandidateRequest({ candidates: [candidate] }, "kric-subway-timetable"),
     /candidate is not allowed/,

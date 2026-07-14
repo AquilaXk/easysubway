@@ -66,6 +66,7 @@ async function fetchWithRetry(url, fetchImpl, sleepImpl) {
       await sleepImpl(500);
     } catch (error) {
       if (attempt === 1) throw new Error("Seoul open data API transport failure", { cause: error });
+      await sleepImpl(500);
     }
   }
   throw new Error("Seoul open data API transport failure");

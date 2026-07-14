@@ -47,6 +47,52 @@ test("서울시 path-key API probe는 retryable 응답 뒤 bounded backoff를 �
   assert.equal(evidence.rowCount, 1);
 });
 
+test("서울시 path-key API probe는 HTTP와 schema 및 transport 오류를 fail closed한다", async (t) => {
+  const base = { sourceId: "seoul-topis-realtime-station-arrival", serviceKey: "key" };
+
+  await t.test("HTTP failure", async () => {
+    await assert.rejects(probeSeoulOpenDataApi({
+      ...base,
+      fetchImpl: async () => new Response("", { status: 404 }),
+    }), /Seoul open data API HTTP 404/);
+  });
+
+  await t.test("content-type mismatch", async () => {
+    await assert.rejects(probeSeoulOpenDataApi({
+      ...base,
+      fetchImpl: async () => new Response("not json", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      }),
+    }), /schema mismatch: content-type text\/plain/);
+  });
+
+  await t.test("required row field missing", async () => {
+    await assert.rejects(probeSeoulOpenDataApi({
+      ...base,
+      fetchImpl: async () => new Response(JSON.stringify({
+        errorMessage: { status: 200, code: "INFO-000" },
+        realtimeArrivalList: [{ statnId: "1004000432" }],
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    }), /schema mismatch: item\[0\] fields missing=statnNm/);
+  });
+
+  await t.test("transport failure after bounded retry", async () => {
+    const delays = [];
+    let attempts = 0;
+    await assert.rejects(probeSeoulOpenDataApi({
+      ...base,
+      sleepImpl: async (milliseconds) => delays.push(milliseconds),
+      fetchImpl: async () => {
+        attempts += 1;
+        throw new Error("network details must stay in cause");
+      },
+    }), /Seoul open data API transport failure/);
+    assert.equal(attempts, 2);
+    assert.deepEqual(delays, [500]);
+  });
+});
+
 test("서울시 path-key API probe는 Sheet envelope와 provider/schema 오류를 fail closed한다", async (t) => {
   let requestedUrl;
   const sheet = await probeSeoulOpenDataApi({
