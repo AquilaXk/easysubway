@@ -45,32 +45,34 @@ public class TimetableSeedLoader implements ApplicationRunner {
 	private final DataSource dataSource;
 	private final TransactionTemplate transactionTemplate;
 	private final Resource seedResource;
+	private final boolean includesItxSeed;
 
 	public TimetableSeedLoader(
 		LoadRouteTimetablePort routeTimetablePort,
 		DataSource dataSource,
 		PlatformTransactionManager transactionManager,
-		@Value("${easysubway.timetable.seed.resource:classpath:timetable/line4-timetable-seed.sql.gz}") Resource seedResource
+		@Value("${easysubway.timetable.seed.resource:classpath:timetable/line4-timetable-seed.sql.gz}") Resource seedResource,
+		@Value("${easysubway.timetable.seed.includes-itx:false}") boolean includesItxSeed
 	) {
 		this.routeTimetablePort = routeTimetablePort;
 		this.dataSource = dataSource;
 		this.transactionTemplate = new TransactionTemplate(transactionManager);
 		this.seedResource = seedResource;
+		this.includesItxSeed = includesItxSeed;
 	}
 
 	@Override
 	public void run(ApplicationArguments args) {
-		List<String> statements = readStatements(seedResource);
-		boolean includesItx = statements.stream().anyMatch(TimetableSeedLoader::isItxTripInsert);
 		if (routeTimetablePort.hasRouteTimetable()) {
 			boolean existingItx = validateRouteServiceAdmission();
-			if (includesItx && !existingItx) {
+			if (includesItxSeed && !existingItx) {
 				throw new IllegalStateException(
 					"additive ITX timetable seed is not supported while another timetable is present");
 			}
 			log.info("transit timetable already present; skipping seed load");
 			return;
 		}
+		List<String> statements = readStatements(seedResource);
 		try {
 			transactionTemplate.executeWithoutResult(status -> {
 				executeBatch(statements);
@@ -80,19 +82,13 @@ public class TimetableSeedLoader implements ApplicationRunner {
 			// 다중 replica 동시 배포 경쟁: 다른 인스턴스가 먼저 적재하면 이 배치는 PK/싱글턴 충돌로 실패한다.
 			// 실패 후 이미 적재됐으면(경쟁 loser) 관용 처리한다(부팅 crash loop 방지). 아니면 실제 오류로 재던진다.
 			if (routeTimetablePort.hasRouteTimetable()
-					&& (!includesItx || validateRouteServiceAdmission())) {
+					&& (!includesItxSeed || validateRouteServiceAdmission())) {
 				log.info("transit timetable was seeded concurrently by another instance; batch failure is benign");
 				return;
 			}
 			throw exception;
 		}
 		log.info("transit timetable seeded from {} ({} statements)", seedResource, statements.size());
-	}
-
-	private static boolean isItxTripInsert(String statement) {
-		return statement.startsWith("INSERT INTO transit_trips ")
-			&& statement.contains("service_class")
-			&& statement.contains("'ITX_CHEONGCHUN'");
 	}
 
 	private boolean validateRouteServiceAdmission() {

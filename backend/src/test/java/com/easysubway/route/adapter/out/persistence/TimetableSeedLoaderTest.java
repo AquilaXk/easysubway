@@ -3,6 +3,8 @@ package com.easysubway.route.adapter.out.persistence;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.OffsetDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,11 +32,16 @@ class TimetableSeedLoaderTest {
 	}
 
 	private TimetableSeedLoader loader(Resource seed) {
+		return loader(seed, false);
+	}
+
+	private TimetableSeedLoader loader(Resource seed, boolean includesItx) {
 		return new TimetableSeedLoader(
 			new JdbcRouteTimetableRepository(dataSource),
 			dataSource,
 			new DataSourceTransactionManager(dataSource),
-			seed);
+			seed,
+			includesItx);
 	}
 
 	@Test
@@ -77,7 +84,7 @@ class TimetableSeedLoaderTest {
 			}
 		};
 		var loser = new TimetableSeedLoader(
-			racingPort, dataSource, new DataSourceTransactionManager(dataSource), seed);
+			racingPort, dataSource, new DataSourceTransactionManager(dataSource), seed, false);
 		loser.run(null); // 예외 없이 반환해야 한다.
 
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_stop_times", Integer.class)).isEqualTo(2);
@@ -135,12 +142,12 @@ class TimetableSeedLoaderTest {
 
 	@Test
 	void rejectsExpiredExistingItxIdentityOnRestart() {
-		loader(itxSeed("ADMITTED", true, OffsetDateTime.now().plusDays(1).toString())).run(null);
+		loader(itxSeed("ADMITTED", true, OffsetDateTime.now().plusDays(1).toString()), true).run(null);
 		jdbc.update(
 			"UPDATE route_service_artifact_evidence SET fresh_until = '2000-01-01T00:00:00.000Z' WHERE service_class = 'ITX_CHEONGCHUN'");
 
 		assertThatThrownBy(() -> loader(itxSeed(
-			"ADMITTED", true, OffsetDateTime.now().plusDays(1).toString())).run(null))
+			"ADMITTED", true, OffsetDateTime.now().plusDays(1).toString()), true).run(null))
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("valid freshness");
 	}
@@ -150,7 +157,7 @@ class TimetableSeedLoaderTest {
 		loader(new ClassPathResource("timetable/test-line4-seed.sql")).run(null);
 
 		assertThatThrownBy(() -> loader(itxSeed(
-			"ADMITTED", true, OffsetDateTime.now().plusDays(1).toString())).run(null))
+			"ADMITTED", true, OffsetDateTime.now().plusDays(1).toString()), true).run(null))
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessageContaining("additive ITX timetable seed is not supported");
 		assertThat(jdbc.queryForObject(
@@ -165,6 +172,21 @@ class TimetableSeedLoaderTest {
 
 		assertThat(jdbc.queryForObject(
 			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'", Integer.class)).isZero();
+	}
+
+	@Test
+	void skipsUnavailableExternalSeedResourceWhenTimetableAlreadyExists() {
+		loader(new ClassPathResource("timetable/test-line4-seed.sql")).run(null);
+		var unavailable = new ByteArrayResource(new byte[0]) {
+			@Override
+			public InputStream getInputStream() throws IOException {
+				throw new IOException("external seed mount unavailable");
+			}
+		};
+
+		loader(unavailable).run(null);
+
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_stop_times", Integer.class)).isEqualTo(2);
 	}
 
 	private Resource itxSeed(String admissionStatus, boolean admissionEligible, String freshUntil) {
