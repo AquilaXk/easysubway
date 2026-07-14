@@ -436,12 +436,48 @@ test("Korail station row의 시각이 비면 sequence evidence만 보존하고 t
       reasonCode: "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY",
       checkedStopCount: 7,
       populatedTimestampStopCount: 6,
+      requiredTimestampFieldCount: 10,
+      populatedTimestampFieldCount: 8,
     },
   });
   assert.equal(artifact.stationSequences.length, 2);
   assert.equal(artifact.stationSequences[0].stops.length, 4);
   assert.deepEqual(artifact.transitTrips, []);
   assert.deepEqual(artifact.transitStopTimes, []);
+});
+
+test("Korail station row의 필수 시각이 부분적으로 있으면 전체 필드 empty로 분류하지 않는다", async () => {
+  const { plans, info } = fixtureRows();
+  const lastSequenceByTrain = new Map([["02001", 4], ["02002", 3]]);
+  const partialTimes = info.map((row) => ({
+    ...row,
+    trn_dptre_dt: row.trn_run_sn < lastSequenceByTrain.get(row.trn_no) ? "" : row.trn_dptre_dt,
+    trn_arvl_dt: row.trn_run_sn === lastSequenceByTrain.get(row.trn_no) ? "" : row.trn_arvl_dt,
+  }));
+  const artifact = await collectKorailItxCheongchunTimetable({
+    serviceKey: "key",
+    runDate: "20260713",
+    kricServiceDayCode: "8",
+    packPath: PACK_PATH,
+    trainNumberEvidence: trainNumberEvidence(),
+    fetchImpl: async (url) => {
+      if (url.pathname.endsWith("codes2")) {
+        return url.searchParams.get("cond[type::EQ]") === "mrnt_cd"
+          ? apiResponse([{ code: "GJ", type: "mrnt_cd", value: "경춘선" }])
+          : apiResponse([{ code: "11", type: "stop_se_cd", value: "여객승하차" }]);
+      }
+      return apiResponse(url.pathname.endsWith("travelerTrainRunPlan2") ? plans : partialTimes);
+    },
+  });
+
+  assert.deepEqual(artifact.materialization.stationTimeCapability, {
+    status: "MISSING",
+    reasonCode: "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY",
+    checkedStopCount: 7,
+    populatedTimestampStopCount: 0,
+    requiredTimestampFieldCount: 10,
+    populatedTimestampFieldCount: 3,
+  });
 });
 
 test("Korail collector는 legacy 대전 row를 canonical mapping 전에 count와 함께 거부한다", async () => {
@@ -492,6 +528,8 @@ test(
       reasonCode: "OFFICIAL_OPERATION_FIELDS_EMPTY",
       checkedStopCount: 113,
       populatedTimestampStopCount: 0,
+      requiredTimestampFieldCount: 190,
+      populatedTimestampFieldCount: 0,
       verifiedAt: "2026-07-14T06:36:22.122Z",
       travelerTrainRunInfo2RawResponseSha256: "ff64cf6683de1fbc089dde751af198b4745bbd71260b3867cef69f615bafce4c",
     });
@@ -680,6 +718,16 @@ test("Korail ITX materialization은 누락·중복·역순·시각 역전을 거
       ...base,
       kricServiceDayCode: "6",
     }), /kricServiceDayCode must be 7, 8, or 9/);
+  });
+
+  await context.test("U/D가 아닌 방향 code", () => {
+    const invalidDirection = info.map((row) => row.trn_no === "02001"
+      ? { ...row, uppln_dn_se_cd: null }
+      : row);
+    assert.throws(() => materializeKorailItxRows({
+      ...base,
+      infoRows: invalidDirection,
+    }), /direction code/);
   });
 
   await context.test("canonical mapping이 없는 여객 정차", () => {

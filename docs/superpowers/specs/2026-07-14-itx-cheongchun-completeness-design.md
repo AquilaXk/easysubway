@@ -60,7 +60,7 @@ KORAIL catalog상 `travelerTrainRunInfo2`의 조회 범위는 전일까지다. �
 - 날짜별 canonical 역 수, roster 탐색 역 수, 제외된 canonical 역과 사유
 - 날짜별 `expectedOdCount`, `completedOdCount`, `failedOdCount`, `stationSetHash`, 정렬된 `odMatrixHash`
 - 날짜별 roster/train plan/train info/materialized train-number 집합과 불일치 집합
-- 날짜별 방향 집합, 시발·종착 조합, trip 수, 정차 row 수, 시각 누락 수
+- 날짜별 방향 집합, 시발·종착 조합, trip 수, 정차 row 수, 시각 누락 stop 수, 필수·실제 시각 field 수
 - 날짜별 completeness 상태와 실패 reason code
 - 전체 `materialization.status`
 - `allowedConsumerIssues`: `["#1400", "#2098", "#2099"]`

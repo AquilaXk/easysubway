@@ -104,12 +104,19 @@ export async function collectTagoItxCheongchunRoster({
         depPlandTime: serviceDate,
         trainGradeCode: grade.vehiclekndid,
       }, key, fetchImpl);
+      const departureStation = stationByProviderId.get(depStationId);
+      const arrivalStation = stationByProviderId.get(arrStationId);
+      const normalizedItineraries = operation.rows.map((row, index) => ({
+        ...normalizeItinerary(row, index, {
+          serviceDate,
+          departureStationName: departureStation.providerStationName,
+          arrivalStationName: arrivalStation.providerStationName,
+        }),
+        departureStationId: departureStation.canonicalStationId,
+        arrivalStationId: arrivalStation.canonicalStationId,
+      }));
       odOperations.push(operation);
-      itineraries.push(...operation.rows.map((row, index) => ({
-        ...normalizeItinerary(row, index),
-        departureStationId: stationByProviderId.get(depStationId).canonicalStationId,
-        arrivalStationId: stationByProviderId.get(arrStationId).canonicalStationId,
-      })));
+      itineraries.push(...normalizedItineraries);
     } catch {
       failedOds.push({
         departureStationId: depStationId,
@@ -276,18 +283,27 @@ function stationMapping(row, name) {
   return { providerStationId: row.nodeid, providerStationName: row.nodename, canonicalStationId: CANONICAL_STATIONS[name] };
 }
 
-function normalizeItinerary(row, index) {
+function normalizeItinerary(row, index, expected = {}) {
   if (normalize(row.traingradename) !== "itx청춘") throw new Error(`TAGO OD row[${index}] train grade mismatch`);
   const departureAt = providerTimestamp(row.depplandtime, `row[${index}].depplandtime`);
   const arrivalAt = providerTimestamp(row.arrplandtime, `row[${index}].arrplandtime`);
   if (arrivalAt.epoch <= departureAt.epoch) throw new Error(`TAGO OD row[${index}] arrival must follow departure`);
+  const departureStationName = requiredString(row.depplacename, `row[${index}].depplacename`);
+  const arrivalStationName = requiredString(row.arrplacename, `row[${index}].arrplacename`);
+  if (expected.serviceDate && String(row.depplandtime).slice(0, 8) !== expected.serviceDate) {
+    throw new Error(`TAGO OD row[${index}] departure date mismatch`);
+  }
+  if ((expected.departureStationName && normalize(departureStationName) !== normalize(expected.departureStationName))
+    || (expected.arrivalStationName && normalize(arrivalStationName) !== normalize(expected.arrivalStationName))) {
+    throw new Error(`TAGO OD row[${index}] station mismatch`);
+  }
   const fare = Number(row.adultcharge);
   if (!Number.isInteger(fare) || fare < 0) throw new Error(`TAGO OD row[${index}] adultcharge is invalid`);
   return {
     trainNumber: requiredString(String(row.trainno), `row[${index}].trainno`),
     trainType: "ITX_CHEONGCHUN",
-    departureStationName: requiredString(row.depplacename, `row[${index}].depplacename`),
-    arrivalStationName: requiredString(row.arrplacename, `row[${index}].arrplacename`),
+    departureStationName,
+    arrivalStationName,
     departureAt: departureAt.iso,
     arrivalAt: arrivalAt.iso,
     adultFareWon: fare,

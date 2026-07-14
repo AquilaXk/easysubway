@@ -229,9 +229,9 @@ export async function collectKorailItxCheongchunTimetable({
   let stationTimeCapabilityStatus = "SUPPORTED";
   let stationTimeCapabilityReasonCode = "OFFICIAL_OPERATION_FIELDS_POPULATED";
   if (analyzed.missingTimestampStopCount > 0) {
-    stationTimeCapabilityStatus = populatedTimestampStopCount === 0
+    stationTimeCapabilityStatus = analyzed.populatedTimestampFieldCount === 0
       ? "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE" : "MISSING";
-    stationTimeCapabilityReasonCode = populatedTimestampStopCount === 0
+    stationTimeCapabilityReasonCode = analyzed.populatedTimestampFieldCount === 0
       ? "OFFICIAL_OPERATION_FIELDS_EMPTY" : "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY";
   }
 
@@ -278,6 +278,8 @@ export async function collectKorailItxCheongchunTimetable({
         reasonCode: stationTimeCapabilityReasonCode,
         checkedStopCount,
         populatedTimestampStopCount,
+        requiredTimestampFieldCount: analyzed.requiredTimestampFieldCount,
+        populatedTimestampFieldCount: analyzed.populatedTimestampFieldCount,
       },
     },
     operations: [
@@ -355,6 +357,8 @@ export function analyzeKorailItxRows({
       )),
       stationSequences: sequenceAnalysis.stationSequences,
       missingTimestampStopCount: sequenceAnalysis.missingTimestampStopCount,
+      requiredTimestampFieldCount: sequenceAnalysis.requiredTimestampFieldCount,
+      populatedTimestampFieldCount: sequenceAnalysis.populatedTimestampFieldCount,
     };
   } finally {
     canonical.close();
@@ -385,15 +389,19 @@ function analyzeStationSequences({ grouped, canonical, passengerStopCodes, planB
   const stationMappings = new Map();
   const stationSequences = [];
   let missingTimestampStopCount = 0;
+  let requiredTimestampFieldCount = 0;
+  let populatedTimestampFieldCount = 0;
   for (const [trainNumber, trainRows] of [...grouped.entries()].sort(([left], [right]) => naturalCompare(left, right))) {
     const ordered = orderedTrainRows(trainRows, trainNumber);
-    const directionCodes = new Set(ordered.map(({ row }) => requiredString(String(row.uppln_dn_se_cd), "uppln_dn_se_cd")));
+    const directionCodes = new Set(ordered.map(({ row }) => korailDirectionCode(row.uppln_dn_se_cd, trainNumber)));
     if (directionCodes.size !== 1) throw new Error(`Korail ITX direction mismatch: ${safeToken(trainNumber)}`);
     const selected = selectPassengerStops({ ordered, canonical, passengerStopCodes, stationMappings, trainNumber });
     const stops = assignCanonicalLineIds(selected.stops, trainNumber);
     const plan = planByTrain.get(trainNumber);
     validateCanonicalTrip(stops, ordered, trainNumber, plan, runDate);
     missingTimestampStopCount += selected.missingTimestampStopCount;
+    requiredTimestampFieldCount += selected.requiredTimestampFieldCount;
+    populatedTimestampFieldCount += selected.populatedTimestampFieldCount;
     stationSequences.push({
       trainNumber,
       directionCode: [...directionCodes][0],
@@ -402,7 +410,13 @@ function analyzeStationSequences({ grouped, canonical, passengerStopCodes, planB
       stops,
     });
   }
-  return { stationMappings, stationSequences, missingTimestampStopCount };
+  return {
+    stationMappings,
+    stationSequences,
+    missingTimestampStopCount,
+    requiredTimestampFieldCount,
+    populatedTimestampFieldCount,
+  };
 }
 
 function orderedTrainRows(trainRows, trainNumber) {
@@ -418,6 +432,8 @@ function orderedTrainRows(trainRows, trainNumber) {
 function selectPassengerStops({ ordered, canonical, passengerStopCodes, stationMappings, trainNumber }) {
   const stops = [];
   let missingTimestampStopCount = 0;
+  let requiredTimestampFieldCount = 0;
+  let populatedTimestampFieldCount = 0;
   const passengerRows = ordered.flatMap(({ row, sequence }, index) => {
     const stopCode = String(row.stop_se_cd);
     const expectedStopName = passengerStopCodes.get(stopCode);
@@ -433,6 +449,14 @@ function selectPassengerStops({ ordered, canonical, passengerStopCodes, stationM
     if (!station) throw new Error(`Korail ITX passenger stop canonical mapping missing: ${safeToken(trainNumber)}/${safeLabel(row.stn_nm)}`);
     const arrivalTimestamp = validProviderTimestamp(row.trn_arvl_dt);
     const departureTimestamp = validProviderTimestamp(row.trn_dptre_dt);
+    if (index > 0) {
+      requiredTimestampFieldCount += 1;
+      if (arrivalTimestamp !== null) populatedTimestampFieldCount += 1;
+    }
+    if (index < passengerRows.length - 1) {
+      requiredTimestampFieldCount += 1;
+      if (departureTimestamp !== null) populatedTimestampFieldCount += 1;
+    }
     if ((index > 0 && arrivalTimestamp === null)
       || (index < passengerRows.length - 1 && departureTimestamp === null)) missingTimestampStopCount += 1;
     stationMappings.set(`${row.stn_cd}|${station.stationId}`, {
@@ -454,7 +478,7 @@ function selectPassengerStops({ ordered, canonical, passengerStopCodes, stationM
       departureTimestamp,
     });
   }
-  return { stops, missingTimestampStopCount };
+  return { stops, missingTimestampStopCount, requiredTimestampFieldCount, populatedTimestampFieldCount };
 }
 
 function assignCanonicalLineIds(stops, trainNumber) {
@@ -941,6 +965,13 @@ function positiveInteger(value, label) {
   const number = Number(value);
   if (!Number.isInteger(number) || number <= 0) throw new Error(`${label} must be a positive integer`);
   return number;
+}
+
+function korailDirectionCode(value, trainNumber) {
+  if (value !== "U" && value !== "D") {
+    throw new Error(`Korail ITX direction code must be U or D: ${safeToken(trainNumber)}`);
+  }
+  return value;
 }
 
 function decodedServiceKey(value) {

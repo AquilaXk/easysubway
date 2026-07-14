@@ -196,6 +196,52 @@ test("TAGO ITX roster는 공식 totalCount가 없는 OD 응답을 완료로 세�
   assert.deepEqual(artifact.trainNumbers, ["2001"]);
 });
 
+test("TAGO ITX roster는 요청과 다른 OD·날짜 응답을 완료로 세지 않는다", async (context) => {
+  for (const scenario of [
+    {
+      name: "요청과 다른 역",
+      mutate: (payload) => {
+        payload.response.body.items.item[0].depplacename = "청량리";
+      },
+    },
+    {
+      name: "요청과 다른 날짜",
+      mutate: (payload) => {
+        payload.response.body.items.item[0].depplandtime = "20260714083000";
+        payload.response.body.items.item[0].arrplandtime = "20260714095000";
+      },
+    },
+  ]) {
+    await context.test(scenario.name, async () => {
+      const fallback = validFetch();
+      const artifact = await collectTagoItxCheongchunRoster({
+        serviceKey: "key",
+        serviceDate: "20260715",
+        kricServiceDayCode: "8",
+        canonicalStations: [
+          { canonicalStationId: "station-a", nameKo: "청량리" },
+          { canonicalStationId: "station-b", nameKo: "춘천" },
+        ],
+        fetchImpl: async (url) => {
+          const parsed = new URL(url);
+          const response = await fallback(url);
+          if (!parsed.pathname.endsWith("GetStrtpntAlocFndTrainInfo")
+            || parsed.searchParams.get("depPlaceId") !== "NAT140873") return response;
+          const payload = await response.json();
+          scenario.mutate(payload);
+          return new Response(JSON.stringify(payload), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        },
+      });
+
+      assert.equal(artifact.completedOdCount, 1);
+      assert.equal(artifact.failedOdCount, 1);
+    });
+  }
+});
+
 test("TAGO roster matrix는 provider station catalog와 canonical 경춘선의 교집합을 증명한다", async () => {
   const artifact = await collectTagoItxCheongchunRoster({
     serviceKey: "key",
@@ -303,10 +349,18 @@ function validFetch({ duplicateOd = false, reverseTime = false } = {}) {
         ? tagoResponse([{ nodeid: "NAT130126", nodename: "청량리" }])
         : tagoResponse([{ nodeid: "NAT140873", nodename: "춘천" }]);
     }
+    const reverse = parsed.searchParams.get("depPlaceId") === "NAT140873";
+    const serviceDate = parsed.searchParams.get("depPlandTime") ?? "20260714";
     const row = {
-      trainno: "2001", traingradename: "ITX-청춘", depplandtime: "20260714083000",
-      arrplandtime: reverseTime ? "20260714082000" : "20260714095000",
-      depplacename: "청량리", arrplacename: "춘천", adultcharge: "9800",
+      trainno: reverse ? "2002" : "2001",
+      traingradename: "ITX-청춘",
+      depplandtime: `${serviceDate}${reverse ? "103000" : "083000"}`,
+      arrplandtime: reverseTime
+        ? `${serviceDate}082000`
+        : `${serviceDate}${reverse ? "115000" : "095000"}`,
+      depplacename: reverse ? "춘천" : "청량리",
+      arrplacename: reverse ? "청량리" : "춘천",
+      adultcharge: "9800",
     };
     return tagoResponse(duplicateOd ? [row, row] : [row]);
   };
