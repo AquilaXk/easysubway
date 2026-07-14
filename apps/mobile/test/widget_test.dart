@@ -68,10 +68,7 @@ OnboardingState _completedOnboardingStateWithPreferences({
   MobilityPreset preset = MobilityPreset.slow,
 }) {
   return OnboardingState.completed(
-    result: OnboardingResult(
-      preset: preset,
-      preferences: preferences,
-    ),
+    result: OnboardingResult(preset: preset, preferences: preferences),
   );
 }
 
@@ -137,6 +134,53 @@ Future<void> _openFavoriteList(
   );
   await tester.pumpAndSettle();
   // 즐겨찾기 홈은 단일 리스트라 카테고리 진입 탭이 없다. 항목이 바로 보인다(#1569).
+}
+
+Future<void> _pumpStationDetailForTest(
+  WidgetTester tester, {
+  required StationSearchRepository repository,
+  required FacilityReportRepository reportRepository,
+  String stationId = 'station-sangnoksu',
+  FavoriteStationRepository? favoriteRepository,
+  AdRepository? adRepository,
+  RealtimeRepository? realtimeRepository,
+  CurrentLocationProvider? locationProvider,
+  bool? initiallyFavorite,
+  FacilityReportDraftTargetStore? facilityReportDraftTargetStore,
+  InternalRouteRepository? internalRouteRepository,
+  InternalRouteRequest? internalRouteRequest,
+  String internalRouteMobilityType = 'SENIOR',
+  RouteDraftController? routeDraftController,
+  KakaoMapLauncher mapLauncher = const UrlLauncherKakaoMapLauncher(),
+  bool settle = true,
+}) async {
+  await tester.pumpWidget(
+    MaterialApp(
+      home: StationDetailScreen(
+        repository: repository,
+        reportRepository: reportRepository,
+        stationId: stationId,
+        favoriteRepository: favoriteRepository,
+        adRepository: adRepository,
+        realtimeRepository: realtimeRepository,
+        locationProvider: locationProvider,
+        initiallyFavorite: initiallyFavorite,
+        facilityReportDraftTargetStore: facilityReportDraftTargetStore,
+        internalRouteRepository: internalRouteRepository,
+        internalRouteRequest: internalRouteRequest,
+        internalRouteMobilityType: internalRouteMobilityType,
+        routeDraftController: routeDraftController,
+        mapLauncher: mapLauncher,
+      ),
+    ),
+  );
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pump();
+  }
 }
 
 // #2109: 노선도 역 액션 메뉴가 다크 텍스트 팝오버에서 부채꼴(방사형) 팬 메뉴로
@@ -650,7 +694,9 @@ void main() {
         routeRepository: routeRepository,
         favoriteRepository: FakeFavoriteStationRepository(),
         notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.stepFree),
+        initialOnboardingState: _completedOnboardingState(
+          preset: MobilityPreset.stepFree,
+        ),
       ),
     );
 
@@ -1126,10 +1172,7 @@ void main() {
           matching: find.byType(SizedBox),
         )
         .first;
-    expect(
-      tester.getSize(inputTapTarget).height,
-      greaterThanOrEqualTo(48.0),
-    );
+    expect(tester.getSize(inputTapTarget).height, greaterThanOrEqualTo(48.0));
 
     final clearButtonSize = tester.getSize(
       find.widgetWithIcon(IconButton, Icons.close),
@@ -1202,154 +1245,108 @@ void main() {
     expect(searchField.expands, isFalse);
   });
 
-  testWidgets(
-    '#2082 역 검색 화면은 필드 우측에 지역 표시를 두고 필드가 그 앞에서 끝난다',
-    (tester) async {
+  testWidgets('#2082 역 검색 화면은 필드 우측에 지역 표시를 두고 필드가 그 앞에서 끝난다', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          pickSlot: RouteDraftSlot.origin,
+          regionLabel: '수도권',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // #3: 홈과 동일하게 검색 화면 우측에 현재 지역명을 표시한다.
+    final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
+    expect(indicator, findsOneWidget);
+    expect(
+      find.descendant(of: indicator, matching: find.text('수도권')),
+      findsOneWidget,
+    );
+    // 표시 전용이라 지역 변경 화살표(아래 방향)를 홈과 같은 스타일로 둔다.
+    expect(
+      find.descendant(
+        of: indicator,
+        matching: find.byIcon(Icons.keyboard_arrow_down),
+      ),
+      findsOneWidget,
+    );
+
+    // #2: 검색 필드가 우측 끝까지 꽉 차지 않고 지역 표시 앞에서 끝난다
+    // (홈 idle [≡ | 필드 | 지역표시] 구성과 정합).
+    final fieldRight = tester
+        .getRect(find.byKey(const Key('heroStationSearchInputBox')))
+        .right;
+    final indicatorLeft = tester.getRect(indicator).left;
+    expect(fieldRight, lessThanOrEqualTo(indicatorLeft));
+
+    // ← 뒤로가기 버튼이 홈 ≡ 슬롯과 같은 위치(필드 왼쪽)에 남는다.
+    expect(find.byKey(const Key('stationSearchBackButton')), findsOneWidget);
+  });
+
+  testWidgets('#2090 수도권 외 지역(부산) 선택 상태에서 열어도 검색 화면 지역 표시가 실제 선택 지역을 따른다', (
+    tester,
+  ) async {
+    // 회귀 방지: 직전 구현은 regionLabel 기본값이 '수도권' 고정이고 호출부가
+    // 실제 선택 지역을 주입하지 않아, 부산 선택 상태에서 검색을 열어도
+    // '수도권'이 잘못 표시됐다. 이제 호출부(main.dart)가 NetworkMapScreen의
+    // 현재 선택 지역 표시명을 regionLabel로 넘기므로, 여기서는 그 배선의
+    // 최종 결과(regionLabel이 실제로 화면에 반영되는지)를 검증한다.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          pickSlot: RouteDraftSlot.origin,
+          regionLabel: '부산',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
+    expect(indicator, findsOneWidget);
+    expect(
+      find.descendant(of: indicator, matching: find.text('부산')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: indicator, matching: find.text('수도권')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('#2090 공용 검색 필드는 시스템 글자 배율에 비례해 입력 텍스트가 커지고 잘리지 않는다', (
+    tester,
+  ) async {
+    // #2090: 이전 구현은 안쪽 고정 높이(SizedBox 48) tight constraint 탓에
+    // textScaler 1.0/2.0/3.0에서 입력 텍스트 렌더 높이가 18px로 고정돼(WCAG
+    // 1.4.4 위반) 배율을 키워도 글자가 커지지 않았다. 배율별로 입력 텍스트
+    // 렌더 높이가 비례해 커지고 예외·잘림이 없음을 고정한다.
+    final measured = <double, double>{};
+    for (final scale in const [1.0, 2.0, 3.0]) {
+      final controller = TextEditingController();
+      addTearDown(controller.dispose);
       await tester.pumpWidget(
-        MaterialApp(
-          home: StationSearchScreen(
-            repository: FakeStationSearchRepository(),
-            reportRepository: FakeFacilityReportRepository(),
-            locationProvider: FakeCurrentLocationProvider(),
-            pickSlot: RouteDraftSlot.origin,
-            regionLabel: '수도권',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // #3: 홈과 동일하게 검색 화면 우측에 현재 지역명을 표시한다.
-      final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
-      expect(indicator, findsOneWidget);
-      expect(
-        find.descendant(of: indicator, matching: find.text('수도권')),
-        findsOneWidget,
-      );
-      // 표시 전용이라 지역 변경 화살표(아래 방향)를 홈과 같은 스타일로 둔다.
-      expect(
-        find.descendant(
-          of: indicator,
-          matching: find.byIcon(Icons.keyboard_arrow_down),
-        ),
-        findsOneWidget,
-      );
-
-      // #2: 검색 필드가 우측 끝까지 꽉 차지 않고 지역 표시 앞에서 끝난다
-      // (홈 idle [≡ | 필드 | 지역표시] 구성과 정합).
-      final fieldRight = tester
-          .getRect(find.byKey(const Key('heroStationSearchInputBox')))
-          .right;
-      final indicatorLeft = tester.getRect(indicator).left;
-      expect(fieldRight, lessThanOrEqualTo(indicatorLeft));
-
-      // ← 뒤로가기 버튼이 홈 ≡ 슬롯과 같은 위치(필드 왼쪽)에 남는다.
-      expect(find.byKey(const Key('stationSearchBackButton')), findsOneWidget);
-    },
-  );
-
-  testWidgets(
-    '#2090 수도권 외 지역(부산) 선택 상태에서 열어도 검색 화면 지역 표시가 실제 선택 지역을 따른다',
-    (tester) async {
-      // 회귀 방지: 직전 구현은 regionLabel 기본값이 '수도권' 고정이고 호출부가
-      // 실제 선택 지역을 주입하지 않아, 부산 선택 상태에서 검색을 열어도
-      // '수도권'이 잘못 표시됐다. 이제 호출부(main.dart)가 NetworkMapScreen의
-      // 현재 선택 지역 표시명을 regionLabel로 넘기므로, 여기서는 그 배선의
-      // 최종 결과(regionLabel이 실제로 화면에 반영되는지)를 검증한다.
-      await tester.pumpWidget(
-        MaterialApp(
-          home: StationSearchScreen(
-            repository: FakeStationSearchRepository(),
-            reportRepository: FakeFacilityReportRepository(),
-            locationProvider: FakeCurrentLocationProvider(),
-            pickSlot: RouteDraftSlot.origin,
-            regionLabel: '부산',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      final indicator = find.byKey(const Key('stationSearchRegionIndicator'));
-      expect(indicator, findsOneWidget);
-      expect(
-        find.descendant(of: indicator, matching: find.text('부산')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: indicator, matching: find.text('수도권')),
-        findsNothing,
-      );
-    },
-  );
-
-  testWidgets(
-    '#2090 공용 검색 필드는 시스템 글자 배율에 비례해 입력 텍스트가 커지고 잘리지 않는다',
-    (tester) async {
-      // #2090: 이전 구현은 안쪽 고정 높이(SizedBox 48) tight constraint 탓에
-      // textScaler 1.0/2.0/3.0에서 입력 텍스트 렌더 높이가 18px로 고정돼(WCAG
-      // 1.4.4 위반) 배율을 키워도 글자가 커지지 않았다. 배율별로 입력 텍스트
-      // 렌더 높이가 비례해 커지고 예외·잘림이 없음을 고정한다.
-      final measured = <double, double>{};
-      for (final scale in const [1.0, 2.0, 3.0]) {
-        final controller = TextEditingController();
-        addTearDown(controller.dispose);
-        await tester.pumpWidget(
-          MediaQuery(
-            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
-            child: MaterialApp(
-              home: Scaffold(
-                body: Center(
-                  child: SizedBox(
-                    width: 320,
-                    child: EasySubwaySearchField(
-                      controller: controller,
-                      hintText: '역 이름을 입력해 주세요',
-                    ),
+        MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+          child: MaterialApp(
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(
+                  width: 320,
+                  child: EasySubwaySearchField(
+                    controller: controller,
+                    hintText: '역 이름을 입력해 주세요',
                   ),
                 ),
               ),
             ),
           ),
-        );
-        await tester.pumpAndSettle();
-        await tester.enterText(
-          find.byKey(const Key('stationSearchInput')),
-          '상록수',
-        );
-        await tester.pumpAndSettle();
-
-        // 렌더 중 오버플로 등 예외가 없어야 한다(잘림 금지 우선).
-        expect(tester.takeException(), isNull, reason: 'scale $scale');
-
-        // 입력 텍스트 렌더 높이가 배율에 비례해 커진다(더 이상 18px 고정 아님).
-        final textHeight = tester.getSize(find.text('상록수')).height;
-        measured[scale] = textHeight;
-      }
-
-      // 배율이 커질수록 입력 텍스트 렌더 높이가 엄격히 증가한다.
-      expect(measured[2.0]!, greaterThan(measured[1.0]!));
-      expect(measured[3.0]!, greaterThan(measured[2.0]!));
-      // 배율에 대략 비례한다(2.0에서 최소 1.5배 이상 커짐 — 고정 18px 회귀 방지).
-      expect(measured[2.0]!, greaterThan(measured[1.0]! * 1.5));
-    },
-  );
-
-  testWidgets(
-    '#2090 배율 3.0에서 역 검색 화면 필드가 툴바 안에서 잘리지 않는다',
-    (tester) async {
-      // Finding 2: 툴바 높이 보정 상수가 새 필드 메트릭과 정합돼 큰 배율에서도
-      // 필드가 AppBar 세로 범위 안에 온전히 들어가야 한다.
-      await tester.pumpWidget(
-        MediaQuery(
-          data: const MediaQueryData(textScaler: TextScaler.linear(3.0)),
-          child: MaterialApp(
-            home: StationSearchScreen(
-              repository: FakeStationSearchRepository(),
-              reportRepository: FakeFacilityReportRepository(),
-              locationProvider: FakeCurrentLocationProvider(),
-              pickSlot: RouteDraftSlot.origin,
-              regionLabel: '수도권',
-            ),
-          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1359,34 +1356,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
+      // 렌더 중 오버플로 등 예외가 없어야 한다(잘림 금지 우선).
+      expect(tester.takeException(), isNull, reason: 'scale $scale');
 
-      final inputFinder = find.byKey(const Key('stationSearchInput'));
-      final appBarFinder = find.ancestor(
-        of: inputFinder,
-        matching: find.byType(AppBar),
-      );
-      final appBar = tester.widget<AppBar>(appBarFinder);
-      expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
+      // 입력 텍스트 렌더 높이가 배율에 비례해 커진다(더 이상 18px 고정 아님).
+      final textHeight = tester.getSize(find.text('상록수')).height;
+      measured[scale] = textHeight;
+    }
 
-      final appBarRect = tester.getRect(appBarFinder);
-      final boxRect = tester.getRect(
-        find.byKey(const Key('heroStationSearchInputBox')),
-      );
-      // 시각 박스가 툴바 세로 범위 안에 온전히 들어간다(위/아래로 잘리지 않음).
-      expect(boxRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
-      expect(boxRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
-    },
-  );
+    // 배율이 커질수록 입력 텍스트 렌더 높이가 엄격히 증가한다.
+    expect(measured[2.0]!, greaterThan(measured[1.0]!));
+    expect(measured[3.0]!, greaterThan(measured[2.0]!));
+    // 배율에 대략 비례한다(2.0에서 최소 1.5배 이상 커짐 — 고정 18px 회귀 방지).
+    expect(measured[2.0]!, greaterThan(measured[1.0]! * 1.5));
+  });
 
-  testWidgets(
-    '#2090 역 검색 필드는 입력 후에도 슬롯 맥락 semantics 라벨을 유지한다',
-    (tester) async {
-      // Finding 3: 이전 floating label이 유지하던 슬롯 맥락("출발역") 라벨이
-      // 입력 후에도 스크린리더 semantics 트리에 남아야 한다.
-      final handle = tester.ensureSemantics();
-      await tester.pumpWidget(
-        MaterialApp(
+  testWidgets('#2090 배율 3.0에서 역 검색 화면 필드가 툴바 안에서 잘리지 않는다', (tester) async {
+    // Finding 2: 툴바 높이 보정 상수가 새 필드 메트릭과 정합돼 큰 배율에서도
+    // 필드가 AppBar 세로 범위 안에 온전히 들어가야 한다.
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(3.0)),
+        child: MaterialApp(
           home: StationSearchScreen(
             repository: FakeStationSearchRepository(),
             reportRepository: FakeFacilityReportRepository(),
@@ -1395,55 +1386,84 @@ void main() {
             regionLabel: '수도권',
           ),
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
 
-      // 입력 전: 슬롯 맥락 라벨이 semantics 트리에 있다(hint 노드 + 라벨 래퍼
-      // 노드가 중첩돼 하나 이상 존재한다).
-      expect(find.bySemanticsLabel('출발역'), findsWidgets);
+    expect(tester.takeException(), isNull);
 
-      // 입력 후: hint는 InputDecorator가 지우지만 슬롯 맥락 라벨은 유지된다.
-      // 이전 floating label 없이도 맥락이 남아야 한다(#2090 Finding 3).
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      // 정확히 한 노드(라벨 래퍼)가 슬롯 맥락 라벨을 유지한다. 입력 필드 노드는
-      // 입력값(상록수)을 value로 갖고 라벨은 상위 래퍼 노드가 보존한다.
-      expect(find.bySemanticsLabel('출발역'), findsOneWidget);
+    final inputFinder = find.byKey(const Key('stationSearchInput'));
+    final appBarFinder = find.ancestor(
+      of: inputFinder,
+      matching: find.byType(AppBar),
+    );
+    final appBar = tester.widget<AppBar>(appBarFinder);
+    expect(appBar.toolbarHeight, greaterThan(kToolbarHeight));
 
-      handle.dispose();
-    },
-  );
+    final appBarRect = tester.getRect(appBarFinder);
+    final boxRect = tester.getRect(
+      find.byKey(const Key('heroStationSearchInputBox')),
+    );
+    // 시각 박스가 툴바 세로 범위 안에 온전히 들어간다(위/아래로 잘리지 않음).
+    expect(boxRect.bottom, lessThanOrEqualTo(appBarRect.bottom + 0.5));
+    expect(boxRect.top, greaterThanOrEqualTo(appBarRect.top - 0.5));
+  });
 
-  testWidgets(
-    '#2090 도착역 슬롯은 도착역 맥락 semantics 라벨을 노출한다',
-    (tester) async {
-      final handle = tester.ensureSemantics();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: StationSearchScreen(
-            repository: FakeStationSearchRepository(),
-            reportRepository: FakeFacilityReportRepository(),
-            locationProvider: FakeCurrentLocationProvider(),
-            pickSlot: RouteDraftSlot.destination,
-            regionLabel: '수도권',
-          ),
+  testWidgets('#2090 역 검색 필드는 입력 후에도 슬롯 맥락 semantics 라벨을 유지한다', (tester) async {
+    // Finding 3: 이전 floating label이 유지하던 슬롯 맥락("출발역") 라벨이
+    // 입력 후에도 스크린리더 semantics 트리에 남아야 한다.
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          pickSlot: RouteDraftSlot.origin,
+          regionLabel: '수도권',
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '사당',
-      );
-      await tester.pumpAndSettle();
-      expect(find.bySemanticsLabel('도착역'), findsOneWidget);
-      // 출발역 맥락이 새어 나오지 않는다.
-      expect(find.bySemanticsLabel('출발역'), findsNothing);
-      handle.dispose();
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 입력 전: 슬롯 맥락 라벨이 semantics 트리에 있다(hint 노드 + 라벨 래퍼
+    // 노드가 중첩돼 하나 이상 존재한다).
+    expect(find.bySemanticsLabel('출발역'), findsWidgets);
+
+    // 입력 후: hint는 InputDecorator가 지우지만 슬롯 맥락 라벨은 유지된다.
+    // 이전 floating label 없이도 맥락이 남아야 한다(#2090 Finding 3).
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    // 정확히 한 노드(라벨 래퍼)가 슬롯 맥락 라벨을 유지한다. 입력 필드 노드는
+    // 입력값(상록수)을 value로 갖고 라벨은 상위 래퍼 노드가 보존한다.
+    expect(find.bySemanticsLabel('출발역'), findsOneWidget);
+
+    handle.dispose();
+  });
+
+  testWidgets('#2090 도착역 슬롯은 도착역 맥락 semantics 라벨을 노출한다', (tester) async {
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StationSearchScreen(
+          repository: FakeStationSearchRepository(),
+          reportRepository: FakeFacilityReportRepository(),
+          locationProvider: FakeCurrentLocationProvider(),
+          pickSlot: RouteDraftSlot.destination,
+          regionLabel: '수도권',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('도착역'), findsOneWidget);
+    // 출발역 맥락이 새어 나오지 않는다.
+    expect(find.bySemanticsLabel('출발역'), findsNothing);
+    handle.dispose();
+  });
 
   testWidgets('#2003 상단 내비게이션(검색바·메뉴·힌트 텍스트)이 확대된 안 B 치수를 갖는다', (tester) async {
     await tester.pumpWidget(
@@ -1710,7 +1730,9 @@ void main() {
           favorites: [_favoriteRoute(mobilityType: 'WHEELCHAIR')],
         ),
         notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.slow),
+        initialOnboardingState: _completedOnboardingState(
+          preset: MobilityPreset.slow,
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -1986,41 +2008,40 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets(
-    '#2082 저장된 지역(부산)으로 로드된 뒤 역 검색을 열면 지역 표시가 부산을 따른다',
-    (tester) async {
-      // 회귀 방지: _currentRegionDisplayName이 _selectedRegion(세션 중 지역
-      // 선택기를 조작해야만 채워지는 상태)에만 의존하면, 저장된 지역이 부산인
-      // 사용자가 재시작 후 지역 선택기를 건드리지 않고 검색을 열 때 '수도권'이
-      // 잘못 표시된다. getNetworkMap(region: null) 호출이 저장된 지역(부산)을
-      // 반환하도록 페이크를 구성해, 로드 완료 후 지역 표시가 실제 로드된 지역을
-      // 따르는지 검증한다.
-      String? openedRegionLabel;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: NetworkMapScreen(
-            repository: FakeStationSearchRepository(
-              networkMapRegionNames: const ['부산'],
-            ),
-            routeDraftController: RouteDraftController(),
-            onOpenStationSearch: (regionLabel) {
-              openedRegionLabel = regionLabel;
-            },
+  testWidgets('#2082 저장된 지역(부산)으로 로드된 뒤 역 검색을 열면 지역 표시가 부산을 따른다', (
+    tester,
+  ) async {
+    // 회귀 방지: _currentRegionDisplayName이 _selectedRegion(세션 중 지역
+    // 선택기를 조작해야만 채워지는 상태)에만 의존하면, 저장된 지역이 부산인
+    // 사용자가 재시작 후 지역 선택기를 건드리지 않고 검색을 열 때 '수도권'이
+    // 잘못 표시된다. getNetworkMap(region: null) 호출이 저장된 지역(부산)을
+    // 반환하도록 페이크를 구성해, 로드 완료 후 지역 표시가 실제 로드된 지역을
+    // 따르는지 검증한다.
+    String? openedRegionLabel;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['부산'],
           ),
+          routeDraftController: RouteDraftController(),
+          onOpenStationSearch: (regionLabel) {
+            openedRegionLabel = regionLabel;
+          },
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('networkMapMenuButton')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('networkMapMenuStationSearchButton')),
-      );
-      await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapMenuButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('networkMapMenuStationSearchButton')),
+    );
+    await tester.pumpAndSettle();
 
-      expect(openedRegionLabel, '부산');
-    },
-  );
+    expect(openedRegionLabel, '부산');
+  });
 
   testWidgets('노선도 로드 실패는 재시도만 보여준다', (tester) async {
     await tester.pumpWidget(
@@ -2079,7 +2100,7 @@ void main() {
     (tester) async {
       // 회귀 방지: 검색 결과 탭 → focusStationRequestId(null→역 id) 소비 → 팬
       // 메뉴 채널로 수렴할 때, 지도 탭(_selectStation)과 동일하게 팬 메뉴가
-      // 뜨고(앵커 라벨 포함) 카메라 anti-clip 패닝 콜백
+      // 뜨고 카메라 anti-clip 패닝 콜백
       // (_NetworkMapCanvas.didUpdateWidget)이 예외 없이 도는지 검증한다. 이전엔
       // 패닝이 _selectStation 경로에서만 예약돼 검색 채널로 열린 메뉴는 경계에서
       // 잘린 채 남을 수 있었다. 프로덕션과 같이 마운트 후 prop이 전이되도록 host
@@ -2111,11 +2132,7 @@ void main() {
       // 검색 채널 요청이 소비되고(부모 통지) 팬 메뉴가 떴다.
       expect(handled, isTrue);
       expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-      // 앵커 역명 라벨(상세 진입)도 지도 탭과 동일하게 형제로 얹힌다.
-      expect(
-        find.byKey(const Key('networkMapFanMenuStationLabel')),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('상록수역 상세 보기'), findsNothing);
       expect(find.bySemanticsLabel(_fanOriginLabel), findsOneWidget);
     },
   );
@@ -2676,14 +2693,22 @@ void main() {
 
     // 방사형 배치에서 출발(좌하)·경유(상중)·도착(우하)의 좌→우 순서가 유지되고,
     // 닫기는 중앙 노치다(경유와 도착 사이 x 범위).
-    final originDx =
-        tester.getRect(find.bySemanticsLabel(_fanOriginLabel)).center.dx;
-    final waypointDx =
-        tester.getRect(find.bySemanticsLabel(_fanWaypointLabel)).center.dx;
-    final destinationDx =
-        tester.getRect(find.bySemanticsLabel(_fanDestinationLabel)).center.dx;
-    final closeDx =
-        tester.getRect(find.bySemanticsLabel(_fanCloseLabel)).center.dx;
+    final originDx = tester
+        .getRect(find.bySemanticsLabel(_fanOriginLabel))
+        .center
+        .dx;
+    final waypointDx = tester
+        .getRect(find.bySemanticsLabel(_fanWaypointLabel))
+        .center
+        .dx;
+    final destinationDx = tester
+        .getRect(find.bySemanticsLabel(_fanDestinationLabel))
+        .center
+        .dx;
+    final closeDx = tester
+        .getRect(find.bySemanticsLabel(_fanCloseLabel))
+        .center
+        .dx;
     expect(originDx < waypointDx, isTrue);
     expect(waypointDx < destinationDx, isTrue);
     expect(originDx < closeDx && closeDx < destinationDx, isTrue);
@@ -3571,9 +3596,7 @@ void main() {
     expect(find.bySemanticsLabel(_fanCloseLabel), findsOneWidget);
   });
 
-  testWidgets('노선도에서 출발을 지정한 뒤 다른 역을 누르면 팬 메뉴의 도착 섹터를 쓸 수 있다', (
-    tester,
-  ) async {
+  testWidgets('노선도에서 출발을 지정한 뒤 다른 역을 누르면 팬 메뉴의 도착 섹터를 쓸 수 있다', (tester) async {
     final routeDraftController = RouteDraftController();
     await tester.pumpWidget(
       MaterialApp(
@@ -5283,7 +5306,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('휠체어 이용'), findsWidgets);
-      expect(find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'), findsOneWidget);
+      expect(
+        find.text('엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
+        findsOneWidget,
+      );
 
       await tester.scrollUntilVisible(
         find.byKey(const Key('notificationSettingsButton')),
@@ -7095,7 +7121,9 @@ void main() {
         favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
         favoriteRouteRepository: favoriteRouteRepository,
         notificationRepository: FakeNotificationSettingsRepository(),
-        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.slow),
+        initialOnboardingState: _completedOnboardingState(
+          preset: MobilityPreset.slow,
+        ),
       ),
     );
 
@@ -7220,8 +7248,9 @@ void main() {
       final searchBoxRect = tester.getRect(
         find.byKey(const Key('heroStationSearchInputBox')),
       );
-      final searchHintCenterDy =
-          tester.getCenter(find.text('역 이름을 입력해 주세요')).dy;
+      final searchHintCenterDy = tester
+          .getCenter(find.text('역 이름을 입력해 주세요'))
+          .dy;
       expect(searchHintCenterDy, greaterThan(searchBoxRect.top));
       expect(searchHintCenterDy, lessThan(searchBoxRect.bottom));
       expect(find.byKey(const Key('stationSearchSubmitButton')), findsNothing);
@@ -7507,15 +7536,10 @@ void main() {
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     // 포커스한 역의 부채꼴 팬 메뉴가 나타난다(주변 역 패널이 아니다).
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(
-      find.byKey(const Key('networkMapNearbyStationPanel')),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
-  testWidgets('#2109 팬 메뉴 앵커 역명 라벨을 탭하면 역 상세로 진입한다', (tester) async {
-    // #2109: 팬 메뉴가 뜬 상태에서 중심 위 역명 라벨을 탭하면 해당 역의
-    // StationDetailScreen으로 진입한다(팬 메뉴는 출발/도착 지정, 라벨은 상세 진입).
+  testWidgets('#2109 팬 메뉴에 역명 라벨과 상세 진입이 없다', (tester) async {
     final repository = FakeStationSearchRepository(
       queryResults: {
         '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
@@ -7549,17 +7573,10 @@ void main() {
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(find.byType(StationDetailScreen), findsNothing);
-
-    // 팬 메뉴 앵커의 역명 라벨을 탭 → 역 상세 진입.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(StationDetailScreen), findsOneWidget);
+    expect(find.bySemanticsLabel('상록수역 상세 보기'), findsNothing);
   });
 
-  testWidgets('#2109 풀페이지 검색(햄버거 메뉴) 결과 탭도 노선도 복귀+팬 메뉴로 수렴한다', (
-    tester,
-  ) async {
+  testWidgets('#2109 풀페이지 검색(햄버거 메뉴) 결과 탭도 노선도 복귀+팬 메뉴로 수렴한다', (tester) async {
     // #2109 Fix: 좌측 햄버거 메뉴 "역 검색"으로 여는 풀페이지 StationSearchScreen의
     // 일반(둘러보기) 결과 탭도 임베디드 검색과 동일하게 노선도 복귀 → 카메라
     // 포커스 → 팬 메뉴 표시로 수렴해야 한다(오너 승인 스펙: "역을 검색하면 팬
@@ -7593,59 +7610,7 @@ void main() {
     expect(find.byType(StationDetailScreen), findsNothing);
     expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
-    expect(find.byType(StationDetailScreen), findsOneWidget);
-  });
-
-  testWidgets('#2109 팬 메뉴 라벨 탭 → 상세 push → 복귀하면 팬 메뉴가 남지 않는다', (
-    tester,
-  ) async {
-    // #2109 Fix: 검색 채널로 열린 팬 메뉴의 역명 라벨을 탭하면 상세로 진입하되,
-    // 섹터 액션과 동일하게 팬 메뉴를 닫는다. 그렇지 않으면 selectedStationId
-    // prop(_searchFanMenuStationId)이 살아 있어 상세에서 pop 복귀했을 때 팬 메뉴가
-    // 그대로 재표시된다.
-    final repository = FakeStationSearchRepository(
-      queryResults: {
-        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
-      },
-    );
-
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
-    );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-
-    // 라벨 탭 → 상세 push.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
-    expect(find.byType(StationDetailScreen), findsOneWidget);
-
-    // 상세에서 pop 복귀.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    // 노선도로 돌아왔고 팬 메뉴는 남아 있지 않다.
-    expect(find.byKey(const Key('networkMapScreen')), findsOneWidget);
-    expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    expect(find.bySemanticsLabel('상록수역 상세 보기'), findsNothing);
   });
 
   testWidgets('#2109 주변 역 패널이 열린 채 풀페이지 검색 결과 탭 → 패널은 닫히고 팬 메뉴만 남는다', (
@@ -7700,10 +7665,7 @@ void main() {
 
     // 팬 메뉴는 뜨고, 주변 역 패널은 닫힌다.
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
-    expect(
-      find.byKey(const Key('networkMapNearbyStationPanel')),
-      findsNothing,
-    );
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
   testWidgets('경로 검색 첫 화면은 v3 출발 도착 입력 구조를 보여준다', (tester) async {
@@ -8990,7 +8952,31 @@ void main() {
     expect(repository.requestedNearbyLocations, isEmpty);
   });
 
-  testWidgets('역 검색 결과를 누르면 출구와 시설 상태를 쉬운 문구로 보여준다', (tester) async {
+  testWidgets('역 검색 결과는 기본 품질 문구를 숨기고 노선별 선택 Semantics를 제공한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+    );
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await _openStationSearchScreenViaMenu(tester);
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
+    expect(find.text('출처 공식 파일'), findsNothing);
+    expect(find.bySemanticsLabel('상록수역, 수도권 2호선, 선택'), findsOneWidget);
+  });
+
+  testWidgets('역 상세는 출구와 시설 상태를 쉬운 문구로 보여준다', (tester) async {
     debugStationVerifiedClock = () => DateTime(2026, 6, 15);
     final semanticsHandle = tester.ensureSemantics();
     final repository = FakeStationSearchRepository(
@@ -9067,37 +9053,11 @@ void main() {
     );
 
     try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingState(),
-        ),
+      await _pumpStationDetailForTest(
+        tester,
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
       );
-
-      await _openStationSearchScreenViaMenu(tester);
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
-      // 기본 레벨(LEVEL_1) 품질 필러는 목록에서 감춘다(#1477). 시맨틱에는 유지.
-      expect(find.text('일부 정보는 확인 중이에요'), findsNothing);
-      expect(find.text('출처 공식 파일'), findsNothing);
-      // #1933: 결과 행은 노선마다 한 행이며, 각 행 시맨틱은 "역명, 노선명, 선택".
-      expect(find.bySemanticsLabel('상록수역, 수도권 2호선, 선택'), findsOneWidget);
-      await tester.tap(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-      await tester.pumpAndSettle();
 
       expect(repository.requestedDetailStationIds, ['station-sangnoksu']);
       expect(repository.requestedExitStationIds, ['station-sangnoksu']);
@@ -9286,29 +9246,11 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: repository,
+      reportRepository: FakeFacilityReportRepository(),
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
 
     expect(
       find.byKey(const Key('stationDetailLargeScreenLayout')),
@@ -9404,42 +9346,11 @@ void main() {
     );
 
     try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingStateWithPreferences(
-            preferences: const OnboardingViewPreferences(
-              largeTextEnabled: false,
-              highContrastEnabled: true,
-              simpleViewEnabled: false,
-            ),
-          ),
-        ),
+      await _pumpStationDetailForTest(
+        tester,
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
       );
-
-      await _openStationSearchScreenViaMenu(tester);
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
-      await tester.ensureVisible(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-      await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('stationDetailList')), findsOneWidget);
@@ -9501,33 +9412,15 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: reportRepository,
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        locationProvider: FakeCurrentLocationProvider(
-          location: _freshCurrentLocation(),
-          needsPermissionRequest: false,
-        ),
-        initialOnboardingState: _completedOnboardingState(),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: repository,
+      reportRepository: reportRepository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
       ),
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(
         const Key('stationFacilityCard-facility-sangnoksu-elevator-2'),
@@ -9608,30 +9501,12 @@ void main() {
     );
     final draftTargetStore = MemoryFacilityReportDraftTargetStore();
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: repository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        facilityReportDraftTargetStore: draftTargetStore,
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: repository,
+      reportRepository: FakeFacilityReportRepository(),
+      facilityReportDraftTargetStore: draftTargetStore,
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byKey(
         const Key('facilityReportButton-facility-sangnoksu-elevator-1'),
@@ -9684,32 +9559,11 @@ void main() {
     );
 
     try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: repository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          initialOnboardingState: _completedOnboardingState(),
-        ),
+      await _pumpStationDetailForTest(
+        tester,
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
       );
-
-      await _openStationSearchScreenViaMenu(tester);
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-      await tester.pumpAndSettle();
 
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
@@ -10322,7 +10176,7 @@ void main() {
     );
   });
 
-  testWidgets('앱 역 검색 흐름은 내부 이동 노드로 기본 안내를 표시한다', (tester) async {
+  testWidgets('역 상세는 내부 이동 노드로 기본 안내를 표시한다', (tester) async {
     final stationRepository = FakeStationSearchRepository(
       nextResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
@@ -10332,30 +10186,13 @@ void main() {
       result: _internalRouteResult(),
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        internalRouteRepository: internalRouteRepository,
-        initialOnboardingState: _completedOnboardingState(preset: MobilityPreset.stepFree),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: stationRepository,
+      reportRepository: FakeFacilityReportRepository(),
+      internalRouteRepository: internalRouteRepository,
+      internalRouteMobilityType: 'WHEELCHAIR',
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
 
     expect(internalRouteRepository.nodeStationIds, ['station-sangnoksu']);
     expect(internalRouteRepository.requests, hasLength(1));
@@ -10413,32 +10250,12 @@ void main() {
     );
 
     try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: stationRepository,
-          reportRepository: FakeFacilityReportRepository(),
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: favoriteRepository,
-          initialOnboardingState: _completedOnboardingState(),
-        ),
+      await _pumpStationDetailForTest(
+        tester,
+        repository: stationRepository,
+        reportRepository: FakeFacilityReportRepository(),
+        favoriteRepository: favoriteRepository,
       );
-
-      await _openStationSearchScreenViaMenu(tester);
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-      await tester.pumpAndSettle();
 
       expect(find.widgetWithText(OutlinedButton, '저장'), findsOneWidget);
       expect(find.bySemanticsLabel('상록수역 즐겨찾기 저장'), findsOneWidget);
@@ -10466,7 +10283,7 @@ void main() {
     }
   });
 
-  testWidgets('검색 결과의 저장된 역은 상세에서 해제 버튼으로 시작한다', (tester) async {
+  testWidgets('저장된 역은 상세에서 해제 버튼으로 시작한다', (tester) async {
     final favoriteRepository = FakeFavoriteStationRepository(
       favorites: [_favoriteStation(id: 'station-sangnoksu', name: '상록수')],
     );
@@ -10475,30 +10292,12 @@ void main() {
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: favoriteRepository,
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: stationRepository,
+      reportRepository: FakeFacilityReportRepository(),
+      favoriteRepository: favoriteRepository,
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
 
     expect(find.widgetWithText(OutlinedButton, '저장됨'), findsOneWidget);
     expect(find.bySemanticsLabel('상록수역 즐겨찾기 해제'), findsOneWidget);
@@ -10512,32 +10311,13 @@ void main() {
       stationDetail: _stationDetail(id: 'station-sangnoksu', name: '상록수'),
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: FakeFacilityReportRepository(),
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: favoriteRepository,
-        favoriteRouteRepository: FakeFavoriteRouteRepository(),
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: stationRepository,
+      reportRepository: FakeFacilityReportRepository(),
+      favoriteRepository: favoriteRepository,
+      settle: false,
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 350));
-    await tester.pump();
 
     expect(
       find.bySemanticsLabel('상록수역 자세한 안내, 수도권 2호선, 마지막 확인 2일 전'),
@@ -10671,9 +10451,7 @@ void main() {
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
 
-      final wheelchairRow = find.byKey(
-        const Key('mobilityPresetRow-stepFree'),
-      );
+      final wheelchairRow = find.byKey(const Key('mobilityPresetRow-stepFree'));
       expect(wheelchairRow, findsOneWidget);
       expect(tester.getSize(wheelchairRow).height, greaterThanOrEqualTo(48));
 
@@ -11152,9 +10930,7 @@ void main() {
     expect(find.byKey(const Key('mobilityPresetRow-standard')), findsOneWidget);
     expect(find.text('계단 대신 에스컬레이터·엘리베이터로 안내해요'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(
-        '휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요',
-      ),
+      find.bySemanticsLabel('휠체어 이용, 엘리베이터로만 이동하는 길을 안내해요 · 유아차와 함께일 때도 좋아요'),
       findsOneWidget,
     );
 
@@ -11184,11 +10960,7 @@ void main() {
 
       expect(
         tester.getSemantics(find.bySemanticsLabel('경로 시간 기준, 천천히')),
-        isSemantics(
-          label: '경로 시간 기준, 천천히',
-          isButton: true,
-          hasTapAction: true,
-        ),
+        isSemantics(label: '경로 시간 기준, 천천히', isButton: true, hasTapAction: true),
       );
     } finally {
       semanticsHandle.dispose();
@@ -13692,39 +13464,18 @@ void main() {
     );
 
     try {
-      await tester.pumpWidget(
-        EasySubwayApp(
-          repository: stationRepository,
-          reportRepository: reportRepository,
-          routeRepository: FakeRouteSearchRepository(),
-          favoriteRepository: FakeFavoriteStationRepository(),
-          locationProvider: FakeCurrentLocationProvider(
-            location: const CurrentLocation(
-              latitude: 37.302421,
-              longitude: 126.866221,
-            ),
-            needsPermissionRequest: false,
+      await _pumpStationDetailForTest(
+        tester,
+        repository: stationRepository,
+        reportRepository: reportRepository,
+        locationProvider: FakeCurrentLocationProvider(
+          location: const CurrentLocation(
+            latitude: 37.302421,
+            longitude: 126.866221,
           ),
-          initialOnboardingState: _completedOnboardingState(),
+          needsPermissionRequest: false,
         ),
       );
-
-      await _openStationSearchScreenViaMenu(tester);
-      await tester.enterText(
-        find.byKey(const Key('stationSearchInput')),
-        '상록수',
-      );
-      await tester.pumpAndSettle();
-      await tester.testTextInput.receiveAction(TextInputAction.search);
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-      );
-      await tester.pumpAndSettle();
-      // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-      // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-      await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-      await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView), const Offset(0, -520));
       await tester.pumpAndSettle();
       await tester.ensureVisible(
@@ -14905,30 +14656,12 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: reportRepository,
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        locationProvider: locationProvider,
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: stationRepository,
+      reportRepository: reportRepository,
+      locationProvider: locationProvider,
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
@@ -14994,30 +14727,12 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: reportRepository,
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        locationProvider: locationProvider,
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: stationRepository,
+      reportRepository: reportRepository,
+      locationProvider: locationProvider,
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
@@ -15156,30 +14871,12 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: reportRepository,
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        locationProvider: locationProvider,
-        initialOnboardingState: _completedOnboardingState(),
-      ),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: stationRepository,
+      reportRepository: reportRepository,
+      locationProvider: locationProvider,
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
@@ -15300,33 +14997,15 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      EasySubwayApp(
-        repository: stationRepository,
-        reportRepository: reportRepository,
-        routeRepository: FakeRouteSearchRepository(),
-        favoriteRepository: FakeFavoriteStationRepository(),
-        locationProvider: FakeCurrentLocationProvider(
-          error: const CurrentLocationException('위치 권한을 허용해 주세요.'),
-          needsPermissionRequest: false,
-        ),
-        initialOnboardingState: _completedOnboardingState(),
+    await _pumpStationDetailForTest(
+      tester,
+      repository: stationRepository,
+      reportRepository: reportRepository,
+      locationProvider: FakeCurrentLocationProvider(
+        error: const CurrentLocationException('위치 권한을 허용해 주세요.'),
+        needsPermissionRequest: false,
       ),
     );
-
-    await _openStationSearchScreenViaMenu(tester);
-    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
-    await tester.pumpAndSettle();
-    await tester.testTextInput.receiveAction(TextInputAction.search);
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
-    );
-    await tester.pumpAndSettle();
-    // #2109 Fix: 풀페이지 검색 결과 탭은 상세를 즉시 열지 않고 팬 메뉴를 연다.
-    // 팬 메뉴 앵커의 역명 라벨을 탭해 상세로 진입한 뒤 기존 검증을 이어간다.
-    await tester.tap(find.byKey(const Key('networkMapFanMenuStationLabel')));
-    await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, -520));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
