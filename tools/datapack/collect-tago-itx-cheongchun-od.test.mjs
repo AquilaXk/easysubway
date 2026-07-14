@@ -47,6 +47,19 @@ test("ITX admission 날짜는 KST 오늘~6일과 dayCd 요일을 검증한다", 
   }), /today through 6 days/);
 });
 
+test("TAGO ITX roster collector는 serviceDate와 dayCd 요일 불일치를 provider 호출 전에 거부한다", async () => {
+  await assert.rejects(collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "7",
+    canonicalStations: [
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    fetchImpl: async () => assert.fail("provider must not be called"),
+  }), /dayCd 7 must be a Saturday/);
+});
+
 test("ITX OD matrix hash는 정렬된 date·depStationId·arrStationId tuple 직렬화로 결정된다", () => {
   const matrix = buildItxOdMatrix("20260715", [
     { providerStationId: "B" },

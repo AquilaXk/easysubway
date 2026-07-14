@@ -68,7 +68,10 @@ Expected: FAIL because the three exports do not exist.
 
 ```js
 export function buildItxOdMatrix(date, stations) {
-  const ids = [...new Set(stations.map(({ providerStationId }) => requiredString(providerStationId, "providerStationId")))].sort();
+  const ids = stations.map(({ providerStationId }) => requiredString(providerStationId, "providerStationId")).sort();
+  if (ids.length < 2 || new Set(ids).size !== ids.length) {
+    throw new Error("ITX roster stations must be unique and contain at least 2 stations");
+  }
   const rows = ids.flatMap((depStationId) => ids
     .filter((arrStationId) => arrStationId !== depStationId)
     .map((arrStationId) => ({ date, depStationId, arrStationId })));

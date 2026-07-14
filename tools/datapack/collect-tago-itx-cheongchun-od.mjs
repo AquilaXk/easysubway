@@ -16,12 +16,9 @@ const CANONICAL_STATIONS = Object.freeze({
 export function validateItxServiceDates(serviceDates, { now = new Date(), replay = false } = {}) {
   const result = {};
   const today = calendarDate(kstDate(now));
-  for (const [dayCd, expectedDay] of [["8", "weekday"], ["7", "Saturday"], ["9", "Sunday"]]) {
+  for (const dayCd of ["8", "7", "9"]) {
     const value = requiredString(serviceDates?.[dayCd], `dayCd ${dayCd} date`);
-    const date = calendarDate(value);
-    const weekday = date.getUTCDay();
-    const validDay = dayCd === "8" ? weekday >= 1 && weekday <= 5 : weekday === (dayCd === "7" ? 6 : 0);
-    if (!validDay) throw new Error(`dayCd ${dayCd} must be a ${expectedDay}`);
+    const date = validateServiceDay(value, dayCd);
     const offset = Math.round((date - today) / 86_400_000);
     if (!replay && (offset < 0 || offset > 6)) throw new Error("ITX admission dates must be today through 6 days in Asia/Seoul");
     result[dayCd] = value;
@@ -55,8 +52,8 @@ export async function collectTagoItxCheongchunRoster({
   now = new Date(),
 } = {}) {
   const key = decodedServiceKey(requiredString(serviceKey, "DATA_GO_KR_SERVICE_KEY"));
-  calendarDate(serviceDate);
   if (!["7", "8", "9"].includes(kricServiceDayCode)) throw new Error("kricServiceDayCode must be 7, 8, or 9");
+  validateServiceDay(serviceDate, kricServiceDayCode);
   if (!Array.isArray(canonicalStations) || canonicalStations.length < 2) throw new Error("canonicalStations must contain at least 2 stations");
 
   const trainGrades = await fetchAll("GetVhcleKndList", {}, key, fetchImpl);
@@ -315,6 +312,15 @@ function calendarDate(value) {
   const date = new Date(Date.UTC(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8))));
   const actual = `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
   if (actual !== value) throw new Error("service date must be a valid calendar date");
+  return date;
+}
+
+function validateServiceDay(value, dayCd) {
+  const date = calendarDate(value);
+  const weekday = date.getUTCDay();
+  const expectedDay = dayCd === "8" ? "weekday" : dayCd === "7" ? "Saturday" : "Sunday";
+  const validDay = dayCd === "8" ? weekday >= 1 && weekday <= 5 : weekday === (dayCd === "7" ? 6 : 0);
+  if (!validDay) throw new Error(`dayCd ${dayCd} must be a ${expectedDay}`);
   return date;
 }
 
