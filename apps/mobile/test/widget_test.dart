@@ -4668,7 +4668,7 @@ void main() {
     expect(find.byKey(const Key('homeSavedItemsCard')), findsNothing);
   });
 
-  testWidgets('홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다', (tester) async {
+  testWidgets('홈은 시설 알림과 최근 경로 로드 실패를 인라인 오류 없이 넘긴다', (tester) async {
     final facilityRepository = FakeFavoriteFacilityRepository()
       ..error = const FavoriteFacilityException('시설 알림 실패');
     final routeRepository = FakeFavoriteRouteRepository()
@@ -4838,6 +4838,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('현재 실시간, 시간표로 전환'), findsOneWidget);
     expect(
       tester
           .widget<Text>(
@@ -4878,6 +4879,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.bySemanticsLabel('현재 시간표, 실시간으로 전환'), findsOneWidget);
     expect(
       tester
           .getSize(find.byKey(const Key('networkMapNearbyDataSourceToggle')))
@@ -4894,6 +4896,7 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.bySemanticsLabel('현재 실시간, 시간표로 전환'), findsOneWidget);
   });
 
   testWidgets('GPS 하단 패널은 선택한 데이터가 없으면 검정 대시 하나만 보여준다', (tester) async {
@@ -7963,6 +7966,45 @@ void main() {
     expect(find.text('상록수'), findsOneWidget);
   });
 
+  testWidgets('#2109 검색 선택은 지도에서 직접 선택한 역을 교체한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+
+    await _openStationSearchScreenViaMenu(tester);
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+
+    await _tapFanMenuSector(tester, _fanOriginLabel);
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('사당역, 출발 지정됨'), findsOneWidget);
+    expect(find.bySemanticsLabel('상록수역, 출발 지정됨'), findsNothing);
+  });
+
   testWidgets('#2109 팬 메뉴에 역명 라벨과 상세 진입이 없다', (tester) async {
     final repository = FakeStationSearchRepository(
       queryResults: {
@@ -8096,6 +8138,57 @@ void main() {
     await tester.pumpAndSettle();
 
     // 검색 결과도 같은 단일 팬 메뉴로 수렴하고 하단 패널은 사당으로 교체된다.
+    expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    expect(find.text('사당'), findsOneWidget);
+    expect(find.text('상록수'), findsNothing);
+  });
+
+  testWidgets('#2109 검색 선택 뒤 늦게 끝난 GPS 요청은 선택 역을 덮지 않는다', (tester) async {
+    final nearbyCompleter = Completer<List<StationSearchResult>>();
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '사당': [_stationResult(id: 'station-sadang', name: '사당')],
+      },
+      nearbyCompleter: nearbyCompleter,
+    );
+
+    await tester.pumpWidget(
+      EasySubwayApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '사당');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sadang')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('사당'), findsOneWidget);
+
+    nearbyCompleter.complete([
+      _stationResult(id: 'station-sangnoksu', name: '상록수'),
+    ]);
+    await tester.pumpAndSettle();
+
     expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
     expect(
       find.byKey(const Key('networkMapNearbyStationPanel')),

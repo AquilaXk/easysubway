@@ -588,6 +588,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   void _showStationPanelFromSearch(StationSearchResult result) {
     final firstLine = result.lines.firstOrNull;
     setState(() {
+      _nearestStationRequestToken++;
+      _selectionClearRevision++;
       _nearbyDataRequestToken++;
       _nearbyPanelVisible = true;
       _nearbySelectedStationId = result.id;
@@ -2489,6 +2491,10 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = data.results.isEmpty ? null : data.results.first;
+    final dataSourceToggleEnabled = !(primary?.lines.isEmpty ?? true);
+    final dataSourceToggleLabel = dataSource == _NearbyPanelDataSource.realtime
+        ? '현재 실시간, 시간표로 전환'
+        : '현재 시간표, 실시간으로 전환';
     return Material(
       key: const Key('networkMapNearbyStationPanel'),
       color: Colors.white,
@@ -2530,29 +2536,38 @@ class _NetworkMapNearbyStationPanel extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 2),
-                      child: TextButton(
-                        key: const Key('networkMapNearbyDataSourceToggle'),
-                        onPressed: primary?.lines.isEmpty ?? true
-                            ? null
-                            : onDataSourceToggle,
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(58, 48),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          foregroundColor: EasySubwayAccessibleColors.mint,
-                          side: const BorderSide(
-                            color: EasySubwayAccessibleColors.mintBorder,
+                      child: Semantics(
+                        button: true,
+                        enabled: dataSourceToggleEnabled,
+                        label: dataSourceToggleLabel,
+                        onTap: dataSourceToggleEnabled
+                            ? onDataSourceToggle
+                            : null,
+                        excludeSemantics: true,
+                        child: TextButton(
+                          key: const Key('networkMapNearbyDataSourceToggle'),
+                          onPressed: dataSourceToggleEnabled
+                              ? onDataSourceToggle
+                              : null,
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(58, 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            foregroundColor: EasySubwayAccessibleColors.mint,
+                            side: const BorderSide(
+                              color: EasySubwayAccessibleColors.mintBorder,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(3),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                        child: Text(
-                          dataSource == _NearbyPanelDataSource.realtime
-                              ? '실시간'
-                              : '시간표',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                          child: Text(
+                            dataSource == _NearbyPanelDataSource.realtime
+                                ? '실시간'
+                                : '시간표',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
