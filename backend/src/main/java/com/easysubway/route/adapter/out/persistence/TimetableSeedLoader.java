@@ -60,11 +60,17 @@ public class TimetableSeedLoader implements ApplicationRunner {
 
 	@Override
 	public void run(ApplicationArguments args) {
+		List<String> statements = readStatements(seedResource);
+		boolean includesItx = statements.stream().anyMatch(statement -> statement.contains("'ITX_CHEONGCHUN'"));
 		if (routeTimetablePort.hasRouteTimetable()) {
+			boolean existingItx = validateRouteServiceAdmission();
+			if (includesItx && !existingItx) {
+				throw new IllegalStateException(
+					"additive ITX timetable seed is not supported while another timetable is present");
+			}
 			log.info("transit timetable already present; skipping seed load");
 			return;
 		}
-		List<String> statements = readStatements(seedResource);
 		try {
 			transactionTemplate.executeWithoutResult(status -> {
 				executeBatch(statements);
@@ -73,7 +79,8 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		} catch (RuntimeException exception) {
 			// 다중 replica 동시 배포 경쟁: 다른 인스턴스가 먼저 적재하면 이 배치는 PK/싱글턴 충돌로 실패한다.
 			// 실패 후 이미 적재됐으면(경쟁 loser) 관용 처리한다(부팅 crash loop 방지). 아니면 실제 오류로 재던진다.
-			if (routeTimetablePort.hasRouteTimetable()) {
+			if (routeTimetablePort.hasRouteTimetable()
+					&& (!includesItx || validateRouteServiceAdmission())) {
 				log.info("transit timetable was seeded concurrently by another instance; batch failure is benign");
 				return;
 			}
@@ -82,7 +89,7 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		log.info("transit timetable seeded from {} ({} statements)", seedResource, statements.size());
 	}
 
-	private void validateRouteServiceAdmission() {
+	private boolean validateRouteServiceAdmission() {
 		Connection connection = DataSourceUtils.getConnection(dataSource);
 		try (Statement statement = connection.createStatement()) {
 			try (ResultSet count = statement.executeQuery("""
@@ -90,9 +97,9 @@ public class TimetableSeedLoader implements ApplicationRunner {
 				FROM transit_trips
 				WHERE service_class = 'ITX_CHEONGCHUN'
 				""")) {
-				count.next();
-				if (count.getInt("row_count") == 0) {
-					return;
+					count.next();
+					if (count.getInt("row_count") == 0) {
+						return false;
 				}
 			}
 			try (ResultSet rows = statement.executeQuery("""
@@ -107,6 +114,7 @@ public class TimetableSeedLoader implements ApplicationRunner {
 					throw new IllegalStateException("ITX-청춘 timetable seed requires ADMITTED evidence with valid freshness");
 				}
 			}
+			return true;
 		} catch (SQLException exception) {
 			throw new IllegalStateException("ITX-청춘 timetable seed admission validation failed", exception);
 		} finally {

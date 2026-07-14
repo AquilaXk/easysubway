@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
 import { buildBackendTimetableSeed } from "./build-backend-timetable-seed.mjs";
+
+const execFileAsync = promisify(execFile);
+const root = path.resolve(import.meta.dirname, "../..");
 
 // 재구성 artifact(수집기 산출물) 축약 — up/down 각 1 trip, weekday/holiday 각 1.
 const ARTIFACT = {
@@ -141,6 +148,42 @@ test("ITX seed evidence hash가 입력 timetable artifact bytes identity와 다�
     }),
     /timetable artifact SHA-256 identity mismatch/,
   );
+});
+
+test("CLI는 timetable 원본과 분리된 evidence sidecar를 실제 input bytes hash에 결합한다", async (context) => {
+  const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-seed-sidecar-"));
+  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  const artifactBytes = await readFile(new URL("./fixtures/test-only-itx-cheongchun-admitted.json", import.meta.url));
+  const artifact = JSON.parse(artifactBytes);
+  const inputPath = path.join(temporaryDir, "timetable.json");
+  const evidencePath = path.join(temporaryDir, "evidence.json");
+  const outputPath = path.join(temporaryDir, "seed.sql");
+  const timetableArtifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
+  await writeFile(inputPath, artifactBytes);
+  await writeFile(evidencePath, `${JSON.stringify({
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: artifact.timetableArtifactIdentity.id,
+    timetableArtifactSha256,
+    canonicalPackId: artifact.canonicalPackIdentity.id,
+    canonicalPackSha256: artifact.canonicalPackIdentity.sha256,
+    canonicalPackSqliteSha256: artifact.canonicalPackIdentity.sqliteSha256,
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil: "2999-01-01T00:00:00.000Z",
+    sourceIssue: 2116,
+  })}\n`);
+
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-backend-timetable-seed.mjs",
+    "--input", inputPath,
+    "--route-service-evidence", evidencePath,
+    "--line-id", artifact.canonicalLineId,
+    "--output", outputPath,
+  ], { cwd: root });
+
+  const sql = await readFile(outputPath, "utf8");
+  assert.match(sql, new RegExp(timetableArtifactSha256));
+  assert.match(sql, /'ITX_CHEONGCHUN'/);
 });
 
 test("stale ITX evidence는 seed 생성 단계에서 거부한다", () => {

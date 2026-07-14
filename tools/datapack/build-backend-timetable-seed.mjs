@@ -301,12 +301,22 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const artifactBytes = await readFile(args.input);
   const artifact = JSON.parse(artifactBytes.toString("utf8"));
+  if (args["route-service-evidence"]) {
+    if ((artifact.routeServiceArtifactEvidence ?? []).length > 0) {
+      throw new Error("route service evidence must be separate from timetable artifact bytes");
+    }
+    const sidecar = JSON.parse(await readFile(args["route-service-evidence"], "utf8"));
+    artifact.routeServiceArtifactEvidence = Array.isArray(sidecar) ? sidecar : [sidecar];
+  }
   const seed = buildBackendTimetableSeed(artifact, {
     lineId: args["line-id"],
     startDate: args["start-date"],
     endDate: args["end-date"],
     feedEndDate: args["feed-end-date"],
     timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+    serviceCalendarDayMap: Array.isArray(artifact.serviceCalendars)
+      ? Object.fromEntries(artifact.serviceCalendars.map((calendar) => [calendar.serviceId, calendar]))
+      : undefined,
   });
   if (args.output) {
     await writeFile(args.output, seed.sql);

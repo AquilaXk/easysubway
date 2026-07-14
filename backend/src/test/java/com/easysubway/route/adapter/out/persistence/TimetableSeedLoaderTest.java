@@ -133,6 +133,30 @@ class TimetableSeedLoaderTest {
 			.isEqualTo("capital");
 	}
 
+	@Test
+	void rejectsExpiredExistingItxIdentityOnRestart() {
+		loader(itxSeed("ADMITTED", true, OffsetDateTime.now().plusDays(1).toString())).run(null);
+		jdbc.update(
+			"UPDATE route_service_artifact_evidence SET fresh_until = '2000-01-01T00:00:00.000Z' WHERE service_class = 'ITX_CHEONGCHUN'");
+
+		assertThatThrownBy(() -> loader(itxSeed(
+			"ADMITTED", true, OffsetDateTime.now().plusDays(1).toString())).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("valid freshness");
+	}
+
+	@Test
+	void rejectsAdditiveItxSeedWhenSubwayTimetableAlreadyExists() {
+		loader(new ClassPathResource("timetable/test-line4-seed.sql")).run(null);
+
+		assertThatThrownBy(() -> loader(itxSeed(
+			"ADMITTED", true, OffsetDateTime.now().plusDays(1).toString())).run(null))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("additive ITX timetable seed is not supported");
+		assertThat(jdbc.queryForObject(
+			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'", Integer.class)).isZero();
+	}
+
 	private Resource itxSeed(String admissionStatus, boolean admissionEligible, String freshUntil) {
 		return new ByteArrayResource((
 			"INSERT INTO service_calendars (service_id, start_date, end_date, timezone, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES ('itx-weekday','20260714','20260721','Asia/Seoul',TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE);\n"
