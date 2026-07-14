@@ -17,7 +17,7 @@ test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원
     partitionKey: "CANONICAL_OD_STATION_MEMBERSHIP",
     metropolitanRouteSearch: {
       SUBWAY: "EXCLUDED",
-      SUBWAY_AND_TRAIN: "ALL_OD_STATIONS_IN_CAPITAL_METROPOLITAN_NETWORK",
+      SUBWAY_AND_TRAIN: "CANONICAL_OD_STATIONS_IN_CAPITAL_METROPOLITAN_NETWORK",
     },
     duplicatePhysicalStationAllowed: false,
   });
@@ -41,9 +41,10 @@ test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원
   assert.equal(contract.officialEvidence.korailStationSequence.missingTimestampStopCount,
     stationSequenceEvidence.materialization.missingTimestampStopCount);
   assert.deepEqual(contract.officialEvidence.korailStationSequence.stationTimeCapability,
-    { ...stationSequenceEvidence.materialization.stationTimeCapability,
-      verifiedAt: "2026-07-14T06:36:22.122Z",
-      travelerTrainRunInfo2RawSha256: "ff64cf6683de1fbc089dde751af198b4745bbd71260b3867cef69f615bafce4c" });
+    stationSequenceEvidence.materialization.stationTimeCapability);
+  const korailRunInfo = sourceCandidates.candidates.find(({ id }) => id === "korail-traveler-train-run-info");
+  assert.deepEqual(korailRunInfo.evidence.liveMaterialization.stationTimeCapability,
+    stationSequenceEvidence.materialization.stationTimeCapability);
   assert.equal(contract.officialEvidence.korailStationSequence.disposition, "SUPPORTED_FOR_CANONICAL_STOP_SEQUENCE_ONLY");
   assert.equal(contract.materialization.status, "MISSING_STATION_TIMES");
   assert.equal(contract.claimGate.supportClaimAllowed, false);
@@ -55,6 +56,12 @@ test("ITX-청춘 #2116 evidence wiring은 #1400·#2098·#2099만 허용한다", 
     .find(({ serviceId }) => serviceId === "ITX_CHEONGCHUN");
   assert.equal(Object.hasOwn(contract.searchScopePolicy, "trainSearch"), false);
   assert.equal(Object.hasOwn(itxTarget, "trainSearchCoverage"), false);
+  assert.equal(itxTarget.operatingRoute, contract.searchScopePolicy.operatingRoute);
+  assert.equal(itxTarget.legacyDaejeonData, contract.searchScopePolicy.legacyDaejeonData);
+  assert.equal(
+    itxTarget.metropolitanRouteSearchCoverage,
+    contract.searchScopePolicy.metropolitanRouteSearch.SUBWAY_AND_TRAIN,
+  );
   assert.equal(targets.railProductScope.trainSearchOnly.services.includes("ITX_CHEONGCHUN"), false);
   assert.deepEqual(contract.allowedConsumerIssues, ["#1400", "#2098", "#2099"]);
   assert.equal(contract.legacyDaejeonRowCount, 0);

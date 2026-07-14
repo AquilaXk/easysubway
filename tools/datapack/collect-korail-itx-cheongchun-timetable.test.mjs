@@ -206,6 +206,23 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.doesNotMatch(JSON.stringify(artifact), /503/);
   });
 
+  await context.test("OD 일부 실패", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectRosterImpl: async ({ serviceDate, kricServiceDayCode }) => ({
+        ...trainNumberEvidence(), serviceDate, kricServiceDayCode,
+        completedOdCount: 1,
+        failedOdCount: 1,
+      }),
+      collectTimetableImpl: async () => assert.fail("must not run"),
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "OD_MATRIX_INCOMPLETE");
+    assert.equal(artifact.serviceDays[0].completedOdCount, 1);
+    assert.equal(artifact.serviceDays[0].failedOdCount, 1);
+    assert.equal(artifact.admissionStatus, "MISSING");
+  });
+
   await context.test("station mapping 오류", async () => {
     const artifact = await collectKorailItxCheongchunCompleteness({
       serviceKey: "key", serviceDates, packPath: PACK_PATH,
@@ -215,6 +232,17 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     });
     assert.equal(artifact.serviceDays[0].failureReasonCode, "STATION_MAPPING_INCOMPLETE");
     assert.equal(artifact.serviceDays[0].failureContext, "갈매");
+  });
+
+  await context.test("canonical passenger-stop mapping 오류", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"), collectRosterImpl: roster,
+      collectTimetableImpl: async () => {
+        throw new Error("Korail ITX passenger stop canonical mapping missing: 2001/UNKNOWN");
+      },
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "CANONICAL_STATION_MAPPING_INCOMPLETE");
   });
 
   await context.test("timetable 오류에도 완료된 OD evidence를 보존", async () => {
@@ -250,6 +278,24 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.serviceDays[0].failureReasonCode, "OFFICIAL_RUN_INFO_EMPTY");
     assert.equal(artifact.serviceDays[0].failureContext, "operation=travelerTrainRunInfo2,total=0");
   });
+
+  await context.test("legacy 대전 위반 count 보존", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"), collectRosterImpl: roster,
+      collectTimetableImpl: async () => {
+        const error = new Error("Korail ITX legacy Daejeon data must be zero");
+        error.legacyDaejeonRowCount = 2;
+        error.legacyYongsanDaejeonTripCount = 1;
+        throw error;
+      },
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "LEGACY_DAEJEON_DATA_PRESENT");
+    assert.equal(artifact.serviceDays[0].legacyDaejeonRowCount, 2);
+    assert.equal(artifact.serviceDays[0].legacyYongsanDaejeonTripCount, 1);
+    assert.equal(artifact.legacyDaejeonRowCount, 6);
+    assert.equal(artifact.legacyYongsanDaejeonTripCount, 3);
+  });
 });
 
 test("ITX CLI는 runtime 실패를 MISSING artifact로 저장하고 non-zero를 반환한다", async () => {
@@ -274,6 +320,36 @@ test("ITX CLI는 runtime 실패를 MISSING artifact로 저장하고 non-zero를 
     assert.equal(artifact.admissionEligible, false);
     assert.equal(artifact.failureReasonCode, "PROVIDER_HTTP_FAILURE");
     assert.doesNotMatch(JSON.stringify(artifact), /503|secret/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("ITX CLI는 invalid input을 artifact 생성 전에 거부한다", async (context) => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-cli-invalid-"));
+  const base = [
+    "--day8-date", "20260715",
+    "--day7-date", "20260718",
+    "--day9-date", "20260719",
+    "--canonical-pack", PACK_PATH,
+  ];
+  try {
+    for (const scenario of [
+      { name: "잘못된 날짜", argv: base.with(1, "20260718"), env: { DATA_GO_KR_SERVICE_KEY: "key" }, pattern: /dayCd 8/ },
+      { name: "pack 누락", argv: base.slice(0, -2), env: { DATA_GO_KR_SERVICE_KEY: "key" }, pattern: /--canonical-pack/ },
+      { name: "credential 누락", argv: base, env: {}, pattern: /DATA_GO_KR_SERVICE_KEY/ },
+    ]) {
+      await context.test(scenario.name, async () => {
+        const output = path.join(dir, `${scenario.name}.json`);
+        await assert.rejects(runKorailItxCompletenessCli({
+          argv: [...scenario.argv, "--output", output],
+          env: scenario.env,
+          now: new Date("2026-07-14T00:00:00.000Z"),
+          collectImpl: async () => assert.fail("must not run"),
+        }), scenario.pattern);
+        await assert.rejects(readFile(output), /ENOENT/);
+      });
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -366,6 +442,36 @@ test("Korail station row의 시각이 비면 sequence evidence만 보존하고 t
   assert.deepEqual(artifact.transitStopTimes, []);
 });
 
+test("Korail collector는 legacy 대전 row를 canonical mapping 전에 count와 함께 거부한다", async () => {
+  const { plans, info } = fixtureRows();
+  const legacyPlans = plans.map((row) => row.trn_no === "02001"
+    ? { ...row, arvl_stn_cd: "0010", arvl_stn_nm: "대전" }
+    : row);
+  const legacyInfo = info.map((row) => row.trn_no === "02001" && row.trn_run_sn === 4
+    ? { ...row, stn_cd: "0010", stn_nm: "대전" }
+    : row);
+  await assert.rejects(collectKorailItxCheongchunTimetable({
+    serviceKey: "key",
+    runDate: "20260713",
+    kricServiceDayCode: "8",
+    packPath: PACK_PATH,
+    trainNumberEvidence: trainNumberEvidence(),
+    fetchImpl: async (url) => {
+      if (url.pathname.endsWith("codes2")) {
+        return url.searchParams.get("cond[type::EQ]") === "mrnt_cd"
+          ? apiResponse([{ code: "GJ", type: "mrnt_cd", value: "경춘선" }])
+          : apiResponse([{ code: "11", type: "stop_se_cd", value: "여객승하차" }]);
+      }
+      return apiResponse(url.pathname.endsWith("travelerTrainRunPlan2") ? legacyPlans : legacyInfo);
+    },
+  }), (error) => {
+    assert.match(error.message, /legacy Daejeon data must be zero/);
+    assert.equal(error.legacyDaejeonRowCount, 1);
+    assert.equal(error.legacyYongsanDaejeonTripCount, 1);
+    return true;
+  });
+});
+
 test(
   `live evidence는 TAGO 18편을 Korail canonical sequence로 검증하고 빈 시각을 거부한다 ` +
     `(sequences=${LIVE_EVIDENCE.stationSequenceRowCount},missing=${LIVE_EVIDENCE.materialization.missingTimestampStopCount})`,
@@ -384,6 +490,8 @@ test(
       reasonCode: "OFFICIAL_OPERATION_FIELDS_EMPTY",
       checkedStopCount: 113,
       populatedTimestampStopCount: 0,
+      verifiedAt: "2026-07-14T06:36:22.122Z",
+      travelerTrainRunInfo2RawResponseSha256: "ff64cf6683de1fbc089dde751af198b4745bbd71260b3867cef69f615bafce4c",
     });
     assert.deepEqual(LIVE_EVIDENCE.transitTrips, []);
     assert.deepEqual(LIVE_EVIDENCE.transitStopTimes, []);
@@ -466,7 +574,7 @@ test("Korail materialization은 현재 시종착 변형을 plan endpoint 그대�
     passengerStopCodes: new Map([["11", "여객승하차"]]),
   });
 
-  assert.equal(materialized.transitTrips[0].tripHeadsign, "station-f3d9c93ba7d6");
+  assert.equal(materialized.transitTrips[0].tripHeadsign, "평내호평");
   assert.deepEqual(materialized.transitStopTimes.map(({ stationId }) => stationId), [
     "station-8aa315864466",
     "station-b819702fa7d9",

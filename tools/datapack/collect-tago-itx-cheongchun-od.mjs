@@ -98,22 +98,31 @@ export async function collectTagoItxCheongchunRoster({
   const stationByProviderId = new Map(stations.map((station) => [station.providerStationId, station]));
   const odOperations = [];
   const itineraries = [];
+  const failedOds = [];
   for (const { depStationId, arrStationId } of matrix.rows) {
-    const operation = await fetchAll("GetStrtpntAlocFndTrainInfo", {
-      depPlaceId: depStationId,
-      arrPlaceId: arrStationId,
-      depPlandTime: serviceDate,
-      trainGradeCode: grade.vehiclekndid,
-    }, key, fetchImpl);
-    odOperations.push(operation);
-    itineraries.push(...operation.rows.map((row, index) => ({
-      ...normalizeItinerary(row, index),
-      departureStationId: stationByProviderId.get(depStationId).canonicalStationId,
-      arrivalStationId: stationByProviderId.get(arrStationId).canonicalStationId,
-    })));
+    try {
+      const operation = await fetchAll("GetStrtpntAlocFndTrainInfo", {
+        depPlaceId: depStationId,
+        arrPlaceId: arrStationId,
+        depPlandTime: serviceDate,
+        trainGradeCode: grade.vehiclekndid,
+      }, key, fetchImpl);
+      odOperations.push(operation);
+      itineraries.push(...operation.rows.map((row, index) => ({
+        ...normalizeItinerary(row, index),
+        departureStationId: stationByProviderId.get(depStationId).canonicalStationId,
+        arrivalStationId: stationByProviderId.get(arrStationId).canonicalStationId,
+      })));
+    } catch {
+      failedOds.push({
+        departureStationId: depStationId,
+        arrivalStationId: arrStationId,
+        reasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
+      });
+    }
   }
   const trainNumbers = [...new Set(itineraries.map(({ trainNumber }) => trainNumber))].sort(naturalCompare);
-  if (trainNumbers.length === 0) throw new Error("TAGO ITX-청춘 roster returned zero rows");
+  if (trainNumbers.length === 0 && failedOds.length === 0) throw new Error("TAGO ITX-청춘 roster returned zero rows");
   return {
     schemaVersion: 1,
     artifactKind: "tago-itx-cheongchun-roster-evidence",
@@ -129,14 +138,16 @@ export async function collectTagoItxCheongchunRoster({
     stations: stations.sort((left, right) => left.providerStationId.localeCompare(right.providerStationId)),
     expectedOdCount: matrix.expectedOdCount,
     completedOdCount: odOperations.length,
-    failedOdCount: 0,
+    failedOdCount: failedOds.length,
+    ...(failedOds.length > 0 ? { failedOds } : {}),
     stationSetHash: matrix.stationSetHash,
     odMatrixHash: matrix.odMatrixHash,
     operations: [trainGrades, cities, ...stationOperations, ...odOperations].map(operationEvidence),
     trainNumbers,
     itineraries,
     evidenceHash: sha256(JSON.stringify({
-      serviceDate, kricServiceDayCode, stations, excludedCanonicalStations, matrix, trainNumbers, itineraries,
+      serviceDate, kricServiceDayCode, stations, excludedCanonicalStations, matrix,
+      ...(failedOds.length > 0 ? { failedOds } : {}), trainNumbers, itineraries,
     })),
     credentialRedacted: true,
   };

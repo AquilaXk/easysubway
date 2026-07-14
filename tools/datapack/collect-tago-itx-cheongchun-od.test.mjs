@@ -115,6 +115,37 @@ test("TAGO ITX roster는 canonical 역의 양방향 OD 전체를 수집한다", 
   assert.doesNotMatch(JSON.stringify(artifact), /never-print-data-key/);
 });
 
+test("TAGO ITX roster는 OD 일부 실패를 count한 뒤 admission이 거부할 evidence를 반환한다", async () => {
+  const fallback = validFetch();
+  const artifact = await collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: [
+      { canonicalStationId: "station-a", nameKo: "청량리" },
+      { canonicalStationId: "station-b", nameKo: "춘천" },
+    ],
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith("GetStrtpntAlocFndTrainInfo")
+        && parsed.searchParams.get("depPlaceId") === "NAT140873") {
+        return new Response("unavailable", { status: 503 });
+      }
+      return fallback(url);
+    },
+  });
+
+  assert.equal(artifact.expectedOdCount, 2);
+  assert.equal(artifact.completedOdCount, 1);
+  assert.equal(artifact.failedOdCount, 1);
+  assert.deepEqual(artifact.failedOds, [{
+    departureStationId: "NAT140873",
+    arrivalStationId: "NAT130126",
+    reasonCode: "PROVIDER_OR_SCHEMA_FAILURE",
+  }]);
+  assert.deepEqual(artifact.trainNumbers, ["2001"]);
+});
+
 test("TAGO roster matrix는 provider station catalog와 canonical 경춘선의 교집합을 증명한다", async () => {
   const artifact = await collectTagoItxCheongchunRoster({
     serviceKey: "key",

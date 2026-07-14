@@ -31,6 +31,8 @@
 
 roster 탐색 역의 모든 OD를 조회하는 방식은 고정 시종착 목록보다 호출 수가 많지만 현재 시·종착 변형을 누락하지 않는다. 고정 OD 목록은 시간이 지나면 새 변형을 놓치므로 채택하지 않는다. 열차번호 범위 추정도 공식 roster가 아니므로 사용하지 않는다.
 
+KORAIL catalog상 `travelerTrainRunInfo2`의 조회 범위는 전일까지다. 따라서 오늘부터 6일 이내인 현재 admission 날짜에서 이 operation이 0건이면 과거 날짜로 이동하지 않고 `OFFICIAL_RUN_INFO_EMPTY`로 `MISSING`을 유지한다. 과거 날짜의 정차 순서·빈 시각 evidence는 source capability 판정에만 쓰며 현재 admission을 열지 않는다. provider가 현재 계획 정차시각을 제공하거나 다른 공식 station-level operation이 확인될 때 새 대표 날짜로 재검증한다.
+
 ## 완전성 판정
 
 날짜별 `SUPPORTED` 조건은 모두 충족해야 한다.

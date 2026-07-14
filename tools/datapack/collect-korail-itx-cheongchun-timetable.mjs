@@ -81,6 +81,9 @@ export async function collectKorailItxCheongchunCompleteness({
         status: "MISSING",
         failureStage,
         failureReasonCode: completenessFailureReason(error),
+        legacyDaejeonRowCount: Number.isInteger(error?.legacyDaejeonRowCount) ? error.legacyDaejeonRowCount : 0,
+        legacyYongsanDaejeonTripCount: Number.isInteger(error?.legacyYongsanDaejeonTripCount)
+          ? error.legacyYongsanDaejeonTripCount : 0,
         ...(roster ? {
           expectedOdCount: roster.expectedOdCount,
           completedOdCount: roster.completedOdCount,
@@ -106,8 +109,12 @@ export async function collectKorailItxCheongchunCompleteness({
     admissionStatus,
     admissionEligible: admissionStatus === "SUPPORTED",
     allowedConsumerIssues: ["#1400", "#2098", "#2099"],
-    legacyDaejeonRowCount: serviceDays.reduce((total, day) => total + (day.timetable?.legacyDaejeonRowCount ?? 0), 0),
-    legacyYongsanDaejeonTripCount: serviceDays.reduce((total, day) => total + (day.timetable?.legacyYongsanDaejeonTripCount ?? 0), 0),
+    legacyDaejeonRowCount: serviceDays.reduce((total, day) => (
+      total + (day.timetable?.legacyDaejeonRowCount ?? day.legacyDaejeonRowCount ?? 0)
+    ), 0),
+    legacyYongsanDaejeonTripCount: serviceDays.reduce((total, day) => (
+      total + (day.timetable?.legacyYongsanDaejeonTripCount ?? day.legacyYongsanDaejeonTripCount ?? 0)
+    ), 0),
     serviceDays,
     materialization: { status: complete ? "SUPPORTED" : "MISSING" },
     credentialRedacted: true,
@@ -165,6 +172,17 @@ export async function collectKorailItxCheongchunTimetable({
     key,
     fetchImpl,
   });
+  const { legacyDaejeonRowCount, legacyYongsanDaejeonTripCount } = legacyDaejeonCounts(
+    plans.rows,
+    info.rows,
+    trainNumberEvidence.trainNumbers,
+  );
+  if (legacyDaejeonRowCount !== 0 || legacyYongsanDaejeonTripCount !== 0) {
+    const error = new Error("Korail ITX legacy Daejeon data must be zero");
+    error.legacyDaejeonRowCount = legacyDaejeonRowCount;
+    error.legacyYongsanDaejeonTripCount = legacyYongsanDaejeonTripCount;
+    throw error;
+  }
   const materializationInput = {
     plans: plans.rows,
     infoRows: info.rows,
@@ -192,15 +210,6 @@ export async function collectKorailItxCheongchunTimetable({
     || naturalCompare(left.originStationName, right.originStationName)
     || naturalCompare(left.destinationStationName, right.destinationStationName)
   ));
-  const legacyDaejeonRowCount = analyzed.stationSequences.reduce((total, trip) => total + trip.stops
-    .filter(({ providerStationName }) => normalizeStationName(providerStationName) === normalizeStationName("대전")).length, 0);
-  const legacyYongsanDaejeonTripCount = terminalVariants.filter(({ originStationName, destinationStationName }) => (
-    [originStationName, destinationStationName].map(normalizeStationName).includes(normalizeStationName("용산"))
-    && [originStationName, destinationStationName].map(normalizeStationName).includes(normalizeStationName("대전"))
-  )).length;
-  if (legacyDaejeonRowCount !== 0 || legacyYongsanDaejeonTripCount !== 0) {
-    throw new Error("Korail ITX legacy Daejeon data must be zero");
-  }
   const materialized = analyzed.missingTimestampStopCount === 0
     ? materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate)
     : { transitTrips: [], transitStopTimes: [], trainNumbers: [], stationMappings: analyzed.stationMappings };
@@ -501,7 +510,7 @@ function materializeAnalyzedKorailItxRows(analyzed, kricServiceDayCode, runDate)
       id: tripId,
       routeId,
       serviceId,
-      tripHeadsign: rows.at(-1).stationId,
+      tripHeadsign: trip.stops.at(-1).providerStationName,
       directionId,
       servicePattern: "EXPRESS",
     });
@@ -592,6 +601,20 @@ function sameSet(left, right) {
   return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
+function legacyDaejeonCounts(plans, infoRows, trainNumbers) {
+  const allowed = new Set(trainNumbers.map(normalizeTrainNumber));
+  const isAllowed = (row) => allowed.has(normalizeTrainNumber(row.trn_no));
+  const legacyDaejeonRowCount = infoRows.filter((row) => (
+    isAllowed(row) && normalizeStationName(row.stn_nm) === normalizeStationName("대전")
+  )).length;
+  const legacyYongsanDaejeonTripCount = plans.filter((row) => {
+    if (!isAllowed(row)) return false;
+    const endpoints = [row.dptre_stn_nm, row.arvl_stn_nm].map(normalizeStationName);
+    return endpoints.includes(normalizeStationName("용산")) && endpoints.includes(normalizeStationName("대전"));
+  }).length;
+  return { legacyDaejeonRowCount, legacyYongsanDaejeonTripCount };
+}
+
 function completenessFailureReason(error) {
   const message = error instanceof Error ? error.message : "";
   if (/HTTP \d+/.test(message)) return "PROVIDER_HTTP_FAILURE";
@@ -601,10 +624,12 @@ function completenessFailureReason(error) {
   if (/provider resultCode/.test(message)) return "PROVIDER_RESULT_FAILURE";
   if (/train grade is missing or ambiguous/.test(message)) return "TRAIN_GRADE_MAPPING_INCOMPLETE";
   if (/station mapping/.test(message)) return "STATION_MAPPING_INCOMPLETE";
+  if (/canonical mapping missing/.test(message)) return "CANONICAL_STATION_MAPPING_INCOMPLETE";
   if (/roster stations must be unique/.test(message)) return "ROSTER_STATION_SET_INVALID";
   if (/roster returned zero rows/.test(message)) return "ROSTER_EMPTY";
   if (/run plan returned zero rows/.test(message)) return "OFFICIAL_RUN_PLAN_EMPTY";
   if (/run info returned zero rows/.test(message)) return "OFFICIAL_RUN_INFO_EMPTY";
+  if (/legacy Daejeon data must be zero/.test(message)) return "LEGACY_DAEJEON_DATA_PRESENT";
   if (/OD matrix/.test(message)) return "OD_MATRIX_INCOMPLETE";
   if (/both directions/.test(message)) return "PARTIAL_DIRECTION";
   if (/timestamp missing/.test(message)) return "PLANNED_TIME_MISSING";
