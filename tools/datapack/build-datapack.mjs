@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { gzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -179,10 +179,21 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
   if (fixtureArg != null) {
     const fixture = JSON.parse(await readFile(path.resolve(root, fixtureArg), "utf8"));
     rejectTestOnlyBuildInput(fixture);
+    if (args["test-only-itx-admission"] != null) {
+      const admissionPath = await resolveBuildInputPath(
+        args["test-only-itx-admission"],
+        "testOnlyItxAdmission",
+      );
+      const admissionBytes = await readFile(admissionPath);
+      await materializeTestOnlyItxAdmission(fixture, JSON.parse(admissionBytes), admissionBytes);
+    }
     return {
       fixture,
       candidateBuild: null,
     };
+  }
+  if (args["test-only-itx-admission"] != null) {
+    throw new Error("--test-only-itx-admission cannot be used with --build-spec");
   }
 
   const buildSpecPath = await resolveBuildInputPath(buildSpecArg, "buildSpec");
@@ -200,6 +211,128 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
     fixture,
     candidateBuild: candidateBuildProvenance(buildSpec, sha256(buildSpecBytes), officialOdFareEvidence),
   };
+}
+
+async function materializeTestOnlyItxAdmission(fixture, admission, admissionBytes) {
+  if (
+    admission?.fixtureClass !== "TEST_ONLY"
+    || admission?.artifactKind !== "deterministic-itx-cheongchun-admission-fixture"
+  ) {
+    throw new Error("--test-only-itx-admission requires the deterministic TEST_ONLY fixture");
+  }
+  if (
+    admission.serviceClass !== "ITX_CHEONGCHUN"
+    || admission.sourceIssue !== 2116
+    || admission.admissionStatus !== "ADMITTED"
+    || admission.admissionEligible !== true
+    || admission.freshness?.status !== "FRESH"
+  ) {
+    throw new Error("test-only ITX admission must be FRESH and ADMITTED by #2116");
+  }
+  const freshUntil = requiredUtcDateString(
+    admission.freshness.freshUntil,
+    "testOnlyItxAdmission.freshness.freshUntil",
+  );
+  if (Date.parse(freshUntil) <= candidateBuildNow().getTime()) {
+    throw new Error("test-only ITX admission freshness must be in the future");
+  }
+  const canonicalIdentity = admission.canonicalPackIdentity;
+  const canonicalGzipBytes = await readFile(
+    path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"),
+  );
+  if (
+    canonicalIdentity?.id !== "capital"
+    || canonicalIdentity.sha256 !== sha256(canonicalGzipBytes)
+    || canonicalIdentity.sqliteSha256 !== sha256(gunzipSync(canonicalGzipBytes))
+  ) {
+    throw new Error("test-only ITX admission canonical pack identity is stale");
+  }
+  if (admission.timetableArtifactIdentity?.sha256Source !== "FIXTURE_FILE_BYTES") {
+    throw new Error("test-only ITX timetable identity must hash fixture file bytes");
+  }
+
+  const pack = fixture.packs?.find(({ id }) => id === canonicalIdentity.id);
+  if (!pack || (pack.artifactKind ?? "fixture") !== "fixture") {
+    throw new Error("test-only ITX admission can materialize only into a fixture pack");
+  }
+  const lineId = requiredString(admission.canonicalLineId, "testOnlyItxAdmission.canonicalLineId");
+  const stationIds = new Set((pack.stations ?? []).map(({ id }) => id));
+  const routeMapMembers = new Set((pack.routeMapPositions ?? [])
+    .filter(({ lineId: memberLineId, region }) => memberLineId === lineId && region === "수도권")
+    .map(({ stationId }) => stationId));
+  const admittedStationIds = new Set((admission.canonicalStations ?? []).map((station) => {
+    if (station.capitalRouteMapMember !== true) {
+      throw new Error(`test-only ITX station is not a capital route-map member: ${station.canonicalStationId}`);
+    }
+    return requiredString(station.canonicalStationId, "testOnlyItxAdmission.canonicalStations[].canonicalStationId");
+  }));
+  for (const stationId of admittedStationIds) {
+    if (!stationIds.has(stationId) || !routeMapMembers.has(stationId)) {
+      throw new Error(`test-only ITX canonical station membership is missing: ${stationId}`);
+    }
+  }
+
+  const timetableHash = sha256(admissionBytes);
+  const trips = admission.transitTrips ?? [];
+  const stopTimes = admission.transitStopTimes ?? [];
+  const edges = [];
+  for (const trip of trips) {
+    if (trip.serviceClass !== "ITX_CHEONGCHUN" || trip.servicePattern !== "EXPRESS") {
+      throw new Error(`test-only ITX trip must be EXPRESS: ${trip.id}`);
+    }
+    const tripStops = stopTimes
+      .filter(({ tripId }) => tripId === trip.id)
+      .sort((left, right) => left.stopSequence - right.stopSequence);
+    if (tripStops.length < 2) {
+      throw new Error(`test-only ITX trip must have at least two stops: ${trip.id}`);
+    }
+    for (const stop of tripStops) {
+      if (stop.lineId !== lineId || !admittedStationIds.has(stop.stationId)) {
+        throw new Error(`test-only ITX stop is outside admitted canonical scope: ${trip.id}`);
+      }
+    }
+    for (let index = 1; index < tripStops.length; index += 1) {
+      const from = tripStops[index - 1];
+      const to = tripStops[index];
+      const durationSeconds = to.arrivalSeconds - from.departureSeconds;
+      if (!Number.isInteger(durationSeconds) || durationSeconds <= 0) {
+        throw new Error(`test-only ITX stop times are not increasing: ${trip.id}`);
+      }
+      edges.push({
+        id: `itx-cheongchun:${trip.id}:${from.stopSequence}-${to.stopSequence}`,
+        fromNodeId: `${from.stationId}:${lineId}`,
+        toNodeId: `${to.stationId}:${lineId}`,
+        durationSeconds,
+        distanceMeters: 0,
+        edgeType: "RIDE",
+        servicePattern: "EXPRESS",
+        serviceClass: "ITX_CHEONGCHUN",
+        evidenceHash: timetableHash,
+        lastVerifiedAt: admission.freshness.observedAt,
+      });
+    }
+  }
+
+  pack.serviceCalendars = [...(pack.serviceCalendars ?? []), ...(admission.serviceCalendars ?? [])];
+  pack.transitRoutes = [...(pack.transitRoutes ?? []), ...(admission.transitRoutes ?? [])];
+  pack.transitTrips = [...(pack.transitTrips ?? []), ...trips];
+  pack.transitStopTimes = [...(pack.transitStopTimes ?? []), ...stopTimes];
+  pack.networkEdges = [...(pack.networkEdges ?? []), ...edges];
+  pack.routeServiceArtifactEvidence = [{
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: requiredString(
+      admission.timetableArtifactIdentity?.id,
+      "testOnlyItxAdmission.timetableArtifactIdentity.id",
+    ),
+    timetableArtifactSha256: timetableHash,
+    canonicalPackId: canonicalIdentity.id,
+    canonicalPackSha256: canonicalIdentity.sha256,
+    canonicalPackSqliteSha256: canonicalIdentity.sqliteSha256,
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil,
+    sourceIssue: 2116,
+  }];
 }
 
 function rejectTestOnlyBuildInput(fixture) {

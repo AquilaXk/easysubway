@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -143,4 +144,79 @@ test("MISSING admission pack에 ITX data row가 섞이면 build를 거부한다"
     ], { cwd: root }),
     /ITX_CHEONGCHUN rows require ADMITTED evidence/,
   );
+});
+
+test("test-only ADMITTED timetable은 ITX trip·stop·EXPRESS edge를 materialize한다", async (context) => {
+  const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-admitted-"));
+  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  const fixture = JSON.parse(await readFile(new URL("./fixtures/catalog-fixture.json", import.meta.url), "utf8"));
+  const pack = fixture.packs[0];
+  pack.lines.push({
+    id: "line-54a7b980b7c3",
+    operatorId: "korail",
+    nameKo: "경춘선",
+    nameEn: "Gyeongchun Line",
+    color: "#00A3E0",
+  });
+  pack.stations.push(
+    {
+      id: "station-b819702fa7d9",
+      nameKo: "청량리",
+      nameEn: "Cheongnyangni",
+      normalizedName: "청량리",
+      region: "수도권",
+    },
+    {
+      id: "station-dd14cfb89cbc",
+      nameKo: "춘천",
+      nameEn: "Chuncheon",
+      normalizedName: "춘천",
+      region: "수도권",
+    },
+  );
+  pack.stationLines.push(
+    { stationId: "station-b819702fa7d9", lineId: "line-54a7b980b7c3", stationCode: "P117", lineSequence: 1 },
+    { stationId: "station-dd14cfb89cbc", lineId: "line-54a7b980b7c3", stationCode: "P140", lineSequence: 2 },
+  );
+  const routeMapTemplate = pack.routeMapPositions[0];
+  pack.routeMapPositions.push(
+    { ...routeMapTemplate, stationId: "station-b819702fa7d9", lineId: "line-54a7b980b7c3", region: "수도권", x: 100, y: 100 },
+    { ...routeMapTemplate, stationId: "station-dd14cfb89cbc", lineId: "line-54a7b980b7c3", region: "수도권", x: 200, y: 200 },
+  );
+  const fixturePath = path.join(temporaryDir, "fixture.json");
+  const outputDir = path.join(temporaryDir, "output");
+  await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs",
+    "--fixture", fixturePath,
+    "--test-only-itx-admission", "tools/datapack/fixtures/test-only-itx-cheongchun-admitted.json",
+    "--output", outputDir,
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-14T00:00:00.000Z" },
+  });
+
+  const sqlitePath = path.join(temporaryDir, "capital.sqlite");
+  await writeFile(sqlitePath, gunzipSync(await readFile(path.join(outputDir, "catalog/capital-v1.sqlite.gz"))));
+  const database = new DatabaseSync(sqlitePath, { readOnly: true });
+  try {
+    assert.equal(database.prepare("SELECT count(*) AS count FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN' AND service_pattern = 'EXPRESS'").get().count, 1);
+    assert.equal(database.prepare("SELECT count(*) AS count FROM transit_stop_times WHERE trip_id = 'test-only-itx-cheongchun-2001'").get().count, 2);
+    assert.deepEqual({ ...database.prepare("SELECT edge_type, service_pattern, service_class, duration_seconds FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN'").get() }, {
+      edge_type: "RIDE",
+      service_pattern: "EXPRESS",
+      service_class: "ITX_CHEONGCHUN",
+      duration_seconds: 4140,
+    });
+    const evidence = database.prepare("SELECT * FROM route_service_artifact_evidence WHERE service_class = 'ITX_CHEONGCHUN'").get();
+    const admissionBytes = await readFile(new URL("./fixtures/test-only-itx-cheongchun-admitted.json", import.meta.url));
+    assert.equal(evidence.admission_status, "ADMITTED");
+    assert.equal(evidence.admission_eligible, 1);
+    assert.equal(evidence.timetable_artifact_sha256, createHash("sha256").update(admissionBytes).digest("hex"));
+    assert.equal(evidence.canonical_pack_sha256, "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9");
+    assert.equal(evidence.canonical_pack_sqlite_sha256, "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03");
+  } finally {
+    database.close();
+  }
 });

@@ -3,6 +3,7 @@
   "artifactKind": "deterministic-itx-cheongchun-admission-fixture",
   "fixtureClass": "TEST_ONLY",
   "serviceClass": "ITX_CHEONGCHUN",
+  "canonicalLineId": "line-54a7b980b7c3",
   "sourceIssue": 2116,
   "admissionStatus": "ADMITTED",
   "admissionEligible": true,
@@ -16,8 +17,9 @@
     "sha256Source": "FIXTURE_FILE_BYTES"
   },
   "canonicalPackIdentity": {
-    "id": "test-only-capital-canonical-v1",
-    "sha256Source": "GENERATED_TEST_PACK_BYTES"
+    "id": "capital",
+    "sha256": "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
+    "sqliteSha256": "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03"
   },
   "canonicalStations": [
     {
@@ -31,6 +33,31 @@
       "canonicalStationId": "station-dd14cfb89cbc",
       "nameKo": "춘천",
       "capitalRouteMapMember": true
+    }
+  ],
+  "serviceCalendars": [
+    {
+      "serviceId": "test-only-weekday",
+      "monday": true,
+      "tuesday": true,
+      "wednesday": true,
+      "thursday": true,
+      "friday": true,
+      "saturday": false,
+      "sunday": false,
+      "startDate": "20260714",
+      "endDate": "20260721",
+      "timezone": "Asia/Seoul"
+    }
+  ],
+  "transitRoutes": [
+    {
+      "id": "test-only-itx-cheongchun-down",
+      "lineId": "line-54a7b980b7c3",
+      "routeShortName": "ITX-청춘",
+      "routeLongName": "청량리 → 춘천",
+      "directionName": "춘천 방면",
+      "timezone": "Asia/Seoul"
     }
   ],
   "transitTrips": [
