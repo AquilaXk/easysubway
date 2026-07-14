@@ -218,15 +218,27 @@ class _StationFanMenuPainter extends CustomPainter {
     _labelPainters = {
       _FanSector.departure: _buildLabelPainter(
         '출발',
-        _labelColor(_FanSector.departure, EasySubwayFanMenuColors.departure),
+        _contentColor(_FanSector.departure),
+        fontSize: 34,
+        letterSpacing: -0.7,
       ),
       _FanSector.waypoint: _buildLabelPainter(
         '경유',
-        _labelColor(_FanSector.waypoint, EasySubwayFanMenuColors.waypoint),
+        _contentColor(_FanSector.waypoint),
+        fontSize: 32,
+        letterSpacing: -0.6,
       ),
       _FanSector.arrival: _buildLabelPainter(
         '도착',
-        _labelColor(_FanSector.arrival, EasySubwayFanMenuColors.arrival),
+        _contentColor(_FanSector.arrival),
+        fontSize: 34,
+        letterSpacing: -0.7,
+      ),
+      _FanSector.close: _buildLabelPainter(
+        '닫기',
+        _contentColor(_FanSector.close),
+        fontSize: 30,
+        letterSpacing: -0.6,
       ),
     };
   }
@@ -243,45 +255,31 @@ class _StationFanMenuPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.scale(scale);
-    _paintShadow(canvas);
     _paintSector(
       canvas,
       _FanSector.departure,
       EasySubwayFanMenuColors.departure,
+      EasySubwayFanMenuColors.departureSurface,
       EasySubwayFanMenuColors.departurePressed,
     );
     _paintSector(
       canvas,
       _FanSector.waypoint,
       EasySubwayFanMenuColors.waypoint,
+      EasySubwayFanMenuColors.waypointSurface,
       EasySubwayFanMenuColors.waypointPressed,
     );
     _paintSector(
       canvas,
       _FanSector.arrival,
       EasySubwayFanMenuColors.arrival,
+      EasySubwayFanMenuColors.arrivalSurface,
       EasySubwayFanMenuColors.arrivalPressed,
     );
     _paintClose(canvas);
     _paintBorders(canvas);
     _paintIconsAndLabels(canvas);
     canvas.restore();
-  }
-
-  void _paintShadow(Canvas canvas) {
-    // 스펙 menuShadow: dy12 blur13 .18 + dy3 blur3 .08.
-    for (final layer in const [
-      [12.0, 13.0, 0.18],
-      [3.0, 3.0, 0.08],
-    ]) {
-      final paint = Paint()
-        ..color = const Color(0xFF101828).withValues(alpha: layer[2])
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, layer[1]);
-      canvas.save();
-      canvas.translate(0, layer[0]);
-      canvas.drawPath(geometry.silhouette, paint);
-      canvas.restore();
-    }
   }
 
   Path _pathFor(_FanSector sector) => _pathForSector(geometry, sector);
@@ -293,194 +291,289 @@ class _StationFanMenuPainter extends CustomPainter {
     return slot != null && selectedSlots.contains(slot);
   }
 
-  void _paintSector(Canvas canvas, _FanSector sector, Color color, Color soft) {
-    final path = _pathFor(sector);
-    final Color fill;
-    if (_selected(sector)) {
-      fill = color;
-    } else if (pressed == sector && !_disabled(sector)) {
-      fill = soft;
-    } else {
-      fill = Colors.white;
-    }
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = _disabled(sector)
-          ? fill.withValues(alpha: EasySubwayFanMenuColors.disabledOpacity)
-          : fill;
-    canvas.drawPath(path, paint);
+  ({Color fill, Color content, double opacity}) _visualFor(
+    _FanSector sector,
+    Color selected,
+    Color surface,
+    Color pressedSurface,
+  ) {
+    final disabled = _disabled(sector);
+    final selectedState = _selected(sector);
+    final pressedState = pressed == sector;
+    return (
+      fill: selectedState
+          ? selected
+          : (pressedState ? pressedSurface : surface),
+      content: selectedState ? Colors.white : selected,
+      opacity: disabled
+          ? EasySubwayFanMenuColors.disabledOpacity
+          : (pressedState ? EasySubwayFanMenuColors.pressedOpacity : 1),
+    );
+  }
+
+  ({Color fill, Color content, double opacity}) _closeVisual() {
+    final pressedState = pressed == _FanSector.close;
+    return (
+      fill: pressedState
+          ? EasySubwayFanMenuColors.closePressed
+          : EasySubwayFanMenuColors.closeSurface,
+      content: EasySubwayFanMenuColors.closeInk,
+      opacity: pressedState ? EasySubwayFanMenuColors.pressedOpacity : 1,
+    );
+  }
+
+  void _paintSector(
+    Canvas canvas,
+    _FanSector sector,
+    Color selected,
+    Color surface,
+    Color pressedSurface,
+  ) {
+    final visual = _visualFor(sector, selected, surface, pressedSurface);
+    canvas.drawPath(
+      _pathFor(sector),
+      Paint()
+        ..style = PaintingStyle.fill
+        ..color = visual.fill.withValues(alpha: visual.opacity),
+    );
   }
 
   void _paintClose(Canvas canvas) {
-    final fill = pressed == _FanSector.close
-        ? EasySubwayFanMenuColors.closePressed
-        : EasySubwayFanMenuColors.closeSurface;
+    final visual = _closeVisual();
     canvas.drawPath(
       geometry.close,
       Paint()
         ..style = PaintingStyle.fill
-        ..color = fill,
+        ..color = visual.fill.withValues(alpha: visual.opacity),
     );
   }
 
   void _paintBorders(Canvas canvas) {
-    canvas.saveLayer(Offset.zero & kFanMenuDesignSize, Paint());
-    _drawBorders(canvas);
-    final disabledBorders = Path();
-    for (final sector in _FanSector.values) {
-      if (_disabled(sector)) {
-        disabledBorders.addPath(_pathFor(sector), Offset.zero);
-      }
-    }
-    if (!disabledBorders.getBounds().isEmpty) {
-      canvas.drawPath(
-        disabledBorders,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
-          ..color = Colors.white.withValues(
-            alpha: EasySubwayFanMenuColors.disabledOpacity,
-          )
-          ..blendMode = BlendMode.dstIn,
-      );
-    }
-    canvas.restore();
-  }
-
-  void _drawBorders(Canvas canvas) {
+    final bounds = Offset.zero & kFanMenuDesignSize;
+    final structuralStrokeWidth = 2.4 / scale;
+    canvas.saveLayer(bounds, Paint());
+    canvas.drawPath(
+      geometry.dividers,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = structuralStrokeWidth
+        ..color = EasySubwayFanMenuColors.border,
+    );
     canvas.drawPath(
       geometry.silhouette,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
+        ..strokeWidth = structuralStrokeWidth
         ..color = EasySubwayFanMenuColors.outline,
     );
-    // 섹터 간 경계선(스펙 §비주얼: #D5DAE2). 인접 섹터 경계 line 세그먼트만
-    // 재현한다. 섹터 Path 스트로크로 대체하면 공유 경계가 겹쳐 진해지므로,
-    // 각 섹터 Path를 얇게 스트로크한다.
-    final border = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..color = EasySubwayFanMenuColors.border;
-    canvas.drawPath(geometry.departure, border);
-    canvas.drawPath(geometry.waypoint, border);
-    canvas.drawPath(geometry.arrival, border);
-    canvas.drawPath(geometry.close, border);
+
+    // SVG sector 방향과 무관하게 right-hand sector도 내부만 clip하도록 한다.
+    final disabledMask = Path()..fillType = PathFillType.evenOdd;
+    final pressedMask = Path()..fillType = PathFillType.evenOdd;
+    for (final sector in _FanSector.values) {
+      if (_disabled(sector)) {
+        disabledMask.addPath(_pathFor(sector), Offset.zero);
+      } else if (pressed == sector) {
+        pressedMask.addPath(_pathFor(sector), Offset.zero);
+      }
+    }
+
+    canvas.saveLayer(bounds, Paint()..blendMode = BlendMode.dstIn);
+    canvas.drawRect(bounds, Paint()..color = Colors.white);
+    if (!pressedMask.getBounds().isEmpty) {
+      canvas.save();
+      canvas.clipPath(pressedMask);
+      canvas.drawRect(
+        bounds,
+        Paint()
+          ..color = Colors.white.withValues(
+            alpha: EasySubwayFanMenuColors.pressedOpacity,
+          )
+          ..blendMode = BlendMode.src,
+      );
+      canvas.restore();
+    }
+    if (!disabledMask.getBounds().isEmpty) {
+      canvas.save();
+      canvas.clipPath(disabledMask);
+      canvas.drawRect(
+        bounds,
+        Paint()
+          ..color = Colors.white.withValues(
+            alpha: EasySubwayFanMenuColors.disabledOpacity,
+          )
+          ..blendMode = BlendMode.src,
+      );
+      canvas.restore();
+    }
+    canvas.restore();
+    canvas.restore();
   }
 
   void _paintIconsAndLabels(Canvas canvas) {
-    _paintDepartureIcon(
-      canvas,
-      _iconColor(_FanSector.departure, EasySubwayFanMenuColors.departure),
-    );
-    _paintWaypointIcon(
-      canvas,
-      _iconColor(_FanSector.waypoint, EasySubwayFanMenuColors.waypoint),
-    );
-    _paintArrivalIcon(
-      canvas,
-      _iconColor(_FanSector.arrival, EasySubwayFanMenuColors.arrival),
-    );
-    _paintCloseIcon(canvas);
+    _paintDepartureIcon(canvas, _contentColor(_FanSector.departure));
+    _paintWaypointIcon(canvas, _contentColor(_FanSector.waypoint));
+    _paintArrivalIcon(canvas, _contentColor(_FanSector.arrival));
+    _paintCloseIcon(canvas, _contentColor(_FanSector.close));
     _paintLabel(canvas, _FanSector.departure, const Offset(175, 243));
-    _paintLabel(canvas, _FanSector.waypoint, const Offset(350, 195));
+    _paintLabel(
+      canvas,
+      _FanSector.waypoint,
+      const Offset(350.58783, 160.31921),
+    );
     _paintLabel(canvas, _FanSector.arrival, const Offset(525, 243));
+    _paintLabel(canvas, _FanSector.close, const Offset(350, 302.93903));
   }
 
-  Color _iconColor(_FanSector sector, Color base) {
-    if (_selected(sector)) return Colors.white;
-    final c = base;
-    return _disabled(sector)
-        ? c.withValues(alpha: EasySubwayFanMenuColors.disabledOpacity)
-        : c;
+  Color _contentColor(_FanSector sector) {
+    final visual = switch (sector) {
+      _FanSector.departure => _visualFor(
+        sector,
+        EasySubwayFanMenuColors.departure,
+        EasySubwayFanMenuColors.departureSurface,
+        EasySubwayFanMenuColors.departurePressed,
+      ),
+      _FanSector.waypoint => _visualFor(
+        sector,
+        EasySubwayFanMenuColors.waypoint,
+        EasySubwayFanMenuColors.waypointSurface,
+        EasySubwayFanMenuColors.waypointPressed,
+      ),
+      _FanSector.arrival => _visualFor(
+        sector,
+        EasySubwayFanMenuColors.arrival,
+        EasySubwayFanMenuColors.arrivalSurface,
+        EasySubwayFanMenuColors.arrivalPressed,
+      ),
+      _FanSector.close => _closeVisual(),
+    };
+    return visual.content.withValues(alpha: visual.opacity);
   }
-
-  Color _labelColor(_FanSector sector, Color base) => _iconColor(sector, base);
 
   void _paintDepartureIcon(Canvas canvas, Color color) {
-    // translate(175,173), stroke-width 10. ↗ 화살표 2패스.
-    final paint = Paint()
+    const origin = Offset(175, 168);
+    final outerStroke = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 7
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..color = color;
-    const o = Offset(175, 173);
-    canvas.drawPath(
-      Path()
-        ..moveTo(o.dx - 24, o.dy + 22)
-        ..lineTo(o.dx + 20, o.dy - 22),
-      paint,
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(origin.dx - 24, origin.dy - 28, 48, 48),
+        const Radius.circular(9),
+      ),
+      outerStroke,
     );
-    canvas.drawPath(
-      Path()
-        ..moveTo(o.dx - 4, o.dy - 22)
-        ..lineTo(o.dx + 20, o.dy - 22)
-        ..lineTo(o.dx + 20, o.dy + 2),
-      paint,
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(origin.dx - 14, origin.dy - 16, 28, 16),
+        const Radius.circular(2.5),
+      ),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5.5
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = color,
+    );
+    final fill = Paint()..color = color;
+    canvas.drawCircle(origin + const Offset(-13, 11), 4.2, fill);
+    canvas.drawCircle(origin + const Offset(13, 11), 4.2, fill);
+    final legStroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..color = color;
+    canvas.drawLine(
+      origin + const Offset(-16, 21),
+      origin + const Offset(-23, 30),
+      legStroke,
+    );
+    canvas.drawLine(
+      origin + const Offset(16, 21),
+      origin + const Offset(23, 30),
+      legStroke,
+    );
+    canvas.drawLine(
+      origin + const Offset(-11, 28),
+      origin + const Offset(11, 28),
+      legStroke,
     );
   }
 
   void _paintWaypointIcon(Canvas canvas, Color color) {
-    // translate(600→350,337→127), plus, stroke-width 10.
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 9
       ..strokeCap = StrokeCap.round
       ..color = color;
-    const o = Offset(350, 127);
-    canvas.drawLine(Offset(o.dx - 24, o.dy), Offset(o.dx + 24, o.dy), paint);
-    canvas.drawLine(Offset(o.dx, o.dy - 24), Offset(o.dx, o.dy + 24), paint);
+    const origin = Offset(350.58781, 93.31923);
+    canvas.drawLine(
+      origin + const Offset(-20, 0),
+      origin + const Offset(20, 0),
+      paint,
+    );
+    canvas.drawLine(
+      origin + const Offset(0, -20),
+      origin + const Offset(0, 20),
+      paint,
+    );
   }
 
   void _paintArrivalIcon(Canvas canvas, Color color) {
-    // translate(525,173): 이중 원. 외곽 r24 stroke9 + 채움 r8.
-    const o = Offset(525, 173);
+    const origin = Offset(525, 173);
     canvas.drawCircle(
-      o,
-      24,
+      origin,
+      22,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 9
+        ..strokeWidth = 8
         ..color = color,
     );
     canvas.drawCircle(
-      o,
-      8,
+      origin,
+      7.5,
       Paint()
         ..style = PaintingStyle.fill
         ..color = color,
     );
   }
 
-  void _paintCloseIcon(Canvas canvas) {
-    // translate(350,277): X, stroke-width 9, #343A43.
+  void _paintCloseIcon(Canvas canvas, Color color) {
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 9
+      ..strokeWidth = 8
       ..strokeCap = StrokeCap.round
-      ..color = EasySubwayFanMenuColors.closeInk;
-    const o = Offset(350, 277);
+      ..color = color;
+    const origin = Offset(350, 250.93905);
     canvas.drawLine(
-      Offset(o.dx - 17, o.dy - 17),
-      Offset(o.dx + 17, o.dy + 17),
+      origin + const Offset(-15, -15),
+      origin + const Offset(15, 15),
       paint,
     );
     canvas.drawLine(
-      Offset(o.dx + 17, o.dy - 17),
-      Offset(o.dx - 17, o.dy + 17),
+      origin + const Offset(15, -15),
+      origin + const Offset(-15, 15),
       paint,
     );
   }
 
-  TextPainter _buildLabelPainter(String text, Color color) => TextPainter(
+  TextPainter _buildLabelPainter(
+    String text,
+    Color color, {
+    required double fontSize,
+    required double letterSpacing,
+  }) => TextPainter(
     text: TextSpan(
       text: text,
       style: TextStyle(
         color: color,
-        fontSize: 34,
+        fontSize: fontSize,
         fontWeight: FontWeight.w700,
         fontFamily: fontFamily,
+        letterSpacing: letterSpacing,
       ),
     ),
     textDirection: TextDirection.ltr,
