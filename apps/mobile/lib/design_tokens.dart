@@ -153,6 +153,26 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
   }
 }
 
+/// 방사형 역 액션 메뉴(#2109) 전용 색. 오너 제작 SVG 원본 수치를 그대로
+/// 옮긴 화면 로컬 톤이라 [EasySubwayTokens] 의미 토큰으로 수렴하지 않는다
+/// (design_guard_test.dart 로컬 색 상수 ratchet 해소 경로).
+abstract final class EasySubwayFanMenuColors {
+  static const departure = Color(0xFF176FD1);
+  static const departureSoft = Color(0xFFEAF3FF);
+  static const waypoint = Color(0xFFF57C00);
+  static const waypointSoft = Color(0xFFFFF3E6);
+  static const arrival = Color(0xFFEE2C35);
+  static const arrivalSoft = Color(0xFFFFF0F1);
+  static const closeSurface = Color(0xFFF1F3F6);
+  static const closePressed = Color(0xFFE4E7EC);
+  static const closeInk = Color(0xFF343A43);
+  static const border = Color(0xFFD5DAE2);
+  static const outline = Color(0xFFC9D0DA);
+
+  /// 팬 메뉴 앵커 역명 라벨의 텍스트 잉크.
+  static const ink = Color(0xFF20262E);
+}
+
 /// v4 타이포 위계 — 크기·행간·색으로 위계를 만들고 굵기는 보조로만 쓴다.
 ///
 /// w800+는 화면 타이틀(titleLarge) 한정, 본문 w500, 라벨 w600, 행 강조 w700.
