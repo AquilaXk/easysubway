@@ -29,10 +29,10 @@ String _semanticsLabel(_FanSector sector) => switch (sector) {
 /// 히트테스트(Listener + path.contains)는 이 값을 쓰지 않으므로 정확한 부채꼴
 /// 경계를 그대로 유지한다.
 const Map<_FanSector, Rect> _sectorSemanticsCore = {
-  _FanSector.departure: Rect.fromLTRB(130, 150, 220, 250),
-  _FanSector.waypoint: Rect.fromLTRB(300, 100, 400, 210),
-  _FanSector.arrival: Rect.fromLTRB(480, 150, 570, 250),
-  _FanSector.close: Rect.fromLTRB(320, 252, 380, 302),
+  _FanSector.departure: Rect.fromLTWH(100, 130, 114, 114),
+  _FanSector.waypoint: Rect.fromLTWH(293, 70, 114, 114),
+  _FanSector.arrival: Rect.fromLTWH(486, 130, 114, 114),
+  _FanSector.close: Rect.fromLTWH(293, 240, 114, 114),
 };
 
 /// State(히트테스트)와 Painter(렌더)가 같은 섹터→Path 매핑을 공유하도록
@@ -75,6 +75,7 @@ class StationFanMenu extends StatefulWidget {
 
 class _StationFanMenuState extends State<StationFanMenu> {
   final StationFanMenuGeometry _geometry = buildStationFanMenuGeometry();
+  int? _activePointer;
   _FanSector? _pressed;
 
   double get _scale => widget.width / kFanMenuDesignSize.width;
@@ -118,19 +119,48 @@ class _StationFanMenuState extends State<StationFanMenu> {
         children: [
           Listener(
             onPointerDown: (event) {
+              if (_activePointer != null) {
+                return;
+              }
               final sector = _sectorAtLocal(event.localPosition);
               if (sector != null && !_disabled(sector)) {
-                setState(() => _pressed = sector);
+                setState(() {
+                  _activePointer = event.pointer;
+                  _pressed = sector;
+                });
+              }
+            },
+            onPointerMove: (event) {
+              if (event.pointer != _activePointer || _pressed == null) {
+                return;
+              }
+              if (_sectorAtLocal(event.localPosition) != _pressed) {
+                setState(() => _pressed = null);
               }
             },
             onPointerUp: (event) {
-              final sector = _sectorAtLocal(event.localPosition);
-              setState(() => _pressed = null);
-              if (sector != null) {
-                _handleTapUp(sector);
+              if (event.pointer != _activePointer) {
+                return;
+              }
+              final pressed = _pressed;
+              final released = _sectorAtLocal(event.localPosition);
+              setState(() {
+                _activePointer = null;
+                _pressed = null;
+              });
+              if (pressed != null && released == pressed) {
+                _handleTapUp(pressed);
               }
             },
-            onPointerCancel: (_) => setState(() => _pressed = null),
+            onPointerCancel: (event) {
+              if (event.pointer != _activePointer) {
+                return;
+              }
+              setState(() {
+                _activePointer = null;
+                _pressed = null;
+              });
+            },
             behavior: HitTestBehavior.opaque,
             child: CustomPaint(
               size: size,

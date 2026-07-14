@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 Future<void> _pump(
   WidgetTester tester, {
+  double width = 700,
   Set<RouteDraftSlot> selected = const {},
   Set<RouteDraftSlot> disabled = const {},
   required void Function(RouteDraftSlot) onAction,
@@ -17,7 +18,7 @@ Future<void> _pump(
       home: Scaffold(
         body: Center(
           child: StationFanMenu(
-            width: 700, // design 1:1 스케일이라 design 좌표=위젯 좌표
+            width: width,
             selectedSlots: selected,
             disabledSlots: disabled,
             onAction: onAction,
@@ -29,11 +30,11 @@ Future<void> _pump(
   );
 }
 
-// width=700 → 위젯 로컬 좌표 = design 좌표. Center 배치이므로 위젯 좌상단
-// 오프셋을 더해 글로벌 좌표로 변환한다.
+// design 좌표를 현재 메뉴 폭에 맞춰 위젯 글로벌 좌표로 변환한다.
 Offset _global(WidgetTester tester, Offset design) {
   final topLeft = tester.getTopLeft(find.byType(StationFanMenu));
-  return topLeft + design;
+  final scale = tester.getSize(find.byType(StationFanMenu)).width / 700;
+  return topLeft + design * scale;
 }
 
 void main() {
@@ -139,5 +140,85 @@ void main() {
         expect(area, 0.0, reason: '노드 $i 와 $j 의 접근성 rect가 겹친다(겹침 면적 $area)');
       }
     }
+  });
+
+  for (final width in [296.0, 336.0, 340.0]) {
+    testWidgets('$width dp 메뉴의 Semantics는 48dp 이상이고 겹치지 않는다', (tester) async {
+      await _pump(tester, width: width, onAction: (_) {}, onClose: () {});
+      final rects = [
+        '출발역으로 설정',
+        '경유지로 추가',
+        '도착역으로 설정',
+        '메뉴 닫기',
+      ].map((label) => tester.getRect(find.bySemanticsLabel(label))).toList();
+
+      for (final rect in rects) {
+        expect(rect.width, greaterThanOrEqualTo(48));
+        expect(rect.height, greaterThanOrEqualTo(48));
+      }
+      for (var i = 0; i < rects.length; i++) {
+        for (var j = i + 1; j < rects.length; j++) {
+          expect(rects[i].intersect(rects[j]).isEmpty, isTrue);
+        }
+      }
+    });
+  }
+
+  testWidgets('같은 활성 섹터에서 down/up한 경우에만 action을 실행한다', (tester) async {
+    final actions = <RouteDraftSlot>[];
+    await _pump(tester, onAction: actions.add, onClose: () {});
+    final gesture = await tester.startGesture(
+      _global(tester, const Offset(175, 168)),
+    );
+    await gesture.up();
+    await tester.pump();
+    expect(actions, [RouteDraftSlot.origin]);
+  });
+
+  testWidgets('다른 섹터로 드래그한 뒤 놓으면 action을 취소한다', (tester) async {
+    final actions = <RouteDraftSlot>[];
+    await _pump(tester, onAction: actions.add, onClose: () {});
+    final gesture = await tester.startGesture(
+      _global(tester, const Offset(175, 168)),
+    );
+    await gesture.moveTo(_global(tester, const Offset(350, 93)));
+    await gesture.up();
+    await tester.pump();
+    expect(actions, isEmpty);
+  });
+
+  testWidgets('Path 밖 이동과 pointerCancel은 action을 취소한다', (tester) async {
+    final actions = <RouteDraftSlot>[];
+    await _pump(tester, onAction: actions.add, onClose: () {});
+    final outside = await tester.startGesture(
+      _global(tester, const Offset(175, 168)),
+    );
+    await outside.moveTo(_global(tester, const Offset(350, 370)));
+    await outside.up();
+    final cancelled = await tester.startGesture(
+      _global(tester, const Offset(525, 173)),
+    );
+    await cancelled.cancel();
+    await tester.pump();
+    expect(actions, isEmpty);
+  });
+
+  testWidgets('다른 pointer의 up은 활성 pointer의 action을 완료하지 않는다', (tester) async {
+    final actions = <RouteDraftSlot>[];
+    await _pump(tester, onAction: actions.add, onClose: () {});
+    final first = await tester.startGesture(
+      _global(tester, const Offset(175, 168)),
+      pointer: 1,
+    );
+    final second = await tester.startGesture(
+      _global(tester, const Offset(350, 93)),
+      pointer: 2,
+    );
+    await second.up();
+    await tester.pump();
+    expect(actions, isEmpty);
+    await first.up();
+    await tester.pump();
+    expect(actions, [RouteDraftSlot.origin]);
   });
 }
