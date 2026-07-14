@@ -19,6 +19,7 @@
 // 오염시키며 버전 번호 경합이 있다. feed_end_date는 seed에 포함(--feed-end-date, 기본=--end-date; STALE 안전장치).
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
+import { gunzipSync } from "node:zlib";
 
 const SECONDS_LIMIT_EXCLUSIVE = 108000; // V29 CHECK: arrival/departure BETWEEN 0 AND 107999
 
@@ -53,6 +54,7 @@ export function buildBackendTimetableSeed(artifact, options = {}) {
     trips,
     options.buildNow ?? new Date(),
     options.timetableArtifactSha256,
+    options.canonicalPackIdentity,
   );
 
   const calendars = deriveCalendars(trips, dayMap, startDate, endDate);
@@ -101,7 +103,13 @@ function validateTrips(trips) {
   return ids;
 }
 
-function validateRouteServiceEvidence(rows, trips, buildNow, timetableArtifactSha256) {
+function validateRouteServiceEvidence(
+  rows,
+  trips,
+  buildNow,
+  timetableArtifactSha256,
+  canonicalPackIdentity,
+) {
   if (!Array.isArray(rows) || rows.length > 1) {
     throw new Error("routeServiceArtifactEvidence must contain at most one row");
   }
@@ -114,6 +122,9 @@ function validateRouteServiceEvidence(rows, trips, buildNow, timetableArtifactSh
       || evidence.admissionEligible !== false
     )) {
       throw new Error("ADMITTED evidence requires ITX_CHEONGCHUN trips");
+    }
+    if (evidence) {
+      validateCanonicalPackIdentity(evidence, canonicalPackIdentity);
     }
     return rows;
   }
@@ -139,7 +150,21 @@ function validateRouteServiceEvidence(rows, trips, buildNow, timetableArtifactSh
   ) {
     throw new Error("ITX_CHEONGCHUN timetable artifact SHA-256 identity mismatch");
   }
+  validateCanonicalPackIdentity(evidence, canonicalPackIdentity);
   return rows;
+}
+
+function validateCanonicalPackIdentity(evidence, canonicalPackIdentity) {
+  if (
+    typeof canonicalPackIdentity?.id !== "string"
+    || !/^[a-f0-9]{64}$/.test(canonicalPackIdentity?.sha256 ?? "")
+    || !/^[a-f0-9]{64}$/.test(canonicalPackIdentity?.sqliteSha256 ?? "")
+    || evidence.canonicalPackId !== canonicalPackIdentity.id
+    || evidence.canonicalPackSha256 !== canonicalPackIdentity.sha256
+    || evidence.canonicalPackSqliteSha256 !== canonicalPackIdentity.sqliteSha256
+  ) {
+    throw new Error("ITX_CHEONGCHUN canonical pack identity mismatch");
+  }
 }
 
 function validateStopTimes(stopTimes, tripIds) {
@@ -313,9 +338,31 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const artifactBytes = await readFile(args.input);
   const artifact = JSON.parse(artifactBytes.toString("utf8"));
+  let canonicalPackIdentity;
   if (args["route-service-evidence"]) {
     if ((artifact.routeServiceArtifactEvidence ?? []).length > 0) {
       throw new Error("route service evidence must be separate from timetable artifact bytes");
+    }
+    if (!args["canonical-pack"]) {
+      throw new Error("--canonical-pack is required with --route-service-evidence");
+    }
+    const canonicalPackBytes = await readFile(args["canonical-pack"]);
+    let canonicalSqliteBytes;
+    try {
+      canonicalSqliteBytes = gunzipSync(canonicalPackBytes);
+    } catch {
+      throw new Error("--canonical-pack must be a gzip-compressed SQLite artifact");
+    }
+    canonicalPackIdentity = {
+      id: requireString(artifact.canonicalPackIdentity?.id, "canonicalPackIdentity.id"),
+      sha256: createHash("sha256").update(canonicalPackBytes).digest("hex"),
+      sqliteSha256: createHash("sha256").update(canonicalSqliteBytes).digest("hex"),
+    };
+    if (
+      artifact.canonicalPackIdentity?.sha256 !== canonicalPackIdentity.sha256
+      || artifact.canonicalPackIdentity?.sqliteSha256 !== canonicalPackIdentity.sqliteSha256
+    ) {
+      throw new Error("timetable artifact canonical pack identity mismatch");
     }
     const sidecar = JSON.parse(await readFile(args["route-service-evidence"], "utf8"));
     artifact.routeServiceArtifactEvidence = Array.isArray(sidecar) ? sidecar : [sidecar];
@@ -326,6 +373,7 @@ async function main() {
     endDate: args["end-date"],
     feedEndDate: args["feed-end-date"],
     timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+    canonicalPackIdentity,
     serviceCalendarDayMap: Array.isArray(artifact.serviceCalendars)
       ? Object.fromEntries(artifact.serviceCalendars.map((calendar) => [calendar.serviceId, {
         monday: calendar.monday,

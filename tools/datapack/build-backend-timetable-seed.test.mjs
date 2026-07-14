@@ -107,6 +107,7 @@ test("ITX seed는 test-only timetable·canonical pack identity evidence를 같�
     ...OPTIONS,
     lineId: artifact.canonicalLineId,
     timetableArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+    canonicalPackIdentity: artifact.canonicalPackIdentity,
     serviceCalendarDayMap: Object.fromEntries(artifact.serviceCalendars.map((calendar) => [
       calendar.serviceId,
       calendar,
@@ -177,6 +178,7 @@ test("CLI는 timetable 원본과 분리된 evidence sidecar를 실제 input byte
     "tools/datapack/build-backend-timetable-seed.mjs",
     "--input", inputPath,
     "--route-service-evidence", evidencePath,
+    "--canonical-pack", "apps/mobile/assets/datapacks/capital.sqlite.gz",
     "--line-id", artifact.canonicalLineId,
     "--start-date", "20300101",
     "--end-date", "20300131",
@@ -189,6 +191,33 @@ test("CLI는 timetable 원본과 분리된 evidence sidecar를 실제 input byte
   assert.match(sql, /'ITX_CHEONGCHUN'/);
   assert.match(sql, /'20300101', '20300131', 'Asia\/Seoul'/);
   assert.match(sql, /transit_feed_info \(id, feed_end_date\) VALUES \(1, '20300131'\)/);
+
+  await writeFile(evidencePath, `${JSON.stringify({
+    serviceClass: "ITX_CHEONGCHUN",
+    timetableArtifactId: artifact.timetableArtifactIdentity.id,
+    timetableArtifactSha256,
+    canonicalPackId: artifact.canonicalPackIdentity.id,
+    canonicalPackSha256: "0".repeat(64),
+    canonicalPackSqliteSha256: artifact.canonicalPackIdentity.sqliteSha256,
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil: "2999-01-01T00:00:00.000Z",
+    sourceIssue: 2116,
+  })}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/build-backend-timetable-seed.mjs",
+      "--input", inputPath,
+      "--route-service-evidence", evidencePath,
+      "--canonical-pack", "apps/mobile/assets/datapacks/capital.sqlite.gz",
+      "--line-id", artifact.canonicalLineId,
+      "--start-date", "20300101",
+      "--end-date", "20300131",
+      "--feed-end-date", "20300131",
+      "--output", outputPath,
+    ], { cwd: root }),
+    /canonical pack identity mismatch/,
+  );
 });
 
 test("stale ITX evidence는 seed 생성 단계에서 거부한다", () => {
