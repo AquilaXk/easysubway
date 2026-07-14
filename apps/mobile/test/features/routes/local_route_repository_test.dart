@@ -531,6 +531,95 @@ void main() {
     expect(result.etaSource, 'STATIC_LOCAL');
   });
 
+  test('Mobile 로컬 planner는 ITX topology를 직접 소비하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, edge_type,
+        service_pattern, service_class, stair_access_state,
+        accessibility_status, reliability_score
+      ) VALUES (
+        'itx-edge-a-b', 'station-a:line-test', 'station-b:line-test', 60,
+        'RIDE', 'EXPRESS', 'ITX_CHEONGCHUN', 'STEP_FREE', 'AVAILABLE', 100
+      )
+    ''');
+
+    final result = await LocalRouteRepository(catalogDatabase: database)
+        .searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-b',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+
+    expect(result.status, isNot('FOUND'));
+    expect(
+      result.steps.expand((step) => step.evidenceSources),
+      isNot(contains('edge:itx-edge-a-b')),
+    );
+  });
+
+  test('Mobile 로컬 planner는 ITX timetable row를 직접 소비하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'subway-edge-a-b',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 600,
+      servicePattern: 'EXPRESS',
+    );
+    await database.customStatement('''
+      INSERT INTO service_calendars (
+        service_id, monday, tuesday, wednesday, thursday, friday,
+        saturday, sunday, start_date, end_date
+      ) VALUES (
+        'itx-weekday', 1, 1, 1, 1, 1, 0, 0, '20260101', '20261231'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_routes (id, line_id, route_short_name)
+      VALUES ('itx-route', 'line-test', 'ITX-청춘')
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_trips (
+        id, route_id, service_id, service_pattern, service_class
+      ) VALUES (
+        'itx-trip', 'itx-route', 'itx-weekday', 'EXPRESS', 'ITX_CHEONGCHUN'
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO transit_stop_times (
+        trip_id, stop_sequence, station_id, line_id,
+        arrival_seconds, departure_seconds
+      ) VALUES
+        ('itx-trip', 1, 'station-a', 'line-test', 28770, 28800),
+        ('itx-trip', 2, 'station-b', 'line-test', 29400, 29430)
+    ''');
+    final repository = LocalRouteRepository(
+      catalogDatabase: database,
+      now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+    );
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(result.status, 'FOUND');
+    expect(ride.plannedArrivalTimeIso, isEmpty);
+  });
+
   test('SLOW 프리셋은 보행 스텝 시간을 늘리고 ride 스텝은 그대로 둔다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
