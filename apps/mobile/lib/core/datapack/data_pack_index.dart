@@ -28,13 +28,17 @@ class DataPackIndex {
         'Data pack index freshnessExpiresAt must be after qualityAsOf.',
       );
     }
+    final schemaIdentity = _requiredString(json, 'schemaIdentity');
+    if (schemaIdentity != 'catalog-schema-v1') {
+      throw const FormatException('Unsupported data pack schema identity.');
+    }
     return DataPackIndex(
       schemaVersion: schemaVersion,
       builtAt: _requiredUtcDateTime(json, 'builtAt'),
       qualityAsOf: qualityAsOf,
       freshnessExpiresAt: freshnessExpiresAt,
       sourceSnapshotSetHash: _requiredSha256(json, 'sourceSnapshotSetHash'),
-      schemaIdentity: _requiredString(json, 'schemaIdentity'),
+      schemaIdentity: schemaIdentity,
       packs: packs
           .map((pack) {
             if (pack is! Map<String, Object?>) {
@@ -114,7 +118,9 @@ String _requiredSha256(Map<String, Object?> json, String key) {
 DateTime _requiredUtcDateTime(Map<String, Object?> json, String key) {
   final value = _requiredString(json, key);
   final parsed = DateTime.tryParse(value);
-  if (parsed == null || !value.endsWith('Z')) {
+  if (parsed == null ||
+      !value.endsWith('Z') ||
+      parsed.toUtc().toIso8601String() != value) {
     throw FormatException('Invalid data pack index field: $key.');
   }
   return parsed.toUtc();

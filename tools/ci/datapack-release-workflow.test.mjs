@@ -96,6 +96,15 @@ test("production publish는 canonical decision의 write 허용 뒤에만 실행�
   assert.match(publishStep, /steps\.release-decision\.outputs\.productionWriteAllowed == 'true'/);
 });
 
+test("current manifest 조회는 404만 initial release로 허용한다", () => {
+  const downloadStep = yml.match(/- name: Data Pack Release \/ Download current production manifest[\s\S]*?\n\s+- name:/)?.[0];
+  assert.ok(downloadStep, "current production manifest 다운로드 스텝을 찾지 못함");
+  assert.match(downloadStep, /http_status/);
+  assert.match(downloadStep, /404/);
+  assert.match(downloadStep, /rm -f "\$\{EASYSUBWAY_DATAPACK_CURRENT_MANIFEST\}"/);
+  assert.match(downloadStep, /exit 1/);
+});
+
 test("publish run은 remote artifact validation 뒤 최종 decision과 callback을 만든다", () => {
   assert.match(yml, /validate-remote-datapack-artifact\.mjs/);
   assert.match(yml, /id:\s*final-release-decision/);

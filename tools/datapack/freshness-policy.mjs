@@ -73,6 +73,8 @@ function addCadence(basisMillis, cadence) {
     value.setUTCFullYear(value.getUTCFullYear() + Number(years[1]));
     return value.getTime();
   }
+  const seconds = /^PT([1-9][0-9]*)S$/.exec(cadence);
+  if (seconds) return basisMillis + Number(seconds[1]) * 1_000;
   throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: unsupported cadence ${cadence}`);
 }
 

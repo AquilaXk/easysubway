@@ -74,6 +74,7 @@ public class JdbcDatapackReleaseBlockerSummaryRepository implements DatapackRele
 			candidateGateBlockers,
 			aliasBlockers,
 			quarantineBlockers,
+			sourceFreshnessBlockers,
 			manualOverrideBlockers,
 			facilityBlockers,
 			routeGateBlockers,

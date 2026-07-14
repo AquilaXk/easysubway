@@ -127,6 +127,16 @@ test("tracked freshness policy는 수동 decision 없이 파생 필드를 선언
       typeof (sourceClass.reverificationCadence ?? sourceClass.maximumReverificationCadence),
       "string",
     );
+    const cadence = sourceClass.reverificationCadence ?? sourceClass.maximumReverificationCadence;
+    const basisAt = "2026-07-01T00:00:00.000Z";
+    const storedExpiresAt = expectedExpiry(basisAt, cadence);
+    assert.equal(deriveFreshness({
+      policy: tracked,
+      sourceClassId: sourceClass.id,
+      basisAt,
+      storedExpiresAt,
+      evaluationAt: basisAt,
+    }).freshnessExpiresAt, storedExpiresAt);
   }
   assert.deepEqual(tracked.scheduledPipeline.requiredStages, [
     "source-snapshot",
@@ -137,3 +147,17 @@ test("tracked freshness policy는 수동 decision 없이 파생 필드를 선언
     "conditional-post-publish-artifact-validation",
   ]);
 });
+
+function expectedExpiry(basisAt, cadence) {
+  const basis = new Date(basisAt);
+  const days = /^P([1-9][0-9]*)D$/.exec(cadence);
+  if (days) return new Date(basis.getTime() + Number(days[1]) * 86_400_000).toISOString();
+  const years = /^P([1-9][0-9]*)Y$/.exec(cadence);
+  if (years) {
+    basis.setUTCFullYear(basis.getUTCFullYear() + Number(years[1]));
+    return basis.toISOString();
+  }
+  const seconds = /^PT([1-9][0-9]*)S$/.exec(cadence);
+  if (seconds) return new Date(basis.getTime() + Number(seconds[1]) * 1_000).toISOString();
+  throw new Error(`unsupported test cadence ${cadence}`);
+}

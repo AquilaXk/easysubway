@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.easysubway.datapack.application.port.in.DatapackReleaseBlockerSummaryUseCase;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -43,6 +44,9 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	private DatapackReleaseBlockerSummaryUseCase blockerSummaryUseCase;
 
 	@BeforeEach
 	void setUp() {
@@ -256,6 +260,7 @@ class DatapackReleaseBlockerSummaryAdminPageTest {
 			.contains("Source freshness")
 			.contains("SOURCE_SNAPSHOT_EXPIRED")
 			.contains("FAIL");
+		assertThat(blockerSummaryUseCase.summarize().sourceFreshnessBlockers()).isEqualTo(1);
 	}
 
 	@Test

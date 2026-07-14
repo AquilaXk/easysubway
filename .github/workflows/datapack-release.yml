@@ -640,9 +640,20 @@ jobs:
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' && steps.remote-publish-env.outputs.enabled == 'true' }}
         run: |
           set -euo pipefail
-          curl -fsS --connect-timeout 10 --max-time 30 \
-            "${EASYSUBWAY_DATA_PACK_BASE_URL%/}/catalog/current.json" \
-            -o "${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}"
+          if ! http_status="$(curl -sS --connect-timeout 10 --max-time 30 \
+            --write-out '%{http_code}' \
+            --output "${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}" \
+            "${EASYSUBWAY_DATA_PACK_BASE_URL%/}/catalog/current.json")"; then
+            rm -f "${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}"
+            exit 1
+          fi
+          if [[ "${http_status}" == "404" ]]; then
+            rm -f "${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}"
+          elif [[ "${http_status}" != "200" ]]; then
+            echo "current production manifest returned HTTP ${http_status}" >&2
+            rm -f "${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}"
+            exit 1
+          fi
 
       - name: Data Pack Release / Decide conditional publish
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' }}

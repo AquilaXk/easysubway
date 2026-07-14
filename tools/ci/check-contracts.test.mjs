@@ -5,6 +5,7 @@ import {
   collectContractErrors,
   loadJson,
   validateCompatibilityMatrixPayload,
+  validateDatapackIndex,
   validateDatapackManifest,
   validateJson,
 } from "./check-contracts.mjs";
@@ -15,6 +16,21 @@ test("번들 datapack index 실물이 계약 스키마를 통과한다", () => {
   const index = loadJson("apps/mobile/assets/datapacks/index.json");
 
   assert.deepEqual(validateSchema(schema, index).errors, []);
+});
+
+test("번들 datapack index는 실재하지 않는 UTC 시각을 거부한다", () => {
+  const errors = [];
+
+  validateDatapackIndex({
+    builtAt: "2026-02-31T00:00:00.000Z",
+    qualityAsOf: "2026-07-12T25:00:00.000Z",
+    freshnessExpiresAt: "2026-08-11T00:00:00.000Z",
+  }, "index.json", errors);
+
+  assert.deepEqual(errors, [
+    "index.json: builtAt은 유효한 UTC 시각이어야 한다",
+    "index.json: qualityAsOf은 유효한 UTC 시각이어야 한다",
+  ]);
 });
 
 test("번들 source-inventory 실물이 계약 스키마를 통과한다", () => {

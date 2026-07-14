@@ -18,16 +18,20 @@ export function evaluateReleaseDecision({
   evaluationAt,
 }) {
   const evaluatedMillis = requiredInstant(evaluationAt, "evaluationAt");
+  const candidateIdentity = stableManifestIdentity(candidateManifest);
+  const currentIdentity = currentManifest == null ? null : stableManifestIdentity(currentManifest);
   const materialChange = currentManifest == null
-    || stableManifestIdentity(candidateManifest) !== stableManifestIdentity(currentManifest);
+    || candidateIdentity !== currentIdentity;
   const currentExpired = currentManifest != null
     && evaluatedMillis >= requiredInstant(currentManifest.expiresAt, "currentManifest.expiresAt");
   const publishRequired = materialChange || currentExpired;
   const approvalValid = validApproval({ buildSpec, buildSpecSha256, releaseRequest });
-  const sequenceValid = !publishRequired || currentManifest == null
-    || (Number.isInteger(candidateManifest.releaseSequence)
-      && Number.isInteger(currentManifest.releaseSequence)
-      && candidateManifest.releaseSequence > currentManifest.releaseSequence);
+  const candidateSequenceValid = Number.isInteger(candidateManifest.releaseSequence)
+    && candidateManifest.releaseSequence >= 1;
+  const sequenceValid = !publishRequired || (candidateSequenceValid
+    && (currentManifest == null
+      || (Number.isInteger(currentManifest.releaseSequence)
+        && candidateManifest.releaseSequence > currentManifest.releaseSequence)));
   const sequenceRequiredAndInvalid = approvalValid && !sequenceValid;
   const effectiveStrictValidationPassed = strictValidationPassed && !sequenceRequiredAndInvalid;
   const scheduled = decideScheduledRun({

@@ -30,4 +30,30 @@ void main() {
       throwsA(isA<UnsupportedDatapackSchemaException>()),
     );
   });
+
+  test('지원하지 않는 schema identity를 거부한다', () {
+    final decoded =
+        jsonDecode(
+              File(
+                '../../apps/mobile/assets/datapacks/index.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, Object?>;
+    decoded['schemaIdentity'] = 'catalog-schema-v2';
+
+    expect(() => DataPackIndex.fromJson(decoded), throwsFormatException);
+  });
+
+  test('실재하지 않는 UTC 시각을 거부한다', () {
+    final decoded =
+        jsonDecode(
+              File(
+                '../../apps/mobile/assets/datapacks/index.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, Object?>;
+    decoded['builtAt'] = '2026-02-31T00:00:00.000Z';
+
+    expect(() => DataPackIndex.fromJson(decoded), throwsFormatException);
+  });
 }

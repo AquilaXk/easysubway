@@ -169,6 +169,23 @@ test("publish가 필요한 candidate sequence가 증가하지 않으면 fail clo
   assert.deepEqual(result.reasonCodes, ["PUBLISH_SEQUENCE_NOT_INCREASING"]);
 });
 
+test("initial release도 양의 정수 sequence를 요구한다", () => {
+  const result = decide({
+    candidateManifest: manifest({ releaseSequence: "1" }),
+    currentManifest: null,
+  });
+
+  assert.equal(result.outcome, "FAILED");
+  assert.deepEqual(result.reasonCodes, ["PUBLISH_SEQUENCE_NOT_INCREASING"]);
+});
+
+test("initial release의 빈 packs는 구조 검증에서 거부한다", () => {
+  assert.throws(() => decide({
+    candidateManifest: manifest({ releaseSequence: 1, packs: [] }),
+    currentManifest: null,
+  }), /manifest\.packs must be a non-empty array/);
+});
+
 test("strict validation 실패는 승인과 무관하게 FAILED이며 write를 금지한다", () => {
   const result = decide({ strictValidationPassed: false });
 
