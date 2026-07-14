@@ -515,24 +515,29 @@ void main() {
       assetBundle: rootBundle,
       now: () => DateTime.utc(2026, 8, 11),
     ).open();
-    addTearDown(database.close);
-    final rows = await database.customSelect('''
-      SELECT key, value
-      FROM catalog_metadata
-      WHERE key LIKE 'datapack.freshness.%'
-    ''').get();
-    final metadata = {
-      for (final row in rows)
-        row.read<String>('key'): row.read<String>('value'),
-    };
+    final installedPack = File('${directory.path}/datapacks/capital.sqlite');
+    final firstHash = sha256.convert(await installedPack.readAsBytes());
+    await database.close();
+    final state =
+        jsonDecode(
+              await File(
+                '${directory.path}/datapacks/bundled-freshness.json',
+              ).readAsString(),
+            )
+            as Map<String, Object?>;
 
-    expect(metadata['datapack.freshness.status'], 'STALE');
-    expect(metadata['datapack.freshness.reasonCode'], 'BUNDLED_PACK_EXPIRED');
-    expect(metadata['datapack.freshness.labelKo'], '저장된 데이터 기준 · 갱신 필요');
-    expect(
-      metadata['datapack.freshness.expiresAt'],
-      '2026-08-11T00:00:00.000Z',
-    );
+    expect(state['status'], 'STALE');
+    expect(state['reasonCode'], 'BUNDLED_PACK_EXPIRED');
+    expect(state['labelKo'], '저장된 데이터 기준 · 갱신 필요');
+    expect(state['freshnessExpiresAt'], '2026-08-11T00:00:00.000Z');
+
+    final reopened = await CatalogDatabaseOpener(
+      databaseDirectory: directory,
+      assetBundle: rootBundle,
+      now: () => DateTime.utc(2026, 8, 11),
+    ).open();
+    addTearDown(reopened.close);
+    expect(sha256.convert(await installedPack.readAsBytes()), firstHash);
   });
 
   test('기존 baseline 노선도 출처에 남은 fixture 문구를 정리한다', () async {

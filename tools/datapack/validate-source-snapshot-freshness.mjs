@@ -55,12 +55,15 @@ async function main(argv) {
   const args = parseArgs(argv);
   const buildSpecPath = requiredArg(args, "build-spec");
   const policyPath = requiredArg(args, "policy");
-  const snapshotsPath = requiredArg(args, "snapshots");
   const buildSpec = JSON.parse(await readFile(buildSpecPath, "utf8"));
+  const snapshotsPath = requiredString(
+    buildSpec.sourceSnapshotEvidencePath,
+    "buildSpec.sourceSnapshotEvidencePath",
+  );
   const root = process.cwd();
   const resolvedEvidencePath = path.resolve(root, snapshotsPath);
   if (path.relative(root, resolvedEvidencePath).startsWith("..")) {
-    throw new Error("--snapshots must stay within the repository");
+    throw new Error("buildSpec.sourceSnapshotEvidencePath must stay within the repository");
   }
   const [snapshots, policy] = await Promise.all([
     readFile(resolvedEvidencePath, "utf8").then(JSON.parse),

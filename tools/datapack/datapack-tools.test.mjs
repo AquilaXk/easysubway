@@ -1583,6 +1583,50 @@ test("source snapshot command는 policy에서 파생되지 않은 임의 만료 
   }
 });
 
+test("source snapshot command는 정책 basis와 provider validity 필드를 보존한다", async () => {
+  const workDir = path.join(tmpdir(), `easysubway-source-snapshot-planned-${process.pid}-${Date.now()}`);
+  const rawPath = path.join(workDir, "raw.csv");
+  const outputPath = path.join(workDir, "snapshot.json");
+  const policyPath = path.join(workDir, "policy.json");
+  await rm(workDir, { recursive: true, force: true });
+  await mkdir(workDir, { recursive: true });
+  await writeFile(rawPath, "trip\nA\n");
+  await writeFile(policyPath, JSON.stringify({
+    clockSkewSeconds: 300,
+    sourceClasses: [{
+      id: "planned_timetable",
+      basisField: "serviceEffectiveAt",
+      maximumReverificationCadence: "P30D",
+      providerValidityEndField: "serviceEffectiveUntil",
+    }],
+  }));
+
+  try {
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-source-snapshot.mjs",
+      "--input", rawPath,
+      "--output", outputPath,
+      "--snapshot-id", "snapshot-planned-a",
+      "--source-id", "planned-a",
+      "--provider", "provider-a",
+      "--source-class-id", "planned_timetable",
+      "--freshness-policy", policyPath,
+      "--retrieved-at", "2026-07-02T00:00:00Z",
+      "--freshness-basis-at", "2026-07-01T00:00:00Z",
+      "--provider-valid-until", "2026-07-20T00:00:00Z",
+      "--raw-object-uri", "s3://bucket/snapshot-planned-a.csv",
+      "--freshness-expires-at", "2026-07-20T00:00:00Z",
+      "--raw-retention-expires-at", "2026-10-01T00:00:00Z",
+    ], { cwd: root });
+
+    const snapshot = JSON.parse(await readFile(outputPath, "utf8"));
+    assert.equal(snapshot.serviceEffectiveAt, "2026-07-01T00:00:00Z");
+    assert.equal(snapshot.serviceEffectiveUntil, "2026-07-20T00:00:00Z");
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("데이터팩 생성기는 같은 buildSpec에서 candidate artifact hash를 재현한다", async () => {
   const outputRoot = path.join(tmpdir(), `easysubway-datapack-deterministic-${process.pid}-${Date.now()}`);
   const firstOutputDir = path.join(outputRoot, "first");

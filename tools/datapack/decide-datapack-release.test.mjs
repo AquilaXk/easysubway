@@ -159,6 +159,22 @@ test("current expiry와 같은 평가 시각은 변경이 없어도 PUBLISH_REQU
   ]);
 });
 
+test("current expiry가 다음 schedule cadence 안이면 미리 PUBLISH_REQUIRED이다", () => {
+  const current = manifest({ expiresAt: "2026-07-15T23:59:59.999Z" });
+  const result = decide({
+    candidateManifest: { ...current, releaseSequence: 11 },
+    currentManifest: current,
+    refreshBeforeMillis: 86_400_000,
+  });
+
+  assert.equal(result.outcome, "PUBLISH_REQUIRED");
+  assert.equal(result.publishRequired, true);
+  assert.deepEqual(result.reasonCodes, [
+    "PACK_PUBLISH_FRESHNESS_EXPIRING",
+    "PUBLISH_REQUIRED_NOT_COMPLETED",
+  ]);
+});
+
 test("expiry alert 경로는 승인 없이 PUBLISH_REQUIRED를 보고하되 write를 금지한다", () => {
   const expired = manifest({ expiresAt: evaluationAt });
   const result = decide({

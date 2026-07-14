@@ -135,6 +135,7 @@ jobs:
           node tools/datapack/decide-datapack-release.mjs \
             --alert-only \
             --current-manifest "${EASYSUBWAY_DATAPACK_EXPIRY_MANIFEST}" \
+            --freshness-policy apps/mobile/release/datapack-freshness-sla.json \
             --output "${EASYSUBWAY_DATAPACK_EXPIRY_DECISION}"
           node -e '
             const fs = require("fs");

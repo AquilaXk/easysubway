@@ -41,7 +41,7 @@ class CatalogDatabaseOpener {
       File(p.join(datapackDirectory.path, 'capital.sqlite')),
     );
     await database.seedBaselineIfEmpty();
-    await _writeBundledFreshness(database, index);
+    await _writeBundledFreshness(datapackDirectory, index);
     return database;
   }
 
@@ -323,7 +323,7 @@ class CatalogDatabaseOpener {
   }
 
   Future<void> _writeBundledFreshness(
-    CatalogDatabase database,
+    Directory datapackDirectory,
     DataPackIndex index,
   ) async {
     final freshness = evaluateDataPackFreshness(
@@ -331,26 +331,15 @@ class CatalogDatabaseOpener {
       freshnessExpiresAt: index.freshnessExpiresAt,
     );
     final stale = freshness == DataPackFreshnessState.stale;
-    await database.batch((batch) {
-      batch.insertAllOnConflictUpdate(database.catalogMetadata, [
-        CatalogMetadataCompanion.insert(
-          key: 'datapack.freshness.status',
-          value: stale ? 'STALE' : 'FRESH',
-        ),
-        CatalogMetadataCompanion.insert(
-          key: 'datapack.freshness.expiresAt',
-          value: index.freshnessExpiresAt.toIso8601String(),
-        ),
-        CatalogMetadataCompanion.insert(
-          key: 'datapack.freshness.reasonCode',
-          value: stale ? 'BUNDLED_PACK_EXPIRED' : 'NONE',
-        ),
-        CatalogMetadataCompanion.insert(
-          key: 'datapack.freshness.labelKo',
-          value: stale ? '저장된 데이터 기준 · 갱신 필요' : '',
-        ),
-      ]);
-    });
+    final target = File(
+      p.join(datapackDirectory.path, 'bundled-freshness.json'),
+    );
+    final temporary = File('${target.path}.installing');
+    await temporary.writeAsString(
+      '${jsonEncode({'status': stale ? 'STALE' : 'FRESH', 'freshnessExpiresAt': index.freshnessExpiresAt.toIso8601String(), 'reasonCode': stale ? 'BUNDLED_PACK_EXPIRED' : 'NONE', 'labelKo': stale ? '저장된 데이터 기준 · 갱신 필요' : ''})}\n',
+      flush: true,
+    );
+    await _replaceFile(temporary, target);
   }
 
   Future<void> _replaceInstalledDataPack(

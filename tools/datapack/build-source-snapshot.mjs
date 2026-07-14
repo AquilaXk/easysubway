@@ -54,11 +54,19 @@ async function validateFreshnessPolicy(snapshot, args) {
   const sourceClass = policy.sourceClasses?.find((entry) => entry.id === sourceClassId);
   const basisAt = args["freshness-basis-at"]
     ?? (sourceClass?.basisField === "retrievedAt" ? snapshot.retrievedAt : null);
+  if (sourceClass?.basisField && basisAt) {
+    snapshot[sourceClass.basisField] = basisAt;
+  }
+  if (sourceClass?.providerValidityEndField && args["provider-valid-until"]) {
+    snapshot[sourceClass.providerValidityEndField] = args["provider-valid-until"];
+  }
   deriveFreshness({
     policy,
     sourceClassId,
     basisAt,
-    providerValidUntil: args["provider-valid-until"],
+    providerValidUntil: sourceClass?.providerValidityEndField
+      ? snapshot[sourceClass.providerValidityEndField]
+      : args["provider-valid-until"],
     storedExpiresAt: snapshot.freshnessExpiresAt,
     evaluationAt: snapshot.retrievedAt,
   });

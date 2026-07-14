@@ -17,15 +17,22 @@ export function evaluateReleaseDecision({
   publishAttempted,
   remoteValidationPassed,
   evaluationAt,
+  refreshBeforeMillis = 0,
 }) {
   const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
   const candidateIdentity = stableManifestIdentity(candidateManifest);
   const currentIdentity = currentManifest == null ? null : stableManifestIdentity(currentManifest);
   const materialChange = currentManifest == null
     || candidateIdentity !== currentIdentity;
-  const currentExpired = currentManifest != null
-    && evaluatedMillis >= requiredUtcInstant(currentManifest.expiresAt, "currentManifest.expiresAt");
-  const publishRequired = materialChange || currentExpired;
+  const requiredRefreshBeforeMillis = requiredNonNegativeInteger(refreshBeforeMillis, "refreshBeforeMillis");
+  const currentExpiresAtMillis = currentManifest == null
+    ? null
+    : requiredUtcInstant(currentManifest.expiresAt, "currentManifest.expiresAt");
+  const currentExpired = currentExpiresAtMillis != null && evaluatedMillis >= currentExpiresAtMillis;
+  const currentExpiring = currentExpiresAtMillis != null
+    && !currentExpired
+    && currentExpiresAtMillis - evaluatedMillis <= requiredRefreshBeforeMillis;
+  const publishRequired = materialChange || currentExpired || currentExpiring;
   const approvalValid = validApproval({ buildSpec, buildSpecSha256, releaseRequest });
   const candidateSequenceValid = Number.isInteger(candidateManifest.releaseSequence)
     && candidateManifest.releaseSequence >= 1;
@@ -45,6 +52,7 @@ export function evaluateReleaseDecision({
   });
   const reasonCodes = [];
   if (currentExpired) reasonCodes.push("PACK_PUBLISH_FRESHNESS_EXPIRED");
+  if (currentExpiring) reasonCodes.push("PACK_PUBLISH_FRESHNESS_EXPIRING");
   if (publishRequired && !sequenceValid) reasonCodes.push("PUBLISH_SEQUENCE_NOT_INCREASING");
   if (materialChange && !approvalValid) reasonCodes.push("MATERIAL_CHANGE_UNAPPROVED");
   if (scheduled.outcome === "PUBLISH_REQUIRED") reasonCodes.push("PUBLISH_REQUIRED_NOT_COMPLETED");
@@ -151,6 +159,7 @@ async function main(argv) {
   const buildSpecBytes = buildSpecPath ? await readFile(buildSpecPath) : null;
   const buildSpec = buildSpecBytes ? JSON.parse(buildSpecBytes.toString("utf8")) : null;
   const releaseRequest = await optionalJson(args.get("release-request"));
+  const freshnessPolicy = await optionalJson(args.get("freshness-policy"));
   const evaluationAt = args.get("evaluation-at") ?? new Date().toISOString();
   const strictValidationPassed = alertOnly || args.get("strict-validation-status") === "PASS";
   const publishAttempted = args.get("publish-attempted") === "true";
@@ -165,6 +174,9 @@ async function main(argv) {
     publishAttempted,
     remoteValidationPassed,
     evaluationAt,
+    refreshBeforeMillis: freshnessPolicy == null
+      ? 0
+      : requiredFixedDurationMillis(freshnessPolicy.scheduledPipeline?.cadence),
   });
 
   const outputPath = requiredArg(args, "output");
@@ -220,6 +232,21 @@ function requiredArg(args, name) {
 function requiredString(value, label) {
   if (typeof value !== "string" || value.length === 0) throw new Error(`${label} must be a non-empty string`);
   return value;
+}
+
+function requiredNonNegativeInteger(value, label) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer`);
+  }
+  return value;
+}
+
+function requiredFixedDurationMillis(value) {
+  const days = /^P([1-9][0-9]*)D$/.exec(value ?? "");
+  if (days) return Number(days[1]) * 86_400_000;
+  const hours = /^PT([1-9][0-9]*)H$/.exec(value ?? "");
+  if (hours) return Number(hours[1]) * 3_600_000;
+  throw new Error("freshness policy scheduledPipeline.cadence must be a fixed day/hour duration");
 }
 
 function requiredSha256(value, label) {

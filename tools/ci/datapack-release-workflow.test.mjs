@@ -118,7 +118,7 @@ test("release build는 source snapshot freshness를 build 전에 fail closed로 
   assert.ok(freshnessStep, "source snapshot freshness 검증 스텝을 찾지 못함");
   assert.match(freshnessStep, /validate-source-snapshot-freshness\.mjs/);
   assert.match(freshnessStep, /--build-spec/);
-  assert.match(freshnessStep, /--snapshots tools\/datapack\/release\/source-snapshots\.json/);
+  assert.doesNotMatch(freshnessStep, /--snapshots/);
   assert.match(freshnessStep, /--policy apps\/mobile\/release\/datapack-freshness-sla\.json/);
   assert.ok(
     yml.indexOf("Validate source snapshot freshness") < yml.indexOf("Build data packs"),
@@ -147,7 +147,14 @@ test("publish run은 remote artifact validation 뒤 최종 decision과 callback�
   assert.match(remoteValidationArtifact, /always\(\)/);
   assert.match(remoteValidationArtifact, /EASYSUBWAY_DATAPACK_REMOTE_VALIDATION/);
   assert.match(remoteValidationArtifact, /if-no-files-found:\s*ignore/);
-  assert.match(yml, /Verify published manifest identity/);
+  const remoteValidation = yml.match(
+    /- name: Data Pack Release \/ Validate published remote artifact[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(remoteValidation, "remote validation 스텝을 찾지 못함");
+  assert.match(remoteValidation, /EXPECTED_MANIFEST_SHA256/);
+  assert.match(remoteValidation, /for attempt in 1 2 3 4/);
+  assert.match(remoteValidation, /sleep 20/);
+  assert.match(remoteValidation, /remote validation manifestSha256 mismatch/);
   assert.match(yml, /steps\.production-publish\.outputs\.manifestSha256/);
   assert.match(yml, /remote validation manifestSha256 mismatch/);
   const finalDecision = yml.match(
@@ -155,6 +162,7 @@ test("publish run은 remote artifact validation 뒤 최종 decision과 callback�
   )?.[0];
   assert.ok(finalDecision, "최종 release decision 스텝을 찾지 못함");
   assert.match(finalDecision, /final_decision_args=\(/);
+  assert.match(finalDecision, /steps\.remote-validation\.outcome == 'success'/);
   assert.match(finalDecision, /if \[\[ -f "\$\{EASYSUBWAY_DATAPACK_CURRENT_MANIFEST\}" \]\]; then/);
   assert.match(finalDecision, /final_decision_args\+=\(--current-manifest/);
   assert.match(yml, /GITHUB_STEP_SUMMARY/);
