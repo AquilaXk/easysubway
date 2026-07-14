@@ -90,6 +90,14 @@ export async function collectKorailItxCheongchunTimetable({
   }
   const checkedStopCount = analyzed.stationSequences.reduce((total, trip) => total + trip.stops.length, 0);
   const populatedTimestampStopCount = checkedStopCount - analyzed.missingTimestampStopCount;
+  let stationTimeCapabilityStatus = "SUPPORTED";
+  let stationTimeCapabilityReasonCode = "OFFICIAL_OPERATION_FIELDS_POPULATED";
+  if (analyzed.missingTimestampStopCount > 0) {
+    stationTimeCapabilityStatus = populatedTimestampStopCount === 0
+      ? "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE" : "MISSING";
+    stationTimeCapabilityReasonCode = populatedTimestampStopCount === 0
+      ? "OFFICIAL_OPERATION_FIELDS_EMPTY" : "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY";
+  }
 
   return {
     schemaVersion: 1,
@@ -120,14 +128,8 @@ export async function collectKorailItxCheongchunTimetable({
       status: analyzed.missingTimestampStopCount === 0 ? "SUPPORTED" : "MISSING_STATION_TIMES",
       missingTimestampStopCount: analyzed.missingTimestampStopCount,
       stationTimeCapability: {
-        status: analyzed.missingTimestampStopCount === 0
-          ? "SUPPORTED"
-          : populatedTimestampStopCount === 0 ? "EXPLICITLY_UNSUPPORTED_WITH_EVIDENCE" : "MISSING",
-        reasonCode: analyzed.missingTimestampStopCount === 0
-          ? "OFFICIAL_OPERATION_FIELDS_POPULATED"
-          : populatedTimestampStopCount === 0
-            ? "OFFICIAL_OPERATION_FIELDS_EMPTY"
-            : "PARTIAL_OFFICIAL_OPERATION_FIELDS_EMPTY",
+        status: stationTimeCapabilityStatus,
+        reasonCode: stationTimeCapabilityReasonCode,
         checkedStopCount,
         populatedTimestampStopCount,
       },
