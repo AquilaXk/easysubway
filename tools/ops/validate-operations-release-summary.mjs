@@ -67,7 +67,7 @@ function assertRcManifestIdentity(artifactIdentity, rcManifest, gate) {
   }
 }
 
-function assertEvidenceValidity(summary, gate, requirePass, now) {
+function assertEvidenceValidity(summary, gate, artifactIdentity, requirePass, now) {
   const validity = required(summary.evidenceValidity, "evidenceValidity");
   const expectedTestedAt = `${gate.preLaunchReadiness.evidenceDateKst}T00:00:00+09:00`;
   const expectedExpiresWhen = `${gate.preLaunchReadiness.finalRcBinding.evidenceValidity.validUntilKst}T23:59:59.999+09:00`;
@@ -79,6 +79,12 @@ function assertEvidenceValidity(summary, gate, requirePass, now) {
     && (!Number.isFinite(now) || now < Date.parse(validity.testedAt) || now > Date.parse(validity.expiresWhen))
   ) {
     throw new Error("evidenceValidity must be current for --require-pass");
+  }
+  if (requirePass && (
+    String(artifactIdentity.versionName) !== String(gate.preLaunchReadiness.finalRcBinding.evidenceValidity.appVersionName)
+    || String(artifactIdentity.versionCode) !== String(gate.preLaunchReadiness.finalRcBinding.evidenceValidity.versionCode)
+  )) {
+    throw new Error("artifactIdentity must match the canonical Phase A evidence scope");
   }
 }
 
@@ -408,7 +414,7 @@ async function main() {
     "artifactIdentity",
     postLaunch.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
   );
-  assertEvidenceValidity(summary, postLaunch, requirePass, now);
+  assertEvidenceValidity(summary, postLaunch, artifactIdentity, requirePass, now);
   if (rcManifest) assertRcManifestIdentity(artifactIdentity, rcManifest, postLaunch);
   const gates = { observability, postLaunch, support };
   assertNoSensitiveSummary(summary, gates);

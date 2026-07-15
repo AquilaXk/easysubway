@@ -21,8 +21,8 @@ const supportGate = JSON.parse(
 
 const artifactIdentity = {
   gitSha: "abcdef1234567890",
-  versionName: "1.0.2",
-  versionCode: 10002,
+  versionName: "1.0.4",
+  versionCode: 10005,
   androidApplicationId: "com.easysubway.app",
   aabSha256: "a".repeat(64),
   backendArtifactSha256: "b".repeat(64),
@@ -166,6 +166,28 @@ test("operations release summary validator rejects expired Phase A evidence", as
       ], { cwd: root }),
     ),
     /evidenceValidity must be current/,
+  );
+});
+
+test("operations release summary validator rejects identity outside the canonical evidence scope", async () => {
+  const summary = validSummary();
+  summary.artifactIdentity.versionName = "1.0.5";
+  summary.artifactIdentity.versionCode = 10006;
+  for (const review of summary.postLaunchReviews) {
+    review.artifactIdentity.versionName = summary.artifactIdentity.versionName;
+    review.artifactIdentity.versionCode = summary.artifactIdentity.versionCode;
+  }
+  summary.postLaunchObservation.publicReleaseIdentity.versionCode = summary.artifactIdentity.versionCode;
+  await assert.rejects(
+    withSummary(summary, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /artifactIdentity must match the canonical Phase A evidence scope/,
   );
 });
 
