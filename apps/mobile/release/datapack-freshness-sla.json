@@ -31,7 +31,7 @@
     },
     {
       "id": "planned_timetable",
-      "sourceIds": [],
+      "sourceIds": ["kric-subway-timetable"],
       "examples": ["service calendar", "trips", "stop_times", "headway"],
       "basisField": "serviceEffectiveAt",
       "maximumReverificationCadence": "P30D",
