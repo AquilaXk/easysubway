@@ -26,6 +26,8 @@ const dataPackManifestPath = resolvePath(
 const dataPackManifest = readJsonIfExists(dataPackManifestPath);
 const backendIdentity = readBackendIdentity(args);
 const gateStatuses = parsePairs(arg("gateStatus", "gate-status"));
+const evidenceStatuses = parsePairs(arg("evidenceStatus", "evidence-status"));
+const evidencePaths = parsePairs(arg("evidencePath", "evidence-path"));
 const expectedValues = parsePairs(args.expect);
 const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
 const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
@@ -54,7 +56,14 @@ const identity = {
   identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
 
-const evidenceEntries = requiredEvidenceEntries(testedAt, evidenceRoot, args.device, arg("androidVersion", "android-version"));
+const evidenceEntries = requiredEvidenceEntries(
+  testedAt,
+  evidenceRoot,
+  args.device,
+  arg("androidVersion", "android-version"),
+  evidenceStatuses,
+  evidencePaths,
+);
 const blockers = [
   ...identityBlockers(identity),
   ...expectedMismatchBlockers(identity, expectedValues),
@@ -208,7 +217,7 @@ function parsePairs(value) {
   }));
 }
 
-function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion) {
+function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion, statuses, paths) {
   const sourceEntries = [
     ["rc_device_qa", 571],
     ["production_datapack", 547],
@@ -221,16 +230,46 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion)
     ["abuse_penetration_rehearsal", 1022],
     ["container_hardening", 1914],
   ];
-  return sourceEntries.map(([id, sourceIssue]) => ({
-    id,
-    sourceIssue,
-    device: device ?? "local_android_emulator",
-    androidVersion: androidVersion ?? "android-15-or-16",
-    testedAt: baseTestedAt,
-    evidencePaths: [`${rootPath}${id}/`],
-    expiresWhen: addDays(baseTestedAt, 14),
-    status: "PENDING_LOCAL_EVIDENCE",
-  }));
+  const knownIds = new Set(sourceEntries.map(([id]) => id));
+  for (const id of [...Object.keys(statuses), ...Object.keys(paths)]) {
+    if (!knownIds.has(id)) fail(`Unknown evidence entry: ${id}`);
+  }
+  for (const [id, status] of Object.entries(statuses)) {
+    if (!["SATISFIED", "BLOCKED_EXTERNAL", "PENDING_LOCAL_EVIDENCE"].includes(status)) {
+      fail(`Invalid evidence status for ${id}: ${status}`);
+    }
+    if (status === "SATISFIED" && !paths[id]) {
+      fail(`SATISFIED evidence entry requires --evidence-path: ${id}`);
+    }
+    if (status === "SATISFIED" && !existsSync(resolvePath(paths[id]))) {
+      fail(`SATISFIED evidence path does not exist for ${id}: ${paths[id]}`);
+    }
+  }
+  return sourceEntries.map(([id, sourceIssue]) => {
+    const evidencePaths = [`${rootPath}${id}/`];
+    if (paths[id]) evidencePaths.push(paths[id]);
+    const evidence = statuses[id] === "SATISFIED" ? readJsonIfExists(resolvePath(paths[id])) : null;
+    const evidenceTestedAt = evidence?.evidenceValidity?.testedAt ?? baseTestedAt;
+    const evidenceExpiresWhen = evidence?.evidenceValidity?.expiresWhen ?? addDays(baseTestedAt, 14);
+    if (statuses[id] === "SATISFIED" && (
+      !Number.isFinite(Date.parse(evidenceTestedAt))
+      || !Number.isFinite(Date.parse(evidenceExpiresWhen))
+      || Date.parse(evidenceExpiresWhen) < Date.parse(baseTestedAt)
+      || Date.parse(evidenceExpiresWhen) < Date.parse(evidenceTestedAt)
+    )) {
+      fail(`SATISFIED evidence entry has invalid or expired evidenceValidity: ${id}`);
+    }
+    return {
+      id,
+      sourceIssue,
+      device: device ?? "local_android_emulator",
+      androidVersion: androidVersion ?? "android-15-or-16",
+      testedAt: evidenceTestedAt,
+      evidencePaths,
+      expiresWhen: evidenceExpiresWhen,
+      status: statuses[id] ?? "PENDING_LOCAL_EVIDENCE",
+    };
+  });
 }
 
 function normalizeEvidenceRoot(rootPath) {

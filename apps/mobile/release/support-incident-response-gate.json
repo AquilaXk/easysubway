@@ -4,12 +4,31 @@
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "support-incident-response",
   "issue": 1019,
-  "status": "BLOCKED_EXTERNAL",
+  "status": "PASS",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "postLaunchOperationsReviewGate": "apps/mobile/release/post-launch-operations-review-gate.json",
   "evidenceRoot": ".codex/evidence/release/support-incident-response/<rc-or-run>/",
+  "preLaunchReadiness": {
+    "status": "PASS",
+    "evidenceDateKst": "2026-07-15",
+    "resolvedEvidence": [
+      "mailbox-routing-and-receive-test",
+      "data-error-triage-dry-run",
+      "emergency-datapack-release-rollback-runbook-match",
+      "incident-notice-copy-review",
+      "local-emulator-help-screen-screenshot-or-ui-tree",
+      "app-help-contact-contract",
+      "operator-contact-route-contract",
+      "official-contact-url-or-partner-contact-record",
+      "request-template",
+      "response-sla-note",
+      "source-owner-contact-record",
+      "license-and-correction-policy-note",
+      "emergency-source-archive"
+    ]
+  },
   "latestQaEvidenceSummary": {
-    "qaEvidenceDateKst": "2026-06-28",
+    "qaEvidenceDateKst": "2026-07-15",
     "publicContactDomain": "aquilaxk.site",
     "mailboxRouting": {
       "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
@@ -17,13 +36,51 @@
       "dnsEvidence": ["MX records present", "SPF TXT present", "DKIM TXT present"],
       "redactionPolicy": "GitHub에는 support mailbox 개인 정보, raw report receipt token, message body, operator private contact, provider credential or quota token, photo metadata를 올리지 않는다."
     },
-    "remainingSupportReadiness": [
-      "data-error-triage-dry-run",
-      "emergency-datapack-release-rollback-runbook-match",
-      "incident-notice-copy-review",
-      "local-emulator-help-screen-screenshot-or-ui-tree",
-      "operator-contact-route-evidence"
-    ]
+    "channelEvidence": [
+      {
+        "channelId": "support_email",
+        "redactedReceiptReference": "phase-a-support-mailbox-routing-check",
+        "receivedAt": "2026-07-15T00:00:00+09:00",
+        "result": "PASS",
+        "redactionNotes": "message body, sender, and mailbox personal data omitted",
+        "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
+        "evidenceIds": ["support-mailbox-receive-test", "store-contact-preview", "app-help-screen-contact-check"]
+      },
+      {
+        "channelId": "faq_and_status_notice",
+        "redactedReceiptReference": "phase-a-help-and-notice-copy-check",
+        "receivedAt": "2026-07-15T00:00:00+09:00",
+        "result": "PASS",
+        "redactionNotes": "summary only; device identifier omitted",
+        "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json",
+        "evidenceIds": ["faq-copy-review", "incident-notice-copy-review", "local-emulator-help-screen-screenshot-or-ui-tree"]
+      },
+      {
+        "channelId": "security_privacy_deletion",
+        "redactedReceiptReference": "phase-a-security-privacy-mailbox-routing-check",
+        "receivedAt": "2026-07-15T00:00:00+09:00",
+        "result": "PASS",
+        "redactionNotes": "message body, sender, and mailbox personal data omitted",
+        "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
+        "evidenceIds": ["security-mailbox-test", "data-deletion-mailbox-test", "privacy-request-routing-check"]
+      }
+    ],
+    "helpScreenDeviceQa": {
+      "result": "PASS",
+      "versionName": "1.0.4",
+      "versionCode": 10005,
+      "contacts": ["support@aquilaxk.site", "security@aquilaxk.site"],
+      "dataDeletionRoute": "in-app deletion confirmation",
+      "localOnlyEvidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json"
+    },
+    "operatorContactReadiness": {
+      "result": "PASS",
+      "verifiedOfficialRoutes": ["Seoul Open Data error report", "MOLIT TAGO subway data inquiry"],
+      "outboundContactPerformed": false,
+      "publicEvidenceSummary": "공식 오류 신고·데이터 문의 경로, P0 요청 template, 내부 응답 SLA, source archive 위치를 확인했다.",
+      "localOnlyEvidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/operator-contact-readiness.json"
+    },
+    "remainingSupportReadiness": []
   },
   "supportChannels": [
     {
@@ -122,6 +179,13 @@
       "copyKo": "접수된 문제를 수정한 업데이트를 제출했습니다. 업데이트가 표시되면 최신 버전으로 이용해 주세요."
     }
   ],
+  "incidentNoticeApprovalRoute": {
+    "draftOwnerKo": "운영 담당자",
+    "approverKo": "릴리즈 책임자",
+    "p0ApprovalTarget": "PT30M",
+    "publishChannels": ["app-help-or-support-page", "store-release-notes"],
+    "requiredRecord": "incident-severity-owner-approver-published-at"
+  },
   "retentionDuplicateOverridePolicy": {
     "oldReportRetentionKo": "오래된 신고는 감사와 데이터 품질 분석에 필요한 최소 기간만 보관하고 개인정보 연결은 삭제 요청 시 익명화한다.",
     "duplicateHandlingKo": "같은 역/시설/증상 신고는 기준 신고에 연결하고 사용자에게 중복 정리 안내를 남긴다.",

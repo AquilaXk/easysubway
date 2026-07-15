@@ -414,6 +414,9 @@ jobs:
           cp release/signed-release-artifact-gate.json release-artifacts/android/signed-release-artifact-gate.json
           cp release/android-16kb-page-size-gate.json release-artifacts/android/android-16kb-page-size-gate.json
           cp release/android-rc-store-evidence.json release-artifacts/android/android-rc-store-evidence.json
+          cp release/post-launch-operations-review-gate.json release-artifacts/android/post-launch-operations-review-gate.json
+          cp release/support-incident-response-gate.json release-artifacts/android/support-incident-response-gate.json
+          cp release/operations-observability-gate.json release-artifacts/android/operations-observability-gate.json
           cp ../../tools/mobile/check-android-aab-16kb-page-size.sh release-artifacts/android/check-android-aab-16kb-page-size.sh
           cp ../../tools/mobile/check-elf-load-alignment.mjs release-artifacts/android/check-elf-load-alignment.mjs
           if [[ -f build/app/outputs/mapping/release/mapping.txt ]]; then
@@ -661,7 +664,6 @@ jobs:
             --repo-root .
             --app-root apps/mobile
             --data-pack-manifest apps/mobile/assets/datapacks/metro_map_pack/manifest.json
-            --output release-artifacts/rc/rc-evidence-manifest.json
             --evidence-root ".codex/evidence/release/rc-evidence-manifest/${GITHUB_SHA}/"
             --device local_android_emulator
             --android-version android-15-or-16
@@ -669,7 +671,6 @@ jobs:
             --gate-status productionDatapack=BLOCKED_EXTERNAL
             --gate-status playGeneratedApkDeviceMatrix=BLOCKED_EXTERNAL
             --gate-status backendOperations=BLOCKED_EXTERNAL
-            --gate-status postLaunchOperations=BLOCKED_EXTERNAL
             --gate-status androidReleaseQuality=BLOCKED_EXTERNAL
             --gate-status abusePenetrationRehearsal=BLOCKED_EXTERNAL
           )
@@ -684,7 +685,36 @@ jobs:
           if [[ -f release-artifacts/downloaded/backend/image-inspect.json ]]; then
             generator_args+=(--backend-image-inspect release-artifacts/downloaded/backend/image-inspect.json)
           fi
-          node tools/release/generate-rc-evidence-manifest.mjs "${generator_args[@]}"
+          node tools/release/generate-rc-evidence-manifest.mjs \
+            "${generator_args[@]}" \
+            --output release-artifacts/rc/rc-evidence-manifest-preliminary.json \
+            --gate-status postLaunchOperations=BLOCKED_EXTERNAL
+          node tools/ops/generate-operations-phase-a-summary.mjs \
+            --rc-manifest release-artifacts/rc/rc-evidence-manifest-preliminary.json \
+            --summary release-artifacts/rc/operations-phase-a-summary.json \
+            --status-output release-artifacts/rc/operations-phase-a-status.txt
+          IFS= read -r operations_status < release-artifacts/rc/operations-phase-a-status.txt
+          if [[ "${operations_status}" == "SATISFIED" ]]; then
+            node tools/ops/validate-operations-release-summary.mjs \
+              --summary release-artifacts/rc/operations-phase-a-summary.json \
+              --rc-manifest release-artifacts/rc/rc-evidence-manifest-preliminary.json \
+              --require-pass
+          elif [[ "${operations_status}" != "BLOCKED_EXTERNAL" ]]; then
+            echo "unexpected operations Phase A status: ${operations_status}" >&2
+            exit 1
+          fi
+          operations_evidence_args=(--evidence-status "post_launch_operations=${operations_status}")
+          if [[ "${operations_status}" == "SATISFIED" ]]; then
+            operations_evidence_args+=(--evidence-path post_launch_operations=release-artifacts/rc/operations-phase-a-summary.json)
+          fi
+          node tools/release/generate-rc-evidence-manifest.mjs \
+            "${generator_args[@]}" \
+            "${operations_evidence_args[@]}" \
+            --output release-artifacts/rc/rc-evidence-manifest.json \
+            --gate-status "postLaunchOperations=${operations_status}"
+          cp apps/mobile/release/post-launch-operations-review-gate.json release-artifacts/rc/post-launch-operations-review-gate.json
+          cp apps/mobile/release/support-incident-response-gate.json release-artifacts/rc/support-incident-response-gate.json
+          cp apps/mobile/release/operations-observability-gate.json release-artifacts/rc/operations-observability-gate.json
           cp apps/mobile/release/rc-evidence-manifest-contract.json release-artifacts/rc/rc-evidence-manifest-contract.json
           {
             echo "commit=${GITHUB_SHA}"

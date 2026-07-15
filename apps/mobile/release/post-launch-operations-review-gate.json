@@ -4,18 +4,151 @@
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "post-launch-operations-review",
   "issue": 1019,
-  "status": "BLOCKED_EXTERNAL",
+  "status": "IN_PROGRESS",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "operationsEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
   "supportIncidentResponseGate": "apps/mobile/release/support-incident-response-gate.json",
   "evidenceRoot": ".codex/evidence/release/post-launch-operations-review/<rc-or-run>/",
+  "preLaunchReadiness": {
+    "status": "PASS",
+    "evidenceDateKst": "2026-07-15",
+    "requiredEvidence": [
+      "signal-owner-threshold-first-response",
+      "grafana-prometheus-loki-play-console-access",
+      "p0-p1-p2-alert-route-dry-run",
+      "support-security-privacy-data-deletion-mailbox-receive-test",
+      "backend-datapack-rollback-rehearsal",
+      "p0-data-error-emergency-release-rollback-rehearsal",
+      "fixed-release-versioncode-build-submit-procedure",
+      "post-launch-window-owner-time-checklist-record-location-reservation",
+      "incident-notice-template-approval-route"
+    ],
+    "finalRcBinding": {
+      "manifest": "apps/mobile/release/rc-evidence-manifest-contract.json",
+      "requiredFields": ["gitSha", "versionCode", "aabSha256", "dataPackManifestSha256"],
+      "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
+      "evidenceValidity": {
+        "appVersionName": "1.0.4",
+        "versionCode": 10005,
+        "validFromKst": "2026-07-15",
+        "validUntilKst": "2026-07-29",
+        "refreshOn": [
+          "operations-contract-change",
+          "support-contact-or-help-ui-change",
+          "observability-infrastructure-change",
+          "fixed-release-procedure-change"
+        ]
+      },
+      "refreshBindings": [
+        {
+          "refreshOn": "operations-contract-change",
+          "files": [
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "fc9e00164b711954906724a0141fb4f3ebbe3cb875e6d4f0e4f6d34987e8a01a"},
+            {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"}
+          ]
+        },
+        {
+          "refreshOn": "support-contact-or-help-ui-change",
+          "files": [
+            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "64de4e446595a7b122d152c5ef9c414119095e6abcc2594442d9ce3bd02056aa"},
+            {"path": "apps/mobile/lib/main.dart", "sha256": "42948d0ab160eb576c0a1ccaa46324e5f39fa200030a68663a5b7e39982d83b6"}
+          ]
+        },
+        {
+          "refreshOn": "observability-infrastructure-change",
+          "files": [
+            {"path": "infra/prometheus/prometheus.yml", "sha256": "258441d7b2881a629145a9bfae65574769ccf2d218d94f70c29148bebad33ae0"},
+            {"path": "infra/prometheus/alerts.yml", "sha256": "1d8c2c05b9da8b105d0b9db45512f14932006b16c0de1f2d4715c0cac74ce323"},
+            {"path": "infra/grafana/provisioning/datasources/prometheus.yml", "sha256": "857e2caebec8b70f3aa50c0b968c1ceed46b668a8f08a08532b47be22af3ed97"},
+            {"path": "infra/grafana/provisioning/datasources/loki.yml", "sha256": "9156897987a95d3fe59f98651ade7802ad2fc9b65acd2845da90b36dd6f5949c"},
+            {"path": "infra/loki/loki.yml", "sha256": "101b9286a15cc0c4f2a66879d801995efabd2c4d98cac904c4c3bd0816bf0e20"}
+          ]
+        },
+        {
+          "refreshOn": "fixed-release-procedure-change",
+          "files": [
+            {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "7690e3f3de3ce4408f477ac30cec1d8f92ceca8056e367170863448a278cf9cb"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "5de6da258d9061672b50db6896cbcdec318cf3f481dae0441ed9ac21b00b1658"}
+          ]
+        }
+      ],
+      "bindingKo": "Phase A gate 파일은 signed RC artifact에 포함하며 최종 RC manifest의 identity와 함께 동결한다."
+    },
+    "evidenceSummary": [
+      {
+        "id": "signal-owner-threshold-first-response",
+        "status": "PASS",
+        "evidence": "apps/mobile/release/operations-observability-gate.json"
+      },
+      {
+        "id": "grafana-prometheus-loki-play-console-access",
+        "status": "PASS",
+        "evidence": "infra observability contract + Play API access check + main CD run 29419211010"
+      },
+      {
+        "id": "p0-p1-p2-alert-route-dry-run",
+        "status": "PASS",
+        "evidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+      },
+      {
+        "id": "support-security-privacy-data-deletion-mailbox-receive-test",
+        "status": "PASS",
+        "evidence": "#1019 QA manual mailbox routing evidence"
+      },
+      {
+        "id": "backend-datapack-rollback-rehearsal",
+        "status": "PASS",
+        "evidence": "apps/mobile/release/operations-release-evidence.json"
+      },
+      {
+        "id": "p0-data-error-emergency-release-rollback-rehearsal",
+        "status": "PASS",
+        "evidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
+      },
+      {
+        "id": "fixed-release-versioncode-build-submit-procedure",
+        "status": "PASS",
+        "evidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json"
+      },
+      {
+        "id": "post-launch-window-owner-time-checklist-record-location-reservation",
+        "status": "PASS",
+        "evidence": "reviewWindows"
+      },
+      {
+        "id": "incident-notice-template-approval-route",
+        "status": "PASS",
+        "evidence": "apps/mobile/release/support-incident-response-gate.json"
+      }
+    ]
+  },
+  "postLaunchObservation": {
+    "status": "PENDING_PUBLIC_RELEASE",
+    "publicReleaseIdentity": {
+      "publishedAt": null,
+      "versionCode": null,
+      "gitSha": null
+    },
+    "dueTimePolicy": "dueAt = publicReleaseIdentity.publishedAt + reviewWindows[].afterPublicRelease",
+    "allowedStatusTransitions": [
+      "PENDING_PUBLIC_RELEASE->IN_PROGRESS",
+      "IN_PROGRESS->PASS"
+    ],
+    "completionKo": "공개 시각, versionCode, git SHA를 기록한 뒤 2h, 24h, 7d, 30d window를 실행하고 모든 기록이 PASS면 완료한다."
+  },
   "latestQaEvidenceSummary": {
-    "qaEvidenceDateKst": "2026-06-28",
+    "qaEvidenceDateKst": "2026-07-15",
     "alertRouteDryRun": {
       "result": "PASS",
       "channel": "Slack Incoming Webhook",
-      "publicEvidenceSummary": "HTTP 200 / ok dry-run passed; webhook URL is not stored in tracked files or GitHub comments.",
-      "localOnlyEvidenceRoot": ".codex/evidence/release/post-launch-operations-review/slack-alert-route-20260628/"
+      "severities": ["P0", "P1", "P2"],
+      "publicEvidenceSummary": "P0/P1/P2 각각 HTTP 200 / ok dry-run을 통과했고 webhook URL은 tracked file이나 GitHub에 저장하지 않았다.",
+      "localOnlyEvidenceRoot": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/"
+    },
+    "observabilityAccess": {
+      "result": "PASS",
+      "services": ["Alertmanager", "Prometheus", "Loki", "Grafana", "Google Play Android Publisher API"],
+      "publicEvidenceSummary": "로컬 observability readiness HTTP 200과 Play edit insert/list/validate/delete를 확인했다."
     },
     "supportMailboxRouting": {
       "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
@@ -34,7 +167,9 @@
     {
       "id": "first_2h",
       "afterPublicRelease": "PT2H",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+PT2H",
       "ownerKo": "릴리즈 운영 담당자",
+      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/first_2h/",
       "requiredSignals": [
         "play-review-status",
         "crash-free-session-rate",
@@ -49,7 +184,9 @@
     {
       "id": "first_24h",
       "afterPublicRelease": "P1D",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+P1D",
       "ownerKo": "모바일/운영 공동 담당자",
+      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/first_24h/",
       "requiredSignals": [
         "crash-anr-summary",
         "play-review-and-rating-summary",
@@ -64,7 +201,9 @@
     {
       "id": "day_7",
       "afterPublicRelease": "P7D",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+P7D",
       "ownerKo": "제품/운영 담당자",
+      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/day_7/",
       "requiredSignals": [
         "retention-and-active-use-summary",
         "route-search-success-blocked-unknown-distribution",
@@ -77,7 +216,9 @@
     {
       "id": "day_30",
       "afterPublicRelease": "P30D",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+P30D",
       "ownerKo": "릴리즈 책임자",
+      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/day_30/",
       "requiredSignals": [
         "monthly-crash-anr-trend",
         "support-data-error-trend",
@@ -139,6 +280,7 @@
   "releaseEvidenceSummaryPolicy": {
     "githubSummaryFields": [
       "reviewWindowId",
+      "observedAt",
       "artifactIdentity",
       "signalSnapshot",
       "owner",
