@@ -3,6 +3,8 @@ package com.easysubway.route.adapter.out.integrity;
 import com.easysubway.route.application.port.out.PlayIntegrityDecoder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.client.http.BoundedHttpTransport;
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import java.io.ByteArrayInputStream;
@@ -28,6 +30,7 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 		"https://playintegrity.googleapis.com/v1/com.easysubway.app:decodeIntegrityToken";
 	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
 	private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
+	private static final String PLAY_INTEGRITY_SCOPE = "https://www.googleapis.com/auth/playintegrity";
 
 	private final RestClient restClient;
 	private final ObjectMapper objectMapper;
@@ -39,7 +42,11 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 		ObjectMapper objectMapper,
 		@Value("${easysubway.play-integrity.credentials-base64:}") String credentialsBase64
 	) {
-		this(boundedRestClient(restClientBuilder), objectMapper, new GoogleAccessTokenProvider(credentialsBase64));
+		this(
+			boundedRestClient(restClientBuilder),
+			objectMapper,
+			new GoogleAccessTokenProvider(credentialsBase64)
+		);
 	}
 
 	GooglePlayIntegrityDecoder(
@@ -57,6 +64,10 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 		requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
 		requestFactory.setReadTimeout(READ_TIMEOUT);
 		return sharedBuilder.clone().requestFactory(requestFactory).build();
+	}
+
+	private static BoundedHttpTransport boundedGoogleTransport() {
+		return new BoundedHttpTransport(new NetHttpTransport(), CONNECT_TIMEOUT, READ_TIMEOUT);
 	}
 
 	@Override
@@ -127,7 +138,7 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 		public synchronized String accessToken() {
 			try {
 				if (credentials == null) {
-					credentials = loadCredentials().createScoped("https://www.googleapis.com/auth/playintegrity");
+					credentials = loadCredentials().createScoped(PLAY_INTEGRITY_SCOPE);
 				}
 				credentials.refreshIfExpired();
 				AccessToken token = credentials.getAccessToken();
@@ -142,10 +153,13 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 
 		private GoogleCredentials loadCredentials() throws IOException {
 			if (credentialsBase64 == null || credentialsBase64.isBlank()) {
-				return GoogleCredentials.getApplicationDefault();
+				return GoogleCredentials.getApplicationDefault(GooglePlayIntegrityDecoder::boundedGoogleTransport);
 			}
 			byte[] decoded = Base64.getDecoder().decode(credentialsBase64);
-			return GoogleCredentials.fromStream(new ByteArrayInputStream(decoded));
+			return GoogleCredentials.fromStream(
+				new ByteArrayInputStream(decoded),
+				GooglePlayIntegrityDecoder::boundedGoogleTransport
+			);
 		}
 	}
 
