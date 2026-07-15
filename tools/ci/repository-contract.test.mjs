@@ -2209,6 +2209,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(gate.artifacts.android.productionRcSigningKeyType, "production-upload-key");
   assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("uploadKeySha256Fingerprint"));
   assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("appSigningKeySha256Fingerprint"));
+  assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("supportContactSetSha256"));
   assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("versionCodeMonotonicPolicy"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play production access or closed test requirement satisfaction evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play-generated APK device compatibility matrix evidence"));
@@ -3127,6 +3128,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "aabSha256",
     "aabPayloadSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",
@@ -4118,7 +4120,9 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "appVersionName",
     "versionCode",
     "aabSha256",
+    "aabPayloadSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",

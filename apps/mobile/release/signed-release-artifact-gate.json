@@ -44,6 +44,7 @@
         "packageId",
         "aabSha256",
         "aabPayloadSha256",
+        "supportContactSetSha256",
         "uploadKeySha256Fingerprint",
         "appSigningKeySha256Fingerprint",
         "dataPackManifestSha256",
