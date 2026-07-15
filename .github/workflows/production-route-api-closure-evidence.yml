@@ -25,12 +25,15 @@ jobs:
     concurrency:
       group: cd-production-deploy
       cancel-in-progress: false
+    outputs:
+      deployed_sha: ${{ steps.closure.outputs.deployed_sha }}
     env:
       CLOSURE_BASE_SHA: cba25764de4ed646e398b2141b64fa41767ed3cc
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
 
     steps:
       - name: Verify deployed revision, origin denial, and row invariance
+        id: closure
         shell: bash
         run: |
           set -euo pipefail
@@ -172,6 +175,7 @@ jobs:
             echo "route_search_results changed during the closure probe" >&2
             exit 1
           fi
+          printf 'deployed_sha=%s\n' "${current_sha}" >> "${GITHUB_OUTPUT}"
 
   snapshot-gate:
     name: Verify route purge snapshot gate
@@ -187,6 +191,7 @@ jobs:
     env:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
       DEPLOY_COMPOSE_PROJECT: ${{ vars.DEPLOY_COMPOSE_PROJECT }}
+      EXPECTED_DEPLOYED_SHA: ${{ needs.verify.outputs.deployed_sha }}
 
     steps:
       - name: Snapshot gate / Checkout reviewed main

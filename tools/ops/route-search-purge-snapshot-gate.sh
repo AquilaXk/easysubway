@@ -6,6 +6,7 @@ umask 077
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
 DEPLOY_COMPOSE_PROJECT="${DEPLOY_COMPOSE_PROJECT:-easysubway}"
+EXPECTED_DEPLOYED_SHA="${EXPECTED_DEPLOYED_SHA:-}"
 RESTORE_CPU_LIMIT="1"
 RESTORE_MEMORY_LIMIT="2g"
 RESTORE_PIDS_LIMIT="256"
@@ -18,6 +19,10 @@ if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; 
 fi
 if [[ ! "${DEPLOY_COMPOSE_PROJECT}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
 	printf 'DEPLOY_COMPOSE_PROJECT is invalid\n' >&2
+	exit 2
+fi
+if [[ ! "${EXPECTED_DEPLOYED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+	printf 'EXPECTED_DEPLOYED_SHA is invalid\n' >&2
 	exit 2
 fi
 
@@ -36,7 +41,22 @@ if ! flock -w 300 9; then
 	exit 1
 fi
 
+current_sha="$(<"${SHARED_DIR}/current-sha")"
+if [[ ! "${current_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+	printf 'deployed SHA marker is invalid\n' >&2
+	exit 1
+fi
+if [[ "${current_sha}" != "${EXPECTED_DEPLOYED_SHA}" ]]; then
+	printf 'deployed SHA changed after closure verification\n' >&2
+	exit 1
+fi
+
 if [[ -f "${MARKER_FILE}" ]] && grep -qx 'status=snapshot-complete' "${MARKER_FILE}"; then
+	marker_sha="$(sed -n 's/^current_sha=//p' "${MARKER_FILE}")"
+	if [[ "${marker_sha}" != "${EXPECTED_DEPLOYED_SHA}" ]]; then
+		printf 'snapshot marker SHA does not match verified deployment\n' >&2
+		exit 1
+	fi
 	backup_file="$(sed -n 's/^backup_file=//p' "${MARKER_FILE}")"
 	case "${backup_file}" in
 		"${BACKUP_DIR}"/*.dump) ;;
@@ -55,12 +75,6 @@ if [[ -f "${MARKER_FILE}" ]] && grep -qx 'status=snapshot-complete' "${MARKER_FI
 		echo '- status: `snapshot-complete` (existing verified backup)'
 	} >> "${SUMMARY_FILE}"
 	exit 0
-fi
-
-current_sha="$(<"${SHARED_DIR}/current-sha")"
-if [[ ! "${current_sha}" =~ ^[0-9a-f]{40}$ ]]; then
-	printf 'deployed SHA marker is invalid\n' >&2
-	exit 1
 fi
 
 expected_image="easysubway-backend:${current_sha}"

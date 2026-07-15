@@ -38,6 +38,9 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   assert.match(workflow, /row_count_before/);
   assert.match(workflow, /row_count_after/);
   assert.match(workflow, /row_count_before[^\n]+!=[^\n]+row_count_after/);
+  assert.match(workflow, /outputs:\n\s+deployed_sha: \$\{\{ steps\.closure\.outputs\.deployed_sha \}\}/);
+  assert.match(workflow, /id: closure/);
+  assert.match(workflow, /deployed_sha=%s\\n[^\n]+GITHUB_OUTPUT/);
 });
 
 test("production snapshot gate는 main-only runner에서 backup·격리 restore·purge plan만 수집한다", async () => {
@@ -46,11 +49,13 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
 
   assert.match(workflow, /tools\/ops\/route-search-purge-snapshot-gate\.sh/);
   assert.match(workflow, /tools\/ops\/postgres-backup\.sh/);
-  assert.match(workflow, /backend\/src\/main\/resources\/db\/migration\/(postgresql|h2)\/V51__/);
+  assert.match(workflow, /backend\/src\/main\/resources\/db\/migration\/postgresql\/V51__/);
+  assert.match(workflow, /backend\/src\/main\/resources\/db\/migration\/h2\/V51__/);
   assert.match(workflow, /snapshot-gate:[\s\S]*needs: verify/);
   assert.match(workflow, /snapshot-gate:[\s\S]*runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*environment: production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*group: cd-production-deploy/);
+  assert.match(workflow, /EXPECTED_DEPLOYED_SHA: \$\{\{ needs\.verify\.outputs\.deployed_sha \}\}/);
   assert.match(workflow, /snapshot-gate:[\s\S]*Checkout reviewed main[\s\S]*persist-credentials: false/);
   assert.doesNotMatch(workflow, /upload-artifact|workflow_dispatch/);
 
@@ -60,6 +65,10 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /could not acquire deploy lock within timeout/);
   assert.match(snapshotGate, /existing snapshot backup or checksum file is missing/);
   assert.match(snapshotGate, /existing snapshot backup checksum mismatch/);
+  assert.match(snapshotGate, /EXPECTED_DEPLOYED_SHA/);
+  assert.match(snapshotGate, /marker_sha/);
+  assert.match(snapshotGate, /current_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
+  assert.match(snapshotGate, /marker_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore/);
   assert.match(snapshotGate, /--pull never/);
