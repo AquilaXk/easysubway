@@ -257,6 +257,7 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion,
       !Number.isFinite(Date.parse(evidenceTestedAt))
       || !Number.isFinite(Date.parse(evidenceExpiresWhen))
       || Date.parse(evidenceTestedAt) > Date.parse(generatedAt)
+      || Date.parse(evidenceExpiresWhen) < Date.parse(generatedAt)
       || Date.parse(evidenceExpiresWhen) < Date.parse(baseTestedAt)
       || Date.parse(evidenceExpiresWhen) < Date.parse(evidenceTestedAt)
     )) {
