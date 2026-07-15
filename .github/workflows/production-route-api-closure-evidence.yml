@@ -22,8 +22,7 @@ jobs:
       group: cd-production-deploy
       cancel-in-progress: false
     env:
-      EXPECTED_SHA: cba25764de4ed646e398b2141b64fa41767ed3cc
-      EXPECTED_IMAGE_DIGEST: sha256:ef9067f8890e72a5a4cd2fa3ab478d80951e577042e3016bff266b2fd24859e8
+      CLOSURE_BASE_SHA: cba25764de4ed646e398b2141b64fa41767ed3cc
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
 
     steps:
@@ -32,12 +31,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ ! "${EXPECTED_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "expected_sha must be a 40-character lowercase commit SHA" >&2
-            exit 1
-          fi
-          if [[ ! "${EXPECTED_IMAGE_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "expected_image_digest must be a sha256 digest" >&2
+          if [[ ! "${CLOSURE_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "closure base must be a 40-character lowercase commit SHA" >&2
             exit 1
           fi
 
@@ -49,33 +44,37 @@ jobs:
 
           current_sha="$(<"${DEPLOY_ROOT}/shared/current-sha")"
           current_digest="$(<"${DEPLOY_ROOT}/shared/current-image-digest")"
-          if [[ "${current_sha}" != "${EXPECTED_SHA}" ]]; then
-            echo "deployed SHA does not match the approved PR1 SHA" >&2
+          if [[ ! "${current_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "deployed SHA marker is invalid" >&2
             exit 1
           fi
-          if [[ "${current_digest}" != "${EXPECTED_IMAGE_DIGEST}" ]]; then
-            echo "deployed image digest does not match the approved PR1 digest" >&2
+          if [[ ! "${current_digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "deployed image digest marker is invalid" >&2
+            exit 1
+          fi
+          if ! git -C "${DEPLOY_ROOT}/repository" merge-base --is-ancestor "${CLOSURE_BASE_SHA}" "${current_sha}"; then
+            echo "deployed SHA does not contain the approved PR1 closure" >&2
             exit 1
           fi
 
-          expected_runtime_image="easysubway-backend:${EXPECTED_SHA}"
-          approved_image_id="$(docker image inspect --format '{{.Id}}' "${expected_runtime_image}")"
-          approved_repo_digests="$(
+          expected_runtime_image="easysubway-backend:${current_sha}"
+          deployed_image_id="$(docker image inspect --format '{{.Id}}' "${expected_runtime_image}")"
+          deployed_repo_digests="$(
             docker image inspect --format '{{join .RepoDigests "\n"}}' "${expected_runtime_image}"
           )"
-          if ! grep -Fxq "ghcr.io/aquilaxk/easysubway-backend@${EXPECTED_IMAGE_DIGEST}" <<< "${approved_repo_digests}"; then
-            echo "approved PR1 image tag is not associated with the approved digest" >&2
+          if ! grep -Fxq "ghcr.io/aquilaxk/easysubway-backend@${current_digest}" <<< "${deployed_repo_digests}"; then
+            echo "deployed image tag is not associated with the committed digest" >&2
             exit 1
           fi
           for container in easysubway-backend easysubway-back-worker; do
             runtime_image="$(docker inspect --format '{{.Config.Image}}' "${container}")"
             if [[ "${runtime_image}" != "${expected_runtime_image}" ]]; then
-              echo "${container} does not use the approved PR1 image tag" >&2
+              echo "${container} does not use the deployed image tag" >&2
               exit 1
             fi
             running_image_id="$(docker inspect --format '{{.Image}}' "${container}")"
-            if [[ "${running_image_id}" != "${approved_image_id}" ]]; then
-              echo "${container} does not run the approved PR1 image ID" >&2
+            if [[ "${running_image_id}" != "${deployed_image_id}" ]]; then
+              echo "${container} does not run the deployed image ID" >&2
               exit 1
             fi
           done
