@@ -2653,19 +2653,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         result == null) {
       return;
     }
-    final rideLegs = _rideLegArrivalsFromResult(result);
-    if (rideLegs.isEmpty) {
-      if (outcome.refreshed) {
-        final disabled = await _disableActiveGetOffAlarm();
-        if (!disabled) {
-          _rollbackRouteAfterAlarmFailure(
-            previousState: previousState,
-            expectedCurrentResult: result,
-          );
-        }
-      }
+    if (getOffAlarmController.state.activeRouteId != result.routeSearchId) {
       return;
     }
+    final rideLegs = _rideLegArrivalsFromResult(result);
     final source =
         outcome.refreshed &&
             rideLegs.any((leg) => leg.realtimeArrivalIso?.isNotEmpty ?? false)
@@ -2674,7 +2665,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     try {
       final activeSubscription = await getOffAlarmController.repository
           .loadActive();
-      if (!mounted) {
+      if (!mounted ||
+          !getOffAlarmController.state.enabled ||
+          getOffAlarmController.state.activeRouteId != result.routeSearchId ||
+          activeSubscription?.routeId != result.routeSearchId) {
         return;
       }
       final activeStationNames = <String, String>{
@@ -2712,16 +2706,19 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         stationName: (id) => stationNames[id]!,
         source: source,
       );
-      final destination = stops.last;
       final previousArrivalAt = activeSubscription?.destination.arrivalAt;
-      final deltaSeconds = previousArrivalAt == null
+      final deltaSeconds = previousArrivalAt == null || stops.isEmpty
           ? 0
-          : destination.arrivalAt.difference(previousArrivalAt).inSeconds;
-      final changed = previousArrivalAt != null && deltaSeconds != 0;
-      await getOffAlarmController.refresh(
+          : stops.last.arrivalAt.difference(previousArrivalAt).inSeconds;
+      final changed =
+          previousArrivalAt != null && stops.isNotEmpty && deltaSeconds != 0;
+      final refreshResult = await getOffAlarmController.refresh(
+        routeId: result.routeSearchId,
         stops: stops,
-        transferAlarmEnabled: activeSubscription?.transferAlarmEnabled ?? true,
       );
+      if (refreshResult == GetOffAlarmRefreshResult.routeMismatch) {
+        return;
+      }
       if (kDebugMode && getOffAlarmController.state.enabled) {
         debugPrint(
           'get_off_alarm foreground_refresh changed=$changed '
