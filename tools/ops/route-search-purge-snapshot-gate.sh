@@ -263,7 +263,7 @@ if [[ "${ready}" != "true" ]]; then
 fi
 
 docker exec -i "${restore_container}" \
-	pg_restore --no-owner --no-privileges -U snapshot_gate -d easysubway_restore \
+	pg_restore --clean --if-exists --no-owner --no-privileges -U snapshot_gate -d easysubway_restore \
 	< "${backup_file}"
 
 restore_psql() {
