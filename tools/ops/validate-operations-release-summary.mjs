@@ -58,12 +58,14 @@ function assertRcManifestIdentity(artifactIdentity, rcManifest, gate) {
     }
   }
   const backendFields = gate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf;
-  if (!backendFields.some((field) => (
-    artifactIdentity[field] !== undefined
-    && artifactIdentity[field] !== null
-    && artifactIdentity[field] === rcIdentity[field]
-  ))) {
-    throw new Error("artifactIdentity must match the RC manifest identity");
+  for (const field of backendFields) {
+    if (
+      artifactIdentity[field] !== undefined
+      && artifactIdentity[field] !== null
+      && artifactIdentity[field] !== rcIdentity[field]
+    ) {
+      throw new Error("artifactIdentity must match the RC manifest identity");
+    }
   }
 }
 

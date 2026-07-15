@@ -395,6 +395,29 @@ test("operations release summary validator rejects an empty backend identity", a
   );
 });
 
+test("operations release summary validator rejects a conflicting secondary backend identity", async () => {
+  const summary = validSummary();
+  summary.artifactIdentity.backendImageDigest = `sha256:${"d".repeat(64)}`;
+  for (const review of summary.postLaunchReviews) {
+    review.artifactIdentity.backendImageDigest = summary.artifactIdentity.backendImageDigest;
+  }
+
+  await assert.rejects(
+    withSummary(summary, async (summaryPath, rcManifestPath) => {
+      const rcManifest = JSON.parse(readFileSync(rcManifestPath, "utf8"));
+      rcManifest.rcIdentity.backendImageDigest = `sha256:${"e".repeat(64)}`;
+      await writeFile(rcManifestPath, `${JSON.stringify(rcManifest, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /artifactIdentity must match the RC manifest identity/,
+  );
+});
+
 test("operations release summary validator rejects an identity that does not match the RC manifest", async () => {
   const summary = validSummary();
 
