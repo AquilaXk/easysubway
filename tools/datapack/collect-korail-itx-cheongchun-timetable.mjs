@@ -73,7 +73,7 @@ export async function collectKorailItxCheongchunCompleteness({
           throw new Error("TAGO_OD_STOP_SEQUENCE_INVALID");
         }
       }
-      failureStage = "PLAN_VALIDATION";
+      failureStage = "PLAN_CORROBORATION";
       const timetable = await collectTimetable({
         serviceKey,
         runDate: serviceDate,
@@ -89,7 +89,7 @@ export async function collectKorailItxCheongchunCompleteness({
         serviceDate,
         status: timetableSupported ? "SUPPORTED" : "MISSING",
         ...(!timetableSupported ? {
-          failureStage: "PLAN_VALIDATION",
+          failureStage: "PLAN_CORROBORATION",
           failureReasonCode: timetable.materialization?.status === "MISSING_STATION_TIMES"
             ? timetable.materialization?.stationTimeCapability?.reasonCode ?? "PLANNED_TIME_MISSING"
             : "TIMETABLE_MATERIALIZATION_INCOMPLETE",
@@ -116,7 +116,7 @@ export async function collectKorailItxCheongchunCompleteness({
       const failureReasonCode = completenessFailureReason(error);
       const classifiedFailureStage = failureReasonCode.startsWith("TAGO_OD_")
         ? "OD_MATERIALIZATION"
-        : failureReasonCode.startsWith("KORAIL_PLAN_") ? "PLAN_VALIDATION" : failureStage;
+        : failureReasonCode.startsWith("KORAIL_PLAN_") ? "PLAN_CORROBORATION" : failureStage;
       serviceDays.push({
         dayCd,
         serviceDate,
@@ -212,8 +212,8 @@ export async function collectKorailItxCheongchunPlan({
   const materializedTrainSetHash = sha256(JSON.stringify(
     materialized.stationSequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)).sort(naturalCompare),
   ));
-  if (tagoOdTrainSetHash !== selected.trainSetHash || selected.trainSetHash !== materializedTrainSetHash) {
-    throw new Error("KORAIL_PLAN_MISMATCH: train set");
+  if (tagoOdTrainSetHash !== materializedTrainSetHash) {
+    throw new Error("TAGO_OD_STOP_SEQUENCE_INVALID: train set");
   }
   const artifact = {
     schemaVersion: 2,
@@ -227,8 +227,8 @@ export async function collectKorailItxCheongchunPlan({
     kricServiceDayCode,
     providerResultCode: "0",
     schemaStatus: "EXPECTED",
-    requiredTrainNumberSets: ["TAGO_OD", "KORAIL_PLAN", "MATERIALIZED"],
-    trainNumbers: selected.trainNumbers,
+    requiredTrainNumberSets: ["TAGO_OD", "MATERIALIZED"],
+    trainNumbers: materialized.trainNumbers.map(normalizeTrainNumber).sort(naturalCompare),
     trainNumberSets: {
       tagoOd: materialized.trainNumbers.map(normalizeTrainNumber).sort(naturalCompare),
       korailPlan: selected.trainNumbers,
@@ -238,6 +238,15 @@ export async function collectKorailItxCheongchunPlan({
       tagoOd: tagoOdTrainSetHash,
       korailPlan: selected.trainSetHash,
       materialized: materializedTrainSetHash,
+    },
+    korailPlanCorroboration: {
+      availableCount: selected.trainNumbers.length,
+      missingCount: selected.missingTrainNumbers.length,
+      duplicateCount: 0,
+      mismatchCount: 0,
+      warningCodes: selected.missingTrainNumbers.length > 0 ? ["KORAIL_PLAN_NOT_AVAILABLE"] : [],
+      missingTrainNumbers: selected.missingTrainNumbers,
+      corroboratedTrainSetHash: selected.trainSetHash,
     },
     selectedPlans: selected.selectedPlans,
     stationSequences: materialized.stationSequences,
@@ -453,18 +462,22 @@ export function materializeKorailItxRows({
 }
 
 export function validateKorailItxPlans({ plans, materialized, runDate }) {
-  if (!Array.isArray(plans)) throw new Error("KORAIL_PLAN_MISSING");
+  if (!Array.isArray(plans)) throw new Error("KORAIL_PLAN_MISMATCH: plans");
   const trainNumbers = (materialized?.trainNumbers ?? []).map(normalizeTrainNumber).sort(naturalCompare);
   if (trainNumbers.length === 0 || new Set(trainNumbers).size !== trainNumbers.length) {
-    throw new Error("KORAIL_PLAN_MISSING");
+    throw new Error("KORAIL_PLAN_MISMATCH: TAGO train set");
   }
   const stationSequences = new Map((materialized?.stationSequences ?? []).map((sequence) => (
     [normalizeTrainNumber(sequence.trainNumber), sequence]
   )));
   const selectedPlans = [];
+  const missingTrainNumbers = [];
   for (const trainNumber of trainNumbers) {
     const matches = plans.filter((plan) => normalizeTrainNumber(plan?.trn_no) === trainNumber);
-    if (matches.length === 0) throw new Error(`KORAIL_PLAN_MISSING: ${safeToken(trainNumber)}`);
+    if (matches.length === 0) {
+      missingTrainNumbers.push(trainNumber);
+      continue;
+    }
     if (matches.length > 1) throw new Error(`KORAIL_PLAN_DUPLICATE: ${safeToken(trainNumber)}`);
     const plan = matches[0];
     const sequence = stationSequences.get(trainNumber);
@@ -502,6 +515,7 @@ export function validateKorailItxPlans({ plans, materialized, runDate }) {
     .sort(naturalCompare);
   return {
     trainNumbers: selectedTrainNumbers,
+    missingTrainNumbers,
     selectedPlans,
     trainSetHash: sha256(JSON.stringify(selectedTrainNumbers)),
   };
@@ -906,7 +920,6 @@ function completenessFailureReason(error) {
     "TAGO_OD_PAIR_COVERAGE_INCOMPLETE",
     "TAGO_OD_TIME_CONFLICT",
     "TAGO_OD_STOP_SEQUENCE_INVALID",
-    "KORAIL_PLAN_MISSING",
     "KORAIL_PLAN_DUPLICATE",
     "KORAIL_PLAN_MISMATCH",
   ]) if (message.startsWith(code)) return code;

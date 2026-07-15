@@ -187,7 +187,7 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.admissionStatus, "MISSING");
     assert.equal(artifact.admissionEligible, false);
     assert.equal(artifact.serviceDays.length, 3);
-    assert.equal(artifact.serviceDays[1].failureStage, "PLAN_VALIDATION");
+    assert.equal(artifact.serviceDays[1].failureStage, "PLAN_CORROBORATION");
     assert.equal(artifact.serviceDays[1].failureReasonCode, "PLANNED_TIME_MISSING");
   });
 
@@ -289,15 +289,15 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.serviceDays[0].reconstructionSummary.conflictingTimestampCount, 1);
   });
 
-  await context.test("KORAIL plan 누락 context", async () => {
+  await context.test("KORAIL plan duplicate context", async () => {
     const artifact = await collectKorailItxCheongchunCompleteness({
       serviceKey: "key", serviceDates, packPath: PACK_PATH,
       now: new Date("2026-07-14T00:00:00.000Z"), collectRosterImpl: roster,
-      collectTimetableImpl: async () => { throw new Error("KORAIL_PLAN_MISSING: 2041"); },
+      collectTimetableImpl: async () => { throw new Error("KORAIL_PLAN_DUPLICATE: 2041"); },
     });
-    assert.equal(artifact.serviceDays[0].failureStage, "PLAN_VALIDATION");
-    assert.equal(artifact.serviceDays[0].failureReasonCode, "KORAIL_PLAN_MISSING");
-    assert.equal(artifact.serviceDays[0].failureContext, "reason=KORAIL_PLAN_MISSING,trainNumber=2041");
+    assert.equal(artifact.serviceDays[0].failureStage, "PLAN_CORROBORATION");
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "KORAIL_PLAN_DUPLICATE");
+    assert.equal(artifact.serviceDays[0].failureContext, "reason=KORAIL_PLAN_DUPLICATE,trainNumber=2041");
   });
 
   await context.test("station mapping 오류", async () => {
@@ -378,7 +378,7 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
         );
       },
     });
-    assert.equal(artifact.serviceDays[0].failureStage, "PLAN_VALIDATION");
+    assert.equal(artifact.serviceDays[0].failureStage, "PLAN_CORROBORATION");
     assert.equal(artifact.serviceDays[0].expectedOdCount, 2);
     assert.equal(artifact.serviceDays[0].completedOdCount, 2);
     assert.equal(artifact.serviceDays[0].failedOdCount, 0);
@@ -1060,15 +1060,53 @@ test("fresh KORAIL admission은 travelerTrainRunPlan2만 호출하고 future inf
 
   assert.deepEqual(requestedOperations, ["travelerTrainRunPlan2"]);
   assert.equal(artifact.materialization.status, "SUPPORTED");
-  assert.deepEqual(artifact.requiredTrainNumberSets, ["TAGO_OD", "KORAIL_PLAN", "MATERIALIZED"]);
+  assert.deepEqual(artifact.requiredTrainNumberSets, ["TAGO_OD", "MATERIALIZED"]);
+  assert.deepEqual(artifact.korailPlanCorroboration, {
+    availableCount: 1,
+    missingCount: 0,
+    duplicateCount: 0,
+    mismatchCount: 0,
+    warningCodes: [],
+    missingTrainNumbers: [],
+    corroboratedTrainSetHash: artifact.trainSetHashes.korailPlan,
+  });
 });
 
-test("KORAIL plan selection은 missing·duplicate·date·endpoint·time mismatch를 구분한다", () => {
+test("KORAIL plan row 0건은 admission을 뒤집지 않고 warning evidence로 기록한다", async () => {
+  const artifact = await collectKorailItxCheongchunPlan({
+    serviceKey: "key",
+    runDate: "20260713",
+    kricServiceDayCode: "8",
+    trainNumberEvidence: {
+      ...trainNumberEvidence(),
+      schemaVersion: 2,
+      ...tagoMaterializedFixture(),
+    },
+    fetchImpl: async () => apiResponse([]),
+  });
+
+  assert.equal(artifact.materialization.status, "SUPPORTED");
+  assert.deepEqual(artifact.requiredTrainNumberSets, ["TAGO_OD", "MATERIALIZED"]);
+  assert.deepEqual(artifact.trainNumberSets.korailPlan, []);
+  assert.deepEqual(artifact.korailPlanCorroboration, {
+    availableCount: 0,
+    missingCount: 1,
+    duplicateCount: 0,
+    mismatchCount: 0,
+    warningCodes: ["KORAIL_PLAN_NOT_AVAILABLE"],
+    missingTrainNumbers: ["2001"],
+    corroboratedTrainSetHash: createHash("sha256").update(JSON.stringify([])).digest("hex"),
+  });
+});
+
+test("KORAIL plan selection은 missing warning과 duplicate·date·endpoint·time mismatch를 구분한다", () => {
   const materialized = tagoMaterializedFixture();
   const valid = planRow("02001", "용산", "춘천", "20260713060000", "20260713080000");
   const input = (plans) => ({ plans, materialized, runDate: "20260713" });
 
-  assert.throws(() => validateKorailItxPlans(input([])), /KORAIL_PLAN_MISSING/);
+  const missing = validateKorailItxPlans(input([]));
+  assert.deepEqual(missing.trainNumbers, []);
+  assert.deepEqual(missing.missingTrainNumbers, ["2001"]);
   assert.throws(() => validateKorailItxPlans(input([valid, { ...valid }])), /KORAIL_PLAN_DUPLICATE/);
   assert.throws(() => validateKorailItxPlans(input([{ ...valid, run_ymd: "20260714" }])), /KORAIL_PLAN_MISMATCH/);
   assert.throws(() => validateKorailItxPlans(input([{ ...valid, arvl_stn_nm: "청량리" }])), /KORAIL_PLAN_MISMATCH/);
