@@ -168,10 +168,15 @@ test("ITX-청춘 production source artifact는 변경 없는 5-set의 UNCHANGED_
   assert.match(reference.artifactId, /^itx-cheongchun-source-timetable-\d{17}$/);
   assert.equal(reference.artifactPath, `tools/datapack/sources/${reference.artifactId}.json`);
   assert.match(reference.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(
+    reference.completenessEvidencePath,
+    `tools/datapack/sources/${reference.artifactId}-completeness-evidence.json`,
+  );
+  assert.match(reference.completenessEvidenceSha256, /^[a-f0-9]{64}$/);
   assert.deepEqual(reference.promotion, {
     mode: "UNCHANGED_AUTO",
-    previousArtifactSha256: "cc11088e48235a8d2eccc55758a2b002b0fb5eb691aa55430e701fa01fd59201",
-    previousArtifactPath: "tools/datapack/sources/itx-cheongchun-source-timetable-20260715104320157.json",
+    previousArtifactSha256: "4134ae94f2cae0e6463077ee8c29c2f2417904de9dd2e751782c26ab0af1a2a7",
+    previousArtifactPath: "tools/datapack/sources/itx-cheongchun-source-timetable-20260715112641542.json",
     approvalUrl: null,
     approvedArtifactSha256: null,
   });
@@ -185,6 +190,16 @@ test("ITX-청춘 production source artifact는 변경 없는 5-set의 UNCHANGED_
   const artifactBytes = await readFile(new URL(`../../${reference.artifactPath}`, import.meta.url));
   assert.equal(createHash("sha256").update(artifactBytes).digest("hex"), reference.sha256);
   const artifact = JSON.parse(artifactBytes);
+  const completenessBytes = await readFile(new URL(`../../${reference.completenessEvidencePath}`, import.meta.url));
+  assert.equal(
+    createHash("sha256").update(completenessBytes).digest("hex"),
+    reference.completenessEvidenceSha256,
+  );
+  const completeness = JSON.parse(completenessBytes);
+  assert.equal(artifact.completenessEvidenceSha256, reference.completenessEvidenceSha256);
+  assert.equal(completeness.validationStatus, "SUPPORTED");
+  assert.equal(completeness.materialization.status, "SUPPORTED");
+  assert.deepEqual(completeness.selectedServiceDates, artifact.selectedServiceDates);
   assert.equal(artifact.artifactId, reference.artifactId);
   assert.equal(artifact.artifactKind, "itx-cheongchun-source-timetable");
   assert.equal(artifact.promotionStatus, "SUPPORTED");
@@ -210,7 +225,7 @@ test("ITX-청춘 production source artifact는 변경 없는 5-set의 UNCHANGED_
     }
   }
   assert.equal(artifact.credentialRedacted, true);
-  assert.deepEqual(artifact.selectedServiceDates, { "8": "20260715", "7": "20260718", "9": "20260719" });
+  assert.deepEqual(artifact.selectedServiceDates, { "8": "20260716", "7": "20260718", "9": "20260719" });
   for (const dayCd of ["8", "7", "9"]) {
     assert.deepEqual(
       [...new Set(artifact.stationSequences.filter((row) => row.dayCd === dayCd).map((row) => row.directionId))].sort(),
@@ -220,6 +235,10 @@ test("ITX-청춘 production source artifact는 변경 없는 5-set의 UNCHANGED_
   assert.equal(artifact.stationSequences.filter(({ trainNumber }) => trainNumber === "2035").length, 1);
   assert.doesNotMatch(
     artifactBytes.toString("utf8"),
+    /serviceKey(?:=|["']?\s*:)|KRIC_SERVICE_KEY|DATA_GO_KR_SERVICE_KEY/i,
+  );
+  assert.doesNotMatch(
+    completenessBytes.toString("utf8"),
     /serviceKey(?:=|["']?\s*:)|KRIC_SERVICE_KEY|DATA_GO_KR_SERVICE_KEY/i,
   );
 });

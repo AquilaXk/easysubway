@@ -323,6 +323,7 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
     policyVersion: "itx-snapshot-anomaly-v1",
     validationStatus: "SUPPORTED",
     promotionStatus: completeness.sourceTimetableArtifact.status,
+    completenessEvidenceSha256: sha256(canonicalJsonBytes(completeness)),
     canonicalPackIdentity: await readCanonicalPackIdentity(packPath, repositoryRoot),
     selectedServiceDates: completeness.selectedServiceDates,
     sourceLineage: serviceDays.map((day) => ({
@@ -368,6 +369,7 @@ export async function promoteItxSourceCandidate(options = {}) {
 
 async function promoteItxSourceCandidateLocked({
   candidatePath,
+  completenessPath,
   approvedSha256,
   approvalUrl,
   sourceOutputDir,
@@ -406,6 +408,12 @@ async function promoteItxSourceCandidateLocked({
     || JSON.stringify(candidate.snapshotDiff) !== JSON.stringify(expectedSnapshotDiff)) {
     throw new Error("SNAPSHOT_PROMOTION_AUTHORITY_INVALID");
   }
+  const { bytes: completenessBytes } = await loadCompletenessEvidence(
+    completenessPath ?? `${candidatePath}.completeness.json`,
+    candidate,
+    repositoryRoot,
+    now,
+  );
   const approvalRequired = bootstrap || changed;
   if (approvalRequired) {
     if (approvedSha256 !== candidateSha256 || !/^[a-f0-9]{64}$/.test(approvedSha256 ?? "")) {
@@ -422,24 +430,23 @@ async function promoteItxSourceCandidateLocked({
     throw new Error("unchanged promotion must not include approval arguments");
   }
   const artifactRelativePath = `tools/datapack/sources/${candidate.artifactId}.json`;
+  const completenessRelativePath = `tools/datapack/sources/${candidate.artifactId}-completeness-evidence.json`;
   const artifactPath = await validateSourceOutputPath(sourceOutputDir, artifactRelativePath, repositoryRoot);
-  try {
-    await writeFile(artifactPath, candidateBytes, { flag: "wx", mode: 0o644 });
-  } catch (error) {
-    if (error?.code !== "EEXIST") throw error;
-    const existingStat = await lstat(artifactPath);
-    if (existingStat.isSymbolicLink() || !existingStat.isFile()) {
-      throw new Error("ADMITTED_SOURCE_ARTIFACT_INVALID");
-    }
-    const existingBytes = await readFile(artifactPath);
-    if (!existingBytes.equals(candidateBytes)) throw new Error("ADMITTED_SOURCE_ARTIFACT_CONFLICT");
-  }
+  const completenessArtifactPath = await validateSourceOutputPath(
+    sourceOutputDir,
+    completenessRelativePath,
+    repositoryRoot,
+  );
+  await writeImmutableArtifact(artifactPath, candidateBytes, "ADMITTED_SOURCE_ARTIFACT");
+  await writeImmutableArtifact(completenessArtifactPath, completenessBytes, "ADMITTED_COMPLETENESS_EVIDENCE");
   contract.sourceTimetableArtifact = {
     status: "ADMITTED",
     admissionEligible: true,
     artifactId: candidate.artifactId,
     artifactPath: artifactRelativePath,
     sha256: candidateSha256,
+    completenessEvidencePath: completenessRelativePath,
+    completenessEvidenceSha256: sha256(completenessBytes),
     schemaVersion: 1,
     freshUntil: candidate.freshUntil,
     policyVersion: "itx-snapshot-anomaly-v1",
@@ -460,7 +467,73 @@ async function promoteItxSourceCandidateLocked({
       if (error?.code !== "ENOENT") throw error;
     });
   }
-  return { candidateSha256, artifactPath, sourceTimetableArtifact: contract.sourceTimetableArtifact };
+  return {
+    candidateSha256,
+    artifactPath,
+    completenessArtifactPath,
+    sourceTimetableArtifact: contract.sourceTimetableArtifact,
+  };
+}
+
+async function loadCompletenessEvidence(completenessPath, candidate, repositoryRoot, now) {
+  requiredString(completenessPath, "completenessPath");
+  let stat;
+  try {
+    stat = await lstat(completenessPath);
+  } catch (error) {
+    throw new Error("SOURCE_COMPLETENESS_EVIDENCE_MISMATCH", { cause: error });
+  }
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error("SOURCE_COMPLETENESS_EVIDENCE_MISMATCH");
+  const bytes = await readFile(completenessPath);
+  let completeness;
+  try {
+    completeness = JSON.parse(bytes);
+  } catch (error) {
+    throw new Error("SOURCE_COMPLETENESS_EVIDENCE_MISMATCH", { cause: error });
+  }
+  const { evidenceHash, ...withoutEvidenceHash } = completeness;
+  if (!/^[a-f0-9]{64}$/.test(candidate.completenessEvidenceSha256 ?? "")
+    || sha256(bytes) !== candidate.completenessEvidenceSha256
+    || bytes.toString("utf8") !== canonicalJsonBytes(completeness).toString("utf8")
+    || evidenceHash !== sha256(JSON.stringify(withoutEvidenceHash))
+    || completeness?.schemaVersion !== 2
+    || completeness.artifactKind !== "korail-itx-cheongchun-completeness-evidence"
+    || completeness.serviceId !== "ITX_CHEONGCHUN"
+    || completeness.validationMode !== "ADMISSION"
+    || completeness.validationStatus !== "SUPPORTED"
+    || completeness.materialization?.status !== "SUPPORTED"
+    || completeness.credentialRedacted !== true) {
+    throw new Error("SOURCE_COMPLETENESS_EVIDENCE_MISMATCH");
+  }
+  let expectedCandidate;
+  try {
+    expectedCandidate = await buildItxSourceCandidate({
+      completeness,
+      packPath: candidate.canonicalPackIdentity.path,
+      now,
+      repositoryRoot,
+    });
+  } catch (error) {
+    throw new Error("SOURCE_COMPLETENESS_EVIDENCE_MISMATCH", { cause: error });
+  }
+  if (JSON.stringify(expectedCandidate) !== JSON.stringify(candidate)) {
+    throw new Error("SOURCE_COMPLETENESS_EVIDENCE_MISMATCH");
+  }
+  return { bytes, completeness };
+}
+
+async function writeImmutableArtifact(artifactPath, bytes, errorPrefix) {
+  try {
+    await writeFile(artifactPath, bytes, { flag: "wx", mode: 0o644 });
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    const existingStat = await lstat(artifactPath);
+    if (existingStat.isSymbolicLink() || !existingStat.isFile()) {
+      throw new Error(`${errorPrefix}_INVALID`);
+    }
+    const existingBytes = await readFile(artifactPath);
+    if (!existingBytes.equals(bytes)) throw new Error(`${errorPrefix}_CONFLICT`);
+  }
 }
 
 function validateSourceFreshness(source, selectedServiceDates, now = null) {
@@ -513,7 +586,7 @@ function hasClosedCandidateShape(candidate) {
     && Object.keys(value).every((key) => keys.includes(key));
   const topLevel = [
     "schemaVersion", "artifactKind", "artifactId", "serviceId", "observedAt", "freshUntil",
-    "policyVersion", "validationStatus", "promotionStatus", "canonicalPackIdentity",
+    "policyVersion", "validationStatus", "promotionStatus", "completenessEvidenceSha256", "canonicalPackIdentity",
     "selectedServiceDates", "sourceLineage", "stationRosters", "stationSequences", "transitTrips",
     "transitStopTimes", "warnings", "normalizedSnapshotSets", "snapshotDiff", "credentialRedacted",
     "evidenceHash",
@@ -896,6 +969,24 @@ async function loadAdmittedSourceReference(contract, repositoryRoot) {
   validateSourceFreshness(source, source.selectedServiceDates);
   validateCanonicalCorridorAuthority(source);
   validateSourceSnapshotSets(source);
+  if (source.completenessEvidenceSha256 !== undefined) {
+    const expectedEvidencePath = `tools/datapack/sources/${source.artifactId}-completeness-evidence.json`;
+    if (reference.completenessEvidencePath !== expectedEvidencePath
+      || reference.completenessEvidenceSha256 !== source.completenessEvidenceSha256
+      || path.isAbsolute(reference.completenessEvidencePath)
+      || path.posix.normalize(reference.completenessEvidencePath) !== reference.completenessEvidencePath) {
+      throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+    }
+    await loadCompletenessEvidence(
+      path.join(repositoryRoot, ...reference.completenessEvidencePath.split("/")),
+      source,
+      repositoryRoot,
+      null,
+    );
+  } else if (reference.completenessEvidencePath !== undefined
+    || reference.completenessEvidenceSha256 !== undefined) {
+    throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+  }
   source.sourceTimetableArtifact = {
     sha256: reference.sha256,
     artifactPath: reference.artifactPath,
@@ -2067,6 +2158,7 @@ function requiredString(value, label) { if (typeof value !== "string" || value.t
 function safeToken(value) { const text = String(value ?? "UNKNOWN"); return /^[A-Za-z0-9._/+:-]{1,64}$/.test(text) ? text : "UNKNOWN"; }
 function safeLabel(value) { const text = String(value ?? "UNKNOWN"); return /^[\p{L}\p{N} ._()+/-]{1,64}$/u.test(text) ? text : "UNKNOWN"; }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
+function canonicalJsonBytes(value) { return Buffer.from(`${JSON.stringify(value, null, 2)}\n`); }
 function naturalCompare(left, right) { return String(left).localeCompare(String(right), "ko", { numeric: true }); }
 function parseArgs(argv) {
   const result = {};
@@ -2095,6 +2187,7 @@ export async function runKorailItxCompletenessCli({
     );
     const promotion = await promoteImpl({
       candidatePath: requiredString(args["promote-candidate"], "--promote-candidate"),
+      completenessPath: requiredString(args["completeness-evidence"], "--completeness-evidence"),
       approvedSha256: args["approved-sha256"],
       approvalUrl: args["approval-url"],
       sourceOutputDir: requiredString(args["source-output-dir"], "--source-output-dir"),
@@ -2107,6 +2200,11 @@ export async function runKorailItxCompletenessCli({
   }
   const output = requiredString(args.output, "--output");
   if (!path.isAbsolute(output)) throw new Error("--output must be absolute");
+  const completenessOutputArg = args["completeness-output"];
+  if (typeof completenessOutputArg === "string"
+    && path.resolve(completenessOutputArg) === path.resolve(output)) {
+    throw new Error("candidate and completeness output paths must differ");
+  }
   const packPath = requiredString(args["canonical-pack"], "--canonical-pack");
   const serviceKey = requiredString(env.DATA_GO_KR_SERVICE_KEY, "DATA_GO_KR_SERVICE_KEY");
   const replay = args.replay === true;
@@ -2153,13 +2251,25 @@ export async function runKorailItxCompletenessCli({
   const candidate = artifact.validationStatus === "SUPPORTED" && !replay
     ? await buildItxSourceCandidate({ completeness: artifact, packPath, now, repositoryRoot })
     : null;
+  let completenessEvidenceSha256 = null;
+  if (candidate) {
+    const completenessOutput = requiredString(completenessOutputArg, "--completeness-output");
+    if (!path.isAbsolute(completenessOutput)) throw new Error("--completeness-output must be absolute");
+    const completenessBytes = canonicalJsonBytes(artifact);
+    completenessEvidenceSha256 = sha256(completenessBytes);
+    if (completenessEvidenceSha256 !== candidate.completenessEvidenceSha256) {
+      throw new Error("SOURCE_COMPLETENESS_EVIDENCE_MISMATCH");
+    }
+    await writeFile(completenessOutput, completenessBytes, { flag: "wx", mode: 0o600 });
+  }
   const outputValue = candidate ?? artifact;
-  const outputBytes = `${JSON.stringify(outputValue, null, 2)}\n`;
-  await writeFile(output, outputBytes, { mode: 0o600 });
+  const outputBytes = canonicalJsonBytes(outputValue);
+  await writeFile(output, outputBytes, { flag: "wx", mode: 0o600 });
   return {
     artifact,
     candidate,
     outputSha256: sha256(outputBytes),
+    completenessEvidenceSha256,
     exitCode: artifact.validationStatus === "SUPPORTED" ? 0 : 1,
   };
 }
