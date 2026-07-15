@@ -74,11 +74,63 @@ function input(overrides = {}) {
   };
 }
 
+function twoSourceInput() {
+  const value = input();
+  const second = {
+    ...value.snapshots[0],
+    snapshotId: "snapshot-b",
+    sourceId: "source-b",
+    rawObjectUri: "s3://bucket/snapshot-b.json",
+    rawSha256: "e".repeat(64),
+    retrievedAt: "2026-07-13T00:00:00Z",
+    freshnessExpiresAt: "2026-08-12T00:00:00Z",
+    rawRetentionExpiresAt: "2026-10-11T00:00:00.000Z",
+  };
+  value.snapshots.push(second);
+  value.buildSpec.sourceSnapshotIds.push(second.snapshotId);
+  value.buildSpec.sourceSnapshots.push({
+    ...value.buildSpec.sourceSnapshots[0],
+    snapshotId: second.snapshotId,
+    sourceId: second.sourceId,
+    rawObjectUri: second.rawObjectUri,
+    rawSha256: second.rawSha256,
+    freshnessExpiresAt: second.freshnessExpiresAt,
+    rawRetentionExpiresAt: second.rawRetentionExpiresAt,
+  });
+  value.buildSpec.sourceSnapshotSetHash = createHash("sha256")
+    .update(JSON.stringify(value.snapshots))
+    .digest("hex");
+  value.policy = {
+    ...value.policy,
+    sourceClasses: [{
+      ...value.policy.sourceClasses[0],
+      sourceIds: ["source-a", "source-b"],
+    }],
+  };
+  return value;
+}
+
 test("source snapshot ID·hash·policy 파생 freshness가 맞으면 통과한다", () => {
   const result = validateSourceSnapshotFreshness(input());
 
   assert.equal(result.results.length, 1);
   assert.equal(result.results[0].status, "FRESH");
+});
+
+test("sourceSnapshotIds 순서가 evidence와 달라도 동일한 snapshot 집합은 통과한다", () => {
+  const value = twoSourceInput();
+  value.buildSpec.sourceSnapshotIds.reverse();
+
+  const result = validateSourceSnapshotFreshness(value);
+
+  assert.deepEqual(result.results.map((entry) => entry.snapshotId), ["snapshot-a", "snapshot-b"]);
+});
+
+test("governance 입력이 없을 때 policy provenance는 snapshot ID로 비교한다", () => {
+  const value = twoSourceInput();
+  value.buildSpec.sourceSnapshots.reverse();
+
+  assert.doesNotThrow(() => validateSourceSnapshotFreshness(value));
 });
 
 test("선택한 head만 freshness를 판정하고 만료된 이전 snapshot은 lineage로만 검증한다", () => {

@@ -228,11 +228,11 @@ function selectSnapshots(snapshots, selectedIds) {
     }
     byId.set(snapshotId, snapshot);
   }
-  const selected = ids.map((id) => byId.get(id));
-  if (selected.some((snapshot) => snapshot == null)) {
+  if (ids.some((id) => !byId.has(id))) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
   }
-  return selected;
+  const selectedIdsSet = new Set(ids);
+  return snapshots.filter((snapshot) => selectedIdsSet.has(snapshot.snapshotId));
 }
 
 function validateRequiredProductionSources(snapshots, inventory) {
@@ -303,10 +303,15 @@ function canonicalPolicyProvenance(snapshots, label, includeGovernance) {
   const fields = includeGovernance
     ? policyBoundProvenanceStringFields
     : policyBoundProvenanceStringFields.filter((field) => !field.startsWith("governancePolicy"));
-  return snapshots.map((snapshot, index) => Object.fromEntries(fields.map((field) => [
-    field,
-    requiredString(snapshot?.[field], `${label}[${index}].${field}`),
-  ])));
+  return snapshots.map((snapshot, index) => ({
+    snapshotId: requiredString(snapshot?.snapshotId, `${label}[${index}].snapshotId`),
+    provenance: Object.fromEntries(fields.map((field) => [
+      field,
+      requiredString(snapshot?.[field], `${label}[${index}].${field}`),
+    ])),
+  }))
+    .sort((left, right) => left.snapshotId.localeCompare(right.snapshotId))
+    .map((entry) => entry.provenance);
 }
 
 function sha256(value) {
