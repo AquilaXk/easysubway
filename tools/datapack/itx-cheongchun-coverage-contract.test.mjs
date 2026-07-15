@@ -183,6 +183,22 @@ test("ITX-청춘 production source artifact는 변경 없는 5-set의 UNCHANGED_
   assert.equal(artifact.promotionStatus, "SUPPORTED");
   assert.equal(artifact.snapshotDiff.status, "SUPPORTED");
   assert.equal(artifact.snapshotDiff.previousArtifactSha256, reference.promotion.previousArtifactSha256);
+  const diffByDay = new Map(artifact.snapshotDiff.serviceDays.map((day) => [day.dayCd, day]));
+  const setNames = ["stationSet", "odSet", "trainSet", "stopSequenceSet", "timetableTupleSet"];
+  for (const { dayCd, sets } of artifact.normalizedSnapshotSets) {
+    const diff = diffByDay.get(dayCd);
+    assert.equal(diff.blocked, false);
+    for (const name of setNames) {
+      const values = sets[name].map((value) => JSON.stringify(value)).sort().map(JSON.parse);
+      assert.deepEqual(diff.sets[name].added, []);
+      assert.deepEqual(diff.sets[name].removed, []);
+      assert.equal(diff.sets[name].count, values.length);
+      assert.equal(
+        diff.sets[name].sha256,
+        createHash("sha256").update(JSON.stringify(values)).digest("hex"),
+      );
+    }
+  }
   assert.equal(artifact.credentialRedacted, true);
   assert.deepEqual(artifact.selectedServiceDates, { "8": "20260715", "7": "20260718", "9": "20260719" });
   for (const dayCd of ["8", "7", "9"]) {

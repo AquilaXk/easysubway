@@ -220,8 +220,10 @@ function sourceCandidate(overrides = {}) {
     normalizedSnapshotSets,
     snapshotDiff: {
       policyVersion: "itx-snapshot-anomaly-v1",
+      threshold: "ZERO_TOLERANCE",
       status: "BOOTSTRAP_REVIEW_REQUIRED",
       previousArtifactSha256: null,
+      serviceDays: [],
     },
     credentialRedacted: true,
     ...overrides,
@@ -263,8 +265,41 @@ async function writeCoverageContract(repositoryRoot, contents) {
     "tools/datapack/itx-cheongchun-coverage-contract.json",
   );
   await mkdir(path.dirname(contractPath), { recursive: true });
-  await writeFile(contractPath, contents);
+  const contract = {
+    schemaVersion: 2,
+    artifactKind: "itx-cheongchun-coverage-contract",
+    serviceId: "ITX_CHEONGCHUN",
+    canonicalLineId: "line-54a7b980b7c3",
+    completenessAdmission: {
+      snapshotAnomalyPolicy: { policyId: "itx-snapshot-anomaly-v1" },
+    },
+    ...JSON.parse(contents),
+  };
+  await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
   return contractPath;
+}
+
+function unchangedSnapshotDiff(previousArtifactSha256, normalizedSnapshotSets) {
+  const names = ["stationSet", "odSet", "trainSet", "stopSequenceSet", "timetableTupleSet"];
+  return {
+    policyVersion: "itx-snapshot-anomaly-v1",
+    threshold: "ZERO_TOLERANCE",
+    status: "SUPPORTED",
+    previousArtifactSha256,
+    serviceDays: normalizedSnapshotSets.map(({ dayCd, sets }) => ({
+      dayCd,
+      blocked: false,
+      sets: Object.fromEntries(names.map((name) => {
+        const values = sets[name].map((value) => JSON.stringify(value)).sort().map(JSON.parse);
+        return [name, {
+          count: values.length,
+          added: [],
+          removed: [],
+          sha256: createHash("sha256").update(JSON.stringify(values)).digest("hex"),
+        }];
+      })),
+    })),
+  };
 }
 
 test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission artifact로 묶는다", async () => {
@@ -966,6 +1001,53 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
     }
   });
 
+  await context.test("candidate unknown top-level과 nested credential field", async () => {
+    for (const mutate of [
+      (candidate) => { candidate.serviceKey = "should-not-persist"; },
+      (candidate) => { candidate.stationRosters[0].stations[0].serviceKey = "should-not-persist"; },
+    ]) {
+      const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-closed-schema-"));
+      try {
+        const candidate = sourceCandidate();
+        mutate(candidate);
+        rehashCandidate(candidate);
+        const candidatePath = path.join(dir, "candidate.json");
+        await writeFile(candidatePath, sourceBytes(candidate));
+        const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+        await assert.rejects(promoteItxSourceCandidate({
+          candidatePath,
+          ...ownerApproval(candidate),
+          sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+          coverageContractPath: contractPath,
+          repositoryRoot: dir,
+          now: new Date("2026-07-15T02:00:00.000Z"),
+        }), /ITX source candidate schema is invalid/);
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  await context.test("canonical v2 coverage contract authority", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-contract-authority-"));
+    try {
+      const candidate = sourceCandidate();
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      const contractPath = await writeCoverageContract(dir, '{"schemaVersion":1}\n');
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        ...ownerApproval(candidate),
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /ITX_COVERAGE_CONTRACT_INVALID/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   await context.test("existing promotion lock은 동시 promotion을 거부", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-lock-"));
     try {
@@ -1267,24 +1349,13 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
         },
       }, null, 2)}\n`);
 
-      for (const candidate of [
-        sourceCandidate({
-          promotionStatus: "BOOTSTRAP_REVIEW_REQUIRED",
-          snapshotDiff: {
-            policyVersion: "itx-snapshot-anomaly-v1",
-            status: "SUPPORTED",
-            previousArtifactSha256: previousSha,
-          },
-        }),
-        sourceCandidate({
-          promotionStatus: "SUPPORTED",
-          snapshotDiff: {
-            policyVersion: "itx-snapshot-anomaly-v1",
-            status: "SUPPORTED",
-            previousArtifactSha256: "f".repeat(64),
-          },
-        }),
-      ]) {
+      const arbitraryStatus = sourceCandidate({ promotionStatus: "BOOTSTRAP_REVIEW_REQUIRED" });
+      arbitraryStatus.snapshotDiff = unchangedSnapshotDiff(previousSha, arbitraryStatus.normalizedSnapshotSets);
+      rehashCandidate(arbitraryStatus);
+      const staleDigest = sourceCandidate({ promotionStatus: "SUPPORTED" });
+      staleDigest.snapshotDiff = unchangedSnapshotDiff("f".repeat(64), staleDigest.normalizedSnapshotSets);
+      rehashCandidate(staleDigest);
+      for (const candidate of [arbitraryStatus, staleDigest]) {
         const candidatePath = path.join(dir, `${candidate.promotionStatus}-candidate.json`);
         await writeFile(candidatePath, sourceBytes(candidate));
         await assert.rejects(promoteItxSourceCandidate({
@@ -1295,6 +1366,48 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
           now: new Date("2026-07-15T02:00:00.000Z"),
         }), /SNAPSHOT_PROMOTION_AUTHORITY_INVALID/);
       }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  await context.test("snapshot diff summary tamper", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-snapshot-summary-"));
+    try {
+      const sourceDir = path.join(dir, "tools/datapack/sources");
+      await mkdir(sourceDir, { recursive: true });
+      const previous = sourceCandidate({
+        artifactId: "itx-cheongchun-source-timetable-20260714010000000",
+        promotionStatus: "SUPPORTED",
+      });
+      const previousBytes = sourceBytes(previous);
+      const previousSha = createHash("sha256").update(previousBytes).digest("hex");
+      await writeFile(path.join(sourceDir, `${previous.artifactId}.json`), previousBytes);
+      const contractPath = await writeCoverageContract(dir, `${JSON.stringify({
+        sourceTimetableArtifact: {
+          status: "ADMITTED",
+          admissionEligible: true,
+          artifactId: previous.artifactId,
+          artifactPath: `tools/datapack/sources/${previous.artifactId}.json`,
+          sha256: previousSha,
+          schemaVersion: 1,
+          policyVersion: "itx-snapshot-anomaly-v1",
+          freshUntil: previous.freshUntil,
+        },
+      })}\n`);
+      const candidate = sourceCandidate({ promotionStatus: "SUPPORTED" });
+      candidate.snapshotDiff = unchangedSnapshotDiff(previousSha, candidate.normalizedSnapshotSets);
+      candidate.snapshotDiff.serviceDays[0].sets.trainSet.count += 1;
+      rehashCandidate(candidate);
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        sourceOutputDir: sourceDir,
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /SNAPSHOT_PROMOTION_AUTHORITY_INVALID/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

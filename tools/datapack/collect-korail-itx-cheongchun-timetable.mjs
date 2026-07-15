@@ -209,13 +209,8 @@ export async function collectKorailItxCheongchunCompleteness({
 }
 
 export function evaluateItxSnapshotAnomaly({ serviceDays, previousArtifact = null }) {
-  const policy = {
-    policyVersion: "itx-snapshot-anomaly-v1",
-    threshold: "ZERO_TOLERANCE",
-  };
-  if (previousArtifact === null) {
-    return { ...policy, status: "BOOTSTRAP_REVIEW_REQUIRED", previousArtifactSha256: null, serviceDays: [] };
-  }
+  const currentSets = serviceDays.map((day) => ({ dayCd: day.dayCd, sets: snapshotSets(day) }));
+  if (previousArtifact === null) return compareSnapshotSets(currentSets, null, null);
   const previousCompleteness = previousArtifact?.artifactKind === "korail-itx-cheongchun-completeness-evidence"
     && previousArtifact.admissionStatus === "ADMITTED"
     && previousArtifact.admissionEligible === true
@@ -223,16 +218,28 @@ export function evaluateItxSnapshotAnomaly({ serviceDays, previousArtifact = nul
   const previousSource = previousArtifact?.artifactKind === "itx-cheongchun-source-timetable"
     && Array.isArray(previousArtifact.normalizedSnapshotSets);
   const previousValid = previousCompleteness || previousSource;
-  const previousByDay = new Map(previousCompleteness
+  const previousSets = previousCompleteness
     ? previousArtifact.serviceDays.map((day) => [day.dayCd, snapshotSets(day)])
-    : previousSource ? previousArtifact.normalizedSnapshotSets.map(({ dayCd, sets }) => [dayCd, sets]) : []);
-  const comparisons = serviceDays.map((day) => {
-    const current = snapshotSets(day);
-    const previous = previousByDay.get(day.dayCd);
+    : previousSource ? previousArtifact.normalizedSnapshotSets.map(({ dayCd, sets }) => [dayCd, sets]) : [];
+  return compareSnapshotSets(
+    currentSets,
+    previousSets.map(([dayCd, sets]) => ({ dayCd, sets })),
+    previousValid ? previousArtifact.sourceTimetableArtifact?.sha256 ?? previousArtifact.evidenceHash ?? null : null,
+  );
+}
+
+function compareSnapshotSets(currentRows, previousRows, previousArtifactSha256) {
+  const policy = { policyVersion: "itx-snapshot-anomaly-v1", threshold: "ZERO_TOLERANCE" };
+  if (previousRows === null) {
+    return { ...policy, status: "BOOTSTRAP_REVIEW_REQUIRED", previousArtifactSha256: null, serviceDays: [] };
+  }
+  const previousByDay = new Map(previousRows.map(({ dayCd, sets }) => [dayCd, sets]));
+  const comparisons = currentRows.map(({ dayCd, sets: current }) => {
+    const previous = previousByDay.get(dayCd);
     const names = ["stationSet", "odSet", "trainSet", "stopSequenceSet", "timetableTupleSet"];
     const sets = Object.fromEntries(names.map((name) => [name, summarizeSet(current[name], previous?.[name] ?? [])]));
     return {
-      dayCd: day.dayCd,
+      dayCd,
       blocked: !previous || Object.values(sets).some(({ added, removed }) => added.length > 0 || removed.length > 0),
       ...(!previous ? { reason: "PREVIOUS_ADMITTED_SNAPSHOT_MISSING" } : {}),
       sets,
@@ -241,9 +248,7 @@ export function evaluateItxSnapshotAnomaly({ serviceDays, previousArtifact = nul
   return {
     ...policy,
     status: comparisons.some(({ blocked }) => blocked) ? "CHANGE_REVIEW_REQUIRED" : "SUPPORTED",
-    previousArtifactSha256: previousValid
-      ? previousArtifact.sourceTimetableArtifact?.sha256 ?? previousArtifact.evidenceHash ?? null
-      : null,
+    previousArtifactSha256,
     serviceDays: comparisons,
   };
 }
@@ -353,16 +358,19 @@ async function promoteItxSourceCandidateLocked({
   validateSourceFreshness(candidate, candidate.selectedServiceDates, now);
   await validateCanonicalPackIdentity(candidate.canonicalPackIdentity, repositoryRoot);
   const candidateSets = validateSourceSnapshotSets(candidate);
-  const contract = JSON.parse(await readFile(coverageContractPath, "utf8"));
+  const contract = validateCoverageContractAuthority(JSON.parse(await readFile(coverageContractPath, "utf8")));
   const previousSource = await loadAdmittedSourceReference(contract, repositoryRoot);
   const previous = previousSource?.sourceTimetableArtifact ?? null;
   const bootstrap = previousSource === null;
-  const changed = !bootstrap
-    && JSON.stringify(candidateSets) !== JSON.stringify(validateSourceSnapshotSets(previousSource));
-  const expectedStatus = bootstrap ? "BOOTSTRAP_REVIEW_REQUIRED" : changed ? "CHANGE_REVIEW_REQUIRED" : "SUPPORTED";
+  const expectedSnapshotDiff = compareSnapshotSets(
+    candidateSets,
+    bootstrap ? null : validateSourceSnapshotSets(previousSource),
+    previous?.sha256 ?? null,
+  );
+  const expectedStatus = expectedSnapshotDiff.status;
+  const changed = expectedStatus === "CHANGE_REVIEW_REQUIRED";
   if (candidate.promotionStatus !== expectedStatus
-    || candidate.snapshotDiff?.status !== expectedStatus
-    || candidate.snapshotDiff?.previousArtifactSha256 !== (previous?.sha256 ?? null)) {
+    || JSON.stringify(candidate.snapshotDiff) !== JSON.stringify(expectedSnapshotDiff)) {
     throw new Error("SNAPSHOT_PROMOTION_AUTHORITY_INVALID");
   }
   const approvalRequired = bootstrap || changed;
@@ -438,7 +446,8 @@ function validateSourceCandidateSchema(candidate) {
   } catch {
     serviceDatesValid = false;
   }
-  if (candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1
+  if (!hasClosedCandidateShape(candidate)
+    || candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1
     || !/^itx-cheongchun-source-timetable-\d{17}$/.test(candidate.artifactId ?? "")
     || candidate.serviceId !== "ITX_CHEONGCHUN" || candidate.validationStatus !== "SUPPORTED"
     || candidate.policyVersion !== "itx-snapshot-anomaly-v1" || candidate.credentialRedacted !== true
@@ -458,6 +467,66 @@ function validateSourceCandidateSchema(candidate) {
       throw new Error("ITX source candidate schema is invalid");
     }
   }
+}
+
+function hasClosedCandidateShape(candidate) {
+  const allowed = (value, keys) => isPlainObject(value)
+    && Object.keys(value).every((key) => keys.includes(key));
+  const topLevel = [
+    "schemaVersion", "artifactKind", "artifactId", "serviceId", "observedAt", "freshUntil",
+    "policyVersion", "validationStatus", "promotionStatus", "canonicalPackIdentity",
+    "selectedServiceDates", "sourceLineage", "stationRosters", "stationSequences", "transitTrips",
+    "transitStopTimes", "warnings", "normalizedSnapshotSets", "snapshotDiff", "credentialRedacted",
+    "evidenceHash",
+  ];
+  const stationKeys = [
+    "providerStationId", "providerStationName", "canonicalStationId", "nameKo", "corridorSequence", "lineId",
+  ];
+  const sequenceKeys = [
+    "dayCd", "trainNumber", "directionId", "originStationName", "destinationStationName", "terminalVariant",
+    "observedOdCount", "stopCount", "conflictingTimestampCount", "missingPairCount", "duplicateOdCount", "stops",
+  ];
+  const stopKeys = [
+    "stationId", "nameKo", "corridorSequence", "lineId", "arrivalAt", "departureAt",
+    "arrivalSeconds", "departureSeconds", "stopSequence",
+  ];
+  const tripKeys = ["id", "routeId", "serviceId", "directionId", "servicePattern", "tripHeadsign"];
+  const stopTimeKeys = ["tripId", "stopSequence", "stationId", "lineId", "arrivalSeconds", "departureSeconds"];
+  const summaryKeys = ["count", "added", "removed", "sha256"];
+  const setNames = ["stationSet", "odSet", "trainSet", "stopSequenceSet", "timetableTupleSet"];
+  if (!allowed(candidate, topLevel)
+    || !allowed(candidate?.canonicalPackIdentity, ["path", "sha256"])
+    || !allowed(candidate?.selectedServiceDates, ["7", "8", "9"])
+    || !Array.isArray(candidate?.sourceLineage)
+    || candidate.sourceLineage.some((row) => !allowed(row, ["dayCd", "rosterEvidenceHash", "timetableEvidenceHash"]))
+    || !Array.isArray(candidate?.stationRosters)
+    || candidate.stationRosters.some((row) => !allowed(row, ["dayCd", "stations"])
+      || !Array.isArray(row.stations) || row.stations.some((station) => !allowed(station, stationKeys)))
+    || !Array.isArray(candidate?.stationSequences)
+    || candidate.stationSequences.some((sequence) => !allowed(sequence, sequenceKeys)
+      || !Array.isArray(sequence.stops) || sequence.stops.some((stop) => !allowed(stop, stopKeys)))
+    || !Array.isArray(candidate?.transitTrips)
+    || candidate.transitTrips.some((trip) => !allowed(trip, tripKeys))
+    || !Array.isArray(candidate?.transitStopTimes)
+    || candidate.transitStopTimes.some((row) => !allowed(row, stopTimeKeys))
+    || !Array.isArray(candidate?.warnings)
+    || candidate.warnings.some((warning) => !allowed(warning, ["code", "dayCd", "trainNumber"]))
+    || !Array.isArray(candidate?.normalizedSnapshotSets)
+    || candidate.normalizedSnapshotSets.some((row) => !allowed(row, ["dayCd", "sets"])
+      || !allowed(row.sets, setNames) || !setNames.every((name) => Array.isArray(row.sets[name])))
+    || !allowed(candidate?.snapshotDiff, ["policyVersion", "threshold", "status", "previousArtifactSha256", "serviceDays"])
+    || !Array.isArray(candidate.snapshotDiff.serviceDays)
+    || candidate.snapshotDiff.serviceDays.some((day) => !allowed(day, ["dayCd", "blocked", "reason", "sets"])
+      || !allowed(day.sets, setNames)
+      || !setNames.every((name) => allowed(day.sets[name], summaryKeys)
+        && Array.isArray(day.sets[name].added) && Array.isArray(day.sets[name].removed)))) {
+    return false;
+  }
+  return true;
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 async function readCanonicalPackIdentity(packPath, repositoryRoot) {
@@ -634,6 +703,17 @@ function validateCoverageContractPath(contractPath, repositoryRoot) {
     throw new Error("ITX coverage contract path must be canonical");
   }
   return expectedPath;
+}
+
+function validateCoverageContractAuthority(contract) {
+  if (contract?.schemaVersion !== 2
+    || contract.artifactKind !== "itx-cheongchun-coverage-contract"
+    || contract.serviceId !== "ITX_CHEONGCHUN"
+    || contract.canonicalLineId !== LINE_ID
+    || contract.completenessAdmission?.snapshotAnomalyPolicy?.policyId !== "itx-snapshot-anomaly-v1") {
+    throw new Error("ITX_COVERAGE_CONTRACT_INVALID");
+  }
+  return contract;
 }
 
 async function loadAdmittedSourceReference(contract, repositoryRoot) {
