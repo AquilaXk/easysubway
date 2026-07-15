@@ -42,6 +42,7 @@ public class InMemoryRouteSearchRepository
 	private static final String DELETED_USER_ID = "deleted-user";
 	private static final String DELETED_COMMENT = "사용자 데이터 삭제로 경로 피드백 내용이 삭제되었습니다.";
 
+	// LinkedHashMap의 삽입 순서를 저장 순서로 삼아, 한도 초과 시 가장 먼저 저장된 항목부터 제거한다.
 	private final SequencedMap<String, RouteSearchResult> routeSearches = new LinkedHashMap<>();
 	private final SequencedMap<String, RouteFeedback> routeFeedbacks = new LinkedHashMap<>();
 
