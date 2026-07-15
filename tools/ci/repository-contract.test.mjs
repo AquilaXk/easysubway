@@ -2365,6 +2365,16 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(postLaunchOperationsReviewGate.issue, 1019);
   assert.equal(postLaunchOperationsReviewGate.status, "IN_PROGRESS");
   assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "PASS");
+  const phaseAReleaseVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
+  assert.ok(phaseAReleaseVersion, "mobile pubspec must contain versionName+versionCode");
+  assert.equal(
+    phaseAReleaseVersion[1],
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.appVersionName,
+  );
+  assert.equal(
+    Number(phaseAReleaseVersion[2]),
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.versionCode,
+  );
   assert.equal(postLaunchOperationsReviewGate.postLaunchObservation.status, "PENDING_PUBLIC_RELEASE");
   assert.deepEqual(postLaunchOperationsReviewGate.postLaunchObservation.publicReleaseIdentity, {
     publishedAt: null,
@@ -2457,6 +2467,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "tools/release/summary-validation-utils.mjs",
     "tools/release/hash-android-bundle-payload.mjs",
     "tools/release/generate-rc-evidence-manifest.mjs",
+    "apps/mobile/pubspec.yaml",
   ]) {
     assert.ok(refreshBoundPaths.has(requiredPath), `${requiredPath} must invalidate Phase A evidence`);
   }
