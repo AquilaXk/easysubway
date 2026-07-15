@@ -125,6 +125,15 @@ test("nationwide 0% does not block a fully satisfied v1 scope", () => {
   assert.deepEqual(report.blockers, []);
 });
 
+test("report는 secret 없는 evaluator input만 포함하고 자체 재계산할 수 있다", () => {
+  const evidence = passingEvidence();
+  evidence.apiKey = "must-not-leak";
+  evidence.source.credential = "must-not-leak";
+  const report = buildLaunchDenominatorReport(scope, evidence);
+  assert.doesNotMatch(JSON.stringify(report), /must-not-leak/);
+  assert.deepEqual(buildLaunchDenominatorReport(scope, report.evaluatorInput), report);
+});
+
 test("pilot row and each routing exact-set gap block launch", async (context) => {
   const gaps = [
     ["pilot row", (evidence) => evidence.pilot.coveredRowIds.pop(), "PILOT_ROW_GAP"],
@@ -210,6 +219,7 @@ test("committed current report는 gap과 unavailable consumer를 숨기지 않�
     path.join(import.meta.dirname, "reports/android-v1-launch-denominator-20260715.json"),
     "utf8",
   ));
+  assert.deepEqual(buildLaunchDenominatorReport(productionScope, report.evaluatorInput), report);
   assert.equal(report.decision, "NO_GO");
   assert.equal(report.scopes.routingLaunchScope.id, productionScope.routingLaunchScope.id);
   assert.equal(report.scopes.routingLaunchScope.sha256, canonicalScopeHash(productionScope.routingLaunchScope));

@@ -13,17 +13,19 @@ export function canonicalScopeHash(scope) {
 }
 
 export function buildLaunchDenominatorReport(scope, evidence) {
-  const blockers = collectV1Blockers(scope, evidence);
-  const identities = ["source", "server", "mobile"].map((consumer) => evidence?.[consumer]?.identity);
+  const evaluatorInput = sanitizeEvaluatorInput(evidence);
+  const blockers = collectV1Blockers(scope, evaluatorInput);
+  const identities = ["source", "server", "mobile"].map((consumer) => evaluatorInput[consumer].identity);
   const sharedFields = scope?.identityMatrix?.requiredSharedFields ?? [];
   const sharedIdentity = Object.fromEntries(sharedFields.map((field) => [field, identities[0]?.[field] ?? null]));
   const requiredAccessibilityRows = requiredPilotRowIds(scope?.verifiedAccessibilityScope);
-  const coveredAccessibilityRows = new Set(evidence?.pilot?.coveredRowIds ?? []);
+  const coveredAccessibilityRows = new Set(evaluatorInput.pilot.coveredRowIds ?? []);
   const coveredAccessibilityCount = requiredAccessibilityRows
     .filter((rowId) => coveredAccessibilityRows.has(rowId)).length;
   return {
     decision: blockers.length === 0 ? "GO" : "NO_GO",
     blockers,
+    evaluatorInput,
     nationwideBlocksV1: false,
     scopes: {
       verifiedAccessibilityScope: scopeSummary(scope?.verifiedAccessibilityScope),
@@ -35,9 +37,9 @@ export function buildLaunchDenominatorReport(scope, evidence) {
       matrixSha256: scope?.identityMatrix ? canonicalScopeHash(scope.identityMatrix) : null,
       shared: sharedIdentity,
       artifactHashes: {
-        source: evidence?.source?.artifactHash ?? null,
-        server: evidence?.server?.artifactHash ?? null,
-        mobile: evidence?.mobile?.artifactHash ?? null,
+        source: evaluatorInput.source.artifactHash,
+        server: evaluatorInput.server.artifactHash,
+        mobile: evaluatorInput.mobile.artifactHash,
       },
     },
     coverage: {
@@ -48,25 +50,85 @@ export function buildLaunchDenominatorReport(scope, evidence) {
       },
       nationwide: {
         requiredCount: scope?.nationwideRoadmapScope?.launchRequiredCount ?? 0,
-        missingCount: evidence?.nationwide?.missingCount ?? null,
+        missingCount: evaluatorInput.nationwide.missingCount,
         blocksV1: false,
       },
     },
     consumerStates: {
-      source: evidence?.source?.status ?? "UNAVAILABLE",
-      server: evidence?.server?.status ?? "UNAVAILABLE",
-      mobile: evidence?.mobile?.status ?? "UNAVAILABLE",
+      source: evaluatorInput.source.status ?? "UNAVAILABLE",
+      server: evaluatorInput.server.status ?? "UNAVAILABLE",
+      mobile: evaluatorInput.mobile.status ?? "UNAVAILABLE",
     },
     routing: {
       admittedStationIds: {
-        status: evidence?.source?.status === "ADMITTED" ? "ADMITTED" : "MISSING",
-        ids: evidence?.source?.admittedStationIds ?? [],
+        status: evaluatorInput.source.status === "ADMITTED" ? "ADMITTED" : "MISSING",
+        ids: evaluatorInput.source.admittedStationIds ?? [],
       },
-      sourceDerivedConnectionEdgeIds: evidence?.routing?.sourceDerivedConnectionEdgeIds ?? {
-        status: "MISSING",
-        ids: [],
-      },
+      sourceDerivedConnectionEdgeIds: evaluatorInput.routing.sourceDerivedConnectionEdgeIds,
     },
+  };
+}
+
+function sanitizeEvaluatorInput(evidence) {
+  const arrayOrNull = (value) => Array.isArray(value) ? [...value] : null;
+  const identity = (value) => Object.fromEntries(
+    REQUIRED_IDENTITY_FIELDS.map((field) => [field, value?.[field] ?? null]),
+  );
+  return {
+    pilot: { coveredRowIds: arrayOrNull(evidence?.pilot?.coveredRowIds) },
+    routing: {
+      regionIds: arrayOrNull(evidence?.routing?.regionIds),
+      operatorIds: arrayOrNull(evidence?.routing?.operatorIds),
+      lineIds: arrayOrNull(evidence?.routing?.lineIds),
+      baseStationIds: arrayOrNull(evidence?.routing?.baseStationIds),
+      admittedStationIds: arrayOrNull(evidence?.routing?.admittedStationIds),
+      materializedStationIds: arrayOrNull(evidence?.routing?.materializedStationIds),
+      transferStationIds: arrayOrNull(evidence?.routing?.transferStationIds),
+      baseEdgeIds: arrayOrNull(evidence?.routing?.baseEdgeIds),
+      transferEdgeIds: arrayOrNull(evidence?.routing?.transferEdgeIds),
+      sourceDerivedConnectionEdgeIds: {
+        status: evidence?.routing?.sourceDerivedConnectionEdgeIds?.status ?? "MISSING",
+        ids: arrayOrNull(evidence?.routing?.sourceDerivedConnectionEdgeIds?.ids) ?? [],
+      },
+      serviceIds: arrayOrNull(evidence?.routing?.serviceIds),
+    },
+    source: {
+      status: evidence?.source?.status ?? null,
+      freshness: evidence?.source?.freshness ?? null,
+      routingScopeHash: evidence?.source?.routingScopeHash ?? null,
+      admittedStationIds: arrayOrNull(evidence?.source?.admittedStationIds),
+      sourceDerivedConnectionEdgeIds: arrayOrNull(evidence?.source?.sourceDerivedConnectionEdgeIds),
+      artifactHash: evidence?.source?.artifactHash ?? null,
+      identity: identity(evidence?.source?.identity),
+    },
+    server: {
+      status: evidence?.server?.status ?? null,
+      routingReady: evidence?.server?.routingReady === true,
+      artifactHash: evidence?.server?.artifactHash ?? null,
+      identity: identity(evidence?.server?.identity),
+    },
+    mobile: {
+      status: evidence?.mobile?.status ?? null,
+      topologyReady: evidence?.mobile?.topologyReady === true,
+      artifactHash: evidence?.mobile?.artifactHash ?? null,
+      identity: identity(evidence?.mobile?.identity),
+    },
+    safety: {
+      signatureValid: evidence?.safety?.signatureValid === true,
+      rollbackVerified: evidence?.safety?.rollbackVerified === true,
+      freshness: evidence?.safety?.freshness ?? null,
+      lineage: evidence?.safety?.lineage ?? null,
+    },
+    claims: {
+      accessibilityScopeId: evidence?.claims?.accessibilityScopeId ?? null,
+      routingScopeId: evidence?.claims?.routingScopeId ?? null,
+      serviceIds: arrayOrNull(evidence?.claims?.serviceIds),
+    },
+    forbiddenEvidence: Array.isArray(evidence?.forbiddenEvidence)
+      ? evidence.forbiddenEvidence.map(({ evidenceClass }) => ({ evidenceClass: evidenceClass ?? null }))
+      : null,
+    forbiddenEvidenceStatus: evidence?.forbiddenEvidenceStatus ?? null,
+    nationwide: { missingCount: evidence?.nationwide?.missingCount ?? null },
   };
 }
 

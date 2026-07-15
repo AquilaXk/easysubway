@@ -1,6 +1,11 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { canonicalScopeHash } from "./build-launch-denominator-report.mjs";
+import { isDeepStrictEqual } from "node:util";
+import {
+  buildLaunchDenominatorReport,
+  canonicalScopeHash,
+} from "./build-launch-denominator-report.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL"]);
@@ -73,10 +78,80 @@ function validateRouteGraphTopologyIntegrity(bundle) {
   }
 }
 
+function validateLaunchDenominatorReport(bundle, report, reportRaw, scope, requirePass) {
+  const scopeBindings = [
+    [
+      "verified accessibility",
+      report.scopes?.verifiedAccessibilityScope,
+      scope.verifiedAccessibilityScope,
+      "verifiedAccessibilityScopeId",
+      "verifiedAccessibilityScopeSha256",
+    ],
+    [
+      "routing",
+      report.scopes?.routingLaunchScope,
+      scope.routingLaunchScope,
+      "launchScopeId",
+      "launchScopeSha256",
+    ],
+    [
+      "nationwide roadmap",
+      report.scopes?.nationwideRoadmapScope,
+      scope.nationwideRoadmapScope,
+      "nationwideRoadmapScopeId",
+      "nationwideRoadmapScopeSha256",
+    ],
+  ];
+  for (const [label, reportScope, canonicalScope, idField, hashField] of scopeBindings) {
+    if (
+      reportScope?.id !== canonicalScope?.id
+      || reportScope?.sha256 !== canonicalScopeHash(canonicalScope)
+    ) {
+      throw new Error(`launch denominator report ${label} scope identity mismatch`);
+    }
+    if (bundle[idField] !== reportScope.id || bundle[hashField] !== reportScope.sha256) {
+      throw new Error(`launch denominator report ${label} scope binding mismatch`);
+    }
+  }
+  if (bundle.scopeId !== report.scopes.verifiedAccessibilityScope.id) {
+    throw new Error("scopeId must match launch denominator verified accessibility scope");
+  }
+  const matrixSha256 = canonicalScopeHash(scope.identityMatrix);
+  if (
+    report.identityLinkage?.matrixSha256 !== matrixSha256
+    || bundle.identityLinkageMatrixSha256 !== report.identityLinkage.matrixSha256
+  ) {
+    throw new Error("launch denominator report identity linkage matrix mismatch");
+  }
+  if (
+    report.nationwideBlocksV1 !== false
+    || report.coverage?.nationwide?.blocksV1 !== false
+    || scope.nationwideRoadmapScope?.blocksRoutingLaunch !== false
+  ) {
+    throw new Error("nationwide roadmap must remain nonblocking for v1 launch");
+  }
+  const canonicalReport = buildLaunchDenominatorReport(scope, report.evaluatorInput);
+  if (!isDeepStrictEqual(report, canonicalReport)) {
+    throw new Error("launch denominator report must match canonical evaluator output");
+  }
+  if (bundle.launchDenominatorDecision !== report.decision) {
+    throw new Error("launch denominator report decision must match bundle");
+  }
+  const reportSha256 = createHash("sha256").update(reportRaw).digest("hex");
+  if (bundle.launchDenominatorReportSha256 !== reportSha256) {
+    throw new Error("launch denominator report sha256 mismatch");
+  }
+  if (requirePass && report.decision !== "GO") {
+    throw new Error("launch denominator decision must be GO for publish");
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const bundlePath = argValue(args, "--bundle");
   const scopePath = argValue(args, "--scope") ?? "apps/mobile/release/production-datapack-scope.json";
+  const launchReportPath = argValue(args, "--launch-report")
+    ?? "tools/datapack/reports/android-v1-launch-denominator-20260715.json";
   const requirePass = args.includes("--require-pass");
   if (!bundlePath) {
     throw new Error("--bundle is required");
@@ -84,6 +159,8 @@ async function main() {
 
   const bundle = JSON.parse(await readFile(bundlePath, "utf8"));
   const scope = JSON.parse(await readFile(scopePath, "utf8"));
+  const launchReportRaw = await readFile(launchReportPath, "utf8");
+  const launchReport = JSON.parse(launchReportRaw);
   for (const [field, expected] of [
     ["schemaVersion", 1],
     ["artifactKind", "datapack-release-evidence-bundle"],
@@ -96,7 +173,10 @@ async function main() {
   for (const field of [
     "candidateId",
     "scopeId",
+    "verifiedAccessibilityScopeId",
     "launchScopeId",
+    "nationwideRoadmapScopeId",
+    "launchDenominatorDecision",
     "releaseRequestId",
     "builderGitSha",
     "createdAt",
@@ -104,18 +184,13 @@ async function main() {
   ]) {
     requireField(bundle, field);
   }
-  if (bundle.launchScopeId !== scope.routingLaunchScope?.id) {
-    throw new Error("launchScopeId must match routing launch scope");
-  }
-  if (bundle.launchScopeSha256 !== canonicalScopeHash(scope.routingLaunchScope)) {
-    throw new Error("launchScopeSha256 must match canonical routing launch scope");
-  }
-  if (bundle.identityLinkageMatrixSha256 !== canonicalScopeHash(scope.identityMatrix)) {
-    throw new Error("identityLinkageMatrixSha256 must match canonical identity linkage matrix");
-  }
+  validateLaunchDenominatorReport(bundle, launchReport, launchReportRaw, scope, requirePass);
   for (const field of [
+    "verifiedAccessibilityScopeSha256",
     "launchScopeSha256",
+    "nationwideRoadmapScopeSha256",
     "identityLinkageMatrixSha256",
+    "launchDenominatorReportSha256",
     "buildSpecSha256",
     "supportedDenominatorSha256",
     "sourceSnapshotSetHash",

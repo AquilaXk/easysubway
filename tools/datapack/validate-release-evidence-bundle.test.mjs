@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
+import {
+  buildLaunchDenominatorReport,
+  canonicalScopeHash,
+} from "./build-launch-denominator-report.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -19,16 +24,88 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     path.join(root, "apps/mobile/release/production-datapack-scope.json"),
     "utf8",
   ));
-  const { canonicalScopeHash } = await import("./build-launch-denominator-report.mjs");
   const scopeArgs = ["--scope", "apps/mobile/release/production-datapack-scope.json"];
+  const launchReportPath = path.join(outputDir, "launch-denominator-go.json");
+  const currentLaunchReportPath = "tools/datapack/reports/android-v1-launch-denominator-20260715.json";
+  const identity = {
+    canonicalStationVersion: "station-catalog-v18",
+    corridorId: "capital-gyeongchun-v1",
+    serviceId: "ITX_CHEONGCHUN",
+    lineageId: "launch-lineage-v1",
+    schemaVersion: 1,
+  };
+  const admittedStationIds = [
+    ...scope.routingLaunchScope.baseRoutingStationIds,
+    ...scope.routingLaunchScope.requiredTransferStationIds,
+  ];
+  const sourceDerivedConnectionEdgeIds = ["source-edge-a"];
+  const goReport = buildLaunchDenominatorReport(scope, {
+    pilot: {
+      coveredRowIds: scope.verifiedAccessibilityScope.includedStationIds.flatMap((stationId) =>
+        scope.verifiedAccessibilityScope.requiredFacilityTypes.map((facilityType) =>
+          `${stationId}|${scope.verifiedAccessibilityScope.includedLineIds[0]}|${facilityType}`)),
+    },
+    routing: {
+      regionIds: [...scope.routingLaunchScope.regionIds],
+      operatorIds: [...scope.routingLaunchScope.operatorIds],
+      lineIds: [...scope.routingLaunchScope.lineIds],
+      baseStationIds: [...scope.routingLaunchScope.baseRoutingStationIds],
+      admittedStationIds,
+      materializedStationIds: [...admittedStationIds],
+      transferStationIds: [...scope.routingLaunchScope.requiredTransferStationIds],
+      baseEdgeIds: [...scope.routingLaunchScope.requiredBaseEdgeIds],
+      transferEdgeIds: [...scope.routingLaunchScope.requiredTransferEdgeIds],
+      sourceDerivedConnectionEdgeIds: { status: "ADMITTED", ids: sourceDerivedConnectionEdgeIds },
+      serviceIds: [...scope.routingLaunchScope.serviceIds],
+    },
+    source: {
+      status: "ADMITTED",
+      freshness: "FRESH",
+      routingScopeHash: canonicalScopeHash(scope.routingLaunchScope),
+      admittedStationIds,
+      sourceDerivedConnectionEdgeIds,
+      artifactHash: "a".repeat(64),
+      identity,
+    },
+    server: { status: "ACTIVE", routingReady: true, artifactHash: "b".repeat(64), identity },
+    mobile: { status: "READY", topologyReady: true, artifactHash: "c".repeat(64), identity },
+    safety: { signatureValid: true, rollbackVerified: true, freshness: "FRESH", lineage: "VERIFIED" },
+    claims: {
+      accessibilityScopeId: scope.verifiedAccessibilityScope.id,
+      routingScopeId: scope.routingLaunchScope.id,
+      serviceIds: [...scope.routingLaunchScope.serviceIds],
+    },
+    forbiddenEvidence: [],
+    forbiddenEvidenceStatus: "VERIFIED",
+    nationwide: { missingCount: 270 },
+  });
+  assert.equal(goReport.decision, "GO");
+  const goReportRaw = `${JSON.stringify(goReport, null, 2)}\n`;
+  await writeFile(launchReportPath, goReportRaw);
+  const reportArgs = ["--launch-report", launchReportPath];
+  const validatorCommand = [
+    "tools/datapack/validate-release-evidence-bundle.mjs",
+    "--bundle",
+    bundlePath,
+    ...reportArgs,
+  ];
+  const bindLaunchReport = (target, report, raw) => Object.assign(target, {
+    scopeId: report.scopes.verifiedAccessibilityScope.id,
+    verifiedAccessibilityScopeId: report.scopes.verifiedAccessibilityScope.id,
+    verifiedAccessibilityScopeSha256: report.scopes.verifiedAccessibilityScope.sha256,
+    launchScopeId: report.scopes.routingLaunchScope.id,
+    launchScopeSha256: report.scopes.routingLaunchScope.sha256,
+    nationwideRoadmapScopeId: report.scopes.nationwideRoadmapScope.id,
+    nationwideRoadmapScopeSha256: report.scopes.nationwideRoadmapScope.sha256,
+    identityLinkageMatrixSha256: report.identityLinkage.matrixSha256,
+    launchDenominatorDecision: report.decision,
+    launchDenominatorReportSha256: createHash("sha256").update(raw).digest("hex"),
+  });
   const bundle = {
     schemaVersion: 1,
     artifactKind: "datapack-release-evidence-bundle",
     candidateId: "capital@1",
     scopeId: "capital_pilot_android_v1",
-    launchScopeId: scope.routingLaunchScope.id,
-    launchScopeSha256: canonicalScopeHash(scope.routingLaunchScope),
-    identityLinkageMatrixSha256: canonicalScopeHash(scope.identityMatrix),
     releaseRequestId: "release-request-1",
     builderGitSha: "abcdef1",
     buildSpecSha256: hash,
@@ -61,13 +138,117 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     createdAt: "2026-06-30T00:00:00.000Z",
     workflowRunUrl: "https://github.com/AquilaXk/easysubway/actions/runs/1",
   };
+  bindLaunchReport(bundle, goReport, goReportRaw);
 
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await execFileAsync(
     process.execPath,
-    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, ...scopeArgs, "--require-pass"],
+    [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+      ...reportArgs,
+      "--require-pass",
+    ],
     { cwd: root },
   );
+
+  const currentLaunchReportRaw = await readFile(path.join(root, currentLaunchReportPath), "utf8");
+  const currentLaunchReport = JSON.parse(currentLaunchReportRaw);
+  bindLaunchReport(bundle, currentLaunchReport, currentLaunchReportRaw);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await execFileAsync(process.execPath, [
+    "tools/datapack/validate-release-evidence-bundle.mjs",
+    "--bundle",
+    bundlePath,
+    ...scopeArgs,
+    "--launch-report",
+    currentLaunchReportPath,
+  ], { cwd: root });
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+      "--launch-report",
+      currentLaunchReportPath,
+      "--require-pass",
+    ], { cwd: root }),
+    /launch denominator decision must be GO for publish/,
+  );
+
+  bundle.launchDenominatorDecision = "GO";
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+      "--launch-report",
+      currentLaunchReportPath,
+    ], { cwd: root }),
+    /launch denominator report decision must match bundle/,
+  );
+
+  bindLaunchReport(bundle, currentLaunchReport, currentLaunchReportRaw);
+  bundle.launchDenominatorReportSha256 = "f".repeat(64);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+      "--launch-report",
+      currentLaunchReportPath,
+    ], { cwd: root }),
+    /launch denominator report sha256 mismatch/,
+  );
+
+  const forgedGoReport = structuredClone(currentLaunchReport);
+  forgedGoReport.decision = "GO";
+  forgedGoReport.blockers = [];
+  const forgedGoReportRaw = `${JSON.stringify(forgedGoReport, null, 2)}\n`;
+  const forgedGoReportPath = path.join(outputDir, "launch-denominator-forged-go.json");
+  await writeFile(forgedGoReportPath, forgedGoReportRaw);
+  bindLaunchReport(bundle, forgedGoReport, forgedGoReportRaw);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+      "--launch-report",
+      forgedGoReportPath,
+      "--require-pass",
+    ], { cwd: root }),
+    /launch denominator report must match canonical evaluator output/,
+  );
+
+  const mismatchedReport = structuredClone(currentLaunchReport);
+  mismatchedReport.scopes.routingLaunchScope.sha256 = "f".repeat(64);
+  const mismatchedReportRaw = `${JSON.stringify(mismatchedReport, null, 2)}\n`;
+  const mismatchedReportPath = path.join(outputDir, "launch-denominator-mismatched.json");
+  await writeFile(mismatchedReportPath, mismatchedReportRaw);
+  bindLaunchReport(bundle, mismatchedReport, mismatchedReportRaw);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+      "--launch-report",
+      mismatchedReportPath,
+    ], { cwd: root }),
+    /launch denominator report routing scope identity mismatch/,
+  );
+
+  bindLaunchReport(bundle, goReport, goReportRaw);
 
   bundle.launchScopeSha256 = "f".repeat(64);
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
@@ -77,17 +258,18 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
       "--bundle",
       bundlePath,
       ...scopeArgs,
+      ...reportArgs,
     ], { cwd: root }),
-    /launchScopeSha256 must match canonical routing launch scope/,
+    /launch denominator report routing scope binding mismatch/,
   );
-  bundle.launchScopeSha256 = canonicalScopeHash(scope.routingLaunchScope);
+  bundle.launchScopeSha256 = goReport.scopes.routingLaunchScope.sha256;
 
   bundle.androidEvidenceStatus = "FAIL";
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+      [...validatorCommand, "--require-pass"],
       { cwd: root },
     ),
     /androidEvidenceStatus must be PASS for publish/,
@@ -98,7 +280,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await execFileAsync(
     process.execPath,
-    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+    [...validatorCommand, "--require-pass"],
     { cwd: root },
   );
 
@@ -109,7 +291,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await execFileAsync(
     process.execPath,
-    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+    [...validatorCommand, "--require-pass"],
     { cwd: root },
   );
 
@@ -121,7 +303,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+      [...validatorCommand, "--require-pass"],
       { cwd: root },
     ),
     /routeMapPositionCoverageStatus must be a release gate status/,
@@ -131,7 +313,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   bundle.validatorStatus = "DEFERRED";
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await assert.rejects(
-    execFileAsync(process.execPath, ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath], {
+    execFileAsync(process.execPath, validatorCommand, {
       cwd: root,
     }),
     /validatorStatus must be a release gate status/,
@@ -146,7 +328,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+      [...validatorCommand, "--require-pass"],
       { cwd: root },
     ),
     /routeGraphTopologyStatus DEFERRED requires routeGraphTopologyViolationCount > 0/,
@@ -159,7 +341,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+      [...validatorCommand, "--require-pass"],
       { cwd: root },
     ),
     /routeGraphTopologyStatus PASS requires routeGraphTopologyViolationCount 0/,
@@ -172,7 +354,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+      [...validatorCommand, "--require-pass"],
       { cwd: root },
     ),
     /routeGraphTopologyViolationCount must be a non-negative integer/,
@@ -185,7 +367,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+      [...validatorCommand, "--require-pass"],
       { cwd: root },
     ),
     /release evidence bundle missing routeGraphTopologyViolationCount/,
@@ -197,7 +379,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await execFileAsync(
     process.execPath,
-    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+    [...validatorCommand, "--require-pass"],
     { cwd: root },
   );
 });

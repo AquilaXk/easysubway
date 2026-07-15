@@ -22,6 +22,114 @@
     "EVIDENCE_STALE",
     "LINEAGE_UNVERIFIED"
   ],
+  "evaluatorInput": {
+    "pilot": {
+      "coveredRowIds": [
+        "station-sangnoksu|seoul-4|ELEVATOR",
+        "station-sangnoksu|seoul-4|ESCALATOR",
+        "station-sangnoksu|seoul-4|WHEELCHAIR_LIFT",
+        "station-sadang|seoul-4|ELEVATOR",
+        "station-sadang|seoul-4|ESCALATOR",
+        "station-sadang|seoul-4|WHEELCHAIR_LIFT"
+      ]
+    },
+    "routing": {
+      "regionIds": [
+        "capital"
+      ],
+      "operatorIds": [
+        "seoul-metro",
+        "korail"
+      ],
+      "lineIds": [
+        "seoul-4",
+        "line-6e39be0cb6e2",
+        "line-54a7b980b7c3"
+      ],
+      "baseStationIds": [
+        "station-sangnoksu",
+        "station-sadang"
+      ],
+      "admittedStationIds": [],
+      "materializedStationIds": [],
+      "transferStationIds": [],
+      "baseEdgeIds": [
+        "edge-entry-sangnoksu-seoul-4",
+        "edge-exit-sangnoksu-seoul-4",
+        "edge-entry-sadang-seoul-4",
+        "edge-exit-sadang-seoul-4"
+      ],
+      "transferEdgeIds": [
+        "path-edge-sadang-4-to-2-fast"
+      ],
+      "sourceDerivedConnectionEdgeIds": {
+        "status": "MISSING",
+        "ids": []
+      },
+      "serviceIds": [
+        "SUBWAY",
+        "ITX_CHEONGCHUN"
+      ]
+    },
+    "source": {
+      "status": "MISSING",
+      "freshness": "MISSING",
+      "routingScopeHash": null,
+      "admittedStationIds": [],
+      "sourceDerivedConnectionEdgeIds": [],
+      "artifactHash": null,
+      "identity": {
+        "canonicalStationVersion": null,
+        "corridorId": null,
+        "serviceId": null,
+        "lineageId": null,
+        "schemaVersion": null
+      }
+    },
+    "server": {
+      "status": "UNAVAILABLE",
+      "routingReady": false,
+      "artifactHash": null,
+      "identity": {
+        "canonicalStationVersion": null,
+        "corridorId": null,
+        "serviceId": null,
+        "lineageId": null,
+        "schemaVersion": null
+      }
+    },
+    "mobile": {
+      "status": "MISSING",
+      "topologyReady": false,
+      "artifactHash": null,
+      "identity": {
+        "canonicalStationVersion": null,
+        "corridorId": null,
+        "serviceId": null,
+        "lineageId": null,
+        "schemaVersion": null
+      }
+    },
+    "safety": {
+      "signatureValid": false,
+      "rollbackVerified": false,
+      "freshness": "MISSING",
+      "lineage": "MISSING"
+    },
+    "claims": {
+      "accessibilityScopeId": "capital_pilot_android_v1",
+      "routingScopeId": "capital_routing_android_v1",
+      "serviceIds": [
+        "SUBWAY",
+        "ITX_CHEONGCHUN"
+      ]
+    },
+    "forbiddenEvidence": [],
+    "forbiddenEvidenceStatus": "VERIFIED",
+    "nationwide": {
+      "missingCount": 270
+    }
+  },
   "nationwideBlocksV1": false,
   "scopes": {
     "verifiedAccessibilityScope": {
