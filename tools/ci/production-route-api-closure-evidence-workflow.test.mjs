@@ -89,6 +89,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /rm -f "\$\{MARKER_FILE\}"/);
   assert.match(snapshotGate, /current_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
   assert.match(snapshotGate, /purge_sql_sha256/);
+  assert.match(snapshotGate, /EXECUTION_BUDGET_MS="30000"/);
+  assert.match(snapshotGate, /WAL_BUDGET_BYTES="\$\(\(256 \* 1024 \* 1024\)\)"/);
   assert.match(snapshotGate, /production_schema_version/);
   assert.match(snapshotGate, /restore_schema_version/);
   assert.match(snapshotGate, /shopt -s nullglob/);
@@ -161,14 +163,22 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /schema_version/);
   assert.match(snapshotGate, /purge_sql_sha256/);
   assert.match(snapshotGate, /owner approved on #1913 — 30 seconds execution\/lock and 256 MiB WAL/);
+  assert.match(snapshotGate, /adjusted purge execution exceeds approved 30 second budget/);
+  assert.match(snapshotGate, /purge WAL exceeds approved 256 MiB budget/);
   assert.doesNotMatch(snapshotGate, /budget decision: pending/);
   assert.doesNotMatch(snapshotGate, /existing verified backup/);
   assert.doesNotMatch(snapshotGate, /\b(curl|scp)\b|upload-artifact/);
 
   const reportAppend = snapshotGate.indexOf('cat "${report_file}" >> "${SUMMARY_FILE}"');
+  const executionBudgetCheck = snapshotGate.indexOf("adjusted purge execution exceeds approved 30 second budget");
+  const walBudgetCheck = snapshotGate.indexOf("purge WAL exceeds approved 256 MiB budget");
   const markerPublish = snapshotGate.lastIndexOf('mv "${marker_tmp}" "${MARKER_FILE}"');
   assert.notEqual(reportAppend, -1);
+  assert.notEqual(executionBudgetCheck, -1);
+  assert.notEqual(walBudgetCheck, -1);
   assert.notEqual(markerPublish, -1);
+  assert.ok(executionBudgetCheck < markerPublish, "execution budget must fail closed before marker publish");
+  assert.ok(walBudgetCheck < markerPublish, "WAL budget must fail closed before marker publish");
   assert.ok(reportAppend < markerPublish, "success marker must be published after required evidence");
 });
 

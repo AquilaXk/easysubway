@@ -11,7 +11,9 @@ SNAPSHOT_REQUEST_SHA="${SNAPSHOT_REQUEST_SHA:-}"
 RESTORE_CPU_LIMIT="1"
 RESTORE_MEMORY_LIMIT="2g"
 RESTORE_PIDS_LIMIT="256"
-WAL_HEADROOM_BYTES="$((256 * 1024 * 1024))"
+EXECUTION_BUDGET_MS="30000"
+WAL_BUDGET_BYTES="$((256 * 1024 * 1024))"
+WAL_HEADROOM_BYTES="${WAL_BUDGET_BYTES}"
 MIN_OPERATIONAL_RESERVE_BYTES="$((1024 * 1024 * 1024))"
 SPACE_CLASS='[:space:]'
 PURGE_SQL_FILE="${ROOT_DIR}/tools/ops/route-search-purge.sql"
@@ -396,6 +398,15 @@ restore_settings="$(restore_psql -F '|' -c "SELECT current_setting('server_versi
 
 adjusted_execution_ms="$(awk -v value="${execution_ms}" 'BEGIN { printf "%.3f", value * 2 }')"
 adjusted_wall_ms="$(( wall_ms * 2 ))"
+if ! awk -v value="${adjusted_execution_ms}" -v budget="${EXECUTION_BUDGET_MS}" \
+	'BEGIN { exit !(value <= budget) }'; then
+	printf 'adjusted purge execution exceeds approved 30 second budget\n' >&2
+	exit 1
+fi
+if (( wal_bytes > WAL_BUDGET_BYTES )); then
+	printf 'purge WAL exceeds approved 256 MiB budget\n' >&2
+	exit 1
+fi
 
 report_file="${EVIDENCE_DIR}/report-${backup_sha256:0:12}.md"
 snapshot_completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
