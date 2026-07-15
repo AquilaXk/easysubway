@@ -2418,7 +2418,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     validatedArtifactIdentity,
     {
       aabPayloadSha256: validatedArtifactIdentity.aabPayloadSha256,
-      backendImageDigest: operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.imageId,
+      backendArtifactSha256:
+        operationsEvidence.backendControlPlane.latestQaEvidenceStatus.phaseACurrentRcArtifact.backendArtifactSha256,
       dataPackManifestSha256: createHash("sha256")
         .update(read("apps/mobile/assets/datapacks/metro_map_pack/manifest.json"))
         .digest("hex"),
@@ -2469,6 +2470,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "tools/release/hash-android-bundle-payload.mjs",
     "tools/release/generate-rc-evidence-manifest.mjs",
     "apps/mobile/pubspec.yaml",
+    "backend/build.gradle",
+    "backend/Dockerfile",
   ]) {
     assert.ok(refreshBoundPaths.has(requiredPath), `${requiredPath} must invalidate Phase A evidence`);
   }

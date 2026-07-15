@@ -67,6 +67,13 @@
         "entrypoint": "java -jar /app/app.jar",
         "profile": "prod"
       },
+      "phaseACurrentRcArtifact": {
+        "result": "PASS_TWO_CLEAN_REPRODUCIBLE_BOOTJAR_BUILDS",
+        "sourceCommit": "0404f70fd5c056e49f0b73143d255b541768df1c",
+        "artifact": "backend-boot.jar",
+        "backendArtifactSha256": "9eb2a03811e0e8cb4ef71a6dbcc99b0214eb7c884950e5d822b242fc4abc11b3",
+        "productionMutationPerformed": false
+      },
       "datapackArtifact": {
         "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29271665083",
         "result": "PASS_SUCCESS",

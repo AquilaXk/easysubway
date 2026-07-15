@@ -21,8 +21,8 @@ function rcManifest(overrides = {}) {
       versionCode: "10005",
       aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
       aabPayloadSha256: "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
-      backendImageDigest: "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
-      backendArtifactSha256: null,
+      backendImageDigest: null,
+      backendArtifactSha256: "9eb2a03811e0e8cb4ef71a6dbcc99b0214eb7c884950e5d822b242fc4abc11b3",
       dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
       supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
       ...overrides,
@@ -121,7 +121,7 @@ test("Phase A summary generator rejects an RC outside the recorded evidence scop
 
 for (const [field, value] of [
   ["aabPayloadSha256", "d".repeat(64)],
-  ["backendImageDigest", `sha256:${"d".repeat(64)}`],
+  ["backendArtifactSha256", "d".repeat(64)],
   ["dataPackManifestSha256", "d".repeat(64)],
 ]) {
   test(`Phase A summary generator rejects an RC with an unvalidated ${field}`, async () => {

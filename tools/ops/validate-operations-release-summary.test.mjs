@@ -34,7 +34,7 @@ const artifactIdentity = {
   androidApplicationId: "com.easysubway.app",
   aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
   aabPayloadSha256: "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
-  backendImageDigest: "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
+  backendArtifactSha256: "9eb2a03811e0e8cb4ef71a6dbcc99b0214eb7c884950e5d822b242fc4abc11b3",
   dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
   supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
 };
@@ -211,7 +211,7 @@ test("operations release summary validator rejects identity outside the canonica
 
 for (const [field, value] of [
   ["aabPayloadSha256", "d".repeat(64)],
-  ["backendImageDigest", `sha256:${"d".repeat(64)}`],
+  ["backendArtifactSha256", "d".repeat(64)],
   ["dataPackManifestSha256", "d".repeat(64)],
 ]) {
   test(`operations release summary validator rejects an unvalidated ${field}`, async () => {
@@ -221,7 +221,7 @@ for (const [field, value] of [
         gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity = {
           aabSha256: artifactIdentity.aabSha256,
           aabPayloadSha256: artifactIdentity.aabPayloadSha256,
-          backendImageDigest: artifactIdentity.backendImageDigest,
+          backendArtifactSha256: artifactIdentity.backendArtifactSha256,
           dataPackManifestSha256: artifactIdentity.dataPackManifestSha256,
           [field]: value,
         };
@@ -442,7 +442,7 @@ test("operations release summary validator compares artifact identity independen
     versionCode: artifactIdentity.versionCode,
     gitSha: artifactIdentity.gitSha,
     dataPackManifestSha256: artifactIdentity.dataPackManifestSha256,
-    backendImageDigest: artifactIdentity.backendImageDigest,
+    backendArtifactSha256: artifactIdentity.backendArtifactSha256,
     aabSha256: artifactIdentity.aabSha256,
     aabPayloadSha256: artifactIdentity.aabPayloadSha256,
     androidApplicationId: artifactIdentity.androidApplicationId,
@@ -461,24 +461,36 @@ test("operations release summary validator compares artifact identity independen
 
 test("operations release summary validator accepts backendImageDigest as the final RC backend identity", async () => {
   const summary = validSummary();
+  delete summary.artifactIdentity.backendArtifactSha256;
+  summary.artifactIdentity.backendImageDigest = `sha256:${"b".repeat(64)}`;
+  for (const review of summary.postLaunchReviews) {
+    delete review.artifactIdentity.backendArtifactSha256;
+    review.artifactIdentity.backendImageDigest = summary.artifactIdentity.backendImageDigest;
+  }
 
-  await withSummary(summary, (summaryPath) =>
-    execFileAsync(process.execPath, [
+  await withSummary(summary, async (summaryPath) => {
+    const gate = structuredClone(postLaunchGate);
+    delete gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity.backendArtifactSha256;
+    gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity.backendImageDigest =
+      summary.artifactIdentity.backendImageDigest;
+    const gatePath = path.join(path.dirname(summaryPath), "post-launch-gate.json");
+    await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+    return execFileAsync(process.execPath, [
       "tools/ops/validate-operations-release-summary.mjs",
       "--summary",
       summaryPath,
+      "--post-launch-gate",
+      gatePath,
       "--require-pass",
-    ], { cwd: root }),
-  );
+    ], { cwd: root });
+  });
 });
 
 test("operations release summary validator rejects an empty backend identity", async () => {
   const summary = validSummary();
-  delete summary.artifactIdentity.backendImageDigest;
-  summary.artifactIdentity.backendArtifactSha256 = "";
+  delete summary.artifactIdentity.backendArtifactSha256;
   for (const review of summary.postLaunchReviews) {
-    delete review.artifactIdentity.backendImageDigest;
-    review.artifactIdentity.backendArtifactSha256 = "";
+    delete review.artifactIdentity.backendArtifactSha256;
   }
 
   await assert.rejects(
