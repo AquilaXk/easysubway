@@ -236,6 +236,13 @@ export function buildPurgePlan({
     if (new Date(storedMillis).toISOString() !== derivedExpiry) {
       throw new Error("RAW_RETENTION_OVERDUE: retention derivation mismatch");
     }
+    if (evidence.rawRetentionExpiresMillis !== storedMillis
+      || (evidence.governancePolicyVersion != null && (
+        evidence.governancePolicyVersion !== entry.governancePolicyVersion
+        || evidence.governancePolicySha256 !== entry.governancePolicySha256
+      ))) {
+      throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence mismatch");
+    }
     const protectedBy = validateProtectedBy(entry.protectedBy);
     const holdValid = entry.legalHold == null ? false : isValidLegalHold({
       hold: entry.legalHold,
@@ -284,11 +291,27 @@ function snapshotBindings(snapshots, expectedSourceAuthority) {
     if (rawObject.sourceAuthority !== expectedSourceAuthority) {
       throw new Error("RAW_RETENTION_OVERDUE: storage authority mismatch");
     }
+    const governancePolicyVersion = snapshot.governancePolicyVersion ?? null;
+    const governancePolicySha256 = snapshot.governancePolicySha256 ?? null;
+    if ((governancePolicyVersion == null) !== (governancePolicySha256 == null)
+      || (governancePolicyVersion != null && (
+        typeof governancePolicyVersion !== "string"
+        || governancePolicyVersion.trim() === ""
+        || !/^[0-9a-f]{64}$/.test(governancePolicySha256)
+      ))) {
+      throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence");
+    }
     bindings.set(snapshotId, {
       sourceId: requiredText(snapshot.sourceId, "sourceId"),
       rawSha256,
       objectKey: rawObject.objectKey,
       retrievedMillis: requiredUtcInstant(snapshot.retrievedAt, "retrievedAt"),
+      rawRetentionExpiresMillis: requiredUtcInstant(
+        snapshot.rawRetentionExpiresAt,
+        "rawRetentionExpiresAt",
+      ),
+      governancePolicyVersion,
+      governancePolicySha256,
     });
   }
   return bindings;

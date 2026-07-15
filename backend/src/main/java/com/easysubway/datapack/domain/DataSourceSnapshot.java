@@ -126,12 +126,26 @@ public record DataSourceSnapshot(
 			|| uri.getRawPath() == null
 			|| uri.getRawPath().isBlank()
 			|| "/".equals(uri.getRawPath())
+			|| !isCanonicalObjectPath(uri.getPath())
 			|| trimmed.contains("@")
 			|| uri.getRawQuery() != null
 			|| uri.getRawUserInfo() != null
 			|| uri.getRawFragment() != null) {
 			throw new InvalidDataSourceSnapshotException("rawObjectUri must be a credential-free object storage URI.");
 		}
+	}
+
+	private static boolean isCanonicalObjectPath(String decodedPath) {
+		if (decodedPath == null || !decodedPath.startsWith("/") || decodedPath.length() == 1) {
+			return false;
+		}
+		for (String segment : decodedPath.substring(1).split("/", -1)) {
+			if (segment.isEmpty() || ".".equals(segment) || "..".equals(segment)
+				|| segment.codePoints().anyMatch(Character::isISOControl)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private static String trimToNull(String value) {

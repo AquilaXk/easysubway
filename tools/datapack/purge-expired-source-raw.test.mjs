@@ -356,6 +356,58 @@ test("ledger object key가 LOCKED snapshot raw URI와 다르면 DELETE 전에 �
   });
 });
 
+test("ledger는 LOCKED snapshot에 저장된 retention policy binding과 정확히 일치해야 한다", async () => {
+  await withFixture(async ({ baseUrl, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("bound", "raw/bound.json")]);
+    const original = JSON.parse(await readFile(files.snapshots, "utf8"));
+    const cases = [
+      (snapshot) => { snapshot.rawRetentionExpiresAt = "2026-07-16T00:00:00.000Z"; },
+      (snapshot) => { snapshot.governancePolicyVersion = "2026-07-14"; },
+      (snapshot) => { snapshot.governancePolicySha256 = "f".repeat(64); },
+      (snapshot) => {
+        snapshot.rawRetentionExpiresAt = "2026-07-16T00:00:00.000Z";
+        delete snapshot.governancePolicyVersion;
+        delete snapshot.governancePolicySha256;
+      },
+    ];
+
+    for (const [index, mutate] of cases.entries()) {
+      const snapshots = structuredClone(original);
+      mutate(snapshots[0]);
+      await writeFile(files.snapshots, `${JSON.stringify(snapshots, null, 2)}\n`);
+      await assert.rejects(
+        runPurge({
+          ...files,
+          baseUrl,
+          output: path.join(workDir, `retention-binding-${index}.json`),
+        }),
+        /snapshot evidence mismatch/,
+      );
+    }
+    assert.deepEqual(requests, []);
+  });
+});
+
+test("legacy snapshot은 저장된 retention expiry가 ledger와 같은 경우에만 purge한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("legacy", "raw/legacy.json")]);
+    const snapshots = JSON.parse(await readFile(files.snapshots, "utf8"));
+    delete snapshots[0].governancePolicyVersion;
+    delete snapshots[0].governancePolicySha256;
+    await writeFile(files.snapshots, `${JSON.stringify(snapshots, null, 2)}\n`);
+    objects.add("/raw/legacy.json");
+
+    const report = await runPurge({
+      ...files,
+      baseUrl,
+      output: path.join(workDir, "legacy-retention-binding.json"),
+    });
+
+    assert.deepEqual(report.deleted.map((entry) => entry.snapshotId), ["legacy"]);
+    assert.deepEqual(requests, ["/raw/legacy.json"]);
+  });
+});
+
 test("snapshot raw URI의 dot-segment는 URL 정규화 전에 거부한다", async () => {
   await withFixture(async ({ baseUrl, requests, workDir }) => {
     for (const objectKey of ["raw/../victim.json", "raw/%2e%2e/victim.json"]) {
@@ -725,6 +777,9 @@ async function writeSnapshotEvidence(workDir, entries, objectKeyOverrides = {}) 
     sourceId: entry.sourceId,
     snapshotStatus: "LOCKED",
     retrievedAt: entry.retrievedAt,
+    rawRetentionExpiresAt: entry.rawRetentionExpiresAt,
+    governancePolicyVersion: entry.governancePolicyVersion,
+    governancePolicySha256: entry.governancePolicySha256,
     rawSha256: entry.rawSha256,
     rawObjectUri: `s3://easysubway-datapack-sources/${objectKeyOverrides[entry.snapshotId] ?? entry.objectKey}`,
   }));

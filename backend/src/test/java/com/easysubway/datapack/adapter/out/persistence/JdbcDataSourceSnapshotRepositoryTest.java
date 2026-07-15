@@ -155,6 +155,27 @@ class JdbcDataSourceSnapshotRepositoryTest {
 		)))
 			.isInstanceOf(InvalidDataSourceSnapshotException.class)
 			.hasMessageContaining("rawObjectUri");
+		for (String rawObjectUri : java.util.List.of(
+			"s3://easysubway-datapack-sources/raw/../victim.json",
+			"s3://easysubway-datapack-sources/raw/%2e%2e/victim.json"
+		)) {
+			assertThatThrownBy(() -> repository.saveSnapshot(lockedSnapshot(
+				"snapshot-uri-dot-segment",
+				"a".repeat(64),
+				13,
+				rawObjectUri,
+				true
+			)))
+				.isInstanceOf(InvalidDataSourceSnapshotException.class)
+				.hasMessageContaining("rawObjectUri");
+		}
+		assertThat(repository.saveSnapshot(lockedSnapshot(
+			"snapshot-uri-unicode",
+			"a".repeat(64),
+			13,
+			"s3://easysubway-datapack-sources/raw/%ED%95%9C%EA%B8%80%20file.json",
+			true
+		))).isNotNull();
 	}
 
 	@Test
