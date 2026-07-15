@@ -114,6 +114,19 @@ export function buildGovernanceSummary({ entries, evaluationAt }) {
   return { ...body, summarySha256: sha256(JSON.stringify(body)) };
 }
 
+export function isValidLegalHold({ hold, policy, sourceId, snapshotId, evaluationAt }) {
+  try {
+    return validateLegalHold(
+      hold,
+      policyEntry(policy, sourceId),
+      { snapshotId },
+      requiredUtcInstant(evaluationAt, "evaluationAt"),
+    );
+  } catch {
+    return false;
+  }
+}
+
 function validatePolicySource(entry, { inventorySources, retentionClasses, freshnessPolicy }) {
   const sourceId = requiredText(entry?.sourceId, "sourceId");
   const source = inventorySources.get(sourceId);
