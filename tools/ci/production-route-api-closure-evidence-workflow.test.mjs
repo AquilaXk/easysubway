@@ -10,7 +10,7 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   const workflow = await readFile(workflowPath, "utf8");
 
   assert.match(workflow, /^on:\n  push:\n    branches:\n      - main\n    paths:/m);
-  assert.doesNotMatch(workflow, /workflow_dispatch/);
+  assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /CLOSURE_BASE_SHA: cba25764de4ed646e398b2141b64fa41767ed3cc/);
   assert.doesNotMatch(workflow, /EXPECTED_IMAGE_DIGEST/);
   assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
@@ -58,10 +58,11 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(workflow, /snapshot-gate:[\s\S]*environment: production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*?permissions:\n\s+contents: read[\s\S]*?steps:/);
   assert.match(workflow, /snapshot-gate:[\s\S]*group: cd-production-deploy/);
+  assert.match(workflow, /manual snapshot revalidation must run from main/);
   assert.match(workflow, /EXPECTED_DEPLOYED_SHA: \$\{\{ needs\.verify\.outputs\.deployed_sha \}\}/);
   assert.match(workflow, /SNAPSHOT_REQUEST_SHA: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /snapshot-gate:[\s\S]*Checkout reviewed main[\s\S]*persist-credentials: false/);
-  assert.doesNotMatch(workflow, /upload-artifact|workflow_dispatch/);
+  assert.doesNotMatch(workflow, /upload-artifact/);
 
   assert.match(snapshotGate, /^set -euo pipefail$/m);
   assert.match(snapshotGate, /^umask 077$/m);
@@ -138,12 +139,17 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   );
   assert.match(
     workflow,
-    /actions\/workflows\/production-route-api-closure-evidence\.yml\/runs\?head_sha=\$\{DEPLOY_SHA\}&branch=main&event=push&status=success&per_page=20/,
+    /actions\/workflows\/production-route-api-closure-evidence\.yml\/runs\?head_sha=\$\{DEPLOY_SHA\}&branch=main&status=success&per_page=20/,
   );
   assert.match(
     workflow,
-    /node tools\/ci\/require-successful-workflow-run\.mjs[\s\S]*?"\$\{snapshot_runs_file\}"[\s\S]*?"\$\{DEPLOY_SHA\}"[\s\S]*?"Production route API closure evidence"[\s\S]*?push[\s\S]*?main[\s\S]*?3600/,
+    /node tools\/ci\/require-successful-workflow-run\.mjs[\s\S]*?"\$\{snapshot_runs_file\}"[\s\S]*?"\$\{DEPLOY_SHA\}"[\s\S]*?"Production route API closure evidence"[\s\S]*?"push,workflow_dispatch"[\s\S]*?main[\s\S]*?3600/,
   );
+  assert.match(workflow, /echo "current_sha=\$\{current_sha\}" >> "\$\{GITHUB_OUTPUT\}"/);
+  assert.match(workflow, /snapshot-\$\{DEPLOY_SHA\}\.env/);
+  assert.match(workflow, /marker_request_sha[^\n]+!=[^\n]+DEPLOY_SHA/);
+  assert.match(workflow, /marker_current_sha[^\n]+!=[^\n]+CURRENT_DEPLOYED_SHA/);
+  assert.match(workflow, /snapshot marker backup checksum mismatch/);
 
   const rangeDetectionIndex = workflow.indexOf('git diff --name-only "${current_sha}" "${DEPLOY_SHA}"');
   const latchIndex = workflow.indexOf("CD Deploy / Require route purge snapshot evidence");

@@ -6,23 +6,25 @@ const [
   responsePath,
   expectedSha,
   expectedName,
-  expectedEvent,
+  expectedEventsInput,
   expectedBranch,
   maxAgeSecondsInput,
 ] = process.argv.slice(2);
 const maxAgeSeconds = Number(maxAgeSecondsInput);
+const expectedEvents = expectedEventsInput?.split(",") ?? [];
 
 if (
   !responsePath ||
   !/^[0-9a-f]{40}$/.test(expectedSha ?? "") ||
   !expectedName ||
-  !expectedEvent ||
+  expectedEvents.length === 0 ||
+  expectedEvents.some((event) => !/^[a-z_]+$/.test(event)) ||
   !expectedBranch ||
   !Number.isSafeInteger(maxAgeSeconds) ||
   maxAgeSeconds <= 0
 ) {
   console.error(
-    "usage: require-successful-workflow-run.mjs <response.json> <sha> <name> <event> <branch> <max-age-seconds>",
+    "usage: require-successful-workflow-run.mjs <response.json> <sha> <name> <events> <branch> <max-age-seconds>",
   );
   process.exit(2);
 }
@@ -49,7 +51,7 @@ const matchingRun = payload.workflow_runs.find((run) => {
     run?.name === expectedName &&
     run?.head_sha === expectedSha &&
     run?.head_branch === expectedBranch &&
-    run?.event === expectedEvent &&
+    expectedEvents.includes(run?.event) &&
     run?.status === "completed" &&
     run?.conclusion === "success" &&
     Number.isSafeInteger(run?.id) &&

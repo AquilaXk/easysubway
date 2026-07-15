@@ -11,6 +11,7 @@ on:
       - "tools/ops/postgres-backup.sh"
       - "backend/src/main/resources/db/migration/postgresql/V51__*"
       - "backend/src/main/resources/db/migration/h2/V51__*"
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -36,6 +37,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "manual snapshot revalidation must run from main" >&2
+            exit 1
+          fi
 
           if [[ ! "${CLOSURE_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "closure base must be a 40-character lowercase commit SHA" >&2

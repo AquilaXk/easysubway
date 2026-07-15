@@ -33,7 +33,15 @@ async function invoke(workflowRuns) {
   try {
     return await execFileAsync(
       "node",
-      [scriptPath, responsePath, expectedSha, expectedName, "push", "main", "3600"],
+      [
+        scriptPath,
+        responsePath,
+        expectedSha,
+        expectedName,
+        "push,workflow_dispatch",
+        "main",
+        "3600",
+      ],
       { cwd: root, encoding: "utf8" },
     );
   } finally {
@@ -42,10 +50,13 @@ async function invoke(workflowRuns) {
 }
 
 test("exact SHA의 completed/success workflow run만 승인한다", async () => {
-  const result = await invoke([successfulRun()]);
+  const pushResult = await invoke([successfulRun()]);
+  const dispatchResult = await invoke([successfulRun({ event: "workflow_dispatch" })]);
 
-  assert.equal(result.stdout, "validated_workflow_run_id=123456\n");
-  assert.equal(result.stderr, "");
+  assert.equal(pushResult.stdout, "validated_workflow_run_id=123456\n");
+  assert.equal(pushResult.stderr, "");
+  assert.equal(dispatchResult.stdout, "validated_workflow_run_id=123456\n");
+  assert.equal(dispatchResult.stderr, "");
 });
 
 test("workflow identity나 성공 상태가 다르면 fail closed한다", async () => {
@@ -53,7 +64,7 @@ test("workflow identity나 성공 상태가 다르면 fail closed한다", async 
     { head_sha: "b".repeat(40) },
     { name: "CI" },
     { head_branch: "release" },
-    { event: "workflow_dispatch" },
+    { event: "pull_request" },
     { status: "in_progress" },
     { conclusion: "failure" },
     { updated_at: new Date(Date.now() - 3_601_000).toISOString() },
