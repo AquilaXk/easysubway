@@ -95,6 +95,13 @@ test("승인 provenance와 유효한 새 시간 경계를 필수로 한다", () 
     /expiresAt must be after publishedAt/,
   );
   assert.throws(
+    () => buildRescueManifest({
+      ...validInput(),
+      approval: { ...approved(), approvedAt: "2026-07-15T01:00:01.000Z" },
+    }),
+    /approval.approvedAt must not be after publishedAt/,
+  );
+  assert.throws(
     () => buildRescueManifest({ ...validInput(), approval: { ...approved(), reasonCode: "free form secret" } }),
     /approval.reasonCode is invalid/,
   );
@@ -132,6 +139,25 @@ test("production-equivalent RSA private key가 없으면 rescue 서명을 만들
     () => buildRescueManifest({ ...validInput(), privateKey: undefined }),
     /signing private key is required/,
   );
+});
+
+test("known-good의 지속 pack 선택만 보존하고 rollout은 제거한다", () => {
+  const activePack = { id: "capital", version: "1" };
+  const emergencyOverride = { ...activePack, reason: "KNOWN_GOOD_OVERRIDE" };
+  const knownGood = manifest(114, {
+    activePack,
+    emergencyOverride,
+    rollout: { percentage: 10, seed: "0123456789abcdef0123456789abcdef" },
+  });
+  const result = buildRescueManifest({
+    ...validInput(),
+    knownGoodManifest: knownGood,
+    knownGoodManifestBytes: bytes(knownGood),
+  });
+
+  assert.deepEqual(result.manifest.activePack, activePack);
+  assert.deepEqual(result.manifest.emergencyOverride, emergencyOverride);
+  assert.equal(result.manifest.rollout, undefined);
 });
 
 function validInput() {

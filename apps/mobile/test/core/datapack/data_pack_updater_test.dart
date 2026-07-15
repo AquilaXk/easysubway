@@ -2893,7 +2893,7 @@ Map<String, Object?> _signedV2PackManifest({
     'keyId': 'fixture-key',
     'ttlSeconds': 1,
     'activePack': {'id': 'capital', 'version': version},
-    if (rollbackProvenance != null) 'rollbackProvenance': rollbackProvenance,
+    'rollbackProvenance': ?rollbackProvenance,
     'packs': [pack],
   });
 }

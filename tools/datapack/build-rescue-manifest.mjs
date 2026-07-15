@@ -8,7 +8,6 @@ import {
   requiredSha256,
   sha256,
   validateManifest,
-  withoutSignature,
 } from "./lib/manifest-validation.mjs";
 import { rsaSha256Signature, signingPrivateKey } from "./lib/manifest-signing.mjs";
 
@@ -65,15 +64,18 @@ export function buildRescueManifest(input) {
     reasonCode: approval.reasonCode,
   };
   const unsigned = {
-    ...withoutSignature(knownGood),
+    manifestVersion: knownGood.manifestVersion,
     channel: current.channel,
     releaseSequence,
     publishedAt,
     expiresAt,
     keyId: current.keyId,
+    ttlSeconds: knownGood.ttlSeconds,
+    ...(knownGood.activePack === undefined ? {} : { activePack: knownGood.activePack }),
+    ...(knownGood.emergencyOverride === undefined ? {} : { emergencyOverride: knownGood.emergencyOverride }),
+    packs: knownGood.packs,
     rollbackProvenance,
   };
-  delete unsigned.rollout;
   const manifest = {
     ...unsigned,
     signature: {
