@@ -387,6 +387,7 @@ async function promoteItxSourceCandidateLocked({
     throw new Error("ITX source candidate hash is invalid");
   }
   validateSourceFreshness(candidate, candidate.selectedServiceDates, now);
+  validateItxServiceDates(candidate.selectedServiceDates, { now });
   await validateCanonicalPackIdentity(candidate.canonicalPackIdentity, repositoryRoot);
   validateCanonicalCorridorAuthority(candidate);
   const candidateSets = validateSourceSnapshotSets(candidate);
@@ -637,15 +638,51 @@ function validateMaterializedProjection(source, dayCd, errorCode) {
 function validateCanonicalCorridorAuthority(source) {
   const canonical = readCanonicalLine(CANONICAL_PACK_PATH);
   try {
-    const lineByStation = new Map(canonical.rosterStations.map(({ canonicalStationId, lineId }) => (
-      [canonicalStationId, lineId]
+    const invalid = () => { throw new Error("CANONICAL_CORRIDOR_AUTHORITY_INVALID"); };
+    const stationsById = new Map(canonical.rosterStations.map((station) => (
+      [station.canonicalStationId, station]
     )));
-    const valid = ({ canonicalStationId, stationId, lineId }) => (
-      lineByStation.get(canonicalStationId ?? stationId) === lineId
-    );
-    if (source.stationRosters.some(({ stations }) => stations.some((station) => !valid(station)))
-      || source.stationSequences.some(({ stops }) => stops.some((stop) => !valid(stop)))) {
-      throw new Error("CANONICAL_CORRIDOR_AUTHORITY_INVALID");
+    const matchesCanonical = (value, stationId) => {
+      const expected = stationsById.get(stationId);
+      return expected !== undefined && value.nameKo === expected.nameKo
+        && value.corridorSequence === expected.corridorSequence && value.lineId === expected.lineId;
+    };
+    if (source.stationRosters.some(({ stations }) => stations.some((station) => (
+      !matchesCanonical(station, station.canonicalStationId)
+      || station.providerStationName !== station.nameKo
+    )))) invalid();
+    const sequenceByTripId = new Map();
+    for (const sequence of source.stationSequences) {
+      const first = sequence.stops[0];
+      const last = sequence.stops.at(-1);
+      if (!first || !last || sequence.originStationName !== first.nameKo
+        || sequence.destinationStationName !== last.nameKo
+        || sequence.terminalVariant !== `${first.nameKo}→${last.nameKo}`
+        || sequence.stopCount !== sequence.stops.length
+        || !Number.isInteger(sequence.observedOdCount) || sequence.observedOdCount < 1
+        || sequence.conflictingTimestampCount !== 0 || sequence.missingPairCount !== 0
+        || sequence.duplicateOdCount !== 0) invalid();
+      const serviceDate = source.selectedServiceDates?.[sequence.dayCd];
+      for (const [index, stop] of sequence.stops.entries()) {
+        try {
+          if (!matchesCanonical(stop, stop.stationId) || stop.stopSequence !== index + 1
+            || isoServiceSeconds(stop.arrivalAt, serviceDate, "arrivalAt") !== stop.arrivalSeconds
+            || isoServiceSeconds(stop.departureAt, serviceDate, "departureAt") !== stop.departureSeconds
+            || stop.arrivalSeconds > stop.departureSeconds) invalid();
+        } catch {
+          invalid();
+        }
+      }
+      sequenceByTripId.set(
+        `route-${LINE_ID}-${sequence.directionId}-${normalizeTrainNumber(sequence.trainNumber)}-${sequence.dayCd}`,
+        sequence,
+      );
+    }
+    if (source.transitTrips.some((trip) => {
+      const sequence = sequenceByTripId.get(trip.id);
+      return sequence === undefined || trip.tripHeadsign !== sequence.stops.at(-1).nameKo;
+    })) {
+      invalid();
     }
   } finally {
     canonical.close();
