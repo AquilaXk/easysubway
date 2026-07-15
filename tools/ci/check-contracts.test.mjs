@@ -71,6 +71,20 @@ test("source admission evidence가 있으면 license evidence hash를 요구한�
   )));
 });
 
+test("source admission evidence envelope는 승인 필드 외 값을 거부하고 선택적으로 남는다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const admitted = inventory.sources.find((source) => source.admissionEvidence != null);
+  admitted.admissionEvidence.serviceKey = "must-never-enter-contract";
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("admissionEvidence.serviceKey")
+  )));
+
+  delete admitted.admissionEvidence;
+  assert.deepEqual(validateSchema(schema, inventory).errors, []);
+});
+
 test("inventory provenance 전용 source는 production 사용 금지만 선언할 수 있다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");

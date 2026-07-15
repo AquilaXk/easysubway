@@ -187,6 +187,21 @@ class DatapackSourceSnapshotLineageTest {
 	}
 
 	@Test
+	@DisplayName("기존 snapshot ID는 새 idempotency key로 다시 등록할 수 없다")
+	void existingSnapshotCannotBeReRegisteredWithNewIdempotencyKey() {
+		var first = command("source-a", "snapshot-a-1", null, null);
+		service.createLockedSnapshot(first);
+
+		assertThatThrownBy(() -> service.createLockedSnapshot(copyCommand(
+			first,
+			first.freshnessExpiresAt(),
+			"different-idempotency-key"
+		)))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("snapshot ID");
+	}
+
+	@Test
 	@DisplayName("정책이 갱신되어도 기존 idempotency key는 당시 snapshot을 재생한다")
 	void existingCommandReplaysAfterGovernancePolicyUpdate() {
 		var first = command("source-a", "snapshot-a-1", null, null);
@@ -298,6 +313,20 @@ class DatapackSourceSnapshotLineageTest {
 			.hasMessageContaining("RAW_RETENTION_OVERDUE");
 	}
 
+	@Test
+	@DisplayName("freshness expiry는 신뢰한 정책에서 파생한 값만 저장한다")
+	void rejectsForgedFreshnessExpiry() {
+		var command = command("source-a", "snapshot-a-forged-freshness", null, null);
+
+		assertThatThrownBy(() -> service.createLockedSnapshot(copyCommand(
+			command,
+			LocalDateTime.of(2099, 1, 1, 0, 0),
+			command.idempotencyKey()
+		)))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("SOURCE_FRESHNESS_DERIVATION_MISMATCH");
+	}
+
 	private String createAfter(CountDownLatch start, SourceSnapshotCommand command) throws InterruptedException {
 		start.await();
 		try {
@@ -357,6 +386,22 @@ class DatapackSourceSnapshotLineageTest {
 			""".trim();
 	}
 
+	private SourceSnapshotCommand copyCommand(
+		SourceSnapshotCommand command,
+		LocalDateTime freshnessExpiresAt,
+		String idempotencyKey
+	) {
+		return new SourceSnapshotCommand(
+			command.snapshotId(), command.sourceId(), command.provider(), command.retrievedAt(), command.sourceUpdatedAt(),
+			command.rowCount(), command.coverageCount(), command.rawSha256(), command.rawObjectUri(),
+			command.redactedRequestFingerprint(), command.schemaFingerprint(), command.schemaStatus(), command.licenseStatus(),
+			command.fetchStatus(), command.redistributionAllowed(), command.credentialRedacted(), command.previousSnapshotId(),
+			command.diffSummary(), command.diffSummaryJson(), freshnessExpiresAt, command.rawRetentionExpiresAt(),
+			command.governancePolicyVersion(), command.governancePolicySha256(), command.requestedBy(), command.reason(),
+			idempotencyKey
+		);
+	}
+
 	private DatapackSourceGovernancePolicy testGovernancePolicy() {
 		return governancePolicy("2026-07-15");
 	}
@@ -365,9 +410,13 @@ class DatapackSourceSnapshotLineageTest {
 		String policy = """
 			{"policyVersion":"%s","retentionClasses":[{"id":"standard-90d","retentionDays":90}],"sources":[{"sourceId":"source-a","retentionClassId":"standard-90d"},{"sourceId":"source-b","retentionClassId":"standard-90d"}]}
 			""".formatted(version);
+		String freshnessPolicy = """
+			{"sourceClasses":[{"id":"test","sourceIds":["source-a","source-b"],"basisField":"retrievedAt","reverificationCadence":"P31D"}]}
+			""";
 		return new DatapackSourceGovernancePolicy(
 			new ObjectMapper(),
-			new ByteArrayResource(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+			new ByteArrayResource(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+			new ByteArrayResource(freshnessPolicy.getBytes(java.nio.charset.StandardCharsets.UTF_8))
 		);
 	}
 

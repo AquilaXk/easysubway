@@ -251,16 +251,23 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
   }
 });
 
-test("legacy root는 rowCount를 결정적 coverage로 migration해 lineage를 연장한다", () => {
-  const legacyRoot = { ...first };
-  delete legacyRoot.coverageCount;
-  const child = snapshot({
-    snapshotId: "snapshot-a-legacy-child",
+test("승인된 legacy root는 rowCount를 결정적 coverage로 migration해 lineage를 연장한다", async () => {
+  const snapshots = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/release/source-snapshots.json"),
+    "utf8",
+  ));
+  const legacyRoot = snapshots.find((entry) => entry.coverageCount == null);
+  const child = {
+    ...legacyRoot,
+    snapshotId: `${legacyRoot.snapshotId}-child`,
     previousSnapshotId: legacyRoot.snapshotId,
-    retrievedAt: "2026-07-02T00:00:00Z",
-    coverageCount: 11,
-  });
-  child.diffSummary = buildSnapshotDiff(legacyRoot, child);
+    retrievedAt: new Date(Date.parse(legacyRoot.retrievedAt) + 86_400_000).toISOString(),
+    rowCount: legacyRoot.rowCount + 1,
+    coverageCount: legacyRoot.rowCount + 1,
+    rawSha256: "f".repeat(64),
+    diffSummary: null,
+  };
+	child.diffSummary = buildSnapshotDiff(legacyRoot, child);
 
   assert.equal(child.diffSummary.coverageDelta, 1);
   assert.doesNotThrow(() => validateLineage([legacyRoot, child]));
@@ -274,6 +281,26 @@ test("tracked production legacy root는 승인 bytes를 바꾸지 않고 검증�
 
   assert.equal(snapshots.filter((entry) => entry.coverageCount == null).length, 9);
   assert.doesNotThrow(() => validateLineage(snapshots));
+});
+
+test("임의 coverage 없는 root는 legacy snapshot으로 가장할 수 없다", () => {
+  const arbitraryRoot = { ...first };
+  delete arbitraryRoot.coverageCount;
+
+  assert.throws(() => validateLineage([arbitraryRoot]), /SOURCE_DIFF_MISSING/);
+});
+
+test("승인된 legacy root의 의미 bytes가 바뀌면 예외를 잃는다", async () => {
+  const snapshots = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/release/source-snapshots.json"),
+    "utf8",
+  ));
+  const legacyRoot = snapshots.find((entry) => entry.coverageCount == null);
+
+  assert.throws(
+    () => validateLineage([{ ...legacyRoot, rowCount: legacyRoot.rowCount + 1 }]),
+    /SOURCE_DIFF_MISSING/,
+  );
 });
 
 test("governance policy는 production source별 freshness·retention·책임 역할을 요구한다", () => {
@@ -318,6 +345,23 @@ test("governance policy는 production source별 freshness·retention·책임 역
     }),
     /duplicate inventory source/,
   );
+});
+
+test("governance policy URL은 parser 정규화 전 raw URI 경계를 지킨다", () => {
+  const inventory = { sources: [source()] };
+  const freshnessPolicy = freshnessPolicyFixture();
+  for (const malformed of [
+    "https://example.invalid/has space",
+    "https://example.invalid/%zz",
+    String.raw`https:\example.invalid/path`,
+  ]) {
+    const policy = governancePolicy();
+    policy.sources[0].licenseReview.termsUrl = malformed;
+    assert.throws(
+      () => validateSourceGovernancePolicy({ policy, inventory, freshnessPolicy }),
+      /termsUrl/,
+    );
+  }
 });
 
 test("raw retention 만료는 policy retentionDays에서 결정론적으로 파생한다", () => {

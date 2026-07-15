@@ -91,4 +91,11 @@ test("date·date-time·uri format은 달력과 URL 구조까지 검증한다", (
     termsUrl: "https://",
   }).ok, false);
   assert.equal(validateSchema({ type: "string", format: "uri" }, "urn:example:source").ok, true);
+  for (const malformed of [
+    "https://example.invalid/has space",
+    "https://example.invalid/%zz",
+    String.raw`https:\example.invalid/path`,
+  ]) {
+    assert.equal(validateSchema({ type: "string", format: "uri" }, malformed).ok, false, malformed);
+  }
 });

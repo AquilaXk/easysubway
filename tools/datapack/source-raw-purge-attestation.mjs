@@ -105,13 +105,21 @@ function verifyPurgeJournal(report, journalText) {
   } catch {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal JSON");
   }
-  if (records[0]?.event !== "PLAN" || records[0].evaluatedAt !== report.evaluatedAt) {
-    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal plan");
-  }
   const expected = new Map();
   addExpectedResults(expected, report.deleted, new Set(["DELETED"]));
   addExpectedResults(expected, report.alreadyAbsent, new Set(["ALREADY_ABSENT"]));
   addExpectedResults(expected, report.failed, new Set(["FAILED", "AUTHORIZATION_FAILED", "AUDIT_WRITE_FAILED"]));
+  const planCandidates = records[0]?.deleteCandidates;
+  const planKeys = Array.isArray(planCandidates) ? planCandidates.map(journalItemKey) : [];
+  if (records[0]?.event !== "PLAN"
+    || records[0].evaluatedAt !== report.evaluatedAt
+    || records[0].dryRun !== report.dryRun
+    || planKeys.some((key) => key == null)
+    || new Set(planKeys).size !== planKeys.length
+    || planKeys.length !== expected.size
+    || planKeys.some((key) => !expected.has(key))) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal plan");
+  }
   const intents = new Set();
   const results = new Map();
   for (const record of records.slice(1)) {
@@ -120,7 +128,7 @@ function verifyPurgeJournal(report, journalText) {
       throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal item");
     }
     if (record.event === "DELETE_INTENT") {
-      if (intents.has(key) || results.has(key)) {
+      if (!expected.has(key) || intents.has(key) || results.has(key)) {
         throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal sequence");
       }
       intents.add(key);
@@ -133,6 +141,9 @@ function verifyPurgeJournal(report, journalText) {
   }
   if (results.size !== expected.size) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal result set");
+  }
+  if ([...intents].some((key) => !results.has(key))) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal sequence");
   }
   for (const [key, outcomes] of expected) {
     const outcome = results.get(key);

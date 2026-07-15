@@ -1,6 +1,6 @@
 import { gzipSync, gunzipSync } from "node:zlib";
 import { createHash, createSign } from "node:crypto";
-import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import { createServer } from "node:http";
 import assert from "node:assert/strict";
@@ -8160,6 +8160,7 @@ test("source admission pipeline은 custom candidates를 최종 inventory 검증�
   const seedSamplePath = path.join(outputDir, "seed-sample.json");
   const candidatesPath = path.join(outputDir, "source-candidates.json");
   const adminReviewPath = path.join(outputDir, "admin-review.json");
+  const outputInventoryPath = path.join(outputDir, "source-inventory.admitted.json");
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
   await writeFile(rawPath, `${JSON.stringify([{ railOprIsttCd: "S1", railOprIsttNm: "서울교통공사" }])}\n`);
@@ -8261,6 +8262,7 @@ test("source admission pipeline은 custom candidates를 최종 inventory 검증�
     productionSource,
   };
   await writeFile(adminReviewPath, `${JSON.stringify(adminReview, null, 2)}\n`);
+  await writeFile(outputInventoryPath, "preserved-final-inventory\n");
 
   await assert.rejects(
     execFileAsync(
@@ -8296,13 +8298,18 @@ test("source admission pipeline은 custom candidates를 최종 inventory 검증�
         "--admin-review",
         adminReviewPath,
         "--output-inventory",
-        path.join(outputDir, "source-inventory.admitted.json"),
+        outputInventoryPath,
         "--output",
         path.join(outputDir, "admission-summary.json"),
       ],
       { cwd: root },
     ),
     /molit-tago-subway-info\.admissionEvidence\.sampleEvidenceHash must be/,
+  );
+  assert.equal(await readFile(outputInventoryPath, "utf8"), "preserved-final-inventory\n");
+  assert.deepEqual(
+    (await readdir(outputDir)).filter((name) => name.startsWith(".source-inventory.admitted.json.")),
+    [],
   );
 });
 

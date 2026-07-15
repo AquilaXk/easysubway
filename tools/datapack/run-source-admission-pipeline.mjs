@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -44,18 +44,27 @@ async function main() {
     productionSource: adminReview.productionSource,
     licenseEvidenceHash: adminReview.licenseEvidenceHash,
   });
-  await writeFile(outputInventoryPath, `${JSON.stringify(outputInventory, null, 2)}\n`);
-  await execNode([
-    "tools/datapack/validate-source-inventory.mjs",
-    "--inventory",
-    outputInventoryPath,
-    "--candidates",
-    args.candidates,
-    "--governance-policy",
-    args["governance-policy"],
-    "--freshness-policy",
-    args["freshness-policy"],
-  ]);
+  const stagedInventoryPath = path.join(
+    path.dirname(outputInventoryPath),
+    `.${path.basename(outputInventoryPath)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+  try {
+    await writeFile(stagedInventoryPath, `${JSON.stringify(outputInventory, null, 2)}\n`, { flag: "wx" });
+    await execNode([
+      "tools/datapack/validate-source-inventory.mjs",
+      "--inventory",
+      stagedInventoryPath,
+      "--candidates",
+      args.candidates,
+      "--governance-policy",
+      args["governance-policy"],
+      "--freshness-policy",
+      args["freshness-policy"],
+    ]);
+    await rename(stagedInventoryPath, outputInventoryPath);
+  } finally {
+    await rm(stagedInventoryPath, { force: true });
+  }
 
   const summary = {
     schemaVersion: 1,

@@ -55,16 +55,24 @@ public class DatapackSourceSnapshotCommandService {
 		var policyBinding = governancePolicy.requireBinding(
 			command.sourceId(),
 			command.retrievedAt(),
+			command.freshnessExpiresAt(),
 			command.rawRetentionExpiresAt(),
 			command.governancePolicyVersion(),
 			command.governancePolicySha256()
 		);
 		DataSourceSnapshot snapshot = snapshotFrom(command, policyBinding);
 		snapshotRepository.lockSourceLineage(command.sourceId());
-		var existingSnapshot = snapshotRepository.loadSnapshot(snapshot.snapshotId());
-		if (existingSnapshot.isEmpty()) {
-			validateLineage(snapshot);
+		var lockedEvent = snapshotRepository
+			.findEventByIdempotencyKey(command.sourceId(), command.idempotencyKey());
+		if (lockedEvent.isPresent()) {
+			ensureSameIdempotentRequest(command, lockedEvent.get());
+			return lockedEvent.get().snapshotId();
 		}
+		var existingSnapshot = snapshotRepository.loadSnapshot(snapshot.snapshotId());
+		if (existingSnapshot.isPresent()) {
+			throw new IllegalArgumentException("snapshot ID already exists without this idempotency key");
+		}
+		validateLineage(snapshot);
 		String snapshotId = snapshotRepository.saveSnapshot(snapshot).snapshotId();
 		try {
 			insertEvent(command, snapshotId);
@@ -157,6 +165,7 @@ public class DatapackSourceSnapshotCommandService {
 	) {
 		return snapshotFrom(
 			command,
+			policyBinding.freshnessExpiresAt(),
 			policyBinding.rawRetentionExpiresAt(),
 			policyBinding.version(),
 			policyBinding.sha256()
@@ -165,6 +174,7 @@ public class DatapackSourceSnapshotCommandService {
 
 	private static DataSourceSnapshot snapshotFrom(
 		SourceSnapshotCommand command,
+		LocalDateTime freshnessExpiresAt,
 		LocalDateTime rawRetentionExpiresAt,
 		String governancePolicyVersion,
 		String governancePolicySha256
@@ -173,6 +183,7 @@ public class DatapackSourceSnapshotCommandService {
 			command,
 			command.coverageCount(),
 			command.diffSummaryJson(),
+			freshnessExpiresAt,
 			rawRetentionExpiresAt,
 			governancePolicyVersion,
 			governancePolicySha256
@@ -183,6 +194,7 @@ public class DatapackSourceSnapshotCommandService {
 		SourceSnapshotCommand command,
 		int coverageCount,
 		String diffSummaryJson,
+		LocalDateTime freshnessExpiresAt,
 		LocalDateTime rawRetentionExpiresAt,
 		String governancePolicyVersion,
 		String governancePolicySha256
@@ -208,7 +220,7 @@ public class DatapackSourceSnapshotCommandService {
 			command.previousSnapshotId(),
 			command.diffSummary(),
 			diffSummaryJson,
-			command.freshnessExpiresAt(),
+			freshnessExpiresAt,
 			rawRetentionExpiresAt,
 			governancePolicyVersion,
 			governancePolicySha256
@@ -236,6 +248,7 @@ public class DatapackSourceSnapshotCommandService {
 			command,
 			legacy ? storedSnapshot.coverageCount() : command.coverageCount(),
 			legacy ? storedSnapshot.diffSummaryJson() : command.diffSummaryJson(),
+			command.freshnessExpiresAt(),
 			command.rawRetentionExpiresAt(),
 			command.governancePolicyVersion(),
 			command.governancePolicySha256()

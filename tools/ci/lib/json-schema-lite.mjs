@@ -81,6 +81,7 @@ function matchesFormat(format, value) {
     return true;
   }
   if (format === "uri") {
+    if (!isRawUri(value)) return false;
     try {
       const parsed = new URL(value);
       return parsed.protocol !== "";
@@ -89,6 +90,11 @@ function matchesFormat(format, value) {
     }
   }
   throw new Error(`json-schema-lite: 미지원 format '${format}'`);
+}
+
+function isRawUri(value) {
+  return /^[A-Za-z0-9:/?#\[\]@!$&'()*+,;=._~%\-]+$/.test(value)
+    && !/%(?![0-9A-Fa-f]{2})/.test(value);
 }
 
 function isLeapYear(year) {

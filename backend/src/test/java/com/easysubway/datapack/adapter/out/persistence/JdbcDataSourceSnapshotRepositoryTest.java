@@ -180,6 +180,24 @@ class JdbcDataSourceSnapshotRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("root와 child는 previous·diff 두 필드를 같은 형태로 요구한다")
+	void rootAndChildRequireMatchingDiffFields() {
+		var root = lockedSnapshot("snapshot-root", "a".repeat(64), 13);
+
+		assertThatThrownBy(() -> repository.saveSnapshot(withLineage(root, null, "unexpected", null)))
+			.isInstanceOf(InvalidDataSourceSnapshotException.class)
+			.hasMessageContaining("diffSummary");
+		assertThatThrownBy(() -> repository.saveSnapshot(withLineage(
+			root,
+			"snapshot-parent",
+			null,
+			"{\"status\":\"CHANGED\"}"
+		)))
+			.isInstanceOf(InvalidDataSourceSnapshotException.class)
+			.hasMessageContaining("diffSummary");
+	}
+
+	@Test
 	@DisplayName("staged constraint cleanup 전 legacy snapshot row도 조회할 수 있다")
 	void loadSnapshotAllowsLegacyRowsBeforeConstraintValidation() {
 		insertLegacyUnsafeSnapshot();
@@ -248,12 +266,29 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			true,
 			credentialRedacted,
 			null,
-			"initial snapshot",
+			null,
 			null,
 			LocalDateTime.of(2026, 7, 6, 3, 0, 0, 555555555),
 			LocalDateTime.of(2026, 9, 29, 3, 0, 0, 555555555),
 			"2026-07-15",
 			"e".repeat(64)
+		);
+	}
+
+	private DataSourceSnapshot withLineage(
+		DataSourceSnapshot snapshot,
+		String previousSnapshotId,
+		String diffSummary,
+		String diffSummaryJson
+	) {
+		return new DataSourceSnapshot(
+			snapshot.snapshotId(), snapshot.sourceId(), snapshot.provider(), snapshot.retrievedAt(),
+			snapshot.sourceUpdatedAt(), snapshot.rowCount(), snapshot.coverageCount(), snapshot.rawSha256(),
+			snapshot.rawObjectUri(), snapshot.redactedRequestFingerprint(), snapshot.schemaFingerprint(),
+			snapshot.snapshotStatus(), snapshot.schemaStatus(), snapshot.licenseStatus(), snapshot.fetchStatus(),
+			snapshot.redistributionAllowed(), snapshot.credentialRedacted(), previousSnapshotId, diffSummary,
+			diffSummaryJson, snapshot.freshnessExpiresAt(), snapshot.rawRetentionExpiresAt(),
+			snapshot.governancePolicyVersion(), snapshot.governancePolicySha256()
 		);
 	}
 }

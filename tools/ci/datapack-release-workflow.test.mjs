@@ -34,11 +34,13 @@ test("workflow_dispatch 입력은 mode·targetChannel·modeArgs 3개로 통합�
 });
 
 test("modeArgs 파싱 스텝이 개별 인자를 output으로 펼친다", () => {
-  assert.match(yml, /id:\s*args/);
-  assert.match(yml, /modeArgs/);
-  assert.match(yml, /buildSpecPath/);
-  assert.match(yml, /releaseRequestId/);
-  assert.match(yml, /sourceGovernanceEvaluationAt/);
+  const parseStep = yml.match(/- name: Data Pack Release \/ Parse modeArgs[\s\S]*?\n\s+- name:/)?.[0];
+  assert.ok(parseStep, "Parse modeArgs 스텝을 찾지 못함");
+  assert.match(parseStep, /id:\s*args/);
+  assert.match(parseStep, /modeArgs/);
+  assert.match(parseStep, /buildSpecPath/);
+  assert.match(parseStep, /releaseRequestId/);
+  assert.match(parseStep, /sourceGovernanceEvaluationAt/);
 });
 
 test("modeArgs 파싱 스텝은 비-JSON·개행 주입을 방어한다", () => {

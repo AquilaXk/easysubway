@@ -146,8 +146,7 @@ function purgeReport(
   return attestPurgeReport(body);
 }
 
-function attestPurgeReport(report) {
-  const journalText = purgeJournal(report);
+function attestPurgeReport(report, journalText = purgeJournal(report)) {
   report.auditJournalSha256 = sha256(journalText);
   report.auditJournalRecordCount = journalText.trimEnd().split("\n").length;
   attachPurgeAttestation(report, {
@@ -292,6 +291,35 @@ test("attestation에 결합된 journal·ledger·public key 변조를 거부한�
     () => purgeEvidenceBySnapshot(report, { ...attestation, trustedPublicKeySha256: "f".repeat(64) }),
     /trusted purge attestation key/,
   );
+});
+
+test("서명된 purge journal도 PLAN dryRun과 deleteCandidates를 report에 결합한다", () => {
+  const entry = { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) };
+  const dryRunMismatch = purgeReport([entry]);
+  const dryRunRecords = purgeJournal(dryRunMismatch).trimEnd().split("\n").map(JSON.parse);
+  dryRunRecords[0].dryRun = true;
+  attestPurgeReport(dryRunMismatch, `${dryRunRecords.map(JSON.stringify).join("\n")}\n`);
+  assert.throws(() => verifiedPurgeEvidence(dryRunMismatch), /purge journal plan/);
+
+  const candidatesMismatch = purgeReport([entry]);
+  const candidateRecords = purgeJournal(candidatesMismatch).trimEnd().split("\n").map(JSON.parse);
+  candidateRecords[0].deleteCandidates = [];
+  attestPurgeReport(candidatesMismatch, `${candidateRecords.map(JSON.stringify).join("\n")}\n`);
+  assert.throws(() => verifiedPurgeEvidence(candidatesMismatch), /purge journal plan/);
+});
+
+test("purge journal의 추가·미완료 DELETE_INTENT는 증거로 소비하지 않는다", () => {
+  const entry = { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) };
+  const report = purgeReport([entry]);
+  const records = purgeJournal(report).trimEnd().split("\n").map(JSON.parse);
+  records.push({
+    event: "DELETE_INTENT",
+    evaluatedAt: report.evaluatedAt,
+    item: { sourceId: "source-b", snapshotId: "snapshot-b", rawSha256: "b".repeat(64) },
+  });
+  attestPurgeReport(report, `${records.map(JSON.stringify).join("\n")}\n`);
+
+  assert.throws(() => verifiedPurgeEvidence(report), /purge journal sequence/);
 });
 
 test("GET 404로 이미 사라진 raw는 DELETE intent 없이도 idempotent purge evidence로 검증한다", () => {

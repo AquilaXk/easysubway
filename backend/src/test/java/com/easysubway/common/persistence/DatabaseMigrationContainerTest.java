@@ -66,7 +66,15 @@ class DatabaseMigrationContainerTest {
 				"transit_master_overrides",
 				"transit_master_override_audits"
 			);
-		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53");
+		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53", "54", "55", "56");
+		assertThat(jdbcTemplate.queryForObject("""
+			SELECT COUNT(*)
+			FROM pg_index i
+			JOIN pg_class c ON c.oid = i.indexrelid
+			WHERE c.relname IN ('uq_data_source_snapshots_previous_child', 'uq_data_source_snapshots_source_root')
+				AND i.indisvalid = TRUE
+				AND i.indisready = TRUE
+			""", Integer.class)).isEqualTo(2);
 		assertAdPlacementsSeeded(jdbcTemplate);
 		assertThat(foreignKeyNames(jdbcTemplate))
 			.contains(
@@ -104,6 +112,7 @@ class DatabaseMigrationContainerTest {
 				"chk_data_source_snapshots_raw_retention",
 				"chk_data_source_snapshots_coverage_count",
 				"chk_data_source_snapshots_governance_pair",
+				"chk_data_source_snapshots_previous_not_self",
 				"chk_facility_evidence_strict_route",
 				"chk_manual_overrides_approval_state",
 				"chk_manual_overrides_effective_window",
@@ -120,6 +129,7 @@ class DatabaseMigrationContainerTest {
 		assertSnapshotSourceForeignKeysRejectMismatch(jdbcTemplate);
 		assertSnapshotRawEvidencePolicyGuards(jdbcTemplate);
 		assertSnapshotGovernanceGuards(jdbcTemplate);
+		assertPostgresqlSnapshotLineageIsAppendOnly(jdbcTemplate);
 		assertPostgresqlSnapshotRawEvidenceConstraintsAreStaged(jdbcTemplate);
 		assertFacilityEvidenceStrictRouteGuards(jdbcTemplate);
 		assertManualOverrideProductionGuards(jdbcTemplate);
@@ -165,7 +175,10 @@ class DatabaseMigrationContainerTest {
 		insertLegacySnapshotBeforeGovernance(jdbcTemplate, "legacy-root-b", "legacy-source");
 
 		assertThatThrownBy(() -> migrate(dataSource, "classpath:db/migration/h2", null))
-			.isInstanceOf(org.flywaydb.core.api.FlywayException.class);
+			.isInstanceOf(org.flywaydb.core.api.FlywayException.class)
+			.hasMessageContaining("V52__datapack_source_governance.sql")
+			.rootCause()
+			.hasMessageContaining("uq_data_source_snapshots_source_root");
 	}
 
 	@Test
@@ -644,6 +657,23 @@ class DatabaseMigrationContainerTest {
 			UPDATE data_source_snapshots
 			SET coverage_count = -1
 			WHERE snapshot_id = 'lineage-root'
+			""")).isInstanceOf(DataAccessException.class);
+	}
+
+	private void assertPostgresqlSnapshotLineageIsAppendOnly(JdbcTemplate jdbcTemplate) {
+		assertThatThrownBy(() -> insertSnapshotChild(
+			jdbcTemplate,
+			"lineage-self",
+			"lineage-self-source",
+			"lineage-self"
+		)).isInstanceOf(DataAccessException.class);
+
+		insertSnapshot(jdbcTemplate, "lineage-cycle-root", "lineage-cycle-source");
+		insertSnapshotChild(jdbcTemplate, "lineage-cycle-child", "lineage-cycle-source", "lineage-cycle-root");
+		assertThatThrownBy(() -> jdbcTemplate.update("""
+			UPDATE data_source_snapshots
+			SET previous_snapshot_id = 'lineage-cycle-child'
+			WHERE snapshot_id = 'lineage-cycle-root'
 			""")).isInstanceOf(DataAccessException.class);
 	}
 

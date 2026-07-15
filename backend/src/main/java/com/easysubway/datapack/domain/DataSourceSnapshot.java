@@ -89,9 +89,10 @@ public record DataSourceSnapshot(
 		}
 		requireText(governancePolicyVersion, "governancePolicyVersion");
 		requireSha256(governancePolicySha256, "governancePolicySha256");
-		if ((previousSnapshotId == null) != (diffSummaryJson == null)) {
+		if ((previousSnapshotId == null) != (diffSummary == null)
+			|| (previousSnapshotId == null) != (diffSummaryJson == null)) {
 			throw new InvalidDataSourceSnapshotException(
-				"first snapshot must omit diffSummaryJson and later snapshots must include it."
+				"first snapshot must omit diffSummary and diffSummaryJson; later snapshots must include both."
 			);
 		}
 	}

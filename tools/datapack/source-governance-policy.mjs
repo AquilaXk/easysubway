@@ -400,9 +400,14 @@ function isSha256(value) {
 }
 
 function requiredHttpsUrl(value, label) {
+  const raw = requiredText(value, label);
+  if (!/^[A-Za-z0-9:/?#\[\]@!$&'()*+,;=._~%\-]+$/.test(raw)
+    || /%(?![0-9A-Fa-f]{2})/.test(raw)) {
+    throw new Error(`${label} must be a valid URL`);
+  }
   let url;
   try {
-    url = new URL(requiredText(value, label));
+    url = new URL(raw);
   } catch {
     throw new Error(`${label} must be a valid URL`);
   }

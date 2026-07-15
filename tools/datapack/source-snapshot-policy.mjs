@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
+import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
 
 export function requiredCredentialFreeObjectUri(value, label) {
   return parseCredentialFreeObjectUri(value, label).uri;
@@ -178,7 +179,8 @@ function validateDiffSnapshot(snapshot, label, allowLegacyRootCoverage = false) 
   if (allowLegacyRootCoverage
     && snapshot.coverageCount == null
     && snapshot.previousSnapshotId == null
-    && snapshot.diffSummary == null) {
+    && snapshot.diffSummary == null
+    && approvedLegacyGovernanceBinding(snapshot) != null) {
     return;
   }
   requiredNonNegativeInteger(snapshot.coverageCount, `${label}.coverageCount`);
@@ -187,7 +189,8 @@ function validateDiffSnapshot(snapshot, label, allowLegacyRootCoverage = false) 
 function requiredCoverageCount(snapshot, label) {
   if (snapshot.coverageCount == null
     && snapshot.previousSnapshotId == null
-    && snapshot.diffSummary == null) {
+    && snapshot.diffSummary == null
+    && approvedLegacyGovernanceBinding(snapshot) != null) {
     return requiredNonNegativeInteger(snapshot.rowCount, `${label} legacy rowCount`);
   }
   return requiredNonNegativeInteger(snapshot.coverageCount, label);

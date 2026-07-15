@@ -201,7 +201,7 @@ class DataSourceSnapshotAdminPageControllerTest {
 				.param("previousSnapshotId", "snapshot-kric-20260629")
 				.param("diffSummary", "이전 snapshot 대비 +12 rows")
 				.param("diffSummaryJson", "{\"status\":\"CHANGED\",\"rawHashChanged\":true,\"schemaHashChanged\":true,\"requestHashChanged\":true,\"sourceUpdatedAtChanged\":true,\"rowDelta\":12,\"coverageDelta\":12}")
-				.param("freshnessExpiresAt", "2026-07-07T03:00:00")
+				.param("freshnessExpiresAt", "2026-09-28T03:00:00")
 				.param("rawRetentionExpiresAt", RAW_RETENTION_EXPIRES_AT)
 				.param("governancePolicyVersion", GOVERNANCE_POLICY_VERSION)
 				.param("governancePolicySha256", GOVERNANCE_POLICY_SHA256)
@@ -287,7 +287,7 @@ class DataSourceSnapshotAdminPageControllerTest {
 				.param("previousSnapshotId", "snapshot-kric-20260629")
 				.param("diffSummary", "이전 snapshot 대비 +12 rows")
 				.param("diffSummaryJson", "{\"status\":\"CHANGED\",\"rawHashChanged\":true,\"schemaHashChanged\":true,\"requestHashChanged\":true,\"sourceUpdatedAtChanged\":true,\"rowDelta\":12,\"coverageDelta\":12}")
-				.param("freshnessExpiresAt", "2026-07-07T03:00:00")
+				.param("freshnessExpiresAt", "2026-09-28T03:00:00")
 				.param("rawRetentionExpiresAt", RAW_RETENTION_EXPIRES_AT)
 				.param("governancePolicyVersion", GOVERNANCE_POLICY_VERSION)
 				.param("governancePolicySha256", GOVERNANCE_POLICY_SHA256)
@@ -389,7 +389,7 @@ class DataSourceSnapshotAdminPageControllerTest {
 				?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE,
 				'snapshot-kric-20260629', '이전 snapshot 대비 +12 rows',
 				'{"status":"CHANGED","rawHashChanged":true,"schemaHashChanged":true,"requestHashChanged":true,"sourceUpdatedAtChanged":true,"rowDelta":12,"coverageDelta":12}',
-				'2026-07-07 03:00:00', '2026-09-28 03:00:00', '2026-07-15', ?)
+				'2026-09-28 03:00:00', '2026-09-28 03:00:00', '2026-07-15', ?)
 			""",
 			"d".repeat(64),
 			"e".repeat(64),
