@@ -6,6 +6,10 @@ const workflowPath = ".github/workflows/production-route-api-closure-evidence.ym
 const cdWorkflowPath = ".github/workflows/cd.yml";
 const snapshotGatePath = "tools/ops/route-search-purge-snapshot-gate.sh";
 const purgeSqlPath = "tools/ops/route-search-purge.sql";
+const postgresV51Path =
+  "backend/src/main/resources/db/migration/postgresql/V51__purge_unreferenced_route_search_results.sql";
+const h2V51Path =
+  "backend/src/main/resources/db/migration/h2/V51__purge_unreferenced_route_search_results.sql";
 
 test("production route API closure evidence는 현재 배포와 origin 403·row 불변을 검증한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -50,6 +54,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   const workflow = await readFile(workflowPath, "utf8");
   const snapshotGate = await readFile(snapshotGatePath, "utf8").catch(() => "");
   const purgeSql = await readFile(purgeSqlPath, "utf8").catch(() => "");
+  const postgresV51 = await readFile(postgresV51Path, "utf8");
+  const h2V51 = await readFile(h2V51Path, "utf8");
 
   assert.match(workflow, /tools\/ops\/route-search-purge-snapshot-gate\.sh/);
   assert.match(workflow, /tools\/ops\/route-search-purge\.sql/);
@@ -90,6 +96,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.doesNotMatch(snapshotGate, /if \[\[ -e "\$\{POSTGRES_V51\}" \|\| -e "\$\{H2_V51\}" \]\]/);
   assert.match(purgeSql, /^DELETE FROM route_search_results AS route/m);
   assert.doesNotMatch(purgeSql, /BEGIN|EXPLAIN|ROLLBACK/);
+  assert.equal(postgresV51, purgeSql);
+  assert.equal(h2V51, purgeSql);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore --clean --if-exists --no-owner --no-privileges/);
   assert.match(snapshotGate, /cat \/proc\/1\/comm/);
