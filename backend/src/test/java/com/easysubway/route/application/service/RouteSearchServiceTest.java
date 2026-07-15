@@ -1310,6 +1310,7 @@ class RouteSearchServiceTest {
 		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.LEGACY_GRAPH);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.STATIC_BACKEND_ESTIMATE);
 		assertThat(plan.itineraries().getFirst().warnings())
 			.extracting("code")

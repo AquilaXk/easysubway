@@ -3,6 +3,7 @@ package com.easysubway.route.application.service;
 import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableCandidateSource;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.SearchRouteV2Command;
@@ -80,14 +81,23 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 				if (timetableItineraries.isEmpty()) {
 					return noTimetableServicePlan(command);
 				}
-				timetableItineraries = routeSearchUseCase.stabilizeTimetableRouteCandidates(
+				var stabilizedCandidates = routeSearchUseCase.stabilizeTimetableRouteCandidatesWithSource(
 					searchRouteCommand,
 					RANKING_CANDIDATE_LIMIT,
 					command.alternativeCount(),
 					timetableItineraries,
 					candidates -> rankTimetableItineraries(candidates, command.alternativeCount())
 				);
-				return timetablePlan(timetableItineraries, statusesOf(timetableItineraries, command.useRealtime()));
+				timetableItineraries = stabilizedCandidates.itineraries();
+				return new RouteV2Plan(
+					timetableItineraries,
+					statusesOf(timetableItineraries, command.useRealtime()),
+					PLANNER_ADR,
+					null,
+					stabilizedCandidates.source() == TimetableCandidateSource.TIMETABLE_SCAN
+						? RouteV2PlanSource.TIMETABLE_RAPTOR
+						: RouteV2PlanSource.LEGACY_GRAPH
+				);
 			}
 			rejectUnsupportedMobilityPreset(command);
 			SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);

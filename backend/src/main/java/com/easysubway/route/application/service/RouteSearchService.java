@@ -2,6 +2,8 @@ package com.easysubway.route.application.service;
 
 import com.easysubway.profile.domain.MobilityType;
 import com.easysubway.route.application.port.in.RouteSearchUseCase;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableCandidateSelection;
+import com.easysubway.route.application.port.in.RouteSearchUseCase.TimetableCandidateSource;
 import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.SubmitRouteFeedbackCommand;
@@ -220,20 +222,43 @@ public class RouteSearchService implements RouteSearchUseCase {
 		List<RouteSearchResult> timetableResults,
 		UnaryOperator<List<RouteSearchResult>> selectCandidates
 	) {
+		return stabilizeTimetableRouteCandidatesWithSource(
+			command,
+			candidateCount,
+			alternativeCount,
+			timetableResults,
+			selectCandidates
+		).itineraries();
+	}
+
+	@Override
+	public TimetableCandidateSelection stabilizeTimetableRouteCandidatesWithSource(
+		SearchRouteCommand command,
+		int candidateCount,
+		int alternativeCount,
+		List<RouteSearchResult> timetableResults,
+		UnaryOperator<List<RouteSearchResult>> selectCandidates
+	) {
 		try {
 			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, candidateCount);
 			List<RouteSearchResult> selectedAccessibilityCheckedResults = selectCandidates.apply(accessibilityCheckedResults);
 			if (selectedAccessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
-				return List.copyOf(selectedAccessibilityCheckedResults);
+				return new TimetableCandidateSelection(
+					selectedAccessibilityCheckedResults,
+					TimetableCandidateSource.LEGACY_ACCESSIBILITY_CHECK
+				);
 			}
 		} catch (RouteNotFoundException | StationNotFoundException exception) {
 			// Timetable coverage can lead legacy graph coverage while #1400 closes the production graph gap.
 			log.debug("Legacy graph could not stabilize timetable route {} -> {}", command.originStationId(), command.destinationStationId(), exception);
 		}
-		return selectCandidates.apply(timetableResults)
-			.stream()
-			.map(this::ephemeralTimetableRouteResult)
-			.toList();
+		return new TimetableCandidateSelection(
+			selectCandidates.apply(timetableResults)
+				.stream()
+				.map(this::ephemeralTimetableRouteResult)
+				.toList(),
+			TimetableCandidateSource.TIMETABLE_SCAN
+		);
 	}
 
 	private RouteSearchResult ephemeralTimetableRouteResult(RouteSearchResult routeSearchResult) {
