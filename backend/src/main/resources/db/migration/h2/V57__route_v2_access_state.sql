@@ -23,7 +23,7 @@ CREATE TABLE route_v2_states (
 	transport_scope VARCHAR(40) NOT NULL,
 	requested_departure_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	itinerary_json TEXT NOT NULL,
-	timetable_artifact_id VARCHAR(200) NOT NULL,
+	timetable_artifact_id VARCHAR(160) NOT NULL,
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	planned_arrival_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	expires_at TIMESTAMP WITH TIME ZONE NOT NULL,

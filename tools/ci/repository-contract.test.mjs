@@ -12397,6 +12397,8 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const routeV2Port = read(routeV2PortPath);
   const postgresStateMigration = read("backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql");
   const h2StateMigration = read("backend/src/main/resources/db/migration/h2/V57__route_v2_access_state.sql");
+  const postgresArtifactIdMigration = read("backend/src/main/resources/db/migration/postgresql/V58__widen_route_v2_timetable_artifact_id.sql");
+  const h2ArtifactIdMigration = read("backend/src/main/resources/db/migration/h2/V58__widen_route_v2_timetable_artifact_id.sql");
   const v2Endpoint = controller.match(
     /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
@@ -12420,8 +12422,10 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.doesNotMatch(planner, /!command\.useRealtime\(\)/);
   assert.match(planner, /applyRealtimeToTimetableCandidates/);
   assert.match(routeV2Port, /applyRealtimeToTimetableCandidates/);
-  assert.match(postgresStateMigration, /timetable_artifact_id VARCHAR\(200\) NOT NULL/);
-  assert.match(h2StateMigration, /timetable_artifact_id VARCHAR\(200\) NOT NULL/);
+  assert.match(postgresStateMigration, /timetable_artifact_id VARCHAR\(160\) NOT NULL/);
+  assert.match(h2StateMigration, /timetable_artifact_id VARCHAR\(160\) NOT NULL/);
+  assert.match(postgresArtifactIdMigration, /ALTER COLUMN timetable_artifact_id TYPE VARCHAR\(200\)/);
+  assert.match(h2ArtifactIdMigration, /ALTER COLUMN timetable_artifact_id VARCHAR\(200\)/);
   assert.match(planner, /canUseTimetableRaptor/);
   assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
