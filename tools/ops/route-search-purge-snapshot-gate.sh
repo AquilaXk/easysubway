@@ -249,7 +249,9 @@ docker run -d --rm --pull never \
 
 ready=false
 for _ in $(seq 1 60); do
-	if docker exec "${restore_container}" pg_isready -U snapshot_gate -d easysubway_restore >/dev/null 2>&1; then
+	restore_init_process="$(docker exec "${restore_container}" cat /proc/1/comm 2>/dev/null || true)"
+	if [[ "${restore_init_process}" == "postgres" ]] \
+		&& docker exec "${restore_container}" pg_isready -U snapshot_gate -d easysubway_restore >/dev/null 2>&1; then
 		ready=true
 		break
 	fi
@@ -261,7 +263,7 @@ if [[ "${ready}" != "true" ]]; then
 fi
 
 docker exec -i "${restore_container}" \
-	pg_restore --no-owner --no-privileges -U snapshot_gate -d easysubway_restore \
+	pg_restore --clean --if-exists --no-owner --no-privileges -U snapshot_gate -d easysubway_restore \
 	< "${backup_file}"
 
 restore_psql() {
