@@ -5,6 +5,7 @@ import test from "node:test";
 const workflowPath = ".github/workflows/production-route-api-closure-evidence.yml";
 const cdWorkflowPath = ".github/workflows/cd.yml";
 const snapshotGatePath = "tools/ops/route-search-purge-snapshot-gate.sh";
+const rollbackRehearsalPath = "tools/ops/route-search-purge-rollback-rehearsal.sh";
 const purgeSqlPath = "tools/ops/route-search-purge.sql";
 const postgresV51Path =
   "backend/src/main/resources/db/migration/postgresql/V51__purge_unreferenced_route_search_results.sql";
@@ -249,4 +250,36 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   assert.notEqual(latchIndex, -1);
   assert.notEqual(mutationPreparationIndex, -1);
   assert.ok(latchIndex < mutationPreparationIndex, "snapshot evidence must gate production mutation");
+});
+
+test("V51 CD는 production mutation 전에 exact PR1 image rollback을 격리 rehearsal한다", async () => {
+  const workflow = await readFile(cdWorkflowPath, "utf8");
+  const rehearsal = await readFile(rollbackRehearsalPath, "utf8").catch(() => "");
+
+  assert.match(workflow, /CD Deploy \/ Rehearse PR1 image rollback after V51/);
+  assert.match(workflow, /bash tools\/ops\/route-search-purge-rollback-rehearsal\.sh/);
+  assert.match(workflow, /CURRENT_DEPLOYED_SHA: \$\{\{ steps\.route-purge\.outputs\.current_sha \}\}/);
+  const imagePullIndex = workflow.indexOf("CD Deploy / Pull backend image by digest");
+  const rehearsalIndex = workflow.indexOf("CD Deploy / Rehearse PR1 image rollback after V51");
+  const productionMutationIndex = workflow.indexOf("CD Deploy / Run local deployment");
+  assert.notEqual(imagePullIndex, -1);
+  assert.notEqual(rehearsalIndex, -1);
+  assert.notEqual(productionMutationIndex, -1);
+  assert.ok(imagePullIndex < rehearsalIndex);
+  assert.ok(rehearsalIndex < productionMutationIndex);
+
+  assert.match(rehearsal, /^set -euo pipefail$/m);
+  assert.match(rehearsal, /snapshot-\$\{DEPLOY_SHA\}\.env/);
+  assert.match(rehearsal, /docker network create --internal/);
+  assert.match(rehearsal, /pg_restore --clean --if-exists --no-owner --no-privileges/);
+  assert.match(rehearsal, /org\.opencontainers\.image\.revision/);
+  assert.match(rehearsal, /TARGET_IMAGE/);
+  assert.match(rehearsal, /PR1_IMAGE/);
+  assert.match(rehearsal, /schema_after[^\n]+== 51/);
+  assert.match(rehearsal, /ROLLBACK_BACKEND/);
+  assert.match(rehearsal, /ROLLBACK_WORKER/);
+  assert.match(rehearsal, /readiness=backend:200,back-worker:200/);
+  assert.match(rehearsal, /route_statuses=403\/403\/403/);
+  assert.match(rehearsal, /Flyway validation error/);
+  assert.doesNotMatch(rehearsal, /--publish|-p [0-9]/);
 });
