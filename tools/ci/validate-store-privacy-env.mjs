@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { appendFileSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 
@@ -218,6 +219,14 @@ function validateEnv(values, options = {}) {
   validateEmail("EASYSUBWAY_SUPPORT_EMAIL", selected.get("EASYSUBWAY_SUPPORT_EMAIL"));
   validateEmail("EASYSUBWAY_SECURITY_EMAIL", selected.get("EASYSUBWAY_SECURITY_EMAIL"));
   validateEmail("EASYSUBWAY_DATA_DELETION_EMAIL", selected.get("EASYSUBWAY_DATA_DELETION_EMAIL"));
+  selected.set(
+    "EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256",
+    createHash("sha256").update(JSON.stringify({
+      supportEmail: selected.get("EASYSUBWAY_SUPPORT_EMAIL"),
+      securityEmail: selected.get("EASYSUBWAY_SECURITY_EMAIL"),
+      dataDeletionEmail: selected.get("EASYSUBWAY_DATA_DELETION_EMAIL"),
+    })).digest("hex"),
+  );
 
   if (options.requireAndroidRcProduction) {
     validateAndroidRcProduction(values, selected);

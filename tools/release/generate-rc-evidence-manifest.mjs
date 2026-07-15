@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 
@@ -15,7 +17,13 @@ if (!outputPath) {
   fail("--output is required");
 }
 
-const testedAt = arg("testedAt", "tested-at") ?? new Date().toISOString();
+const nowArg = arg("now");
+const generatedAtMillis = nowArg === undefined ? Date.now() : Date.parse(nowArg);
+if (!Number.isFinite(generatedAtMillis)) {
+  fail("--now must be a valid timestamp");
+}
+const generatedAt = new Date(generatedAtMillis).toISOString();
+const testedAt = arg("testedAt", "tested-at") ?? generatedAt;
 const evidenceRoot = normalizeEvidenceRoot(
   arg("evidenceRoot", "evidence-root") ?? ".codex/evidence/release/rc-evidence-manifest/<rc-or-run>/",
 );
@@ -26,8 +34,17 @@ const dataPackManifestPath = resolvePath(
 const dataPackManifest = readJsonIfExists(dataPackManifestPath);
 const backendIdentity = readBackendIdentity(args);
 const gateStatuses = parsePairs(arg("gateStatus", "gate-status"));
+const evidenceStatuses = parsePairs(arg("evidenceStatus", "evidence-status"));
+const evidencePaths = parsePairs(arg("evidencePath", "evidence-path"));
 const expectedValues = parsePairs(args.expect);
+const androidReleaseMetadata = readKeyValueFileIfExists(arg("androidReleaseMetadata", "android-release-metadata"));
 const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
+const rcEvidenceContract = readJsonIfExists(
+  path.join(appRoot, "release/rc-evidence-manifest-contract.json"),
+);
+if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
+  fail("RC evidence manifest contract with requiredEvidenceEntries is required");
+}
 const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
   fail("production routing launch scope and identity matrix are required");
@@ -41,9 +58,13 @@ const identity = {
   appVersionName: appVersion.name,
   versionCode: appVersion.code,
   aabSha256: sha256FileIfExists(args.aab),
+  aabPayloadSha256: aabPayloadSha256IfExists(args.aab),
   backendImageDigest: backendIdentity.backendImageDigest,
   backendArtifactSha256: backendIdentity.backendArtifactSha256,
   dataPackManifestSha256: sha256FileIfExists(dataPackManifestPath),
+  supportContactSetSha256: arg("supportContactSetSha256", "support-contact-set-sha256")
+    ?? androidReleaseMetadata.supportContactSetSha256
+    ?? null,
   releaseSequence: arg("releaseSequence", "release-sequence") ?? dataPackManifest?.releaseSequence ?? dataPackManifest?.pack_version ?? null,
   routeContractVersion: arg("routeContractVersion", "route-contract-version") ?? "route-map-contract-v1",
   realtimeContractVersion: arg("realtimeContractVersion", "realtime-contract-version") ?? readRealtimeContractVersion(repoRoot),
@@ -54,9 +75,20 @@ const identity = {
   identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
 
-const evidenceEntries = requiredEvidenceEntries(testedAt, evidenceRoot, args.device, arg("androidVersion", "android-version"));
+const evidenceEntries = requiredEvidenceEntries(
+  testedAt,
+  evidenceRoot,
+  args.device,
+  arg("androidVersion", "android-version"),
+  evidenceStatuses,
+  evidencePaths,
+  generatedAt,
+  rcEvidenceContract.requiredEvidenceEntries,
+  { identity, repoRoot, androidApplicationId: "com.easysubway.app" },
+);
 const blockers = [
   ...identityBlockers(identity),
+  ...androidReleaseMetadataMismatchBlockers(identity, androidReleaseMetadata),
   ...expectedMismatchBlockers(identity, expectedValues),
   ...gateStatusBlockers(gateStatuses),
   ...openP0Blockers(arg("openAndroidP0Count", "open-android-p0-count")),
@@ -69,7 +101,7 @@ const manifest = {
   issue: 1020,
   applicationId: "easysubway",
   androidApplicationId: "com.easysubway.app",
-  generatedAt: new Date().toISOString(),
+  generatedAt,
   ...identity,
   rcIdentity: identity,
   evidenceEntries,
@@ -152,11 +184,42 @@ function sha256FileIfExists(filePath) {
   return createHash("sha256").update(readFileSync(resolved)).digest("hex");
 }
 
+function aabPayloadSha256IfExists(filePath) {
+  if (!filePath) return null;
+  const resolved = resolvePath(filePath);
+  if (!existsSync(resolved)) return null;
+  try {
+    const digest = execFileSync(process.execPath, [
+      path.join(repoRoot, "tools/release/hash-android-bundle-payload.mjs"),
+      "--aab",
+      resolved,
+    ], { encoding: "utf8", maxBuffer: 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] }).trim();
+    return /^[0-9a-f]{64}$/.test(digest) ? digest : null;
+  } catch {
+    return null;
+  }
+}
+
 function readJsonIfExists(filePath) {
   if (!filePath || !existsSync(filePath)) {
     return null;
   }
   return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function readKeyValueFileIfExists(filePath) {
+  if (!filePath) return {};
+  const resolved = resolvePath(filePath);
+  if (!existsSync(resolved)) return {};
+  return Object.fromEntries(readFileSync(resolved, "utf8")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf("=");
+      return separatorIndex === -1
+        ? [line, ""]
+        : [line.slice(0, separatorIndex), line.slice(separatorIndex + 1)];
+    }));
 }
 
 function readBackendIdentity(parsedArgs) {
@@ -208,29 +271,109 @@ function parsePairs(value) {
   }));
 }
 
-function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion) {
-  const sourceEntries = [
-    ["rc_device_qa", 571],
-    ["production_datapack", 547],
-    ["signed_rc_store_submission", 1015],
-    ["play_generated_install", 1016],
-    ["store_privacy_submission", 1018],
-    ["backend_operations", 1017],
-    ["post_launch_operations", 1019],
-    ["android_release_quality", 1021],
-    ["abuse_penetration_rehearsal", 1022],
-    ["container_hardening", 1914],
-  ];
-  return sourceEntries.map(([id, sourceIssue]) => ({
-    id,
-    sourceIssue,
-    device: device ?? "local_android_emulator",
-    androidVersion: androidVersion ?? "android-15-or-16",
-    testedAt: baseTestedAt,
-    evidencePaths: [`${rootPath}${id}/`],
-    expiresWhen: addDays(baseTestedAt, 14),
-    status: "PENDING_LOCAL_EVIDENCE",
-  }));
+function requiredEvidenceEntries(
+  baseTestedAt,
+  rootPath,
+  device,
+  androidVersion,
+  statuses,
+  paths,
+  generatedAt,
+  contractEntries,
+  validationContext,
+) {
+  const knownIds = new Set(contractEntries.map(({ id }) => id));
+  for (const id of [...Object.keys(statuses), ...Object.keys(paths)]) {
+    if (!knownIds.has(id)) fail(`Unknown evidence entry: ${id}`);
+  }
+  for (const [id, status] of Object.entries(statuses)) {
+    if (!["SATISFIED", "BLOCKED_EXTERNAL", "PENDING_LOCAL_EVIDENCE"].includes(status)) {
+      fail(`Invalid evidence status for ${id}: ${status}`);
+    }
+    if (status === "SATISFIED" && !paths[id]) {
+      fail(`SATISFIED evidence entry requires --evidence-path: ${id}`);
+    }
+    if (status === "SATISFIED" && !existsSync(resolvePath(paths[id]))) {
+      fail(`SATISFIED evidence path does not exist for ${id}: ${paths[id]}`);
+    }
+  }
+  return contractEntries.map(({ id, sourceIssue, expiresAfterDays }) => {
+    if (!id || !Number.isInteger(sourceIssue) || !Number.isInteger(expiresAfterDays) || expiresAfterDays <= 0) {
+      fail(`Invalid RC evidence contract entry: ${id ?? "<missing>"}`);
+    }
+    const evidencePaths = [`${rootPath}${id}/`];
+    if (paths[id]) evidencePaths.push(paths[id]);
+    const evidence = statuses[id] === "SATISFIED" ? readJsonIfExists(resolvePath(paths[id])) : null;
+    if (statuses[id] === "SATISFIED" && (
+      evidence?.evidenceValidity?.testedAt === undefined
+      || evidence?.evidenceValidity?.expiresWhen === undefined
+    )) {
+      fail(`SATISFIED evidence entry requires evidenceValidity.testedAt and evidenceValidity.expiresWhen: ${id}`);
+    }
+    const evidenceTestedAt = evidence?.evidenceValidity?.testedAt ?? baseTestedAt;
+    const evidenceExpiresWhen = evidence?.evidenceValidity?.expiresWhen ?? addDays(baseTestedAt, expiresAfterDays);
+    const maxEvidenceExpiresWhen = addDays(evidenceTestedAt, expiresAfterDays);
+    if (statuses[id] === "SATISFIED" && (
+      !Number.isFinite(Date.parse(evidenceTestedAt))
+      || !Number.isFinite(Date.parse(evidenceExpiresWhen))
+      || Date.parse(evidenceTestedAt) > Date.parse(generatedAt)
+      || Date.parse(evidenceExpiresWhen) < Date.parse(generatedAt)
+      || Date.parse(evidenceExpiresWhen) < Date.parse(baseTestedAt)
+      || Date.parse(evidenceExpiresWhen) < Date.parse(evidenceTestedAt)
+    )) {
+      fail(`SATISFIED evidence entry has invalid, future, or expired evidenceValidity: ${id}`);
+    }
+    if (statuses[id] === "SATISFIED" && Date.parse(evidenceExpiresWhen) > Date.parse(maxEvidenceExpiresWhen)) {
+      fail(`SATISFIED evidence entry exceeds the ${expiresAfterDays}-day evidence lifetime: ${id}`);
+    }
+    if (statuses[id] === "SATISFIED") {
+      validateSatisfiedEvidence(id, paths[id], generatedAt, validationContext);
+    }
+    return {
+      id,
+      sourceIssue,
+      device: device ?? "local_android_emulator",
+      androidVersion: androidVersion ?? "android-15-or-16",
+      testedAt: evidenceTestedAt,
+      evidencePaths,
+      expiresWhen: evidenceExpiresWhen,
+      status: statuses[id] ?? "PENDING_LOCAL_EVIDENCE",
+    };
+  });
+}
+
+function validateSatisfiedEvidence(id, evidencePath, generatedAt, context) {
+  if (id !== "post_launch_operations") {
+    fail(`SATISFIED evidence entry has no canonical validator: ${id}`);
+  }
+  const validationDir = mkdtempSync(path.join(tmpdir(), "easysubway-rc-evidence-validation-"));
+  const rcManifestPath = path.join(validationDir, "rc-evidence-manifest.json");
+  writeFileSync(rcManifestPath, `${JSON.stringify({
+    schemaVersion: 1,
+    releaseGate: "rc-evidence-manifest",
+    androidApplicationId: context.androidApplicationId,
+    rcIdentity: context.identity,
+  }, null, 2)}\n`);
+  let validationError = null;
+  try {
+    execFileSync(process.execPath, [
+      path.join(context.repoRoot, "tools/ops/validate-operations-release-summary.mjs"),
+      "--summary",
+      resolvePath(evidencePath),
+      "--rc-manifest",
+      rcManifestPath,
+      "--now",
+      generatedAt,
+      "--require-pass",
+    ], { cwd: context.repoRoot, stdio: "pipe" });
+  } catch (error) {
+    validationError = error.stderr?.toString().trim() || error.message;
+  } finally {
+    rmSync(validationDir, { recursive: true, force: true });
+  }
+  if (validationError) {
+    fail(`SATISFIED evidence entry failed canonical validation: ${id}: ${validationError}`);
+  }
 }
 
 function normalizeEvidenceRoot(rootPath) {
@@ -252,7 +395,9 @@ function identityBlockers(values) {
     "appVersionName",
     "versionCode",
     "aabSha256",
+    "aabPayloadSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",
@@ -283,6 +428,15 @@ function expectedMismatchBlockers(values, expected) {
       severity: "P0",
       reason: `${key} expected ${expectedValue} but got ${values[key] ?? "missing"}`,
     }));
+}
+
+function androidReleaseMetadataMismatchBlockers(values, metadata) {
+  if (!metadata.aabPayloadSha256 || metadata.aabPayloadSha256 === values.aabPayloadSha256) return [];
+  return [{
+    id: "mismatch_android_release_metadata_aabPayloadSha256",
+    severity: "P0",
+    reason: "aabPayloadSha256 in release metadata does not match the supplied AAB payload",
+  }];
 }
 
 function gateStatusBlockers(statuses) {

@@ -14,6 +14,128 @@
     ],
     "requiredPerSignalKo": "각 signal은 owner, threshold, first response와 함께 dashboard URL, alert route, runbook 또는 외부 blocker 기록 중 하나 이상을 RC evidence에 연결한다."
   },
+  "phaseAValidatedEvidence": [
+    {
+      "signalId": "backend_health_readiness_storage_datapack_report",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["actuator-readiness", "productionReadiness-health-group", "backend-log-review"],
+      "result": "PASS",
+      "redactionNotes": "summary only; sensitive values omitted",
+      "localEvidencePath": "apps/mobile/release/operations-release-evidence.json"
+    },
+    {
+      "signalId": "report_api_error_rate",
+      "resolutionKind": "alert-route",
+      "evidenceIds": ["admin-usage-api-error-rate", "report-controller-error-log"],
+      "result": "PASS",
+      "redactionNotes": "summary only; webhook URL omitted",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+    },
+    {
+      "signalId": "admin_review_latency",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["report-processing-time-summary", "review-audit-log"],
+      "result": "PASS",
+      "redactionNotes": "summary only; report records omitted",
+      "localEvidencePath": "apps/mobile/release/support-incident-response-gate.json"
+    },
+    {
+      "signalId": "datapack_release_publish_result",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["datapack-observability-artifact", "pack-version", "source-updated-at", "publish-result"],
+      "result": "PASS",
+      "redactionNotes": "summary only; provider values omitted",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
+    },
+    {
+      "signalId": "mobile_crash_free_rate",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["crash-free-session-dashboard-or-external-blocker"],
+      "result": "PASS",
+      "redactionNotes": "Phase A verifies the Play access and response runbook; live rate is recorded in Phase B",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/play-api-report.txt"
+    },
+    {
+      "signalId": "mobile_anr_rate",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["play-vitals-anr-or-external-blocker"],
+      "result": "PASS",
+      "redactionNotes": "Phase A verifies the Play access and response runbook; live rate is recorded in Phase B",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/play-api-report.txt"
+    },
+    {
+      "signalId": "mobile_app_start_failure_rate",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["release-app-start-smoke", "store-install-log"],
+      "result": "PASS",
+      "redactionNotes": "summary only; device identifier omitted",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json"
+    },
+    {
+      "signalId": "route_search_found_blocked_unknown_distribution",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["route-result-distribution", "route-engine-version"],
+      "result": "PASS",
+      "redactionNotes": "summary only; test data contains no personal data",
+      "localEvidencePath": "apps/mobile/release/route-commercialization-gate.json"
+    },
+    {
+      "signalId": "route_quality_observability_dashboard",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["route-quality-dashboard-url-or-external-blocker", "route-accuracy-report", "route-v2-contract-report"],
+      "result": "PASS",
+      "redactionNotes": "Phase A verifies the quality review runbook; live dashboard observations are recorded in Phase B",
+      "localEvidencePath": "apps/mobile/release/route-commercialization-gate.json"
+    },
+    {
+      "signalId": "datapack_install_rollback_failure_rate",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["datapack-updater-test", "rollback-log"],
+      "result": "PASS",
+      "redactionNotes": "summary only; drill inputs contain no credentials",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
+    },
+    {
+      "signalId": "realtime_provider_success_stale_timeout_latency_eta_error",
+      "resolutionKind": "alert-route",
+      "evidenceIds": ["provider-success-rate", "source-age", "timeout-count", "fallback-label-count-or-external-blocker"],
+      "result": "PASS",
+      "redactionNotes": "summary only; provider credentials and webhook URL omitted",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+    },
+    {
+      "signalId": "report_upload_failure_duplicate_orphan_cleanup_rate",
+      "resolutionKind": "alert-route",
+      "evidenceIds": ["report-upload-failure-count", "duplicate-claim-count", "orphan-cleanup-count"],
+      "result": "PASS",
+      "redactionNotes": "summary only; receipt tokens, upload URLs, and webhook URL omitted",
+      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+    },
+    {
+      "signalId": "cross_version_correlation_ids",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["app-datapack-route-provider-correlation", "release-metadata"],
+      "result": "PASS",
+      "redactionNotes": "summary only; public artifact identity only",
+      "localEvidencePath": ".github/workflows/release-artifacts.yml"
+    },
+    {
+      "signalId": "android_mapping_retention",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["android-mapping-artifact-retention"],
+      "result": "PASS",
+      "redactionNotes": "summary only; signing material omitted",
+      "localEvidencePath": ".github/workflows/release-artifacts.yml"
+    },
+    {
+      "signalId": "ios_dsym_retention",
+      "resolutionKind": "runbook",
+      "evidenceIds": ["ios-dsym-artifact-retention-deferred"],
+      "result": "PASS",
+      "redactionNotes": "Android-first scope; the iOS release gate remains deferred until an iOS release PR",
+      "localEvidencePath": "apps/mobile/release/signed-release-artifact-gate.json"
+    }
+  ],
   "sensitiveLogPolicy": {
     "forbidReceiptTokens": true,
     "forbidUploadUrls": true,
