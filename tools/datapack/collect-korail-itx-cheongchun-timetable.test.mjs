@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -11,6 +11,7 @@ import {
   collectKorailItxCheongchunTimetable,
   evaluateItxSnapshotAnomaly,
   materializeKorailItxRows,
+  promoteItxSourceCandidate,
   runKorailItxCompletenessCli,
   validateKorailItxPlans,
 } from "./collect-korail-itx-cheongchun-timetable.mjs";
@@ -161,12 +162,12 @@ test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission ar
     4, 5, 6, 7, 8, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
   ]);
   assert.deepEqual(artifact.selectedServiceDates, { "8": "20260715", "7": "20260718", "9": "20260719" });
-  assert.equal(artifact.admissionStatus, "ADMITTED");
-  assert.equal(artifact.admissionEligible, true);
-  assert.equal(artifact.snapshotDiff.status, "BASELINE_CREATED");
-  assert.equal(artifact.snapshotDiff.policyVersion, 1);
-  assert.equal(artifact.sourceTimetableArtifact.status, "ADMITTED");
-  assert.match(artifact.sourceTimetableArtifact.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(artifact.validationStatus, "SUPPORTED");
+  assert.equal(artifact.admissionStatus, "BOOTSTRAP_REVIEW_REQUIRED");
+  assert.equal(artifact.admissionEligible, false);
+  assert.equal(artifact.snapshotDiff.status, "BOOTSTRAP_REVIEW_REQUIRED");
+  assert.equal(artifact.snapshotDiff.policyVersion, "itx-snapshot-anomaly-v1");
+  assert.equal(artifact.sourceTimetableArtifact.status, "BOOTSTRAP_REVIEW_REQUIRED");
   assert.deepEqual(artifact.allowedConsumerIssues, ["#2145", "#1400", "#2098", "#2099", "#2058", "#2137"]);
   assert.equal(artifact.serviceDays.length, 3);
   assert.match(artifact.evidenceHash, /^[a-f0-9]{64}$/);
@@ -200,15 +201,15 @@ test("ITX snapshot anomaly gate는 동일 집합을 통과시키고 열차 소�
     serviceDays: [day("8"), day("7"), day("9")],
     previousArtifact,
   });
-  assert.equal(unchanged.status, "PASS");
+  assert.equal(unchanged.status, "SUPPORTED");
   assert.equal(unchanged.serviceDays.every(({ blocked }) => blocked === false), true);
 
   const missingTrain = evaluateItxSnapshotAnomaly({
     serviceDays: [day("8", ["2001"]), day("7"), day("9")],
     previousArtifact,
   });
-  assert.equal(missingTrain.status, "CHANGE_BLOCKED");
-  assert.deepEqual(missingTrain.serviceDays[0].removedTrainNumbers, ["2002"]);
+  assert.equal(missingTrain.status, "CHANGE_REVIEW_REQUIRED");
+  assert.deepEqual(missingTrain.serviceDays[0].sets.trainSet.removed, ["2002"]);
   assert.equal(missingTrain.serviceDays[0].blocked, true);
 });
 
@@ -230,7 +231,7 @@ test("ITX completeness는 이전 ADMITTED snapshot의 열차 소실을 SNAPSHOT_
   const blocked = await collectKorailItxCheongchunCompleteness({
     serviceKey: "key", serviceDates, packPath: PACK_PATH,
     now: new Date("2026-07-14T01:00:00.000Z"),
-    previousAdmittedArtifact: baseline,
+    previousAdmittedArtifact: { ...baseline, admissionStatus: "ADMITTED", admissionEligible: true },
     collectRosterImpl: async ({ serviceDate, kricServiceDayCode }) => ({
       ...trainNumberEvidence(),
       serviceDate,
@@ -240,11 +241,12 @@ test("ITX completeness는 이전 ADMITTED snapshot의 열차 소실을 SNAPSHOT_
     collectTimetableImpl,
   });
 
-  assert.equal(blocked.admissionStatus, "CHANGE_BLOCKED");
+  assert.equal(blocked.validationStatus, "SUPPORTED");
+  assert.equal(blocked.admissionStatus, "CHANGE_REVIEW_REQUIRED");
   assert.equal(blocked.admissionEligible, false);
-  assert.equal(blocked.serviceDays[0].failureStage, "SNAPSHOT_DIFF");
-  assert.equal(blocked.serviceDays[0].failureReasonCode, "SNAPSHOT_ANOMALY_BLOCKED");
-  assert.deepEqual(blocked.snapshotDiff.serviceDays[0].removedTrainNumbers, ["2002"]);
+  assert.equal(blocked.failureStage, "SNAPSHOT_DIFF");
+  assert.equal(blocked.failureReasonCode, "SNAPSHOT_ANOMALY_BLOCKED");
+  assert.deepEqual(blocked.snapshotDiff.serviceDays[0].sets.trainSet.removed, ["2002"]);
 });
 
 test("ITX completeness는 partial day·replay·provider 오류를 admission하지 않는다", async (context) => {
@@ -535,8 +537,18 @@ test("ITX CLI는 absolute previous ADMITTED artifact를 tracked parser로 전달
   const admitted = {
     schemaVersion: 2,
     artifactKind: "korail-itx-cheongchun-completeness-evidence",
-    admissionStatus: "ADMITTED",
-    admissionEligible: true,
+    observedAt: "2026-07-14T00:00:00.000Z",
+    validationMode: "ADMISSION",
+    validationStatus: "SUPPORTED",
+    admissionStatus: "BOOTSTRAP_REVIEW_REQUIRED",
+    admissionEligible: false,
+    selectedServiceDates: { "8": "20260715", "7": "20260718", "9": "20260719" },
+    sourceTimetableArtifact: {
+      status: "BOOTSTRAP_REVIEW_REQUIRED",
+      artifactId: "itx-cheongchun-source-timetable-20260714000000000",
+      freshUntil: "2026-07-20T00:00:00+09:00",
+    },
+    snapshotDiff: { status: "BOOTSTRAP_REVIEW_REQUIRED" },
     serviceDays: [],
   };
   try {
@@ -557,11 +569,71 @@ test("ITX CLI는 absolute previous ADMITTED artifact를 tracked parser로 전달
       env: { DATA_GO_KR_SERVICE_KEY: "secret" },
       now: new Date("2026-07-14T00:00:00.000Z"),
       collectImpl: async ({ previousAdmittedArtifact }) => {
-        assert.deepEqual(previousAdmittedArtifact, admitted);
+        assert.equal(previousAdmittedArtifact.artifactKind, "itx-cheongchun-source-timetable");
         return admitted;
       },
     });
     assert.equal(result.exitCode, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("ITX bootstrap promotion은 exact candidate SHA와 OWNER approval 뒤에만 immutable payload를 만든다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-"));
+  const candidatePath = path.join(dir, "candidate.json");
+  const contractPath = path.join(dir, "contract.json");
+  const sourceDir = path.join(dir, "sources");
+  const candidate = {
+    schemaVersion: 1,
+    artifactKind: "itx-cheongchun-source-timetable",
+    artifactId: "itx-cheongchun-source-timetable-20260715010000000",
+    observedAt: "2026-07-15T01:00:00.000Z",
+    freshUntil: "2026-07-20T00:00:00+09:00",
+    promotionStatus: "BOOTSTRAP_REVIEW_REQUIRED",
+  };
+  candidate.evidenceHash = createHash("sha256").update(JSON.stringify(candidate)).digest("hex");
+  const candidateBytes = `${JSON.stringify(candidate, null, 2)}\n`;
+  const digest = createHash("sha256").update(candidateBytes).digest("hex");
+  const approvalUrl = "https://github.com/AquilaXk/easysubway/issues/2135#issuecomment-123";
+  try {
+    await writeFile(candidatePath, candidateBytes);
+    await writeFile(contractPath, '{"schemaVersion":2}\n');
+    await assert.rejects(promoteItxSourceCandidate({
+      candidatePath,
+      approvedSha256: digest,
+      approvalUrl,
+      sourceOutputDir: sourceDir,
+      coverageContractPath: contractPath,
+      now: new Date("2026-07-20T00:00:00+09:00"),
+    }), /SOURCE_SNAPSHOT_EXPIRED/);
+    await assert.rejects(promoteItxSourceCandidate({
+      candidatePath,
+      approvedSha256: "0".repeat(64),
+      approvalUrl,
+      sourceOutputDir: sourceDir,
+      coverageContractPath: contractPath,
+      now: new Date("2026-07-15T02:00:00.000Z"),
+    }), /SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID/);
+
+    const promoted = await promoteItxSourceCandidate({
+      candidatePath,
+      approvedSha256: digest,
+      approvalUrl,
+      sourceOutputDir: sourceDir,
+      coverageContractPath: contractPath,
+      now: new Date("2026-07-15T02:00:00.000Z"),
+      fetchImpl: async () => new Response(JSON.stringify({
+        author_association: "OWNER",
+        body: `/approve-itx-bootstrap artifactId=${candidate.artifactId} sha256=${digest} policy=itx-snapshot-anomaly-v1`,
+        created_at: "2026-07-15T01:30:00.000Z",
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    });
+    assert.equal(promoted.candidateSha256, digest);
+    assert.deepEqual(await readFile(promoted.artifactPath), Buffer.from(candidateBytes));
+    const contract = JSON.parse(await readFile(contractPath, "utf8"));
+    assert.equal(contract.sourceTimetableArtifact.status, "ADMITTED");
+    assert.equal(contract.sourceTimetableArtifact.promotion.mode, "BOOTSTRAP_OWNER_APPROVED");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

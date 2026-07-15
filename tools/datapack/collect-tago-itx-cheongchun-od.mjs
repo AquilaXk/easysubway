@@ -337,9 +337,9 @@ export async function collectTagoItxCheongchunRoster({
   const catalogRequestCount = [trainGrades, cities, ...stationOperations]
     .reduce((total, operation) => total + operation.requestCount, 0);
   const remainingInitialRequestBudget = requestBudget.remaining;
-  const worstCaseOdRequestCount = matrix.expectedOdCount * 3;
-  if (worstCaseOdRequestCount > remainingInitialRequestBudget) {
-    throw new Error("TAGO OD quota budget exceeded");
+  const initialOdRequestCount = matrix.expectedOdCount;
+  if (initialOdRequestCount > remainingInitialRequestBudget) {
+    throw new Error("TAGO_QUOTA_BUDGET_EXHAUSTED");
   }
   const stationByProviderId = new Map(stations.map((station) => [station.providerStationId, station]));
   const odOperations = [];
@@ -367,7 +367,7 @@ export async function collectTagoItxCheongchunRoster({
       odOperations.push(operation);
       itineraries.push(...normalizedItineraries);
     } catch (error) {
-      if (error instanceof Error && error.message === "TAGO OD quota budget exceeded") throw error;
+      if (error instanceof Error && error.message === "TAGO_QUOTA_BUDGET_EXHAUSTED") throw error;
       const failure = tagoOdFailure(error);
       failedOds.push({
         departureStationId: departureStation.canonicalStationId,
@@ -401,7 +401,7 @@ export async function collectTagoItxCheongchunRoster({
       quotaSummary: {
         catalogRequestCount,
         remainingInitialRequestBudget,
-        worstCaseOdRequestCount,
+        initialOdRequestCount,
       },
       operations: [trainGrades, cities, ...stationOperations, ...odOperations].map(operationEvidence),
       trainNumbers: materialized?.trainNumbers ?? trainNumbers,
@@ -567,7 +567,7 @@ async function fetchWithRetry(url, fetchImpl, requestBudget) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       if (requestBudget) {
-        if (requestBudget.remaining <= 0) throw new Error("TAGO OD quota budget exceeded");
+        if (requestBudget.remaining <= 0) throw new Error("TAGO_QUOTA_BUDGET_EXHAUSTED");
         requestBudget.remaining -= 1;
       }
       const response = await fetchImpl(url, {
@@ -579,7 +579,7 @@ async function fetchWithRetry(url, fetchImpl, requestBudget) {
       if (!retryable || attempt === 2) return { response, attemptCount: attempt + 1 };
       if (response.body) await response.body.cancel().catch(() => {});
     } catch (error) {
-      if (error instanceof Error && error.message === "TAGO OD quota budget exceeded") throw error;
+      if (error instanceof Error && error.message === "TAGO_QUOTA_BUDGET_EXHAUSTED") throw error;
       if (attempt === 2) throw new Error("TAGO transport failure", { cause: error });
     }
   }

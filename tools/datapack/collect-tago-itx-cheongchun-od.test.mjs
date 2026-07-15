@@ -532,7 +532,7 @@ test("TAGO 공유 quota는 paginated OD의 실제 retry attempt마다 차감한�
       };
       return tagoResponse(pageNo === "1" ? Array.from({ length: 100 }, () => row) : [row], 101);
     },
-  }), /TAGO OD quota budget exceeded/);
+  }), /TAGO_QUOTA_BUDGET_EXHAUSTED/);
   assert.equal(actualRequestCount, 10);
   assert.deepEqual([...attempts.values()], [3, 3]);
 });
