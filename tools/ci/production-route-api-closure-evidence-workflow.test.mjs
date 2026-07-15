@@ -201,11 +201,15 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
 test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 중단한다", async () => {
   const workflow = await readFile(cdWorkflowPath, "utf8");
 
-  assert.match(workflow, /CD Deploy \/ Set up Node\.js/);
+  const nodeSetupStep = workflow.match(
+    /- name: CD Deploy \/ Set up Node\.js[\s\S]*?(?=\n\s+- name:)/,
+  )?.[0] ?? "";
+  assert.notEqual(nodeSetupStep, "", "the CD Deploy Node.js setup step must exist");
   assert.match(
-    workflow,
-    /CD Deploy \/ Set up Node\.js[\s\S]*?actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*?node-version: "24"/,
+    nodeSetupStep,
+    /uses: actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/,
   );
+  assert.match(nodeSetupStep, /node-version: "24"/);
   assert.match(workflow, /CD Deploy \/ Detect route purge migration/);
   assert.match(
     workflow,
