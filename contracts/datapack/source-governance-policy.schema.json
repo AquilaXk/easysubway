@@ -87,8 +87,8 @@
             "properties": {
               "status": { "enum": ["APPROVED", "REVIEW_REQUIRED", "BLOCKED", "EXPIRED"] },
               "termsHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-              "reviewedAt": { "type": "string", "format": "date-time" },
-              "nextReviewAt": { "type": "string", "format": "date-time" },
+              "reviewedAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+              "nextReviewAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
               "termsUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
               "reviewedProvider": { "type": "string", "pattern": ".+" },
               "reviewedDatasetUrl": { "type": "string", "format": "uri", "pattern": "^https://" },

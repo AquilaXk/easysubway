@@ -54,7 +54,7 @@ export function validateSourceGovernanceContracts(
   try {
     validateSourceGovernancePolicy({ policy: governancePolicy, inventory, freshnessPolicy });
   } catch (error) {
-    errors.push(`${SOURCE_GOVERNANCE_POLICY_PATH}: ${error instanceof Error ? error.message : String(error)}`);
+    errors.push(`source-governance: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

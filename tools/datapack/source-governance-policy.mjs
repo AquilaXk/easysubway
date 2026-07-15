@@ -306,7 +306,7 @@ function requiredRole(value, label) {
 }
 
 function requiredIdentifier(value, label) {
-  if (typeof value !== "string" || !/^[a-z][a-z0-9_-]*$/.test(value)) {
+  if (typeof value !== "string" || !/^[a-z][a-z0-9_]*$/.test(value)) {
     throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}`);
   }
   return value;

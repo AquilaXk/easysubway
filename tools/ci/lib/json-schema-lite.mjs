@@ -67,21 +67,32 @@ function matchesFormat(format, value) {
     return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
   }
   if (format === "date-time") {
-    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/.exec(value);
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/.exec(value);
     if (!match) return false;
-    const millis = Date.parse(value);
-    const normalized = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.${(match[7] ?? "").padEnd(3, "0")}Z`;
-    return Number.isFinite(millis) && new Date(millis).toISOString() === normalized;
+    const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+    const offset = match[7];
+    const maxDay = [31, isLeapYear(year) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+    if (month < 1 || month > 12 || day < 1 || day > maxDay
+      || hour > 23 || minute > 59 || second > 59) return false;
+    if (offset !== "Z") {
+      const [offsetHour, offsetMinute] = offset.slice(1).split(":").map(Number);
+      if (offsetHour > 23 || offsetMinute > 59) return false;
+    }
+    return true;
   }
   if (format === "uri") {
     try {
       const parsed = new URL(value);
-      return parsed.protocol !== "" && parsed.hostname !== "";
+      return parsed.protocol !== "";
     } catch {
       return false;
     }
   }
   throw new Error(`json-schema-lite: 미지원 format '${format}'`);
+}
+
+function isLeapYear(year) {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
 
 function validateObject(schema, value, path, errors) {

@@ -96,6 +96,8 @@
           },
           "admissionEvidence": {
             "type": "object",
+            "description": "승격 단계별 sanitized evidence를 보존하는 확장 envelope이며 licenseEvidenceHash만 공통 필수다.",
+            "additionalProperties": true,
             "required": ["licenseEvidenceHash"],
             "properties": {
               "licenseEvidenceHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }

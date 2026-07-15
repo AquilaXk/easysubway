@@ -370,7 +370,7 @@ function governancePolicy() {
     }],
     sources: [{
       sourceId: "source-a",
-      sourceClassId: "static-network",
+      sourceClassId: "static_network",
       retentionClassId: "standard-90d",
       ownerRole: "datapack-source-owner",
       stewardRole: "datapack-data-steward",
@@ -396,7 +396,7 @@ function freshnessPolicyFixture() {
   return {
     clockSkewSeconds: 0,
     sourceClasses: [{
-      id: "static-network",
+      id: "static_network",
       sourceIds: ["source-a"],
       basisField: "retrievedAt",
       reverificationCadence: "P30D",

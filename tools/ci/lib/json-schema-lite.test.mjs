@@ -72,12 +72,23 @@ test("date·date-time·uri format은 달력과 URL 구조까지 검증한다", (
 
   assert.equal(validateSchema(schema, {
     policyVersion: "2026-07-15",
-    reviewedAt: "2026-07-15T00:00:00Z",
+    reviewedAt: "2026-07-15T09:00:00.123456+09:00",
     termsUrl: "https://example.invalid/terms",
   }).ok, true);
   assert.equal(validateSchema(schema, {
     policyVersion: "2026-02-31",
+    reviewedAt: "2026-07-15T00:00:00Z",
+    termsUrl: "https://example.invalid/terms",
+  }).ok, false);
+  assert.equal(validateSchema(schema, {
+    policyVersion: "2026-07-15",
     reviewedAt: "2026-07-15T25:00:00Z",
+    termsUrl: "https://example.invalid/terms",
+  }).ok, false);
+  assert.equal(validateSchema(schema, {
+    policyVersion: "2026-07-15",
+    reviewedAt: "2026-07-15T00:00:00Z",
     termsUrl: "https://",
   }).ok, false);
+  assert.equal(validateSchema({ type: "string", format: "uri" }, "urn:example:source").ok, true);
 });

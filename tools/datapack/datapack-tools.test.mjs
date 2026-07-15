@@ -8033,8 +8033,6 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
       "s3://easysubway-datapack-sources/kric-train-operation-organ/20260702.json",
       "--freshness-expires-at",
       "2026-08-01T00:00:00Z",
-      "--raw-retention-expires-at",
-      "2026-09-30T00:00:00Z",
       "--admin-review",
       adminReviewPath,
       "--output-inventory",
