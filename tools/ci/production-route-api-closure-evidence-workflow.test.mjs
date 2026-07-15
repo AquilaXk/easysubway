@@ -50,6 +50,7 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(workflow, /snapshot-gate:[\s\S]*runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*environment: production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*group: cd-production-deploy/);
+  assert.match(workflow, /snapshot-gate:[\s\S]*Checkout reviewed main[\s\S]*persist-credentials: false/);
   assert.doesNotMatch(workflow, /upload-artifact|workflow_dispatch/);
 
   assert.match(snapshotGate, /^set -euo pipefail$/m);
@@ -61,6 +62,11 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore/);
   assert.match(snapshotGate, /--pull never/);
+  assert.match(snapshotGate, /--cpus "\$\{RESTORE_CPU_LIMIT\}"/);
+  assert.match(snapshotGate, /--memory "\$\{RESTORE_MEMORY_LIMIT\}"/);
+  assert.match(snapshotGate, /--memory-swap "\$\{RESTORE_MEMORY_LIMIT\}"/);
+  assert.match(snapshotGate, /--pids-limit "\$\{RESTORE_PIDS_LIMIT\}"/);
+  assert.match(snapshotGate, /restore resource limits/);
   assert.match(snapshotGate, /EXPLAIN \(ANALYZE, BUFFERS, WAL/);
   assert.match(snapshotGate, /ROLLBACK/);
   assert.match(snapshotGate, /favorite_routes/);

@@ -6,6 +6,9 @@ umask 077
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
 DEPLOY_COMPOSE_PROJECT="${DEPLOY_COMPOSE_PROJECT:-easysubway}"
+RESTORE_CPU_LIMIT="1"
+RESTORE_MEMORY_LIMIT="2g"
+RESTORE_PIDS_LIMIT="256"
 
 if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
 	printf 'DEPLOY_ROOT is invalid\n' >&2
@@ -129,6 +132,10 @@ docker volume create "${restore_volume}" >/dev/null
 docker run -d --rm --pull never \
 	--name "${restore_container}" \
 	--network none \
+	--cpus "${RESTORE_CPU_LIMIT}" \
+	--memory "${RESTORE_MEMORY_LIMIT}" \
+	--memory-swap "${RESTORE_MEMORY_LIMIT}" \
+	--pids-limit "${RESTORE_PIDS_LIMIT}" \
 	--volume "${restore_volume}:/var/lib/postgresql/data" \
 	-e POSTGRES_DB=easysubway_restore \
 	-e POSTGRES_USER=snapshot_gate \
@@ -303,6 +310,7 @@ report_file="${EVIDENCE_DIR}/report-${backup_sha256:0:12}.md"
 	echo "- 2x safety execution/wall: \`${adjusted_execution_ms} ms/${adjusted_wall_ms} ms\`"
 	echo "- WAL bytes: \`${wal_bytes}\`"
 	echo '- restore isolation: same host/image/storage driver, separate Docker volume, no network or published port'
+	echo "- restore resource limits: \`${RESTORE_CPU_LIMIT} CPU, ${RESTORE_MEMORY_LIMIT} memory/no swap, ${RESTORE_PIDS_LIMIT} pids\`"
 	echo '- budget decision: pending explicit owner approval of 30 seconds and 256 MiB'
 	echo
 	echo '<details><summary>Sanitized EXPLAIN plan</summary>'
