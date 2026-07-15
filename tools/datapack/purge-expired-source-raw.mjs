@@ -9,6 +9,7 @@ import {
   deriveRawRetentionExpiresAt,
   isValidLegalHold,
 } from "./source-governance-policy.mjs";
+import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
 import {
   parseCredentialFreeObjectUri,
   requiredObjectKey,
@@ -317,10 +318,17 @@ export function buildPurgePlan({
     if (new Date(storedMillis).toISOString() !== derivedExpiry) {
       throw new Error("RAW_RETENTION_OVERDUE: retention derivation mismatch");
     }
-    if (evidence.rawRetentionExpiresMillis !== storedMillis
+    const approvedLegacyBinding = evidence.governancePolicyVersion == null
+      ? evidence.approvedLegacyGovernanceBinding
+      : null;
+    if ((evidence.rawRetentionExpiresMillis !== storedMillis && approvedLegacyBinding == null)
       || (evidence.governancePolicyVersion != null && (
         evidence.governancePolicyVersion !== entry.governancePolicyVersion
         || evidence.governancePolicySha256 !== entry.governancePolicySha256
+      ))
+      || (approvedLegacyBinding != null && (
+        approvedLegacyBinding.governancePolicyVersion !== entry.governancePolicyVersion
+        || approvedLegacyBinding.governancePolicySha256 !== entry.governancePolicySha256
       ))) {
       throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence mismatch");
     }
@@ -393,6 +401,9 @@ function snapshotBindings(snapshots, expectedSourceAuthority) {
       ),
       governancePolicyVersion,
       governancePolicySha256,
+      approvedLegacyGovernanceBinding: governancePolicyVersion == null
+        ? approvedLegacyGovernanceBinding(snapshot)
+        : null,
     });
   }
   return bindings;

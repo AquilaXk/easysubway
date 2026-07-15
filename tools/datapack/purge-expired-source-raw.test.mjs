@@ -8,7 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { deleteExpiredItems } from "./purge-expired-source-raw.mjs";
+import { buildPurgePlan, deleteExpiredItems } from "./purge-expired-source-raw.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -538,6 +538,73 @@ test("legacy snapshot은 저장된 retention expiry가 ledger와 같은 경우�
     assert.deepEqual(report.deleted.map((entry) => entry.snapshotId), ["legacy"]);
     assert.deepEqual(requests, ["/raw/legacy.json"]);
   });
+});
+
+test("exact-hash 승인 legacy snapshot은 현행 policy로 파생한 retention expiry를 적용한다", async () => {
+  const [snapshot] = JSON.parse(await readFile(path.join(root, "tools/datapack/release/source-snapshots.json"), "utf8"));
+  const policyText = await readFile(path.join(root, "tools/datapack/source-governance-policy.json"), "utf8");
+  const policy = JSON.parse(policyText);
+  const rawRetentionExpiresAt = "2026-10-10T00:00:00.000Z";
+  const objectKey = new URL(snapshot.rawObjectUri).pathname.slice(1);
+  const ledger = {
+    schemaVersion: 1,
+    artifactKind: "source-raw-retention-ledger",
+    evaluatedAt: "2026-10-11T00:00:00.000Z",
+    entries: [{
+      sourceId: snapshot.sourceId,
+      snapshotId: snapshot.snapshotId,
+      retrievedAt: snapshot.retrievedAt,
+      rawRetentionExpiresAt,
+      rawSha256: snapshot.rawSha256,
+      objectKey,
+      protectedBy: [],
+      legalHold: null,
+      governancePolicyVersion: policy.policyVersion,
+      governancePolicySha256: sha256(policyText),
+    }],
+  };
+
+  const plan = buildPurgePlan({
+    ledger,
+    snapshots: [snapshot],
+    policyFiles: [{ policy, sha256: sha256(policyText) }],
+    evaluationAt: ledger.evaluatedAt,
+    evaluatedMillis: Date.parse(ledger.evaluatedAt),
+    baseUrl: new URL("https://objects.example.invalid/authorized/"),
+    sourceAuthority: "s3://easysubway-datapack-sources",
+  });
+
+  assert.equal(snapshot.rawRetentionExpiresAt, "2099-10-01T00:00:00Z");
+  assert.deepEqual(plan.map(({ snapshotId, disposition }) => ({ snapshotId, disposition })), [{
+    snapshotId: snapshot.snapshotId,
+    disposition: "DELETE",
+  }]);
+
+  const tamperedSnapshot = { ...snapshot, provider: `${snapshot.provider}-tampered` };
+  assert.throws(() => buildPurgePlan({
+    ledger,
+    snapshots: [tamperedSnapshot],
+    policyFiles: [{ policy, sha256: sha256(policyText) }],
+    evaluationAt: ledger.evaluatedAt,
+    evaluatedMillis: Date.parse(ledger.evaluatedAt),
+    baseUrl: new URL("https://objects.example.invalid/authorized/"),
+    sourceAuthority: "s3://easysubway-datapack-sources",
+  }), /snapshot evidence mismatch/);
+
+  const unapprovedPolicy = { ...policy, policyVersion: "2026-07-16" };
+  const unapprovedPolicyText = `${JSON.stringify(unapprovedPolicy, null, 2)}\n`;
+  const unapprovedLedger = structuredClone(ledger);
+  unapprovedLedger.entries[0].governancePolicyVersion = unapprovedPolicy.policyVersion;
+  unapprovedLedger.entries[0].governancePolicySha256 = sha256(unapprovedPolicyText);
+  assert.throws(() => buildPurgePlan({
+    ledger: unapprovedLedger,
+    snapshots: [snapshot],
+    policyFiles: [{ policy: unapprovedPolicy, sha256: sha256(unapprovedPolicyText) }],
+    evaluationAt: ledger.evaluatedAt,
+    evaluatedMillis: Date.parse(ledger.evaluatedAt),
+    baseUrl: new URL("https://objects.example.invalid/authorized/"),
+    sourceAuthority: "s3://easysubway-datapack-sources",
+  }), /snapshot evidence mismatch/);
 });
 
 test("snapshot raw URI의 dot-segment는 URL 정규화 전에 거부한다", async () => {
