@@ -993,6 +993,12 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /Buildx metadata digest does not match the pushed manifest/);
   assert.match(workflow, /backend-image-evidence/);
   assert.match(workflow, /docker buildx imagetools inspect "\$\{tag\}" --raw/);
+  assert.match(workflow, /--format '\{\{\.Manifest\.Digest\}\}'/);
+  assert.match(
+    workflow,
+    /--format '\{\{range \.Manifest\.Manifests\}\}\{\{if eq \.Platform\.OS "linux"\}\}\{\{\.Platform\.OS\}\}\/\{\{\.Platform\.Architecture\}\}/,
+  );
+  assert.doesNotMatch(workflow, /\.Manifest\.digest|\.Manifest\.manifests|\.platform\.(?:os|architecture)/);
   assert.match(workflow, /printf 'base_image=%s\\n' "\$\{base_image\}"/);
   assert.match(workflow, /printf 'image_digest=%s\\n' "\$\{digest\}"/);
   assert.match(workflow, /name: backend-image-identity-\$\{\{ needs\.plan\.outputs\.sha \}\}/);
