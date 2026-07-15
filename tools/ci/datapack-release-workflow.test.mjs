@@ -146,6 +146,8 @@ test("scheduled publish는 명시적 opt-in과 승인된 입력 경로 없이는
   assert.match(yml, /SCHEDULED_ANDROID_EVIDENCE_PATH/);
   assert.match(yml, /SCHEDULED_STRICT_ROUTE_REGRESSION_PATH/);
   assert.match(yml, /scheduled production publish requires configured approval evidence/);
+  assert.doesNotMatch(yml, /SCHEDULED_SOURCE_GOVERNANCE_EVALUATION_AT/);
+  assert.match(yml, /scheduled production publish requires a fresh protection evidence pipeline/);
   assert.match(yml, /steps\.release-mode\.outputs\.release_request_id/);
 });
 

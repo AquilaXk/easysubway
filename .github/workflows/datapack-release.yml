@@ -132,7 +132,6 @@ jobs:
           SCHEDULED_RELEASE_REQUEST_ID: ${{ vars.DATAPACK_SCHEDULED_RELEASE_REQUEST_ID }}
           SCHEDULED_ANDROID_EVIDENCE_PATH: ${{ vars.DATAPACK_SCHEDULED_ANDROID_EVIDENCE_PATH }}
           SCHEDULED_STRICT_ROUTE_REGRESSION_PATH: ${{ vars.DATAPACK_SCHEDULED_STRICT_ROUTE_REGRESSION_PATH }}
-          SCHEDULED_SOURCE_GOVERNANCE_EVALUATION_AT: ${{ vars.DATAPACK_SCHEDULED_SOURCE_GOVERNANCE_EVALUATION_AT }}
         run: |
           set -euo pipefail
           mode="${MODE_INPUT:-exploratory}"
@@ -153,7 +152,6 @@ jobs:
             release_request_id="${SCHEDULED_RELEASE_REQUEST_ID:-}"
             android_evidence_path="${SCHEDULED_ANDROID_EVIDENCE_PATH:-}"
             strict_route_regression_path="${SCHEDULED_STRICT_ROUTE_REGRESSION_PATH:-}"
-            source_governance_evaluation_at="${SCHEDULED_SOURCE_GOVERNANCE_EVALUATION_AT:-}"
             if [[ -z "${build_spec}" || -z "${release_request_id}" || -z "${android_evidence_path}" || -z "${strict_route_regression_path}" ]]; then
               echo "scheduled production publish requires configured approval evidence" >&2
               exit 1
@@ -206,6 +204,9 @@ jobs:
               requireHash(buildSpec[field], `buildSpec.${field}`);
             }
             if (buildSpec.sourceRawPurgeReportPath) {
+              if (process.env.GITHUB_EVENT_NAME === "schedule") {
+                throw new Error("scheduled production publish requires a fresh protection evidence pipeline");
+              }
               if (!sourceGovernanceEvaluationAt || !Number.isFinite(Date.parse(sourceGovernanceEvaluationAt))) {
                 throw new Error("sourceGovernanceEvaluationAt is required with sourceRawPurgeReportPath");
               }

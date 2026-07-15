@@ -172,6 +172,46 @@ test("GET 뒤 authoritative ledger가 보호 상태로 바뀌면 DELETE를 중�
   });
 });
 
+test("여러 DELETE 중 보호 재검증이 실패해도 완료 결과를 hash-bound FAIL report로 남긴다", async () => {
+  await withFixture(async ({ baseUrl, getHooks, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [
+      rawEntry("first", "raw/first.json"),
+      rawEntry("second", "raw/second.json"),
+    ]);
+    objects.add("/raw/first.json");
+    objects.add("/raw/second.json");
+    let getCount = 0;
+    getHooks.push(async () => {
+      getCount += 1;
+      if (getCount !== 2) return;
+      const ledger = JSON.parse(await readFile(files.ledger, "utf8"));
+      ledger.entries.find((entry) => entry.snapshotId === "second").protectedBy = ["ACTIVE_RELEASE"];
+      await writeFile(files.ledger, `${JSON.stringify(ledger, null, 2)}\n`);
+    });
+    const output = path.join(workDir, "partial-failure.json");
+
+    await assert.rejects(
+      runPurge({ ...files, baseUrl, output }),
+      /ledger sha256 mismatch|protection changed/i,
+    );
+
+    const report = JSON.parse(await readFile(output, "utf8"));
+    assert.equal(report.decision, "FAIL");
+    assert.match(report.completedAt, /Z$/);
+    assert.deepEqual(report.deleted.map((entry) => entry.snapshotId), ["first"]);
+    assert.deepEqual(report.failed.map((entry) => entry.snapshotId), ["second"]);
+    assert.deepEqual(report.reasonCodes, ["RAW_RETENTION_OVERDUE"]);
+    assert.equal(
+      report.reportSha256,
+      sha256(JSON.stringify({ ...report, reportSha256: undefined })),
+    );
+    assert.equal(report.auditJournalSha256, sha256(await readFile(`${output}.journal`)));
+    assert.deepEqual(requests, ["/raw/first.json"]);
+    assert.equal(objects.has("/raw/first.json"), false);
+    assert.equal(objects.has("/raw/second.json"), true);
+  });
+});
+
 test("실제 DELETE는 env-injected snapshot evidence hash로 승인 bytes를 고정한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);

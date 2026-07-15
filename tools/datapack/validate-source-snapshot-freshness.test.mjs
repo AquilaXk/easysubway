@@ -187,6 +187,38 @@ test("PASS purge report를 snapshot별 완료 evidence로 검증해 변환한다
   );
 });
 
+test("FAIL purge report도 완료된 삭제 증거만 소비하고 실패 항목은 미완료로 남긴다", () => {
+  const report = purgeReport([
+    { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) },
+  ]);
+  report.decision = "FAIL";
+  report.failed = [
+    { sourceId: "source-b", snapshotId: "snapshot-b", rawSha256: "b".repeat(64) },
+  ];
+  report.reasonCodes = ["RAW_RETENTION_OVERDUE"];
+  report.reportSha256 = createHash("sha256")
+    .update(JSON.stringify({ ...report, reportSha256: undefined }))
+    .digest("hex");
+
+  const evidence = purgeEvidenceBySnapshot(report);
+
+  assert.equal(evidence.has("source-a\0snapshot-a"), true);
+  assert.equal(evidence.has("source-b\0snapshot-b"), false);
+  const missingReason = { ...report, reasonCodes: [] };
+  missingReason.reportSha256 = createHash("sha256")
+    .update(JSON.stringify({ ...missingReason, reportSha256: undefined }))
+    .digest("hex");
+  assert.throws(() => purgeEvidenceBySnapshot(missingReason), /purge report/);
+  const duplicated = {
+    ...report,
+    failed: [{ sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) }],
+  };
+  duplicated.reportSha256 = createHash("sha256")
+    .update(JSON.stringify({ ...duplicated, reportSha256: undefined }))
+    .digest("hex");
+  assert.throws(() => purgeEvidenceBySnapshot(duplicated), /duplicate snapshot/);
+});
+
 test("PASS purge report의 검증된 protection을 snapshot governance 입력으로 변환한다", () => {
   const report = purgeReport([]);
   report.protected = [{

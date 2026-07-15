@@ -278,15 +278,22 @@ export function purgeEvidenceBySnapshot(report) {
   } catch {
     // The identity check below reports one stable contract error.
   }
+  const pass = report?.decision === "PASS"
+    && Array.isArray(report.reasonCodes)
+    && report.reasonCodes.length === 0
+    && Array.isArray(report.failed)
+    && report.failed.length === 0;
+  const partialFailure = report?.decision === "FAIL"
+    && Array.isArray(report.reasonCodes)
+    && report.reasonCodes.length === 1
+    && report.reasonCodes[0] === "RAW_RETENTION_OVERDUE"
+    && Array.isArray(report.failed)
+    && report.failed.length > 0;
   if (report?.schemaVersion !== 1
     || report?.artifactKind !== "source-raw-purge-report"
     || report.dryRun !== false
-    || report.decision !== "PASS"
     || report.reportSha256 !== expectedHash
-    || !Array.isArray(report.reasonCodes)
-    || report.reasonCodes.length !== 0
-    || !Array.isArray(report.failed)
-    || report.failed.length !== 0
+    || (!pass && !partialFailure)
     || !Number.isFinite(completedMillis)
     || !Number.isFinite(evaluatedMillis)
     || completedMillis < evaluatedMillis
@@ -297,14 +304,16 @@ export function purgeEvidenceBySnapshot(report) {
   }
   const purgedAt = new Date(completedMillis).toISOString();
   const evidence = new Map();
+  const seen = new Set();
   for (const entry of [...report.deleted, ...report.alreadyAbsent]) {
     const sourceId = requiredString(entry?.sourceId, "purge report sourceId");
     const snapshotId = requiredString(entry?.snapshotId, "purge report snapshotId");
     const rawSha256 = requiredSha256(entry?.rawSha256, "purge report rawSha256");
     const key = `${sourceId}\0${snapshotId}`;
-    if (evidence.has(key)) {
+    if (seen.has(key)) {
       throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report duplicate snapshot");
     }
+    seen.add(key);
     evidence.set(key, { sourceId, snapshotId, rawSha256, purgedAt });
   }
   for (const entry of report.protected) {
@@ -314,7 +323,7 @@ export function purgeEvidenceBySnapshot(report) {
     const protectedBy = entry?.protectedBy;
     const legalHold = entry?.legalHold ?? null;
     const key = `${sourceId}\0${snapshotId}`;
-    if (evidence.has(key)
+    if (seen.has(key)
       || !Array.isArray(protectedBy)
       || new Set(protectedBy).size !== protectedBy.length
       || !protectedBy.every((reason) => RELEASE_PROTECTION_REASONS.has(reason))
@@ -322,6 +331,7 @@ export function purgeEvidenceBySnapshot(report) {
       || (legalHold != null && (typeof legalHold !== "object" || Array.isArray(legalHold)))) {
       throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report protection");
     }
+    seen.add(key);
     evidence.set(key, {
       sourceId,
       snapshotId,
@@ -330,6 +340,16 @@ export function purgeEvidenceBySnapshot(report) {
       legalHold,
       protectedAt: new Date(evaluatedMillis).toISOString(),
     });
+  }
+  for (const entry of report.failed) {
+    const sourceId = requiredString(entry?.sourceId, "purge report sourceId");
+    const snapshotId = requiredString(entry?.snapshotId, "purge report snapshotId");
+    requiredSha256(entry?.rawSha256, "purge report rawSha256");
+    const key = `${sourceId}\0${snapshotId}`;
+    if (seen.has(key)) {
+      throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report duplicate snapshot");
+    }
+    seen.add(key);
   }
   return evidence;
 }

@@ -95,6 +95,7 @@ async function main(argv) {
 
   const reportFiles = await openReport(outputPath);
   const journalLines = [];
+  let executionError = null;
   try {
     await appendAuditRecord(reportFiles.journalFile, journalLines, {
       event: "PLAN",
@@ -103,40 +104,51 @@ async function main(argv) {
       deleteCandidates: deleteItems.map(sanitized),
     });
     for (const item of deleteItems) {
-      const [result] = await deleteExpiredItems([item], {
-        executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
-        beforeDelete: async (candidate) => {
-          await requireCurrentDeleteAuthorization({
-            item: candidate,
-            ledgerPath,
-            snapshotPath,
-            policyPaths,
-            evaluationAt,
-            evaluatedMillis,
-            baseUrl,
-            sourceAuthority,
-          });
+      try {
+        const [result] = await deleteExpiredItems([item], {
+          executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
+          beforeDelete: async (candidate) => {
+            await requireCurrentDeleteAuthorization({
+              item: candidate,
+              ledgerPath,
+              snapshotPath,
+              policyPaths,
+              evaluationAt,
+              evaluatedMillis,
+              baseUrl,
+              sourceAuthority,
+            });
+            await appendAuditRecord(reportFiles.journalFile, journalLines, {
+              event: "DELETE_INTENT",
+              evaluatedAt: report.evaluatedAt,
+              item: sanitized(candidate),
+            });
+          },
+        });
+        const { status } = result;
+        recordPurgeResult(report, item, status);
+        await appendAuditRecord(reportFiles.journalFile, journalLines, {
+          event: "DELETE_RESULT",
+          evaluatedAt: report.evaluatedAt,
+          item: sanitized(item),
+          outcome: purgeOutcome(status),
+        });
+      } catch (error) {
+        executionError = error;
+        const resultRecorded = hasPurgeResult(report, item);
+        if (!resultRecorded) report.failed.push(sanitized(item));
+        try {
           await appendAuditRecord(reportFiles.journalFile, journalLines, {
-            event: "DELETE_INTENT",
+            event: "DELETE_RESULT",
             evaluatedAt: report.evaluatedAt,
-            item: sanitized(candidate),
+            item: sanitized(item),
+            outcome: resultRecorded ? "AUDIT_WRITE_FAILED" : "AUTHORIZATION_FAILED",
           });
-        },
-      });
-      const { status } = result;
-      if (status === 200 || status === 204) {
-        report.deleted.push(sanitized(item));
-      } else if (status === 404 || status === 410) {
-        report.alreadyAbsent.push(sanitized(item));
-      } else {
-        report.failed.push(sanitized(item));
+        } catch {
+          // The durable intent or preceding result stays available; final report writing is still attempted.
+        }
+        break;
       }
-      await appendAuditRecord(reportFiles.journalFile, journalLines, {
-        event: "DELETE_RESULT",
-        evaluatedAt: report.evaluatedAt,
-        item: sanitized(item),
-        outcome: purgeOutcome(status),
-      });
     }
 
     report.completedAt = args.dryRun ? null : new Date().toISOString();
@@ -150,7 +162,25 @@ async function main(argv) {
   } finally {
     await Promise.allSettled([reportFiles.reportFile.close(), reportFiles.journalFile.close()]);
   }
+  if (executionError != null) throw executionError;
   if (report.decision !== "PASS") throw new Error(report.reasonCodes.join(","));
+}
+
+function recordPurgeResult(report, item, status) {
+  if (status === 200 || status === 204) {
+    report.deleted.push(sanitized(item));
+  } else if (status === 404 || status === 410) {
+    report.alreadyAbsent.push(sanitized(item));
+  } else {
+    report.failed.push(sanitized(item));
+  }
+}
+
+function hasPurgeResult(report, item) {
+  return [report.deleted, report.alreadyAbsent, report.failed]
+    .some((entries) => entries.some((entry) => (
+      entry.sourceId === item.sourceId && entry.snapshotId === item.snapshotId
+    )));
 }
 
 function requireTrustedExecutionEvidence({ ledgerText, snapshotText }) {
