@@ -130,17 +130,23 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /docker_available_after_backup/);
   assert.match(snapshotGate, /insufficient Docker filesystem headroom/);
   assert.match(snapshotGate, /ANALYZE route_search_results, favorite_routes, favorite_route_stations, route_feedbacks/);
+  const analyzeIndex = snapshotGate.indexOf("ANALYZE route_search_results");
+  const checkpointIndex = snapshotGate.indexOf("restore_psql -c 'CHECKPOINT;'");
+  const explainIndex = snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)");
+  assert.notEqual(analyzeIndex, -1, "the restored purge tables must be analyzed");
+  assert.notEqual(checkpointIndex, -1, "the restore database must be checkpointed");
+  assert.notEqual(explainIndex, -1, "the measured purge plan must be present");
   assert.ok(
-    snapshotGate.indexOf("ANALYZE route_search_results") < snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)"),
+    analyzeIndex < explainIndex,
     "restored purge tables must be analyzed before the measured plan",
   );
   assert.match(snapshotGate, /restore_psql -c 'CHECKPOINT;'/);
   assert.ok(
-    snapshotGate.indexOf("ANALYZE route_search_results") < snapshotGate.indexOf("restore_psql -c 'CHECKPOINT;'"),
+    analyzeIndex < checkpointIndex,
     "checkpoint must include the restored and analyzed table state",
   );
   assert.ok(
-    snapshotGate.indexOf("restore_psql -c 'CHECKPOINT;'") < snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)"),
+    checkpointIndex < explainIndex,
     "checkpoint must precede the WAL measurement",
   );
   assert.ok(
