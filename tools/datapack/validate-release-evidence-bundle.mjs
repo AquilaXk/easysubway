@@ -82,11 +82,14 @@ function validateRouteGraphTopologyIntegrity(bundle) {
   }
 }
 
-function validateRollbackRescue(bundle, requirePass) {
+function validateRollbackRescue(bundle, requirePass, evidenceRaw, evidence) {
   const rescue = bundle.rollbackRescue;
   if (rescue === undefined) return;
   if (!rescue || typeof rescue !== "object" || Array.isArray(rescue)) {
     throw new Error("rollbackRescue must be an object");
+  }
+  if (!evidenceRaw || !evidence) {
+    throw new Error("rollbackRescue requires --rollback-evidence");
   }
   for (const field of [
     "evidenceSha256",
@@ -148,6 +151,32 @@ function validateRollbackRescue(bundle, requirePass) {
   }
   if ((rescue.executionEnvironment === "PRODUCTION") !== rescue.productionExecuted) {
     throw new Error("rollbackRescue productionExecuted must match executionEnvironment");
+  }
+  if (rescue.evidenceSha256 !== createHash("sha256").update(evidenceRaw).digest("hex")) {
+    throw new Error("rollbackRescue evidence sha256 mismatch");
+  }
+  if (evidence.schemaVersion !== 1 || evidence.artifactKind !== "datapack-rollback-rescue-evidence") {
+    throw new Error("rollbackRescue evidence identity mismatch");
+  }
+  for (const [field, actual] of [
+    ["releaseRequestId", evidence.releaseRequestId],
+    ["currentReleaseSequence", evidence.from?.releaseSequence],
+    ["failedReleaseSequence", evidence.failed?.releaseSequence],
+    ["knownGoodReleaseSequence", evidence.knownGood?.releaseSequence],
+    ["rescueReleaseSequence", evidence.rescue?.releaseSequence],
+    ["rescueManifestSha256", evidence.rescue?.manifestSha256],
+    ["recoveryDurationSeconds", evidence.recoveryDurationSeconds],
+    ["validatorStatus", evidence.validatorStatus],
+    ["manifestLastStatus", evidence.manifestLastStatus],
+    ["executionEnvironment", evidence.executionEnvironment],
+    ["productionExecuted", evidence.productionExecuted],
+  ]) {
+    if (rescue[field] !== actual) throw new Error(`rollbackRescue ${field} evidence mismatch`);
+  }
+  if (!evidence.knownGood?.packs?.some((pack) =>
+    pack.sha256 === rescue.knownGoodPackSha256
+    && pack.sqliteSha256 === rescue.knownGoodSqliteSha256)) {
+    throw new Error("rollbackRescue known-good pack evidence mismatch");
   }
   if (requirePass && rescue.validatorStatus !== "PASS") {
     throw new Error("rollbackRescue validatorStatus must be PASS");
@@ -281,6 +310,11 @@ async function main() {
   }
 
   const bundle = JSON.parse(await readFile(bundlePath, "utf8"));
+  const rollbackEvidencePath = argValue(args, "--rollback-evidence");
+  const rollbackEvidenceRaw = rollbackEvidencePath
+    ? await readFile(rollbackEvidencePath, "utf8")
+    : null;
+  const rollbackEvidence = rollbackEvidenceRaw ? JSON.parse(rollbackEvidenceRaw) : null;
   const scopeRaw = await readFile(scopePath, "utf8");
   const scope = JSON.parse(scopeRaw);
   const launchReportRaw = await readFile(launchReportPath, "utf8");
@@ -383,7 +417,7 @@ async function main() {
   }
 
   validateRouteGraphTopologyIntegrity(bundle);
-  validateRollbackRescue(bundle, requirePass);
+  validateRollbackRescue(bundle, requirePass, rollbackEvidenceRaw, rollbackEvidence);
 }
 
 main().catch((error) => {

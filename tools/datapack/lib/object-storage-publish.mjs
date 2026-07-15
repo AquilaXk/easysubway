@@ -175,6 +175,12 @@ function validateRescueSqlite(sqlitePath, pack) {
 export async function putCurrentAndVerify(baseUrl, bytes, expectedPreviousSha256 = undefined) {
   const currentUrl = objectUrl(baseUrl, "catalog/current.json");
   const previous = await request(currentUrl, "GET");
+  if (previous.statusCode !== 200 && previous.statusCode !== 404) {
+    throw new Error(`current.json GET failed with HTTP ${previous.statusCode}`);
+  }
+  if (previous.statusCode === 200 && !previous.headers.etag) {
+    throw new Error("current.json GET response is missing ETag");
+  }
   const previousCurrentSha256 = previous.statusCode === 200 ? sha256(previous.body) : null;
   if (expectedPreviousSha256 !== undefined && previousCurrentSha256 !== expectedPreviousSha256) {
     throw new Error("current manifest changed during rescue");
@@ -183,7 +189,12 @@ export async function putCurrentAndVerify(baseUrl, bytes, expectedPreviousSha256
     "content-type": "application/json",
     "content-length": String(bytes.length),
     "cache-control": "public, max-age=60",
+    [previous.statusCode === 200 ? "if-match" : "if-none-match"]:
+      previous.statusCode === 200 ? previous.headers.etag : "*",
   });
+  if (put.statusCode === 412) {
+    throw new Error("current.json precondition failed; concurrent publish preserved");
+  }
   if (put.statusCode < 200 || put.statusCode >= 300) {
     throw new Error(`current.json PUT failed with HTTP ${put.statusCode}`);
   }

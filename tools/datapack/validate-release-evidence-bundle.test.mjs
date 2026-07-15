@@ -277,23 +277,72 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     executionEnvironment: "LOCAL_FIXTURE",
     productionExecuted: false,
   };
+  const rollbackEvidencePath = path.join(outputDir, "rollback-evidence.json");
+  const rollbackEvidence = {
+    schemaVersion: 1,
+    artifactKind: "datapack-rollback-rescue-evidence",
+    releaseRequestId: bundle.releaseRequestId,
+    from: { releaseSequence: 115 },
+    failed: { releaseSequence: 115 },
+    knownGood: {
+      releaseSequence: 114,
+      packs: [{ sha256: hash, sqliteSha256: hash }],
+    },
+    rescue: { releaseSequence: 116, manifestSha256: bundle.manifestSha256 },
+    status: "PASS",
+    validatorStatus: "PASS",
+    manifestLastStatus: "PASS",
+    recoveryDurationSeconds: 42,
+    executionEnvironment: "LOCAL_FIXTURE",
+    productionExecuted: false,
+  };
+  const rollbackEvidenceRaw = json(rollbackEvidence);
+  bundle.rollbackRescue.evidenceSha256 = sha256(rollbackEvidenceRaw);
+  await writeFile(rollbackEvidencePath, rollbackEvidenceRaw);
   await writeFile(bundlePath, json(bundle));
-  await execFileAsync(process.execPath, [...validatorCommand, "--require-pass"], { cwd: root });
+  const rollbackValidatorCommand = [
+    ...validatorCommand,
+    "--rollback-evidence", rollbackEvidencePath,
+  ];
+  await execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root });
 
   for (const [field, value, expected] of [
     ["rescueReleaseSequence", 115, /knownGood < failed = current < rescue/],
     ["rcManifestSha256", "f".repeat(64), /rollbackRescue rcManifestSha256 must match bundle manifestSha256/],
-    ["manifestLastStatus", "FAIL", /rollbackRescue manifestLastStatus must be PASS/],
+    ["manifestLastStatus", "FAIL", /rollbackRescue manifestLastStatus evidence mismatch/],
   ]) {
     const original = bundle.rollbackRescue[field];
     bundle.rollbackRescue[field] = value;
     await writeFile(bundlePath, json(bundle));
     await assert.rejects(
-      execFileAsync(process.execPath, [...validatorCommand, "--require-pass"], { cwd: root }),
+      execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root }),
       expected,
     );
     bundle.rollbackRescue[field] = original;
   }
+  await writeFile(bundlePath, json(bundle));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...validatorCommand, "--require-pass"], { cwd: root }),
+    /rollbackRescue requires --rollback-evidence/,
+  );
+
+  rollbackEvidence.knownGood.packs[0].sha256 = "f".repeat(64);
+  const tamperedRollbackEvidenceRaw = json(rollbackEvidence);
+  await writeFile(rollbackEvidencePath, tamperedRollbackEvidenceRaw);
+  await assert.rejects(
+    execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root }),
+    /rollbackRescue evidence sha256 mismatch/,
+  );
+  bundle.rollbackRescue.evidenceSha256 = sha256(tamperedRollbackEvidenceRaw);
+  await writeFile(bundlePath, json(bundle));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root }),
+    /rollbackRescue known-good pack evidence mismatch/,
+  );
+  await writeFile(rollbackEvidencePath, rollbackEvidenceRaw);
+  rollbackEvidence.knownGood.packs[0].sha256 = hash;
+  delete bundle.rollbackRescue;
+  await writeFile(bundlePath, json(bundle));
 
   bundle.supportedDenominatorSha256 = "f".repeat(64);
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);

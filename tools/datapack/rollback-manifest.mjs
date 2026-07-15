@@ -42,6 +42,9 @@ async function main() {
   await validateReferencedPacksForRescue(baseUrl, knownGood);
 
   if (isSameApprovedRescue(current, approval, targetSequence)) {
+    if (Date.parse(current.expiresAt) <= Date.now()) {
+      throw new Error("idempotent rescue expired");
+    }
     const replayCatalogSequences = validatedCatalogSequences(catalogSequences);
     if (Math.max(...replayCatalogSequences) > current.releaseSequence) {
       throw new Error("immutable catalog advanced beyond the idempotent rescue");

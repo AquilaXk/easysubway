@@ -15972,6 +15972,7 @@ async function startRolloutTestStorage(seed) {
     const found = objects.get(key);
     if (!found) { res.statusCode = 404; res.end(); return; }
     res.setHeader("content-length", String(found.body.length));
+    res.setHeader("etag", `"${createHash("sha256").update(found.body).digest("hex")}"`);
     res.statusCode = 200;
     res.end(req.method === "HEAD" ? undefined : found.body);
   });

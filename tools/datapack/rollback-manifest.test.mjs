@@ -54,6 +54,22 @@ test("동일 승인 입력 재실행은 immutable/current PUT 없이 멱등 성�
   });
 });
 
+test("만료된 동일 rescue 재실행은 성공 evidence를 만들지 않는다", async () => {
+  await withFixture(async ({ directory, storage }) => {
+    const first = JSON.parse((await runRollback(directory, storage.baseUrl)).stdout);
+    const rescueKey = `catalog/releases/${first.rescue.releaseSequence}.json`;
+    const expired = JSON.parse(storage.objects.get(rescueKey).body);
+    expired.publishedAt = "2019-01-01T00:00:00.000Z";
+    expired.expiresAt = "2020-01-01T00:00:00.000Z";
+    resignManifest(expired);
+    const expiredBytes = bytes(expired);
+    storage.objects.set(rescueKey, { body: expiredBytes });
+    storage.objects.set("catalog/current.json", { body: expiredBytes });
+
+    await assert.rejects(runRollback(directory, storage.baseUrl), /idempotent rescue expired/);
+  });
+});
+
 test("dry-run은 모든 검증과 report 생성을 수행하되 object를 쓰지 않는다", async () => {
   await withFixture(async ({ directory, storage, currentBytes }) => {
     const report = JSON.parse((await runRollback(directory, storage.baseUrl, ["--dry-run"])).stdout);
@@ -80,6 +96,19 @@ test("immutable 게시 뒤 current identity가 경합하면 기존 새 current�
     storage.afterImmutablePut = () => storage.objects.set("catalog/current.json", { body: concurrentBytes });
     await assert.rejects(runRollback(directory, storage.baseUrl), /current manifest changed during rescue/);
     assert.equal(storage.log.includes("PUT catalog/current.json"), false);
+    assert.deepEqual(storage.objects.get("catalog/current.json").body, concurrentBytes);
+  });
+});
+
+test("current GET 뒤 동시 게시가 발생하면 조건부 PUT이 최신 current를 보존한다", async () => {
+  await withFixture(async ({ directory, storage }) => {
+    const concurrent = manifest(120, storage.pack);
+    const concurrentBytes = bytes(concurrent);
+    storage.afterImmutablePut = () => {
+      storage.afterCurrentGet = () => storage.objects.set("catalog/current.json", { body: concurrentBytes });
+    };
+
+    await assert.rejects(runRollback(directory, storage.baseUrl), /precondition failed/);
     assert.deepEqual(storage.objects.get("catalog/current.json").body, concurrentBytes);
   });
 });
@@ -182,7 +211,7 @@ async function runRollback(directory, baseUrl, extraArgs = []) {
 async function startStorage(seed) {
   const objects = new Map(seed);
   const log = [];
-  const state = { objects, log, failPutKey: null, afterImmutablePut: null };
+  const state = { objects, log, failPutKey: null, afterImmutablePut: null, afterCurrentGet: null };
   const server = createServer((request, response) => {
     const key = decodeURIComponent(request.url.replace(/^\//, ""));
     log.push(`${request.method} ${key}`);
@@ -193,6 +222,17 @@ async function startStorage(seed) {
         if (state.failPutKey === key) {
           response.statusCode = 500;
           response.end("injected failure");
+          return;
+        }
+        const current = objects.get(key);
+        const expectedEtag = current ? `"${sha256(current.body)}"` : null;
+        const condition = request.headers["if-match"] ?? request.headers["if-none-match"];
+        if (
+          key === "catalog/current.json"
+          && condition !== (expectedEtag ?? "*")
+        ) {
+          response.statusCode = 412;
+          response.end("precondition failed");
           return;
         }
         objects.set(key, { body: Buffer.concat(chunks) });
@@ -209,7 +249,13 @@ async function startStorage(seed) {
       return;
     }
     response.statusCode = 200;
+    response.setHeader("etag", `"${sha256(object.body)}"`);
     response.end(object.body);
+    if (key === "catalog/current.json") {
+      const afterCurrentGet = state.afterCurrentGet;
+      state.afterCurrentGet = null;
+      afterCurrentGet?.();
+    }
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   Object.assign(state, { server, baseUrl: `http://127.0.0.1:${server.address().port}` });
