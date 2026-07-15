@@ -904,6 +904,20 @@ test("ITX candidate builder의 실제 payload에서 생성한 5-set은 promotion
       now: new Date("2026-07-15T02:00:00.000Z"),
     });
     assert.equal(candidate.canonicalPackIdentity.path, PACK_PATH);
+    const originalCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const repositoryCandidate = await buildItxSourceCandidate({
+        completeness,
+        packPath: PACK_PATH,
+        repositoryRoot: path.resolve(import.meta.dirname, "../.."),
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      });
+      assert.equal(repositoryCandidate.canonicalPackIdentity.path, PACK_PATH);
+      assert.equal(repositoryCandidate.canonicalPackIdentity.sha256, PACK_SHA256);
+    } finally {
+      process.chdir(originalCwd);
+    }
     const candidatePath = path.join(dir, "candidate.json");
     const bytes = sourceBytes(candidate);
     const digest = createHash("sha256").update(bytes).digest("hex");

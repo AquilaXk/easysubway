@@ -564,7 +564,7 @@ function isPlainObject(value) {
 }
 
 async function readCanonicalPackIdentity(packPath, repositoryRoot) {
-  const absolutePath = path.resolve(packPath);
+  const absolutePath = path.resolve(repositoryRoot, packPath);
   if (absolutePath !== path.resolve(repositoryRoot, CANONICAL_PACK_PATH)) {
     throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
   }
