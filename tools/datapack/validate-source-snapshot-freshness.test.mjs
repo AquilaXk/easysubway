@@ -189,6 +189,44 @@ test("실제 release build spec은 governance 계약으로 freshness를 통과�
   assert.equal(JSON.parse(stdout).governanceDecision, "GO");
 });
 
+test("승인 allowlist 밖의 unbound snapshot은 build spec policy로 backfill할 수 없다", () => {
+  const value = input();
+  delete value.snapshots[0].governancePolicyVersion;
+  delete value.snapshots[0].governancePolicySha256;
+  value.buildSpec.sourceSnapshotSetHash = createHash("sha256")
+    .update(JSON.stringify(value.snapshots))
+    .digest("hex");
+  value.governancePolicy = {};
+  value.inventory = { sources: [] };
+  value.governancePolicySha256 = "d".repeat(64);
+
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /SOURCE_FRESHNESS_POLICY_MISSING: governance policy binding/,
+  );
+});
+
+test("승인 legacy snapshot ID를 재사용해도 exact evidence hash가 다르면 backfill할 수 없다", () => {
+  const value = input({
+    snapshotId: "kric-subway-timetable-line4-pilot-20260709",
+  });
+  delete value.snapshots[0].governancePolicyVersion;
+  delete value.snapshots[0].governancePolicySha256;
+  value.buildSpec.sourceSnapshotIds = [value.snapshots[0].snapshotId];
+  value.buildSpec.sourceSnapshots[0].snapshotId = value.snapshots[0].snapshotId;
+  value.buildSpec.sourceSnapshotSetHash = createHash("sha256")
+    .update(JSON.stringify(value.snapshots))
+    .digest("hex");
+  value.governancePolicy = {};
+  value.inventory = { sources: [] };
+  value.governancePolicySha256 = "d".repeat(64);
+
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /SOURCE_FRESHNESS_POLICY_MISSING: governance policy binding/,
+  );
+});
+
 test("governance 입력이 없으면 provenance의 governance binding도 선택 사항이다", () => {
   const value = input();
   delete value.snapshots[0].governancePolicyVersion;

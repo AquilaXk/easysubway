@@ -71,6 +71,25 @@ test("실제 DELETE는 CLI 인자가 아닌 env-injected preauthenticated base U
   });
 });
 
+test("실제 DELETE는 system clock보다 미래인 evaluation-at을 요청 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "future-evaluation.json"),
+        evaluationAtOverride: "2099-01-01T00:00:00Z",
+      }),
+      /evaluationAt must not be in the future/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
 test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes로 purge한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const first = policyFixture(["source-old"]);
@@ -260,13 +279,14 @@ async function runPurge({
   output,
   dryRun = false,
   authenticated = true,
+  evaluationAtOverride = evaluationAt,
 }) {
   try {
     await execFileAsync(process.execPath, [
       "tools/datapack/purge-expired-source-raw.mjs",
       "--ledger", ledger,
       ...policies.flatMap((policy) => ["--policy", policy]),
-      "--evaluation-at", evaluationAt,
+      "--evaluation-at", evaluationAtOverride,
       "--output", output,
       ...(dryRun ? ["--dry-run", "--base-url", baseUrl] : []),
       ...(!dryRun && !authenticated ? ["--base-url", baseUrl] : []),

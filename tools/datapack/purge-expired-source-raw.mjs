@@ -14,6 +14,7 @@ const ALLOWED_ARGS = new Set(["ledger", "policy", "evaluation-at", "base-url", "
 const PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const DELETE_CONCURRENCY = 4;
 const DELETE_TIMEOUT_MS = 30_000;
+const EXECUTION_CLOCK_SKEW_MS = 5 * 60 * 1_000;
 const PREAUTH_BASE_URL_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL";
 
 async function main(argv) {
@@ -21,6 +22,9 @@ async function main(argv) {
   const outputPath = path.resolve(requiredArg(args, "output"));
   const evaluationAt = requiredArg(args, "evaluation-at");
   const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
+  if (!args.dryRun && evaluatedMillis > Date.now() + EXECUTION_CLOCK_SKEW_MS) {
+    throw new Error("evaluationAt must not be in the future for actual DELETE");
+  }
   const baseUrl = args.dryRun
     ? validatedBaseUrl(requiredArg(args, "base-url"), false)
     : executionBaseUrl(args);
