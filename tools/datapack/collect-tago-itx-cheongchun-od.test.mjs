@@ -680,6 +680,31 @@ test("TAGO paginated schema mismatch는 값 없이 정렬된 body field만 진�
 });
 
 test("TAGO ITX roster는 요청과 다른 OD·날짜 응답을 완료로 세지 않는다", async (context) => {
+  await context.test("익일 02:59 이내 출발은 24:xx service time으로 허용", async () => {
+    const fallback = validFetch();
+    const artifact = await collectTagoItxCheongchunRoster({
+      serviceKey: "key",
+      serviceDate: "20260715",
+      kricServiceDayCode: "8",
+      canonicalStations: canonicalRosterStations(),
+      fetchImpl: async (url) => {
+        const parsed = new URL(url);
+        const response = await fallback(url);
+        if (!parsed.pathname.endsWith("GetStrtpntAlocFndTrainInfo")
+          || parsed.searchParams.get("depPlaceId") !== "NAT140873") return response;
+        const payload = await response.json();
+        payload.response.body.items.item[0].depplandtime = "20260716020000";
+        payload.response.body.items.item[0].arrplandtime = "20260716021000";
+        return new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    });
+    assert.equal(artifact.completedOdCount, 2);
+    assert.equal(artifact.failedOdCount, 0);
+  });
+
   for (const scenario of [
     {
       name: "요청과 다른 역",

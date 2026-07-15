@@ -604,7 +604,7 @@ function normalizeItinerary(row, index, expected = {}) {
   if (arrivalAt.epoch <= departureAt.epoch) throw new Error(`TAGO OD row[${index}] arrival must follow departure`);
   const departureStationName = requiredString(row.depplacename, `row[${index}].depplacename`);
   const arrivalStationName = requiredString(row.arrplacename, `row[${index}].arrplacename`);
-  if (expected.serviceDate && String(row.depplandtime).slice(0, 8) !== expected.serviceDate) {
+  if (expected.serviceDate && !belongsToTagoServiceDate(row.depplandtime, expected.serviceDate)) {
     throw new Error(`TAGO OD row[${index}] departure date mismatch`);
   }
   if ((expected.departureStationName && normalize(departureStationName) !== normalize(expected.departureStationName))
@@ -622,6 +622,16 @@ function normalizeItinerary(row, index, expected = {}) {
     arrivalAt: arrivalAt.iso,
     adultFareWon: fare,
   };
+}
+
+function belongsToTagoServiceDate(value, serviceDate) {
+  const text = String(value ?? "");
+  if (!/^\d{14}$/.test(text)) return false;
+  if (text.slice(0, 8) === serviceDate) return true;
+  const next = calendarDate(serviceDate);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const nextServiceDate = `${next.getUTCFullYear()}${String(next.getUTCMonth() + 1).padStart(2, "0")}${String(next.getUTCDate()).padStart(2, "0")}`;
+  return text.slice(0, 8) === nextServiceDate && Number(text.slice(8, 10)) <= 2;
 }
 
 function providerTimestamp(value, label) {
