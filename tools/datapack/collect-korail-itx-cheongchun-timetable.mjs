@@ -485,6 +485,7 @@ function validateSourceCandidateSchema(candidate) {
     serviceDatesValid = false;
   }
   if (!hasClosedCandidateShape(candidate)
+    || !sourceWarningsMatchTrainSets(candidate)
     || candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1
     || !/^itx-cheongchun-source-timetable-\d{17}$/.test(candidate.artifactId ?? "")
     || candidate.serviceId !== "ITX_CHEONGCHUN" || candidate.validationStatus !== "SUPPORTED"
@@ -569,6 +570,26 @@ function validSourceWarning(warning) {
     || typeof warning.trainNumber !== "string") return false;
   try {
     return normalizeTrainNumber(warning.trainNumber) === warning.trainNumber;
+  } catch {
+    return false;
+  }
+}
+
+function sourceWarningsMatchTrainSets(candidate) {
+  try {
+    const trainSets = new Map(["7", "8", "9"].map((dayCd) => [
+      dayCd,
+      new Set(candidate.stationSequences
+        .filter((sequence) => sequence.dayCd === dayCd)
+        .map((sequence) => normalizeTrainNumber(sequence.trainNumber))),
+    ]));
+    const seen = new Set();
+    return candidate.warnings.every((warning) => {
+      const key = JSON.stringify([warning.code, warning.dayCd, warning.trainNumber]);
+      if (seen.has(key) || !trainSets.get(warning.dayCd)?.has(warning.trainNumber)) return false;
+      seen.add(key);
+      return true;
+    });
   } catch {
     return false;
   }
@@ -675,7 +696,7 @@ function validateCanonicalCorridorAuthority(source) {
         || sequence.destinationStationName !== last.nameKo
         || sequence.terminalVariant !== `${first.nameKo}→${last.nameKo}`
         || sequence.stopCount !== sequence.stops.length
-        || !Number.isInteger(sequence.observedOdCount) || sequence.observedOdCount < 1
+        || sequence.observedOdCount !== sequence.stops.length * (sequence.stops.length - 1) / 2
         || sequence.conflictingTimestampCount !== 0 || sequence.missingPairCount !== 0
         || sequence.duplicateOdCount !== 0) invalid();
       const serviceDate = source.selectedServiceDates?.[sequence.dayCd];

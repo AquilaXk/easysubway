@@ -1229,6 +1229,15 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
           trainNumber: { serviceKey: "should-not-persist" },
         }];
       },
+      (candidate) => {
+        candidate.warnings = [{ code: "KORAIL_PLAN_NOT_AVAILABLE", dayCd: "8", trainNumber: "9999" }];
+      },
+      (candidate) => {
+        candidate.warnings = [
+          { code: "KORAIL_PLAN_NOT_AVAILABLE", dayCd: "8", trainNumber: "2001" },
+          { code: "KORAIL_PLAN_NOT_AVAILABLE", dayCd: "8", trainNumber: "2001" },
+        ];
+      },
     ]) {
       const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-closed-schema-"));
       try {
@@ -1431,6 +1440,7 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
       (candidate) => { candidate.stationSequences[0].destinationStationName = "변조역"; },
       (candidate) => { candidate.stationSequences[0].terminalVariant = "변조역→춘천"; },
       (candidate) => { candidate.stationSequences[0].stopCount = 99; },
+      (candidate) => { candidate.stationSequences[0].observedOdCount = 2; },
       (candidate) => { candidate.stationSequences[0].conflictingTimestampCount = 1; },
       (candidate) => { candidate.transitTrips[0].tripHeadsign = "변조역"; },
     ];
