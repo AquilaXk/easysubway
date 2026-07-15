@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
 const DATAPACK_MANIFEST_SCHEMA_PATH = "contracts/datapack/datapack-manifest.schema.json";
@@ -9,6 +10,9 @@ const DATAPACK_COMPATIBILITY_MATRIX_PATH = "contracts/datapack/compatibility-mat
 const DATAPACK_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
 const RELEASE_GATE_INDEX_PATH = "contracts/release/gate-index.json";
 const RELEASE_GATE_DIRECTORY = "apps/mobile/release";
+const SOURCE_INVENTORY_PATH = "apps/mobile/assets/datapacks/source-inventory.json";
+const SOURCE_GOVERNANCE_POLICY_PATH = "tools/datapack/source-governance-policy.json";
+const FRESHNESS_POLICY_PATH = "apps/mobile/release/datapack-freshness-sla.json";
 
 export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -19,20 +23,38 @@ export function collectContractErrors() {
   validateJson("contracts/datapack/datapack-index.schema.json", "apps/mobile/assets/datapacks/index.json", errors);
   validateJson(
     "contracts/datapack/source-inventory.schema.json",
-    "apps/mobile/assets/datapacks/source-inventory.json",
+    SOURCE_INVENTORY_PATH,
     errors,
   );
   validateJson(
     "contracts/datapack/source-governance-policy.schema.json",
-    "tools/datapack/source-governance-policy.json",
+    SOURCE_GOVERNANCE_POLICY_PATH,
     errors,
   );
+  if ([SOURCE_INVENTORY_PATH, SOURCE_GOVERNANCE_POLICY_PATH, FRESHNESS_POLICY_PATH].every(existsSync)) {
+    validateSourceGovernanceContracts({
+      inventory: loadJson(SOURCE_INVENTORY_PATH),
+      governancePolicy: loadJson(SOURCE_GOVERNANCE_POLICY_PATH),
+      freshnessPolicy: loadJson(FRESHNESS_POLICY_PATH),
+    }, errors);
+  }
   validateBoundaries(errors);
   validateOpenApiFixtures(errors);
   validateCompatibilityMatrix(errors);
   validateGateIndex(errors);
   validateEnvScopeMap(errors);
   return errors;
+}
+
+export function validateSourceGovernanceContracts(
+  { governancePolicy, inventory, freshnessPolicy },
+  errors,
+) {
+  try {
+    validateSourceGovernancePolicy({ policy: governancePolicy, inventory, freshnessPolicy });
+  } catch (error) {
+    errors.push(`${SOURCE_GOVERNANCE_POLICY_PATH}: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 export function validateJson(schemaPath, valuePath, errors) {

@@ -74,6 +74,7 @@ export function validateLineage(snapshots) {
     const sourceSnapshots = snapshots.filter((snapshot) => snapshot.sourceId === sourceId);
     const roots = sourceSnapshots.filter((snapshot) => snapshot.previousSnapshotId == null);
     if (roots.length !== 1) throw new Error("SOURCE_LINEAGE_BROKEN: source root");
+    if (roots[0].diffSummary != null) throw new Error("SOURCE_DIFF_MISSING: root snapshot diff");
     const chain = [];
     const visited = new Set();
     let current = roots[0];

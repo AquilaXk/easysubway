@@ -21,3 +21,7 @@ ALTER TABLE data_source_snapshots
 CREATE UNIQUE INDEX uq_data_source_snapshots_previous_child
 	ON data_source_snapshots (previous_snapshot_id)
 	WHERE previous_snapshot_id IS NOT NULL;
+
+CREATE TABLE datapack_source_lineage_locks (
+	source_id VARCHAR(120) PRIMARY KEY
+);

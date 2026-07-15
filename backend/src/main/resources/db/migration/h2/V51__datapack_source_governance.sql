@@ -12,3 +12,5 @@ ALTER TABLE data_source_snapshots ADD CONSTRAINT chk_data_source_snapshots_gover
 ALTER TABLE data_source_snapshots ADD CONSTRAINT fk_data_source_snapshots_previous_source FOREIGN KEY (previous_snapshot_id, source_id) REFERENCES data_source_snapshots(snapshot_id, source_id) ON DELETE RESTRICT ON UPDATE RESTRICT;
 
 CREATE UNIQUE INDEX uq_data_source_snapshots_previous_child ON data_source_snapshots (previous_snapshot_id);
+
+CREATE TABLE datapack_source_lineage_locks (source_id VARCHAR(120) PRIMARY KEY);

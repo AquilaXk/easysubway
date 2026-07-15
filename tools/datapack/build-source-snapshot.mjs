@@ -49,6 +49,7 @@ async function main() {
     rawRetentionExpiresAt: args["governance-policy"] ? null : requireArg(args, "raw-retention-expires-at"),
     providerRecordHashes: records.map((record) => sha256(JSON.stringify(record))),
   };
+  await validateFreshnessPolicy(snapshot, args);
   if (previousSnapshot != null) {
     if (previousSnapshot.sourceId !== snapshot.sourceId) {
       throw new Error("SOURCE_LINEAGE_BROKEN: previous snapshot source");
@@ -56,7 +57,6 @@ async function main() {
     snapshot.previousSnapshotId = requiredText(previousSnapshot.snapshotId, "previousSnapshot.snapshotId");
     snapshot.diffSummary = buildSnapshotDiff(previousSnapshot, snapshot);
   }
-  await validateFreshnessPolicy(snapshot, args);
   await validateRetentionPolicy(snapshot, args);
   validateSnapshot(snapshot);
 

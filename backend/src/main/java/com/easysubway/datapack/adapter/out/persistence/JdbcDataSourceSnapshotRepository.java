@@ -12,6 +12,7 @@ import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Repository;
 public class JdbcDataSourceSnapshotRepository {
 
 	private final JdbcTemplate jdbcTemplate;
+	private final DatabaseDialect databaseDialect;
 
 	@Autowired
 	public JdbcDataSourceSnapshotRepository(DataSource dataSource) {
@@ -27,6 +29,7 @@ public class JdbcDataSourceSnapshotRepository {
 
 	JdbcDataSourceSnapshotRepository(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
+		this.databaseDialect = detectDatabaseDialect(jdbcTemplate);
 	}
 
 	public DataSourceSnapshot saveSnapshot(DataSourceSnapshot snapshot) {
@@ -58,6 +61,37 @@ public class JdbcDataSourceSnapshotRepository {
 		} catch (EmptyResultDataAccessException exception) {
 			return Optional.empty();
 		}
+	}
+
+	public void lockSourceLineage(String sourceId) {
+		if (databaseDialect == DatabaseDialect.H2) {
+			jdbcTemplate.update("MERGE INTO datapack_source_lineage_locks (source_id) KEY (source_id) VALUES (?)", sourceId);
+		} else {
+			jdbcTemplate.update("""
+				INSERT INTO datapack_source_lineage_locks (source_id)
+				VALUES (?)
+				ON CONFLICT (source_id) DO NOTHING
+				""", sourceId);
+		}
+		jdbcTemplate.queryForObject("""
+			SELECT source_id
+			FROM datapack_source_lineage_locks
+			WHERE source_id = ?
+			FOR UPDATE
+			""", String.class, sourceId);
+	}
+
+	private static DatabaseDialect detectDatabaseDialect(JdbcTemplate jdbcTemplate) {
+		DatabaseDialect dialect = jdbcTemplate.execute((ConnectionCallback<DatabaseDialect>) connection -> {
+			String productName = connection.getMetaData().getDatabaseProductName();
+			return "H2".equalsIgnoreCase(productName) ? DatabaseDialect.H2 : DatabaseDialect.POSTGRESQL;
+		});
+		return dialect == null ? DatabaseDialect.POSTGRESQL : dialect;
+	}
+
+	private enum DatabaseDialect {
+		POSTGRESQL,
+		H2
 	}
 
 	public Optional<DataSourceSnapshot> findHeadBySourceIdForUpdate(String sourceId) {

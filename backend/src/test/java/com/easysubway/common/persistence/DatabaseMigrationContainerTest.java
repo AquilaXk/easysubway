@@ -49,6 +49,7 @@ class DatabaseMigrationContainerTest {
 				"facility_reports",
 				"push_notification_outbox",
 				"data_source_snapshots",
+				"datapack_source_lineage_locks",
 				"datapack_normalization_runs",
 				"datapack_normalized_outputs",
 				"datapack_candidates",

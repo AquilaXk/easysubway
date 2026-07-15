@@ -8053,7 +8053,8 @@ test("source admission pipeline은 admin 승인 record로 inventory admission ev
   assert.equal(summary.adminReviewRecordHash, sha256(JSON.stringify(sortJson(adminReview))));
   assert.equal(summary.licenseEvidenceHash, adminReview.licenseEvidenceHash);
   const outputInventory = JSON.parse(await readFile(outputInventoryPath, "utf8"));
-  assert.ok(outputInventory.sources.some((source) => source.id === "kric-train-operation-organ"));
+  const admittedSource = outputInventory.sources.find((source) => source.id === "kric-train-operation-organ");
+  assert.equal(admittedSource.admissionEvidence.licenseEvidenceHash, adminReview.licenseEvidenceHash);
 
   const mismatchedAdminReview = JSON.parse(JSON.stringify(adminReview));
   mismatchedAdminReview.productionSource.admissionEvidence = {

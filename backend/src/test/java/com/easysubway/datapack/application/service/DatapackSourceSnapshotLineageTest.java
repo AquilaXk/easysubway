@@ -13,6 +13,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,11 +22,14 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("데이터팩 source snapshot lineage command")
 class DatapackSourceSnapshotLineageTest {
 
 	private DatapackSourceSnapshotCommandService service;
+	private PlatformTransactionManager transactionManager;
 
 	@BeforeEach
 	void setUp() {
@@ -35,7 +40,9 @@ class DatapackSourceSnapshotLineageTest {
 		);
 		var jdbcTemplate = new JdbcTemplate(dataSource);
 		jdbcTemplate.execute("DROP TABLE IF EXISTS datapack_source_snapshot_events");
+		jdbcTemplate.execute("DROP TABLE IF EXISTS datapack_source_lineage_locks");
 		jdbcTemplate.execute("DROP TABLE IF EXISTS data_source_snapshots");
+		jdbcTemplate.execute("CREATE TABLE datapack_source_lineage_locks (source_id VARCHAR(120) PRIMARY KEY)");
 		jdbcTemplate.execute("""
 			CREATE TABLE data_source_snapshots (
 				snapshot_id VARCHAR(120) PRIMARY KEY,
@@ -83,9 +90,10 @@ class DatapackSourceSnapshotLineageTest {
 		when(clockProvider.getIfAvailable(any())).thenReturn(
 			Clock.fixed(Instant.parse("2026-07-15T00:00:00Z"), ZoneOffset.UTC)
 		);
+		transactionManager = new DataSourceTransactionManager(dataSource);
 		service = new DatapackSourceSnapshotCommandService(
 			new JdbcDataSourceSnapshotRepository(dataSource),
-			new DataSourceTransactionManager(dataSource),
+			transactionManager,
 			clockProvider,
 			new ObjectMapper()
 		);
@@ -140,7 +148,33 @@ class DatapackSourceSnapshotLineageTest {
 		var first = command("source-a", "snapshot-a-1", null, null);
 
 		assertThat(service.createLockedSnapshot(first)).isEqualTo("snapshot-a-1");
+		service.createLockedSnapshot(command("source-a", "snapshot-a-2", "snapshot-a-1", changedDiff()));
 		assertThat(service.createLockedSnapshot(first)).isEqualTo("snapshot-a-1");
+	}
+
+	@Test
+	@DisplayName("같은 source의 동시 최초 snapshot은 하나만 root로 저장한다")
+	void concurrentFirstSnapshotsCreateOneRoot() throws Exception {
+		var start = new CountDownLatch(1);
+		try (var executor = Executors.newFixedThreadPool(2)) {
+			var first = executor.submit(() -> createAfter(start, command("source-a", "snapshot-a-1", null, null)));
+			var second = executor.submit(() -> createAfter(start, command("source-a", "snapshot-a-2", null, null)));
+			start.countDown();
+
+			var results = java.util.List.of(first.get(), second.get());
+			assertThat(results).contains("SOURCE_LINEAGE_BROKEN");
+			assertThat(results).filteredOn(result -> result.startsWith("snapshot-a-")).hasSize(1);
+		}
+	}
+
+	private String createAfter(CountDownLatch start, SourceSnapshotCommand command) throws InterruptedException {
+		start.await();
+		try {
+			return new TransactionTemplate(transactionManager).execute(status -> service.createLockedSnapshot(command));
+		} catch (IllegalArgumentException exception) {
+			assertThat(exception).hasMessageContaining("SOURCE_LINEAGE_BROKEN");
+			return "SOURCE_LINEAGE_BROKEN";
+		}
 	}
 
 	private SourceSnapshotCommand command(

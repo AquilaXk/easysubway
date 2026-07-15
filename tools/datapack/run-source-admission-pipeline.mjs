@@ -39,7 +39,11 @@ async function main() {
   const adminReview = await readJson(path.resolve(root, requireArg(args, "admin-review")));
   const adminReviewRecordHash = validateAdminReview({ adminReview, candidateId, sample, snapshot, args });
   const inventory = await readJson(path.resolve(root, requireArg(args, "inventory")));
-  const outputInventory = admitSource({ inventory, productionSource: adminReview.productionSource });
+  const outputInventory = admitSource({
+    inventory,
+    productionSource: adminReview.productionSource,
+    licenseEvidenceHash: adminReview.licenseEvidenceHash,
+  });
   await writeFile(outputInventoryPath, `${JSON.stringify(outputInventory, null, 2)}\n`);
   await execNode([
     "tools/datapack/validate-source-inventory.mjs",
@@ -234,6 +238,12 @@ function validateAdminReview({ adminReview, candidateId, sample, snapshot, args 
     if (productionQuota !== adminQuota) {
       throw new Error("adminReview.productionSource.admissionEvidence.quotaEvidence must match adminReview.quotaEvidence");
     }
+    if (
+      productionAdmissionEvidence.licenseEvidenceHash != null
+      && productionAdmissionEvidence.licenseEvidenceHash !== adminReview.licenseEvidenceHash
+    ) {
+      throw new Error("adminReview.productionSource.admissionEvidence.licenseEvidenceHash must match adminReview.licenseEvidenceHash");
+    }
   }
   const fieldsProvided = new Set(adminReview.productionSource.fieldsProvided ?? []);
   for (const field of sample.fields) {
@@ -244,9 +254,15 @@ function validateAdminReview({ adminReview, candidateId, sample, snapshot, args 
   return sha256(JSON.stringify(sortJson(adminReview)));
 }
 
-function admitSource({ inventory, productionSource }) {
+function admitSource({ inventory, productionSource, licenseEvidenceHash }) {
   const sources = inventory.sources.filter((source) => source.id !== productionSource.id);
-  sources.push(productionSource);
+  sources.push({
+    ...productionSource,
+    admissionEvidence: {
+      ...(productionSource.admissionEvidence ?? {}),
+      licenseEvidenceHash,
+    },
+  });
   sources.sort((left, right) => compareStrings(left.id, right.id));
   return { ...inventory, sources };
 }

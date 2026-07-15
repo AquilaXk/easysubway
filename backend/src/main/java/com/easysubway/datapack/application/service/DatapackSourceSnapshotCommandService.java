@@ -49,6 +49,7 @@ public class DatapackSourceSnapshotCommandService {
 			ensureSameIdempotentRequest(command, snapshot, existingEvent.get());
 			return existingEvent.get().snapshotId();
 		}
+		snapshotRepository.lockSourceLineage(command.sourceId());
 		var existingSnapshot = snapshotRepository.loadSnapshot(snapshot.snapshotId());
 		if (existingSnapshot.isEmpty()) {
 			validateLineage(snapshot);

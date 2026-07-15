@@ -42,6 +42,13 @@ test("두 번째 snapshot의 null previousSnapshotId를 거부한다", () => {
   );
 });
 
+test("root snapshot에 diff가 있으면 거부한다", () => {
+  assert.throws(
+    () => validateLineage([{ ...first, diffSummary: buildSnapshotDiff(first, first) }]),
+    /SOURCE_DIFF_MISSING/,
+  );
+});
+
 test("orphan과 cross-source previous snapshot을 거부한다", () => {
   assert.throws(
     () => validateLineage([first, { ...second, previousSnapshotId: "missing" }]),
@@ -164,6 +171,22 @@ test("governance policy는 production source별 freshness·retention·책임 역
     () => validateSourceGovernancePolicy({ policy: { ...policy, sources: [] }, inventory, freshnessPolicy }),
     /SOURCE_GOVERNANCE_OWNER_MISSING/,
   );
+  assert.throws(
+    () => validateSourceGovernancePolicy({
+      policy: { ...policy, policyVersion: "2026-99-99" },
+      inventory,
+      freshnessPolicy,
+    }),
+    /policyVersion/,
+  );
+  assert.throws(
+    () => validateSourceGovernancePolicy({
+      policy,
+      inventory: { sources: [source({ admissionEvidence: {} })] },
+      freshnessPolicy,
+    }),
+    /LICENSE_REVIEW_REQUIRED/,
+  );
 });
 
 test("raw retention 만료는 policy retentionDays에서 결정론적으로 파생한다", () => {
@@ -208,6 +231,12 @@ test("license review 기한·terms/provider/endpoint 변경을 REVIEW_REQUIRED�
   ]) {
     assert.ok(evaluateSourceGovernance({ ...input, source: changedSource }).reasonCodes.includes("LICENSE_REVIEW_REQUIRED"));
   }
+  const futureReviewPolicy = governancePolicy();
+  futureReviewPolicy.sources[0].licenseReview.reviewedAt = "2026-07-20T00:00:00Z";
+  assert.ok(evaluateSourceGovernance({
+    ...input,
+    policy: futureReviewPolicy,
+  }).reasonCodes.includes("LICENSE_REVIEW_REQUIRED"));
 });
 
 test("재배포 권한이 확인되지 않으면 release를 차단한다", () => {

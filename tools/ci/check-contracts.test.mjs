@@ -10,6 +10,7 @@ import {
   validateDatapackIndex,
   validateDatapackManifest,
   validateJson,
+  validateSourceGovernanceContracts,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -85,6 +86,19 @@ test("boundaries.json이 스스로 정합하다", () => {
 
 test("check-contracts CLI 검증 오류가 없다", () => {
   assert.deepEqual(collectContractErrors(), []);
+});
+
+test("check-contracts는 inventory·freshness·governance 참조를 함께 검증한다", () => {
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const freshnessPolicy = loadJson("apps/mobile/release/datapack-freshness-sla.json");
+  const governancePolicy = loadJson("tools/datapack/source-governance-policy.json");
+  governancePolicy.sources[0].retentionClassId = "missing-retention-class";
+  const errors = [];
+
+  validateSourceGovernanceContracts({ governancePolicy, inventory, freshnessPolicy }, errors);
+
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /RAW_RETENTION_OVERDUE/);
 });
 
 test("필수 계약 입력 파일이 없으면 실패한다", () => {

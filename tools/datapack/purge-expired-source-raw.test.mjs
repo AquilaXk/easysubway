@@ -78,6 +78,23 @@ test("invalid legal hold가 있으면 전체 plan을 DELETE 전에 거부한다"
   });
 });
 
+test("같은 object key가 만료와 legal hold entry에 중복되면 DELETE 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [
+      rawEntry("expired", "raw/shared.json"),
+      rawEntry("legal-hold", "raw/shared.json", { legalHold: legalHold("legal-hold") }),
+    ]);
+    objects.add("/raw/shared.json");
+
+    await assert.rejects(
+      runPurge({ ...files, baseUrl, output: path.join(workDir, "duplicate-object.json") }),
+      /duplicate object key/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/shared.json"), true);
+  });
+});
+
 test("DELETE 5xx는 sanitized RAW_RETENTION_OVERDUE evidence를 남기고 실패한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir, failPaths }) => {
     const files = await writeInputs(workDir, [rawEntry("failed", "raw/failed-secret-name.json")]);

@@ -76,6 +76,7 @@ export function buildPurgePlan({ ledger, policy, policySha256, evaluationAt, eva
     throw new Error("RAW_RETENTION_OVERDUE: ledger entries");
   }
   const snapshotIds = new Set();
+  const objectKeys = new Set();
   const plan = ledger.entries.map((entry) => {
     const sourceId = requiredText(entry?.sourceId, "sourceId");
     const snapshotId = requiredText(entry?.snapshotId, "snapshotId");
@@ -88,6 +89,8 @@ export function buildPurgePlan({ ledger, policy, policySha256, evaluationAt, eva
       throw new Error("RAW_RETENTION_OVERDUE: raw hash");
     }
     const objectKey = validatedObjectKey(entry.objectKey);
+    if (objectKeys.has(objectKey)) throw new Error("RAW_RETENTION_OVERDUE: duplicate object key");
+    objectKeys.add(objectKey);
     const derivedExpiry = deriveRawRetentionExpiresAt({ policy, sourceId, retrievedAt: entry.retrievedAt });
     const storedMillis = requiredUtcInstant(entry.rawRetentionExpiresAt, "rawRetentionExpiresAt");
     if (new Date(storedMillis).toISOString() !== derivedExpiry) {

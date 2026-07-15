@@ -22,7 +22,7 @@ export function validateSourceGovernancePolicy({ policy, inventory, freshnessPol
   if (policy?.schemaVersion !== 1 || policy?.artifactKind !== "datapack-source-governance-policy") {
     throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: policy identity");
   }
-  requiredText(policy.policyVersion, "policyVersion");
+  requiredUtcDate(policy.policyVersion, "policyVersion");
   const retentionClasses = new Map();
   for (const retentionClass of requiredArray(policy.retentionClasses, "retentionClasses")) {
     const id = requiredRole(retentionClass?.id, "retentionClasses[].id");
@@ -143,6 +143,7 @@ function validatePolicySource(entry, { inventorySources, retentionClasses, fresh
   requiredPositiveInteger(entry.escalationHours, `${sourceId}.escalationHours`);
   requiredText(entry.alertRoute, `${sourceId}.alertRoute`);
   validateLicenseReview(entry.licenseReview, entry, sourceId);
+  requiredSha256(source.admissionEvidence?.licenseEvidenceHash, `${sourceId}.licenseEvidenceHash`);
 }
 
 function validateReasonCodeEscalations(escalations) {
@@ -233,14 +234,25 @@ function evaluateRetention({ entry, snapshot, policy, evaluatedMillis, legalHold
 
 function evaluateLicense({ entry, source, snapshot, evaluatedMillis, reasonCodes }) {
   const review = entry.licenseReview;
+  let reviewedMillis = Number.NaN;
+  let nextReviewMillis = Number.NaN;
+  try {
+    reviewedMillis = requiredUtcInstant(review?.reviewedAt, "licenseReview.reviewedAt");
+    nextReviewMillis = requiredUtcInstant(review?.nextReviewAt, "licenseReview.nextReviewAt");
+  } catch {
+    // Invalid review timestamps are handled by the fail-closed predicate below.
+  }
   const reviewRequired = review?.status !== "APPROVED"
     || !isSha256(review?.termsHash)
     || review.termsHash !== source?.admissionEvidence?.licenseEvidenceHash
     || review.reviewedProvider !== source?.provider
     || review.reviewedDatasetUrl !== source?.datasetUrl
     || review.approvedByRole !== entry.approvalRole
-    || !Number.isFinite(Date.parse(review.nextReviewAt))
-    || evaluatedMillis >= Date.parse(review.nextReviewAt);
+    || !Number.isFinite(reviewedMillis)
+    || !Number.isFinite(nextReviewMillis)
+    || reviewedMillis > evaluatedMillis
+    || reviewedMillis >= nextReviewMillis
+    || evaluatedMillis >= nextReviewMillis;
   if (reviewRequired) reasonCodes.add("LICENSE_REVIEW_REQUIRED");
 
   if (
@@ -292,6 +304,16 @@ function requiredIdentifier(value, label) {
 
 function requiredText(value, label) {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} is required`);
+  return value;
+}
+
+function requiredUtcDate(value, label) {
+  const match = typeof value === "string" ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
+  if (!match) throw new Error(`${label} must be a UTC date`);
+  const millis = Date.parse(`${value}T00:00:00Z`);
+  if (!Number.isFinite(millis) || new Date(millis).toISOString().slice(0, 10) !== value) {
+    throw new Error(`${label} must be a UTC date`);
+  }
   return value;
 }
 
