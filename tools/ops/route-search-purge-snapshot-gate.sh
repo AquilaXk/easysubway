@@ -348,6 +348,7 @@ if (( favorite_routes_raw != favorite_routes_preserved + favorite_routes_danglin
 fi
 
 restore_psql -c 'ANALYZE route_search_results, favorite_routes, favorite_route_stations, route_feedbacks;' >/dev/null
+restore_psql -c 'CHECKPOINT;' >/dev/null
 
 plan_file="${EVIDENCE_DIR}/purge-plan-${backup_sha256:0:12}.txt"
 start_ns="$(date +%s%N)"

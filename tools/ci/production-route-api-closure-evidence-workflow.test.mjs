@@ -134,6 +134,15 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
     snapshotGate.indexOf("ANALYZE route_search_results") < snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)"),
     "restored purge tables must be analyzed before the measured plan",
   );
+  assert.match(snapshotGate, /restore_psql -c 'CHECKPOINT;'/);
+  assert.ok(
+    snapshotGate.indexOf("ANALYZE route_search_results") < snapshotGate.indexOf("restore_psql -c 'CHECKPOINT;'"),
+    "checkpoint must include the restored and analyzed table state",
+  );
+  assert.ok(
+    snapshotGate.indexOf("restore_psql -c 'CHECKPOINT;'") < snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)"),
+    "checkpoint must precede the WAL measurement",
+  );
   assert.ok(
     snapshotGate.indexOf("cat /proc/1/comm") < snapshotGate.indexOf("pg_restore"),
     "restore must wait for the final PostgreSQL server, not the temporary init server",
