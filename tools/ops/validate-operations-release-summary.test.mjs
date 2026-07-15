@@ -234,6 +234,74 @@ test("operations release summary validator rejects regressed canonical support r
   }
 });
 
+test("operations release summary validator rejects support evidence before the Phase A window", async () => {
+  const summary = validSummary();
+  const receivedAt = "2026-07-14T23:59:59+09:00";
+  summary.supportChannels[0].receivedAt = receivedAt;
+
+  await assert.rejects(
+    withSummary(summary, async (summaryPath) => {
+      const gate = structuredClone(supportGate);
+      gate.latestQaEvidenceSummary.channelEvidence[0].receivedAt = receivedAt;
+      const gatePath = path.join(path.dirname(summaryPath), "support-gate.json");
+      await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        validatorPath,
+        "--summary",
+        summaryPath,
+        "--support-gate",
+        gatePath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /receivedAt must be within the Phase A evidence window and not in the future/,
+  );
+});
+
+test("operations release summary validator rejects support evidence after the validation clock", async () => {
+  const summary = validSummary();
+  const receivedAt = "2026-08-16T00:00:00+09:00";
+  summary.supportChannels[0].receivedAt = receivedAt;
+
+  await assert.rejects(
+    withSummary(summary, async (summaryPath) => {
+      const gate = structuredClone(supportGate);
+      gate.latestQaEvidenceSummary.channelEvidence[0].receivedAt = receivedAt;
+      const gatePath = path.join(path.dirname(summaryPath), "support-gate.json");
+      await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        validatorPath,
+        "--summary",
+        summaryPath,
+        "--support-gate",
+        gatePath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /receivedAt must be within the Phase A evidence window and not in the future/,
+  );
+});
+
+test("operations release summary validator rejects stale refresh bindings", async () => {
+  await assert.rejects(
+    withSummary(validSummary(), async (summaryPath) => {
+      const gate = structuredClone(postLaunchGate);
+      gate.preLaunchReadiness.finalRcBinding.refreshBindings[0].files[0].sha256 = "0".repeat(64);
+      const gatePath = path.join(path.dirname(summaryPath), "post-launch-gate.json");
+      await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        validatorPath,
+        "--summary",
+        summaryPath,
+        "--post-launch-gate",
+        gatePath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /refresh bindings must match the current release surfaces/,
+  );
+});
+
 test("operations release summary validator rejects help-screen device QA from a different RC", async () => {
   await assert.rejects(
     withSummary(validSummary(), async (summaryPath) => {

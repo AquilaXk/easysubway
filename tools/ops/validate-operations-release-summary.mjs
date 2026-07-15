@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import {
   argValue,
   collectStrings,
@@ -41,6 +43,44 @@ function durationMillis(value) {
   const days = /^P(\d+)D$/.exec(value);
   if (days) return Number(days[1]) * 24 * 60 * 60 * 1000;
   throw new Error(`unsupported review window duration: ${value}`);
+}
+
+async function assertRefreshBindings(gate) {
+  const finalRcBinding = required(
+    gate.preLaunchReadiness.finalRcBinding,
+    "gate.preLaunchReadiness.finalRcBinding",
+  );
+  const refreshConditions = new Set(required(
+    finalRcBinding.evidenceValidity.refreshOn,
+    "gate.preLaunchReadiness.finalRcBinding.evidenceValidity.refreshOn",
+  ));
+  const refreshBindings = required(
+    finalRcBinding.refreshBindings,
+    "gate.preLaunchReadiness.finalRcBinding.refreshBindings",
+  );
+  const bindingConditions = new Set(refreshBindings.map((binding) => binding.refreshOn));
+  if (
+    refreshBindings.length !== refreshConditions.size
+    || bindingConditions.size !== refreshBindings.length
+    || refreshBindings.some((binding) => !refreshConditions.has(binding.refreshOn))
+  ) {
+    throw new Error("refresh bindings must match the current release surfaces");
+  }
+  for (const binding of refreshBindings) {
+    if (!Array.isArray(binding.files) || binding.files.length === 0) {
+      throw new Error("refresh bindings must match the current release surfaces");
+    }
+    for (const file of binding.files) {
+      try {
+        const contents = await readFile(file.path);
+        if (createHash("sha256").update(contents).digest("hex") !== file.sha256) {
+          throw new Error("stale refresh binding");
+        }
+      } catch {
+        throw new Error("refresh bindings must match the current release surfaces");
+      }
+    }
+  }
 }
 
 function assertRcManifestIdentity(artifactIdentity, rcManifest, gate) {
@@ -345,7 +385,7 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
   }
 }
 
-function assertSupport(summary, gate, artifactIdentity, requirePass) {
+function assertSupport(summary, gate, artifactIdentity, requirePass, now) {
   const helpScreenDeviceQa = required(
     gate.latestQaEvidenceSummary.helpScreenDeviceQa,
     "gate.latestQaEvidenceSummary.helpScreenDeviceQa",
@@ -397,6 +437,17 @@ function assertSupport(summary, gate, artifactIdentity, requirePass) {
       || stableFlatJson([...evidence].sort()) !== stableFlatJson([...validated.evidenceIds].sort())
     ) {
       throw new Error(`supportChannels.${channel.id} must match validated Phase A evidence`);
+    }
+    const receivedAt = Date.parse(validated.receivedAt);
+    if (requirePass && (
+      !isRfc3339Timestamp(validated.receivedAt)
+      || receivedAt < Date.parse(summary.evidenceValidity.testedAt)
+      || receivedAt > Date.parse(summary.evidenceValidity.expiresWhen)
+      || receivedAt > now
+    )) {
+      throw new Error(
+        `supportChannels.${channel.id}.receivedAt must be within the Phase A evidence window and not in the future`,
+      );
     }
     if (requirePass && item.result !== "PASS") throw new Error(`supportChannels.${channel.id}.result must be PASS`);
   }
@@ -458,13 +509,14 @@ async function main() {
     "artifactIdentity",
     postLaunch.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
   );
+  if (requirePass) await assertRefreshBindings(postLaunch);
   assertEvidenceValidity(summary, postLaunch, artifactIdentity, requirePass, now);
   if (rcManifest) assertRcManifestIdentity(artifactIdentity, rcManifest, postLaunch);
   const gates = { observability, postLaunch, support };
   assertNoSensitiveSummary(summary, gates);
   assertObservability(summary, observability, requirePass);
   assertPostLaunch(summary, postLaunch, artifactIdentity, requirePass, now);
-  assertSupport(summary, support, artifactIdentity, requirePass);
+  assertSupport(summary, support, artifactIdentity, requirePass, now);
 }
 
 main().catch((error) => {
