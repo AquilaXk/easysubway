@@ -153,6 +153,49 @@ test("operations release summary validator accepts complete redacted release evi
   );
 });
 
+test("operations release summary validator rejects expired Phase A evidence", async () => {
+  await assert.rejects(
+    withSummary(validSummary(), (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--now",
+        "2026-07-30T00:00:00+09:00",
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /evidenceValidity must be current/,
+  );
+});
+
+test("operations release summary validator rejects regressed canonical support readiness", async () => {
+  for (const mutate of [
+    (gate) => { gate.preLaunchReadiness.status = "FAIL"; },
+    (gate) => { gate.latestQaEvidenceSummary.helpScreenDeviceQa.result = "FAIL"; },
+    (gate) => { gate.latestQaEvidenceSummary.operatorContactReadiness.result = "FAIL"; },
+    (gate) => { gate.latestQaEvidenceSummary.remainingSupportReadiness = ["mailbox-routing"]; },
+  ]) {
+    await assert.rejects(
+      withSummary(validSummary(), async (summaryPath) => {
+        const gate = structuredClone(supportGate);
+        mutate(gate);
+        const gatePath = path.join(path.dirname(summaryPath), "support-gate.json");
+        await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+        return execFileAsync(process.execPath, [
+          "tools/ops/validate-operations-release-summary.mjs",
+          "--summary",
+          summaryPath,
+          "--support-gate",
+          gatePath,
+          "--require-pass",
+        ], { cwd: root });
+      }),
+      /canonical support readiness must be PASS/,
+    );
+  }
+});
+
 test("operations release summary validator compares artifact identity independent of JSON key order", async () => {
   const summary = validSummary();
   summary.postLaunchReviews[0].artifactIdentity = {

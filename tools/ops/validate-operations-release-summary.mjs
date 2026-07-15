@@ -67,12 +67,18 @@ function assertRcManifestIdentity(artifactIdentity, rcManifest, gate) {
   }
 }
 
-function assertEvidenceValidity(summary, gate) {
+function assertEvidenceValidity(summary, gate, requirePass, now) {
   const validity = required(summary.evidenceValidity, "evidenceValidity");
   const expectedTestedAt = `${gate.preLaunchReadiness.evidenceDateKst}T00:00:00+09:00`;
   const expectedExpiresWhen = `${gate.preLaunchReadiness.finalRcBinding.evidenceValidity.validUntilKst}T23:59:59.999+09:00`;
   if (validity.testedAt !== expectedTestedAt || validity.expiresWhen !== expectedExpiresWhen) {
     throw new Error("evidenceValidity must match the canonical Phase A evidence window");
+  }
+  if (
+    requirePass
+    && (!Number.isFinite(now) || now < Date.parse(validity.testedAt) || now > Date.parse(validity.expiresWhen))
+  ) {
+    throw new Error("evidenceValidity must be current for --require-pass");
   }
 }
 
@@ -300,6 +306,24 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass) {
 }
 
 function assertSupport(summary, gate, requirePass) {
+  if (requirePass && (
+    required(gate.status, "gate.status") !== "PASS"
+    || required(gate.preLaunchReadiness, "gate.preLaunchReadiness").status !== "PASS"
+    || required(
+      gate.latestQaEvidenceSummary.remainingSupportReadiness,
+      "gate.latestQaEvidenceSummary.remainingSupportReadiness",
+    ).length > 0
+    || required(
+      gate.latestQaEvidenceSummary.helpScreenDeviceQa,
+      "gate.latestQaEvidenceSummary.helpScreenDeviceQa",
+    ).result !== "PASS"
+    || required(
+      gate.latestQaEvidenceSummary.operatorContactReadiness,
+      "gate.latestQaEvidenceSummary.operatorContactReadiness",
+    ).result !== "PASS"
+  )) {
+    throw new Error("canonical support readiness must be PASS for --require-pass");
+  }
   const byId = new Map(required(summary.supportChannels, "supportChannels").map((item) => [item.channelId, item]));
   const validatedById = new Map(
     required(gate.latestQaEvidenceSummary.channelEvidence, "gate.latestQaEvidenceSummary.channelEvidence")
@@ -357,6 +381,8 @@ async function main() {
   const args = process.argv.slice(2);
   const summaryPath = argValue(args, "--summary");
   const requirePass = args.includes("--require-pass");
+  const nowArg = argValue(args, "--now");
+  const now = nowArg === undefined ? Date.now() : Date.parse(nowArg);
   const rcManifestPath = argValue(args, "--rc-manifest", process.env.EASYSUBWAY_OPERATIONS_RC_MANIFEST);
   if (!summaryPath) throw new Error("--summary is required");
   if (requirePass && !rcManifestPath) throw new Error("--rc-manifest is required for --require-pass");
@@ -382,7 +408,7 @@ async function main() {
     "artifactIdentity",
     postLaunch.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
   );
-  assertEvidenceValidity(summary, postLaunch);
+  assertEvidenceValidity(summary, postLaunch, requirePass, now);
   if (rcManifest) assertRcManifestIdentity(artifactIdentity, rcManifest, postLaunch);
   const gates = { observability, postLaunch, support };
   assertNoSensitiveSummary(summary, gates);
