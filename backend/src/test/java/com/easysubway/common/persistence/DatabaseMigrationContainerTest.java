@@ -33,10 +33,7 @@ class DatabaseMigrationContainerTest {
 			POSTGRES.getUsername(),
 			POSTGRES.getPassword()
 		);
-		var flyway = Flyway.configure()
-			.dataSource(dataSource)
-			.locations("classpath:db/migration/postgresql")
-			.load();
+		var flyway = flyway(dataSource, "classpath:db/migration/postgresql", null).load();
 
 		var result = flyway.migrate();
 
@@ -71,7 +68,9 @@ class DatabaseMigrationContainerTest {
 			SELECT COUNT(*)
 			FROM pg_index i
 			JOIN pg_class c ON c.oid = i.indexrelid
+			JOIN pg_namespace n ON n.oid = c.relnamespace
 			WHERE c.relname IN ('uq_data_source_snapshots_previous_child', 'uq_data_source_snapshots_source_root')
+				AND n.nspname = 'public'
 				AND i.indisvalid = TRUE
 				AND i.indisready = TRUE
 			""", Integer.class)).isEqualTo(2);
@@ -446,7 +445,10 @@ class DatabaseMigrationContainerTest {
 		String location,
 		String schema
 	) {
-		var configuration = Flyway.configure().dataSource(dataSource).locations(location);
+		var configuration = Flyway.configure()
+			.configuration(java.util.Map.of("flyway.postgresql.transactional.lock", "false"))
+			.dataSource(dataSource)
+			.locations(location);
 		return schema == null ? configuration : configuration.schemas(schema).defaultSchema(schema);
 	}
 
