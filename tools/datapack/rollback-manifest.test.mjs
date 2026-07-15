@@ -42,6 +42,21 @@ test("known-good pack 검증 후 immutable rescue를 쓰고 current를 마지막
   });
 });
 
+test("rollout current pointer는 failed immutable 승인 해시로 rollback한다", async () => {
+  await withFixture(async ({ directory, storage, current }) => {
+    current.rollout = { percentage: 10, seed: "a".repeat(32) };
+    resignManifest(current);
+    const rolloutBytes = bytes(current);
+    storage.objects.set("catalog/current.json", { body: rolloutBytes });
+
+    const report = JSON.parse((await runRollback(directory, storage.baseUrl)).stdout);
+
+    assert.equal(report.from.manifestSha256, sha256(storage.originalFailedBytes));
+    assert.notEqual(report.from.manifestSha256, sha256(rolloutBytes));
+    assert.equal(storage.currentIfMatch, sha256(rolloutBytes));
+  });
+});
+
 test("동일 승인 입력 재실행은 immutable/current PUT 없이 멱등 성공한다", async () => {
   await withFixture(async ({ directory, storage }) => {
     const first = JSON.parse((await runRollback(directory, storage.baseUrl)).stdout);
@@ -221,6 +236,7 @@ async function withFixture(callback) {
     ["catalog/capital-v1.sqlite.gz", { body: packBytes }],
   ]);
   storage.pack = pack;
+  storage.originalFailedBytes = currentBytes;
   await writeFile(path.join(directory, "approval.json"), `${JSON.stringify({
     schemaVersion: 1,
     artifactKind: "datapack-rollback-approval",
@@ -267,6 +283,7 @@ async function startStorage(seed) {
   const log = [];
   const state = {
     objects, log, failPutKey: null, afterCatalogList: null, afterImmutablePut: null, afterCurrentGet: null,
+    currentIfMatch: null,
   };
   const server = createServer((request, response) => {
     const url = new URL(request.url, "http://fixture.local");
@@ -301,6 +318,7 @@ async function startStorage(seed) {
         const current = objects.get(key);
         const expectedEtag = current ? `"${sha256(current.body)}"` : null;
         const condition = request.headers["if-match"] ?? request.headers["if-none-match"];
+        if (key === "catalog/current.json") state.currentIfMatch = condition?.replaceAll('"', "") ?? null;
         if (
           key === "catalog/current.json"
           && condition !== (expectedEtag ?? "*")

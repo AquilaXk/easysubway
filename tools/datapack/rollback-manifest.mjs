@@ -85,12 +85,19 @@ async function main() {
   if (current.releaseSequence !== failedSequence) {
     throw new Error("failedSequence must match current manifest releaseSequence");
   }
-  if (approval.failedManifestSha256 !== sha256(currentBytes)) {
+  const failedResponse = await getRequiredObject(baseUrl, `catalog/releases/${failedSequence}.json`);
+  const failedBytes = failedResponse.body;
+  const failed = JSON.parse(failedBytes.toString("utf8"));
+  validateManifest(failed, { requireProduction: channel === "production", releasesTarget: true });
+  if (failed.channel !== channel || failed.releaseSequence !== failedSequence) {
+    throw new Error("failed immutable release identity mismatch");
+  }
+  if (approval.failedManifestSha256 !== sha256(failedBytes)) {
     throw new Error("approval failed manifest identity mismatch");
   }
   const result = buildRescueManifest({
-    currentManifest: current,
-    currentManifestBytes: currentBytes,
+    currentManifest: failed,
+    currentManifestBytes: failedBytes,
     failedSequence,
     knownGoodManifest: knownGood,
     knownGoodManifestBytes: knownGoodBytes,
