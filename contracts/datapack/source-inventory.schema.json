@@ -127,7 +127,7 @@
                 "required": ["defaultDailyLimit", "portal", "productionUseAllowed", "unlockStatus"],
                 "properties": {
                   "portal": { "type": "string" },
-                  "defaultDailyLimit": {},
+                  "defaultDailyLimit": { "type": ["integer", "string", "null"] },
                   "unlockStatus": { "type": "string" },
                   "productionUseAllowed": { "type": "boolean" },
                   "documentedMonthlyLimit": { "type": "integer" },

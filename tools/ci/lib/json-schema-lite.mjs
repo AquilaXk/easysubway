@@ -134,6 +134,10 @@ function validateArray(schema, value, path, errors) {
 }
 
 function matchesType(type, value) {
+  if (Array.isArray(type)) {
+    if (type.length === 0) throw new Error("json-schema-lite: type 배열은 비어 있을 수 없습니다");
+    return type.map((candidate) => matchesType(candidate, value)).some(Boolean);
+  }
   switch (type) {
     case "object":
       return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -147,6 +151,8 @@ function matchesType(type, value) {
       return typeof value === "number" && Number.isFinite(value);
     case "boolean":
       return typeof value === "boolean";
+    case "null":
+      return value === null;
     default:
       throw new Error(`json-schema-lite: 미지원 type '${type}'`);
   }

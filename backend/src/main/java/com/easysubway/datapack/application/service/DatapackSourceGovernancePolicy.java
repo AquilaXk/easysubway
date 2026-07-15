@@ -46,6 +46,9 @@ public class DatapackSourceGovernancePolicy {
 			this.sha256 = sha256(bytes);
 			this.retentionDaysBySource = retentionDays(policy);
 			this.freshnessRuleBySource = freshnessRules(freshnessPolicy);
+			if (!retentionDaysBySource.keySet().equals(freshnessRuleBySource.keySet())) {
+				throw new IllegalStateException("Datapack source governance source bindings do not match.");
+			}
 		} catch (IOException exception) {
 			throw new IllegalStateException("Datapack source governance policy could not be loaded.", exception);
 		}
@@ -90,7 +93,7 @@ public class DatapackSourceGovernancePolicy {
 		if (freshnessRule.providerValidityRequired() != (submittedProviderValidUntil != null)) {
 			throw new IllegalArgumentException("SOURCE_FRESHNESS_POLICY_MISSING: provider validity");
 		}
-		LocalDateTime freshnessExpiry = freshnessBasis.plus(freshnessRule.cadence());
+		LocalDateTime freshnessExpiry = addCadence(freshnessBasis, freshnessRule.cadence());
 		if (submittedProviderValidUntil != null && submittedProviderValidUntil.isBefore(freshnessExpiry)) {
 			freshnessExpiry = submittedProviderValidUntil;
 		}
@@ -153,6 +156,19 @@ public class DatapackSourceGovernancePolicy {
 			}
 		}
 		return Map.copyOf(result);
+	}
+
+	private static LocalDateTime addCadence(LocalDateTime basis, Period cadence) {
+		LocalDateTime expiry = basis.plus(cadence);
+		if (cadence.getYears() > 0
+			&& cadence.getMonths() == 0
+			&& cadence.getDays() == 0
+			&& basis.getMonthValue() == 2
+			&& basis.getDayOfMonth() == 29
+			&& expiry.getDayOfMonth() == 28) {
+			return expiry.plusDays(1);
+		}
+		return expiry;
 	}
 
 	private static Map<String, Integer> retentionDays(JsonNode policy) {

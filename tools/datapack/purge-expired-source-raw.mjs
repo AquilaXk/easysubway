@@ -111,7 +111,7 @@ async function main(argv) {
       dryRun: args.dryRun,
       deleteCandidates: deleteItems.map(sanitized),
     });
-    for (const item of deleteItems) {
+    for (const [index, item] of deleteItems.entries()) {
       try {
         const [result] = await deleteExpiredItems([item], {
           executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
@@ -154,6 +154,19 @@ async function main(argv) {
           });
         } catch {
           // The durable intent or preceding result stays available; final report writing is still attempted.
+        }
+        for (const remaining of deleteItems.slice(index + 1)) {
+          recordPurgeFailure(report, remaining);
+          try {
+            await appendAuditRecord(reportFiles.journalFile, journalLines, {
+              event: "DELETE_RESULT",
+              evaluatedAt: report.evaluatedAt,
+              item: sanitized(remaining),
+              outcome: "FAILED",
+            });
+          } catch {
+            // A journal write failure remains fail-closed and makes attestation verification fail.
+          }
         }
         break;
       }

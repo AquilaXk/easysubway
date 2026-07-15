@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { createHash, generateKeyPairSync } from "node:crypto";
+import { createHash, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -13,6 +13,7 @@ import {
   deleteExpiredItems,
   recordPurgeFailure,
 } from "./purge-expired-source-raw.mjs";
+import { verifyPurgeAttestation } from "./source-raw-purge-attestation.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -672,6 +673,40 @@ test("DELETE 5xx는 sanitized RAW_RETENTION_OVERDUE evidence를 남기고 실패
     assert.deepEqual(report.reasonCodes, ["RAW_RETENTION_OVERDUE"]);
     assert.deepEqual(report.failed.map((entry) => entry.snapshotId), ["failed"]);
     assert.doesNotMatch(reportText, /failed-secret-name|objectKey|baseUrl/i);
+  });
+});
+
+test("중간 authorization 실패는 나머지 plan을 삭제하지 않고 검증 가능한 실패로 기록한다", async () => {
+  await withFixture(async ({ baseUrl, deleteHooks, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [
+      rawEntry("first", "raw/first.json"),
+      rawEntry("second", "raw/second.json"),
+      rawEntry("third", "raw/third.json"),
+    ]);
+    for (const key of ["first", "second", "third"]) objects.add(`/raw/${key}.json`);
+    const snapshotText = await readFile(files.snapshots, "utf8");
+    deleteHooks.push(async () => writeFile(files.snapshots, `${snapshotText}\n`));
+    const output = path.join(workDir, "mid-plan-authorization-failure.json");
+
+    await assert.rejects(runPurge({ ...files, baseUrl, output }), /snapshot evidence sha256 mismatch/);
+
+    const report = JSON.parse(await readFile(output, "utf8"));
+    const journalText = await readFile(`${output}.journal`, "utf8");
+    const ledgerText = await readFile(files.ledger, "utf8");
+    const policyText = await readFile(files.policies[0], "utf8");
+    const publicKey = createPublicKey(purgeAttestationPrivateKey);
+    assert.deepEqual(requests, ["/raw/first.json"]);
+    assert.deepEqual(report.deleted.map((entry) => entry.snapshotId), ["first"]);
+    assert.deepEqual(report.failed.map((entry) => entry.snapshotId), ["second", "third"]);
+    assert.doesNotThrow(() => verifyPurgeAttestation(report, {
+      journalText,
+      ledgerText,
+      snapshotText,
+      governancePolicyVersion: "2026-07-15",
+      governancePolicySha256: sha256(policyText),
+      publicKeyText: publicKey.export({ type: "spki", format: "pem" }),
+      trustedPublicKeySha256: sha256(publicKey.export({ type: "spki", format: "der" })),
+    }));
   });
 });
 

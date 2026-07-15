@@ -336,6 +336,45 @@ class DatapackSourceSnapshotLineageTest {
 	}
 
 	@Test
+	@DisplayName("P1Y freshness는 Node producer와 같은 UTC calendar overflow를 사용한다")
+	void yearlyFreshnessMatchesNodeCalendarOverflow() {
+		governancePolicy = governancePolicy("2026-07-15", "P1Y");
+		var leapDay = LocalDateTime.of(2024, 2, 29, 0, 0);
+
+		var binding = governancePolicy.requireBinding(
+			"source-a",
+			leapDay,
+			null,
+			null,
+			LocalDateTime.of(2025, 3, 1, 0, 0),
+			LocalDateTime.of(2024, 5, 29, 0, 0),
+			governancePolicy.version(),
+			governancePolicy.sha256()
+		);
+
+		assertThat(binding.freshnessExpiresAt()).isEqualTo(LocalDateTime.of(2025, 3, 1, 0, 0));
+	}
+
+	@Test
+	@DisplayName("retention과 freshness source binding이 다르면 기동 시 fail closed한다")
+	void policySourceBindingsMustMatchAtStartup() {
+		String policy = """
+			{"policyVersion":"2026-07-15","retentionClasses":[{"id":"standard-90d","retentionDays":90}],"sources":[{"sourceId":"source-a","retentionClassId":"standard-90d"}]}
+			""";
+		String freshnessPolicy = """
+			{"sourceClasses":[{"id":"test","sourceIds":["source-b"],"basisField":"retrievedAt","reverificationCadence":"P31D"}]}
+			""";
+
+		assertThatThrownBy(() -> new DatapackSourceGovernancePolicy(
+			new ObjectMapper(),
+			new ByteArrayResource(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+			new ByteArrayResource(freshnessPolicy.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+		))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("source bindings");
+	}
+
+	@Test
 	@DisplayName("provider validity가 있는 source는 policy basis와 validity로 freshness를 파생한다")
 	void plannedSourceUsesPolicyBasisAndProviderValidity() {
 		governancePolicy = plannedGovernancePolicy();
@@ -454,12 +493,16 @@ class DatapackSourceSnapshotLineageTest {
 	}
 
 	private DatapackSourceGovernancePolicy governancePolicy(String version) {
+		return governancePolicy(version, "P31D");
+	}
+
+	private DatapackSourceGovernancePolicy governancePolicy(String version, String cadence) {
 		String policy = """
 			{"policyVersion":"%s","retentionClasses":[{"id":"standard-90d","retentionDays":90}],"sources":[{"sourceId":"source-a","retentionClassId":"standard-90d"},{"sourceId":"source-b","retentionClassId":"standard-90d"}]}
 			""".formatted(version);
 		String freshnessPolicy = """
-			{"sourceClasses":[{"id":"test","sourceIds":["source-a","source-b"],"basisField":"retrievedAt","reverificationCadence":"P31D"}]}
-			""";
+			{"sourceClasses":[{"id":"test","sourceIds":["source-a","source-b"],"basisField":"retrievedAt","reverificationCadence":"%s"}]}
+			""".formatted(cadence);
 		return new DatapackSourceGovernancePolicy(
 			new ObjectMapper(),
 			new ByteArrayResource(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8)),

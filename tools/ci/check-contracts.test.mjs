@@ -60,6 +60,17 @@ test("번들 source-inventory 실물이 계약 스키마를 통과한다", () =>
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
+test("source quota defaultDailyLimit는 허용된 scalar만 받는다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const admitted = inventory.sources.find((source) => source.admissionEvidence?.quotaEvidence != null);
+  admitted.admissionEvidence.quotaEvidence.defaultDailyLimit = { unexpected: true };
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("quotaEvidence.defaultDailyLimit")
+  )));
+});
+
 test("source admission evidence가 있으면 license evidence hash를 요구한다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
