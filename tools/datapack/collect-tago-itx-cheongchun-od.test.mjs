@@ -552,9 +552,16 @@ test("TAGO ITX roster는 OD 일부 실패를 count한 뒤 admission이 거부할
   assert.deepEqual(artifact.failedOds, [{
     departureStationId: "station-b",
     arrivalStationId: "station-a",
+    requestCount: 3,
     reasonCode: "PROVIDER_HTTP_FAILURE",
     failureContext: "operation=GetStrtpntAlocFndTrainInfo,httpStatus=503",
   }]);
+  assert.equal(artifact.quotaSummary.odRequestCount, 4);
+  assert.equal(artifact.quotaSummary.failedOdRequestCount, 3);
+  assert.equal(
+    artifact.quotaSummary.actualRequestCount,
+    artifact.quotaSummary.catalogRequestCount + artifact.quotaSummary.odRequestCount,
+  );
   assert.deepEqual(artifact.trainNumbers, ["2001"]);
 });
 
@@ -755,6 +762,7 @@ test("TAGO ITX roster는 공식 totalCount가 없는 OD 응답을 완료로 세�
   assert.deepEqual(artifact.failedOds, [{
     departureStationId: "station-b",
     arrivalStationId: "station-a",
+    requestCount: 1,
     reasonCode: "PROVIDER_SCHEMA_FAILURE",
     failureContext: "operation=GetStrtpntAlocFndTrainInfo,reason=schema_mismatch,totalCount,bodyFields=items,numOfRows,pageNo",
   }]);

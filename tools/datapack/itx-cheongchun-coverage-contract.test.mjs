@@ -315,6 +315,7 @@ test("ITX-청춘 evidence는 공식 URL·schema/hash·재검토 시점을 갖고
   assert.match(contract.officialEvidence.tagoTrainOd.evidenceHash, /^[a-f0-9]{64}$/);
   assert.equal(contract.officialEvidence.korailStationSequence.evidenceArtifact,
     "tools/datapack/sources/korail-itx-cheongchun-station-sequence-20260713.json");
-  assert.equal(new Date(contract.freshness.nextReviewAt).toISOString(), contract.freshness.nextReviewAt);
+  assert.match(contract.freshness.nextReviewAt, /(?:Z|[+-]\d{2}:\d{2})$/);
+  assert.equal(Date.parse(contract.freshness.nextReviewAt), Date.parse(contract.sourceTimetableArtifact.freshUntil));
   assert.doesNotMatch(serialized, /serviceKey=|KRIC_SERVICE_KEY|DATA_GO_KR_SERVICE_KEY/);
 });

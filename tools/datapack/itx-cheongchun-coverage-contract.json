@@ -339,7 +339,7 @@
   },
   "freshness": {
     "status": "MISSING",
-    "nextReviewAt": "2026-07-20T00:00:00.000Z",
+    "nextReviewAt": "2026-07-20T00:00:00+09:00",
     "eventTrigger": "Korail station row 시각 값 제공 또는 다른 공식 station-level timetable 발견"
   },
   "claimGate": {

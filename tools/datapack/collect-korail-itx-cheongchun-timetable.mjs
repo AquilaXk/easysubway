@@ -124,7 +124,8 @@ export async function collectKorailItxCheongchunCompleteness({
       }
       const failureContext = completenessFailureContext(error) ?? rosterOdFailureContext(roster);
       const failureReasonCode = completenessFailureReason(error);
-      const classifiedFailureStage = failureReasonCode.startsWith("TAGO_OD_")
+      const classifiedFailureStage = failureReasonCode === "TAGO_QUOTA_BUDGET_EXHAUSTED"
+        || failureReasonCode.startsWith("TAGO_OD_")
         ? "OD_MATERIALIZATION"
         : failureReasonCode.startsWith("KORAIL_PLAN_") ? "PLAN_CORROBORATION" : failureStage;
       serviceDays.push({
@@ -253,7 +254,7 @@ function compareSnapshotSets(currentRows, previousRows, previousArtifactSha256) 
   };
 }
 
-export async function buildItxSourceCandidate({ completeness, packPath, now = new Date() }) {
+export async function buildItxSourceCandidate({ completeness, packPath, now = new Date(), repositoryRoot = repoRoot }) {
   if (completeness?.validationStatus !== "SUPPORTED" || completeness?.validationMode !== "ADMISSION") {
     throw new Error("ITX source candidate requires SUPPORTED admission completeness");
   }
@@ -292,7 +293,7 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
     policyVersion: "itx-snapshot-anomaly-v1",
     validationStatus: "SUPPORTED",
     promotionStatus: completeness.sourceTimetableArtifact.status,
-    canonicalPackIdentity: await readCanonicalPackIdentity(packPath, repoRoot),
+    canonicalPackIdentity: await readCanonicalPackIdentity(packPath, repositoryRoot),
     selectedServiceDates: completeness.selectedServiceDates,
     sourceLineage: serviceDays.map((day) => ({
       dayCd: day.dayCd,
@@ -376,11 +377,11 @@ async function promoteItxSourceCandidateLocked({
   const approvalRequired = bootstrap || changed;
   if (approvalRequired) {
     if (approvedSha256 !== candidateSha256 || !/^[a-f0-9]{64}$/.test(approvedSha256 ?? "")) {
-      throw new Error("SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
+      throw new Error(changed ? "SNAPSHOT_CHANGE_APPROVAL_INVALID" : "SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
     }
     await verifyOwnerApproval({
       approvalUrl,
-      expectedBody: `/approve-itx-bootstrap artifactId=${candidate.artifactId} sha256=${candidateSha256} policy=itx-snapshot-anomaly-v1`,
+      expectedBody: `/${changed ? "approve-itx-change" : "approve-itx-bootstrap"} artifactId=${candidate.artifactId} sha256=${candidateSha256} policy=itx-snapshot-anomaly-v1`,
       observedAt: candidate.observedAt,
       fetchImpl,
       githubToken,
@@ -2009,7 +2010,7 @@ export async function runKorailItxCompletenessCli({
     artifact.evidenceHash = sha256(JSON.stringify(artifact));
   }
   const candidate = artifact.validationStatus === "SUPPORTED" && !replay
-    ? await buildItxSourceCandidate({ completeness: artifact, packPath, now })
+    ? await buildItxSourceCandidate({ completeness: artifact, packPath, now, repositoryRoot })
     : null;
   const outputValue = candidate ?? artifact;
   const outputBytes = `${JSON.stringify(outputValue, null, 2)}\n`;

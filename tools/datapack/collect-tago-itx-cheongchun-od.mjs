@@ -376,6 +376,7 @@ export async function collectTagoItxCheongchunRoster({
   for (const { depStationId, arrStationId } of matrix.rows) {
     const departureStation = stationByProviderId.get(depStationId);
     const arrivalStation = stationByProviderId.get(arrStationId);
+    const remainingBeforeOd = requestBudget.remaining;
     try {
       const operation = await fetchAll("GetStrtpntAlocFndTrainInfo", {
         depPlaceId: depStationId,
@@ -407,6 +408,7 @@ export async function collectTagoItxCheongchunRoster({
       failedOds.push({
         departureStationId: departureStation.canonicalStationId,
         arrivalStationId: arrivalStation.canonicalStationId,
+        requestCount: remainingBeforeOd - requestBudget.remaining,
         ...failure,
       });
     }
@@ -414,6 +416,8 @@ export async function collectTagoItxCheongchunRoster({
   const trainNumbers = [...new Set(itineraries.map(({ trainNumber }) => normalizeTrainNumber(trainNumber)))].sort(naturalCompare);
   if (trainNumbers.length === 0 && failedOds.length === 0) throw new Error("TAGO ITX-청춘 roster returned zero rows");
   const buildArtifact = (materialized, reconstructionSummary = null) => {
+    const odRequestCount = remainingInitialRequestBudget - requestBudget.remaining;
+    const failedOdRequestCount = failedOds.reduce((total, { requestCount }) => total + requestCount, 0);
     const artifact = {
       schemaVersion: 2,
       artifactKind: "tago-itx-cheongchun-roster-evidence",
@@ -437,6 +441,9 @@ export async function collectTagoItxCheongchunRoster({
         catalogRequestCount,
         remainingInitialRequestBudget,
         initialOdRequestCount,
+        odRequestCount,
+        failedOdRequestCount,
+        actualRequestCount: catalogRequestCount + odRequestCount,
       },
       operations: [trainGrades, cities, ...stationOperations, ...odOperations].map(operationEvidence),
       trainNumbers: materialized?.trainNumbers ?? trainNumbers,

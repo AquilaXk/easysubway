@@ -551,6 +551,17 @@ test("ITX completeness는 partial day·replay·provider 오류를 admission하�
     assert.equal(artifact.serviceDays[0].reconstructionSummary.conflictingTimestampCount, 1);
   });
 
+  await context.test("quota exhaustion은 OD materialization 단계로 기록", async () => {
+    const artifact = await collectKorailItxCheongchunCompleteness({
+      serviceKey: "key", serviceDates, packPath: PACK_PATH,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectRosterImpl: async () => { throw new Error("TAGO_QUOTA_BUDGET_EXHAUSTED"); },
+      collectTimetableImpl: async () => assert.fail("must not run"),
+    });
+    assert.equal(artifact.serviceDays[0].failureReasonCode, "TAGO_QUOTA_BUDGET_EXHAUSTED");
+    assert.equal(artifact.serviceDays[0].failureStage, "OD_MATERIALIZATION");
+  });
+
   await context.test("불완전한 OD count는 OD materialization 단계로 기록", async () => {
     const artifact = await collectKorailItxCheongchunCompleteness({
       serviceKey: "key", serviceDates, packPath: PACK_PATH,
@@ -814,17 +825,21 @@ test("ITX candidate builder의 실제 payload에서 생성한 5-set은 promotion
     serviceDays,
   };
   try {
+    const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+    const alternatePackPath = path.join(dir, PACK_PATH);
     const invalidCompleteness = structuredClone(completeness);
     invalidCompleteness.serviceDays[0].timetable.transitTrips[0].serviceId = "holiday-kric";
     await assert.rejects(buildItxSourceCandidate({
       completeness: invalidCompleteness,
-      packPath: PACK_PATH,
+      packPath: alternatePackPath,
+      repositoryRoot: dir,
       now: new Date("2026-07-15T02:00:00.000Z"),
     }), /TAGO_OD_STOP_SEQUENCE_INVALID/);
 
     const candidate = await buildItxSourceCandidate({
       completeness,
-      packPath: PACK_PATH,
+      packPath: alternatePackPath,
+      repositoryRoot: dir,
       now: new Date("2026-07-15T02:00:00.000Z"),
     });
     assert.equal(candidate.canonicalPackIdentity.path, PACK_PATH);
@@ -832,7 +847,6 @@ test("ITX candidate builder의 실제 payload에서 생성한 5-set은 promotion
     const bytes = sourceBytes(candidate);
     const digest = createHash("sha256").update(bytes).digest("hex");
     await writeFile(candidatePath, bytes);
-    const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
     const promoted = await promoteItxSourceCandidate({
       candidatePath,
       approvedSha256: digest,
@@ -908,6 +922,84 @@ test("ITX bootstrap promotion은 exact candidate SHA와 OWNER approval 뒤에만
       contract.sourceTimetableArtifact.artifactPath,
       `tools/datapack/sources/${candidate.artifactId}.json`,
     );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("ITX changed candidate는 change OWNER approval로 immutable artifact를 승격한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-change-promotion-"));
+  const sourceDir = path.join(dir, "tools/datapack/sources");
+  try {
+    await mkdir(sourceDir, { recursive: true });
+    const previous = sourceCandidate({
+      artifactId: "itx-cheongchun-source-timetable-20260714010000000",
+      promotionStatus: "SUPPORTED",
+    });
+    const previousSequence = previous.stationSequences.find(({ dayCd, trainNumber }) => (
+      dayCd === "8" && trainNumber === "2001"
+    ));
+    previousSequence.stops[0].arrivalSeconds = 28_700;
+    previousSequence.stops[0].departureSeconds = 28_700;
+    const previousStopTime = previous.transitStopTimes.find(({ tripId, stationId }) => (
+      tripId.endsWith("-2001-8") && stationId === "station-a"
+    ));
+    previousStopTime.arrivalSeconds = 28_700;
+    previousStopTime.departureSeconds = 28_700;
+    const previousTuple = previous.normalizedSnapshotSets
+      .find(({ dayCd }) => dayCd === "8").sets.timetableTupleSet
+      .find(([, trainNumber, stationId]) => trainNumber === "2001" && stationId === "station-a");
+    previousTuple[3] = 28_700;
+    previousTuple[4] = 28_700;
+    rehashCandidate(previous);
+    const previousBytes = sourceBytes(previous);
+    const previousSha = createHash("sha256").update(previousBytes).digest("hex");
+    await writeFile(path.join(sourceDir, `${previous.artifactId}.json`), previousBytes);
+
+    const contractPath = await writeCoverageContract(dir, JSON.stringify({
+      sourceTimetableArtifact: {
+        status: "ADMITTED",
+        admissionEligible: true,
+        artifactId: previous.artifactId,
+        artifactPath: `tools/datapack/sources/${previous.artifactId}.json`,
+        sha256: previousSha,
+        schemaVersion: 1,
+        freshUntil: previous.freshUntil,
+        policyVersion: "itx-snapshot-anomaly-v1",
+      },
+    }));
+    const candidate = sourceCandidate({ promotionStatus: "CHANGE_REVIEW_REQUIRED" });
+    candidate.snapshotDiff = unchangedSnapshotDiff(previousSha, candidate.normalizedSnapshotSets);
+    candidate.snapshotDiff.status = "CHANGE_REVIEW_REQUIRED";
+    const changedDay = candidate.snapshotDiff.serviceDays.find(({ dayCd }) => dayCd === "8");
+    changedDay.blocked = true;
+    changedDay.sets.timetableTupleSet.added = [["8", "2001", "station-a", 28_800, 28_800]];
+    changedDay.sets.timetableTupleSet.removed = [["8", "2001", "station-a", 28_700, 28_700]];
+    rehashCandidate(candidate);
+    const candidateBytes = sourceBytes(candidate);
+    const digest = createHash("sha256").update(candidateBytes).digest("hex");
+    const candidatePath = path.join(dir, "candidate.json");
+    const approvalUrl = "https://github.com/AquilaXk/easysubway/issues/2135#issuecomment-123";
+    await writeFile(candidatePath, candidateBytes);
+
+    const promoted = await promoteItxSourceCandidate({
+      candidatePath,
+      approvedSha256: digest,
+      approvalUrl,
+      sourceOutputDir: sourceDir,
+      coverageContractPath: contractPath,
+      repositoryRoot: dir,
+      now: new Date("2026-07-15T02:00:00.000Z"),
+      fetchImpl: async () => new Response(JSON.stringify({
+        author_association: "OWNER",
+        html_url: approvalUrl,
+        body: `/approve-itx-change artifactId=${candidate.artifactId} sha256=${digest} policy=itx-snapshot-anomaly-v1`,
+        created_at: "2026-07-15T01:30:00.000Z",
+      }), { status: 200, headers: { "content-type": "application/json" } }),
+    });
+    assert.equal(promoted.sourceTimetableArtifact.promotion.mode, "CHANGE_OWNER_APPROVED");
+    assert.equal(promoted.sourceTimetableArtifact.promotion.previousArtifactSha256, previousSha);
+    assert.deepEqual(await readFile(promoted.artifactPath), Buffer.from(candidateBytes));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
