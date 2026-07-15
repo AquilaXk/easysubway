@@ -74,6 +74,8 @@ test("Phase A summary generator binds a complete RC and validator accepts it", a
     output.summary,
     "--rc-manifest",
     output.manifest,
+    "--now",
+    validPhaseANow,
     "--require-pass",
   ], { cwd: root });
 });
