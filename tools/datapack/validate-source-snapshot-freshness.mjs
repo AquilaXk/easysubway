@@ -197,6 +197,16 @@ async function main(argv) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report hash");
   }
   const governancePolicy = governancePolicyText ? JSON.parse(governancePolicyText) : null;
+  const purgeReport = purgeReportText ? JSON.parse(purgeReportText) : null;
+  if (purgeReport != null) {
+    const suppliedPurgeEvaluationAt = new Date(requiredUtcInstant(
+      requiredArg(args, "purge-evaluation-at"),
+      "--purge-evaluation-at",
+    )).toISOString();
+    if (purgeReport.evaluatedAt !== suppliedPurgeEvaluationAt) {
+      throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report evaluation time");
+    }
+  }
   const result = validateSourceSnapshotFreshness({
     buildSpec,
     snapshots,
@@ -205,7 +215,7 @@ async function main(argv) {
     governancePolicy,
     inventory,
     governancePolicySha256: governancePolicyText ? sha256(governancePolicyText) : null,
-    purgeReport: purgeReportText ? JSON.parse(purgeReportText) : null,
+    purgeReport,
   });
   process.stdout.write(`${JSON.stringify({
     status: "PASS",

@@ -263,7 +263,7 @@ jobs:
             --inventory tools/datapack/source-inventory.json \
           )
           if [[ -n "${EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT:-}" ]]; then
-            freshness_args+=(--evaluation-at "${EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT}")
+            freshness_args+=(--purge-evaluation-at "${EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT}")
           fi
           node tools/datapack/validate-source-snapshot-freshness.mjs "${freshness_args[@]}"
 

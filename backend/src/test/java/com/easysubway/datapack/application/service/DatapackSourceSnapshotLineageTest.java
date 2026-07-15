@@ -213,7 +213,7 @@ class DatapackSourceSnapshotLineageTest {
 				snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed,
 				credential_redacted, previous_snapshot_id, diff_summary, diff_summary_json,
 				freshness_expires_at, raw_retention_expires_at, governance_policy_version, governance_policy_sha256
-			) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE,
+			) VALUES (?, ?, ?, ?, ?, ?, 10, ?, ?, ?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE,
 				TRUE, NULL, NULL, NULL, ?, ?, NULL, NULL)
 			""",
 			"snapshot-legacy", "source-a", "provider",

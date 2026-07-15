@@ -442,6 +442,39 @@ test("알 수 없는 release protection reason은 raw retention 만료를 우회
   assert.ok(result.reasonCodes.includes("RAW_RETENTION_OVERDUE"));
 });
 
+test("release protection evidence는 trusted 현재 시각 기준 5분까지만 유효하다", () => {
+  const input = governanceInput();
+  const expiredSnapshot = {
+    ...input.snapshot,
+    freshnessExpiresAt: "2027-04-16T00:00:00Z",
+    retrievedAt: "2026-04-16T00:00:00Z",
+    rawRetentionExpiresAt: "2026-07-15T00:00:00.000Z",
+  };
+  const base = {
+    ...input,
+    snapshot: expiredSnapshot,
+    freshnessPolicy: {
+      ...input.freshnessPolicy,
+      sourceClasses: [{ ...input.freshnessPolicy.sourceClasses[0], reverificationCadence: "P1Y" }],
+    },
+    evaluationAt: "2026-07-16T00:05:00Z",
+    protectedBy: ["ACTIVE_RELEASE"],
+  };
+
+  assert.ok(!evaluateSourceGovernance({
+    ...base,
+    protectionEvaluatedAt: "2026-07-16T00:00:01Z",
+  }).reasonCodes.includes("RAW_RETENTION_OVERDUE"));
+  assert.ok(evaluateSourceGovernance({
+    ...base,
+    protectionEvaluatedAt: "2026-07-15T23:59:59Z",
+  }).reasonCodes.includes("RAW_RETENTION_OVERDUE"));
+  assert.ok(evaluateSourceGovernance({
+    ...base,
+    protectionEvaluatedAt: "2026-07-16T00:05:01Z",
+  }).reasonCodes.includes("RAW_RETENTION_OVERDUE"));
+});
+
 test("같은 입력은 byte-identical governance summary와 hash를 만든다", () => {
   const input = governanceInput();
   const firstSummary = buildGovernanceSummary({ entries: [input], evaluationAt: input.evaluationAt });

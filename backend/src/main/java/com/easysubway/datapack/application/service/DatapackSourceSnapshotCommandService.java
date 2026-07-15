@@ -169,6 +169,24 @@ public class DatapackSourceSnapshotCommandService {
 		String governancePolicyVersion,
 		String governancePolicySha256
 	) {
+		return snapshotFrom(
+			command,
+			command.coverageCount(),
+			command.diffSummaryJson(),
+			rawRetentionExpiresAt,
+			governancePolicyVersion,
+			governancePolicySha256
+		);
+	}
+
+	private static DataSourceSnapshot snapshotFrom(
+		SourceSnapshotCommand command,
+		int coverageCount,
+		String diffSummaryJson,
+		LocalDateTime rawRetentionExpiresAt,
+		String governancePolicyVersion,
+		String governancePolicySha256
+	) {
 		return new DataSourceSnapshot(
 			command.snapshotId(),
 			command.sourceId(),
@@ -176,7 +194,7 @@ public class DatapackSourceSnapshotCommandService {
 			command.retrievedAt(),
 			command.sourceUpdatedAt(),
 			command.rowCount(),
-			command.coverageCount(),
+			coverageCount,
 			command.rawSha256(),
 			command.rawObjectUri(),
 			command.redactedRequestFingerprint(),
@@ -189,7 +207,7 @@ public class DatapackSourceSnapshotCommandService {
 			command.credentialRedacted(),
 			command.previousSnapshotId(),
 			command.diffSummary(),
-			command.diffSummaryJson(),
+			diffSummaryJson,
 			command.freshnessExpiresAt(),
 			rawRetentionExpiresAt,
 			governancePolicyVersion,
@@ -201,21 +219,27 @@ public class DatapackSourceSnapshotCommandService {
 		SourceSnapshotCommand command,
 		SourceSnapshotEventRow event
 	) {
-		DataSourceSnapshot requestedSnapshot = snapshotFrom(
+		var storedSnapshot = snapshotRepository.loadSnapshot(event.snapshotId());
+		if (!command.snapshotId().equals(event.snapshotId())
+			|| !command.requestedBy().equals(event.requestedBy())
+			|| !command.reason().equals(event.reason())
+			|| storedSnapshot.filter(snapshot -> replaySnapshot(command, snapshot).equals(snapshot)).isEmpty()) {
+			throw new IllegalArgumentException(
+				"idempotency key already belongs to a different source snapshot operation");
+		}
+	}
+
+	private static DataSourceSnapshot replaySnapshot(SourceSnapshotCommand command, DataSourceSnapshot storedSnapshot) {
+		boolean legacy = storedSnapshot.governancePolicyVersion() == null
+			&& storedSnapshot.governancePolicySha256() == null;
+		return snapshotFrom(
 			command,
+			legacy ? storedSnapshot.coverageCount() : command.coverageCount(),
+			legacy ? storedSnapshot.diffSummaryJson() : command.diffSummaryJson(),
 			command.rawRetentionExpiresAt(),
 			command.governancePolicyVersion(),
 			command.governancePolicySha256()
 		);
-		if (!command.snapshotId().equals(event.snapshotId())
-			|| !command.requestedBy().equals(event.requestedBy())
-			|| !command.reason().equals(event.reason())
-			|| snapshotRepository.loadSnapshot(event.snapshotId())
-				.filter(requestedSnapshot::equals)
-				.isEmpty()) {
-			throw new IllegalArgumentException(
-				"idempotency key already belongs to a different source snapshot operation");
-		}
 	}
 
 	public record SourceSnapshotCommand(

@@ -4,6 +4,7 @@ import { deriveFreshness } from "./freshness-policy.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
+const RELEASE_PROTECTION_MAX_AGE_MS = 5 * 60 * 1_000;
 const RELEASE_PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const LICENSE_STATUSES = new Set(["APPROVED", "REVIEW_REQUIRED", "BLOCKED", "EXPIRED"]);
 const LEGAL_HOLD_REASONS = new Set(["REGULATORY_AUDIT", "SECURITY_INVESTIGATION", "LEGAL_REQUEST"]);
@@ -263,7 +264,9 @@ function evaluateRetention({
   if (!validProtection) reasonCodes.add("RAW_RETENTION_OVERDUE");
   let protectionIsCurrent = false;
   try {
-    protectionIsCurrent = requiredUtcInstant(protectionEvaluatedAt, "protectionEvaluatedAt") === evaluatedMillis;
+    const protectionMillis = requiredUtcInstant(protectionEvaluatedAt, "protectionEvaluatedAt");
+    protectionIsCurrent = protectionMillis <= evaluatedMillis
+      && evaluatedMillis - protectionMillis <= RELEASE_PROTECTION_MAX_AGE_MS;
   } catch {
     protectionIsCurrent = false;
   }
