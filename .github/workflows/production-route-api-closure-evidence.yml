@@ -1,16 +1,12 @@
 name: Production route API closure evidence
 
 on:
-  workflow_dispatch:
-    inputs:
-      expected_sha:
-        description: "현재 production에 배포돼 있어야 하는 40자 commit SHA"
-        required: true
-        type: string
-      expected_image_digest:
-        description: "현재 production에 배포돼 있어야 하는 sha256 image digest"
-        required: true
-        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/production-route-api-closure-evidence.yml"
+      - "tools/ci/production-route-api-closure-evidence-workflow.test.mjs"
 
 permissions:
   contents: read
@@ -26,8 +22,8 @@ jobs:
       group: cd-production-deploy
       cancel-in-progress: false
     env:
-      EXPECTED_SHA: ${{ inputs.expected_sha }}
-      EXPECTED_IMAGE_DIGEST: ${{ inputs.expected_image_digest }}
+      EXPECTED_SHA: cba25764de4ed646e398b2141b64fa41767ed3cc
+      EXPECTED_IMAGE_DIGEST: sha256:ef9067f8890e72a5a4cd2fa3ab478d80951e577042e3016bff266b2fd24859e8
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
 
     steps:

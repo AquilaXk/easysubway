@@ -7,9 +7,10 @@ const workflowPath = ".github/workflows/production-route-api-closure-evidence.ym
 test("production route API closure evidence는 현재 배포와 origin 403·row 불변을 검증한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
 
-  assert.match(workflow, /^on:\n  workflow_dispatch:\n/m);
-  assert.match(workflow, /expected_sha:/);
-  assert.match(workflow, /expected_image_digest:/);
+  assert.match(workflow, /^on:\n  push:\n    branches:\n      - main\n    paths:/m);
+  assert.doesNotMatch(workflow, /workflow_dispatch/);
+  assert.match(workflow, /EXPECTED_SHA: cba25764de4ed646e398b2141b64fa41767ed3cc/);
+  assert.match(workflow, /EXPECTED_IMAGE_DIGEST: sha256:ef9067f8890e72a5a4cd2fa3ab478d80951e577042e3016bff266b2fd24859e8/);
   assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
   assert.doesNotMatch(workflow, /environment:\n\s+name: production/);
   assert.match(workflow, /permissions:\n\s+contents: read/);
