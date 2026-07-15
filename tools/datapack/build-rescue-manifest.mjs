@@ -64,7 +64,8 @@ export function buildRescueManifest(input) {
   if (Date.parse(approval.approvedAt) > Date.parse(publishedAt)) {
     throw new Error("approval.approvedAt must not be after publishedAt");
   }
-  if (typeof input.privateKey !== "string" || input.privateKey.trim() === "") {
+  const hasProductionPack = knownGood.packs.some((pack) => pack.artifactKind === "production");
+  if (hasProductionPack && (typeof input.privateKey !== "string" || input.privateKey.trim() === "")) {
     throw new Error("signing private key is required");
   }
 
@@ -97,12 +98,17 @@ export function buildRescueManifest(input) {
   };
   const manifest = {
     ...unsigned,
-    signature: {
-      algorithm: "rsa-sha256-manifest-v2",
-      value: rsaSha256Signature(input.privateKey, canonicalJson(unsigned)),
-    },
+    signature: hasProductionPack
+      ? {
+          algorithm: "rsa-sha256-manifest-v2",
+          value: rsaSha256Signature(input.privateKey, canonicalJson(unsigned)),
+        }
+      : {
+          algorithm: "sha256-manifest-v2",
+          value: sha256(Buffer.from(canonicalJson(unsigned))),
+        },
   };
-  validateManifest(manifest, { requireProduction: true, releasesTarget: true });
+  validateManifest(manifest, { requireProduction: current.channel === "production", releasesTarget: true });
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
   const manifestSha256 = sha256(manifestBytes);
 
@@ -150,18 +156,22 @@ async function main() {
     readFile(catalogPath),
     readFile(approvalPath),
   ]);
+  const currentManifest = JSON.parse(currentBytes.toString("utf8"));
+  const knownGoodManifest = JSON.parse(knownGoodBytes.toString("utf8"));
   const catalog = JSON.parse(catalogBytes.toString("utf8"));
   const result = buildRescueManifest({
-    currentManifest: JSON.parse(currentBytes.toString("utf8")),
+    currentManifest,
     currentManifestBytes: currentBytes,
     failedSequence: Number(requiredArg(args, "failed-sequence")),
-    knownGoodManifest: JSON.parse(knownGoodBytes.toString("utf8")),
+    knownGoodManifest,
     knownGoodManifestBytes: knownGoodBytes,
     catalogSequences: Array.isArray(catalog) ? catalog : catalog.sequences,
     approval: JSON.parse(approvalBytes.toString("utf8")),
     publishedAt: requiredArg(args, "published-at"),
     expiresAt: requiredArg(args, "expires-at"),
-    privateKey: signingPrivateKey(),
+    privateKey: knownGoodManifest.packs?.some((pack) => pack.artifactKind === "production")
+      ? signingPrivateKey()
+      : undefined,
   });
   await Promise.all([
     writeJsonBytes(outputPath, result.manifestBytes),

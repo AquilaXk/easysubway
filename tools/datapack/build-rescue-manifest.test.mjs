@@ -3,7 +3,7 @@ import { createHash, createSign, generateKeyPairSync } from "node:crypto";
 import test from "node:test";
 
 import { buildRescueManifest } from "./build-rescue-manifest.mjs";
-import { canonicalJson, withoutSignature } from "./lib/manifest-validation.mjs";
+import { canonicalJson, validateManifest, withoutSignature } from "./lib/manifest-validation.mjs";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const privateKeyPem = privateKey.export({ type: "pkcs8", format: "pem" });
@@ -166,6 +166,23 @@ test("production-equivalent RSA private key가 없으면 rescue 서명을 만들
   );
 });
 
+test("staging fixture rescue는 private key 없이 fixture 서명 계약을 유지한다", () => {
+  const current = fixtureManifest(115);
+  const knownGood = fixtureManifest(114);
+  const result = buildRescueManifest({
+    ...validInput(),
+    currentManifest: current,
+    currentManifestBytes: bytes(current),
+    knownGoodManifest: knownGood,
+    knownGoodManifestBytes: bytes(knownGood),
+    approval: approved(current, knownGood),
+    privateKey: undefined,
+  });
+
+  assert.equal(result.manifest.signature.algorithm, "sha256-manifest-v2");
+  assert.doesNotThrow(() => validateManifest(result.manifest, { releasesTarget: true }));
+});
+
 test("known-good의 지속 pack 선택만 보존하고 rollout은 제거한다", () => {
   const activePack = { id: "capital", version: "1" };
   const emergencyOverride = { ...activePack, reason: "KNOWN_GOOD_OVERRIDE" };
@@ -235,6 +252,33 @@ function manifest(releaseSequence, overrides = {}) {
   value.signature = {
     algorithm: "rsa-sha256-manifest-v2",
     value: sign(canonicalJson(withoutSignature(value))),
+  };
+  return value;
+}
+
+function fixtureManifest(releaseSequence) {
+  const value = manifest(releaseSequence, {
+    keyId: "fixture-key",
+    packs: [fixturePack()],
+  });
+  value.signature = {
+    algorithm: "sha256-manifest-v2",
+    value: sha256(canonicalJson(withoutSignature(value))),
+  };
+  return value;
+}
+
+function fixturePack() {
+  const value = {
+    ...pack(),
+    artifactKind: "fixture",
+    url: "catalog/capital-v1.sqlite.gz",
+  };
+  const payload = `${value.id}:${value.version}:${value.sha256}:${value.sqliteSha256}:${value.sizeBytes}`;
+  value.signature = { algorithm: "sha256-pack-manifest-v2", value: sha256(payload) };
+  value.representativeRouteRegressionSignature = {
+    algorithm: "sha256-route-regression-v1",
+    value: sha256(`${payload}:${JSON.stringify(value.representativeRouteRegressions)}`),
   };
   return value;
 }
