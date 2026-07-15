@@ -48,12 +48,16 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(workflow, /backend\/src\/main\/resources\/db\/migration\/(postgresql|h2)\/V51__/);
   assert.match(workflow, /snapshot-gate:[\s\S]*needs: verify/);
   assert.match(workflow, /snapshot-gate:[\s\S]*runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
+  assert.match(workflow, /snapshot-gate:[\s\S]*environment: production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*group: cd-production-deploy/);
   assert.doesNotMatch(workflow, /upload-artifact|workflow_dispatch/);
 
   assert.match(snapshotGate, /^set -euo pipefail$/m);
   assert.match(snapshotGate, /^umask 077$/m);
-  assert.match(snapshotGate, /flock 9/);
+  assert.match(snapshotGate, /if ! flock -w 300 9/);
+  assert.match(snapshotGate, /could not acquire deploy lock within timeout/);
+  assert.match(snapshotGate, /existing snapshot backup or checksum file is missing/);
+  assert.match(snapshotGate, /existing snapshot backup checksum mismatch/);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore/);
   assert.match(snapshotGate, /--pull never/);
@@ -63,6 +67,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /favorite_route_stations/);
   assert.match(snapshotGate, /route_feedbacks/);
   assert.match(snapshotGate, /org\.opencontainers\.image\.revision/);
+  assert.match(snapshotGate, /production_image=.*\{\{\.Image\}\}/);
+  assert.doesNotMatch(snapshotGate, /production_image=.*\{\{\.Config\.Image\}\}/);
   assert.match(snapshotGate, /report_file/);
   assert.match(snapshotGate, /cat "\$\{report_file\}"/);
   assert.match(snapshotGate, /snapshot-complete/);

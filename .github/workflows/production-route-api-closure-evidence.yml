@@ -179,6 +179,7 @@ jobs:
       - self-hosted
       - easysubway-production
     timeout-minutes: 15
+    environment: production
     concurrency:
       group: cd-production-deploy
       cancel-in-progress: false

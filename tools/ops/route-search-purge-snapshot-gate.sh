@@ -26,7 +26,10 @@ mkdir -p "${BACKUP_DIR}" "${EVIDENCE_DIR}"
 chmod 700 "${BACKUP_DIR}" "${EVIDENCE_DIR}"
 
 exec 9>"${DEPLOY_ROOT}/deploy.lock"
-flock 9
+if ! flock -w 300 9; then
+	printf 'could not acquire deploy lock within timeout\n' >&2
+	exit 1
+fi
 
 if [[ -f "${MARKER_FILE}" ]] && grep -qx 'status=snapshot-complete' "${MARKER_FILE}"; then
 	backup_file="$(sed -n 's/^backup_file=//p' "${MARKER_FILE}")"
@@ -34,8 +37,14 @@ if [[ -f "${MARKER_FILE}" ]] && grep -qx 'status=snapshot-complete' "${MARKER_FI
 		"${BACKUP_DIR}"/*.dump) ;;
 		*) printf 'snapshot marker backup path is invalid\n' >&2; exit 1 ;;
 	esac
-	test -f "${backup_file}" -a -f "${backup_file}.sha256"
-	sha256sum -c "${backup_file}.sha256" >/dev/null
+	if [[ ! -f "${backup_file}" || ! -f "${backup_file}.sha256" ]]; then
+		printf 'existing snapshot backup or checksum file is missing\n' >&2
+		exit 1
+	fi
+	if ! sha256sum -c "${backup_file}.sha256" >/dev/null; then
+		printf 'existing snapshot backup checksum mismatch\n' >&2
+		exit 1
+	fi
 	{
 		echo '### #1913 route purge snapshot gate'
 		echo '- status: `snapshot-complete` (existing verified backup)'
@@ -56,7 +65,7 @@ if [[ "${image_revision}" != "${current_sha}" ]]; then
 	exit 1
 fi
 
-production_image="$(docker inspect --format '{{.Config.Image}}' easysubway-postgres)"
+production_image="$(docker inspect --format '{{.Image}}' easysubway-postgres)"
 production_version_num="$(docker exec easysubway-postgres sh -lc \
 	'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SHOW server_version_num;"' \
 	| tr -d '[:space:]')"
