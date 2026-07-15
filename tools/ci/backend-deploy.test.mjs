@@ -497,12 +497,29 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   const deploy = read("tools/deploy/deploy-backend.sh");
   const host = read("infra/nginx/host-easysubway.conf.template");
   const routeHeaders = read("infra/nginx/host-route-v2-proxy.conf");
+  const cloudflareCidrs = [
+    ...read("infra/terraform/oci/always-free-a1-flex/locals.tf")
+      .match(/cloudflare_ipv4_ingress_cidrs\s*=\s*toset\(\[([\s\S]*?)\]\)/)[1]
+      .matchAll(/"([0-9.]+\/[0-9]+)"/g),
+  ].map((match) => match[1]);
 
-  assert.equal((host.match(/location = \/api\/v2\/routes\/session/g) ?? []).length, 2);
-  assert.equal((host.match(/location = \/api\/v2\/routes\/search/g) ?? []).length, 2);
-  assert.equal((host.match(/__ROUTE_V2_ACTION__/g) ?? []).length, 4);
-  assert.match(host, /location \/ \{[\s\S]*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/);
-  assert.match(routeHeaders, /proxy_set_header CF-Connecting-IP \$http_cf_connecting_ip;/);
+  const httpServer = host.slice(0, host.indexOf("server {", 1));
+  const httpsServer = host.slice(host.indexOf("server {", 1));
+  assert.match(httpServer, /location \^~ \/\.well-known\/acme-challenge\//);
+  assert.match(httpServer, /location \/ \{\s*return 308 https:\/\/\$host\$request_uri;\s*\}/);
+  assert.doesNotMatch(httpServer, /proxy_pass|__ROUTE_V2_ACTION__/);
+  assert.equal((httpsServer.match(/location = \/api\/v2\/routes\/session/g) ?? []).length, 1);
+  assert.equal((httpsServer.match(/location = \/api\/v2\/routes\/search/g) ?? []).length, 1);
+  assert.equal((httpsServer.match(/__ROUTE_V2_ACTION__/g) ?? []).length, 2);
+  assert.match(httpsServer, /location \/ \{[\s\S]*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/);
+  assert.deepEqual(
+    [...routeHeaders.matchAll(/set_real_ip_from ([0-9.]+\/[0-9]+);/g)].map((match) => match[1]),
+    cloudflareCidrs,
+  );
+  assert.match(routeHeaders, /real_ip_header CF-Connecting-IP;/);
+  assert.match(routeHeaders, /real_ip_recursive on;/);
+  assert.match(routeHeaders, /proxy_set_header CF-Connecting-IP \$remote_addr;/);
+  assert.doesNotMatch(routeHeaders, /proxy_set_header CF-Connecting-IP \$http_cf_connecting_ip;/);
   assert.match(routeHeaders, /proxy_set_header X-Forwarded-For "";/);
   assert.match(deploy, /sudo nginx -t/);
   assert.match(deploy, /sudo systemctl reload nginx/);

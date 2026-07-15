@@ -4,6 +4,7 @@ real_ip_header CF-Connecting-IP;
 real_ip_recursive on;
 
 limit_req_zone $binary_remote_addr zone=route_session_ip:10m rate=${EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE}r/m;
+limit_req_zone $binary_remote_addr zone=route_search_ip:10m rate=${EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE}r/m;
 limit_req_zone $http_authorization zone=route_search_token:10m rate=${EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE}r/m;
 log_format route_v2_session_rate_limited escape=json '{"event":"route_v2_rate_limited","scope":"session","status":429}';
 log_format route_v2_search_rate_limited escape=json '{"event":"route_v2_rate_limited","scope":"search","status":429}';
@@ -25,6 +26,7 @@ server {
 
 	location = /api/v2/routes/search {
 		error_page 429 = @route_search_rate_limited;
+		limit_req zone=route_search_ip burst=${EASYSUBWAY_ROUTE_V2_SEARCH_BURST} nodelay;
 		limit_req zone=route_search_token burst=${EASYSUBWAY_ROUTE_V2_SEARCH_BURST} nodelay;
 		proxy_pass http://backend:8080;
 		include /tmp/nginx-conf.d/route-v2-proxy-headers.inc;

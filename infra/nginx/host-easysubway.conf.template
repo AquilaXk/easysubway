@@ -8,19 +8,8 @@ server {
         default_type text/plain;
     }
 
-    location = /api/v2/routes/session {
-        __ROUTE_V2_ACTION__
-        include /etc/nginx/snippets/easysubway-route-v2-proxy.conf;
-    }
-
-    location = /api/v2/routes/search {
-        __ROUTE_V2_ACTION__
-        include /etc/nginx/snippets/easysubway-route-v2-proxy.conf;
-    }
-
     location / {
-        proxy_pass http://127.0.0.1:__BACKEND_PORT__;
-        include /etc/nginx/snippets/easysubway-default-proxy.conf;
+        return 308 https://$host$request_uri;
     }
 }
 

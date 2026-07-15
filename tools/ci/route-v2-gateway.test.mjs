@@ -11,6 +11,8 @@ test("Route V2 gateway는 IP·token limiter와 exact 429 계약을 소유한다"
 
   assert.match(nginx, /rate=\$\{EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE\}r\/m;/);
   assert.match(nginx, /rate=\$\{EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE\}r\/m;/);
+  assert.match(nginx, /limit_req_zone \$binary_remote_addr zone=route_search_ip:/);
+  assert.match(nginx, /limit_req_zone \$http_authorization zone=route_search_token:/);
   assert.match(nginx, /burst=\$\{EASYSUBWAY_ROUTE_V2_SESSION_BURST\} nodelay;/);
   assert.match(nginx, /burst=\$\{EASYSUBWAY_ROUTE_V2_SEARCH_BURST\} nodelay;/);
   assert.match(nginx, /limit_req_status 429;/);
@@ -19,6 +21,9 @@ test("Route V2 gateway는 IP·token limiter와 exact 429 계약을 소유한다"
   assert.match(nginx, /limit_req_log_level info;/);
   assert.match(nginx, /error_page 429 = @route_session_rate_limited;/);
   assert.match(nginx, /error_page 429 = @route_search_rate_limited;/);
+  const searchLocation = nginx.match(/location = \/api\/v2\/routes\/search \{([\s\S]*?)\n\t\}/)?.[1] ?? "";
+  assert.match(searchLocation, /limit_req zone=route_search_ip burst=\$\{EASYSUBWAY_ROUTE_V2_SEARCH_BURST\} nodelay;/);
+  assert.match(searchLocation, /limit_req zone=route_search_token burst=\$\{EASYSUBWAY_ROUTE_V2_SEARCH_BURST\} nodelay;/);
   assert.match(nginx, /return 429 '\{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"\}';/);
   assert.match(nginx, /add_header Retry-After 60 always;/);
   assert.match(nginx, /add_header Cache-Control "private, no-store" always;/);
@@ -77,11 +82,13 @@ test("Route V2 gateway runtime integration probe는 privacy·bucket·identifier-
 
   assert.match(probe, /CF-Connecting-IP: 198\.51\.100\.10/);
   assert.match(probe, /CF-Connecting-IP: 198\.51\.100\.20/);
+  assert.match(probe, /CF-Connecting-IP: 198\.51\.100\.40/);
   assert.match(probe, /rawIpHeaderCount/);
   assert.match(probe, /ROUTE_RATE_LIMITED/);
   assert.match(probe, /docker logs/);
   assert.match(probe, /"scope":"session"/);
   assert.match(probe, /"scope":"search"/);
   assert.match(probe, /integration-token/);
-  assert.match(probe, /\{"requests":8\}/);
+  assert.match(probe, /rotating-token/);
+  assert.match(probe, /\{"requests":12\}/);
 });

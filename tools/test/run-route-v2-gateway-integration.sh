@@ -66,19 +66,38 @@ rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS"
 
 curl -fsS -o /dev/null -H 'CF-Connecting-IP: 198.51.100.20' "$BASE/api/v2/routes/session"
 
-for attempt in 1 2 3 4; do
-	curl -fsS -o /dev/null -H 'Authorization: Bearer integration-token' "$BASE/api/v2/routes/search"
+for client_suffix in 31 32 33 34; do
+	curl -fsS -o /dev/null \
+		-H "CF-Connecting-IP: 198.51.100.$client_suffix" \
+		-H 'Authorization: Bearer integration-token' \
+		"$BASE/api/v2/routes/search"
 done
-STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' -H 'Authorization: Bearer integration-token' "$BASE/api/v2/routes/search")
+STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
+	-H 'CF-Connecting-IP: 198.51.100.35' \
+	-H 'Authorization: Bearer integration-token' \
+	"$BASE/api/v2/routes/search")
+[ "$STATUS" = 429 ]
+[ "$(tr -d '\n' < "$TMP_BODY")" = '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"}' ]
+
+for attempt in 1 2 3 4; do
+	curl -fsS -o /dev/null \
+		-H 'CF-Connecting-IP: 198.51.100.40' \
+		-H "Authorization: Bearer rotating-token-$attempt" \
+		"$BASE/api/v2/routes/search"
+done
+STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
+	-H 'CF-Connecting-IP: 198.51.100.40' \
+	-H 'Authorization: Bearer rotating-token-5' \
+	"$BASE/api/v2/routes/search")
 [ "$STATUS" = 429 ]
 [ "$(tr -d '\n' < "$TMP_BODY")" = '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"}' ]
 
 sleep 1
 docker logs "$GATEWAY" > "$TMP_LOG" 2>&1
 [ "$(rg -c '"scope":"session"' "$TMP_LOG")" = 1 ]
-[ "$(rg -c '"scope":"search"' "$TMP_LOG")" = 1 ]
-! rg -q '198\.51\.100\.|integration-token' "$TMP_LOG"
+[ "$(rg -c '"scope":"search"' "$TMP_LOG")" = 2 ]
+! rg -q '198\.51\.100\.|integration-token|rotating-token' "$TMP_LOG"
 BACKEND_PROBE=$(docker exec "$BACKEND" wget -qO- http://127.0.0.1:8080/probe)
-[ "$BACKEND_PROBE" = '{"requests":8}' ]
+[ "$BACKEND_PROBE" = '{"requests":12}' ]
 
-echo "Route V2 gateway integration passed: trusted-IP buckets, direct exact 429, stripped IP headers, identifier-free limiter logs"
+echo "Route V2 gateway integration passed: trusted-IP and token buckets, direct exact 429, stripped IP headers, identifier-free limiter logs"

@@ -3,6 +3,7 @@ package com.easysubway.route.adapter.in.web;
 import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.route.application.service.ItxTimetableUnavailableException;
 import com.easysubway.route.application.service.RouteSessionAttestationRejectedException;
+import com.easysubway.transit.domain.StationNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
@@ -45,7 +46,12 @@ class RouteV2ExceptionHandler {
 		return error(HttpStatus.SERVICE_UNAVAILABLE, "ITX_TIMETABLE_UNAVAILABLE", "ITX 시간표를 불러올 수 없어요");
 	}
 
-	@ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class, InvalidRequestException.class})
+	@ExceptionHandler({
+		MethodArgumentNotValidException.class,
+		HttpMessageNotReadableException.class,
+		InvalidRequestException.class,
+		StationNotFoundException.class
+	})
 	ResponseEntity<RouteV2Error> handleInvalidRequest(HttpServletRequest request) {
 		if ("/api/v2/routes/session".equals(request.getRequestURI())) {
 			return handleAttestationRejected();

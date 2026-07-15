@@ -27,6 +27,7 @@ import com.easysubway.route.domain.RouteRefreshResult;
 import com.easysubway.route.domain.RouteRefreshStatus;
 import com.easysubway.route.domain.RouteSearchResult;
 import com.easysubway.route.domain.RouteSearchStatus;
+import com.easysubway.transit.domain.StationNotFoundException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -253,7 +254,7 @@ class ProductionRouteApiClosureTest {
 	void invalidStationPrecedesMissingTimetable() throws Exception {
 		String token = "F".repeat(43);
 		insertSession(token, 0);
-		doThrow(new InvalidRequestException("존재하지 않는 역입니다."))
+		doThrow(new StationNotFoundException())
 			.when(routeSearchUseCase)
 			.validateRouteSearch(argThat(command -> "missing-station".equals(command.originStationId())));
 
