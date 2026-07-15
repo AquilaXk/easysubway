@@ -1486,7 +1486,15 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA",
     "EASYSUBWAY_GOOGLE_PLAY_LATEST_VERSION_CODE=0",
     "EASYSUBWAY_GOOGLE_PLAY_SERVICE_ACCOUNT_BASE64=base64-json",
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789012",
+    "EASYSUBWAY_ROUTE_V2_GATEWAY_PORT=8081",
+    "EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED=false",
+    "EASYSUBWAY_ROUTE_V2_TRUSTED_PROXY_CIDR=172.16.0.0/12",
     "EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+    "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE=5",
+    "EASYSUBWAY_ROUTE_V2_SESSION_BURST=2",
+    "EASYSUBWAY_ROUTE_V2_SEARCH_RATE_PER_MINUTE=10",
+    "EASYSUBWAY_ROUTE_V2_SEARCH_BURST=3",
     "EASYSUBWAY_ROUTE_V2_SESSION_MAX_REQUESTS=50",
     "EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     "EASYSUBWAY_PLAY_INTEGRITY_CREDENTIALS_BASE64=e30=",
@@ -2016,6 +2024,11 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
     "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:443",
   ], { cwd: root });
+  await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+    "--dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true",
+    "--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
+  ], { cwd: root });
   const injectionDir = await mkdtemp(path.join(tmpdir(), "release-dart-define-"));
   const injectionMarker = path.join(injectionDir, "executed");
   try {
@@ -2056,6 +2069,19 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
     ], { cwd: root }),
     /EASYSUBWAY_DEMO_HOME_DATA is not allowed in release/,
   );
+  for (const cloudProjectNumber of [undefined, "", "0", "12a"] ) {
+    const args = [
+      "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+      "--dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true",
+    ];
+    if (cloudProjectNumber !== undefined) {
+      args.push(`--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=${cloudProjectNumber}`);
+    }
+    await assert.rejects(
+      execFileAsync("tools/mobile/validate-release-dart-defines.sh", args, { cwd: root }),
+      /EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER/,
+    );
+  }
 });
 
 test("mobile datapack asset audit는 fixture provenance와 최소 row를 검사한다", async () => {
@@ -2131,6 +2157,15 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
 	  assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
+	  assert.equal(
+	    (workflow.match(/--dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true/g) ?? []).length,
+	    2,
+	  );
+	  assert.equal(
+	    (workflow.match(/--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="\$\{EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER\}"/g) ?? []).length,
+	    2,
+	  );
+	  assert.doesNotMatch(workflow, /vars\.EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER/);
 	  assert.doesNotMatch(workflow, /--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true/);
   assert.match(workflow, /build\/app\/outputs\/bundle\/release\/app-release\.aab/);
   assert.match(workflow, /build\/app\/outputs\/mapping\/release\/mapping\.txt/);
@@ -4464,6 +4499,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=production",
     `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   const rcGithubEnv = path.join(dir, "android-rc-github.env");
@@ -4489,6 +4525,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     rcGithubEnvOutput,
     new RegExp(`^EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${escapeRegExp(validPlayAppSigningFingerprint)}$`, "m"),
   );
+  assert.match(rcGithubEnvOutput, /^EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789$/m);
 
   const invalidEnv = path.join(dir, "invalid.env");
   await writeFile(invalidEnv, [
@@ -4517,6 +4554,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=staging",
     `EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=${validPlayAppSigningFingerprint}`,
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   await assert.rejects(
@@ -4543,6 +4581,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=production",
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   await assert.rejects(
@@ -4569,6 +4608,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=production-v1",
     "EASYSUBWAY_DATAPACK_CHANNEL=production",
     "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256=AA:BB:CC",
+    "EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
     "",
   ].join("\n"));
   await assert.rejects(
@@ -4955,7 +4995,6 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.securityMatcherComparisonRequired, true);
   const closedRouteEndpoints = [
     "/api/v1/routes/search",
-    "/api/v2/routes/search",
     "/api/v2/routes/{routeSearchId}/refresh",
   ];
   assert.deepEqual(
@@ -5021,9 +5060,15 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       `production public endpoints must exclude ${endpoint}`,
     );
   }
+  assert.match(routeSearchController, /@RestController/);
+  assert.doesNotMatch(routeSearchController, /@Profile\("!prod & !staging & !release & !prod-like"\)/);
+  assert.deepEqual(operationsEvidence.backendControlPlane.publicApiSurface.allowedAuthenticatedEndpoints, [
+    "/api/v2/routes/session",
+    "/api/v2/routes/search",
+  ]);
   assert.match(
-    routeSearchController,
-    /@Profile\("!prod & !staging & !release & !prod-like"\)[\s\S]*@RestController/,
+    securityConfig,
+    /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,
   );
   assert.match(
     securityConfig,
@@ -8774,7 +8819,7 @@ test("Docker Compose는 backend 필수 서비스를 기본값으로 노출하고
   const compose = read("infra/docker-compose.yml");
   const postgresBlock = compose.match(/  postgres:\n[\s\S]*?\n\n  object-storage:/)?.[0] ?? "";
   const objectStorageBlock = compose.match(/  object-storage:\n[\s\S]*?\n\n  backend:/)?.[0] ?? "";
-  const backWorkerBlock = compose.match(/  back-worker:\n[\s\S]*?\n\n  public-edge-probe:/)?.[0] ?? "";
+  const backWorkerBlock = compose.match(/  back-worker:\n[\s\S]*?\n\n  route-v2-gateway:/)?.[0] ?? "";
 
   assert.match(compose, /postgres:\n/);
   assert.match(
@@ -12376,7 +12421,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const planner = read(plannerPath);
   const raptorPlanner = read(raptorPlannerPath);
   const v2Endpoint = controller.match(
-    /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?ApiResponse<RouteSearchV2Response> searchRouteV2[\s\S]*?\n\t}/,
+    /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
 
   assert.match(v2Endpoint, /routeV2SearchUseCase\.search/);

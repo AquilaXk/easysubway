@@ -1139,8 +1139,8 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
-	@DisplayName("V2 planner는 시간표 scan 결과를 refresh와 feedback 조회 경로에 저장한다")
-	void routeV2PlannerPersistsTimetableScanResultsForRefreshAndFeedback() {
+	@DisplayName("V2 planner는 시간표 scan 결과를 legacy refresh와 feedback 저장소에 쓰지 않는다")
+	void routeV2PlannerKeepsTimetableScanResultsOutOfLegacyStore() {
 		var repository = new InMemoryRouteSearchRepository();
 		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
 		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
@@ -1149,7 +1149,8 @@ class RouteSearchServiceTest {
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
-		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isPresent();
+		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isEmpty();
+		assertThat(repository.summarizeRouteSearches().totalCount()).isZero();
 	}
 
 	@Test
@@ -1180,8 +1181,8 @@ class RouteSearchServiceTest {
 	}
 
 	@Test
-	@DisplayName("V2 planner는 시간표 scan 결과 저장 시 검색별 ID와 생성 시각을 부여한다")
-	void routeV2PlannerStoresTimetableScanResultsWithSearchIdentityAndCreationTime() {
+	@DisplayName("V2 planner는 legacy 저장 없이 시간표 scan 결과에 검색별 ID와 생성 시각을 부여한다")
+	void routeV2PlannerBuildsTimetableScanResultsWithoutLegacyPersistence() {
 		var repository = new InMemoryRouteSearchRepository();
 		var routeSearchService = new RouteSearchService(repository, repository, new RampAccessibleTransitMasterPort(), CLOCK);
 		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
@@ -1196,11 +1197,12 @@ class RouteSearchServiceTest {
 		assertThat(first.destinationStationName()).isEqualTo("도착역");
 		assertThat(first.createdAt()).isEqualTo(LocalDate.of(2026, 6, 13).atTime(18, 0));
 		assertThat(second.createdAt()).isEqualTo(LocalDate.of(2026, 6, 13).atTime(18, 0));
+		assertThat(repository.summarizeRouteSearches().totalCount()).isZero();
 	}
 
 	@Test
-	@DisplayName("시간표 후보 stabilization은 응답에서 제외된 후보를 저장하지 않는다")
-	void stabilizeTimetableRouteCandidatesDoesNotPersistDroppedCandidates() {
+	@DisplayName("시간표 후보 stabilization은 legacy 결과를 저장하지 않는다")
+	void stabilizeTimetableRouteCandidatesDoesNotPersistLegacyResults() {
 		var repository = new InMemoryRouteSearchRepository();
 		var routeSearchService = new RouteSearchService(repository, repository, new DisconnectedTransitMasterPort(), CLOCK);
 
@@ -1218,8 +1220,8 @@ class RouteSearchServiceTest {
 		);
 
 		assertThat(results).hasSize(1);
-		assertThat(repository.summarizeRouteSearches().totalCount()).isEqualTo(1);
-		assertThat(repository.loadRouteSearch(results.getFirst().routeSearchId())).isPresent();
+		assertThat(repository.summarizeRouteSearches().totalCount()).isZero();
+		assertThat(repository.loadRouteSearch(results.getFirst().routeSearchId())).isEmpty();
 	}
 
 	@Test
@@ -1258,7 +1260,8 @@ class RouteSearchServiceTest {
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.PLANNED);
-		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isPresent();
+		assertThat(repository.loadRouteSearch(plan.itineraries().getFirst().routeSearchId())).isEmpty();
+		assertThat(repository.summarizeRouteSearches().totalCount()).isZero();
 	}
 
 	@Test

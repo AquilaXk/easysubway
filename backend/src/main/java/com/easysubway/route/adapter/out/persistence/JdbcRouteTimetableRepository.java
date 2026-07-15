@@ -64,6 +64,30 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 	}
 
 	@Override
+	public Optional<String> activeItxTimetableArtifactId() {
+		return jdbcTemplate.query(
+			"""
+				SELECT timetable_artifact_id, fresh_until
+				FROM route_service_artifact_evidence
+				WHERE service_class = 'ITX_CHEONGCHUN'
+					AND admission_status = 'ADMITTED'
+					AND admission_eligible = TRUE
+					AND EXISTS (
+						SELECT 1 FROM transit_trips
+						WHERE service_class = 'ITX_CHEONGCHUN'
+					)
+				""",
+			(resultSet, rowNumber) -> new ItxArtifact(
+				resultSet.getString("timetable_artifact_id"),
+				resultSet.getString("fresh_until")
+			)
+		).stream()
+			.filter(artifact -> freshOffsetDateTime(artifact.freshUntil()).isPresent())
+			.map(ItxArtifact::id)
+			.findFirst();
+	}
+
+	@Override
 	public RouteTimetable loadRouteTimetable() {
 		boolean includeItx = activeItxFreshUntil().isPresent();
 		String tripFilter = includeItx ? "" : "WHERE service_class <> 'ITX_CHEONGCHUN'";
@@ -204,6 +228,9 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 		} catch (DateTimeParseException exception) {
 			return Optional.empty();
 		}
+	}
+
+	private record ItxArtifact(String id, String freshUntil) {
 	}
 
 	private LocalDate loadFeedEndDate() {

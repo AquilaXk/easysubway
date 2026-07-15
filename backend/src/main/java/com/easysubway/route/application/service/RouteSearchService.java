@@ -181,13 +181,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 
 	@Override
 	public RouteSearchResult searchRoute(SearchRouteCommand command) {
-		return searchRouteAlternatives(command, 1).getFirst();
+		return saveRouteSearchPort.saveRouteSearch(searchRouteAlternatives(command, 1).getFirst());
 	}
 
 	public List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount) {
-		return buildRouteSearchAlternatives(command, alternativeCount).stream()
-			.map(saveRouteSearchPort::saveRouteSearch)
-			.toList();
+		return buildRouteSearchAlternatives(command, alternativeCount);
 	}
 
 	@Override
@@ -226,9 +224,7 @@ public class RouteSearchService implements RouteSearchUseCase {
 			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, candidateCount);
 			List<RouteSearchResult> selectedAccessibilityCheckedResults = selectCandidates.apply(accessibilityCheckedResults);
 			if (selectedAccessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
-				return selectedAccessibilityCheckedResults.stream()
-					.map(saveRouteSearchPort::saveRouteSearch)
-					.toList();
+				return List.copyOf(selectedAccessibilityCheckedResults);
 			}
 		} catch (RouteNotFoundException | StationNotFoundException exception) {
 			// Timetable coverage can lead legacy graph coverage while #1400 closes the production graph gap.
@@ -236,12 +232,11 @@ public class RouteSearchService implements RouteSearchUseCase {
 		}
 		return selectCandidates.apply(timetableResults)
 			.stream()
-			.map(this::storedTimetableRouteResult)
-			.map(saveRouteSearchPort::saveRouteSearch)
+			.map(this::ephemeralTimetableRouteResult)
 			.toList();
 	}
 
-	private RouteSearchResult storedTimetableRouteResult(RouteSearchResult routeSearchResult) {
+	private RouteSearchResult ephemeralTimetableRouteResult(RouteSearchResult routeSearchResult) {
 		Station origin = loadActiveStation(routeSearchResult.originStationId());
 		Station destination = loadActiveStation(routeSearchResult.destinationStationId());
 		return new RouteSearchResult(
