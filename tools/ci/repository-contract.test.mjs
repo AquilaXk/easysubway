@@ -2471,6 +2471,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "tools/release/hash-android-bundle-payload.mjs",
     "tools/release/generate-rc-evidence-manifest.mjs",
     "tools/datapack/run-emergency-datapack-drill.mjs",
+    "tools/release/upload-play-internal.mjs",
+    "apps/mobile/release/route-commercialization-gate.json",
     "apps/mobile/pubspec.yaml",
     "backend/build.gradle",
     "backend/Dockerfile",
