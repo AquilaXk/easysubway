@@ -25,6 +25,7 @@ import '../internal_route.dart';
 import '../network_map.dart';
 import '../notification_settings.dart';
 import '../route_search.dart';
+import '../route_v2_ingress.dart';
 import '../station_search.dart';
 import '../user_data_deletion.dart';
 import '../features/internal_route/data/local_internal_route_repository.dart';
@@ -85,6 +86,7 @@ class AppDependencies {
       defaultValue: false,
     ),
     RouteSearchOnlineFirstMetrics? routeSearchOnlineFirstMetrics,
+    PlayIntegrityAttestor? playIntegrityAttestor,
     required bool enablePushNotifications,
   }) {
     Uri? cachedBaseUri;
@@ -165,20 +167,30 @@ class AppDependencies {
             final routeV2BaseUri = enableRouteV2OnlineFirst
                 ? optionalBaseUri()
                 : null;
-            if (routeV2BaseUri != null) {
-              return OnlineFirstRouteSearchRepository(
-                onlineRepository: RouteSearchV2ApiRepository(
-                  baseUri: routeV2BaseUri,
-                ),
-                localRepository: localRouteRepository,
-                metrics: routeSearchOnlineFirstMetrics,
-              );
-            }
             if (localRouteRepository == null) {
               return RouteSearchApiRepository(baseUri: requireBaseUri());
             }
-            return LocalFirstRouteSearchRepository(
+            final local = LocalFirstRouteSearchRepository(
               localRepository: localRouteRepository,
+            );
+            if (routeV2BaseUri == null) {
+              return local;
+            }
+            final sessionProvider = PlayIntegrityRouteV2SessionProvider(
+              apiClient: ApiClient(baseUri: routeV2BaseUri),
+              attestor:
+                  playIntegrityAttestor ?? MethodChannelPlayIntegrityAttestor(),
+            );
+            return TransportScopedRouteSearchRepository(
+              localRepository: local,
+              itxOnlineRepository: OnlineFirstRouteSearchRepository(
+                onlineRepository: RouteSearchV2ApiRepository(
+                  baseUri: routeV2BaseUri,
+                  bearerTokenProvider: sessionProvider.issueToken,
+                ),
+                localRepository: localRouteRepository,
+                metrics: routeSearchOnlineFirstMetrics,
+              ),
             );
           })(),
       routeFeedbackRepository:

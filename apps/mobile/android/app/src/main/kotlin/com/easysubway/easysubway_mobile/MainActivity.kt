@@ -12,6 +12,10 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
+import com.google.android.play.core.integrity.IntegrityManagerFactory
+import com.google.android.play.core.integrity.StandardIntegrityManager
+import com.google.android.play.core.integrity.StandardIntegrityManager.PrepareIntegrityTokenRequest
+import com.google.android.play.core.integrity.StandardIntegrityManager.StandardIntegrityTokenRequest
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.StandardMessageCodec
@@ -20,6 +24,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val locationChannelName = "com.easysubway.easysubway_mobile/location"
     private val notificationChannelName = "com.easysubway.easysubway_mobile/notifications"
+    private val playIntegrityChannelName = "com.easysubway.easysubway_mobile/play_integrity"
     private val locationPermissionRequestCode = 2401
     private val notificationPermissionRequestCode = 2402
     private val locationTimeoutMillis = 10_000L
@@ -28,6 +33,9 @@ class MainActivity : FlutterActivity() {
 
     private var pendingLocationResult: MethodChannel.Result? = null
     private var pendingNotificationPermissionResult: MethodChannel.Result? = null
+    private var pendingIntegrityResult: MethodChannel.Result? = null
+    private var integrityTokenProvider: StandardIntegrityManager.StandardIntegrityTokenProvider? = null
+    private var integrityCloudProjectNumber: Long? = null
     private var pendingLocationListener: LocationListener? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -50,6 +58,17 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, playIntegrityChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "requestToken" -> requestPlayIntegrityToken(
+                        requestHash = call.argument<String>("requestHash"),
+                        cloudProjectNumber = call.argument<String>("cloudProjectNumber"),
+                        result = result,
+                    )
+                    else -> result.notImplemented()
+                }
+            }
         flutterEngine.platformViewsController.registry.registerViewFactory(
             "com.easysubway.easysubway_mobile/original_route_map_asset",
             OriginalRouteMapAssetViewFactory(StandardMessageCodec.INSTANCE),
@@ -61,6 +80,67 @@ class MainActivity : FlutterActivity() {
                 flutterEngine.dartExecutor.binaryMessenger,
             ),
         )
+    }
+
+    private fun requestPlayIntegrityToken(
+        requestHash: String?,
+        cloudProjectNumber: String?,
+        result: MethodChannel.Result,
+    ) {
+        if (pendingIntegrityResult != null) {
+            result.error("integrityUnavailable", "integrity request already running", null)
+            return
+        }
+        val projectNumber = cloudProjectNumber?.toLongOrNull()
+        if (requestHash == null || !requestHash.matches(Regex("^[A-Za-z0-9_-]{43}$")) || projectNumber == null || projectNumber <= 0) {
+            result.error("integrityInvalidRequest", "invalid integrity request", null)
+            return
+        }
+        pendingIntegrityResult = result
+        val cachedProvider = integrityTokenProvider
+        if (cachedProvider != null && integrityCloudProjectNumber == projectNumber) {
+            emitPlayIntegrityToken(cachedProvider, requestHash)
+            return
+        }
+        val manager = IntegrityManagerFactory.createStandard(applicationContext)
+        manager.prepareIntegrityToken(
+            PrepareIntegrityTokenRequest.builder()
+                .setCloudProjectNumber(projectNumber)
+                .build(),
+        ).addOnSuccessListener { provider ->
+            integrityTokenProvider = provider
+            integrityCloudProjectNumber = projectNumber
+            emitPlayIntegrityToken(provider, requestHash)
+        }.addOnFailureListener {
+            finishPlayIntegrityError()
+        }
+    }
+
+    private fun emitPlayIntegrityToken(
+        provider: StandardIntegrityManager.StandardIntegrityTokenProvider,
+        requestHash: String,
+    ) {
+        provider.request(
+            StandardIntegrityTokenRequest.builder()
+                .setRequestHash(requestHash)
+                .build(),
+        ).addOnSuccessListener { response ->
+            pendingIntegrityResult?.success(response.token())
+            pendingIntegrityResult = null
+        }.addOnFailureListener {
+            integrityTokenProvider = null
+            integrityCloudProjectNumber = null
+            finishPlayIntegrityError()
+        }
+    }
+
+    private fun finishPlayIntegrityError() {
+        pendingIntegrityResult?.error(
+            "integrityUnavailable",
+            "Play Integrity token is unavailable",
+            null,
+        )
+        pendingIntegrityResult = null
     }
 
     private fun openLocationSettings(result: MethodChannel.Result) {

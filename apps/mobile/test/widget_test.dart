@@ -8368,6 +8368,7 @@ void main() {
       expect(find.byKey(const Key('routeMobilityTypeInput')), findsNothing);
       expect(find.byKey(const Key('routeStrictStepFreeSwitch')), findsNothing);
       expect(find.byKey(const Key('routeConditionChips')), findsOneWidget);
+      expect(find.byKey(const Key('routeScopeItxChip')), findsNothing);
       expect(find.text('최근 도착지'), findsNothing);
       expect(find.widgetWithText(FilledButton, '길찾기'), findsNothing);
       expect(find.byKey(const Key('routeResultListItem')), findsOneWidget);
@@ -8375,6 +8376,51 @@ void main() {
     } finally {
       semanticsHandle.dispose();
     }
+  });
+
+  testWidgets('Route V2 transport flag는 explicit ITX 선택에서만 combined 재검색한다', (
+    tester,
+  ) async {
+    final routeRepository = FakeRouteSearchRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: FakeStationSearchRepository(),
+          favoriteRouteRepository: FakeFavoriteRouteRepository(),
+          itxTransportScopeEnabled: true,
+          initialDraft: RouteDraft(
+            origin: const RouteDraftStation(
+              id: 'station-sangnoksu',
+              nameKo: '상록수',
+            ),
+            destination: const RouteDraftStation(
+              id: 'station-sadang',
+              nameKo: '사당',
+            ),
+            lastModifiedAt: DateTime(2026, 7, 16),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(1));
+    expect(
+      routeRepository.requests.single.transportScope,
+      RouteTransportScope.subway,
+    );
+    expect(find.byKey(const Key('routeScopeSubwayChip')), findsOneWidget);
+    expect(find.byKey(const Key('routeScopeItxChip')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('routeScopeItxChip')));
+    await tester.pumpAndSettle();
+
+    expect(routeRepository.requests, hasLength(2));
+    expect(
+      routeRepository.requests.last.transportScope,
+      RouteTransportScope.subwayAndItxCheongchun,
+    );
   });
 
   testWidgets('경로 검색 strict switch는 STRICT_STEP_FREE 요청을 보낸다', (tester) async {

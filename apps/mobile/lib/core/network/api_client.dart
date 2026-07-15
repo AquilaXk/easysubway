@@ -121,7 +121,7 @@ class ApiClient {
       if (!_isSuccessStatus(response.statusCode)) {
         return ApiResponse(
           statusCode: response.statusCode,
-          jsonBody: null,
+          jsonBody: _tryDecodeJson(responseBody),
           etag: etag,
         );
       }
@@ -165,6 +165,15 @@ class ApiClient {
         cause: error,
         causeStackTrace: stackTrace,
       );
+    }
+  }
+
+  Object? _tryDecodeJson(String responseBody) {
+    if (responseBody.trim().isEmpty) return null;
+    try {
+      return jsonDecode(responseBody);
+    } on FormatException {
+      return null;
     }
   }
 
