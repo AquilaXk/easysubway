@@ -14,6 +14,7 @@ import '../notification_settings.dart';
 import '../route_search.dart';
 import '../station_search.dart';
 import '../core/datapack/data_pack_client.dart';
+import '../core/datapack/bundled_data_pack_freshness.dart';
 import '../core/datapack/data_pack_installer.dart';
 import '../core/datapack/data_pack_update_state.dart';
 import '../core/datapack/data_pack_updater.dart';
@@ -42,6 +43,7 @@ class AppBootstrap {
     required this.dataPackUpdate,
     required this.resumeDataPackUpdate,
     required this.acceptMeteredDataPackUpdate,
+    required this.bundledDataPackFreshness,
   });
 
   final AppDependencies dependencies;
@@ -50,6 +52,7 @@ class AppBootstrap {
   final Future<void> dataPackUpdate;
   final Future<void> Function() resumeDataPackUpdate;
   final Future<void> Function() acceptMeteredDataPackUpdate;
+  final BundledDataPackFreshness? bundledDataPackFreshness;
 
   static Future<AppBootstrap> initialize({
     Directory? databaseDirectory,
@@ -81,11 +84,16 @@ class AppBootstrap {
 
     Future<void>? dataPackUpdate;
     try {
-      final catalogDatabase = await CatalogDatabaseOpener(
+      final catalogDatabaseOpener = CatalogDatabaseOpener(
         databaseDirectory: supportDirectory,
         assetBundle: assetBundle ?? rootBundle,
         emergencyOverrideRepository: emergencyOverrideRepository,
-      ).open();
+      );
+      final catalogDatabase = await catalogDatabaseOpener.open();
+      final bundledDataPackFreshness =
+          catalogDatabaseOpener.openedBundledDataPack
+          ? await BundledDataPackFreshness.read(supportDirectory)
+          : await _installedDataPackFreshness(userDatabase);
       final runner = dataPackUpdateRunner ?? _defaultDataPackUpdateRunner;
       dataPackUpdate = _runDataPackUpdateSafely(
         supportDirectory: supportDirectory,
@@ -130,6 +138,7 @@ class AppBootstrap {
           runner: runner,
           trigger: UpdateTrigger.userConsent,
         ),
+        bundledDataPackFreshness: bundledDataPackFreshness,
       );
     } catch (error, stackTrace) {
       await dataPackUpdate;
@@ -143,6 +152,22 @@ class AppBootstrap {
     await catalogDatabase.close();
     await userDatabase.close();
   }
+}
+
+Future<BundledDataPackFreshness?> _installedDataPackFreshness(
+  UserDatabase userDatabase,
+) async {
+  final cache = await DataPackUpdateStateRepository(
+    userDatabase: userDatabase,
+  ).readManifestCache();
+  final expiresAt = cache?.expiresAt;
+  if (expiresAt == null) {
+    return null;
+  }
+  return BundledDataPackFreshness.fromExpiry(
+    freshnessExpiresAt: expiresAt,
+    staleReasonCode: 'PACK_PUBLISH_FRESHNESS_EXPIRED',
+  );
 }
 
 Future<void> _runDataPackUpdateSafely({

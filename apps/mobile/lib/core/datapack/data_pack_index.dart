@@ -1,5 +1,13 @@
 class DataPackIndex {
-  const DataPackIndex({required this.schemaVersion, required this.packs});
+  const DataPackIndex({
+    required this.schemaVersion,
+    required this.builtAt,
+    required this.qualityAsOf,
+    required this.freshnessExpiresAt,
+    required this.sourceSnapshotSetHash,
+    required this.schemaIdentity,
+    required this.packs,
+  });
 
   factory DataPackIndex.fromJson(Map<String, Object?> json) {
     final schemaVersion = json['schemaVersion'];
@@ -13,8 +21,24 @@ class DataPackIndex {
     if (packs is! List<Object?> || packs.isEmpty) {
       throw const FormatException('Invalid data pack index packs.');
     }
+    final qualityAsOf = _requiredUtcDateTime(json, 'qualityAsOf');
+    final freshnessExpiresAt = _requiredUtcDateTime(json, 'freshnessExpiresAt');
+    if (!freshnessExpiresAt.isAfter(qualityAsOf)) {
+      throw const FormatException(
+        'Data pack index freshnessExpiresAt must be after qualityAsOf.',
+      );
+    }
+    final schemaIdentity = _requiredString(json, 'schemaIdentity');
+    if (schemaIdentity != 'catalog-schema-v1') {
+      throw const FormatException('Unsupported data pack schema identity.');
+    }
     return DataPackIndex(
       schemaVersion: schemaVersion,
+      builtAt: _requiredUtcDateTime(json, 'builtAt'),
+      qualityAsOf: qualityAsOf,
+      freshnessExpiresAt: freshnessExpiresAt,
+      sourceSnapshotSetHash: _requiredSha256(json, 'sourceSnapshotSetHash'),
+      schemaIdentity: schemaIdentity,
       packs: packs
           .map((pack) {
             if (pack is! Map<String, Object?>) {
@@ -27,6 +51,11 @@ class DataPackIndex {
   }
 
   final int schemaVersion;
+  final DateTime builtAt;
+  final DateTime qualityAsOf;
+  final DateTime freshnessExpiresAt;
+  final String sourceSnapshotSetHash;
+  final String schemaIdentity;
   final List<DataPackIndexEntry> packs;
 }
 
@@ -76,4 +105,23 @@ int _requiredPositiveInt(Map<String, Object?> json, String key) {
     return value;
   }
   throw FormatException('Invalid data pack index field: $key.');
+}
+
+String _requiredSha256(Map<String, Object?> json, String key) {
+  final value = _requiredString(json, key);
+  if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(value)) {
+    throw FormatException('Invalid data pack index field: $key.');
+  }
+  return value;
+}
+
+DateTime _requiredUtcDateTime(Map<String, Object?> json, String key) {
+  final value = _requiredString(json, key);
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null ||
+      !value.endsWith('Z') ||
+      parsed.toUtc().toIso8601String() != value) {
+    throw FormatException('Invalid data pack index field: $key.');
+  }
+  return parsed.toUtc();
 }

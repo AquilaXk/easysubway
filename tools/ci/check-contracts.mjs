@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
 const DATAPACK_MANIFEST_SCHEMA_PATH = "contracts/datapack/datapack-manifest.schema.json";
+const DATAPACK_INDEX_SCHEMA_PATH = "contracts/datapack/datapack-index.schema.json";
 const DATAPACK_COMPATIBILITY_MATRIX_PATH = "contracts/datapack/compatibility-matrix.json";
 const DATAPACK_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
 const RELEASE_GATE_INDEX_PATH = "contracts/release/gate-index.json";
@@ -43,6 +44,18 @@ export function validateJson(schemaPath, valuePath, errors) {
   const result = validateSchema(loadJson(schemaPath), loadJson(valuePath));
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
   if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(loadJson(valuePath), valuePath, errors);
+  if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(loadJson(valuePath), valuePath, errors);
+}
+
+export function validateDatapackIndex(index, valuePath, errors) {
+  if (index == null || typeof index !== "object" || Array.isArray(index)) return;
+  for (const field of ["builtAt", "qualityAsOf", "freshnessExpiresAt"]) {
+    const value = index[field];
+    const millis = typeof value === "string" ? Date.parse(value) : Number.NaN;
+    if (!Number.isFinite(millis) || new Date(millis).toISOString() !== value) {
+      errors.push(`${valuePath}: ${field}은 유효한 UTC 시각이어야 한다`);
+    }
+  }
 }
 
 export function validateDatapackManifest(manifest, valuePath, errors) {
@@ -85,6 +98,7 @@ function validateOpenApiFixtures(errors) {
   for (const [docPath, paths] of Object.entries({
     "contracts/api/report-api.openapi.yaml": ["/api/v1/report-uploads", "/api/v1/reports", "/api/v1/reports/{reportId}"],
     "contracts/api/realtime-api.openapi.yaml": ["/api/v1/realtime/arrivals", "/api/v1/realtime/train-positions"],
+    "contracts/api/train-api.openapi.yaml": ["/api/v1/trains/stations", "/api/v1/trains/search"],
   })) {
     if (!existsSync(docPath)) {
       errors.push(`${docPath} 누락`);

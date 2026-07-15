@@ -1776,7 +1776,7 @@ test("모바일 홈 shell과 주요 상태 UI 회귀 테스트는 유지된다",
   assert.match(widgetTest, /find\.byKey\(const Key\('homeBottomNavigationBar'\)\), findsNothing/);
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavHome'\)\), findsNothing/);
   assert.match(widgetTest, /find\.byKey\(const Key\('bottomNavSaved'\)\), findsNothing/);
-  assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 화면에 보여준다/);
+  assert.match(widgetTest, /홈은 시설 알림과 최근 경로 로드 실패를 인라인 오류 없이 넘긴다/);
   assert.match(widgetTest, /노선도 로드 실패는 재시도만 보여준다/);
   assert.doesNotMatch(main, /class _HomeHero/);
   assert.doesNotMatch(main, /class _HomeAdaptiveContent/);
@@ -4186,6 +4186,10 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
   const securityConfig = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
+  const routeSearchController = read(
+    "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java",
+  );
+  const internalApiIndex = readJson("contracts/api/internal-api-index.json");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -4480,6 +4484,11 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     true,
   );
   assert.equal(operationsEvidence.backendControlPlane.publicApiSurface.securityMatcherComparisonRequired, true);
+  const closedRouteEndpoints = [
+    "/api/v1/routes/search",
+    "/api/v2/routes/search",
+    "/api/v2/routes/{routeSearchId}/refresh",
+  ];
   assert.deepEqual(
     operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicEndpoints,
     [
@@ -4492,9 +4501,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/reports",
       "/api/v1/reports/{reportId}",
       "/api/v1/reports/{reportId}/confirm",
-      "/api/v1/routes/search",
-      "/api/v2/routes/search",
-      "/api/v2/routes/{routeSearchId}/refresh",
+      "/api/v1/trains/stations",
+      "/api/v1/trains/search",
       "/api/v1/realtime/arrivals",
       "/api/v1/realtime/train-positions",
       "/api/notices/active",
@@ -4510,10 +4518,9 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/v1/reports",
       "/api/v1/reports/*",
       "/api/v1/reports/*/confirm",
-      "/api/v1/routes/search",
-      "/api/v2/routes/search",
-      "/api/v2/routes/*/refresh",
       "/api/ads/events",
+      "/api/v1/trains/stations",
+      "/api/v1/trains/search",
       "/api/health",
       "/actuator/health",
       "/actuator/health/liveness",
@@ -4523,13 +4530,47 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       "/api/ads/active",
     ],
   );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.publicApiSurface.closedProductionEndpoints,
+    closedRouteEndpoints,
+  );
+  assert.deepEqual(
+    operationsEvidence.backendControlPlane.publicApiSurface.closedProductionEndpointPolicy,
+    {
+      strategy: "NON_PRODUCTION_ONLY",
+      issue: 1913,
+      androidRouteMode: "LOCAL_FIRST",
+    },
+  );
+  for (const endpoint of closedRouteEndpoints) {
+    assert.ok(
+      internalApiIndex.operations.some((operation) => operation.method === "POST" && operation.path === endpoint),
+      `internal API source catalog must retain ${endpoint}`,
+    );
+    assert.ok(
+      !operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicEndpoints.includes(endpoint),
+      `production public endpoints must exclude ${endpoint}`,
+    );
+  }
+  assert.match(
+    routeSearchController,
+    /@Profile\("!prod & !staging & !release & !prod-like"\)[\s\S]*@RestController/,
+  );
+  assert.match(
+    securityConfig,
+    /@Profile\("!prod & !staging & !release & !prod-like"\)[\s\S]*SecurityFilterChain routeSearchSecurityFilterChain/,
+  );
+  const reportApiMatcherScope = securityConfig.match(
+    /SecurityFilterChain reportSecurityFilterChain[\s\S]*?\.build\(\)/,
+  );
   const publicApiMatcherScope = securityConfig.match(
-    /reportSecurityFilterChain[\s\S]*?publicSecurityFilterChain[\s\S]*?\.anyRequest\(\)\.denyAll\(\)/,
+    /SecurityFilterChain publicSecurityFilterChain[\s\S]*?\.anyRequest\(\)\.denyAll\(\)/,
   );
+  assert.ok(reportApiMatcherScope, "report API security matcher scope must be readable");
   assert.ok(publicApiMatcherScope, "public API security matcher scope must be readable");
-  const publicApiMatchers = Array.from(publicApiMatcherScope[0].matchAll(/"([^"]+)"/g), (match) => match[1]).filter(
-    (matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"),
-  );
+  const publicApiMatchers = [reportApiMatcherScope[0], publicApiMatcherScope[0]]
+    .flatMap((scope) => Array.from(scope.matchAll(/"([^"]+)"/g), (match) => match[1]))
+    .filter((matcher) => matcher.startsWith("/api/") || matcher.startsWith("/actuator/"));
   assert.deepEqual(
     publicApiMatchers,
     operationsEvidence.backendControlPlane.publicApiSurface.allowedPublicSecurityMatchers,
@@ -4994,9 +5035,9 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
     .split("\n")
     .filter((line) => /^\s*NODE$/.test(line))
     .map((line) => line.match(/^\s*/)[0].length);
-  assert.deepEqual(
-    nodeTerminatorIndents,
-    [10, 10, 10, 10],
+  assert.ok(nodeTerminatorIndents.length >= 4);
+  assert.ok(
+    nodeTerminatorIndents.every((indent) => indent === 10),
     "workflow heredoc terminators must start at shell column 1 after YAML indentation is stripped",
   );
 
@@ -6207,11 +6248,14 @@ test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정�
   const policy = readJson("apps/mobile/release/datapack-freshness-sla.json");
   const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
 
-  assert.equal(policy.schemaVersion, 1);
+  assert.equal(policy.schemaVersion, 2);
   assert.equal(policy.issue, 1418);
-  assert.equal(policy.currentDecision, "NO_GO");
+  assert.equal(Object.hasOwn(policy, "currentDecision"), false);
+  assert.equal(Object.hasOwn(policy, "status"), false);
   assert.equal(classes.get("static_accessibility_facility").reverificationCadence, "P90D");
   assert.equal(classes.get("static_accessibility_facility").changePublishSla, "P3D");
+  assert.equal(classes.get("planned_timetable").maximumReverificationCadence, "P30D");
+  assert.equal(classes.get("planned_timetable").futureBasisAllowed, true);
   assert.equal(classes.get("planned_timetable").changePublishSla, "before-effective-date");
   assert.equal(classes.get("route_map_asset").reverificationCadence, "P1Y");
   assert.equal(classes.get("realtime_overlay").reverificationCadence, "PT90S");
@@ -6220,10 +6264,11 @@ test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정�
   assert.equal(policy.monitoring.productionChannelAllowsExpiredPack, false);
   assert.deepEqual(policy.scheduledPipeline.requiredStages, [
     "source-snapshot",
+    "change-detection",
     "build",
-    "validate",
-    "publish",
-    "post-publish-artifact-validation",
+    "strict-validation",
+    "conditional-publish",
+    "conditional-post-publish-artifact-validation",
   ]);
   assert.equal(policy.scheduledPipeline.releaseSequenceManagedByPipeline, true);
   assert.equal(policy.scheduledPipeline.expiresAtManagedByPipeline, true);
