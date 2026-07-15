@@ -85,7 +85,9 @@ async function main(argv) {
     deleteItems.push(item);
   }
 
-  for (const { item, status } of await deleteExpiredItems(deleteItems)) {
+  for (const { item, status } of await deleteExpiredItems(deleteItems, {
+    executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
+  })) {
     if (status === 200 || status === 204) {
       report.deleted.push(sanitized(item));
     } else if (status === 404 || status === 410) {
@@ -122,14 +124,27 @@ function requireTrustedExecutionEvidence({ ledgerText, snapshotText }) {
 
 export async function deleteExpiredItems(
   items,
-  { fetchImpl = fetch, timeoutMs = DELETE_TIMEOUT_MS, concurrency = DELETE_CONCURRENCY } = {},
+  {
+    fetchImpl = fetch,
+    timeoutMs = DELETE_TIMEOUT_MS,
+    concurrency = DELETE_CONCURRENCY,
+    executionEvidenceExpiresAt = null,
+    now = Date.now,
+  } = {},
 ) {
   const results = [];
   for (let index = 0; index < items.length; index += concurrency) {
+    if (executionEvidenceExpired(executionEvidenceExpiresAt, now)) {
+      results.push(...items.slice(index).map((item) => ({ item, status: 0 })));
+      break;
+    }
     const batch = items.slice(index, index + concurrency);
     results.push(...await Promise.all(batch.map(async (item) => {
       let status;
       try {
+        if (executionEvidenceExpired(executionEvidenceExpiresAt, now)) {
+          return { item, status: 0 };
+        }
         const current = await fetchImpl(item.objectUrl, {
           method: "GET",
           redirect: "error",
@@ -145,6 +160,9 @@ export async function deleteExpiredItems(
           || await responseSha256(current) !== item.rawSha256) {
           return { item, status: 412 };
         }
+        if (executionEvidenceExpired(executionEvidenceExpiresAt, now)) {
+          return { item, status: 0 };
+        }
         status = (await fetchImpl(item.objectUrl, {
           method: "DELETE",
           headers: { "If-Match": etag },
@@ -158,6 +176,10 @@ export async function deleteExpiredItems(
     })));
   }
   return results;
+}
+
+function executionEvidenceExpired(expiresAt, now) {
+  return expiresAt != null && now() > expiresAt;
 }
 
 export function buildPurgePlan({

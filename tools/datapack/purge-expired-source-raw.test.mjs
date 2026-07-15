@@ -427,6 +427,63 @@ test("검증한 원격 ETag를 If-Match로 고정해 DELETE한다", async () => 
   ]);
 });
 
+test("보호 근거 deadline이 GET 뒤 만료되면 DELETE하지 않는다", async () => {
+  const raw = "approved-bytes";
+  const methods = [];
+  let now = 1_000;
+  const [result] = await deleteExpiredItems(
+    [{
+      snapshotId: "expired-evidence",
+      rawSha256: sha256(raw),
+      objectUrl: "https://objects.example.invalid/raw/expired-evidence",
+    }],
+    {
+      executionEvidenceExpiresAt: 2_000,
+      now: () => now,
+      fetchImpl: async (_url, options) => {
+        methods.push(options.method);
+        if (options.method === "GET") {
+          now = 2_001;
+          return new Response(raw, { headers: { etag: '"approved-version"' } });
+        }
+        return new Response(null, { status: 204 });
+      },
+    },
+  );
+
+  assert.equal(result.status, 0);
+  assert.deepEqual(methods, ["GET"]);
+});
+
+test("보호 근거 deadline이 batch 사이 만료되면 남은 object를 조회하지 않는다", async () => {
+  const raw = "approved-bytes";
+  const methods = [];
+  let now = 1_000;
+  const results = await deleteExpiredItems(
+    ["first", "second"].map((snapshotId) => ({
+      snapshotId,
+      rawSha256: sha256(raw),
+      objectUrl: `https://objects.example.invalid/raw/${snapshotId}`,
+    })),
+    {
+      concurrency: 1,
+      executionEvidenceExpiresAt: 2_000,
+      now: () => now,
+      fetchImpl: async (url, options) => {
+        methods.push(`${options.method}:${new URL(url).pathname}`);
+        if (options.method === "GET") {
+          return new Response(raw, { headers: { etag: '"approved-version"' } });
+        }
+        now = 2_001;
+        return new Response(null, { status: 204 });
+      },
+    },
+  );
+
+  assert.deepEqual(results.map((result) => result.status), [204, 0]);
+  assert.deepEqual(methods, ["GET:/raw/first", "DELETE:/raw/first"]);
+});
+
 test("응답 없는 DELETE는 timeout 뒤 실패 상태로 반환한다", async () => {
   const [result] = await deleteExpiredItems(
     [{ snapshotId: "stalled", objectUrl: "https://objects.example.invalid/raw/stalled" }],
