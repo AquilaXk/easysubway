@@ -5143,6 +5143,24 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.equal(releaseEvidenceBundleSchema.properties.headwayReportStatus.$ref, "#/$defs/headwayGateStatus");
   // route_graph_topology는 deferred domain이므로 자체 gate status def(DEFERRED 허용)를 참조한다.
   assert.equal(releaseEvidenceBundleSchema.properties.routeGraphTopologyStatus.$ref, "#/$defs/routeGraphGateStatus");
+  assert.deepEqual(releaseEvidenceBundleSchema.properties.rollbackRescue.required, [
+    "evidenceSha256",
+    "releaseRequestId",
+    "rcCandidateId",
+    "rcManifestSha256",
+    "currentReleaseSequence",
+    "failedReleaseSequence",
+    "knownGoodReleaseSequence",
+    "rescueReleaseSequence",
+    "knownGoodPackSha256",
+    "knownGoodSqliteSha256",
+    "rescueManifestSha256",
+    "recoveryDurationSeconds",
+    "validatorStatus",
+    "manifestLastStatus",
+    "executionEnvironment",
+    "productionExecuted",
+  ]);
   assert.equal(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"), false);
   assert.equal(releaseEvidenceBundleSchema.$defs.headwayGateStatus.enum.includes("DEFERRED"), true);
   assert.equal(releaseEvidenceBundleSchema.$defs.routeGraphGateStatus.enum.includes("DEFERRED"), true);

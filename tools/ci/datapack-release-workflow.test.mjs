@@ -128,6 +128,38 @@ test("워크플로는 rollout-update 모드·publish-rollout 스텝을 가지고
   assert.doesNotMatch(yml, /mode != 'rollback'/);  // 구 게이트가 pointer-only로 통합됨
 });
 
+test("rollback 모드는 monotonic rescue 승인·catalog evidence와 sanitized report를 강제한다", () => {
+  const parseStep = yml.match(/- name: Data Pack Release \/ Parse modeArgs[\s\S]*?\n\s+- name:/)?.[0];
+  for (const field of [
+    "rollbackFailedSequence",
+    "rollbackCatalogSequences",
+    "rollbackApprovedByRole",
+    "rollbackApprovedAt",
+    "rollbackReasonCode",
+    "rollbackPublishedAt",
+    "rollbackExpiresAt",
+  ]) {
+    assert.match(parseStep, new RegExp(field));
+  }
+  assert.match(yml, /Data Pack Release \/ Prepare monotonic rescue evidence/);
+  assert.match(yml, /rollback known-good sequence must be lower than failed sequence/);
+  assert.match(yml, /rollback catalog sequences must contain known-good and failed sequences/);
+  const rollbackStep = yml.match(/- name: Data Pack Release \/ Publish monotonic rescue release[\s\S]*?\n\s+- name:/)?.[0];
+  assert.ok(rollbackStep, "monotonic rescue publish 스텝을 찾지 못함");
+  assert.match(rollbackStep, /--failed-sequence/);
+  assert.match(rollbackStep, /--catalog-sequences/);
+  assert.match(rollbackStep, /--approval/);
+  assert.match(rollbackStep, /--published-at/);
+  assert.match(rollbackStep, /--expires-at/);
+  assert.match(rollbackStep, /--evidence-output/);
+  assert.doesNotMatch(rollbackStep, /--reason|--idempotency-key/);
+  assert.ok(
+    yml.indexOf("Prepare monotonic rescue evidence") < yml.indexOf("Publish monotonic rescue release"),
+  );
+  assert.match(yml, /Data Pack Release \/ Upload rollback rescue evidence/);
+  assert.match(yml, /easysubway-datapack-rollback-rescue-/);
+});
+
 test("production publish는 canonical decision의 write 허용 뒤에만 실행된다", () => {
   assert.match(yml, /id:\s*release-decision/);
   assert.match(yml, /node tools\/datapack\/decide-datapack-release\.mjs/);

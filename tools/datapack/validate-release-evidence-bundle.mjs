@@ -82,6 +82,81 @@ function validateRouteGraphTopologyIntegrity(bundle) {
   }
 }
 
+function validateRollbackRescue(bundle, requirePass) {
+  const rescue = bundle.rollbackRescue;
+  if (rescue === undefined) return;
+  if (!rescue || typeof rescue !== "object" || Array.isArray(rescue)) {
+    throw new Error("rollbackRescue must be an object");
+  }
+  for (const field of [
+    "evidenceSha256",
+    "rcManifestSha256",
+    "knownGoodPackSha256",
+    "knownGoodSqliteSha256",
+    "rescueManifestSha256",
+  ]) {
+    if (!SHA256.test(rescue[field] ?? "")) throw new Error(`rollbackRescue ${field} must be sha256`);
+  }
+  for (const field of ["releaseRequestId", "rcCandidateId"]) {
+    if (typeof rescue[field] !== "string" || rescue[field].length === 0) {
+      throw new Error(`rollbackRescue ${field} must be a non-empty string`);
+    }
+  }
+  for (const field of [
+    "currentReleaseSequence",
+    "failedReleaseSequence",
+    "knownGoodReleaseSequence",
+    "rescueReleaseSequence",
+  ]) {
+    if (!Number.isInteger(rescue[field]) || rescue[field] < 1) {
+      throw new Error(`rollbackRescue ${field} must be a positive integer`);
+    }
+  }
+  if (!(
+    rescue.knownGoodReleaseSequence < rescue.failedReleaseSequence
+    && rescue.failedReleaseSequence === rescue.currentReleaseSequence
+    && rescue.currentReleaseSequence < rescue.rescueReleaseSequence
+  )) {
+    throw new Error("rollbackRescue sequences must satisfy knownGood < failed = current < rescue");
+  }
+  if (rescue.releaseRequestId !== bundle.releaseRequestId) {
+    throw new Error("rollbackRescue releaseRequestId must match bundle releaseRequestId");
+  }
+  if (rescue.rcCandidateId !== bundle.candidateId) {
+    throw new Error("rollbackRescue rcCandidateId must match bundle candidateId");
+  }
+  if (rescue.rcManifestSha256 !== bundle.manifestSha256) {
+    throw new Error("rollbackRescue rcManifestSha256 must match bundle manifestSha256");
+  }
+  if (rescue.rescueManifestSha256 !== rescue.rcManifestSha256) {
+    throw new Error("rollbackRescue rescueManifestSha256 must match rcManifestSha256");
+  }
+  if (!Number.isInteger(rescue.recoveryDurationSeconds) || rescue.recoveryDurationSeconds < 0) {
+    throw new Error("rollbackRescue recoveryDurationSeconds must be a non-negative integer");
+  }
+  if (!new Set(["PASS", "FAIL"]).has(rescue.validatorStatus)) {
+    throw new Error("rollbackRescue validatorStatus must be PASS or FAIL");
+  }
+  if (!new Set(["PASS", "FAIL", "NOT_EXECUTED"]).has(rescue.manifestLastStatus)) {
+    throw new Error("rollbackRescue manifestLastStatus is invalid");
+  }
+  if (!new Set(["LOCAL_FIXTURE", "NON_PRODUCTION", "PRODUCTION"]).has(rescue.executionEnvironment)) {
+    throw new Error("rollbackRescue executionEnvironment is invalid");
+  }
+  if (typeof rescue.productionExecuted !== "boolean") {
+    throw new Error("rollbackRescue productionExecuted must be boolean");
+  }
+  if ((rescue.executionEnvironment === "PRODUCTION") !== rescue.productionExecuted) {
+    throw new Error("rollbackRescue productionExecuted must match executionEnvironment");
+  }
+  if (requirePass && rescue.validatorStatus !== "PASS") {
+    throw new Error("rollbackRescue validatorStatus must be PASS");
+  }
+  if (requirePass && rescue.manifestLastStatus !== "PASS") {
+    throw new Error("rollbackRescue manifestLastStatus must be PASS");
+  }
+}
+
 function validateLaunchDenominatorReport(
   bundle,
   report,
@@ -308,6 +383,7 @@ async function main() {
   }
 
   validateRouteGraphTopologyIntegrity(bundle);
+  validateRollbackRescue(bundle, requirePass);
 }
 
 main().catch((error) => {

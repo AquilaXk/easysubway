@@ -82,6 +82,9 @@ jobs:
             echo "EASYSUBWAY_DATAPACK_RELEASE_DECISION=${{ runner.temp }}/easysubway-datapack-stage/release-decision.json"
             echo "EASYSUBWAY_DATAPACK_FINAL_RELEASE_DECISION=${{ runner.temp }}/easysubway-datapack-stage/final-release-decision.json"
             echo "EASYSUBWAY_DATAPACK_REMOTE_VALIDATION=${{ runner.temp }}/easysubway-datapack-remote-validation"
+            echo "EASYSUBWAY_DATAPACK_ROLLBACK_APPROVAL=${{ runner.temp }}/easysubway-rollback-approval.json"
+            echo "EASYSUBWAY_DATAPACK_ROLLBACK_CATALOG_SEQUENCES=${{ runner.temp }}/easysubway-rollback-catalog-sequences.json"
+            echo "EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE=${{ runner.temp }}/easysubway-datapack-rollback-rescue.json"
           } >> "${GITHUB_ENV}"
 
       - name: Data Pack Release / Parse modeArgs
@@ -102,11 +105,13 @@ jobs:
               console.error("modeArgs must be a JSON object");
               process.exit(1);
             }
-            const keys = ["buildSpecPath","releaseRequestId","releaseRequestPath","androidEvidencePath","strictRouteRegressionPath","allowGaps","rollbackTargetSequence","rollbackReason","rollbackIdempotencyKey","rolloutPercentage","rolloutTargetSequence","sourceGovernanceEvaluationAt"];
+            const keys = ["buildSpecPath","releaseRequestId","releaseRequestPath","androidEvidencePath","strictRouteRegressionPath","allowGaps","rollbackTargetSequence","rollbackFailedSequence","rollbackCatalogSequences","rollbackApprovedByRole","rollbackApprovedAt","rollbackReasonCode","rollbackPublishedAt","rollbackExpiresAt","rolloutPercentage","rolloutTargetSequence","sourceGovernanceEvaluationAt"];
             const out = [];
             for (const k of keys) {
-              const v = String(a[k] ?? "");
-              if (v.includes("\n")) {
+              const v = k === "rollbackCatalogSequences"
+                ? JSON.stringify(a[k] ?? [])
+                : String(a[k] ?? "");
+              if (v.includes("\n") || v.includes("\r")) {
                 console.error("modeArgs." + k + " must not contain newlines");
                 process.exit(1);
               }
@@ -237,6 +242,10 @@ jobs:
           fi
           if [[ "${mode}" == "production-publish" && "${target_channel}" != "production" ]]; then
             echo "production-publish requires targetChannel=production" >&2
+            exit 1
+          fi
+          if [[ "${mode}" == "rollback" && -z "${RELEASE_REQUEST_ID_INPUT:-}" ]]; then
+            echo "rollback requires releaseRequestId approval evidence" >&2
             exit 1
           fi
 
@@ -945,22 +954,95 @@ jobs:
           curl -fsS -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
             --data @callback.json "${API_BASE}/admin/api/datapack/release-callbacks" || echo "callback delivery failed (non-fatal)"
 
-      - name: Data Pack Release / Rollback pointer swap
+      - name: Data Pack Release / Prepare monotonic rescue evidence
+        if: ${{ steps.release-mode.outputs.mode == 'rollback' }}
+        env:
+          ROLLBACK_TARGET_SEQUENCE: ${{ steps.args.outputs.rollbackTargetSequence }}
+          ROLLBACK_FAILED_SEQUENCE: ${{ steps.args.outputs.rollbackFailedSequence }}
+          ROLLBACK_CATALOG_SEQUENCES: ${{ steps.args.outputs.rollbackCatalogSequences }}
+          ROLLBACK_APPROVED_BY_ROLE: ${{ steps.args.outputs.rollbackApprovedByRole }}
+          ROLLBACK_APPROVED_AT: ${{ steps.args.outputs.rollbackApprovedAt }}
+          ROLLBACK_REASON_CODE: ${{ steps.args.outputs.rollbackReasonCode }}
+          ROLLBACK_PUBLISHED_AT: ${{ steps.args.outputs.rollbackPublishedAt }}
+          ROLLBACK_EXPIRES_AT: ${{ steps.args.outputs.rollbackExpiresAt }}
+          ROLLBACK_RELEASE_REQUEST_ID: ${{ steps.release-mode.outputs.release_request_id }}
+        run: |
+          set -euo pipefail
+          umask 077
+          node - <<'NODE'
+          const fs = require("fs");
+          const required = (name) => {
+            const value = process.env[name]?.trim();
+            if (!value) throw new Error(`${name} is required for rollback`);
+            return value;
+          };
+          const positiveInteger = (name) => {
+            const value = Number(required(name));
+            if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive safe integer`);
+            return value;
+          };
+          const target = positiveInteger("ROLLBACK_TARGET_SEQUENCE");
+          const failed = positiveInteger("ROLLBACK_FAILED_SEQUENCE");
+          if (target >= failed) throw new Error("rollback known-good sequence must be lower than failed sequence");
+          let sequences;
+          try {
+            sequences = JSON.parse(required("ROLLBACK_CATALOG_SEQUENCES"));
+          } catch (error) {
+            throw new Error(`rollbackCatalogSequences must be JSON: ${error.message}`);
+          }
+          if (!Array.isArray(sequences) || sequences.length === 0 || sequences.some((value) => !Number.isSafeInteger(value) || value < 1)) {
+            throw new Error("rollbackCatalogSequences must be a non-empty positive integer array");
+          }
+          if (new Set(sequences).size !== sequences.length) throw new Error("rollbackCatalogSequences must not contain duplicates");
+          if (!sequences.includes(target) || !sequences.includes(failed)) {
+            throw new Error("rollback catalog sequences must contain known-good and failed sequences");
+          }
+          const approvedAt = required("ROLLBACK_APPROVED_AT");
+          const publishedAt = required("ROLLBACK_PUBLISHED_AT");
+          const expiresAt = required("ROLLBACK_EXPIRES_AT");
+          for (const [name, value] of [["rollbackApprovedAt", approvedAt], ["rollbackPublishedAt", publishedAt], ["rollbackExpiresAt", expiresAt]]) {
+            if (!/(Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) throw new Error(`${name} must be an ISO date-time with timezone`);
+          }
+          if (Date.parse(approvedAt) > Date.parse(publishedAt)) throw new Error("rollback approval must precede publish time");
+          if (Date.parse(publishedAt) >= Date.parse(expiresAt)) throw new Error("rollback expiry must follow publish time");
+          fs.writeFileSync(process.env.EASYSUBWAY_DATAPACK_ROLLBACK_CATALOG_SEQUENCES, `${JSON.stringify(sequences)}\n`, { mode: 0o600 });
+          fs.writeFileSync(process.env.EASYSUBWAY_DATAPACK_ROLLBACK_APPROVAL, `${JSON.stringify({
+            releaseRequestId: required("ROLLBACK_RELEASE_REQUEST_ID"),
+            approvedByRole: required("ROLLBACK_APPROVED_BY_ROLE"),
+            approvedAt,
+            reasonCode: required("ROLLBACK_REASON_CODE"),
+          }, null, 2)}\n`, { mode: 0o600 });
+          NODE
+
+      - name: Data Pack Release / Publish monotonic rescue release
         if: ${{ steps.release-mode.outputs.mode == 'rollback' && steps.remote-publish-env.outputs.enabled == 'true' && github.ref == 'refs/heads/main' }}
         env:
-          # workflow_dispatch 자유입력을 셸에 직접 보간하지 않고 env로 전달한다(GHA expression injection 방지).
           ROLLBACK_TARGET_SEQUENCE: ${{ steps.args.outputs.rollbackTargetSequence }}
+          ROLLBACK_FAILED_SEQUENCE: ${{ steps.args.outputs.rollbackFailedSequence }}
           ROLLBACK_TARGET_CHANNEL: ${{ github.event.inputs.targetChannel }}
-          ROLLBACK_REASON: ${{ steps.args.outputs.rollbackReason }}
-          ROLLBACK_IDEMPOTENCY_KEY: ${{ steps.args.outputs.rollbackIdempotencyKey }}
+          ROLLBACK_PUBLISHED_AT: ${{ steps.args.outputs.rollbackPublishedAt }}
+          ROLLBACK_EXPIRES_AT: ${{ steps.args.outputs.rollbackExpiresAt }}
         run: |
           set -euo pipefail
           node tools/datapack/rollback-manifest.mjs \
             --target-sequence "${ROLLBACK_TARGET_SEQUENCE}" \
+            --failed-sequence "${ROLLBACK_FAILED_SEQUENCE}" \
             --channel "${ROLLBACK_TARGET_CHANNEL}" \
             --base-url "${EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL}" \
-            --reason "${ROLLBACK_REASON}" \
-            --idempotency-key "${ROLLBACK_IDEMPOTENCY_KEY}"
+            --catalog-sequences "${EASYSUBWAY_DATAPACK_ROLLBACK_CATALOG_SEQUENCES}" \
+            --approval "${EASYSUBWAY_DATAPACK_ROLLBACK_APPROVAL}" \
+            --published-at "${ROLLBACK_PUBLISHED_AT}" \
+            --expires-at "${ROLLBACK_EXPIRES_AT}" \
+            --evidence-output "${EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE}"
+
+      - name: Data Pack Release / Upload rollback rescue evidence
+        if: ${{ always() && steps.release-mode.outputs.mode == 'rollback' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-datapack-rollback-rescue-${{ github.run_id }}
+          path: ${{ env.EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE }}
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Data Pack Release / Rollout update pointer swap
         if: ${{ steps.release-mode.outputs.mode == 'rollout-update' && steps.remote-publish-env.outputs.enabled == 'true' && github.ref == 'refs/heads/main' }}

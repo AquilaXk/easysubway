@@ -259,6 +259,42 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     { cwd: root },
   );
 
+  bundle.rollbackRescue = {
+    evidenceSha256: hash,
+    releaseRequestId: bundle.releaseRequestId,
+    rcCandidateId: bundle.candidateId,
+    rcManifestSha256: bundle.manifestSha256,
+    currentReleaseSequence: 115,
+    failedReleaseSequence: 115,
+    knownGoodReleaseSequence: 114,
+    rescueReleaseSequence: 116,
+    knownGoodPackSha256: hash,
+    knownGoodSqliteSha256: hash,
+    rescueManifestSha256: bundle.manifestSha256,
+    recoveryDurationSeconds: 42,
+    validatorStatus: "PASS",
+    manifestLastStatus: "PASS",
+    executionEnvironment: "LOCAL_FIXTURE",
+    productionExecuted: false,
+  };
+  await writeFile(bundlePath, json(bundle));
+  await execFileAsync(process.execPath, [...validatorCommand, "--require-pass"], { cwd: root });
+
+  for (const [field, value, expected] of [
+    ["rescueReleaseSequence", 115, /knownGood < failed = current < rescue/],
+    ["rcManifestSha256", "f".repeat(64), /rollbackRescue rcManifestSha256 must match bundle manifestSha256/],
+    ["manifestLastStatus", "FAIL", /rollbackRescue manifestLastStatus must be PASS/],
+  ]) {
+    const original = bundle.rollbackRescue[field];
+    bundle.rollbackRescue[field] = value;
+    await writeFile(bundlePath, json(bundle));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...validatorCommand, "--require-pass"], { cwd: root }),
+      expected,
+    );
+    bundle.rollbackRescue[field] = original;
+  }
+
   bundle.supportedDenominatorSha256 = "f".repeat(64);
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await assert.rejects(
