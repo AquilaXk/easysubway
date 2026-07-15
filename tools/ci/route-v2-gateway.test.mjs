@@ -37,7 +37,7 @@ test("Route V2 gateway는 client origin·IP header를 제거하고 내부 origin
   const nginx = `${gateway}\n${headers}`;
 
   assert.match(gateway, /include \/tmp\/nginx-conf\.d\/route-v2-proxy-headers\.inc;/);
-  assert.match(nginx, /proxy_set_header X-EasySubway-Origin-Verify \$\{EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET\};/);
+  assert.match(nginx, /proxy_set_header X-EasySubway-Origin-Verify "\$\{EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET\}";/);
   assert.match(nginx, /proxy_set_header Forwarded "";/);
   assert.match(nginx, /proxy_set_header X-Forwarded-For "";/);
   assert.match(nginx, /proxy_set_header X-Real-IP "";/);
@@ -90,5 +90,7 @@ test("Route V2 gateway runtime integration probe는 privacy·bucket·identifier-
   assert.match(probe, /"scope":"search"/);
   assert.match(probe, /integration-token/);
   assert.match(probe, /rotating-token/);
-  assert.match(probe, /\{"requests":12\}/);
+  assert.match(probe, /start_gateway ""/);
+  assert.match(probe, /originVerified.*false/);
+  assert.match(probe, /\{"requests":13\}/);
 });

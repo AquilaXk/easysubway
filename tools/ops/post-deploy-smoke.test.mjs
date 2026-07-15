@@ -16,7 +16,7 @@ function defaultRoutes() {
     liveness: () => ({ status: 200, body: { status: "UP" } }),
     readiness: () => ({ status: 200, body: { status: "UP" } }),
     routeV1Search: () => ({ status: 403, body: {} }),
-    routeV2Search: () => ({ status: 403, body: {} }),
+    routeV2Search: () => ({ status: 401, body: {} }),
     routeRefresh: () => ({ status: 404, body: {} }),
     adminLogin: () => ({ status: 200, body: "<html><body><form method=\"post\">login</form></body></html>", raw: true }),
     datapack: () => ({ status: 200, body: { packs: [{ id: "capital", version: "2026.07.01" }] } }),
@@ -117,13 +117,24 @@ test("post-deploy smoke fails when liveness is not UP", async () => {
   });
 });
 
-test("post-deploy smoke accepts one-shot 403/404 for every closed route endpoint", async () => {
+test("post-deploy smoke accepts 401 for authenticated V2 search and keeps closed endpoints at 403/404", async () => {
   const routes = defaultRoutes();
   await withServer(routes, async (baseUrl) => {
     const { code, report } = await runSmoke(baseUrl);
     assert.equal(code, 0);
     assert.equal(axis(report, "route-api-closure").result, "PASS");
     assert.equal(axis(report, "route-api-closure").attempts, 1);
+  });
+});
+
+test("post-deploy smoke does not weaken v1 closure to 401", async () => {
+  const routes = defaultRoutes();
+  routes.routeV1Search = () => ({ status: 401, body: {} });
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 1);
+    assert.equal(axis(report, "route-api-closure").result, "FAIL");
+    assert.match(axis(report, "route-api-closure").detail, /POST \/api\/v1\/routes\/search returned HTTP 401/);
   });
 });
 
@@ -149,8 +160,11 @@ test("post-deploy smoke shares one timeout budget across closed route endpoints"
   const delayedForbidden = () => new Promise((resolve) => {
     setTimeout(() => resolve({ status: 403, body: {} }), 900);
   });
+  const delayedUnauthorized = () => new Promise((resolve) => {
+    setTimeout(() => resolve({ status: 401, body: {} }), 900);
+  });
   routes.routeV1Search = delayedForbidden;
-  routes.routeV2Search = delayedForbidden;
+  routes.routeV2Search = delayedUnauthorized;
   routes.routeRefresh = delayedForbidden;
 
   await withServer(routes, async (baseUrl) => {
@@ -214,6 +228,10 @@ test("post-deploy smoke contract file matches the expected schema", async () => 
   assert.equal(routeApiClosure.deploymentAttributed, true);
   assert.equal(routeApiClosure.id, "route-api-closure");
   assert.deepEqual(routeApiClosure.acceptedStatuses, [403, 404]);
+  const authenticatedV2Search = routeApiClosure.endpoints.find(
+    ({ path: endpointPath }) => endpointPath === "/api/v2/routes/search",
+  );
+  assert.deepEqual(authenticatedV2Search.acceptedStatuses, [401, 404]);
   assert.deepEqual(
     routeApiClosure.endpoints.map(({ method, path: endpointPath }) => `${method} ${endpointPath}`),
     [

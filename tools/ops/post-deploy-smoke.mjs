@@ -92,7 +92,8 @@ async function checkRouteApiClosure(baseUrl, axis, timeoutMs) {
     } catch (error) {
       throw new Error(`${context} check failed: ${error.message}`, { cause: error });
     }
-    if (!axis.acceptedStatuses.includes(status)) {
+    const acceptedStatuses = endpoint.acceptedStatuses ?? axis.acceptedStatuses;
+    if (!acceptedStatuses.includes(status)) {
       throw new Error(`${context} returned HTTP ${status}`);
     }
   }
