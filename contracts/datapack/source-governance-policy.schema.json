@@ -15,7 +15,7 @@
   "properties": {
     "schemaVersion": { "type": "integer", "const": 1 },
     "artifactKind": { "type": "string", "const": "datapack-source-governance-policy" },
-    "policyVersion": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "policyVersion": { "type": "string", "format": "date" },
     "retentionClasses": {
       "type": "array",
       "minItems": 1,
@@ -87,11 +87,11 @@
             "properties": {
               "status": { "enum": ["APPROVED", "REVIEW_REQUIRED", "BLOCKED", "EXPIRED"] },
               "termsHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-              "reviewedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T" },
-              "nextReviewAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T" },
-              "termsUrl": { "type": "string", "pattern": "^https://" },
+              "reviewedAt": { "type": "string", "format": "date-time" },
+              "nextReviewAt": { "type": "string", "format": "date-time" },
+              "termsUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
               "reviewedProvider": { "type": "string", "pattern": ".+" },
-              "reviewedDatasetUrl": { "type": "string", "pattern": "^https://" },
+              "reviewedDatasetUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
               "redistributionScopes": {
                 "type": "array",
                 "minItems": 1,

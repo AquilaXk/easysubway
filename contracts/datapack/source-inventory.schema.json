@@ -96,6 +96,7 @@
           },
           "admissionEvidence": {
             "type": "object",
+            "required": ["licenseEvidenceHash"],
             "properties": {
               "licenseEvidenceHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
             }

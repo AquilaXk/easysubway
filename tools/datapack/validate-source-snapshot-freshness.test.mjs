@@ -31,6 +31,7 @@ function input(overrides = {}) {
     snapshotStatus: "LOCKED",
     credentialRedacted: true,
     retrievedAt: "2026-07-12T00:00:00Z",
+    sourceUpdatedAt: null,
     freshnessExpiresAt: "2026-08-11T00:00:00Z",
     rawRetentionExpiresAt: "2026-10-10T00:00:00.000Z",
     governancePolicyVersion: "2026-07-15",
@@ -69,6 +70,19 @@ test("source snapshot ID·hash·policy 파생 freshness가 맞으면 통과한�
 
   assert.equal(result.results.length, 1);
   assert.equal(result.results[0].status, "FRESH");
+});
+
+test("governance 입력이 없으면 provenance의 governance binding도 선택 사항이다", () => {
+  const value = input();
+  delete value.snapshots[0].governancePolicyVersion;
+  delete value.snapshots[0].governancePolicySha256;
+  delete value.buildSpec.sourceSnapshots[0].governancePolicyVersion;
+  delete value.buildSpec.sourceSnapshots[0].governancePolicySha256;
+  value.buildSpec.sourceSnapshotSetHash = createHash("sha256")
+    .update(JSON.stringify(value.snapshots))
+    .digest("hex");
+
+  assert.doesNotThrow(() => validateSourceSnapshotFreshness(value));
 });
 
 test("source snapshot evidence의 absolute relative-result를 거부한다", () => {

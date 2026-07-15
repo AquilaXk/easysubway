@@ -5,6 +5,7 @@ const SUPPORTED = new Set([
   "const",
   "description",
   "enum",
+  "format",
   "items",
   "minItems",
   "minimum",
@@ -50,10 +51,37 @@ function validateScalar(schema, value, path, errors) {
   if (schema.type === "string" && schema.pattern && !new RegExp(schema.pattern).test(value)) {
     errors.push(`${path}: pattern ${schema.pattern} 불일치`);
   }
+  if (schema.type === "string" && schema.format && !matchesFormat(schema.format, value)) {
+    errors.push(`${path}: format ${schema.format} 불일치`);
+  }
   if (typeof value === "number" && schema.minimum !== undefined && value < schema.minimum) {
     errors.push(`${path}: minimum ${schema.minimum} 미만`);
   }
   return false;
+}
+
+function matchesFormat(format, value) {
+  if (format === "date") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  }
+  if (format === "date-time") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/.exec(value);
+    if (!match) return false;
+    const millis = Date.parse(value);
+    const normalized = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.${(match[7] ?? "").padEnd(3, "0")}Z`;
+    return Number.isFinite(millis) && new Date(millis).toISOString() === normalized;
+  }
+  if (format === "uri") {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol !== "" && parsed.hostname !== "";
+    } catch {
+      return false;
+    }
+  }
+  throw new Error(`json-schema-lite: 미지원 format '${format}'`);
 }
 
 function validateObject(schema, value, path, errors) {

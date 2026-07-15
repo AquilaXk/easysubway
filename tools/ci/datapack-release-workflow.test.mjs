@@ -159,6 +159,12 @@ test("release build는 source snapshot freshness를 build 전에 fail closed로 
   assert.match(freshnessStep, /--policy apps\/mobile\/release\/datapack-freshness-sla\.json/);
   assert.match(freshnessStep, /--governance-policy tools\/datapack\/source-governance-policy\.json/);
   assert.match(freshnessStep, /--inventory tools\/datapack\/source-inventory\.json/);
+  const inventoryStep = yml.match(
+    /- name: Data Pack Release \/ Validate source inventory[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(inventoryStep, "source inventory 검증 스텝을 찾지 못함");
+  assert.match(inventoryStep, /--governance-policy tools\/datapack\/source-governance-policy\.json/);
+  assert.match(inventoryStep, /--freshness-policy apps\/mobile\/release\/datapack-freshness-sla\.json/);
   assert.ok(
     yml.indexOf("Validate source snapshot freshness") < yml.indexOf("Build data packs"),
     "source snapshot freshness는 build 전에 검증해야 함",

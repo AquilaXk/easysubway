@@ -8,6 +8,8 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
+import { deleteExpiredItems } from "./purge-expired-source-raw.mjs";
+
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const evaluationAt = "2026-07-15T00:00:00Z";
@@ -110,6 +112,42 @@ test("DELETE 5xx는 sanitized RAW_RETENTION_OVERDUE evidence를 남기고 실패
     assert.deepEqual(report.failed.map((entry) => entry.snapshotId), ["failed"]);
     assert.doesNotMatch(reportText, /failed-secret-name|objectKey|baseUrl/i);
   });
+});
+
+test("DELETE는 최대 4개 동시 실행하고 각 요청에 timeout signal을 건다", async () => {
+  let active = 0;
+  let maxActive = 0;
+  const items = Array.from({ length: 9 }, (_, index) => ({
+    snapshotId: `snapshot-${index}`,
+    objectUrl: `https://objects.example.invalid/raw/${index}`,
+  }));
+  const results = await deleteExpiredItems(items, {
+    fetchImpl: async (_url, options) => {
+      assert.ok(options.signal instanceof AbortSignal);
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return { status: 204 };
+    },
+  });
+
+  assert.equal(maxActive, 4);
+  assert.deepEqual(results.map((result) => result.status), Array(9).fill(204));
+});
+
+test("응답 없는 DELETE는 timeout 뒤 실패 상태로 반환한다", async () => {
+  const [result] = await deleteExpiredItems(
+    [{ snapshotId: "stalled", objectUrl: "https://objects.example.invalid/raw/stalled" }],
+    {
+      timeoutMs: 5,
+      fetchImpl: async (_url, { signal }) => new Promise((_resolve, reject) => {
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      }),
+    },
+  );
+
+  assert.equal(result.status, 0);
 });
 
 async function withFixture(run) {

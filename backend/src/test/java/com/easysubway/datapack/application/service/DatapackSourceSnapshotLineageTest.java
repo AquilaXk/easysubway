@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -150,6 +151,34 @@ class DatapackSourceSnapshotLineageTest {
 		assertThat(service.createLockedSnapshot(first)).isEqualTo("snapshot-a-1");
 		service.createLockedSnapshot(command("source-a", "snapshot-a-2", "snapshot-a-1", changedDiff()));
 		assertThat(service.createLockedSnapshot(first)).isEqualTo("snapshot-a-1");
+		assertThatThrownBy(() -> service.createLockedSnapshot(new SourceSnapshotCommand(
+			first.snapshotId(),
+			first.sourceId(),
+			first.provider(),
+			first.retrievedAt(),
+			first.sourceUpdatedAt(),
+			first.rowCount(),
+			first.coverageCount() + 1,
+			first.rawSha256(),
+			first.rawObjectUri(),
+			first.redactedRequestFingerprint(),
+			first.schemaFingerprint(),
+			first.schemaStatus(),
+			first.licenseStatus(),
+			first.fetchStatus(),
+			first.redistributionAllowed(),
+			first.credentialRedacted(),
+			first.previousSnapshotId(),
+			first.diffSummary(),
+			first.diffSummaryJson(),
+			first.freshnessExpiresAt(),
+			first.rawRetentionExpiresAt(),
+			first.governancePolicyVersion(),
+			first.governancePolicySha256(),
+			first.requestedBy(),
+			first.reason(),
+			first.idempotencyKey()
+		))).hasMessageContaining("idempotency key");
 	}
 
 	@Test
@@ -161,7 +190,7 @@ class DatapackSourceSnapshotLineageTest {
 			var second = executor.submit(() -> createAfter(start, command("source-a", "snapshot-a-2", null, null)));
 			start.countDown();
 
-			var results = java.util.List.of(first.get(), second.get());
+			var results = java.util.List.of(first.get(5, TimeUnit.SECONDS), second.get(5, TimeUnit.SECONDS));
 			assertThat(results).contains("SOURCE_LINEAGE_BROKEN");
 			assertThat(results).filteredOn(result -> result.startsWith("snapshot-a-")).hasSize(1);
 		}

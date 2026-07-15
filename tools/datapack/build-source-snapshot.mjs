@@ -68,7 +68,8 @@ async function main() {
 
 async function validateRetentionPolicy(snapshot, args) {
   if (!args["governance-policy"]) return;
-  const policy = JSON.parse(await readFile(path.resolve(args["governance-policy"]), "utf8"));
+  const policyBytes = await readFile(path.resolve(args["governance-policy"]));
+  const policy = JSON.parse(policyBytes.toString("utf8"));
   const derived = deriveRawRetentionExpiresAt({
     policy,
     sourceId: snapshot.sourceId,
@@ -82,7 +83,7 @@ async function validateRetentionPolicy(snapshot, args) {
   }
   snapshot.rawRetentionExpiresAt = derived;
   snapshot.governancePolicyVersion = requiredText(policy.policyVersion, "governance policy version");
-  snapshot.governancePolicySha256 = sha256(await readFile(path.resolve(args["governance-policy"])));
+  snapshot.governancePolicySha256 = sha256(policyBytes);
 }
 
 async function validateFreshnessPolicy(snapshot, args) {

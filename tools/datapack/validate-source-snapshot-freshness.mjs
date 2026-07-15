@@ -46,10 +46,12 @@ export function validateSourceSnapshotFreshness({
   if (new Set(actualIds).size !== actualIds.length || JSON.stringify(actualIds) !== JSON.stringify(expectedIds)) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
   }
-  const evidenceProvenance = canonicalBuildProvenance(snapshots, "snapshots");
+  const includeGovernance = governancePolicy != null;
+  const evidenceProvenance = canonicalBuildProvenance(snapshots, "snapshots", includeGovernance);
   const buildProvenance = canonicalBuildProvenance(
     buildSpec.sourceSnapshots,
     "buildSpec.sourceSnapshots",
+    includeGovernance,
   );
   if (JSON.stringify(evidenceProvenance) !== JSON.stringify(buildProvenance)) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot provenance");
@@ -184,7 +186,7 @@ function requiredString(value, label) {
   return value;
 }
 
-function canonicalBuildProvenance(snapshots, label) {
+function canonicalBuildProvenance(snapshots, label, includeGovernance) {
   if (!Array.isArray(snapshots) || snapshots.length === 0) {
     throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}`);
   }
@@ -192,7 +194,10 @@ function canonicalBuildProvenance(snapshots, label) {
     if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
       throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}[${index}]`);
     }
-    const canonical = Object.fromEntries(buildProvenanceStringFields.map((field) => [
+    const fields = includeGovernance
+      ? buildProvenanceStringFields
+      : buildProvenanceStringFields.filter((field) => !field.startsWith("governancePolicy"));
+    const canonical = Object.fromEntries(fields.map((field) => [
       field,
       requiredString(snapshot[field], `${label}[${index}].${field}`),
     ]));

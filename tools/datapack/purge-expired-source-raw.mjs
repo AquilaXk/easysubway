@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   deriveRawRetentionExpiresAt,
@@ -11,6 +12,8 @@ import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 const ALLOWED_ARGS = new Set(["ledger", "policy", "evaluation-at", "base-url", "output"]);
 const PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
+const DELETE_CONCURRENCY = 4;
+const DELETE_TIMEOUT_MS = 30_000;
 
 async function main(argv) {
   const args = parseArgs(argv);
@@ -32,6 +35,7 @@ async function main(argv) {
     baseUrl,
   });
   const report = emptyReport(evaluationAt, args.dryRun);
+  const deleteItems = [];
 
   for (const item of plan) {
     if (item.disposition === "PROTECTED") {
@@ -46,12 +50,10 @@ async function main(argv) {
       report.wouldDelete.push(sanitized(item));
       continue;
     }
-    let status;
-    try {
-      status = (await fetch(item.objectUrl, { method: "DELETE", redirect: "error" })).status;
-    } catch {
-      status = 0;
-    }
+    deleteItems.push(item);
+  }
+
+  for (const { item, status } of await deleteExpiredItems(deleteItems)) {
     if (status >= 200 && status < 300) {
       report.deleted.push(sanitized(item));
     } else if (status === 404) {
@@ -66,6 +68,30 @@ async function main(argv) {
   report.reportSha256 = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
   await writeJson(outputPath, report);
   if (report.decision !== "PASS") throw new Error(report.reasonCodes.join(","));
+}
+
+export async function deleteExpiredItems(
+  items,
+  { fetchImpl = fetch, timeoutMs = DELETE_TIMEOUT_MS, concurrency = DELETE_CONCURRENCY } = {},
+) {
+  const results = [];
+  for (let index = 0; index < items.length; index += concurrency) {
+    const batch = items.slice(index, index + concurrency);
+    results.push(...await Promise.all(batch.map(async (item) => {
+      let status;
+      try {
+        status = (await fetchImpl(item.objectUrl, {
+          method: "DELETE",
+          redirect: "error",
+          signal: AbortSignal.timeout(timeoutMs),
+        })).status;
+      } catch {
+        status = 0;
+      }
+      return { item, status };
+    })));
+  }
+  return results;
 }
 
 export function buildPurgePlan({ ledger, policy, policySha256, evaluationAt, evaluatedMillis, baseUrl }) {
@@ -220,7 +246,9 @@ function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-main(process.argv.slice(2)).catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main(process.argv.slice(2)).catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}

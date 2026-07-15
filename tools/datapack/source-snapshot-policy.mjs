@@ -1,3 +1,5 @@
+import { requiredUtcInstant } from "./lib/utc-instant.mjs";
+
 export function requiredCredentialFreeObjectUri(value, label) {
   const uri = requiredText(value, label);
   let parsed;
@@ -21,6 +23,8 @@ export function requiredCredentialFreeObjectUri(value, label) {
 }
 
 export function buildSnapshotDiff(previous, next) {
+  validateDiffSnapshot(previous, "previous");
+  validateDiffSnapshot(next, "next");
   const changes = {
     rawHashChanged: previous.rawSha256 !== next.rawSha256,
     schemaHashChanged: previous.schemaFingerprint !== next.schemaFingerprint,
@@ -48,6 +52,7 @@ export function validateLineage(snapshots) {
   for (const snapshot of snapshots) {
     const snapshotId = requiredText(snapshot?.snapshotId, "snapshotId");
     requiredText(snapshot.sourceId, "sourceId");
+    validateDiffSnapshot(snapshot, "snapshot");
     if (byId.has(snapshotId)) throw new Error("SOURCE_LINEAGE_BROKEN: duplicate snapshot ID");
     byId.set(snapshotId, snapshot);
   }
@@ -92,6 +97,24 @@ export function validateLineage(snapshots) {
     chainsBySource[sourceId] = chain;
   }
   return { headsBySource, chainsBySource };
+}
+
+function validateDiffSnapshot(snapshot, label) {
+  for (const field of ["rawSha256", "schemaFingerprint", "redactedRequestFingerprint"]) {
+    if (!/^[0-9a-f]{64}$/.test(snapshot?.[field] ?? "")) {
+      throw new Error(`SOURCE_DIFF_MISSING: ${label}.${field}`);
+    }
+  }
+  if (!("sourceUpdatedAt" in (snapshot ?? {}))) {
+    throw new Error(`SOURCE_DIFF_MISSING: ${label}.sourceUpdatedAt`);
+  }
+  if (snapshot.sourceUpdatedAt != null) {
+    try {
+      requiredUtcInstant(snapshot.sourceUpdatedAt, `${label}.sourceUpdatedAt`);
+    } catch {
+      throw new Error(`SOURCE_DIFF_MISSING: ${label}.sourceUpdatedAt`);
+    }
+  }
 }
 
 function requiredText(value, label) {

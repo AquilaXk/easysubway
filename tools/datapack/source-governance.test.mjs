@@ -107,6 +107,18 @@ test("snapshot diff는 hash·시각·row·coverage 변화를 결정적으로 기
   });
 });
 
+test("snapshot diff와 lineage는 필수 hash·sourceUpdatedAt 형식을 검증한다", () => {
+  for (const invalid of [
+    { rawSha256: undefined },
+    { schemaFingerprint: "invalid" },
+    { redactedRequestFingerprint: "A".repeat(64) },
+    { sourceUpdatedAt: "2026-02-31T00:00:00Z" },
+  ]) {
+    assert.throws(() => buildSnapshotDiff(first, { ...second, ...invalid }), /SOURCE_DIFF_MISSING/);
+    assert.throws(() => validateLineage([first, { ...second, ...invalid }]), /SOURCE_DIFF_MISSING/);
+  }
+});
+
 test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다", async () => {
   const workDir = path.join(tmpdir(), `easysubway-source-lineage-${process.pid}-${Date.now()}`);
   const firstRaw = path.join(workDir, "first.csv");
@@ -186,6 +198,14 @@ test("governance policy는 production source별 freshness·retention·책임 역
       freshnessPolicy,
     }),
     /LICENSE_REVIEW_REQUIRED/,
+  );
+  assert.throws(
+    () => validateSourceGovernancePolicy({
+      policy,
+      inventory: { sources: [source(), source()] },
+      freshnessPolicy,
+    }),
+    /duplicate inventory source/,
   );
 });
 
@@ -269,6 +289,11 @@ test("legal hold는 역할·사유 코드·유한한 만료시각을 요구하�
     ...input,
     snapshot: expiredSnapshot,
     legalHold: { ...validHold, expiresAt: "2026-07-15T00:00:00Z" },
+  }).reasonCodes.includes("LEGAL_HOLD_INVALID"));
+  assert.ok(evaluateSourceGovernance({
+    ...input,
+    snapshot: expiredSnapshot,
+    legalHold: { ...validHold, createdAt: "2026-07-16T00:00:00Z" },
   }).reasonCodes.includes("LEGAL_HOLD_INVALID"));
   assert.ok(evaluateSourceGovernance({
     ...input,

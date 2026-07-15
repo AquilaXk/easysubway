@@ -59,3 +59,25 @@ test("객체·배열 전용 키워드는 type 누락 시 스키마 작성 오류
     /type: array/,
   );
 });
+
+test("date·date-time·uri format은 달력과 URL 구조까지 검증한다", () => {
+  const schema = {
+    type: "object",
+    properties: {
+      policyVersion: { type: "string", format: "date" },
+      reviewedAt: { type: "string", format: "date-time" },
+      termsUrl: { type: "string", format: "uri", pattern: "^https://" },
+    },
+  };
+
+  assert.equal(validateSchema(schema, {
+    policyVersion: "2026-07-15",
+    reviewedAt: "2026-07-15T00:00:00Z",
+    termsUrl: "https://example.invalid/terms",
+  }).ok, true);
+  assert.equal(validateSchema(schema, {
+    policyVersion: "2026-02-31",
+    reviewedAt: "2026-07-15T25:00:00Z",
+    termsUrl: "https://",
+  }).ok, false);
+});

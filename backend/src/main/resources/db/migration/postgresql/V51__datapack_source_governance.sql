@@ -9,6 +9,7 @@ SET coverage_count = row_count
 WHERE coverage_count IS NULL;
 
 ALTER TABLE data_source_snapshots
+	ALTER COLUMN coverage_count SET NOT NULL,
 	ADD CONSTRAINT chk_data_source_snapshots_coverage_count
 		CHECK (coverage_count >= 0),
 	ADD CONSTRAINT chk_data_source_snapshots_governance_pair

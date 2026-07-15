@@ -31,6 +31,7 @@ export function collectContractErrors() {
     SOURCE_GOVERNANCE_POLICY_PATH,
     errors,
   );
+  if (!existsSync(FRESHNESS_POLICY_PATH)) errors.push(`${FRESHNESS_POLICY_PATH} 누락`);
   if ([SOURCE_INVENTORY_PATH, SOURCE_GOVERNANCE_POLICY_PATH, FRESHNESS_POLICY_PATH].every(existsSync)) {
     validateSourceGovernanceContracts({
       inventory: loadJson(SOURCE_INVENTORY_PATH),

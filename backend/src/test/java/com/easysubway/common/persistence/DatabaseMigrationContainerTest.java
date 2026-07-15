@@ -548,12 +548,12 @@ class DatabaseMigrationContainerTest {
 		jdbcTemplate.update("""
 			INSERT INTO data_source_snapshots (
 				snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count,
-				raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
+				coverage_count, raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
 				snapshot_status, schema_status, license_status, fetch_status,
 				redistribution_allowed, credential_redacted, previous_snapshot_id,
 				diff_summary, freshness_expires_at, raw_retention_expires_at
 			)
-			VALUES (?, ?, 'KRIC', '2026-06-29 00:00:00', NULL, 1, ?, ?, ?, ?,
+			VALUES (?, ?, 'KRIC', '2026-06-29 00:00:00', NULL, 1, 1, ?, ?, ?, ?,
 				'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE, NULL, NULL,
 				'2026-07-06 00:00:00', '2026-09-29 00:00:00')
 			""",
@@ -587,6 +587,11 @@ class DatabaseMigrationContainerTest {
 			SET governance_policy_version = '2026-07-15'
 			WHERE snapshot_id = 'lineage-root'
 			""")).isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbcTemplate.update("""
+			UPDATE data_source_snapshots
+			SET governance_policy_sha256 = ?
+			WHERE snapshot_id = 'lineage-root'
+			""", "d".repeat(64))).isInstanceOf(DataAccessException.class);
 		assertThatThrownBy(() -> jdbcTemplate.update("""
 			UPDATE data_source_snapshots
 			SET coverage_count = -1

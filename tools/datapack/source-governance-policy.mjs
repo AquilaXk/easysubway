@@ -31,8 +31,14 @@ export function validateSourceGovernancePolicy({ policy, inventory, freshnessPol
     retentionClasses.set(id, retentionClass);
   }
 
-  const inventorySources = new Map(requiredArray(inventory?.sources, "inventory.sources")
-    .map((source) => [requiredText(source?.id, "inventory source id"), source]));
+  const inventorySources = new Map();
+  for (const source of requiredArray(inventory?.sources, "inventory.sources")) {
+    const sourceId = requiredText(source?.id, "inventory source id");
+    if (inventorySources.has(sourceId)) {
+      throw new Error(`SOURCE_GOVERNANCE_OWNER_MISSING: duplicate inventory source ${sourceId}`);
+    }
+    inventorySources.set(sourceId, source);
+  }
   if (!Array.isArray(policy.sources)) {
     throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: policy.sources");
   }
@@ -272,7 +278,9 @@ function validateLegalHold(hold, entry, snapshot, evaluatedMillis) {
     if (hold.ownerRole !== entry.ownerRole || !LEGAL_HOLD_REASONS.has(hold.reasonCode)) return false;
     const createdMillis = requiredUtcInstant(hold.createdAt, "legalHold.createdAt");
     const expiresMillis = requiredUtcInstant(hold.expiresAt, "legalHold.expiresAt");
-    return expiresMillis > createdMillis && evaluatedMillis < expiresMillis;
+    return createdMillis <= evaluatedMillis
+      && expiresMillis > createdMillis
+      && evaluatedMillis < expiresMillis;
   } catch {
     return false;
   }
