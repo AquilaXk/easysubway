@@ -44,7 +44,9 @@
           "refreshOn": "operations-contract-change",
           "files": [
             {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "fc9e00164b711954906724a0141fb4f3ebbe3cb875e6d4f0e4f6d34987e8a01a"},
-            {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"}
+            {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
+            {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "dcf582fea08a8a10096f156e0d8dfb0057053cf9427623fa624b31b205563cc6"},
+            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "3f184b50500fa3649237ec22fe27b1383a503f9eb7ec1d0c2044271532268924"}
           ]
         },
         {
@@ -69,7 +71,8 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "7690e3f3de3ce4408f477ac30cec1d8f92ceca8056e367170863448a278cf9cb"},
             {"path": ".github/workflows/release-artifacts.yml", "sha256": "7afcc2e60de1166d0b8077c54099899f4a4c2c8fcbad833d030276c11b712f5c"},
-            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "6784beebb3c9c3ac8df9f386196d47f987aa60f16140379b88937c6805c20001"}
+            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "6784beebb3c9c3ac8df9f386196d47f987aa60f16140379b88937c6805c20001"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "7bf816b8486065cf97fefc85bd9a62d5f1dce5627fef6a7551fba3deb71c28cd"}
           ]
         }
       ],

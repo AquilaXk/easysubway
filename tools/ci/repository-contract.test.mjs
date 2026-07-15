@@ -2426,6 +2426,16 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       );
     }
   }
+  const refreshBoundPaths = new Set(
+    refreshBindings.flatMap((binding) => binding.files.map((file) => file.path)),
+  );
+  for (const requiredPath of [
+    "tools/ops/generate-operations-phase-a-summary.mjs",
+    "tools/ops/validate-operations-release-summary.mjs",
+    "tools/release/generate-rc-evidence-manifest.mjs",
+  ]) {
+    assert.ok(refreshBoundPaths.has(requiredPath), `${requiredPath} must invalidate Phase A evidence`);
+  }
   assert.ok(
     postLaunchOperationsReviewGate.preLaunchReadiness.requiredEvidence.includes(
       "p0-data-error-emergency-release-rollback-rehearsal",
@@ -3637,10 +3647,6 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "Android 16 API 36",
     "--gate-status",
     "androidRcEvidence=BLOCKED_EXTERNAL",
-    "--evidence-status",
-    "post_launch_operations=SATISFIED",
-    "--evidence-path",
-    `post_launch_operations=${phaseASummaryPath}`,
   ], { cwd: root });
 
   const manifest = JSON.parse(readFileSync(outputPath, "utf8"));
@@ -3672,13 +3678,13 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(manifest.readiness.blockers.map((blocker) => blocker.id).includes("gate_androidrcevidence_blocked_external"));
   assert.equal(
     manifest.readiness.blockers.some((blocker) => blocker.id === "pending_post_launch_operations"),
-    false,
+    true,
   );
   const postLaunchOperationsEntry = manifest.evidenceEntries.find((entry) => entry.id === "post_launch_operations");
-  assert.equal(postLaunchOperationsEntry.status, "SATISFIED");
-  assert.ok(postLaunchOperationsEntry.evidencePaths.includes(phaseASummaryPath));
-  assert.equal(postLaunchOperationsEntry.testedAt, "2026-07-15T00:00:00+09:00");
-  assert.equal(postLaunchOperationsEntry.expiresWhen, "2026-07-28T23:59:59.999+09:00");
+  assert.equal(postLaunchOperationsEntry.status, "PENDING_LOCAL_EVIDENCE");
+  assert.equal(postLaunchOperationsEntry.evidencePaths.includes(phaseASummaryPath), false);
+  assert.equal(postLaunchOperationsEntry.testedAt, "2026-06-26T00:00:00.000Z");
+  assert.equal(postLaunchOperationsEntry.expiresWhen, "2026-07-10T00:00:00.000Z");
   assert.deepEqual(
     manifest.evidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
     [
@@ -3696,10 +3702,8 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   );
   assert.ok(manifest.evidenceEntries.every((entry) => entry.device === "local_android_emulator"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.androidVersion === "Android 16 API 36"));
-  assert.ok(manifest.evidenceEntries.filter((entry) => entry.id !== "post_launch_operations")
-    .every((entry) => entry.testedAt === "2026-06-26T00:00:00.000Z"));
-  assert.ok(manifest.evidenceEntries.filter((entry) => entry.id !== "post_launch_operations")
-    .every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
+  assert.ok(manifest.evidenceEntries.every((entry) => entry.testedAt === "2026-06-26T00:00:00.000Z"));
+  assert.ok(manifest.evidenceEntries.every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
 
   await writeFile(phaseASummaryPath, JSON.stringify({
     status: "PASS",
@@ -3792,6 +3796,51 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
     ], { cwd: root }),
     /SATISFIED evidence entry requires evidenceValidity/,
+  );
+
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "FAIL",
+    issue: 9999,
+    releaseGate: "unrelated-evidence",
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-20T00:00:00Z",
+    },
+  }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-16T00:00:00Z",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-07-15T00:00:00Z",
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /failed canonical validation/,
+  );
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-16T00:00:00Z",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-07-15T00:00:00Z",
+      "--evidence-status", "rc_device_qa=SATISFIED",
+      "--evidence-path", `rc_device_qa=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /has no canonical validator/,
   );
 
   const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");

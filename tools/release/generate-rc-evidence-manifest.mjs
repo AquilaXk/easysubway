@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 
@@ -81,6 +83,7 @@ const evidenceEntries = requiredEvidenceEntries(
   evidencePaths,
   generatedAt,
   rcEvidenceContract.requiredEvidenceEntries,
+  { identity, repoRoot, androidApplicationId: "com.easysubway.app" },
 );
 const blockers = [
   ...identityBlockers(identity),
@@ -259,6 +262,7 @@ function requiredEvidenceEntries(
   paths,
   generatedAt,
   contractEntries,
+  validationContext,
 ) {
   const knownIds = new Set(contractEntries.map(({ id }) => id));
   for (const id of [...Object.keys(statuses), ...Object.keys(paths)]) {
@@ -304,6 +308,9 @@ function requiredEvidenceEntries(
     if (statuses[id] === "SATISFIED" && Date.parse(evidenceExpiresWhen) > Date.parse(maxEvidenceExpiresWhen)) {
       fail(`SATISFIED evidence entry exceeds the ${expiresAfterDays}-day evidence lifetime: ${id}`);
     }
+    if (statuses[id] === "SATISFIED") {
+      validateSatisfiedEvidence(id, paths[id], generatedAt, validationContext);
+    }
     return {
       id,
       sourceIssue,
@@ -315,6 +322,40 @@ function requiredEvidenceEntries(
       status: statuses[id] ?? "PENDING_LOCAL_EVIDENCE",
     };
   });
+}
+
+function validateSatisfiedEvidence(id, evidencePath, generatedAt, context) {
+  if (id !== "post_launch_operations") {
+    fail(`SATISFIED evidence entry has no canonical validator: ${id}`);
+  }
+  const validationDir = mkdtempSync(path.join(tmpdir(), "easysubway-rc-evidence-validation-"));
+  const rcManifestPath = path.join(validationDir, "rc-evidence-manifest.json");
+  writeFileSync(rcManifestPath, `${JSON.stringify({
+    schemaVersion: 1,
+    releaseGate: "rc-evidence-manifest",
+    androidApplicationId: context.androidApplicationId,
+    rcIdentity: context.identity,
+  }, null, 2)}\n`);
+  let validationFailed = false;
+  try {
+    execFileSync(process.execPath, [
+      path.join(context.repoRoot, "tools/ops/validate-operations-release-summary.mjs"),
+      "--summary",
+      resolvePath(evidencePath),
+      "--rc-manifest",
+      rcManifestPath,
+      "--now",
+      generatedAt,
+      "--require-pass",
+    ], { cwd: context.repoRoot, stdio: "pipe" });
+  } catch {
+    validationFailed = true;
+  } finally {
+    rmSync(validationDir, { recursive: true, force: true });
+  }
+  if (validationFailed) {
+    fail(`SATISFIED evidence entry failed canonical validation: ${id}`);
+  }
 }
 
 function normalizeEvidenceRoot(rootPath) {
