@@ -83,6 +83,8 @@ const ready = postLaunch.preLaunchReadiness.status === "PASS"
   && postLaunch.preLaunchReadiness.evidenceSummary.every((item) => item.status === "PASS")
   && support.latestQaEvidenceSummary.remainingSupportReadiness.length === 0
   && support.latestQaEvidenceSummary.helpScreenDeviceQa.result === "PASS"
+  && String(support.latestQaEvidenceSummary.helpScreenDeviceQa.versionName) === String(identity.appVersionName)
+  && String(support.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode) === String(identity.versionCode)
   && support.latestQaEvidenceSummary.operatorContactReadiness.result === "PASS"
   && identity.appVersionName === validity.appVersionName
   && String(identity.versionCode) === String(validity.versionCode)

@@ -218,6 +218,26 @@ test("operations release summary validator rejects regressed canonical support r
   }
 });
 
+test("operations release summary validator rejects help-screen device QA from a different RC", async () => {
+  await assert.rejects(
+    withSummary(validSummary(), async (summaryPath) => {
+      const gate = structuredClone(supportGate);
+      gate.latestQaEvidenceSummary.helpScreenDeviceQa.versionName = "1.0.3";
+      const gatePath = path.join(path.dirname(summaryPath), "support-gate.json");
+      await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--support-gate",
+        gatePath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /help-screen device QA must match artifactIdentity/,
+  );
+});
+
 test("operations release summary validator compares artifact identity independent of JSON key order", async () => {
   const summary = validSummary();
   summary.postLaunchReviews[0].artifactIdentity = {

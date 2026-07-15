@@ -115,6 +115,20 @@ test("Phase A summary generator rejects an RC outside the recorded evidence scop
   await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
 });
 
+test("Phase A summary generator rejects help-screen device QA from a different RC", async () => {
+  const output = await paths();
+  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
+  gate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode = 10004;
+  const gatePath = path.join(output.dir, "support-incident-response-gate.json");
+  await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
+  await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+
+  await generate(output, ["--support-gate", gatePath]);
+
+  assert.equal((await readFile(output.status, "utf8")).trim(), "BLOCKED_EXTERNAL");
+  await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
+});
+
 test("Phase A summary generator rejects expired evidence", async () => {
   const output = await paths();
   await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);

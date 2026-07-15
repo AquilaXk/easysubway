@@ -311,7 +311,11 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass) {
   }
 }
 
-function assertSupport(summary, gate, requirePass) {
+function assertSupport(summary, gate, artifactIdentity, requirePass) {
+  const helpScreenDeviceQa = required(
+    gate.latestQaEvidenceSummary.helpScreenDeviceQa,
+    "gate.latestQaEvidenceSummary.helpScreenDeviceQa",
+  );
   if (requirePass && (
     required(gate.status, "gate.status") !== "PASS"
     || required(gate.preLaunchReadiness, "gate.preLaunchReadiness").status !== "PASS"
@@ -319,16 +323,19 @@ function assertSupport(summary, gate, requirePass) {
       gate.latestQaEvidenceSummary.remainingSupportReadiness,
       "gate.latestQaEvidenceSummary.remainingSupportReadiness",
     ).length > 0
-    || required(
-      gate.latestQaEvidenceSummary.helpScreenDeviceQa,
-      "gate.latestQaEvidenceSummary.helpScreenDeviceQa",
-    ).result !== "PASS"
+    || helpScreenDeviceQa.result !== "PASS"
     || required(
       gate.latestQaEvidenceSummary.operatorContactReadiness,
       "gate.latestQaEvidenceSummary.operatorContactReadiness",
     ).result !== "PASS"
   )) {
     throw new Error("canonical support readiness must be PASS for --require-pass");
+  }
+  if (requirePass && (
+    String(helpScreenDeviceQa.versionName) !== String(artifactIdentity.versionName)
+    || String(helpScreenDeviceQa.versionCode) !== String(artifactIdentity.versionCode)
+  )) {
+    throw new Error("help-screen device QA must match artifactIdentity");
   }
   const byId = new Map(required(summary.supportChannels, "supportChannels").map((item) => [item.channelId, item]));
   const validatedById = new Map(
@@ -420,7 +427,7 @@ async function main() {
   assertNoSensitiveSummary(summary, gates);
   assertObservability(summary, observability, requirePass);
   assertPostLaunch(summary, postLaunch, artifactIdentity, requirePass);
-  assertSupport(summary, support, requirePass);
+  assertSupport(summary, support, artifactIdentity, requirePass);
 }
 
 main().catch((error) => {
