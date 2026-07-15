@@ -12,9 +12,19 @@ const root = path.resolve(import.meta.dirname, "../..");
 const validatorPath = "tools/ops/validate-operations-release-summary.mjs";
 
 function execFileAsync(file, args, options) {
-  const resolvedArgs = args[0] === validatorPath && !args.includes("--now")
-    ? [...args, "--now", "2026-08-15T00:00:00+09:00"]
-    : args;
+  const resolvedArgs = [...args];
+  if (args[0] === validatorPath && !resolvedArgs.includes("--now")) {
+    resolvedArgs.push("--now", "2026-07-23T00:00:00+09:00");
+  }
+  if (args[0] === validatorPath && !resolvedArgs.includes("--rc-manifest")) {
+    const summaryIndex = resolvedArgs.indexOf("--summary");
+    if (summaryIndex !== -1 && resolvedArgs[summaryIndex + 1]) {
+      resolvedArgs.push(
+        "--rc-manifest",
+        path.join(path.dirname(resolvedArgs[summaryIndex + 1]), "rc-evidence-manifest.json"),
+      );
+    }
+  }
   return rawExecFileAsync(file, resolvedArgs, options);
 }
 const observabilityGate = JSON.parse(
@@ -91,7 +101,7 @@ function validSummary() {
       goNoGoResult: "PASS",
       redactionNotes: "summary only; no personal data",
       localEvidencePath: ".codex/evidence/release/post-launch-operations-review/rc/redacted-summary.json",
-    })),
+    })).slice(0, -1),
     postLaunchDryRunEvidence: postLaunchGate.dryRunRequiredEvidence,
     supportChannels: supportGate.supportChannels.map((channel) => {
       const evidence = supportGate.latestQaEvidenceSummary.channelEvidence.find(
@@ -144,14 +154,7 @@ async function withSummary(summary, fn) {
       supportContactSetSha256: summary.artifactIdentity.supportContactSetSha256,
     },
   }, null, 2)}\n`);
-  const previousRcManifest = process.env.EASYSUBWAY_OPERATIONS_RC_MANIFEST;
-  process.env.EASYSUBWAY_OPERATIONS_RC_MANIFEST = rcManifestPath;
-  try {
-    return await fn(summaryPath, rcManifestPath);
-  } finally {
-    if (previousRcManifest === undefined) delete process.env.EASYSUBWAY_OPERATIONS_RC_MANIFEST;
-    else process.env.EASYSUBWAY_OPERATIONS_RC_MANIFEST = previousRcManifest;
-  }
+  return fn(summaryPath, rcManifestPath);
 }
 
 test("operations release summary validator accepts complete redacted release evidence", async () => {
@@ -294,8 +297,13 @@ test("operations release summary validator rejects support evidence before the P
 
 test("operations release summary validator rejects support evidence after the validation clock", async () => {
   const summary = validSummary();
-  const receivedAt = "2026-08-16T00:00:00+09:00";
+  const receivedAt = "2026-07-20T00:00:00+09:00";
   summary.supportChannels[0].receivedAt = receivedAt;
+  summary.postLaunchObservation = {
+    status: "PENDING_PUBLIC_RELEASE",
+    publicReleaseIdentity: { publishedAt: null, versionCode: null, gitSha: null },
+  };
+  summary.postLaunchReviews = [];
 
   await assert.rejects(
     withSummary(summary, async (summaryPath) => {
@@ -309,6 +317,8 @@ test("operations release summary validator rejects support evidence after the va
         summaryPath,
         "--support-gate",
         gatePath,
+        "--now",
+        "2026-07-19T23:59:59+09:00",
         "--require-pass",
       ], { cwd: root });
     }),
@@ -436,6 +446,37 @@ test("operations release summary validator uses --now for review timestamps", as
   );
 });
 
+test("operations release summary validator requires PASS after every review window completes", async () => {
+  const summary = validSummary();
+  summary.postLaunchObservation.status = "IN_PROGRESS";
+  const window = postLaunchGate.reviewWindows.at(-1);
+  summary.postLaunchReviews.push({
+    reviewWindowId: window.id,
+    observedAt: "2026-08-14T00:00:00+09:00",
+    artifactIdentity: { ...artifactIdentity },
+    signalSnapshot: window.requiredSignals,
+    owner: window.ownerKo,
+    decision: window.decisionKo,
+    goNoGoResult: "PASS",
+    redactionNotes: "summary only; no personal data",
+    localEvidencePath: ".codex/evidence/release/post-launch-operations-review/rc/redacted-summary.json",
+  });
+
+  await assert.rejects(
+    withSummary(summary, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        validatorPath,
+        "--summary",
+        summaryPath,
+        "--now",
+        "2026-08-15T00:00:00+09:00",
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /postLaunchObservation.status must be PASS after all review windows complete/,
+  );
+});
+
 test("operations release summary validator compares artifact identity independent of JSON key order", async () => {
   const summary = validSummary();
   summary.postLaunchReviews[0].artifactIdentity = {
@@ -548,6 +589,25 @@ test("operations release summary validator rejects an identity that does not mat
       await writeFile(rcManifestPath, `${JSON.stringify(rcManifest, null, 2)}\n`);
       return execFileAsync(process.execPath, [
         "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /artifactIdentity must match the RC manifest identity/,
+  );
+});
+
+test("operations release summary validator rejects a backend identity omitted only from the summary", async () => {
+  const summary = validSummary();
+
+  await assert.rejects(
+    withSummary(summary, async (summaryPath, rcManifestPath) => {
+      const rcManifest = JSON.parse(readFileSync(rcManifestPath, "utf8"));
+      rcManifest.rcIdentity.backendImageDigest = "sha256:conflicting-secondary";
+      await writeFile(rcManifestPath, `${JSON.stringify(rcManifest, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        validatorPath,
         "--summary",
         summaryPath,
         "--require-pass",
@@ -719,6 +779,18 @@ test("operations release summary validator rejects skipping directly from pendin
 test("operations release summary validator accepts the declared in-progress to pass transition", async () => {
   const summary = validSummary();
   summary.postLaunchObservation.status = "PASS";
+  const window = postLaunchGate.reviewWindows.at(-1);
+  summary.postLaunchReviews.push({
+    reviewWindowId: window.id,
+    observedAt: "2026-08-14T00:00:00+09:00",
+    artifactIdentity: { ...artifactIdentity },
+    signalSnapshot: window.requiredSignals,
+    owner: window.ownerKo,
+    decision: window.decisionKo,
+    goNoGoResult: "PASS",
+    redactionNotes: "summary only; no personal data",
+    localEvidencePath: ".codex/evidence/release/post-launch-operations-review/rc/redacted-summary.json",
+  });
 
   await withSummary(summary, async (summaryPath) => {
     const gate = structuredClone(postLaunchGate);

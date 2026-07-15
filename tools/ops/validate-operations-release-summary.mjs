@@ -37,6 +37,16 @@ function isRfc3339Timestamp(value) {
     && offsetHour <= 23 && offsetMinute <= 59;
 }
 
+function sortedStrings(values) {
+  return [...values].sort((left, right) => left.localeCompare(right));
+}
+
+function backendIdentityMatches(fields = [], left, right) {
+  return fields.length > 0
+    && fields.some((field) => typeof left[field] === "string" && left[field].trim().length > 0)
+    && fields.every((field) => (left[field] ?? null) === (right[field] ?? null));
+}
+
 function durationMillis(value) {
   const hours = /^PT(\d+)H$/.exec(value);
   if (hours) return Number(hours[1]) * 60 * 60 * 1000;
@@ -97,15 +107,9 @@ function assertRcManifestIdentity(artifactIdentity, rcManifest, gate) {
       throw new Error("artifactIdentity must match the RC manifest identity");
     }
   }
-  const backendFields = gate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf;
-  for (const field of backendFields) {
-    if (
-      artifactIdentity[field] !== undefined
-      && artifactIdentity[field] !== null
-      && artifactIdentity[field] !== rcIdentity[field]
-    ) {
-      throw new Error("artifactIdentity must match the RC manifest identity");
-    }
+  const backendFields = gate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf ?? [];
+  if (!backendIdentityMatches(backendFields, artifactIdentity, rcIdentity)) {
+    throw new Error("artifactIdentity must match the RC manifest identity");
   }
 }
 
@@ -138,21 +142,11 @@ function assertEvidenceValidity(summary, gate, artifactIdentity, requirePass, no
       finalRcBinding.validatedArtifactIdentity,
       "gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity",
     );
-    const backendFields = finalRcBinding.backendIdentityFieldsAnyOf;
-    const backendMatches = backendFields.some((field) => (
-      typeof validatedIdentity[field] === "string"
-      && validatedIdentity[field].length > 0
-      && artifactIdentity[field] === validatedIdentity[field]
-    )) && backendFields.every((field) => (
-      artifactIdentity[field] === undefined
-      || artifactIdentity[field] === null
-      || artifactIdentity[field] === ""
-      || artifactIdentity[field] === validatedIdentity[field]
-    ));
+    const backendFields = finalRcBinding.backendIdentityFieldsAnyOf ?? [];
     if (
       artifactIdentity.aabPayloadSha256 !== validatedIdentity.aabPayloadSha256
       || artifactIdentity.dataPackManifestSha256 !== validatedIdentity.dataPackManifestSha256
-      || !backendMatches
+      || !backendIdentityMatches(backendFields, artifactIdentity, validatedIdentity)
     ) {
       throw new Error("artifactIdentity must match the Phase A validated artifact identity");
     }
@@ -200,7 +194,7 @@ function assertNoSensitiveSummary(summary, gates) {
 function assertIdentity(
   summary,
   path = "artifactIdentity",
-  backendIdentityFieldsAnyOf = ["backendImageDigest", "backendArtifactSha256"],
+  backendIdentityFieldsAnyOf = [],
 ) {
   const identity = required(summary.artifactIdentity, path);
   for (const field of [
@@ -252,7 +246,7 @@ function assertObservability(summary, gate, requirePass) {
       item.resolutionKind !== validated.resolutionKind
       || item.result !== validated.result
       || item.localEvidencePath !== validated.localEvidencePath
-      || stableFlatJson([...evidence].sort()) !== stableFlatJson([...validated.evidenceIds].sort())
+      || stableFlatJson(sortedStrings(evidence)) !== stableFlatJson(sortedStrings(validated.evidenceIds))
     ) {
       throw new Error(`observabilitySignals.${signal.id} must match validated Phase A evidence`);
     }
@@ -262,7 +256,7 @@ function assertObservability(summary, gate, requirePass) {
   }
 }
 
-function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
+function assertPreLaunchReadiness(summary, gate, requirePass) {
   const preLaunch = required(summary.preLaunchReadiness, "preLaunchReadiness");
   if (!STATUS.has(preLaunch.status)) {
     throw new Error("preLaunchReadiness.status must be a release gate status");
@@ -291,18 +285,113 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
       }
     }
   }
+}
 
+function assertPublicReleaseIdentity(observation, gateObservation, artifactIdentity, validity, now) {
+  const identity = required(
+    observation.publicReleaseIdentity,
+    "postLaunchObservation.publicReleaseIdentity",
+  );
+  if (!isRfc3339Timestamp(identity.publishedAt)) {
+    throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must be an RFC 3339 timestamp");
+  }
+  if (Date.parse(identity.publishedAt) > now) {
+    throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must not be in the future");
+  }
+  if (Date.parse(identity.publishedAt) < Date.parse(validity.testedAt)
+    || Date.parse(identity.publishedAt) > Date.parse(validity.expiresWhen)) {
+    throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must be within Phase A evidence validity");
+  }
+  required(identity.versionCode, "postLaunchObservation.publicReleaseIdentity.versionCode");
+  required(identity.gitSha, "postLaunchObservation.publicReleaseIdentity.gitSha");
+  if (String(identity.versionCode) !== String(artifactIdentity.versionCode) || identity.gitSha !== artifactIdentity.gitSha) {
+    throw new Error("public release identity must match artifactIdentity");
+  }
+  if (gateObservation.status !== "PENDING_PUBLIC_RELEASE"
+    && stableFlatJson(identity) !== stableFlatJson(gateObservation.publicReleaseIdentity)) {
+    throw new Error("public release identity must match the current gate state");
+  }
+  return identity;
+}
+
+function assertReviewWindow(item, window, identity, artifactIdentity, gate, requirePass, observationStatus, now) {
+  if (!isRfc3339Timestamp(item.observedAt)) {
+    throw new Error(`postLaunchReviews.${window.id}.observedAt must be an RFC 3339 timestamp`);
+  }
+  if (Date.parse(item.observedAt) > now) {
+    throw new Error(`postLaunchReviews.${window.id}.observedAt must not be in the future`);
+  }
+  const dueAt = Date.parse(identity.publishedAt) + durationMillis(window.afterPublicRelease);
+  if (Date.parse(item.observedAt) < dueAt) {
+    throw new Error(`postLaunchReviews.${window.id}.observedAt must be at or after its due time`);
+  }
+  assertIdentity(
+    item,
+    `postLaunchReviews.${window.id}.artifactIdentity`,
+    gate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
+  );
+  if (stableFlatJson(item.artifactIdentity) !== stableFlatJson(artifactIdentity)) {
+    throw new Error(`postLaunchReviews.${window.id}.artifactIdentity must match artifactIdentity`);
+  }
+  for (const field of gate.releaseEvidenceSummaryPolicy.githubSummaryFields) {
+    required(item[field], `postLaunchReviews.${window.id}.${field}`);
+  }
+  const snapshot = new Set(required(item.signalSnapshot, `postLaunchReviews.${window.id}.signalSnapshot`));
+  for (const signalId of window.requiredSignals) {
+    if (!snapshot.has(signalId)) throw new Error(`postLaunchReviews.${window.id}.signalSnapshot missing ${signalId}`);
+  }
+  if ((requirePass || observationStatus === "PASS") && item.goNoGoResult !== "PASS") {
+    throw new Error(`postLaunchReviews.${window.id}.goNoGoResult must be PASS`);
+  }
+}
+
+function assertPostLaunchReviews(summary, gate, observation, identity, artifactIdentity, requirePass, now) {
+  const reviews = required(summary.postLaunchReviews, "postLaunchReviews");
+  const byId = new Map(reviews.map((item) => [item.reviewWindowId, item]));
+  if (byId.size !== reviews.length) throw new Error("postLaunchReviews must not contain duplicate review windows");
+  if (observation.status === "IN_PROGRESS"
+    && reviews.some((item, index) => item.reviewWindowId !== gate.reviewWindows[index]?.id)) {
+    throw new Error("IN_PROGRESS postLaunchReviews must be a chronological prefix of reviewWindows");
+  }
+  if (observation.status === "IN_PROGRESS" && reviews.length === gate.reviewWindows.length) {
+    throw new Error("postLaunchObservation.status must be PASS after all review windows complete");
+  }
+  if (requirePass && observation.status === "IN_PROGRESS") {
+    for (const window of gate.reviewWindows) {
+      const dueAt = Date.parse(identity.publishedAt) + durationMillis(window.afterPublicRelease);
+      if (dueAt <= now && !byId.has(window.id)) throw new Error(`postLaunchReviews.${window.id} is overdue and missing`);
+    }
+  }
+  const windows = observation.status === "PASS"
+    ? gate.reviewWindows
+    : reviews.map((item) => required(
+      gate.reviewWindows.find((window) => window.id === item.reviewWindowId),
+      `reviewWindows.${item.reviewWindowId}`,
+    ));
+  for (const window of windows) {
+    assertReviewWindow(
+      required(byId.get(window.id), `postLaunchReviews.${window.id}`),
+      window,
+      identity,
+      artifactIdentity,
+      gate,
+      requirePass,
+      observation.status,
+      now,
+    );
+  }
+}
+
+function assertPostLaunchState(summary, gate, artifactIdentity, requirePass, now) {
   const observation = required(summary.postLaunchObservation, "postLaunchObservation");
-  if (!new Set(["PENDING_PUBLIC_RELEASE", "IN_PROGRESS", "PASS"]).has(observation.status)) {
+  if (!["PENDING_PUBLIC_RELEASE", "IN_PROGRESS", "PASS"].includes(observation.status)) {
     throw new Error("postLaunchObservation.status must be a post-launch state");
   }
   const gateObservation = required(gate.postLaunchObservation, "gate.postLaunchObservation");
   const transition = `${gateObservation.status}->${observation.status}`;
-  if (
-    observation.status !== gateObservation.status
+  if (observation.status !== gateObservation.status
     && !required(gateObservation.allowedStatusTransitions, "gate.postLaunchObservation.allowedStatusTransitions")
-      .includes(transition)
-  ) {
+      .includes(transition)) {
     throw new Error("postLaunchObservation.status must follow an allowed transition from the current gate state");
   }
   if (observation.status === "PENDING_PUBLIC_RELEASE") {
@@ -313,93 +402,21 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
     if ((summary.postLaunchReviews ?? []).length > 0) {
       throw new Error("PENDING_PUBLIC_RELEASE must not contain post-launch observations");
     }
-  } else {
-    const publicReleaseIdentity = required(
-      observation.publicReleaseIdentity,
-      "postLaunchObservation.publicReleaseIdentity",
-    );
-    if (!isRfc3339Timestamp(publicReleaseIdentity.publishedAt)) {
-      throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must be an RFC 3339 timestamp");
-    }
-    if (Date.parse(publicReleaseIdentity.publishedAt) > now) {
-      throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must not be in the future");
-    }
-    const phaseAValidity = required(summary.evidenceValidity, "evidenceValidity");
-    if (
-      Date.parse(publicReleaseIdentity.publishedAt) < Date.parse(phaseAValidity.testedAt)
-      || Date.parse(publicReleaseIdentity.publishedAt) > Date.parse(phaseAValidity.expiresWhen)
-    ) {
-      throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must be within Phase A evidence validity");
-    }
-    required(publicReleaseIdentity.versionCode, "postLaunchObservation.publicReleaseIdentity.versionCode");
-    required(publicReleaseIdentity.gitSha, "postLaunchObservation.publicReleaseIdentity.gitSha");
-    if (
-      String(publicReleaseIdentity.versionCode) !== String(artifactIdentity.versionCode)
-      || publicReleaseIdentity.gitSha !== artifactIdentity.gitSha
-    ) {
-      throw new Error("public release identity must match artifactIdentity");
-    }
-    if (
-      gateObservation.status !== "PENDING_PUBLIC_RELEASE"
-      && stableFlatJson(publicReleaseIdentity) !== stableFlatJson(gateObservation.publicReleaseIdentity)
-    ) {
-      throw new Error("public release identity must match the current gate state");
-    }
-    const reviews = required(summary.postLaunchReviews, "postLaunchReviews");
-    const byId = new Map(reviews.map((item) => [item.reviewWindowId, item]));
-    if (byId.size !== reviews.length) throw new Error("postLaunchReviews must not contain duplicate review windows");
-    if (
-      observation.status === "IN_PROGRESS"
-      && reviews.some((item, index) => item.reviewWindowId !== gate.reviewWindows[index]?.id)
-    ) {
-      throw new Error("IN_PROGRESS postLaunchReviews must be a chronological prefix of reviewWindows");
-    }
-    if (requirePass && observation.status === "IN_PROGRESS") {
-      for (const window of gate.reviewWindows) {
-        const dueAt = Date.parse(publicReleaseIdentity.publishedAt) + durationMillis(window.afterPublicRelease);
-        if (dueAt <= now && !byId.has(window.id)) {
-          throw new Error(`postLaunchReviews.${window.id} is overdue and missing`);
-        }
-      }
-    }
-    const windows = observation.status === "PASS"
-      ? gate.reviewWindows
-      : reviews.map((item) => required(
-        gate.reviewWindows.find((window) => window.id === item.reviewWindowId),
-        `reviewWindows.${item.reviewWindowId}`,
-      ));
-    for (const window of windows) {
-      const item = required(byId.get(window.id), `postLaunchReviews.${window.id}`);
-      if (!isRfc3339Timestamp(item.observedAt)) {
-        throw new Error(`postLaunchReviews.${window.id}.observedAt must be an RFC 3339 timestamp`);
-      }
-      if (Date.parse(item.observedAt) > now) {
-        throw new Error(`postLaunchReviews.${window.id}.observedAt must not be in the future`);
-      }
-      const dueAt = Date.parse(publicReleaseIdentity.publishedAt) + durationMillis(window.afterPublicRelease);
-      if (Date.parse(item.observedAt) < dueAt) {
-        throw new Error(`postLaunchReviews.${window.id}.observedAt must be at or after its due time`);
-      }
-      assertIdentity(
-        item,
-        `postLaunchReviews.${window.id}.artifactIdentity`,
-        gate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
-      );
-      if (stableFlatJson(item.artifactIdentity) !== stableFlatJson(artifactIdentity)) {
-        throw new Error(`postLaunchReviews.${window.id}.artifactIdentity must match artifactIdentity`);
-      }
-      for (const field of gate.releaseEvidenceSummaryPolicy.githubSummaryFields) {
-        required(item[field], `postLaunchReviews.${window.id}.${field}`);
-      }
-      const snapshot = new Set(required(item.signalSnapshot, `postLaunchReviews.${window.id}.signalSnapshot`));
-      for (const signalId of window.requiredSignals) {
-        if (!snapshot.has(signalId)) throw new Error(`postLaunchReviews.${window.id}.signalSnapshot missing ${signalId}`);
-      }
-      if ((requirePass || observation.status === "PASS") && item.goNoGoResult !== "PASS") {
-        throw new Error(`postLaunchReviews.${window.id}.goNoGoResult must be PASS`);
-      }
-    }
+    return;
   }
+  const identity = assertPublicReleaseIdentity(
+    observation,
+    gateObservation,
+    artifactIdentity,
+    required(summary.evidenceValidity, "evidenceValidity"),
+    now,
+  );
+  assertPostLaunchReviews(summary, gate, observation, identity, artifactIdentity, requirePass, now);
+}
+
+function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
+  assertPreLaunchReadiness(summary, gate, requirePass);
+  assertPostLaunchState(summary, gate, artifactIdentity, requirePass, now);
 
   const fixedSteps = new Set(required(summary.fixedReleaseSteps, "fixedReleaseSteps"));
   for (const step of gate.fixedReleaseProcedure.requiredSteps) {
@@ -411,7 +428,7 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
   }
 }
 
-function assertSupport(summary, gate, artifactIdentity, requirePass, now) {
+function assertSupportReadiness(gate, artifactIdentity, requirePass) {
   const helpScreenDeviceQa = required(
     gate.latestQaEvidenceSummary.helpScreenDeviceQa,
     "gate.latestQaEvidenceSummary.helpScreenDeviceQa",
@@ -440,6 +457,36 @@ function assertSupport(summary, gate, artifactIdentity, requirePass, now) {
   if (requirePass && helpScreenDeviceQa.contactSetSha256 !== artifactIdentity.supportContactSetSha256) {
     throw new Error("help-screen device QA contact set must match artifactIdentity");
   }
+}
+
+function assertSupportChannel(item, validated, channel, summary, gate, requirePass, now) {
+  for (const field of gate.supportEvidenceSummaryPolicy.githubSummaryFields) {
+    required(item[field], `supportChannels.${channel.id}.${field}`);
+  }
+  const evidence = new Set(required(item.evidenceIds, `supportChannels.${channel.id}.evidenceIds`));
+  for (const evidenceId of channel.requiredEvidence) {
+    if (!evidence.has(evidenceId)) throw new Error(`supportChannels.${channel.id}.evidenceIds missing ${evidenceId}`);
+  }
+  if (item.result !== validated.result
+    || item.redactedReceiptReference !== validated.redactedReceiptReference
+    || item.receivedAt !== validated.receivedAt
+    || item.localEvidencePath !== validated.localEvidencePath
+    || stableFlatJson(sortedStrings(evidence)) !== stableFlatJson(sortedStrings(validated.evidenceIds))) {
+    throw new Error(`supportChannels.${channel.id} must match validated Phase A evidence`);
+  }
+  const receivedAt = Date.parse(validated.receivedAt);
+  if (requirePass && (!isRfc3339Timestamp(validated.receivedAt)
+    || receivedAt < Date.parse(summary.evidenceValidity.testedAt)
+    || receivedAt > Date.parse(summary.evidenceValidity.expiresWhen)
+    || receivedAt > now)) {
+    throw new Error(
+      `supportChannels.${channel.id}.receivedAt must be within the Phase A evidence window and not in the future`,
+    );
+  }
+  if (requirePass && item.result !== "PASS") throw new Error(`supportChannels.${channel.id}.result must be PASS`);
+}
+
+function assertSupportChannels(summary, gate, requirePass, now) {
   const byId = new Map(required(summary.supportChannels, "supportChannels").map((item) => [item.channelId, item]));
   const validatedById = new Map(
     required(gate.latestQaEvidenceSummary.channelEvidence, "gate.latestQaEvidenceSummary.channelEvidence")
@@ -448,35 +495,11 @@ function assertSupport(summary, gate, artifactIdentity, requirePass, now) {
   for (const channel of gate.supportChannels) {
     const item = required(byId.get(channel.id), `supportChannels.${channel.id}`);
     const validated = required(validatedById.get(channel.id), `gate.latestQaEvidenceSummary.channelEvidence.${channel.id}`);
-    for (const field of gate.supportEvidenceSummaryPolicy.githubSummaryFields) {
-      required(item[field], `supportChannels.${channel.id}.${field}`);
-    }
-    const evidence = new Set(required(item.evidenceIds, `supportChannels.${channel.id}.evidenceIds`));
-    for (const evidenceId of channel.requiredEvidence) {
-      if (!evidence.has(evidenceId)) throw new Error(`supportChannels.${channel.id}.evidenceIds missing ${evidenceId}`);
-    }
-    if (
-      item.result !== validated.result
-      || item.redactedReceiptReference !== validated.redactedReceiptReference
-      || item.receivedAt !== validated.receivedAt
-      || item.localEvidencePath !== validated.localEvidencePath
-      || stableFlatJson([...evidence].sort()) !== stableFlatJson([...validated.evidenceIds].sort())
-    ) {
-      throw new Error(`supportChannels.${channel.id} must match validated Phase A evidence`);
-    }
-    const receivedAt = Date.parse(validated.receivedAt);
-    if (requirePass && (
-      !isRfc3339Timestamp(validated.receivedAt)
-      || receivedAt < Date.parse(summary.evidenceValidity.testedAt)
-      || receivedAt > Date.parse(summary.evidenceValidity.expiresWhen)
-      || receivedAt > now
-    )) {
-      throw new Error(
-        `supportChannels.${channel.id}.receivedAt must be within the Phase A evidence window and not in the future`,
-      );
-    }
-    if (requirePass && item.result !== "PASS") throw new Error(`supportChannels.${channel.id}.result must be PASS`);
+    assertSupportChannel(item, validated, channel, summary, gate, requirePass, now);
   }
+}
+
+function assertSupportCollections(summary, gate) {
   for (const [field, requiredValues] of [
     ["supportDryRunEvidence", gate.dryRunRequiredEvidence],
     ["dataCorrectionSteps", gate.dataCorrectionFlow.requiredSteps],
@@ -486,6 +509,9 @@ function assertSupport(summary, gate, artifactIdentity, requirePass, now) {
       if (!values.has(value)) throw new Error(`${field} missing ${value}`);
     }
   }
+}
+
+function assertOperatorContactRoutes(summary, gate, requirePass) {
   const contactRoutes = new Map(
     required(summary.operatorContactRoutes, "operatorContactRoutes").map((item) => [item.routeId, item]),
   );
@@ -502,6 +528,13 @@ function assertSupport(summary, gate, artifactIdentity, requirePass, now) {
       throw new Error(`operatorContactRoutes.${route.id}.result must be PASS`);
     }
   }
+}
+
+function assertSupport(summary, gate, artifactIdentity, requirePass, now) {
+  assertSupportReadiness(gate, artifactIdentity, requirePass);
+  assertSupportChannels(summary, gate, requirePass, now);
+  assertSupportCollections(summary, gate);
+  assertOperatorContactRoutes(summary, gate, requirePass);
 }
 
 async function main() {

@@ -188,12 +188,16 @@ function aabPayloadSha256IfExists(filePath) {
   if (!filePath) return null;
   const resolved = resolvePath(filePath);
   if (!existsSync(resolved)) return null;
-  const digest = execFileSync(process.execPath, [
-    path.join(repoRoot, "tools/release/hash-android-bundle-payload.mjs"),
-    "--aab",
-    resolved,
-  ], { encoding: "utf8", maxBuffer: 1024 * 1024 }).trim();
-  return /^[0-9a-f]{64}$/.test(digest) ? digest : null;
+  try {
+    const digest = execFileSync(process.execPath, [
+      path.join(repoRoot, "tools/release/hash-android-bundle-payload.mjs"),
+      "--aab",
+      resolved,
+    ], { encoding: "utf8", maxBuffer: 1024 * 1024, stdio: ["ignore", "pipe", "pipe"] }).trim();
+    return /^[0-9a-f]{64}$/.test(digest) ? digest : null;
+  } catch {
+    return null;
+  }
 }
 
 function readJsonIfExists(filePath) {
@@ -350,7 +354,7 @@ function validateSatisfiedEvidence(id, evidencePath, generatedAt, context) {
     androidApplicationId: context.androidApplicationId,
     rcIdentity: context.identity,
   }, null, 2)}\n`);
-  let validationFailed = false;
+  let validationError = null;
   try {
     execFileSync(process.execPath, [
       path.join(context.repoRoot, "tools/ops/validate-operations-release-summary.mjs"),
@@ -362,13 +366,13 @@ function validateSatisfiedEvidence(id, evidencePath, generatedAt, context) {
       generatedAt,
       "--require-pass",
     ], { cwd: context.repoRoot, stdio: "pipe" });
-  } catch {
-    validationFailed = true;
+  } catch (error) {
+    validationError = error.stderr?.toString().trim() || error.message;
   } finally {
     rmSync(validationDir, { recursive: true, force: true });
   }
-  if (validationFailed) {
-    fail(`SATISFIED evidence entry failed canonical validation: ${id}`);
+  if (validationError) {
+    fail(`SATISFIED evidence entry failed canonical validation: ${id}: ${validationError}`);
   }
 }
 

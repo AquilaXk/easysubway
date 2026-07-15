@@ -56,7 +56,7 @@
             {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "f025501ef4a9301ea9d5ee5680c777922d1a2ed875ad3f232e6d0d8117c8daff"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
-            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "30e8531504e47acc94ec673689529444b1717cd40a5756132e0f231aa54bab20"},
+            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "71a2a51da2b9c3a20d14512b608bccfbfee9022ca5718b77d44ff9254cc67979"},
             {"path": "tools/release/summary-validation-utils.mjs", "sha256": "d6c8980536e6aba14d9d2f41879339c434759bfa986aca2045d6bf5909fe0d8e"},
             {"path": "tools/release/hash-android-bundle-payload.mjs", "sha256": "86b5e211f2f8be3308092f71613fdca1b88dfa9fc9b3101d4ba384236d945c9f"},
             {"path": "tools/datapack/run-emergency-datapack-drill.mjs", "sha256": "d371ece038c80d6ba9e50798528339344d3a314e983085aa4b8d3009813d83e7"},
@@ -89,7 +89,7 @@
             {"path": "backend/build.gradle", "sha256": "7e5a413411692dd7eabe183b63f30f9744c55b977a1e79bc1800aa0d268624f6"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "2a73141971a85b165669906f9468588349167b0885ef8e0569e1191f90b63a67"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "e0235311b90375049175573a17674cf445f4b56ff34252c1db74bd59502e860a"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "e01166d4c290e07945e8d9b096e6c9d3c6f90db67edc01e10e3bc5820bfae105"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
           ]
         }

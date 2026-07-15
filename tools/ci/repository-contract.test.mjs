@@ -3256,6 +3256,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /node tools\/ops\/generate-operations-phase-a-summary\.mjs/);
   assert.match(
     workflow,
+    /node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--output release-artifacts\/rc\/rc-evidence-manifest-preliminary\.json[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--require-pass[\s\S]*node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--output release-artifacts\/rc\/rc-evidence-manifest\.json/,
+  );
+  assert.match(
+    workflow,
     /if \[\[ "\$\{android_artifact_source\}" == easysubway-android-production-rc-\* \]\]; then[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*else[\s\S]*BLOCKED_EXTERNAL/,
   );
   assert.ok(
@@ -3785,6 +3789,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "--repo-root", ".",
       "--app-root", "apps/mobile",
       "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-11T00:00:00Z",
       "--aab", aabPath,
       "--backend-image-inspect", backendInspectPath,
       "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
@@ -4022,6 +4027,23 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     ], { cwd: root }),
     /mismatch_gitSha/,
   );
+
+  const corruptAabPath = path.join(tempDir, "corrupt.aab");
+  const corruptManifestPath = path.join(tempDir, "corrupt-aab-manifest.json");
+  await writeFile(corruptAabPath, "not-a-zip");
+  await execFileAsync(process.execPath, [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".",
+    "--app-root", "apps/mobile",
+    "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+    "--aab", corruptAabPath,
+    "--backend-image-inspect", backendInspectPath,
+    "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+    "--output", corruptManifestPath,
+  ], { cwd: root });
+  const corruptManifest = JSON.parse(readFileSync(corruptManifestPath, "utf8"));
+  assert.equal(corruptManifest.aabPayloadSha256, null);
+  assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
 });
 
 test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계약을 고정한다", () => {
