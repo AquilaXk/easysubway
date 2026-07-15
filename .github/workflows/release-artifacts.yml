@@ -693,19 +693,23 @@ jobs:
             "${generator_args[@]}" \
             --output release-artifacts/rc/rc-evidence-manifest-preliminary.json \
             --gate-status postLaunchOperations=BLOCKED_EXTERNAL
-          node tools/ops/generate-operations-phase-a-summary.mjs \
-            --rc-manifest release-artifacts/rc/rc-evidence-manifest-preliminary.json \
-            --summary release-artifacts/rc/operations-phase-a-summary.json \
-            --status-output release-artifacts/rc/operations-phase-a-status.txt
-          IFS= read -r operations_status < release-artifacts/rc/operations-phase-a-status.txt
-          if [[ "${operations_status}" == "SATISFIED" ]]; then
-            node tools/ops/validate-operations-release-summary.mjs \
-              --summary release-artifacts/rc/operations-phase-a-summary.json \
+          if [[ "${android_artifact_source}" == easysubway-android-production-rc-* ]]; then
+            node tools/ops/generate-operations-phase-a-summary.mjs \
               --rc-manifest release-artifacts/rc/rc-evidence-manifest-preliminary.json \
-              --require-pass
-          elif [[ "${operations_status}" != "BLOCKED_EXTERNAL" ]]; then
-            echo "unexpected operations Phase A status: ${operations_status}" >&2
-            exit 1
+              --summary release-artifacts/rc/operations-phase-a-summary.json \
+              --status-output release-artifacts/rc/operations-phase-a-status.txt
+            IFS= read -r operations_status < release-artifacts/rc/operations-phase-a-status.txt
+            if [[ "${operations_status}" == "SATISFIED" ]]; then
+              node tools/ops/validate-operations-release-summary.mjs \
+                --summary release-artifacts/rc/operations-phase-a-summary.json \
+                --rc-manifest release-artifacts/rc/rc-evidence-manifest-preliminary.json \
+                --require-pass
+            elif [[ "${operations_status}" != "BLOCKED_EXTERNAL" ]]; then
+              echo "unexpected operations Phase A status: ${operations_status}" >&2
+              exit 1
+            fi
+          else
+            printf 'BLOCKED_EXTERNAL\n' > release-artifacts/rc/operations-phase-a-status.txt
           fi
           operations_evidence_args=(--evidence-status "post_launch_operations=${operations_status}")
           if [[ "${operations_status}" == "SATISFIED" ]]; then

@@ -66,7 +66,7 @@ test("Phase A summary generator binds a complete RC and validator accepts it", a
   assert.equal(summary.postLaunchObservation.status, "PENDING_PUBLIC_RELEASE");
   assert.deepEqual(summary.evidenceValidity, {
     testedAt: "2026-07-15T00:00:00+09:00",
-    expiresWhen: "2026-07-29T23:59:59.999+09:00",
+    expiresWhen: "2026-07-28T23:59:59.999+09:00",
   });
   await execFileAsync(process.execPath, [
     "tools/ops/validate-operations-release-summary.mjs",

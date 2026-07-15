@@ -2403,7 +2403,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     appVersionName: "1.0.4",
     versionCode: 10005,
     validFromKst: "2026-07-15",
-    validUntilKst: "2026-07-29",
+    validUntilKst: "2026-07-28",
     refreshOn: [
       "operations-contract-change",
       "support-contact-or-help-ui-change",
@@ -3195,6 +3195,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /node tools\/ops\/generate-operations-phase-a-summary\.mjs/);
   assert.match(
     workflow,
+    /if \[\[ "\$\{android_artifact_source\}" == easysubway-android-production-rc-\* \]\]; then[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*else[\s\S]*BLOCKED_EXTERNAL/,
+  );
+  assert.match(
+    workflow,
     /node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--rc-manifest release-artifacts\/rc\/rc-evidence-manifest-preliminary\.json[\s\S]*--require-pass/,
   );
   assert.match(workflow, /--gate-status "postLaunchOperations=\$\{operations_status\}"/);
@@ -3597,7 +3601,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     issue: 1019,
     evidenceValidity: {
       testedAt: "2026-07-15T00:00:00+09:00",
-      expiresWhen: "2026-07-29T23:59:59.999+09:00",
+      expiresWhen: "2026-07-28T23:59:59.999+09:00",
     },
   }));
   await writeFile(
@@ -3674,7 +3678,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(postLaunchOperationsEntry.status, "SATISFIED");
   assert.ok(postLaunchOperationsEntry.evidencePaths.includes(phaseASummaryPath));
   assert.equal(postLaunchOperationsEntry.testedAt, "2026-07-15T00:00:00+09:00");
-  assert.equal(postLaunchOperationsEntry.expiresWhen, "2026-07-29T23:59:59.999+09:00");
+  assert.equal(postLaunchOperationsEntry.expiresWhen, "2026-07-28T23:59:59.999+09:00");
   assert.deepEqual(
     manifest.evidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
     [
@@ -3720,6 +3724,32 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
     ], { cwd: root }),
     /future.*evidenceValidity/,
+  );
+
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "PASS",
+    issue: 1019,
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-30T00:00:00Z",
+    },
+  }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-16T00:00:00Z",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-07-15T00:00:00Z",
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /exceeds the 14-day evidence lifetime/,
   );
 
   await writeFile(phaseASummaryPath, JSON.stringify({

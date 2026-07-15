@@ -31,7 +31,7 @@
         "appVersionName": "1.0.4",
         "versionCode": 10005,
         "validFromKst": "2026-07-15",
-        "validUntilKst": "2026-07-29",
+        "validUntilKst": "2026-07-28",
         "refreshOn": [
           "operations-contract-change",
           "support-contact-or-help-ui-change",
@@ -68,7 +68,7 @@
           "refreshOn": "fixed-release-procedure-change",
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "7690e3f3de3ce4408f477ac30cec1d8f92ceca8056e367170863448a278cf9cb"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "cb2858b93d389dcf5170a17ff980926524800b38985816bf38d8c560a81f9f5e"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "7afcc2e60de1166d0b8077c54099899f4a4c2c8fcbad833d030276c11b712f5c"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "6784beebb3c9c3ac8df9f386196d47f987aa60f16140379b88937c6805c20001"}
           ]
         }

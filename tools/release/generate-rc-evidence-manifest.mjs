@@ -37,6 +37,12 @@ const evidencePaths = parsePairs(arg("evidencePath", "evidence-path"));
 const expectedValues = parsePairs(args.expect);
 const androidReleaseMetadata = readKeyValueFileIfExists(arg("androidReleaseMetadata", "android-release-metadata"));
 const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
+const rcEvidenceContract = readJsonIfExists(
+  path.join(appRoot, "release/rc-evidence-manifest-contract.json"),
+);
+if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
+  fail("RC evidence manifest contract with requiredEvidenceEntries is required");
+}
 const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
   fail("production routing launch scope and identity matrix are required");
@@ -74,6 +80,7 @@ const evidenceEntries = requiredEvidenceEntries(
   evidenceStatuses,
   evidencePaths,
   generatedAt,
+  rcEvidenceContract.requiredEvidenceEntries,
 );
 const blockers = [
   ...identityBlockers(identity),
@@ -243,20 +250,17 @@ function parsePairs(value) {
   }));
 }
 
-function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion, statuses, paths, generatedAt) {
-  const sourceEntries = [
-    ["rc_device_qa", 571],
-    ["production_datapack", 547],
-    ["signed_rc_store_submission", 1015],
-    ["play_generated_install", 1016],
-    ["store_privacy_submission", 1018],
-    ["backend_operations", 1017],
-    ["post_launch_operations", 1019],
-    ["android_release_quality", 1021],
-    ["abuse_penetration_rehearsal", 1022],
-    ["container_hardening", 1914],
-  ];
-  const knownIds = new Set(sourceEntries.map(([id]) => id));
+function requiredEvidenceEntries(
+  baseTestedAt,
+  rootPath,
+  device,
+  androidVersion,
+  statuses,
+  paths,
+  generatedAt,
+  contractEntries,
+) {
+  const knownIds = new Set(contractEntries.map(({ id }) => id));
   for (const id of [...Object.keys(statuses), ...Object.keys(paths)]) {
     if (!knownIds.has(id)) fail(`Unknown evidence entry: ${id}`);
   }
@@ -271,7 +275,10 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion,
       fail(`SATISFIED evidence path does not exist for ${id}: ${paths[id]}`);
     }
   }
-  return sourceEntries.map(([id, sourceIssue]) => {
+  return contractEntries.map(({ id, sourceIssue, expiresAfterDays }) => {
+    if (!id || !Number.isInteger(sourceIssue) || !Number.isInteger(expiresAfterDays) || expiresAfterDays <= 0) {
+      fail(`Invalid RC evidence contract entry: ${id ?? "<missing>"}`);
+    }
     const evidencePaths = [`${rootPath}${id}/`];
     if (paths[id]) evidencePaths.push(paths[id]);
     const evidence = statuses[id] === "SATISFIED" ? readJsonIfExists(resolvePath(paths[id])) : null;
@@ -282,7 +289,8 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion,
       fail(`SATISFIED evidence entry requires evidenceValidity.testedAt and evidenceValidity.expiresWhen: ${id}`);
     }
     const evidenceTestedAt = evidence?.evidenceValidity?.testedAt ?? baseTestedAt;
-    const evidenceExpiresWhen = evidence?.evidenceValidity?.expiresWhen ?? addDays(baseTestedAt, 14);
+    const evidenceExpiresWhen = evidence?.evidenceValidity?.expiresWhen ?? addDays(baseTestedAt, expiresAfterDays);
+    const maxEvidenceExpiresWhen = addDays(evidenceTestedAt, expiresAfterDays);
     if (statuses[id] === "SATISFIED" && (
       !Number.isFinite(Date.parse(evidenceTestedAt))
       || !Number.isFinite(Date.parse(evidenceExpiresWhen))
@@ -292,6 +300,9 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion,
       || Date.parse(evidenceExpiresWhen) < Date.parse(evidenceTestedAt)
     )) {
       fail(`SATISFIED evidence entry has invalid, future, or expired evidenceValidity: ${id}`);
+    }
+    if (statuses[id] === "SATISFIED" && Date.parse(evidenceExpiresWhen) > Date.parse(maxEvidenceExpiresWhen)) {
+      fail(`SATISFIED evidence entry exceeds the ${expiresAfterDays}-day evidence lifetime: ${id}`);
     }
     return {
       id,

@@ -46,7 +46,7 @@ function validSummary() {
     status: "PASS",
     evidenceValidity: {
       testedAt: "2026-07-15T00:00:00+09:00",
-      expiresWhen: "2026-07-29T23:59:59.999+09:00",
+      expiresWhen: "2026-07-28T23:59:59.999+09:00",
     },
     artifactIdentity: { ...artifactIdentity },
     preLaunchReadiness: {
