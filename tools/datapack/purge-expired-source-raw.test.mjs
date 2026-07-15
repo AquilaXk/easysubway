@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -94,6 +94,78 @@ test("실제 DELETE는 report output을 열 수 없으면 객체 요청 전에 �
         output: path.join(parentFile, "purge-report.json"),
       }),
       /EEXIST|ENOTDIR|not a directory/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
+test("실제 DELETE는 기존 report 파일이나 symbolic link를 덮어쓰지 않는다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+    const existing = path.join(workDir, "existing.json");
+    const victim = path.join(workDir, "victim.txt");
+    const linked = path.join(workDir, "linked.json");
+    await writeFile(existing, "existing\n");
+    await chmod(existing, 0o644);
+    await writeFile(victim, "do-not-truncate\n");
+    await symlink(victim, linked);
+
+    for (const output of [existing, linked]) {
+      await assert.rejects(
+        runPurge({ ...files, baseUrl, output }),
+        /EEXIST|ELOOP|purge report output/i,
+      );
+    }
+    assert.equal(await readFile(existing, "utf8"), "existing\n");
+    assert.equal(await readFile(victim, "utf8"), "do-not-truncate\n");
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
+test("DELETE 직전 report에는 fsync 대상 sanitized intent가 기록된다", async () => {
+  await withFixture(async ({ baseUrl, deleteHooks, objects, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/secret-object.json")]);
+    objects.add("/raw/secret-object.json");
+    const output = path.join(workDir, "journaled.json");
+    deleteHooks.push(async () => {
+      const journal = (await readFile(`${output}.journal`, "utf8"))
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+      assert.deepEqual(journal.map((entry) => entry.event), ["PLAN", "DELETE_INTENT"]);
+      assert.deepEqual(journal[0].deleteCandidates.map((entry) => entry.snapshotId), ["expired"]);
+      assert.equal(journal[1].item.snapshotId, "expired");
+      assert.doesNotMatch(JSON.stringify(journal), /secret-object|objectUrl|objectKey/i);
+    });
+
+    const report = await runPurge({ ...files, baseUrl, output });
+
+    assert.equal(report.decision, "PASS");
+    assert.match(report.auditJournalSha256, /^[0-9a-f]{64}$/);
+    assert.equal(report.auditJournalRecordCount, 3);
+  });
+});
+
+test("GET 뒤 authoritative ledger가 보호 상태로 바뀌면 DELETE를 중단한다", async () => {
+  await withFixture(async ({ baseUrl, getHooks, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+    getHooks.push(async () => {
+      const ledger = JSON.parse(await readFile(files.ledger, "utf8"));
+      ledger.entries[0].protectedBy = ["ACTIVE_RELEASE"];
+      await writeFile(files.ledger, `${JSON.stringify(ledger, null, 2)}\n`);
+    });
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "protection-changed.json"),
+      }),
+      /ledger sha256 mismatch|protection changed/i,
     );
     assert.deepEqual(requests, []);
     assert.equal(objects.has("/raw/expired.json"), true);
@@ -668,14 +740,17 @@ async function withFixture(run) {
   const requests = [];
   const failPaths = new Set();
   const responseStatuses = new Map();
+  const getHooks = [];
+  const deleteHooks = [];
   await mkdir(workDir, { recursive: true });
-  const server = createServer((request, response) => {
+  const server = createServer(async (request, response) => {
     if (request.method === "GET") {
       if (!objects.has(request.url)) {
         response.writeHead(404).end();
         return;
       }
       const body = objects.get(request.url);
+      for (const hook of getHooks) await hook(request.url);
       response.writeHead(200, { etag: `"${sha256(body)}"` }).end(body);
       return;
     }
@@ -683,6 +758,7 @@ async function withFixture(run) {
       response.writeHead(405).end();
       return;
     }
+    for (const hook of deleteHooks) await hook(request.url);
     requests.push(request.url);
     if (responseStatuses.has(request.url)) {
       response.writeHead(responseStatuses.get(request.url)).end();
@@ -714,6 +790,8 @@ async function withFixture(run) {
       requests,
       failPaths,
       responseStatuses,
+      getHooks,
+      deleteHooks,
       workDir,
     });
   } finally {

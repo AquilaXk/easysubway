@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
+import { constants as fileSystemConstants } from "node:fs";
 import { mkdir, open, readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -52,11 +53,14 @@ async function main(argv) {
   const sourceAuthority = args.dryRun
     ? validatedSourceAuthority(requiredArg(args, "source-authority"))
     : executionSourceAuthority(args);
+  const ledgerPath = path.resolve(requiredArg(args, "ledger"));
+  const snapshotPath = path.resolve(requiredArg(args, "snapshots"));
+  const policyPaths = requiredPolicies(args).map((policyPath) => path.resolve(policyPath));
   const [ledgerText, snapshotText, policyFiles] = await Promise.all([
-    readFile(path.resolve(requiredArg(args, "ledger")), "utf8"),
-    readFile(path.resolve(requiredArg(args, "snapshots")), "utf8"),
-    Promise.all(requiredPolicies(args).map(async (policyPath) => {
-      const text = await readFile(path.resolve(policyPath), "utf8");
+    readFile(ledgerPath, "utf8"),
+    readFile(snapshotPath, "utf8"),
+    Promise.all(policyPaths.map(async (policyPath) => {
+      const text = await readFile(policyPath, "utf8");
       return { policy: JSON.parse(text), sha256: sha256(text) };
     })),
   ]);
@@ -89,11 +93,37 @@ async function main(argv) {
     deleteItems.push(item);
   }
 
-  const reportFile = await openReport(outputPath);
+  const reportFiles = await openReport(outputPath);
+  const journalLines = [];
   try {
-    for (const { item, status } of await deleteExpiredItems(deleteItems, {
-      executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
-    })) {
+    await appendAuditRecord(reportFiles.journalFile, journalLines, {
+      event: "PLAN",
+      evaluatedAt: report.evaluatedAt,
+      dryRun: args.dryRun,
+      deleteCandidates: deleteItems.map(sanitized),
+    });
+    for (const item of deleteItems) {
+      const [result] = await deleteExpiredItems([item], {
+        executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
+        beforeDelete: async (candidate) => {
+          await requireCurrentDeleteAuthorization({
+            item: candidate,
+            ledgerPath,
+            snapshotPath,
+            policyPaths,
+            evaluationAt,
+            evaluatedMillis,
+            baseUrl,
+            sourceAuthority,
+          });
+          await appendAuditRecord(reportFiles.journalFile, journalLines, {
+            event: "DELETE_INTENT",
+            evaluatedAt: report.evaluatedAt,
+            item: sanitized(candidate),
+          });
+        },
+      });
+      const { status } = result;
       if (status === 200 || status === 204) {
         report.deleted.push(sanitized(item));
       } else if (status === 404 || status === 410) {
@@ -101,16 +131,24 @@ async function main(argv) {
       } else {
         report.failed.push(sanitized(item));
       }
+      await appendAuditRecord(reportFiles.journalFile, journalLines, {
+        event: "DELETE_RESULT",
+        evaluatedAt: report.evaluatedAt,
+        item: sanitized(item),
+        outcome: purgeOutcome(status),
+      });
     }
 
     report.completedAt = args.dryRun ? null : new Date().toISOString();
     if (report.failed.length > 0) report.reasonCodes.push("RAW_RETENTION_OVERDUE");
     report.decision = report.reasonCodes.length === 0 ? "PASS" : "FAIL";
+    report.auditJournalSha256 = sha256(journalLines.join(""));
+    report.auditJournalRecordCount = journalLines.length;
     report.reportSha256 = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
-    await reportFile.writeFile(`${JSON.stringify(report, null, 2)}\n`);
-    await reportFile.sync();
+    await reportFiles.reportFile.writeFile(`${JSON.stringify(report, null, 2)}\n`);
+    await reportFiles.reportFile.sync();
   } finally {
-    await reportFile.close();
+    await Promise.allSettled([reportFiles.reportFile.close(), reportFiles.journalFile.close()]);
   }
   if (report.decision !== "PASS") throw new Error(report.reasonCodes.join(","));
 }
@@ -140,6 +178,7 @@ export async function deleteExpiredItems(
     concurrency = DELETE_CONCURRENCY,
     executionEvidenceExpiresAt = null,
     now = Date.now,
+    beforeDelete = async () => {},
   } = {},
 ) {
   const results = [];
@@ -150,12 +189,13 @@ export async function deleteExpiredItems(
     }
     const batch = items.slice(index, index + concurrency);
     results.push(...await Promise.all(batch.map(async (item) => {
-      let status;
+      let current;
+      let etag;
       try {
         if (executionEvidenceExpired(executionEvidenceExpiresAt, now)) {
           return { item, status: 0 };
         }
-        const current = await fetchImpl(item.objectUrl, {
+        current = await fetchImpl(item.objectUrl, {
           method: "GET",
           redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
@@ -163,26 +203,31 @@ export async function deleteExpiredItems(
         if (current.status === 404 || current.status === 410) {
           return { item, status: current.status };
         }
-        const etag = current.headers?.get?.("etag");
+        etag = current.headers?.get?.("etag");
         if (current.status !== 200
           || typeof etag !== "string"
           || !/^"[^"\r\n]+"$/.test(etag)
           || await responseSha256(current) !== item.rawSha256) {
           return { item, status: 412 };
         }
-        if (executionEvidenceExpired(executionEvidenceExpiresAt, now)) {
-          return { item, status: 0 };
-        }
-        status = (await fetchImpl(item.objectUrl, {
+      } catch {
+        return { item, status: 0 };
+      }
+      if (executionEvidenceExpired(executionEvidenceExpiresAt, now)) {
+        return { item, status: 0 };
+      }
+      await beforeDelete(item);
+      try {
+        const status = (await fetchImpl(item.objectUrl, {
           method: "DELETE",
           headers: { "If-Match": etag },
           redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
         })).status;
+        return { item, status };
       } catch {
-        status = 0;
+        return { item, status: 0 };
       }
-      return { item, status };
     })));
   }
   return results;
@@ -513,7 +558,81 @@ async function responseSha256(response) {
 
 async function openReport(outputPath) {
   await mkdir(path.dirname(outputPath), { recursive: true });
-  return open(outputPath, "w", 0o600);
+  if (!Number.isInteger(fileSystemConstants.O_NOFOLLOW)) {
+    throw new Error("purge report output requires O_NOFOLLOW");
+  }
+  const flags = fileSystemConstants.O_RDWR
+    | fileSystemConstants.O_CREAT
+    | fileSystemConstants.O_EXCL
+    | fileSystemConstants.O_NOFOLLOW;
+  const journalPath = `${outputPath}.journal`;
+  let reportFile;
+  let journalFile;
+  try {
+    reportFile = await open(outputPath, flags, 0o600);
+    journalFile = await open(journalPath, flags | fileSystemConstants.O_APPEND, 0o600);
+    await Promise.all([reportFile.chmod(0o600), journalFile.chmod(0o600)]);
+    const parent = await open(path.dirname(outputPath), fileSystemConstants.O_RDONLY);
+    try {
+      await parent.sync();
+    } finally {
+      await parent.close();
+    }
+    return { reportFile, journalFile };
+  } catch (error) {
+    await Promise.allSettled([reportFile?.close(), journalFile?.close()]);
+    throw error;
+  }
+}
+
+async function appendAuditRecord(journalFile, journalLines, record) {
+  const line = `${JSON.stringify(record)}\n`;
+  await journalFile.writeFile(line);
+  await journalFile.sync();
+  journalLines.push(line);
+}
+
+async function requireCurrentDeleteAuthorization({
+  item,
+  ledgerPath,
+  snapshotPath,
+  policyPaths,
+  evaluationAt,
+  evaluatedMillis,
+  baseUrl,
+  sourceAuthority,
+}) {
+  const [ledgerText, snapshotText, policyFiles] = await Promise.all([
+    readFile(ledgerPath, "utf8"),
+    readFile(snapshotPath, "utf8"),
+    Promise.all(policyPaths.map(async (policyPath) => {
+      const text = await readFile(policyPath, "utf8");
+      return { policy: JSON.parse(text), sha256: sha256(text) };
+    })),
+  ]);
+  requireTrustedExecutionEvidence({ ledgerText, snapshotText });
+  const current = buildPurgePlan({
+    ledger: JSON.parse(ledgerText),
+    snapshots: JSON.parse(snapshotText),
+    policyFiles,
+    evaluationAt,
+    evaluatedMillis,
+    baseUrl,
+    sourceAuthority,
+  }).find((candidate) => candidate.snapshotId === item.snapshotId);
+  if (current == null
+    || current.disposition !== "DELETE"
+    || current.sourceId !== item.sourceId
+    || current.rawSha256 !== item.rawSha256
+    || current.objectUrl.href !== item.objectUrl.href) {
+    throw new Error("RAW_RETENTION_OVERDUE: protection changed before DELETE");
+  }
+}
+
+function purgeOutcome(status) {
+  if (status === 200 || status === 204) return "DELETED";
+  if (status === 404 || status === 410) return "ALREADY_ABSENT";
+  return "FAILED";
 }
 
 function requiredArg(args, name) {
