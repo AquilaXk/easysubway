@@ -184,6 +184,13 @@ class GetOffAlarmController extends ChangeNotifier {
         activeRouteId == null ||
         subscription.routeId != activeRouteId ||
         activeRouteId != routeId) {
+      if (kDebugMode) {
+        debugPrint(
+          'get_off_alarm refresh route_mismatch '
+          'subscription_route_id=${subscription?.routeId} '
+          'active_route_id=$activeRouteId input_route_id=$routeId',
+        );
+      }
       return GetOffAlarmRefreshResult.routeMismatch;
     }
     if (stops.isEmpty) {
