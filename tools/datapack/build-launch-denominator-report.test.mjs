@@ -307,6 +307,51 @@ test("server, mobile, shared identity, and common safety evidence fail closed", 
   }
 });
 
+test("shared identity fields reject empty values and wrong types", async (context) => {
+  const invalidValues = [
+    ["canonicalStationVersion", ""],
+    ["canonicalStationVersion", 1],
+    ["corridorId", "   "],
+    ["corridorId", false],
+    ["serviceId", ""],
+    ["serviceId", 1],
+    ["lineageId", "\t"],
+    ["lineageId", []],
+    ["schemaVersion", ""],
+    ["schemaVersion", "1"],
+    ["schemaVersion", 0],
+    ["schemaVersion", 1.5],
+    ["schemaVersion", Number.MAX_SAFE_INTEGER + 1],
+  ];
+  for (const [field, invalidValue] of invalidValues) {
+    await context.test(`${field}: ${JSON.stringify(invalidValue)}`, () => {
+      const evidence = passingEvidence();
+      for (const consumer of ["source", "server", "mobile"]) {
+        evidence[consumer].identity[field] = invalidValue;
+      }
+      const report = buildLaunchDenominatorReport(scope, evidence);
+      assert.equal(report.decision, "NO_GO");
+      assert.ok(report.blockers.includes(`IDENTITY_FIELD_INVALID:${field}`));
+    });
+  }
+
+  await context.test("invalid value also preserves mismatch blocker", () => {
+    const evidence = passingEvidence();
+    evidence.mobile.identity.serviceId = "";
+    const report = buildLaunchDenominatorReport(scope, evidence);
+    assert.ok(report.blockers.includes("IDENTITY_FIELD_INVALID:serviceId"));
+    assert.ok(report.blockers.includes("IDENTITY_FIELD_MISMATCH:serviceId"));
+  });
+
+  await context.test("validation does not normalize original values before equality", () => {
+    const evidence = passingEvidence();
+    evidence.mobile.identity.corridorId = ` ${evidence.mobile.identity.corridorId} `;
+    const report = buildLaunchDenominatorReport(scope, evidence);
+    assert.equal(report.blockers.includes("IDENTITY_FIELD_INVALID:corridorId"), false);
+    assert.ok(report.blockers.includes("IDENTITY_FIELD_MISMATCH:corridorId"));
+  });
+});
+
 test("identity matrix must declare every required shared field", async (context) => {
   const requiredFields = [
     "canonicalStationVersion",

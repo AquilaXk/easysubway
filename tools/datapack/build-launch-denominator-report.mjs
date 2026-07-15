@@ -206,6 +206,9 @@ function collectV1Blockers(scope, evidence) {
   }
   for (const field of identityMatrix?.requiredSharedFields ?? []) {
     const values = consumers.map((consumer) => evidence?.[consumer]?.identity?.[field]);
+    if (REQUIRED_IDENTITY_FIELDS.includes(field) && values.some((value) => !validIdentityField(field, value))) {
+      blockers.push(`IDENTITY_FIELD_INVALID:${field}`);
+    }
     if (values.some((value) => value === undefined || value === null) || new Set(values).size !== 1) {
       blockers.push(`IDENTITY_FIELD_MISMATCH:${field}`);
     }
@@ -238,6 +241,11 @@ function collectV1Blockers(scope, evidence) {
   }
 
   return [...new Set(blockers)];
+}
+
+function validIdentityField(field, value) {
+  if (field === "schemaVersion") return Number.isSafeInteger(value) && value > 0;
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function requiredPilotRowIds(scope) {

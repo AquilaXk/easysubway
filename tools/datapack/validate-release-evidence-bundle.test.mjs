@@ -229,6 +229,33 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     /launch denominator report must match canonical evaluator output/,
   );
 
+  const forgedEmptyIdentityReport = structuredClone(goReport);
+  for (const consumer of ["source", "server", "mobile"]) {
+    for (const field of ["canonicalStationVersion", "corridorId", "serviceId", "lineageId", "schemaVersion"]) {
+      forgedEmptyIdentityReport.evaluatorInput[consumer].identity[field] = "";
+    }
+  }
+  for (const field of ["canonicalStationVersion", "corridorId", "serviceId", "lineageId", "schemaVersion"]) {
+    forgedEmptyIdentityReport.identityLinkage.shared[field] = "";
+  }
+  const forgedEmptyIdentityRaw = `${JSON.stringify(forgedEmptyIdentityReport, null, 2)}\n`;
+  const forgedEmptyIdentityPath = path.join(outputDir, "launch-denominator-forged-empty-identity.json");
+  await writeFile(forgedEmptyIdentityPath, forgedEmptyIdentityRaw);
+  bindLaunchReport(bundle, forgedEmptyIdentityReport, forgedEmptyIdentityRaw);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+      "--launch-report",
+      forgedEmptyIdentityPath,
+      "--require-pass",
+    ], { cwd: root }),
+    /launch denominator report must match canonical evaluator output/,
+  );
+
   const mismatchedReport = structuredClone(currentLaunchReport);
   mismatchedReport.scopes.routingLaunchScope.sha256 = "f".repeat(64);
   const mismatchedReportRaw = `${JSON.stringify(mismatchedReport, null, 2)}\n`;
