@@ -41,6 +41,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @DisplayName("관리자 데이터팩 source snapshot 화면")
 class DataSourceSnapshotAdminPageControllerTest {
+	private static final String GOVERNANCE_POLICY_VERSION = "2026-07-15";
+	private static final String GOVERNANCE_POLICY_SHA256 = "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128";
+	private static final String RAW_RETENTION_EXPIRES_AT = "2026-09-28T03:00:00";
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -182,9 +185,9 @@ class DataSourceSnapshotAdminPageControllerTest {
 				.param("diffSummary", "이전 snapshot 대비 +12 rows")
 				.param("diffSummaryJson", "{\"status\":\"CHANGED\",\"rawHashChanged\":true,\"schemaHashChanged\":true,\"requestHashChanged\":true,\"sourceUpdatedAtChanged\":true,\"rowDelta\":12,\"coverageDelta\":12}")
 				.param("freshnessExpiresAt", "2026-07-07T03:00:00")
-				.param("rawRetentionExpiresAt", "2026-09-30T03:00:00")
-				.param("governancePolicyVersion", "2026-07-15")
-				.param("governancePolicySha256", "9".repeat(64))
+				.param("rawRetentionExpiresAt", RAW_RETENTION_EXPIRES_AT)
+				.param("governancePolicyVersion", GOVERNANCE_POLICY_VERSION)
+				.param("governancePolicySha256", GOVERNANCE_POLICY_SHA256)
 				.param("reason", "official source refresh")
 				.param("idempotencyKey", "source-snapshot-1162-20260630"))
 			.andExpect(status().is3xxRedirection())
@@ -268,9 +271,9 @@ class DataSourceSnapshotAdminPageControllerTest {
 				.param("diffSummary", "이전 snapshot 대비 +12 rows")
 				.param("diffSummaryJson", "{\"status\":\"CHANGED\",\"rawHashChanged\":true,\"schemaHashChanged\":true,\"requestHashChanged\":true,\"sourceUpdatedAtChanged\":true,\"rowDelta\":12,\"coverageDelta\":12}")
 				.param("freshnessExpiresAt", "2026-07-07T03:00:00")
-				.param("rawRetentionExpiresAt", "2026-09-30T03:00:00")
-				.param("governancePolicyVersion", "2026-07-15")
-				.param("governancePolicySha256", "9".repeat(64))
+				.param("rawRetentionExpiresAt", RAW_RETENTION_EXPIRES_AT)
+				.param("governancePolicyVersion", GOVERNANCE_POLICY_VERSION)
+				.param("governancePolicySha256", GOVERNANCE_POLICY_SHA256)
 				.param("reason", "official source refresh")
 				.param("idempotencyKey", "source-snapshot-1162-20260630"))
 			.andExpect(status().is3xxRedirection())
@@ -369,12 +372,12 @@ class DataSourceSnapshotAdminPageControllerTest {
 				?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE,
 				'snapshot-kric-20260629', '이전 snapshot 대비 +12 rows',
 				'{"status":"CHANGED","rawHashChanged":true,"schemaHashChanged":true,"requestHashChanged":true,"sourceUpdatedAtChanged":true,"rowDelta":12,"coverageDelta":12}',
-				'2026-07-07 03:00:00', '2026-09-30 03:00:00', '2026-07-15', ?)
+				'2026-07-07 03:00:00', '2026-09-28 03:00:00', '2026-07-15', ?)
 			""",
 			"d".repeat(64),
 			"e".repeat(64),
 			"f".repeat(64),
-			"9".repeat(64)
+			GOVERNANCE_POLICY_SHA256
 		);
 	}
 

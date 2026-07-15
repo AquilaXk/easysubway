@@ -14,22 +14,26 @@ const ALLOWED_ARGS = new Set(["ledger", "policy", "evaluation-at", "base-url", "
 const PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const DELETE_CONCURRENCY = 4;
 const DELETE_TIMEOUT_MS = 30_000;
+const PREAUTH_BASE_URL_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL";
 
 async function main(argv) {
   const args = parseArgs(argv);
   const outputPath = path.resolve(requiredArg(args, "output"));
   const evaluationAt = requiredArg(args, "evaluation-at");
   const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
-  const baseUrl = validatedBaseUrl(requiredArg(args, "base-url"));
-  const [ledger, policyText] = await Promise.all([
+  const baseUrl = args.dryRun
+    ? validatedBaseUrl(requiredArg(args, "base-url"), false)
+    : executionBaseUrl(args);
+  const [ledger, policyFiles] = await Promise.all([
     readFile(path.resolve(requiredArg(args, "ledger")), "utf8").then(JSON.parse),
-    readFile(path.resolve(requiredArg(args, "policy")), "utf8"),
+    Promise.all(requiredPolicies(args).map(async (policyPath) => {
+      const text = await readFile(path.resolve(policyPath), "utf8");
+      return { policy: JSON.parse(text), sha256: sha256(text) };
+    })),
   ]);
-  const policy = JSON.parse(policyText);
   const plan = buildPurgePlan({
     ledger,
-    policy,
-    policySha256: sha256(policyText),
+    policyFiles,
     evaluationAt,
     evaluatedMillis,
     baseUrl,
@@ -94,7 +98,7 @@ export async function deleteExpiredItems(
   return results;
 }
 
-export function buildPurgePlan({ ledger, policy, policySha256, evaluationAt, evaluatedMillis, baseUrl }) {
+export function buildPurgePlan({ ledger, policyFiles, evaluationAt, evaluatedMillis, baseUrl }) {
   if (ledger?.schemaVersion !== 1 || ledger?.artifactKind !== "source-raw-retention-ledger") {
     throw new Error("RAW_RETENTION_OVERDUE: ledger identity");
   }
@@ -103,12 +107,14 @@ export function buildPurgePlan({ ledger, policy, policySha256, evaluationAt, eva
   }
   const snapshotIds = new Set();
   const objectKeys = new Set();
+  const policies = policyBindings(policyFiles);
   const plan = ledger.entries.map((entry) => {
     const sourceId = requiredText(entry?.sourceId, "sourceId");
     const snapshotId = requiredText(entry?.snapshotId, "snapshotId");
     if (snapshotIds.has(snapshotId)) throw new Error("RAW_RETENTION_OVERDUE: duplicate snapshot");
     snapshotIds.add(snapshotId);
-    if (entry.governancePolicyVersion !== policy.policyVersion || entry.governancePolicySha256 !== policySha256) {
+    const policy = policies.get(`${entry.governancePolicyVersion}:${entry.governancePolicySha256}`);
+    if (policy == null) {
       throw new Error("RAW_RETENTION_OVERDUE: governance policy binding");
     }
     if (!/^[0-9a-f]{64}$/.test(entry.rawSha256 ?? "")) {
@@ -148,7 +154,7 @@ export function buildPurgePlan({ ledger, policy, policySha256, evaluationAt, eva
 }
 
 function parseArgs(argv) {
-  const args = { dryRun: false };
+  const args = { dryRun: false, policy: [] };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === "--dry-run") {
@@ -159,24 +165,70 @@ function parseArgs(argv) {
     const name = flag?.startsWith("--") ? flag.slice(2) : "";
     if (!ALLOWED_ARGS.has(name)) throw new Error("unknown purge argument");
     const value = argv[index + 1];
-    if (!value || value.startsWith("--") || args[name] != null) throw new Error(`invalid --${name}`);
-    args[name] = value;
+    if (!value || value.startsWith("--")) throw new Error(`invalid --${name}`);
+    if (name === "policy") {
+      args.policy.push(value);
+    } else {
+      if (args[name] != null) throw new Error(`invalid --${name}`);
+      args[name] = value;
+    }
     index += 1;
   }
   return args;
 }
 
-function validatedBaseUrl(value) {
+function executionBaseUrl(args) {
+  if (args["base-url"] != null) {
+    throw new Error(
+      `actual DELETE requires the ${PREAUTH_BASE_URL_ENV} preauthenticated base URL environment variable, not --base-url`,
+    );
+  }
+  const value = process.env[PREAUTH_BASE_URL_ENV]?.trim();
+  if (!value) {
+    throw new Error(`${PREAUTH_BASE_URL_ENV} preauthenticated base URL environment variable is required`);
+  }
+  return validatedBaseUrl(value, true);
+}
+
+function validatedBaseUrl(value, execution) {
   let url;
   try {
     url = new URL(value);
   } catch {
     throw new Error("base URL is invalid");
   }
-  if (!new Set(["http:", "https:"]).has(url.protocol)) throw new Error("base URL protocol is invalid");
+  const loopback = new Set(["127.0.0.1", "localhost", "::1"]).has(url.hostname);
+  if (url.protocol !== "https:" && !(execution && loopback && url.protocol === "http:")
+    && !(!execution && url.protocol === "http:")) {
+    throw new Error("base URL protocol is invalid");
+  }
   if (url.username || url.password || url.search || url.hash) throw new Error("base URL must not contain credentials");
+  if (execution && !loopback && url.pathname === "/") {
+    throw new Error("preauthenticated base URL must include a secret path");
+  }
   if (!url.pathname.endsWith("/")) url.pathname += "/";
   return url;
+}
+
+function requiredPolicies(args) {
+  if (!Array.isArray(args.policy) || args.policy.length === 0) {
+    throw new Error("--policy is required");
+  }
+  return args.policy;
+}
+
+function policyBindings(policyFiles) {
+  const bindings = new Map();
+  for (const file of policyFiles) {
+    const version = requiredText(file?.policy?.policyVersion, "policyVersion");
+    if (!/^[0-9a-f]{64}$/.test(file?.sha256 ?? "")) {
+      throw new Error("RAW_RETENTION_OVERDUE: governance policy hash");
+    }
+    const key = `${version}:${file.sha256}`;
+    if (bindings.has(key)) throw new Error("RAW_RETENTION_OVERDUE: duplicate governance policy");
+    bindings.set(key, file.policy);
+  }
+  return bindings;
 }
 
 function validatedObjectKey(value) {

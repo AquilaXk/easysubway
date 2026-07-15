@@ -25,24 +25,34 @@ public class DatapackSourceSnapshotCommandService {
 	private final TransactionTemplate eventInsertTransaction;
 	private final Clock clock;
 	private final ObjectMapper objectMapper;
+	private final DatapackSourceGovernancePolicy governancePolicy;
 
 	public DatapackSourceSnapshotCommandService(
 		JdbcDataSourceSnapshotRepository snapshotRepository,
 		PlatformTransactionManager transactionManager,
 		ObjectProvider<Clock> clockProvider,
-		ObjectMapper objectMapper
+		ObjectMapper objectMapper,
+		DatapackSourceGovernancePolicy governancePolicy
 	) {
 		this.snapshotRepository = snapshotRepository;
 		this.eventInsertTransaction = new TransactionTemplate(transactionManager);
 		this.eventInsertTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
 		this.clock = clockProvider.getIfAvailable(Clock::systemDefaultZone);
 		this.objectMapper = objectMapper;
+		this.governancePolicy = governancePolicy;
 	}
 
 	@Transactional
 	public String createLockedSnapshot(SourceSnapshotCommand command) {
 		command.validate();
-		DataSourceSnapshot snapshot = snapshotFrom(command);
+		var policyBinding = governancePolicy.requireBinding(
+			command.sourceId(),
+			command.retrievedAt(),
+			command.rawRetentionExpiresAt(),
+			command.governancePolicyVersion(),
+			command.governancePolicySha256()
+		);
+		DataSourceSnapshot snapshot = snapshotFrom(command, policyBinding);
 		var existingEvent = snapshotRepository
 			.findEventByIdempotencyKey(command.sourceId(), command.idempotencyKey());
 		if (existingEvent.isPresent()) {
@@ -140,7 +150,10 @@ public class DatapackSourceSnapshotCommandService {
 		));
 	}
 
-	private static DataSourceSnapshot snapshotFrom(SourceSnapshotCommand command) {
+	private static DataSourceSnapshot snapshotFrom(
+		SourceSnapshotCommand command,
+		DatapackSourceGovernancePolicy.Binding policyBinding
+	) {
 		return new DataSourceSnapshot(
 			command.snapshotId(),
 			command.sourceId(),
@@ -163,9 +176,9 @@ public class DatapackSourceSnapshotCommandService {
 			command.diffSummary(),
 			command.diffSummaryJson(),
 			command.freshnessExpiresAt(),
-			command.rawRetentionExpiresAt(),
-			command.governancePolicyVersion(),
-			command.governancePolicySha256()
+			policyBinding.rawRetentionExpiresAt(),
+			policyBinding.version(),
+			policyBinding.sha256()
 		);
 	}
 

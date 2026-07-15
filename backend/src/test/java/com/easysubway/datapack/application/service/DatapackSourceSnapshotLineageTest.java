@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -31,6 +32,7 @@ class DatapackSourceSnapshotLineageTest {
 
 	private DatapackSourceSnapshotCommandService service;
 	private PlatformTransactionManager transactionManager;
+	private DatapackSourceGovernancePolicy governancePolicy;
 
 	@BeforeEach
 	void setUp() {
@@ -92,11 +94,13 @@ class DatapackSourceSnapshotLineageTest {
 			Clock.fixed(Instant.parse("2026-07-15T00:00:00Z"), ZoneOffset.UTC)
 		);
 		transactionManager = new DataSourceTransactionManager(dataSource);
+		governancePolicy = testGovernancePolicy();
 		service = new DatapackSourceSnapshotCommandService(
 			new JdbcDataSourceSnapshotRepository(dataSource),
 			transactionManager,
 			clockProvider,
-			new ObjectMapper()
+			new ObjectMapper(),
+			governancePolicy
 		);
 	}
 
@@ -196,6 +200,39 @@ class DatapackSourceSnapshotLineageTest {
 		}
 	}
 
+	@Test
+	@DisplayName("임의 governance hash와 90일을 넘는 raw retention은 저장하지 않는다")
+	void rejectsForgedGovernanceBindingAndRetention() {
+		var command = command("source-a", "snapshot-a-forged", null, null);
+		var forged = new SourceSnapshotCommand(
+			command.snapshotId(), command.sourceId(), command.provider(), command.retrievedAt(),
+			command.sourceUpdatedAt(), command.rowCount(), command.coverageCount(), command.rawSha256(),
+			command.rawObjectUri(), command.redactedRequestFingerprint(), command.schemaFingerprint(),
+			command.schemaStatus(), command.licenseStatus(), command.fetchStatus(), command.redistributionAllowed(),
+			command.credentialRedacted(), command.previousSnapshotId(), command.diffSummary(), command.diffSummaryJson(),
+			command.freshnessExpiresAt(), LocalDateTime.of(2099, 1, 1, 0, 0),
+			"forged-policy", "f".repeat(64), command.requestedBy(), command.reason(), command.idempotencyKey()
+		);
+
+		assertThatThrownBy(() -> service.createLockedSnapshot(forged))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("SOURCE_GOVERNANCE_OWNER_MISSING");
+
+		var overdue = new SourceSnapshotCommand(
+			command.snapshotId(), command.sourceId(), command.provider(), command.retrievedAt(),
+			command.sourceUpdatedAt(), command.rowCount(), command.coverageCount(), command.rawSha256(),
+			command.rawObjectUri(), command.redactedRequestFingerprint(), command.schemaFingerprint(),
+			command.schemaStatus(), command.licenseStatus(), command.fetchStatus(), command.redistributionAllowed(),
+			command.credentialRedacted(), command.previousSnapshotId(), command.diffSummary(), command.diffSummaryJson(),
+			command.freshnessExpiresAt(), LocalDateTime.of(2099, 1, 1, 0, 0),
+			governancePolicy.version(), governancePolicy.sha256(), command.requestedBy(), command.reason(),
+			command.idempotencyKey()
+		);
+		assertThatThrownBy(() -> service.createLockedSnapshot(overdue))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("RAW_RETENTION_OVERDUE");
+	}
+
 	private String createAfter(CountDownLatch start, SourceSnapshotCommand command) throws InterruptedException {
 		start.await();
 		try {
@@ -235,8 +272,8 @@ class DatapackSourceSnapshotLineageTest {
 			diffSummaryJson,
 			LocalDateTime.of(2026, 8, root ? 1 : 2, 0, 0),
 			LocalDateTime.of(2026, 9, root ? 29 : 30, 0, 0),
-			"2026-07-15",
-			"e".repeat(64),
+			governancePolicy.version(),
+			governancePolicy.sha256(),
 			"qa-role",
 			"source governance fixture",
 			"idempotency-" + snapshotId
@@ -253,5 +290,15 @@ class DatapackSourceSnapshotLineageTest {
 		return """
 			{"status":"NO_CHANGE","rawHashChanged":false,"schemaHashChanged":false,"requestHashChanged":false,"sourceUpdatedAtChanged":false,"rowDelta":0,"coverageDelta":0}
 			""".trim();
+	}
+
+	private DatapackSourceGovernancePolicy testGovernancePolicy() {
+		String policy = """
+			{"policyVersion":"2026-07-15","retentionClasses":[{"id":"standard-90d","retentionDays":90}],"sources":[{"sourceId":"source-a","retentionClassId":"standard-90d"},{"sourceId":"source-b","retentionClassId":"standard-90d"}]}
+			""";
+		return new DatapackSourceGovernancePolicy(
+			new ObjectMapper(),
+			new ByteArrayResource(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+		);
 	}
 }

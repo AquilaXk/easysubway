@@ -59,6 +59,51 @@ test("dry-run은 만료 raw를 계획하지만 DELETE하지 않는다", async ()
   });
 });
 
+test("실제 DELETE는 CLI 인자가 아닌 env-injected preauthenticated base URL을 요구한다", async () => {
+  await withFixture(async ({ baseUrl, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+
+    await assert.rejects(
+      runPurge({ ...files, baseUrl, output: path.join(workDir, "unauthenticated.json"), authenticated: false }),
+      /preauthenticated base URL environment variable/,
+    );
+    assert.deepEqual(requests, []);
+  });
+});
+
+test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes로 purge한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const first = policyFixture(["source-old"]);
+    const second = { ...policyFixture(["source-new"]), policyVersion: "2026-07-16" };
+    const policies = await Promise.all([
+      writePolicy(workDir, "old", first),
+      writePolicy(workDir, "new", second),
+    ]);
+    const ledger = {
+      schemaVersion: 1,
+      artifactKind: "source-raw-retention-ledger",
+      entries: [
+        bindPolicy(rawEntry("old", "raw/old.json"), policies[0]),
+        bindPolicy(rawEntry("new", "raw/new.json"), policies[1]),
+      ],
+    };
+    const ledgerPath = path.join(workDir, "multi-policy-ledger.json");
+    await writeFile(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
+    objects.add("/raw/old.json");
+    objects.add("/raw/new.json");
+
+    const report = await runPurge({
+      ledger: ledgerPath,
+      policies: policies.map((entry) => entry.path),
+      baseUrl,
+      output: path.join(workDir, "multi-policy.json"),
+    });
+
+    assert.deepEqual(report.deleted.map((entry) => entry.snapshotId), ["new", "old"]);
+    assert.deepEqual(requests.sort(), ["/raw/new.json", "/raw/old.json"]);
+  });
+});
+
 test("invalid legal hold가 있으면 전체 plan을 DELETE 전에 거부한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const files = await writeInputs(workDir, [
@@ -193,35 +238,45 @@ async function withFixture(run) {
 
 async function writeInputs(workDir, entries) {
   const policy = policyFixture(entries.map((entry) => entry.sourceId));
-  const policyText = `${JSON.stringify(policy, null, 2)}\n`;
-  const policyHash = sha256(policyText);
+  const policyFile = await writePolicy(workDir, "current", policy);
   const ledger = {
     schemaVersion: 1,
     artifactKind: "source-raw-retention-ledger",
     entries: entries.map((entry) => ({
       ...entry,
       governancePolicyVersion: policy.policyVersion,
-      governancePolicySha256: policyHash,
+      governancePolicySha256: policyFile.hash,
     })),
   };
-  const policyPath = path.join(workDir, "policy.json");
   const ledgerPath = path.join(workDir, "ledger.json");
-  await writeFile(policyPath, policyText);
   await writeFile(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
-  return { policy: policyPath, ledger: ledgerPath };
+  return { policies: [policyFile.path], ledger: ledgerPath };
 }
 
-async function runPurge({ ledger, policy, baseUrl, output, dryRun = false }) {
+async function runPurge({
+  ledger,
+  policies,
+  baseUrl,
+  output,
+  dryRun = false,
+  authenticated = true,
+}) {
   try {
     await execFileAsync(process.execPath, [
       "tools/datapack/purge-expired-source-raw.mjs",
       "--ledger", ledger,
-      "--policy", policy,
+      ...policies.flatMap((policy) => ["--policy", policy]),
       "--evaluation-at", evaluationAt,
-      "--base-url", baseUrl,
       "--output", output,
-      ...(dryRun ? ["--dry-run"] : []),
-    ], { cwd: root });
+      ...(dryRun ? ["--dry-run", "--base-url", baseUrl] : []),
+      ...(!dryRun && !authenticated ? ["--base-url", baseUrl] : []),
+    ], {
+      cwd: root,
+      env: {
+        ...process.env,
+        EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL: !dryRun && authenticated ? baseUrl : "",
+      },
+    });
   } catch (error) {
     const message = `${error.stderr ?? ""}${error.stdout ?? ""}`;
     const wrapped = new Error(message || error.message);
@@ -229,6 +284,21 @@ async function runPurge({ ledger, policy, baseUrl, output, dryRun = false }) {
     throw wrapped;
   }
   return JSON.parse(await readFile(output, "utf8"));
+}
+
+async function writePolicy(workDir, name, policy) {
+  const text = `${JSON.stringify(policy, null, 2)}\n`;
+  const policyPath = path.join(workDir, `${name}-policy.json`);
+  await writeFile(policyPath, text);
+  return { path: policyPath, hash: sha256(text), policy };
+}
+
+function bindPolicy(entry, policyFile) {
+  return {
+    ...entry,
+    governancePolicyVersion: policyFile.policy.policyVersion,
+    governancePolicySha256: policyFile.hash,
+  };
 }
 
 function rawEntry(snapshotId, objectKey, overrides = {}) {
