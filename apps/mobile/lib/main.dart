@@ -12,6 +12,7 @@ import 'accessible_design.dart';
 import 'app/app_bootstrap.dart';
 import 'app/app_dependencies.dart';
 import 'core/datapack/data_pack_metered_consent_gate.dart';
+import 'core/datapack/bundled_data_pack_freshness.dart';
 import 'core/datapack/data_pack_update_state.dart';
 import 'design_tokens.dart';
 import 'features/get_off_alarm/get_off_alarm_controller.dart';
@@ -145,6 +146,7 @@ Future<void> main() async {
           ),
           onDataPackMeteredConsent: bootstrap.acceptMeteredDataPackUpdate,
           dataPackUpdate: bootstrap.dataPackUpdate,
+          bundledDataPackFreshness: bootstrap.bundledDataPackFreshness,
         ),
       ),
     ),
@@ -365,6 +367,7 @@ class EasySubwayApp extends StatelessWidget {
     DataPackUpdateStateRepository? dataPackUpdateStateRepository,
     Future<void> Function()? onDataPackMeteredConsent,
     Future<void>? dataPackUpdate,
+    BundledDataPackFreshness? bundledDataPackFreshness,
     OnboardingState initialOnboardingState = const OnboardingState.initial(),
     bool enablePushNotifications = defaultPushNotificationsEnabled,
     GlobalKey<NavigatorState>? navigatorKey,
@@ -405,6 +408,7 @@ class EasySubwayApp extends StatelessWidget {
          dataPackUpdateStateRepository: dataPackUpdateStateRepository,
          onDataPackMeteredConsent: onDataPackMeteredConsent,
          dataPackUpdate: dataPackUpdate,
+         bundledDataPackFreshness: bundledDataPackFreshness,
          recentRoutesFuture:
              recentRoutesFuture ??
              (defaultDemoHomeDataEnabled
@@ -426,6 +430,7 @@ class EasySubwayApp extends StatelessWidget {
     required this.dataPackUpdateStateRepository,
     required this.onDataPackMeteredConsent,
     required this.dataPackUpdate,
+    required this.bundledDataPackFreshness,
     required this.recentRoutesFuture,
     this.navigatorKey,
     super.key,
@@ -479,6 +484,7 @@ class EasySubwayApp extends StatelessWidget {
   final DataPackUpdateStateRepository? dataPackUpdateStateRepository;
   final Future<void> Function()? onDataPackMeteredConsent;
   final Future<void>? dataPackUpdate;
+  final BundledDataPackFreshness? bundledDataPackFreshness;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
   final GlobalKey<NavigatorState>? navigatorKey;
 
@@ -586,6 +592,7 @@ class EasySubwayApp extends StatelessWidget {
           userDataDeletionRepository: userDataDeletionRepository,
           noticeRepository: noticeRepository,
           recentRoutesFuture: recentRoutesFuture,
+          bundledDataPackFreshness: bundledDataPackFreshness,
         ),
       ),
     );
@@ -787,6 +794,7 @@ class _EasySubwayHome extends StatefulWidget {
     required this.userDataDeletionRepository,
     required this.noticeRepository,
     required this.recentRoutesFuture,
+    required this.bundledDataPackFreshness,
   });
 
   final StationSearchRepository repository;
@@ -816,12 +824,14 @@ class _EasySubwayHome extends StatefulWidget {
   final UserDataDeletionRepository? userDataDeletionRepository;
   final NoticeRepository? noticeRepository;
   final Future<List<FavoriteRoute>>? recentRoutesFuture;
+  final BundledDataPackFreshness? bundledDataPackFreshness;
 
   @override
   State<_EasySubwayHome> createState() => _EasySubwayHomeState();
 }
 
-class _EasySubwayHomeState extends State<_EasySubwayHome> {
+class _EasySubwayHomeState extends State<_EasySubwayHome>
+    with WidgetsBindingObserver {
   // 저장소가 없는 테스트/프리뷰에서도 같은 앱 세션에서는 온보딩 완료 상태를 유지한다.
   late OnboardingState _onboardingState = widget.initialOnboardingState;
   late bool _loadingOnboardingState =
@@ -835,10 +845,13 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
   late OnboardingResult? _lastPersistedOnboardingResult =
       widget.initialOnboardingState.result;
   UserDataDeletionResult? _dataDeletionResult;
+  Timer? _bundledFreshnessTimer;
+  bool _bundledDataPackStale = false;
 
   @override
   void initState() {
     super.initState();
+    _initializeBundledFreshness();
     unawaited(_clearLegacyCredentialsOnStartup());
     if (_loadingOnboardingState) {
       _restoreOnboardingState();
@@ -920,11 +933,79 @@ class _EasySubwayHomeState extends State<_EasySubwayHome> {
         userDataDeletionRepository: widget.userDataDeletionRepository,
         noticeRepository: widget.noticeRepository,
         recentRoutesFuture: widget.recentRoutesFuture,
+        bundledDataPackStaleLabel: _bundledDataPackStale
+            ? BundledDataPackFreshness.staleLabelKo
+            : null,
         onUserDataDeleted: _handleUserDataDeleted,
         onMobilityProfileChanged: _saveMobilityProfile,
         onViewPreferencesChanged: _saveViewPreferences,
       ),
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshBundledFreshness();
+    }
+  }
+
+  @override
+  void dispose() {
+    _bundledFreshnessTimer?.cancel();
+    if (widget.bundledDataPackFreshness != null) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
+    super.dispose();
+  }
+
+  void _initializeBundledFreshness() {
+    final freshness = widget.bundledDataPackFreshness;
+    if (freshness == null) {
+      return;
+    }
+    WidgetsBinding.instance.addObserver(this);
+    final now = DateTime.now().toUtc();
+    _bundledDataPackStale = freshness.isStaleAt(now);
+    _scheduleBundledFreshnessExpiry(freshness, now);
+  }
+
+  void _refreshBundledFreshness() {
+    final freshness = widget.bundledDataPackFreshness;
+    if (freshness == null) {
+      return;
+    }
+    final now = DateTime.now().toUtc();
+    final stale = freshness.isStaleAt(now);
+    if (stale != _bundledDataPackStale && mounted) {
+      setState(() {
+        _bundledDataPackStale = stale;
+      });
+    }
+    _scheduleBundledFreshnessExpiry(freshness, now);
+  }
+
+  void _scheduleBundledFreshnessExpiry(
+    BundledDataPackFreshness freshness,
+    DateTime now,
+  ) {
+    _bundledFreshnessTimer?.cancel();
+    if (_bundledDataPackStale) {
+      return;
+    }
+    final delay = freshness.freshnessExpiresAt.toUtc().difference(now);
+    if (delay <= Duration.zero) {
+      _refreshBundledFreshness();
+      return;
+    }
+    _bundledFreshnessTimer = Timer(delay, () {
+      if (!mounted || _bundledDataPackStale) {
+        return;
+      }
+      setState(() {
+        _bundledDataPackStale = true;
+      });
+    });
   }
 
   Future<void> _handleUserDataDeleted(UserDataDeletionResult result) async {
@@ -1425,6 +1506,7 @@ class HomeScreen extends StatefulWidget {
     this.viewPreferences = const OnboardingViewPreferences.defaults(),
     this.simpleViewEnabled = true,
     this.facilityReportDraftTargetStore,
+    this.bundledDataPackStaleLabel,
     String? initialMobilityType,
     super.key,
   }) : initialMobilityType =
@@ -1461,6 +1543,7 @@ class HomeScreen extends StatefulWidget {
   final OnboardingViewPreferences viewPreferences;
   final bool simpleViewEnabled;
   final FacilityReportDraftTargetStore? facilityReportDraftTargetStore;
+  final String? bundledDataPackStaleLabel;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -1810,6 +1893,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     Widget rootTab(Widget child) {
+      final staleLabel = widget.bundledDataPackStaleLabel;
       return PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -1818,7 +1902,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           }
           openHomeTab();
         },
-        child: child,
+        child: staleLabel == null
+            ? child
+            : SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    Material(
+                      color: EasySubwayAccessibleColors.surface,
+                      child: Semantics(
+                        container: true,
+                        liveRegion: true,
+                        label: staleLabel,
+                        child: Container(
+                          key: const Key('bundledDataPackStaleBanner'),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: EasySubwayAccessibleColors.line,
+                              ),
+                            ),
+                          ),
+                          child: ExcludeSemantics(
+                            child: Text(
+                              staleLabel,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: EasySubwayAccessibleColors.text,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(child: child),
+                  ],
+                ),
+              ),
       );
     }
 
@@ -1901,20 +2027,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     if (_selectedTabIndex == 2) {
-      return RouteSearchScreen(
-        repository: routeRepository,
-        stationRepository: repository,
-        routeFeedbackRepository: routeFeedbackRepository,
-        getOffAlarmController: getOffAlarmController,
-        favoriteRouteRepository: favoriteRouteRepository,
-        adRepository: adRepository,
-        initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
-        initialDraft: _routeDraftController.draft,
-        simpleViewEnabled: simpleViewEnabled,
-        onShellBackToHome: () {
-          _routeDraftController.clear();
-          openHomeTab();
-        },
+      return rootTab(
+        RouteSearchScreen(
+          repository: routeRepository,
+          stationRepository: repository,
+          routeFeedbackRepository: routeFeedbackRepository,
+          getOffAlarmController: getOffAlarmController,
+          favoriteRouteRepository: favoriteRouteRepository,
+          adRepository: adRepository,
+          initialMobilityType: _routeTabMobilityType ?? initialMobilityType,
+          initialDraft: _routeDraftController.draft,
+          simpleViewEnabled: simpleViewEnabled,
+          onShellBackToHome: () {
+            _routeDraftController.clear();
+            openHomeTab();
+          },
+        ),
       );
     }
 
