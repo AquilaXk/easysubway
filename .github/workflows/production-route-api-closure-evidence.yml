@@ -7,29 +7,42 @@ on:
     paths:
       - ".github/workflows/production-route-api-closure-evidence.yml"
       - "tools/ci/production-route-api-closure-evidence-workflow.test.mjs"
-
-permissions:
-  contents: read
+      - "tools/ops/route-search-purge-snapshot-gate.sh"
+      - "tools/ops/route-search-purge.sql"
+      - "tools/ops/postgres-backup.sh"
+      - "backend/src/main/resources/db/migration/postgresql/V51__*"
+      - "backend/src/main/resources/db/migration/h2/V51__*"
+  workflow_dispatch:
 
 jobs:
   verify:
     name: Verify production route API closure
+    permissions:
+      contents: read
     runs-on:
       - self-hosted
       - easysubway-production
     timeout-minutes: 5
     concurrency:
-      group: cd-production-deploy
+      group: production-route-api-closure-evidence
       cancel-in-progress: false
+    outputs:
+      deployed_sha: ${{ steps.closure.outputs.deployed_sha }}
     env:
       CLOSURE_BASE_SHA: cba25764de4ed646e398b2141b64fa41767ed3cc
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
 
     steps:
       - name: Verify deployed revision, origin denial, and row invariance
+        id: closure
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "manual snapshot revalidation must run from main" >&2
+            exit 1
+          fi
 
           if [[ ! "${CLOSURE_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "closure base must be a 40-character lowercase commit SHA" >&2
@@ -168,3 +181,33 @@ jobs:
             echo "route_search_results changed during the closure probe" >&2
             exit 1
           fi
+          printf 'deployed_sha=%s\n' "${current_sha}" >> "${GITHUB_OUTPUT}"
+
+  snapshot-gate:
+    name: Verify route purge snapshot gate
+    needs: verify
+    permissions:
+      contents: read
+    runs-on:
+      - self-hosted
+      - easysubway-production
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: production-route-api-closure-evidence
+      cancel-in-progress: false
+    env:
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+      DEPLOY_COMPOSE_PROJECT: ${{ vars.DEPLOY_COMPOSE_PROJECT }}
+      EXPECTED_DEPLOYED_SHA: ${{ needs.verify.outputs.deployed_sha }}
+      SNAPSHOT_REQUEST_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Snapshot gate / Checkout reviewed main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Snapshot gate / Backup, restore, and analyze purge
+        shell: bash
+        run: bash tools/ops/route-search-purge-snapshot-gate.sh
