@@ -10,6 +10,7 @@ RESTORE_CPU_LIMIT="1"
 RESTORE_MEMORY_LIMIT="2g"
 RESTORE_PIDS_LIMIT="256"
 WAL_HEADROOM_BYTES="$((256 * 1024 * 1024))"
+MIN_OPERATIONAL_RESERVE_BYTES="$((1024 * 1024 * 1024))"
 
 if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
 	printf 'DEPLOY_ROOT is invalid\n' >&2
@@ -84,18 +85,62 @@ production_count() {
 		| tr -d '[:space:]'
 }
 
+storage_probe() {
+	docker run --rm --pull never \
+		--network none \
+		--read-only \
+		--user 0:0 \
+		--mount "type=bind,src=${BACKUP_DIR},dst=/probe/backup,readonly" \
+		--mount type=volume,target=/probe/docker \
+		--entrypoint sh \
+		"${production_image}" -c '
+set -eu
+set -- $(df -PB1 /probe/backup | tail -n 1)
+backup_available="$4"
+set -- $(df -PB1 /probe/docker | tail -n 1)
+docker_available="$4"
+printf "%s|%s|%s|%s\n" \
+  "$(stat -c %d /probe/backup)" "${backup_available}" \
+  "$(stat -c %d /probe/docker)" "${docker_available}"
+'
+}
+
 source_count_before="$(production_count)"
 source_database_bytes="$(docker exec easysubway-postgres sh -lc \
 	'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT pg_database_size(current_database());"' \
 	| tr -d '[:space:]')"
-docker_root_dir="$(docker info --format '{{.DockerRootDir}}')"
-backup_available_before="$(df -PB1 "${BACKUP_DIR}" | awk 'NR == 2 {print $4}')"
-if [[ ! "${source_count_before}" =~ ^[0-9]+$ || ! "${source_database_bytes}" =~ ^[0-9]+$ || ! "${backup_available_before}" =~ ^[0-9]+$ ]]; then
+IFS='|' read -r backup_device_before backup_available_before docker_device_before docker_available_before <<< "$(storage_probe)"
+if [[ ! "${source_count_before}" =~ ^[0-9]+$ || ! "${source_database_bytes}" =~ ^[0-9]+$ \
+	|| ! "${backup_device_before}" =~ ^[0-9]+$ || ! "${backup_available_before}" =~ ^[0-9]+$ \
+	|| ! "${docker_device_before}" =~ ^[0-9]+$ || ! "${docker_available_before}" =~ ^[0-9]+$ ]]; then
 	printf 'production snapshot preflight metrics are invalid\n' >&2
 	exit 1
 fi
-if (( backup_available_before < source_database_bytes )); then
+
+operational_reserve_bytes="${MIN_OPERATIONAL_RESERVE_BYTES}"
+if (( source_database_bytes > operational_reserve_bytes )); then
+	operational_reserve_bytes="${source_database_bytes}"
+fi
+backup_reserve_bytes="$((source_database_bytes * 2))"
+restore_cluster_reserve_bytes="$((source_database_bytes * 2))"
+restore_wal_reserve_bytes="$((source_database_bytes * 2))"
+if (( restore_wal_reserve_bytes < WAL_HEADROOM_BYTES )); then
+	restore_wal_reserve_bytes="${WAL_HEADROOM_BYTES}"
+fi
+restore_required_bytes="$((restore_cluster_reserve_bytes + restore_wal_reserve_bytes + operational_reserve_bytes))"
+backup_required_before="$((backup_reserve_bytes + operational_reserve_bytes))"
+storage_shared_before=false
+if [[ "${backup_device_before}" == "${docker_device_before}" ]]; then
+	storage_shared_before=true
+	backup_required_before="$((backup_reserve_bytes + restore_required_bytes))"
+fi
+
+if (( backup_available_before < backup_required_before )); then
 	printf 'insufficient backup filesystem headroom\n' >&2
+	exit 1
+fi
+if (( docker_available_before < restore_required_bytes )); then
+	printf 'insufficient Docker filesystem headroom before backup\n' >&2
 	exit 1
 fi
 
@@ -123,9 +168,21 @@ if [[ ! "${backup_sha256}" =~ ^[0-9a-f]{64}$ || ! "${backup_bytes}" =~ ^[0-9]+$ 
 	printf 'backup identity is invalid\n' >&2
 	exit 1
 fi
-docker_available_after_backup="$(df -PB1 "${docker_root_dir}" | awk 'NR == 2 {print $4}')"
-restore_required_bytes="$((source_database_bytes + WAL_HEADROOM_BYTES))"
-if [[ ! "${docker_available_after_backup}" =~ ^[0-9]+$ ]] || (( docker_available_after_backup < restore_required_bytes )); then
+IFS='|' read -r backup_device_after backup_available_after docker_device_after docker_available_after_backup <<< "$(storage_probe)"
+if [[ ! "${backup_device_after}" =~ ^[0-9]+$ || ! "${backup_available_after}" =~ ^[0-9]+$ \
+	|| ! "${docker_device_after}" =~ ^[0-9]+$ || ! "${docker_available_after_backup}" =~ ^[0-9]+$ ]]; then
+	printf 'post-backup filesystem metrics are invalid\n' >&2
+	exit 1
+fi
+if [[ "${backup_device_after}" != "${backup_device_before}" || "${docker_device_after}" != "${docker_device_before}" ]]; then
+	printf 'snapshot filesystem layout changed during backup\n' >&2
+	exit 1
+fi
+if (( backup_available_after < operational_reserve_bytes )); then
+	printf 'insufficient operational reserve after backup\n' >&2
+	exit 1
+fi
+if (( docker_available_after_backup < restore_required_bytes )); then
 	printf 'insufficient Docker filesystem headroom\n' >&2
 	exit 1
 fi
@@ -227,6 +284,8 @@ for metric in "${required_metrics[@]}"; do
 	printf -v "${metric}" '%s' "${value}"
 done
 
+restore_psql -c 'ANALYZE route_search_results, favorite_routes, favorite_route_stations, route_feedbacks;' >/dev/null
+
 plan_file="${EVIDENCE_DIR}/purge-plan-${backup_sha256:0:12}.txt"
 start_ns="$(date +%s%N)"
 restore_psql > "${plan_file}" <<'SQL'
@@ -297,8 +356,12 @@ report_file="${EVIDENCE_DIR}/report-${backup_sha256:0:12}.md"
 	echo "- backup SHA-256: \`${backup_sha256}\`"
 	echo "- backup bytes: \`${backup_bytes}\`"
 	echo "- source database bytes: \`${source_database_bytes}\`"
-	echo "- backup filesystem available before: \`${backup_available_before}\`"
-	echo "- Docker available after backup/required restore headroom: \`${docker_available_after_backup}/${restore_required_bytes}\`"
+	echo "- backup filesystem available/required before: \`${backup_available_before}/${backup_required_before}\`"
+	echo "- backup filesystem available after: \`${backup_available_after}\`"
+	echo "- Docker available before/after backup: \`${docker_available_before}/${docker_available_after_backup}\`"
+	echo "- storage shared before backup: \`${storage_shared_before}\`"
+	echo "- operational reserve bytes: \`${operational_reserve_bytes}\`"
+	echo "- restore cluster/WAL/total reserve bytes: \`${restore_cluster_reserve_bytes}/${restore_wal_reserve_bytes}/${restore_required_bytes}\`"
 	echo "- PostgreSQL image: \`${production_image}\`"
 	echo "- CPU: \`${cpu_model}\`, cores \`${cpu_cores}\`"
 	echo "- memory KiB: \`${memory_kib}\`"

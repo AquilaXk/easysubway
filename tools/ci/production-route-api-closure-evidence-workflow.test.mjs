@@ -69,8 +69,20 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /--pids-limit "\$\{RESTORE_PIDS_LIMIT\}"/);
   assert.match(snapshotGate, /restore resource limits/);
   assert.match(snapshotGate, /source_database_bytes/);
+  assert.match(snapshotGate, /storage_probe/);
+  assert.match(snapshotGate, /--mount type=volume,target=\/probe\/docker/);
+  assert.doesNotMatch(snapshotGate, /df -PB1 "\$\{docker_root_dir\}"/);
+  assert.match(snapshotGate, /backup_required_before/);
+  assert.match(snapshotGate, /operational_reserve_bytes/);
+  assert.match(snapshotGate, /restore_cluster_reserve_bytes/);
+  assert.match(snapshotGate, /restore_wal_reserve_bytes/);
   assert.match(snapshotGate, /docker_available_after_backup/);
   assert.match(snapshotGate, /insufficient Docker filesystem headroom/);
+  assert.match(snapshotGate, /ANALYZE route_search_results, favorite_routes, favorite_route_stations, route_feedbacks/);
+  assert.ok(
+    snapshotGate.indexOf("ANALYZE route_search_results") < snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)"),
+    "restored purge tables must be analyzed before the measured plan",
+  );
   assert.match(snapshotGate, /EXPLAIN \(ANALYZE, BUFFERS, WAL/);
   assert.match(snapshotGate, /ROLLBACK/);
   assert.match(snapshotGate, /favorite_routes/);
