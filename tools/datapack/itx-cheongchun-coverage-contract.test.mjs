@@ -171,9 +171,16 @@ test("ITX-청춘 production source artifact는 변경 없는 5-set의 UNCHANGED_
   assert.deepEqual(reference.promotion, {
     mode: "UNCHANGED_AUTO",
     previousArtifactSha256: "cc11088e48235a8d2eccc55758a2b002b0fb5eb691aa55430e701fa01fd59201",
+    previousArtifactPath: "tools/datapack/sources/itx-cheongchun-source-timetable-20260715104320157.json",
     approvalUrl: null,
     approvedArtifactSha256: null,
   });
+
+  const previousBytes = await readFile(new URL(`../../${reference.promotion.previousArtifactPath}`, import.meta.url));
+  assert.equal(
+    createHash("sha256").update(previousBytes).digest("hex"),
+    reference.promotion.previousArtifactSha256,
+  );
 
   const artifactBytes = await readFile(new URL(`../../${reference.artifactPath}`, import.meta.url));
   assert.equal(createHash("sha256").update(artifactBytes).digest("hex"), reference.sha256);

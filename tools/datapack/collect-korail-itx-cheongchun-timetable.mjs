@@ -442,6 +442,7 @@ async function promoteItxSourceCandidateLocked({
     promotion: {
       mode: bootstrap ? "BOOTSTRAP_OWNER_APPROVED" : changed ? "CHANGE_OWNER_APPROVED" : "UNCHANGED_AUTO",
       previousArtifactSha256: previous?.sha256 ?? null,
+      previousArtifactPath: previous?.artifactPath ?? null,
       approvalUrl: approvalRequired ? approvalUrl : null,
       approvedArtifactSha256: approvalRequired ? candidateSha256 : null,
     },
@@ -673,6 +674,16 @@ function validateCanonicalCorridorAuthority(source) {
           invalid();
         }
       }
+      const stationIds = sequence.stops.map(({ stationId }) => stationId);
+      if (new Set(stationIds).size !== stationIds.length) invalid();
+      const direction = sequence.directionId === "up" ? 1 : sequence.directionId === "down" ? -1 : 0;
+      for (let index = 1; index < sequence.stops.length; index += 1) {
+        const previousStop = sequence.stops[index - 1];
+        const currentStop = sequence.stops[index];
+        if (direction === 0
+          || direction * (currentStop.corridorSequence - previousStop.corridorSequence) <= 0
+          || previousStop.departureSeconds > currentStop.arrivalSeconds) invalid();
+      }
       sequenceByTripId.set(
         `route-${LINE_ID}-${sequence.directionId}-${normalizeTrainNumber(sequence.trainNumber)}-${sequence.dayCd}`,
         sequence,
@@ -849,7 +860,10 @@ async function loadAdmittedSourceReference(contract, repositoryRoot) {
   validateSourceFreshness(source, source.selectedServiceDates);
   validateCanonicalCorridorAuthority(source);
   validateSourceSnapshotSets(source);
-  source.sourceTimetableArtifact = { sha256: reference.sha256 };
+  source.sourceTimetableArtifact = {
+    sha256: reference.sha256,
+    artifactPath: reference.artifactPath,
+  };
   return source;
 }
 

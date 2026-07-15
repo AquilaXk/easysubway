@@ -1062,6 +1062,10 @@ test("ITX changed candidate는 change OWNER approval로 immutable artifact를 �
     });
     assert.equal(promoted.sourceTimetableArtifact.promotion.mode, "CHANGE_OWNER_APPROVED");
     assert.equal(promoted.sourceTimetableArtifact.promotion.previousArtifactSha256, previousSha);
+    assert.equal(
+      promoted.sourceTimetableArtifact.promotion.previousArtifactPath,
+      `tools/datapack/sources/${previous.artifactId}.json`,
+    );
     assert.deepEqual(await readFile(promoted.artifactPath), Buffer.from(candidateBytes));
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -1370,6 +1374,12 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
       (candidate) => { candidate.stationRosters[0].stations[0].corridorSequence = 99; },
       (candidate) => { candidate.stationSequences[0].stops[0].nameKo = "변조역"; },
       (candidate) => { candidate.stationSequences[0].stops[0].corridorSequence = 99; },
+      (candidate) => {
+        candidate.stationSequences[0].stops[1].stationId = candidate.stationSequences[0].stops[0].stationId;
+      },
+      (candidate) => {
+        candidate.stationSequences[0].stops[1].corridorSequence = candidate.stationSequences[0].stops[0].corridorSequence;
+      },
       (candidate) => { candidate.stationSequences[0].stops[0].arrivalAt = "2026-07-18T08:01:00+09:00"; },
       (candidate) => { candidate.stationSequences[0].stops[0].stopSequence = 2; },
       (candidate) => { candidate.stationSequences[0].originStationName = "변조역"; },
@@ -1419,6 +1429,46 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
       } finally {
         await rm(dir, { recursive: true, force: true });
       }
+    }
+  });
+
+  await context.test("인접 stop 시각 단조성 tamper", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-stop-order-"));
+    try {
+      const candidate = sourceCandidate();
+      const sequence = candidate.stationSequences.find(({ dayCd, trainNumber }) => (
+        dayCd === "8" && trainNumber === "2001"
+      ));
+      const stop = sequence.stops[1];
+      stop.arrivalAt = "2026-07-16T07:00:00+09:00";
+      stop.departureAt = stop.arrivalAt;
+      stop.arrivalSeconds = 25_200;
+      stop.departureSeconds = 25_200;
+      const stopTime = candidate.transitStopTimes.find(({ tripId, stopSequence }) => (
+        tripId === "route-line-54a7b980b7c3-up-2001-8" && stopSequence === 2
+      ));
+      stopTime.arrivalSeconds = stop.arrivalSeconds;
+      stopTime.departureSeconds = stop.departureSeconds;
+      const tuple = candidate.normalizedSnapshotSets.find(({ dayCd }) => dayCd === "8")
+        .sets.timetableTupleSet.find(([, trainNumber, stationId]) => (
+          trainNumber === "2001" && stationId === CHUNCHEON_STATION_ID
+        ));
+      tuple[3] = stop.arrivalSeconds;
+      tuple[4] = stop.departureSeconds;
+      rehashCandidate(candidate);
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        ...ownerApproval(candidate),
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /CANONICAL_CORRIDOR_AUTHORITY_INVALID/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
   });
 

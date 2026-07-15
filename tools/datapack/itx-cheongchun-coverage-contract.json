@@ -365,6 +365,7 @@
     "promotion": {
       "mode": "UNCHANGED_AUTO",
       "previousArtifactSha256": "cc11088e48235a8d2eccc55758a2b002b0fb5eb691aa55430e701fa01fd59201",
+      "previousArtifactPath": "tools/datapack/sources/itx-cheongchun-source-timetable-20260715104320157.json",
       "approvalUrl": null,
       "approvedArtifactSha256": null
     }
