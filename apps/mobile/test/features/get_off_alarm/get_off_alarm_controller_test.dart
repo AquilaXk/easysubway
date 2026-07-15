@@ -60,6 +60,7 @@ class _RecordingStateRepository implements GetOffAlarmStateRepository {
   Object? saveError;
   Object? clearError;
   int clearCount = 0;
+  int saveCount = 0;
 
   @override
   Future<void> clearActive() async {
@@ -82,12 +83,28 @@ class _RecordingStateRepository implements GetOffAlarmStateRepository {
 
   @override
   Future<void> saveActive(GetOffAlarmSubscription subscription) async {
+    saveCount += 1;
     final error = saveError;
     if (error != null) {
       throw error;
     }
     active = subscription;
   }
+}
+
+GetOffAlarmSubscription _withRouteId(
+  GetOffAlarmSubscription subscription,
+  String routeId,
+) {
+  return GetOffAlarmSubscription(
+    routeId: routeId,
+    transferAlarmEnabled: subscription.transferAlarmEnabled,
+    scheduledCount: subscription.scheduledCount,
+    scheduleMode: subscription.scheduleMode,
+    inexactNotice: subscription.inexactNotice,
+    destination: subscription.destination,
+    transfers: subscription.transfers,
+  );
 }
 
 class _StubExactAlarmGate implements ExactAlarmPermissionGate {
@@ -392,7 +409,7 @@ void main() {
     expect(exactAlarmGate.isPermittedCalls, 0);
 
     exactAlarmGate.permitted = false;
-    await c.refresh(stops: stops(), transferAlarmEnabled: true);
+    await c.refresh(routeId: 'r1', stops: stops());
 
     expect(exactAlarmGate.requestCalls, 1);
     expect(exactAlarmGate.isPermittedCalls, 1);
@@ -416,7 +433,7 @@ void main() {
     await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
     permission.status = NotificationPermissionStatus.denied;
 
-    await c.refresh(stops: stops(), transferAlarmEnabled: true);
+    await c.refresh(routeId: 'r1', stops: stops());
 
     expect(permission.requestCalls, 1);
     expect(permission.statusCalls, 1);
@@ -446,6 +463,7 @@ void main() {
     final cancelCallsBeforeRefresh = notifier.cancelAllCount;
 
     await c.refresh(
+      routeId: 'r1',
       stops: [
         GetOffAlarmStop(
           stationId: 'transfer',
@@ -454,7 +472,6 @@ void main() {
           kind: GetOffAlarmKind.transfer,
         ),
       ],
-      transferAlarmEnabled: true,
     );
 
     expect(notifier.scheduleCalls, scheduleCallsBeforeRefresh);
@@ -462,6 +479,111 @@ void main() {
     expect(c.state, same(stateBeforeRefresh));
     expect(stateRepository.active, same(subscriptionBeforeRefresh));
     expect(gate.isPermittedCalls, 0);
+  });
+
+  for (final mismatch in [
+    (
+      name: 'persisted route만 다르면',
+      controllerRouteId: 'r1',
+      persistedRouteId: 'r2',
+      inputRouteId: 'r1',
+    ),
+    (
+      name: 'controller route만 다르면',
+      controllerRouteId: 'r2',
+      persistedRouteId: 'r1',
+      inputRouteId: 'r1',
+    ),
+    (
+      name: '입력 route만 다르면',
+      controllerRouteId: 'r1',
+      persistedRouteId: 'r1',
+      inputRouteId: 'r2',
+    ),
+  ]) {
+    test('refresh는 ${mismatch.name} routeMismatch로 기존 알림과 구독을 보존한다', () async {
+      final stateRepository = _RecordingStateRepository();
+      final c = GetOffAlarmController(
+        notifier: notifier,
+        permissionGate: _StubExactAlarmGate(true),
+        notificationPermissionProvider: _StubNotificationPermissionProvider(
+          NotificationPermissionStatus.granted,
+        ),
+        repository: stateRepository,
+        now: () => now,
+      );
+      addTearDown(c.dispose);
+      await c.enable(
+        routeId: mismatch.controllerRouteId,
+        stops: stops(),
+        transferAlarmEnabled: true,
+      );
+      stateRepository.active = _withRouteId(
+        stateRepository.active!,
+        mismatch.persistedRouteId,
+      );
+      final subscriptionBefore = stateRepository.active;
+      final pendingBefore = List<ScheduledGetOffAlarm>.of(
+        notifier.scheduledAlarms!,
+      );
+      final scheduleCallsBefore = notifier.scheduleCalls;
+      final cancelCallsBefore = notifier.cancelAllCount;
+      final saveCallsBefore = stateRepository.saveCount;
+      final clearCallsBefore = stateRepository.clearCount;
+
+      final result = await c.refresh(
+        routeId: mismatch.inputRouteId,
+        stops: stops(),
+      );
+
+      expect(result, GetOffAlarmRefreshResult.routeMismatch);
+      expect(notifier.scheduleCalls, scheduleCallsBefore);
+      expect(notifier.cancelAllCount, cancelCallsBefore);
+      expect(stateRepository.saveCount, saveCallsBefore);
+      expect(stateRepository.clearCount, clearCallsBefore);
+      expect(stateRepository.active, same(subscriptionBefore));
+      expect(notifier.scheduledAlarms, pendingBefore);
+    });
+  }
+
+  test('route 전환 뒤 queued된 이전 route refresh는 routeMismatch로 거부한다', () async {
+    final gate = _BlockingRefreshExactAlarmGate();
+    final stateRepository = _RecordingStateRepository();
+    final c = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: gate,
+      notificationPermissionProvider: _StubNotificationPermissionProvider(
+        NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => now,
+    );
+    addTearDown(c.dispose);
+    await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
+
+    final inFlight = c.refresh(routeId: 'r1', stops: stops());
+    await gate.isPermittedStarted.future;
+    final transition = c.enable(
+      routeId: 'r2',
+      stops: stops(),
+      transferAlarmEnabled: false,
+    );
+    final stale = c.refresh(routeId: 'r1', stops: stops());
+    gate.permitted.complete(true);
+
+    expect(await inFlight, GetOffAlarmRefreshResult.refreshed);
+    await transition;
+    final scheduleCallsBeforeStale = notifier.scheduleCalls;
+    final saveCallsBeforeStale = stateRepository.saveCount;
+    expect(await stale, GetOffAlarmRefreshResult.routeMismatch);
+
+    expect(notifier.scheduleCalls, scheduleCallsBeforeStale);
+    expect(notifier.cancelAllCount, 0);
+    expect(stateRepository.saveCount, saveCallsBeforeStale);
+    expect(stateRepository.clearCount, 0);
+    expect(stateRepository.active?.routeId, 'r2');
+    expect(stateRepository.active?.transferAlarmEnabled, isFalse);
+    expect(c.state.activeRouteId, 'r2');
   });
 
   test('예약 성공이 0건이면 enabled와 활성 구독을 저장하지 않는다', () async {
@@ -676,7 +798,7 @@ void main() {
     addTearDown(c.dispose);
     await c.enable(routeId: 'r1', stops: stops(), transferAlarmEnabled: true);
 
-    final refresh = c.refresh(stops: stops(), transferAlarmEnabled: true);
+    final refresh = c.refresh(routeId: 'r1', stops: stops());
     await gate.isPermittedStarted.future;
     final disable = c.disable();
     gate.permitted.complete(true);
@@ -706,7 +828,7 @@ void main() {
 
     final disable = c.disable();
     await Future<void>.delayed(Duration.zero);
-    final refresh = c.refresh(stops: stops(), transferAlarmEnabled: true);
+    final refresh = c.refresh(routeId: 'r1', stops: stops());
     await Future<void>.delayed(Duration.zero);
     notifier.cancelBarrier!.complete();
     await Future.wait([disable, refresh]);
