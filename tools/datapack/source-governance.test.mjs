@@ -123,6 +123,34 @@ test("snapshot diff는 hash·시각·row·coverage 변화를 결정적으로 기
   });
 });
 
+test("sourceUpdatedAt은 표기가 달라도 같은 UTC instant면 변경이 아니다", () => {
+  const sameInstant = snapshot({
+    snapshotId: "snapshot-a-2",
+    previousSnapshotId: first.snapshotId,
+    retrievedAt: "2026-07-02T00:00:00Z",
+    sourceUpdatedAt: "2026-07-01T00:00:00.000Z",
+  });
+
+  assert.deepEqual(buildSnapshotDiff(first, sameInstant), {
+    status: "NO_CHANGE",
+    rawHashChanged: false,
+    schemaHashChanged: false,
+    requestHashChanged: false,
+    sourceUpdatedAtChanged: false,
+    rowDelta: 0,
+    coverageDelta: 0,
+  });
+});
+
+test("lineage diff는 JSON 속성 순서가 달라도 같은 구조와 값이면 통과한다", () => {
+  const reordered = {
+    ...second,
+    diffSummary: Object.fromEntries(Object.entries(second.diffSummary).reverse()),
+  };
+
+  assert.doesNotThrow(() => validateLineage([first, reordered]));
+});
+
 test("snapshot diff와 lineage는 필수 hash·sourceUpdatedAt 형식을 검증한다", () => {
   for (const invalid of [
     { rawSha256: undefined },

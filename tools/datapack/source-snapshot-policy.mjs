@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 export function requiredCredentialFreeObjectUri(value, label) {
@@ -29,7 +31,8 @@ export function buildSnapshotDiff(previous, next) {
     rawHashChanged: previous.rawSha256 !== next.rawSha256,
     schemaHashChanged: previous.schemaFingerprint !== next.schemaFingerprint,
     requestHashChanged: previous.redactedRequestFingerprint !== next.redactedRequestFingerprint,
-    sourceUpdatedAtChanged: previous.sourceUpdatedAt !== next.sourceUpdatedAt,
+    sourceUpdatedAtChanged: optionalUtcInstant(previous.sourceUpdatedAt, "previous.sourceUpdatedAt")
+      !== optionalUtcInstant(next.sourceUpdatedAt, "next.sourceUpdatedAt"),
     rowDelta: requiredNonNegativeInteger(next.rowCount, "rowCount")
       - requiredNonNegativeInteger(previous.rowCount, "previous.rowCount"),
     coverageDelta: requiredNonNegativeInteger(next.coverageCount, "coverageCount")
@@ -72,7 +75,7 @@ export function validateLineage(snapshots) {
     childIds.push(snapshot.snapshotId);
     if (childIds.length > 1) throw new Error("SOURCE_LINEAGE_BROKEN: snapshot fork");
     children.set(previous.snapshotId, childIds);
-    if (JSON.stringify(snapshot.diffSummary) !== JSON.stringify(buildSnapshotDiff(previous, snapshot))) {
+    if (!isDeepStrictEqual(snapshot.diffSummary, buildSnapshotDiff(previous, snapshot))) {
       throw new Error("SOURCE_DIFF_MISSING: snapshot diff");
     }
   }
@@ -101,6 +104,10 @@ export function validateLineage(snapshots) {
     chainsBySource[sourceId] = chain;
   }
   return { headsBySource, chainsBySource };
+}
+
+function optionalUtcInstant(value, label) {
+  return value == null ? null : requiredUtcInstant(value, label);
 }
 
 function validateDiffSnapshot(snapshot, label, allowLegacyRootCoverage = false) {
