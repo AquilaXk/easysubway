@@ -984,6 +984,30 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   // on the runner or on the server (issue #1686).
   assert.match(workflow, /CD Build image \/ Build and push arm64 image/);
   assert.match(workflow, /ghcr\.io\/aquilaxk\/easysubway-backend/);
+  assert.match(workflow, /docker buildx create --use/);
+  assert.match(workflow, /docker buildx build \\/);
+  assert.match(workflow, /--platform linux\/arm64 \\/);
+  assert.match(workflow, /--attest type=sbom \\/);
+  assert.match(workflow, /--provenance=true \\/);
+  assert.match(workflow, /--metadata-file "\$\{metadata_file\}" \\/);
+  assert.match(workflow, /--push \\/);
+  assert.match(workflow, /backend-build-metadata\.json/);
+  assert.match(workflow, /Buildx metadata digest does not match the pushed manifest/);
+  assert.match(workflow, /backend-image-evidence/);
+  assert.match(workflow, /docker buildx imagetools inspect "\$\{tag\}" --raw/);
+  assert.match(workflow, /--format '\{\{\.Manifest\.Digest\}\}'/);
+  assert.match(
+    workflow,
+    /--format '\{\{range \.Manifest\.Manifests\}\}\{\{if eq \.Platform\.OS "linux"\}\}\{\{\.Platform\.OS\}\}\/\{\{\.Platform\.Architecture\}\}/,
+  );
+  assert.doesNotMatch(workflow, /\.Manifest\.digest|\.Manifest\.manifests|\.platform\.(?:os|architecture)/);
+  assert.match(workflow, /printf 'base_image=%s\\n' "\$\{base_image\}"/);
+  assert.match(workflow, /printf 'image_digest=%s\\n' "\$\{digest\}"/);
+  assert.match(workflow, /name: backend-image-identity-\$\{\{ needs\.plan\.outputs\.sha \}\}/);
+  assert.match(
+    workflow,
+    /if digest="\$\(docker buildx imagetools inspect[\s\S]*?else[\s\S]*?docker buildx build[\s\S]*?^          fi[\s\S]*?arch="\$\(docker buildx imagetools inspect/m,
+  );
   assert.match(workflow, /if \[\[ "\$\{arch\}" != "linux\/arm64" \]\]; then/);
   assert.match(workflow, /CD Deploy \/ Pull backend image by digest/);
   assert.match(workflow, /docker tag "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}" "easysubway-backend:\$\{DEPLOY_SHA\}"/);
@@ -2642,6 +2666,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "deployed-ad-event-edge-rate-limit",
     "deployed-ad-event-origin-bypass-denial",
     "deployed-ad-event-privacy-redaction",
+    "container-hardening-negative-controls",
   ]);
   assert.match(abusePenetrationRehearsalGate.latestQaEvidenceStatus.notClosingReasonKo, /#1022/);
   assert.equal(abusePenetrationRehearsalGate.latestQaEvidenceStatus.redactionPolicy.secretValuesPrinted, false);
@@ -2650,7 +2675,12 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "raw signed URL",
     ),
   );
-  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020"]);
+  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
+  assert.ok(
+    abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
+      "container-hardening-negative-controls",
+    ),
+  );
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.acceptedArtifactSources, [
     "rc-aab",
     "play-generated-apk",
@@ -2940,7 +2970,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(rcEvidenceManifestContract.releaseGate, "rc-evidence-manifest");
   assert.equal(rcEvidenceManifestContract.issue, 1020);
   assert.deepEqual(rcEvidenceManifestContract.parentIssues, [1014, 1020]);
-  assert.deepEqual(rcEvidenceManifestContract.linkedEvidenceIssues, [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022]);
+  assert.deepEqual(rcEvidenceManifestContract.linkedEvidenceIssues, [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1914]);
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
   assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
@@ -2975,6 +3005,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       { id: "post_launch_operations", sourceIssue: 1019 },
       { id: "android_release_quality", sourceIssue: 1021 },
       { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
+      { id: "container_hardening", sourceIssue: 1914 },
     ],
   );
   assert.equal(rcEvidenceManifestContract.readinessPolicy.openAndroidP0BlocksGo, true);
@@ -3507,6 +3538,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       { id: "post_launch_operations", sourceIssue: 1019 },
       { id: "android_release_quality", sourceIssue: 1021 },
       { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
+      { id: "container_hardening", sourceIssue: 1914 },
     ],
   );
   assert.ok(manifest.evidenceEntries.every((entry) => entry.device === "local_android_emulator"));
@@ -8207,11 +8239,17 @@ test("backend release image는 bootJar 산출물만 포함하는 runtime image�
   const dockerfile = read("backend/Dockerfile");
   const dockerignore = read("backend/.dockerignore");
 
-  assert.match(dockerfile, /^FROM eclipse-temurin:21-jre$/m);
+  assert.match(
+    dockerfile,
+    /^FROM eclipse-temurin:21-jre@sha256:[0-9a-f]{64}$/m,
+  );
+  assert.match(dockerfile, /^RUN groupadd --system --gid 10001 app && \\$/m);
+  assert.match(dockerfile, /useradd --uid 10001 --gid 10001 --no-create-home --home-dir \/nonexistent --shell \/usr\/sbin\/nologin app/);
   assert.match(dockerfile, /^WORKDIR \/app$/m);
-  assert.match(dockerfile, /^COPY build\/libs\/\*\.jar app\.jar$/m);
+  assert.match(dockerfile, /^COPY --chown=10001:10001 build\/libs\/\*\.jar app\.jar$/m);
   assert.match(dockerfile, /^EXPOSE 8080$/m);
   assert.match(dockerfile, /^ENV SPRING_PROFILES_ACTIVE=prod$/m);
+  assert.match(dockerfile, /^USER 10001:10001$/m);
   assert.match(dockerfile, /^ENTRYPOINT \["java", "-jar", "\/app\/app\.jar"\]$/m);
   assert.doesNotMatch(dockerfile, /EASYSUBWAY_/);
   assert.doesNotMatch(dockerfile, /COPY \. \./);
@@ -8220,6 +8258,12 @@ test("backend release image는 bootJar 산출물만 포함하는 runtime image�
   assert.match(dockerignore, /^!build\/libs$/m);
   assert.match(dockerignore, /^!build\/libs\/\*\.jar$/m);
   assert.doesNotMatch(dockerignore, /^!\.env/m);
+
+  const dependabot = read(".github/dependabot.yml");
+  assert.match(
+    dependabot,
+    /package-ecosystem: "docker"\s+directory: "\/backend"\s+schedule:\s+interval: "weekly"\s+day: "tuesday"\s+time: "06:23"\s+timezone: "Asia\/Seoul"/,
+  );
 });
 
 test("OSV baseline은 기존 취약점 ID를 lockfile 위치별로 좁게 예외 처리한다", () => {
