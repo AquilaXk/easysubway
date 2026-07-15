@@ -201,6 +201,11 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
 test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 중단한다", async () => {
   const workflow = await readFile(cdWorkflowPath, "utf8");
 
+  assert.match(workflow, /CD Deploy \/ Set up Node\.js/);
+  assert.match(
+    workflow,
+    /CD Deploy \/ Set up Node\.js[\s\S]*?actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*?node-version: "24"/,
+  );
   assert.match(workflow, /CD Deploy \/ Detect route purge migration/);
   assert.match(
     workflow,
@@ -243,12 +248,15 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   assert.match(workflow, /while true; do[\s\S]*?require-successful-workflow-run\.mjs[\s\S]*?break[\s\S]*?sleep 15[\s\S]*?done/);
 
   const rangeDetectionIndex = workflow.indexOf('git diff --name-only "${current_sha}" "${DEPLOY_SHA}"');
+  const nodeSetupIndex = workflow.indexOf("CD Deploy / Set up Node.js");
   const latchIndex = workflow.indexOf("CD Deploy / Require route purge snapshot evidence");
   const mutationPreparationIndex = workflow.indexOf("CD Deploy / Restore GitHub Actions dotenv secret");
 
   assert.notEqual(rangeDetectionIndex, -1);
+  assert.notEqual(nodeSetupIndex, -1);
   assert.notEqual(latchIndex, -1);
   assert.notEqual(mutationPreparationIndex, -1);
+  assert.ok(nodeSetupIndex < latchIndex, "Node.js must be available before the snapshot evidence gate");
   assert.ok(latchIndex < mutationPreparationIndex, "snapshot evidence must gate production mutation");
 });
 
