@@ -15,7 +15,8 @@ if (!outputPath) {
   fail("--output is required");
 }
 
-const testedAt = arg("testedAt", "tested-at") ?? new Date().toISOString();
+const generatedAt = new Date().toISOString();
+const testedAt = arg("testedAt", "tested-at") ?? generatedAt;
 const evidenceRoot = normalizeEvidenceRoot(
   arg("evidenceRoot", "evidence-root") ?? ".codex/evidence/release/rc-evidence-manifest/<rc-or-run>/",
 );
@@ -63,6 +64,7 @@ const evidenceEntries = requiredEvidenceEntries(
   arg("androidVersion", "android-version"),
   evidenceStatuses,
   evidencePaths,
+  generatedAt,
 );
 const blockers = [
   ...identityBlockers(identity),
@@ -78,7 +80,7 @@ const manifest = {
   issue: 1020,
   applicationId: "easysubway",
   androidApplicationId: "com.easysubway.app",
-  generatedAt: new Date().toISOString(),
+  generatedAt,
   ...identity,
   rcIdentity: identity,
   evidenceEntries,
@@ -217,7 +219,7 @@ function parsePairs(value) {
   }));
 }
 
-function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion, statuses, paths) {
+function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion, statuses, paths, generatedAt) {
   const sourceEntries = [
     ["rc_device_qa", 571],
     ["production_datapack", 547],
@@ -254,10 +256,11 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion,
     if (statuses[id] === "SATISFIED" && (
       !Number.isFinite(Date.parse(evidenceTestedAt))
       || !Number.isFinite(Date.parse(evidenceExpiresWhen))
+      || Date.parse(evidenceTestedAt) > Date.parse(generatedAt)
       || Date.parse(evidenceExpiresWhen) < Date.parse(baseTestedAt)
       || Date.parse(evidenceExpiresWhen) < Date.parse(evidenceTestedAt)
     )) {
-      fail(`SATISFIED evidence entry has invalid or expired evidenceValidity: ${id}`);
+      fail(`SATISFIED evidence entry has invalid, future, or expired evidenceValidity: ${id}`);
     }
     return {
       id,

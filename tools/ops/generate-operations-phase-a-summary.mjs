@@ -52,6 +52,13 @@ const validatedSignals = new Map(
 const validatedChannels = new Map(
   (support.latestQaEvidenceSummary.channelEvidence ?? []).map((item) => [item.channelId, item]),
 );
+const requiredEvidence = postLaunch.preLaunchReadiness.requiredEvidence ?? [];
+const evidenceSummary = postLaunch.preLaunchReadiness.evidenceSummary ?? [];
+const evidenceSummaryById = new Map(evidenceSummary.map((item) => [item.id, item]));
+const evidenceSummaryReady = new Set(requiredEvidence).size === requiredEvidence.length
+  && requiredEvidence.length === evidenceSummary.length
+  && evidenceSummaryById.size === evidenceSummary.length
+  && requiredEvidence.every((evidenceId) => evidenceSummaryById.get(evidenceId)?.status === "PASS");
 const signalEvidenceReady = validatedSignals.size === observability.signals.length
   && observability.signals.every((signal) => {
     const item = validatedSignals.get(signal.id);
@@ -80,7 +87,7 @@ const ready = postLaunch.preLaunchReadiness.status === "PASS"
   && refreshBindingsReady
   && signalEvidenceReady
   && channelEvidenceReady
-  && postLaunch.preLaunchReadiness.evidenceSummary.every((item) => item.status === "PASS")
+  && evidenceSummaryReady
   && support.latestQaEvidenceSummary.remainingSupportReadiness.length === 0
   && support.latestQaEvidenceSummary.helpScreenDeviceQa.result === "PASS"
   && String(support.latestQaEvidenceSummary.helpScreenDeviceQa.versionName) === String(identity.appVersionName)
@@ -125,7 +132,7 @@ const summary = {
   artifactIdentity,
   preLaunchReadiness: {
     status: "PASS",
-    evidenceIds: postLaunch.preLaunchReadiness.requiredEvidence,
+    evidenceIds: requiredEvidence,
   },
   postLaunchObservation: {
     status: "PENDING_PUBLIC_RELEASE",

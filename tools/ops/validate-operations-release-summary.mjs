@@ -187,7 +187,7 @@ function assertObservability(summary, gate, requirePass) {
   }
 }
 
-function assertPostLaunch(summary, gate, artifactIdentity, requirePass) {
+function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
   const preLaunch = required(summary.preLaunchReadiness, "preLaunchReadiness");
   if (!STATUS.has(preLaunch.status)) {
     throw new Error("preLaunchReadiness.status must be a release gate status");
@@ -198,9 +198,19 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass) {
   if ((requirePass || summary.status === "PASS") && preLaunch.status !== "PASS") {
     throw new Error("preLaunchReadiness.status must be PASS");
   }
+  const requiredEvidence = required(gate.preLaunchReadiness.requiredEvidence, "gate.preLaunchReadiness.requiredEvidence");
+  const evidenceSummary = required(gate.preLaunchReadiness.evidenceSummary, "gate.preLaunchReadiness.evidenceSummary");
+  const evidenceSummaryById = new Map(evidenceSummary.map((item) => [item.id, item]));
+  const canonicalEvidenceReady = new Set(requiredEvidence).size === requiredEvidence.length
+    && requiredEvidence.length === evidenceSummary.length
+    && evidenceSummaryById.size === evidenceSummary.length
+    && requiredEvidence.every((evidenceId) => evidenceSummaryById.get(evidenceId)?.status === "PASS");
+  if (preLaunch.status === "PASS" && !canonicalEvidenceReady) {
+    throw new Error("canonical pre-launch evidence summary must exactly match requiredEvidence with PASS");
+  }
   const preLaunchEvidence = new Set(required(preLaunch.evidenceIds, "preLaunchReadiness.evidenceIds"));
   if (preLaunch.status === "PASS") {
-    for (const evidenceId of gate.preLaunchReadiness.requiredEvidence) {
+    for (const evidenceId of requiredEvidence) {
       if (!preLaunchEvidence.has(evidenceId)) {
         throw new Error(`preLaunchReadiness.evidenceIds missing ${evidenceId}`);
       }
@@ -236,7 +246,7 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass) {
     if (!isRfc3339Timestamp(publicReleaseIdentity.publishedAt)) {
       throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must be an RFC 3339 timestamp");
     }
-    if (Date.parse(publicReleaseIdentity.publishedAt) > Date.now()) {
+    if (Date.parse(publicReleaseIdentity.publishedAt) > now) {
       throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must not be in the future");
     }
     required(publicReleaseIdentity.versionCode, "postLaunchObservation.publicReleaseIdentity.versionCode");
@@ -273,7 +283,7 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass) {
       if (!isRfc3339Timestamp(item.observedAt)) {
         throw new Error(`postLaunchReviews.${window.id}.observedAt must be an RFC 3339 timestamp`);
       }
-      if (Date.parse(item.observedAt) > Date.now()) {
+      if (Date.parse(item.observedAt) > now) {
         throw new Error(`postLaunchReviews.${window.id}.observedAt must not be in the future`);
       }
       const dueAt = Date.parse(publicReleaseIdentity.publishedAt) + durationMillis(window.afterPublicRelease);
@@ -426,7 +436,7 @@ async function main() {
   const gates = { observability, postLaunch, support };
   assertNoSensitiveSummary(summary, gates);
   assertObservability(summary, observability, requirePass);
-  assertPostLaunch(summary, postLaunch, artifactIdentity, requirePass);
+  assertPostLaunch(summary, postLaunch, artifactIdentity, requirePass, now);
   assertSupport(summary, support, artifactIdentity, requirePass);
 }
 

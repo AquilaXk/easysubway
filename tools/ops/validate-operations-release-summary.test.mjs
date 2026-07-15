@@ -238,6 +238,66 @@ test("operations release summary validator rejects help-screen device QA from a 
   );
 });
 
+test("operations release summary validator rejects required evidence without a canonical PASS summary", async () => {
+  await assert.rejects(
+    withSummary(validSummary(), async (summaryPath) => {
+      const gate = structuredClone(postLaunchGate);
+      gate.preLaunchReadiness.requiredEvidence.push("new-unproven-required-evidence");
+      const summary = JSON.parse(readFileSync(summaryPath, "utf8"));
+      summary.preLaunchReadiness.evidenceIds.push("new-unproven-required-evidence");
+      await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+      const gatePath = path.join(path.dirname(summaryPath), "post-launch-gate.json");
+      await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--post-launch-gate",
+        gatePath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /canonical pre-launch evidence summary must exactly match requiredEvidence with PASS/,
+  );
+});
+
+test("operations release summary validator uses --now for public release timestamps", async () => {
+  const summary = validSummary();
+  summary.postLaunchObservation.status = "IN_PROGRESS";
+  summary.postLaunchObservation.publicReleaseIdentity.publishedAt = "2026-07-20T00:00:00+09:00";
+  summary.postLaunchReviews = [];
+
+  await withSummary(summary, (summaryPath) =>
+    execFileAsync(process.execPath, [
+      "tools/ops/validate-operations-release-summary.mjs",
+      "--summary",
+      summaryPath,
+      "--now",
+      "2026-07-21T00:00:00+09:00",
+      "--require-pass",
+    ], { cwd: root }),
+  );
+});
+
+test("operations release summary validator uses --now for review timestamps", async () => {
+  const summary = validSummary();
+  summary.postLaunchObservation.status = "IN_PROGRESS";
+  summary.postLaunchObservation.publicReleaseIdentity.publishedAt = "2026-07-14T00:00:00+09:00";
+  summary.postLaunchReviews = summary.postLaunchReviews.slice(0, 1);
+  summary.postLaunchReviews[0].observedAt = "2026-07-20T00:00:00+09:00";
+
+  await withSummary(summary, (summaryPath) =>
+    execFileAsync(process.execPath, [
+      "tools/ops/validate-operations-release-summary.mjs",
+      "--summary",
+      summaryPath,
+      "--now",
+      "2026-07-21T00:00:00+09:00",
+      "--require-pass",
+    ], { cwd: root }),
+  );
+});
+
 test("operations release summary validator compares artifact identity independent of JSON key order", async () => {
   const summary = validSummary();
   summary.postLaunchReviews[0].artifactIdentity = {

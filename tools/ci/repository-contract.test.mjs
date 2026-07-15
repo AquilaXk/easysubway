@@ -3677,6 +3677,31 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(manifest.evidenceEntries.filter((entry) => entry.id !== "post_launch_operations")
     .every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
 
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "PASS",
+    issue: 1019,
+    evidenceValidity: {
+      testedAt: "2999-01-01T00:00:00Z",
+      expiresWhen: "2999-01-15T00:00:00Z",
+    },
+  }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-06-26T00:00:00.000Z",
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /future.*evidenceValidity/,
+  );
+
   const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");
   await mkdir(path.join(incompleteRepo, "apps/mobile/release"), { recursive: true });
   const incompleteScope = structuredClone(launchScope);
