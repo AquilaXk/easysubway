@@ -46,7 +46,7 @@
             {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "fc9e00164b711954906724a0141fb4f3ebbe3cb875e6d4f0e4f6d34987e8a01a"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "8b65d172e8d6b2cf90231dab29fe2aebf092ed52a142dd13c383e6bcb473b013"},
-            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "3f184b50500fa3649237ec22fe27b1383a503f9eb7ec1d0c2044271532268924"},
+            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "22c2d85c0c69c246d5f9d053b6233dc9501b770cd0f1eed738c8dc71041aeed4"},
             {"path": "tools/release/summary-validation-utils.mjs", "sha256": "d6c8980536e6aba14d9d2f41879339c434759bfa986aca2045d6bf5909fe0d8e"}
           ]
         },

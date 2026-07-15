@@ -147,7 +147,9 @@ function assertIdentity(
   ]) {
     required(identity[field], `${path}.${field}`);
   }
-  if (!backendIdentityFieldsAnyOf.some((field) => identity[field] !== undefined && identity[field] !== null)) {
+  if (!backendIdentityFieldsAnyOf.some((field) => (
+    typeof identity[field] === "string" && identity[field].trim().length > 0
+  ))) {
     throw new Error(`${path} must include one of ${backendIdentityFieldsAnyOf.join(", ")}`);
   }
   return identity;
@@ -283,6 +285,14 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
       && reviews.some((item, index) => item.reviewWindowId !== gate.reviewWindows[index]?.id)
     ) {
       throw new Error("IN_PROGRESS postLaunchReviews must be a chronological prefix of reviewWindows");
+    }
+    if (requirePass && observation.status === "IN_PROGRESS") {
+      for (const window of gate.reviewWindows) {
+        const dueAt = Date.parse(publicReleaseIdentity.publishedAt) + durationMillis(window.afterPublicRelease);
+        if (dueAt <= now && !byId.has(window.id)) {
+          throw new Error(`postLaunchReviews.${window.id} is overdue and missing`);
+        }
+      }
     }
     const windows = observation.status === "PASS"
       ? gate.reviewWindows

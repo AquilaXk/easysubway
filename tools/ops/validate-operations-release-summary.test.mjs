@@ -309,7 +309,7 @@ test("operations release summary validator uses --now for public release timesta
       "--summary",
       summaryPath,
       "--now",
-      "2026-07-21T00:00:00+09:00",
+      "2026-07-20T01:00:00+09:00",
       "--require-pass",
     ], { cwd: root }),
   );
@@ -319,8 +319,8 @@ test("operations release summary validator uses --now for review timestamps", as
   const summary = validSummary();
   summary.postLaunchObservation.status = "IN_PROGRESS";
   summary.postLaunchObservation.publicReleaseIdentity.publishedAt = "2026-07-15T00:00:00+09:00";
-  summary.postLaunchReviews = summary.postLaunchReviews.slice(0, 1);
-  summary.postLaunchReviews[0].observedAt = "2026-07-20T00:00:00+09:00";
+  summary.postLaunchReviews = summary.postLaunchReviews.slice(0, 2);
+  for (const review of summary.postLaunchReviews) review.observedAt = "2026-07-20T00:00:00+09:00";
 
   await withSummary(summary, (summaryPath) =>
     execFileAsync(process.execPath, [
@@ -372,6 +372,26 @@ test("operations release summary validator accepts backendImageDigest as the fin
       summaryPath,
       "--require-pass",
     ], { cwd: root }),
+  );
+});
+
+test("operations release summary validator rejects an empty backend identity", async () => {
+  const summary = validSummary();
+  summary.artifactIdentity.backendArtifactSha256 = "";
+  for (const review of summary.postLaunchReviews) review.artifactIdentity.backendArtifactSha256 = "";
+
+  await assert.rejects(
+    withSummary(summary, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--now",
+        "2026-09-01T00:00:00Z",
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /must include one of backendImageDigest, backendArtifactSha256/,
   );
 });
 
@@ -636,6 +656,8 @@ test("operations release summary validator accepts a partial Phase B observation
       "tools/ops/validate-operations-release-summary.mjs",
       "--summary",
       summaryPath,
+      "--now",
+      "2026-07-15T12:00:00+09:00",
       "--require-pass",
     ], { cwd: root }),
   );
@@ -668,8 +690,30 @@ test("operations release summary validator accepts Phase B in progress before th
       "tools/ops/validate-operations-release-summary.mjs",
       "--summary",
       summaryPath,
+      "--now",
+      "2026-07-15T01:00:00+09:00",
       "--require-pass",
     ], { cwd: root }),
+  );
+});
+
+test("operations release summary validator rejects an overdue missing Phase B review", async () => {
+  const summary = validSummary();
+  summary.postLaunchObservation.status = "IN_PROGRESS";
+  summary.postLaunchReviews = [];
+
+  await assert.rejects(
+    withSummary(summary, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        "tools/ops/validate-operations-release-summary.mjs",
+        "--summary",
+        summaryPath,
+        "--now",
+        "2026-07-16T00:00:01+09:00",
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /postLaunchReviews\.first_2h is overdue and missing/,
   );
 });
 
@@ -702,6 +746,8 @@ test("operations release summary validator rejects a failed Phase B review when 
         "tools/ops/validate-operations-release-summary.mjs",
         "--summary",
         summaryPath,
+        "--now",
+        "2026-07-15T12:00:00+09:00",
         "--require-pass",
       ], { cwd: root }),
     ),
