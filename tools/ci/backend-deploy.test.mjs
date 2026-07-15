@@ -405,6 +405,27 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /fail_backend_deployment\(\)/);
   assert.match(deploy, /fail_backend_deployment "backend_start_failed"/);
   assert.match(deploy, /fail_backend_deployment "observability_start_failed"/);
+  assert.match(deploy, /verify_runtime_hardening\(\)/);
+  assert.match(deploy, /runtime_services_hardened\(\)/);
+  assert.match(deploy, /docker inspect --format '\{\{\.Config\.User\}\}\|\{\{\.HostConfig\.ReadonlyRootfs\}\}\|\{\{json \.HostConfig\.Tmpfs\}\}\|\{\{json \.HostConfig\.CapDrop\}\}\|\{\{json \.HostConfig\.SecurityOpt\}\}'/);
+  assert.match(deploy, /docker exec "\$\{container_id\}" id -u/);
+  assert.match(deploy, /docker exec "\$\{container_id\}" id -g/);
+  assert.match(deploy, /docker exec "\$\{container_id\}" touch \/app\/app\.jar/);
+  assert.match(deploy, /docker exec "\$\{container_id\}" sh -c 'probe="\$\(mktemp \/tmp\/easysubway-hardening\.XXXXXX\)" && rm -f "\$probe"'/);
+  assert.match(deploy, /docker exec "\$\{container_id\}" cat \/proc\/1\/status/);
+  assert.match(deploy, /CapEff:/);
+  assert.match(deploy, /NoNewPrivs:/);
+  assert.ok(
+    deploy.indexOf("runtime_services_hardened()") < deploy.indexOf('if [[ "${current_sha}" == "${DEPLOY_SHA}"'),
+    "runtime hardening helper must be available to the same-SHA no-op path",
+  );
+  assert.match(deploy, /compose_services_running[\s\S]*&& runtime_services_hardened; then/);
+  assert.match(deploy, /if ! runtime_services_hardened; then/);
+  assert.match(deploy, /fail_backend_deployment "runtime_hardening_failed"/);
+  assert.ok(
+    deploy.indexOf('verify_runtime_hardening "${service}"') < deploy.indexOf('ready=0'),
+    "runtime hardening must pass before readiness completes the deployment",
+  );
   assert.match(deploy, /observability_ready=0/);
   assert.match(deploy, /compose_services_running "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /mktemp "\$\{DIAGNOSTICS_DIR\}\/\$\{DEPLOY_SHA\}-observability-\$\(date -u \+%Y%m%dT%H%M%SZ\)\.XXXXXX\.log"/);
@@ -465,4 +486,13 @@ test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인�
   assert.match(compose, /max-size: "10m"/);
   assert.match(compose, /postgres:\s*\n\s*condition: service_healthy/);
   assert.match(compose, /object-storage:\s*\n\s*condition: service_healthy/);
+
+  for (const service of ["backend", "back-worker"]) {
+    const block = compose.match(new RegExp(`\\n  ${service}:\\n[\\s\\S]*?(?=\\n  [a-z0-9-]+:\\n|\\nvolumes:)`))?.[0] ?? "";
+    assert.match(block, /^    user: "10001:10001"$/m, `${service} numeric user`);
+    assert.match(block, /^    read_only: true$/m, `${service} read-only rootfs`);
+    assert.match(block, /^    tmpfs:\s*\n      - \/tmp:rw,nosuid,nodev$/m, `${service} tmpfs`);
+    assert.match(block, /^    cap_drop:\s*\n      - ALL$/m, `${service} capabilities`);
+    assert.match(block, /^    security_opt:\s*\n      - no-new-privileges:true$/m, `${service} no-new-privileges`);
+  }
 });
