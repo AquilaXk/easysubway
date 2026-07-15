@@ -2030,7 +2030,7 @@ async function loadPromotedSourceArtifact(contractPath, repositoryRoot = repoRoo
     if (error?.code === "ENOENT") return null;
     throw error;
   }
-  return loadAdmittedSourceReference(contract, repositoryRoot);
+  return loadAdmittedSourceReference(validateCoverageContractAuthority(contract), repositoryRoot);
 }
 
 async function main() {

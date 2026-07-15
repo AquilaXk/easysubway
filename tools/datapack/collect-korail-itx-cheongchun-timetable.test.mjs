@@ -760,6 +760,26 @@ test("ITX CLI는 --previous-admitted 임의 baseline을 거부한다", async () 
   }
 });
 
+test("ITX CLI는 invalid coverage contract를 baseline authority로 사용하지 않는다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-cli-contract-authority-"));
+  const output = path.join(dir, "current.json");
+  try {
+    await writeCoverageContract(dir, '{"schemaVersion":1}\n');
+    await assert.rejects(runKorailItxCompletenessCli({
+      argv: [
+        "--day8-date", "20260715", "--day7-date", "20260718", "--day9-date", "20260719",
+        "--canonical-pack", path.join(dir, PACK_PATH), "--output", output,
+      ],
+      env: { DATA_GO_KR_SERVICE_KEY: "secret" },
+      repositoryRoot: dir,
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectImpl: async () => assert.fail("must reject before collection"),
+    }), /ITX_COVERAGE_CONTRACT_INVALID/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("ITX candidate builder의 실제 payload에서 생성한 5-set은 promotion 재검증을 통과한다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "itx-built-candidate-"));
   const template = sourceCandidate();
