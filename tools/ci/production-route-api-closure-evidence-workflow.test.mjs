@@ -59,6 +59,7 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(workflow, /snapshot-gate:[\s\S]*?permissions:\n\s+contents: read[\s\S]*?steps:/);
   assert.match(workflow, /snapshot-gate:[\s\S]*group: cd-production-deploy/);
   assert.match(workflow, /EXPECTED_DEPLOYED_SHA: \$\{\{ needs\.verify\.outputs\.deployed_sha \}\}/);
+  assert.match(workflow, /SNAPSHOT_REQUEST_SHA: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /snapshot-gate:[\s\S]*Checkout reviewed main[\s\S]*persist-credentials: false/);
   assert.doesNotMatch(workflow, /upload-artifact|workflow_dispatch/);
 
@@ -66,12 +67,11 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /^umask 077$/m);
   assert.match(snapshotGate, /if ! flock -w 300 9/);
   assert.match(snapshotGate, /could not acquire deploy lock within timeout/);
-  assert.match(snapshotGate, /existing snapshot backup or checksum file is missing/);
-  assert.match(snapshotGate, /existing snapshot backup checksum mismatch/);
   assert.match(snapshotGate, /EXPECTED_DEPLOYED_SHA/);
-  assert.match(snapshotGate, /marker_sha/);
+  assert.match(snapshotGate, /SNAPSHOT_REQUEST_SHA/);
+  assert.match(snapshotGate, /snapshot-\$\{SNAPSHOT_REQUEST_SHA\}\.env/);
+  assert.match(snapshotGate, /rm -f "\$\{MARKER_FILE\}"/);
   assert.match(snapshotGate, /current_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
-  assert.match(snapshotGate, /marker_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore/);
   assert.match(snapshotGate, /--pull never/);
@@ -110,6 +110,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /report_file/);
   assert.match(snapshotGate, /cat "\$\{report_file\}"/);
   assert.match(snapshotGate, /snapshot-complete/);
+  assert.match(snapshotGate, /snapshot_request_sha/);
+  assert.doesNotMatch(snapshotGate, /existing verified backup/);
   assert.doesNotMatch(snapshotGate, /\b(curl|scp)\b|upload-artifact/);
 
   const reportAppend = snapshotGate.indexOf('cat "${report_file}" >> "${SUMMARY_FILE}"');
@@ -122,18 +124,17 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
 test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 중단한다", async () => {
   const workflow = await readFile(cdWorkflowPath, "utf8");
 
-  assert.match(
-    workflow,
-    /echo "route_purge_snapshot_required=\$\{route_purge_snapshot_required\}" >> "\$\{GITHUB_OUTPUT\}"/,
-  );
+  assert.match(workflow, /CD Deploy \/ Detect route purge migration/);
+  assert.match(workflow, /current_sha="\$\(<"\$\{DEPLOY_ROOT\}\/shared\/current-sha"\)"/);
+  assert.match(workflow, /git diff --name-only "\$\{current_sha\}" "\$\{DEPLOY_SHA\}"/);
   assert.match(
     workflow,
     /backend\/src\/main\/resources\/db\/migration\/\(postgresql\|h2\)\/V51__/,
   );
-  assert.match(workflow, /CD Plan \/ Require route purge snapshot evidence/);
+  assert.match(workflow, /CD Deploy \/ Require route purge snapshot evidence/);
   assert.match(
     workflow,
-    /if: \$\{\{ steps\.changes\.outputs\.route_purge_snapshot_required == 'true' \}\}/,
+    /if: \$\{\{ steps\.route-purge\.outputs\.required == 'true' \}\}/,
   );
   assert.match(
     workflow,
@@ -141,21 +142,15 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   );
   assert.match(
     workflow,
-    /node tools\/ci\/require-successful-workflow-run\.mjs[\s\S]*?"\$\{snapshot_runs_file\}"[\s\S]*?"\$\{DEPLOY_SHA\}"[\s\S]*?"Production route API closure evidence"[\s\S]*?push[\s\S]*?main/,
+    /node tools\/ci\/require-successful-workflow-run\.mjs[\s\S]*?"\$\{snapshot_runs_file\}"[\s\S]*?"\$\{DEPLOY_SHA\}"[\s\S]*?"Production route API closure evidence"[\s\S]*?push[\s\S]*?main[\s\S]*?3600/,
   );
 
-  const changedFilesIndex = workflow.indexOf('git diff --name-only "${DEPLOY_SHA}^"');
-  const manualDispatchIndex = workflow.indexOf('if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]');
-  const latchIndex = workflow.indexOf("CD Plan / Require route purge snapshot evidence");
-  const buildIndex = workflow.indexOf("CD Build image / Checkout target SHA");
+  const rangeDetectionIndex = workflow.indexOf('git diff --name-only "${current_sha}" "${DEPLOY_SHA}"');
+  const latchIndex = workflow.indexOf("CD Deploy / Require route purge snapshot evidence");
   const mutationPreparationIndex = workflow.indexOf("CD Deploy / Restore GitHub Actions dotenv secret");
 
-  assert.notEqual(changedFilesIndex, -1);
-  assert.notEqual(manualDispatchIndex, -1);
-  assert.ok(changedFilesIndex < manualDispatchIndex, "manual dispatch must inspect the target commit");
+  assert.notEqual(rangeDetectionIndex, -1);
   assert.notEqual(latchIndex, -1);
-  assert.notEqual(buildIndex, -1);
   assert.notEqual(mutationPreparationIndex, -1);
-  assert.ok(latchIndex < buildIndex, "snapshot evidence must gate image build");
   assert.ok(latchIndex < mutationPreparationIndex, "snapshot evidence must gate production mutation");
 });

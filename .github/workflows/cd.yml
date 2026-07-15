@@ -84,50 +84,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          if git rev-parse "${DEPLOY_SHA}^" >/dev/null 2>&1; then
-            git diff --name-only "${DEPLOY_SHA}^" "${DEPLOY_SHA}" > changed-files.txt
-          else
-            git diff-tree --root --name-only "${DEPLOY_SHA}" > changed-files.txt
-          fi
-
-          route_purge_snapshot_required=false
-          if grep -Eq '^backend/src/main/resources/db/migration/(postgresql|h2)/V51__' changed-files.txt; then
-            route_purge_snapshot_required=true
-          fi
-          echo "route_purge_snapshot_required=${route_purge_snapshot_required}" >> "${GITHUB_OUTPUT}"
-
           if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             echo "deploy=true" >> "${GITHUB_OUTPUT}"
             echo "manual dispatch deploys the requested main SHA" >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
 
+          if git rev-parse "${DEPLOY_SHA}^" >/dev/null 2>&1; then
+            git diff --name-only "${DEPLOY_SHA}^" "${DEPLOY_SHA}" > changed-files.txt
+          else
+            git diff-tree --root --name-only "${DEPLOY_SHA}" > changed-files.txt
+          fi
           bash tools/ci/detect-changed-paths.sh changed-files.txt
-
-      - name: CD Plan / Require route purge snapshot evidence
-        if: ${{ steps.changes.outputs.route_purge_snapshot_required == 'true' }}
-        shell: bash
-        env:
-          DEPLOY_SHA: ${{ steps.target.outputs.sha }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          snapshot_runs_file="${RUNNER_TEMP}/route-purge-snapshot-runs.json"
-          curl -fsS \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            --output "${snapshot_runs_file}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/production-route-api-closure-evidence.yml/runs?head_sha=${DEPLOY_SHA}&branch=main&event=push&status=success&per_page=20"
-
-          node tools/ci/require-successful-workflow-run.mjs \
-            "${snapshot_runs_file}" \
-            "${DEPLOY_SHA}" \
-            "Production route API closure evidence" \
-            push \
-            main
-          echo "validated_route_purge_snapshot_sha=${DEPLOY_SHA}" >> "${GITHUB_STEP_SUMMARY}"
 
   build-image:
     name: CD Build image
@@ -281,6 +249,72 @@ jobs:
           echo "sha=${deploy_sha}" >> "${GITHUB_OUTPUT}"
           echo "mode=${mode}" >> "${GITHUB_OUTPUT}"
           echo "DEPLOY_SHA=${deploy_sha}" >> "${GITHUB_ENV}"
+
+      - name: CD Deploy / Detect route purge migration
+        id: route-purge
+        shell: bash
+        env:
+          DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+        run: |
+          set -euo pipefail
+
+          DEPLOY_ROOT="${DEPLOY_ROOT:-/opt/easysubway}"
+          if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
+            echo "DEPLOY_ROOT is invalid" >&2
+            exit 1
+          fi
+          current_sha="$(<"${DEPLOY_ROOT}/shared/current-sha")"
+          if [[ ! "${current_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "deployed SHA marker is invalid" >&2
+            exit 1
+          fi
+          if ! git cat-file -e "${current_sha}^{commit}"; then
+            echo "deployed SHA is unavailable in the repository" >&2
+            exit 1
+          fi
+
+          route_purge_changes="${RUNNER_TEMP}/route-purge-migration-changes.txt"
+          git diff --name-only "${current_sha}" "${DEPLOY_SHA}" -- \
+            backend/src/main/resources/db/migration/postgresql \
+            backend/src/main/resources/db/migration/h2 \
+            > "${route_purge_changes}"
+          target_migrations="${RUNNER_TEMP}/target-migrations.txt"
+          git ls-tree -r --name-only "${DEPLOY_SHA}" -- \
+            backend/src/main/resources/db/migration/postgresql \
+            backend/src/main/resources/db/migration/h2 \
+            > "${target_migrations}"
+
+          required=false
+          if grep -Eq '^backend/src/main/resources/db/migration/(postgresql|h2)/V51__' "${route_purge_changes}" && \
+             grep -Eq '^backend/src/main/resources/db/migration/(postgresql|h2)/V51__' "${target_migrations}"; then
+            required=true
+          fi
+          echo "required=${required}" >> "${GITHUB_OUTPUT}"
+
+      - name: CD Deploy / Require route purge snapshot evidence
+        if: ${{ steps.route-purge.outputs.required == 'true' }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          snapshot_runs_file="${RUNNER_TEMP}/route-purge-snapshot-runs.json"
+          curl -fsS \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${snapshot_runs_file}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/production-route-api-closure-evidence.yml/runs?head_sha=${DEPLOY_SHA}&branch=main&event=push&status=success&per_page=20"
+
+          node tools/ci/require-successful-workflow-run.mjs \
+            "${snapshot_runs_file}" \
+            "${DEPLOY_SHA}" \
+            "Production route API closure evidence" \
+            push \
+            main \
+            3600
+          echo "validated_route_purge_snapshot_sha=${DEPLOY_SHA}" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: CD Deploy / Validate manual dispatch CI
         if: ${{ github.event_name == 'workflow_dispatch' }}

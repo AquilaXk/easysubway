@@ -21,6 +21,7 @@ function successfulRun(overrides = {}) {
     event: "push",
     status: "completed",
     conclusion: "success",
+    updated_at: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -32,7 +33,7 @@ async function invoke(workflowRuns) {
   try {
     return await execFileAsync(
       "node",
-      [scriptPath, responsePath, expectedSha, expectedName, "push", "main"],
+      [scriptPath, responsePath, expectedSha, expectedName, "push", "main", "3600"],
       { cwd: root, encoding: "utf8" },
     );
   } finally {
@@ -55,6 +56,8 @@ test("workflow identity나 성공 상태가 다르면 fail closed한다", async 
     { event: "workflow_dispatch" },
     { status: "in_progress" },
     { conclusion: "failure" },
+    { updated_at: new Date(Date.now() - 3_601_000).toISOString() },
+    { updated_at: "not-a-timestamp" },
   ]) {
     await assert.rejects(
       invoke([successfulRun(mismatch)]),

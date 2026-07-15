@@ -2,18 +2,27 @@
 
 import { readFile } from "node:fs/promises";
 
-const [responsePath, expectedSha, expectedName, expectedEvent, expectedBranch] =
-  process.argv.slice(2);
+const [
+  responsePath,
+  expectedSha,
+  expectedName,
+  expectedEvent,
+  expectedBranch,
+  maxAgeSecondsInput,
+] = process.argv.slice(2);
+const maxAgeSeconds = Number(maxAgeSecondsInput);
 
 if (
   !responsePath ||
   !/^[0-9a-f]{40}$/.test(expectedSha ?? "") ||
   !expectedName ||
   !expectedEvent ||
-  !expectedBranch
+  !expectedBranch ||
+  !Number.isSafeInteger(maxAgeSeconds) ||
+  maxAgeSeconds <= 0
 ) {
   console.error(
-    "usage: require-successful-workflow-run.mjs <response.json> <sha> <name> <event> <branch>",
+    "usage: require-successful-workflow-run.mjs <response.json> <sha> <name> <event> <branch> <max-age-seconds>",
   );
   process.exit(2);
 }
@@ -31,16 +40,24 @@ if (!Array.isArray(payload?.workflow_runs)) {
   process.exit(1);
 }
 
-const matchingRun = payload.workflow_runs.find(
-  (run) =>
+const now = Date.now();
+const maxFutureSkewMs = 5 * 60 * 1000;
+const matchingRun = payload.workflow_runs.find((run) => {
+  const updatedAt = Date.parse(run?.updated_at ?? "");
+  const ageMs = now - updatedAt;
+  return (
     run?.name === expectedName &&
     run?.head_sha === expectedSha &&
     run?.head_branch === expectedBranch &&
     run?.event === expectedEvent &&
     run?.status === "completed" &&
     run?.conclusion === "success" &&
-    Number.isSafeInteger(run?.id),
-);
+    Number.isSafeInteger(run?.id) &&
+    Number.isFinite(updatedAt) &&
+    ageMs >= -maxFutureSkewMs &&
+    ageMs <= maxAgeSeconds * 1000
+  );
+});
 
 if (!matchingRun) {
   console.error("required successful workflow run was not found");

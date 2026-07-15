@@ -193,6 +193,7 @@ jobs:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
       DEPLOY_COMPOSE_PROJECT: ${{ vars.DEPLOY_COMPOSE_PROJECT }}
       EXPECTED_DEPLOYED_SHA: ${{ needs.verify.outputs.deployed_sha }}
+      SNAPSHOT_REQUEST_SHA: ${{ github.sha }}
 
     steps:
       - name: Snapshot gate / Checkout reviewed main
