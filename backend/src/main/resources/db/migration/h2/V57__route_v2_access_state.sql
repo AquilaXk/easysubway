@@ -27,7 +27,15 @@ CREATE TABLE route_v2_states (
 	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	planned_arrival_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	CONSTRAINT chk_route_v2_states_scope CHECK (transport_scope = 'SUBWAY_AND_ITX_CHEONGCHUN')
+	CONSTRAINT chk_route_v2_states_scope CHECK (transport_scope = 'SUBWAY_AND_ITX_CHEONGCHUN'),
+	CONSTRAINT chk_route_v2_states_expiry CHECK (
+		expires_at = LEAST(
+			DATEADD('HOUR', 6, created_at),
+			GREATEST(DATEADD('MINUTE', 30, created_at), DATEADD('MINUTE', 30, planned_arrival_at))
+		)
+	)
 );
 
+CREATE INDEX idx_route_v2_sessions_expires_at ON route_v2_sessions (expires_at);
+CREATE INDEX idx_route_v2_nonce_replays_expires_at ON route_v2_nonce_replays (expires_at);
 CREATE INDEX idx_route_v2_states_expires_at ON route_v2_states (expires_at);

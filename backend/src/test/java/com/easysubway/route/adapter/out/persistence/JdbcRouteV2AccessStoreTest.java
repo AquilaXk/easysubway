@@ -6,6 +6,7 @@ import com.easysubway.route.application.port.out.RouteV2AccessStore.RouteV2Sessi
 import com.easysubway.route.application.port.out.RouteV2AccessStore.RouteV2State;
 import com.easysubway.route.application.port.out.RouteV2AccessStore.SessionStatus;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("Route V2 접근·임시 상태 저장소")
 class JdbcRouteV2AccessStoreTest {
@@ -63,6 +65,18 @@ class JdbcRouteV2AccessStoreTest {
 			)
 			""");
 		store = new JdbcRouteV2AccessStore(jdbcTemplate);
+	}
+
+	@Test
+	@DisplayName("nonce claim과 session 저장은 하나의 transaction 경계로 노출한다")
+	void claimsNonceAndSavesSessionInOneTransaction() {
+		var methods = Arrays.stream(JdbcRouteV2AccessStore.class.getDeclaredMethods())
+			.filter(method -> method.getName().equals("claimNonceAndSaveSession"))
+			.toList();
+
+		assertThat(methods).singleElement().satisfies(method ->
+			assertThat(method.isAnnotationPresent(Transactional.class)).isTrue()
+		);
 	}
 
 	@Test

@@ -107,6 +107,21 @@ public class JdbcRouteV2AccessStore implements RouteV2AccessStore {
 	}
 
 	@Override
+	@Transactional
+	public boolean claimNonceAndSaveSession(
+		String nonceSha256,
+		Instant nonceExpiresAt,
+		Instant now,
+		RouteV2Session session
+	) {
+		if (!claimNonce(nonceSha256, nonceExpiresAt, now)) {
+			return false;
+		}
+		saveSession(session);
+		return true;
+	}
+
+	@Override
 	public void saveState(RouteV2State state) {
 		jdbcTemplate.update(
 			"""

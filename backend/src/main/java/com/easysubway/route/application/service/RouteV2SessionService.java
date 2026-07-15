@@ -77,15 +77,19 @@ public class RouteV2SessionService {
 			throw new RouteSessionAttestationRejectedException(exception);
 		}
 		validateVerdict(verdict, clientNonce, now);
-		if (!store.claimNonce(sha256Hex(clientNonce), now.plus(VERDICT_MAX_AGE), now)) {
-			throw new RouteSessionAttestationRejectedException();
-		}
-
 		byte[] tokenBytes = new byte[32];
 		secureRandom.nextBytes(tokenBytes);
 		String token = BASE64_URL.encodeToString(tokenBytes);
 		Instant expiresAt = now.plus(SESSION_TTL);
-		store.saveSession(new RouteV2Session(sha256Hex(token), SCOPE, now, expiresAt, 0));
+		var session = new RouteV2Session(sha256Hex(token), SCOPE, now, expiresAt, 0);
+		if (!store.claimNonceAndSaveSession(
+			sha256Hex(clientNonce),
+			now.plus(VERDICT_MAX_AGE),
+			now,
+			session
+		)) {
+			throw new RouteSessionAttestationRejectedException();
+		}
 		return new IssuedRouteV2Session(token, SCOPE, now, expiresAt);
 	}
 

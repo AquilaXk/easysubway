@@ -11,6 +11,13 @@ public interface RouteV2AccessStore {
 
 	boolean claimNonce(String nonceSha256, Instant expiresAt, Instant now);
 
+	boolean claimNonceAndSaveSession(
+		String nonceSha256,
+		Instant nonceExpiresAt,
+		Instant now,
+		RouteV2Session session
+	);
+
 	void saveState(RouteV2State state);
 
 	Optional<RouteV2State> loadState(String routeStateId, Instant now);

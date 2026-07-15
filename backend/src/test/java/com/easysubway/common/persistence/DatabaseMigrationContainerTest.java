@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.DisplayName;
@@ -162,46 +163,47 @@ class DatabaseMigrationContainerTest {
 			POSTGRES.getPassword()
 		);
 		migrate(migrationDataSource, "classpath:db/migration/postgresql", schema);
-		var dataSource = new HikariDataSource();
-		dataSource.setJdbcUrl(POSTGRES.getJdbcUrl());
-		dataSource.setUsername(POSTGRES.getUsername());
-		dataSource.setPassword(POSTGRES.getPassword());
-		dataSource.setSchema(schema);
-		dataSource.setMaximumPoolSize(20);
-		var store = new JdbcRouteV2AccessStore(dataSource, 50);
-		Instant now = Instant.parse("2026-07-16T09:00:00Z");
-		String tokenHash = "e".repeat(64);
-		store.saveSession(new RouteV2Session(tokenHash, "route:v2:itx", now, now.plusSeconds(600), 0));
-		var ready = new CountDownLatch(100);
-		var start = new CountDownLatch(1);
+		try (var dataSource = new HikariDataSource()) {
+			dataSource.setJdbcUrl(POSTGRES.getJdbcUrl());
+			dataSource.setUsername(POSTGRES.getUsername());
+			dataSource.setPassword(POSTGRES.getPassword());
+			dataSource.setSchema(schema);
+			dataSource.setMaximumPoolSize(20);
+			var store = new JdbcRouteV2AccessStore(dataSource, 50);
+			Instant now = Instant.parse("2026-07-16T09:00:00Z");
+			String tokenHash = "e".repeat(64);
+			store.saveSession(new RouteV2Session(tokenHash, "route:v2:itx", now, now.plusSeconds(600), 0));
+			var ready = new CountDownLatch(100);
+			var start = new CountDownLatch(1);
 
-		try (var executor = Executors.newFixedThreadPool(100)) {
-			var attempts = java.util.stream.IntStream.range(0, 100)
-				.mapToObj(ignored -> executor.submit(() -> {
-					ready.countDown();
-					start.await();
-					return store.consumeSession(tokenHash, now.plusSeconds(1)).status();
-				}))
-				.toList();
-			ready.await();
-			start.countDown();
-			var statuses = attempts.stream().map(future -> {
-				try {
-					return future.get();
-				} catch (Exception exception) {
-					throw new IllegalStateException(exception);
-				}
-			}).toList();
+			try (var executor = Executors.newFixedThreadPool(100)) {
+				var attempts = java.util.stream.IntStream.range(0, 100)
+					.mapToObj(ignored -> executor.submit(() -> {
+						ready.countDown();
+						start.await();
+						return store.consumeSession(tokenHash, now.plusSeconds(1)).status();
+					}))
+					.toList();
+				boolean allReady = ready.await(10, TimeUnit.SECONDS);
+				start.countDown();
+				assertThat(allReady).isTrue();
+				var statuses = attempts.stream().map(future -> {
+					try {
+						return future.get(10, TimeUnit.SECONDS);
+					} catch (Exception exception) {
+						throw new IllegalStateException(exception);
+					}
+				}).toList();
 
-			assertThat(statuses).filteredOn(SessionStatus.VALID::equals).hasSize(50);
-			assertThat(statuses).filteredOn(SessionStatus.LIMITED::equals).hasSize(50);
+				assertThat(statuses).filteredOn(SessionStatus.VALID::equals).hasSize(50);
+				assertThat(statuses).filteredOn(SessionStatus.LIMITED::equals).hasSize(50);
+			}
+			assertThat(new JdbcTemplate(dataSource).queryForObject(
+				"SELECT request_count FROM route_v2_sessions WHERE token_sha256 = ?",
+				Integer.class,
+				tokenHash
+			)).isEqualTo(50);
 		}
-		assertThat(new JdbcTemplate(dataSource).queryForObject(
-			"SELECT request_count FROM route_v2_sessions WHERE token_sha256 = ?",
-			Integer.class,
-			tokenHash
-		)).isEqualTo(50);
-		dataSource.close();
 	}
 
 	@Test
@@ -440,6 +442,35 @@ class DatabaseMigrationContainerTest {
 			INSERT INTO route_v2_sessions (token_sha256, scope, issued_at, expires_at, request_count)
 			VALUES (?, 'route:v2:itx', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '10 minutes', 51)
 			""", "a".repeat(64))).isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbcTemplate.update("""
+			INSERT INTO route_v2_states (
+				route_state_id, origin_station_id, destination_station_id, transport_scope,
+				requested_departure_at, itinerary_json, timetable_artifact_id,
+				created_at, planned_arrival_at, expires_at
+			) VALUES (?, 'origin', 'destination', 'SUBWAY_AND_ITX_CHEONGCHUN',
+				CURRENT_TIMESTAMP, '{}', 'artifact', CURRENT_TIMESTAMP,
+				CURRENT_TIMESTAMP + INTERVAL '10 minutes', CURRENT_TIMESTAMP + INTERVAL '1 hour')
+			""", "invalid-expiry")).isInstanceOf(DataAccessException.class);
+		assertThat(indexNames(jdbcTemplate, "route_v2_sessions")).contains("idx_route_v2_sessions_expires_at");
+		assertThat(indexNames(jdbcTemplate, "route_v2_nonce_replays")).contains("idx_route_v2_nonce_replays_expires_at");
+	}
+
+	private List<String> indexNames(JdbcTemplate jdbcTemplate, String tableName) {
+		return jdbcTemplate.execute((org.springframework.jdbc.core.ConnectionCallback<List<String>>) connection -> {
+			String physicalName = connection.getMetaData().storesUpperCaseIdentifiers()
+				? tableName.toUpperCase(java.util.Locale.ROOT)
+				: tableName;
+			try (var indexes = connection.getMetaData().getIndexInfo(null, null, physicalName, false, false)) {
+				var names = new java.util.ArrayList<String>();
+				while (indexes.next()) {
+					String name = indexes.getString("INDEX_NAME");
+					if (name != null) {
+						names.add(name.toLowerCase(java.util.Locale.ROOT));
+					}
+				}
+				return names;
+			}
+		});
 	}
 
 	private List<String> columns(JdbcTemplate jdbcTemplate, String tableName) {

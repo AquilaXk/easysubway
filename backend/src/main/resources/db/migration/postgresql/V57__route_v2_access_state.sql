@@ -36,4 +36,6 @@ CREATE TABLE route_v2_states (
 	)
 );
 
+CREATE INDEX idx_route_v2_sessions_expires_at ON route_v2_sessions (expires_at);
+CREATE INDEX idx_route_v2_nonce_replays_expires_at ON route_v2_nonce_replays (expires_at);
 CREATE INDEX idx_route_v2_states_expires_at ON route_v2_states (expires_at);

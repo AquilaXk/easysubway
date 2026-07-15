@@ -43,7 +43,7 @@ class RouteV2SessionServiceTest {
 			Clock.fixed(NOW, ZoneOffset.UTC),
 			CERTIFICATE_DIGEST
 		);
-		when(store.claimNonce(any(), any(), any())).thenReturn(true);
+		when(store.claimNonceAndSaveSession(any(), any(), any(), any())).thenReturn(true);
 	}
 
 	@Test
@@ -66,7 +66,7 @@ class RouteV2SessionServiceTest {
 		assertThat(issued.issuedAt()).isEqualTo(NOW);
 		assertThat(issued.expiresAt()).isEqualTo(NOW.plusSeconds(600));
 		var session = ArgumentCaptor.forClass(RouteV2Session.class);
-		verify(store).saveSession(session.capture());
+		verify(store).claimNonceAndSaveSession(any(), eq(NOW.plusSeconds(120)), eq(NOW), session.capture());
 		assertThat(session.getValue().tokenSha256()).matches("^[0-9a-f]{64}$");
 		assertThat(session.getValue().tokenSha256()).doesNotContain(issued.token());
 		assertThat(session.getValue().requestCount()).isZero();
@@ -125,7 +125,7 @@ class RouteV2SessionServiceTest {
 		assertThatThrownBy(() -> service.issue("integrity-token", "not-128-bit"))
 			.isInstanceOf(RouteSessionAttestationRejectedException.class);
 
-		when(store.claimNonce(any(), eq(NOW.plusSeconds(120)), eq(NOW))).thenReturn(false);
+		when(store.claimNonceAndSaveSession(any(), eq(NOW.plusSeconds(120)), eq(NOW), any())).thenReturn(false);
 		assertThatThrownBy(() -> service.issue("integrity-token", NONCE))
 			.isInstanceOf(RouteSessionAttestationRejectedException.class);
 	}
