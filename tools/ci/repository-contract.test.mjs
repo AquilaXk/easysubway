@@ -5512,6 +5512,25 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.equal(releaseEvidenceBundleSchema.properties.headwayReportStatus.$ref, "#/$defs/headwayGateStatus");
   // route_graph_topology는 deferred domain이므로 자체 gate status def(DEFERRED 허용)를 참조한다.
   assert.equal(releaseEvidenceBundleSchema.properties.routeGraphTopologyStatus.$ref, "#/$defs/routeGraphGateStatus");
+  assert.deepEqual(releaseEvidenceBundleSchema.properties.rollbackRescue.required, [
+    "evidenceSha256",
+    "releaseRequestId",
+    "rollbackApprovalEventId",
+    "rcCandidateId",
+    "rcManifestSha256",
+    "currentReleaseSequence",
+    "failedReleaseSequence",
+    "knownGoodReleaseSequence",
+    "rescueReleaseSequence",
+    "knownGoodPackSha256",
+    "knownGoodSqliteSha256",
+    "rescueManifestSha256",
+    "recoveryDurationSeconds",
+    "validatorStatus",
+    "manifestLastStatus",
+    "executionEnvironment",
+    "productionExecuted",
+  ]);
   assert.equal(releaseEvidenceBundleSchema.$defs.gateStatus.enum.includes("DEFERRED"), false);
   assert.equal(releaseEvidenceBundleSchema.$defs.headwayGateStatus.enum.includes("DEFERRED"), true);
   assert.equal(releaseEvidenceBundleSchema.$defs.routeGraphGateStatus.enum.includes("DEFERRED"), true);
@@ -5809,12 +5828,19 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   const fixture = JSON.parse(read("tools/datapack/fixtures/catalog-fixture.json"));
   const candidateBuildSpec = JSON.parse(read("tools/datapack/fixtures/candidate-build-spec.json"));
   const releaseRequestSchema = readJson("tools/datapack/schema/release-request.schema.json");
+  const rollbackApprovalSchema = readJson("tools/datapack/schema/rollback-approval.schema.json");
   const releaseCallbackSchema = readJson("tools/datapack/schema/release-callback.schema.json");
   const releaseEvidenceBundleSchema = readJson("tools/datapack/schema/release-evidence-bundle.schema.json");
   const schema = read("tools/datapack/schema/catalog-schema.sql");
   const builder = read("tools/datapack/build-datapack.mjs");
   const validator = read("tools/datapack/validate-datapack.mjs");
   const manifestValidation = read("tools/datapack/lib/manifest-validation.mjs");
+
+  assert.equal(rollbackApprovalSchema.properties.artifactKind.const, "datapack-rollback-approval");
+  assert.equal(rollbackApprovalSchema.properties.approvedByRole.const, "admin.datapack.rollback");
+  assert.ok(rollbackApprovalSchema.required.includes("rollbackApprovalEventId"));
+  assert.ok(rollbackApprovalSchema.required.includes("failedManifestSha256"));
+  assert.ok(rollbackApprovalSchema.required.includes("knownGoodManifestSha256"));
 
   assert.equal(fixture.manifest.ttlSeconds, 3600);
   assert.deepEqual(fixture.manifest.activePack, { id: "capital", version: "1" });
