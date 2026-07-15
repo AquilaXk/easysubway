@@ -91,7 +91,7 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(purgeSql, /^DELETE FROM route_search_results AS route/m);
   assert.doesNotMatch(purgeSql, /BEGIN|EXPLAIN|ROLLBACK/);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
-  assert.match(snapshotGate, /pg_restore/);
+  assert.match(snapshotGate, /pg_restore --clean --if-exists --no-owner --no-privileges/);
   assert.match(snapshotGate, /cat \/proc\/1\/comm/);
   assert.match(snapshotGate, /restore_init_process[^\n]+==[^\n]+postgres/);
   assert.match(snapshotGate, /--pull never/);
