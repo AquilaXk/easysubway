@@ -4,6 +4,7 @@ import com.easysubway.datapack.domain.DataSourceSnapshot;
 import com.easysubway.datapack.domain.InvalidDataSourceSnapshotException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.SqlParameterValue;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -243,12 +245,18 @@ public class JdbcDataSourceSnapshotRepository {
 			snapshot.credentialRedacted(),
 			snapshot.previousSnapshotId(),
 			snapshot.diffSummary(),
-			snapshot.diffSummaryJson(),
+			jsonParameter(snapshot.diffSummaryJson()),
 			snapshot.freshnessExpiresAt(),
 			snapshot.rawRetentionExpiresAt(),
 			snapshot.governancePolicyVersion(),
 			snapshot.governancePolicySha256()
 		);
+	}
+
+	private Object jsonParameter(String value) {
+		return databaseDialect == DatabaseDialect.POSTGRESQL
+			? new SqlParameterValue(Types.OTHER, value)
+			: value;
 	}
 
 	private DataSourceSnapshot mapSnapshot(ResultSet resultSet, int rowNumber) throws SQLException {

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   assertRepositoryRelativePath,
@@ -8,6 +11,8 @@ import {
 } from "./validate-source-snapshot-freshness.mjs";
 
 const evaluationAt = "2026-07-15T00:00:00.000Z";
+const execFileAsync = promisify(execFile);
+const root = path.resolve(import.meta.dirname, "../..");
 const policy = {
   clockSkewSeconds: 300,
   sourceClasses: [{
@@ -32,6 +37,10 @@ function input(overrides = {}) {
     credentialRedacted: true,
     retrievedAt: "2026-07-12T00:00:00Z",
     sourceUpdatedAt: null,
+    rowCount: 10,
+    coverageCount: 10,
+    previousSnapshotId: null,
+    diffSummary: null,
     freshnessExpiresAt: "2026-08-11T00:00:00Z",
     rawRetentionExpiresAt: "2026-10-10T00:00:00.000Z",
     governancePolicyVersion: "2026-07-15",
@@ -70,6 +79,58 @@ test("source snapshot ID·hash·policy 파생 freshness가 맞으면 통과한�
 
   assert.equal(result.results.length, 1);
   assert.equal(result.results[0].status, "FRESH");
+});
+
+test("선택한 head만 freshness를 판정하고 만료된 이전 snapshot은 lineage로만 검증한다", () => {
+  const value = input();
+  const previous = {
+    ...value.snapshots[0],
+    snapshotId: "snapshot-a-1",
+    retrievedAt: "2026-05-01T00:00:00Z",
+    freshnessExpiresAt: "2026-05-31T00:00:00Z",
+    previousSnapshotId: null,
+    diffSummary: null,
+  };
+  const head = {
+    ...value.snapshots[0],
+    snapshotId: "snapshot-a-2",
+    previousSnapshotId: previous.snapshotId,
+    diffSummary: {
+      status: "NO_CHANGE",
+      rawHashChanged: false,
+      schemaHashChanged: false,
+      requestHashChanged: false,
+      sourceUpdatedAtChanged: false,
+      rowDelta: 0,
+      coverageDelta: 0,
+    },
+  };
+  value.snapshots = [previous, head];
+  value.buildSpec.sourceSnapshotIds = [head.snapshotId];
+  value.buildSpec.sourceSnapshots = value.buildSpec.sourceSnapshots.map((snapshot) => ({
+    ...snapshot,
+    snapshotId: head.snapshotId,
+  }));
+  value.buildSpec.sourceSnapshotSetHash = createHash("sha256")
+    .update(JSON.stringify([head]))
+    .digest("hex");
+
+  const result = validateSourceSnapshotFreshness(value);
+
+  assert.deepEqual(result.results.map((entry) => entry.snapshotId), [head.snapshotId]);
+});
+
+test("실제 release build spec은 governance 계약으로 freshness를 통과한다", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "tools/datapack/validate-source-snapshot-freshness.mjs",
+    "--build-spec", "tools/datapack/release/candidate-build-spec.json",
+    "--policy", "apps/mobile/release/datapack-freshness-sla.json",
+    "--governance-policy", "tools/datapack/source-governance-policy.json",
+    "--inventory", "tools/datapack/source-inventory.json",
+    "--evaluation-at", evaluationAt,
+  ], { cwd: root });
+
+  assert.equal(JSON.parse(stdout).governanceDecision, "GO");
 });
 
 test("governance 입력이 없으면 provenance의 governance binding도 선택 사항이다", () => {

@@ -29,7 +29,10 @@
       "adminReviewRecordHash": "deb0280494956f8ff72fabc34bec250ff17a30b702ac32c6a4589f3d1e302395",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-08-11T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "seoulmetro-station-line-info-capital-admission-20260712",
@@ -43,7 +46,10 @@
       "adminReviewRecordHash": "c64feb8bd9bf6db8be936f11d7fe3e8d5a867b16be6e037f13bf55da01e2be4d",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-08-11T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "seoulmetro-cyberstation-route-map-capital-admission-20260712",
@@ -57,7 +63,10 @@
       "adminReviewRecordHash": "4ea77265d144baa6b06e8f10152743420006f7581b24ffd68b21367341aa1b6c",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2027-07-12T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "kric-station-elevator-capital-admission-20260712",
@@ -71,7 +80,10 @@
       "adminReviewRecordHash": "71e7c6bbe0269005c84c665e85b43b7d0e79146589cc33ac715f82e76f81c47f",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "kric-station-elevator-movement-capital-admission-20260712",
@@ -85,7 +97,10 @@
       "adminReviewRecordHash": "045aad6dd616b4c408ba3addbfd208adcb5c7ffd92dacd1cf1ccbb2d362da6c0",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "kric-station-escalator-capital-admission-20260712",
@@ -99,7 +114,10 @@
       "adminReviewRecordHash": "7fe82686e278449f48d69d15957f48024130c096d24af65213c5a7c95ba1fceb",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "kric-wheelchair-lift-location-capital-admission-20260712",
@@ -113,7 +131,10 @@
       "adminReviewRecordHash": "5eb37360a6cac4113c486cbf5a9c955b04bcd377f168a4e3ad9db6d76fb2e094",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "kric-wheelchair-lift-movement-capital-admission-20260712",
@@ -127,7 +148,10 @@
       "adminReviewRecordHash": "8309bcbe21eb1f153db99f33ad4c332c1475e23a0ff0dcfda89044efa87701ba",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     },
     {
       "snapshotId": "seoul-metro-accessibility-capital-admission-20260712",
@@ -141,7 +165,10 @@
       "adminReviewRecordHash": "9ccbf78e88d905207134ca3ad08ef7e99fbbdff16c4503b13c4ed925a99b5303",
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
-      "freshnessExpiresAt": "2099-08-01T00:00:00Z"
+      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
+      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
+      "governancePolicyVersion": "2026-07-15",
+      "governancePolicySha256": "ebc469886bbc11af62629d2d55129e2d27bdcabec300dcc268bb73d546fe2128"
     }
   ],
   "sourceSnapshotSetHash": "845b5a8f54f5c09277c2e7e6468fd8baab4da74210512f3b83be12d3bdcad75e",

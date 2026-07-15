@@ -1,9 +1,14 @@
 package com.easysubway.datapack.domain;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.regex.Pattern;
 
 public record DataSourceSnapshot(
@@ -34,6 +39,7 @@ public record DataSourceSnapshot(
 ) {
 
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	public DataSourceSnapshot {
 		snapshotId = requireText(snapshotId, "snapshotId");
@@ -60,7 +66,7 @@ public record DataSourceSnapshot(
 		fetchStatus = requireText(fetchStatus, "fetchStatus");
 		previousSnapshotId = trimToNull(previousSnapshotId);
 		diffSummary = trimToNull(diffSummary);
-		diffSummaryJson = trimToNull(diffSummaryJson);
+		diffSummaryJson = canonicalJson(diffSummaryJson);
 		if (freshnessExpiresAt == null) {
 			throw new InvalidDataSourceSnapshotException("freshnessExpiresAt is required.");
 		}
@@ -133,6 +139,37 @@ public record DataSourceSnapshot(
 			return null;
 		}
 		return value.trim();
+	}
+
+	private static String canonicalJson(String value) {
+		String trimmed = trimToNull(value);
+		if (trimmed == null) {
+			return null;
+		}
+		try {
+			return OBJECT_MAPPER.writeValueAsString(sortJson(OBJECT_MAPPER.readTree(trimmed)));
+		} catch (JsonProcessingException exception) {
+			throw new InvalidDataSourceSnapshotException("diffSummaryJson must be valid JSON.");
+		}
+	}
+
+	private static JsonNode sortJson(JsonNode value) {
+		if (value.isObject()) {
+			var sorted = OBJECT_MAPPER.createObjectNode();
+			var fields = new ArrayList<String>();
+			value.fieldNames().forEachRemaining(fields::add);
+			fields.sort(Comparator.naturalOrder());
+			for (String field : fields) {
+				sorted.set(field, sortJson(value.get(field)));
+			}
+			return sorted;
+		}
+		if (value.isArray()) {
+			var sorted = OBJECT_MAPPER.createArrayNode();
+			value.forEach(entry -> sorted.add(sortJson(entry)));
+			return sorted;
+		}
+		return value;
 	}
 
 	private static LocalDateTime normalizeTimestamp(LocalDateTime value) {

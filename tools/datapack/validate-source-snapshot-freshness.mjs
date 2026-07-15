@@ -18,6 +18,8 @@ const buildProvenanceStringFields = [
   "redactedRequestFingerprint",
   "licenseStatus",
   "snapshotStatus",
+];
+const policyBoundProvenanceStringFields = [
   "freshnessExpiresAt",
   "rawRetentionExpiresAt",
   "governancePolicyVersion",
@@ -41,27 +43,36 @@ export function validateSourceSnapshotFreshness({
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: source snapshots");
   }
   validateLineage(snapshots);
-  const expectedIds = [...buildSpec.sourceSnapshotIds].sort();
-  const actualIds = snapshots.map((snapshot) => requiredString(snapshot.snapshotId, "snapshotId")).sort();
-  if (new Set(actualIds).size !== actualIds.length || JSON.stringify(actualIds) !== JSON.stringify(expectedIds)) {
-    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
-  }
+  const selectedSnapshots = selectSnapshots(snapshots, buildSpec.sourceSnapshotIds);
   const includeGovernance = governancePolicy != null;
-  const evidenceProvenance = canonicalBuildProvenance(snapshots, "snapshots", includeGovernance);
+  const evidenceProvenance = canonicalBuildProvenance(selectedSnapshots, "snapshots");
   const buildProvenance = canonicalBuildProvenance(
     buildSpec.sourceSnapshots,
     "buildSpec.sourceSnapshots",
-    includeGovernance,
   );
   if (JSON.stringify(evidenceProvenance) !== JSON.stringify(buildProvenance)) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot provenance");
   }
-  const snapshotSetHash = sha256(JSON.stringify(snapshots));
+  const effectiveSnapshots = includeGovernance
+    ? bindGovernanceProvenance(selectedSnapshots, buildSpec.sourceSnapshots)
+    : selectedSnapshots;
+  if (!includeGovernance) {
+    const evidencePolicyProvenance = canonicalPolicyProvenance(selectedSnapshots, "snapshots", false);
+    const buildPolicyProvenance = canonicalPolicyProvenance(
+      buildSpec.sourceSnapshots,
+      "buildSpec.sourceSnapshots",
+      false,
+    );
+    if (JSON.stringify(evidencePolicyProvenance) !== JSON.stringify(buildPolicyProvenance)) {
+      throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot provenance");
+    }
+  }
+  const snapshotSetHash = sha256(JSON.stringify(selectedSnapshots));
   if (snapshotSetHash !== buildSpec.sourceSnapshotSetHash) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot set hash");
   }
 
-  const results = snapshots.map((snapshot) => {
+  const results = effectiveSnapshots.map((snapshot) => {
     const sourceId = requiredString(snapshot.sourceId, "sourceId");
     const sourceClasses = policy?.sourceClasses?.filter((entry) => entry.sourceIds?.includes(sourceId)) ?? [];
     if (sourceClasses.length !== 1) {
@@ -95,14 +106,14 @@ export function validateSourceSnapshotFreshness({
     if (!/^[0-9a-f]{64}$/.test(governancePolicySha256 ?? "")) {
       throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy hash");
     }
-    if (snapshots.some((snapshot) => (
+    if (effectiveSnapshots.some((snapshot) => (
       snapshot.governancePolicyVersion !== governancePolicy.policyVersion
       || snapshot.governancePolicySha256 !== governancePolicySha256
     ))) {
       throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: governance policy binding");
     }
     const sources = new Map(inventory.sources.map((source) => [source.id, source]));
-    governanceResults = snapshots.map((snapshot) => evaluateSourceGovernance({
+    governanceResults = effectiveSnapshots.map((snapshot) => evaluateSourceGovernance({
       source: sources.get(snapshot.sourceId),
       snapshot,
       policy: governancePolicy,
@@ -186,7 +197,50 @@ function requiredString(value, label) {
   return value;
 }
 
-function canonicalBuildProvenance(snapshots, label, includeGovernance) {
+function selectSnapshots(snapshots, selectedIds) {
+  const ids = selectedIds.map((id, index) => requiredString(id, `buildSpec.sourceSnapshotIds[${index}]`));
+  if (new Set(ids).size !== ids.length) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
+  }
+  const byId = new Map();
+  for (const snapshot of snapshots) {
+    const snapshotId = requiredString(snapshot?.snapshotId, "snapshotId");
+    if (byId.has(snapshotId)) {
+      throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
+    }
+    byId.set(snapshotId, snapshot);
+  }
+  const selected = ids.map((id) => byId.get(id));
+  if (selected.some((snapshot) => snapshot == null)) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
+  }
+  return selected;
+}
+
+function bindGovernanceProvenance(snapshots, buildSnapshots) {
+  const buildById = new Map(buildSnapshots.map((snapshot) => [snapshot?.snapshotId, snapshot]));
+  return snapshots.map((snapshot, index) => {
+    const buildSnapshot = buildById.get(snapshot.snapshotId);
+    const hasPolicyBinding = snapshot.governancePolicyVersion != null
+      || snapshot.governancePolicySha256 != null;
+    if (hasPolicyBinding) {
+      const evidence = canonicalPolicyProvenance([snapshot], `snapshots[${index}]`, true);
+      const build = canonicalPolicyProvenance([buildSnapshot], `buildSpec.sourceSnapshots[${index}]`, true);
+      if (JSON.stringify(evidence) !== JSON.stringify(build)) {
+        throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot provenance");
+      }
+      return snapshot;
+    }
+    const policyProvenance = canonicalPolicyProvenance(
+      [buildSnapshot],
+      `buildSpec.sourceSnapshots[${index}]`,
+      true,
+    )[0];
+    return { ...snapshot, ...policyProvenance };
+  });
+}
+
+function canonicalBuildProvenance(snapshots, label) {
   if (!Array.isArray(snapshots) || snapshots.length === 0) {
     throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}`);
   }
@@ -194,10 +248,7 @@ function canonicalBuildProvenance(snapshots, label, includeGovernance) {
     if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
       throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}[${index}]`);
     }
-    const fields = includeGovernance
-      ? buildProvenanceStringFields
-      : buildProvenanceStringFields.filter((field) => !field.startsWith("governancePolicy"));
-    const canonical = Object.fromEntries(fields.map((field) => [
+    const canonical = Object.fromEntries(buildProvenanceStringFields.map((field) => [
       field,
       requiredString(snapshot[field], `${label}[${index}].${field}`),
     ]));
@@ -209,6 +260,19 @@ function canonicalBuildProvenance(snapshots, label, includeGovernance) {
     }
     return canonical;
   }).sort((left, right) => left.snapshotId.localeCompare(right.snapshotId));
+}
+
+function canonicalPolicyProvenance(snapshots, label, includeGovernance) {
+  if (!Array.isArray(snapshots) || snapshots.length === 0) {
+    throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: ${label}`);
+  }
+  const fields = includeGovernance
+    ? policyBoundProvenanceStringFields
+    : policyBoundProvenanceStringFields.filter((field) => !field.startsWith("governancePolicy"));
+  return snapshots.map((snapshot, index) => Object.fromEntries(fields.map((field) => [
+    field,
+    requiredString(snapshot?.[field], `${label}[${index}].${field}`),
+  ])));
 }
 
 function sha256(value) {
