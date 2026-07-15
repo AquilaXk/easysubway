@@ -33,8 +33,10 @@
 			<tr><th scope="row">retrieved at</th><td th:text="${snapshot.retrievedAt}">2026-06-29T03:00</td></tr>
 			<tr><th scope="row">source updated at</th><td th:text="${snapshot.sourceUpdatedAt}">2026-06-28T00:00</td></tr>
 			<tr><th scope="row">row count</th><td th:text="${snapshot.rowCount}">0</td></tr>
+			<tr><th scope="row">coverage count</th><td th:text="${snapshot.coverageCount}">0</td></tr>
 			<tr><th scope="row">previous snapshot</th><td th:text="${snapshot.previousSnapshotId}">-</td></tr>
 			<tr><th scope="row">diff summary</th><td th:text="${snapshot.diffSummary}">-</td></tr>
+			<tr><th scope="row">diff summary JSON</th><td th:text="${snapshot.diffSummaryJson}">-</td></tr>
 			</tbody>
 		</table>
 	</section>
@@ -51,6 +53,8 @@
 			<tr><th scope="row">credential redacted</th><td th:text="${snapshot.credentialRedactedLabel()}">credential redacted</td></tr>
 			<tr><th scope="row">freshness expires</th><td th:text="${snapshot.freshnessExpiresAt}">2026-07-06T03:00</td></tr>
 			<tr><th scope="row">raw retention</th><td th:text="${snapshot.rawRetentionExpiresAt}">2026-09-29T03:00</td></tr>
+			<tr><th scope="row">governance policy version</th><td th:text="${snapshot.governancePolicyVersion}">-</td></tr>
+			<tr><th scope="row">governance policy sha256</th><td th:text="${snapshot.governancePolicySha256}">-</td></tr>
 			</tbody>
 		</table>
 	</section>
@@ -100,6 +104,10 @@
 				<label>
 					row count
 					<input name="rowCount" type="number" min="0" required>
+				</label>
+				<label>
+					coverage count
+					<input name="coverageCount" type="number" min="0" required>
 				</label>
 			</div>
 			<div class="admin-form-section">
@@ -163,12 +171,24 @@
 					<input name="diffSummary" required>
 				</label>
 				<label>
+					diff summary JSON
+					<textarea name="diffSummaryJson" required></textarea>
+				</label>
+				<label>
 					freshness expires at
 					<input name="freshnessExpiresAt" type="datetime-local" required>
 				</label>
 				<label>
 					raw retention expires at
 					<input name="rawRetentionExpiresAt" type="datetime-local" required>
+				</label>
+				<label>
+					governance policy version
+					<input name="governancePolicyVersion" required>
+				</label>
+				<label>
+					governance policy sha256
+					<input name="governancePolicySha256" minlength="64" maxlength="64" required>
 				</label>
 				<label>
 					reason

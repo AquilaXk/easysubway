@@ -35,6 +35,7 @@ class JdbcDataSourceSnapshotRepositoryTest {
 				retrieved_at TIMESTAMP NOT NULL,
 				source_updated_at TIMESTAMP,
 				row_count INTEGER NOT NULL,
+				coverage_count INTEGER,
 				raw_sha256 VARCHAR(64) NOT NULL,
 				raw_object_uri VARCHAR(1000) NOT NULL,
 				redacted_request_fingerprint VARCHAR(64) NOT NULL,
@@ -47,8 +48,11 @@ class JdbcDataSourceSnapshotRepositoryTest {
 				credential_redacted BOOLEAN NOT NULL,
 				previous_snapshot_id VARCHAR(120),
 				diff_summary VARCHAR(1000),
+				diff_summary_json CLOB,
 				freshness_expires_at TIMESTAMP NOT NULL,
-				raw_retention_expires_at TIMESTAMP NOT NULL
+				raw_retention_expires_at TIMESTAMP NOT NULL,
+				governance_policy_version VARCHAR(32),
+				governance_policy_sha256 VARCHAR(64)
 			)
 			""");
 		repository = new JdbcDataSourceSnapshotRepository(jdbcTemplate);
@@ -210,6 +214,7 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			LocalDateTime.of(2026, 6, 29, 3, 0, 0, 123456789),
 			LocalDateTime.of(2026, 6, 28, 0, 0, 0, 987654321),
 			rowCount,
+			rowCount,
 			rawSha256,
 			rawObjectUri,
 			"c".repeat(64),
@@ -222,8 +227,11 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			credentialRedacted,
 			null,
 			"initial snapshot",
+			null,
 			LocalDateTime.of(2026, 7, 6, 3, 0, 0, 555555555),
-			LocalDateTime.of(2026, 9, 29, 3, 0, 0, 555555555)
+			LocalDateTime.of(2026, 9, 29, 3, 0, 0, 555555555),
+			"2026-07-15",
+			"e".repeat(64)
 		);
 	}
 }

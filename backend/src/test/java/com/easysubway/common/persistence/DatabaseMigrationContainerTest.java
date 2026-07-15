@@ -71,6 +71,7 @@ class DatabaseMigrationContainerTest {
 			.contains(
 				"fk_facility_report_review_audits_report",
 				"fk_data_source_snapshots_previous",
+				"fk_data_source_snapshots_previous_source",
 				"fk_datapack_normalization_runs_snapshot_source",
 				"fk_datapack_normalized_outputs_run",
 				"fk_external_alias_approvals_snapshot_source",
@@ -100,6 +101,8 @@ class DatabaseMigrationContainerTest {
 				"chk_data_source_snapshots_credential_redacted",
 				"chk_data_source_snapshots_raw_object_uri",
 				"chk_data_source_snapshots_raw_retention",
+				"chk_data_source_snapshots_coverage_count",
+				"chk_data_source_snapshots_governance_pair",
 				"chk_facility_evidence_strict_route",
 				"chk_manual_overrides_approval_state",
 				"chk_manual_overrides_effective_window",
@@ -115,6 +118,7 @@ class DatabaseMigrationContainerTest {
 		assertNormalizationRunGuards(jdbcTemplate);
 		assertSnapshotSourceForeignKeysRejectMismatch(jdbcTemplate);
 		assertSnapshotRawEvidencePolicyGuards(jdbcTemplate);
+		assertSnapshotGovernanceGuards(jdbcTemplate);
 		assertPostgresqlSnapshotRawEvidenceConstraintsAreStaged(jdbcTemplate);
 		assertFacilityEvidenceStrictRouteGuards(jdbcTemplate);
 		assertManualOverrideProductionGuards(jdbcTemplate);
@@ -140,6 +144,7 @@ class DatabaseMigrationContainerTest {
 		var jdbcTemplate = new JdbcTemplate(dataSource);
 		assertAdPlacementsSeeded(jdbcTemplate);
 		assertSnapshotSourceForeignKeysRejectMismatch(jdbcTemplate);
+		assertSnapshotGovernanceGuards(jdbcTemplate);
 	}
 
 	@Test
@@ -557,6 +562,66 @@ class DatabaseMigrationContainerTest {
 			"s3://evidence/" + snapshotId,
 			"b".repeat(64),
 			"c".repeat(64)
+		);
+	}
+
+	private void assertSnapshotGovernanceGuards(JdbcTemplate jdbcTemplate) {
+		insertSnapshot(jdbcTemplate, "lineage-root", "lineage-source");
+		assertThatThrownBy(() -> insertSnapshotChild(
+			jdbcTemplate,
+			"lineage-cross-source",
+			"other-source",
+			"lineage-root"
+		)).isInstanceOf(DataAccessException.class);
+
+		insertSnapshotChild(jdbcTemplate, "lineage-child", "lineage-source", "lineage-root");
+		assertThatThrownBy(() -> insertSnapshotChild(
+			jdbcTemplate,
+			"lineage-fork",
+			"lineage-source",
+			"lineage-root"
+		)).isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbcTemplate.update("""
+			UPDATE data_source_snapshots
+			SET governance_policy_version = '2026-07-15'
+			WHERE snapshot_id = 'lineage-root'
+			""")).isInstanceOf(DataAccessException.class);
+		assertThatThrownBy(() -> jdbcTemplate.update("""
+			UPDATE data_source_snapshots
+			SET coverage_count = -1
+			WHERE snapshot_id = 'lineage-root'
+			""")).isInstanceOf(DataAccessException.class);
+	}
+
+	private void insertSnapshotChild(
+		JdbcTemplate jdbcTemplate,
+		String snapshotId,
+		String sourceId,
+		String previousSnapshotId
+	) {
+		jdbcTemplate.update("""
+			INSERT INTO data_source_snapshots (
+				snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count,
+				coverage_count, raw_sha256, raw_object_uri, redacted_request_fingerprint,
+				schema_fingerprint, snapshot_status, schema_status, license_status,
+				fetch_status, redistribution_allowed, credential_redacted,
+				previous_snapshot_id, diff_summary, diff_summary_json,
+				freshness_expires_at, raw_retention_expires_at,
+				governance_policy_version, governance_policy_sha256
+			)
+			VALUES (?, ?, 'KRIC', '2026-06-30 00:00:00', NULL, 2, 2, ?, ?, ?, ?,
+				'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE, ?, 'CHANGED',
+				'{"status":"CHANGED"}', '2026-07-07 00:00:00', '2026-09-30 00:00:00',
+				'2026-07-15', ?)
+			""",
+			snapshotId,
+			sourceId,
+			"a".repeat(64),
+			"s3://evidence/" + snapshotId,
+			"b".repeat(64),
+			"c".repeat(64),
+			previousSnapshotId,
+			"d".repeat(64)
 		);
 	}
 

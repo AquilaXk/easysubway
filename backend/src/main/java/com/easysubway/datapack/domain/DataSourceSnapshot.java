@@ -13,6 +13,7 @@ public record DataSourceSnapshot(
 	LocalDateTime retrievedAt,
 	LocalDateTime sourceUpdatedAt,
 	int rowCount,
+	int coverageCount,
 	String rawSha256,
 	String rawObjectUri,
 	String redactedRequestFingerprint,
@@ -25,8 +26,11 @@ public record DataSourceSnapshot(
 	boolean credentialRedacted,
 	String previousSnapshotId,
 	String diffSummary,
+	String diffSummaryJson,
 	LocalDateTime freshnessExpiresAt,
-	LocalDateTime rawRetentionExpiresAt
+	LocalDateTime rawRetentionExpiresAt,
+	String governancePolicyVersion,
+	String governancePolicySha256
 ) {
 
 	private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
@@ -43,6 +47,9 @@ public record DataSourceSnapshot(
 		if (rowCount < 0) {
 			throw new InvalidDataSourceSnapshotException("rowCount must be zero or positive.");
 		}
+		if (coverageCount < 0) {
+			throw new InvalidDataSourceSnapshotException("coverageCount must be zero or positive.");
+		}
 		rawSha256 = requireSha256(rawSha256, "rawSha256");
 		rawObjectUri = requireText(rawObjectUri, "rawObjectUri");
 		redactedRequestFingerprint = requireSha256(redactedRequestFingerprint, "redactedRequestFingerprint");
@@ -53,6 +60,7 @@ public record DataSourceSnapshot(
 		fetchStatus = requireText(fetchStatus, "fetchStatus");
 		previousSnapshotId = trimToNull(previousSnapshotId);
 		diffSummary = trimToNull(diffSummary);
+		diffSummaryJson = trimToNull(diffSummaryJson);
 		if (freshnessExpiresAt == null) {
 			throw new InvalidDataSourceSnapshotException("freshnessExpiresAt is required.");
 		}
@@ -61,6 +69,8 @@ public record DataSourceSnapshot(
 			throw new InvalidDataSourceSnapshotException("rawRetentionExpiresAt is required.");
 		}
 		rawRetentionExpiresAt = normalizeTimestamp(rawRetentionExpiresAt);
+		governancePolicyVersion = trimToNull(governancePolicyVersion);
+		governancePolicySha256 = trimToNull(governancePolicySha256);
 	}
 
 	public void requireRawEvidenceWritePolicy() {
@@ -70,6 +80,13 @@ public record DataSourceSnapshot(
 		requireCredentialFreeRawObjectUri(rawObjectUri);
 		if (!rawRetentionExpiresAt.isAfter(retrievedAt)) {
 			throw new InvalidDataSourceSnapshotException("rawRetentionExpiresAt must be after retrievedAt.");
+		}
+		requireText(governancePolicyVersion, "governancePolicyVersion");
+		requireSha256(governancePolicySha256, "governancePolicySha256");
+		if ((previousSnapshotId == null) != (diffSummaryJson == null)) {
+			throw new InvalidDataSourceSnapshotException(
+				"first snapshot must omit diffSummaryJson and later snapshots must include it."
+			);
 		}
 	}
 
