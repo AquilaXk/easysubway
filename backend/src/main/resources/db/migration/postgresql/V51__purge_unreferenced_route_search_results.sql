@@ -1,3 +1,6 @@
+SET LOCAL lock_timeout = '30s';
+SET LOCAL statement_timeout = '30s';
+
 DELETE FROM route_search_results AS route
 WHERE NOT EXISTS (
     SELECT 1 FROM favorite_routes AS favorite

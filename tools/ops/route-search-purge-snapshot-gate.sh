@@ -48,12 +48,17 @@ if (( ${#POSTGRES_V51_FILES[@]} > 0 || ${#H2_V51_FILES[@]} > 0 )); then
 		printf 'unexpected V51 migration set\n' >&2
 		exit 1
 	fi
-	for migration in "${POSTGRES_V51}" "${H2_V51}"; do
-		if ! cmp -s "${PURGE_SQL_FILE}" "${migration}"; then
-			printf 'V51 purge SQL differs from the analyzed canonical SQL\n' >&2
-			exit 1
-		fi
-	done
+	if [[ "$(sed -n '1p' "${POSTGRES_V51}")" != "SET LOCAL lock_timeout = '30s';" \
+		|| "$(sed -n '2p' "${POSTGRES_V51}")" != "SET LOCAL statement_timeout = '30s';" \
+		|| -n "$(sed -n '3p' "${POSTGRES_V51}")" ]]; then
+		printf 'PostgreSQL V51 timeout contract is invalid\n' >&2
+		exit 1
+	fi
+	if ! tail -n +4 "${POSTGRES_V51}" | cmp -s "${PURGE_SQL_FILE}" - \
+		|| ! cmp -s "${PURGE_SQL_FILE}" "${H2_V51}"; then
+		printf 'V51 purge DELETE differs from the analyzed canonical SQL\n' >&2
+		exit 1
+	fi
 fi
 purge_sql_sha256="$(sha256sum "${PURGE_SQL_FILE}" | awk '{print $1}')"
 if [[ ! "${purge_sql_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
@@ -429,7 +434,7 @@ snapshot_completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "- WAL bytes: \`${wal_bytes}\`"
 	echo '- restore isolation: same host/image/storage driver, separate Docker volume, no network or published port'
 	echo "- restore resource limits: \`${RESTORE_CPU_LIMIT} CPU, ${RESTORE_MEMORY_LIMIT} memory/no swap, ${RESTORE_PIDS_LIMIT} pids\`"
-	echo '- budget decision: pending explicit owner approval of 30 seconds and 256 MiB'
+	echo '- budget decision: owner approved on #1913 — 30 seconds execution/lock and 256 MiB WAL'
 	echo
 	echo '<details><summary>Sanitized EXPLAIN plan</summary>'
 	echo

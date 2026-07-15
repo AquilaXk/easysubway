@@ -10,6 +10,10 @@ const postgresV51Path =
   "backend/src/main/resources/db/migration/postgresql/V51__purge_unreferenced_route_search_results.sql";
 const h2V51Path =
   "backend/src/main/resources/db/migration/h2/V51__purge_unreferenced_route_search_results.sql";
+const postgresV51TimeoutPrefix = `SET LOCAL lock_timeout = '30s';
+SET LOCAL statement_timeout = '30s';
+
+`;
 
 test("production route API closure evidence는 현재 배포와 origin 403·row 불변을 검증한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -93,10 +97,13 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /#POSTGRES_V51_FILES\[@\][^\n]+!= 1/);
   assert.match(snapshotGate, /POSTGRES_V51_FILES\[0\][^\n]+!=[^\n]+POSTGRES_V51/);
   assert.match(snapshotGate, /cmp -s "\$\{PURGE_SQL_FILE\}"/);
+  assert.match(snapshotGate, /SET LOCAL lock_timeout = '30s'/);
+  assert.match(snapshotGate, /SET LOCAL statement_timeout = '30s'/);
+  assert.match(snapshotGate, /tail -n \+4 "\$\{POSTGRES_V51\}"/);
   assert.doesNotMatch(snapshotGate, /if \[\[ -e "\$\{POSTGRES_V51\}" \|\| -e "\$\{H2_V51\}" \]\]/);
   assert.match(purgeSql, /^DELETE FROM route_search_results AS route/m);
   assert.doesNotMatch(purgeSql, /BEGIN|EXPLAIN|ROLLBACK/);
-  assert.equal(postgresV51, purgeSql);
+  assert.equal(postgresV51, postgresV51TimeoutPrefix + purgeSql);
   assert.equal(h2V51, purgeSql);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore --clean --if-exists --no-owner --no-privileges/);
@@ -153,6 +160,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /postgresql_major/);
   assert.match(snapshotGate, /schema_version/);
   assert.match(snapshotGate, /purge_sql_sha256/);
+  assert.match(snapshotGate, /owner approved on #1913 — 30 seconds execution\/lock and 256 MiB WAL/);
+  assert.doesNotMatch(snapshotGate, /budget decision: pending/);
   assert.doesNotMatch(snapshotGate, /existing verified backup/);
   assert.doesNotMatch(snapshotGate, /\b(curl|scp)\b|upload-artifact/);
 
