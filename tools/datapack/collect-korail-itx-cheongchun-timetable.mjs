@@ -2093,7 +2093,7 @@ function nextRunDate(runDate) {
 }
 
 function freshUntil(serviceDates) {
-  const latest = Object.values(serviceDates).sort().at(-1);
+  const latest = Object.values(serviceDates).sort((left, right) => left.localeCompare(right)).at(-1);
   const next = nextRunDate(latest);
   return `${next.slice(0, 4)}-${next.slice(4, 6)}-${next.slice(6, 8)}T00:00:00+09:00`;
 }

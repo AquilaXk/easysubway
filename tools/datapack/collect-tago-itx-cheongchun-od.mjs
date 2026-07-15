@@ -588,7 +588,7 @@ async function fetchAll(operation, query, key, fetchImpl, requestBudget = null, 
     if (body.totalCount === undefined || body.totalCount === null || body.totalCount === "") {
       const bodyFields = Object.keys(body)
         .filter((field) => /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(field))
-        .sort()
+        .sort((left, right) => left.localeCompare(right))
         .join(",") || "NONE";
       throw new Error(`TAGO ${operation} schema mismatch: totalCount bodyFields=${bodyFields}`);
     }
