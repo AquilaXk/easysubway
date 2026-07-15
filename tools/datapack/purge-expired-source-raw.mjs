@@ -250,10 +250,13 @@ export function buildPurgePlan({
       rawSha256: entry.rawSha256,
       objectUrl: objectUrl(baseUrl, objectKey),
       protectedBy,
-      legalHold: holdValid ? entry.legalHold : null,
+      legalHold: holdValid ? sanitizedLegalHold(entry.legalHold) : null,
       disposition,
     };
   });
+  if (snapshotIds.size !== snapshotEvidence.size) {
+    throw new Error("RAW_RETENTION_OVERDUE: ledger snapshot set mismatch");
+  }
   return plan.sort((left, right) => (
     left.sourceId.localeCompare(right.sourceId) || left.snapshotId.localeCompare(right.snapshotId)
   ));
@@ -467,6 +470,17 @@ function sanitizedProtection(item) {
     ...sanitized(item),
     protectedBy: item.protectedBy,
     legalHold: item.legalHold,
+  };
+}
+
+function sanitizedLegalHold(hold) {
+  return {
+    sourceId: hold.sourceId,
+    snapshotId: hold.snapshotId,
+    ownerRole: hold.ownerRole,
+    reasonCode: hold.reasonCode,
+    createdAt: hold.createdAt,
+    expiresAt: hold.expiresAt,
   };
 }
 

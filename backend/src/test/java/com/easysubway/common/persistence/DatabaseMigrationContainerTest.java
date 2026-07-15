@@ -149,6 +149,26 @@ class DatabaseMigrationContainerTest {
 	}
 
 	@Test
+	@DisplayName("H2 V51은 기존 source의 다중 root lineage가 있으면 migration을 중단한다")
+	void h2GovernanceMigrationRejectsExistingMultipleRoots() {
+		var dataSource = new DriverManagerDataSource(
+			"jdbc:h2:mem:datapack-multiple-roots;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
+			"sa",
+			""
+		);
+		flyway(dataSource, "classpath:db/migration/h2", null)
+			.target(MigrationVersion.fromVersion("50"))
+			.load()
+			.migrate();
+		var jdbcTemplate = new JdbcTemplate(dataSource);
+		insertLegacySnapshotBeforeGovernance(jdbcTemplate, "legacy-root-a", "legacy-source");
+		insertLegacySnapshotBeforeGovernance(jdbcTemplate, "legacy-root-b", "legacy-source");
+
+		assertThatThrownBy(() -> migrate(dataSource, "classpath:db/migration/h2", null))
+			.isInstanceOf(org.flywaydb.core.api.FlywayException.class);
+	}
+
+	@Test
 	@DisplayName("PostgreSQL V48은 기존 placement의 운영 표시명과 비활성 상태를 보존한다")
 	void postgresqlAdPlacementSeedPreservesExistingRow() {
 		String schema = "ad_seed_" + System.nanoTime();
@@ -566,8 +586,36 @@ class DatabaseMigrationContainerTest {
 		);
 	}
 
+	private void insertLegacySnapshotBeforeGovernance(
+		JdbcTemplate jdbcTemplate,
+		String snapshotId,
+		String sourceId
+	) {
+		jdbcTemplate.update("""
+			INSERT INTO data_source_snapshots (
+				snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count,
+				raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
+				snapshot_status, schema_status, license_status, fetch_status,
+				redistribution_allowed, credential_redacted, previous_snapshot_id,
+				diff_summary, freshness_expires_at, raw_retention_expires_at
+			)
+			VALUES (?, ?, 'KRIC', '2026-06-29 00:00:00', NULL, 1, ?, ?, ?, ?,
+				'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE, NULL, NULL,
+				'2026-07-06 00:00:00', '2026-09-29 00:00:00')
+			""",
+			snapshotId,
+			sourceId,
+			"a".repeat(64),
+			"s3://evidence/" + snapshotId,
+			"b".repeat(64),
+			"c".repeat(64)
+		);
+	}
+
 	private void assertSnapshotGovernanceGuards(JdbcTemplate jdbcTemplate) {
 		insertSnapshot(jdbcTemplate, "lineage-root", "lineage-source");
+		assertThatThrownBy(() -> insertSnapshot(jdbcTemplate, "lineage-second-root", "lineage-source"))
+			.isInstanceOf(DataAccessException.class);
 		assertThatThrownBy(() -> insertSnapshotChild(
 			jdbcTemplate,
 			"lineage-cross-source",

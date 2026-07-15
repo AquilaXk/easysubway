@@ -218,6 +218,28 @@ test("실제 DELETE는 승인 ledger의 evaluatedAt과 실행 판단 시각을 �
   });
 });
 
+test("snapshot evidence가 ledger에서 누락되면 DELETE 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [
+      rawEntry("included", "raw/included.json"),
+      rawEntry("omitted", "raw/omitted.json"),
+    ]);
+    const ledger = JSON.parse(await readFile(files.ledger, "utf8"));
+    ledger.entries = ledger.entries.filter((entry) => entry.snapshotId === "included");
+    await writeFile(files.ledger, `${JSON.stringify(ledger, null, 2)}\n`);
+    objects.add("/raw/included.json");
+    objects.add("/raw/omitted.json");
+
+    await assert.rejects(
+      runPurge({ ...files, baseUrl, output: path.join(workDir, "incomplete-ledger.json") }),
+      /ledger snapshot set mismatch/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/included.json"), true);
+    assert.equal(objects.has("/raw/omitted.json"), true);
+  });
+});
+
 test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes로 purge한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const first = policyFixture(["source-old"]);
@@ -272,6 +294,25 @@ test("invalid legal hold가 있으면 전체 plan을 DELETE 전에 거부한다"
     );
     assert.deepEqual(requests, []);
     assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
+test("legal hold report는 검증된 metadata만 기록한다", async () => {
+  await withFixture(async ({ baseUrl, workDir }) => {
+    const files = await writeInputs(workDir, [
+      rawEntry("legal-hold", "raw/legal-hold.json", {
+        legalHold: {
+          ...legalHold("legal-hold"),
+          requesterNote: "serviceKey=must-not-leak",
+        },
+      }),
+    ]);
+    const output = path.join(workDir, "sanitized-legal-hold.json");
+
+    const report = await runPurge({ ...files, baseUrl, output });
+
+    assert.deepEqual(report.protected[0].legalHold, legalHold("legal-hold"));
+    assert.doesNotMatch(await readFile(output, "utf8"), /requesterNote|must-not-leak/);
   });
 });
 

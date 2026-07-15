@@ -2,7 +2,9 @@ ALTER TABLE data_source_snapshots
 	ADD COLUMN coverage_count INTEGER,
 	ADD COLUMN diff_summary_json JSONB,
 	ADD COLUMN governance_policy_version VARCHAR(32),
-	ADD COLUMN governance_policy_sha256 datapack_sha256;
+	ADD COLUMN governance_policy_sha256 datapack_sha256,
+	ADD COLUMN lineage_root_source_id VARCHAR(120)
+		GENERATED ALWAYS AS (CASE WHEN previous_snapshot_id IS NULL THEN source_id ELSE NULL END) STORED;
 
 UPDATE data_source_snapshots
 SET coverage_count = row_count
@@ -23,6 +25,9 @@ ALTER TABLE data_source_snapshots
 CREATE UNIQUE INDEX uq_data_source_snapshots_previous_child
 	ON data_source_snapshots (previous_snapshot_id)
 	WHERE previous_snapshot_id IS NOT NULL;
+
+CREATE UNIQUE INDEX uq_data_source_snapshots_source_root
+	ON data_source_snapshots (lineage_root_source_id);
 
 CREATE TABLE datapack_source_lineage_locks (
 	source_id VARCHAR(120) PRIMARY KEY
