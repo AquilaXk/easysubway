@@ -32,9 +32,9 @@ const artifactIdentity = {
   versionName: "1.0.4",
   versionCode: 10005,
   androidApplicationId: "com.easysubway.app",
-  aabSha256: "a".repeat(64),
-  backendArtifactSha256: "b".repeat(64),
-  dataPackManifestSha256: "c".repeat(64),
+  aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
+  backendImageDigest: "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
+  dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
   supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
 };
 
@@ -206,6 +206,37 @@ test("operations release summary validator rejects identity outside the canonica
     /artifactIdentity must match the canonical Phase A evidence scope/,
   );
 });
+
+for (const [field, value] of [
+  ["aabSha256", "d".repeat(64)],
+  ["backendImageDigest", `sha256:${"d".repeat(64)}`],
+  ["dataPackManifestSha256", "d".repeat(64)],
+]) {
+  test(`operations release summary validator rejects an unvalidated ${field}`, async () => {
+    await assert.rejects(
+      withSummary(validSummary(), async (summaryPath) => {
+        const gate = structuredClone(postLaunchGate);
+        gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity = {
+          aabSha256: artifactIdentity.aabSha256,
+          backendImageDigest: artifactIdentity.backendImageDigest,
+          dataPackManifestSha256: artifactIdentity.dataPackManifestSha256,
+          [field]: value,
+        };
+        const gatePath = path.join(path.dirname(summaryPath), "post-launch-gate.json");
+        await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+        return execFileAsync(process.execPath, [
+          validatorPath,
+          "--summary",
+          summaryPath,
+          "--post-launch-gate",
+          gatePath,
+          "--require-pass",
+        ], { cwd: root });
+      }),
+      /artifactIdentity must match the Phase A validated artifact identity/,
+    );
+  });
+}
 
 test("operations release summary validator rejects regressed canonical support readiness", async () => {
   for (const mutate of [
@@ -408,7 +439,7 @@ test("operations release summary validator compares artifact identity independen
     versionCode: artifactIdentity.versionCode,
     gitSha: artifactIdentity.gitSha,
     dataPackManifestSha256: artifactIdentity.dataPackManifestSha256,
-    backendArtifactSha256: artifactIdentity.backendArtifactSha256,
+    backendImageDigest: artifactIdentity.backendImageDigest,
     aabSha256: artifactIdentity.aabSha256,
     androidApplicationId: artifactIdentity.androidApplicationId,
     versionName: artifactIdentity.versionName,
@@ -426,12 +457,6 @@ test("operations release summary validator compares artifact identity independen
 
 test("operations release summary validator accepts backendImageDigest as the final RC backend identity", async () => {
   const summary = validSummary();
-  delete summary.artifactIdentity.backendArtifactSha256;
-  summary.artifactIdentity.backendImageDigest = `sha256:${"b".repeat(64)}`;
-  for (const review of summary.postLaunchReviews) {
-    delete review.artifactIdentity.backendArtifactSha256;
-    review.artifactIdentity.backendImageDigest = summary.artifactIdentity.backendImageDigest;
-  }
 
   await withSummary(summary, (summaryPath) =>
     execFileAsync(process.execPath, [
@@ -445,8 +470,12 @@ test("operations release summary validator accepts backendImageDigest as the fin
 
 test("operations release summary validator rejects an empty backend identity", async () => {
   const summary = validSummary();
+  delete summary.artifactIdentity.backendImageDigest;
   summary.artifactIdentity.backendArtifactSha256 = "";
-  for (const review of summary.postLaunchReviews) review.artifactIdentity.backendArtifactSha256 = "";
+  for (const review of summary.postLaunchReviews) {
+    delete review.artifactIdentity.backendImageDigest;
+    review.artifactIdentity.backendArtifactSha256 = "";
+  }
 
   await assert.rejects(
     withSummary(summary, (summaryPath) =>
@@ -465,20 +494,27 @@ test("operations release summary validator rejects an empty backend identity", a
 
 test("operations release summary validator rejects a conflicting secondary backend identity", async () => {
   const summary = validSummary();
-  summary.artifactIdentity.backendImageDigest = `sha256:${"d".repeat(64)}`;
+  summary.artifactIdentity.backendArtifactSha256 = "d".repeat(64);
   for (const review of summary.postLaunchReviews) {
-    review.artifactIdentity.backendImageDigest = summary.artifactIdentity.backendImageDigest;
+    review.artifactIdentity.backendArtifactSha256 = summary.artifactIdentity.backendArtifactSha256;
   }
 
   await assert.rejects(
     withSummary(summary, async (summaryPath, rcManifestPath) => {
       const rcManifest = JSON.parse(readFileSync(rcManifestPath, "utf8"));
-      rcManifest.rcIdentity.backendImageDigest = `sha256:${"e".repeat(64)}`;
+      rcManifest.rcIdentity.backendArtifactSha256 = "e".repeat(64);
       await writeFile(rcManifestPath, `${JSON.stringify(rcManifest, null, 2)}\n`);
+      const gate = structuredClone(postLaunchGate);
+      gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity.backendArtifactSha256 =
+        summary.artifactIdentity.backendArtifactSha256;
+      const gatePath = path.join(path.dirname(summaryPath), "post-launch-gate.json");
+      await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
       return execFileAsync(process.execPath, [
         "tools/ops/validate-operations-release-summary.mjs",
         "--summary",
         summaryPath,
+        "--post-launch-gate",
+        gatePath,
         "--require-pass",
       ], { cwd: root });
     }),

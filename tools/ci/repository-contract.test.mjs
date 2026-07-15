@@ -2168,6 +2168,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   const abusePenetrationRehearsalPath = "apps/mobile/release/abuse-penetration-rehearsal-gate.json";
   const abusePenetrationRehearsalGate = readJson(abusePenetrationRehearsalPath);
   const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
+  const operationsEvidence = readJson("apps/mobile/release/operations-release-evidence.json");
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
@@ -2398,6 +2399,24 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
     rcEvidenceManifestContract.backendIdentityFieldsAnyOf,
+  );
+  assert.deepEqual(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity,
+    {
+      aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
+      backendImageDigest: operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.imageId,
+      dataPackManifestSha256: createHash("sha256")
+        .update(read("apps/mobile/assets/datapacks/metro_map_pack/manifest.json"))
+        .digest("hex"),
+    },
+  );
+  assert.deepEqual(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentityEvidence,
+    {
+      aab: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+      backend: "apps/mobile/release/operations-release-evidence.json",
+      dataPackManifest: "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+    },
   );
   assert.deepEqual(postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity, {
     appVersionName: "1.0.4",

@@ -24,6 +24,7 @@ const [rcManifest, observability, postLaunch, support] = await Promise.all([
 const identity = rcManifest.rcIdentity ?? {};
 const requiredIdentity = postLaunch.preLaunchReadiness.finalRcBinding.requiredFields;
 const backendIdentityFields = postLaunch.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf;
+const validatedArtifactIdentity = postLaunch.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity ?? {};
 const validity = postLaunch.preLaunchReadiness.finalRcBinding.evidenceValidity;
 const now = Date.parse(args.get("--now") ?? new Date().toISOString());
 const validFrom = Date.parse(`${validity.validFromKst}T00:00:00+09:00`);
@@ -83,12 +84,26 @@ const channelEvidenceReady = validatedChannels.size === support.supportChannels.
       && typeof item.localEvidencePath === "string" && item.localEvidencePath.length > 0
       && channel.requiredEvidence.every((evidenceId) => evidenceIds.has(evidenceId));
   });
+const validatedBackendIdentityReady = backendIdentityFields.some((field) => (
+  typeof validatedArtifactIdentity[field] === "string"
+  && validatedArtifactIdentity[field].length > 0
+  && identity[field] === validatedArtifactIdentity[field]
+)) && backendIdentityFields.every((field) => (
+  identity[field] === undefined
+  || identity[field] === null
+  || identity[field] === ""
+  || identity[field] === validatedArtifactIdentity[field]
+));
+const validatedArtifactIdentityReady = identity.aabSha256 === validatedArtifactIdentity.aabSha256
+  && identity.dataPackManifestSha256 === validatedArtifactIdentity.dataPackManifestSha256
+  && validatedBackendIdentityReady;
 const ready = postLaunch.preLaunchReadiness.status === "PASS"
   && support.preLaunchReadiness.status === "PASS"
   && rcManifest.androidApplicationId === postLaunch.androidApplicationId
   && refreshBindingsReady
   && signalEvidenceReady
   && channelEvidenceReady
+  && validatedArtifactIdentityReady
   && evidenceSummaryReady
   && support.latestQaEvidenceSummary.remainingSupportReadiness.length === 0
   && support.latestQaEvidenceSummary.helpScreenDeviceQa.result === "PASS"

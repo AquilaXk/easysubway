@@ -132,6 +132,31 @@ function assertEvidenceValidity(summary, gate, artifactIdentity, requirePass, no
   )) {
     throw new Error("artifactIdentity must match the canonical Phase A evidence scope");
   }
+  if (requirePass) {
+    const finalRcBinding = gate.preLaunchReadiness.finalRcBinding;
+    const validatedIdentity = required(
+      finalRcBinding.validatedArtifactIdentity,
+      "gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity",
+    );
+    const backendFields = finalRcBinding.backendIdentityFieldsAnyOf;
+    const backendMatches = backendFields.some((field) => (
+      typeof validatedIdentity[field] === "string"
+      && validatedIdentity[field].length > 0
+      && artifactIdentity[field] === validatedIdentity[field]
+    )) && backendFields.every((field) => (
+      artifactIdentity[field] === undefined
+      || artifactIdentity[field] === null
+      || artifactIdentity[field] === ""
+      || artifactIdentity[field] === validatedIdentity[field]
+    ));
+    if (
+      artifactIdentity.aabSha256 !== validatedIdentity.aabSha256
+      || artifactIdentity.dataPackManifestSha256 !== validatedIdentity.dataPackManifestSha256
+      || !backendMatches
+    ) {
+      throw new Error("artifactIdentity must match the Phase A validated artifact identity");
+    }
+  }
 }
 
 function assertNoSensitiveSummary(summary, gates) {

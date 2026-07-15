@@ -19,10 +19,10 @@ function rcManifest(overrides = {}) {
       gitSha: "abcdef1234567890",
       appVersionName: "1.0.4",
       versionCode: "10005",
-      aabSha256: "a".repeat(64),
-      backendImageDigest: `sha256:${"b".repeat(64)}`,
+      aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
+      backendImageDigest: "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
       backendArtifactSha256: null,
-      dataPackManifestSha256: "c".repeat(64),
+      dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
       supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
       ...overrides,
     },
@@ -117,6 +117,29 @@ test("Phase A summary generator rejects an RC outside the recorded evidence scop
   assert.equal((await readFile(output.status, "utf8")).trim(), "BLOCKED_EXTERNAL");
   await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
 });
+
+for (const [field, value] of [
+  ["aabSha256", "d".repeat(64)],
+  ["backendImageDigest", `sha256:${"d".repeat(64)}`],
+  ["dataPackManifestSha256", "d".repeat(64)],
+]) {
+  test(`Phase A summary generator rejects an RC with an unvalidated ${field}`, async () => {
+    const output = await paths();
+    const gate = JSON.parse(await readFile(
+      path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"),
+      "utf8",
+    ));
+    gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity = rcManifest().rcIdentity;
+    const gatePath = path.join(output.dir, "post-launch-operations-review-gate.json");
+    await writeFile(output.manifest, `${JSON.stringify(rcManifest({ [field]: value }), null, 2)}\n`);
+    await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+
+    await generate(output, ["--post-launch-gate", gatePath]);
+
+    assert.equal((await readFile(output.status, "utf8")).trim(), "BLOCKED_EXTERNAL");
+    await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
+  });
+}
 
 test("Phase A summary generator rejects help-screen device QA from a different RC", async () => {
   const output = await paths();
