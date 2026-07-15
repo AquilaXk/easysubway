@@ -143,7 +143,9 @@ function validatePolicySource(entry, { inventorySources, retentionClasses, fresh
   requiredPositiveInteger(entry.escalationHours, `${sourceId}.escalationHours`);
   requiredText(entry.alertRoute, `${sourceId}.alertRoute`);
   validateLicenseReview(entry.licenseReview, entry, sourceId);
-  requiredSha256(source.admissionEvidence?.licenseEvidenceHash, `${sourceId}.licenseEvidenceHash`);
+  if (!isSha256(source.admissionEvidence?.licenseEvidenceHash)) {
+    throw new Error(`LICENSE_REVIEW_REQUIRED: ${sourceId}.licenseEvidenceHash`);
+  }
 }
 
 function validateReasonCodeEscalations(escalations) {
