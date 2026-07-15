@@ -2400,10 +2400,13 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
     rcEvidenceManifestContract.backendIdentityFieldsAnyOf,
   );
+  const validatedArtifactIdentity =
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity;
+  assert.match(validatedArtifactIdentity.aabPayloadSha256, /^[0-9a-f]{64}$/);
   assert.deepEqual(
-    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity,
+    validatedArtifactIdentity,
     {
-      aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
+      aabPayloadSha256: validatedArtifactIdentity.aabPayloadSha256,
       backendImageDigest: operationsEvidence.backendControlPlane.latestQaEvidenceStatus.releaseArtifact.imageId,
       dataPackManifestSha256: createHash("sha256")
         .update(read("apps/mobile/assets/datapacks/metro_map_pack/manifest.json"))
@@ -2413,7 +2416,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentityEvidence,
     {
-      aab: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+      aabPayload: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
       backend: "apps/mobile/release/operations-release-evidence.json",
       dataPackManifest: "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
     },
@@ -2452,6 +2455,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "tools/ops/generate-operations-phase-a-summary.mjs",
     "tools/ops/validate-operations-release-summary.mjs",
     "tools/release/summary-validation-utils.mjs",
+    "tools/release/hash-android-bundle-payload.mjs",
     "tools/release/generate-rc-evidence-manifest.mjs",
   ]) {
     assert.ok(refreshBoundPaths.has(requiredPath), `${requiredPath} must invalidate Phase A evidence`);
@@ -3106,6 +3110,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "appVersionName",
     "versionCode",
     "aabSha256",
+    "aabPayloadSha256",
     "dataPackManifestSha256",
     "releaseSequence",
     "routeContractVersion",
@@ -3179,6 +3184,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /versionCode=\$\{version_code\}/);
   assert.match(workflow, /packageId=com\.easysubway\.app/);
   assert.match(workflow, /aabSha256=\$\{aab_sha256\}/);
+  assert.match(workflow, /node \.\.\/\.\.\/tools\/release\/hash-android-bundle-payload\.mjs/);
+  assert.match(workflow, /aabPayloadSha256=\$\{aab_payload_sha256\}/);
   assert.match(workflow, /dataPackManifestSha256=\$\{data_pack_manifest_sha256\}/);
   assert.match(workflow, /supportContactSetSha256=\$\{EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256\}/);
   assert.match(
@@ -3629,8 +3636,13 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(appVersion, "mobile pubspec must contain versionName+versionCode");
 
-  await writeFile(aabPath, "fake-aab");
-  await writeFile(androidReleaseMetadataPath, `supportContactSetSha256=${"d".repeat(64)}\n`);
+  const aabPayloadPath = path.join(tempDir, "payload.bin");
+  await writeFile(aabPayloadPath, "fake-aab-payload");
+  await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
+  await writeFile(
+    androidReleaseMetadataPath,
+    `supportContactSetSha256=${"d".repeat(64)}\naabPayloadSha256=${"e".repeat(64)}\n`,
+  );
   await writeFile(phaseASummaryPath, JSON.stringify({
     status: "PASS",
     issue: 1019,
@@ -3683,6 +3695,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.appVersionName, appVersion[1]);
   assert.equal(manifest.versionCode, appVersion[2]);
   assert.match(manifest.aabSha256, /^[a-f0-9]{64}$/);
+  assert.match(manifest.aabPayloadSha256, /^[a-f0-9]{64}$/);
+  assert.notEqual(manifest.aabPayloadSha256, "e".repeat(64));
+  assert.ok(
+    manifest.readiness.blockers.some((blocker) => blocker.id === "mismatch_android_release_metadata_aabPayloadSha256"),
+  );
   assert.equal(manifest.backendImageDigest, "sha256:abcdef");
   assert.equal(manifest.backendArtifactSha256, null);
   assert.match(manifest.dataPackManifestSha256, /^[a-f0-9]{64}$/);

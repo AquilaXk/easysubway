@@ -33,6 +33,7 @@ const artifactIdentity = {
   versionCode: 10005,
   androidApplicationId: "com.easysubway.app",
   aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
+  aabPayloadSha256: "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
   backendImageDigest: "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
   dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
   supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
@@ -136,6 +137,7 @@ async function withSummary(summary, fn) {
       appVersionName: summary.artifactIdentity.versionName,
       versionCode: summary.artifactIdentity.versionCode,
       aabSha256: summary.artifactIdentity.aabSha256,
+      aabPayloadSha256: summary.artifactIdentity.aabPayloadSha256,
       backendImageDigest: summary.artifactIdentity.backendImageDigest ?? null,
       backendArtifactSha256: summary.artifactIdentity.backendArtifactSha256 ?? null,
       dataPackManifestSha256: summary.artifactIdentity.dataPackManifestSha256,
@@ -208,7 +210,7 @@ test("operations release summary validator rejects identity outside the canonica
 });
 
 for (const [field, value] of [
-  ["aabSha256", "d".repeat(64)],
+  ["aabPayloadSha256", "d".repeat(64)],
   ["backendImageDigest", `sha256:${"d".repeat(64)}`],
   ["dataPackManifestSha256", "d".repeat(64)],
 ]) {
@@ -218,6 +220,7 @@ for (const [field, value] of [
         const gate = structuredClone(postLaunchGate);
         gate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity = {
           aabSha256: artifactIdentity.aabSha256,
+          aabPayloadSha256: artifactIdentity.aabPayloadSha256,
           backendImageDigest: artifactIdentity.backendImageDigest,
           dataPackManifestSha256: artifactIdentity.dataPackManifestSha256,
           [field]: value,
@@ -441,6 +444,7 @@ test("operations release summary validator compares artifact identity independen
     dataPackManifestSha256: artifactIdentity.dataPackManifestSha256,
     backendImageDigest: artifactIdentity.backendImageDigest,
     aabSha256: artifactIdentity.aabSha256,
+    aabPayloadSha256: artifactIdentity.aabPayloadSha256,
     androidApplicationId: artifactIdentity.androidApplicationId,
     versionName: artifactIdentity.versionName,
     supportContactSetSha256: artifactIdentity.supportContactSetSha256,

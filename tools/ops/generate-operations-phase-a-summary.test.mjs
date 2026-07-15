@@ -20,6 +20,7 @@ function rcManifest(overrides = {}) {
       appVersionName: "1.0.4",
       versionCode: "10005",
       aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
+      aabPayloadSha256: "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
       backendImageDigest: "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
       backendArtifactSha256: null,
       dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
@@ -119,7 +120,7 @@ test("Phase A summary generator rejects an RC outside the recorded evidence scop
 });
 
 for (const [field, value] of [
-  ["aabSha256", "d".repeat(64)],
+  ["aabPayloadSha256", "d".repeat(64)],
   ["backendImageDigest", `sha256:${"d".repeat(64)}`],
   ["dataPackManifestSha256", "d".repeat(64)],
 ]) {
@@ -140,6 +141,24 @@ for (const [field, value] of [
     await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
   });
 }
+
+test("Phase A summary generator binds a newly signed AAB with the validated payload", async () => {
+  const output = await paths();
+  await writeFile(
+    output.manifest,
+    `${JSON.stringify(rcManifest({ aabSha256: "d".repeat(64) }), null, 2)}\n`,
+  );
+
+  await generate(output);
+
+  assert.equal((await readFile(output.status, "utf8")).trim(), "SATISFIED");
+  const summary = JSON.parse(await readFile(output.summary, "utf8"));
+  assert.equal(summary.artifactIdentity.aabSha256, "d".repeat(64));
+  assert.equal(
+    summary.artifactIdentity.aabPayloadSha256,
+    "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
+  );
+});
 
 test("Phase A summary generator rejects help-screen device QA from a different RC", async () => {
   const output = await paths();

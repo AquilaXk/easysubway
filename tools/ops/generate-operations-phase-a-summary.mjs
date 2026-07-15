@@ -94,7 +94,7 @@ const validatedBackendIdentityReady = backendIdentityFields.some((field) => (
   || identity[field] === ""
   || identity[field] === validatedArtifactIdentity[field]
 ));
-const validatedArtifactIdentityReady = identity.aabSha256 === validatedArtifactIdentity.aabSha256
+const validatedArtifactIdentityReady = identity.aabPayloadSha256 === validatedArtifactIdentity.aabPayloadSha256
   && identity.dataPackManifestSha256 === validatedArtifactIdentity.dataPackManifestSha256
   && validatedBackendIdentityReady;
 const ready = postLaunch.preLaunchReadiness.status === "PASS"
@@ -130,6 +130,7 @@ const artifactIdentity = {
   versionCode: identity.versionCode,
   androidApplicationId: rcManifest.androidApplicationId,
   aabSha256: identity.aabSha256,
+  aabPayloadSha256: identity.aabPayloadSha256,
   dataPackManifestSha256: identity.dataPackManifestSha256,
   supportContactSetSha256: identity.supportContactSetSha256,
 };

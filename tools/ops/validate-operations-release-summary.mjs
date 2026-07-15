@@ -150,7 +150,7 @@ function assertEvidenceValidity(summary, gate, artifactIdentity, requirePass, no
       || artifactIdentity[field] === validatedIdentity[field]
     ));
     if (
-      artifactIdentity.aabSha256 !== validatedIdentity.aabSha256
+      artifactIdentity.aabPayloadSha256 !== validatedIdentity.aabPayloadSha256
       || artifactIdentity.dataPackManifestSha256 !== validatedIdentity.dataPackManifestSha256
       || !backendMatches
     ) {
@@ -209,6 +209,7 @@ function assertIdentity(
     "versionCode",
     "androidApplicationId",
     "aabSha256",
+    "aabPayloadSha256",
     "dataPackManifestSha256",
     "supportContactSetSha256",
   ]) {

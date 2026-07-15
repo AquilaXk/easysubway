@@ -236,6 +236,7 @@ jobs:
           else
             printf 'mapping=not-generated\n' > release-artifacts/android/mapping.txt
           fi
+          aab_payload_sha256="$(node ../../tools/release/hash-android-bundle-payload.mjs --aab release-artifacts/android/app-release.aab)"
           {
             echo "commit=${GITHUB_SHA}"
             echo "artifact=app-release.aab"
@@ -252,6 +253,7 @@ jobs:
             echo "post_launch_operations_review_evidence=blocked_until_post_launch_operations_review_gate_is_satisfied"
             echo "support_incident_response_evidence=blocked_until_support_incident_response_gate_is_satisfied"
             echo "supportContactSetSha256=${EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256}"
+            echo "aabPayloadSha256=${aab_payload_sha256}"
             echo "abuse_penetration_rehearsal_evidence=blocked_until_abuse_penetration_rehearsal_gate_is_satisfied"
             echo "toolchain_policy=apps/mobile/release/signed-release-artifact-gate.json"
           } > release-artifacts/android/release-metadata.txt
@@ -429,6 +431,7 @@ jobs:
           version_name="${version_line%%+*}"
           version_code="${version_line##*+}"
           aab_sha256="$(sha256sum release-artifacts/android/app-release.aab | awk '{print $1}')"
+          aab_payload_sha256="$(node ../../tools/release/hash-android-bundle-payload.mjs --aab release-artifacts/android/app-release.aab)"
           data_pack_manifest_sha256="$(sha256sum assets/datapacks/metro_map_pack/manifest.json | awk '{print $1}')"
           {
             echo "gitSha=${GITHUB_SHA}"
@@ -441,6 +444,7 @@ jobs:
             echo "versionCode=${version_code}"
             echo "packageId=com.easysubway.app"
             echo "aabSha256=${aab_sha256}"
+            echo "aabPayloadSha256=${aab_payload_sha256}"
             echo "dataPackManifestSha256=${data_pack_manifest_sha256}"
             echo "supportContactSetSha256=${EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256}"
             echo "dataPackChannel=${EASYSUBWAY_DATAPACK_CHANNEL}"

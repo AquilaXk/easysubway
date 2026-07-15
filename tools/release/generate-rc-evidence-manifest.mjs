@@ -58,6 +58,7 @@ const identity = {
   appVersionName: appVersion.name,
   versionCode: appVersion.code,
   aabSha256: sha256FileIfExists(args.aab),
+  aabPayloadSha256: aabPayloadSha256IfExists(args.aab),
   backendImageDigest: backendIdentity.backendImageDigest,
   backendArtifactSha256: backendIdentity.backendArtifactSha256,
   dataPackManifestSha256: sha256FileIfExists(dataPackManifestPath),
@@ -87,6 +88,7 @@ const evidenceEntries = requiredEvidenceEntries(
 );
 const blockers = [
   ...identityBlockers(identity),
+  ...androidReleaseMetadataMismatchBlockers(identity, androidReleaseMetadata),
   ...expectedMismatchBlockers(identity, expectedValues),
   ...gateStatusBlockers(gateStatuses),
   ...openP0Blockers(arg("openAndroidP0Count", "open-android-p0-count")),
@@ -180,6 +182,18 @@ function sha256FileIfExists(filePath) {
     return null;
   }
   return createHash("sha256").update(readFileSync(resolved)).digest("hex");
+}
+
+function aabPayloadSha256IfExists(filePath) {
+  if (!filePath) return null;
+  const resolved = resolvePath(filePath);
+  if (!existsSync(resolved)) return null;
+  const digest = execFileSync(process.execPath, [
+    path.join(repoRoot, "tools/release/hash-android-bundle-payload.mjs"),
+    "--aab",
+    resolved,
+  ], { encoding: "utf8", maxBuffer: 1024 * 1024 }).trim();
+  return /^[0-9a-f]{64}$/.test(digest) ? digest : null;
 }
 
 function readJsonIfExists(filePath) {
@@ -377,6 +391,7 @@ function identityBlockers(values) {
     "appVersionName",
     "versionCode",
     "aabSha256",
+    "aabPayloadSha256",
     "dataPackManifestSha256",
     "supportContactSetSha256",
     "releaseSequence",
@@ -409,6 +424,15 @@ function expectedMismatchBlockers(values, expected) {
       severity: "P0",
       reason: `${key} expected ${expectedValue} but got ${values[key] ?? "missing"}`,
     }));
+}
+
+function androidReleaseMetadataMismatchBlockers(values, metadata) {
+  if (!metadata.aabPayloadSha256 || metadata.aabPayloadSha256 === values.aabPayloadSha256) return [];
+  return [{
+    id: "mismatch_android_release_metadata_aabPayloadSha256",
+    severity: "P0",
+    reason: "aabPayloadSha256 in release metadata does not match the supplied AAB payload",
+  }];
 }
 
 function gateStatusBlockers(statuses) {

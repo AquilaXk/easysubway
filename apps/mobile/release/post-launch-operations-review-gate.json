@@ -25,15 +25,15 @@
     ],
     "finalRcBinding": {
       "manifest": "apps/mobile/release/rc-evidence-manifest-contract.json",
-      "requiredFields": ["gitSha", "versionCode", "aabSha256", "dataPackManifestSha256", "supportContactSetSha256"],
+      "requiredFields": ["gitSha", "versionCode", "aabSha256", "aabPayloadSha256", "dataPackManifestSha256", "supportContactSetSha256"],
       "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
       "validatedArtifactIdentity": {
-        "aabSha256": "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
+        "aabPayloadSha256": "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
         "backendImageDigest": "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
         "dataPackManifestSha256": "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5"
       },
       "validatedArtifactIdentityEvidence": {
-        "aab": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+        "aabPayload": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
         "backend": "apps/mobile/release/operations-release-evidence.json",
         "dataPackManifest": "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"
       },
@@ -55,9 +55,10 @@
           "files": [
             {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "fc9e00164b711954906724a0141fb4f3ebbe3cb875e6d4f0e4f6d34987e8a01a"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
-            {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "043326147ab2fb0db79abe1ebab6d8e2848e8a08a23decaa5cc81754747be394"},
-            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "59625dca4bb4968d5e7a006eec44e33edaba5f660cd713776dcea2df2fbf649f"},
-            {"path": "tools/release/summary-validation-utils.mjs", "sha256": "d6c8980536e6aba14d9d2f41879339c434759bfa986aca2045d6bf5909fe0d8e"}
+            {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
+            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "30e8531504e47acc94ec673689529444b1717cd40a5756132e0f231aa54bab20"},
+            {"path": "tools/release/summary-validation-utils.mjs", "sha256": "d6c8980536e6aba14d9d2f41879339c434759bfa986aca2045d6bf5909fe0d8e"},
+            {"path": "tools/release/hash-android-bundle-payload.mjs", "sha256": "86b5e211f2f8be3308092f71613fdca1b88dfa9fc9b3101d4ba384236d945c9f"}
           ]
         },
         {
@@ -80,14 +81,14 @@
         {
           "refreshOn": "fixed-release-procedure-change",
           "files": [
-            {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "7690e3f3de3ce4408f477ac30cec1d8f92ceca8056e367170863448a278cf9cb"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "d0573769c04a24a0bcb6b4668ce8ac1c5e2b11a43aa00df7d0df2808d783aa95"},
-            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "6784beebb3c9c3ac8df9f386196d47f987aa60f16140379b88937c6805c20001"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "7bf816b8486065cf97fefc85bd9a62d5f1dce5627fef6a7551fba3deb71c28cd"}
+            {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "88d6038209a8959728719877da34c9202fcfa9878eea255f6d2acfd23e9e1d06"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "d34dd617de966c6822d764535075eaf342f15c4bc01e8fd770312fb02f4d4da7"},
+            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "2a73141971a85b165669906f9468588349167b0885ef8e0569e1191f90b63a67"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "e0235311b90375049175573a17674cf445f4b56ff34252c1db74bd59502e860a"}
           ]
         }
       ],
-      "bindingKo": "Phase A gate 파일은 signed RC artifact에 포함하며 최종 RC manifest의 identity와 함께 동결한다."
+      "bindingKo": "Phase A는 서명 재생성에 영향받지 않는 AAB payload hash로 검증된 실행 내용을 고정하고, 실제 signed AAB hash는 최종 RC manifest와 summary에 그대로 결속한다."
     },
     "evidenceSummary": [
       {
