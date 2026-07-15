@@ -34,7 +34,7 @@ const artifactIdentity = {
   androidApplicationId: "com.easysubway.app",
   aabSha256: "15d9c7a3ff98c770a6b757f776ad102ad10c5b1dda81a0847a84e6d65b689a69",
   aabPayloadSha256: "6c4962a7858d7b6887d22770adaa1a3988dbed17f36d76e1298bd789639ad281",
-  backendArtifactSha256: "9eb2a03811e0e8cb4ef71a6dbcc99b0214eb7c884950e5d822b242fc4abc11b3",
+  backendArtifactSha256: "8bc8f71f92fa82b38739a02424c6758f317b6dd4d3f07398cdf29a886c4b5f98",
   dataPackManifestSha256: "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5",
   supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
 };
