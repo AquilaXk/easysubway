@@ -10,6 +10,7 @@
   "signedReleaseArtifactGate": "apps/mobile/release/signed-release-artifact-gate.json",
   "releaseGovernanceGate": "apps/mobile/release/release-governance-gate.json",
   "generator": "tools/release/generate-rc-evidence-manifest.mjs",
+  "launchScopeSource": "apps/mobile/release/production-datapack-scope.json",
   "requiredRcIdentityFields": [
     "gitSha",
     "appVersionName",
@@ -18,7 +19,12 @@
     "dataPackManifestSha256",
     "releaseSequence",
     "routeContractVersion",
-    "realtimeContractVersion"
+    "realtimeContractVersion",
+    "launchScopeId",
+    "launchScopeSha256",
+    "nationwideRoadmapScopeId",
+    "nationwideRoadmapScopeSha256",
+    "identityLinkageMatrixSha256"
   ],
   "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
   "requiredEvidenceEntryFields": [
