@@ -9,6 +9,7 @@ DEPLOY_COMPOSE_PROJECT="${DEPLOY_COMPOSE_PROJECT:-easysubway}"
 RESTORE_CPU_LIMIT="1"
 RESTORE_MEMORY_LIMIT="2g"
 RESTORE_PIDS_LIMIT="256"
+WAL_HEADROOM_BYTES="$((256 * 1024 * 1024))"
 
 if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
 	printf 'DEPLOY_ROOT is invalid\n' >&2
@@ -84,8 +85,17 @@ production_count() {
 }
 
 source_count_before="$(production_count)"
-if [[ ! "${source_count_before}" =~ ^[0-9]+$ ]]; then
-	printf 'production route row count is invalid\n' >&2
+source_database_bytes="$(docker exec easysubway-postgres sh -lc \
+	'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT pg_database_size(current_database());"' \
+	| tr -d '[:space:]')"
+docker_root_dir="$(docker info --format '{{.DockerRootDir}}')"
+backup_available_before="$(df -PB1 "${BACKUP_DIR}" | awk 'NR == 2 {print $4}')"
+if [[ ! "${source_count_before}" =~ ^[0-9]+$ || ! "${source_database_bytes}" =~ ^[0-9]+$ || ! "${backup_available_before}" =~ ^[0-9]+$ ]]; then
+	printf 'production snapshot preflight metrics are invalid\n' >&2
+	exit 1
+fi
+if (( backup_available_before < source_database_bytes )); then
+	printf 'insufficient backup filesystem headroom\n' >&2
 	exit 1
 fi
 
@@ -111,6 +121,12 @@ backup_sha256="$(sha256sum "${backup_file}" | awk '{print $1}')"
 backup_bytes="$(stat -c '%s' "${backup_file}")"
 if [[ ! "${backup_sha256}" =~ ^[0-9a-f]{64}$ || ! "${backup_bytes}" =~ ^[0-9]+$ ]]; then
 	printf 'backup identity is invalid\n' >&2
+	exit 1
+fi
+docker_available_after_backup="$(df -PB1 "${docker_root_dir}" | awk 'NR == 2 {print $4}')"
+restore_required_bytes="$((source_database_bytes + WAL_HEADROOM_BYTES))"
+if [[ ! "${docker_available_after_backup}" =~ ^[0-9]+$ ]] || (( docker_available_after_backup < restore_required_bytes )); then
+	printf 'insufficient Docker filesystem headroom\n' >&2
 	exit 1
 fi
 
@@ -274,28 +290,15 @@ restore_settings="$(restore_psql -F '|' -c "SELECT current_setting('server_versi
 adjusted_execution_ms="$(awk -v value="${execution_ms}" 'BEGIN { printf "%.3f", value * 2 }')"
 adjusted_wall_ms="$(( wall_ms * 2 ))"
 
-marker_tmp="$(mktemp "${EVIDENCE_DIR}/snapshot.XXXXXX")"
-{
-	printf 'status=snapshot-complete\n'
-	printf 'current_sha=%s\n' "${current_sha}"
-	printf 'backup_file=%s\n' "${backup_file}"
-	printf 'backup_sha256=%s\n' "${backup_sha256}"
-	printf 'backup_bytes=%s\n' "${backup_bytes}"
-	printf 'route_total=%s\n' "${route_total}"
-	printf 'delete_candidates=%s\n' "${delete_candidates}"
-	printf 'execution_ms=%s\n' "${execution_ms}"
-	printf 'wall_ms=%s\n' "${wall_ms}"
-	printf 'wal_bytes=%s\n' "${wal_bytes}"
-} > "${marker_tmp}"
-chmod 600 "${marker_tmp}"
-mv "${marker_tmp}" "${MARKER_FILE}"
-
 report_file="${EVIDENCE_DIR}/report-${backup_sha256:0:12}.md"
 {
 	echo '### #1913 route purge snapshot gate'
 	echo "- deployed SHA: \`${current_sha}\`"
 	echo "- backup SHA-256: \`${backup_sha256}\`"
 	echo "- backup bytes: \`${backup_bytes}\`"
+	echo "- source database bytes: \`${source_database_bytes}\`"
+	echo "- backup filesystem available before: \`${backup_available_before}\`"
+	echo "- Docker available after backup/required restore headroom: \`${docker_available_after_backup}/${restore_required_bytes}\`"
 	echo "- PostgreSQL image: \`${production_image}\`"
 	echo "- CPU: \`${cpu_model}\`, cores \`${cpu_cores}\`"
 	echo "- memory KiB: \`${memory_kib}\`"
@@ -325,5 +328,21 @@ report_file="${EVIDENCE_DIR}/report-${backup_sha256:0:12}.md"
 chmod 600 "${report_file}"
 cat "${report_file}" >> "${SUMMARY_FILE}"
 cat "${report_file}"
+
+marker_tmp="$(mktemp "${EVIDENCE_DIR}/snapshot.XXXXXX")"
+{
+	printf 'status=snapshot-complete\n'
+	printf 'current_sha=%s\n' "${current_sha}"
+	printf 'backup_file=%s\n' "${backup_file}"
+	printf 'backup_sha256=%s\n' "${backup_sha256}"
+	printf 'backup_bytes=%s\n' "${backup_bytes}"
+	printf 'route_total=%s\n' "${route_total}"
+	printf 'delete_candidates=%s\n' "${delete_candidates}"
+	printf 'execution_ms=%s\n' "${execution_ms}"
+	printf 'wall_ms=%s\n' "${wall_ms}"
+	printf 'wal_bytes=%s\n' "${wal_bytes}"
+} > "${marker_tmp}"
+chmod 600 "${marker_tmp}"
+mv "${marker_tmp}" "${MARKER_FILE}"
 
 printf 'route purge snapshot gate completed: %s\n' "${backup_sha256}"

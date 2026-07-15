@@ -68,6 +68,9 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /--memory-swap "\$\{RESTORE_MEMORY_LIMIT\}"/);
   assert.match(snapshotGate, /--pids-limit "\$\{RESTORE_PIDS_LIMIT\}"/);
   assert.match(snapshotGate, /restore resource limits/);
+  assert.match(snapshotGate, /source_database_bytes/);
+  assert.match(snapshotGate, /docker_available_after_backup/);
+  assert.match(snapshotGate, /insufficient Docker filesystem headroom/);
   assert.match(snapshotGate, /EXPLAIN \(ANALYZE, BUFFERS, WAL/);
   assert.match(snapshotGate, /ROLLBACK/);
   assert.match(snapshotGate, /favorite_routes/);
@@ -82,4 +85,10 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /cat "\$\{report_file\}"/);
   assert.match(snapshotGate, /snapshot-complete/);
   assert.doesNotMatch(snapshotGate, /\b(curl|scp)\b|upload-artifact/);
+
+  const reportAppend = snapshotGate.indexOf('cat "${report_file}" >> "${SUMMARY_FILE}"');
+  const markerPublish = snapshotGate.lastIndexOf('mv "${marker_tmp}" "${MARKER_FILE}"');
+  assert.notEqual(reportAppend, -1);
+  assert.notEqual(markerPublish, -1);
+  assert.ok(reportAppend < markerPublish, "success marker must be published after required evidence");
 });
