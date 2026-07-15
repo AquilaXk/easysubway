@@ -64,6 +64,10 @@ export function validateLineage(snapshots) {
     if (!previous || previous.sourceId !== snapshot.sourceId) {
       throw new Error("SOURCE_LINEAGE_BROKEN: previous snapshot");
     }
+    if (requiredUtcInstant(snapshot.retrievedAt, "snapshot.retrievedAt")
+      <= requiredUtcInstant(previous.retrievedAt, "previous.retrievedAt")) {
+      throw new Error("SOURCE_LINEAGE_BROKEN: retrievedAt order");
+    }
     const childIds = children.get(previous.snapshotId) ?? [];
     childIds.push(snapshot.snapshotId);
     if (childIds.length > 1) throw new Error("SOURCE_LINEAGE_BROKEN: snapshot fork");
@@ -100,6 +104,11 @@ export function validateLineage(snapshots) {
 }
 
 function validateDiffSnapshot(snapshot, label) {
+  try {
+    requiredUtcInstant(snapshot?.retrievedAt, `${label}.retrievedAt`);
+  } catch {
+    throw new Error(`SOURCE_LINEAGE_BROKEN: ${label}.retrievedAt`);
+  }
   for (const field of ["rawSha256", "schemaFingerprint", "redactedRequestFingerprint"]) {
     if (!/^[0-9a-f]{64}$/.test(snapshot?.[field] ?? "")) {
       throw new Error(`SOURCE_DIFF_MISSING: ${label}.${field}`);

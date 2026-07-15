@@ -65,6 +65,22 @@ test("orphan과 cross-source previous snapshot을 거부한다", () => {
   );
 });
 
+test("후속 snapshot retrievedAt은 parent보다 엄격히 이후여야 한다", () => {
+  for (const retrievedAt of [first.retrievedAt, "2026-06-30T23:59:59Z"]) {
+    const child = snapshot({
+      snapshotId: `snapshot-a-${retrievedAt}`,
+      previousSnapshotId: first.snapshotId,
+      retrievedAt,
+    });
+    child.diffSummary = buildSnapshotDiff(first, child);
+
+    assert.throws(
+      () => validateLineage([first, child]),
+      /SOURCE_LINEAGE_BROKEN: retrievedAt order/,
+    );
+  }
+});
+
 test("cycle과 기존 head에서 갈라지는 fork를 거부한다", () => {
   const cycleA = snapshot({ snapshotId: "cycle-a", previousSnapshotId: "cycle-b" });
   const cycleB = snapshot({ snapshotId: "cycle-b", previousSnapshotId: "cycle-a" });

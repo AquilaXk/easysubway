@@ -120,6 +120,62 @@ test("선택한 head만 freshness를 판정하고 만료된 이전 snapshot은 l
   assert.deepEqual(result.results.map((entry) => entry.snapshotId), [head.snapshotId]);
 });
 
+test("lineage head가 아닌 이전 snapshot을 release 대상으로 선택하면 거부한다", () => {
+  const value = input();
+  const previous = {
+    ...value.snapshots[0],
+    snapshotId: "snapshot-a-1",
+    previousSnapshotId: null,
+    diffSummary: null,
+  };
+  const head = {
+    ...value.snapshots[0],
+    snapshotId: "snapshot-a-2",
+    retrievedAt: "2026-07-13T00:00:00Z",
+    previousSnapshotId: previous.snapshotId,
+    diffSummary: {
+      status: "NO_CHANGE",
+      rawHashChanged: false,
+      schemaHashChanged: false,
+      requestHashChanged: false,
+      sourceUpdatedAtChanged: false,
+      rowDelta: 0,
+      coverageDelta: 0,
+    },
+  };
+  value.snapshots = [previous, head];
+  value.buildSpec.sourceSnapshotIds = [previous.snapshotId];
+  value.buildSpec.sourceSnapshots = value.buildSpec.sourceSnapshots.map((snapshot) => ({
+    ...snapshot,
+    snapshotId: previous.snapshotId,
+  }));
+  value.buildSpec.sourceSnapshotSetHash = createHash("sha256")
+    .update(JSON.stringify([previous]))
+    .digest("hex");
+
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /SOURCE_LINEAGE_BROKEN: selected snapshot is not source head/,
+  );
+});
+
+test("production 필수 source가 build snapshot에서 빠지면 governance GO를 거부한다", () => {
+  const value = input();
+  value.inventory = {
+    sources: [
+      { id: "source-a", requiredForProductionPack: true },
+      { id: "source-b", requiredForProductionPack: true },
+    ],
+  };
+  value.governancePolicy = {};
+  value.governancePolicySha256 = "d".repeat(64);
+
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /SOURCE_FRESHNESS_POLICY_MISSING: required production source source-b/,
+  );
+});
+
 test("실제 release build spec은 governance 계약으로 freshness를 통과한다", async () => {
   const { stdout } = await execFileAsync(process.execPath, [
     "tools/datapack/validate-source-snapshot-freshness.mjs",

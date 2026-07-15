@@ -42,8 +42,14 @@ export function validateSourceSnapshotFreshness({
   if (!Array.isArray(snapshots) || snapshots.length === 0) {
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: source snapshots");
   }
-  validateLineage(snapshots);
+  const { headsBySource } = validateLineage(snapshots);
   const selectedSnapshots = selectSnapshots(snapshots, buildSpec.sourceSnapshotIds);
+  for (const snapshot of selectedSnapshots) {
+    if (headsBySource[snapshot.sourceId] !== snapshot.snapshotId) {
+      throw new Error("SOURCE_LINEAGE_BROKEN: selected snapshot is not source head");
+    }
+  }
+  if (inventory != null) validateRequiredProductionSources(selectedSnapshots, inventory);
   const includeGovernance = governancePolicy != null;
   const evidenceProvenance = canonicalBuildProvenance(selectedSnapshots, "snapshots");
   const buildProvenance = canonicalBuildProvenance(
@@ -215,6 +221,18 @@ function selectSnapshots(snapshots, selectedIds) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source snapshot IDs");
   }
   return selected;
+}
+
+function validateRequiredProductionSources(snapshots, inventory) {
+  const counts = new Map();
+  for (const snapshot of snapshots) {
+    counts.set(snapshot.sourceId, (counts.get(snapshot.sourceId) ?? 0) + 1);
+  }
+  for (const source of inventory?.sources ?? []) {
+    if (source.requiredForProductionPack === true && counts.get(source.id) !== 1) {
+      throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: required production source ${source.id}`);
+    }
+  }
 }
 
 function bindGovernanceProvenance(snapshots, buildSnapshots) {
