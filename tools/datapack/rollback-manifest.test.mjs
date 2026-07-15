@@ -109,6 +109,27 @@ test("dry-run은 모든 검증과 report 생성을 수행하되 object를 쓰지
   });
 });
 
+test("fixture rescue wrapper는 production private key 없이 sha256 manifest를 게시한다", async () => {
+  await withFixture(async ({ directory, storage, current, knownGood }) => {
+    signFixtureManifest(current);
+    signFixtureManifest(knownGood);
+    const currentBytes = bytes(current);
+    const knownGoodBytes = bytes(knownGood);
+    storage.objects.set("catalog/current.json", { body: currentBytes });
+    storage.objects.set("catalog/releases/115.json", { body: currentBytes });
+    storage.objects.set("catalog/releases/114.json", { body: knownGoodBytes });
+    const approvalPath = path.join(directory, "approval.json");
+    const approval = JSON.parse(await readFile(approvalPath, "utf8"));
+    approval.failedManifestSha256 = sha256(currentBytes);
+    approval.knownGoodManifestSha256 = sha256(knownGoodBytes);
+    await writeFile(approvalPath, `${JSON.stringify(approval)}\n`);
+
+    const report = JSON.parse((await runRollback(directory, storage.baseUrl, [], false)).stdout);
+    const rescue = JSON.parse(storage.objects.get(`catalog/releases/${report.rescue.releaseSequence}.json`).body);
+    assert.equal(rescue.signature.algorithm, "sha256-manifest-v2");
+  });
+});
+
 test("rescue sequence는 caller 파일이 아니라 원격 immutable catalog 최대값 다음으로 계산한다", async () => {
   await withFixture(async ({ directory, storage }) => {
     storage.objects.set("catalog/releases/120.json", { body: bytes(manifest(120, storage.pack)) });
@@ -272,7 +293,9 @@ async function withFixture(callback) {
   }
 }
 
-async function runRollback(directory, baseUrl, extraArgs = []) {
+async function runRollback(directory, baseUrl, extraArgs = [], includePrivateKey = true) {
+  const publishedAt = new Date();
+  const expiresAt = new Date(publishedAt.getTime() + 86_400_000);
   return execFileAsync("node", [
     path.join(repoRoot, "tools/datapack/rollback-manifest.mjs"),
     "--target-sequence", "114",
@@ -280,16 +303,16 @@ async function runRollback(directory, baseUrl, extraArgs = []) {
     "--channel", "staging",
     "--base-url", baseUrl,
     "--approval", path.join(directory, "approval.json"),
-    "--published-at", "2026-07-15T01:00:00.000Z",
-    "--expires-at", "2026-07-16T01:00:00.000Z",
+    "--published-at", publishedAt.toISOString(),
+    "--expires-at", expiresAt.toISOString(),
     "--manifest-output", path.join(directory, "rollback-manifest.json"),
     "--evidence-output", path.join(directory, "rollback-evidence.json"),
     ...extraArgs,
   ], {
     env: {
       ...process.env,
-      EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKeyPem,
       EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKeyPem,
+      ...(includePrivateKey ? { EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: privateKeyPem } : {}),
     },
   });
 }
@@ -467,6 +490,23 @@ function resignManifest(value) {
   value.signature = {
     algorithm: "rsa-sha256-manifest-v2",
     value: sign(canonicalJson(withoutSignature(value))),
+  };
+}
+
+function signFixtureManifest(value) {
+  const pack = value.packs[0];
+  pack.artifactKind = "fixture";
+  pack.url = "catalog/capital-v1.sqlite.gz";
+  const payload = `${pack.id}:${pack.version}:${pack.sha256}:${pack.sqliteSha256}:${pack.sizeBytes}`;
+  pack.signature = { algorithm: "sha256-pack-manifest-v2", value: sha256(payload) };
+  pack.representativeRouteRegressionSignature = {
+    algorithm: "sha256-route-regression-v1",
+    value: sha256(`${payload}:${JSON.stringify(pack.representativeRouteRegressions)}`),
+  };
+  value.keyId = "fixture-key";
+  value.signature = {
+    algorithm: "sha256-manifest-v2",
+    value: sha256(canonicalJson(withoutSignature(value))),
   };
 }
 

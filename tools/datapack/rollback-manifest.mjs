@@ -108,7 +108,9 @@ async function main() {
     approval,
     publishedAt: requiredArg(args, "published-at"),
     expiresAt: requiredArg(args, "expires-at"),
-    privateKey: signingPrivateKey(),
+    privateKey: knownGood.packs?.some((pack) => pack.artifactKind === "production")
+      ? signingPrivateKey()
+      : undefined,
   });
   await writeOutput(manifestOutput, result.manifestBytes);
 

@@ -30,6 +30,7 @@ test("current, failed, immutable catalog 최대값보다 큰 rescue sequence를 
     approval: approved(current, knownGood),
     publishedAt: "2026-07-15T01:00:00.000Z",
     expiresAt: "2026-07-16T01:00:00.000Z",
+    now: new Date("2026-07-15T01:00:00.000Z"),
     privateKey: privateKeyPem,
   });
 
