@@ -20,6 +20,9 @@ const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const purgeKeys = generateKeyPairSync("ed25519");
 const purgePublicKeyText = purgeKeys.publicKey.export({ type: "spki", format: "pem" });
+const purgePublicKeySha256 = createHash("sha256")
+  .update(purgeKeys.publicKey.export({ type: "spki", format: "der" }))
+  .digest("hex");
 const purgeLedgerText = '{"artifactKind":"trusted-test-retention-ledger"}\n';
 const purgeSnapshotText = '[{"artifactKind":"trusted-test-snapshot"}]\n';
 const purgeAttestations = new WeakMap();
@@ -161,6 +164,7 @@ function attestPurgeReport(report) {
     governancePolicyVersion: "2026-07-15",
     governancePolicySha256: "d".repeat(64),
     publicKeyText: purgePublicKeyText,
+    trustedPublicKeySha256: purgePublicKeySha256,
   });
   return report;
 }
@@ -178,7 +182,6 @@ function purgeJournal(report) {
     records.push({ event: "DELETE_RESULT", evaluatedAt: report.evaluatedAt, item: entry, outcome: "DELETED" });
   }
   for (const entry of report.alreadyAbsent) {
-    records.push({ event: "DELETE_INTENT", evaluatedAt: report.evaluatedAt, item: entry });
     records.push({ event: "DELETE_RESULT", evaluatedAt: report.evaluatedAt, item: entry, outcome: "ALREADY_ABSENT" });
   }
   for (const entry of report.failed) {
@@ -285,6 +288,20 @@ test("attestation에 결합된 journal·ledger·public key 변조를 거부한�
     () => purgeEvidenceBySnapshot(report, { ...attestation, publicKeyText: otherPublicKeyText }),
     /purge attestation/,
   );
+  assert.throws(
+    () => purgeEvidenceBySnapshot(report, { ...attestation, trustedPublicKeySha256: "f".repeat(64) }),
+    /trusted purge attestation key/,
+  );
+});
+
+test("GET 404로 이미 사라진 raw는 DELETE intent 없이도 idempotent purge evidence로 검증한다", () => {
+  const report = purgeReport([]);
+  report.alreadyAbsent = [
+    { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) },
+  ];
+  attestPurgeReport(report);
+
+  assert.equal(verifiedPurgeEvidence(report).get("source-a\0snapshot-a").purgedAt, report.completedAt);
 });
 
 test("FAIL purge report도 완료된 삭제 증거만 소비하고 실패 항목은 미완료로 남긴다", () => {

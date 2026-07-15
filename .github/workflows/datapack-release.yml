@@ -266,6 +266,8 @@ jobs:
 
       - name: Data Pack Release / Validate source snapshot freshness
         if: ${{ steps.release-mode.outputs.mode == 'release-candidate' || steps.release-mode.outputs.mode == 'production-publish' }}
+        env:
+          EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256: ${{ secrets.EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
           freshness_args=( \

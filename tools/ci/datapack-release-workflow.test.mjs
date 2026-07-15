@@ -162,6 +162,10 @@ test("release build는 source snapshot freshness를 build 전에 fail closed로 
   assert.match(freshnessStep, /--policy apps\/mobile\/release\/datapack-freshness-sla\.json/);
   assert.match(freshnessStep, /--governance-policy tools\/datapack\/source-governance-policy\.json/);
   assert.match(freshnessStep, /--inventory tools\/datapack\/source-inventory\.json/);
+  assert.match(
+    freshnessStep,
+    /EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256: \$\{\{ secrets\.EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256 \}\}/,
+  );
   assert.match(freshnessStep, /--purge-evaluation-at "\$\{EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT\}"/);
   assert.doesNotMatch(freshnessStep, /--evaluation-at/);
   assert.match(yml, /sourceGovernanceEvaluationAt is required with sourceRawPurgeReportPath/);

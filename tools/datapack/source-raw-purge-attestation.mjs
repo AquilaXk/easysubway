@@ -43,6 +43,7 @@ export function verifyPurgeAttestation(report, {
   governancePolicyVersion,
   governancePolicySha256,
   publicKeyText,
+  trustedPublicKeySha256,
 }) {
   if (typeof journalText !== "string"
     || typeof ledgerText !== "string"
@@ -51,6 +52,10 @@ export function verifyPurgeAttestation(report, {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge attestation inputs");
   }
   const publicKey = createPublicKey(publicKeyText);
+  if (!/^[0-9a-f]{64}$/.test(trustedPublicKeySha256 ?? "")
+    || publicKeyFingerprint(publicKey) !== trustedPublicKeySha256) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: trusted purge attestation key");
+  }
   const attestation = report?.attestation;
   const policyBindings = normalizedPolicyBindings(attestation?.policyBindings);
   if (attestation?.schemaVersion !== 1
@@ -131,8 +136,9 @@ function verifyPurgeJournal(report, journalText) {
   }
   for (const [key, outcomes] of expected) {
     const outcome = results.get(key);
+    const intentRequired = outcome === "DELETED" || outcome === "AUDIT_WRITE_FAILED";
     if (!outcomes.has(outcome)
-      || (outcome !== "AUTHORIZATION_FAILED" && !intents.has(key))) {
+      || (intentRequired && !intents.has(key))) {
       throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge journal result");
     }
   }

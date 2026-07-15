@@ -226,6 +226,8 @@ async function main(argv) {
       governancePolicyVersion: governancePolicy.policyVersion,
       governancePolicySha256,
       publicKeyText,
+      trustedPublicKeySha256:
+        process.env.EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256,
     };
   }
   if (purgeReport != null) {
