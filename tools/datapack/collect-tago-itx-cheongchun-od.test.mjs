@@ -203,6 +203,18 @@ test("TAGO OD materialization은 duplicate·pair 누락·시각 충돌·방향 �
     return true;
   });
   assert.throws(() => materializeTagoItxOdRows(input([
+    od("2001", "A", "B", "2026-07-15T08:00:00+09:00", "2026-07-15T09:00:00+09:00"),
+    od("2001", "B", "C", "2026-07-15T09:05:00+09:00", "2026-07-15T10:00:00+09:00"),
+    od("2001", "C", "D", "2026-07-15T10:05:00+09:00", "2026-07-15T11:00:00+09:00"),
+  ], [
+    ...corridorStations(),
+    { stationId: "D", nameKo: "라", corridorSequence: 4, lineId: "line-54a7b980b7c3" },
+  ])), (error) => {
+    assert.match(error.message, /TAGO_OD_PAIR_COVERAGE_INCOMPLETE/);
+    assert.equal(error.reconstructionSummary.missingPairCount, 3);
+    return true;
+  });
+  assert.throws(() => materializeTagoItxOdRows(input([
     base[0],
     { ...base[1], departureAt: "2026-07-15T08:01:00+09:00" },
     base[2],

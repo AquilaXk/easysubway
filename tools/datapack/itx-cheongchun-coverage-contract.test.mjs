@@ -161,7 +161,7 @@ test("ITX-청춘 admission contract는 날짜·OD matrix·양방향 completeness
   });
 });
 
-test("ITX-청춘 production source artifact는 OWNER-approved baseline과 동일한 5-set의 exact bytes로 ADMITTED된다", async () => {
+test("ITX-청춘 production source artifact는 변경 없는 5-set의 UNCHANGED_AUTO exact bytes로 ADMITTED된다", async () => {
   const reference = contract.sourceTimetableArtifact;
   assert.equal(reference.status, "ADMITTED");
   assert.equal(reference.admissionEligible, true);

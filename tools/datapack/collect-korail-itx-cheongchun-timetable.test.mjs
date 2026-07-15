@@ -1012,6 +1012,87 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
     }
   });
 
+  await context.test("OWNER approval transport는 timeout signal과 sanitized failure를 사용", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-approval-timeout-"));
+    let requestOptions;
+    try {
+      const candidate = sourceCandidate();
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        ...ownerApproval(candidate),
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+        fetchImpl: async (_url, options) => {
+          requestOptions = options;
+          throw new Error("transport stalled");
+        },
+      }), /SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID/);
+      assert.equal(requestOptions.redirect, "error");
+      assert.ok(requestOptions.signal instanceof AbortSignal);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  await context.test("selected service date의 dayCd 요일 tamper", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-service-date-"));
+    try {
+      const candidate = sourceCandidate({
+        selectedServiceDates: { "8": "20260718", "7": "20260716", "9": "20260719" },
+      });
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        ...ownerApproval(candidate),
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /ITX source candidate schema is invalid/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  await context.test("day roster 밖 stop station tamper", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-roster-stop-"));
+    try {
+      const candidate = sourceCandidate();
+      const sequence = candidate.stationSequences.find((row) => row.dayCd === "8" && row.trainNumber === "2001");
+      sequence.stops[0].stationId = "station-outside-roster";
+      const stopTime = candidate.transitStopTimes.find((row) => (
+        row.tripId === "route-line-54a7b980b7c3-up-2001-8" && row.stopSequence === 1
+      ));
+      stopTime.stationId = "station-outside-roster";
+      const sets = candidate.normalizedSnapshotSets.find((row) => row.dayCd === "8").sets;
+      sets.stopSequenceSet.find(([, trainNumber]) => trainNumber === "2001")[3][0] = "station-outside-roster";
+      sets.timetableTupleSet.find(([, trainNumber, , arrival]) => (
+        trainNumber === "2001" && arrival === 28_800
+      ))[2] = "station-outside-roster";
+      rehashCandidate(candidate);
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        ...ownerApproval(candidate),
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /SOURCE_SNAPSHOT_SETS_MISMATCH/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   await context.test("parseable timestamp without offset", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-no-offset-"));
     try {

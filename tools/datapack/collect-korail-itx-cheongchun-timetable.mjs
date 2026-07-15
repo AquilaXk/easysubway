@@ -432,6 +432,12 @@ function validateSourceCandidateSchema(candidate) {
   const dayCodes = ["8", "7", "9"];
   const selectedDayCodes = Object.keys(candidate?.selectedServiceDates ?? {}).sort(naturalCompare);
   const lineage = candidate?.sourceLineage;
+  let serviceDatesValid = true;
+  try {
+    validateItxServiceDates(candidate?.selectedServiceDates, { replay: true });
+  } catch {
+    serviceDatesValid = false;
+  }
   if (candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1
     || !/^itx-cheongchun-source-timetable-\d{17}$/.test(candidate.artifactId ?? "")
     || candidate.serviceId !== "ITX_CHEONGCHUN" || candidate.validationStatus !== "SUPPORTED"
@@ -440,6 +446,7 @@ function validateSourceCandidateSchema(candidate) {
     || !["BOOTSTRAP_REVIEW_REQUIRED", "CHANGE_REVIEW_REQUIRED", "SUPPORTED"].includes(candidate.promotionStatus)
     || candidate.snapshotDiff?.policyVersion !== "itx-snapshot-anomaly-v1"
     || JSON.stringify(selectedDayCodes) !== JSON.stringify([...dayCodes].sort(naturalCompare))
+    || !serviceDatesValid
     || !Array.isArray(lineage) || lineage.length !== dayCodes.length
     || !Array.isArray(candidate.warnings)) {
     throw new Error("ITX source candidate schema is invalid");
@@ -551,6 +558,11 @@ function validateSourceSnapshotSets(source) {
     }, dayCd, "SOURCE_SNAPSHOT_SETS_MISMATCH");
     const tripIds = new Set(trips.map(({ id }) => id));
     const stopTimes = source.transitStopTimes.filter(({ tripId }) => tripIds.has(tripId));
+    const rosterStationIds = new Set(stationSet);
+    if (sequences.some((sequence) => sequence.stops.some(({ stationId }) => !rosterStationIds.has(stationId)))
+      || stopTimes.some(({ stationId }) => !rosterStationIds.has(stationId))) {
+      throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+    }
     const trainSet = sequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber));
     if (trainSet.length === 0 || new Set(trainSet).size !== trainSet.length || trips.length !== sequences.length) {
       throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
@@ -672,14 +684,25 @@ async function loadAdmittedSourceReference(contract, repositoryRoot) {
 async function verifyOwnerApproval({ approvalUrl, expectedBody, observedAt, fetchImpl, githubToken }) {
   const match = /^https:\/\/github\.com\/AquilaXk\/easysubway\/(issues\/2135|pull\/2139)#issuecomment-(\d+)$/.exec(approvalUrl ?? "");
   if (!match) throw new Error("SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
-  const response = await fetchImpl(`https://api.github.com/repos/AquilaXk/easysubway/issues/comments/${match[2]}`, {
-    headers: {
-      accept: "application/vnd.github+json",
-      ...(githubToken ? { authorization: `Bearer ${githubToken}` } : {}),
-    },
-  });
-  if (!response.ok) throw new Error("SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
-  const record = await response.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  let record;
+  try {
+    const response = await fetchImpl(`https://api.github.com/repos/AquilaXk/easysubway/issues/comments/${match[2]}`, {
+      redirect: "error",
+      signal: controller.signal,
+      headers: {
+        accept: "application/vnd.github+json",
+        ...(githubToken ? { authorization: `Bearer ${githubToken}` } : {}),
+      },
+    });
+    if (!response.ok) throw new Error("approval response is not OK");
+    record = await response.json();
+  } catch {
+    throw new Error("SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
+  } finally {
+    clearTimeout(timeout);
+  }
   const approvalAt = offsetIsoEpoch(record.created_at);
   const candidateObservedAt = offsetIsoEpoch(observedAt);
   if (record.author_association !== "OWNER" || record.html_url !== approvalUrl || record.body !== expectedBody

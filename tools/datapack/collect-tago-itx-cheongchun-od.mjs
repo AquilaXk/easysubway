@@ -131,12 +131,14 @@ function materializeTagoItxOdRowsStrict({
       throw new Error(`TAGO_OD_STOP_SEQUENCE_INVALID: ${trainNumber}`);
     }
     const key = JSON.stringify([serviceDate, trainNumber, departureStationId, arrivalStationId]);
-    if (uniqueOdKeys.has(key)) throw new Error(`TAGO_OD_DUPLICATE: ${trainNumber}`);
+    if (uniqueOdKeys.has(key)) {
+      throw reconstructionError(`TAGO_OD_DUPLICATE: ${trainNumber}`, { duplicateOdCount: 1 });
+    }
     uniqueOdKeys.add(key);
     const rows = grouped.get(trainNumber) ?? [];
     if (typeof itinerary?.departureAt !== "string" || itinerary.departureAt === ""
       || typeof itinerary?.arrivalAt !== "string" || itinerary.arrivalAt === "") {
-      throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+      throw reconstructionError(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`, { conflictingTimestampCount: 1 });
     }
     rows.push({
       trainNumber,
@@ -186,7 +188,9 @@ function materializeTagoItxOdRowsStrict({
     }
     const expectedPairCount = stopIds.length * (stopIds.length - 1) / 2;
     if (missingPairs.length > 0 || rows.length !== expectedPairCount) {
-      throw new Error(`TAGO_OD_PAIR_COVERAGE_INCOMPLETE: ${trainNumber}`);
+      throw reconstructionError(`TAGO_OD_PAIR_COVERAGE_INCOMPLETE: ${trainNumber}`, {
+        missingPairCount: Math.max(missingPairs.length, expectedPairCount - rows.length),
+      });
     }
 
     const stops = stopIds.map((stationId, index) => {
@@ -195,7 +199,7 @@ function materializeTagoItxOdRowsStrict({
       if (arrivals.size > 1 || departures.size > 1
         || (index > 0 && arrivals.size !== 1)
         || (index < stopIds.length - 1 && departures.size !== 1)) {
-        throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+        throw reconstructionError(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`, { conflictingTimestampCount: 1 });
       }
       const arrivalAt = index === 0 ? [...departures][0] : [...arrivals][0];
       const departureAt = index === stopIds.length - 1 ? [...arrivals][0] : [...departures][0];
@@ -214,7 +218,7 @@ function materializeTagoItxOdRowsStrict({
       for (let to = from + 1; to < stops.length; to += 1) {
         const pair = pairByEndpoints.get(`${stops[from].stationId}\u0000${stops[to].stationId}`);
         if (pair.departureAt !== stops[from].departureAt || pair.arrivalAt !== stops[to].arrivalAt) {
-          throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+          throw reconstructionError(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`, { conflictingTimestampCount: 1 });
         }
       }
     }
@@ -676,13 +680,15 @@ function providerTimestamp(value, label) {
 
 function tagoServiceSeconds(value, serviceDate, trainNumber) {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\+09:00$/.exec(String(value ?? ""));
-  if (!match) throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+  if (!match) {
+    throw reconstructionError(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`, { conflictingTimestampCount: 1 });
+  }
   const timestampDate = `${match[1]}${match[2]}${match[3]}`;
   const hours = Number(match[4]);
   const minutes = Number(match[5]);
   const seconds = Number(match[6]);
   if (hours > 23 || minutes > 59 || seconds > 59) {
-    throw new Error(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`);
+    throw reconstructionError(`TAGO_OD_TIME_CONFLICT: ${trainNumber}`, { conflictingTimestampCount: 1 });
   }
   const next = calendarDate(serviceDate);
   next.setUTCDate(next.getUTCDate() + 1);
@@ -776,14 +782,24 @@ function reconstructionFailureSummary(error, itineraries) {
   const trainCount = new Set((Array.isArray(itineraries) ? itineraries : []).flatMap((itinerary) => {
     try { return [normalizeTrainNumber(itinerary?.trainNumber)]; } catch { return []; }
   })).size;
-  const message = error instanceof Error ? error.message : "";
+  const counts = error?.reconstructionCounts ?? {};
   return {
     trainCount,
     stopCount: 0,
-    conflictingTimestampCount: message.startsWith("TAGO_OD_TIME_CONFLICT") ? 1 : 0,
-    missingPairCount: message.startsWith("TAGO_OD_PAIR_COVERAGE_INCOMPLETE") ? 1 : 0,
-    duplicateOdCount: message.startsWith("TAGO_OD_DUPLICATE") ? 1 : 0,
+    conflictingTimestampCount: reportedCount(counts.conflictingTimestampCount),
+    missingPairCount: reportedCount(counts.missingPairCount),
+    duplicateOdCount: reportedCount(counts.duplicateOdCount),
   };
+}
+
+function reconstructionError(message, counts) {
+  const error = new Error(message);
+  error.reconstructionCounts = counts;
+  return error;
+}
+
+function reportedCount(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0;
 }
 
 function wait(milliseconds) {
