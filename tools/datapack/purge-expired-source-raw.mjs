@@ -15,6 +15,11 @@ import {
   requiredObjectKey,
 } from "./source-snapshot-policy.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
+import {
+  assertPurgeAttestationPrivateKey,
+  attachPurgeAttestation,
+  purgeReportSha256,
+} from "./source-raw-purge-attestation.mjs";
 
 const ALLOWED_ARGS = new Set([
   "ledger",
@@ -33,6 +38,7 @@ const PREAUTH_BASE_URL_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL";
 const SNAPSHOT_EVIDENCE_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_SNAPSHOT_EVIDENCE_SHA256";
 const LEDGER_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_LEDGER_SHA256";
 const OBJECT_AUTHORITY_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_OBJECT_AUTHORITY";
+const ATTESTATION_PRIVATE_KEY_PATH_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PRIVATE_KEY_PATH";
 
 async function main(argv) {
   const args = parseArgs(argv);
@@ -65,6 +71,7 @@ async function main(argv) {
       return { policy: JSON.parse(text), sha256: sha256(text) };
     })),
   ]);
+  const attestationPrivateKey = args.dryRun ? null : await executionAttestationPrivateKey();
   if (!args.dryRun) requireTrustedExecutionEvidence({ ledgerText, snapshotText });
   const plan = buildPurgePlan({
     ledger: JSON.parse(ledgerText),
@@ -157,7 +164,18 @@ async function main(argv) {
     report.decision = report.reasonCodes.length === 0 ? "PASS" : "FAIL";
     report.auditJournalSha256 = sha256(journalLines.join(""));
     report.auditJournalRecordCount = journalLines.length;
-    report.reportSha256 = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
+    if (!args.dryRun) {
+      attachPurgeAttestation(report, {
+        privateKey: attestationPrivateKey,
+        ledgerText,
+        snapshotText,
+        policyBindings: policyFiles.map(({ policy, sha256: policySha256 }) => ({
+          policyVersion: policy.policyVersion,
+          policySha256,
+        })),
+      });
+    }
+    report.reportSha256 = purgeReportSha256(report);
     await reportFiles.reportFile.writeFile(`${JSON.stringify(report, null, 2)}\n`);
     await reportFiles.reportFile.sync();
   } finally {
@@ -165,6 +183,14 @@ async function main(argv) {
   }
   if (executionError != null) throw executionError;
   if (report.decision !== "PASS") throw new Error(report.reasonCodes.join(","));
+}
+
+async function executionAttestationPrivateKey() {
+  const keyPath = process.env[ATTESTATION_PRIVATE_KEY_PATH_ENV]?.trim();
+  if (!keyPath) {
+    throw new Error(`${ATTESTATION_PRIVATE_KEY_PATH_ENV} is required for actual DELETE`);
+  }
+  return assertPurgeAttestationPrivateKey(await readFile(path.resolve(keyPath), "utf8"));
 }
 
 function recordPurgeResult(report, item, status) {

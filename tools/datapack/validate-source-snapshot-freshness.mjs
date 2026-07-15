@@ -12,6 +12,10 @@ import {
   validateSourceGovernancePolicy,
 } from "./source-governance-policy.mjs";
 import { validateLineage } from "./source-snapshot-policy.mjs";
+import {
+  purgeReportSha256,
+  verifyPurgeAttestation,
+} from "./source-raw-purge-attestation.mjs";
 
 const buildProvenanceStringFields = [
   "snapshotId",
@@ -38,6 +42,7 @@ export function validateSourceSnapshotFreshness({
   inventory = null,
   governancePolicySha256 = null,
   purgeReport = null,
+  purgeAttestation = null,
 }) {
   if (!Array.isArray(buildSpec?.sourceSnapshotIds) || buildSpec.sourceSnapshotIds.length === 0) {
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: buildSpec.sourceSnapshotIds");
@@ -107,7 +112,9 @@ export function validateSourceSnapshotFreshness({
     throw new Error("SOURCE_SNAPSHOT_EXPIRED");
   }
   let governanceResults = [];
-  const purgeEvidence = purgeReport == null ? new Map() : purgeEvidenceBySnapshot(purgeReport);
+  const purgeEvidence = purgeReport == null
+    ? new Map()
+    : purgeEvidenceBySnapshot(purgeReport, purgeAttestation);
   if (governancePolicy != null || inventory != null) {
     if (governancePolicy == null || inventory == null) {
       throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy and inventory are required together");
@@ -170,22 +177,57 @@ async function main(argv) {
     throw new Error("--governance-policy and --inventory must be provided together");
   }
   const purgeReportPath = buildSpec.sourceRawPurgeReportPath;
-  const [snapshots, policy, governancePolicyText, inventory, purgeReportText] = await Promise.all([
-    readFile(resolvedEvidencePath, "utf8").then(JSON.parse),
+  const [snapshotText, policy, governancePolicyText, inventory] = await Promise.all([
+    readFile(resolvedEvidencePath, "utf8"),
     readFile(policyPath, "utf8").then(JSON.parse),
     governancePolicyPath ? readFile(governancePolicyPath, "utf8") : null,
     inventoryPath ? readFile(inventoryPath, "utf8").then(JSON.parse) : null,
-    purgeReportPath ? readRepositoryArtifact(root, purgeReportPath, "buildSpec.sourceRawPurgeReportPath") : null,
   ]);
-  if (purgeReportText != null
-    && sha256(purgeReportText) !== requiredSha256(
-      buildSpec.sourceRawPurgeReportSha256,
-      "buildSpec.sourceRawPurgeReportSha256",
-    )) {
-    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report hash");
-  }
+  const snapshots = JSON.parse(snapshotText);
   const governancePolicy = governancePolicyText ? JSON.parse(governancePolicyText) : null;
-  const purgeReport = purgeReportText ? JSON.parse(purgeReportText) : null;
+  const governancePolicySha256 = governancePolicyText ? sha256(governancePolicyText) : null;
+  let purgeReport = null;
+  let purgeAttestation = null;
+  if (purgeReportPath != null) {
+    if (governancePolicy == null || governancePolicySha256 == null) {
+      throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: purge governance policy");
+    }
+    const [purgeReportText, journalText, ledgerText, publicKeyText] = await Promise.all([
+      readHashBoundArtifact(
+        root,
+        purgeReportPath,
+        buildSpec.sourceRawPurgeReportSha256,
+        "buildSpec.sourceRawPurgeReportPath",
+      ),
+      readHashBoundArtifact(
+        root,
+        buildSpec.sourceRawPurgeJournalPath,
+        buildSpec.sourceRawPurgeJournalSha256,
+        "buildSpec.sourceRawPurgeJournalPath",
+      ),
+      readHashBoundArtifact(
+        root,
+        buildSpec.sourceRawPurgeLedgerPath,
+        buildSpec.sourceRawPurgeLedgerSha256,
+        "buildSpec.sourceRawPurgeLedgerPath",
+      ),
+      readHashBoundArtifact(
+        root,
+        buildSpec.sourceRawPurgeAttestationPublicKeyPath,
+        buildSpec.sourceRawPurgeAttestationPublicKeySha256,
+        "buildSpec.sourceRawPurgeAttestationPublicKeyPath",
+      ),
+    ]);
+    purgeReport = JSON.parse(purgeReportText);
+    purgeAttestation = {
+      journalText,
+      ledgerText,
+      snapshotText,
+      governancePolicyVersion: governancePolicy.policyVersion,
+      governancePolicySha256,
+      publicKeyText,
+    };
+  }
   if (purgeReport != null) {
     const suppliedPurgeEvaluationAt = new Date(requiredUtcInstant(
       requiredArg(args, "purge-evaluation-at"),
@@ -202,8 +244,9 @@ async function main(argv) {
     evaluationAt: args.get("evaluation-at") ?? new Date().toISOString(),
     governancePolicy,
     inventory,
-    governancePolicySha256: governancePolicyText ? sha256(governancePolicyText) : null,
+    governancePolicySha256,
     purgeReport,
+    purgeAttestation,
   });
   process.stdout.write(`${JSON.stringify({
     status: "PASS",
@@ -224,6 +267,14 @@ async function readRepositoryArtifact(root, artifactPath, label) {
   const resolvedPath = path.resolve(root, relativePath);
   assertRepositoryRelativePath(path.relative(root, resolvedPath));
   return readFile(resolvedPath, "utf8");
+}
+
+async function readHashBoundArtifact(root, artifactPath, expectedHash, label) {
+  const text = await readRepositoryArtifact(root, artifactPath, label);
+  if (sha256(text) !== requiredSha256(expectedHash, `${label}Sha256`)) {
+    throw new Error(`SOURCE_FRESHNESS_DERIVATION_MISMATCH: ${label} hash`);
+  }
+  return text;
 }
 
 function parseArgs(argv) {
@@ -256,8 +307,9 @@ function requiredSha256(value, label) {
   return normalized;
 }
 
-export function purgeEvidenceBySnapshot(report) {
-  const expectedHash = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
+export function purgeEvidenceBySnapshot(report, attestation) {
+  verifyPurgeAttestation(report, attestation ?? {});
+  const expectedHash = purgeReportSha256(report);
   let completedMillis = Number.NaN;
   let evaluatedMillis = Number.NaN;
   try {

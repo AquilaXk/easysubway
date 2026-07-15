@@ -210,6 +210,17 @@ jobs:
               if (!sourceGovernanceEvaluationAt || !Number.isFinite(Date.parse(sourceGovernanceEvaluationAt))) {
                 throw new Error("sourceGovernanceEvaluationAt is required with sourceRawPurgeReportPath");
               }
+              for (const [pathField, hashField] of [
+                ["sourceRawPurgeReportPath", "sourceRawPurgeReportSha256"],
+                ["sourceRawPurgeJournalPath", "sourceRawPurgeJournalSha256"],
+                ["sourceRawPurgeLedgerPath", "sourceRawPurgeLedgerSha256"],
+                ["sourceRawPurgeAttestationPublicKeyPath", "sourceRawPurgeAttestationPublicKeySha256"],
+              ]) {
+                if (!buildSpec[pathField] || typeof buildSpec[pathField] !== "string") {
+                  throw new Error(`buildSpec.${pathField} is required with sourceRawPurgeReportPath`);
+                }
+                requireHash(buildSpec[hashField], `buildSpec.${hashField}`);
+              }
             }
             if (releaseRequestPath) {
               const request = JSON.parse(fs.readFileSync(releaseRequestPath, "utf8"));

@@ -165,6 +165,9 @@ test("release build는 source snapshot freshness를 build 전에 fail closed로 
   assert.match(freshnessStep, /--purge-evaluation-at "\$\{EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT\}"/);
   assert.doesNotMatch(freshnessStep, /--evaluation-at/);
   assert.match(yml, /sourceGovernanceEvaluationAt is required with sourceRawPurgeReportPath/);
+  assert.match(yml, /sourceRawPurgeAttestationPublicKey/);
+  assert.match(yml, /sourceRawPurgeJournal/);
+  assert.match(yml, /sourceRawPurgeLedger/);
   const inventoryStep = yml.match(
     /- name: Data Pack Release \/ Validate source inventory[\s\S]*?\n\s+- name:/,
   )?.[0];

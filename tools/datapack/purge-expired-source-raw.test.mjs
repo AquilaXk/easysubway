@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -13,6 +13,8 @@ import { buildPurgePlan, deleteExpiredItems } from "./purge-expired-source-raw.m
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 const evaluationAt = new Date().toISOString();
+const purgeAttestationPrivateKey = generateKeyPairSync("ed25519").privateKey
+  .export({ type: "pkcs8", format: "pem" });
 
 test("만료 raw만 삭제하고 active·rollback·legal hold 원본은 보존하며 재실행은 idempotent하다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
@@ -146,6 +148,8 @@ test("DELETE 직전 report에는 fsync 대상 sanitized intent가 기록된다",
     assert.equal(report.decision, "PASS");
     assert.match(report.auditJournalSha256, /^[0-9a-f]{64}$/);
     assert.equal(report.auditJournalRecordCount, 3);
+    assert.equal(report.attestation.algorithm, "Ed25519");
+    assert.match(report.attestation.signature, /^[A-Za-z0-9+/]+=*$/);
   });
 });
 
@@ -373,7 +377,7 @@ test("snapshot evidence가 ledger에서 누락되면 DELETE 전에 거부한다"
 });
 
 test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes로 purge한다", async () => {
-  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+  await withFixture(async ({ attestationPrivateKey, baseUrl, objects, requests, workDir }) => {
     const first = policyFixture(["source-old"]);
     const second = { ...policyFixture(["source-new"]), policyVersion: "2026-07-16" };
     const policies = await Promise.all([
@@ -399,6 +403,7 @@ test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes
       ledger: ledgerPath,
       policies: policies.map((entry) => entry.path),
       snapshots,
+      attestationPrivateKey,
       baseUrl,
       output: path.join(workDir, "multi-policy.json"),
     });
@@ -850,6 +855,8 @@ async function withFixture(run) {
   const getHooks = [];
   const deleteHooks = [];
   await mkdir(workDir, { recursive: true });
+  const attestationPrivateKey = path.join(workDir, "fixture-purge-attestation-private.pem");
+  await writeFile(attestationPrivateKey, purgeAttestationPrivateKey, { mode: 0o600 });
   const server = createServer(async (request, response) => {
     if (request.method === "GET") {
       if (!objects.has(request.url)) {
@@ -899,6 +906,7 @@ async function withFixture(run) {
       responseStatuses,
       getHooks,
       deleteHooks,
+      attestationPrivateKey,
       workDir,
     });
   } finally {
@@ -923,7 +931,9 @@ async function writeInputs(workDir, entries, ledgerEvaluatedAt = evaluationAt) {
   const ledgerPath = path.join(workDir, "ledger.json");
   await writeFile(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
   const snapshots = await writeSnapshotEvidence(workDir, ledger.entries);
-  return { policies: [policyFile.path], ledger: ledgerPath, snapshots };
+  const attestationPrivateKey = path.join(workDir, "purge-attestation-private.pem");
+  await writeFile(attestationPrivateKey, purgeAttestationPrivateKey, { mode: 0o600 });
+  return { policies: [policyFile.path], ledger: ledgerPath, snapshots, attestationPrivateKey };
 }
 
 async function runPurge({
@@ -938,6 +948,7 @@ async function runPurge({
   trustedLedger = true,
   sourceAuthority = "s3://easysubway-datapack-sources",
   evaluationAtOverride = evaluationAt,
+  attestationPrivateKey,
 }) {
   try {
     const snapshotEvidenceSha256 = snapshots && trustedSnapshots
@@ -965,6 +976,7 @@ async function runPurge({
         EASYSUBWAY_SOURCE_RAW_PURGE_SNAPSHOT_EVIDENCE_SHA256: !dryRun ? snapshotEvidenceSha256 : "",
         EASYSUBWAY_SOURCE_RAW_PURGE_LEDGER_SHA256: !dryRun ? ledgerSha256 : "",
         EASYSUBWAY_SOURCE_RAW_PURGE_OBJECT_AUTHORITY: !dryRun ? sourceAuthority : "",
+        EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PRIVATE_KEY_PATH: !dryRun ? attestationPrivateKey : "",
       },
     });
   } catch (error) {

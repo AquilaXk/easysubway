@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
@@ -10,10 +10,19 @@ import {
   purgeEvidenceBySnapshot,
   validateSourceSnapshotFreshness,
 } from "./validate-source-snapshot-freshness.mjs";
+import {
+  attachPurgeAttestation,
+  purgeReportSha256,
+} from "./source-raw-purge-attestation.mjs";
 
 const evaluationAt = "2026-07-15T00:00:00.000Z";
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+const purgeKeys = generateKeyPairSync("ed25519");
+const purgePublicKeyText = purgeKeys.publicKey.export({ type: "spki", format: "pem" });
+const purgeLedgerText = '{"artifactKind":"trusted-test-retention-ledger"}\n';
+const purgeSnapshotText = '[{"artifactKind":"trusted-test-snapshot"}]\n';
+const purgeAttestations = new WeakMap();
 const policy = {
   clockSkewSeconds: 300,
   sourceClasses: [{
@@ -131,10 +140,65 @@ function purgeReport(
     failed: [],
     reasonCodes: [],
   };
-  return {
-    ...body,
-    reportSha256: createHash("sha256").update(JSON.stringify(body)).digest("hex"),
-  };
+  return attestPurgeReport(body);
+}
+
+function attestPurgeReport(report) {
+  const journalText = purgeJournal(report);
+  report.auditJournalSha256 = sha256(journalText);
+  report.auditJournalRecordCount = journalText.trimEnd().split("\n").length;
+  attachPurgeAttestation(report, {
+    privateKey: purgeKeys.privateKey,
+    ledgerText: purgeLedgerText,
+    snapshotText: purgeSnapshotText,
+    policyBindings: [{ policyVersion: "2026-07-15", policySha256: "d".repeat(64) }],
+  });
+  report.reportSha256 = purgeReportSha256(report);
+  purgeAttestations.set(report, {
+    journalText,
+    ledgerText: purgeLedgerText,
+    snapshotText: purgeSnapshotText,
+    governancePolicyVersion: "2026-07-15",
+    governancePolicySha256: "d".repeat(64),
+    publicKeyText: purgePublicKeyText,
+  });
+  return report;
+}
+
+function purgeJournal(report) {
+  const candidates = [...report.deleted, ...report.alreadyAbsent, ...report.failed];
+  const records = [{
+    event: "PLAN",
+    evaluatedAt: report.evaluatedAt,
+    dryRun: false,
+    deleteCandidates: candidates,
+  }];
+  for (const entry of report.deleted) {
+    records.push({ event: "DELETE_INTENT", evaluatedAt: report.evaluatedAt, item: entry });
+    records.push({ event: "DELETE_RESULT", evaluatedAt: report.evaluatedAt, item: entry, outcome: "DELETED" });
+  }
+  for (const entry of report.alreadyAbsent) {
+    records.push({ event: "DELETE_INTENT", evaluatedAt: report.evaluatedAt, item: entry });
+    records.push({ event: "DELETE_RESULT", evaluatedAt: report.evaluatedAt, item: entry, outcome: "ALREADY_ABSENT" });
+  }
+  for (const entry of report.failed) {
+    records.push({ event: "DELETE_INTENT", evaluatedAt: report.evaluatedAt, item: entry });
+    records.push({ event: "DELETE_RESULT", evaluatedAt: report.evaluatedAt, item: entry, outcome: "FAILED" });
+  }
+  return `${records.map((record) => JSON.stringify(record)).join("\n")}\n`;
+}
+
+function verifiedPurgeEvidence(report) {
+  return purgeEvidenceBySnapshot(report, purgeAttestations.get(report));
+}
+
+function bindPurgeReport(value, report) {
+  value.purgeReport = report;
+  value.purgeAttestation = purgeAttestations.get(report);
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function bindInventory(value) {
@@ -171,19 +235,55 @@ test("PASS purge report를 snapshot별 완료 evidence로 검증해 변환한다
     { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) },
   ]);
 
-  assert.deepEqual(purgeEvidenceBySnapshot(report).get("source-a\0snapshot-a"), {
+  assert.deepEqual(verifiedPurgeEvidence(report).get("source-a\0snapshot-a"), {
     sourceId: "source-a",
     snapshotId: "snapshot-a",
     rawSha256: "a".repeat(64),
     purgedAt: report.completedAt,
   });
   assert.throws(
-    () => purgeEvidenceBySnapshot({ ...report, dryRun: true }),
-    /purge report/,
+    () => purgeEvidenceBySnapshot({ ...report, dryRun: true }, purgeAttestations.get(report)),
+    /purge attestation|purge report/,
   );
   assert.throws(
-    () => purgeEvidenceBySnapshot({ ...report, completedAt: undefined }),
-    /purge report/,
+    () => purgeEvidenceBySnapshot({ ...report, completedAt: undefined }, purgeAttestations.get(report)),
+    /purge attestation|purge report/,
+  );
+});
+
+test("self-hash만 다시 계산한 위조 purge report는 실행 attestation으로 거부한다", () => {
+  const report = purgeReport([
+    { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) },
+  ]);
+  const forged = structuredClone(report);
+  forged.deleted[0].rawSha256 = "b".repeat(64);
+  forged.reportSha256 = purgeReportSha256(forged);
+
+  assert.throws(
+    () => purgeEvidenceBySnapshot(forged, purgeAttestations.get(report)),
+    /purge attestation/,
+  );
+});
+
+test("attestation에 결합된 journal·ledger·public key 변조를 거부한다", () => {
+  const report = purgeReport([
+    { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) },
+  ]);
+  const attestation = purgeAttestations.get(report);
+  const otherPublicKeyText = generateKeyPairSync("ed25519").publicKey
+    .export({ type: "spki", format: "pem" });
+
+  assert.throws(
+    () => purgeEvidenceBySnapshot(report, { ...attestation, journalText: `${attestation.journalText} ` }),
+    /purge journal hash/,
+  );
+  assert.throws(
+    () => purgeEvidenceBySnapshot(report, { ...attestation, ledgerText: `${attestation.ledgerText} ` }),
+    /purge attestation/,
+  );
+  assert.throws(
+    () => purgeEvidenceBySnapshot(report, { ...attestation, publicKeyText: otherPublicKeyText }),
+    /purge attestation/,
   );
 });
 
@@ -196,27 +296,20 @@ test("FAIL purge report도 완료된 삭제 증거만 소비하고 실패 항목
     { sourceId: "source-b", snapshotId: "snapshot-b", rawSha256: "b".repeat(64) },
   ];
   report.reasonCodes = ["RAW_RETENTION_OVERDUE"];
-  report.reportSha256 = createHash("sha256")
-    .update(JSON.stringify({ ...report, reportSha256: undefined }))
-    .digest("hex");
-
-  const evidence = purgeEvidenceBySnapshot(report);
+  attestPurgeReport(report);
+  const evidence = verifiedPurgeEvidence(report);
 
   assert.equal(evidence.has("source-a\0snapshot-a"), true);
   assert.equal(evidence.has("source-b\0snapshot-b"), false);
   const missingReason = { ...report, reasonCodes: [] };
-  missingReason.reportSha256 = createHash("sha256")
-    .update(JSON.stringify({ ...missingReason, reportSha256: undefined }))
-    .digest("hex");
-  assert.throws(() => purgeEvidenceBySnapshot(missingReason), /purge report/);
+  attestPurgeReport(missingReason);
+  assert.throws(() => verifiedPurgeEvidence(missingReason), /purge report/);
   const duplicated = {
     ...report,
     failed: [{ sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) }],
   };
-  duplicated.reportSha256 = createHash("sha256")
-    .update(JSON.stringify({ ...duplicated, reportSha256: undefined }))
-    .digest("hex");
-  assert.throws(() => purgeEvidenceBySnapshot(duplicated), /duplicate snapshot/);
+  attestPurgeReport(duplicated);
+  assert.throws(() => verifiedPurgeEvidence(duplicated), /duplicate snapshot|journal result set/);
 });
 
 test("PASS purge report의 검증된 protection을 snapshot governance 입력으로 변환한다", () => {
@@ -228,11 +321,9 @@ test("PASS purge report의 검증된 protection을 snapshot governance 입력으
     protectedBy: ["ACTIVE_RELEASE"],
     legalHold: null,
   }];
-  report.reportSha256 = createHash("sha256")
-    .update(JSON.stringify({ ...report, reportSha256: undefined }))
-    .digest("hex");
+  attestPurgeReport(report);
 
-  assert.deepEqual(purgeEvidenceBySnapshot(report).get("source-a\0snapshot-a"), {
+  assert.deepEqual(verifiedPurgeEvidence(report).get("source-a\0snapshot-a"), {
     sourceId: "source-a",
     snapshotId: "snapshot-a",
     rawSha256: "a".repeat(64),
@@ -304,66 +395,60 @@ test("freshness validator는 hash-bound purge report를 retention 완료 근거�
     }],
   };
   value.governancePolicySha256 = "d".repeat(64);
-  value.purgeReport = purgeReport([{
+  bindPurgeReport(value, purgeReport([{
     sourceId: value.snapshots[0].sourceId,
     snapshotId: value.snapshots[0].snapshotId,
     rawSha256: value.snapshots[0].rawSha256,
-  }]);
+  }]));
 
   const result = validateSourceSnapshotFreshness(value);
 
   assert.equal(result.governanceResults[0].decision, "GO");
 
-  value.purgeReport = purgeReport(
+  const freshProtectionReport = purgeReport(
     [],
     "2026-10-11T00:00:01.000Z",
     value.evaluationAt,
   );
-  value.purgeReport.protected = [{
+  freshProtectionReport.protected = [{
     sourceId: value.snapshots[0].sourceId,
     snapshotId: value.snapshots[0].snapshotId,
     rawSha256: value.snapshots[0].rawSha256,
     protectedBy: ["ACTIVE_RELEASE"],
     legalHold: null,
   }];
-  value.purgeReport.reportSha256 = createHash("sha256")
-    .update(JSON.stringify({ ...value.purgeReport, reportSha256: undefined }))
-    .digest("hex");
+  bindPurgeReport(value, attestPurgeReport(freshProtectionReport));
 
   assert.equal(validateSourceSnapshotFreshness(value).governanceResults[0].decision, "GO");
 
-  value.purgeReport = purgeReport([]);
-  value.purgeReport.protected = [{
+  const staleProtectionReport = purgeReport([]);
+  staleProtectionReport.protected = [{
     sourceId: value.snapshots[0].sourceId,
     snapshotId: value.snapshots[0].snapshotId,
     rawSha256: value.snapshots[0].rawSha256,
     protectedBy: ["ACTIVE_RELEASE"],
     legalHold: null,
   }];
-  value.purgeReport.reportSha256 = createHash("sha256")
-    .update(JSON.stringify({ ...value.purgeReport, reportSha256: undefined }))
-    .digest("hex");
+  bindPurgeReport(value, attestPurgeReport(staleProtectionReport));
 
   assert.throws(
     () => validateSourceSnapshotFreshness(value),
     /RAW_RETENTION_OVERDUE/,
   );
 
-  value.purgeReport = purgeReport(
+  const mismatchedProtectionReport = purgeReport(
     [],
     "2026-10-11T00:00:01.000Z",
     value.evaluationAt,
   );
-  value.purgeReport.protected = [{
+  mismatchedProtectionReport.protected = [{
     sourceId: value.snapshots[0].sourceId,
     snapshotId: value.snapshots[0].snapshotId,
     rawSha256: "f".repeat(64),
     protectedBy: ["ACTIVE_RELEASE"],
     legalHold: null,
   }];
-  value.purgeReport.reportSha256 = createHash("sha256")
-    .update(JSON.stringify({ ...value.purgeReport, reportSha256: undefined }))
-    .digest("hex");
+  bindPurgeReport(value, attestPurgeReport(mismatchedProtectionReport));
 
   assert.throws(
     () => validateSourceSnapshotFreshness(value),
