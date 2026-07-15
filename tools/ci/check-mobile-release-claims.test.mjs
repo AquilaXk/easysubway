@@ -32,7 +32,7 @@ test("mobile release claim scan rejects forbidden app copy", async () => {
   );
 });
 
-test("mobile release claim scan rejects a Play routing launch identity mismatch", async () => {
+test("mobile release claim scan rejects incomplete Play launch identities", async () => {
   const tmp = path.join(tmpdir(), `mobile-claim-scope-${Date.now()}`);
   await rm(tmp, { recursive: true, force: true });
   await mkdir(path.join(tmp, "apps/mobile"), { recursive: true });
@@ -40,17 +40,24 @@ test("mobile release claim scan rejects a Play routing launch identity mismatch"
   await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
   const playPath = path.join(tmp, "apps/mobile/release/play-store-submission-content.json");
   const play = JSON.parse(await readFile(playPath, "utf8"));
-  play.launchScopeSha256 = "f".repeat(64);
-  await writeFile(playPath, JSON.stringify(play));
-
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      path.join(root, "tools/ci/check-mobile-release-claims.mjs"),
-      "--root",
-      tmp,
-    ], { cwd: root }),
-    /launchScopeSha256 must match canonical routing launch scope/,
-  );
+  for (const [field, message] of [
+    ["verifiedAccessibilityScopeSha256", "verifiedAccessibilityScopeSha256 must match canonical verified accessibility scope"],
+    ["launchScopeSha256", "launchScopeSha256 must match canonical routing launch scope"],
+    ["nationwideRoadmapScopeId", "nationwideRoadmapScopeId must match nationwide roadmap scope"],
+    ["nationwideRoadmapScopeSha256", "nationwideRoadmapScopeSha256 must match canonical nationwide roadmap scope"],
+  ]) {
+    const invalid = structuredClone(play);
+    invalid[field] = field.endsWith("Sha256") ? "f".repeat(64) : "other-scope";
+    await writeFile(playPath, JSON.stringify(invalid));
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        path.join(root, "tools/ci/check-mobile-release-claims.mjs"),
+        "--root",
+        tmp,
+      ], { cwd: root }),
+      new RegExp(message),
+    );
+  }
 });
 
 test("allowedPhrasesKo lets facility names pass but still blocks classification context", async () => {

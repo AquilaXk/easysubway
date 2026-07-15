@@ -109,6 +109,17 @@ function passingEvidence({ nationwideMissing = 270 } = {}) {
     forbiddenEvidence: [],
     forbiddenEvidenceStatus: "VERIFIED",
     nationwide: { missingCount: nationwideMissing },
+    candidateBinding: {
+      status: "BOUND",
+      buildCandidateId: "candidate-a",
+      packCandidateId: "capital@1",
+      candidateBuilderGitSha: "abcdef1",
+      buildSpecSha256: "d".repeat(64),
+      manifestSha256: "e".repeat(64),
+      sourceEvidence: { status: "FRESH", sha256: "a".repeat(64), freshUntil: "2099-08-01T00:00:00Z" },
+      serverEvidence: { status: "FRESH", sha256: "b".repeat(64), freshUntil: "2099-08-01T00:00:00Z" },
+      mobileEvidence: { status: "FRESH", sha256: "c".repeat(64), freshUntil: "2099-08-01T00:00:00Z" },
+    },
   };
 }
 
@@ -418,4 +429,62 @@ test("nationwide progress does not change the routing launch scope hash", () => 
     canonicalScopeHash(before.routingLaunchScope),
     canonicalScopeHash(after.routingLaunchScope),
   );
+});
+
+test("candidate binding and authoritative evidence hashes fail closed", async (context) => {
+  await context.test("missing binding", () => {
+    const evidence = passingEvidence();
+    delete evidence.candidateBinding;
+    const report = buildLaunchDenominatorReport(scope, evidence);
+    assert.equal(report.decision, "NO_GO");
+    assert.ok(report.blockers.includes("CANDIDATE_BINDING_INVALID"));
+  });
+  await context.test("consumer evidence hash mismatch", () => {
+    const evidence = passingEvidence();
+    evidence.candidateBinding.serverEvidence.sha256 = "f".repeat(64);
+    const report = buildLaunchDenominatorReport(scope, evidence);
+    assert.equal(report.decision, "NO_GO");
+    assert.ok(report.blockers.includes("CANDIDATE_EVIDENCE_HASH_MISMATCH:server"));
+  });
+  await context.test("stale consumer evidence", () => {
+    const evidence = passingEvidence();
+    evidence.candidateBinding.mobileEvidence.status = "STALE";
+    const report = buildLaunchDenominatorReport(scope, evidence);
+    assert.equal(report.decision, "NO_GO");
+    assert.ok(report.blockers.includes("CANDIDATE_EVIDENCE_NOT_FRESH:mobile"));
+  });
+});
+
+test("malformed scope subsections produce explicit contract blockers without throwing", async (context) => {
+  for (const subsection of [
+    "verifiedAccessibilityScope",
+    "routingLaunchScope",
+    "nationwideRoadmapScope",
+    "identityMatrix",
+  ]) {
+    for (const [label, malformed] of [["missing", null], ["empty", {}]]) {
+      await context.test(`${subsection} ${label}`, () => {
+        const malformedScope = structuredClone(scope);
+        malformedScope[subsection] = malformed;
+        const report = buildLaunchDenominatorReport(malformedScope, passingEvidence());
+        assert.equal(report.decision, "NO_GO");
+        assert.ok(report.blockers.includes(`SCOPE_CONTRACT_INVALID:${subsection}`));
+        if (malformed === null) assert.equal(report.scopes[subsection]?.sha256 ?? null, null);
+      });
+    }
+  }
+});
+
+test("incompatible shared identity values are null in report output", () => {
+  const evidence = passingEvidence();
+  evidence.mobile.identity.corridorId = "other-corridor";
+  const report = buildLaunchDenominatorReport(scope, evidence);
+  assert.equal(report.identityLinkage.compatible, false);
+  assert.deepEqual(report.identityLinkage.shared, {
+    canonicalStationVersion: null,
+    corridorId: null,
+    serviceId: null,
+    lineageId: null,
+    schemaVersion: null,
+  });
 });

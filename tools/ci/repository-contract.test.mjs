@@ -2952,6 +2952,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",
+    "nationwideRoadmapScopeId",
+    "nationwideRoadmapScopeSha256",
   ]) {
     assert.ok(rcEvidenceManifestContract.requiredRcIdentityFields.includes(field), `${field} must be required`);
   }
@@ -3483,6 +3485,10 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.rcIdentity.launchScopeId, launchScope.routingLaunchScope.id);
   assert.equal(manifest.launchScopeSha256, canonicalScopeHash(launchScope.routingLaunchScope));
   assert.equal(manifest.rcIdentity.launchScopeSha256, canonicalScopeHash(launchScope.routingLaunchScope));
+  assert.equal(manifest.nationwideRoadmapScopeId, launchScope.nationwideRoadmapScope.id);
+  assert.equal(manifest.rcIdentity.nationwideRoadmapScopeId, launchScope.nationwideRoadmapScope.id);
+  assert.equal(manifest.nationwideRoadmapScopeSha256, canonicalScopeHash(launchScope.nationwideRoadmapScope));
+  assert.equal(manifest.rcIdentity.nationwideRoadmapScopeSha256, canonicalScopeHash(launchScope.nationwideRoadmapScope));
   assert.equal(manifest.identityLinkageMatrixSha256, canonicalScopeHash(launchScope.identityMatrix));
   assert.equal(manifest.rcIdentity.identityLinkageMatrixSha256, canonicalScopeHash(launchScope.identityMatrix));
   assert.equal(manifest.readiness.status, "NO_GO");
@@ -3505,6 +3511,29 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(manifest.evidenceEntries.every((entry) => entry.androidVersion === "Android 16 API 36"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.testedAt === "2026-06-26T00:00:00.000Z"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
+
+  const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");
+  await mkdir(path.join(incompleteRepo, "apps/mobile/release"), { recursive: true });
+  const incompleteScope = structuredClone(launchScope);
+  delete incompleteScope.nationwideRoadmapScope;
+  await writeFile(
+    path.join(incompleteRepo, "apps/mobile/release/production-datapack-scope.json"),
+    JSON.stringify(incompleteScope),
+  );
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", incompleteRepo,
+      "--app-root", path.join(root, "apps/mobile"),
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+      "--output", path.join(tempDir, "incomplete-scope-manifest.json"),
+      "--tested-at", "2026-06-26T00:00:00.000Z",
+    ], { cwd: root }),
+    /production nationwide roadmap scope is required/,
+  );
 
   const localImageInspectPath = path.join(tempDir, "local-image-inspect.json");
   const localImageManifestPath = path.join(tempDir, "local-image-rc-evidence-manifest.json");
@@ -5051,6 +5080,8 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
 
   for (const field of [
     "releaseRequestId",
+    "buildCandidateId",
+    "candidateBuilderGitSha",
     "verifiedAccessibilityScopeId",
     "verifiedAccessibilityScopeSha256",
     "launchScopeId",
@@ -5438,6 +5469,8 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "schemaVersion",
     "artifactKind",
     "candidateId",
+    "buildCandidateId",
+    "candidateBuilderGitSha",
     "scopeId",
     "verifiedAccessibilityScopeId",
     "verifiedAccessibilityScopeSha256",
@@ -6174,6 +6207,15 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     playStoreContent.koreanListing.supportRegionKo,
     scope.verifiedAccessibilityScope.supportedClaimKo,
     "Play listing support region must use the production scope artifact claim",
+  );
+  assert.equal(
+    playStoreContent.verifiedAccessibilityScopeSha256,
+    canonicalScopeHash(scope.verifiedAccessibilityScope),
+  );
+  assert.equal(playStoreContent.nationwideRoadmapScopeId, scope.nationwideRoadmapScope.id);
+  assert.equal(
+    playStoreContent.nationwideRoadmapScopeSha256,
+    canonicalScopeHash(scope.nationwideRoadmapScope),
   );
   assert.match(
     playStoreContent.koreanListing.fullDescriptionKo,

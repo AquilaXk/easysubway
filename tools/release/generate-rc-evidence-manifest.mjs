@@ -32,6 +32,9 @@ const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/pr
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
   fail("production routing launch scope and identity matrix are required");
 }
+if (!launchScope?.nationwideRoadmapScope) {
+  fail("production nationwide roadmap scope is required");
+}
 
 const identity = {
   gitSha,
@@ -46,6 +49,8 @@ const identity = {
   realtimeContractVersion: arg("realtimeContractVersion", "realtime-contract-version") ?? readRealtimeContractVersion(repoRoot),
   launchScopeId: launchScope.routingLaunchScope.id,
   launchScopeSha256: canonicalScopeHash(launchScope.routingLaunchScope),
+  nationwideRoadmapScopeId: launchScope.nationwideRoadmapScope.id,
+  nationwideRoadmapScopeSha256: canonicalScopeHash(launchScope.nationwideRoadmapScope),
   identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
 
@@ -252,6 +257,8 @@ function identityBlockers(values) {
     "realtimeContractVersion",
     "launchScopeId",
     "launchScopeSha256",
+    "nationwideRoadmapScopeId",
+    "nationwideRoadmapScopeSha256",
     "identityLinkageMatrixSha256",
   ];
   const blockers = required

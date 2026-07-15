@@ -22,6 +22,8 @@
     "realtimeContractVersion",
     "launchScopeId",
     "launchScopeSha256",
+    "nationwideRoadmapScopeId",
+    "nationwideRoadmapScopeSha256",
     "identityLinkageMatrixSha256"
   ],
   "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],

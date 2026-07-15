@@ -9,6 +9,7 @@ const REQUIRED_IDENTITY_FIELDS = [
 ];
 
 export function canonicalScopeHash(scope) {
+  if (!scope || typeof scope !== "object" || Array.isArray(scope)) return null;
   return createHash("sha256").update(JSON.stringify(canonicalize(scope))).digest("hex");
 }
 
@@ -17,7 +18,10 @@ export function buildLaunchDenominatorReport(scope, evidence) {
   const blockers = collectV1Blockers(scope, evaluatorInput);
   const identities = ["source", "server", "mobile"].map((consumer) => evaluatorInput[consumer].identity);
   const sharedFields = scope?.identityMatrix?.requiredSharedFields ?? [];
-  const sharedIdentity = Object.fromEntries(sharedFields.map((field) => [field, identities[0]?.[field] ?? null]));
+  const identityCompatible = !blockers.some((blocker) => blocker.startsWith("IDENTITY_"));
+  const sharedIdentity = Object.fromEntries(
+    sharedFields.map((field) => [field, identityCompatible ? identities[0]?.[field] ?? null : null]),
+  );
   const requiredAccessibilityRows = requiredPilotRowIds(scope?.verifiedAccessibilityScope);
   const coveredAccessibilityRows = new Set(evaluatorInput.pilot.coveredRowIds ?? []);
   const coveredAccessibilityCount = requiredAccessibilityRows
@@ -33,7 +37,7 @@ export function buildLaunchDenominatorReport(scope, evidence) {
       nationwideRoadmapScope: scopeSummary(scope?.nationwideRoadmapScope),
     },
     identityLinkage: {
-      compatible: !blockers.some((blocker) => blocker.startsWith("IDENTITY_")),
+      compatible: identityCompatible,
       matrixSha256: scope?.identityMatrix ? canonicalScopeHash(scope.identityMatrix) : null,
       shared: sharedIdentity,
       artifactHashes: {
@@ -129,6 +133,26 @@ function sanitizeEvaluatorInput(evidence) {
       : null,
     forbiddenEvidenceStatus: evidence?.forbiddenEvidenceStatus ?? null,
     nationwide: { missingCount: evidence?.nationwide?.missingCount ?? null },
+    candidateBinding: sanitizeCandidateBinding(evidence?.candidateBinding),
+  };
+}
+
+function sanitizeCandidateBinding(value) {
+  const artifact = (evidence) => ({
+    status: evidence?.status ?? "MISSING",
+    sha256: evidence?.sha256 ?? null,
+    freshUntil: evidence?.freshUntil ?? null,
+  });
+  return {
+    status: value?.status ?? "INCOMPLETE",
+    buildCandidateId: value?.buildCandidateId ?? null,
+    packCandidateId: value?.packCandidateId ?? null,
+    candidateBuilderGitSha: value?.candidateBuilderGitSha ?? null,
+    buildSpecSha256: value?.buildSpecSha256 ?? null,
+    manifestSha256: value?.manifestSha256 ?? null,
+    sourceEvidence: artifact(value?.sourceEvidence),
+    serverEvidence: artifact(value?.serverEvidence),
+    mobileEvidence: artifact(value?.mobileEvidence),
   };
 }
 
@@ -137,6 +161,29 @@ function collectV1Blockers(scope, evidence) {
   const accessibilityScope = scope?.verifiedAccessibilityScope;
   const routingScope = scope?.routingLaunchScope;
   const identityMatrix = scope?.identityMatrix;
+
+  for (const subsection of [
+    "verifiedAccessibilityScope",
+    "routingLaunchScope",
+    "nationwideRoadmapScope",
+    "identityMatrix",
+  ]) {
+    const value = scope?.[subsection];
+    if (!validScopeSubsection(subsection, value)) {
+      blockers.push(`SCOPE_CONTRACT_INVALID:${subsection}`);
+    }
+  }
+
+  const candidateBinding = evidence?.candidateBinding;
+  if (!validCandidateBinding(candidateBinding)) blockers.push("CANDIDATE_BINDING_INVALID");
+  for (const consumer of ["source", "server", "mobile"]) {
+    const boundEvidence = candidateBinding?.[`${consumer}Evidence`];
+    if (boundEvidence?.status !== "FRESH") {
+      blockers.push(`CANDIDATE_EVIDENCE_NOT_FRESH:${consumer}`);
+    } else if (boundEvidence.sha256 !== evidence?.[consumer]?.artifactHash) {
+      blockers.push(`CANDIDATE_EVIDENCE_HASH_MISMATCH:${consumer}`);
+    }
+  }
 
   if (!sameSet(requiredPilotRowIds(accessibilityScope), evidence?.pilot?.coveredRowIds)) {
     blockers.push("PILOT_ROW_GAP");
@@ -243,8 +290,59 @@ function collectV1Blockers(scope, evidence) {
   return [...new Set(blockers)];
 }
 
+function validScopeSubsection(subsection, value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (subsection === "verifiedAccessibilityScope") {
+    return nonEmptyString(value.id)
+      && (
+        nonEmptyStringSet(value.requiredRowIds)
+        || (
+          nonEmptyStringSet(value.includedStationIds)
+          && nonEmptyStringSet(value.includedLineIds)
+          && nonEmptyStringSet(value.requiredFacilityTypes)
+        )
+      );
+  }
+  if (subsection === "routingLaunchScope") {
+    return nonEmptyString(value.id)
+      && nonEmptyStringSet(value.regionIds)
+      && nonEmptyStringSet(value.operatorIds)
+      && nonEmptyStringSet(value.lineIds)
+      && nonEmptyStringSet(value.serviceIds)
+      && nonEmptyStringSet(value.baseRoutingStationIds);
+  }
+  if (subsection === "nationwideRoadmapScope") {
+    return nonEmptyString(value.id)
+      && Number.isSafeInteger(value.launchRequiredCount)
+      && value.launchRequiredCount >= 0;
+  }
+  return subsection === "identityMatrix"
+    && nonEmptyStringSet(value.requiredSharedFields)
+    && typeof value.differentArtifactHashesAllowed === "boolean";
+}
+
+function validCandidateBinding(value) {
+  return value?.status === "BOUND"
+    && nonEmptyString(value.buildCandidateId)
+    && nonEmptyString(value.packCandidateId)
+    && nonEmptyString(value.candidateBuilderGitSha)
+    && /^[a-f0-9]{64}$/.test(value.buildSpecSha256 ?? "")
+    && /^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "")
+    && ["source", "server", "mobile"].every((consumer) => {
+      const artifact = value?.[`${consumer}Evidence`];
+      return artifact?.status === "FRESH"
+        && /^[a-f0-9]{64}$/.test(artifact.sha256 ?? "")
+        && typeof artifact.freshUntil === "string"
+        && Number.isFinite(Date.parse(artifact.freshUntil));
+    });
+}
+
 function validIdentityField(field, value) {
   if (field === "schemaVersion") return Number.isSafeInteger(value) && value > 0;
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 

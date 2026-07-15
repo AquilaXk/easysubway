@@ -1,6 +1,10 @@
 {
   "decision": "NO_GO",
   "blockers": [
+    "CANDIDATE_BINDING_INVALID",
+    "CANDIDATE_EVIDENCE_NOT_FRESH:source",
+    "CANDIDATE_EVIDENCE_NOT_FRESH:server",
+    "CANDIDATE_EVIDENCE_NOT_FRESH:mobile",
     "ROUTING_STATION_ID_GAP",
     "ROUTING_TRANSFER_STATION_ID_GAP",
     "ROUTING_SOURCE_DERIVED_CONNECTION_EDGE_ID_GAP",
@@ -133,6 +137,29 @@
     "forbiddenEvidenceStatus": "VERIFIED",
     "nationwide": {
       "missingCount": 270
+    },
+    "candidateBinding": {
+      "status": "INCOMPLETE",
+      "buildCandidateId": null,
+      "packCandidateId": null,
+      "candidateBuilderGitSha": null,
+      "buildSpecSha256": null,
+      "manifestSha256": null,
+      "sourceEvidence": {
+        "status": "MISSING",
+        "sha256": null,
+        "freshUntil": null
+      },
+      "serverEvidence": {
+        "status": "MISSING",
+        "sha256": null,
+        "freshUntil": null
+      },
+      "mobileEvidence": {
+        "status": "MISSING",
+        "sha256": null,
+        "freshUntil": null
+      }
     }
   },
   "nationwideBlocksV1": false,

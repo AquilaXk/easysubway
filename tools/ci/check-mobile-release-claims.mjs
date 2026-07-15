@@ -35,11 +35,20 @@ async function main() {
   if (play.verifiedAccessibilityScopeId !== scope.verifiedAccessibilityScope?.id) {
     failures.push("play-store verifiedAccessibilityScopeId must match verified accessibility scope");
   }
+  if (play.verifiedAccessibilityScopeSha256 !== canonicalScopeHash(scope.verifiedAccessibilityScope)) {
+    failures.push("play-store verifiedAccessibilityScopeSha256 must match canonical verified accessibility scope");
+  }
   if (play.launchScopeId !== scope.routingLaunchScope?.id) {
     failures.push("play-store launchScopeId must match routing launch scope");
   }
   if (play.launchScopeSha256 !== canonicalScopeHash(scope.routingLaunchScope)) {
     failures.push("play-store launchScopeSha256 must match canonical routing launch scope");
+  }
+  if (play.nationwideRoadmapScopeId !== scope.nationwideRoadmapScope?.id) {
+    failures.push("play-store nationwideRoadmapScopeId must match nationwide roadmap scope");
+  }
+  if (play.nationwideRoadmapScopeSha256 !== canonicalScopeHash(scope.nationwideRoadmapScope)) {
+    failures.push("play-store nationwideRoadmapScopeSha256 must match canonical nationwide roadmap scope");
   }
   if (play.identityLinkageMatrixSha256 !== canonicalScopeHash(scope.identityMatrix)) {
     failures.push("play-store identityLinkageMatrixSha256 must match canonical identity linkage matrix");

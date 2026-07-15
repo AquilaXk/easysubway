@@ -6,6 +6,10 @@ import {
   buildLaunchDenominatorReport,
   canonicalScopeHash,
 } from "./build-launch-denominator-report.mjs";
+import {
+  bindAuthoritativeLaunchEvidence,
+  buildLaunchCandidateBinding,
+} from "./launch-candidate-binding.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL"]);
@@ -78,7 +82,15 @@ function validateRouteGraphTopologyIntegrity(bundle) {
   }
 }
 
-function validateLaunchDenominatorReport(bundle, report, reportRaw, scope, requirePass) {
+function validateLaunchDenominatorReport(
+  bundle,
+  report,
+  reportRaw,
+  scope,
+  requirePass,
+  candidateBinding,
+  candidateArtifactRaw,
+) {
   const scopeBindings = [
     [
       "verified accessibility",
@@ -134,6 +146,35 @@ function validateLaunchDenominatorReport(bundle, report, reportRaw, scope, requi
   if (!isDeepStrictEqual(report, canonicalReport)) {
     throw new Error("launch denominator report must match canonical evaluator output");
   }
+  if (candidateBinding && !isDeepStrictEqual(report.evaluatorInput?.candidateBinding, candidateBinding)) {
+    throw new Error("launch denominator candidate binding must match current artifacts");
+  }
+  if (candidateBinding) {
+    const authoritativeInput = bindAuthoritativeLaunchEvidence(report.evaluatorInput, {
+      ...candidateArtifactRaw,
+      candidateBinding,
+    });
+    const authoritativeReport = buildLaunchDenominatorReport(scope, authoritativeInput);
+    if (!isDeepStrictEqual(report.evaluatorInput, authoritativeReport.evaluatorInput)) {
+      throw new Error("launch denominator evaluator input must match current authoritative evidence");
+    }
+  }
+  if (candidateBinding) {
+    for (const [field, expected] of [
+      ["candidateId", candidateBinding.packCandidateId],
+      ["buildCandidateId", candidateBinding.buildCandidateId],
+      ["candidateBuilderGitSha", candidateBinding.candidateBuilderGitSha],
+      ["buildSpecSha256", candidateBinding.buildSpecSha256],
+      ["manifestSha256", candidateBinding.manifestSha256],
+      ["normalizedSourceInventorySha256", candidateBinding.sourceEvidence.sha256 ?? "0".repeat(64)],
+      ["strictRouteRegressionSha256", candidateBinding.serverEvidence.sha256 ?? "0".repeat(64)],
+      ["androidEvidenceSha256", candidateBinding.mobileEvidence.sha256 ?? "0".repeat(64)],
+    ]) {
+      if (bundle[field] !== expected) {
+        throw new Error(`release evidence bundle ${field} must match current candidate binding`);
+      }
+    }
+  }
   if (bundle.launchDenominatorDecision !== report.decision) {
     throw new Error("launch denominator report decision must match bundle");
   }
@@ -152,15 +193,42 @@ async function main() {
   const scopePath = argValue(args, "--scope") ?? "apps/mobile/release/production-datapack-scope.json";
   const launchReportPath = argValue(args, "--launch-report")
     ?? "tools/datapack/reports/android-v1-launch-denominator-20260715.json";
+  const candidatePaths = {
+    buildSpec: argValue(args, "--build-spec"),
+    manifest: argValue(args, "--manifest"),
+    source: argValue(args, "--source-evidence"),
+    server: argValue(args, "--server-evidence"),
+    mobile: argValue(args, "--mobile-evidence"),
+  };
   const requirePass = args.includes("--require-pass");
   if (!bundlePath) {
     throw new Error("--bundle is required");
   }
 
   const bundle = JSON.parse(await readFile(bundlePath, "utf8"));
-  const scope = JSON.parse(await readFile(scopePath, "utf8"));
+  const scopeRaw = await readFile(scopePath, "utf8");
+  const scope = JSON.parse(scopeRaw);
   const launchReportRaw = await readFile(launchReportPath, "utf8");
   const launchReport = JSON.parse(launchReportRaw);
+  const requiredCandidatePaths = ["buildSpec", "manifest", "source"];
+  if (requirePass && requiredCandidatePaths.some((key) => !candidatePaths[key])) {
+    throw new Error("publish validation requires current build spec, manifest, and source evidence");
+  }
+  const hasCandidatePaths = Object.values(candidatePaths).some(Boolean);
+  if (hasCandidatePaths && requiredCandidatePaths.some((key) => !candidatePaths[key])) {
+    throw new Error("candidate validation requires build spec, manifest, and source evidence together");
+  }
+  const readOptional = async (file) => file ? readFile(file, "utf8") : null;
+  const candidateArtifactRaw = hasCandidatePaths ? {
+    buildSpecRaw: await readOptional(candidatePaths.buildSpec),
+    manifestRaw: await readOptional(candidatePaths.manifest),
+    sourceEvidenceRaw: await readOptional(candidatePaths.source),
+    serverEvidenceRaw: await readOptional(candidatePaths.server),
+    mobileEvidenceRaw: await readOptional(candidatePaths.mobile),
+  } : null;
+  const candidateBinding = candidateArtifactRaw
+    ? buildLaunchCandidateBinding(candidateArtifactRaw)
+    : null;
   for (const [field, expected] of [
     ["schemaVersion", 1],
     ["artifactKind", "datapack-release-evidence-bundle"],
@@ -172,6 +240,8 @@ async function main() {
 
   for (const field of [
     "candidateId",
+    "buildCandidateId",
+    "candidateBuilderGitSha",
     "scopeId",
     "verifiedAccessibilityScopeId",
     "launchScopeId",
@@ -184,7 +254,19 @@ async function main() {
   ]) {
     requireField(bundle, field);
   }
-  validateLaunchDenominatorReport(bundle, launchReport, launchReportRaw, scope, requirePass);
+  const rawScopeSha256 = createHash("sha256").update(scopeRaw).digest("hex");
+  if (bundle.supportedDenominatorSha256 !== rawScopeSha256) {
+    throw new Error("supportedDenominatorSha256 must match raw production scope bytes");
+  }
+  validateLaunchDenominatorReport(
+    bundle,
+    launchReport,
+    launchReportRaw,
+    scope,
+    requirePass,
+    candidateBinding,
+    candidateArtifactRaw,
+  );
   for (const field of [
     "verifiedAccessibilityScopeSha256",
     "launchScopeSha256",
