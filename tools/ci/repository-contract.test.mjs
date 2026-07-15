@@ -484,6 +484,7 @@ function assertActionsEnvSecretPolicy(file, source) {
     ]),
     ".github/workflows/datapack-release.yml": new Set([
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+      "EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256",
       "DATA_GO_KR_SERVICE_KEY",
       "KRIC_SERVICE_KEY",
     ]),

@@ -66,7 +66,7 @@ class DatabaseMigrationContainerTest {
 				"transit_master_overrides",
 				"transit_master_override_audits"
 			);
-		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51");
+		assertThat(successfulMigrationVersions(jdbcTemplate)).contains("1", "14", "16", "17", "18", "19", "20", "21", "22", "23", "25", "26", "48", "51", "52", "53");
 		assertAdPlacementsSeeded(jdbcTemplate);
 		assertThat(foreignKeyNames(jdbcTemplate))
 			.contains(
@@ -149,7 +149,7 @@ class DatabaseMigrationContainerTest {
 	}
 
 	@Test
-	@DisplayName("H2 V51은 기존 source의 다중 root lineage가 있으면 migration을 중단한다")
+	@DisplayName("H2 V52는 기존 source의 다중 root lineage가 있으면 migration을 중단한다")
 	void h2GovernanceMigrationRejectsExistingMultipleRoots() {
 		var dataSource = new DriverManagerDataSource(
 			"jdbc:h2:mem:datapack-multiple-roots;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE",
