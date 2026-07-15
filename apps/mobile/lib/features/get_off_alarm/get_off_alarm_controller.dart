@@ -36,6 +36,8 @@ class GetOffAlarmState {
   static const GetOffAlarmState off = GetOffAlarmState();
 }
 
+enum GetOffAlarmRefreshResult { refreshed, routeMismatch, skipped }
+
 /// 하차 알림 엔진을 화면·수명주기와 연결하는 오케스트레이션 컨트롤러.
 ///
 /// 순수 계산([computeGetOffAlarms])·강등 판정([resolveGetOffAlarmScheduleMode])·
@@ -164,32 +166,41 @@ class GetOffAlarmController extends ChangeNotifier {
   }
 
   /// 실시간 보정(#1416)·포그라운드 복귀 시 갱신된 도착 시각으로 재예약한다.
-  Future<void> refresh({
+  Future<GetOffAlarmRefreshResult> refresh({
+    required String routeId,
     required List<GetOffAlarmStop> stops,
-    required bool transferAlarmEnabled,
-  }) => _enqueueMutation(
-    () => _refresh(stops: stops, transferAlarmEnabled: transferAlarmEnabled),
-  );
+  }) => _enqueueMutation(() => _refresh(routeId: routeId, stops: stops));
 
-  Future<void> _refresh({
+  Future<GetOffAlarmRefreshResult> _refresh({
+    required String routeId,
     required List<GetOffAlarmStop> stops,
-    required bool transferAlarmEnabled,
   }) async {
-    final routeId = _state.activeRouteId;
-    if (!_state.enabled || routeId == null) {
-      return;
+    if (!_state.enabled) {
+      return GetOffAlarmRefreshResult.skipped;
+    }
+    final activeRouteId = _state.activeRouteId;
+    final subscription = await repository.loadActive();
+    if (subscription == null ||
+        activeRouteId == null ||
+        subscription.routeId != activeRouteId ||
+        activeRouteId != routeId) {
+      return GetOffAlarmRefreshResult.routeMismatch;
+    }
+    if (stops.isEmpty) {
+      await _turnOff();
+      return GetOffAlarmRefreshResult.refreshed;
     }
     final hasDestination = stops.any(
       (stop) => stop.kind == GetOffAlarmKind.destination,
     );
     if (!hasDestination) {
-      return;
+      return GetOffAlarmRefreshResult.skipped;
     }
     final notificationPermission = await notificationPermissionProvider
         .notificationPermissionStatus();
     if (notificationPermission != NotificationPermissionStatus.granted) {
       await _turnOff(permissionNotice: notificationPermissionDeniedNotice);
-      return;
+      return GetOffAlarmRefreshResult.refreshed;
     }
     final permitted = await permissionGate.isExactAlarmPermitted();
     final resolution = resolveGetOffAlarmScheduleMode(
@@ -198,9 +209,10 @@ class GetOffAlarmController extends ChangeNotifier {
     await _schedule(
       routeId: routeId,
       stops: stops,
-      transferAlarmEnabled: transferAlarmEnabled,
+      transferAlarmEnabled: subscription.transferAlarmEnabled,
       resolution: resolution,
     );
+    return GetOffAlarmRefreshResult.refreshed;
   }
 
   Future<void> _schedule({
@@ -249,7 +261,7 @@ class GetOffAlarmController extends ChangeNotifier {
   /// 경로 탐색 시 호출한다.
   Future<void> disable() => _enqueueMutation(_turnOff);
 
-  Future<void> _enqueueMutation(Future<void> Function() mutation) {
+  Future<T> _enqueueMutation<T>(Future<T> Function() mutation) {
     final result = _mutationTail.then((_) => mutation());
     _mutationTail = result.then<void>(
       (_) {},

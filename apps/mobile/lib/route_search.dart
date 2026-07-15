@@ -2719,8 +2719,8 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
           : destination.arrivalAt.difference(previousArrivalAt).inSeconds;
       final changed = previousArrivalAt != null && deltaSeconds != 0;
       await getOffAlarmController.refresh(
+        routeId: result.routeSearchId,
         stops: stops,
-        transferAlarmEnabled: activeSubscription?.transferAlarmEnabled ?? true,
       );
       if (kDebugMode && getOffAlarmController.state.enabled) {
         debugPrint(
