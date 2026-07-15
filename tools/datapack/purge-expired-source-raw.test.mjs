@@ -8,7 +8,11 @@ import path from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
 
-import { buildPurgePlan, deleteExpiredItems } from "./purge-expired-source-raw.mjs";
+import {
+  buildPurgePlan,
+  deleteExpiredItems,
+  recordPurgeFailure,
+} from "./purge-expired-source-raw.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -687,6 +691,35 @@ test("DELETE 202 Accepted는 완료 evidence가 아니라 실패로 기록한다
   });
 });
 
+test("감사 기록 실패는 이미 기록한 DELETE 성공을 failed로 재분류한다", () => {
+  const item = {
+    sourceId: "source-expired",
+    snapshotId: "expired",
+    rawSha256: sha256("raw"),
+    objectUrl: "https://secret.example.invalid/raw/expired",
+  };
+  const report = {
+    deleted: [{
+      sourceId: item.sourceId,
+      snapshotId: item.snapshotId,
+      rawSha256: item.rawSha256,
+    }],
+    alreadyAbsent: [],
+    failed: [],
+  };
+
+  recordPurgeFailure(report, item);
+
+  assert.deepEqual(report.deleted, []);
+  assert.deepEqual(report.alreadyAbsent, []);
+  assert.deepEqual(report.failed, [{
+    sourceId: item.sourceId,
+    snapshotId: item.snapshotId,
+    rawSha256: item.rawSha256,
+  }]);
+  assert.doesNotMatch(JSON.stringify(report), /secret\.example\.invalid/);
+});
+
 test("DELETE는 최대 4개 동시 실행하고 각 요청에 timeout signal을 건다", async () => {
   let active = 0;
   let maxActive = 0;
@@ -783,6 +816,36 @@ test("보호 근거 deadline이 GET 뒤 만료되면 DELETE하지 않는다", as
         methods.push(options.method);
         if (options.method === "GET") {
           now = 2_001;
+          return new Response(raw, { headers: { etag: '"approved-version"' } });
+        }
+        return new Response(null, { status: 204 });
+      },
+    },
+  );
+
+  assert.equal(result.status, 0);
+  assert.deepEqual(methods, ["GET"]);
+});
+
+test("보호 근거 deadline이 최종 보호 재검증 중 만료되면 DELETE하지 않는다", async () => {
+  const raw = "approved-bytes";
+  const methods = [];
+  let now = 1_000;
+  const [result] = await deleteExpiredItems(
+    [{
+      snapshotId: "expired-during-authorization",
+      rawSha256: sha256(raw),
+      objectUrl: "https://objects.example.invalid/raw/expired-during-authorization",
+    }],
+    {
+      executionEvidenceExpiresAt: 2_000,
+      now: () => now,
+      beforeDelete: async () => {
+        now = 2_001;
+      },
+      fetchImpl: async (_url, options) => {
+        methods.push(options.method);
+        if (options.method === "GET") {
           return new Response(raw, { headers: { etag: '"approved-version"' } });
         }
         return new Response(null, { status: 204 });

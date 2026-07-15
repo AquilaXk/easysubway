@@ -144,7 +144,7 @@ async function main(argv) {
       } catch (error) {
         executionError = error;
         const resultRecorded = hasPurgeResult(report, item);
-        if (!resultRecorded) report.failed.push(sanitized(item));
+        recordPurgeFailure(report, item);
         try {
           await appendAuditRecord(reportFiles.journalFile, journalLines, {
             event: "DELETE_RESULT",
@@ -208,6 +208,16 @@ function hasPurgeResult(report, item) {
     .some((entries) => entries.some((entry) => (
       entry.sourceId === item.sourceId && entry.snapshotId === item.snapshotId
     )));
+}
+
+export function recordPurgeFailure(report, item) {
+  const matches = (entry) => (
+    entry.sourceId === item.sourceId && entry.snapshotId === item.snapshotId
+  );
+  report.deleted = report.deleted.filter((entry) => !matches(entry));
+  report.alreadyAbsent = report.alreadyAbsent.filter((entry) => !matches(entry));
+  report.failed = report.failed.filter((entry) => !matches(entry));
+  report.failed.push(sanitized(item));
 }
 
 function requireTrustedExecutionEvidence({ ledgerText, snapshotText }) {
@@ -274,6 +284,9 @@ export async function deleteExpiredItems(
         return { item, status: 0 };
       }
       await beforeDelete(item);
+      if (executionEvidenceExpired(executionEvidenceExpiresAt, now)) {
+        return { item, status: 0 };
+      }
       try {
         const status = (await fetchImpl(item.objectUrl, {
           method: "DELETE",
