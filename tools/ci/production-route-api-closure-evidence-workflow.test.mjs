@@ -17,7 +17,7 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   assert.doesNotMatch(workflow, /environment:\n\s+name: production/);
   assert.doesNotMatch(workflow, /^permissions:/m);
   assert.match(workflow, /verify:[\s\S]*?permissions:\n\s+contents: read[\s\S]*?steps:/);
-  assert.match(workflow, /group: cd-production-deploy/);
+  assert.match(workflow, /group: production-route-api-closure-evidence/);
 
   assert.match(workflow, /shared\/current-sha/);
   assert.match(workflow, /shared\/current-image-digest/);
@@ -57,7 +57,9 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(workflow, /snapshot-gate:[\s\S]*runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*environment: production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*?permissions:\n\s+contents: read[\s\S]*?steps:/);
-  assert.match(workflow, /snapshot-gate:[\s\S]*group: cd-production-deploy/);
+  assert.match(workflow, /verify:[\s\S]*group: production-route-api-closure-evidence/);
+  assert.match(workflow, /snapshot-gate:[\s\S]*group: production-route-api-closure-evidence/);
+  assert.doesNotMatch(workflow, /group: cd-production-deploy/);
   assert.match(workflow, /manual snapshot revalidation must run from main/);
   assert.match(workflow, /EXPECTED_DEPLOYED_SHA: \$\{\{ needs\.verify\.outputs\.deployed_sha \}\}/);
   assert.match(workflow, /SNAPSHOT_REQUEST_SHA: \$\{\{ github\.sha \}\}/);
@@ -126,6 +128,10 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   const workflow = await readFile(cdWorkflowPath, "utf8");
 
   assert.match(workflow, /CD Deploy \/ Detect route purge migration/);
+  assert.match(
+    workflow,
+    /if \[\[ ! -f "\$\{DEPLOY_ROOT\}\/shared\/current-sha" \]\]; then[\s\S]*?echo "required=false"[\s\S]*?exit 0/,
+  );
   assert.match(workflow, /current_sha="\$\(<"\$\{DEPLOY_ROOT\}\/shared\/current-sha"\)"/);
   assert.match(workflow, /git diff --name-only "\$\{current_sha\}" "\$\{DEPLOY_SHA\}"/);
   assert.match(
@@ -150,6 +156,8 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   assert.match(workflow, /marker_request_sha[^\n]+!=[^\n]+DEPLOY_SHA/);
   assert.match(workflow, /marker_current_sha[^\n]+!=[^\n]+CURRENT_DEPLOYED_SHA/);
   assert.match(workflow, /snapshot marker backup checksum mismatch/);
+  assert.match(workflow, /snapshot_wait_deadline="\$\(\(SECONDS \+ 3600\)\)"/);
+  assert.match(workflow, /while true; do[\s\S]*?require-successful-workflow-run\.mjs[\s\S]*?break[\s\S]*?sleep 15[\s\S]*?done/);
 
   const rangeDetectionIndex = workflow.indexOf('git diff --name-only "${current_sha}" "${DEPLOY_SHA}"');
   const latchIndex = workflow.indexOf("CD Deploy / Require route purge snapshot evidence");

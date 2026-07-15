@@ -23,7 +23,7 @@ jobs:
       - easysubway-production
     timeout-minutes: 5
     concurrency:
-      group: cd-production-deploy
+      group: production-route-api-closure-evidence
       cancel-in-progress: false
     outputs:
       deployed_sha: ${{ steps.closure.outputs.deployed_sha }}
@@ -193,7 +193,7 @@ jobs:
     timeout-minutes: 15
     environment: production
     concurrency:
-      group: cd-production-deploy
+      group: production-route-api-closure-evidence
       cancel-in-progress: false
     env:
       DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
