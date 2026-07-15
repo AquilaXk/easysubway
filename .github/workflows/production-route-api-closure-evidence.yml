@@ -7,6 +7,9 @@ on:
     paths:
       - ".github/workflows/production-route-api-closure-evidence.yml"
       - "tools/ci/production-route-api-closure-evidence-workflow.test.mjs"
+      - "tools/ops/route-search-purge-snapshot-gate.sh"
+      - "backend/src/main/resources/db/migration/postgresql/V51__*"
+      - "backend/src/main/resources/db/migration/h2/V51__*"
 
 permissions:
   contents: read
@@ -168,3 +171,27 @@ jobs:
             echo "route_search_results changed during the closure probe" >&2
             exit 1
           fi
+
+  snapshot-gate:
+    name: Verify route purge snapshot gate
+    needs: verify
+    runs-on:
+      - self-hosted
+      - easysubway-production
+    timeout-minutes: 15
+    concurrency:
+      group: cd-production-deploy
+      cancel-in-progress: false
+    env:
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+      DEPLOY_COMPOSE_PROJECT: ${{ vars.DEPLOY_COMPOSE_PROJECT }}
+
+    steps:
+      - name: Snapshot gate / Checkout reviewed main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Snapshot gate / Backup, restore, and analyze purge
+        shell: bash
+        run: bash tools/ops/route-search-purge-snapshot-gate.sh
