@@ -186,6 +186,23 @@ class DatapackSourceSnapshotLineageTest {
 	}
 
 	@Test
+	@DisplayName("정책이 갱신되어도 기존 idempotency key는 당시 snapshot을 재생한다")
+	void existingCommandReplaysAfterGovernancePolicyUpdate() {
+		var first = command("source-a", "snapshot-a-1", null, null);
+		assertThat(service.createLockedSnapshot(first)).isEqualTo("snapshot-a-1");
+
+		service = new DatapackSourceSnapshotCommandService(
+			new JdbcDataSourceSnapshotRepository(((DataSourceTransactionManager) transactionManager).getDataSource()),
+			transactionManager,
+			fixedClockProvider(),
+			new ObjectMapper(),
+			governancePolicy("2026-08-01")
+		);
+
+		assertThat(service.createLockedSnapshot(first)).isEqualTo("snapshot-a-1");
+	}
+
+	@Test
 	@DisplayName("같은 source의 동시 최초 snapshot은 하나만 root로 저장한다")
 	void concurrentFirstSnapshotsCreateOneRoot() throws Exception {
 		var start = new CountDownLatch(1);
@@ -293,12 +310,25 @@ class DatapackSourceSnapshotLineageTest {
 	}
 
 	private DatapackSourceGovernancePolicy testGovernancePolicy() {
+		return governancePolicy("2026-07-15");
+	}
+
+	private DatapackSourceGovernancePolicy governancePolicy(String version) {
 		String policy = """
-			{"policyVersion":"2026-07-15","retentionClasses":[{"id":"standard-90d","retentionDays":90}],"sources":[{"sourceId":"source-a","retentionClassId":"standard-90d"},{"sourceId":"source-b","retentionClassId":"standard-90d"}]}
-			""";
+			{"policyVersion":"%s","retentionClasses":[{"id":"standard-90d","retentionDays":90}],"sources":[{"sourceId":"source-a","retentionClassId":"standard-90d"},{"sourceId":"source-b","retentionClassId":"standard-90d"}]}
+			""".formatted(version);
 		return new DatapackSourceGovernancePolicy(
 			new ObjectMapper(),
 			new ByteArrayResource(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8))
 		);
+	}
+
+	@SuppressWarnings("unchecked")
+	private ObjectProvider<Clock> fixedClockProvider() {
+		ObjectProvider<Clock> clockProvider = mock(ObjectProvider.class);
+		when(clockProvider.getIfAvailable(any())).thenReturn(
+			Clock.fixed(Instant.parse("2026-07-15T00:00:00Z"), ZoneOffset.UTC)
+		);
+		return clockProvider;
 	}
 }

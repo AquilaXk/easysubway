@@ -129,6 +129,7 @@ test("snapshot diff와 lineage는 필수 hash·sourceUpdatedAt 형식을 검증�
     { schemaFingerprint: "invalid" },
     { redactedRequestFingerprint: "A".repeat(64) },
     { sourceUpdatedAt: "2026-02-31T00:00:00Z" },
+    { coverageCount: undefined },
   ]) {
     assert.throws(() => buildSnapshotDiff(first, { ...second, ...invalid }), /SOURCE_DIFF_MISSING/);
     assert.throws(() => validateLineage([first, { ...second, ...invalid }]), /SOURCE_DIFF_MISSING/);
@@ -176,9 +177,36 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
     assert.equal(produced.rawRetentionExpiresAt, "2026-09-29T03:00:00.000Z");
     assert.equal(produced.governancePolicyVersion, "2026-07-15");
     assert.match(produced.governancePolicySha256, /^[0-9a-f]{64}$/);
+
+    await assert.rejects(
+      buildSnapshot([
+        "--input", secondRaw,
+        "--output", secondOutput,
+        "--snapshot-id", "snapshot-a-out-of-order",
+        "--retrieved-at", "2026-06-30T03:00:00Z",
+        "--freshness-expires-at", "2026-09-28T03:00:00Z",
+        "--raw-retention-expires-at", "2026-09-28T03:00:00Z",
+        "--coverage-count", "2",
+        "--raw-object-uri", "s3://bucket/snapshot-a-out-of-order.csv",
+        "--previous-snapshot", firstOutput,
+      ]),
+      /SOURCE_LINEAGE_BROKEN: retrievedAt order/,
+    );
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
+});
+
+test("tracked production snapshot root는 coverageCount를 명시한다", async () => {
+  const snapshots = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/release/source-snapshots.json"),
+    "utf8",
+  ));
+
+  for (const entry of snapshots) {
+    assert.ok(Number.isInteger(entry.coverageCount) && entry.coverageCount >= 0, entry.snapshotId);
+  }
+  assert.doesNotThrow(() => validateLineage(snapshots));
 });
 
 test("governance policy는 production source별 freshness·retention·책임 역할을 요구한다", () => {

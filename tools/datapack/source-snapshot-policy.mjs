@@ -124,6 +124,8 @@ function validateDiffSnapshot(snapshot, label) {
       throw new Error(`SOURCE_DIFF_MISSING: ${label}.sourceUpdatedAt`);
     }
   }
+  requiredNonNegativeInteger(snapshot.rowCount, `${label}.rowCount`);
+  requiredNonNegativeInteger(snapshot.coverageCount, `${label}.coverageCount`);
 }
 
 function requiredText(value, label) {

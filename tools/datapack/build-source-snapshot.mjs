@@ -8,6 +8,7 @@ import {
   buildSnapshotDiff,
   requiredCredentialFreeObjectUri,
 } from "./source-snapshot-policy.mjs";
+import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 const DEFAULT_FRESHNESS_POLICY = "apps/mobile/release/datapack-freshness-sla.json";
 
@@ -53,6 +54,10 @@ async function main() {
   if (previousSnapshot != null) {
     if (previousSnapshot.sourceId !== snapshot.sourceId) {
       throw new Error("SOURCE_LINEAGE_BROKEN: previous snapshot source");
+    }
+    if (requiredUtcInstant(snapshot.retrievedAt, "snapshot.retrievedAt")
+      <= requiredUtcInstant(previousSnapshot.retrievedAt, "previousSnapshot.retrievedAt")) {
+      throw new Error("SOURCE_LINEAGE_BROKEN: retrievedAt order");
     }
     snapshot.previousSnapshotId = requiredText(previousSnapshot.snapshotId, "previousSnapshot.snapshotId");
     snapshot.diffSummary = buildSnapshotDiff(previousSnapshot, snapshot);

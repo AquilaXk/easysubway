@@ -45,6 +45,12 @@ public class DatapackSourceSnapshotCommandService {
 	@Transactional
 	public String createLockedSnapshot(SourceSnapshotCommand command) {
 		command.validate();
+		var existingEvent = snapshotRepository
+			.findEventByIdempotencyKey(command.sourceId(), command.idempotencyKey());
+		if (existingEvent.isPresent()) {
+			ensureSameIdempotentRequest(command, existingEvent.get());
+			return existingEvent.get().snapshotId();
+		}
 		var policyBinding = governancePolicy.requireBinding(
 			command.sourceId(),
 			command.retrievedAt(),
@@ -53,12 +59,6 @@ public class DatapackSourceSnapshotCommandService {
 			command.governancePolicySha256()
 		);
 		DataSourceSnapshot snapshot = snapshotFrom(command, policyBinding);
-		var existingEvent = snapshotRepository
-			.findEventByIdempotencyKey(command.sourceId(), command.idempotencyKey());
-		if (existingEvent.isPresent()) {
-			ensureSameIdempotentRequest(command, snapshot, existingEvent.get());
-			return existingEvent.get().snapshotId();
-		}
 		snapshotRepository.lockSourceLineage(command.sourceId());
 		var existingSnapshot = snapshotRepository.loadSnapshot(snapshot.snapshotId());
 		if (existingSnapshot.isEmpty()) {
@@ -71,7 +71,7 @@ public class DatapackSourceSnapshotCommandService {
 			SourceSnapshotEventRow replayedEvent = snapshotRepository
 				.findEventByIdempotencyKey(command.sourceId(), command.idempotencyKey())
 				.orElseThrow(() -> exception);
-			ensureSameIdempotentRequest(command, snapshot, replayedEvent);
+			ensureSameIdempotentRequest(command, replayedEvent);
 			return replayedEvent.snapshotId();
 		}
 		return snapshotId;
@@ -154,6 +154,20 @@ public class DatapackSourceSnapshotCommandService {
 		SourceSnapshotCommand command,
 		DatapackSourceGovernancePolicy.Binding policyBinding
 	) {
+		return snapshotFrom(
+			command,
+			policyBinding.rawRetentionExpiresAt(),
+			policyBinding.version(),
+			policyBinding.sha256()
+		);
+	}
+
+	private static DataSourceSnapshot snapshotFrom(
+		SourceSnapshotCommand command,
+		LocalDateTime rawRetentionExpiresAt,
+		String governancePolicyVersion,
+		String governancePolicySha256
+	) {
 		return new DataSourceSnapshot(
 			command.snapshotId(),
 			command.sourceId(),
@@ -176,22 +190,27 @@ public class DatapackSourceSnapshotCommandService {
 			command.diffSummary(),
 			command.diffSummaryJson(),
 			command.freshnessExpiresAt(),
-			policyBinding.rawRetentionExpiresAt(),
-			policyBinding.version(),
-			policyBinding.sha256()
+			rawRetentionExpiresAt,
+			governancePolicyVersion,
+			governancePolicySha256
 		);
 	}
 
 	private void ensureSameIdempotentRequest(
 		SourceSnapshotCommand command,
-		DataSourceSnapshot snapshot,
 		SourceSnapshotEventRow event
 	) {
+		DataSourceSnapshot requestedSnapshot = snapshotFrom(
+			command,
+			command.rawRetentionExpiresAt(),
+			command.governancePolicyVersion(),
+			command.governancePolicySha256()
+		);
 		if (!command.snapshotId().equals(event.snapshotId())
 			|| !command.requestedBy().equals(event.requestedBy())
 			|| !command.reason().equals(event.reason())
 			|| snapshotRepository.loadSnapshot(event.snapshotId())
-				.filter(snapshot::equals)
+				.filter(requestedSnapshot::equals)
 				.isEmpty()) {
 			throw new IllegalArgumentException(
 				"idempotency key already belongs to a different source snapshot operation");
