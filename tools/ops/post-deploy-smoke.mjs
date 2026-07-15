@@ -83,8 +83,9 @@ async function checkRouteApiClosure(baseUrl, axis, timeoutMs, routeV2IngressEnab
     const remainingMs = deadline - Date.now();
     if (remainingMs <= 0) throw new Error(`${context} check failed: timeout budget exhausted`);
     let status;
+    let text;
     try {
-      ({ status } = await httpRequest(joinUrl(baseUrl, endpoint.path), {
+      ({ status, text } = await httpRequest(joinUrl(baseUrl, endpoint.path), {
         method: endpoint.method,
         headers: { "content-type": "application/json" },
         body: JSON.stringify(endpoint.request),
@@ -98,6 +99,15 @@ async function checkRouteApiClosure(baseUrl, axis, timeoutMs, routeV2IngressEnab
       ?? axis.acceptedStatuses;
     if (!acceptedStatuses.includes(status)) {
       throw new Error(`${context} returned HTTP ${status}`);
+    }
+    const expectedJsonFields = endpoint.expectedJsonFieldsByIngress?.[String(routeV2IngressEnabled)];
+    if (expectedJsonFields) {
+      const body = parseJson(text, context);
+      for (const [field, expected] of Object.entries(expectedJsonFields)) {
+        if (body[field] !== expected) {
+          throw new Error(`${context} ${field} was ${String(body[field])}, expected ${String(expected)}`);
+        }
+      }
     }
   }
 }

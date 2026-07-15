@@ -12,6 +12,7 @@ import com.easysubway.route.application.port.in.SearchInternalRouteCommand;
 import com.easysubway.route.application.port.in.SearchRouteCommand;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Status;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2PlanSource;
 import com.easysubway.route.application.port.in.SubmitRouteFeedbackCommand;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.RealtimeArrivalResolver;
@@ -748,6 +749,7 @@ class RouteSearchServiceTest {
 		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 0, 3));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.LEGACY_GRAPH);
 		assertThat(plan.itineraries()).hasSize(1);
 		assertThat(plan.itineraries().getFirst().transferCount()).isZero();
 	}
@@ -760,6 +762,7 @@ class RouteSearchServiceTest {
 		var plan = planner.search(routeV2Command(ConstraintMode.STRICT_STEP_FREE, MobilityType.WHEELCHAIR, 1, 2));
 
 		assertThat(plan.plannerAdr()).isEqualTo("tools/routes/route-algorithm-v2-adr.json");
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.LEGACY_GRAPH);
 		assertThat(plan.itineraries()).hasSize(2);
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND, RouteV2Status.BLOCKED_ACCESSIBILITY);
 		assertThat(plan.itineraries())
@@ -775,6 +778,7 @@ class RouteSearchServiceTest {
 		var plan = planner.search(routeV2Command(ConstraintMode.PREFER_STEP_FREE, MobilityType.SENIOR, 1, 3));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.LEGACY_GRAPH);
 		assertThat(plan.itineraries()).hasSize(1);
 		assertThat(plan.itineraries().getFirst().transferCount()).isEqualTo(1);
 	}
@@ -835,6 +839,7 @@ class RouteSearchServiceTest {
 		));
 
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.NO_TIMETABLE_SERVICE);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.TIMETABLE_RAPTOR);
 		assertThat(plan.itineraries()).isEmpty();
 		assertThat(plan.nextServiceTime()).isEqualTo(OffsetDateTime.parse("2026-07-02T09:07:00+09:00"));
 	}
@@ -1622,6 +1627,7 @@ class RouteSearchServiceTest {
 				assertThat(step.servedAt()).isEqualTo("2026-06-13T09:00:00Z");
 			});
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.LEGACY_GRAPH);
 	}
 
 	@Test

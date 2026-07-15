@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Plan;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2PlanSource;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Status;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.RouteV2AccessStore;
@@ -44,7 +45,7 @@ class ProductionRouteV2SupportTest {
 	}
 
 	@Test
-	@DisplayName("fresh ITX artifact가 없거나 planner가 stale이면 fail closed한다")
+	@DisplayName("fresh ITX artifact가 없거나 timetable provenance가 아니면 fail closed한다")
 	void rejectsUnavailableOrStaleTimetable() {
 		when(timetable.activeItxTimetableArtifactId()).thenReturn(Optional.empty());
 		assertThatThrownBy(support::requireTimetableArtifact)
@@ -52,7 +53,22 @@ class ProductionRouteV2SupportTest {
 
 		when(timetable.activeItxTimetableArtifactId()).thenReturn(Optional.of("itx-artifact"));
 		assertThatThrownBy(() -> support.requireUsablePlan(
-			new RouteV2Plan(List.of(), List.of(RouteV2Status.STALE_TIMETABLE), "planner")
+			new RouteV2Plan(
+				List.of(),
+				List.of(RouteV2Status.STALE_TIMETABLE),
+				"planner",
+				null,
+				RouteV2PlanSource.TIMETABLE_RAPTOR
+			)
+		)).isInstanceOf(ItxTimetableUnavailableException.class);
+		assertThatThrownBy(() -> support.requireUsablePlan(
+			new RouteV2Plan(
+				List.of(),
+				List.of(RouteV2Status.FOUND),
+				"planner",
+				null,
+				RouteV2PlanSource.LEGACY_GRAPH
+			)
 		)).isInstanceOf(ItxTimetableUnavailableException.class);
 	}
 

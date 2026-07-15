@@ -3,6 +3,7 @@ package com.easysubway.route.adapter.in.web;
 import com.easysubway.route.application.service.RouteV2SessionService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -42,7 +43,7 @@ class RouteV2SessionController {
 	}
 
 	private record RouteV2SessionRequest(
-		@NotBlank String integrityToken,
+		@NotBlank @Size(max = 16_384) String integrityToken,
 		@NotBlank String clientNonce
 	) {
 	}

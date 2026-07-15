@@ -16,6 +16,10 @@ function defaultRoutes() {
     liveness: () => ({ status: 200, body: { status: "UP" } }),
     readiness: () => ({ status: 200, body: { status: "UP" } }),
     routeV1Search: () => ({ status: 403, body: {} }),
+    routeV2Session: () => ({
+      status: 403,
+      body: { success: false, code: "ROUTE_SESSION_ATTESTATION_REJECTED", message: "ITX 시간표를 불러올 수 없어요" },
+    }),
     routeV2Search: () => ({ status: 401, body: {} }),
     routeRefresh: () => ({ status: 404, body: {} }),
     adminLogin: () => ({ status: 200, body: "<html><body><form method=\"post\">login</form></body></html>", raw: true }),
@@ -30,6 +34,7 @@ async function withServer(routes, fn) {
     if (url.pathname === "/actuator/health/liveness") handler = routes.liveness;
     else if (url.pathname === "/actuator/health/readiness") handler = routes.readiness;
     else if (url.pathname === "/api/v1/routes/search" && req.method === "POST") handler = routes.routeV1Search;
+    else if (url.pathname === "/api/v2/routes/session" && req.method === "POST") handler = routes.routeV2Session;
     else if (url.pathname === "/api/v2/routes/search" && req.method === "POST") handler = routes.routeV2Search;
     else if (url.pathname === "/api/v2/routes/closure-probe/refresh" && req.method === "POST") handler = routes.routeRefresh;
     else if (url.pathname === "/admin/login") handler = routes.adminLogin;
@@ -131,6 +136,23 @@ test("post-deploy smoke accepts 401 for authenticated V2 search and keeps closed
   });
 });
 
+test("post-deploy smoke requires enabled session ingress to reach exact attestation rejection", async () => {
+  const routes = defaultRoutes();
+  routes.routeV2Session = () => ({ status: 404, body: {} });
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 1);
+    assert.match(axis(report, "route-api-closure").detail, /POST \/api\/v2\/routes\/session returned HTTP 404/);
+  });
+
+  routes.routeV2Session = () => ({ status: 403, body: { success: false, code: "WRONG_CODE" } });
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 1);
+    assert.match(axis(report, "route-api-closure").detail, /code was WRONG_CODE/);
+  });
+});
+
 test("post-deploy smoke requires enabled ingress to return 401 instead of 404", async () => {
   const routes = defaultRoutes();
   routes.routeV2Search = () => ({ status: 404, body: {} });
@@ -144,6 +166,7 @@ test("post-deploy smoke requires enabled ingress to return 401 instead of 404", 
 
 test("post-deploy smoke requires disabled ingress to return 404 instead of 401", async () => {
   const routes = defaultRoutes();
+  routes.routeV2Session = () => ({ status: 404, body: {} });
   routes.routeV2Search = () => ({ status: 404, body: {} });
   await withServer(routes, async (baseUrl) => {
     const { code, report } = await runSmoke(baseUrl, ["--route-v2-ingress-enabled", "false"]);
@@ -268,10 +291,22 @@ test("post-deploy smoke contract file matches the expected schema", async () => 
     true: [401],
     false: [404],
   });
+  const session = routeApiClosure.endpoints.find(
+    ({ path: endpointPath }) => endpointPath === "/api/v2/routes/session",
+  );
+  assert.deepEqual(session.acceptedStatusesByIngress, {
+    true: [403],
+    false: [404],
+  });
+  assert.deepEqual(session.expectedJsonFieldsByIngress.true, {
+    success: false,
+    code: "ROUTE_SESSION_ATTESTATION_REJECTED",
+  });
   assert.deepEqual(
     routeApiClosure.endpoints.map(({ method, path: endpointPath }) => `${method} ${endpointPath}`),
     [
       "POST /api/v1/routes/search",
+      "POST /api/v2/routes/session",
       "POST /api/v2/routes/search",
       "POST /api/v2/routes/closure-probe/refresh",
     ],

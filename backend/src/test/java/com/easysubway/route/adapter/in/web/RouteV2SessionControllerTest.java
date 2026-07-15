@@ -1,6 +1,7 @@
 package com.easysubway.route.adapter.in.web;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -73,5 +74,19 @@ class RouteV2SessionControllerTest {
 			.andExpect(jsonPath("$.code").value("ROUTE_SESSION_ATTESTATION_REJECTED"))
 			.andExpect(jsonPath("$.message").value("ITX 시간표를 불러올 수 없어요"))
 			.andExpect(jsonPath("$..secret-verdict").doesNotExist());
+	}
+
+	@Test
+	@DisplayName("oversized attestation token은 decoder 호출 전에 exact 403으로 거부한다")
+	void rejectsOversizedAttestationBeforeDecode() throws Exception {
+		mockMvc.perform(post("/api/v2/routes/session")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"integrityToken":"%s","clientNonce":"AAAAAAAAAAAAAAAAAAAAAA"}
+					""".formatted("A".repeat(16_385))))
+			.andExpect(status().isForbidden())
+			.andExpect(jsonPath("$.code").value("ROUTE_SESSION_ATTESTATION_REJECTED"));
+
+		verifyNoInteractions(service);
 	}
 }

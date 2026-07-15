@@ -16,6 +16,7 @@ test("Route V2 gateway는 IP·token limiter와 exact 429 계약을 소유한다"
   assert.match(nginx, /burst=\$\{EASYSUBWAY_ROUTE_V2_SESSION_BURST\} nodelay;/);
   assert.match(nginx, /burst=\$\{EASYSUBWAY_ROUTE_V2_SEARCH_BURST\} nodelay;/);
   assert.match(nginx, /limit_req_status 429;/);
+  assert.match(nginx, /location = \/api\/v2\/routes\/session \{[\s\S]*client_max_body_size 20k;/);
   assert.match(nginx, /access_log off;/);
   assert.match(nginx, /error_log \/dev\/stderr crit;/);
   assert.match(nginx, /limit_req_log_level info;/);

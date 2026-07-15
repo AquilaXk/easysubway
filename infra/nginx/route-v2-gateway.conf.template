@@ -18,6 +18,7 @@ server {
 	limit_req_log_level info;
 
 	location = /api/v2/routes/session {
+		client_max_body_size 20k;
 		error_page 429 = @route_session_rate_limited;
 		limit_req zone=route_session_ip burst=${EASYSUBWAY_ROUTE_V2_SESSION_BURST} nodelay;
 		proxy_pass http://backend:8080;

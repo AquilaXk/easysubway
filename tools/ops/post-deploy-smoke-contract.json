@@ -37,6 +37,24 @@
         },
         {
           "method": "POST",
+          "path": "/api/v2/routes/session",
+          "acceptedStatusesByIngress": {
+            "true": [403],
+            "false": [404]
+          },
+          "expectedJsonFieldsByIngress": {
+            "true": {
+              "success": false,
+              "code": "ROUTE_SESSION_ATTESTATION_REJECTED"
+            }
+          },
+          "request": {
+            "integrityToken": "deployment-smoke-invalid-integrity-token",
+            "clientNonce": "AAAAAAAAAAAAAAAAAAAAAA"
+          }
+        },
+        {
+          "method": "POST",
           "path": "/api/v2/routes/search",
           "acceptedStatusesByIngress": {
             "true": [401],

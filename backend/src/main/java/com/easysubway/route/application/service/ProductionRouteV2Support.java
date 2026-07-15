@@ -1,6 +1,7 @@
 package com.easysubway.route.application.service;
 
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Plan;
+import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2PlanSource;
 import com.easysubway.route.application.port.in.RouteV2SearchUseCase.RouteV2Status;
 import com.easysubway.route.application.port.out.LoadRouteTimetablePort;
 import com.easysubway.route.application.port.out.RouteV2AccessStore;
@@ -49,7 +50,8 @@ public class ProductionRouteV2Support {
 	}
 
 	public void requireUsablePlan(RouteV2Plan plan) {
-		if (plan.statuses().contains(RouteV2Status.STALE_TIMETABLE)) {
+		if (plan.source() != RouteV2PlanSource.TIMETABLE_RAPTOR
+			|| plan.statuses().contains(RouteV2Status.STALE_TIMETABLE)) {
 			throw new ItxTimetableUnavailableException();
 		}
 	}
