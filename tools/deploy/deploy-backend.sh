@@ -557,6 +557,38 @@ fail_backend_deployment() {
 	printf '%s\n' "${DEPLOY_SHA}" > "${SHARED_DIR}/failed-sha"
 }
 
+verify_runtime_hardening() {
+	local service="$1"
+	local container_id=""
+	local runtime_config=""
+	local uid=""
+	local gid=""
+	local process_status=""
+	local cap_eff=""
+	local no_new_privs=""
+
+	container_id="$(compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" ps -q "${service}" 2>/dev/null || true)"
+	[[ -n "${container_id}" ]] || return 1
+	runtime_config="$(docker inspect --format '{{.Config.User}}|{{.HostConfig.ReadonlyRootfs}}|{{json .HostConfig.Tmpfs}}|{{json .HostConfig.CapDrop}}|{{json .HostConfig.SecurityOpt}}' "${container_id}")"
+	[[ "${runtime_config}" == '10001:10001|true|{"/tmp":"rw,nosuid,nodev"}|["ALL"]|["no-new-privileges:true"]' ]] || return 1
+
+	uid="$(docker exec "${container_id}" id -u)"
+	gid="$(docker exec "${container_id}" id -g)"
+	[[ "${uid}:${gid}" == "10001:10001" ]] || return 1
+	if docker exec "${container_id}" touch /app/app.jar >/dev/null 2>&1; then
+		return 1
+	fi
+	docker exec "${container_id}" sh -c 'probe="$(mktemp /tmp/easysubway-hardening.XXXXXX)" && rm -f "$probe"' || return 1
+
+	process_status="$(docker exec "${container_id}" cat /proc/1/status)"
+	cap_eff="$(awk '$1 == "CapEff:" { print $2 }' <<<"${process_status}")"
+	no_new_privs="$(awk '$1 == "NoNewPrivs:" { print $2 }' <<<"${process_status}")"
+	[[ "${cap_eff}" == "0000000000000000" && "${no_new_privs}" == "1" ]] || return 1
+
+	printf 'runtime_hardening service=%s uid=%s gid=%s rootfs=read-only tmpfs=/tmp cap_eff=%s no_new_privs=%s image_digest=%s\n' \
+		"${service}" "${uid}" "${gid}" "${cap_eff}" "${no_new_privs}" "${DEPLOY_IMAGE_DIGEST}"
+}
+
 write_phase "restarting"
 if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build "${RUNTIME_SERVICES[@]}"; then
 	fail_backend_deployment "backend_start_failed"
@@ -566,6 +598,12 @@ if ! start_observability_services "${SHARED_DIR}/current-env/backend.env" "${SHA
 	fail_backend_deployment "observability_start_failed"
 	exit 1
 fi
+for service in "${RUNTIME_SERVICES[@]}"; do
+	if ! verify_runtime_hardening "${service}"; then
+		fail_backend_deployment "${service}_hardening_failed"
+		exit 1
+	fi
+done
 
 observability_ready=0
 for _ in $(seq 1 12); do

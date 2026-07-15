@@ -87,7 +87,8 @@
       "deployed-distributed-or-multi-node-rate-limit-rehearsal",
       "deployed-ad-event-edge-rate-limit",
       "deployed-ad-event-origin-bypass-denial",
-      "deployed-ad-event-privacy-redaction"
+      "deployed-ad-event-privacy-redaction",
+      "container-hardening-negative-controls"
     ],
     "notClosingReasonKo": "#1022는 Play credential/store preflight와 local/backend 자동 검증은 확보됐지만, Play-generated/Play-installed artifact 및 deployed production-like rehearsal evidence가 아직 없어 open 유지한다.",
     "redactionPolicy": {
@@ -114,7 +115,8 @@
       "distributed-or-waived-rate-limit-rehearsal",
       "deployed-ad-event-edge-rate-limit",
       "deployed-ad-event-origin-bypass-denial",
-      "deployed-ad-event-privacy-redaction"
+      "deployed-ad-event-privacy-redaction",
+      "container-hardening-negative-controls"
     ],
     "forbiddenClosureEvidence": [
       "static gate JSON",
@@ -127,7 +129,7 @@
     "policyKo": "#1022는 Play-generated/Play-installed artifact와 deployed production-like backend/object-storage rehearsal 증거가 없으면 preflight, local selected test, static contract만으로 완료 처리하지 않는다."
   },
   "buildIdentityPolicy": {
-    "requiredIssueLinks": ["#1015", "#1016", "#1020"],
+    "requiredIssueLinks": ["#1015", "#1016", "#1020", "#1914"],
     "acceptedArtifactSources": ["rc-aab", "play-generated-apk", "play-installed-build", "backend-release-image"],
     "requiredIdentityFields": [
       "gitSha",
