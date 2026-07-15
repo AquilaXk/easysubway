@@ -13341,6 +13341,90 @@ void main() {
     expect(controller.state.activeRouteId, 'route-1');
   });
 
+  testWidgets('경로 mismatch는 새 경로 역명 조회 전에 종료한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    final repository =
+        FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(routeSearchId: 'route-2'),
+          )
+          ..refreshResult = RouteRefreshResult(
+            routeSearchId: 'route-2',
+            status: 'UPDATED_ROUTE',
+            result: _sampleRouteSearchResult(
+              routeSearchId: 'route-2',
+              steps: const [
+                RouteSearchStep(
+                  sequence: 1,
+                  stepType: 'ride',
+                  title: '상록수에서 환승역까지 이동',
+                  description: '열차를 이용해 이동합니다.',
+                  lineId: 'seoul-4',
+                  lineName: '수도권 4호선',
+                  fromStationId: 'station-sangnoksu',
+                  toStationId: 'station-new-transfer',
+                  estimatedMinutes: 20,
+                  distanceMeters: 9000,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
+                  plannedArrivalTimeIso: '2026-07-06T09:20:00+09:00',
+                ),
+                RouteSearchStep(
+                  sequence: 2,
+                  stepType: 'ride',
+                  title: '환승역에서 사당까지 이동',
+                  description: '열차를 이용해 이동합니다.',
+                  lineId: 'seoul-2',
+                  lineName: '수도권 2호선',
+                  fromStationId: 'station-new-transfer',
+                  toStationId: 'station-sadang',
+                  estimatedMinutes: 15,
+                  distanceMeters: 4500,
+                  includesStairs: false,
+                  requiresAccessibilityCheck: true,
+                  plannedArrivalTimeIso: '2026-07-06T09:37:30+09:00',
+                ),
+              ],
+            ),
+            refreshedAt: '2026-07-06T09:01:00+09:00',
+            etaSource: 'PLANNED',
+            etaConfidence: 'MEDIUM',
+            sourceLabel: '계획 시간 기준',
+          );
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: repository,
+      controller: controller,
+    );
+    await _enableSampleGetOffAlarm(controller);
+    final subscriptionBefore = await stateRepository.loadActive();
+    notifier.reset();
+    final reports = <FlutterErrorDetails>[];
+
+    await runWithMobileErrorReporter(reports.add, () async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+    });
+
+    expect(reports, isEmpty);
+    expect(notifier.scheduleCalls, 0);
+    expect(notifier.cancelCalls, 0);
+    expect(await stateRepository.loadActive(), same(subscriptionBefore));
+    expect(controller.state.activeRouteId, 'route-1');
+  });
+
   testWidgets('성공한 foreground refresh에 usable ride가 없으면 활성 하차 알림을 취소한다', (
     tester,
   ) async {

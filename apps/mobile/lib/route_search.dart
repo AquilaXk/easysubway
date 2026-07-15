@@ -2653,6 +2653,9 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
         result == null) {
       return;
     }
+    if (getOffAlarmController.state.activeRouteId != result.routeSearchId) {
+      return;
+    }
     final rideLegs = _rideLegArrivalsFromResult(result);
     final source =
         outcome.refreshed &&
@@ -2662,7 +2665,10 @@ class _RouteSearchScreenState extends State<RouteSearchScreen>
     try {
       final activeSubscription = await getOffAlarmController.repository
           .loadActive();
-      if (!mounted) {
+      if (!mounted ||
+          !getOffAlarmController.state.enabled ||
+          getOffAlarmController.state.activeRouteId != result.routeSearchId ||
+          activeSubscription?.routeId != result.routeSearchId) {
         return;
       }
       final activeStationNames = <String, String>{
