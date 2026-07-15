@@ -82,15 +82,26 @@ function validateRouteGraphTopologyIntegrity(bundle) {
   }
 }
 
-function validateRollbackRescue(bundle, requirePass, evidenceRaw, evidence) {
+function validateRollbackRescue(bundle, requirePass, evidenceRaw, evidence, manifestRaw) {
   const rescue = bundle.rollbackRescue;
   if (rescue === undefined) return;
   if (!rescue || typeof rescue !== "object" || Array.isArray(rescue)) {
     throw new Error("rollbackRescue must be an object");
   }
-  if (!evidenceRaw || !evidence) {
-    throw new Error("rollbackRescue requires --rollback-evidence");
+  if (!evidenceRaw || !evidence) throw new Error("rollbackRescue requires --rollback-evidence");
+  if (!manifestRaw) throw new Error("rollbackRescue requires --rollback-manifest");
+  validateRollbackShape(rescue);
+  validateRollbackBundleBinding(rescue, bundle);
+  validateRollbackArtifactBinding(rescue, evidenceRaw, evidence, manifestRaw);
+  if (requirePass && rescue.validatorStatus !== "PASS") {
+    throw new Error("rollbackRescue validatorStatus must be PASS");
   }
+  if (requirePass && rescue.manifestLastStatus !== "PASS") {
+    throw new Error("rollbackRescue manifestLastStatus must be PASS");
+  }
+}
+
+function validateRollbackShape(rescue) {
   for (const field of [
     "evidenceSha256",
     "rcManifestSha256",
@@ -122,18 +133,6 @@ function validateRollbackRescue(bundle, requirePass, evidenceRaw, evidence) {
   )) {
     throw new Error("rollbackRescue sequences must satisfy knownGood < failed = current < rescue");
   }
-  if (rescue.releaseRequestId !== bundle.releaseRequestId) {
-    throw new Error("rollbackRescue releaseRequestId must match bundle releaseRequestId");
-  }
-  if (rescue.rcCandidateId !== bundle.candidateId) {
-    throw new Error("rollbackRescue rcCandidateId must match bundle candidateId");
-  }
-  if (rescue.rcManifestSha256 !== bundle.manifestSha256) {
-    throw new Error("rollbackRescue rcManifestSha256 must match bundle manifestSha256");
-  }
-  if (rescue.rescueManifestSha256 !== rescue.rcManifestSha256) {
-    throw new Error("rollbackRescue rescueManifestSha256 must match rcManifestSha256");
-  }
   if (!Number.isInteger(rescue.recoveryDurationSeconds) || rescue.recoveryDurationSeconds < 0) {
     throw new Error("rollbackRescue recoveryDurationSeconds must be a non-negative integer");
   }
@@ -147,13 +146,35 @@ function validateRollbackRescue(bundle, requirePass, evidenceRaw, evidence) {
     throw new Error("rollbackRescue executionEnvironment is invalid");
   }
   if (typeof rescue.productionExecuted !== "boolean") {
-    throw new Error("rollbackRescue productionExecuted must be boolean");
+    throw new TypeError("rollbackRescue productionExecuted must be boolean");
   }
   if ((rescue.executionEnvironment === "PRODUCTION") !== rescue.productionExecuted) {
     throw new Error("rollbackRescue productionExecuted must match executionEnvironment");
   }
+}
+
+function validateRollbackBundleBinding(rescue, bundle) {
+  if (rescue.releaseRequestId !== bundle.releaseRequestId) {
+    throw new Error("rollbackRescue releaseRequestId must match bundle releaseRequestId");
+  }
+  if (rescue.rcCandidateId !== bundle.candidateId) {
+    throw new Error("rollbackRescue rcCandidateId must match bundle candidateId");
+  }
+  if (rescue.rcManifestSha256 !== bundle.manifestSha256) {
+    throw new Error("rollbackRescue rcManifestSha256 must match bundle manifestSha256");
+  }
+}
+
+function validateRollbackArtifactBinding(rescue, evidenceRaw, evidence, manifestRaw) {
   if (rescue.evidenceSha256 !== createHash("sha256").update(evidenceRaw).digest("hex")) {
     throw new Error("rollbackRescue evidence sha256 mismatch");
+  }
+  if (rescue.rescueManifestSha256 !== createHash("sha256").update(manifestRaw).digest("hex")) {
+    throw new Error("rollbackRescue manifest sha256 mismatch");
+  }
+  const manifest = JSON.parse(manifestRaw);
+  if (manifest.releaseSequence !== rescue.rescueReleaseSequence) {
+    throw new Error("rollbackRescue manifest releaseSequence mismatch");
   }
   if (evidence.schemaVersion !== 1 || evidence.artifactKind !== "datapack-rollback-rescue-evidence") {
     throw new Error("rollbackRescue evidence identity mismatch");
@@ -177,12 +198,6 @@ function validateRollbackRescue(bundle, requirePass, evidenceRaw, evidence) {
     pack.sha256 === rescue.knownGoodPackSha256
     && pack.sqliteSha256 === rescue.knownGoodSqliteSha256)) {
     throw new Error("rollbackRescue known-good pack evidence mismatch");
-  }
-  if (requirePass && rescue.validatorStatus !== "PASS") {
-    throw new Error("rollbackRescue validatorStatus must be PASS");
-  }
-  if (requirePass && rescue.manifestLastStatus !== "PASS") {
-    throw new Error("rollbackRescue manifestLastStatus must be PASS");
   }
 }
 
@@ -315,6 +330,10 @@ async function main() {
     ? await readFile(rollbackEvidencePath, "utf8")
     : null;
   const rollbackEvidence = rollbackEvidenceRaw ? JSON.parse(rollbackEvidenceRaw) : null;
+  const rollbackManifestPath = argValue(args, "--rollback-manifest");
+  const rollbackManifestRaw = rollbackManifestPath
+    ? await readFile(rollbackManifestPath, "utf8")
+    : null;
   const scopeRaw = await readFile(scopePath, "utf8");
   const scope = JSON.parse(scopeRaw);
   const launchReportRaw = await readFile(launchReportPath, "utf8");
@@ -417,7 +436,7 @@ async function main() {
   }
 
   validateRouteGraphTopologyIntegrity(bundle);
-  validateRollbackRescue(bundle, requirePass, rollbackEvidenceRaw, rollbackEvidence);
+  validateRollbackRescue(bundle, requirePass, rollbackEvidenceRaw, rollbackEvidence, rollbackManifestRaw);
 }
 
 main().catch((error) => {

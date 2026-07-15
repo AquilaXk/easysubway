@@ -72,7 +72,7 @@ export async function validateReferencedPacksForRescue(baseUrl, manifest) {
   const temporaryDir = await mkdtemp(path.join(tmpdir(), "easysubway-rescue-pack-"));
   try {
     for (const pack of manifest.packs) {
-      const packKey = pack.url && !/^https:\/\//.test(pack.url)
+      const packKey = pack.url && !pack.url.startsWith("https://")
         ? pack.url
         : `catalog/${pack.id}-v${pack.version}.sqlite.gz`;
       const response = await request(objectUrl(baseUrl, packKey), "GET");
@@ -220,6 +220,7 @@ export async function putImmutableAndVerify(baseUrl, key, bytes) {
     "cache-control": "public, max-age=31536000, immutable",
     "if-none-match": "*",
   });
+  if (put.statusCode === 412) throw new Error(`${key} immutable collision`);
   if (put.statusCode < 200 || put.statusCode >= 300) {
     throw new Error(`${key} PUT failed with HTTP ${put.statusCode}`);
   }

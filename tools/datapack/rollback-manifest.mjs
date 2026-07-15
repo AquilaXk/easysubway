@@ -24,6 +24,7 @@ async function main() {
   const approval = validateRollbackApproval(
     JSON.parse(await readFile(path.resolve(requiredArg(args, "approval")), "utf8")),
   );
+  const manifestOutput = path.resolve(requiredArg(args, "manifest-output"));
   const evidenceOutput = path.resolve(requiredArg(args, "evidence-output"));
   const dryRun = args.has("dry-run");
 
@@ -39,6 +40,7 @@ async function main() {
   const knownGood = JSON.parse(knownGoodBytes.toString("utf8"));
   validateManifest(knownGood, { requireProduction: channel === "production", releasesTarget: true });
   if (knownGood.channel !== channel) throw new Error(`known-good channel mismatch: ${knownGood.channel} != ${channel}`);
+  if (knownGood.releaseSequence !== targetSequence) throw new Error("known-good releaseSequence mismatch");
   if (approval.targetChannel !== channel) throw new Error("approval targetChannel mismatch");
   if (approval.knownGoodManifestSha256 !== sha256(knownGoodBytes)) {
     throw new Error("approval known-good manifest identity mismatch");
@@ -64,8 +66,6 @@ async function main() {
       throw new Error("idempotent rescue immutable/current identity mismatch");
     }
     const report = buildReport({
-      current,
-      currentBytes,
       knownGood,
       knownGoodBytes,
       rescue: current,
@@ -77,7 +77,10 @@ async function main() {
       startedAtMs,
       idempotentReplay: true,
     });
-    await writeEvidence(evidenceOutput, report);
+    await Promise.all([
+      writeOutput(manifestOutput, currentBytes),
+      writeOutput(evidenceOutput, Buffer.from(`${JSON.stringify(report, null, 2)}\n`)),
+    ]);
     process.stdout.write(`${JSON.stringify(report)}\n`);
     return;
   }
@@ -107,6 +110,7 @@ async function main() {
     expiresAt: requiredArg(args, "expires-at"),
     privateKey: signingPrivateKey(),
   });
+  await writeOutput(manifestOutput, result.manifestBytes);
 
   let manifestLastStatus = "NOT_EXECUTED";
   if (!dryRun) {
@@ -128,11 +132,11 @@ async function main() {
     completedAt: new Date().toISOString(),
     recoveryDurationSeconds: Math.max(0, Math.ceil((Date.now() - startedAtMs) / 1000)),
   };
-  await writeEvidence(evidenceOutput, report);
+  await writeOutput(evidenceOutput, Buffer.from(`${JSON.stringify(report, null, 2)}\n`));
   process.stdout.write(`${JSON.stringify(report)}\n`);
 }
 
-function buildReport({ current, currentBytes, knownGood, knownGoodBytes, rescue, rescueBytes, approval, baseUrl, dryRun, manifestLastStatus, startedAtMs, idempotentReplay }) {
+function buildReport({ knownGood, knownGoodBytes, rescue, rescueBytes, approval, baseUrl, dryRun, manifestLastStatus, startedAtMs, idempotentReplay }) {
   return {
     schemaVersion: 1,
     artifactKind: "datapack-rollback-rescue-evidence",
@@ -146,7 +150,7 @@ function buildReport({ current, currentBytes, knownGood, knownGoodBytes, rescue,
       manifestSha256: rescue.rollbackProvenance.failedManifestSha256,
     },
     failed: {
-      channel: rescue.rollbackProvenance.currentReleaseSequence === current.releaseSequence ? current.channel : rescue.channel,
+      channel: rescue.channel,
       releaseSequence: rescue.rollbackProvenance.failedReleaseSequence,
       manifestSha256: rescue.rollbackProvenance.failedManifestSha256,
     },
@@ -243,9 +247,9 @@ async function authenticatedCatalogSequences(baseUrl, channel) {
   return sequences;
 }
 
-async function writeEvidence(outputPath, report) {
+async function writeOutput(outputPath, bytes) {
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(outputPath, bytes);
 }
 
 function isLoopback(hostname) {

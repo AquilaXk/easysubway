@@ -84,6 +84,7 @@ jobs:
             echo "EASYSUBWAY_DATAPACK_REMOTE_VALIDATION=${{ runner.temp }}/easysubway-datapack-remote-validation"
             echo "EASYSUBWAY_DATAPACK_ROLLBACK_APPROVAL=${{ runner.temp }}/easysubway-rollback-approval.json"
             echo "EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE=${{ runner.temp }}/easysubway-datapack-rollback-rescue.json"
+            echo "EASYSUBWAY_DATAPACK_ROLLBACK_MANIFEST=${{ runner.temp }}/easysubway-datapack-rollback-rescue-manifest.json"
           } >> "${GITHUB_ENV}"
 
       - name: Data Pack Release / Parse modeArgs
@@ -991,6 +992,7 @@ jobs:
             --approval "${EASYSUBWAY_DATAPACK_ROLLBACK_APPROVAL}" \
             --published-at "${ROLLBACK_PUBLISHED_AT}" \
             --expires-at "${ROLLBACK_EXPIRES_AT}" \
+            --manifest-output "${EASYSUBWAY_DATAPACK_ROLLBACK_MANIFEST}" \
             --evidence-output "${EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE}"
 
       - name: Data Pack Release / Upload rollback rescue evidence
@@ -998,7 +1000,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: easysubway-datapack-rollback-rescue-${{ github.run_id }}
-          path: ${{ env.EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE }}
+          path: |
+            ${{ env.EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE }}
+            ${{ env.EASYSUBWAY_DATAPACK_ROLLBACK_MANIFEST }}
           if-no-files-found: ignore
           retention-days: 14
 

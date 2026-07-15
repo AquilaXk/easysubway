@@ -270,7 +270,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     rescueReleaseSequence: 116,
     knownGoodPackSha256: hash,
     knownGoodSqliteSha256: hash,
-    rescueManifestSha256: bundle.manifestSha256,
+    rescueManifestSha256: hash,
     recoveryDurationSeconds: 42,
     validatorStatus: "PASS",
     manifestLastStatus: "PASS",
@@ -288,7 +288,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
       releaseSequence: 114,
       packs: [{ sha256: hash, sqliteSha256: hash }],
     },
-    rescue: { releaseSequence: 116, manifestSha256: bundle.manifestSha256 },
+    rescue: { releaseSequence: 116, manifestSha256: hash },
     status: "PASS",
     validatorStatus: "PASS",
     manifestLastStatus: "PASS",
@@ -296,13 +296,19 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     executionEnvironment: "LOCAL_FIXTURE",
     productionExecuted: false,
   };
-  const rollbackEvidenceRaw = json(rollbackEvidence);
-  bundle.rollbackRescue.evidenceSha256 = sha256(rollbackEvidenceRaw);
-  await writeFile(rollbackEvidencePath, rollbackEvidenceRaw);
+  const rollbackManifestPath = path.join(outputDir, "rollback-manifest.json");
+  const rollbackManifestRaw = json({ manifestVersion: 2, releaseSequence: 116, marker: "rescue" });
+  bundle.rollbackRescue.rescueManifestSha256 = sha256(rollbackManifestRaw);
+  rollbackEvidence.rescue.manifestSha256 = bundle.rollbackRescue.rescueManifestSha256;
+  const boundRollbackEvidenceRaw = json(rollbackEvidence);
+  bundle.rollbackRescue.evidenceSha256 = sha256(boundRollbackEvidenceRaw);
+  await writeFile(rollbackEvidencePath, boundRollbackEvidenceRaw);
+  await writeFile(rollbackManifestPath, rollbackManifestRaw);
   await writeFile(bundlePath, json(bundle));
   const rollbackValidatorCommand = [
     ...validatorCommand,
     "--rollback-evidence", rollbackEvidencePath,
+    "--rollback-manifest", rollbackManifestPath,
   ];
   await execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root });
 
@@ -315,8 +321,8 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root });
   bundle.rollbackRescue.executionEnvironment = "LOCAL_FIXTURE";
   rollbackEvidence.executionEnvironment = "LOCAL_FIXTURE";
-  bundle.rollbackRescue.evidenceSha256 = sha256(rollbackEvidenceRaw);
-  await writeFile(rollbackEvidencePath, rollbackEvidenceRaw);
+  bundle.rollbackRescue.evidenceSha256 = sha256(boundRollbackEvidenceRaw);
+  await writeFile(rollbackEvidencePath, boundRollbackEvidenceRaw);
   await writeFile(bundlePath, json(bundle));
 
   for (const [field, value, expected] of [
@@ -338,6 +344,17 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     execFileAsync(process.execPath, [...validatorCommand, "--require-pass"], { cwd: root }),
     /rollbackRescue requires --rollback-evidence/,
   );
+  await assert.rejects(
+    execFileAsync(process.execPath, [...validatorCommand, "--rollback-evidence", rollbackEvidencePath, "--require-pass"], { cwd: root }),
+    /rollbackRescue requires --rollback-manifest/,
+  );
+
+  await writeFile(rollbackManifestPath, json({ manifestVersion: 2, releaseSequence: 117, marker: "tampered" }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root }),
+    /rollbackRescue manifest sha256 mismatch/,
+  );
+  await writeFile(rollbackManifestPath, rollbackManifestRaw);
 
   rollbackEvidence.knownGood.packs[0].sha256 = "f".repeat(64);
   const tamperedRollbackEvidenceRaw = json(rollbackEvidence);
@@ -352,7 +369,7 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root }),
     /rollbackRescue known-good pack evidence mismatch/,
   );
-  await writeFile(rollbackEvidencePath, rollbackEvidenceRaw);
+  await writeFile(rollbackEvidencePath, boundRollbackEvidenceRaw);
   rollbackEvidence.knownGood.packs[0].sha256 = hash;
   delete bundle.rollbackRescue;
   await writeFile(bundlePath, json(bundle));

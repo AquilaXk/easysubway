@@ -37,7 +37,9 @@ test("known-good pack 검증 후 immutable rescue를 쓰고 current를 마지막
     assert.equal(sha256(packBytes), knownGood.packs[0].sha256);
 
     const evidence = JSON.parse(await readFile(path.join(directory, "rollback-evidence.json"), "utf8"));
+    const rescueManifest = await readFile(path.join(directory, "rollback-manifest.json"));
     assert.equal(evidence.rescue.manifestSha256, report.rescue.manifestSha256);
+    assert.equal(sha256(rescueManifest), report.rescue.manifestSha256);
     assert.equal(evidence.manifestLastStatus, "PASS");
   });
 });
@@ -114,6 +116,19 @@ test("rescue sequence는 caller 파일이 아니라 원격 immutable catalog 최
     assert.equal(report.rescue.releaseSequence, 121);
     assert.ok(storage.log.some((entry) => entry.startsWith("GET ?prefix=catalog%2Freleases%2F")));
     assert.ok(storage.log.includes("GET catalog/releases/120.json"));
+  });
+});
+
+test("known-good immutable key와 manifest releaseSequence가 다르면 거부한다", async () => {
+  await withFixture(async (fixture) => {
+    fixture.knownGood.releaseSequence = 113;
+    resignManifest(fixture.knownGood);
+    fixture.storage.objects.set("catalog/releases/114.json", { body: bytes(fixture.knownGood) });
+    await bindApprovalToKnownGood(fixture);
+    await assert.rejects(
+      runRollback(fixture.directory, fixture.storage.baseUrl),
+      /known-good releaseSequence mismatch/,
+    );
   });
 });
 
@@ -267,6 +282,7 @@ async function runRollback(directory, baseUrl, extraArgs = []) {
     "--approval", path.join(directory, "approval.json"),
     "--published-at", "2026-07-15T01:00:00.000Z",
     "--expires-at", "2026-07-16T01:00:00.000Z",
+    "--manifest-output", path.join(directory, "rollback-manifest.json"),
     "--evidence-output", path.join(directory, "rollback-evidence.json"),
     ...extraArgs,
   ], {
