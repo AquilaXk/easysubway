@@ -5,6 +5,7 @@ import test from "node:test";
 const workflowPath = ".github/workflows/production-route-api-closure-evidence.yml";
 const cdWorkflowPath = ".github/workflows/cd.yml";
 const snapshotGatePath = "tools/ops/route-search-purge-snapshot-gate.sh";
+const purgeSqlPath = "tools/ops/route-search-purge.sql";
 
 test("production route API closure evidence는 현재 배포와 origin 403·row 불변을 검증한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -48,8 +49,10 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
 test("production snapshot gate는 main-only runner에서 backup·격리 restore·purge plan만 수집한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
   const snapshotGate = await readFile(snapshotGatePath, "utf8").catch(() => "");
+  const purgeSql = await readFile(purgeSqlPath, "utf8").catch(() => "");
 
   assert.match(workflow, /tools\/ops\/route-search-purge-snapshot-gate\.sh/);
+  assert.match(workflow, /tools\/ops\/route-search-purge\.sql/);
   assert.match(workflow, /tools\/ops\/postgres-backup\.sh/);
   assert.match(workflow, /backend\/src\/main\/resources\/db\/migration\/postgresql\/V51__/);
   assert.match(workflow, /backend\/src\/main\/resources\/db\/migration\/h2\/V51__/);
@@ -75,6 +78,12 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /snapshot-\$\{SNAPSHOT_REQUEST_SHA\}\.env/);
   assert.match(snapshotGate, /rm -f "\$\{MARKER_FILE\}"/);
   assert.match(snapshotGate, /current_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
+  assert.match(snapshotGate, /purge_sql_sha256/);
+  assert.match(snapshotGate, /production_schema_version/);
+  assert.match(snapshotGate, /restore_schema_version/);
+  assert.match(snapshotGate, /cmp -s "\$\{PURGE_SQL_FILE\}"/);
+  assert.match(purgeSql, /^DELETE FROM route_search_results AS route/m);
+  assert.doesNotMatch(purgeSql, /BEGIN|EXPLAIN|ROLLBACK/);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore/);
   assert.match(snapshotGate, /--pull never/);
@@ -105,6 +114,11 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /favorite_routes/);
   assert.match(snapshotGate, /favorite_route_stations/);
   assert.match(snapshotGate, /route_feedbacks/);
+  assert.match(snapshotGate, /favorite_routes_null/);
+  assert.match(snapshotGate, /favorite_route_stations_null/);
+  assert.match(snapshotGate, /route_feedbacks_null/);
+  assert.match(snapshotGate, /route reference NULL anomaly/);
+  assert.match(snapshotGate, /route purge aggregate invariant failed/);
   assert.match(snapshotGate, /org\.opencontainers\.image\.revision/);
   assert.match(snapshotGate, /production_image=.*\{\{\.Image\}\}/);
   assert.doesNotMatch(snapshotGate, /production_image=.*\{\{\.Config\.Image\}\}/);
@@ -114,6 +128,11 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /cat "\$\{report_file\}"/);
   assert.match(snapshotGate, /snapshot-complete/);
   assert.match(snapshotGate, /snapshot_request_sha/);
+  assert.match(snapshotGate, /deployed_sha/);
+  assert.match(snapshotGate, /image_revision/);
+  assert.match(snapshotGate, /postgresql_major/);
+  assert.match(snapshotGate, /schema_version/);
+  assert.match(snapshotGate, /purge_sql_sha256/);
   assert.doesNotMatch(snapshotGate, /existing verified backup/);
   assert.doesNotMatch(snapshotGate, /\b(curl|scp)\b|upload-artifact/);
 
@@ -154,7 +173,11 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   assert.match(workflow, /echo "current_sha=\$\{current_sha\}" >> "\$\{GITHUB_OUTPUT\}"/);
   assert.match(workflow, /snapshot-\$\{DEPLOY_SHA\}\.env/);
   assert.match(workflow, /marker_request_sha[^\n]+!=[^\n]+DEPLOY_SHA/);
-  assert.match(workflow, /marker_current_sha[^\n]+!=[^\n]+CURRENT_DEPLOYED_SHA/);
+  assert.match(workflow, /marker_deployed_sha[^\n]+!=[^\n]+CURRENT_DEPLOYED_SHA/);
+  assert.match(workflow, /marker_image_revision[^\n]+!=[^\n]+current_image_revision/);
+  assert.match(workflow, /marker_postgresql_major[^\n]+!=[^\n]+current_postgresql_major/);
+  assert.match(workflow, /marker_schema_version[^\n]+!=[^\n]+current_schema_version/);
+  assert.match(workflow, /marker_purge_sql_sha[^\n]+!=[^\n]+current_purge_sql_sha/);
   assert.match(workflow, /snapshot marker backup checksum mismatch/);
   assert.match(workflow, /snapshot_wait_deadline="\$\(\(SECONDS \+ 3600\)\)"/);
   assert.match(

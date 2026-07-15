@@ -14,6 +14,9 @@ RESTORE_PIDS_LIMIT="256"
 WAL_HEADROOM_BYTES="$((256 * 1024 * 1024))"
 MIN_OPERATIONAL_RESERVE_BYTES="$((1024 * 1024 * 1024))"
 SPACE_CLASS='[:space:]'
+PURGE_SQL_FILE="${ROOT_DIR}/tools/ops/route-search-purge.sql"
+POSTGRES_V51="${ROOT_DIR}/backend/src/main/resources/db/migration/postgresql/V51__purge_unreferenced_route_search_results.sql"
+H2_V51="${ROOT_DIR}/backend/src/main/resources/db/migration/h2/V51__purge_unreferenced_route_search_results.sql"
 
 if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
 	printf 'DEPLOY_ROOT is invalid\n' >&2
@@ -30,6 +33,23 @@ fi
 if [[ ! "${SNAPSHOT_REQUEST_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
 	printf 'SNAPSHOT_REQUEST_SHA is invalid\n' >&2
 	exit 2
+fi
+if [[ ! -f "${PURGE_SQL_FILE}" ]]; then
+	printf 'canonical purge SQL is missing\n' >&2
+	exit 2
+fi
+if [[ -e "${POSTGRES_V51}" || -e "${H2_V51}" ]]; then
+	for migration in "${POSTGRES_V51}" "${H2_V51}"; do
+		if [[ ! -f "${migration}" ]] || ! cmp -s "${PURGE_SQL_FILE}" "${migration}"; then
+			printf 'V51 purge SQL differs from the analyzed canonical SQL\n' >&2
+			exit 1
+		fi
+	done
+fi
+purge_sql_sha256="$(sha256sum "${PURGE_SQL_FILE}" | awk '{print $1}')"
+if [[ ! "${purge_sql_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
+	printf 'purge SQL checksum is invalid\n' >&2
+	exit 1
 fi
 
 SHARED_DIR="${DEPLOY_ROOT}/shared"
@@ -71,6 +91,14 @@ production_version_num="$(docker exec easysubway-postgres sh -lc \
 	| tr -d "${SPACE_CLASS}")"
 if [[ ! "${production_version_num}" =~ ^16[0-9]{4}$ ]]; then
 	printf 'production PostgreSQL major version is not 16\n' >&2
+	exit 1
+fi
+production_postgresql_major="${production_version_num:0:2}"
+production_schema_version="$(docker exec easysubway-postgres sh -lc \
+	'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1;"' \
+	| tr -d "${SPACE_CLASS}")"
+if [[ ! "${production_schema_version}" =~ ^[0-9]+([.][0-9]+)*$ ]]; then
+	printf 'production Flyway schema version is invalid\n' >&2
 	exit 1
 fi
 
@@ -232,6 +260,12 @@ restore_psql() {
 		psql -X -v ON_ERROR_STOP=1 -A -t -U snapshot_gate -d easysubway_restore "$@"
 }
 
+restore_schema_version="$(restore_psql -c 'SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1;' | tr -d "${SPACE_CLASS}")"
+if [[ "${restore_schema_version}" != "${production_schema_version}" ]]; then
+	printf 'restored Flyway schema version does not match production\n' >&2
+	exit 1
+fi
+
 restore_count="$(restore_psql -c 'SELECT count(*) FROM route_search_results;' | tr -d "${SPACE_CLASS}")"
 if [[ "${restore_count}" != "${source_count_before}" ]]; then
 	printf 'restored route row count does not match production backup count\n' >&2
@@ -240,20 +274,23 @@ fi
 
 counts="$(restore_psql -F '|' -c "
 WITH reference_ids AS (
-    SELECT route_search_id FROM favorite_routes
-    UNION SELECT route_search_id FROM favorite_route_stations
-    UNION SELECT route_search_id FROM route_feedbacks
+    SELECT route_search_id FROM favorite_routes WHERE route_search_id IS NOT NULL
+    UNION SELECT route_search_id FROM favorite_route_stations WHERE route_search_id IS NOT NULL
+    UNION SELECT route_search_id FROM route_feedbacks WHERE route_search_id IS NOT NULL
 ), metrics AS (
     SELECT 'route_total' AS key, count(*)::bigint AS value FROM route_search_results
-    UNION ALL SELECT 'favorite_routes_raw', count(DISTINCT route_search_id) FROM favorite_routes
+    UNION ALL SELECT 'favorite_routes_null', count(*) FROM favorite_routes WHERE route_search_id IS NULL
+    UNION ALL SELECT 'favorite_routes_raw', count(DISTINCT route_search_id) FROM favorite_routes WHERE route_search_id IS NOT NULL
     UNION ALL SELECT 'favorite_routes_preserved', count(DISTINCT favorite.route_search_id) FROM favorite_routes favorite JOIN route_search_results route USING (route_search_id)
-    UNION ALL SELECT 'favorite_routes_dangling', count(DISTINCT favorite.route_search_id) FROM favorite_routes favorite LEFT JOIN route_search_results route USING (route_search_id) WHERE route.route_search_id IS NULL
-    UNION ALL SELECT 'favorite_route_stations_raw', count(DISTINCT route_search_id) FROM favorite_route_stations
+    UNION ALL SELECT 'favorite_routes_dangling', count(DISTINCT favorite.route_search_id) FROM favorite_routes favorite LEFT JOIN route_search_results route USING (route_search_id) WHERE favorite.route_search_id IS NOT NULL AND route.route_search_id IS NULL
+    UNION ALL SELECT 'favorite_route_stations_null', count(*) FROM favorite_route_stations WHERE route_search_id IS NULL
+    UNION ALL SELECT 'favorite_route_stations_raw', count(DISTINCT route_search_id) FROM favorite_route_stations WHERE route_search_id IS NOT NULL
     UNION ALL SELECT 'favorite_route_stations_preserved', count(DISTINCT station.route_search_id) FROM favorite_route_stations station JOIN route_search_results route USING (route_search_id)
-    UNION ALL SELECT 'favorite_route_stations_dangling', count(DISTINCT station.route_search_id) FROM favorite_route_stations station LEFT JOIN route_search_results route USING (route_search_id) WHERE route.route_search_id IS NULL
-    UNION ALL SELECT 'route_feedbacks_raw', count(DISTINCT route_search_id) FROM route_feedbacks
+    UNION ALL SELECT 'favorite_route_stations_dangling', count(DISTINCT station.route_search_id) FROM favorite_route_stations station LEFT JOIN route_search_results route USING (route_search_id) WHERE station.route_search_id IS NOT NULL AND route.route_search_id IS NULL
+    UNION ALL SELECT 'route_feedbacks_null', count(*) FROM route_feedbacks WHERE route_search_id IS NULL
+    UNION ALL SELECT 'route_feedbacks_raw', count(DISTINCT route_search_id) FROM route_feedbacks WHERE route_search_id IS NOT NULL
     UNION ALL SELECT 'route_feedbacks_preserved', count(DISTINCT feedback.route_search_id) FROM route_feedbacks feedback JOIN route_search_results route USING (route_search_id)
-    UNION ALL SELECT 'route_feedbacks_dangling', count(DISTINCT feedback.route_search_id) FROM route_feedbacks feedback LEFT JOIN route_search_results route USING (route_search_id) WHERE route.route_search_id IS NULL
+    UNION ALL SELECT 'route_feedbacks_dangling', count(DISTINCT feedback.route_search_id) FROM route_feedbacks feedback LEFT JOIN route_search_results route USING (route_search_id) WHERE feedback.route_search_id IS NOT NULL AND route.route_search_id IS NULL
     UNION ALL SELECT 'reference_union_raw', count(*) FROM reference_ids
     UNION ALL SELECT 'preserved_union', count(*) FROM reference_ids reference JOIN route_search_results route USING (route_search_id)
     UNION ALL SELECT 'dangling_union', count(*) FROM reference_ids reference LEFT JOIN route_search_results route USING (route_search_id) WHERE route.route_search_id IS NULL
@@ -265,9 +302,9 @@ WITH reference_ids AS (
 SELECT key, value FROM metrics ORDER BY key;")"
 
 required_metrics=(
-	route_total favorite_routes_raw favorite_routes_preserved favorite_routes_dangling
-	favorite_route_stations_raw favorite_route_stations_preserved favorite_route_stations_dangling
-	route_feedbacks_raw route_feedbacks_preserved route_feedbacks_dangling
+	route_total favorite_routes_null favorite_routes_raw favorite_routes_preserved favorite_routes_dangling
+	favorite_route_stations_null favorite_route_stations_raw favorite_route_stations_preserved favorite_route_stations_dangling
+	route_feedbacks_null route_feedbacks_raw route_feedbacks_preserved route_feedbacks_dangling
 	reference_union_raw preserved_union dangling_union delete_candidates
 )
 for metric in "${required_metrics[@]}"; do
@@ -278,29 +315,29 @@ for metric in "${required_metrics[@]}"; do
 	fi
 	printf -v "${metric}" '%s' "${value}"
 done
+if (( favorite_routes_null != 0 || favorite_route_stations_null != 0 || route_feedbacks_null != 0 )); then
+	printf 'route reference NULL anomaly\n' >&2
+	exit 1
+fi
+if (( favorite_routes_raw != favorite_routes_preserved + favorite_routes_dangling \
+	|| favorite_route_stations_raw != favorite_route_stations_preserved + favorite_route_stations_dangling \
+	|| route_feedbacks_raw != route_feedbacks_preserved + route_feedbacks_dangling \
+	|| reference_union_raw != preserved_union + dangling_union \
+	|| route_total != preserved_union + delete_candidates \
+	|| preserved_union > route_total )); then
+	printf 'route purge aggregate invariant failed\n' >&2
+	exit 1
+fi
 
 restore_psql -c 'ANALYZE route_search_results, favorite_routes, favorite_route_stations, route_feedbacks;' >/dev/null
 
 plan_file="${EVIDENCE_DIR}/purge-plan-${backup_sha256:0:12}.txt"
 start_ns="$(date +%s%N)"
-restore_psql > "${plan_file}" <<'SQL'
-BEGIN;
-EXPLAIN (ANALYZE, BUFFERS, WAL)
-DELETE FROM route_search_results AS route
-WHERE NOT EXISTS (
-    SELECT 1 FROM favorite_routes AS favorite
-    WHERE favorite.route_search_id = route.route_search_id
-)
-AND NOT EXISTS (
-    SELECT 1 FROM favorite_route_stations AS station
-    WHERE station.route_search_id = route.route_search_id
-)
-AND NOT EXISTS (
-    SELECT 1 FROM route_feedbacks AS feedback
-    WHERE feedback.route_search_id = route.route_search_id
-);
-ROLLBACK;
-SQL
+{
+	printf 'BEGIN;\nEXPLAIN (ANALYZE, BUFFERS, WAL)\n'
+	cat "${PURGE_SQL_FILE}"
+	printf 'ROLLBACK;\n'
+} | restore_psql > "${plan_file}"
 end_ns="$(date +%s%N)"
 chmod 600 "${plan_file}"
 
@@ -351,6 +388,9 @@ snapshot_completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "- snapshot request SHA: \`${SNAPSHOT_REQUEST_SHA}\`"
 	echo "- snapshot completed at: \`${snapshot_completed_at}\`"
 	echo "- deployed SHA: \`${current_sha}\`"
+	echo "- image revision: \`${image_revision}\`"
+	echo "- PostgreSQL major/schema: \`${production_postgresql_major}/${production_schema_version}\`"
+	echo "- purge SQL SHA-256: \`${purge_sql_sha256}\`"
 	echo "- backup SHA-256: \`${backup_sha256}\`"
 	echo "- backup bytes: \`${backup_bytes}\`"
 	echo "- source database bytes: \`${source_database_bytes}\`"
@@ -366,7 +406,8 @@ snapshot_completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "- storage: root filesystem \`${root_filesystem}\`, Docker \`${docker_storage_driver}\`, IOPS/throughput not independently measured"
 	echo "- production settings: \`${production_settings}\`"
 	echo "- restore settings: \`${restore_settings}\`"
-	echo "- route rows production/restored/after rollback: \`${source_count_before}/${restore_count}/${rollback_count}\`"
+	echo "- route rows production before/after/restored/rollback: \`${source_count_before}/${source_count_after}/${restore_count}/${rollback_count}\`"
+	echo "- NULL references favorite_routes/favorite_route_stations/route_feedbacks: \`${favorite_routes_null}/${favorite_route_stations_null}/${route_feedbacks_null}\`"
 	echo "- favorite_routes raw/preserved/dangling: \`${favorite_routes_raw}/${favorite_routes_preserved}/${favorite_routes_dangling}\`"
 	echo "- favorite_route_stations raw/preserved/dangling: \`${favorite_route_stations_raw}/${favorite_route_stations_preserved}/${favorite_route_stations_dangling}\`"
 	echo "- route_feedbacks raw/preserved/dangling: \`${route_feedbacks_raw}/${route_feedbacks_preserved}/${route_feedbacks_dangling}\`"
@@ -395,7 +436,11 @@ marker_tmp="$(mktemp "${EVIDENCE_DIR}/snapshot.XXXXXX")"
 	printf 'status=snapshot-complete\n'
 	printf 'snapshot_request_sha=%s\n' "${SNAPSHOT_REQUEST_SHA}"
 	printf 'completed_at=%s\n' "${snapshot_completed_at}"
-	printf 'current_sha=%s\n' "${current_sha}"
+	printf 'deployed_sha=%s\n' "${current_sha}"
+	printf 'image_revision=%s\n' "${image_revision}"
+	printf 'postgresql_major=%s\n' "${production_postgresql_major}"
+	printf 'schema_version=%s\n' "${production_schema_version}"
+	printf 'purge_sql_sha256=%s\n' "${purge_sql_sha256}"
 	printf 'backup_file=%s\n' "${backup_file}"
 	printf 'backup_sha256=%s\n' "${backup_sha256}"
 	printf 'backup_bytes=%s\n' "${backup_bytes}"
