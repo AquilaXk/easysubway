@@ -13,6 +13,7 @@ const API_ORIGIN = "https://apis.data.go.kr";
 const DETAIL_URL = "https://www.data.go.kr/data/15125762/openapi.do";
 const LINE_ID = "line-54a7b980b7c3";
 const CAPITAL_APPROACH_LINE_ID = "line-6e39be0cb6e2";
+const CANONICAL_PACK_PATH = "apps/mobile/assets/datapacks/capital.sqlite.gz";
 const CAPITAL_APPROACH_STATIONS = Object.freeze([
   Object.freeze({ canonicalStationId: "station-8aa315864466", nameKo: "용산", corridorSequence: 1, lineId: CAPITAL_APPROACH_LINE_ID }),
   Object.freeze({ canonicalStationId: "station-c0679b9a6cf8", nameKo: "옥수", corridorSequence: 2, lineId: CAPITAL_APPROACH_LINE_ID }),
@@ -222,11 +223,13 @@ export function evaluateItxSnapshotAnomaly({ serviceDays, previousArtifact = nul
   const previousSets = previousCompleteness
     ? previousArtifact.serviceDays.map((day) => [day.dayCd, snapshotSets(day)])
     : previousSource ? previousArtifact.normalizedSnapshotSets.map(({ dayCd, sets }) => [dayCd, sets]) : [];
-  return compareSnapshotSets(
+  return applyStationMappingAuthority(compareSnapshotSets(
     currentSets,
     previousSets.map(([dayCd, sets]) => ({ dayCd, sets })),
     previousValid ? previousArtifact.sourceTimetableArtifact?.sha256 ?? previousArtifact.evidenceHash ?? null : null,
-  );
+  ), stationMappingsFromServiceDays(serviceDays), previousCompleteness
+    ? stationMappingsFromServiceDays(previousArtifact.serviceDays)
+    : stationMappingsFromSource(previousArtifact));
 }
 
 function compareSnapshotSets(currentRows, previousRows, previousArtifactSha256) {
@@ -252,6 +255,33 @@ function compareSnapshotSets(currentRows, previousRows, previousArtifactSha256) 
     previousArtifactSha256,
     serviceDays: comparisons,
   };
+}
+
+function stationMappingsFromServiceDays(serviceDays) {
+  return new Map((serviceDays ?? []).map((day) => [day.dayCd, stationMappingSet(day.roster?.stations)]));
+}
+
+function stationMappingsFromSource(source) {
+  return new Map((source?.stationRosters ?? []).map((day) => [day.dayCd, stationMappingSet(day.stations)]));
+}
+
+function stationMappingSet(stations = []) {
+  return stations.map(({ canonicalStationId, providerStationId }) => (
+    [canonicalStationId, providerStationId ?? canonicalStationId]
+  ));
+}
+
+function applyStationMappingAuthority(snapshotDiff, currentMappings, previousMappings) {
+  if (previousMappings === null) return snapshotDiff;
+  for (const day of snapshotDiff.serviceDays) {
+    const summary = summarizeSet(currentMappings.get(day.dayCd) ?? [], previousMappings.get(day.dayCd) ?? []);
+    if (summary.added.length > 0 || summary.removed.length > 0) {
+      day.blocked = true;
+      day.sets.stationSet = summary;
+    }
+  }
+  if (snapshotDiff.serviceDays.some(({ blocked }) => blocked)) snapshotDiff.status = "CHANGE_REVIEW_REQUIRED";
+  return snapshotDiff;
 }
 
 export async function buildItxSourceCandidate({ completeness, packPath, now = new Date(), repositoryRoot = repoRoot }) {
@@ -358,16 +388,17 @@ async function promoteItxSourceCandidateLocked({
   }
   validateSourceFreshness(candidate, candidate.selectedServiceDates, now);
   await validateCanonicalPackIdentity(candidate.canonicalPackIdentity, repositoryRoot);
+  validateCanonicalCorridorAuthority(candidate);
   const candidateSets = validateSourceSnapshotSets(candidate);
   const contract = validateCoverageContractAuthority(JSON.parse(await readFile(coverageContractPath, "utf8")));
   const previousSource = await loadAdmittedSourceReference(contract, repositoryRoot);
   const previous = previousSource?.sourceTimetableArtifact ?? null;
   const bootstrap = previousSource === null;
-  const expectedSnapshotDiff = compareSnapshotSets(
+  const expectedSnapshotDiff = applyStationMappingAuthority(compareSnapshotSets(
     candidateSets,
     bootstrap ? null : validateSourceSnapshotSets(previousSource),
     previous?.sha256 ?? null,
-  );
+  ), stationMappingsFromSource(candidate), bootstrap ? null : stationMappingsFromSource(previousSource));
   const expectedStatus = expectedSnapshotDiff.status;
   const changed = expectedStatus === "CHANGE_REVIEW_REQUIRED";
   if (candidate.promotionStatus !== expectedStatus
@@ -532,6 +563,9 @@ function isPlainObject(value) {
 
 async function readCanonicalPackIdentity(packPath, repositoryRoot) {
   const absolutePath = path.resolve(packPath);
+  if (absolutePath !== path.resolve(repositoryRoot, CANONICAL_PACK_PATH)) {
+    throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
+  }
   const relativePath = path.relative(path.resolve(repositoryRoot), absolutePath).split(path.sep).join("/");
   if (relativePath.startsWith("../") || relativePath === ".." || path.isAbsolute(relativePath)) {
     throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
@@ -543,7 +577,7 @@ async function readCanonicalPackIdentity(packPath, repositoryRoot) {
 
 async function validateCanonicalPackIdentity(identity, repositoryRoot) {
   const relativePath = identity?.path;
-  if (typeof relativePath !== "string" || relativePath === "" || path.isAbsolute(relativePath)
+  if (relativePath !== CANONICAL_PACK_PATH || path.isAbsolute(relativePath)
     || path.posix.normalize(relativePath) !== relativePath || relativePath.startsWith("../")
     || !/^[a-f0-9]{64}$/.test(identity?.sha256 ?? "")) {
     throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
@@ -553,7 +587,8 @@ async function validateCanonicalPackIdentity(identity, repositoryRoot) {
     const [realRoot, realParent] = await Promise.all([realpath(repositoryRoot), realpath(path.dirname(packPath))]);
     const stat = await lstat(packPath);
     if (!realParent.startsWith(`${realRoot}${path.sep}`) || stat.isSymbolicLink() || !stat.isFile()
-      || sha256(await readFile(packPath)) !== identity.sha256) {
+      || sha256(await readFile(packPath)) !== identity.sha256
+      || sha256(await readFile(path.join(repoRoot, CANONICAL_PACK_PATH))) !== identity.sha256) {
       throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
     }
   } catch (error) {
@@ -592,11 +627,29 @@ function validateMaterializedProjection(source, dayCd, errorCode) {
     if (rows.length !== sequence.stops.length) invalid();
     rows.forEach((row, index) => {
       const stop = sequence.stops[index];
-      if (row.stopSequence !== index + 1 || row.stationId !== stop.stationId
+      if (row.stopSequence !== index + 1 || row.stationId !== stop.stationId || row.lineId !== stop.lineId
         || row.arrivalSeconds !== stop.arrivalSeconds || row.departureSeconds !== stop.departureSeconds) invalid();
     });
   }
   return { sequences, trips, stopTimes: source.transitStopTimes };
+}
+
+function validateCanonicalCorridorAuthority(source) {
+  const canonical = readCanonicalLine(CANONICAL_PACK_PATH);
+  try {
+    const lineByStation = new Map(canonical.rosterStations.map(({ canonicalStationId, lineId }) => (
+      [canonicalStationId, lineId]
+    )));
+    const valid = ({ canonicalStationId, stationId, lineId }) => (
+      lineByStation.get(canonicalStationId ?? stationId) === lineId
+    );
+    if (source.stationRosters.some(({ stations }) => stations.some((station) => !valid(station)))
+      || source.stationSequences.some(({ stops }) => stops.some((stop) => !valid(stop)))) {
+      throw new Error("CANONICAL_CORRIDOR_AUTHORITY_INVALID");
+    }
+  } finally {
+    canonical.close();
+  }
 }
 
 function validateSourceSnapshotSets(source) {
@@ -652,7 +705,7 @@ function validateSourceSnapshotSets(source) {
       const stationIds = [];
       rows.forEach((row, index) => {
         const stop = sequence.stops[index];
-        if (row.stopSequence !== index + 1 || row.stationId !== stop.stationId
+        if (row.stopSequence !== index + 1 || row.stationId !== stop.stationId || row.lineId !== stop.lineId
           || row.arrivalSeconds !== stop.arrivalSeconds || row.departureSeconds !== stop.departureSeconds) {
           throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
         }
@@ -757,6 +810,7 @@ async function loadAdmittedSourceReference(contract, repositoryRoot) {
   }
   validateSourceCandidateSchema(source);
   validateSourceFreshness(source, source.selectedServiceDates);
+  validateCanonicalCorridorAuthority(source);
   validateSourceSnapshotSets(source);
   source.sourceTimetableArtifact = { sha256: reference.sha256 };
   return source;
