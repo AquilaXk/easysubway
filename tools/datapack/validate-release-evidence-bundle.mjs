@@ -10,6 +10,7 @@ import {
   bindAuthoritativeLaunchEvidence,
   buildLaunchCandidateBinding,
 } from "./launch-candidate-binding.mjs";
+import { validateManifest } from "./lib/manifest-validation.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL"]);
@@ -111,7 +112,7 @@ function validateRollbackShape(rescue) {
   ]) {
     if (!SHA256.test(rescue[field] ?? "")) throw new Error(`rollbackRescue ${field} must be sha256`);
   }
-  for (const field of ["releaseRequestId", "rcCandidateId"]) {
+  for (const field of ["releaseRequestId", "rollbackApprovalEventId", "rcCandidateId"]) {
     if (typeof rescue[field] !== "string" || rescue[field].length === 0) {
       throw new Error(`rollbackRescue ${field} must be a non-empty string`);
     }
@@ -173,6 +174,7 @@ function validateRollbackArtifactBinding(rescue, evidenceRaw, evidence, manifest
     throw new Error("rollbackRescue manifest sha256 mismatch");
   }
   const manifest = JSON.parse(manifestRaw);
+  validateManifest(manifest, { requireProduction: true, releasesTarget: true });
   if (manifest.releaseSequence !== rescue.rescueReleaseSequence) {
     throw new Error("rollbackRescue manifest releaseSequence mismatch");
   }
@@ -180,7 +182,7 @@ function validateRollbackArtifactBinding(rescue, evidenceRaw, evidence, manifest
     throw new Error("rollbackRescue evidence identity mismatch");
   }
   for (const [field, actual] of [
-    ["releaseRequestId", evidence.releaseRequestId],
+    ["rollbackApprovalEventId", evidence.rollbackApprovalEventId],
     ["currentReleaseSequence", evidence.from?.releaseSequence],
     ["failedReleaseSequence", evidence.failed?.releaseSequence],
     ["knownGoodReleaseSequence", evidence.knownGood?.releaseSequence],
@@ -194,10 +196,34 @@ function validateRollbackArtifactBinding(rescue, evidenceRaw, evidence, manifest
   ]) {
     if (rescue[field] !== actual) throw new Error(`rollbackRescue ${field} evidence mismatch`);
   }
-  if (!evidence.knownGood?.packs?.some((pack) =>
+  const provenance = manifest.rollbackProvenance;
+  for (const [field, expected] of [
+    ["currentReleaseSequence", rescue.currentReleaseSequence],
+    ["failedReleaseSequence", rescue.failedReleaseSequence],
+    ["knownGoodReleaseSequence", rescue.knownGoodReleaseSequence],
+    ["failedManifestSha256", rescue.rcManifestSha256],
+    ["knownGoodManifestSha256", evidence.knownGood?.manifestSha256],
+    ["rollbackApprovalEventId", rescue.rollbackApprovalEventId],
+  ]) {
+    if (provenance?.[field] !== expected) {
+      throw new Error(`rollbackRescue manifest rollbackProvenance ${field} mismatch`);
+    }
+  }
+  if (evidence.failed?.manifestSha256 !== rescue.rcManifestSha256) {
+    throw new Error("rollbackRescue failed manifest evidence mismatch");
+  }
+  const knownGoodPack = evidence.knownGood?.packs?.find((pack) =>
     pack.sha256 === rescue.knownGoodPackSha256
-    && pack.sqliteSha256 === rescue.knownGoodSqliteSha256)) {
+    && pack.sqliteSha256 === rescue.knownGoodSqliteSha256);
+  if (!knownGoodPack) {
     throw new Error("rollbackRescue known-good pack evidence mismatch");
+  }
+  if (!manifest.packs.some((pack) =>
+    pack.id === knownGoodPack.id
+    && pack.version === knownGoodPack.version
+    && pack.sha256 === knownGoodPack.sha256
+    && pack.sqliteSha256 === knownGoodPack.sqliteSha256)) {
+    throw new Error("rollbackRescue manifest known-good pack identity mismatch");
   }
 }
 

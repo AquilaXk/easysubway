@@ -77,7 +77,7 @@ export function buildRescueManifest(input) {
     failedManifestSha256: sha256(currentBytes),
     knownGoodReleaseSequence: knownGood.releaseSequence,
     knownGoodManifestSha256: sha256(knownGoodBytes),
-    releaseRequestId: approval.releaseRequestId,
+    rollbackApprovalEventId: approval.rollbackApprovalEventId,
     approvedByRole: approval.approvedByRole,
     approvedAt: approval.approvedAt,
     reasonCode: approval.reasonCode,
@@ -112,7 +112,7 @@ export function buildRescueManifest(input) {
     evidence: {
       schemaVersion: 1,
       artifactKind: "datapack-rollback-rescue-evidence",
-      releaseRequestId: approval.releaseRequestId,
+      rollbackApprovalEventId: approval.rollbackApprovalEventId,
       approvedByRole: approval.approvedByRole,
       approvedAt: approval.approvedAt,
       reasonCode: approval.reasonCode,
@@ -225,7 +225,7 @@ export function validateRollbackApproval(value) {
   return {
     schemaVersion: value.schemaVersion,
     artifactKind: value.artifactKind,
-    releaseRequestId: matched(value.releaseRequestId, "approval.releaseRequestId", /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+    rollbackApprovalEventId: matched(value.rollbackApprovalEventId, "approval.rollbackApprovalEventId", /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
     targetChannel: matched(value.targetChannel, "approval.targetChannel", /^(dev|staging|production)$/),
     failedManifestSha256: requiredSha256(value.failedManifestSha256, "approval.failedManifestSha256"),
     knownGoodManifestSha256: requiredSha256(value.knownGoodManifestSha256, "approval.knownGoodManifestSha256"),

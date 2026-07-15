@@ -102,7 +102,7 @@
         "failedManifestSha256",
         "knownGoodReleaseSequence",
         "knownGoodManifestSha256",
-        "releaseRequestId",
+        "rollbackApprovalEventId",
         "approvedByRole",
         "approvedAt",
         "reasonCode"
@@ -115,7 +115,7 @@
         "failedManifestSha256": { "$ref": "#/$defs/sha256" },
         "knownGoodReleaseSequence": { "type": "integer", "minimum": 1 },
         "knownGoodManifestSha256": { "$ref": "#/$defs/sha256" },
-        "releaseRequestId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "rollbackApprovalEventId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
         "approvedByRole": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$" },
         "approvedAt": { "type": "string", "format": "date-time" },
         "reasonCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" }

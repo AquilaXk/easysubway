@@ -140,7 +140,7 @@ function buildReport({ knownGood, knownGoodBytes, rescue, rescueBytes, approval,
   return {
     schemaVersion: 1,
     artifactKind: "datapack-rollback-rescue-evidence",
-    releaseRequestId: approval.releaseRequestId,
+    rollbackApprovalEventId: approval.rollbackApprovalEventId,
     approvedByRole: approval.approvedByRole,
     approvedAt: approval.approvedAt,
     reasonCode: approval.reasonCode,
@@ -175,7 +175,7 @@ function buildReport({ knownGood, knownGoodBytes, rescue, rescueBytes, approval,
 function isSameApprovedRescue(current, approval, targetSequence) {
   const provenance = current.rollbackProvenance;
   return provenance?.kind === "MONOTONIC_RESCUE"
-    && provenance.releaseRequestId === approval.releaseRequestId
+    && provenance.rollbackApprovalEventId === approval.rollbackApprovalEventId
     && provenance.approvedByRole === approval.approvedByRole
     && provenance.approvedAt === approval.approvedAt
     && provenance.reasonCode === approval.reasonCode

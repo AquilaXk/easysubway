@@ -255,7 +255,7 @@ async function withFixture(callback) {
   await writeFile(path.join(directory, "approval.json"), `${JSON.stringify({
     schemaVersion: 1,
     artifactKind: "datapack-rollback-approval",
-    releaseRequestId: "rollback-request-1",
+    rollbackApprovalEventId: "release-channel-event-1",
     targetChannel: "staging",
     failedManifestSha256: sha256(currentBytes),
     knownGoodManifestSha256: sha256(bytes(knownGood)),

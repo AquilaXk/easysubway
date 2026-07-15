@@ -42,7 +42,7 @@ test("current, failed, immutable catalog 최대값보다 큰 rescue sequence를 
     failedManifestSha256: sha256(bytes(current)),
     knownGoodReleaseSequence: 114,
     knownGoodManifestSha256: sha256(knownGoodBytes),
-    releaseRequestId: "rollback-request-1",
+    rollbackApprovalEventId: "release-channel-event-1",
     approvedByRole: "release-manager",
     approvedAt: "2026-07-15T00:30:00.000Z",
     reasonCode: "FAILED_RELEASE",
@@ -86,7 +86,7 @@ test("catalog sequence는 중복 없는 양의 정수여야 한다", () => {
 
 test("승인 provenance와 유효한 새 시간 경계를 필수로 한다", () => {
   for (const field of [
-    "releaseRequestId", "targetChannel", "failedManifestSha256", "knownGoodManifestSha256",
+    "rollbackApprovalEventId", "targetChannel", "failedManifestSha256", "knownGoodManifestSha256",
     "approvedBy", "approvedByRole", "approvedAt", "reasonCode",
   ]) {
     const approval = approved();
@@ -209,7 +209,7 @@ function approved(current = manifest(115), knownGood = manifest(114)) {
   return {
     schemaVersion: 1,
     artifactKind: "datapack-rollback-approval",
-    releaseRequestId: "rollback-request-1",
+    rollbackApprovalEventId: "release-channel-event-1",
     targetChannel: current.channel,
     failedManifestSha256: sha256(bytes(current)),
     knownGoodManifestSha256: sha256(bytes(knownGood)),

@@ -464,7 +464,7 @@ function validateRollbackProvenance(provenance, rescueSequence) {
   }
   const allowed = new Set([
     "kind", "currentReleaseSequence", "failedReleaseSequence", "failedManifestSha256", "knownGoodReleaseSequence",
-    "knownGoodManifestSha256", "releaseRequestId", "approvedByRole", "approvedAt", "reasonCode",
+    "knownGoodManifestSha256", "rollbackApprovalEventId", "approvedByRole", "approvedAt", "reasonCode",
   ]);
   for (const key of Object.keys(provenance)) {
     if (!allowed.has(key)) throw new Error(`manifest.rollbackProvenance additional field is unsupported: ${key}`);
@@ -481,7 +481,7 @@ function validateRollbackProvenance(provenance, rescueSequence) {
   }
   requiredSha256(provenance.failedManifestSha256, "manifest.rollbackProvenance.failedManifestSha256");
   requiredSha256(provenance.knownGoodManifestSha256, "manifest.rollbackProvenance.knownGoodManifestSha256");
-  requiredMatchingString(provenance.releaseRequestId, "manifest.rollbackProvenance.releaseRequestId", /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
+  requiredMatchingString(provenance.rollbackApprovalEventId, "manifest.rollbackProvenance.rollbackApprovalEventId", /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/);
   requiredMatchingString(provenance.approvedByRole, "manifest.rollbackProvenance.approvedByRole", /^[A-Za-z][A-Za-z0-9._-]{0,63}$/);
   requiredDate(provenance.approvedAt, "manifest.rollbackProvenance.approvedAt");
   requiredMatchingString(provenance.reasonCode, "manifest.rollbackProvenance.reasonCode", /^[A-Z][A-Z0-9_]{0,63}$/);

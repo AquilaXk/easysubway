@@ -56,7 +56,7 @@ class DatapackRollbackApprovalApiControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.schemaVersion").value(1))
 			.andExpect(jsonPath("$.artifactKind").value("datapack-rollback-approval"))
-			.andExpect(jsonPath("$.releaseRequestId").value("rollback-event-1"))
+			.andExpect(jsonPath("$.rollbackApprovalEventId").value("rollback-event-1"))
 			.andExpect(jsonPath("$.targetChannel").value("production"))
 			.andExpect(jsonPath("$.failedManifestSha256").value("1".repeat(64)))
 			.andExpect(jsonPath("$.knownGoodManifestSha256").value("2".repeat(64)))

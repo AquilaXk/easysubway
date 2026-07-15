@@ -5146,6 +5146,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.deepEqual(releaseEvidenceBundleSchema.properties.rollbackRescue.required, [
     "evidenceSha256",
     "releaseRequestId",
+    "rollbackApprovalEventId",
     "rcCandidateId",
     "rcManifestSha256",
     "currentReleaseSequence",
@@ -5468,6 +5469,7 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
 
   assert.equal(rollbackApprovalSchema.properties.artifactKind.const, "datapack-rollback-approval");
   assert.equal(rollbackApprovalSchema.properties.approvedByRole.const, "admin.datapack.rollback");
+  assert.ok(rollbackApprovalSchema.required.includes("rollbackApprovalEventId"));
   assert.ok(rollbackApprovalSchema.required.includes("failedManifestSha256"));
   assert.ok(rollbackApprovalSchema.required.includes("knownGoodManifestSha256"));
 

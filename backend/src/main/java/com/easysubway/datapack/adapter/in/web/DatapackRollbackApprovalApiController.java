@@ -37,7 +37,7 @@ public class DatapackRollbackApprovalApiController {
 		var body = new LinkedHashMap<String, Object>();
 		body.put("schemaVersion", 1);
 		body.put("artifactKind", "datapack-rollback-approval");
-		body.put("releaseRequestId", event.id());
+		body.put("rollbackApprovalEventId", event.id());
 		body.put("targetChannel", event.channel());
 		body.put("failedManifestSha256", event.previousManifestSha256());
 		body.put("knownGoodManifestSha256", event.nextManifestSha256());
