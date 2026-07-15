@@ -92,6 +92,7 @@ const ready = postLaunch.preLaunchReadiness.status === "PASS"
   && support.latestQaEvidenceSummary.helpScreenDeviceQa.result === "PASS"
   && String(support.latestQaEvidenceSummary.helpScreenDeviceQa.versionName) === String(identity.appVersionName)
   && String(support.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode) === String(identity.versionCode)
+  && support.latestQaEvidenceSummary.helpScreenDeviceQa.contactSetSha256 === identity.supportContactSetSha256
   && support.latestQaEvidenceSummary.operatorContactReadiness.result === "PASS"
   && identity.appVersionName === validity.appVersionName
   && String(identity.versionCode) === String(validity.versionCode)
@@ -113,6 +114,7 @@ const artifactIdentity = {
   androidApplicationId: rcManifest.androidApplicationId,
   aabSha256: identity.aabSha256,
   dataPackManifestSha256: identity.dataPackManifestSha256,
+  supportContactSetSha256: identity.supportContactSetSha256,
 };
 for (const field of backendIdentityFields) {
   if (identity[field] !== undefined && identity[field] !== null && identity[field] !== "") {

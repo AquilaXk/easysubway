@@ -23,6 +23,7 @@ function rcManifest(overrides = {}) {
       backendImageDigest: `sha256:${"b".repeat(64)}`,
       backendArtifactSha256: null,
       dataPackManifestSha256: "c".repeat(64),
+      supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
       ...overrides,
     },
   };
@@ -119,6 +120,20 @@ test("Phase A summary generator rejects help-screen device QA from a different R
   const output = await paths();
   const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
   gate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode = 10004;
+  const gatePath = path.join(output.dir, "support-incident-response-gate.json");
+  await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
+  await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+
+  await generate(output, ["--support-gate", gatePath]);
+
+  assert.equal((await readFile(output.status, "utf8")).trim(), "BLOCKED_EXTERNAL");
+  await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
+});
+
+test("Phase A summary generator rejects a contact set not verified by device QA", async () => {
+  const output = await paths();
+  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
+  gate.latestQaEvidenceSummary.helpScreenDeviceQa.contactSetSha256 = "e".repeat(64);
   const gatePath = path.join(output.dir, "support-incident-response-gate.json");
   await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
   await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);

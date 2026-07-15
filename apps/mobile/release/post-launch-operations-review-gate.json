@@ -25,7 +25,7 @@
     ],
     "finalRcBinding": {
       "manifest": "apps/mobile/release/rc-evidence-manifest-contract.json",
-      "requiredFields": ["gitSha", "versionCode", "aabSha256", "dataPackManifestSha256"],
+      "requiredFields": ["gitSha", "versionCode", "aabSha256", "dataPackManifestSha256", "supportContactSetSha256"],
       "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
       "evidenceValidity": {
         "appVersionName": "1.0.4",
@@ -50,7 +50,7 @@
         {
           "refreshOn": "support-contact-or-help-ui-change",
           "files": [
-            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "64de4e446595a7b122d152c5ef9c414119095e6abcc2594442d9ce3bd02056aa"},
+            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "82db73ed9b0e84ed140f8ebc16326844dd2cc58181b918806fa4aba29bfcb4ca"},
             {"path": "apps/mobile/lib/main.dart", "sha256": "42948d0ab160eb576c0a1ccaa46324e5f39fa200030a68663a5b7e39982d83b6"}
           ]
         },
@@ -68,7 +68,8 @@
           "refreshOn": "fixed-release-procedure-change",
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "7690e3f3de3ce4408f477ac30cec1d8f92ceca8056e367170863448a278cf9cb"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "5de6da258d9061672b50db6896cbcdec318cf3f481dae0441ed9ac21b00b1658"}
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "cb2858b93d389dcf5170a17ff980926524800b38985816bf38d8c560a81f9f5e"},
+            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "6784beebb3c9c3ac8df9f386196d47f987aa60f16140379b88937c6805c20001"}
           ]
         }
       ],

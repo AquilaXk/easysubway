@@ -15,7 +15,12 @@ if (!outputPath) {
   fail("--output is required");
 }
 
-const generatedAt = new Date().toISOString();
+const nowArg = arg("now");
+const generatedAtMillis = nowArg === undefined ? Date.now() : Date.parse(nowArg);
+if (!Number.isFinite(generatedAtMillis)) {
+  fail("--now must be a valid timestamp");
+}
+const generatedAt = new Date(generatedAtMillis).toISOString();
 const testedAt = arg("testedAt", "tested-at") ?? generatedAt;
 const evidenceRoot = normalizeEvidenceRoot(
   arg("evidenceRoot", "evidence-root") ?? ".codex/evidence/release/rc-evidence-manifest/<rc-or-run>/",
@@ -30,6 +35,7 @@ const gateStatuses = parsePairs(arg("gateStatus", "gate-status"));
 const evidenceStatuses = parsePairs(arg("evidenceStatus", "evidence-status"));
 const evidencePaths = parsePairs(arg("evidencePath", "evidence-path"));
 const expectedValues = parsePairs(args.expect);
+const androidReleaseMetadata = readKeyValueFileIfExists(arg("androidReleaseMetadata", "android-release-metadata"));
 const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
 const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
@@ -47,6 +53,9 @@ const identity = {
   backendImageDigest: backendIdentity.backendImageDigest,
   backendArtifactSha256: backendIdentity.backendArtifactSha256,
   dataPackManifestSha256: sha256FileIfExists(dataPackManifestPath),
+  supportContactSetSha256: arg("supportContactSetSha256", "support-contact-set-sha256")
+    ?? androidReleaseMetadata.supportContactSetSha256
+    ?? null,
   releaseSequence: arg("releaseSequence", "release-sequence") ?? dataPackManifest?.releaseSequence ?? dataPackManifest?.pack_version ?? null,
   routeContractVersion: arg("routeContractVersion", "route-contract-version") ?? "route-map-contract-v1",
   realtimeContractVersion: arg("realtimeContractVersion", "realtime-contract-version") ?? readRealtimeContractVersion(repoRoot),
@@ -168,6 +177,21 @@ function readJsonIfExists(filePath) {
     return null;
   }
   return JSON.parse(readFileSync(filePath, "utf8"));
+}
+
+function readKeyValueFileIfExists(filePath) {
+  if (!filePath) return {};
+  const resolved = resolvePath(filePath);
+  if (!existsSync(resolved)) return {};
+  return Object.fromEntries(readFileSync(resolved, "utf8")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf("=");
+      return separatorIndex === -1
+        ? [line, ""]
+        : [line.slice(0, separatorIndex), line.slice(separatorIndex + 1)];
+    }));
 }
 
 function readBackendIdentity(parsedArgs) {
@@ -302,6 +326,7 @@ function identityBlockers(values) {
     "versionCode",
     "aabSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",

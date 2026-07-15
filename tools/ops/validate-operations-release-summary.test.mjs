@@ -35,6 +35,7 @@ const artifactIdentity = {
   aabSha256: "a".repeat(64),
   backendArtifactSha256: "b".repeat(64),
   dataPackManifestSha256: "c".repeat(64),
+  supportContactSetSha256: "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
 };
 
 function validSummary() {
@@ -138,6 +139,7 @@ async function withSummary(summary, fn) {
       backendImageDigest: summary.artifactIdentity.backendImageDigest ?? null,
       backendArtifactSha256: summary.artifactIdentity.backendArtifactSha256 ?? null,
       dataPackManifestSha256: summary.artifactIdentity.dataPackManifestSha256,
+      supportContactSetSha256: summary.artifactIdentity.supportContactSetSha256,
     },
   }, null, 2)}\n`);
   const previousRcManifest = process.env.EASYSUBWAY_OPERATIONS_RC_MANIFEST;
@@ -252,6 +254,26 @@ test("operations release summary validator rejects help-screen device QA from a 
   );
 });
 
+test("operations release summary validator rejects a contact set not verified by device QA", async () => {
+  await assert.rejects(
+    withSummary(validSummary(), async (summaryPath) => {
+      const gate = structuredClone(supportGate);
+      gate.latestQaEvidenceSummary.helpScreenDeviceQa.contactSetSha256 = "e".repeat(64);
+      const gatePath = path.join(path.dirname(summaryPath), "support-gate.json");
+      await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+      return execFileAsync(process.execPath, [
+        validatorPath,
+        "--summary",
+        summaryPath,
+        "--support-gate",
+        gatePath,
+        "--require-pass",
+      ], { cwd: root });
+    }),
+    /help-screen device QA contact set must match artifactIdentity/,
+  );
+});
+
 test("operations release summary validator rejects required evidence without a canonical PASS summary", async () => {
   await assert.rejects(
     withSummary(validSummary(), async (summaryPath) => {
@@ -322,6 +344,7 @@ test("operations release summary validator compares artifact identity independen
     aabSha256: artifactIdentity.aabSha256,
     androidApplicationId: artifactIdentity.androidApplicationId,
     versionName: artifactIdentity.versionName,
+    supportContactSetSha256: artifactIdentity.supportContactSetSha256,
   };
   await withSummary(summary, (summaryPath) =>
     execFileAsync(process.execPath, [

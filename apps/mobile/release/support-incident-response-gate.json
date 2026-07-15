@@ -69,6 +69,7 @@
       "result": "PASS",
       "versionName": "1.0.4",
       "versionCode": 10005,
+      "contactSetSha256": "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
       "contacts": ["support@aquilaxk.site", "security@aquilaxk.site"],
       "dataDeletionRoute": "in-app deletion confirmation",
       "localOnlyEvidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json"

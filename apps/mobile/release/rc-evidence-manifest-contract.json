@@ -17,6 +17,7 @@
     "versionCode",
     "aabSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",

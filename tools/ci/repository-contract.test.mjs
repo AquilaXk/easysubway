@@ -2384,6 +2384,13 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.ok(
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.requiredFields.includes("versionCode"),
   );
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.requiredFields.includes("supportContactSetSha256"),
+  );
+  assert.equal(
+    supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.contactSetSha256,
+    "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
+  );
   assert.equal(
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.requiredFields.includes("backendImageDigest"),
     false,
@@ -3143,6 +3150,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /packageId=com\.easysubway\.app/);
   assert.match(workflow, /aabSha256=\$\{aab_sha256\}/);
   assert.match(workflow, /dataPackManifestSha256=\$\{data_pack_manifest_sha256\}/);
+  assert.match(workflow, /supportContactSetSha256=\$\{EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256\}/);
+  assert.match(
+    workflow,
+    /--android-release-metadata release-artifacts\/downloaded\/android-production-rc\/release-metadata\.txt/,
+  );
   assert.match(workflow, /routeContractVersion=route-map-contract-v1/);
   assert.match(workflow, /realtimeContractVersion=seoul-topis-schema-v1/);
   assert.match(workflow, /mappingRetentionDays=90/);
@@ -3572,12 +3584,14 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-rc-manifest-"));
   const aabPath = path.join(tempDir, "app-release.aab");
   const backendInspectPath = path.join(tempDir, "image-inspect.json");
+  const androidReleaseMetadataPath = path.join(tempDir, "release-metadata.txt");
   const phaseASummaryPath = path.join(tempDir, "operations-phase-a-summary.json");
   const outputPath = path.join(tempDir, "rc-evidence-manifest.json");
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(appVersion, "mobile pubspec must contain versionName+versionCode");
 
   await writeFile(aabPath, "fake-aab");
+  await writeFile(androidReleaseMetadataPath, `supportContactSetSha256=${"d".repeat(64)}\n`);
   await writeFile(phaseASummaryPath, JSON.stringify({
     status: "PASS",
     issue: 1019,
@@ -3599,6 +3613,10 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "apps/mobile",
     "--git-sha",
     "0123456789abcdef0123456789abcdef01234567",
+    "--now",
+    "2026-07-16T00:00:00.000Z",
+    "--android-release-metadata",
+    androidReleaseMetadataPath,
     "--aab",
     aabPath,
     "--backend-image-inspect",
@@ -3625,6 +3643,8 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.releaseGate, "rc-evidence-manifest");
   assert.equal(manifest.issue, 1020);
   assert.equal(manifest.gitSha, "0123456789abcdef0123456789abcdef01234567");
+  assert.equal(manifest.generatedAt, "2026-07-16T00:00:00.000Z");
+  assert.equal(manifest.supportContactSetSha256, "d".repeat(64));
   assert.equal(manifest.appVersionName, appVersion[1]);
   assert.equal(manifest.versionCode, appVersion[2]);
   assert.match(manifest.aabSha256, /^[a-f0-9]{64}$/);
@@ -4253,6 +4273,10 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(githubEnvOutput, /^EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk\.site$/m);
+  assert.match(
+    githubEnvOutput,
+    /^EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256=e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a$/m,
+  );
 
   const rcEnv = path.join(dir, "android-rc.env");
   await writeFile(rcEnv, [

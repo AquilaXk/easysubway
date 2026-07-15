@@ -143,6 +143,7 @@ function assertIdentity(
     "androidApplicationId",
     "aabSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
   ]) {
     required(identity[field], `${path}.${field}`);
   }
@@ -357,6 +358,9 @@ function assertSupport(summary, gate, artifactIdentity, requirePass) {
     || String(helpScreenDeviceQa.versionCode) !== String(artifactIdentity.versionCode)
   )) {
     throw new Error("help-screen device QA must match artifactIdentity");
+  }
+  if (requirePass && helpScreenDeviceQa.contactSetSha256 !== artifactIdentity.supportContactSetSha256) {
+    throw new Error("help-screen device QA contact set must match artifactIdentity");
   }
   const byId = new Map(required(summary.supportChannels, "supportChannels").map((item) => [item.channelId, item]));
   const validatedById = new Map(

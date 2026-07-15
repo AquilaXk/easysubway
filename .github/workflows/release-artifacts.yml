@@ -251,6 +251,7 @@ jobs:
             echo "play_generated_apk_device_matrix_evidence=blocked_until_play_generated_apk_device_matrix_gate_is_satisfied"
             echo "post_launch_operations_review_evidence=blocked_until_post_launch_operations_review_gate_is_satisfied"
             echo "support_incident_response_evidence=blocked_until_support_incident_response_gate_is_satisfied"
+            echo "supportContactSetSha256=${EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256}"
             echo "abuse_penetration_rehearsal_evidence=blocked_until_abuse_penetration_rehearsal_gate_is_satisfied"
             echo "toolchain_policy=apps/mobile/release/signed-release-artifact-gate.json"
           } > release-artifacts/android/release-metadata.txt
@@ -441,6 +442,7 @@ jobs:
             echo "packageId=com.easysubway.app"
             echo "aabSha256=${aab_sha256}"
             echo "dataPackManifestSha256=${data_pack_manifest_sha256}"
+            echo "supportContactSetSha256=${EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256}"
             echo "dataPackChannel=${EASYSUBWAY_DATAPACK_CHANNEL}"
             echo "routeContractVersion=route-map-contract-v1"
             echo "realtimeContractVersion=seoul-topis-schema-v1"
@@ -677,9 +679,11 @@ jobs:
           android_artifact_source="none"
           if [[ -f release-artifacts/downloaded/android-production-rc/app-release.aab ]]; then
             generator_args+=(--aab release-artifacts/downloaded/android-production-rc/app-release.aab)
+            generator_args+=(--android-release-metadata release-artifacts/downloaded/android-production-rc/release-metadata.txt)
             android_artifact_source="easysubway-android-production-rc-${GITHUB_SHA}"
           elif [[ -f release-artifacts/downloaded/android/app-release.aab ]]; then
             generator_args+=(--aab release-artifacts/downloaded/android/app-release.aab)
+            generator_args+=(--android-release-metadata release-artifacts/downloaded/android/release-metadata.txt)
             android_artifact_source="easysubway-android-release-${GITHUB_SHA}"
           fi
           if [[ -f release-artifacts/downloaded/backend/image-inspect.json ]]; then
