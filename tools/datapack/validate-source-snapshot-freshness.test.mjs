@@ -137,6 +137,12 @@ function purgeReport(
   };
 }
 
+function bindInventory(value) {
+  value.buildSpec.sourceInventorySha256 = createHash("sha256")
+    .update(JSON.stringify(value.inventory))
+    .digest("hex");
+}
+
 test("source snapshot ID·hash·policy 파생 freshness가 맞으면 통과한다", () => {
   const result = validateSourceSnapshotFreshness(input());
 
@@ -221,6 +227,7 @@ test("freshness validator는 hash-bound purge report를 retention 완료 근거�
       admissionEvidence: { licenseEvidenceHash: "e".repeat(64) },
     }],
   };
+  bindInventory(value);
   value.governancePolicy = {
     schemaVersion: 1,
     artifactKind: "datapack-source-governance-policy",
@@ -330,6 +337,12 @@ test("freshness validator는 hash-bound purge report를 retention 완료 근거�
     () => validateSourceSnapshotFreshness(value),
     /purge report protection raw hash/,
   );
+
+  value.inventory.sources[0].datasetUrl = "https://example.invalid/unapproved-source-a";
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /source inventory hash/,
+  );
 });
 
 test("선택한 head만 freshness를 판정하고 만료된 이전 snapshot은 lineage로만 검증한다", () => {
@@ -418,6 +431,7 @@ test("production 필수 source가 build snapshot에서 빠지면 governance GO�
       { id: "source-b", requiredForProductionPack: true },
     ],
   };
+  bindInventory(value);
   value.governancePolicy = {};
   value.governancePolicySha256 = "d".repeat(64);
 
@@ -427,17 +441,18 @@ test("production 필수 source가 build snapshot에서 빠지면 governance GO�
   );
 });
 
-test("실제 release build spec은 governance 계약으로 freshness를 통과한다", async () => {
-  const { stdout } = await execFileAsync(process.execPath, [
-    "tools/datapack/validate-source-snapshot-freshness.mjs",
-    "--build-spec", "tools/datapack/release/candidate-build-spec.json",
-    "--policy", "apps/mobile/release/datapack-freshness-sla.json",
-    "--governance-policy", "tools/datapack/source-governance-policy.json",
-    "--inventory", "tools/datapack/source-inventory.json",
-    "--evaluation-at", evaluationAt,
-  ], { cwd: root });
-
-  assert.equal(JSON.parse(stdout).governanceDecision, "GO");
+test("승인 뒤 변경된 실제 source inventory는 stale build spec으로 fail closed한다", async () => {
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-source-snapshot-freshness.mjs",
+      "--build-spec", "tools/datapack/release/candidate-build-spec.json",
+      "--policy", "apps/mobile/release/datapack-freshness-sla.json",
+      "--governance-policy", "tools/datapack/source-governance-policy.json",
+      "--inventory", "tools/datapack/source-inventory.json",
+      "--evaluation-at", evaluationAt,
+    ], { cwd: root }),
+    /source inventory hash/,
+  );
 });
 
 test("승인 allowlist 밖의 unbound snapshot은 build spec policy로 backfill할 수 없다", () => {
@@ -449,6 +464,7 @@ test("승인 allowlist 밖의 unbound snapshot은 build spec policy로 backfill�
     .digest("hex");
   value.governancePolicy = {};
   value.inventory = { sources: [] };
+  bindInventory(value);
   value.governancePolicySha256 = "d".repeat(64);
 
   assert.throws(
@@ -470,6 +486,7 @@ test("승인 legacy snapshot ID를 재사용해도 exact evidence hash가 다르
     .digest("hex");
   value.governancePolicy = {};
   value.inventory = { sources: [] };
+  bindInventory(value);
   value.governancePolicySha256 = "d".repeat(64);
 
   assert.throws(

@@ -124,6 +124,12 @@ export function validateSourceSnapshotFreshness({
     if (governancePolicy == null || inventory == null) {
       throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy and inventory are required together");
     }
+    if (sha256(JSON.stringify(inventory)) !== requiredSha256(
+      buildSpec.sourceInventorySha256,
+      "buildSpec.sourceInventorySha256",
+    )) {
+      throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: source inventory hash");
+    }
     validateSourceGovernancePolicy({ policy: governancePolicy, inventory, freshnessPolicy: policy });
     if (!/^[0-9a-f]{64}$/.test(governancePolicySha256 ?? "")) {
       throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy hash");

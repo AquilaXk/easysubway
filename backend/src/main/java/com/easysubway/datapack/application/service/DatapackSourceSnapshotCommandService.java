@@ -44,13 +44,14 @@ public class DatapackSourceSnapshotCommandService {
 
 	@Transactional
 	public String createLockedSnapshot(SourceSnapshotCommand command) {
-		command.validate();
+		command.validateReplayIdentity();
 		var existingEvent = snapshotRepository
 			.findEventByIdempotencyKey(command.sourceId(), command.idempotencyKey());
 		if (existingEvent.isPresent()) {
 			ensureSameIdempotentRequest(command, existingEvent.get());
 			return existingEvent.get().snapshotId();
 		}
+		command.validateGovernanceBinding();
 		var policyBinding = governancePolicy.requireBinding(
 			command.sourceId(),
 			command.retrievedAt(),
@@ -246,10 +247,13 @@ public class DatapackSourceSnapshotCommandService {
 		String idempotencyKey
 	) {
 
-		private void validate() {
+		private void validateReplayIdentity() {
 			requireText(requestedBy, "requestedBy");
 			requireText(reason, "reason");
 			requireText(idempotencyKey, "idempotencyKey");
+		}
+
+		private void validateGovernanceBinding() {
 			requireText(governancePolicyVersion, "governancePolicyVersion");
 			requireText(governancePolicySha256, "governancePolicySha256");
 		}

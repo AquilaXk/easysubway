@@ -33,6 +33,7 @@ class DatapackSourceSnapshotLineageTest {
 	private DatapackSourceSnapshotCommandService service;
 	private PlatformTransactionManager transactionManager;
 	private DatapackSourceGovernancePolicy governancePolicy;
+	private JdbcTemplate jdbcTemplate;
 
 	@BeforeEach
 	void setUp() {
@@ -41,7 +42,7 @@ class DatapackSourceSnapshotLineageTest {
 			"sa",
 			""
 		);
-		var jdbcTemplate = new JdbcTemplate(dataSource);
+		jdbcTemplate = new JdbcTemplate(dataSource);
 		jdbcTemplate.execute("DROP TABLE IF EXISTS datapack_source_snapshot_events");
 		jdbcTemplate.execute("DROP TABLE IF EXISTS datapack_source_lineage_locks");
 		jdbcTemplate.execute("DROP TABLE IF EXISTS data_source_snapshots");
@@ -200,6 +201,53 @@ class DatapackSourceSnapshotLineageTest {
 		);
 
 		assertThat(service.createLockedSnapshot(first)).isEqualTo("snapshot-a-1");
+	}
+
+	@Test
+	@DisplayName("V51 이전 governance binding이 없는 요청도 기존 idempotency key로 재생한다")
+	void legacyCommandWithoutGovernanceBindingReplaysIdempotently() {
+		jdbcTemplate.update("""
+			INSERT INTO data_source_snapshots (
+				snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, coverage_count,
+				raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
+				snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed,
+				credential_redacted, previous_snapshot_id, diff_summary, diff_summary_json,
+				freshness_expires_at, raw_retention_expires_at, governance_policy_version, governance_policy_sha256
+			) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE,
+				TRUE, NULL, NULL, NULL, ?, ?, NULL, NULL)
+			""",
+			"snapshot-legacy", "source-a", "provider",
+			LocalDateTime.of(2026, 7, 1, 0, 0), LocalDateTime.of(2026, 7, 1, 0, 0), 10,
+			"a".repeat(64), "s3://bucket/snapshot-legacy.json", "b".repeat(64), "c".repeat(64),
+			LocalDateTime.of(2026, 8, 1, 0, 0), LocalDateTime.of(2026, 9, 29, 0, 0)
+		);
+		jdbcTemplate.update("""
+			INSERT INTO datapack_source_snapshot_events (
+				id, source_id, snapshot_id, operation_type, operation_status,
+				requested_by, reason, idempotency_key, created_at
+			) VALUES (?, ?, ?, 'CREATE_LOCKED', 'PASS', ?, ?, ?, ?)
+			""",
+			"legacy-event", "source-a", "snapshot-legacy", "qa-role", "legacy fixture",
+			"legacy-idempotency", LocalDateTime.of(2026, 7, 1, 0, 1)
+		);
+		var legacy = new SourceSnapshotCommand(
+			"snapshot-legacy", "source-a", "provider",
+			LocalDateTime.of(2026, 7, 1, 0, 0), LocalDateTime.of(2026, 7, 1, 0, 0),
+			10, 0, "a".repeat(64), "s3://bucket/snapshot-legacy.json", "b".repeat(64), "c".repeat(64),
+			"PASS", "PASS", "SUCCESS", true, true, null, null, null,
+			LocalDateTime.of(2026, 8, 1, 0, 0), LocalDateTime.of(2026, 9, 29, 0, 0),
+			null, null, "qa-role", "legacy fixture", "legacy-idempotency"
+		);
+
+		assertThat(service.createLockedSnapshot(legacy)).isEqualTo("snapshot-legacy");
+		assertThatThrownBy(() -> service.createLockedSnapshot(new SourceSnapshotCommand(
+			"snapshot-new", "source-a", "provider",
+			LocalDateTime.of(2026, 7, 2, 0, 0), LocalDateTime.of(2026, 7, 2, 0, 0),
+			11, 1, "d".repeat(64), "s3://bucket/snapshot-new.json", "b".repeat(64), "c".repeat(64),
+			"PASS", "PASS", "SUCCESS", true, true, "snapshot-legacy", "CHANGED", changedDiff(),
+			LocalDateTime.of(2026, 8, 2, 0, 0), LocalDateTime.of(2026, 9, 30, 0, 0),
+			null, null, "qa-role", "new fixture", "new-idempotency"
+		))).hasMessageContaining("governancePolicyVersion");
 	}
 
 	@Test

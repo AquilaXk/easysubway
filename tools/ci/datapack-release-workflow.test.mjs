@@ -38,6 +38,7 @@ test("modeArgs 파싱 스텝이 개별 인자를 output으로 펼친다", () => 
   assert.match(yml, /modeArgs/);
   assert.match(yml, /buildSpecPath/);
   assert.match(yml, /releaseRequestId/);
+  assert.match(yml, /sourceGovernanceEvaluationAt/);
 });
 
 test("modeArgs 파싱 스텝은 비-JSON·개행 주입을 방어한다", () => {
@@ -159,6 +160,8 @@ test("release build는 source snapshot freshness를 build 전에 fail closed로 
   assert.match(freshnessStep, /--policy apps\/mobile\/release\/datapack-freshness-sla\.json/);
   assert.match(freshnessStep, /--governance-policy tools\/datapack\/source-governance-policy\.json/);
   assert.match(freshnessStep, /--inventory tools\/datapack\/source-inventory\.json/);
+  assert.match(freshnessStep, /--evaluation-at "\$\{EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT\}"/);
+  assert.match(yml, /sourceGovernanceEvaluationAt is required with sourceRawPurgeReportPath/);
   const inventoryStep = yml.match(
     /- name: Data Pack Release \/ Validate source inventory[\s\S]*?\n\s+- name:/,
   )?.[0];
