@@ -12,6 +12,7 @@ RESTORE_MEMORY_LIMIT="2g"
 RESTORE_PIDS_LIMIT="256"
 WAL_HEADROOM_BYTES="$((256 * 1024 * 1024))"
 MIN_OPERATIONAL_RESERVE_BYTES="$((1024 * 1024 * 1024))"
+SPACE_CLASS='[:space:]'
 
 if [[ ! "${DEPLOY_ROOT}" =~ ^/[A-Za-z0-9._/-]+$ || "${DEPLOY_ROOT}" == *..* ]]; then
 	printf 'DEPLOY_ROOT is invalid\n' >&2
@@ -87,7 +88,7 @@ fi
 production_image="$(docker inspect --format '{{.Image}}' easysubway-postgres)"
 production_version_num="$(docker exec easysubway-postgres sh -lc \
 	'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SHOW server_version_num;"' \
-	| tr -d '[:space:]')"
+	| tr -d "${SPACE_CLASS}")"
 if [[ ! "${production_version_num}" =~ ^16[0-9]{4}$ ]]; then
 	printf 'production PostgreSQL major version is not 16\n' >&2
 	exit 1
@@ -96,7 +97,7 @@ fi
 production_count() {
 	docker exec easysubway-postgres sh -lc \
 		'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT count(*) FROM route_search_results;"' \
-		| tr -d '[:space:]'
+		| tr -d "${SPACE_CLASS}"
 }
 
 storage_probe() {
@@ -122,7 +123,7 @@ printf "%s|%s|%s|%s\n" \
 source_count_before="$(production_count)"
 source_database_bytes="$(docker exec easysubway-postgres sh -lc \
 	'psql -X -v ON_ERROR_STOP=1 -A -t -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT pg_database_size(current_database());"' \
-	| tr -d '[:space:]')"
+	| tr -d "${SPACE_CLASS}")"
 IFS='|' read -r backup_device_before backup_available_before docker_device_before docker_available_before <<< "$(storage_probe)"
 if [[ ! "${source_count_before}" =~ ^[0-9]+$ || ! "${source_database_bytes}" =~ ^[0-9]+$ \
 	|| ! "${backup_device_before}" =~ ^[0-9]+$ || ! "${backup_available_before}" =~ ^[0-9]+$ \
@@ -251,7 +252,7 @@ restore_psql() {
 		psql -X -v ON_ERROR_STOP=1 -A -t -U snapshot_gate -d easysubway_restore "$@"
 }
 
-restore_count="$(restore_psql -c 'SELECT count(*) FROM route_search_results;' | tr -d '[:space:]')"
+restore_count="$(restore_psql -c 'SELECT count(*) FROM route_search_results;' | tr -d "${SPACE_CLASS}")"
 if [[ "${restore_count}" != "${source_count_before}" ]]; then
 	printf 'restored route row count does not match production backup count\n' >&2
 	exit 1
@@ -343,7 +344,7 @@ if [[ ! "${execution_ms}" =~ ^[0-9]+([.][0-9]+)?$ || ! "${wall_ms}" =~ ^[0-9]+$ 
 	exit 1
 fi
 
-rollback_count="$(restore_psql -c 'SELECT count(*) FROM route_search_results;' | tr -d '[:space:]')"
+rollback_count="$(restore_psql -c 'SELECT count(*) FROM route_search_results;' | tr -d "${SPACE_CLASS}")"
 if [[ "${rollback_count}" != "${restore_count}" ]]; then
 	printf 'route row count was not restored after rollback\n' >&2
 	exit 1

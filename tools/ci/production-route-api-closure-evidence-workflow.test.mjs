@@ -14,7 +14,8 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   assert.doesNotMatch(workflow, /EXPECTED_IMAGE_DIGEST/);
   assert.match(workflow, /runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
   assert.doesNotMatch(workflow, /environment:\n\s+name: production/);
-  assert.match(workflow, /permissions:\n\s+contents: read/);
+  assert.doesNotMatch(workflow, /^permissions:/m);
+  assert.match(workflow, /verify:[\s\S]*?permissions:\n\s+contents: read[\s\S]*?steps:/);
   assert.match(workflow, /group: cd-production-deploy/);
 
   assert.match(workflow, /shared\/current-sha/);
@@ -54,6 +55,7 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(workflow, /snapshot-gate:[\s\S]*needs: verify/);
   assert.match(workflow, /snapshot-gate:[\s\S]*runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
   assert.match(workflow, /snapshot-gate:[\s\S]*environment: production/);
+  assert.match(workflow, /snapshot-gate:[\s\S]*?permissions:\n\s+contents: read[\s\S]*?steps:/);
   assert.match(workflow, /snapshot-gate:[\s\S]*group: cd-production-deploy/);
   assert.match(workflow, /EXPECTED_DEPLOYED_SHA: \$\{\{ needs\.verify\.outputs\.deployed_sha \}\}/);
   assert.match(workflow, /snapshot-gate:[\s\S]*Checkout reviewed main[\s\S]*persist-credentials: false/);
@@ -78,6 +80,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /--pids-limit "\$\{RESTORE_PIDS_LIMIT\}"/);
   assert.match(snapshotGate, /restore resource limits/);
   assert.match(snapshotGate, /source_database_bytes/);
+  assert.match(snapshotGate, /SPACE_CLASS='\[:space:\]'/);
+  assert.doesNotMatch(snapshotGate, /tr -d '\[:space:\]'/);
   assert.match(snapshotGate, /storage_probe/);
   assert.match(snapshotGate, /--mount type=volume,target=\/probe\/docker/);
   assert.doesNotMatch(snapshotGate, /df -PB1 "\$\{docker_root_dir\}"/);

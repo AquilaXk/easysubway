@@ -12,12 +12,11 @@ on:
       - "backend/src/main/resources/db/migration/postgresql/V51__*"
       - "backend/src/main/resources/db/migration/h2/V51__*"
 
-permissions:
-  contents: read
-
 jobs:
   verify:
     name: Verify production route API closure
+    permissions:
+      contents: read
     runs-on:
       - self-hosted
       - easysubway-production
@@ -180,6 +179,8 @@ jobs:
   snapshot-gate:
     name: Verify route purge snapshot gate
     needs: verify
+    permissions:
+      contents: read
     runs-on:
       - self-hosted
       - easysubway-production
