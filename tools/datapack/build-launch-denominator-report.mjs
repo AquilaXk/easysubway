@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
 
+const REQUIRED_IDENTITY_FIELDS = [
+  "canonicalStationVersion",
+  "corridorId",
+  "serviceId",
+  "lineageId",
+  "schemaVersion",
+];
+
 export function canonicalScopeHash(scope) {
   return createHash("sha256").update(JSON.stringify(canonicalize(scope))).digest("hex");
 }
@@ -40,6 +48,16 @@ function collectV1Blockers(scope, evidence) {
     blockers.push("PILOT_ROW_GAP");
   }
 
+  if (!sameSet(routingScope?.regionIds, evidence?.routing?.regionIds)) {
+    blockers.push("ROUTING_REGION_SCOPE_MISMATCH");
+  }
+  if (!sameSet(routingScope?.operatorIds, evidence?.routing?.operatorIds)) {
+    blockers.push("ROUTING_OPERATOR_SCOPE_MISMATCH");
+  }
+  if (!sameSet(routingScope?.lineIds, evidence?.routing?.lineIds)) {
+    blockers.push("ROUTING_LINE_SCOPE_MISMATCH");
+  }
+
   const admittedStations = evidence?.routing?.admittedStationIds;
   if (
     !nonEmptyStringSet(admittedStations)
@@ -69,6 +87,12 @@ function collectV1Blockers(scope, evidence) {
   if (evidence?.mobile?.topologyReady !== true) blockers.push("MOBILE_TOPOLOGY_NOT_READY");
 
   const consumers = ["source", "server", "mobile"];
+  if (
+    !nonEmptyStringSet(identityMatrix?.requiredSharedFields)
+    || !REQUIRED_IDENTITY_FIELDS.every((field) => identityMatrix.requiredSharedFields.includes(field))
+  ) {
+    blockers.push("IDENTITY_MATRIX_CONTRACT_INVALID");
+  }
   for (const field of identityMatrix?.requiredSharedFields ?? []) {
     const values = consumers.map((consumer) => evidence?.[consumer]?.identity?.[field]);
     if (values.some((value) => value === undefined || value === null) || new Set(values).size !== 1) {
@@ -93,6 +117,9 @@ function collectV1Blockers(scope, evidence) {
     || !sameSet(evidence?.claims?.serviceIds, routingScope?.serviceIds)
   ) {
     blockers.push("CLAIM_SCOPE_MISMATCH");
+  }
+  if (!Array.isArray(evidence?.forbiddenEvidence) || evidence?.forbiddenEvidenceStatus !== "VERIFIED") {
+    blockers.push("FORBIDDEN_EVIDENCE_UNVERIFIED");
   }
   if ((evidence?.forbiddenEvidence ?? []).some(({ evidenceClass }) =>
     ["FIXTURE", "LEGACY", "OTHER_SERVICE"].includes(evidenceClass))) {

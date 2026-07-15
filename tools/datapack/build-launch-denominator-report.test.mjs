@@ -54,6 +54,9 @@ function passingEvidence({ nationwideMissing = 270 } = {}) {
   return {
     pilot: { coveredRowIds: [...scope.verifiedAccessibilityScope.requiredRowIds] },
     routing: {
+      regionIds: [...scope.routingLaunchScope.regionIds],
+      operatorIds: [...scope.routingLaunchScope.operatorIds],
+      lineIds: [...scope.routingLaunchScope.lineIds],
       admittedStationIds: ["station-a", "station-b", "station-c"],
       materializedStationIds: ["station-a", "station-b", "station-c"],
       baseEdgeIds: [...scope.routingLaunchScope.requiredBaseEdgeIds],
@@ -91,6 +94,7 @@ function passingEvidence({ nationwideMissing = 270 } = {}) {
       serviceIds: [...scope.routingLaunchScope.serviceIds],
     },
     forbiddenEvidence: [],
+    forbiddenEvidenceStatus: "VERIFIED",
     nationwide: { missingCount: nationwideMissing },
   };
 }
@@ -119,6 +123,26 @@ test("pilot row and each routing exact-set gap block launch", async (context) =>
   for (const [name, mutate, blocker] of gaps) {
     await context.test(name, () => {
       const report = buildLaunchDenominatorReport(scope, withGap(mutate));
+      assert.equal(report.decision, "NO_GO");
+      assert.ok(report.blockers.includes(blocker));
+    });
+  }
+});
+
+test("routing region, operator, and line evidence must exactly match launch scope", async (context) => {
+  const gaps = [
+    ["missing region", "regionIds", (values) => values.pop(), "ROUTING_REGION_SCOPE_MISMATCH"],
+    ["extra region", "regionIds", (values) => values.push("other-region"), "ROUTING_REGION_SCOPE_MISMATCH"],
+    ["missing operator", "operatorIds", (values) => values.pop(), "ROUTING_OPERATOR_SCOPE_MISMATCH"],
+    ["extra operator", "operatorIds", (values) => values.push("other-operator"), "ROUTING_OPERATOR_SCOPE_MISMATCH"],
+    ["missing line", "lineIds", (values) => values.pop(), "ROUTING_LINE_SCOPE_MISMATCH"],
+    ["extra line", "lineIds", (values) => values.push("other-line"), "ROUTING_LINE_SCOPE_MISMATCH"],
+  ];
+  for (const [name, field, mutate, blocker] of gaps) {
+    await context.test(name, () => {
+      const report = buildLaunchDenominatorReport(scope, withGap((evidence) => {
+        mutate(evidence.routing[field]);
+      }));
       assert.equal(report.decision, "NO_GO");
       assert.ok(report.blockers.includes(blocker));
     });
@@ -177,6 +201,52 @@ test("server, mobile, shared identity, and common safety evidence fail closed", 
       const report = buildLaunchDenominatorReport(scope, withGap(mutate));
       assert.equal(report.decision, "NO_GO");
       assert.ok(report.blockers.includes(blocker));
+    });
+  }
+});
+
+test("identity matrix must declare every required shared field", async (context) => {
+  const requiredFields = [
+    "canonicalStationVersion",
+    "corridorId",
+    "serviceId",
+    "lineageId",
+    "schemaVersion",
+  ];
+  const invalidMatrices = [
+    ["missing matrix", undefined],
+    ["empty fields", { requiredSharedFields: [], differentArtifactHashesAllowed: true }],
+    ...requiredFields.map((missingField) => [
+      `missing ${missingField}`,
+      {
+        requiredSharedFields: requiredFields.filter((field) => field !== missingField),
+        differentArtifactHashesAllowed: true,
+      },
+    ]),
+  ];
+  for (const [name, identityMatrix] of invalidMatrices) {
+    await context.test(name, () => {
+      const invalidScope = structuredClone(scope);
+      if (identityMatrix === undefined) delete invalidScope.identityMatrix;
+      else invalidScope.identityMatrix = identityMatrix;
+      const report = buildLaunchDenominatorReport(invalidScope, passingEvidence());
+      assert.equal(report.decision, "NO_GO");
+      assert.ok(report.blockers.includes("IDENTITY_MATRIX_CONTRACT_INVALID"));
+    });
+  }
+});
+
+test("forbidden evidence scan requires an explicit verified empty result", async (context) => {
+  const gaps = [
+    ["missing array", (evidence) => { delete evidence.forbiddenEvidence; }],
+    ["missing status", (evidence) => { delete evidence.forbiddenEvidenceStatus; }],
+    ["incomplete status", (evidence) => { evidence.forbiddenEvidenceStatus = "PENDING"; }],
+  ];
+  for (const [name, mutate] of gaps) {
+    await context.test(name, () => {
+      const report = buildLaunchDenominatorReport(scope, withGap(mutate));
+      assert.equal(report.decision, "NO_GO");
+      assert.ok(report.blockers.includes("FORBIDDEN_EVIDENCE_UNVERIFIED"));
     });
   }
 });
