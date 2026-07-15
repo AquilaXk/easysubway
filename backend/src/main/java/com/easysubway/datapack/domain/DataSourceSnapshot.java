@@ -126,6 +126,7 @@ public record DataSourceSnapshot(
 			|| uri.getRawPath() == null
 			|| uri.getRawPath().isBlank()
 			|| "/".equals(uri.getRawPath())
+			|| uri.getPort() != -1
 			|| !isCanonicalObjectPath(uri.getPath())
 			|| trimmed.contains("@")
 			|| uri.getRawQuery() != null

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -89,23 +89,29 @@ async function main(argv) {
     deleteItems.push(item);
   }
 
-  for (const { item, status } of await deleteExpiredItems(deleteItems, {
-    executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
-  })) {
-    if (status === 200 || status === 204) {
-      report.deleted.push(sanitized(item));
-    } else if (status === 404 || status === 410) {
-      report.alreadyAbsent.push(sanitized(item));
-    } else {
-      report.failed.push(sanitized(item));
+  const reportFile = await openReport(outputPath);
+  try {
+    for (const { item, status } of await deleteExpiredItems(deleteItems, {
+      executionEvidenceExpiresAt: evaluatedMillis + EXECUTION_EVIDENCE_MAX_AGE_MS,
+    })) {
+      if (status === 200 || status === 204) {
+        report.deleted.push(sanitized(item));
+      } else if (status === 404 || status === 410) {
+        report.alreadyAbsent.push(sanitized(item));
+      } else {
+        report.failed.push(sanitized(item));
+      }
     }
-  }
 
-  report.completedAt = args.dryRun ? null : new Date().toISOString();
-  if (report.failed.length > 0) report.reasonCodes.push("RAW_RETENTION_OVERDUE");
-  report.decision = report.reasonCodes.length === 0 ? "PASS" : "FAIL";
-  report.reportSha256 = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
-  await writeJson(outputPath, report);
+    report.completedAt = args.dryRun ? null : new Date().toISOString();
+    if (report.failed.length > 0) report.reasonCodes.push("RAW_RETENTION_OVERDUE");
+    report.decision = report.reasonCodes.length === 0 ? "PASS" : "FAIL";
+    report.reportSha256 = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
+    await reportFile.writeFile(`${JSON.stringify(report, null, 2)}\n`);
+    await reportFile.sync();
+  } finally {
+    await reportFile.close();
+  }
   if (report.decision !== "PASS") throw new Error(report.reasonCodes.join(","));
 }
 
@@ -505,9 +511,9 @@ async function responseSha256(response) {
   return hash.digest("hex");
 }
 
-async function writeJson(outputPath, value) {
+async function openReport(outputPath) {
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(value, null, 2)}\n`);
+  return open(outputPath, "w", 0o600);
 }
 
 function requiredArg(args, name) {

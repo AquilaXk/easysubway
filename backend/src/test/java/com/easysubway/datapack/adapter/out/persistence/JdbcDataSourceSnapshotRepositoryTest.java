@@ -157,7 +157,8 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			.hasMessageContaining("rawObjectUri");
 		for (String rawObjectUri : java.util.List.of(
 			"s3://easysubway-datapack-sources/raw/../victim.json",
-			"s3://easysubway-datapack-sources/raw/%2e%2e/victim.json"
+			"s3://easysubway-datapack-sources/raw/%2e%2e/victim.json",
+			"s3://easysubway-datapack-sources:4444/raw/victim.json"
 		)) {
 			assertThatThrownBy(() -> repository.saveSnapshot(lockedSnapshot(
 				"snapshot-uri-dot-segment",

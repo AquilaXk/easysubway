@@ -47,6 +47,13 @@ test("snapshot object URI는 dot-segment를 거부하고 Unicode·공백 key를 
   );
 });
 
+test("snapshot object URI는 storage authority가 달라지는 explicit port를 거부한다", () => {
+  assert.throws(
+    () => parseCredentialFreeObjectUri("s3://bucket:4444/raw/object.json", "rawObjectUri"),
+    /credential-free object storage URI/,
+  );
+});
+
 test("완전한 snapshot chain은 source head까지 추적한다", () => {
   const result = validateLineage([second, first]);
 

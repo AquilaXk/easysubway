@@ -80,6 +80,26 @@ test("실제 DELETE는 CLI 인자가 아닌 env-injected preauthenticated base U
   });
 });
 
+test("실제 DELETE는 report output을 열 수 없으면 객체 요청 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+    const parentFile = path.join(workDir, "not-a-directory");
+    await writeFile(parentFile, "occupied\n");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(parentFile, "purge-report.json"),
+      }),
+      /EEXIST|ENOTDIR|not a directory/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
 test("실제 DELETE는 env-injected snapshot evidence hash로 승인 bytes를 고정한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);

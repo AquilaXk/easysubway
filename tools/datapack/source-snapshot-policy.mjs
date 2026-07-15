@@ -22,6 +22,7 @@ export function parseCredentialFreeObjectUri(value, label) {
     || parsed.password !== ""
     || parsed.search !== ""
     || parsed.hash !== ""
+    || parsed.port !== ""
     || parsed.hostname === ""
     || parsed.pathname === ""
     || parsed.pathname === "/"
