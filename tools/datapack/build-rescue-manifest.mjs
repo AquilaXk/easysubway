@@ -18,6 +18,9 @@ export function buildRescueManifest(input) {
   const knownGoodBytes = requiredBytes(input.knownGoodManifestBytes, "knownGoodManifestBytes");
   assertBytesMatchManifest(currentBytes, current, "currentManifestBytes");
   assertBytesMatchManifest(knownGoodBytes, knownGood, "knownGoodManifestBytes");
+  if (current.manifestVersion !== 2 || knownGood.manifestVersion !== 2) {
+    throw new Error("current and known-good manifests must be v2");
+  }
   validateManifest(current);
   validateManifest(knownGood);
 
@@ -42,6 +45,13 @@ export function buildRescueManifest(input) {
   if (Date.parse(expiresAt) <= Date.parse(publishedAt)) {
     throw new Error("expiresAt must be after publishedAt");
   }
+  const now = input.now ?? new Date();
+  if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
+    throw new Error("now must be a valid Date");
+  }
+  if (Date.parse(expiresAt) <= now.getTime()) {
+    throw new Error("expiresAt must be in the future");
+  }
   if (Date.parse(approval.approvedAt) > Date.parse(publishedAt)) {
     throw new Error("approval.approvedAt must not be after publishedAt");
   }
@@ -64,7 +74,7 @@ export function buildRescueManifest(input) {
     reasonCode: approval.reasonCode,
   };
   const unsigned = {
-    manifestVersion: knownGood.manifestVersion,
+    manifestVersion: 2,
     channel: current.channel,
     releaseSequence,
     publishedAt,

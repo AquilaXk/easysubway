@@ -94,6 +94,16 @@ test("승인 provenance와 유효한 새 시간 경계를 필수로 한다", () 
     () => buildRescueManifest({ ...validInput(), expiresAt: "2026-07-15T00:59:59.000Z" }),
     /expiresAt must be after publishedAt/,
   );
+  for (const expiresAt of ["2026-07-15T01:30:00.000Z", "2026-07-15T02:00:00.000Z"]) {
+    assert.throws(
+      () => buildRescueManifest({
+        ...validInput(),
+        expiresAt,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }),
+      /expiresAt must be in the future/,
+    );
+  }
   assert.throws(
     () => buildRescueManifest({
       ...validInput(),
@@ -132,6 +142,18 @@ test("known-good는 같은 channel의 더 낮은 signed v2 release여야 한다"
     () => buildRescueManifest({ ...validInput(), knownGoodManifest: tampered, knownGoodManifestBytes: bytes(tampered) }),
     /manifest signature mismatch/,
   );
+
+  for (const field of ["current", "knownGood"]) {
+    const legacy = manifest(field === "current" ? 115 : 114, { manifestVersion: 1 });
+    assert.throws(
+      () => buildRescueManifest({
+        ...validInput(),
+        [`${field}Manifest`]: legacy,
+        [`${field}ManifestBytes`]: bytes(legacy),
+      }),
+      /current and known-good manifests must be v2/,
+    );
+  }
 });
 
 test("production-equivalent RSA private key가 없으면 rescue 서명을 만들지 않는다", () => {
@@ -173,6 +195,7 @@ function validInput() {
     approval: approved(),
     publishedAt: "2026-07-15T01:00:00.000Z",
     expiresAt: "2026-07-16T01:00:00.000Z",
+    now: new Date("2026-07-15T01:00:00.000Z"),
     privateKey: privateKeyPem,
   };
 }
