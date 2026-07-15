@@ -5,7 +5,16 @@ import test from "node:test";
 const workflowPath = ".github/workflows/production-route-api-closure-evidence.yml";
 const cdWorkflowPath = ".github/workflows/cd.yml";
 const snapshotGatePath = "tools/ops/route-search-purge-snapshot-gate.sh";
+const rollbackRehearsalPath = "tools/ops/route-search-purge-rollback-rehearsal.sh";
 const purgeSqlPath = "tools/ops/route-search-purge.sql";
+const postgresV51Path =
+  "backend/src/main/resources/db/migration/postgresql/V51__purge_unreferenced_route_search_results.sql";
+const h2V51Path =
+  "backend/src/main/resources/db/migration/h2/V51__purge_unreferenced_route_search_results.sql";
+const postgresV51TimeoutPrefix = `SET LOCAL lock_timeout = '30s';
+SET LOCAL statement_timeout = '30s';
+
+`;
 
 test("production route API closure evidence는 현재 배포와 origin 403·row 불변을 검증한다", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -50,6 +59,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   const workflow = await readFile(workflowPath, "utf8");
   const snapshotGate = await readFile(snapshotGatePath, "utf8").catch(() => "");
   const purgeSql = await readFile(purgeSqlPath, "utf8").catch(() => "");
+  const postgresV51 = await readFile(postgresV51Path, "utf8");
+  const h2V51 = await readFile(h2V51Path, "utf8");
 
   assert.match(workflow, /tools\/ops\/route-search-purge-snapshot-gate\.sh/);
   assert.match(workflow, /tools\/ops\/route-search-purge\.sql/);
@@ -79,6 +90,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /rm -f "\$\{MARKER_FILE\}"/);
   assert.match(snapshotGate, /current_sha[^\n]+!=[^\n]+EXPECTED_DEPLOYED_SHA/);
   assert.match(snapshotGate, /purge_sql_sha256/);
+  assert.match(snapshotGate, /EXECUTION_BUDGET_MS="30000"/);
+  assert.match(snapshotGate, /WAL_BUDGET_BYTES="\$\(\(256 \* 1024 \* 1024\)\)"/);
   assert.match(snapshotGate, /production_schema_version/);
   assert.match(snapshotGate, /restore_schema_version/);
   assert.match(snapshotGate, /shopt -s nullglob/);
@@ -87,9 +100,14 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /#POSTGRES_V51_FILES\[@\][^\n]+!= 1/);
   assert.match(snapshotGate, /POSTGRES_V51_FILES\[0\][^\n]+!=[^\n]+POSTGRES_V51/);
   assert.match(snapshotGate, /cmp -s "\$\{PURGE_SQL_FILE\}"/);
+  assert.match(snapshotGate, /SET LOCAL lock_timeout = '30s'/);
+  assert.match(snapshotGate, /SET LOCAL statement_timeout = '30s'/);
+  assert.match(snapshotGate, /tail -n \+4 "\$\{POSTGRES_V51\}"/);
   assert.doesNotMatch(snapshotGate, /if \[\[ -e "\$\{POSTGRES_V51\}" \|\| -e "\$\{H2_V51\}" \]\]/);
   assert.match(purgeSql, /^DELETE FROM route_search_results AS route/m);
   assert.doesNotMatch(purgeSql, /BEGIN|EXPLAIN|ROLLBACK/);
+  assert.equal(postgresV51, postgresV51TimeoutPrefix + purgeSql);
+  assert.equal(h2V51, purgeSql);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore --clean --if-exists --no-owner --no-privileges/);
   assert.match(snapshotGate, /cat \/proc\/1\/comm/);
@@ -113,9 +131,24 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /docker_available_after_backup/);
   assert.match(snapshotGate, /insufficient Docker filesystem headroom/);
   assert.match(snapshotGate, /ANALYZE route_search_results, favorite_routes, favorite_route_stations, route_feedbacks/);
+  const analyzeIndex = snapshotGate.indexOf("ANALYZE route_search_results");
+  const checkpointIndex = snapshotGate.indexOf("restore_psql -c 'CHECKPOINT;'");
+  const explainIndex = snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)");
+  assert.notEqual(analyzeIndex, -1, "the restored purge tables must be analyzed");
+  assert.notEqual(checkpointIndex, -1, "the restore database must be checkpointed");
+  assert.notEqual(explainIndex, -1, "the measured purge plan must be present");
   assert.ok(
-    snapshotGate.indexOf("ANALYZE route_search_results") < snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)"),
+    analyzeIndex < explainIndex,
     "restored purge tables must be analyzed before the measured plan",
+  );
+  assert.match(snapshotGate, /restore_psql -c 'CHECKPOINT;'/);
+  assert.ok(
+    analyzeIndex < checkpointIndex,
+    "checkpoint must include the restored and analyzed table state",
+  );
+  assert.ok(
+    checkpointIndex < explainIndex,
+    "checkpoint must precede the WAL measurement",
   );
   assert.ok(
     snapshotGate.indexOf("cat /proc/1/comm") < snapshotGate.indexOf("pg_restore"),
@@ -145,19 +178,38 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /postgresql_major/);
   assert.match(snapshotGate, /schema_version/);
   assert.match(snapshotGate, /purge_sql_sha256/);
+  assert.match(snapshotGate, /owner approved on #1913 — 30 seconds execution\/lock and 256 MiB WAL/);
+  assert.match(snapshotGate, /adjusted purge execution exceeds approved 30 second budget/);
+  assert.match(snapshotGate, /purge WAL exceeds approved 256 MiB budget/);
+  assert.doesNotMatch(snapshotGate, /budget decision: pending/);
   assert.doesNotMatch(snapshotGate, /existing verified backup/);
   assert.doesNotMatch(snapshotGate, /\b(curl|scp)\b|upload-artifact/);
 
   const reportAppend = snapshotGate.indexOf('cat "${report_file}" >> "${SUMMARY_FILE}"');
+  const executionBudgetCheck = snapshotGate.indexOf("adjusted purge execution exceeds approved 30 second budget");
+  const walBudgetCheck = snapshotGate.indexOf("purge WAL exceeds approved 256 MiB budget");
   const markerPublish = snapshotGate.lastIndexOf('mv "${marker_tmp}" "${MARKER_FILE}"');
   assert.notEqual(reportAppend, -1);
+  assert.notEqual(executionBudgetCheck, -1);
+  assert.notEqual(walBudgetCheck, -1);
   assert.notEqual(markerPublish, -1);
+  assert.ok(executionBudgetCheck < markerPublish, "execution budget must fail closed before marker publish");
+  assert.ok(walBudgetCheck < markerPublish, "WAL budget must fail closed before marker publish");
   assert.ok(reportAppend < markerPublish, "success marker must be published after required evidence");
 });
 
 test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 중단한다", async () => {
   const workflow = await readFile(cdWorkflowPath, "utf8");
 
+  const nodeSetupStep = workflow.match(
+    /- name: CD Deploy \/ Set up Node\.js[\s\S]*?(?=\n\s+- name:)/,
+  )?.[0] ?? "";
+  assert.notEqual(nodeSetupStep, "", "the CD Deploy Node.js setup step must exist");
+  assert.match(
+    nodeSetupStep,
+    /uses: actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/,
+  );
+  assert.match(nodeSetupStep, /node-version: "24"/);
   assert.match(workflow, /CD Deploy \/ Detect route purge migration/);
   assert.match(
     workflow,
@@ -200,11 +252,46 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   assert.match(workflow, /while true; do[\s\S]*?require-successful-workflow-run\.mjs[\s\S]*?break[\s\S]*?sleep 15[\s\S]*?done/);
 
   const rangeDetectionIndex = workflow.indexOf('git diff --name-only "${current_sha}" "${DEPLOY_SHA}"');
+  const nodeSetupIndex = workflow.indexOf("CD Deploy / Set up Node.js");
   const latchIndex = workflow.indexOf("CD Deploy / Require route purge snapshot evidence");
   const mutationPreparationIndex = workflow.indexOf("CD Deploy / Restore GitHub Actions dotenv secret");
 
   assert.notEqual(rangeDetectionIndex, -1);
+  assert.notEqual(nodeSetupIndex, -1);
   assert.notEqual(latchIndex, -1);
   assert.notEqual(mutationPreparationIndex, -1);
+  assert.ok(nodeSetupIndex < latchIndex, "Node.js must be available before the snapshot evidence gate");
   assert.ok(latchIndex < mutationPreparationIndex, "snapshot evidence must gate production mutation");
+});
+
+test("V51 CD는 production mutation 전에 exact PR1 image rollback을 격리 rehearsal한다", async () => {
+  const workflow = await readFile(cdWorkflowPath, "utf8");
+  const rehearsal = await readFile(rollbackRehearsalPath, "utf8").catch(() => "");
+
+  assert.match(workflow, /CD Deploy \/ Rehearse PR1 image rollback after V51/);
+  assert.match(workflow, /bash tools\/ops\/route-search-purge-rollback-rehearsal\.sh/);
+  assert.match(workflow, /CURRENT_DEPLOYED_SHA: \$\{\{ steps\.route-purge\.outputs\.current_sha \}\}/);
+  const imagePullIndex = workflow.indexOf("CD Deploy / Pull backend image by digest");
+  const rehearsalIndex = workflow.indexOf("CD Deploy / Rehearse PR1 image rollback after V51");
+  const productionMutationIndex = workflow.indexOf("CD Deploy / Run local deployment");
+  assert.notEqual(imagePullIndex, -1);
+  assert.notEqual(rehearsalIndex, -1);
+  assert.notEqual(productionMutationIndex, -1);
+  assert.ok(imagePullIndex < rehearsalIndex);
+  assert.ok(rehearsalIndex < productionMutationIndex);
+
+  assert.match(rehearsal, /^set -euo pipefail$/m);
+  assert.match(rehearsal, /snapshot-\$\{DEPLOY_SHA\}\.env/);
+  assert.match(rehearsal, /docker network create --internal/);
+  assert.match(rehearsal, /pg_restore --clean --if-exists --no-owner --no-privileges/);
+  assert.match(rehearsal, /org\.opencontainers\.image\.revision/);
+  assert.match(rehearsal, /TARGET_IMAGE/);
+  assert.match(rehearsal, /PR1_IMAGE/);
+  assert.match(rehearsal, /schema_after[^\n]+== 51/);
+  assert.match(rehearsal, /ROLLBACK_BACKEND/);
+  assert.match(rehearsal, /ROLLBACK_WORKER/);
+  assert.match(rehearsal, /readiness=backend:200,back-worker:200/);
+  assert.match(rehearsal, /route_statuses=403\/403\/403/);
+  assert.match(rehearsal, /Flyway validation error/);
+  assert.doesNotMatch(rehearsal, /--publish|-p [0-9]/);
 });
