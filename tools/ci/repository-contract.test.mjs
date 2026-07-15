@@ -484,6 +484,7 @@ function assertActionsEnvSecretPolicy(file, source) {
     ]),
     ".github/workflows/datapack-release.yml": new Set([
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
+      "EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256",
       "DATA_GO_KR_SERVICE_KEY",
       "KRIC_SERVICE_KEY",
     ]),
@@ -607,6 +608,7 @@ test("backend production schema is managed by Flyway versioned migrations", () =
   assert.match(application, /locations: classpath:db\/migration\/\{vendor\}/);
   assert.match(applicationProd, /flyway:[\s\S]*enabled: true/);
   assert.match(applicationProd, /locations: classpath:db\/migration\/postgresql/);
+  assert.match(applicationProd, /postgresql:\s*\n\s+transactional-lock: false/);
   assert.match(applicationProd, /baseline-on-migrate: true/);
   assert.match(applicationProd, /baseline-version: 1/);
   assert.doesNotMatch(applicationProd, /schema-locations: classpath:db\/batch\/schema-postgresql\.sql/);

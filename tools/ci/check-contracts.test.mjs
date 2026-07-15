@@ -10,6 +10,7 @@ import {
   validateDatapackIndex,
   validateDatapackManifest,
   validateJson,
+  validateSourceGovernanceContracts,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -59,6 +60,42 @@ test("번들 source-inventory 실물이 계약 스키마를 통과한다", () =>
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
+test("source quota defaultDailyLimit는 허용된 scalar만 받는다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const admitted = inventory.sources.find((source) => source.admissionEvidence?.quotaEvidence != null);
+  admitted.admissionEvidence.quotaEvidence.defaultDailyLimit = { unexpected: true };
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("quotaEvidence.defaultDailyLimit")
+  )));
+});
+
+test("source admission evidence가 있으면 license evidence hash를 요구한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const admitted = inventory.sources.find((source) => source.admissionEvidence != null);
+  delete admitted.admissionEvidence.licenseEvidenceHash;
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("admissionEvidence.licenseEvidenceHash")
+  )));
+});
+
+test("source admission evidence envelope는 승인 필드 외 값을 거부하고 선택적으로 남는다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const admitted = inventory.sources.find((source) => source.admissionEvidence != null);
+  admitted.admissionEvidence.serviceKey = "must-never-enter-contract";
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("admissionEvidence.serviceKey")
+  )));
+
+  delete admitted.admissionEvidence;
+  assert.deepEqual(validateSchema(schema, inventory).errors, []);
+});
+
 test("inventory provenance 전용 source는 production 사용 금지만 선언할 수 있다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
@@ -85,6 +122,19 @@ test("boundaries.json이 스스로 정합하다", () => {
 
 test("check-contracts CLI 검증 오류가 없다", () => {
   assert.deepEqual(collectContractErrors(), []);
+});
+
+test("check-contracts는 inventory·freshness·governance 참조를 함께 검증한다", () => {
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const freshnessPolicy = loadJson("apps/mobile/release/datapack-freshness-sla.json");
+  const governancePolicy = loadJson("tools/datapack/source-governance-policy.json");
+  governancePolicy.sources[0].retentionClassId = "missing-retention-class";
+  const errors = [];
+
+  validateSourceGovernanceContracts({ governancePolicy, inventory, freshnessPolicy }, errors);
+
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /RAW_RETENTION_OVERDUE/);
 });
 
 test("필수 계약 입력 파일이 없으면 실패한다", () => {
