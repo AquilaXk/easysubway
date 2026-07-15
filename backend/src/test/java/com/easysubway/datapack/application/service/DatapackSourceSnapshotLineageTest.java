@@ -54,6 +54,8 @@ class DatapackSourceSnapshotLineageTest {
 				provider VARCHAR(120) NOT NULL,
 				retrieved_at TIMESTAMP NOT NULL,
 				source_updated_at TIMESTAMP,
+				freshness_basis_at TIMESTAMP,
+				provider_valid_until TIMESTAMP,
 				row_count INTEGER NOT NULL,
 				coverage_count INTEGER,
 				raw_sha256 VARCHAR(64) NOT NULL,
@@ -162,6 +164,8 @@ class DatapackSourceSnapshotLineageTest {
 			first.provider(),
 			first.retrievedAt(),
 			first.sourceUpdatedAt(),
+			first.freshnessBasisAt(),
+			first.providerValidUntil(),
 			first.rowCount(),
 			first.coverageCount() + 1,
 			first.rawSha256(),
@@ -248,6 +252,7 @@ class DatapackSourceSnapshotLineageTest {
 		var legacy = new SourceSnapshotCommand(
 			"snapshot-legacy", "source-a", "provider",
 			LocalDateTime.of(2026, 7, 1, 0, 0), LocalDateTime.of(2026, 7, 1, 0, 0),
+			null, null,
 			10, 0, "a".repeat(64), "s3://bucket/snapshot-legacy.json", "b".repeat(64), "c".repeat(64),
 			"PASS", "PASS", "SUCCESS", true, true, null, null, null,
 			LocalDateTime.of(2026, 8, 1, 0, 0), LocalDateTime.of(2026, 9, 29, 0, 0),
@@ -258,6 +263,7 @@ class DatapackSourceSnapshotLineageTest {
 		assertThatThrownBy(() -> service.createLockedSnapshot(new SourceSnapshotCommand(
 			"snapshot-new", "source-a", "provider",
 			LocalDateTime.of(2026, 7, 2, 0, 0), LocalDateTime.of(2026, 7, 2, 0, 0),
+			null, null,
 			11, 1, "d".repeat(64), "s3://bucket/snapshot-new.json", "b".repeat(64), "c".repeat(64),
 			"PASS", "PASS", "SUCCESS", true, true, "snapshot-legacy", "CHANGED", changedDiff(),
 			LocalDateTime.of(2026, 8, 2, 0, 0), LocalDateTime.of(2026, 9, 30, 0, 0),
@@ -286,7 +292,8 @@ class DatapackSourceSnapshotLineageTest {
 		var command = command("source-a", "snapshot-a-forged", null, null);
 		var forged = new SourceSnapshotCommand(
 			command.snapshotId(), command.sourceId(), command.provider(), command.retrievedAt(),
-			command.sourceUpdatedAt(), command.rowCount(), command.coverageCount(), command.rawSha256(),
+			command.sourceUpdatedAt(), command.freshnessBasisAt(), command.providerValidUntil(),
+			command.rowCount(), command.coverageCount(), command.rawSha256(),
 			command.rawObjectUri(), command.redactedRequestFingerprint(), command.schemaFingerprint(),
 			command.schemaStatus(), command.licenseStatus(), command.fetchStatus(), command.redistributionAllowed(),
 			command.credentialRedacted(), command.previousSnapshotId(), command.diffSummary(), command.diffSummaryJson(),
@@ -300,7 +307,8 @@ class DatapackSourceSnapshotLineageTest {
 
 		var overdue = new SourceSnapshotCommand(
 			command.snapshotId(), command.sourceId(), command.provider(), command.retrievedAt(),
-			command.sourceUpdatedAt(), command.rowCount(), command.coverageCount(), command.rawSha256(),
+			command.sourceUpdatedAt(), command.freshnessBasisAt(), command.providerValidUntil(),
+			command.rowCount(), command.coverageCount(), command.rawSha256(),
 			command.rawObjectUri(), command.redactedRequestFingerprint(), command.schemaFingerprint(),
 			command.schemaStatus(), command.licenseStatus(), command.fetchStatus(), command.redistributionAllowed(),
 			command.credentialRedacted(), command.previousSnapshotId(), command.diffSummary(), command.diffSummaryJson(),
@@ -327,6 +335,42 @@ class DatapackSourceSnapshotLineageTest {
 			.hasMessageContaining("SOURCE_FRESHNESS_DERIVATION_MISMATCH");
 	}
 
+	@Test
+	@DisplayName("provider validity가 있는 source는 policy basis와 validity로 freshness를 파생한다")
+	void plannedSourceUsesPolicyBasisAndProviderValidity() {
+		governancePolicy = plannedGovernancePolicy();
+		service = new DatapackSourceSnapshotCommandService(
+			new JdbcDataSourceSnapshotRepository(((DataSourceTransactionManager) transactionManager).getDataSource()),
+			transactionManager,
+			fixedClockProvider(),
+			new ObjectMapper(),
+			governancePolicy
+		);
+		var base = command("planned-a", "snapshot-planned-a", null, null);
+		var planned = new SourceSnapshotCommand(
+			base.snapshotId(), base.sourceId(), base.provider(), base.retrievedAt(), base.sourceUpdatedAt(),
+			LocalDateTime.of(2026, 7, 1, 0, 0), LocalDateTime.of(2026, 7, 20, 0, 0),
+			base.rowCount(), base.coverageCount(), base.rawSha256(), base.rawObjectUri(),
+			base.redactedRequestFingerprint(), base.schemaFingerprint(), base.schemaStatus(), base.licenseStatus(),
+			base.fetchStatus(), base.redistributionAllowed(), base.credentialRedacted(), base.previousSnapshotId(),
+			base.diffSummary(), base.diffSummaryJson(), LocalDateTime.of(2026, 7, 20, 0, 0),
+			base.rawRetentionExpiresAt(), governancePolicy.version(), governancePolicy.sha256(), base.requestedBy(),
+			base.reason(), base.idempotencyKey()
+		);
+
+		assertThat(service.createLockedSnapshot(planned)).isEqualTo("snapshot-planned-a");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT freshness_basis_at FROM data_source_snapshots WHERE snapshot_id = ?",
+			LocalDateTime.class,
+			"snapshot-planned-a"
+		)).isEqualTo(LocalDateTime.of(2026, 7, 1, 0, 0));
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT provider_valid_until FROM data_source_snapshots WHERE snapshot_id = ?",
+			LocalDateTime.class,
+			"snapshot-planned-a"
+		)).isEqualTo(LocalDateTime.of(2026, 7, 20, 0, 0));
+	}
+
 	private String createAfter(CountDownLatch start, SourceSnapshotCommand command) throws InterruptedException {
 		start.await();
 		try {
@@ -350,6 +394,8 @@ class DatapackSourceSnapshotLineageTest {
 			"provider",
 			LocalDateTime.of(2026, 7, root ? 1 : 2, 0, 0),
 			LocalDateTime.of(2026, 7, root ? 1 : 2, 0, 0),
+			null,
+			null,
 			root ? 10 : 12,
 			root ? 8 : 9,
 			(root ? "a" : "d").repeat(64),
@@ -393,6 +439,7 @@ class DatapackSourceSnapshotLineageTest {
 	) {
 		return new SourceSnapshotCommand(
 			command.snapshotId(), command.sourceId(), command.provider(), command.retrievedAt(), command.sourceUpdatedAt(),
+			command.freshnessBasisAt(), command.providerValidUntil(),
 			command.rowCount(), command.coverageCount(), command.rawSha256(), command.rawObjectUri(),
 			command.redactedRequestFingerprint(), command.schemaFingerprint(), command.schemaStatus(), command.licenseStatus(),
 			command.fetchStatus(), command.redistributionAllowed(), command.credentialRedacted(), command.previousSnapshotId(),
@@ -412,6 +459,20 @@ class DatapackSourceSnapshotLineageTest {
 			""".formatted(version);
 		String freshnessPolicy = """
 			{"sourceClasses":[{"id":"test","sourceIds":["source-a","source-b"],"basisField":"retrievedAt","reverificationCadence":"P31D"}]}
+			""";
+		return new DatapackSourceGovernancePolicy(
+			new ObjectMapper(),
+			new ByteArrayResource(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+			new ByteArrayResource(freshnessPolicy.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+		);
+	}
+
+	private DatapackSourceGovernancePolicy plannedGovernancePolicy() {
+		String policy = """
+			{"policyVersion":"2026-07-15","retentionClasses":[{"id":"standard-90d","retentionDays":90}],"sources":[{"sourceId":"planned-a","retentionClassId":"standard-90d"}]}
+			""";
+		String freshnessPolicy = """
+			{"clockSkewSeconds":300,"sourceClasses":[{"id":"planned","sourceIds":["planned-a"],"basisField":"serviceEffectiveAt","maximumReverificationCadence":"P30D","futureBasisAllowed":true,"providerValidityEndField":"serviceEffectiveUntil"}]}
 			""";
 		return new DatapackSourceGovernancePolicy(
 			new ObjectMapper(),

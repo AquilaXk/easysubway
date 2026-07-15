@@ -1,6 +1,8 @@
 ALTER TABLE data_source_snapshots
 	ADD COLUMN coverage_count INTEGER,
 	ADD COLUMN diff_summary_json JSONB,
+	ADD COLUMN freshness_basis_at TIMESTAMP,
+	ADD COLUMN provider_valid_until TIMESTAMP,
 	ADD COLUMN governance_policy_version VARCHAR(32),
 	ADD COLUMN governance_policy_sha256 datapack_sha256;
 

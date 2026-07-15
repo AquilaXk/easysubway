@@ -67,14 +67,15 @@ class DataSourceSnapshotAdminPageControllerTest {
 		jdbcTemplate.update("DELETE FROM data_source_snapshots");
 		jdbcTemplate.update("""
 			INSERT INTO data_source_snapshots (
-				snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, coverage_count,
+				snapshot_id, source_id, provider, retrieved_at, source_updated_at,
+				freshness_basis_at, provider_valid_until, row_count, coverage_count,
 				raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
 				snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed,
 				credential_redacted, previous_snapshot_id, diff_summary, freshness_expires_at,
 				raw_retention_expires_at
 			)
 			VALUES ('snapshot-kric-20260629', 'kric-station-elevator', '국가철도공단',
-				'2026-06-29 03:00:00', '2026-06-28 00:00:00', 12345, 12345,
+				'2026-06-29 03:00:00', '2026-06-28 00:00:00', NULL, NULL, 12345, 12345,
 				?, 's3://easysubway-datapack-sources/kric-station-elevator/snapshot-kric-20260629.json',
 				?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE, NULL,
 				'이전 snapshot 대비 +12 rows', '2026-07-06 03:00:00', '2026-09-29 03:00:00')
@@ -377,14 +378,16 @@ class DataSourceSnapshotAdminPageControllerTest {
 	private void insertSecondSnapshot() {
 		jdbcTemplate.update("""
 			INSERT INTO data_source_snapshots (
-				snapshot_id, source_id, provider, retrieved_at, source_updated_at, row_count, coverage_count,
+				snapshot_id, source_id, provider, retrieved_at, source_updated_at,
+				freshness_basis_at, provider_valid_until, row_count, coverage_count,
 				raw_sha256, raw_object_uri, redacted_request_fingerprint, schema_fingerprint,
 				snapshot_status, schema_status, license_status, fetch_status, redistribution_allowed,
 				credential_redacted, previous_snapshot_id, diff_summary, diff_summary_json, freshness_expires_at,
 				raw_retention_expires_at, governance_policy_version, governance_policy_sha256
 			)
 			VALUES ('snapshot-kric-20260630', 'kric-station-elevator', '국가철도공단',
-				'2026-06-30 03:00:00', '2026-06-29 00:00:00', 12357, 12357,
+				'2026-06-30 03:00:00', '2026-06-29 00:00:00',
+				'2026-06-30 03:00:00', NULL, 12357, 12357,
 				?, 's3://easysubway-datapack-sources/kric-station-elevator/snapshot-kric-20260630.json',
 				?, ?, 'LOCKED', 'PASS', 'PASS', 'SUCCESS', TRUE, TRUE,
 				'snapshot-kric-20260629', '이전 snapshot 대비 +12 rows',

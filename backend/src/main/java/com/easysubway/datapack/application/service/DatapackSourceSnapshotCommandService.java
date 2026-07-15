@@ -55,6 +55,8 @@ public class DatapackSourceSnapshotCommandService {
 		var policyBinding = governancePolicy.requireBinding(
 			command.sourceId(),
 			command.retrievedAt(),
+			command.freshnessBasisAt(),
+			command.providerValidUntil(),
 			command.freshnessExpiresAt(),
 			command.rawRetentionExpiresAt(),
 			command.governancePolicyVersion(),
@@ -165,6 +167,8 @@ public class DatapackSourceSnapshotCommandService {
 	) {
 		return snapshotFrom(
 			command,
+			policyBinding.freshnessBasisAt(),
+			policyBinding.providerValidUntil(),
 			policyBinding.freshnessExpiresAt(),
 			policyBinding.rawRetentionExpiresAt(),
 			policyBinding.version(),
@@ -174,6 +178,8 @@ public class DatapackSourceSnapshotCommandService {
 
 	private static DataSourceSnapshot snapshotFrom(
 		SourceSnapshotCommand command,
+		LocalDateTime freshnessBasisAt,
+		LocalDateTime providerValidUntil,
 		LocalDateTime freshnessExpiresAt,
 		LocalDateTime rawRetentionExpiresAt,
 		String governancePolicyVersion,
@@ -183,6 +189,8 @@ public class DatapackSourceSnapshotCommandService {
 			command,
 			command.coverageCount(),
 			command.diffSummaryJson(),
+			freshnessBasisAt,
+			providerValidUntil,
 			freshnessExpiresAt,
 			rawRetentionExpiresAt,
 			governancePolicyVersion,
@@ -194,6 +202,8 @@ public class DatapackSourceSnapshotCommandService {
 		SourceSnapshotCommand command,
 		int coverageCount,
 		String diffSummaryJson,
+		LocalDateTime freshnessBasisAt,
+		LocalDateTime providerValidUntil,
 		LocalDateTime freshnessExpiresAt,
 		LocalDateTime rawRetentionExpiresAt,
 		String governancePolicyVersion,
@@ -205,6 +215,8 @@ public class DatapackSourceSnapshotCommandService {
 			command.provider(),
 			command.retrievedAt(),
 			command.sourceUpdatedAt(),
+			freshnessBasisAt,
+			providerValidUntil,
 			command.rowCount(),
 			coverageCount,
 			command.rawSha256(),
@@ -248,6 +260,10 @@ public class DatapackSourceSnapshotCommandService {
 			command,
 			legacy ? storedSnapshot.coverageCount() : command.coverageCount(),
 			legacy ? storedSnapshot.diffSummaryJson() : command.diffSummaryJson(),
+			legacy
+				? storedSnapshot.freshnessBasisAt()
+				: command.freshnessBasisAt() == null ? command.retrievedAt() : command.freshnessBasisAt(),
+			legacy ? storedSnapshot.providerValidUntil() : command.providerValidUntil(),
 			command.freshnessExpiresAt(),
 			command.rawRetentionExpiresAt(),
 			command.governancePolicyVersion(),
@@ -261,6 +277,8 @@ public class DatapackSourceSnapshotCommandService {
 		String provider,
 		LocalDateTime retrievedAt,
 		LocalDateTime sourceUpdatedAt,
+		LocalDateTime freshnessBasisAt,
+		LocalDateTime providerValidUntil,
 		int rowCount,
 		int coverageCount,
 		String rawSha256,

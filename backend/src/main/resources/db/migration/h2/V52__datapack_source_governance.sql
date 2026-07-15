@@ -1,5 +1,7 @@
 ALTER TABLE data_source_snapshots ADD COLUMN coverage_count INTEGER;
 ALTER TABLE data_source_snapshots ADD COLUMN diff_summary_json CLOB;
+ALTER TABLE data_source_snapshots ADD COLUMN freshness_basis_at TIMESTAMP;
+ALTER TABLE data_source_snapshots ADD COLUMN provider_valid_until TIMESTAMP;
 ALTER TABLE data_source_snapshots ADD COLUMN governance_policy_version VARCHAR(32);
 ALTER TABLE data_source_snapshots ADD COLUMN governance_policy_sha256 VARCHAR(64);
 ALTER TABLE data_source_snapshots ADD COLUMN lineage_root_source_id VARCHAR(120)

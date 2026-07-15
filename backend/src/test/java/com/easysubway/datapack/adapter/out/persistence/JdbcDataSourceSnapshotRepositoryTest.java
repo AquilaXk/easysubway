@@ -34,6 +34,8 @@ class JdbcDataSourceSnapshotRepositoryTest {
 				provider VARCHAR(120) NOT NULL,
 				retrieved_at TIMESTAMP NOT NULL,
 				source_updated_at TIMESTAMP,
+				freshness_basis_at TIMESTAMP,
+				provider_valid_until TIMESTAMP,
 				row_count INTEGER NOT NULL,
 				coverage_count INTEGER,
 				raw_sha256 VARCHAR(64) NOT NULL,
@@ -253,6 +255,8 @@ class JdbcDataSourceSnapshotRepositoryTest {
 			"국가철도공단",
 			LocalDateTime.of(2026, 6, 29, 3, 0, 0, 123456789),
 			LocalDateTime.of(2026, 6, 28, 0, 0, 0, 987654321),
+			null,
+			null,
 			rowCount,
 			rowCount,
 			rawSha256,
@@ -283,7 +287,8 @@ class JdbcDataSourceSnapshotRepositoryTest {
 	) {
 		return new DataSourceSnapshot(
 			snapshot.snapshotId(), snapshot.sourceId(), snapshot.provider(), snapshot.retrievedAt(),
-			snapshot.sourceUpdatedAt(), snapshot.rowCount(), snapshot.coverageCount(), snapshot.rawSha256(),
+			snapshot.sourceUpdatedAt(), snapshot.freshnessBasisAt(), snapshot.providerValidUntil(),
+			snapshot.rowCount(), snapshot.coverageCount(), snapshot.rawSha256(),
 			snapshot.rawObjectUri(), snapshot.redactedRequestFingerprint(), snapshot.schemaFingerprint(),
 			snapshot.snapshotStatus(), snapshot.schemaStatus(), snapshot.licenseStatus(), snapshot.fetchStatus(),
 			snapshot.redistributionAllowed(), snapshot.credentialRedacted(), previousSnapshotId, diffSummary,

@@ -32,6 +32,8 @@
 			<tr><th scope="row">provider</th><td th:text="${snapshot.provider}">provider</td></tr>
 			<tr><th scope="row">retrieved at</th><td th:text="${snapshot.retrievedAt}">2026-06-29T03:00</td></tr>
 			<tr><th scope="row">source updated at</th><td th:text="${snapshot.sourceUpdatedAt}">2026-06-28T00:00</td></tr>
+			<tr><th scope="row">freshness basis at</th><td th:text="${snapshot.freshnessBasisAt}">2026-06-28T00:00</td></tr>
+			<tr><th scope="row">provider valid until</th><td th:text="${snapshot.providerValidUntil}">2026-07-28T00:00</td></tr>
 			<tr><th scope="row">row count</th><td th:text="${snapshot.rowCount}">0</td></tr>
 			<tr><th scope="row">coverage count</th><td th:text="${snapshot.coverageCount}">0</td></tr>
 			<tr><th scope="row">previous snapshot</th><td th:text="${snapshot.previousSnapshotId}">-</td></tr>
@@ -100,6 +102,14 @@
 				<label>
 					source updated at
 					<input name="sourceUpdatedAt" type="datetime-local">
+				</label>
+				<label>
+					freshness basis at (retrievedAt 이외 기준만 입력)
+					<input name="freshnessBasisAt" type="datetime-local">
+				</label>
+				<label>
+					provider valid until (policy 필수 source만 입력)
+					<input name="providerValidUntil" type="datetime-local">
 				</label>
 				<label>
 					row count

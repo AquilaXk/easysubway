@@ -25,7 +25,7 @@ public class DatapackSourceGovernancePolicy {
 	private final String version;
 	private final String sha256;
 	private final Map<String, Integer> retentionDaysBySource;
-	private final Map<String, Period> freshnessCadenceBySource;
+	private final Map<String, FreshnessRule> freshnessRuleBySource;
 
 	@Autowired
 	public DatapackSourceGovernancePolicy(ObjectMapper objectMapper) {
@@ -45,7 +45,7 @@ public class DatapackSourceGovernancePolicy {
 			this.version = requiredText(policy.path("policyVersion"), "policyVersion");
 			this.sha256 = sha256(bytes);
 			this.retentionDaysBySource = retentionDays(policy);
-			this.freshnessCadenceBySource = freshnessCadences(freshnessPolicy);
+			this.freshnessRuleBySource = freshnessRules(freshnessPolicy);
 		} catch (IOException exception) {
 			throw new IllegalStateException("Datapack source governance policy could not be loaded.", exception);
 		}
@@ -62,20 +62,38 @@ public class DatapackSourceGovernancePolicy {
 	Binding requireBinding(
 		String sourceId,
 		LocalDateTime retrievedAt,
+		LocalDateTime submittedFreshnessBasis,
+		LocalDateTime submittedProviderValidUntil,
 		LocalDateTime submittedFreshnessExpiry,
 		LocalDateTime submittedExpiry,
 		String submittedVersion,
 		String submittedSha256
 	) {
 		Integer retentionDays = retentionDaysBySource.get(sourceId);
-		Period freshnessCadence = freshnessCadenceBySource.get(sourceId);
+		FreshnessRule freshnessRule = freshnessRuleBySource.get(sourceId);
 		if (retentionDays == null || !version.equals(submittedVersion) || !sha256.equals(submittedSha256)) {
 			throw new IllegalArgumentException("SOURCE_GOVERNANCE_OWNER_MISSING: current policy binding");
 		}
-		if (freshnessCadence == null) {
+		if (freshnessRule == null) {
 			throw new IllegalArgumentException("SOURCE_FRESHNESS_POLICY_MISSING: backend freshness basis");
 		}
-		LocalDateTime freshnessExpiry = retrievedAt.plus(freshnessCadence);
+		LocalDateTime freshnessBasis = freshnessRule.retrievedAtBasis()
+			? retrievedAt
+			: submittedFreshnessBasis;
+		if (freshnessBasis == null
+			|| (freshnessRule.retrievedAtBasis() && submittedFreshnessBasis != null
+				&& !retrievedAt.equals(submittedFreshnessBasis))
+			|| (!freshnessRule.futureBasisAllowed()
+				&& freshnessBasis.isAfter(retrievedAt.plusSeconds(freshnessRule.clockSkewSeconds())))) {
+			throw new IllegalArgumentException("SOURCE_FRESHNESS_DERIVATION_MISMATCH: freshness basis");
+		}
+		if (freshnessRule.providerValidityRequired() != (submittedProviderValidUntil != null)) {
+			throw new IllegalArgumentException("SOURCE_FRESHNESS_POLICY_MISSING: provider validity");
+		}
+		LocalDateTime freshnessExpiry = freshnessBasis.plus(freshnessRule.cadence());
+		if (submittedProviderValidUntil != null && submittedProviderValidUntil.isBefore(freshnessExpiry)) {
+			freshnessExpiry = submittedProviderValidUntil;
+		}
 		if (!freshnessExpiry.equals(submittedFreshnessExpiry)) {
 			throw new IllegalArgumentException(
 				"SOURCE_FRESHNESS_DERIVATION_MISMATCH: freshness expiry must match current policy"
@@ -85,16 +103,23 @@ public class DatapackSourceGovernancePolicy {
 		if (!expiry.equals(submittedExpiry)) {
 			throw new IllegalArgumentException("RAW_RETENTION_OVERDUE: retention expiry must match current policy");
 		}
-		return new Binding(version, sha256, freshnessExpiry, expiry);
+		return new Binding(
+			version,
+			sha256,
+			freshnessBasis,
+			submittedProviderValidUntil,
+			freshnessExpiry,
+			expiry
+		);
 	}
 
-	private static Map<String, Period> freshnessCadences(JsonNode policy) {
-		Map<String, Period> result = new HashMap<>();
+	private static Map<String, FreshnessRule> freshnessRules(JsonNode policy) {
+		Map<String, FreshnessRule> result = new HashMap<>();
 		for (JsonNode sourceClass : policy.path("sourceClasses")) {
-			if (!"retrievedAt".equals(sourceClass.path("basisField").asText())
-				|| sourceClass.has("providerValidityEndField")) {
+			if (sourceClass.path("sourceIds").isEmpty()) {
 				continue;
 			}
+			String basisField = requiredText(sourceClass.path("basisField"), "sourceClasses[].basisField");
 			String cadenceText = sourceClass.hasNonNull("reverificationCadence")
 				? sourceClass.path("reverificationCadence").asText()
 				: sourceClass.path("maximumReverificationCadence").asText();
@@ -107,9 +132,22 @@ public class DatapackSourceGovernancePolicy {
 			if (cadence.isZero() || cadence.isNegative()) {
 				throw new IllegalStateException("Datapack source freshness cadence is invalid.");
 			}
+			int clockSkewSeconds = sourceClass.has("clockSkewSeconds")
+				? sourceClass.path("clockSkewSeconds").asInt(-1)
+				: policy.path("clockSkewSeconds").asInt(0);
+			if (clockSkewSeconds < 0) {
+				throw new IllegalStateException("Datapack source freshness clock skew is invalid.");
+			}
+			var rule = new FreshnessRule(
+				cadence,
+				"retrievedAt".equals(basisField),
+				sourceClass.path("futureBasisAllowed").asBoolean(false),
+				sourceClass.hasNonNull("providerValidityEndField"),
+				clockSkewSeconds
+			);
 			for (JsonNode sourceIdNode : sourceClass.path("sourceIds")) {
 				String sourceId = requiredText(sourceIdNode, "sourceClasses[].sourceIds[]");
-				if (result.put(sourceId, cadence) != null) {
+				if (result.put(sourceId, rule) != null) {
 					throw new IllegalStateException("Datapack source freshness binding is duplicated.");
 				}
 			}
@@ -156,7 +194,17 @@ public class DatapackSourceGovernancePolicy {
 	record Binding(
 		String version,
 		String sha256,
+		LocalDateTime freshnessBasisAt,
+		LocalDateTime providerValidUntil,
 		LocalDateTime freshnessExpiresAt,
 		LocalDateTime rawRetentionExpiresAt
+	) {}
+
+	private record FreshnessRule(
+		Period cadence,
+		boolean retrievedAtBasis,
+		boolean futureBasisAllowed,
+		boolean providerValidityRequired,
+		int clockSkewSeconds
 	) {}
 }

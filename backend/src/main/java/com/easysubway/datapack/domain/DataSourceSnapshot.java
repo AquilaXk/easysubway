@@ -17,6 +17,8 @@ public record DataSourceSnapshot(
 	String provider,
 	LocalDateTime retrievedAt,
 	LocalDateTime sourceUpdatedAt,
+	LocalDateTime freshnessBasisAt,
+	LocalDateTime providerValidUntil,
 	int rowCount,
 	int coverageCount,
 	String rawSha256,
@@ -50,6 +52,8 @@ public record DataSourceSnapshot(
 		}
 		retrievedAt = normalizeTimestamp(retrievedAt);
 		sourceUpdatedAt = normalizeTimestamp(sourceUpdatedAt);
+		freshnessBasisAt = normalizeTimestamp(freshnessBasisAt);
+		providerValidUntil = normalizeTimestamp(providerValidUntil);
 		if (rowCount < 0) {
 			throw new InvalidDataSourceSnapshotException("rowCount must be zero or positive.");
 		}

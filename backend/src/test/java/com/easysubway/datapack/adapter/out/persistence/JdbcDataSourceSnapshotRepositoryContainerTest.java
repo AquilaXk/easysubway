@@ -65,6 +65,8 @@ class JdbcDataSourceSnapshotRepositoryContainerTest {
 			"provider-a",
 			LocalDateTime.of(2026, 7, day, 0, 0),
 			LocalDateTime.of(2026, 7, day, 0, 0),
+			null,
+			null,
 			day,
 			day,
 			(day == 1 ? "a" : "d").repeat(64),
