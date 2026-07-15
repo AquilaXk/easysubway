@@ -154,6 +154,38 @@ test("ITX-청춘 admission contract는 날짜·OD matrix·양방향 completeness
   });
 });
 
+test("ITX-청춘 production source artifact는 exact OWNER-approved bytes로 ADMITTED된다", async () => {
+  const reference = contract.sourceTimetableArtifact;
+  assert.equal(reference.status, "ADMITTED");
+  assert.equal(reference.admissionEligible, true);
+  assert.match(reference.artifactId, /^itx-cheongchun-source-timetable-\d{17}$/);
+  assert.equal(reference.artifactPath, `tools/datapack/sources/${reference.artifactId}.json`);
+  assert.match(reference.sha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(reference.promotion, {
+    mode: "BOOTSTRAP_OWNER_APPROVED",
+    previousArtifactSha256: null,
+    approvalUrl: "https://github.com/AquilaXk/easysubway/issues/2135#issuecomment-4979752912",
+    approvedArtifactSha256: reference.sha256,
+  });
+
+  const artifactBytes = await readFile(new URL(`../../${reference.artifactPath}`, import.meta.url));
+  assert.equal(createHash("sha256").update(artifactBytes).digest("hex"), reference.sha256);
+  const artifact = JSON.parse(artifactBytes);
+  assert.equal(artifact.artifactId, reference.artifactId);
+  assert.equal(artifact.artifactKind, "itx-cheongchun-source-timetable");
+  assert.equal(artifact.promotionStatus, "BOOTSTRAP_REVIEW_REQUIRED");
+  assert.equal(artifact.credentialRedacted, true);
+  assert.deepEqual(artifact.selectedServiceDates, { "8": "20260715", "7": "20260718", "9": "20260719" });
+  for (const dayCd of ["8", "7", "9"]) {
+    assert.deepEqual(
+      [...new Set(artifact.stationSequences.filter((row) => row.dayCd === dayCd).map((row) => row.directionId))].sort(),
+      ["down", "up"],
+    );
+  }
+  assert.equal(artifact.stationSequences.filter(({ trainNumber }) => trainNumber === "2035").length, 1);
+  assert.doesNotMatch(artifactBytes.toString("utf8"), /serviceKey=|KRIC_SERVICE_KEY|DATA_GO_KR_SERVICE_KEY/);
+});
+
 test("ITX-청춘 live admission evidence는 세 service day 전수 결과를 credential 없이 고정한다", () => {
   assert.deepEqual(contract.officialEvidence.korailCompletenessAdmission, {
     provider: "TAGO + 한국철도공사",
