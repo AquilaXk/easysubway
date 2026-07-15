@@ -137,6 +137,9 @@ export function validateSourceSnapshotFreshness({
     const sources = new Map(inventory.sources.map((source) => [source.id, source]));
     governanceResults = effectiveSnapshots.map((snapshot) => {
       const rawState = purgeEvidence.get(`${snapshot.sourceId}\0${snapshot.snapshotId}`) ?? null;
+      if (rawState?.protectedBy != null && rawState.rawSha256 !== snapshot.rawSha256) {
+        throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report protection raw hash");
+      }
       return evaluateSourceGovernance({
         source: sources.get(snapshot.sourceId),
         snapshot,
@@ -146,6 +149,7 @@ export function validateSourceSnapshotFreshness({
         purgeEvidence: rawState?.purgedAt == null ? null : rawState,
         protectedBy: rawState?.protectedBy ?? [],
         legalHold: rawState?.legalHold ?? null,
+        protectionEvaluatedAt: rawState?.protectedAt ?? null,
       });
     });
     const reasonCodes = [...new Set(governanceResults.flatMap((result) => result.reasonCodes))].sort();
@@ -302,7 +306,14 @@ export function purgeEvidenceBySnapshot(report) {
       || (legalHold != null && (typeof legalHold !== "object" || Array.isArray(legalHold)))) {
       throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report protection");
     }
-    evidence.set(key, { sourceId, snapshotId, rawSha256, protectedBy, legalHold });
+    evidence.set(key, {
+      sourceId,
+      snapshotId,
+      rawSha256,
+      protectedBy,
+      legalHold,
+      protectedAt: new Date(evaluatedMillis).toISOString(),
+    });
   }
   return evidence;
 }

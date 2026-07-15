@@ -12,7 +12,7 @@ import { deleteExpiredItems } from "./purge-expired-source-raw.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
-const evaluationAt = "2026-07-15T00:00:00Z";
+const evaluationAt = new Date().toISOString();
 
 test("만료 raw만 삭제하고 active·rollback·legal hold 원본은 보존하며 재실행은 idempotent하다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
@@ -175,6 +175,49 @@ test("실제 DELETE는 clock skew 이내라도 미래인 evaluation-at을 요청
   });
 });
 
+test("실제 DELETE는 5분보다 오래된 protection 판단을 요청 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const staleEvaluationAt = new Date(Date.now() - 6 * 60 * 1_000).toISOString();
+    const files = await writeInputs(
+      workDir,
+      [rawEntry("expired", "raw/expired.json")],
+      staleEvaluationAt,
+    );
+    objects.add("/raw/expired.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "stale-evaluation.json"),
+        evaluationAtOverride: staleEvaluationAt,
+      }),
+      /evaluationAt must be recent/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
+test("실제 DELETE는 승인 ledger의 evaluatedAt과 실행 판단 시각을 일치시킨다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "mismatched-evaluation.json"),
+        evaluationAtOverride: new Date(Date.parse(evaluationAt) - 1_000).toISOString(),
+      }),
+      /ledger evaluatedAt mismatch/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
 test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes로 purge한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const first = policyFixture(["source-old"]);
@@ -186,6 +229,7 @@ test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes
     const ledger = {
       schemaVersion: 1,
       artifactKind: "source-raw-retention-ledger",
+      evaluatedAt: evaluationAt,
       entries: [
         bindPolicy(rawEntry("old", "raw/old.json"), policies[0]),
         bindPolicy(rawEntry("new", "raw/new.json"), policies[1]),
@@ -466,12 +510,13 @@ async function withFixture(run) {
   }
 }
 
-async function writeInputs(workDir, entries) {
+async function writeInputs(workDir, entries, ledgerEvaluatedAt = evaluationAt) {
   const policy = policyFixture(entries.map((entry) => entry.sourceId));
   const policyFile = await writePolicy(workDir, "current", policy);
   const ledger = {
     schemaVersion: 1,
     artifactKind: "source-raw-retention-ledger",
+    evaluatedAt: ledgerEvaluatedAt,
     entries: entries.map((entry) => ({
       ...entry,
       governancePolicyVersion: policy.policyVersion,
@@ -584,7 +629,7 @@ function legalHold(snapshotId) {
     ownerRole: "datapack-source-owner",
     reasonCode: "REGULATORY_AUDIT",
     createdAt: "2026-07-01T00:00:00Z",
-    expiresAt: "2026-07-20T00:00:00Z",
+    expiresAt: "2099-07-20T00:00:00Z",
   };
 }
 

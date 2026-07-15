@@ -111,11 +111,15 @@ function twoSourceInput() {
   return value;
 }
 
-function purgeReport(entries, completedAt = "2026-10-10T00:00:01.000Z") {
+function purgeReport(
+  entries,
+  completedAt = "2026-10-10T00:00:01.000Z",
+  evaluatedAt = "2026-10-10T00:00:00.000Z",
+) {
   const body = {
     schemaVersion: 1,
     artifactKind: "source-raw-purge-report",
-    evaluatedAt: "2026-10-10T00:00:00.000Z",
+    evaluatedAt,
     completedAt,
     dryRun: false,
     decision: "PASS",
@@ -196,6 +200,7 @@ test("PASS purge report의 검증된 protection을 snapshot governance 입력으
     rawSha256: "a".repeat(64),
     protectedBy: ["ACTIVE_RELEASE"],
     legalHold: null,
+    protectedAt: report.evaluatedAt,
   });
 });
 
@@ -270,7 +275,11 @@ test("freshness validator는 hash-bound purge report를 retention 완료 근거�
 
   assert.equal(result.governanceResults[0].decision, "GO");
 
-  value.purgeReport = purgeReport([]);
+  value.purgeReport = purgeReport(
+    [],
+    "2026-10-11T00:00:01.000Z",
+    value.evaluationAt,
+  );
   value.purgeReport.protected = [{
     sourceId: value.snapshots[0].sourceId,
     snapshotId: value.snapshots[0].snapshotId,
@@ -283,6 +292,44 @@ test("freshness validator는 hash-bound purge report를 retention 완료 근거�
     .digest("hex");
 
   assert.equal(validateSourceSnapshotFreshness(value).governanceResults[0].decision, "GO");
+
+  value.purgeReport = purgeReport([]);
+  value.purgeReport.protected = [{
+    sourceId: value.snapshots[0].sourceId,
+    snapshotId: value.snapshots[0].snapshotId,
+    rawSha256: value.snapshots[0].rawSha256,
+    protectedBy: ["ACTIVE_RELEASE"],
+    legalHold: null,
+  }];
+  value.purgeReport.reportSha256 = createHash("sha256")
+    .update(JSON.stringify({ ...value.purgeReport, reportSha256: undefined }))
+    .digest("hex");
+
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /RAW_RETENTION_OVERDUE/,
+  );
+
+  value.purgeReport = purgeReport(
+    [],
+    "2026-10-11T00:00:01.000Z",
+    value.evaluationAt,
+  );
+  value.purgeReport.protected = [{
+    sourceId: value.snapshots[0].sourceId,
+    snapshotId: value.snapshots[0].snapshotId,
+    rawSha256: "f".repeat(64),
+    protectedBy: ["ACTIVE_RELEASE"],
+    legalHold: null,
+  }];
+  value.purgeReport.reportSha256 = createHash("sha256")
+    .update(JSON.stringify({ ...value.purgeReport, reportSha256: undefined }))
+    .digest("hex");
+
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /purge report protection raw hash/,
+  );
 });
 
 test("선택한 head만 freshness를 판정하고 만료된 이전 snapshot은 lineage로만 검증한다", () => {

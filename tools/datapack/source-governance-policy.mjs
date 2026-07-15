@@ -76,6 +76,7 @@ export function evaluateSourceGovernance({
   evaluationAt,
   legalHold = null,
   protectedBy = [],
+  protectionEvaluatedAt = null,
   purgeEvidence = null,
 }) {
   const reasonCodes = new Set();
@@ -100,6 +101,7 @@ export function evaluateSourceGovernance({
       evaluatedMillis,
       legalHold,
       protectedBy,
+      protectionEvaluatedAt,
       purgeEvidence,
       reasonCodes,
     });
@@ -235,6 +237,7 @@ function evaluateRetention({
   evaluatedMillis,
   legalHold,
   protectedBy,
+  protectionEvaluatedAt,
   purgeEvidence,
   reasonCodes,
 }) {
@@ -258,7 +261,15 @@ function evaluateRetention({
     && new Set(protectedBy).size === protectedBy.length
     && protectedBy.every((reason) => RELEASE_PROTECTION_REASONS.has(reason));
   if (!validProtection) reasonCodes.add("RAW_RETENTION_OVERDUE");
-  const releaseProtected = validProtection && protectedBy.length > 0;
+  let protectionIsCurrent = false;
+  try {
+    protectionIsCurrent = requiredUtcInstant(protectionEvaluatedAt, "protectionEvaluatedAt") === evaluatedMillis;
+  } catch {
+    protectionIsCurrent = false;
+  }
+  const hasReleaseProtection = validProtection && protectedBy.length > 0;
+  if (hasReleaseProtection && !protectionIsCurrent) reasonCodes.add("RAW_RETENTION_OVERDUE");
+  const releaseProtected = hasReleaseProtection && protectionIsCurrent;
   const purgeCompleted = validPurgeEvidence(purgeEvidence, entry, snapshot, storedMillis, evaluatedMillis);
   if (evaluatedMillis >= storedMillis && !releaseProtected && !holdValid && !purgeCompleted) {
     reasonCodes.add("RAW_RETENTION_OVERDUE");

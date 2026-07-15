@@ -22,6 +22,7 @@ const ALLOWED_ARGS = new Set([
 const PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const DELETE_CONCURRENCY = 4;
 const DELETE_TIMEOUT_MS = 30_000;
+const EXECUTION_EVIDENCE_MAX_AGE_MS = 5 * 60 * 1_000;
 const PREAUTH_BASE_URL_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL";
 const SNAPSHOT_EVIDENCE_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_SNAPSHOT_EVIDENCE_SHA256";
 const LEDGER_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_LEDGER_SHA256";
@@ -32,8 +33,14 @@ async function main(argv) {
   const outputPath = path.resolve(requiredArg(args, "output"));
   const evaluationAt = requiredArg(args, "evaluation-at");
   const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
-  if (!args.dryRun && evaluatedMillis > Date.now()) {
-    throw new Error("evaluationAt must not be in the future for actual DELETE");
+  if (!args.dryRun) {
+    const executionMillis = Date.now();
+    if (evaluatedMillis > executionMillis) {
+      throw new Error("evaluationAt must not be in the future for actual DELETE");
+    }
+    if (executionMillis - evaluatedMillis > EXECUTION_EVIDENCE_MAX_AGE_MS) {
+      throw new Error("evaluationAt must be recent for actual DELETE");
+    }
   }
   const baseUrl = args.dryRun
     ? validatedBaseUrl(requiredArg(args, "base-url"), false)
@@ -167,6 +174,9 @@ export function buildPurgePlan({
   }
   if (!Array.isArray(ledger.entries) || ledger.entries.length === 0) {
     throw new Error("RAW_RETENTION_OVERDUE: ledger entries");
+  }
+  if (requiredUtcInstant(ledger.evaluatedAt, "ledger.evaluatedAt") !== evaluatedMillis) {
+    throw new Error("RAW_RETENTION_OVERDUE: ledger evaluatedAt mismatch");
   }
   const snapshotIds = new Set();
   const objectKeys = new Set();
