@@ -11,7 +11,9 @@ SNAPSHOT_REQUEST_SHA="${SNAPSHOT_REQUEST_SHA:-}"
 RESTORE_CPU_LIMIT="1"
 RESTORE_MEMORY_LIMIT="2g"
 RESTORE_PIDS_LIMIT="256"
-WAL_HEADROOM_BYTES="$((256 * 1024 * 1024))"
+EXECUTION_BUDGET_MS="30000"
+WAL_BUDGET_BYTES="$((256 * 1024 * 1024))"
+WAL_HEADROOM_BYTES="${WAL_BUDGET_BYTES}"
 MIN_OPERATIONAL_RESERVE_BYTES="$((1024 * 1024 * 1024))"
 SPACE_CLASS='[:space:]'
 PURGE_SQL_FILE="${ROOT_DIR}/tools/ops/route-search-purge.sql"
@@ -48,12 +50,17 @@ if (( ${#POSTGRES_V51_FILES[@]} > 0 || ${#H2_V51_FILES[@]} > 0 )); then
 		printf 'unexpected V51 migration set\n' >&2
 		exit 1
 	fi
-	for migration in "${POSTGRES_V51}" "${H2_V51}"; do
-		if ! cmp -s "${PURGE_SQL_FILE}" "${migration}"; then
-			printf 'V51 purge SQL differs from the analyzed canonical SQL\n' >&2
-			exit 1
-		fi
-	done
+	if [[ "$(sed -n '1p' "${POSTGRES_V51}")" != "SET LOCAL lock_timeout = '30s';" \
+		|| "$(sed -n '2p' "${POSTGRES_V51}")" != "SET LOCAL statement_timeout = '30s';" \
+		|| -n "$(sed -n '3p' "${POSTGRES_V51}")" ]]; then
+		printf 'PostgreSQL V51 timeout contract is invalid\n' >&2
+		exit 1
+	fi
+	if ! tail -n +4 "${POSTGRES_V51}" | cmp -s "${PURGE_SQL_FILE}" - \
+		|| ! cmp -s "${PURGE_SQL_FILE}" "${H2_V51}"; then
+		printf 'V51 purge DELETE differs from the analyzed canonical SQL\n' >&2
+		exit 1
+	fi
 fi
 purge_sql_sha256="$(sha256sum "${PURGE_SQL_FILE}" | awk '{print $1}')"
 if [[ ! "${purge_sql_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
@@ -341,6 +348,7 @@ if (( favorite_routes_raw != favorite_routes_preserved + favorite_routes_danglin
 fi
 
 restore_psql -c 'ANALYZE route_search_results, favorite_routes, favorite_route_stations, route_feedbacks;' >/dev/null
+restore_psql -c 'CHECKPOINT;' >/dev/null
 
 plan_file="${EVIDENCE_DIR}/purge-plan-${backup_sha256:0:12}.txt"
 start_ns="$(date +%s%N)"
@@ -391,6 +399,15 @@ restore_settings="$(restore_psql -F '|' -c "SELECT current_setting('server_versi
 
 adjusted_execution_ms="$(awk -v value="${execution_ms}" 'BEGIN { printf "%.3f", value * 2 }')"
 adjusted_wall_ms="$(( wall_ms * 2 ))"
+if ! awk -v value="${adjusted_execution_ms}" -v budget="${EXECUTION_BUDGET_MS}" \
+	'BEGIN { exit !(value <= budget) }'; then
+	printf 'adjusted purge execution exceeds approved 30 second budget\n' >&2
+	exit 1
+fi
+if (( wal_bytes > WAL_BUDGET_BYTES )); then
+	printf 'purge WAL exceeds approved 256 MiB budget\n' >&2
+	exit 1
+fi
 
 report_file="${EVIDENCE_DIR}/report-${backup_sha256:0:12}.md"
 snapshot_completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -429,7 +446,7 @@ snapshot_completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "- WAL bytes: \`${wal_bytes}\`"
 	echo '- restore isolation: same host/image/storage driver, separate Docker volume, no network or published port'
 	echo "- restore resource limits: \`${RESTORE_CPU_LIMIT} CPU, ${RESTORE_MEMORY_LIMIT} memory/no swap, ${RESTORE_PIDS_LIMIT} pids\`"
-	echo '- budget decision: pending explicit owner approval of 30 seconds and 256 MiB'
+	echo '- budget decision: owner approved on #1913 — 30 seconds execution/lock and 256 MiB WAL'
 	echo
 	echo '<details><summary>Sanitized EXPLAIN plan</summary>'
 	echo
