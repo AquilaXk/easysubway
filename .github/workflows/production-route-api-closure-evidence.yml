@@ -8,6 +8,7 @@ on:
       - ".github/workflows/production-route-api-closure-evidence.yml"
       - "tools/ci/production-route-api-closure-evidence-workflow.test.mjs"
       - "tools/ops/route-search-purge-snapshot-gate.sh"
+      - "tools/ops/postgres-backup.sh"
       - "backend/src/main/resources/db/migration/postgresql/V51__*"
       - "backend/src/main/resources/db/migration/h2/V51__*"
 

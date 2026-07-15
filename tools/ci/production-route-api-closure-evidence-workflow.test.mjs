@@ -45,6 +45,7 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   const snapshotGate = await readFile(snapshotGatePath, "utf8").catch(() => "");
 
   assert.match(workflow, /tools\/ops\/route-search-purge-snapshot-gate\.sh/);
+  assert.match(workflow, /tools\/ops\/postgres-backup\.sh/);
   assert.match(workflow, /backend\/src\/main\/resources\/db\/migration\/(postgresql|h2)\/V51__/);
   assert.match(workflow, /snapshot-gate:[\s\S]*needs: verify/);
   assert.match(workflow, /snapshot-gate:[\s\S]*runs-on:\n\s+- self-hosted\n\s+- easysubway-production/);
@@ -75,6 +76,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /org\.opencontainers\.image\.revision/);
   assert.match(snapshotGate, /production_image=.*\{\{\.Image\}\}/);
   assert.doesNotMatch(snapshotGate, /production_image=.*\{\{\.Config\.Image\}\}/);
+  assert.match(snapshotGate, /production_settings_sql=/);
+  assert.match(snapshotGate, /-c "\$1"' sh/);
   assert.match(snapshotGate, /report_file/);
   assert.match(snapshotGate, /cat "\$\{report_file\}"/);
   assert.match(snapshotGate, /snapshot-complete/);

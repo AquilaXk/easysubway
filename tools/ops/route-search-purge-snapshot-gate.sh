@@ -265,8 +265,10 @@ cpu_cores="$(nproc)"
 memory_kib="$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)"
 root_filesystem="$(findmnt -n -o FSTYPE /)"
 docker_storage_driver="$(docker info --format '{{.Driver}}')"
+production_settings_sql="SELECT current_setting('server_version'), current_setting('shared_buffers'), current_setting('work_mem'), current_setting('maintenance_work_mem'), current_setting('effective_cache_size'), current_setting('max_wal_size'), current_setting('checkpoint_timeout'), current_setting('synchronous_commit');"
 production_settings="$(docker exec easysubway-postgres sh -lc \
-	'psql -X -v ON_ERROR_STOP=1 -A -t -F "|" -U "$POSTGRES_USER" "$POSTGRES_DB" -c "SELECT current_setting('\''server_version'\''), current_setting('\''shared_buffers'\''), current_setting('\''work_mem'\''), current_setting('\''maintenance_work_mem'\''), current_setting('\''effective_cache_size'\''), current_setting('\''max_wal_size'\''), current_setting('\''checkpoint_timeout'\''), current_setting('\''synchronous_commit'\'');"')"
+	'psql -X -v ON_ERROR_STOP=1 -A -t -F "|" -U "$POSTGRES_USER" "$POSTGRES_DB" -c "$1"' sh \
+	"${production_settings_sql}")"
 restore_settings="$(restore_psql -F '|' -c "SELECT current_setting('server_version'), current_setting('shared_buffers'), current_setting('work_mem'), current_setting('maintenance_work_mem'), current_setting('effective_cache_size'), current_setting('max_wal_size'), current_setting('checkpoint_timeout'), current_setting('synchronous_commit');")"
 
 adjusted_execution_ms="$(awk -v value="${execution_ms}" 'BEGIN { printf "%.3f", value * 2 }')"
