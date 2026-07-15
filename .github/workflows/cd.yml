@@ -321,21 +321,25 @@ jobs:
           snapshot_runs_file="${RUNNER_TEMP}/route-purge-snapshot-runs.json"
           snapshot_wait_deadline="$((SECONDS + 3600))"
           while true; do
-            curl -fsS \
+            if curl -fsS \
+              --connect-timeout 5 \
+              --max-time 20 \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               --output "${snapshot_runs_file}" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/production-route-api-closure-evidence.yml/runs?head_sha=${DEPLOY_SHA}&branch=main&status=success&per_page=20"
-
-            if node tools/ci/require-successful-workflow-run.mjs \
-              "${snapshot_runs_file}" \
-              "${DEPLOY_SHA}" \
-              "Production route API closure evidence" \
-              "push,workflow_dispatch" \
-              main \
-              3600; then
-              break
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/production-route-api-closure-evidence.yml/runs?head_sha=${DEPLOY_SHA}&branch=main&status=success&per_page=20"; then
+              if node tools/ci/require-successful-workflow-run.mjs \
+                "${snapshot_runs_file}" \
+                "${DEPLOY_SHA}" \
+                "Production route API closure evidence" \
+                "push,workflow_dispatch" \
+                main \
+                3600; then
+                break
+              fi
+            else
+              echo "snapshot evidence query failed; retrying within bounded deadline" >&2
             fi
             if (( SECONDS >= snapshot_wait_deadline )); then
               echo "timed out waiting for route purge snapshot evidence" >&2

@@ -157,6 +157,11 @@ test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 �
   assert.match(workflow, /marker_current_sha[^\n]+!=[^\n]+CURRENT_DEPLOYED_SHA/);
   assert.match(workflow, /snapshot marker backup checksum mismatch/);
   assert.match(workflow, /snapshot_wait_deadline="\$\(\(SECONDS \+ 3600\)\)"/);
+  assert.match(
+    workflow,
+    /if curl -fsS[\s\S]*?--connect-timeout 5[\s\S]*?--max-time 20[\s\S]*?then[\s\S]*?require-successful-workflow-run\.mjs/,
+  );
+  assert.match(workflow, /snapshot evidence query failed; retrying within bounded deadline/);
   assert.match(workflow, /while true; do[\s\S]*?require-successful-workflow-run\.mjs[\s\S]*?break[\s\S]*?sleep 15[\s\S]*?done/);
 
   const rangeDetectionIndex = workflow.indexOf('git diff --name-only "${current_sha}" "${DEPLOY_SHA}"');
