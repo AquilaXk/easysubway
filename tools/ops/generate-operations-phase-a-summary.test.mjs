@@ -144,6 +144,25 @@ test("Phase A summary generator rejects a contact set not verified by device QA"
   await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
 });
 
+for (const [label, receivedAt] of [
+  ["before the evidence window", "2026-07-14T23:59:59+09:00"],
+  ["after the validation clock", "2026-07-17T00:00:00+09:00"],
+]) {
+  test(`Phase A summary generator rejects support evidence ${label}`, async () => {
+    const output = await paths();
+    const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
+    gate.latestQaEvidenceSummary.channelEvidence[0].receivedAt = receivedAt;
+    const gatePath = path.join(output.dir, "support-incident-response-gate.json");
+    await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
+    await writeFile(gatePath, `${JSON.stringify(gate, null, 2)}\n`);
+
+    await generate(output, ["--support-gate", gatePath]);
+
+    assert.equal((await readFile(output.status, "utf8")).trim(), "BLOCKED_EXTERNAL");
+    await assert.rejects(readFile(output.summary, "utf8"), /ENOENT/);
+  });
+}
+
 test("Phase A summary generator requires a PASS summary for every required evidence ID", async () => {
   const output = await paths();
   const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"));

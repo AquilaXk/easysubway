@@ -2432,6 +2432,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   for (const requiredPath of [
     "tools/ops/generate-operations-phase-a-summary.mjs",
     "tools/ops/validate-operations-release-summary.mjs",
+    "tools/release/summary-validation-utils.mjs",
     "tools/release/generate-rc-evidence-manifest.mjs",
   ]) {
     assert.ok(refreshBoundPaths.has(requiredPath), `${requiredPath} must invalidate Phase A evidence`);
@@ -4086,6 +4087,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.deepEqual(gate.latestOperationsEvidenceStatus.pendingPostLaunchEvidence, [
     "play-review-status-summary",
     "crash-anr-vitals-summary",
+    "support-ticket-summary-after-public-release",
     "post-launch-review-window-evidence-after-public-release",
   ]);
   assert.deepEqual(gate.latestOperationsEvidenceStatus.remainingPhaseABlockers, []);

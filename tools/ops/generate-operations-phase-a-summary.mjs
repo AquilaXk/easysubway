@@ -74,9 +74,11 @@ const channelEvidenceReady = validatedChannels.size === support.supportChannels.
   && support.supportChannels.every((channel) => {
     const item = validatedChannels.get(channel.id);
     const evidenceIds = new Set(item?.evidenceIds ?? []);
+    const receivedAt = Date.parse(item?.receivedAt);
     return item?.result === "PASS"
       && typeof item.redactedReceiptReference === "string" && item.redactedReceiptReference.length > 0
-      && typeof item.receivedAt === "string" && Number.isFinite(Date.parse(item.receivedAt))
+      && typeof item.receivedAt === "string" && Number.isFinite(receivedAt)
+      && receivedAt >= validFrom && receivedAt <= validUntil && receivedAt <= now
       && typeof item.redactionNotes === "string" && item.redactionNotes.length > 0
       && typeof item.localEvidencePath === "string" && item.localEvidencePath.length > 0
       && channel.requiredEvidence.every((evidenceId) => evidenceIds.has(evidenceId));

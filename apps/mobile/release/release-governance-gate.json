@@ -89,6 +89,7 @@
     "pendingPostLaunchEvidence": [
       "play-review-status-summary",
       "crash-anr-vitals-summary",
+      "support-ticket-summary-after-public-release",
       "post-launch-review-window-evidence-after-public-release"
     ]
   },
