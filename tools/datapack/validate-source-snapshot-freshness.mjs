@@ -244,6 +244,14 @@ function requiredSha256(value, label) {
 
 export function purgeEvidenceBySnapshot(report) {
   const expectedHash = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
+  let completedMillis = Number.NaN;
+  let evaluatedMillis = Number.NaN;
+  try {
+    completedMillis = requiredUtcInstant(report?.completedAt, "purge report completedAt");
+    evaluatedMillis = requiredUtcInstant(report?.evaluatedAt, "purge report evaluatedAt");
+  } catch {
+    // The identity check below reports one stable contract error.
+  }
   if (report?.schemaVersion !== 1
     || report?.artifactKind !== "source-raw-purge-report"
     || report.dryRun !== false
@@ -253,11 +261,14 @@ export function purgeEvidenceBySnapshot(report) {
     || report.reasonCodes.length !== 0
     || !Array.isArray(report.failed)
     || report.failed.length !== 0
+    || !Number.isFinite(completedMillis)
+    || !Number.isFinite(evaluatedMillis)
+    || completedMillis < evaluatedMillis
     || !Array.isArray(report.deleted)
     || !Array.isArray(report.alreadyAbsent)) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report");
   }
-  const purgedAt = new Date(requiredUtcInstant(report.evaluatedAt, "purge report evaluatedAt")).toISOString();
+  const purgedAt = new Date(completedMillis).toISOString();
   const evidence = new Map();
   for (const entry of [...report.deleted, ...report.alreadyAbsent]) {
     const sourceId = requiredString(entry?.sourceId, "purge report sourceId");

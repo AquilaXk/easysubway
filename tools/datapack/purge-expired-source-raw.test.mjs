@@ -90,6 +90,44 @@ test("실제 DELETE는 env-injected snapshot evidence hash로 승인 bytes를 �
   });
 });
 
+test("실제 DELETE는 보호 상태를 포함한 retention ledger hash를 고정한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "untrusted-ledger.json"),
+        trustedLedger: false,
+      }),
+      /ledger sha256 environment variable/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
+test("snapshot storage authority가 승인된 DELETE target과 다르면 요청 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "wrong-authority.json"),
+        sourceAuthority: "s3://different-bucket",
+      }),
+      /storage authority mismatch/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
 test("실제 DELETE는 system clock보다 미래인 evaluation-at을 요청 전에 거부한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
@@ -222,6 +260,22 @@ test("DELETE 5xx는 sanitized RAW_RETENTION_OVERDUE evidence를 남기고 실패
   });
 });
 
+test("DELETE 202 Accepted는 완료 evidence가 아니라 실패로 기록한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir, responseStatuses }) => {
+    const files = await writeInputs(workDir, [rawEntry("accepted", "raw/accepted.json")]);
+    objects.add("/raw/accepted.json");
+    responseStatuses.set("/raw/accepted.json", 202);
+    const output = path.join(workDir, "accepted.json");
+
+    await assert.rejects(runPurge({ ...files, baseUrl, output }), /RAW_RETENTION_OVERDUE/);
+    const report = JSON.parse(await readFile(output, "utf8"));
+    assert.deepEqual(requests, ["/raw/accepted.json"]);
+    assert.deepEqual(report.deleted, []);
+    assert.deepEqual(report.failed.map((entry) => entry.snapshotId), ["accepted"]);
+    assert.equal(objects.has("/raw/accepted.json"), true);
+  });
+});
+
 test("DELETE는 최대 4개 동시 실행하고 각 요청에 timeout signal을 건다", async () => {
   let active = 0;
   let maxActive = 0;
@@ -263,6 +317,7 @@ async function withFixture(run) {
   const objects = new Set();
   const requests = [];
   const failPaths = new Set();
+  const responseStatuses = new Map();
   await mkdir(workDir, { recursive: true });
   const server = createServer((request, response) => {
     if (request.method !== "DELETE") {
@@ -270,6 +325,10 @@ async function withFixture(run) {
       return;
     }
     requests.push(request.url);
+    if (responseStatuses.has(request.url)) {
+      response.writeHead(responseStatuses.get(request.url)).end();
+      return;
+    }
     if (failPaths.has(request.url)) {
       response.writeHead(503).end();
       return;
@@ -291,6 +350,7 @@ async function withFixture(run) {
       objects,
       requests,
       failPaths,
+      responseStatuses,
       workDir,
     });
   } finally {
@@ -326,12 +386,15 @@ async function runPurge({
   dryRun = false,
   authenticated = true,
   trustedSnapshots = true,
+  trustedLedger = true,
+  sourceAuthority = "s3://easysubway-datapack-sources",
   evaluationAtOverride = evaluationAt,
 }) {
   try {
     const snapshotEvidenceSha256 = snapshots && trustedSnapshots
       ? sha256(await readFile(snapshots))
       : "";
+    const ledgerSha256 = trustedLedger ? sha256(await readFile(ledger)) : "";
     await execFileAsync(process.execPath, [
       "tools/datapack/purge-expired-source-raw.mjs",
       "--ledger", ledger,
@@ -339,7 +402,11 @@ async function runPurge({
       ...(snapshots ? ["--snapshots", snapshots] : []),
       "--evaluation-at", evaluationAtOverride,
       "--output", output,
-      ...(dryRun ? ["--dry-run", "--base-url", baseUrl] : []),
+      ...(dryRun ? [
+        "--dry-run",
+        "--base-url", baseUrl,
+        "--source-authority", sourceAuthority,
+      ] : []),
       ...(!dryRun && !authenticated ? ["--base-url", baseUrl] : []),
     ], {
       cwd: root,
@@ -347,6 +414,8 @@ async function runPurge({
         ...process.env,
         EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL: !dryRun && authenticated ? baseUrl : "",
         EASYSUBWAY_SOURCE_RAW_PURGE_SNAPSHOT_EVIDENCE_SHA256: !dryRun ? snapshotEvidenceSha256 : "",
+        EASYSUBWAY_SOURCE_RAW_PURGE_LEDGER_SHA256: !dryRun ? ledgerSha256 : "",
+        EASYSUBWAY_SOURCE_RAW_PURGE_OBJECT_AUTHORITY: !dryRun ? sourceAuthority : "",
       },
     });
   } catch (error) {

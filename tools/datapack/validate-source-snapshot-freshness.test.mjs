@@ -111,11 +111,12 @@ function twoSourceInput() {
   return value;
 }
 
-function purgeReport(entries, evaluatedAt = "2026-10-10T00:00:00.000Z") {
+function purgeReport(entries, completedAt = "2026-10-10T00:00:01.000Z") {
   const body = {
     schemaVersion: 1,
     artifactKind: "source-raw-purge-report",
-    evaluatedAt,
+    evaluatedAt: "2026-10-10T00:00:00.000Z",
+    completedAt,
     dryRun: false,
     decision: "PASS",
     deleted: entries,
@@ -164,10 +165,14 @@ test("PASS purge report를 snapshot별 완료 evidence로 검증해 변환한다
     sourceId: "source-a",
     snapshotId: "snapshot-a",
     rawSha256: "a".repeat(64),
-    purgedAt: report.evaluatedAt,
+    purgedAt: report.completedAt,
   });
   assert.throws(
     () => purgeEvidenceBySnapshot({ ...report, dryRun: true }),
+    /purge report/,
+  );
+  assert.throws(
+    () => purgeEvidenceBySnapshot({ ...report, completedAt: undefined }),
     /purge report/,
   );
 });

@@ -10,13 +10,23 @@ import {
 } from "./source-governance-policy.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
-const ALLOWED_ARGS = new Set(["ledger", "policy", "snapshots", "evaluation-at", "base-url", "output"]);
+const ALLOWED_ARGS = new Set([
+  "ledger",
+  "policy",
+  "snapshots",
+  "source-authority",
+  "evaluation-at",
+  "base-url",
+  "output",
+]);
 const PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const DELETE_CONCURRENCY = 4;
 const DELETE_TIMEOUT_MS = 30_000;
 const EXECUTION_CLOCK_SKEW_MS = 5 * 60 * 1_000;
 const PREAUTH_BASE_URL_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL";
 const SNAPSHOT_EVIDENCE_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_SNAPSHOT_EVIDENCE_SHA256";
+const LEDGER_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_LEDGER_SHA256";
+const OBJECT_AUTHORITY_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_OBJECT_AUTHORITY";
 
 async function main(argv) {
   const args = parseArgs(argv);
@@ -29,22 +39,26 @@ async function main(argv) {
   const baseUrl = args.dryRun
     ? validatedBaseUrl(requiredArg(args, "base-url"), false)
     : executionBaseUrl(args);
-  const [ledger, snapshotText, policyFiles] = await Promise.all([
-    readFile(path.resolve(requiredArg(args, "ledger")), "utf8").then(JSON.parse),
+  const sourceAuthority = args.dryRun
+    ? validatedSourceAuthority(requiredArg(args, "source-authority"))
+    : executionSourceAuthority(args);
+  const [ledgerText, snapshotText, policyFiles] = await Promise.all([
+    readFile(path.resolve(requiredArg(args, "ledger")), "utf8"),
     readFile(path.resolve(requiredArg(args, "snapshots")), "utf8"),
     Promise.all(requiredPolicies(args).map(async (policyPath) => {
       const text = await readFile(path.resolve(policyPath), "utf8");
       return { policy: JSON.parse(text), sha256: sha256(text) };
     })),
   ]);
-  if (!args.dryRun) requireTrustedSnapshotEvidence(snapshotText);
+  if (!args.dryRun) requireTrustedExecutionEvidence({ ledgerText, snapshotText });
   const plan = buildPurgePlan({
-    ledger,
+    ledger: JSON.parse(ledgerText),
     snapshots: JSON.parse(snapshotText),
     policyFiles,
     evaluationAt,
     evaluatedMillis,
     baseUrl,
+    sourceAuthority,
   });
   const report = emptyReport(evaluationAt, args.dryRun);
   const deleteItems = [];
@@ -66,15 +80,16 @@ async function main(argv) {
   }
 
   for (const { item, status } of await deleteExpiredItems(deleteItems)) {
-    if (status >= 200 && status < 300) {
+    if (status === 200 || status === 204) {
       report.deleted.push(sanitized(item));
-    } else if (status === 404) {
+    } else if (status === 404 || status === 410) {
       report.alreadyAbsent.push(sanitized(item));
     } else {
       report.failed.push(sanitized(item));
     }
   }
 
+  report.completedAt = args.dryRun ? null : new Date().toISOString();
   if (report.failed.length > 0) report.reasonCodes.push("RAW_RETENTION_OVERDUE");
   report.decision = report.reasonCodes.length === 0 ? "PASS" : "FAIL";
   report.reportSha256 = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
@@ -82,13 +97,20 @@ async function main(argv) {
   if (report.decision !== "PASS") throw new Error(report.reasonCodes.join(","));
 }
 
-function requireTrustedSnapshotEvidence(snapshotText) {
-  const expected = process.env[SNAPSHOT_EVIDENCE_SHA256_ENV]?.trim();
-  if (!/^[0-9a-f]{64}$/.test(expected ?? "")) {
+function requireTrustedExecutionEvidence({ ledgerText, snapshotText }) {
+  const expectedSnapshot = process.env[SNAPSHOT_EVIDENCE_SHA256_ENV]?.trim();
+  if (!/^[0-9a-f]{64}$/.test(expectedSnapshot ?? "")) {
     throw new Error(`${SNAPSHOT_EVIDENCE_SHA256_ENV} snapshot evidence sha256 environment variable is required`);
   }
-  if (sha256(snapshotText) !== expected) {
+  if (sha256(snapshotText) !== expectedSnapshot) {
     throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence sha256 mismatch");
+  }
+  const expectedLedger = process.env[LEDGER_SHA256_ENV]?.trim();
+  if (!/^[0-9a-f]{64}$/.test(expectedLedger ?? "")) {
+    throw new Error(`${LEDGER_SHA256_ENV} ledger sha256 environment variable is required`);
+  }
+  if (sha256(ledgerText) !== expectedLedger) {
+    throw new Error("RAW_RETENTION_OVERDUE: ledger sha256 mismatch");
   }
 }
 
@@ -116,7 +138,15 @@ export async function deleteExpiredItems(
   return results;
 }
 
-export function buildPurgePlan({ ledger, snapshots, policyFiles, evaluationAt, evaluatedMillis, baseUrl }) {
+export function buildPurgePlan({
+  ledger,
+  snapshots,
+  policyFiles,
+  evaluationAt,
+  evaluatedMillis,
+  baseUrl,
+  sourceAuthority,
+}) {
   if (ledger?.schemaVersion !== 1 || ledger?.artifactKind !== "source-raw-retention-ledger") {
     throw new Error("RAW_RETENTION_OVERDUE: ledger identity");
   }
@@ -126,7 +156,7 @@ export function buildPurgePlan({ ledger, snapshots, policyFiles, evaluationAt, e
   const snapshotIds = new Set();
   const objectKeys = new Set();
   const policies = policyBindings(policyFiles);
-  const snapshotEvidence = snapshotBindings(snapshots);
+  const snapshotEvidence = snapshotBindings(snapshots, sourceAuthority);
   const plan = ledger.entries.map((entry) => {
     const sourceId = requiredText(entry?.sourceId, "sourceId");
     const snapshotId = requiredText(entry?.snapshotId, "snapshotId");
@@ -180,7 +210,7 @@ export function buildPurgePlan({ ledger, snapshots, policyFiles, evaluationAt, e
   ));
 }
 
-function snapshotBindings(snapshots) {
+function snapshotBindings(snapshots, expectedSourceAuthority) {
   if (!Array.isArray(snapshots) || snapshots.length === 0) {
     throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence");
   }
@@ -194,10 +224,14 @@ function snapshotBindings(snapshots) {
     if (!/^[0-9a-f]{64}$/.test(rawSha256 ?? "")) {
       throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence");
     }
+    const rawObject = objectKeyFromRawUri(snapshot.rawObjectUri);
+    if (rawObject.sourceAuthority !== expectedSourceAuthority) {
+      throw new Error("RAW_RETENTION_OVERDUE: storage authority mismatch");
+    }
     bindings.set(snapshotId, {
       sourceId: requiredText(snapshot.sourceId, "sourceId"),
       rawSha256,
-      objectKey: objectKeyFromRawUri(snapshot.rawObjectUri),
+      objectKey: rawObject.objectKey,
       retrievedMillis: requiredUtcInstant(snapshot.retrievedAt, "retrievedAt"),
     });
   }
@@ -221,7 +255,10 @@ function objectKeyFromRawUri(value) {
   } catch {
     throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence");
   }
-  return validatedObjectKey(objectKey);
+  return {
+    objectKey: validatedObjectKey(objectKey),
+    sourceAuthority: `${uri.protocol}//${uri.hostname}`,
+  };
 }
 
 function parseArgs(argv) {
@@ -259,6 +296,30 @@ function executionBaseUrl(args) {
     throw new Error(`${PREAUTH_BASE_URL_ENV} preauthenticated base URL environment variable is required`);
   }
   return validatedBaseUrl(value, true);
+}
+
+function executionSourceAuthority(args) {
+  if (args["source-authority"] != null) {
+    throw new Error(
+      `actual DELETE requires ${OBJECT_AUTHORITY_ENV}, not --source-authority`,
+    );
+  }
+  return validatedSourceAuthority(process.env[OBJECT_AUTHORITY_ENV]);
+}
+
+function validatedSourceAuthority(value) {
+  let url;
+  try {
+    url = new URL(requiredText(value, OBJECT_AUTHORITY_ENV));
+  } catch {
+    throw new Error(`${OBJECT_AUTHORITY_ENV} storage authority is invalid`);
+  }
+  if (!["s3:", "oci:"].includes(url.protocol)
+    || !url.hostname || url.port || url.username || url.password || url.search || url.hash
+    || (url.pathname !== "" && url.pathname !== "/")) {
+    throw new Error(`${OBJECT_AUTHORITY_ENV} storage authority is invalid`);
+  }
+  return `${url.protocol}//${url.hostname}`;
 }
 
 function validatedBaseUrl(value, execution) {
@@ -335,6 +396,7 @@ function emptyReport(evaluationAt, dryRun) {
     schemaVersion: 1,
     artifactKind: "source-raw-purge-report",
     evaluatedAt: new Date(requiredUtcInstant(evaluationAt, "evaluationAt")).toISOString(),
+    completedAt: null,
     dryRun,
     decision: "PASS",
     deleted: [],
