@@ -247,7 +247,9 @@ jobs:
           set -euo pipefail
           node tools/datapack/validate-source-snapshot-freshness.mjs \
             --build-spec "${EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH}" \
-            --policy apps/mobile/release/datapack-freshness-sla.json
+            --policy apps/mobile/release/datapack-freshness-sla.json \
+            --governance-policy tools/datapack/source-governance-policy.json \
+            --inventory tools/datapack/source-inventory.json
 
       - name: Data Pack Release / Restore GitHub Actions dotenv secret
         env:
@@ -422,7 +424,9 @@ jobs:
           set -euo pipefail
           node tools/datapack/validate-source-inventory.mjs \
             --inventory tools/datapack/source-inventory.json \
-            --scope apps/mobile/release/production-datapack-scope.json
+            --scope apps/mobile/release/production-datapack-scope.json \
+            --governance-policy tools/datapack/source-governance-policy.json \
+            --freshness-policy apps/mobile/release/datapack-freshness-sla.json
 
       - name: Data Pack Release / Validate generated data packs
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' }}

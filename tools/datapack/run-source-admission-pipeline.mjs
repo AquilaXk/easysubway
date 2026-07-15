@@ -47,6 +47,10 @@ async function main() {
     outputInventoryPath,
     "--candidates",
     args.candidates,
+    "--governance-policy",
+    args["governance-policy"],
+    "--freshness-policy",
+    args["freshness-policy"],
   ]);
 
   const summary = {
@@ -64,6 +68,8 @@ async function main() {
     schemaFingerprint: sample.schemaFingerprint,
     providerRecordHashes: sample.providerRecordHashes,
     sourceSnapshotSetHash: sha256(JSON.stringify([snapshot])),
+    governancePolicyVersion: snapshot.governancePolicyVersion,
+    governancePolicySha256: snapshot.governancePolicySha256,
     sourceInventorySha256: sha256(JSON.stringify(outputInventory)),
     adminReviewRecordHash,
     licenseEvidenceHash: adminReview.licenseEvidenceHash,
@@ -84,6 +90,8 @@ function parseArgs(argv) {
   const args = {
     candidates: "tools/datapack/source-candidates.json",
     inventory: "tools/datapack/source-inventory.json",
+    "governance-policy": "tools/datapack/source-governance-policy.json",
+    "freshness-policy": "apps/mobile/release/datapack-freshness-sla.json",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -178,6 +186,10 @@ async function buildSnapshot({ rawPath, canonicalRawPath, snapshotPath, coverage
     ...(args["provider-valid-until"] ? ["--provider-valid-until", args["provider-valid-until"]] : []),
     ...(args["source-updated-at"] ? ["--source-updated-at", args["source-updated-at"]] : []),
     ...(args["previous-snapshot"] ? ["--previous-snapshot", args["previous-snapshot"]] : []),
+    "--governance-policy",
+    args["governance-policy"],
+    "--freshness-policy",
+    args["freshness-policy"],
   ]);
   return readJson(snapshotPath);
 }

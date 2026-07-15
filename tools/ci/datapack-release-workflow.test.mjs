@@ -157,6 +157,8 @@ test("release build는 source snapshot freshness를 build 전에 fail closed로 
   assert.match(freshnessStep, /--build-spec/);
   assert.doesNotMatch(freshnessStep, /--snapshots/);
   assert.match(freshnessStep, /--policy apps\/mobile\/release\/datapack-freshness-sla\.json/);
+  assert.match(freshnessStep, /--governance-policy tools\/datapack\/source-governance-policy\.json/);
+  assert.match(freshnessStep, /--inventory tools\/datapack\/source-inventory\.json/);
   assert.ok(
     yml.indexOf("Validate source snapshot freshness") < yml.indexOf("Build data packs"),
     "source snapshot freshness는 build 전에 검증해야 함",

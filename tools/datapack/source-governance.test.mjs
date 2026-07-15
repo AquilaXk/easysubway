@@ -10,6 +10,12 @@ import {
   buildSnapshotDiff,
   validateLineage,
 } from "./source-snapshot-policy.mjs";
+import {
+  buildGovernanceSummary,
+  deriveRawRetentionExpiresAt,
+  evaluateSourceGovernance,
+  validateSourceGovernancePolicy,
+} from "./source-governance-policy.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -111,7 +117,7 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
       "--snapshot-id", "snapshot-a-1",
       "--retrieved-at", "2026-06-30T03:00:00Z",
       "--freshness-expires-at", "2026-09-28T03:00:00Z",
-      "--raw-retention-expires-at", "2026-09-30T03:00:00Z",
+      "--raw-retention-expires-at", "2026-09-28T03:00:00Z",
       "--coverage-count", "1",
       "--raw-object-uri", "s3://bucket/snapshot-a-1.csv",
     ]);
@@ -121,7 +127,7 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
       "--snapshot-id", "snapshot-a-2",
       "--retrieved-at", "2026-07-01T03:00:00Z",
       "--freshness-expires-at", "2026-09-29T03:00:00Z",
-      "--raw-retention-expires-at", "2026-10-01T03:00:00Z",
+      "--raw-retention-expires-at", "2026-09-29T03:00:00Z",
       "--coverage-count", "2",
       "--raw-object-uri", "s3://bucket/snapshot-a-2.csv",
       "--previous-snapshot", firstOutput,
@@ -132,9 +138,129 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
     assert.equal(produced.diffSummary.status, "CHANGED");
     assert.equal(produced.diffSummary.rowDelta, 1);
     assert.equal(produced.diffSummary.coverageDelta, 1);
+    assert.equal(produced.rawRetentionExpiresAt, "2026-09-29T03:00:00.000Z");
+    assert.equal(produced.governancePolicyVersion, "2026-07-15");
+    assert.match(produced.governancePolicySha256, /^[0-9a-f]{64}$/);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
+});
+
+test("governance policy는 production source별 freshness·retention·책임 역할을 요구한다", () => {
+  const inventory = { sources: [source()] };
+  const policy = governancePolicy();
+  const freshnessPolicy = freshnessPolicyFixture();
+
+  assert.doesNotThrow(() => validateSourceGovernancePolicy({ policy, inventory, freshnessPolicy }));
+  assert.throws(
+    () => validateSourceGovernancePolicy({
+      policy: { ...policy, sources: [{ ...policy.sources[0], ownerRole: "" }] },
+      inventory,
+      freshnessPolicy,
+    }),
+    /SOURCE_GOVERNANCE_OWNER_MISSING/,
+  );
+  assert.throws(
+    () => validateSourceGovernancePolicy({ policy: { ...policy, sources: [] }, inventory, freshnessPolicy }),
+    /SOURCE_GOVERNANCE_OWNER_MISSING/,
+  );
+});
+
+test("raw retention 만료는 policy retentionDays에서 결정론적으로 파생한다", () => {
+  assert.equal(
+    deriveRawRetentionExpiresAt({
+      policy: governancePolicy(),
+      sourceId: "source-a",
+      retrievedAt: "2026-07-01T00:00:00Z",
+    }),
+    "2026-09-29T00:00:00.000Z",
+  );
+});
+
+test("freshness 임의 미래값과 expiry 동일 경계는 release를 차단한다", () => {
+  const input = governanceInput();
+  assert.deepEqual(
+    evaluateSourceGovernance({
+      ...input,
+      snapshot: { ...input.snapshot, freshnessExpiresAt: "2099-01-01T00:00:00Z" },
+    }).reasonCodes,
+    ["SOURCE_FRESHNESS_POLICY_MISSING"],
+  );
+  assert.deepEqual(
+    evaluateSourceGovernance({ ...input, evaluationAt: "2026-07-31T00:00:00Z" }).reasonCodes,
+    ["SOURCE_SNAPSHOT_EXPIRED"],
+  );
+});
+
+test("license review 기한·terms/provider/endpoint 변경을 REVIEW_REQUIRED로 만든다", () => {
+  const input = governanceInput();
+  assert.deepEqual(
+    evaluateSourceGovernance({ ...input, evaluationAt: "2027-07-01T00:00:00Z" }).reasonCodes,
+    ["LICENSE_REVIEW_REQUIRED", "RAW_RETENTION_OVERDUE", "SOURCE_SNAPSHOT_EXPIRED"],
+  );
+  for (const changedSource of [
+    { ...input.source, provider: "changed-provider" },
+    { ...input.source, datasetUrl: "https://example.invalid/changed" },
+    {
+      ...input.source,
+      admissionEvidence: { ...input.source.admissionEvidence, licenseEvidenceHash: "f".repeat(64) },
+    },
+  ]) {
+    assert.ok(evaluateSourceGovernance({ ...input, source: changedSource }).reasonCodes.includes("LICENSE_REVIEW_REQUIRED"));
+  }
+});
+
+test("재배포 권한이 확인되지 않으면 release를 차단한다", () => {
+  const input = governanceInput();
+  const result = evaluateSourceGovernance({
+    ...input,
+    snapshot: { ...input.snapshot, redistributionAllowed: false },
+  });
+
+  assert.deepEqual(result.reasonCodes, ["REDISTRIBUTION_NOT_APPROVED"]);
+  assert.equal(result.decision, "NO_GO");
+});
+
+test("legal hold는 역할·사유 코드·유한한 만료시각을 요구하고 유효할 때만 purge를 보호한다", () => {
+  const input = governanceInput();
+  const expiredSnapshot = {
+    ...input.snapshot,
+    retrievedAt: "2026-04-16T00:00:00Z",
+    rawRetentionExpiresAt: "2026-07-15T00:00:00.000Z",
+  };
+  const validHold = {
+    sourceId: "source-a",
+    snapshotId: expiredSnapshot.snapshotId,
+    ownerRole: "datapack-source-owner",
+    reasonCode: "REGULATORY_AUDIT",
+    createdAt: "2026-07-02T00:00:00Z",
+    expiresAt: "2026-07-20T00:00:00Z",
+  };
+  assert.ok(evaluateSourceGovernance({
+    ...input,
+    snapshot: expiredSnapshot,
+    legalHold: { ...validHold, expiresAt: "2026-07-15T00:00:00Z" },
+  }).reasonCodes.includes("LEGAL_HOLD_INVALID"));
+  assert.ok(evaluateSourceGovernance({
+    ...input,
+    snapshot: expiredSnapshot,
+    legalHold: { ...validHold, ownerRole: "person-name" },
+  }).reasonCodes.includes("LEGAL_HOLD_INVALID"));
+  assert.ok(!evaluateSourceGovernance({
+    ...input,
+    snapshot: expiredSnapshot,
+    legalHold: validHold,
+  }).reasonCodes.includes("RAW_RETENTION_OVERDUE"));
+});
+
+test("같은 입력은 byte-identical governance summary와 hash를 만든다", () => {
+  const input = governanceInput();
+  const firstSummary = buildGovernanceSummary({ entries: [input], evaluationAt: input.evaluationAt });
+  const secondSummary = buildGovernanceSummary({ entries: [input], evaluationAt: input.evaluationAt });
+
+  assert.equal(JSON.stringify(firstSummary), JSON.stringify(secondSummary));
+  assert.match(firstSummary.summarySha256, /^[0-9a-f]{64}$/);
+  assert.equal(firstSummary.decision, "GO");
 });
 
 function snapshot(overrides = {}) {
@@ -154,6 +280,91 @@ function snapshot(overrides = {}) {
   };
 }
 
+function source(overrides = {}) {
+  return {
+    id: "source-a",
+    provider: "provider-a",
+    datasetUrl: "https://example.invalid/source-a",
+    requiredForProductionPack: true,
+    license: { redistributionAllowed: true },
+    admissionEvidence: { licenseEvidenceHash: "e".repeat(64) },
+    ...overrides,
+  };
+}
+
+function governancePolicy() {
+  return {
+    schemaVersion: 1,
+    artifactKind: "datapack-source-governance-policy",
+    policyVersion: "2026-07-15",
+    retentionClasses: [{ id: "standard-90d", retentionDays: 90 }],
+    reasonCodeEscalations: [{
+      reasonCodes: [
+        "SOURCE_LINEAGE_BROKEN",
+        "SOURCE_DIFF_MISSING",
+        "SOURCE_FRESHNESS_POLICY_MISSING",
+        "SOURCE_SNAPSHOT_EXPIRED",
+        "RAW_RETENTION_OVERDUE",
+        "LEGAL_HOLD_INVALID",
+        "LICENSE_REVIEW_REQUIRED",
+        "REDISTRIBUTION_NOT_APPROVED",
+        "SOURCE_GOVERNANCE_OWNER_MISSING",
+      ],
+      responsibleRole: "datapack-source-owner",
+      alertRoute: "github:area-datapack",
+      escalationHours: 4,
+    }],
+    sources: [{
+      sourceId: "source-a",
+      sourceClassId: "static-network",
+      retentionClassId: "standard-90d",
+      ownerRole: "datapack-source-owner",
+      stewardRole: "datapack-data-steward",
+      approvalRole: "datapack-release-approver",
+      escalationHours: 24,
+      alertRoute: "github:area-datapack",
+      licenseReview: {
+        status: "APPROVED",
+        termsHash: "e".repeat(64),
+        reviewedAt: "2026-07-01T00:00:00Z",
+        nextReviewAt: "2027-07-01T00:00:00Z",
+        termsUrl: "https://example.invalid/source-a",
+        reviewedProvider: "provider-a",
+        reviewedDatasetUrl: "https://example.invalid/source-a",
+        redistributionScopes: ["DERIVED_DATAPACK"],
+        approvedByRole: "datapack-release-approver",
+      },
+    }],
+  };
+}
+
+function freshnessPolicyFixture() {
+  return {
+    clockSkewSeconds: 0,
+    sourceClasses: [{
+      id: "static-network",
+      sourceIds: ["source-a"],
+      basisField: "retrievedAt",
+      reverificationCadence: "P30D",
+    }],
+  };
+}
+
+function governanceInput() {
+  return {
+    source: source(),
+    snapshot: {
+      ...snapshot(),
+      freshnessExpiresAt: "2026-07-31T00:00:00Z",
+      rawRetentionExpiresAt: "2026-09-29T00:00:00.000Z",
+      redistributionAllowed: true,
+    },
+    policy: governancePolicy(),
+    freshnessPolicy: freshnessPolicyFixture(),
+    evaluationAt: "2026-07-15T00:00:00Z",
+  };
+}
+
 async function buildSnapshot(args) {
   await execFileAsync(process.execPath, [
     "tools/datapack/build-source-snapshot.mjs",
@@ -161,5 +372,6 @@ async function buildSnapshot(args) {
     "--source-id", "kric-station-elevator",
     "--provider", "국가철도공단",
     "--source-class-id", "static_accessibility_facility",
+    "--governance-policy", "tools/datapack/source-governance-policy.json",
   ], { cwd: root });
 }

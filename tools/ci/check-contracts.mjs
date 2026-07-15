@@ -22,6 +22,11 @@ export function collectContractErrors() {
     "apps/mobile/assets/datapacks/source-inventory.json",
     errors,
   );
+  validateJson(
+    "contracts/datapack/source-governance-policy.schema.json",
+    "tools/datapack/source-governance-policy.json",
+    errors,
+  );
   validateBoundaries(errors);
   validateOpenApiFixtures(errors);
   validateCompatibilityMatrix(errors);

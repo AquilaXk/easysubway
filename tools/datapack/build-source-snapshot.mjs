@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { deriveFreshness } from "./freshness-policy.mjs";
+import { deriveRawRetentionExpiresAt } from "./source-governance-policy.mjs";
 import {
   buildSnapshotDiff,
   requiredCredentialFreeObjectUri,
@@ -45,7 +46,7 @@ async function main() {
     previousSnapshotId: null,
     diffSummary: null,
     freshnessExpiresAt: requireArg(args, "freshness-expires-at"),
-    rawRetentionExpiresAt: requireArg(args, "raw-retention-expires-at"),
+    rawRetentionExpiresAt: args["governance-policy"] ? null : requireArg(args, "raw-retention-expires-at"),
     providerRecordHashes: records.map((record) => sha256(JSON.stringify(record))),
   };
   if (previousSnapshot != null) {
@@ -56,12 +57,32 @@ async function main() {
     snapshot.diffSummary = buildSnapshotDiff(previousSnapshot, snapshot);
   }
   await validateFreshnessPolicy(snapshot, args);
+  await validateRetentionPolicy(snapshot, args);
   validateSnapshot(snapshot);
 
   if (args["raw-output"]) {
     await writeFileWithParents(args["raw-output"], canonicalRaw);
   }
   await writeFileWithParents(requireArg(args, "output"), `${JSON.stringify(snapshot, null, 2)}\n`);
+}
+
+async function validateRetentionPolicy(snapshot, args) {
+  if (!args["governance-policy"]) return;
+  const policy = JSON.parse(await readFile(path.resolve(args["governance-policy"]), "utf8"));
+  const derived = deriveRawRetentionExpiresAt({
+    policy,
+    sourceId: snapshot.sourceId,
+    retrievedAt: snapshot.retrievedAt,
+  });
+  if (
+    args["raw-retention-expires-at"] != null
+    && Date.parse(args["raw-retention-expires-at"]) !== Date.parse(derived)
+  ) {
+    throw new Error("RAW_RETENTION_OVERDUE: raw retention derivation mismatch");
+  }
+  snapshot.rawRetentionExpiresAt = derived;
+  snapshot.governancePolicyVersion = requiredText(policy.policyVersion, "governance policy version");
+  snapshot.governancePolicySha256 = sha256(await readFile(path.resolve(args["governance-policy"])));
 }
 
 async function validateFreshnessPolicy(snapshot, args) {

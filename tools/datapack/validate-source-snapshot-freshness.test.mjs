@@ -32,6 +32,9 @@ function input(overrides = {}) {
     credentialRedacted: true,
     retrievedAt: "2026-07-12T00:00:00Z",
     freshnessExpiresAt: "2026-08-11T00:00:00Z",
+    rawRetentionExpiresAt: "2026-10-10T00:00:00.000Z",
+    governancePolicyVersion: "2026-07-15",
+    governancePolicySha256: "d".repeat(64),
     ...overrides,
   }];
   return {
@@ -50,6 +53,9 @@ function input(overrides = {}) {
         snapshotStatus: snapshot.snapshotStatus,
         credentialRedacted: snapshot.credentialRedacted,
         freshnessExpiresAt: snapshot.freshnessExpiresAt,
+        rawRetentionExpiresAt: snapshot.rawRetentionExpiresAt,
+        governancePolicyVersion: snapshot.governancePolicyVersion,
+        governancePolicySha256: snapshot.governancePolicySha256,
       })),
       sourceSnapshotSetHash: createHash("sha256").update(JSON.stringify(snapshots)).digest("hex"),
     },

@@ -5,6 +5,10 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { deriveFreshness } from "./freshness-policy.mjs";
+import {
+  evaluateSourceGovernance,
+  validateSourceGovernancePolicy,
+} from "./source-governance-policy.mjs";
 import { validateLineage } from "./source-snapshot-policy.mjs";
 
 const buildProvenanceStringFields = [
@@ -15,10 +19,21 @@ const buildProvenanceStringFields = [
   "licenseStatus",
   "snapshotStatus",
   "freshnessExpiresAt",
+  "rawRetentionExpiresAt",
+  "governancePolicyVersion",
+  "governancePolicySha256",
 ];
 const buildProvenanceBooleanFields = ["redistributionAllowed", "credentialRedacted"];
 
-export function validateSourceSnapshotFreshness({ buildSpec, snapshots, policy, evaluationAt }) {
+export function validateSourceSnapshotFreshness({
+  buildSpec,
+  snapshots,
+  policy,
+  evaluationAt,
+  governancePolicy = null,
+  inventory = null,
+  governancePolicySha256 = null,
+}) {
   if (!Array.isArray(buildSpec?.sourceSnapshotIds) || buildSpec.sourceSnapshotIds.length === 0) {
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: buildSpec.sourceSnapshotIds");
   }
@@ -69,7 +84,33 @@ export function validateSourceSnapshotFreshness({ buildSpec, snapshots, policy, 
   if (results.some((result) => result.status !== "FRESH")) {
     throw new Error("SOURCE_SNAPSHOT_EXPIRED");
   }
-  return { snapshotSetHash, results };
+  let governanceResults = [];
+  if (governancePolicy != null || inventory != null) {
+    if (governancePolicy == null || inventory == null) {
+      throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy and inventory are required together");
+    }
+    validateSourceGovernancePolicy({ policy: governancePolicy, inventory, freshnessPolicy: policy });
+    if (!/^[0-9a-f]{64}$/.test(governancePolicySha256 ?? "")) {
+      throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy hash");
+    }
+    if (snapshots.some((snapshot) => (
+      snapshot.governancePolicyVersion !== governancePolicy.policyVersion
+      || snapshot.governancePolicySha256 !== governancePolicySha256
+    ))) {
+      throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: governance policy binding");
+    }
+    const sources = new Map(inventory.sources.map((source) => [source.id, source]));
+    governanceResults = snapshots.map((snapshot) => evaluateSourceGovernance({
+      source: sources.get(snapshot.sourceId),
+      snapshot,
+      policy: governancePolicy,
+      freshnessPolicy: policy,
+      evaluationAt,
+    }));
+    const reasonCodes = [...new Set(governanceResults.flatMap((result) => result.reasonCodes))].sort();
+    if (reasonCodes.length > 0) throw new Error(reasonCodes.join(","));
+  }
+  return { snapshotSetHash, results, governanceResults };
 }
 
 async function main(argv) {
@@ -84,20 +125,32 @@ async function main(argv) {
   const root = process.cwd();
   const resolvedEvidencePath = path.resolve(root, snapshotsPath);
   assertRepositoryRelativePath(path.relative(root, resolvedEvidencePath));
-  const [snapshots, policy] = await Promise.all([
+  const governancePolicyPath = args.get("governance-policy");
+  const inventoryPath = args.get("inventory");
+  if ((governancePolicyPath == null) !== (inventoryPath == null)) {
+    throw new Error("--governance-policy and --inventory must be provided together");
+  }
+  const [snapshots, policy, governancePolicyText, inventory] = await Promise.all([
     readFile(resolvedEvidencePath, "utf8").then(JSON.parse),
     readFile(policyPath, "utf8").then(JSON.parse),
+    governancePolicyPath ? readFile(governancePolicyPath, "utf8") : null,
+    inventoryPath ? readFile(inventoryPath, "utf8").then(JSON.parse) : null,
   ]);
+  const governancePolicy = governancePolicyText ? JSON.parse(governancePolicyText) : null;
   const result = validateSourceSnapshotFreshness({
     buildSpec,
     snapshots,
     policy,
     evaluationAt: args.get("evaluation-at") ?? new Date().toISOString(),
+    governancePolicy,
+    inventory,
+    governancePolicySha256: governancePolicyText ? sha256(governancePolicyText) : null,
   });
   process.stdout.write(`${JSON.stringify({
     status: "PASS",
     sourceSnapshotSetHash: result.snapshotSetHash,
     snapshotCount: result.results.length,
+    governanceDecision: result.governanceResults.length > 0 ? "GO" : "NOT_EVALUATED",
   })}\n`);
 }
 
