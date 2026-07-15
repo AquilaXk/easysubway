@@ -39,7 +39,16 @@ export function buildRescueManifest(input) {
   if (!catalogSequences.includes(current.releaseSequence) || !catalogSequences.includes(knownGood.releaseSequence)) {
     throw new Error("catalogSequences must contain current and known-good releases");
   }
-  const approval = requiredApproval(input.approval);
+  const approval = validateRollbackApproval(input.approval);
+  if (approval.targetChannel !== current.channel) {
+    throw new Error("approval targetChannel mismatch");
+  }
+  if (approval.failedManifestSha256 !== sha256(currentBytes)) {
+    throw new Error("approval failed manifest identity mismatch");
+  }
+  if (approval.knownGoodManifestSha256 !== sha256(knownGoodBytes)) {
+    throw new Error("approval known-good manifest identity mismatch");
+  }
   const publishedAt = dateTime(input.publishedAt, "publishedAt");
   const expiresAt = dateTime(input.expiresAt, "expiresAt");
   if (Date.parse(expiresAt) <= Date.parse(publishedAt)) {
@@ -205,12 +214,22 @@ function requiredCatalogSequences(value) {
   return sequences;
 }
 
-function requiredApproval(value) {
+export function validateRollbackApproval(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("approval must be an object");
   }
+  if (value.schemaVersion !== 1) throw new Error("approval.schemaVersion is invalid");
+  if (value.artifactKind !== "datapack-rollback-approval") {
+    throw new Error("approval.artifactKind is invalid");
+  }
   return {
+    schemaVersion: value.schemaVersion,
+    artifactKind: value.artifactKind,
     releaseRequestId: matched(value.releaseRequestId, "approval.releaseRequestId", /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+    targetChannel: matched(value.targetChannel, "approval.targetChannel", /^(dev|staging|production)$/),
+    failedManifestSha256: requiredSha256(value.failedManifestSha256, "approval.failedManifestSha256"),
+    knownGoodManifestSha256: requiredSha256(value.knownGoodManifestSha256, "approval.knownGoodManifestSha256"),
+    approvedBy: nonEmpty(value.approvedBy, "approval.approvedBy"),
     approvedByRole: matched(value.approvedByRole, "approval.approvedByRole", /^[A-Za-z][A-Za-z0-9._-]{0,63}$/),
     approvedAt: dateTime(value.approvedAt, "approval.approvedAt"),
     reasonCode: matched(value.reasonCode, "approval.reasonCode", /^[A-Z][A-Z0-9_]{0,63}$/),

@@ -143,7 +143,7 @@ function validateRollbackRescue(bundle, requirePass, evidenceRaw, evidence) {
   if (!new Set(["PASS", "FAIL", "NOT_EXECUTED"]).has(rescue.manifestLastStatus)) {
     throw new Error("rollbackRescue manifestLastStatus is invalid");
   }
-  if (!new Set(["LOCAL_FIXTURE", "NON_PRODUCTION", "PRODUCTION"]).has(rescue.executionEnvironment)) {
+  if (!new Set(["DRY_RUN", "LOCAL_FIXTURE", "NON_PRODUCTION", "PRODUCTION"]).has(rescue.executionEnvironment)) {
     throw new Error("rollbackRescue executionEnvironment is invalid");
   }
   if (typeof rescue.productionExecuted !== "boolean") {

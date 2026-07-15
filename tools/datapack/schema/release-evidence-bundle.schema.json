@@ -133,7 +133,7 @@
         "recoveryDurationSeconds": { "type": "integer", "minimum": 0 },
         "validatorStatus": { "enum": ["PASS", "FAIL"] },
         "manifestLastStatus": { "enum": ["PASS", "FAIL", "NOT_EXECUTED"] },
-        "executionEnvironment": { "enum": ["LOCAL_FIXTURE", "NON_PRODUCTION", "PRODUCTION"] },
+        "executionEnvironment": { "enum": ["DRY_RUN", "LOCAL_FIXTURE", "NON_PRODUCTION", "PRODUCTION"] },
         "productionExecuted": { "type": "boolean" }
       }
     },

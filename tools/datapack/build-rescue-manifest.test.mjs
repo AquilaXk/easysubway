@@ -27,7 +27,7 @@ test("current, failed, immutable catalog 최대값보다 큰 rescue sequence를 
     knownGoodManifest: knownGood,
     knownGoodManifestBytes: knownGoodBytes,
     catalogSequences: [114, 115, 120],
-    approval: approved(),
+    approval: approved(current, knownGood),
     publishedAt: "2026-07-15T01:00:00.000Z",
     expiresAt: "2026-07-16T01:00:00.000Z",
     privateKey: privateKeyPem,
@@ -85,7 +85,10 @@ test("catalog sequence는 중복 없는 양의 정수여야 한다", () => {
 });
 
 test("승인 provenance와 유효한 새 시간 경계를 필수로 한다", () => {
-  for (const field of ["releaseRequestId", "approvedByRole", "approvedAt", "reasonCode"]) {
+  for (const field of [
+    "releaseRequestId", "targetChannel", "failedManifestSha256", "knownGoodManifestSha256",
+    "approvedBy", "approvedByRole", "approvedAt", "reasonCode",
+  ]) {
     const approval = approved();
     delete approval[field];
     assert.throws(() => buildRescueManifest({ ...validInput(), approval }), new RegExp(`approval\\.${field}`));
@@ -171,10 +174,12 @@ test("known-good의 지속 pack 선택만 보존하고 rollout은 제거한다",
     emergencyOverride,
     rollout: { percentage: 10, seed: "0123456789abcdef0123456789abcdef" },
   });
+  const input = validInput();
   const result = buildRescueManifest({
-    ...validInput(),
+    ...input,
     knownGoodManifest: knownGood,
     knownGoodManifestBytes: bytes(knownGood),
+    approval: approved(input.currentManifest, knownGood),
   });
 
   assert.deepEqual(result.manifest.activePack, activePack);
@@ -192,7 +197,7 @@ function validInput() {
     knownGoodManifest: knownGood,
     knownGoodManifestBytes: bytes(knownGood),
     catalogSequences: [114, 115],
-    approval: approved(),
+    approval: approved(current, knownGood),
     publishedAt: "2026-07-15T01:00:00.000Z",
     expiresAt: "2026-07-16T01:00:00.000Z",
     now: new Date("2026-07-15T01:00:00.000Z"),
@@ -200,9 +205,15 @@ function validInput() {
   };
 }
 
-function approved() {
+function approved(current = manifest(115), knownGood = manifest(114)) {
   return {
+    schemaVersion: 1,
+    artifactKind: "datapack-rollback-approval",
     releaseRequestId: "rollback-request-1",
+    targetChannel: current.channel,
+    failedManifestSha256: sha256(bytes(current)),
+    knownGoodManifestSha256: sha256(bytes(knownGood)),
+    approvedBy: "release-approver",
     approvedByRole: "release-manager",
     approvedAt: "2026-07-15T00:30:00.000Z",
     reasonCode: "FAILED_RELEASE",

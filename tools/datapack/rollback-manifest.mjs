@@ -2,7 +2,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { buildRescueManifest } from "./build-rescue-manifest.mjs";
+import { buildRescueManifest, validateRollbackApproval } from "./build-rescue-manifest.mjs";
 import { signingPrivateKey } from "./lib/manifest-signing.mjs";
 import { validateManifest } from "./lib/manifest-validation.mjs";
 import {
@@ -21,9 +21,9 @@ async function main() {
   const failedSequence = positiveInteger(Number(requiredArg(args, "failed-sequence")), "--failed-sequence");
   const channel = requiredArg(args, "channel");
   const baseUrl = new URL(requiredArg(args, "base-url"));
-  const approval = JSON.parse(await readFile(path.resolve(requiredArg(args, "approval")), "utf8"));
-  const catalogInput = JSON.parse(await readFile(path.resolve(requiredArg(args, "catalog-sequences")), "utf8"));
-  const catalogSequences = Array.isArray(catalogInput) ? catalogInput : catalogInput.sequences;
+  const approval = validateRollbackApproval(
+    JSON.parse(await readFile(path.resolve(requiredArg(args, "approval")), "utf8")),
+  );
   const evidenceOutput = path.resolve(requiredArg(args, "evidence-output"));
   const dryRun = args.has("dry-run");
 
@@ -39,14 +39,21 @@ async function main() {
   const knownGood = JSON.parse(knownGoodBytes.toString("utf8"));
   validateManifest(knownGood, { requireProduction: channel === "production", releasesTarget: true });
   if (knownGood.channel !== channel) throw new Error(`known-good channel mismatch: ${knownGood.channel} != ${channel}`);
+  if (approval.targetChannel !== channel) throw new Error("approval targetChannel mismatch");
+  if (approval.knownGoodManifestSha256 !== sha256(knownGoodBytes)) {
+    throw new Error("approval known-good manifest identity mismatch");
+  }
   await validateReferencedPacksForRescue(baseUrl, knownGood);
+  const catalogSequences = await authenticatedCatalogSequences(baseUrl, channel);
 
   if (isSameApprovedRescue(current, approval, targetSequence)) {
+    if (approval.failedManifestSha256 !== current.rollbackProvenance.failedManifestSha256) {
+      throw new Error("approval failed manifest identity mismatch");
+    }
     if (Date.parse(current.expiresAt) <= Date.now()) {
       throw new Error("idempotent rescue expired");
     }
-    const replayCatalogSequences = validatedCatalogSequences(catalogSequences);
-    if (Math.max(...replayCatalogSequences) > current.releaseSequence) {
+    if (Math.max(...catalogSequences) > current.releaseSequence) {
       throw new Error("immutable catalog advanced beyond the idempotent rescue");
     }
     if (sha256(knownGoodBytes) !== current.rollbackProvenance.knownGoodManifestSha256) {
@@ -78,6 +85,9 @@ async function main() {
   if (current.releaseSequence !== failedSequence) {
     throw new Error("failedSequence must match current manifest releaseSequence");
   }
+  if (approval.failedManifestSha256 !== sha256(currentBytes)) {
+    throw new Error("approval failed manifest identity mismatch");
+  }
   const result = buildRescueManifest({
     currentManifest: current,
     currentManifestBytes: currentBytes,
@@ -105,7 +115,7 @@ async function main() {
     manifestLastStatus,
     dryRun,
     productionExecuted: !dryRun && channel === "production" && !isLoopback(baseUrl.hostname),
-    executionEnvironment: isLoopback(baseUrl.hostname) ? "LOCAL_FIXTURE" : channel === "production" ? "PRODUCTION" : "NON_PRODUCTION",
+    executionEnvironment: executionEnvironment(baseUrl, channel, dryRun),
     idempotentReplay: false,
     startedAt: new Date(startedAtMs).toISOString(),
     completedAt: new Date().toISOString(),
@@ -143,7 +153,7 @@ function buildReport({ current, currentBytes, knownGood, knownGoodBytes, rescue,
     manifestLastStatus,
     dryRun,
     productionExecuted: !dryRun && rescue.channel === "production" && !isLoopback(baseUrl.hostname),
-    executionEnvironment: isLoopback(baseUrl.hostname) ? "LOCAL_FIXTURE" : rescue.channel === "production" ? "PRODUCTION" : "NON_PRODUCTION",
+    executionEnvironment: executionEnvironment(baseUrl, rescue.channel, dryRun),
     idempotentReplay,
     startedAt: new Date(startedAtMs).toISOString(),
     completedAt: new Date().toISOString(),
@@ -171,6 +181,61 @@ async function getRequiredObject(baseUrl, key) {
   return response;
 }
 
+async function authenticatedCatalogSequences(baseUrl, channel) {
+  const names = [];
+  const starts = new Set();
+  let start;
+  do {
+    if (start && starts.has(start)) throw new Error("immutable catalog pagination did not advance");
+    if (start) starts.add(start);
+    if (starts.size > 1_000) throw new Error("immutable catalog pagination exceeds 1000 pages");
+    const url = new URL(baseUrl);
+    url.searchParams.set("prefix", "catalog/releases/");
+    url.searchParams.set("fields", "name,etag");
+    if (start) url.searchParams.set("start", start);
+    const response = await request(url, "GET");
+    if (response.statusCode !== 200) {
+      throw new Error(`immutable catalog listing failed with HTTP ${response.statusCode}`);
+    }
+    let page;
+    try {
+      page = JSON.parse(response.body.toString("utf8"));
+    } catch {
+      throw new Error("immutable catalog listing must be JSON");
+    }
+    if (!page || typeof page !== "object" || !Array.isArray(page.objects)) {
+      throw new Error("immutable catalog listing objects must be an array");
+    }
+    for (const object of page.objects) {
+      if (!object || typeof object.name !== "string") {
+        throw new Error("immutable catalog object name is required");
+      }
+      names.push(object.name);
+    }
+    start = page.nextStartWith;
+    if (start !== undefined && (typeof start !== "string" || start.length === 0)) {
+      throw new Error("immutable catalog nextStartWith is invalid");
+    }
+  } while (start);
+
+  const sequences = names.map((name) => {
+    const match = name.match(/^catalog\/releases\/([1-9][0-9]*)\.json$/);
+    if (!match) throw new Error(`unexpected immutable catalog object: ${name}`);
+    return positiveInteger(Number(match[1]), "immutable catalog sequence");
+  });
+  if (sequences.length === 0 || new Set(sequences).size !== sequences.length) {
+    throw new Error("immutable catalog listing must contain unique release sequences");
+  }
+  const maximum = Math.max(...sequences);
+  const maximumResponse = await getRequiredObject(baseUrl, `catalog/releases/${maximum}.json`);
+  const maximumManifest = JSON.parse(maximumResponse.body.toString("utf8"));
+  validateManifest(maximumManifest, { requireProduction: channel === "production", releasesTarget: true });
+  if (maximumManifest.channel !== channel || maximumManifest.releaseSequence !== maximum) {
+    throw new Error("maximum immutable release identity mismatch");
+  }
+  return sequences;
+}
+
 async function writeEvidence(outputPath, report) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -180,16 +245,15 @@ function isLoopback(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
 }
 
+function executionEnvironment(baseUrl, channel, dryRun) {
+  if (dryRun) return "DRY_RUN";
+  if (isLoopback(baseUrl.hostname)) return "LOCAL_FIXTURE";
+  return channel === "production" ? "PRODUCTION" : "NON_PRODUCTION";
+}
+
 function positiveInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${label} must be a positive integer`);
   return value;
-}
-
-function validatedCatalogSequences(value) {
-  if (!Array.isArray(value) || value.length === 0) throw new Error("catalog sequences must be a non-empty array");
-  const result = value.map((sequence) => positiveInteger(sequence, "catalog sequence"));
-  if (new Set(result).size !== result.length) throw new Error("catalog sequences must not contain duplicates");
-  return result;
 }
 
 function parseArgs(argv) {

@@ -54,6 +54,17 @@ test("동일 승인 입력 재실행은 immutable/current PUT 없이 멱등 성�
   });
 });
 
+test("멱등 재실행도 승인된 failed identity가 바뀌면 거부한다", async () => {
+  await withFixture(async ({ directory, storage }) => {
+    await runRollback(directory, storage.baseUrl);
+    const approvalPath = path.join(directory, "approval.json");
+    const approval = JSON.parse(await readFile(approvalPath, "utf8"));
+    approval.failedManifestSha256 = "0".repeat(64);
+    await writeFile(approvalPath, `${JSON.stringify(approval)}\n`);
+    await assert.rejects(runRollback(directory, storage.baseUrl), /approval failed manifest identity mismatch/);
+  });
+});
+
 test("만료된 동일 rescue 재실행은 성공 evidence를 만들지 않는다", async () => {
   await withFixture(async ({ directory, storage }) => {
     const first = JSON.parse((await runRollback(directory, storage.baseUrl)).stdout);
@@ -75,14 +86,45 @@ test("dry-run은 모든 검증과 report 생성을 수행하되 object를 쓰지
     const report = JSON.parse((await runRollback(directory, storage.baseUrl, ["--dry-run"])).stdout);
     assert.equal(report.dryRun, true);
     assert.equal(report.manifestLastStatus, "NOT_EXECUTED");
+    assert.equal(report.executionEnvironment, "DRY_RUN");
     assert.equal(storage.log.some((entry) => entry.startsWith("PUT ")), false);
     assert.deepEqual(storage.objects.get("catalog/current.json").body, currentBytes);
   });
 });
 
+test("rescue sequence는 caller 파일이 아니라 원격 immutable catalog 최대값 다음으로 계산한다", async () => {
+  await withFixture(async ({ directory, storage }) => {
+    storage.objects.set("catalog/releases/120.json", { body: bytes(manifest(120, storage.pack)) });
+    const report = JSON.parse((await runRollback(directory, storage.baseUrl)).stdout);
+    assert.equal(report.rescue.releaseSequence, 121);
+    assert.ok(storage.log.some((entry) => entry.startsWith("GET ?prefix=catalog%2Freleases%2F")));
+    assert.ok(storage.log.includes("GET catalog/releases/120.json"));
+  });
+});
+
+test("승인된 rollback event의 channel과 manifest identity가 실제 대상과 다르면 거부한다", async (t) => {
+  for (const [name, mutate, expected] of [
+    ["channel", (approval) => { approval.targetChannel = "production"; }, /approval targetChannel mismatch/],
+    ["failed hash", (approval) => { approval.failedManifestSha256 = "0".repeat(64); }, /approval failed manifest identity mismatch/],
+    ["known-good hash", (approval) => { approval.knownGoodManifestSha256 = "0".repeat(64); }, /approval known-good manifest identity mismatch/],
+  ]) {
+    await t.test(name, async () => {
+      await withFixture(async ({ directory, storage }) => {
+        const approvalPath = path.join(directory, "approval.json");
+        const approval = JSON.parse(await readFile(approvalPath, "utf8"));
+        mutate(approval);
+        await writeFile(approvalPath, `${JSON.stringify(approval)}\n`);
+        await assert.rejects(runRollback(directory, storage.baseUrl), expected);
+      });
+    });
+  }
+});
+
 test("immutable rescue key에 다른 bytes가 있으면 current PUT 전에 거부한다", async () => {
   await withFixture(async ({ directory, storage, currentBytes }) => {
-    storage.objects.set("catalog/releases/116.json", { body: Buffer.from("collision") });
+    storage.afterCatalogList = () => {
+      storage.objects.set("catalog/releases/116.json", { body: Buffer.from("collision") });
+    };
     await assert.rejects(runRollback(directory, storage.baseUrl), /immutable collision/);
     assert.equal(storage.log.includes("PUT catalog/current.json"), false);
     assert.deepEqual(storage.objects.get("catalog/current.json").body, currentBytes);
@@ -151,12 +193,20 @@ test("pack hash, RSA signature, SQLite quick/FK/schema/minimum row 오류를 cur
     await t.test(name, async () => {
       await withFixture(async (fixture) => {
         await mutate(fixture);
+        await bindApprovalToKnownGood(fixture);
         await assert.rejects(runRollback(fixture.directory, fixture.storage.baseUrl), expected);
         assert.equal(fixture.storage.log.includes("PUT catalog/current.json"), false);
       });
     });
   }
 });
+
+async function bindApprovalToKnownGood({ directory, knownGood }) {
+  const approvalPath = path.join(directory, "approval.json");
+  const approval = JSON.parse(await readFile(approvalPath, "utf8"));
+  approval.knownGoodManifestSha256 = sha256(bytes(knownGood));
+  await writeFile(approvalPath, `${JSON.stringify(approval)}\n`);
+}
 
 async function withFixture(callback) {
   const directory = await mkdtemp(path.join(tmpdir(), "rollback-rescue-test-"));
@@ -171,12 +221,17 @@ async function withFixture(callback) {
     ["catalog/capital-v1.sqlite.gz", { body: packBytes }],
   ]);
   storage.pack = pack;
-  await writeFile(path.join(directory, "catalog-sequences.json"), "[114,115]\n");
   await writeFile(path.join(directory, "approval.json"), `${JSON.stringify({
+    schemaVersion: 1,
+    artifactKind: "datapack-rollback-approval",
     releaseRequestId: "rollback-request-1",
-    approvedByRole: "release-manager",
+    targetChannel: "staging",
+    failedManifestSha256: sha256(currentBytes),
+    knownGoodManifestSha256: sha256(bytes(knownGood)),
+    approvedBy: "release-approver",
+    approvedByRole: "admin.datapack.rollback",
     approvedAt: "2026-07-15T00:30:00.000Z",
-    reasonCode: "FAILED_RELEASE",
+    reasonCode: "ADMIN_APPROVED_ROLLBACK",
   })}\n`);
   try {
     await callback({ directory, storage, current, knownGood, currentBytes, packBytes });
@@ -193,7 +248,6 @@ async function runRollback(directory, baseUrl, extraArgs = []) {
     "--failed-sequence", "115",
     "--channel", "staging",
     "--base-url", baseUrl,
-    "--catalog-sequences", path.join(directory, "catalog-sequences.json"),
     "--approval", path.join(directory, "approval.json"),
     "--published-at", "2026-07-15T01:00:00.000Z",
     "--expires-at", "2026-07-16T01:00:00.000Z",
@@ -211,9 +265,29 @@ async function runRollback(directory, baseUrl, extraArgs = []) {
 async function startStorage(seed) {
   const objects = new Map(seed);
   const log = [];
-  const state = { objects, log, failPutKey: null, afterImmutablePut: null, afterCurrentGet: null };
+  const state = {
+    objects, log, failPutKey: null, afterCatalogList: null, afterImmutablePut: null, afterCurrentGet: null,
+  };
   const server = createServer((request, response) => {
-    const key = decodeURIComponent(request.url.replace(/^\//, ""));
+    const url = new URL(request.url, "http://fixture.local");
+    const key = decodeURIComponent(url.pathname.replace(/^\//, ""));
+    if (request.method === "GET" && key === "") {
+      log.push(`GET ${url.search}`);
+      const prefix = url.searchParams.get("prefix");
+      if (prefix !== "catalog/releases/") {
+        response.statusCode = 400;
+        response.end("invalid prefix");
+        return;
+      }
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({
+        objects: [...objects.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),
+      }));
+      const afterCatalogList = state.afterCatalogList;
+      state.afterCatalogList = null;
+      afterCatalogList?.();
+      return;
+    }
     log.push(`${request.method} ${key}`);
     if (request.method === "PUT") {
       const chunks = [];

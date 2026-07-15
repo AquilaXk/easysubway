@@ -306,6 +306,19 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   ];
   await execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root });
 
+  bundle.rollbackRescue.executionEnvironment = "DRY_RUN";
+  rollbackEvidence.executionEnvironment = "DRY_RUN";
+  const dryRunEvidenceRaw = json(rollbackEvidence);
+  bundle.rollbackRescue.evidenceSha256 = sha256(dryRunEvidenceRaw);
+  await writeFile(rollbackEvidencePath, dryRunEvidenceRaw);
+  await writeFile(bundlePath, json(bundle));
+  await execFileAsync(process.execPath, [...rollbackValidatorCommand, "--require-pass"], { cwd: root });
+  bundle.rollbackRescue.executionEnvironment = "LOCAL_FIXTURE";
+  rollbackEvidence.executionEnvironment = "LOCAL_FIXTURE";
+  bundle.rollbackRescue.evidenceSha256 = sha256(rollbackEvidenceRaw);
+  await writeFile(rollbackEvidencePath, rollbackEvidenceRaw);
+  await writeFile(bundlePath, json(bundle));
+
   for (const [field, value, expected] of [
     ["rescueReleaseSequence", 115, /knownGood < failed = current < rescue/],
     ["rcManifestSha256", "f".repeat(64), /rollbackRescue rcManifestSha256 must match bundle manifestSha256/],
