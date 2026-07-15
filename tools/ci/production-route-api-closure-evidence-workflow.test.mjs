@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const workflowPath = ".github/workflows/production-route-api-closure-evidence.yml";
+const cdWorkflowPath = ".github/workflows/cd.yml";
 const snapshotGatePath = "tools/ops/route-search-purge-snapshot-gate.sh";
 
 test("production route API closure evidence는 현재 배포와 origin 403·row 불변을 검증한다", async () => {
@@ -116,4 +117,45 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.notEqual(reportAppend, -1);
   assert.notEqual(markerPublish, -1);
   assert.ok(reportAppend < markerPublish, "success marker must be published after required evidence");
+});
+
+test("V51 CD는 exact SHA의 성공한 snapshot gate 없이는 mutation 전에 중단한다", async () => {
+  const workflow = await readFile(cdWorkflowPath, "utf8");
+
+  assert.match(
+    workflow,
+    /echo "route_purge_snapshot_required=\$\{route_purge_snapshot_required\}" >> "\$\{GITHUB_OUTPUT\}"/,
+  );
+  assert.match(
+    workflow,
+    /backend\/src\/main\/resources\/db\/migration\/\(postgresql\|h2\)\/V51__/,
+  );
+  assert.match(workflow, /CD Plan \/ Require route purge snapshot evidence/);
+  assert.match(
+    workflow,
+    /if: \$\{\{ steps\.changes\.outputs\.route_purge_snapshot_required == 'true' \}\}/,
+  );
+  assert.match(
+    workflow,
+    /actions\/workflows\/production-route-api-closure-evidence\.yml\/runs\?head_sha=\$\{DEPLOY_SHA\}&branch=main&event=push&status=success&per_page=20/,
+  );
+  assert.match(
+    workflow,
+    /node tools\/ci\/require-successful-workflow-run\.mjs[\s\S]*?"\$\{snapshot_runs_file\}"[\s\S]*?"\$\{DEPLOY_SHA\}"[\s\S]*?"Production route API closure evidence"[\s\S]*?push[\s\S]*?main/,
+  );
+
+  const changedFilesIndex = workflow.indexOf('git diff --name-only "${DEPLOY_SHA}^"');
+  const manualDispatchIndex = workflow.indexOf('if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]');
+  const latchIndex = workflow.indexOf("CD Plan / Require route purge snapshot evidence");
+  const buildIndex = workflow.indexOf("CD Build image / Checkout target SHA");
+  const mutationPreparationIndex = workflow.indexOf("CD Deploy / Restore GitHub Actions dotenv secret");
+
+  assert.notEqual(changedFilesIndex, -1);
+  assert.notEqual(manualDispatchIndex, -1);
+  assert.ok(changedFilesIndex < manualDispatchIndex, "manual dispatch must inspect the target commit");
+  assert.notEqual(latchIndex, -1);
+  assert.notEqual(buildIndex, -1);
+  assert.notEqual(mutationPreparationIndex, -1);
+  assert.ok(latchIndex < buildIndex, "snapshot evidence must gate image build");
+  assert.ok(latchIndex < mutationPreparationIndex, "snapshot evidence must gate production mutation");
 });
