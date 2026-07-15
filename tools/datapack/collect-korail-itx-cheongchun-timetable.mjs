@@ -61,10 +61,10 @@ export async function collectKorailItxCheongchunCompleteness({
         serviceKey, serviceDate, kricServiceDayCode: dayCd, canonicalStations, fetchImpl, now,
         requestBudget: tagoRequestBudget,
       });
+      failureStage = "OD_MATERIALIZATION";
       if (roster.completedOdCount !== roster.expectedOdCount || roster.failedOdCount !== 0) {
         throw new Error("TAGO ITX OD matrix evidence is incomplete");
       }
-      failureStage = "OD_MATERIALIZATION";
       if (usingDefaultAdmissionCollector) {
         const directions = new Set(roster.stationSequences?.map(({ directionId }) => directionId));
         if (roster.schemaVersion !== 2 || !directions.has("up") || !directions.has("down")
@@ -253,18 +253,26 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
     throw new Error("ITX source candidate requires SUPPORTED admission completeness");
   }
   validateSourceFreshness(completeness.sourceTimetableArtifact, completeness.selectedServiceDates, now);
-  for (const { dayCd, timetable } of completeness.serviceDays) {
+  const serviceDays = ["8", "7", "9"].map((dayCd) => {
+    const matches = completeness.serviceDays.filter((day) => day?.dayCd === dayCd);
+    if (matches.length !== 1) throw new Error("ITX source candidate requires one entry per service day");
+    return matches[0];
+  });
+  if (completeness.serviceDays.length !== serviceDays.length) {
+    throw new Error("ITX source candidate requires one entry per service day");
+  }
+  for (const { dayCd, timetable } of serviceDays) {
     validateMaterializedProjection(timetable, dayCd, "TAGO_OD_STOP_SEQUENCE_INVALID");
   }
-  const stationSequences = completeness.serviceDays.flatMap(({ dayCd, timetable }) => (
+  const stationSequences = serviceDays.flatMap(({ dayCd, timetable }) => (
     (timetable?.stationSequences ?? []).map((sequence) => ({ dayCd, ...sequence }))
   )).sort((left, right) => naturalCompare(left.dayCd, right.dayCd)
     || naturalCompare(left.trainNumber, right.trainNumber));
-  const transitTrips = completeness.serviceDays.flatMap(({ timetable }) => timetable?.transitTrips ?? [])
+  const transitTrips = serviceDays.flatMap(({ timetable }) => timetable?.transitTrips ?? [])
     .sort((left, right) => naturalCompare(left.id, right.id));
-  const transitStopTimes = completeness.serviceDays.flatMap(({ timetable }) => timetable?.transitStopTimes ?? [])
+  const transitStopTimes = serviceDays.flatMap(({ timetable }) => timetable?.transitStopTimes ?? [])
     .sort((left, right) => naturalCompare(left.tripId, right.tripId) || left.stopSequence - right.stopSequence);
-  const warnings = completeness.serviceDays.flatMap(({ dayCd, timetable }) => (
+  const warnings = serviceDays.flatMap(({ dayCd, timetable }) => (
     (timetable?.korailPlanCorroboration?.missingTrainNumbers ?? []).map((trainNumber) => ({
       code: "KORAIL_PLAN_NOT_AVAILABLE", dayCd, trainNumber,
     }))
@@ -281,12 +289,12 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
     promotionStatus: completeness.sourceTimetableArtifact.status,
     canonicalPackIdentity: await readCanonicalPackIdentity(packPath, repoRoot),
     selectedServiceDates: completeness.selectedServiceDates,
-    sourceLineage: completeness.serviceDays.map((day) => ({
+    sourceLineage: serviceDays.map((day) => ({
       dayCd: day.dayCd,
       rosterEvidenceHash: day.roster?.evidenceHash,
       timetableEvidenceHash: day.timetable?.evidenceHash,
     })),
-    stationRosters: completeness.serviceDays.map((day) => ({
+    stationRosters: serviceDays.map((day) => ({
       dayCd: day.dayCd,
       stations: day.roster?.stations ?? [],
     })),
@@ -294,15 +302,35 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
     transitTrips,
     transitStopTimes,
     warnings,
-    normalizedSnapshotSets: completeness.serviceDays.map((day) => ({ dayCd: day.dayCd, sets: snapshotSets(day) })),
+    normalizedSnapshotSets: serviceDays.map((day) => ({ dayCd: day.dayCd, sets: snapshotSets(day) })),
     snapshotDiff: completeness.snapshotDiff,
     credentialRedacted: true,
   };
+  validateSourceCandidateSchema(candidate);
   candidate.evidenceHash = sha256(JSON.stringify(candidate));
   return candidate;
 }
 
-export async function promoteItxSourceCandidate({
+export async function promoteItxSourceCandidate(options = {}) {
+  const repositoryRoot = options.repositoryRoot ?? repoRoot;
+  const coverageContractPath = validateCoverageContractPath(options.coverageContractPath, repositoryRoot);
+  const lockPath = `${coverageContractPath}.promotion.lock`;
+  try {
+    await writeFile(lockPath, `${randomUUID()}\n`, { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error?.code === "EEXIST") throw new Error("ADMISSION_PROMOTION_CONFLICT");
+    throw error;
+  }
+  try {
+    return await promoteItxSourceCandidateLocked({ ...options, coverageContractPath, repositoryRoot });
+  } finally {
+    await unlink(lockPath).catch((error) => {
+      if (error?.code !== "ENOENT") throw error;
+    });
+  }
+}
+
+async function promoteItxSourceCandidateLocked({
   candidatePath,
   approvedSha256,
   approvalUrl,
@@ -313,14 +341,10 @@ export async function promoteItxSourceCandidate({
   githubToken,
   repositoryRoot = repoRoot,
 }) {
-  coverageContractPath = validateCoverageContractPath(coverageContractPath, repositoryRoot);
   const candidateBytes = await readFile(candidatePath);
   const candidateSha256 = sha256(candidateBytes);
   const candidate = JSON.parse(candidateBytes);
-  if (candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1
-    || !/^itx-cheongchun-source-timetable-\d{17}$/.test(candidate.artifactId ?? "")) {
-    throw new Error("ITX source candidate schema is invalid");
-  }
+  validateSourceCandidateSchema(candidate);
   const { evidenceHash, ...candidateWithoutEvidenceHash } = candidate;
   if (evidenceHash !== sha256(JSON.stringify(candidateWithoutEvidenceHash))
     || candidateBytes.toString("utf8") !== `${JSON.stringify(candidate, null, 2)}\n`) {
@@ -402,6 +426,31 @@ function validateSourceFreshness(source, selectedServiceDates, now = null) {
     throw new Error("SOURCE_SNAPSHOT_FRESHNESS_INVALID");
   }
   if (now && now.getTime() >= Date.parse(value)) throw new Error("SOURCE_SNAPSHOT_EXPIRED");
+}
+
+function validateSourceCandidateSchema(candidate) {
+  const dayCodes = ["8", "7", "9"];
+  const selectedDayCodes = Object.keys(candidate?.selectedServiceDates ?? {}).sort(naturalCompare);
+  const lineage = candidate?.sourceLineage;
+  if (candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1
+    || !/^itx-cheongchun-source-timetable-\d{17}$/.test(candidate.artifactId ?? "")
+    || candidate.serviceId !== "ITX_CHEONGCHUN" || candidate.validationStatus !== "SUPPORTED"
+    || candidate.policyVersion !== "itx-snapshot-anomaly-v1" || candidate.credentialRedacted !== true
+    || offsetIsoEpoch(candidate.observedAt) === null
+    || !["BOOTSTRAP_REVIEW_REQUIRED", "CHANGE_REVIEW_REQUIRED", "SUPPORTED"].includes(candidate.promotionStatus)
+    || candidate.snapshotDiff?.policyVersion !== "itx-snapshot-anomaly-v1"
+    || JSON.stringify(selectedDayCodes) !== JSON.stringify([...dayCodes].sort(naturalCompare))
+    || !Array.isArray(lineage) || lineage.length !== dayCodes.length
+    || !Array.isArray(candidate.warnings)) {
+    throw new Error("ITX source candidate schema is invalid");
+  }
+  for (const dayCd of dayCodes) {
+    const rows = lineage.filter((row) => row?.dayCd === dayCd);
+    if (rows.length !== 1 || !/^[a-f0-9]{64}$/.test(rows[0].rosterEvidenceHash ?? "")
+      || !/^[a-f0-9]{64}$/.test(rows[0].timetableEvidenceHash ?? "")) {
+      throw new Error("ITX source candidate schema is invalid");
+    }
+  }
 }
 
 async function readCanonicalPackIdentity(packPath, repositoryRoot) {
@@ -613,6 +662,7 @@ async function loadAdmittedSourceReference(contract, repositoryRoot) {
     || bytes.toString("utf8") !== `${JSON.stringify(source, null, 2)}\n`) {
     throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
   }
+  validateSourceCandidateSchema(source);
   validateSourceFreshness(source, source.selectedServiceDates);
   validateSourceSnapshotSets(source);
   source.sourceTimetableArtifact = { sha256: reference.sha256 };
@@ -632,7 +682,7 @@ async function verifyOwnerApproval({ approvalUrl, expectedBody, observedAt, fetc
   const record = await response.json();
   const approvalAt = offsetIsoEpoch(record.created_at);
   const candidateObservedAt = offsetIsoEpoch(observedAt);
-  if (record.author_association !== "OWNER" || record.body !== expectedBody
+  if (record.author_association !== "OWNER" || record.html_url !== approvalUrl || record.body !== expectedBody
     || approvalAt === null || candidateObservedAt === null || approvalAt <= candidateObservedAt) {
     throw new Error("SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
   }
@@ -655,7 +705,8 @@ function snapshotSets(day) {
     .filter((arrival) => arrival !== departure)
     .map((arrival) => [day.dayCd, departure, arrival]));
   const trainSet = (day.roster?.trainNumbers ?? []).map(normalizeTrainNumber).sort(naturalCompare);
-  const sequences = day.timetable?.stationSequences ?? day.roster?.stationSequences ?? [];
+  const sequences = [...(day.timetable?.stationSequences ?? day.roster?.stationSequences ?? [])]
+    .sort((left, right) => naturalCompare(normalizeTrainNumber(left.trainNumber), normalizeTrainNumber(right.trainNumber)));
   const stopSequenceSet = sequences.map((sequence) => [
     day.dayCd,
     normalizeTrainNumber(sequence.trainNumber),
@@ -1760,7 +1811,12 @@ function decodedServiceKey(value) {
 }
 
 function normalize(value) { return String(value ?? "").toLocaleLowerCase("ko-KR").replace(/[^\p{L}\p{N}]+/gu, ""); }
-function normalizeTrainNumber(value) { const digits = String(value ?? "").replace(/\D+/g, "").replace(/^0+/, ""); if (digits === "") throw new Error("invalid train number"); return digits; }
+function normalizeTrainNumber(value) {
+  const match = /^(?:ITX-)?(\d+)$/.exec(String(value ?? ""));
+  const digits = match?.[1].replace(/^0+/, "") ?? "";
+  if (digits === "") throw new Error("invalid train number");
+  return digits;
+}
 function normalizeStationName(value) { return String(value ?? "").replace(/\([^)]*\)/g, "").replace(/[^\p{L}\p{N}]+/gu, "").toLocaleLowerCase("ko-KR"); }
 function requiredString(value, label) { if (typeof value !== "string" || value.trim() === "") throw new Error(`${label} is required`); return value; }
 function safeToken(value) { const text = String(value ?? "UNKNOWN"); return /^[A-Za-z0-9._/+:-]{1,64}$/.test(text) ? text : "UNKNOWN"; }

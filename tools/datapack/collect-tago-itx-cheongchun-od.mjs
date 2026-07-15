@@ -47,13 +47,23 @@ export function buildItxOdMatrix(date, stations) {
   const rows = providerIds.flatMap((depStationId) => providerIds
     .filter((arrStationId) => arrStationId !== depStationId)
     .map((arrStationId) => ({ date, depStationId, arrStationId })));
+  const stationByProviderId = new Map(ordered.map((station) => [station.providerStationId, station]));
+  const stationMappings = ordered.map(({ stationId, providerStationId }) => (
+    [stationId, providerStationId]
+  )).sort((left, right) => stringCompare(JSON.stringify(left), JSON.stringify(right)));
   const hashTuples = rows.map(({ depStationId, arrStationId }) => (
-    [date, depStationId, arrStationId]
+    [
+      date,
+      stationByProviderId.get(depStationId).stationId,
+      depStationId,
+      stationByProviderId.get(arrStationId).stationId,
+      arrStationId,
+    ]
   )).sort((left, right) => stringCompare(JSON.stringify(left), JSON.stringify(right)));
   return {
     rows,
     expectedOdCount: providerIds.length * (providerIds.length - 1),
-    stationSetHash: sha256(JSON.stringify([...stationIds].sort(stringCompare))),
+    stationSetHash: sha256(JSON.stringify(stationMappings)),
     odMatrixHash: sha256(JSON.stringify(hashTuples)),
   };
 }
@@ -260,7 +270,8 @@ function materializeTagoItxOdRowsStrict({
 }
 
 export function normalizeTrainNumber(value) {
-  const digits = String(value ?? "").replace(/\D+/g, "").replace(/^0+/, "");
+  const match = /^(?:ITX-)?(\d+)$/.exec(String(value ?? ""));
+  const digits = match?.[1].replace(/^0+/, "") ?? "";
   if (digits === "") throw new Error("invalid train number");
   return digits;
 }

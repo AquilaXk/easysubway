@@ -27,10 +27,16 @@
     },
     "rosterStationUniverse": "CANONICAL_ITX_CORRIDOR_28_INTERSECT_TAGO_TRAIN_STATION_CATALOG",
     "excludedStationEvidenceRequired": true,
+    "stationSetHashInput": [
+      "canonicalStationId",
+      "providerStationId"
+    ],
     "odMatrixHashInput": [
       "date",
-      "depStationId",
-      "arrStationId"
+      "depCanonicalStationId",
+      "depProviderStationId",
+      "arrCanonicalStationId",
+      "arrProviderStationId"
     ],
     "odMatrixCanonicalSerialization": "SORTED_TUPLE_ARRAY_JSON_UTF8",
     "requiredDirections": [
@@ -350,17 +356,17 @@
   "sourceTimetableArtifact": {
     "status": "ADMITTED",
     "admissionEligible": true,
-    "artifactId": "itx-cheongchun-source-timetable-20260715104320157",
-    "artifactPath": "tools/datapack/sources/itx-cheongchun-source-timetable-20260715104320157.json",
-    "sha256": "cc11088e48235a8d2eccc55758a2b002b0fb5eb691aa55430e701fa01fd59201",
+    "artifactId": "itx-cheongchun-source-timetable-20260715112641542",
+    "artifactPath": "tools/datapack/sources/itx-cheongchun-source-timetable-20260715112641542.json",
+    "sha256": "4134ae94f2cae0e6463077ee8c29c2f2417904de9dd2e751782c26ab0af1a2a7",
     "schemaVersion": 1,
     "freshUntil": "2026-07-20T00:00:00+09:00",
     "policyVersion": "itx-snapshot-anomaly-v1",
     "promotion": {
-      "mode": "BOOTSTRAP_OWNER_APPROVED",
-      "previousArtifactSha256": null,
-      "approvalUrl": "https://github.com/AquilaXk/easysubway/issues/2135#issuecomment-4979752912",
-      "approvedArtifactSha256": "cc11088e48235a8d2eccc55758a2b002b0fb5eb691aa55430e701fa01fd59201"
+      "mode": "UNCHANGED_AUTO",
+      "previousArtifactSha256": "cc11088e48235a8d2eccc55758a2b002b0fb5eb691aa55430e701fa01fd59201",
+      "approvalUrl": null,
+      "approvedArtifactSha256": null
     }
   }
 }

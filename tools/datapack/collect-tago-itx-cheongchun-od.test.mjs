@@ -7,6 +7,7 @@ import {
   collectTagoItxCheongchunOd,
   collectTagoItxCheongchunRoster,
   materializeTagoItxOdRows,
+  normalizeTrainNumber,
   validateItxServiceDates,
 } from "./collect-tago-itx-cheongchun-od.mjs";
 
@@ -74,17 +75,22 @@ test("TAGO ITX roster collector는 serviceDate와 dayCd 요일 불일치를 prov
   }), /dayCd 7 must be a Saturday/);
 });
 
-test("ITX OD matrix hash는 정렬된 date·depStationId·arrStationId tuple 직렬화로 결정된다", () => {
+test("ITX OD matrix hash는 정렬된 service date·canonical/provider endpoint tuple로 결정된다", () => {
   const matrix = buildItxOdMatrix("20260715", [
     { providerStationId: "B" },
     { providerStationId: "A" },
   ]);
-  const tuples = [["20260715", "A", "B"], ["20260715", "B", "A"]];
-  assert.deepEqual(matrix.rows, tuples.map(([date, depStationId, arrStationId]) => ({
-    date, depStationId, arrStationId,
-  })));
+  const rows = [
+    { date: "20260715", depStationId: "A", arrStationId: "B" },
+    { date: "20260715", depStationId: "B", arrStationId: "A" },
+  ];
+  const tuples = [
+    ["20260715", "A", "A", "B", "B"],
+    ["20260715", "B", "B", "A", "A"],
+  ];
+  assert.deepEqual(matrix.rows, rows);
   assert.equal(matrix.expectedOdCount, 2);
-  assert.equal(matrix.stationSetHash, sha256(JSON.stringify(["A", "B"])));
+  assert.equal(matrix.stationSetHash, sha256(JSON.stringify([["A", "A"], ["B", "B"]])));
   assert.equal(matrix.odMatrixHash, sha256(JSON.stringify(tuples)));
 });
 
@@ -99,8 +105,29 @@ test("ITX OD matrix hash는 canonical ID가 같아도 실제 provider station ID
     { providerStationId: "NAT-B2", canonicalStationId: canonical[1] },
   ]);
 
-  assert.equal(first.stationSetHash, second.stationSetHash);
+  assert.notEqual(first.stationSetHash, second.stationSetHash);
   assert.notEqual(first.odMatrixHash, second.odMatrixHash);
+});
+
+test("ITX OD matrix hash는 같은 provider ID 집합의 canonical mapping 교환도 탐지한다", () => {
+  const first = buildItxOdMatrix("20260715", [
+    { providerStationId: "NAT-A", canonicalStationId: "station-a" },
+    { providerStationId: "NAT-B", canonicalStationId: "station-b" },
+  ]);
+  const swapped = buildItxOdMatrix("20260715", [
+    { providerStationId: "NAT-B", canonicalStationId: "station-a" },
+    { providerStationId: "NAT-A", canonicalStationId: "station-b" },
+  ]);
+
+  assert.notEqual(first.stationSetHash, swapped.stationSetHash);
+  assert.notEqual(first.odMatrixHash, swapped.odMatrixHash);
+});
+
+test("ITX train number는 digits와 명시적 ITX prefix만 허용한다", () => {
+  assert.equal(normalizeTrainNumber("02001"), "2001");
+  assert.equal(normalizeTrainNumber("ITX-02001"), "2001");
+  assert.throws(() => normalizeTrainNumber("20O1"), /invalid train number/);
+  assert.throws(() => normalizeTrainNumber("2001x"), /invalid train number/);
 });
 
 test("TAGO pairwise OD는 U/D 정차시각을 추정 없이 결정론적으로 materialize한다", () => {

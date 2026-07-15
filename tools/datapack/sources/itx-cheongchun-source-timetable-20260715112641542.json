@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "artifactKind": "itx-cheongchun-source-timetable",
-  "artifactId": "itx-cheongchun-source-timetable-20260715104320157",
+  "artifactId": "itx-cheongchun-source-timetable-20260715112641542",
   "serviceId": "ITX_CHEONGCHUN",
-  "observedAt": "2026-07-15T10:43:20.157Z",
+  "observedAt": "2026-07-15T11:26:41.542Z",
   "freshUntil": "2026-07-20T00:00:00+09:00",
   "policyVersion": "itx-snapshot-anomaly-v1",
   "validationStatus": "SUPPORTED",
-  "promotionStatus": "BOOTSTRAP_REVIEW_REQUIRED",
+  "promotionStatus": "SUPPORTED",
   "canonicalPackIdentity": {
     "path": "apps/mobile/assets/datapacks/capital.sqlite.gz",
     "sha256": "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9"
@@ -20,18 +20,18 @@
   "sourceLineage": [
     {
       "dayCd": "8",
-      "rosterEvidenceHash": "10f3c99e71e08e4ba2c6e370f52213b0a307afd5ee4824dc62422a55cab9333f",
-      "timetableEvidenceHash": "dfda57a3967fefc55ef52513cc0f70f55912f858891e4dc15044324576736dc2"
+      "rosterEvidenceHash": "5e9c24ba1748b8827909a3685a9449585033527c01c2ab24437362ff7ba0fa7c",
+      "timetableEvidenceHash": "6931b831bb3b8cdb244e1b8b32c3f879a95598484862809e3b4e6a9b14e32d67"
     },
     {
       "dayCd": "7",
-      "rosterEvidenceHash": "925ee408575183d77e6bdaaca17d4ce4dc0d41878a464b24c84b30e28be3f9e8",
-      "timetableEvidenceHash": "7efeeb8a144f94af3dd8db2f5016c47e9b30791c235f5e1335957ccf67bd2ac0"
+      "rosterEvidenceHash": "70bc885a2e9ca56ac78bd1c0995d4ce7a45514db9cf5c39825f588b2dc73fceb",
+      "timetableEvidenceHash": "be6bf8a2ba8abe1b21bb0087f0b1999f808b71b69e125bb67118bded035b3a84"
     },
     {
       "dayCd": "9",
-      "rosterEvidenceHash": "2564efcd1f84d6401b80bb6d841e283d8bf58b429f65bd1ea3e1b4ffaf87ae65",
-      "timetableEvidenceHash": "e054b6ffb4b6d4e10804e989f96a4b28d4b35dfe4e643651f6169b562cfa7067"
+      "rosterEvidenceHash": "51e7bef6999929615f9df2baaf44130e784fab63cf7b66fd2ea14c0ab5cd46e8",
+      "timetableEvidenceHash": "a8148b2f19c22b696c1b4102d513d31f082c02b5b5df6995cab6788ea777ace6"
     }
   ],
   "stationRosters": [
@@ -37441,10 +37441,119 @@
   "snapshotDiff": {
     "policyVersion": "itx-snapshot-anomaly-v1",
     "threshold": "ZERO_TOLERANCE",
-    "status": "BOOTSTRAP_REVIEW_REQUIRED",
-    "previousArtifactSha256": null,
-    "serviceDays": []
+    "status": "SUPPORTED",
+    "previousArtifactSha256": "cc11088e48235a8d2eccc55758a2b002b0fb5eb691aa55430e701fa01fd59201",
+    "serviceDays": [
+      {
+        "dayCd": "8",
+        "blocked": false,
+        "sets": {
+          "stationSet": {
+            "count": 18,
+            "added": [],
+            "removed": [],
+            "sha256": "f90bfcc1f32e03e1f3662a2648bfcebfb9f8ea0c971f9f1634c4d162dece3cab"
+          },
+          "odSet": {
+            "count": 306,
+            "added": [],
+            "removed": [],
+            "sha256": "070b00abc7aa1ee01e1fbd3fbf422fa5f3b4f5339b2ef9d074ca785328a9eed0"
+          },
+          "trainSet": {
+            "count": 36,
+            "added": [],
+            "removed": [],
+            "sha256": "af213304cf9b86238eb84f15781487098f65303ba6faa3976b8c8b2fe8b7cc4a"
+          },
+          "stopSequenceSet": {
+            "count": 36,
+            "added": [],
+            "removed": [],
+            "sha256": "e9033428a42debaf25ff3c30faa3ec7a91d25ae3d3f9e89c41b7ed952e9ddd7c"
+          },
+          "timetableTupleSet": {
+            "count": 280,
+            "added": [],
+            "removed": [],
+            "sha256": "e78df7edd3ec0466f30c5b6f7861e59eb3956a763b143371397257871e659aed"
+          }
+        }
+      },
+      {
+        "dayCd": "7",
+        "blocked": false,
+        "sets": {
+          "stationSet": {
+            "count": 18,
+            "added": [],
+            "removed": [],
+            "sha256": "f90bfcc1f32e03e1f3662a2648bfcebfb9f8ea0c971f9f1634c4d162dece3cab"
+          },
+          "odSet": {
+            "count": 306,
+            "added": [],
+            "removed": [],
+            "sha256": "d8b8bc76f07ae18c2491b38db4e3b0f979ee0f13a66ecc09fbb3c5071adc7a2d"
+          },
+          "trainSet": {
+            "count": 52,
+            "added": [],
+            "removed": [],
+            "sha256": "ef728476c0205f8297b5c8fcebc1d588227e4d19b60776ad0346745e3486bbc0"
+          },
+          "stopSequenceSet": {
+            "count": 52,
+            "added": [],
+            "removed": [],
+            "sha256": "a0299914ef910ebd19b39aedbf55257ef6b26720b83bb1a73577e25cd02e0cb3"
+          },
+          "timetableTupleSet": {
+            "count": 364,
+            "added": [],
+            "removed": [],
+            "sha256": "6ee94e649cc99671914a39ed49a5f1a9459154c5cb727e2c264e3464f268efa1"
+          }
+        }
+      },
+      {
+        "dayCd": "9",
+        "blocked": false,
+        "sets": {
+          "stationSet": {
+            "count": 18,
+            "added": [],
+            "removed": [],
+            "sha256": "f90bfcc1f32e03e1f3662a2648bfcebfb9f8ea0c971f9f1634c4d162dece3cab"
+          },
+          "odSet": {
+            "count": 306,
+            "added": [],
+            "removed": [],
+            "sha256": "9d945854d17b5c257ca164779d8ea987651efe235f49ef0bf72a88fc74d96dfd"
+          },
+          "trainSet": {
+            "count": 52,
+            "added": [],
+            "removed": [],
+            "sha256": "ef728476c0205f8297b5c8fcebc1d588227e4d19b60776ad0346745e3486bbc0"
+          },
+          "stopSequenceSet": {
+            "count": 52,
+            "added": [],
+            "removed": [],
+            "sha256": "27ed8d0cfb425d14c5af2dad2b30661a8a75a9e556a999d4530b2ab1a871277b"
+          },
+          "timetableTupleSet": {
+            "count": 364,
+            "added": [],
+            "removed": [],
+            "sha256": "4ac3274f4cf2143ab607354bb30a528c275c8ddaaa95472f1925a32676e86ec7"
+          }
+        }
+      }
+    ]
   },
   "credentialRedacted": true,
-  "evidenceHash": "50213c714d140b62622bb08a3ffb491a7559a8b9166844398ecf57dd056a998a"
+  "evidenceHash": "82c668762783e5235c679f47a34c77c996fb7fc7b9a4fb40845afda19c9193ab"
 }
