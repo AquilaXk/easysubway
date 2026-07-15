@@ -6,7 +6,7 @@
   "representation": "SERVICE_PATTERN_ON_EXISTING_LINE",
   "servicePattern": "EXPRESS",
   "timezone": "Asia/Seoul",
-  "allowedConsumerIssues": ["#1400", "#2098", "#2099"],
+  "allowedConsumerIssues": ["#2145", "#1400", "#2098", "#2099", "#2058", "#2137"],
   "legacyDaejeonRowCount": 0,
   "legacyYongsanDaejeonTripCount": 0,
   "completenessAdmission": {
@@ -19,7 +19,25 @@
     "odMatrixHashInput": ["date", "depStationId", "arrStationId"],
     "odMatrixCanonicalSerialization": "SORTED_TUPLE_ARRAY_JSON_UTF8",
     "requiredDirections": ["up", "down"],
-    "requiredTrainNumberSets": ["TAGO_OD", "KORAIL_PLAN", "MATERIALIZED"],
+    "requiredTrainNumberSets": ["TAGO_OD", "MATERIALIZED"],
+    "korailPlanCorroboration": {
+      "required": false,
+      "missingDisposition": "KORAIL_PLAN_NOT_AVAILABLE_WARNING",
+      "duplicateDisposition": "KORAIL_PLAN_DUPLICATE_FAIL_CLOSED",
+      "mismatchDisposition": "KORAIL_PLAN_MISMATCH_FAIL_CLOSED"
+    },
+    "snapshotAnomalyPolicy": {
+      "version": 1,
+      "baseline": "FIRST_FULLY_VALID_FRESH_ARTIFACT",
+      "maxStationSetChanges": 0,
+      "maxTrainSetChanges": 0,
+      "maxOdSetChanges": 0,
+      "maxCountDelta": 0,
+      "blockedStatus": "CHANGE_BLOCKED",
+      "failureReasonCode": "SNAPSHOT_ANOMALY_BLOCKED"
+    },
+    "failureStages": ["ROSTER", "OD_MATERIALIZATION", "PLAN_CORROBORATION", "SNAPSHOT_DIFF"],
+    "successfulStatus": "ADMITTED",
     "operationResponseContracts": {
       "nonPaginated": ["GetVhcleKndList", "GetCtyCodeList"],
       "paginated": ["GetCtyAcctoTrainSttnList", "GetStrtpntAlocFndTrainInfo"]

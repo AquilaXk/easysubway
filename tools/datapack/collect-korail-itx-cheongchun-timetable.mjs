@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -37,6 +37,7 @@ export async function collectKorailItxCheongchunCompleteness({
   fetchImpl = fetch,
   now = new Date(),
   replay = false,
+  previousAdmittedArtifact = null,
   collectRosterImpl = collectTagoItxCheongchunRoster,
   collectTimetableImpl = null,
 } = {}) {
@@ -146,7 +147,23 @@ export async function collectKorailItxCheongchunCompleteness({
     }
   }
   const complete = serviceDays.length === 3 && serviceDays.every(({ status }) => status === "SUPPORTED");
-  const admissionStatus = complete ? (replay ? "REPLAY_ONLY" : "SUPPORTED") : "MISSING";
+  const snapshotDiff = complete && !replay
+    ? evaluateItxSnapshotAnomaly({ serviceDays, previousArtifact: previousAdmittedArtifact })
+    : { policyVersion: 1, status: "NOT_EVALUATED", serviceDays: [] };
+  const snapshotBlocked = snapshotDiff.status === "CHANGE_BLOCKED";
+  const admittedServiceDays = snapshotBlocked ? serviceDays.map((day) => {
+    const diff = snapshotDiff.serviceDays.find(({ dayCd }) => dayCd === day.dayCd);
+    return diff?.blocked ? {
+      ...day,
+      status: "MISSING",
+      failureStage: "SNAPSHOT_DIFF",
+      failureReasonCode: "SNAPSHOT_ANOMALY_BLOCKED",
+    } : day;
+  }) : serviceDays;
+  const admissionStatus = complete
+    ? replay ? "REPLAY_ONLY" : snapshotBlocked ? "CHANGE_BLOCKED" : "ADMITTED"
+    : "MISSING";
+  const sourcePayloadSha256 = sha256(JSON.stringify({ selectedServiceDates, serviceDays, snapshotDiff }));
   const artifact = {
     schemaVersion: 2,
     artifactKind: "korail-itx-cheongchun-completeness-evidence",
@@ -156,20 +173,142 @@ export async function collectKorailItxCheongchunCompleteness({
     validationMode: replay ? "REPLAY" : "ADMISSION",
     selectedServiceDates,
     admissionStatus,
-    admissionEligible: admissionStatus === "SUPPORTED",
-    allowedConsumerIssues: ["#1400", "#2098", "#2099", "#2058", "#2137"],
+    admissionEligible: admissionStatus === "ADMITTED",
+    allowedConsumerIssues: ["#2145", "#1400", "#2098", "#2099", "#2058", "#2137"],
     legacyDaejeonRowCount: serviceDays.reduce((total, day) => (
       total + (day.timetable?.legacyDaejeonRowCount ?? day.legacyDaejeonRowCount ?? 0)
     ), 0),
     legacyYongsanDaejeonTripCount: serviceDays.reduce((total, day) => (
       total + (day.timetable?.legacyYongsanDaejeonTripCount ?? day.legacyYongsanDaejeonTripCount ?? 0)
     ), 0),
-    serviceDays,
+    serviceDays: admittedServiceDays,
+    snapshotDiff,
+    sourceTimetableArtifact: {
+      status: admissionStatus,
+      ...(admissionStatus === "ADMITTED" ? {
+        id: `itx-cheongchun-source-${now.toISOString().replace(/\D/g, "")}`,
+        sha256: sourcePayloadSha256,
+      } : {}),
+    },
     materialization: { status: complete ? "SUPPORTED" : "MISSING" },
     credentialRedacted: true,
   };
   artifact.evidenceHash = sha256(JSON.stringify(artifact));
   return artifact;
+}
+
+export function evaluateItxSnapshotAnomaly({ serviceDays, previousArtifact = null }) {
+  const policy = {
+    policyVersion: 1,
+    thresholds: {
+      maxStationSetChanges: 0,
+      maxTrainSetChanges: 0,
+      maxOdSetChanges: 0,
+      maxCountDelta: 0,
+    },
+  };
+  if (previousArtifact === null) {
+    return { ...policy, status: "BASELINE_CREATED", previousEvidenceHash: null, serviceDays: [] };
+  }
+  const previousValid = previousArtifact?.artifactKind === "korail-itx-cheongchun-completeness-evidence"
+    && previousArtifact.admissionStatus === "ADMITTED"
+    && previousArtifact.admissionEligible === true
+    && Array.isArray(previousArtifact.serviceDays);
+  const previousByDay = new Map(previousValid
+    ? previousArtifact.serviceDays.map((day) => [day.dayCd, snapshotDay(day)])
+    : []);
+  const comparisons = serviceDays.map((day) => {
+    const current = snapshotDay(day);
+    const previous = previousByDay.get(day.dayCd);
+    if (!previous) return {
+      dayCd: day.dayCd,
+      blocked: true,
+      reason: "PREVIOUS_ADMITTED_SNAPSHOT_MISSING",
+      addedStationIds: current.stationIds,
+      removedStationIds: [],
+      addedTrainNumbers: current.trainNumbers,
+      removedTrainNumbers: [],
+    };
+    const addedStationIds = setDifference(current.stationIds, previous.stationIds);
+    const removedStationIds = setDifference(previous.stationIds, current.stationIds);
+    const addedTrainNumbers = setDifference(current.trainNumbers, previous.trainNumbers);
+    const removedTrainNumbers = setDifference(previous.trainNumbers, current.trainNumbers);
+    const stationSetChanges = addedStationIds.length + removedStationIds.length
+      + Number(current.stationSetHash !== previous.stationSetHash && addedStationIds.length + removedStationIds.length === 0);
+    const trainSetChanges = addedTrainNumbers.length + removedTrainNumbers.length
+      + Number(current.trainSetHash !== previous.trainSetHash && addedTrainNumbers.length + removedTrainNumbers.length === 0);
+    const odSetChanges = Number(current.odSetHash !== previous.odSetHash);
+    const countDelta = Math.max(
+      Math.abs(current.stationCount - previous.stationCount),
+      Math.abs(current.trainCount - previous.trainCount),
+      Math.abs(current.odCount - previous.odCount),
+    );
+    return {
+      dayCd: day.dayCd,
+      blocked: stationSetChanges > policy.thresholds.maxStationSetChanges
+        || trainSetChanges > policy.thresholds.maxTrainSetChanges
+        || odSetChanges > policy.thresholds.maxOdSetChanges
+        || countDelta > policy.thresholds.maxCountDelta,
+      stationSetChanges,
+      trainSetChanges,
+      odSetChanges,
+      countDelta,
+      addedStationIds,
+      removedStationIds,
+      addedTrainNumbers,
+      removedTrainNumbers,
+      current: {
+        stationCount: current.stationCount,
+        trainCount: current.trainCount,
+        odCount: current.odCount,
+        stationSetHash: current.stationSetHash,
+        trainSetHash: current.trainSetHash,
+        odSetHash: current.odSetHash,
+      },
+      previous: {
+        stationCount: previous.stationCount,
+        trainCount: previous.trainCount,
+        odCount: previous.odCount,
+        stationSetHash: previous.stationSetHash,
+        trainSetHash: previous.trainSetHash,
+        odSetHash: previous.odSetHash,
+      },
+    };
+  });
+  return {
+    ...policy,
+    status: comparisons.some(({ blocked }) => blocked) ? "CHANGE_BLOCKED" : "PASS",
+    previousEvidenceHash: previousValid ? previousArtifact.evidenceHash ?? null : null,
+    serviceDays: comparisons,
+  };
+}
+
+function snapshotDay(day) {
+  const stationIds = (day.roster?.stations ?? [])
+    .map(({ canonicalStationId }) => canonicalStationId)
+    .filter((value) => typeof value === "string")
+    .sort(naturalCompare);
+  const trainNumbers = (day.roster?.trainNumbers ?? [])
+    .map(normalizeTrainNumber)
+    .sort(naturalCompare);
+  const stationSetHash = day.stationSetHash ?? sha256(JSON.stringify(stationIds));
+  const trainSetHash = day.trainSetHashes?.materialized ?? sha256(JSON.stringify(trainNumbers));
+  const odCount = Number(day.expectedOdCount ?? 0);
+  return {
+    stationIds,
+    trainNumbers,
+    stationCount: stationIds.length || Number(day.roster?.rosterStationCount ?? 0),
+    trainCount: trainNumbers.length,
+    odCount,
+    stationSetHash,
+    trainSetHash,
+    odSetHash: sha256(JSON.stringify([stationSetHash, odCount])),
+  };
+}
+
+function setDifference(left, right) {
+  const excluded = new Set(right);
+  return left.filter((value) => !excluded.has(value));
 }
 
 export async function collectKorailItxCheongchunPlan({
@@ -1263,6 +1402,11 @@ export async function runKorailItxCompletenessCli({
   const packPath = requiredString(args["canonical-pack"], "--canonical-pack");
   const serviceKey = requiredString(env.DATA_GO_KR_SERVICE_KEY, "DATA_GO_KR_SERVICE_KEY");
   const replay = args.replay === true;
+  const previousPath = args["previous-admitted"];
+  if (previousPath && !path.isAbsolute(previousPath)) throw new Error("--previous-admitted must be absolute");
+  const previousAdmittedArtifact = previousPath
+    ? JSON.parse(await readFile(previousPath, "utf8"))
+    : null;
   const serviceDates = {
     "8": args["day8-date"],
     "7": args["day7-date"],
@@ -1271,7 +1415,9 @@ export async function runKorailItxCompletenessCli({
   validateItxServiceDates(serviceDates, { now, replay });
   let artifact;
   try {
-    artifact = await collectImpl({ serviceKey, serviceDates, packPath, now, replay });
+    artifact = await collectImpl({
+      serviceKey, serviceDates, packPath, now, replay, previousAdmittedArtifact,
+    });
   } catch (error) {
     artifact = {
       schemaVersion: 2,
@@ -1284,7 +1430,7 @@ export async function runKorailItxCompletenessCli({
       admissionStatus: "MISSING",
       admissionEligible: false,
       failureReasonCode: completenessFailureReason(error),
-      allowedConsumerIssues: ["#1400", "#2098", "#2099", "#2058", "#2137"],
+      allowedConsumerIssues: ["#2145", "#1400", "#2098", "#2099", "#2058", "#2137"],
       legacyDaejeonRowCount: 0,
       legacyYongsanDaejeonTripCount: 0,
       serviceDays: [],
@@ -1294,7 +1440,7 @@ export async function runKorailItxCompletenessCli({
     artifact.evidenceHash = sha256(JSON.stringify(artifact));
   }
   await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
-  return { artifact, exitCode: artifact.admissionStatus === "SUPPORTED" ? 0 : 1 };
+  return { artifact, exitCode: artifact.admissionStatus === "ADMITTED" ? 0 : 1 };
 }
 
 async function main() {

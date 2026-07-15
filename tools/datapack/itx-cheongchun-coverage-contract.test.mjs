@@ -96,7 +96,7 @@ test("ITX-청춘 coverage contract는 sequence 성공을 timetable 시각 지원
   assert.equal(contract.claimGate.currentStatus, "NO_GO");
 });
 
-test("ITX-청춘 #2116 evidence wiring은 #1400·#2098·#2099만 허용한다", () => {
+test("ITX-청춘 source artifact는 승인된 후속 이슈만 소비할 수 있다", () => {
   const itxTarget = targets.railProductScope.routeMapAndRouting
     .find(({ serviceId }) => serviceId === "ITX_CHEONGCHUN");
   assert.equal(Object.hasOwn(contract.searchScopePolicy, "trainSearch"), false);
@@ -108,7 +108,7 @@ test("ITX-청춘 #2116 evidence wiring은 #1400·#2098·#2099만 허용한다", 
     contract.searchScopePolicy.metropolitanRouteSearch.SUBWAY_AND_TRAIN,
   );
   assert.equal(targets.railProductScope.trainSearchOnly.services.includes("ITX_CHEONGCHUN"), false);
-  assert.deepEqual(contract.allowedConsumerIssues, ["#1400", "#2098", "#2099"]);
+  assert.deepEqual(contract.allowedConsumerIssues, ["#2145", "#1400", "#2098", "#2099", "#2058", "#2137"]);
   assert.equal(contract.legacyDaejeonRowCount, 0);
   assert.equal(contract.legacyYongsanDaejeonTripCount, 0);
 });
@@ -124,7 +124,25 @@ test("ITX-청춘 admission contract는 날짜·OD matrix·양방향 completeness
     odMatrixHashInput: ["date", "depStationId", "arrStationId"],
     odMatrixCanonicalSerialization: "SORTED_TUPLE_ARRAY_JSON_UTF8",
     requiredDirections: ["up", "down"],
-    requiredTrainNumberSets: ["TAGO_OD", "KORAIL_PLAN", "MATERIALIZED"],
+    requiredTrainNumberSets: ["TAGO_OD", "MATERIALIZED"],
+    korailPlanCorroboration: {
+      required: false,
+      missingDisposition: "KORAIL_PLAN_NOT_AVAILABLE_WARNING",
+      duplicateDisposition: "KORAIL_PLAN_DUPLICATE_FAIL_CLOSED",
+      mismatchDisposition: "KORAIL_PLAN_MISMATCH_FAIL_CLOSED",
+    },
+    snapshotAnomalyPolicy: {
+      version: 1,
+      baseline: "FIRST_FULLY_VALID_FRESH_ARTIFACT",
+      maxStationSetChanges: 0,
+      maxTrainSetChanges: 0,
+      maxOdSetChanges: 0,
+      maxCountDelta: 0,
+      blockedStatus: "CHANGE_BLOCKED",
+      failureReasonCode: "SNAPSHOT_ANOMALY_BLOCKED",
+    },
+    failureStages: ["ROSTER", "OD_MATERIALIZATION", "PLAN_CORROBORATION", "SNAPSHOT_DIFF"],
+    successfulStatus: "ADMITTED",
     operationResponseContracts: {
       nonPaginated: ["GetVhcleKndList", "GetCtyCodeList"],
       paginated: ["GetCtyAcctoTrainSttnList", "GetStrtpntAlocFndTrainInfo"],

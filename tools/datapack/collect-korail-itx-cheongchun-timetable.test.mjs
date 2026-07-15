@@ -9,6 +9,7 @@ import {
   collectKorailItxCheongchunCompleteness,
   collectKorailItxCheongchunPlan,
   collectKorailItxCheongchunTimetable,
+  evaluateItxSnapshotAnomaly,
   materializeKorailItxRows,
   runKorailItxCompletenessCli,
   validateKorailItxPlans,
@@ -160,12 +161,90 @@ test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission ar
     4, 5, 6, 7, 8, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
   ]);
   assert.deepEqual(artifact.selectedServiceDates, { "8": "20260715", "7": "20260718", "9": "20260719" });
-  assert.equal(artifact.admissionStatus, "SUPPORTED");
+  assert.equal(artifact.admissionStatus, "ADMITTED");
   assert.equal(artifact.admissionEligible, true);
-  assert.deepEqual(artifact.allowedConsumerIssues, ["#1400", "#2098", "#2099", "#2058", "#2137"]);
+  assert.equal(artifact.snapshotDiff.status, "BASELINE_CREATED");
+  assert.equal(artifact.snapshotDiff.policyVersion, 1);
+  assert.equal(artifact.sourceTimetableArtifact.status, "ADMITTED");
+  assert.match(artifact.sourceTimetableArtifact.sha256, /^[a-f0-9]{64}$/);
+  assert.deepEqual(artifact.allowedConsumerIssues, ["#2145", "#1400", "#2098", "#2099", "#2058", "#2137"]);
   assert.equal(artifact.serviceDays.length, 3);
   assert.match(artifact.evidenceHash, /^[a-f0-9]{64}$/);
   assert.doesNotMatch(JSON.stringify(artifact), /secret/);
+});
+
+test("ITX snapshot anomaly gate는 동일 집합을 통과시키고 열차 소실을 차단한다", () => {
+  const day = (dayCd, trainNumbers = ["2001", "2002"]) => ({
+    dayCd,
+    status: "SUPPORTED",
+    expectedOdCount: 306,
+    stationSetHash: "a".repeat(64),
+    trainSetHashes: { materialized: createHash("sha256").update(JSON.stringify(trainNumbers)).digest("hex") },
+    roster: {
+      stations: [
+        { canonicalStationId: "station-a" },
+        { canonicalStationId: "station-b" },
+      ],
+      trainNumbers,
+    },
+  });
+  const previousArtifact = {
+    artifactKind: "korail-itx-cheongchun-completeness-evidence",
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    evidenceHash: "f".repeat(64),
+    serviceDays: [day("8"), day("7"), day("9")],
+  };
+
+  const unchanged = evaluateItxSnapshotAnomaly({
+    serviceDays: [day("8"), day("7"), day("9")],
+    previousArtifact,
+  });
+  assert.equal(unchanged.status, "PASS");
+  assert.equal(unchanged.serviceDays.every(({ blocked }) => blocked === false), true);
+
+  const missingTrain = evaluateItxSnapshotAnomaly({
+    serviceDays: [day("8", ["2001"]), day("7"), day("9")],
+    previousArtifact,
+  });
+  assert.equal(missingTrain.status, "CHANGE_BLOCKED");
+  assert.deepEqual(missingTrain.serviceDays[0].removedTrainNumbers, ["2002"]);
+  assert.equal(missingTrain.serviceDays[0].blocked, true);
+});
+
+test("ITX completeness는 이전 ADMITTED snapshot의 열차 소실을 SNAPSHOT_DIFF에서 차단한다", async () => {
+  const serviceDates = { "8": "20260715", "7": "20260718", "9": "20260719" };
+  const collectTimetableImpl = async () => ({
+    materialization: { status: "SUPPORTED" },
+    legacyDaejeonRowCount: 0,
+    legacyYongsanDaejeonTripCount: 0,
+  });
+  const baseline = await collectKorailItxCheongchunCompleteness({
+    serviceKey: "key", serviceDates, packPath: PACK_PATH,
+    now: new Date("2026-07-14T00:00:00.000Z"),
+    collectRosterImpl: async ({ serviceDate, kricServiceDayCode }) => ({
+      ...trainNumberEvidence(), serviceDate, kricServiceDayCode,
+    }),
+    collectTimetableImpl,
+  });
+  const blocked = await collectKorailItxCheongchunCompleteness({
+    serviceKey: "key", serviceDates, packPath: PACK_PATH,
+    now: new Date("2026-07-14T01:00:00.000Z"),
+    previousAdmittedArtifact: baseline,
+    collectRosterImpl: async ({ serviceDate, kricServiceDayCode }) => ({
+      ...trainNumberEvidence(),
+      serviceDate,
+      kricServiceDayCode,
+      trainNumbers: kricServiceDayCode === "8" ? ["02001"] : ["02001", "02002"],
+    }),
+    collectTimetableImpl,
+  });
+
+  assert.equal(blocked.admissionStatus, "CHANGE_BLOCKED");
+  assert.equal(blocked.admissionEligible, false);
+  assert.equal(blocked.serviceDays[0].failureStage, "SNAPSHOT_DIFF");
+  assert.equal(blocked.serviceDays[0].failureReasonCode, "SNAPSHOT_ANOMALY_BLOCKED");
+  assert.deepEqual(blocked.snapshotDiff.serviceDays[0].removedTrainNumbers, ["2002"]);
 });
 
 test("ITX completeness는 partial day·replay·provider 오류를 admission하지 않는다", async (context) => {
@@ -441,9 +520,48 @@ test("ITX CLI는 runtime 실패를 MISSING artifact로 저장하고 non-zero를 
     assert.equal(artifact.admissionStatus, "MISSING");
     assert.equal(artifact.admissionEligible, false);
     assert.equal(artifact.schemaVersion, 2);
-    assert.deepEqual(artifact.allowedConsumerIssues, ["#1400", "#2098", "#2099", "#2058", "#2137"]);
+    assert.deepEqual(artifact.allowedConsumerIssues, ["#2145", "#1400", "#2098", "#2099", "#2058", "#2137"]);
     assert.equal(artifact.failureReasonCode, "PROVIDER_HTTP_FAILURE");
     assert.doesNotMatch(JSON.stringify(artifact), /503|secret/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("ITX CLI는 absolute previous ADMITTED artifact를 tracked parser로 전달한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-cli-previous-"));
+  const previous = path.join(dir, "previous.json");
+  const output = path.join(dir, "current.json");
+  const admitted = {
+    schemaVersion: 2,
+    artifactKind: "korail-itx-cheongchun-completeness-evidence",
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    serviceDays: [],
+  };
+  try {
+    await runKorailItxCompletenessCli({
+      argv: [
+        "--day8-date", "20260715", "--day7-date", "20260718", "--day9-date", "20260719",
+        "--canonical-pack", PACK_PATH, "--output", previous,
+      ],
+      env: { DATA_GO_KR_SERVICE_KEY: "secret" },
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectImpl: async () => admitted,
+    });
+    const result = await runKorailItxCompletenessCli({
+      argv: [
+        "--day8-date", "20260715", "--day7-date", "20260718", "--day9-date", "20260719",
+        "--canonical-pack", PACK_PATH, "--previous-admitted", previous, "--output", output,
+      ],
+      env: { DATA_GO_KR_SERVICE_KEY: "secret" },
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectImpl: async ({ previousAdmittedArtifact }) => {
+        assert.deepEqual(previousAdmittedArtifact, admitted);
+        return admitted;
+      },
+    });
+    assert.equal(result.exitCode, 0);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
