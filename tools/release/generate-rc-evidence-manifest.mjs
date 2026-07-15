@@ -219,6 +219,7 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion)
     ["post_launch_operations", 1019],
     ["android_release_quality", 1021],
     ["abuse_penetration_rehearsal", 1022],
+    ["container_hardening", 1914],
   ];
   return sourceEntries.map(([id, sourceIssue]) => ({
     id,
