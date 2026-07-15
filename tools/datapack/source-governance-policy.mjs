@@ -4,6 +4,7 @@ import { deriveFreshness } from "./freshness-policy.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
+const RELEASE_PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const LICENSE_STATUSES = new Set(["APPROVED", "REVIEW_REQUIRED", "BLOCKED", "EXPIRED"]);
 const LEGAL_HOLD_REASONS = new Set(["REGULATORY_AUDIT", "SECURITY_INVESTIGATION", "LEGAL_REQUEST"]);
 const GOVERNANCE_REASON_CODES = new Set([
@@ -253,7 +254,11 @@ function evaluateRetention({
 
   const holdValid = legalHold == null ? false : validateLegalHold(legalHold, entry, snapshot, evaluatedMillis);
   if (legalHold != null && !holdValid) reasonCodes.add("LEGAL_HOLD_INVALID");
-  const releaseProtected = Array.isArray(protectedBy) && protectedBy.length > 0;
+  const validProtection = Array.isArray(protectedBy)
+    && new Set(protectedBy).size === protectedBy.length
+    && protectedBy.every((reason) => RELEASE_PROTECTION_REASONS.has(reason));
+  if (!validProtection) reasonCodes.add("RAW_RETENTION_OVERDUE");
+  const releaseProtected = validProtection && protectedBy.length > 0;
   const purgeCompleted = validPurgeEvidence(purgeEvidence, entry, snapshot, storedMillis, evaluatedMillis);
   if (evaluatedMillis >= storedMillis && !releaseProtected && !holdValid && !purgeCompleted) {
     reasonCodes.add("RAW_RETENTION_OVERDUE");

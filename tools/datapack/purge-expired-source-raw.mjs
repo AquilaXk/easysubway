@@ -22,7 +22,6 @@ const ALLOWED_ARGS = new Set([
 const PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const DELETE_CONCURRENCY = 4;
 const DELETE_TIMEOUT_MS = 30_000;
-const EXECUTION_CLOCK_SKEW_MS = 5 * 60 * 1_000;
 const PREAUTH_BASE_URL_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL";
 const SNAPSHOT_EVIDENCE_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_SNAPSHOT_EVIDENCE_SHA256";
 const LEDGER_SHA256_ENV = "EASYSUBWAY_SOURCE_RAW_PURGE_LEDGER_SHA256";
@@ -33,7 +32,7 @@ async function main(argv) {
   const outputPath = path.resolve(requiredArg(args, "output"));
   const evaluationAt = requiredArg(args, "evaluation-at");
   const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
-  if (!args.dryRun && evaluatedMillis > Date.now() + EXECUTION_CLOCK_SKEW_MS) {
+  if (!args.dryRun && evaluatedMillis > Date.now()) {
     throw new Error("evaluationAt must not be in the future for actual DELETE");
   }
   const baseUrl = args.dryRun
@@ -65,7 +64,7 @@ async function main(argv) {
 
   for (const item of plan) {
     if (item.disposition === "PROTECTED") {
-      report.protected.push(sanitized(item));
+      report.protected.push(sanitizedProtection(item));
       continue;
     }
     if (item.disposition === "NOT_EXPIRED") {
@@ -124,8 +123,24 @@ export async function deleteExpiredItems(
     results.push(...await Promise.all(batch.map(async (item) => {
       let status;
       try {
+        const current = await fetchImpl(item.objectUrl, {
+          method: "GET",
+          redirect: "error",
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (current.status === 404 || current.status === 410) {
+          return { item, status: current.status };
+        }
+        const etag = current.headers?.get?.("etag");
+        if (current.status !== 200
+          || typeof etag !== "string"
+          || !/^"[^"\r\n]+"$/.test(etag)
+          || await responseSha256(current) !== item.rawSha256) {
+          return { item, status: 412 };
+        }
         status = (await fetchImpl(item.objectUrl, {
           method: "DELETE",
+          headers: { "If-Match": etag },
           redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
         })).status;
@@ -202,6 +217,8 @@ export function buildPurgePlan({
       snapshotId,
       rawSha256: entry.rawSha256,
       objectUrl: objectUrl(baseUrl, objectKey),
+      protectedBy,
+      legalHold: holdValid ? entry.legalHold : null,
       disposition,
     };
   });
@@ -411,6 +428,21 @@ function emptyReport(evaluationAt, dryRun) {
 
 function sanitized(item) {
   return { sourceId: item.sourceId, snapshotId: item.snapshotId, rawSha256: item.rawSha256 };
+}
+
+function sanitizedProtection(item) {
+  return {
+    ...sanitized(item),
+    protectedBy: item.protectedBy,
+    legalHold: item.legalHold,
+  };
+}
+
+async function responseSha256(response) {
+  if (response.body == null) return null;
+  const hash = createHash("sha256");
+  for await (const chunk of response.body) hash.update(chunk);
+  return hash.digest("hex");
 }
 
 async function writeJson(outputPath, value) {

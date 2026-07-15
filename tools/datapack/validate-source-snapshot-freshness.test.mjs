@@ -177,6 +177,28 @@ test("PASS purge report를 snapshot별 완료 evidence로 검증해 변환한다
   );
 });
 
+test("PASS purge report의 검증된 protection을 snapshot governance 입력으로 변환한다", () => {
+  const report = purgeReport([]);
+  report.protected = [{
+    sourceId: "source-a",
+    snapshotId: "snapshot-a",
+    rawSha256: "a".repeat(64),
+    protectedBy: ["ACTIVE_RELEASE"],
+    legalHold: null,
+  }];
+  report.reportSha256 = createHash("sha256")
+    .update(JSON.stringify({ ...report, reportSha256: undefined }))
+    .digest("hex");
+
+  assert.deepEqual(purgeEvidenceBySnapshot(report).get("source-a\0snapshot-a"), {
+    sourceId: "source-a",
+    snapshotId: "snapshot-a",
+    rawSha256: "a".repeat(64),
+    protectedBy: ["ACTIVE_RELEASE"],
+    legalHold: null,
+  });
+});
+
 test("freshness validator는 hash-bound purge report를 retention 완료 근거로 소비한다", () => {
   const value = input({
     freshnessExpiresAt: "2027-07-12T00:00:00Z",
@@ -247,6 +269,20 @@ test("freshness validator는 hash-bound purge report를 retention 완료 근거�
   const result = validateSourceSnapshotFreshness(value);
 
   assert.equal(result.governanceResults[0].decision, "GO");
+
+  value.purgeReport = purgeReport([]);
+  value.purgeReport.protected = [{
+    sourceId: value.snapshots[0].sourceId,
+    snapshotId: value.snapshots[0].snapshotId,
+    rawSha256: value.snapshots[0].rawSha256,
+    protectedBy: ["ACTIVE_RELEASE"],
+    legalHold: null,
+  }];
+  value.purgeReport.reportSha256 = createHash("sha256")
+    .update(JSON.stringify({ ...value.purgeReport, reportSha256: undefined }))
+    .digest("hex");
+
+  assert.equal(validateSourceSnapshotFreshness(value).governanceResults[0].decision, "GO");
 });
 
 test("선택한 head만 freshness를 판정하고 만료된 이전 snapshot은 lineage로만 검증한다", () => {

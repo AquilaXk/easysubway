@@ -27,6 +27,7 @@ const policyBoundProvenanceStringFields = [
   "governancePolicySha256",
 ];
 const buildProvenanceBooleanFields = ["redistributionAllowed", "credentialRedacted"];
+const RELEASE_PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const approvedLegacyGovernanceSnapshotHashes = new Map([
   ["molit-urban-rail-full-route-capital-admission-20260712", "3f676f7ffd29b1a1b5872d65c9926284ba6c88f9a64e00d31323c8617131f452"],
   ["seoulmetro-station-line-info-capital-admission-20260712", "8a171105588371f087f8ee58e2c207c0ed1a32dc6b459aa0427d7262ad393e07"],
@@ -134,14 +135,19 @@ export function validateSourceSnapshotFreshness({
       throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: governance policy binding");
     }
     const sources = new Map(inventory.sources.map((source) => [source.id, source]));
-    governanceResults = effectiveSnapshots.map((snapshot) => evaluateSourceGovernance({
-      source: sources.get(snapshot.sourceId),
-      snapshot,
-      policy: governancePolicy,
-      freshnessPolicy: policy,
-      evaluationAt,
-      purgeEvidence: purgeEvidence.get(`${snapshot.sourceId}\0${snapshot.snapshotId}`) ?? null,
-    }));
+    governanceResults = effectiveSnapshots.map((snapshot) => {
+      const rawState = purgeEvidence.get(`${snapshot.sourceId}\0${snapshot.snapshotId}`) ?? null;
+      return evaluateSourceGovernance({
+        source: sources.get(snapshot.sourceId),
+        snapshot,
+        policy: governancePolicy,
+        freshnessPolicy: policy,
+        evaluationAt,
+        purgeEvidence: rawState?.purgedAt == null ? null : rawState,
+        protectedBy: rawState?.protectedBy ?? [],
+        legalHold: rawState?.legalHold ?? null,
+      });
+    });
     const reasonCodes = [...new Set(governanceResults.flatMap((result) => result.reasonCodes))].sort();
     if (reasonCodes.length > 0) throw new Error(reasonCodes.join(","));
   }
@@ -265,7 +271,8 @@ export function purgeEvidenceBySnapshot(report) {
     || !Number.isFinite(evaluatedMillis)
     || completedMillis < evaluatedMillis
     || !Array.isArray(report.deleted)
-    || !Array.isArray(report.alreadyAbsent)) {
+    || !Array.isArray(report.alreadyAbsent)
+    || !Array.isArray(report.protected)) {
     throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report");
   }
   const purgedAt = new Date(completedMillis).toISOString();
@@ -279,6 +286,23 @@ export function purgeEvidenceBySnapshot(report) {
       throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report duplicate snapshot");
     }
     evidence.set(key, { sourceId, snapshotId, rawSha256, purgedAt });
+  }
+  for (const entry of report.protected) {
+    const sourceId = requiredString(entry?.sourceId, "purge report sourceId");
+    const snapshotId = requiredString(entry?.snapshotId, "purge report snapshotId");
+    const rawSha256 = requiredSha256(entry?.rawSha256, "purge report rawSha256");
+    const protectedBy = entry?.protectedBy;
+    const legalHold = entry?.legalHold ?? null;
+    const key = `${sourceId}\0${snapshotId}`;
+    if (evidence.has(key)
+      || !Array.isArray(protectedBy)
+      || new Set(protectedBy).size !== protectedBy.length
+      || !protectedBy.every((reason) => RELEASE_PROTECTION_REASONS.has(reason))
+      || (protectedBy.length === 0 && legalHold == null)
+      || (legalHold != null && (typeof legalHold !== "object" || Array.isArray(legalHold)))) {
+      throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report protection");
+    }
+    evidence.set(key, { sourceId, snapshotId, rawSha256, protectedBy, legalHold });
   }
   return evidence;
 }

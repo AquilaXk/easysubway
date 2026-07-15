@@ -29,6 +29,15 @@ test("만료 raw만 삭제하고 active·rollback·legal hold 원본은 보존�
     const first = await runPurge({ ...files, baseUrl, output: path.join(workDir, "first.json") });
     assert.deepEqual(first.deleted.map((entry) => entry.snapshotId), ["expired"]);
     assert.deepEqual(first.protected.map((entry) => entry.snapshotId), ["active", "legal-hold", "rollback"]);
+    assert.deepEqual(first.protected.map((entry) => entry.protectedBy), [
+      ["ACTIVE_RELEASE"],
+      [],
+      ["ROLLBACK_WINDOW"],
+    ]);
+    assert.equal(
+      first.protected.find((entry) => entry.snapshotId === "legal-hold").legalHold.reasonCode,
+      "REGULATORY_AUDIT",
+    );
     assert.deepEqual(requests, ["/raw/expired.json"]);
     assert.equal(objects.has("/raw/expired.json"), false);
     assert.equal(objects.has("/raw/active.json"), true);
@@ -37,7 +46,7 @@ test("만료 raw만 삭제하고 active·rollback·legal hold 원본은 보존�
 
     const second = await runPurge({ ...files, baseUrl, output: path.join(workDir, "second.json") });
     assert.deepEqual(second.alreadyAbsent.map((entry) => entry.snapshotId), ["expired"]);
-    assert.deepEqual(requests, ["/raw/expired.json", "/raw/expired.json"]);
+    assert.deepEqual(requests, ["/raw/expired.json"]);
   });
 });
 
@@ -139,6 +148,25 @@ test("실제 DELETE는 system clock보다 미래인 evaluation-at을 요청 전�
         baseUrl,
         output: path.join(workDir, "future-evaluation.json"),
         evaluationAtOverride: "2099-01-01T00:00:00Z",
+      }),
+      /evaluationAt must not be in the future/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
+test("실제 DELETE는 clock skew 이내라도 미래인 evaluation-at을 요청 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "near-future-evaluation.json"),
+        evaluationAtOverride: new Date(Date.now() + 60_000).toISOString(),
       }),
       /evaluationAt must not be in the future/,
     );
@@ -281,21 +309,78 @@ test("DELETE는 최대 4개 동시 실행하고 각 요청에 timeout signal을 
   let maxActive = 0;
   const items = Array.from({ length: 9 }, (_, index) => ({
     snapshotId: `snapshot-${index}`,
+    rawSha256: sha256(`raw-${index}`),
     objectUrl: `https://objects.example.invalid/raw/${index}`,
   }));
   const results = await deleteExpiredItems(items, {
-    fetchImpl: async (_url, options) => {
+    fetchImpl: async (url, options) => {
+      const objectUrl = new URL(url);
       assert.ok(options.signal instanceof AbortSignal);
       active += 1;
       maxActive = Math.max(maxActive, active);
       await new Promise((resolve) => setTimeout(resolve, 5));
       active -= 1;
-      return { status: 204 };
+      if (options.method === "GET") {
+        return new Response(`raw-${objectUrl.pathname.split("/").at(-1)}`, {
+          headers: { etag: `"version-${objectUrl.pathname.split("/").at(-1)}"` },
+        });
+      }
+      return new Response(null, { status: 204 });
     },
   });
 
   assert.equal(maxActive, 4);
   assert.deepEqual(results.map((result) => result.status), Array(9).fill(204));
+});
+
+test("원격 raw bytes가 snapshot hash와 다르면 DELETE하지 않는다", async () => {
+  const methods = [];
+  const [result] = await deleteExpiredItems(
+    [{
+      snapshotId: "changed",
+      rawSha256: sha256("approved-bytes"),
+      objectUrl: "https://objects.example.invalid/raw/changed",
+    }],
+    {
+      fetchImpl: async (_url, options) => {
+        methods.push(options.method);
+        if (options.method === "GET") {
+          return new Response("changed-bytes", { headers: { etag: '"changed-version"' } });
+        }
+        return new Response(null, { status: 204 });
+      },
+    },
+  );
+
+  assert.equal(result.status, 412);
+  assert.deepEqual(methods, ["GET"]);
+});
+
+test("검증한 원격 ETag를 If-Match로 고정해 DELETE한다", async () => {
+  const raw = "approved-bytes";
+  const requests = [];
+  const [result] = await deleteExpiredItems(
+    [{
+      snapshotId: "approved",
+      rawSha256: sha256(raw),
+      objectUrl: "https://objects.example.invalid/raw/approved",
+    }],
+    {
+      fetchImpl: async (_url, options) => {
+        requests.push({ method: options.method, ifMatch: options.headers?.["If-Match"] });
+        if (options.method === "GET") {
+          return new Response(raw, { headers: { etag: '"approved-version"' } });
+        }
+        return new Response(null, { status: 204 });
+      },
+    },
+  );
+
+  assert.equal(result.status, 204);
+  assert.deepEqual(requests, [
+    { method: "GET", ifMatch: undefined },
+    { method: "DELETE", ifMatch: '"approved-version"' },
+  ]);
 });
 
 test("응답 없는 DELETE는 timeout 뒤 실패 상태로 반환한다", async () => {
@@ -314,12 +399,30 @@ test("응답 없는 DELETE는 timeout 뒤 실패 상태로 반환한다", async 
 
 async function withFixture(run) {
   const workDir = path.join(tmpdir(), `easysubway-source-purge-${process.pid}-${Date.now()}`);
-  const objects = new Set();
+  const objectBodies = new Map();
+  const objects = {
+    add(objectPath, body = objectPath) {
+      objectBodies.set(objectPath, body);
+      return this;
+    },
+    delete: (objectPath) => objectBodies.delete(objectPath),
+    get: (objectPath) => objectBodies.get(objectPath),
+    has: (objectPath) => objectBodies.has(objectPath),
+  };
   const requests = [];
   const failPaths = new Set();
   const responseStatuses = new Map();
   await mkdir(workDir, { recursive: true });
   const server = createServer((request, response) => {
+    if (request.method === "GET") {
+      if (!objects.has(request.url)) {
+        response.writeHead(404).end();
+        return;
+      }
+      const body = objects.get(request.url);
+      response.writeHead(200, { etag: `"${sha256(body)}"` }).end(body);
+      return;
+    }
     if (request.method !== "DELETE") {
       response.writeHead(405).end();
       return;
@@ -331,6 +434,10 @@ async function withFixture(run) {
     }
     if (failPaths.has(request.url)) {
       response.writeHead(503).end();
+      return;
+    }
+    if (request.headers["if-match"] !== `"${sha256(objects.get(request.url) ?? "")}"`) {
+      response.writeHead(412).end();
       return;
     }
     if (!objects.delete(request.url)) {
@@ -461,7 +568,7 @@ function rawEntry(snapshotId, objectKey, overrides = {}) {
     sourceId: `source-${snapshotId}`,
     snapshotId,
     objectKey,
-    rawSha256: sha256(snapshotId),
+    rawSha256: sha256(`/${objectKey}`),
     retrievedAt: "2026-04-16T00:00:00Z",
     rawRetentionExpiresAt: "2026-07-15T00:00:00.000Z",
     protectedBy: [],
