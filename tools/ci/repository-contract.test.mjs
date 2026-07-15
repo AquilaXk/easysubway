@@ -996,6 +996,10 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /printf 'base_image=%s\\n' "\$\{base_image\}"/);
   assert.match(workflow, /printf 'image_digest=%s\\n' "\$\{digest\}"/);
   assert.match(workflow, /name: backend-image-identity-\$\{\{ needs\.plan\.outputs\.sha \}\}/);
+  assert.match(
+    workflow,
+    /if digest="\$\(docker buildx imagetools inspect[\s\S]*?else[\s\S]*?docker buildx build[\s\S]*?^          fi[\s\S]*?arch="\$\(docker buildx imagetools inspect/m,
+  );
   assert.match(workflow, /if \[\[ "\$\{arch\}" != "linux\/arm64" \]\]; then/);
   assert.match(workflow, /CD Deploy \/ Pull backend image by digest/);
   assert.match(workflow, /docker tag "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}" "easysubway-backend:\$\{DEPLOY_SHA\}"/);

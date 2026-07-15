@@ -406,6 +406,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /fail_backend_deployment "backend_start_failed"/);
   assert.match(deploy, /fail_backend_deployment "observability_start_failed"/);
   assert.match(deploy, /verify_runtime_hardening\(\)/);
+  assert.match(deploy, /runtime_services_hardened\(\)/);
   assert.match(deploy, /docker inspect --format '\{\{\.Config\.User\}\}\|\{\{\.HostConfig\.ReadonlyRootfs\}\}\|\{\{json \.HostConfig\.Tmpfs\}\}\|\{\{json \.HostConfig\.CapDrop\}\}\|\{\{json \.HostConfig\.SecurityOpt\}\}'/);
   assert.match(deploy, /docker exec "\$\{container_id\}" id -u/);
   assert.match(deploy, /docker exec "\$\{container_id\}" id -g/);
@@ -414,8 +415,13 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /docker exec "\$\{container_id\}" cat \/proc\/1\/status/);
   assert.match(deploy, /CapEff:/);
   assert.match(deploy, /NoNewPrivs:/);
-  assert.match(deploy, /for service in "\$\{RUNTIME_SERVICES\[@\]\}"; do[\s\S]*verify_runtime_hardening "\$\{service\}"/);
-  assert.match(deploy, /fail_backend_deployment "\$\{service\}_hardening_failed"/);
+  assert.ok(
+    deploy.indexOf("runtime_services_hardened()") < deploy.indexOf('if [[ "${current_sha}" == "${DEPLOY_SHA}"'),
+    "runtime hardening helper must be available to the same-SHA no-op path",
+  );
+  assert.match(deploy, /compose_services_running[\s\S]*&& runtime_services_hardened; then/);
+  assert.match(deploy, /if ! runtime_services_hardened; then/);
+  assert.match(deploy, /fail_backend_deployment "runtime_hardening_failed"/);
   assert.ok(
     deploy.indexOf('verify_runtime_hardening "${service}"') < deploy.indexOf('ready=0'),
     "runtime hardening must pass before readiness completes the deployment",

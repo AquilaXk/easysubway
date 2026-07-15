@@ -166,19 +166,19 @@ jobs:
               -t "${tag}" \
               backend
 
-            # An amd64 image would not even start on the aarch64 server, so gate
-            # the architecture before publishing.
-            arch="$(docker buildx imagetools inspect "${tag}" --format '{{range .Manifest.manifests}}{{if eq .platform.os "linux"}}{{.platform.os}}/{{.platform.architecture}}{{end}}{{end}}')"
-            if [[ "${arch}" != "linux/arm64" ]]; then
-              echo "built image arch ${arch}, expected linux/arm64" >&2
-              exit 1
-            fi
-
             digest="$(docker buildx imagetools inspect "${tag}" --format '{{.Manifest.digest}}')"
             if ! grep -Eq '"containerimage\.digest"[[:space:]]*:[[:space:]]*"'"${digest}"'"' "${metadata_file}"; then
               echo "Buildx metadata digest does not match the pushed manifest" >&2
               exit 1
             fi
+          fi
+
+          # A failed build may leave its SHA tag in GHCR. Gate both new and
+          # reused tags before accepting their digest for deployment.
+          arch="$(docker buildx imagetools inspect "${tag}" --format '{{range .Manifest.manifests}}{{if eq .platform.os "linux"}}{{.platform.os}}/{{.platform.architecture}}{{end}}{{end}}')"
+          if [[ "${arch}" != "linux/arm64" ]]; then
+            echo "built image arch ${arch}, expected linux/arm64" >&2
+            exit 1
           fi
 
           if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
