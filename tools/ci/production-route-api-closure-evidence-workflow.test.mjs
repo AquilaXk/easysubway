@@ -92,6 +92,8 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.doesNotMatch(purgeSql, /BEGIN|EXPLAIN|ROLLBACK/);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);
   assert.match(snapshotGate, /pg_restore/);
+  assert.match(snapshotGate, /cat \/proc\/1\/comm/);
+  assert.match(snapshotGate, /restore_init_process[^\n]+==[^\n]+postgres/);
   assert.match(snapshotGate, /--pull never/);
   assert.match(snapshotGate, /--cpus "\$\{RESTORE_CPU_LIMIT\}"/);
   assert.match(snapshotGate, /--memory "\$\{RESTORE_MEMORY_LIMIT\}"/);
@@ -114,6 +116,10 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.ok(
     snapshotGate.indexOf("ANALYZE route_search_results") < snapshotGate.indexOf("EXPLAIN (ANALYZE, BUFFERS, WAL)"),
     "restored purge tables must be analyzed before the measured plan",
+  );
+  assert.ok(
+    snapshotGate.indexOf("cat /proc/1/comm") < snapshotGate.indexOf("pg_restore"),
+    "restore must wait for the final PostgreSQL server, not the temporary init server",
   );
   assert.match(snapshotGate, /EXPLAIN \(ANALYZE, BUFFERS, WAL/);
   assert.match(snapshotGate, /ROLLBACK/);
