@@ -2168,9 +2168,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   const abusePenetrationRehearsalPath = "apps/mobile/release/abuse-penetration-rehearsal-gate.json";
   const abusePenetrationRehearsalGate = readJson(abusePenetrationRehearsalPath);
   const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
+  const operationsEvidence = readJson("apps/mobile/release/operations-release-evidence.json");
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
+  const backendBuild = read("backend/build.gradle");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -2207,10 +2209,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(gate.artifacts.android.productionRcSigningKeyType, "production-upload-key");
   assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("uploadKeySha256Fingerprint"));
   assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("appSigningKeySha256Fingerprint"));
+  assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("supportContactSetSha256"));
   assert.ok(gate.artifacts.android.productionRcRequiredMetadata.includes("versionCodeMonotonicPolicy"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play production access or closed test requirement satisfaction evidence"));
   assert.ok(gate.artifacts.android.storeReadyRequires.includes("Play-generated APK device compatibility matrix evidence"));
-  assert.ok(gate.artifacts.android.storeReadyRequires.includes("Post-launch 2h/24h/7d/30d operations review evidence"));
+  assert.ok(gate.artifacts.android.storeReadyRequires.includes("Phase A pre-launch operations readiness and dry-run evidence"));
+  assert.equal(gate.operationsPhasePolicy.preLaunchRequiredStatus, "PASS");
+  assert.equal(gate.operationsPhasePolicy.prePublicPostLaunchStatus, "PENDING_PUBLIC_RELEASE");
+  assert.equal(gate.operationsPhasePolicy.actualPostLaunchObservationsRequiredBeforeFirstPublicRelease, false);
   assert.ok(
     gate.artifacts.android.storeReadyRequires.includes(
       "Support, data correction, incident notice, emergency datapack response evidence",
@@ -2359,14 +2365,133 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(playGeneratedApkDeviceMatrixGate.goNoGoRules.shellInstalledArtifactUsedAsPlayInstalledSmoke, "BLOCKED_EXTERNAL");
   assert.equal(postLaunchOperationsReviewGate.releaseGate, "post-launch-operations-review");
   assert.equal(postLaunchOperationsReviewGate.issue, 1019);
-  assert.equal(postLaunchOperationsReviewGate.status, "BLOCKED_EXTERNAL");
+  assert.equal(postLaunchOperationsReviewGate.status, "IN_PROGRESS");
+  assert.equal(postLaunchOperationsReviewGate.preLaunchReadiness.status, "PASS");
+  const phaseAReleaseVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
+  assert.ok(phaseAReleaseVersion, "mobile pubspec must contain versionName+versionCode");
+  assert.equal(
+    phaseAReleaseVersion[1],
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.appVersionName,
+  );
+  assert.equal(
+    Number(phaseAReleaseVersion[2]),
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.versionCode,
+  );
+  assert.equal(postLaunchOperationsReviewGate.postLaunchObservation.status, "PENDING_PUBLIC_RELEASE");
+  assert.deepEqual(postLaunchOperationsReviewGate.postLaunchObservation.publicReleaseIdentity, {
+    publishedAt: null,
+    versionCode: null,
+    gitSha: null,
+  });
+  assert.equal(
+    postLaunchOperationsReviewGate.postLaunchObservation.dueTimePolicy,
+    "dueAt = publicReleaseIdentity.publishedAt + reviewWindows[].afterPublicRelease",
+  );
+  assert.deepEqual(postLaunchOperationsReviewGate.postLaunchObservation.allowedStatusTransitions, [
+    "PENDING_PUBLIC_RELEASE->IN_PROGRESS",
+    "IN_PROGRESS->PASS",
+  ]);
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.requiredFields.includes("gitSha"),
+  );
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.requiredFields.includes("versionCode"),
+  );
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.requiredFields.includes("supportContactSetSha256"),
+  );
+  assert.equal(
+    supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.contactSetSha256,
+    "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
+  );
+  assert.equal(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.requiredFields.includes("backendImageDigest"),
+    false,
+  );
+  assert.deepEqual(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.backendIdentityFieldsAnyOf,
+    rcEvidenceManifestContract.backendIdentityFieldsAnyOf,
+  );
+  const validatedArtifactIdentity =
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentity;
+  assert.match(validatedArtifactIdentity.aabPayloadSha256, /^[0-9a-f]{64}$/);
+  assert.deepEqual(
+    validatedArtifactIdentity,
+    {
+      aabPayloadSha256: validatedArtifactIdentity.aabPayloadSha256,
+      backendArtifactSha256:
+        operationsEvidence.backendControlPlane.latestQaEvidenceStatus.phaseACurrentRcArtifact.backendArtifactSha256,
+      dataPackManifestSha256: createHash("sha256")
+        .update(read("apps/mobile/assets/datapacks/metro_map_pack/manifest.json"))
+        .digest("hex"),
+    },
+  );
+  assert.deepEqual(
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentityEvidence,
+    {
+      aabPayload: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json",
+      backend: "apps/mobile/release/operations-release-evidence.json",
+      dataPackManifest: "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+    },
+  );
+  assert.deepEqual(postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity, {
+    appVersionName: "1.0.4",
+    versionCode: 10005,
+    validFromKst: "2026-07-15",
+    validUntilKst: "2026-07-28",
+    refreshOn: [
+      "operations-contract-change",
+      "support-contact-or-help-ui-change",
+      "observability-infrastructure-change",
+      "fixed-release-procedure-change",
+    ],
+  });
+  const refreshBindings = postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.refreshBindings;
+  assert.deepEqual(
+    refreshBindings.map((binding) => binding.refreshOn).sort(),
+    postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.refreshOn.toSorted(),
+  );
+  for (const binding of refreshBindings) {
+    assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
+    for (const file of binding.files) {
+      assert.equal(
+        createHash("sha256").update(read(file.path)).digest("hex"),
+        file.sha256,
+        `${binding.refreshOn} evidence is stale for ${file.path}`,
+      );
+    }
+  }
+  const refreshBoundPaths = new Set(
+    refreshBindings.flatMap((binding) => binding.files.map((file) => file.path)),
+  );
+  for (const requiredPath of [
+    "tools/ops/generate-operations-phase-a-summary.mjs",
+    "tools/ops/validate-operations-release-summary.mjs",
+    "tools/release/summary-validation-utils.mjs",
+    "tools/release/hash-android-bundle-payload.mjs",
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "tools/datapack/run-emergency-datapack-drill.mjs",
+    "tools/release/upload-play-internal.mjs",
+    "apps/mobile/release/route-commercialization-gate.json",
+    "apps/mobile/pubspec.yaml",
+    "backend/build.gradle",
+    "backend/Dockerfile",
+  ]) {
+    assert.ok(refreshBoundPaths.has(requiredPath), `${requiredPath} must invalidate Phase A evidence`);
+  }
+  assert.ok(
+    postLaunchOperationsReviewGate.preLaunchReadiness.requiredEvidence.includes(
+      "p0-data-error-emergency-release-rollback-rehearsal",
+    ),
+  );
   assert.equal(postLaunchOperationsReviewGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(postLaunchOperationsReviewGate.operationsEvidenceManifest, "apps/mobile/release/operations-release-evidence.json");
   assert.equal(postLaunchOperationsReviewGate.supportIncidentResponseGate, supportIncidentResponsePath);
   assert.match(postLaunchOperationsReviewGate.evidenceRoot, /\.codex\/evidence\/release\/post-launch-operations-review\/<rc-or-run>/);
-  assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.qaEvidenceDateKst, "2026-06-28");
+  assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.qaEvidenceDateKst, "2026-07-15");
   assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.alertRouteDryRun.result, "PASS");
   assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.alertRouteDryRun.channel, "Slack Incoming Webhook");
+  assert.deepEqual(postLaunchOperationsReviewGate.latestQaEvidenceSummary.alertRouteDryRun.severities, ["P0", "P1", "P2"]);
   assert.match(
     postLaunchOperationsReviewGate.latestQaEvidenceSummary.alertRouteDryRun.publicEvidenceSummary,
     /HTTP 200 \/ ok/,
@@ -2387,6 +2512,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "post-launch-review-window-evidence-after-public-release",
   ]);
   assert.deepEqual(
+    postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.map((item) => item.id),
+    postLaunchOperationsReviewGate.preLaunchReadiness.requiredEvidence,
+  );
+  assert.ok(postLaunchOperationsReviewGate.preLaunchReadiness.evidenceSummary.every((item) => item.status === "PASS"));
+  assert.deepEqual(
     postLaunchOperationsReviewGate.reviewWindows.map((window) => window.id),
     ["first_2h", "first_24h", "day_7", "day_30"],
   );
@@ -2394,6 +2524,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     assert.ok(window.ownerKo.length > 0, `${window.id} must define owner`);
     assert.ok(window.requiredSignals.length > 0, `${window.id} must define monitoring signals`);
     assert.ok(window.decisionKo.length > 0, `${window.id} must define decision rule`);
+    assert.equal(window.dueAtFormula, `publicReleaseIdentity.publishedAt+${window.afterPublicRelease}`);
+    assert.match(window.recordLocation, /^\.codex\/evidence\/release\/post-launch-operations-review\//);
   }
   assert.deepEqual(
     postLaunchOperationsReviewGate.killSwitchAndRollbackOwners.map((owner) => owner.domain).sort(),
@@ -2405,6 +2537,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.ok(postLaunchOperationsReviewGate.dryRunRequiredEvidence.includes("alert-route-dry-run-log"));
   assert.deepEqual(postLaunchOperationsReviewGate.releaseEvidenceSummaryPolicy.githubSummaryFields, [
     "reviewWindowId",
+    "observedAt",
     "artifactIdentity",
     "signalSnapshot",
     "owner",
@@ -2460,7 +2593,29 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   }
   assert.equal(supportIncidentResponseGate.releaseGate, "support-incident-response");
   assert.equal(supportIncidentResponseGate.issue, 1019);
-  assert.equal(supportIncidentResponseGate.status, "BLOCKED_EXTERNAL");
+  assert.equal(supportIncidentResponseGate.status, "PASS");
+  assert.equal(supportIncidentResponseGate.preLaunchReadiness.status, "PASS");
+  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.qaEvidenceDateKst, "2026-07-15");
+  assert.deepEqual(supportIncidentResponseGate.latestQaEvidenceSummary.remainingSupportReadiness, []);
+  assert.ok(
+    supportIncidentResponseGate.preLaunchReadiness.resolvedEvidence.includes(
+      "local-emulator-help-screen-screenshot-or-ui-tree",
+    ),
+  );
+  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.result, "PASS");
+  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode, 10005);
+  assert.match(
+    supportIncidentResponseGate.latestQaEvidenceSummary.helpScreenDeviceQa.localOnlyEvidence,
+    /fixed-release-help-ui-summary\.json$/,
+  );
+  assert.equal(supportIncidentResponseGate.latestQaEvidenceSummary.operatorContactReadiness.result, "PASS");
+  assert.match(
+    supportIncidentResponseGate.latestQaEvidenceSummary.operatorContactReadiness.localOnlyEvidence,
+    /operator-contact-readiness\.json$/,
+  );
+  for (const evidenceId of supportIncidentResponseGate.operatorContactRoutes.flatMap((route) => route.requiredEvidence)) {
+    assert.ok(supportIncidentResponseGate.preLaunchReadiness.resolvedEvidence.includes(evidenceId));
+  }
   assert.equal(supportIncidentResponseGate.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(supportIncidentResponseGate.postLaunchOperationsReviewGate, postLaunchOperationsReviewPath);
   assert.match(supportIncidentResponseGate.evidenceRoot, /\.codex\/evidence\/release\/support-incident-response\/<rc-or-run>/);
@@ -2491,13 +2646,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     supportIncidentResponseGate.latestQaEvidenceSummary.mailboxRouting.redactionPolicy,
     /photo metadata/,
   );
-  assert.deepEqual(supportIncidentResponseGate.latestQaEvidenceSummary.remainingSupportReadiness, [
-    "data-error-triage-dry-run",
-    "emergency-datapack-release-rollback-runbook-match",
-    "incident-notice-copy-review",
-    "local-emulator-help-screen-screenshot-or-ui-tree",
-    "operator-contact-route-evidence",
-  ]);
+  assert.deepEqual(supportIncidentResponseGate.latestQaEvidenceSummary.remainingSupportReadiness, []);
   assert.deepEqual(
     supportIncidentResponseGate.supportChannels.map((channel) => channel.id).sort(),
     ["faq_and_status_notice", "security_privacy_deletion", "support_email"],
@@ -2980,7 +3129,9 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "appVersionName",
     "versionCode",
     "aabSha256",
+    "aabPayloadSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",
@@ -3053,12 +3204,23 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /versionCode=\$\{version_code\}/);
   assert.match(workflow, /packageId=com\.easysubway\.app/);
   assert.match(workflow, /aabSha256=\$\{aab_sha256\}/);
+  assert.match(workflow, /node \.\.\/\.\.\/tools\/release\/hash-android-bundle-payload\.mjs/);
+  assert.match(workflow, /aabPayloadSha256=\$\{aab_payload_sha256\}/);
   assert.match(workflow, /dataPackManifestSha256=\$\{data_pack_manifest_sha256\}/);
+  assert.match(workflow, /supportContactSetSha256=\$\{EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256\}/);
+  assert.match(
+    workflow,
+    /--android-release-metadata release-artifacts\/downloaded\/android-production-rc\/release-metadata\.txt/,
+  );
   assert.match(workflow, /routeContractVersion=route-map-contract-v1/);
   assert.match(workflow, /realtimeContractVersion=seoul-topis-schema-v1/);
   assert.match(workflow, /mappingRetentionDays=90/);
   assert.match(workflow, /versionCodeMonotonicPolicy=must_be_greater_than_latest_play_uploaded_artifact/);
   assert.match(workflow, /failedRcVersionCodeReusePolicy=forbidden_without_1020_waiver/);
+  assert.match(
+    workflow,
+    /Android Production RC Artifact \/ Collect production metadata[\s\S]*cp release\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json[\s\S]*cp release\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json[\s\S]*cp release\/operations-observability-gate\.json release-artifacts\/android\/operations-observability-gate\.json[\s\S]*Android Production RC Artifact \/ Upload app bundle/,
+  );
   for (const key of gate.artifacts.android.productionRcRequiredMetadata) {
     assert.match(workflow, new RegExp(`${key}=`), `${key} must be emitted in production RC metadata`);
   }
@@ -3079,12 +3241,43 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-android-production-rc-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
-  assert.match(workflow, /node tools\/release\/generate-rc-evidence-manifest\.mjs "\$\{generator_args\[@\]\}"/);
+  assert.match(workflow, /node tools\/release\/generate-rc-evidence-manifest\.mjs/);
+  assert.match(workflow, /"\$\{generator_args\[@\]\}"/);
   assert.match(workflow, /--output release-artifacts\/rc\/rc-evidence-manifest\.json/);
   assert.match(workflow, /--gate-status productionDatapack=BLOCKED_EXTERNAL/);
   assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
+  assert.match(workflow, /cp "\$\{boot_jar\[0\]\}" release-artifacts\/backend\/backend-boot\.jar/);
+  assert.match(workflow, /--backend-artifact release-artifacts\/downloaded\/backend\/backend-boot\.jar/);
+  assert.match(backendBuild, /preserveFileTimestamps\s*=\s*false/);
+  assert.match(backendBuild, /reproducibleFileOrder\s*=\s*true/);
   assert.match(workflow, /--gate-status backendOperations=BLOCKED_EXTERNAL/);
-  assert.match(workflow, /--gate-status postLaunchOperations=BLOCKED_EXTERNAL/);
+  assert.doesNotMatch(workflow, /--gate-status postLaunchOperations=SATISFIED/);
+  assert.match(workflow, /rc-evidence-manifest-preliminary\.json/);
+  assert.match(workflow, /node tools\/ops\/generate-operations-phase-a-summary\.mjs/);
+  assert.match(
+    workflow,
+    /node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--output release-artifacts\/rc\/rc-evidence-manifest-preliminary\.json[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--require-pass[\s\S]*node tools\/release\/generate-rc-evidence-manifest\.mjs[\s\S]*--output release-artifacts\/rc\/rc-evidence-manifest\.json/,
+  );
+  assert.match(
+    workflow,
+    /if \[\[ "\$\{android_artifact_source\}" == easysubway-android-production-rc-\* \]\]; then[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*else[\s\S]*BLOCKED_EXTERNAL/,
+  );
+  assert.ok(
+    workflow.includes(
+      "          else\n            operations_status=BLOCKED_EXTERNAL\n            printf 'BLOCKED_EXTERNAL\\n' > release-artifacts/rc/operations-phase-a-status.txt\n          fi\n          operations_evidence_args=",
+    ),
+  );
+  assert.match(
+    workflow,
+    /node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--rc-manifest release-artifacts\/rc\/rc-evidence-manifest-preliminary\.json[\s\S]*--require-pass/,
+  );
+  assert.match(workflow, /--gate-status "postLaunchOperations=\$\{operations_status\}"/);
+  assert.match(workflow, /--evidence-status "post_launch_operations=\$\{operations_status\}"/);
+  assert.match(workflow, /--evidence-path post_launch_operations=release-artifacts\/rc\/operations-phase-a-summary\.json/);
+  assert.match(workflow, /cp apps\/mobile\/release\/post-launch-operations-review-gate\.json release-artifacts\/rc\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp apps\/mobile\/release\/support-incident-response-gate\.json release-artifacts\/rc\/support-incident-response-gate\.json/);
+  assert.match(workflow, /cp apps\/mobile\/release\/operations-observability-gate\.json release-artifacts\/rc\/operations-observability-gate\.json/);
+  assert.match(workflow, /"\$\{operations_evidence_args\[@\]\}"/);
   assert.match(workflow, /--evidence-root "\.codex\/evidence\/release\/rc-evidence-manifest\/\$\{GITHUB_SHA\}\/"/);
   assert.match(workflow, /android_artifact_source="none"/);
   assert.match(workflow, /android_artifact_source="easysubway-android-production-rc-\$\{GITHUB_SHA\}"/);
@@ -3465,11 +3658,27 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-rc-manifest-"));
   const aabPath = path.join(tempDir, "app-release.aab");
   const backendInspectPath = path.join(tempDir, "image-inspect.json");
+  const androidReleaseMetadataPath = path.join(tempDir, "release-metadata.txt");
+  const phaseASummaryPath = path.join(tempDir, "operations-phase-a-summary.json");
   const outputPath = path.join(tempDir, "rc-evidence-manifest.json");
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
   assert.ok(appVersion, "mobile pubspec must contain versionName+versionCode");
 
-  await writeFile(aabPath, "fake-aab");
+  const aabPayloadPath = path.join(tempDir, "payload.bin");
+  await writeFile(aabPayloadPath, "fake-aab-payload");
+  await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
+  await writeFile(
+    androidReleaseMetadataPath,
+    `supportContactSetSha256=${"d".repeat(64)}\naabPayloadSha256=${"e".repeat(64)}\n`,
+  );
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "PASS",
+    issue: 1019,
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00+09:00",
+      expiresWhen: "2026-07-28T23:59:59.999+09:00",
+    },
+  }));
   await writeFile(
     backendInspectPath,
     JSON.stringify([{ RepoDigests: ["ghcr.io/aquilaxk/easysubway-backend@sha256:abcdef"] }]),
@@ -3483,6 +3692,10 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "apps/mobile",
     "--git-sha",
     "0123456789abcdef0123456789abcdef01234567",
+    "--now",
+    "2026-07-16T00:00:00.000Z",
+    "--android-release-metadata",
+    androidReleaseMetadataPath,
     "--aab",
     aabPath,
     "--backend-image-inspect",
@@ -3505,9 +3718,16 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.releaseGate, "rc-evidence-manifest");
   assert.equal(manifest.issue, 1020);
   assert.equal(manifest.gitSha, "0123456789abcdef0123456789abcdef01234567");
+  assert.equal(manifest.generatedAt, "2026-07-16T00:00:00.000Z");
+  assert.equal(manifest.supportContactSetSha256, "d".repeat(64));
   assert.equal(manifest.appVersionName, appVersion[1]);
   assert.equal(manifest.versionCode, appVersion[2]);
   assert.match(manifest.aabSha256, /^[a-f0-9]{64}$/);
+  assert.match(manifest.aabPayloadSha256, /^[a-f0-9]{64}$/);
+  assert.notEqual(manifest.aabPayloadSha256, "e".repeat(64));
+  assert.ok(
+    manifest.readiness.blockers.some((blocker) => blocker.id === "mismatch_android_release_metadata_aabPayloadSha256"),
+  );
   assert.equal(manifest.backendImageDigest, "sha256:abcdef");
   assert.equal(manifest.backendArtifactSha256, null);
   assert.match(manifest.dataPackManifestSha256, /^[a-f0-9]{64}$/);
@@ -3526,6 +3746,15 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.rcIdentity.identityLinkageMatrixSha256, canonicalScopeHash(launchScope.identityMatrix));
   assert.equal(manifest.readiness.status, "NO_GO");
   assert.ok(manifest.readiness.blockers.map((blocker) => blocker.id).includes("gate_androidrcevidence_blocked_external"));
+  assert.equal(
+    manifest.readiness.blockers.some((blocker) => blocker.id === "pending_post_launch_operations"),
+    true,
+  );
+  const postLaunchOperationsEntry = manifest.evidenceEntries.find((entry) => entry.id === "post_launch_operations");
+  assert.equal(postLaunchOperationsEntry.status, "PENDING_LOCAL_EVIDENCE");
+  assert.equal(postLaunchOperationsEntry.evidencePaths.includes(phaseASummaryPath), false);
+  assert.equal(postLaunchOperationsEntry.testedAt, "2026-06-26T00:00:00.000Z");
+  assert.equal(postLaunchOperationsEntry.expiresWhen, "2026-07-10T00:00:00.000Z");
   assert.deepEqual(
     manifest.evidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
     [
@@ -3545,6 +3774,145 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(manifest.evidenceEntries.every((entry) => entry.androidVersion === "Android 16 API 36"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.testedAt === "2026-06-26T00:00:00.000Z"));
   assert.ok(manifest.evidenceEntries.every((entry) => entry.expiresWhen === "2026-07-10T00:00:00.000Z"));
+
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "PASS",
+    issue: 1019,
+    evidenceValidity: {
+      testedAt: "2999-01-01T00:00:00Z",
+      expiresWhen: "2999-01-15T00:00:00Z",
+    },
+  }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-11T00:00:00Z",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-06-26T00:00:00.000Z",
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /future.*evidenceValidity/,
+  );
+
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "PASS",
+    issue: 1019,
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-30T00:00:00Z",
+    },
+  }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-16T00:00:00Z",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-07-15T00:00:00Z",
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /exceeds the 14-day evidence lifetime/,
+  );
+
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "PASS",
+    issue: 1019,
+    evidenceValidity: {
+      testedAt: "2026-07-01T00:00:00Z",
+      expiresWhen: "2026-07-10T00:00:00Z",
+    },
+  }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-07-01T00:00:00Z",
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /expired evidenceValidity/,
+  );
+
+  await writeFile(phaseASummaryPath, "{}");
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /SATISFIED evidence entry requires evidenceValidity/,
+  );
+
+  await writeFile(phaseASummaryPath, JSON.stringify({
+    status: "FAIL",
+    issue: 9999,
+    releaseGate: "unrelated-evidence",
+    evidenceValidity: {
+      testedAt: "2026-07-15T00:00:00Z",
+      expiresWhen: "2026-07-20T00:00:00Z",
+    },
+  }));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-16T00:00:00Z",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-07-15T00:00:00Z",
+      "--evidence-status", "post_launch_operations=SATISFIED",
+      "--evidence-path", `post_launch_operations=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /failed canonical validation/,
+  );
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "--repo-root", ".",
+      "--app-root", "apps/mobile",
+      "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+      "--now", "2026-07-16T00:00:00Z",
+      "--aab", aabPath,
+      "--backend-image-inspect", backendInspectPath,
+      "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+      "--output", outputPath,
+      "--tested-at", "2026-07-15T00:00:00Z",
+      "--evidence-status", "rc_device_qa=SATISFIED",
+      "--evidence-path", `rc_device_qa=${phaseASummaryPath}`,
+    ], { cwd: root }),
+    /has no canonical validator/,
+  );
 
   const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");
   await mkdir(path.join(incompleteRepo, "apps/mobile/release"), { recursive: true });
@@ -3659,6 +4027,23 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     ], { cwd: root }),
     /mismatch_gitSha/,
   );
+
+  const corruptAabPath = path.join(tempDir, "corrupt.aab");
+  const corruptManifestPath = path.join(tempDir, "corrupt-aab-manifest.json");
+  await writeFile(corruptAabPath, "not-a-zip");
+  await execFileAsync(process.execPath, [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".",
+    "--app-root", "apps/mobile",
+    "--git-sha", "0123456789abcdef0123456789abcdef01234567",
+    "--aab", corruptAabPath,
+    "--backend-image-inspect", backendInspectPath,
+    "--data-pack-manifest", "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
+    "--output", corruptManifestPath,
+  ], { cwd: root });
+  const corruptManifest = JSON.parse(readFileSync(corruptManifestPath, "utf8"));
+  assert.equal(corruptManifest.aabPayloadSha256, null);
+  assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
 });
 
 test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계약을 고정한다", () => {
@@ -3747,6 +4132,8 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "DENOMINATOR_LOCKED",
     "BLOCKED_EXTERNAL",
     "BLOCKED_TECHNICAL",
+    "PASS",
+    "PENDING_PUBLIC_RELEASE",
     "SATISFIED",
     "DEFERRED_OUT_OF_SCOPE",
     "WAIVED_UNTIL",
@@ -3758,7 +4145,9 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "appVersionName",
     "versionCode",
     "aabSha256",
+    "aabPayloadSha256",
     "dataPackManifestSha256",
+    "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",
@@ -3775,19 +4164,21 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("measured_performance_budget_failure"));
   assert.ok(gate.releaseReadiness.p0EscalationRules.includes("play_prelaunch_crash"));
   assert.equal(gate.latestOperationsEvidenceStatus.issue, 1019);
+  assert.equal(gate.latestOperationsEvidenceStatus.preLaunchReadiness, "PASS");
+  assert.equal(gate.latestOperationsEvidenceStatus.postLaunchObservation, "PENDING_PUBLIC_RELEASE");
   assert.equal(gate.latestOperationsEvidenceStatus.supportMailboxRouting, "RESOLVED_BY_QA_MANUAL_EVIDENCE");
   assert.equal(gate.latestOperationsEvidenceStatus.alertRouteDryRun, "PASS");
-  assert.deepEqual(gate.latestOperationsEvidenceStatus.remainingBlockers, [
+  assert.deepEqual(gate.latestOperationsEvidenceStatus.pendingPostLaunchEvidence, [
     "play-review-status-summary",
     "crash-anr-vitals-summary",
+    "support-ticket-summary-after-public-release",
     "post-launch-review-window-evidence-after-public-release",
-    "support-incident-response-dry-run-evidence",
   ]);
-  assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-02");
-  assert.equal(gate.latestGoNoGoStatus.reviewedMainMergeSha, "da34e5215daf64ae4c1c31a7682d4fa774588074");
+  assert.deepEqual(gate.latestOperationsEvidenceStatus.remainingPhaseABlockers, []);
+  assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-15");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
-  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414]);
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1021, 1022, 1230, 1414]);
   assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
@@ -3797,15 +4188,13 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
     "operations-alert-and-mailbox-routing-summary",
-    "operations-post-launch-dry-run-required-evidence-contract",
+    "operations-phase-a-pass-phase-b-scheduled",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingP0Blockers, [
     "play-installed-build-provenance",
     "play-pre-launch-crash-anr-policy-summary",
     "play-console-data-safety-listing-screenshot-final-preview",
     "android-vitals-crash-anr-summary",
-    "support-incident-response-dry-run-evidence",
-    "post-launch-review-window-evidence-after-public-release",
     "play-installed-android-quality-performance-recovery-evidence",
     "production-like-abuse-rehearsal-evidence",
     "play-installed-server-minimized-final-acceptance-evidence",
@@ -3828,6 +4217,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   );
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
+  assert.equal(gate.gates.find((item) => item.id === "G8_OPERATIONS").status, "SATISFIED");
   const routeResultV2UiCopyGatePath = "apps/mobile/release/route-result-v2-ui-copy-gate.json";
   const routeResultV2UiCopyGate = readJson(routeResultV2UiCopyGatePath);
   assert.equal(routeResultV2UiCopyGate.releaseGate, "route-result-v2-ui-copy");
@@ -4053,6 +4443,10 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(githubEnvOutput, /^EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk\.site$/m);
+  assert.match(
+    githubEnvOutput,
+    /^EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256=e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a$/m,
+  );
 
   const rcEnv = path.join(dir, "android-rc.env");
   await writeFile(rcEnv, [
@@ -4784,7 +5178,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.ok(operationsEvidence.observability.allowedFallbackKinds.includes("external-blocker-record"));
   assert.equal(
     operationsEvidence.releaseEvidenceSummaryValidator.command,
-    "node tools/ops/validate-operations-release-summary.mjs --summary <summary.json> --require-pass",
+    "node tools/ops/validate-operations-release-summary.mjs --summary <summary.json> --rc-manifest <rc-evidence-manifest.json> --require-pass",
   );
   assert.match(operationsEvidence.releaseEvidenceSummaryValidator.passPolicyKo, /external-blocker-record/);
   assert.equal(existsSync(path.join(root, "tools/ops/validate-operations-release-summary.mjs")), true);
