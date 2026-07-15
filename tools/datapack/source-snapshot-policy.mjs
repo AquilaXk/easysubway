@@ -23,7 +23,7 @@ export function requiredCredentialFreeObjectUri(value, label) {
 }
 
 export function buildSnapshotDiff(previous, next) {
-  validateDiffSnapshot(previous, "previous");
+  validateDiffSnapshot(previous, "previous", true);
   validateDiffSnapshot(next, "next");
   const changes = {
     rawHashChanged: previous.rawSha256 !== next.rawSha256,
@@ -33,7 +33,7 @@ export function buildSnapshotDiff(previous, next) {
     rowDelta: requiredNonNegativeInteger(next.rowCount, "rowCount")
       - requiredNonNegativeInteger(previous.rowCount, "previous.rowCount"),
     coverageDelta: requiredNonNegativeInteger(next.coverageCount, "coverageCount")
-      - requiredNonNegativeInteger(previous.coverageCount, "previous.coverageCount"),
+      - requiredCoverageCount(previous, "previous.coverageCount"),
   };
   const changed = changes.rawHashChanged
     || changes.schemaHashChanged
@@ -52,7 +52,7 @@ export function validateLineage(snapshots) {
   for (const snapshot of snapshots) {
     const snapshotId = requiredText(snapshot?.snapshotId, "snapshotId");
     requiredText(snapshot.sourceId, "sourceId");
-    validateDiffSnapshot(snapshot, "snapshot");
+    validateDiffSnapshot(snapshot, "snapshot", true);
     if (byId.has(snapshotId)) throw new Error("SOURCE_LINEAGE_BROKEN: duplicate snapshot ID");
     byId.set(snapshotId, snapshot);
   }
@@ -103,7 +103,7 @@ export function validateLineage(snapshots) {
   return { headsBySource, chainsBySource };
 }
 
-function validateDiffSnapshot(snapshot, label) {
+function validateDiffSnapshot(snapshot, label, allowLegacyRootCoverage = false) {
   try {
     requiredUtcInstant(snapshot?.retrievedAt, `${label}.retrievedAt`);
   } catch {
@@ -125,7 +125,22 @@ function validateDiffSnapshot(snapshot, label) {
     }
   }
   requiredNonNegativeInteger(snapshot.rowCount, `${label}.rowCount`);
+  if (allowLegacyRootCoverage
+    && snapshot.coverageCount == null
+    && snapshot.previousSnapshotId == null
+    && snapshot.diffSummary == null) {
+    return;
+  }
   requiredNonNegativeInteger(snapshot.coverageCount, `${label}.coverageCount`);
+}
+
+function requiredCoverageCount(snapshot, label) {
+  if (snapshot.coverageCount == null
+    && snapshot.previousSnapshotId == null
+    && snapshot.diffSummary == null) {
+    return requiredNonNegativeInteger(snapshot.rowCount, `${label} legacy rowCount`);
+  }
+  return requiredNonNegativeInteger(snapshot.coverageCount, label);
 }
 
 function requiredText(value, label) {

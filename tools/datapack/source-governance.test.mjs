@@ -197,15 +197,28 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
   }
 });
 
-test("tracked production snapshot root는 coverageCount를 명시한다", async () => {
+test("legacy root는 rowCount를 결정적 coverage로 migration해 lineage를 연장한다", () => {
+  const legacyRoot = { ...first };
+  delete legacyRoot.coverageCount;
+  const child = snapshot({
+    snapshotId: "snapshot-a-legacy-child",
+    previousSnapshotId: legacyRoot.snapshotId,
+    retrievedAt: "2026-07-02T00:00:00Z",
+    coverageCount: 11,
+  });
+  child.diffSummary = buildSnapshotDiff(legacyRoot, child);
+
+  assert.equal(child.diffSummary.coverageDelta, 1);
+  assert.doesNotThrow(() => validateLineage([legacyRoot, child]));
+});
+
+test("tracked production legacy root는 승인 bytes를 바꾸지 않고 검증한다", async () => {
   const snapshots = JSON.parse(await readFile(
     path.join(root, "tools/datapack/release/source-snapshots.json"),
     "utf8",
   ));
 
-  for (const entry of snapshots) {
-    assert.ok(Number.isInteger(entry.coverageCount) && entry.coverageCount >= 0, entry.snapshotId);
-  }
+  assert.equal(snapshots.filter((entry) => entry.coverageCount == null).length, 9);
   assert.doesNotThrow(() => validateLineage(snapshots));
 });
 
