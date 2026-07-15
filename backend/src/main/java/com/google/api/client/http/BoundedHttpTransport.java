@@ -95,7 +95,7 @@ public final class BoundedHttpTransport extends HttpTransport {
 
 		@Override
 		public void setWriteTimeout(int writeTimeout) throws IOException {
-			delegate.setWriteTimeout(writeTimeout);
+			delegate.setWriteTimeout(clamp(writeTimeout, readTimeoutMillis));
 		}
 
 		@Override

@@ -22,9 +22,14 @@ class BoundedHttpTransportTest {
 
 		LowLevelHttpRequest request = transport.buildRequest("POST", "https://oauth2.googleapis.com/token");
 		request.setTimeout(20_000, 20_000);
+		request.setWriteTimeout(0);
 
 		assertThat(delegate.request.connectTimeout).isEqualTo(3_000);
 		assertThat(delegate.request.readTimeout).isEqualTo(5_000);
+		assertThat(delegate.request.writeTimeout).isEqualTo(5_000);
+
+		request.setWriteTimeout(20_000);
+		assertThat(delegate.request.writeTimeout).isEqualTo(5_000);
 	}
 
 	private static final class RecordingTransport extends HttpTransport {
@@ -41,6 +46,7 @@ class BoundedHttpTransportTest {
 
 		private int connectTimeout;
 		private int readTimeout;
+		private int writeTimeout;
 
 		@Override
 		public void addHeader(String name, String value) {
@@ -50,6 +56,11 @@ class BoundedHttpTransportTest {
 		public void setTimeout(int connectTimeout, int readTimeout) {
 			this.connectTimeout = connectTimeout;
 			this.readTimeout = readTimeout;
+		}
+
+		@Override
+		public void setWriteTimeout(int writeTimeout) {
+			this.writeTimeout = writeTimeout;
 		}
 
 		@Override

@@ -1,6 +1,7 @@
 package com.easysubway.route.adapter.out.integrity;
 
 import com.easysubway.route.application.port.out.PlayIntegrityDecoder;
+import com.easysubway.route.application.port.out.PlayIntegrityProviderUnavailableException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.http.BoundedHttpTransport;
@@ -21,6 +22,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Component
 @Profile("prod | staging | release | prod-like")
@@ -72,13 +75,22 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 
 	@Override
 	public PlayIntegrityVerdict decode(String integrityToken) {
-		JsonNode response = restClient.post()
-			.uri(DECODE_URL)
-			.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenProvider.accessToken())
-			.body(Map.of("integrityToken", integrityToken))
-			.retrieve()
-			.body(JsonNode.class);
-		return parse(response == null ? objectMapper.createObjectNode() : response);
+		try {
+			JsonNode response = restClient.post()
+				.uri(DECODE_URL)
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessTokenProvider.accessToken())
+				.body(Map.of("integrityToken", integrityToken))
+				.retrieve()
+				.body(JsonNode.class);
+			return parse(response == null ? objectMapper.createObjectNode() : response);
+		} catch (RestClientResponseException exception) {
+			if (exception.getStatusCode().value() == 400) {
+				return parse(objectMapper.createObjectNode());
+			}
+			throw new PlayIntegrityProviderUnavailableException(exception);
+		} catch (RestClientException exception) {
+			throw new PlayIntegrityProviderUnavailableException(exception);
+		}
 	}
 
 	private PlayIntegrityVerdict parse(JsonNode response) {
@@ -147,7 +159,7 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 				}
 				return token.getTokenValue();
 			} catch (IOException | RuntimeException exception) {
-				throw new PlayIntegrityDecodeException(exception);
+				throw new PlayIntegrityProviderUnavailableException(exception);
 			}
 		}
 
@@ -163,10 +175,4 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 		}
 	}
 
-	private static final class PlayIntegrityDecodeException extends RuntimeException {
-
-		private PlayIntegrityDecodeException(Throwable cause) {
-			super("Play Integrity decode failed", cause);
-		}
-	}
 }

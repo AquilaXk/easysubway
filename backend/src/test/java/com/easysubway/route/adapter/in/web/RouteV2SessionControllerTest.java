@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.easysubway.route.application.service.RouteSessionAttestationRejectedException;
+import com.easysubway.route.application.service.RouteSessionAttestationUnavailableException;
 import com.easysubway.route.application.service.RouteV2SessionService;
 import com.easysubway.route.application.service.RouteV2SessionService.IssuedRouteV2Session;
 import java.time.Instant;
@@ -74,6 +75,24 @@ class RouteV2SessionControllerTest {
 			.andExpect(jsonPath("$.code").value("ROUTE_SESSION_ATTESTATION_REJECTED"))
 			.andExpect(jsonPath("$.message").value("ITX 시간표를 불러올 수 없어요"))
 			.andExpect(jsonPath("$..secret-verdict").doesNotExist());
+	}
+
+	@Test
+	@DisplayName("provider 장애는 exact 503으로 반환해 ingress smoke를 실패시킨다")
+	void reportsProviderUnavailability() throws Exception {
+		when(service.issue("provider-failure", "AAAAAAAAAAAAAAAAAAAAAA"))
+			.thenThrow(new RouteSessionAttestationUnavailableException(new IllegalStateException("provider-secret")));
+
+		mockMvc.perform(post("/api/v2/routes/session")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{"integrityToken":"provider-failure","clientNonce":"AAAAAAAAAAAAAAAAAAAAAA"}
+					"""))
+			.andExpect(status().isServiceUnavailable())
+			.andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, no-store"))
+			.andExpect(jsonPath("$.success").value(false))
+			.andExpect(jsonPath("$.code").value("ROUTE_SESSION_ATTESTATION_UNAVAILABLE"))
+			.andExpect(jsonPath("$..provider-secret").doesNotExist());
 	}
 
 	@Test

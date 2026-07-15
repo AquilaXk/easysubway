@@ -183,10 +183,17 @@ public class RouteSearchService implements RouteSearchUseCase {
 
 	@Override
 	public RouteSearchResult searchRoute(SearchRouteCommand command) {
-		return saveRouteSearchPort.saveRouteSearch(searchRouteAlternatives(command, 1).getFirst());
+		return searchRouteAlternatives(command, 1).getFirst();
 	}
 
 	public List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount) {
+		return planRouteAlternatives(command, alternativeCount).stream()
+			.map(saveRouteSearchPort::saveRouteSearch)
+			.toList();
+	}
+
+	@Override
+	public List<RouteSearchResult> planRouteAlternatives(SearchRouteCommand command, int alternativeCount) {
 		return buildRouteSearchAlternatives(command, alternativeCount);
 	}
 

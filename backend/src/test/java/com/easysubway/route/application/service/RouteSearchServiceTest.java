@@ -739,6 +739,8 @@ class RouteSearchServiceTest {
 			.containsExactly("station-step-free-transfer");
 		assertThat(results.get(1).blockedReasons())
 			.containsExactly("계단 없는 역 접근 경로를 확인할 수 없습니다.");
+		assertThat(transferService.refreshRoute(results.getFirst().routeSearchId()).routeSearch())
+			.isEqualTo(results.getFirst());
 	}
 
 	@Test

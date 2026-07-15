@@ -25,6 +25,8 @@ import java.util.Comparator;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -37,32 +39,41 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 	private final LoadRouteTimetablePort routeTimetablePort;
 	private final RouteTimetableRaptorPlanner timetableRaptorPlanner = new RouteTimetableRaptorPlanner();
 	private final boolean timetableRequired;
+	private final boolean legacyPersistenceAllowed;
 	private volatile TimetableSnapshot cachedTimetableSnapshot;
 
 	public RouteV2Planner(RouteSearchUseCase routeSearchUseCase) {
-		this(routeSearchUseCase, RouteTimetable::empty, false);
+		this(routeSearchUseCase, RouteTimetable::empty, false, true);
 	}
 
 	@Autowired
 	public RouteV2Planner(
 		RouteSearchUseCase routeSearchUseCase,
-		ObjectProvider<LoadRouteTimetablePort> routeTimetablePortProvider
+		ObjectProvider<LoadRouteTimetablePort> routeTimetablePortProvider,
+		Environment environment
 	) {
-		this(routeSearchUseCase, routeTimetablePortProvider.getIfAvailable(), true);
+		this(
+			routeSearchUseCase,
+			routeTimetablePortProvider.getIfAvailable(),
+			true,
+			!environment.acceptsProfiles(Profiles.of("prod", "staging", "release", "prod-like"))
+		);
 	}
 
 	RouteV2Planner(RouteSearchUseCase routeSearchUseCase, LoadRouteTimetablePort routeTimetablePort) {
-		this(routeSearchUseCase, routeTimetablePort, true);
+		this(routeSearchUseCase, routeTimetablePort, true, false);
 	}
 
 	private RouteV2Planner(
 		RouteSearchUseCase routeSearchUseCase,
 		LoadRouteTimetablePort routeTimetablePort,
-		boolean timetableRequired
+		boolean timetableRequired,
+		boolean legacyPersistenceAllowed
 	) {
 		this.routeSearchUseCase = routeSearchUseCase;
 		this.routeTimetablePort = routeTimetablePort == null ? RouteTimetable::empty : routeTimetablePort;
 		this.timetableRequired = timetableRequired && routeTimetablePort != null;
+		this.legacyPersistenceAllowed = legacyPersistenceAllowed;
 	}
 
 	@Override
@@ -107,10 +118,9 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 			}
 			rejectUnsupportedMobilityPreset(command);
 			SearchRouteCommand searchRouteCommand = toSearchRouteCommand(command);
-			List<RouteSearchResult> itineraries = routeSearchUseCase.searchRouteAlternatives(
-				searchRouteCommand,
-				command.alternativeCount()
-			);
+			List<RouteSearchResult> itineraries = legacyPersistenceAllowed
+				? routeSearchUseCase.searchRouteAlternatives(searchRouteCommand, command.alternativeCount())
+				: routeSearchUseCase.planRouteAlternatives(searchRouteCommand, command.alternativeCount());
 			return new RouteV2Plan(
 				itineraries,
 				statusesOf(itineraries, command.useRealtime()),

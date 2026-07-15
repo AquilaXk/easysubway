@@ -153,6 +153,19 @@ test("post-deploy smoke requires enabled session ingress to reach exact attestat
   });
 });
 
+test("post-deploy smoke rejects Play Integrity provider unavailability", async () => {
+  const routes = defaultRoutes();
+  routes.routeV2Session = () => ({
+    status: 503,
+    body: { success: false, code: "ROUTE_SESSION_ATTESTATION_UNAVAILABLE" },
+  });
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 1);
+    assert.match(axis(report, "route-api-closure").detail, /POST \/api\/v2\/routes\/session returned HTTP 503/);
+  });
+});
+
 test("post-deploy smoke requires enabled ingress to return 401 instead of 404", async () => {
   const routes = defaultRoutes();
   routes.routeV2Search = () => ({ status: 404, body: {} });

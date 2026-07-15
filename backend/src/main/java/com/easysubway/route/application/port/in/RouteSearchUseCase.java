@@ -14,6 +14,10 @@ public interface RouteSearchUseCase {
 
 	List<RouteSearchResult> searchRouteAlternatives(SearchRouteCommand command, int alternativeCount);
 
+	default List<RouteSearchResult> planRouteAlternatives(SearchRouteCommand command, int alternativeCount) {
+		return searchRouteAlternatives(command, alternativeCount);
+	}
+
 	default void validateRouteSearch(SearchRouteCommand command) {
 	}
 

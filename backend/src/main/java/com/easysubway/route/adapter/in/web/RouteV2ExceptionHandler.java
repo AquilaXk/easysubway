@@ -3,6 +3,7 @@ package com.easysubway.route.adapter.in.web;
 import com.easysubway.common.error.InvalidRequestException;
 import com.easysubway.route.application.service.ItxTimetableUnavailableException;
 import com.easysubway.route.application.service.RouteSessionAttestationRejectedException;
+import com.easysubway.route.application.service.RouteSessionAttestationUnavailableException;
 import com.easysubway.transit.domain.StationNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,15 @@ class RouteV2ExceptionHandler {
 		return error(
 			HttpStatus.FORBIDDEN,
 			"ROUTE_SESSION_ATTESTATION_REJECTED",
+			"ITX 시간표를 불러올 수 없어요"
+		);
+	}
+
+	@ExceptionHandler(RouteSessionAttestationUnavailableException.class)
+	ResponseEntity<RouteV2Error> handleAttestationUnavailable() {
+		return error(
+			HttpStatus.SERVICE_UNAVAILABLE,
+			"ROUTE_SESSION_ATTESTATION_UNAVAILABLE",
 			"ITX 시간표를 불러올 수 없어요"
 		);
 	}
