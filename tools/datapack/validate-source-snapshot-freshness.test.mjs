@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 
 import {
   assertRepositoryRelativePath,
+  purgeEvidenceBySnapshot,
   validateSourceSnapshotFreshness,
 } from "./validate-source-snapshot-freshness.mjs";
 
@@ -69,7 +70,7 @@ function input(overrides = {}) {
       })),
       sourceSnapshotSetHash: createHash("sha256").update(JSON.stringify(snapshots)).digest("hex"),
     },
-    policy,
+    policy: structuredClone(policy),
     evaluationAt,
   };
 }
@@ -110,6 +111,27 @@ function twoSourceInput() {
   return value;
 }
 
+function purgeReport(entries, evaluatedAt = "2026-10-10T00:00:00.000Z") {
+  const body = {
+    schemaVersion: 1,
+    artifactKind: "source-raw-purge-report",
+    evaluatedAt,
+    dryRun: false,
+    decision: "PASS",
+    deleted: entries,
+    alreadyAbsent: [],
+    protected: [],
+    retained: [],
+    wouldDelete: [],
+    failed: [],
+    reasonCodes: [],
+  };
+  return {
+    ...body,
+    reportSha256: createHash("sha256").update(JSON.stringify(body)).digest("hex"),
+  };
+}
+
 test("source snapshot ID·hash·policy 파생 freshness가 맞으면 통과한다", () => {
   const result = validateSourceSnapshotFreshness(input());
 
@@ -131,6 +153,95 @@ test("governance 입력이 없을 때 policy provenance는 snapshot ID로 비교
   value.buildSpec.sourceSnapshots.reverse();
 
   assert.doesNotThrow(() => validateSourceSnapshotFreshness(value));
+});
+
+test("PASS purge report를 snapshot별 완료 evidence로 검증해 변환한다", () => {
+  const report = purgeReport([
+    { sourceId: "source-a", snapshotId: "snapshot-a", rawSha256: "a".repeat(64) },
+  ]);
+
+  assert.deepEqual(purgeEvidenceBySnapshot(report).get("source-a\0snapshot-a"), {
+    sourceId: "source-a",
+    snapshotId: "snapshot-a",
+    rawSha256: "a".repeat(64),
+    purgedAt: report.evaluatedAt,
+  });
+  assert.throws(
+    () => purgeEvidenceBySnapshot({ ...report, dryRun: true }),
+    /purge report/,
+  );
+});
+
+test("freshness validator는 hash-bound purge report를 retention 완료 근거로 소비한다", () => {
+  const value = input({
+    freshnessExpiresAt: "2027-07-12T00:00:00Z",
+  });
+  value.buildSpec.sourceSnapshots[0].freshnessExpiresAt = value.snapshots[0].freshnessExpiresAt;
+  value.policy.sourceClasses[0].reverificationCadence = "P1Y";
+  value.evaluationAt = "2026-10-11T00:00:00Z";
+  value.inventory = {
+    sources: [{
+      id: "source-a",
+      provider: "provider-a",
+      datasetUrl: "https://example.invalid/source-a",
+      requiredForProductionPack: true,
+      license: { redistributionAllowed: true },
+      admissionEvidence: { licenseEvidenceHash: "e".repeat(64) },
+    }],
+  };
+  value.governancePolicy = {
+    schemaVersion: 1,
+    artifactKind: "datapack-source-governance-policy",
+    policyVersion: "2026-07-15",
+    retentionClasses: [{ id: "standard-90d", retentionDays: 90 }],
+    reasonCodeEscalations: [{
+      reasonCodes: [
+        "SOURCE_LINEAGE_BROKEN",
+        "SOURCE_DIFF_MISSING",
+        "SOURCE_FRESHNESS_POLICY_MISSING",
+        "SOURCE_SNAPSHOT_EXPIRED",
+        "RAW_RETENTION_OVERDUE",
+        "LEGAL_HOLD_INVALID",
+        "LICENSE_REVIEW_REQUIRED",
+        "REDISTRIBUTION_NOT_APPROVED",
+        "SOURCE_GOVERNANCE_OWNER_MISSING",
+      ],
+      responsibleRole: "datapack-source-owner",
+      alertRoute: "github:area-datapack",
+      escalationHours: 4,
+    }],
+    sources: [{
+      sourceId: "source-a",
+      sourceClassId: "static_network_metadata",
+      retentionClassId: "standard-90d",
+      ownerRole: "datapack-source-owner",
+      stewardRole: "datapack-data-steward",
+      approvalRole: "datapack-release-approver",
+      escalationHours: 4,
+      alertRoute: "github:area-datapack",
+      licenseReview: {
+        status: "APPROVED",
+        termsHash: "e".repeat(64),
+        reviewedAt: "2026-07-01T00:00:00Z",
+        nextReviewAt: "2027-07-01T00:00:00Z",
+        termsUrl: "https://example.invalid/source-a",
+        reviewedProvider: "provider-a",
+        reviewedDatasetUrl: "https://example.invalid/source-a",
+        redistributionScopes: ["DERIVED_DATAPACK"],
+        approvedByRole: "datapack-release-approver",
+      },
+    }],
+  };
+  value.governancePolicySha256 = "d".repeat(64);
+  value.purgeReport = purgeReport([{
+    sourceId: value.snapshots[0].sourceId,
+    snapshotId: value.snapshots[0].snapshotId,
+    rawSha256: value.snapshots[0].rawSha256,
+  }]);
+
+  const result = validateSourceSnapshotFreshness(value);
+
+  assert.equal(result.governanceResults[0].decision, "GO");
 });
 
 test("선택한 head만 freshness를 판정하고 만료된 이전 snapshot은 lineage로만 검증한다", () => {

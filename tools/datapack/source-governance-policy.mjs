@@ -75,6 +75,7 @@ export function evaluateSourceGovernance({
   evaluationAt,
   legalHold = null,
   protectedBy = [],
+  purgeEvidence = null,
 }) {
   const reasonCodes = new Set();
   const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
@@ -91,7 +92,16 @@ export function evaluateSourceGovernance({
 
   if (entry) {
     evaluateFreshness({ entry, snapshot, freshnessPolicy, evaluationAt, reasonCodes });
-    evaluateRetention({ entry, snapshot, policy, evaluatedMillis, legalHold, protectedBy, reasonCodes });
+    evaluateRetention({
+      entry,
+      snapshot,
+      policy,
+      evaluatedMillis,
+      legalHold,
+      protectedBy,
+      purgeEvidence,
+      reasonCodes,
+    });
     evaluateLicense({ entry, source, snapshot, evaluatedMillis, reasonCodes });
   }
 
@@ -217,7 +227,16 @@ function evaluateFreshness({ entry, snapshot, freshnessPolicy, evaluationAt, rea
   }
 }
 
-function evaluateRetention({ entry, snapshot, policy, evaluatedMillis, legalHold, protectedBy, reasonCodes }) {
+function evaluateRetention({
+  entry,
+  snapshot,
+  policy,
+  evaluatedMillis,
+  legalHold,
+  protectedBy,
+  purgeEvidence,
+  reasonCodes,
+}) {
   let storedMillis;
   try {
     const derived = deriveRawRetentionExpiresAt({
@@ -235,8 +254,23 @@ function evaluateRetention({ entry, snapshot, policy, evaluatedMillis, legalHold
   const holdValid = legalHold == null ? false : validateLegalHold(legalHold, entry, snapshot, evaluatedMillis);
   if (legalHold != null && !holdValid) reasonCodes.add("LEGAL_HOLD_INVALID");
   const releaseProtected = Array.isArray(protectedBy) && protectedBy.length > 0;
-  if (evaluatedMillis >= storedMillis && !releaseProtected && !holdValid) {
+  const purgeCompleted = validPurgeEvidence(purgeEvidence, entry, snapshot, storedMillis, evaluatedMillis);
+  if (evaluatedMillis >= storedMillis && !releaseProtected && !holdValid && !purgeCompleted) {
     reasonCodes.add("RAW_RETENTION_OVERDUE");
+  }
+}
+
+function validPurgeEvidence(evidence, entry, snapshot, storedMillis, evaluatedMillis) {
+  if (evidence?.sourceId !== entry.sourceId
+    || evidence.snapshotId !== snapshot?.snapshotId
+    || evidence.rawSha256 !== snapshot?.rawSha256) {
+    return false;
+  }
+  try {
+    const purgedMillis = requiredUtcInstant(evidence.purgedAt, "purgedAt");
+    return purgedMillis >= storedMillis && purgedMillis <= evaluatedMillis;
+  } catch {
+    return false;
   }
 }
 

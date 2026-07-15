@@ -71,6 +71,25 @@ test("실제 DELETE는 CLI 인자가 아닌 env-injected preauthenticated base U
   });
 });
 
+test("실제 DELETE는 env-injected snapshot evidence hash로 승인 bytes를 고정한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
+    objects.add("/raw/expired.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        baseUrl,
+        output: path.join(workDir, "untrusted-evidence.json"),
+        trustedSnapshots: false,
+      }),
+      /snapshot evidence sha256 environment variable/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/expired.json"), true);
+  });
+});
+
 test("실제 DELETE는 system clock보다 미래인 evaluation-at을 요청 전에 거부한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
     const files = await writeInputs(workDir, [rawEntry("expired", "raw/expired.json")]);
@@ -108,12 +127,14 @@ test("서로 다른 governance policy 세대의 entry를 각 원본 policy bytes
     };
     const ledgerPath = path.join(workDir, "multi-policy-ledger.json");
     await writeFile(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
+    const snapshots = await writeSnapshotEvidence(workDir, ledger.entries);
     objects.add("/raw/old.json");
     objects.add("/raw/new.json");
 
     const report = await runPurge({
       ledger: ledgerPath,
       policies: policies.map((entry) => entry.path),
+      snapshots,
       baseUrl,
       output: path.join(workDir, "multi-policy.json"),
     });
@@ -158,6 +179,29 @@ test("같은 object key가 만료와 legal hold entry에 중복되면 DELETE 전
     );
     assert.deepEqual(requests, []);
     assert.equal(objects.has("/raw/shared.json"), true);
+  });
+});
+
+test("ledger object key가 LOCKED snapshot raw URI와 다르면 DELETE 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const entry = rawEntry("expired", "raw/active.json");
+    const files = await writeInputs(workDir, [entry]);
+    const snapshots = await writeSnapshotEvidence(workDir, [entry], {
+      expired: "raw/expired.json",
+    });
+    objects.add("/raw/active.json");
+
+    await assert.rejects(
+      runPurge({
+        ...files,
+        snapshots,
+        baseUrl,
+        output: path.join(workDir, "mismatched-object.json"),
+      }),
+      /snapshot evidence mismatch/,
+    );
+    assert.deepEqual(requests, []);
+    assert.equal(objects.has("/raw/active.json"), true);
   });
 });
 
@@ -269,23 +313,30 @@ async function writeInputs(workDir, entries) {
   };
   const ledgerPath = path.join(workDir, "ledger.json");
   await writeFile(ledgerPath, `${JSON.stringify(ledger, null, 2)}\n`);
-  return { policies: [policyFile.path], ledger: ledgerPath };
+  const snapshots = await writeSnapshotEvidence(workDir, ledger.entries);
+  return { policies: [policyFile.path], ledger: ledgerPath, snapshots };
 }
 
 async function runPurge({
   ledger,
   policies,
+  snapshots,
   baseUrl,
   output,
   dryRun = false,
   authenticated = true,
+  trustedSnapshots = true,
   evaluationAtOverride = evaluationAt,
 }) {
   try {
+    const snapshotEvidenceSha256 = snapshots && trustedSnapshots
+      ? sha256(await readFile(snapshots))
+      : "";
     await execFileAsync(process.execPath, [
       "tools/datapack/purge-expired-source-raw.mjs",
       "--ledger", ledger,
       ...policies.flatMap((policy) => ["--policy", policy]),
+      ...(snapshots ? ["--snapshots", snapshots] : []),
       "--evaluation-at", evaluationAtOverride,
       "--output", output,
       ...(dryRun ? ["--dry-run", "--base-url", baseUrl] : []),
@@ -295,6 +346,7 @@ async function runPurge({
       env: {
         ...process.env,
         EASYSUBWAY_SOURCE_RAW_PURGE_PREAUTH_BASE_URL: !dryRun && authenticated ? baseUrl : "",
+        EASYSUBWAY_SOURCE_RAW_PURGE_SNAPSHOT_EVIDENCE_SHA256: !dryRun ? snapshotEvidenceSha256 : "",
       },
     });
   } catch (error) {
@@ -304,6 +356,20 @@ async function runPurge({
     throw wrapped;
   }
   return JSON.parse(await readFile(output, "utf8"));
+}
+
+async function writeSnapshotEvidence(workDir, entries, objectKeyOverrides = {}) {
+  const snapshots = entries.map((entry) => ({
+    snapshotId: entry.snapshotId,
+    sourceId: entry.sourceId,
+    snapshotStatus: "LOCKED",
+    retrievedAt: entry.retrievedAt,
+    rawSha256: entry.rawSha256,
+    rawObjectUri: `s3://easysubway-datapack-sources/${objectKeyOverrides[entry.snapshotId] ?? entry.objectKey}`,
+  }));
+  const snapshotsPath = path.join(workDir, "source-snapshots.json");
+  await writeFile(snapshotsPath, `${JSON.stringify(snapshots, null, 2)}\n`);
+  return snapshotsPath;
 }
 
 async function writePolicy(workDir, name, policy) {

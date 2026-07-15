@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { deriveFreshness } from "./freshness-policy.mjs";
+import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 import {
   evaluateSourceGovernance,
   validateSourceGovernancePolicy,
@@ -47,6 +48,7 @@ export function validateSourceSnapshotFreshness({
   governancePolicy = null,
   inventory = null,
   governancePolicySha256 = null,
+  purgeReport = null,
 }) {
   if (!Array.isArray(buildSpec?.sourceSnapshotIds) || buildSpec.sourceSnapshotIds.length === 0) {
     throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: buildSpec.sourceSnapshotIds");
@@ -116,6 +118,7 @@ export function validateSourceSnapshotFreshness({
     throw new Error("SOURCE_SNAPSHOT_EXPIRED");
   }
   let governanceResults = [];
+  const purgeEvidence = purgeReport == null ? new Map() : purgeEvidenceBySnapshot(purgeReport);
   if (governancePolicy != null || inventory != null) {
     if (governancePolicy == null || inventory == null) {
       throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy and inventory are required together");
@@ -137,6 +140,7 @@ export function validateSourceSnapshotFreshness({
       policy: governancePolicy,
       freshnessPolicy: policy,
       evaluationAt,
+      purgeEvidence: purgeEvidence.get(`${snapshot.sourceId}\0${snapshot.snapshotId}`) ?? null,
     }));
     const reasonCodes = [...new Set(governanceResults.flatMap((result) => result.reasonCodes))].sort();
     if (reasonCodes.length > 0) throw new Error(reasonCodes.join(","));
@@ -161,12 +165,21 @@ async function main(argv) {
   if ((governancePolicyPath == null) !== (inventoryPath == null)) {
     throw new Error("--governance-policy and --inventory must be provided together");
   }
-  const [snapshots, policy, governancePolicyText, inventory] = await Promise.all([
+  const purgeReportPath = buildSpec.sourceRawPurgeReportPath;
+  const [snapshots, policy, governancePolicyText, inventory, purgeReportText] = await Promise.all([
     readFile(resolvedEvidencePath, "utf8").then(JSON.parse),
     readFile(policyPath, "utf8").then(JSON.parse),
     governancePolicyPath ? readFile(governancePolicyPath, "utf8") : null,
     inventoryPath ? readFile(inventoryPath, "utf8").then(JSON.parse) : null,
+    purgeReportPath ? readRepositoryArtifact(root, purgeReportPath, "buildSpec.sourceRawPurgeReportPath") : null,
   ]);
+  if (purgeReportText != null
+    && sha256(purgeReportText) !== requiredSha256(
+      buildSpec.sourceRawPurgeReportSha256,
+      "buildSpec.sourceRawPurgeReportSha256",
+    )) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report hash");
+  }
   const governancePolicy = governancePolicyText ? JSON.parse(governancePolicyText) : null;
   const result = validateSourceSnapshotFreshness({
     buildSpec,
@@ -176,6 +189,7 @@ async function main(argv) {
     governancePolicy,
     inventory,
     governancePolicySha256: governancePolicyText ? sha256(governancePolicyText) : null,
+    purgeReport: purgeReportText ? JSON.parse(purgeReportText) : null,
   });
   process.stdout.write(`${JSON.stringify({
     status: "PASS",
@@ -189,6 +203,13 @@ export function assertRepositoryRelativePath(relativePath) {
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     throw new Error("buildSpec.sourceSnapshotEvidencePath must stay within the repository");
   }
+}
+
+async function readRepositoryArtifact(root, artifactPath, label) {
+  const relativePath = requiredString(artifactPath, label);
+  const resolvedPath = path.resolve(root, relativePath);
+  assertRepositoryRelativePath(path.relative(root, resolvedPath));
+  return readFile(resolvedPath, "utf8");
 }
 
 function parseArgs(argv) {
@@ -213,6 +234,42 @@ function requiredString(value, label) {
     throw new Error(`${label} must be a non-empty string`);
   }
   return value;
+}
+
+function requiredSha256(value, label) {
+  const normalized = requiredString(value, label);
+  if (!/^[0-9a-f]{64}$/.test(normalized)) throw new Error(`${label} must be sha256`);
+  return normalized;
+}
+
+export function purgeEvidenceBySnapshot(report) {
+  const expectedHash = sha256(JSON.stringify({ ...report, reportSha256: undefined }));
+  if (report?.schemaVersion !== 1
+    || report?.artifactKind !== "source-raw-purge-report"
+    || report.dryRun !== false
+    || report.decision !== "PASS"
+    || report.reportSha256 !== expectedHash
+    || !Array.isArray(report.reasonCodes)
+    || report.reasonCodes.length !== 0
+    || !Array.isArray(report.failed)
+    || report.failed.length !== 0
+    || !Array.isArray(report.deleted)
+    || !Array.isArray(report.alreadyAbsent)) {
+    throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report");
+  }
+  const purgedAt = new Date(requiredUtcInstant(report.evaluatedAt, "purge report evaluatedAt")).toISOString();
+  const evidence = new Map();
+  for (const entry of [...report.deleted, ...report.alreadyAbsent]) {
+    const sourceId = requiredString(entry?.sourceId, "purge report sourceId");
+    const snapshotId = requiredString(entry?.snapshotId, "purge report snapshotId");
+    const rawSha256 = requiredSha256(entry?.rawSha256, "purge report rawSha256");
+    const key = `${sourceId}\0${snapshotId}`;
+    if (evidence.has(key)) {
+      throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report duplicate snapshot");
+    }
+    evidence.set(key, { sourceId, snapshotId, rawSha256, purgedAt });
+  }
+  return evidence;
 }
 
 function selectSnapshots(snapshots, selectedIds) {

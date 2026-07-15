@@ -305,6 +305,34 @@ test("raw retention 만료는 policy retentionDays에서 결정론적으로 파�
   );
 });
 
+test("fresh snapshot은 검증된 purge 완료 evidence가 있으면 retention 만료 후에도 GO다", () => {
+  const input = governanceInput();
+  const snapshot = {
+    ...input.snapshot,
+    freshnessExpiresAt: "2027-04-16T00:00:00Z",
+    retrievedAt: "2026-04-16T00:00:00Z",
+    rawRetentionExpiresAt: "2026-07-15T00:00:00.000Z",
+  };
+  const result = evaluateSourceGovernance({
+    ...input,
+    snapshot,
+    freshnessPolicy: {
+      ...input.freshnessPolicy,
+      sourceClasses: [{ ...input.freshnessPolicy.sourceClasses[0], reverificationCadence: "P1Y" }],
+    },
+    evaluationAt: "2026-07-16T00:00:00Z",
+    purgeEvidence: {
+      sourceId: snapshot.sourceId,
+      snapshotId: snapshot.snapshotId,
+      rawSha256: snapshot.rawSha256,
+      purgedAt: "2026-07-15T00:00:00Z",
+    },
+  });
+
+  assert.equal(result.decision, "GO");
+  assert.ok(!result.reasonCodes.includes("RAW_RETENTION_OVERDUE"));
+});
+
 test("freshness 임의 미래값과 expiry 동일 경계는 release를 차단한다", () => {
   const input = governanceInput();
   assert.deepEqual(
