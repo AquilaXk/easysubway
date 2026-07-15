@@ -240,7 +240,10 @@ public class RouteSearchService implements RouteSearchUseCase {
 		UnaryOperator<List<RouteSearchResult>> selectCandidates
 	) {
 		try {
-			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(command, candidateCount);
+			List<RouteSearchResult> accessibilityCheckedResults = buildRouteSearchAlternatives(
+				withoutRealtime(command),
+				candidateCount
+			);
 			List<RouteSearchResult> selectedAccessibilityCheckedResults = selectCandidates.apply(accessibilityCheckedResults);
 			if (selectedAccessibilityCheckedResults.stream().anyMatch(this::hasAccessibilitySignal)) {
 				return new TimetableCandidateSelection(
@@ -258,6 +261,50 @@ public class RouteSearchService implements RouteSearchUseCase {
 				.map(this::ephemeralTimetableRouteResult)
 				.toList(),
 			TimetableCandidateSource.TIMETABLE_SCAN
+		);
+	}
+
+	private SearchRouteCommand withoutRealtime(SearchRouteCommand command) {
+		return new SearchRouteCommand(
+			command.originStationId(),
+			command.destinationStationId(),
+			command.mobilityType(),
+			command.constraintMode(),
+			command.maxTransfers(),
+			command.departureTime(),
+			false
+		);
+	}
+
+	@Override
+	public List<RouteSearchResult> applyRealtimeToTimetableCandidates(
+		SearchRouteCommand command,
+		List<RouteSearchResult> timetableResults
+	) {
+		if (!command.useRealtime()) {
+			return List.copyOf(timetableResults);
+		}
+		return timetableResults.stream()
+			.map(result -> withSteps(result, realtimeAwareRouteSteps(command, result.steps())))
+			.toList();
+	}
+
+	private RouteSearchResult withSteps(RouteSearchResult result, List<RouteStep> steps) {
+		return new RouteSearchResult(
+			result.routeSearchId(),
+			result.originStationId(),
+			result.originStationName(),
+			result.destinationStationId(),
+			result.destinationStationName(),
+			result.mobilityType(),
+			result.status(),
+			result.lineId(),
+			result.lineName(),
+			result.score(),
+			steps,
+			result.warnings(),
+			result.blockedReasons(),
+			result.createdAt()
 		);
 	}
 

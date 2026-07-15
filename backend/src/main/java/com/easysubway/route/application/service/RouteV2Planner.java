@@ -89,6 +89,12 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 					candidates -> rankTimetableItineraries(candidates, command.alternativeCount())
 				);
 				timetableItineraries = stabilizedCandidates.itineraries();
+				if (stabilizedCandidates.source() == TimetableCandidateSource.TIMETABLE_SCAN) {
+					timetableItineraries = routeSearchUseCase.applyRealtimeToTimetableCandidates(
+						searchRouteCommand,
+						timetableItineraries
+					);
+				}
 				return new RouteV2Plan(
 					timetableItineraries,
 					statusesOf(timetableItineraries, command.useRealtime()),
@@ -134,8 +140,7 @@ public class RouteV2Planner implements RouteV2SearchUseCase {
 
 	private boolean canUseTimetableRaptor(SearchRouteV2Command command) {
 		return command.constraintMode() != ConstraintMode.STRICT_STEP_FREE
-			&& command.mobilityType() != MobilityType.WHEELCHAIR
-			&& (!command.useRealtime() || !routeSearchUseCase.supportsRealtimeOverlay());
+			&& command.mobilityType() != MobilityType.WHEELCHAIR;
 	}
 
 	private void rejectUnsupportedMobilityPreset(SearchRouteV2Command command) {

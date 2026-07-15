@@ -1592,7 +1592,7 @@ class RouteSearchServiceTest {
 		var routeSearchService = new RouteSearchService(
 			repository,
 			repository,
-			new RampAccessibleTransitMasterPort(),
+			new TimetableAlignedRampAccessibleTransitMasterPort(),
 			CLOCK,
 			resolver
 		);
@@ -1611,7 +1611,7 @@ class RouteSearchServiceTest {
 
 		assertThat(resolver.callCount()).isEqualTo(1);
 		assertThat(resolver.lastQuery().stationId()).isEqualTo("station-a");
-		assertThat(resolver.lastQuery().readyAt()).isEqualTo(Instant.parse("2026-07-01T00:07:30Z"));
+		assertThat(resolver.lastQuery().readyAt()).isEqualTo(Instant.parse("2026-07-01T00:08:30Z"));
 		assertThat(plan.itineraries().getFirst().etaSource()).isEqualTo(EtaSource.MIXED);
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
@@ -1623,12 +1623,12 @@ class RouteSearchServiceTest {
 			.satisfies(step -> {
 				assertThat(step.reasonCodes()).containsExactly("MATCHED_REALTIME");
 				assertThat(step.providerSnapshotId()).isEqualTo("test-realtime-snapshot");
-				assertThat(step.providerObservedAt()).isEqualTo("2026-07-01T00:07:00Z");
-				assertThat(step.gatewayReceivedAt()).isEqualTo("2026-07-01T00:07:00Z");
+				assertThat(step.providerObservedAt()).isEqualTo("2026-07-01T00:08:00Z");
+				assertThat(step.gatewayReceivedAt()).isEqualTo("2026-07-01T00:08:00Z");
 				assertThat(step.servedAt()).isEqualTo("2026-06-13T09:00:00Z");
 			});
 		assertThat(plan.statuses()).containsExactly(RouteV2Status.FOUND);
-		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.LEGACY_GRAPH);
+		assertThat(plan.source()).isEqualTo(RouteV2PlanSource.TIMETABLE_RAPTOR);
 	}
 
 	@Test
@@ -1643,7 +1643,7 @@ class RouteSearchServiceTest {
 			CLOCK,
 			resolver
 		);
-		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+		var planner = new RouteV2Planner(routeSearchService, transferRouteTimetablePort());
 
 		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
 			"station-a",
@@ -1660,8 +1660,8 @@ class RouteSearchServiceTest {
 		assertThat(resolver.queries())
 			.extracting(RealtimeArrivalResolver.Query::readyAt)
 			.containsExactly(
-				Instant.parse("2026-07-01T00:07:30Z"),
-				Instant.parse("2026-07-01T00:24:00Z")
+				Instant.parse("2026-07-01T00:08:30Z"),
+				Instant.parse("2026-07-01T00:28:00Z")
 			);
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
@@ -1670,7 +1670,7 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("estimatedMinutes")
-			.containsExactly(6, 6);
+			.containsExactly(8, 9);
 	}
 
 	@Test
@@ -1685,7 +1685,7 @@ class RouteSearchServiceTest {
 			CLOCK,
 			resolver
 		);
-		var planner = new RouteV2Planner(routeSearchService, routeTimetablePort());
+		var planner = new RouteV2Planner(routeSearchService, transferRouteTimetablePort());
 
 		var plan = planner.search(new RouteV2Planner.SearchRouteV2Command(
 			"station-a",
@@ -1702,8 +1702,8 @@ class RouteSearchServiceTest {
 		assertThat(resolver.queries())
 			.extracting(RealtimeArrivalResolver.Query::readyAt)
 			.containsExactly(
-				Instant.parse("2026-07-01T00:07:30Z"),
-				Instant.parse("2026-07-01T00:22:00Z")
+				Instant.parse("2026-07-01T00:08:30Z"),
+				Instant.parse("2026-07-01T00:26:00Z")
 			);
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
@@ -1712,7 +1712,7 @@ class RouteSearchServiceTest {
 		assertThat(plan.itineraries().getFirst().steps())
 			.filteredOn(step -> "ride".equals(step.stepType()))
 			.extracting("estimatedMinutes")
-			.containsExactly(4, 6);
+			.containsExactly(6, 9);
 	}
 
 	@Test
@@ -1752,7 +1752,7 @@ class RouteSearchServiceTest {
 		var routeSearchService = new RouteSearchService(
 			repository,
 			repository,
-			new RampAccessibleTransitMasterPort(),
+			new TimetableAlignedRampAccessibleTransitMasterPort(),
 			CLOCK,
 			query -> new RealtimeArrivalResolver.Resolution(
 				ArrivalFreshness.UNAVAILABLE,
@@ -3964,6 +3964,22 @@ class RouteSearchServiceTest {
 					AccessibilityFacilityType.ELEVATOR,
 					AccessibilityFacilityStatus.NORMAL
 				)
+			);
+		}
+	}
+
+	private static class TimetableAlignedRampAccessibleTransitMasterPort extends RampAccessibleTransitMasterPort {
+
+		@Override
+		public List<SubwayLine> loadLines() {
+			return List.of(line("seoul-4"));
+		}
+
+		@Override
+		public List<StationLine> loadStationLines() {
+			return List.of(
+				new StationLine("station-a", "seoul-4", "101", 1, "상행 / 하행"),
+				new StationLine("station-b", "seoul-4", "102", 2, "상행 / 하행")
 			);
 		}
 	}

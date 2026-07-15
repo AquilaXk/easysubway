@@ -12383,6 +12383,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const timetablePortPath = "backend/src/main/java/com/easysubway/route/application/port/out/LoadRouteTimetablePort.java";
   const plannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java";
   const raptorPlannerPath = "backend/src/main/java/com/easysubway/route/application/service/RouteTimetableRaptorPlanner.java";
+  const routeV2PortPath = "backend/src/main/java/com/easysubway/route/application/port/in/RouteSearchUseCase.java";
 
   assert.equal(existsSync(path.join(root, useCasePath)), true, "RouteV2SearchUseCase must expose the V2 planning port");
   assert.equal(existsSync(path.join(root, timetablePortPath)), true, "RouteV2Planner must get timetable data through a port");
@@ -12393,6 +12394,9 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   const timetablePort = read(timetablePortPath);
   const planner = read(plannerPath);
   const raptorPlanner = read(raptorPlannerPath);
+  const routeV2Port = read(routeV2PortPath);
+  const postgresStateMigration = read("backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql");
+  const h2StateMigration = read("backend/src/main/resources/db/migration/h2/V57__route_v2_access_state.sql");
   const v2Endpoint = controller.match(
     /@PostMapping\("\/api\/v2\/routes\/search"\)[\s\S]*?searchRouteV2[\s\S]*?\n\t}/,
   )?.[0] ?? "";
@@ -12413,7 +12417,11 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(planner, /timetableRequired && canUseTimetableRaptor\(command\) && timetableCovers\(command\)/);
   assert.match(planner, /coveredStationIds\(\)/);
   assert.match(planner, /hasRouteTimetable\(\)/);
-  assert.match(planner, /!command\.useRealtime\(\)/);
+  assert.doesNotMatch(planner, /!command\.useRealtime\(\)/);
+  assert.match(planner, /applyRealtimeToTimetableCandidates/);
+  assert.match(routeV2Port, /applyRealtimeToTimetableCandidates/);
+  assert.match(postgresStateMigration, /timetable_artifact_id VARCHAR\(200\) NOT NULL/);
+  assert.match(h2StateMigration, /timetable_artifact_id VARCHAR\(200\) NOT NULL/);
   assert.match(planner, /canUseTimetableRaptor/);
   assert.match(planner, /loadRouteTimetable\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);

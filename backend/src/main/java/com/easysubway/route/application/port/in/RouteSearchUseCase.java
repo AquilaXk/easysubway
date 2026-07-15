@@ -68,6 +68,13 @@ public interface RouteSearchUseCase {
 		);
 	}
 
+	default List<RouteSearchResult> applyRealtimeToTimetableCandidates(
+		SearchRouteCommand command,
+		List<RouteSearchResult> timetableResults
+	) {
+		return List.copyOf(timetableResults);
+	}
+
 	default boolean supportsRealtimeOverlay() {
 		return true;
 	}
