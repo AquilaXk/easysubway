@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -15,11 +15,20 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await mkdir(outputDir, { recursive: true });
   const bundlePath = path.join(outputDir, "release-evidence-bundle.json");
   const hash = "a".repeat(64);
+  const scope = JSON.parse(await readFile(
+    path.join(root, "apps/mobile/release/production-datapack-scope.json"),
+    "utf8",
+  ));
+  const { canonicalScopeHash } = await import("./build-launch-denominator-report.mjs");
+  const scopeArgs = ["--scope", "apps/mobile/release/production-datapack-scope.json"];
   const bundle = {
     schemaVersion: 1,
     artifactKind: "datapack-release-evidence-bundle",
     candidateId: "capital@1",
     scopeId: "capital_pilot_android_v1",
+    launchScopeId: scope.routingLaunchScope.id,
+    launchScopeSha256: canonicalScopeHash(scope.routingLaunchScope),
+    identityLinkageMatrixSha256: canonicalScopeHash(scope.identityMatrix),
     releaseRequestId: "release-request-1",
     builderGitSha: "abcdef1",
     buildSpecSha256: hash,
@@ -56,9 +65,22 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await execFileAsync(
     process.execPath,
-    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, "--require-pass"],
+    ["tools/datapack/validate-release-evidence-bundle.mjs", "--bundle", bundlePath, ...scopeArgs, "--require-pass"],
     { cwd: root },
   );
+
+  bundle.launchScopeSha256 = "f".repeat(64);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/datapack/validate-release-evidence-bundle.mjs",
+      "--bundle",
+      bundlePath,
+      ...scopeArgs,
+    ], { cwd: root }),
+    /launchScopeSha256 must match canonical routing launch scope/,
+  );
+  bundle.launchScopeSha256 = canonicalScopeHash(scope.routingLaunchScope);
 
   bundle.androidEvidenceStatus = "FAIL";
   await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);

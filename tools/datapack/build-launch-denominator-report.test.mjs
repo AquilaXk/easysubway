@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import test from "node:test";
 import {
   buildLaunchDenominatorReport,
@@ -21,11 +23,14 @@ const scope = {
     id: "capital-routing-launch-v1",
     regionIds: ["capital"],
     operatorIds: ["seoul-metro", "korail"],
-    lineIds: ["seoul-4", "line-54a7b980b7c3"],
+    lineIds: ["seoul-4", "line-6e39be0cb6e2", "line-54a7b980b7c3"],
     serviceIds: ["SUBWAY", "ITX_CHEONGCHUN"],
     candidateStationIds: ["station-a", "station-b", "station-c"],
+    baseRoutingStationIds: ["station-pilot-a", "station-pilot-b"],
+    requiredTransferStationIds: ["station-a", "station-b"],
     requiredBaseEdgeIds: ["edge-a-b", "edge-b-c"],
     requiredTransferEdgeIds: ["transfer-b"],
+    sourceDerivedConnectionEdgeIds: { status: "ADMITTED", ids: ["source-edge-a"] },
   },
   nationwideRoadmapScope: {
     id: "nationwide-roadmap-v1",
@@ -57,10 +62,16 @@ function passingEvidence({ nationwideMissing = 270 } = {}) {
       regionIds: [...scope.routingLaunchScope.regionIds],
       operatorIds: [...scope.routingLaunchScope.operatorIds],
       lineIds: [...scope.routingLaunchScope.lineIds],
+      baseStationIds: [...scope.routingLaunchScope.baseRoutingStationIds],
       admittedStationIds: ["station-a", "station-b", "station-c"],
       materializedStationIds: ["station-a", "station-b", "station-c"],
+      transferStationIds: [...scope.routingLaunchScope.requiredTransferStationIds],
       baseEdgeIds: [...scope.routingLaunchScope.requiredBaseEdgeIds],
       transferEdgeIds: [...scope.routingLaunchScope.requiredTransferEdgeIds],
+      sourceDerivedConnectionEdgeIds: {
+        status: "ADMITTED",
+        ids: [...scope.routingLaunchScope.sourceDerivedConnectionEdgeIds.ids],
+      },
       serviceIds: [...scope.routingLaunchScope.serviceIds],
     },
     source: {
@@ -115,10 +126,17 @@ test("nationwide 0% does not block a fully satisfied v1 scope", () => {
 test("pilot row and each routing exact-set gap block launch", async (context) => {
   const gaps = [
     ["pilot row", (evidence) => evidence.pilot.coveredRowIds.pop(), "PILOT_ROW_GAP"],
+    ["base routing station", (evidence) => evidence.routing.baseStationIds.pop(), "ROUTING_BASE_STATION_ID_GAP"],
     ["admitted station", (evidence) => evidence.routing.admittedStationIds.pop(), "ROUTING_STATION_ID_GAP"],
     ["materialized station", (evidence) => evidence.routing.materializedStationIds.pop(), "ROUTING_STATION_ID_GAP"],
+    ["transfer station", (evidence) => evidence.routing.transferStationIds.pop(), "ROUTING_TRANSFER_STATION_ID_GAP"],
     ["base edge", (evidence) => evidence.routing.baseEdgeIds.pop(), "ROUTING_BASE_EDGE_ID_GAP"],
     ["transfer edge", (evidence) => evidence.routing.transferEdgeIds.pop(), "ROUTING_TRANSFER_EDGE_ID_GAP"],
+    [
+      "source-derived connection edge",
+      (evidence) => { evidence.routing.sourceDerivedConnectionEdgeIds = { status: "MISSING", ids: [] }; },
+      "ROUTING_SOURCE_DERIVED_CONNECTION_EDGE_ID_GAP",
+    ],
   ];
   for (const [name, mutate, blocker] of gaps) {
     await context.test(name, () => {
@@ -127,6 +145,54 @@ test("pilot row and each routing exact-set gap block launch", async (context) =>
       assert.ok(report.blockers.includes(blocker));
     });
   }
+});
+
+test("production routing scope는 #2135 canonical 28역과 필수 접근·환승 ID를 고정한다", async () => {
+  const productionScope = JSON.parse(await readFile(
+    path.join(import.meta.dirname, "../../apps/mobile/release/production-datapack-scope.json"),
+    "utf8",
+  ));
+  assert.deepEqual(productionScope.routingLaunchScope.lineIds, [
+    "seoul-4",
+    "line-6e39be0cb6e2",
+    "line-54a7b980b7c3",
+  ]);
+  assert.equal(productionScope.routingLaunchScope.candidateStationIds.length, 28);
+  assert.deepEqual(productionScope.routingLaunchScope.baseRoutingStationIds, [
+    "station-sangnoksu",
+    "station-sadang",
+  ]);
+  assert.deepEqual(productionScope.routingLaunchScope.requiredTransferStationIds, [
+    "station-8aa315864466",
+    "station-c0679b9a6cf8",
+    "station-e5cf592cf355",
+    "station-b819702fa7d9",
+    "station-83bcb1eae340",
+  ]);
+  assert.deepEqual(productionScope.routingLaunchScope.sourceDerivedConnectionEdgeIds, {
+    status: "MISSING",
+    ids: [],
+    source: "#2135 ADMITTED launch evidence",
+  });
+});
+
+test("committed current report는 gap과 unavailable consumer를 숨기지 않고 NO_GO다", async () => {
+  const productionScope = JSON.parse(await readFile(
+    path.join(import.meta.dirname, "../../apps/mobile/release/production-datapack-scope.json"),
+    "utf8",
+  ));
+  const report = JSON.parse(await readFile(
+    path.join(import.meta.dirname, "reports/android-v1-launch-denominator-20260715.json"),
+    "utf8",
+  ));
+  assert.equal(report.decision, "NO_GO");
+  assert.equal(report.scopes.routingLaunchScope.id, productionScope.routingLaunchScope.id);
+  assert.equal(report.scopes.routingLaunchScope.sha256, canonicalScopeHash(productionScope.routingLaunchScope));
+  assert.equal(report.identityLinkage.matrixSha256, canonicalScopeHash(productionScope.identityMatrix));
+  assert.deepEqual(report.coverage.accessibility, { requiredCount: 6, coveredCount: 6, gapCount: 0 });
+  assert.deepEqual(report.coverage.nationwide, { requiredCount: 270, missingCount: 270, blocksV1: false });
+  assert.deepEqual(report.consumerStates, { source: "MISSING", server: "UNAVAILABLE", mobile: "MISSING" });
+  assert.deepEqual(report.routing.sourceDerivedConnectionEdgeIds, { status: "MISSING", ids: [] });
 });
 
 test("routing region, operator, and line evidence must exactly match launch scope", async (context) => {

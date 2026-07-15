@@ -3477,6 +3477,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.match(manifest.dataPackManifestSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.routeContractVersion, "route-map-contract-v1");
   assert.equal(manifest.realtimeContractVersion, "seoul-topis-schema-v1");
+  const launchScope = readJson("apps/mobile/release/production-datapack-scope.json");
+  assert.equal(manifest.launchScopeId, launchScope.routingLaunchScope.id);
+  assert.equal(manifest.rcIdentity.launchScopeId, launchScope.routingLaunchScope.id);
+  assert.match(manifest.launchScopeSha256, /^[a-f0-9]{64}$/);
+  assert.match(manifest.identityLinkageMatrixSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.readiness.status, "NO_GO");
   assert.ok(manifest.readiness.blockers.map((blocker) => blocker.id).includes("gate_androidrcevidence_blocked_external"));
   assert.deepEqual(
@@ -5043,6 +5048,9 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
 
   for (const field of [
     "releaseRequestId",
+    "launchScopeId",
+    "launchScopeSha256",
+    "identityLinkageMatrixSha256",
     "supportedDenominatorSha256",
     "coverageStatus",
     "routeMapPositionCoverageSha256",
@@ -5422,6 +5430,9 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
     "artifactKind",
     "candidateId",
     "scopeId",
+    "launchScopeId",
+    "launchScopeSha256",
+    "identityLinkageMatrixSha256",
     "releaseRequestId",
     "builderGitSha",
     "buildSpecSha256",

@@ -32,6 +32,27 @@ test("mobile release claim scan rejects forbidden app copy", async () => {
   );
 });
 
+test("mobile release claim scan rejects a Play routing launch identity mismatch", async () => {
+  const tmp = path.join(tmpdir(), `mobile-claim-scope-${Date.now()}`);
+  await rm(tmp, { recursive: true, force: true });
+  await mkdir(path.join(tmp, "apps/mobile"), { recursive: true });
+  await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
+  await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
+  const playPath = path.join(tmp, "apps/mobile/release/play-store-submission-content.json");
+  const play = JSON.parse(await readFile(playPath, "utf8"));
+  play.launchScopeSha256 = "f".repeat(64);
+  await writeFile(playPath, JSON.stringify(play));
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      path.join(root, "tools/ci/check-mobile-release-claims.mjs"),
+      "--root",
+      tmp,
+    ], { cwd: root }),
+    /launchScopeSha256 must match canonical routing launch scope/,
+  );
+});
+
 test("allowedPhrasesKo lets facility names pass but still blocks classification context", async () => {
   const tmp = path.join(tmpdir(), `mobile-claim-scan-allow-${Date.now()}`);
   await rm(tmp, { recursive: true, force: true });

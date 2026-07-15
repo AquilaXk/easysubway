@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -8,7 +9,7 @@ async function main() {
   const configPath = path.resolve(root, args.get("config") ?? "apps/mobile/release/forbidden-release-claims.json");
   const config = JSON.parse(await readFile(configPath, "utf8"));
   const scope = JSON.parse(await readFile(path.resolve(root, config.scopeSource), "utf8"));
-  const supportedClaimKo = scope.supportScope?.supportedClaimKo;
+  const supportedClaimKo = scope.verifiedAccessibilityScope?.supportedClaimKo;
   if (!supportedClaimKo) throw new Error("production scope supportedClaimKo missing");
 
   const allowedPhrasesKo = config.allowedPhrasesKo ?? [];
@@ -30,6 +31,18 @@ async function main() {
   const play = JSON.parse(await readFile(path.resolve(root, "apps/mobile/release/play-store-submission-content.json"), "utf8"));
   if (play.koreanListing?.supportRegionKo !== supportedClaimKo) {
     failures.push(`play-store supportRegionKo must match production scope: ${supportedClaimKo}`);
+  }
+  if (play.verifiedAccessibilityScopeId !== scope.verifiedAccessibilityScope?.id) {
+    failures.push("play-store verifiedAccessibilityScopeId must match verified accessibility scope");
+  }
+  if (play.launchScopeId !== scope.routingLaunchScope?.id) {
+    failures.push("play-store launchScopeId must match routing launch scope");
+  }
+  if (play.launchScopeSha256 !== canonicalScopeHash(scope.routingLaunchScope)) {
+    failures.push("play-store launchScopeSha256 must match canonical routing launch scope");
+  }
+  if (play.identityLinkageMatrixSha256 !== canonicalScopeHash(scope.identityMatrix)) {
+    failures.push("play-store identityLinkageMatrixSha256 must match canonical identity linkage matrix");
   }
 
   if (failures.length > 0) throw new Error(failures.join("\n"));

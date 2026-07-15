@@ -1,0 +1,79 @@
+{
+  "decision": "NO_GO",
+  "blockers": [
+    "ROUTING_STATION_ID_GAP",
+    "ROUTING_TRANSFER_STATION_ID_GAP",
+    "ROUTING_SOURCE_DERIVED_CONNECTION_EDGE_ID_GAP",
+    "SOURCE_NOT_ADMITTED",
+    "SOURCE_STALE",
+    "ROUTING_SCOPE_HASH_MISMATCH",
+    "SERVER_NOT_ACTIVE",
+    "SERVER_ROUTING_NOT_READY",
+    "MOBILE_NOT_READY",
+    "MOBILE_TOPOLOGY_NOT_READY",
+    "IDENTITY_FIELD_MISMATCH:canonicalStationVersion",
+    "IDENTITY_FIELD_MISMATCH:corridorId",
+    "IDENTITY_FIELD_MISMATCH:serviceId",
+    "IDENTITY_FIELD_MISMATCH:lineageId",
+    "IDENTITY_FIELD_MISMATCH:schemaVersion",
+    "IDENTITY_ARTIFACT_HASH_INVALID",
+    "SIGNATURE_INVALID",
+    "ROLLBACK_UNVERIFIED",
+    "EVIDENCE_STALE",
+    "LINEAGE_UNVERIFIED"
+  ],
+  "nationwideBlocksV1": false,
+  "scopes": {
+    "verifiedAccessibilityScope": {
+      "id": "capital_pilot_android_v1",
+      "sha256": "e192eef333e7f90312f841b4f5935d31d15118684b4e53e50f44cfbdfe2a1fd6"
+    },
+    "routingLaunchScope": {
+      "id": "capital_routing_android_v1",
+      "sha256": "b3a47430ffbbf6742f8bd24863bfe82ccc324f74444c35daa3cec65dcdbcde37"
+    },
+    "nationwideRoadmapScope": {
+      "id": "nationwide_roadmap_v1",
+      "sha256": "f93bab74198ed46a708a098201ef53e53c04748a6f18a8a95e01e046d0553442"
+    }
+  },
+  "identityLinkage": {
+    "compatible": false,
+    "matrixSha256": "3250f17b012d958e784e65ff81df60b38f304f43a3ca5dc3a7fd0cc088f3f6a0",
+    "shared": {
+      "canonicalStationVersion": null,
+      "corridorId": null,
+      "serviceId": null,
+      "lineageId": null,
+      "schemaVersion": null
+    },
+    "artifactHashes": {
+      "source": null,
+      "server": null,
+      "mobile": null
+    }
+  },
+  "coverage": {
+    "accessibility": {
+      "requiredCount": 6,
+      "coveredCount": 6,
+      "gapCount": 0
+    },
+    "nationwide": {
+      "requiredCount": 270,
+      "missingCount": 270,
+      "blocksV1": false
+    }
+  },
+  "consumerStates": {
+    "source": "MISSING",
+    "server": "UNAVAILABLE",
+    "mobile": "MISSING"
+  },
+  "routing": {
+    "sourceDerivedConnectionEdgeIds": {
+      "status": "MISSING",
+      "ids": []
+    }
+  }
+}

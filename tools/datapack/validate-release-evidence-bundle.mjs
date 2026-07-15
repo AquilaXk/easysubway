@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { canonicalScopeHash } from "./build-launch-denominator-report.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED_EXTERNAL"]);
@@ -75,12 +76,14 @@ function validateRouteGraphTopologyIntegrity(bundle) {
 async function main() {
   const args = process.argv.slice(2);
   const bundlePath = argValue(args, "--bundle");
+  const scopePath = argValue(args, "--scope") ?? "apps/mobile/release/production-datapack-scope.json";
   const requirePass = args.includes("--require-pass");
   if (!bundlePath) {
     throw new Error("--bundle is required");
   }
 
   const bundle = JSON.parse(await readFile(bundlePath, "utf8"));
+  const scope = JSON.parse(await readFile(scopePath, "utf8"));
   for (const [field, expected] of [
     ["schemaVersion", 1],
     ["artifactKind", "datapack-release-evidence-bundle"],
@@ -93,6 +96,7 @@ async function main() {
   for (const field of [
     "candidateId",
     "scopeId",
+    "launchScopeId",
     "releaseRequestId",
     "builderGitSha",
     "createdAt",
@@ -100,7 +104,18 @@ async function main() {
   ]) {
     requireField(bundle, field);
   }
+  if (bundle.launchScopeId !== scope.routingLaunchScope?.id) {
+    throw new Error("launchScopeId must match routing launch scope");
+  }
+  if (bundle.launchScopeSha256 !== canonicalScopeHash(scope.routingLaunchScope)) {
+    throw new Error("launchScopeSha256 must match canonical routing launch scope");
+  }
+  if (bundle.identityLinkageMatrixSha256 !== canonicalScopeHash(scope.identityMatrix)) {
+    throw new Error("identityLinkageMatrixSha256 must match canonical identity linkage matrix");
+  }
   for (const field of [
+    "launchScopeSha256",
+    "identityLinkageMatrixSha256",
     "buildSpecSha256",
     "supportedDenominatorSha256",
     "sourceSnapshotSetHash",

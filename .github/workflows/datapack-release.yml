@@ -525,10 +525,11 @@ jobs:
         id: evidence-bundle
         run: |
           set -euo pipefail
-          node - <<'NODE'
-          const { createHash } = require("crypto");
-          const fs = require("fs");
-          const path = require("path");
+          node --input-type=module - <<'NODE'
+          import { createHash } from "node:crypto";
+          import fs from "node:fs";
+          import path from "node:path";
+          import { canonicalScopeHash } from "./tools/datapack/build-launch-denominator-report.mjs";
 
           const hashFile = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
           const zeroHash = "0".repeat(64);
@@ -538,6 +539,9 @@ jobs:
           const pack = manifest.packs?.[0] ?? {};
           const buildSpecPath = process.env.EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH;
           const buildSpec = JSON.parse(fs.readFileSync(buildSpecPath, "utf8"));
+          const scope = JSON.parse(
+            fs.readFileSync("apps/mobile/release/production-datapack-scope.json", "utf8"),
+          );
           const catalogDir = path.join(stage, "catalog");
           const gzipFile = fs.readdirSync(catalogDir).find((name) => name.endsWith(".sqlite.gz"));
           const releaseMode = process.env.EASYSUBWAY_DATAPACK_RELEASE_MODE;
@@ -599,7 +603,10 @@ jobs:
             schemaVersion: 1,
             artifactKind: "datapack-release-evidence-bundle",
             candidateId: `${pack.id ?? "unknown"}@${pack.version ?? "unknown"}`,
-            scopeId: "capital_pilot_android_v1",
+            scopeId: scope.verifiedAccessibilityScope.id,
+            launchScopeId: scope.routingLaunchScope.id,
+            launchScopeSha256: canonicalScopeHash(scope.routingLaunchScope),
+            identityLinkageMatrixSha256: canonicalScopeHash(scope.identityMatrix),
             releaseRequestId: process.env.EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID,
             builderGitSha: process.env.GITHUB_SHA,
             buildSpecSha256: hashFile(buildSpecPath),
@@ -639,7 +646,10 @@ jobs:
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' }}
         run: |
           set -euo pipefail
-          bundle_args=(--bundle "${EASYSUBWAY_RELEASE_EVIDENCE_BUNDLE}")
+          bundle_args=(
+            --bundle "${EASYSUBWAY_RELEASE_EVIDENCE_BUNDLE}"
+            --scope apps/mobile/release/production-datapack-scope.json
+          )
           if [[ "${EASYSUBWAY_DATAPACK_RELEASE_MODE}" =~ ^(release-candidate|production-publish)$ ]]; then
             bundle_args+=(--require-pass)
           fi

@@ -28,11 +28,39 @@ export function buildLaunchDenominatorReport(scope, evidence) {
     },
     identityLinkage: {
       compatible: !blockers.some((blocker) => blocker.startsWith("IDENTITY_")),
+      matrixSha256: scope?.identityMatrix ? canonicalScopeHash(scope.identityMatrix) : null,
       shared: sharedIdentity,
       artifactHashes: {
         source: evidence?.source?.artifactHash ?? null,
         server: evidence?.server?.artifactHash ?? null,
         mobile: evidence?.mobile?.artifactHash ?? null,
+      },
+    },
+    coverage: {
+      accessibility: {
+        requiredCount: requiredPilotRowIds(scope?.verifiedAccessibilityScope).length,
+        coveredCount: evidence?.pilot?.coveredRowIds?.length ?? 0,
+        gapCount: Math.max(
+          0,
+          requiredPilotRowIds(scope?.verifiedAccessibilityScope).length
+            - (evidence?.pilot?.coveredRowIds?.length ?? 0),
+        ),
+      },
+      nationwide: {
+        requiredCount: scope?.nationwideRoadmapScope?.launchRequiredCount ?? 0,
+        missingCount: evidence?.nationwide?.missingCount ?? null,
+        blocksV1: false,
+      },
+    },
+    consumerStates: {
+      source: evidence?.source?.status ?? "UNAVAILABLE",
+      server: evidence?.server?.status ?? "UNAVAILABLE",
+      mobile: evidence?.mobile?.status ?? "UNAVAILABLE",
+    },
+    routing: {
+      sourceDerivedConnectionEdgeIds: evidence?.routing?.sourceDerivedConnectionEdgeIds ?? {
+        status: "MISSING",
+        ids: [],
       },
     },
   };
@@ -57,6 +85,9 @@ function collectV1Blockers(scope, evidence) {
   if (!sameSet(routingScope?.lineIds, evidence?.routing?.lineIds)) {
     blockers.push("ROUTING_LINE_SCOPE_MISMATCH");
   }
+  if (!sameSet(routingScope?.baseRoutingStationIds, evidence?.routing?.baseStationIds)) {
+    blockers.push("ROUTING_BASE_STATION_ID_GAP");
+  }
 
   const admittedStations = evidence?.routing?.admittedStationIds;
   if (
@@ -69,8 +100,21 @@ function collectV1Blockers(scope, evidence) {
   if (!sameSet(routingScope?.requiredBaseEdgeIds, evidence?.routing?.baseEdgeIds)) {
     blockers.push("ROUTING_BASE_EDGE_ID_GAP");
   }
+  if (!sameSet(routingScope?.requiredTransferStationIds, evidence?.routing?.transferStationIds)) {
+    blockers.push("ROUTING_TRANSFER_STATION_ID_GAP");
+  }
   if (!sameSet(routingScope?.requiredTransferEdgeIds, evidence?.routing?.transferEdgeIds)) {
     blockers.push("ROUTING_TRANSFER_EDGE_ID_GAP");
+  }
+  if (
+    routingScope?.sourceDerivedConnectionEdgeIds?.status !== "ADMITTED"
+    || evidence?.routing?.sourceDerivedConnectionEdgeIds?.status !== "ADMITTED"
+    || !sameSet(
+      routingScope?.sourceDerivedConnectionEdgeIds?.ids,
+      evidence?.routing?.sourceDerivedConnectionEdgeIds?.ids,
+    )
+  ) {
+    blockers.push("ROUTING_SOURCE_DERIVED_CONNECTION_EDGE_ID_GAP");
   }
   if (!sameSet(routingScope?.serviceIds, evidence?.routing?.serviceIds)) {
     blockers.push("ROUTING_SERVICE_SCOPE_MISMATCH");

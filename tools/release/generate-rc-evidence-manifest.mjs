@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const cwd = process.cwd();
@@ -27,6 +28,10 @@ const backendIdentity = readBackendIdentity(args);
 const gateStatuses = parsePairs(arg("gateStatus", "gate-status"));
 const expectedValues = parsePairs(args.expect);
 const gitSha = arg("gitSha", "git-sha") ?? process.env.GITHUB_SHA ?? requiredGitSha();
+const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
+if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
+  fail("production routing launch scope and identity matrix are required");
+}
 
 const identity = {
   gitSha,
@@ -39,6 +44,9 @@ const identity = {
   releaseSequence: arg("releaseSequence", "release-sequence") ?? dataPackManifest?.releaseSequence ?? dataPackManifest?.pack_version ?? null,
   routeContractVersion: arg("routeContractVersion", "route-contract-version") ?? "route-map-contract-v1",
   realtimeContractVersion: arg("realtimeContractVersion", "realtime-contract-version") ?? readRealtimeContractVersion(repoRoot),
+  launchScopeId: launchScope.routingLaunchScope.id,
+  launchScopeSha256: canonicalScopeHash(launchScope.routingLaunchScope),
+  identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
 
 const evidenceEntries = requiredEvidenceEntries(testedAt, evidenceRoot, args.device, arg("androidVersion", "android-version"));
@@ -242,6 +250,9 @@ function identityBlockers(values) {
     "releaseSequence",
     "routeContractVersion",
     "realtimeContractVersion",
+    "launchScopeId",
+    "launchScopeSha256",
+    "identityLinkageMatrixSha256",
   ];
   const blockers = required
     .filter((field) => !values[field])

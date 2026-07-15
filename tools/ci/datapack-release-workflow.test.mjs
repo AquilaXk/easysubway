@@ -79,6 +79,19 @@ test("coverage gap 스텝은 release 모드에서만 production provenance와 re
   assert.match(yml, /release mode cannot use --allow-gaps/);
 });
 
+test("release evidence는 routing launch scope의 canonical identity를 소비한다", () => {
+  const evidenceStep = yml.match(
+    /- name: Data Pack Release \/ Write release evidence bundle[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(evidenceStep, "release evidence bundle 스텝을 찾지 못함");
+  assert.match(evidenceStep, /canonicalScopeHash/);
+  assert.match(evidenceStep, /launchScopeId:\s*scope\.routingLaunchScope\.id/);
+  assert.match(evidenceStep, /launchScopeSha256:\s*canonicalScopeHash\(scope\.routingLaunchScope\)/);
+  assert.match(evidenceStep, /identityLinkageMatrixSha256:\s*canonicalScopeHash\(scope\.identityMatrix\)/);
+  assert.doesNotMatch(evidenceStep, /scopeId:\s*"capital_pilot_android_v1"/);
+  assert.match(yml, /--scope apps\/mobile\/release\/production-datapack-scope\.json/);
+});
+
 test("워크플로는 rollout-update 모드·publish-rollout 스텝을 가지고 빌드 스텝을 pointer-only로 게이트한다", () => {
   assert.match(yml, /rollout-update/);
   assert.match(yml, /publish-rollout\.mjs/);
