@@ -156,6 +156,23 @@ class DataSourceSnapshotAdminPageControllerTest {
 	}
 
 	@Test
+	@DisplayName("root source snapshot 폼은 diff 입력을 필수로 강제하지 않는다")
+	void rootSourceSnapshotFormDoesNotRequireDiff() throws Exception {
+		String html = mockMvc.perform(get("/admin/datapack/source-snapshots/snapshot-kric-20260629/page")
+				.with(user("datapack-viewer").authorities(new SimpleGrantedAuthority("admin.datapack.read"))))
+			.andExpect(status().isOk())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+
+		assertThat(html)
+			.contains("name=\"diffSummary\"")
+			.contains("name=\"diffSummaryJson\"")
+			.doesNotContain("name=\"diffSummary\" required")
+			.doesNotContain("name=\"diffSummaryJson\" required");
+	}
+
+	@Test
 	@DisplayName("source run 권한 관리자는 redacted LOCKED snapshot을 저장한다")
 	void sourceRunAdminCreatesLockedSnapshot() throws Exception {
 		mockMvc.perform(post("/admin/datapack/source-snapshots")
