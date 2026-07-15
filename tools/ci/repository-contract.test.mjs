@@ -11,6 +11,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 import { gunzipSync, inflateSync } from "node:zlib";
 import { REQUIRED_STATUS_CHECK_CONTEXTS } from "./apply-main-ruleset-required-checks.mjs";
+import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -3480,8 +3481,10 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const launchScope = readJson("apps/mobile/release/production-datapack-scope.json");
   assert.equal(manifest.launchScopeId, launchScope.routingLaunchScope.id);
   assert.equal(manifest.rcIdentity.launchScopeId, launchScope.routingLaunchScope.id);
-  assert.match(manifest.launchScopeSha256, /^[a-f0-9]{64}$/);
-  assert.match(manifest.identityLinkageMatrixSha256, /^[a-f0-9]{64}$/);
+  assert.equal(manifest.launchScopeSha256, canonicalScopeHash(launchScope.routingLaunchScope));
+  assert.equal(manifest.rcIdentity.launchScopeSha256, canonicalScopeHash(launchScope.routingLaunchScope));
+  assert.equal(manifest.identityLinkageMatrixSha256, canonicalScopeHash(launchScope.identityMatrix));
+  assert.equal(manifest.rcIdentity.identityLinkageMatrixSha256, canonicalScopeHash(launchScope.identityMatrix));
   assert.equal(manifest.readiness.status, "NO_GO");
   assert.ok(manifest.readiness.blockers.map((blocker) => blocker.id).includes("gate_androidrcevidence_blocked_external"));
   assert.deepEqual(
@@ -6093,7 +6096,9 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.nationwideRoadmapScope.launchRequiredCount, 270);
   assert.equal(scope.nationwideRoadmapScope.blocksRoutingLaunch, false);
   assert.deepEqual(scope.routingLaunchScope.serviceIds, ["SUBWAY", "ITX_CHEONGCHUN"]);
-  assert.ok(scope.routingLaunchScope.candidateStationIds.length > 0);
+  assert.equal(scope.routingLaunchScope.candidateStationIds, undefined);
+  assert.equal(scope.routingLaunchScope.admittedStationEvidenceRequired, true);
+  assert.equal(scope.routingLaunchScope.sourceDerivedConnectionEdgeEvidenceRequired, true);
   assert.ok(scope.routingLaunchScope.requiredBaseEdgeIds.length > 0);
   assert.ok(scope.routingLaunchScope.requiredTransferEdgeIds.length > 0);
   assert.equal(Object.hasOwn(scope.routingLaunchScope, "admittedStationIds"), false);

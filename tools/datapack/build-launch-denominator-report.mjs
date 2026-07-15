@@ -17,6 +17,10 @@ export function buildLaunchDenominatorReport(scope, evidence) {
   const identities = ["source", "server", "mobile"].map((consumer) => evidence?.[consumer]?.identity);
   const sharedFields = scope?.identityMatrix?.requiredSharedFields ?? [];
   const sharedIdentity = Object.fromEntries(sharedFields.map((field) => [field, identities[0]?.[field] ?? null]));
+  const requiredAccessibilityRows = requiredPilotRowIds(scope?.verifiedAccessibilityScope);
+  const coveredAccessibilityRows = new Set(evidence?.pilot?.coveredRowIds ?? []);
+  const coveredAccessibilityCount = requiredAccessibilityRows
+    .filter((rowId) => coveredAccessibilityRows.has(rowId)).length;
   return {
     decision: blockers.length === 0 ? "GO" : "NO_GO",
     blockers,
@@ -38,13 +42,9 @@ export function buildLaunchDenominatorReport(scope, evidence) {
     },
     coverage: {
       accessibility: {
-        requiredCount: requiredPilotRowIds(scope?.verifiedAccessibilityScope).length,
-        coveredCount: evidence?.pilot?.coveredRowIds?.length ?? 0,
-        gapCount: Math.max(
-          0,
-          requiredPilotRowIds(scope?.verifiedAccessibilityScope).length
-            - (evidence?.pilot?.coveredRowIds?.length ?? 0),
-        ),
+        requiredCount: requiredAccessibilityRows.length,
+        coveredCount: coveredAccessibilityCount,
+        gapCount: requiredAccessibilityRows.length - coveredAccessibilityCount,
       },
       nationwide: {
         requiredCount: scope?.nationwideRoadmapScope?.launchRequiredCount ?? 0,
@@ -58,6 +58,10 @@ export function buildLaunchDenominatorReport(scope, evidence) {
       mobile: evidence?.mobile?.status ?? "UNAVAILABLE",
     },
     routing: {
+      admittedStationIds: {
+        status: evidence?.source?.status === "ADMITTED" ? "ADMITTED" : "MISSING",
+        ids: evidence?.source?.admittedStationIds ?? [],
+      },
       sourceDerivedConnectionEdgeIds: evidence?.routing?.sourceDerivedConnectionEdgeIds ?? {
         status: "MISSING",
         ids: [],
@@ -90,10 +94,11 @@ function collectV1Blockers(scope, evidence) {
   }
 
   const admittedStations = evidence?.routing?.admittedStationIds;
+  const sourceAdmittedStations = evidence?.source?.admittedStationIds;
   if (
-    !nonEmptyStringSet(admittedStations)
-    || !isSubset(admittedStations, routingScope?.candidateStationIds)
-    || !sameSet(admittedStations, evidence?.routing?.materializedStationIds)
+    routingScope?.admittedStationEvidenceRequired !== true
+    || !sameSet(sourceAdmittedStations, admittedStations)
+    || !sameSet(sourceAdmittedStations, evidence?.routing?.materializedStationIds)
   ) {
     blockers.push("ROUTING_STATION_ID_GAP");
   }
@@ -107,10 +112,10 @@ function collectV1Blockers(scope, evidence) {
     blockers.push("ROUTING_TRANSFER_EDGE_ID_GAP");
   }
   if (
-    routingScope?.sourceDerivedConnectionEdgeIds?.status !== "ADMITTED"
+    routingScope?.sourceDerivedConnectionEdgeEvidenceRequired !== true
     || evidence?.routing?.sourceDerivedConnectionEdgeIds?.status !== "ADMITTED"
     || !sameSet(
-      routingScope?.sourceDerivedConnectionEdgeIds?.ids,
+      evidence?.source?.sourceDerivedConnectionEdgeIds,
       evidence?.routing?.sourceDerivedConnectionEdgeIds?.ids,
     )
   ) {
@@ -193,12 +198,6 @@ function sameSet(left, right) {
   const expected = new Set(left);
   return expected.size === left.length && new Set(right).size === right.length
     && right.every((value) => expected.has(value));
-}
-
-function isSubset(values, allowedValues) {
-  if (!nonEmptyStringSet(allowedValues)) return false;
-  const allowed = new Set(allowedValues);
-  return values.every((value) => allowed.has(value));
 }
 
 function nonEmptyStringSet(values) {

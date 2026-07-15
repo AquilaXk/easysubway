@@ -30,7 +30,7 @@
     },
     "routingLaunchScope": {
       "id": "capital_routing_android_v1",
-      "sha256": "b3a47430ffbbf6742f8bd24863bfe82ccc324f74444c35daa3cec65dcdbcde37"
+      "sha256": "5846b91f420b8c6b78cd5094ef7037c8342b4bc4ef9dacf7bc1bb6a5d65e1dbe"
     },
     "nationwideRoadmapScope": {
       "id": "nationwide_roadmap_v1",
@@ -71,6 +71,10 @@
     "mobile": "MISSING"
   },
   "routing": {
+    "admittedStationIds": {
+      "status": "MISSING",
+      "ids": []
+    },
     "sourceDerivedConnectionEdgeIds": {
       "status": "MISSING",
       "ids": []
