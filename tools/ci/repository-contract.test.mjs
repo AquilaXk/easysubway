@@ -6066,7 +6066,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   const inventory = readJson("tools/datapack/source-inventory.json");
   const inventorySources = new Map(inventory.sources.map((source) => [source.id, source]));
 
-  assert.equal(scope.schemaVersion, 1);
+  assert.equal(scope.schemaVersion, 2);
   assert.equal(scope.applicationId, "easysubway");
   assert.equal(scope.androidApplicationId, "com.easysubway.app");
   assert.equal(scope.releaseGate, "production-datapack-scope");
@@ -6074,14 +6074,34 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.status, "DENOMINATOR_LOCKED");
   assert.equal(scope.statusDetail, "SUPPORTED_STATION_LINE_OPERATOR_DENOMINATOR_LOCKED");
   assert.equal(scope.decision.approvalState, "qa-approved");
-  assert.equal(scope.supportScope.id, "capital_pilot_android_v1");
-  assert.deepEqual(scope.supportScope.regionIds, ["capital"]);
-  assert.equal(scope.supportScope.supportedClaimKo, "상록수·사당 검증 pilot");
-  assert.deepEqual(scope.supportScope.includedOperatorIds, ["seoul-metro"]);
-  assert.deepEqual(scope.supportScope.includedLineIds, ["seoul-4"]);
-  assert.deepEqual(scope.supportScope.includedStationIds, ["station-sangnoksu", "station-sadang"]);
-  assert.deepEqual(scope.supportScope.requiredFacilityTypes, ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"]);
-  assert.deepEqual(scope.supportScope.facilityCoverageDenominator, {
+  assert.equal(scope.decision.currentLaunchDecision, "NO_GO");
+  assert.equal(scope.decision.blocker, "ITX_TIMETABLE_SOURCE_MISSING");
+  assert.equal(scope.verifiedAccessibilityScope.id, "capital_pilot_android_v1");
+  assert.equal(scope.routingLaunchScope.id, "capital_routing_android_v1");
+  assert.equal(scope.nationwideRoadmapScope.id, "nationwide_roadmap_v1");
+  assert.equal(scope.nationwideRoadmapScope.launchRequiredCount, 270);
+  assert.equal(scope.nationwideRoadmapScope.blocksRoutingLaunch, false);
+  assert.deepEqual(scope.routingLaunchScope.serviceIds, ["SUBWAY", "ITX_CHEONGCHUN"]);
+  assert.ok(scope.routingLaunchScope.candidateStationIds.length > 0);
+  assert.ok(scope.routingLaunchScope.requiredBaseEdgeIds.length > 0);
+  assert.ok(scope.routingLaunchScope.requiredTransferEdgeIds.length > 0);
+  assert.equal(Object.hasOwn(scope.routingLaunchScope, "admittedStationIds"), false);
+  assert.deepEqual(scope.identityMatrix.requiredSharedFields, [
+    "canonicalStationVersion",
+    "corridorId",
+    "serviceId",
+    "lineageId",
+    "schemaVersion",
+  ]);
+  assert.equal(scope.identityMatrix.differentArtifactHashesAllowed, true);
+  assert.deepEqual(scope.supportScope, scope.verifiedAccessibilityScope);
+  assert.deepEqual(scope.verifiedAccessibilityScope.regionIds, ["capital"]);
+  assert.equal(scope.verifiedAccessibilityScope.supportedClaimKo, "상록수·사당 검증 pilot");
+  assert.deepEqual(scope.verifiedAccessibilityScope.includedOperatorIds, ["seoul-metro"]);
+  assert.deepEqual(scope.verifiedAccessibilityScope.includedLineIds, ["seoul-4"]);
+  assert.deepEqual(scope.verifiedAccessibilityScope.includedStationIds, ["station-sangnoksu", "station-sadang"]);
+  assert.deepEqual(scope.verifiedAccessibilityScope.requiredFacilityTypes, ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"]);
+  assert.deepEqual(scope.verifiedAccessibilityScope.facilityCoverageDenominator, {
     kind: "station_line_x_required_facility_type",
     expectedRows: 6,
   });
@@ -6098,13 +6118,13 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     enhancementDomains: ["demand_reference"],
     completionRule: "ACTIVE_LAUNCH_REQUIRED_MISSING_ZERO",
   });
-  assert.deepEqual(productionInput.supportedV1Scope.includedOperatorIds, scope.supportScope.includedOperatorIds);
-  assert.deepEqual(productionInput.supportedV1Scope.includedLineIds, scope.supportScope.includedLineIds);
-  assert.deepEqual(productionInput.supportedV1Scope.includedStationIds, scope.supportScope.includedStationIds);
-  assert.deepEqual(productionInput.supportedV1Scope.requiredFacilityTypes, scope.supportScope.requiredFacilityTypes);
+  assert.deepEqual(productionInput.supportedV1Scope.includedOperatorIds, scope.verifiedAccessibilityScope.includedOperatorIds);
+  assert.deepEqual(productionInput.supportedV1Scope.includedLineIds, scope.verifiedAccessibilityScope.includedLineIds);
+  assert.deepEqual(productionInput.supportedV1Scope.includedStationIds, scope.verifiedAccessibilityScope.includedStationIds);
+  assert.deepEqual(productionInput.supportedV1Scope.requiredFacilityTypes, scope.verifiedAccessibilityScope.requiredFacilityTypes);
   assert.deepEqual(
     productionInput.supportedV1Scope.facilityCoverageDenominator,
-    scope.supportScope.facilityCoverageDenominator,
+    scope.verifiedAccessibilityScope.facilityCoverageDenominator,
   );
   assert.equal(productionInput.routeRegressionScope, undefined);
   assert.equal(productionInput.routeGraphTopologyPolicy, undefined);
@@ -6118,18 +6138,18 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     const speedKmh = (edge.distanceMeters / edge.durationSeconds) * 3.6;
     assert.ok(speedKmh >= 15 && speedKmh <= 110, `${edge.id} must stay within production ride speed bounds`);
   }
-  assert.deepEqual(scope.supportScope.unsupportedRegionPolicy.requiredAppStatus, [
+  assert.deepEqual(scope.verifiedAccessibilityScope.unsupportedRegionPolicy.requiredAppStatus, [
     "UNSUPPORTED_REGION",
     "다시 확인",
   ]);
   assert.equal(
     playStoreContent.koreanListing.supportRegionKo,
-    scope.supportScope.supportedClaimKo,
+    scope.verifiedAccessibilityScope.supportedClaimKo,
     "Play listing support region must use the production scope artifact claim",
   );
   assert.match(
     playStoreContent.koreanListing.fullDescriptionKo,
-    new RegExp(scope.supportScope.supportedClaimKo),
+    new RegExp(scope.verifiedAccessibilityScope.supportedClaimKo),
     "Play listing full description must expose the approved Android v1 support scope",
   );
   assert.deepEqual(playStoreContent.prohibitedClaims.toSorted(), [

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "production-datapack-scope",
@@ -9,8 +9,29 @@
   "decision": {
     "approvalState": "qa-approved",
     "approvedAt": "2026-06-28",
+    "currentLaunchDecision": "NO_GO",
+    "blocker": "ITX_TIMETABLE_SOURCE_MISSING",
     "supportScope": "capital_pilot_android_v1",
     "reasonKo": "Android v1은 전국 source inventory를 유지하되 production 지원 claim은 P0 coverage gap 0과 strict route safety evidence가 닫힌 수도권 pilot 범위로 제한한다."
+  },
+  "verifiedAccessibilityScope": {
+    "id": "capital_pilot_android_v1",
+    "regionIds": ["capital"],
+    "includedOperatorIds": ["seoul-metro"],
+    "includedLineIds": ["seoul-4"],
+    "includedStationIds": ["station-sangnoksu", "station-sadang"],
+    "requiredFacilityTypes": ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"],
+    "facilityCoverageDenominator": {
+      "kind": "station_line_x_required_facility_type",
+      "expectedRows": 6
+    },
+    "supportedClaimKo": "상록수·사당 검증 pilot",
+    "supportedClaimPolicyKo": "앱 화면과 Play listing은 production coverage evidence가 통과한 상록수·사당 검증 범위만 지원 범위로 표현한다.",
+    "unsupportedRegionPolicy": {
+      "requiredAppStatus": ["UNSUPPORTED_REGION", "다시 확인"],
+      "policyKo": "coverageEvidence와 P0 gap 0을 만족하지 못한 지역, 운영기관, 노선은 지원 지역으로 표시하지 않는다."
+    },
+    "storeListingPolicyKo": "대한민국 도시철도 전체 또는 전국 완전 지원처럼 검증 범위를 넘는 문구를 사용하지 않는다."
   },
   "supportScope": {
     "id": "capital_pilot_android_v1",
@@ -30,6 +51,46 @@
       "policyKo": "coverageEvidence와 P0 gap 0을 만족하지 못한 지역, 운영기관, 노선은 지원 지역으로 표시하지 않는다."
     },
     "storeListingPolicyKo": "대한민국 도시철도 전체 또는 전국 완전 지원처럼 검증 범위를 넘는 문구를 사용하지 않는다."
+  },
+  "routingLaunchScope": {
+    "id": "capital_routing_android_v1",
+    "regionIds": ["capital"],
+    "operatorIds": ["seoul-metro", "korail"],
+    "lineIds": ["seoul-4", "line-54a7b980b7c3"],
+    "serviceIds": ["SUBWAY", "ITX_CHEONGCHUN"],
+    "candidateStationIds": [
+      "station-sangnoksu",
+      "station-sadang",
+      "station-b819702fa7d9",
+      "station-dd14cfb89cbc"
+    ],
+    "requiredBaseEdgeIds": [
+      "edge-entry-sangnoksu-seoul-4",
+      "edge-exit-sangnoksu-seoul-4",
+      "edge-entry-sadang-seoul-4",
+      "edge-exit-sadang-seoul-4"
+    ],
+    "requiredTransferEdgeIds": ["path-edge-sadang-4-to-2-fast"],
+    "admittedStationIdsSource": "launch evidence only",
+    "fixtureOrLegacyEvidenceAllowed": false,
+    "outOfScopeServiceEvidenceAllowed": false
+  },
+  "nationwideRoadmapScope": {
+    "id": "nationwide_roadmap_v1",
+    "targets": "tools/datapack/nationwide-coverage-targets.json",
+    "launchRequiredCount": 270,
+    "blocksRoutingLaunch": false
+  },
+  "identityMatrix": {
+    "consumers": ["source", "server", "mobile"],
+    "requiredSharedFields": [
+      "canonicalStationVersion",
+      "corridorId",
+      "serviceId",
+      "lineageId",
+      "schemaVersion"
+    ],
+    "differentArtifactHashesAllowed": true
   },
   "nationwideCoverageContract": {
     "targets": "tools/datapack/nationwide-coverage-targets.json",
