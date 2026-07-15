@@ -70,7 +70,7 @@
           "refreshOn": "fixed-release-procedure-change",
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "7690e3f3de3ce4408f477ac30cec1d8f92ceca8056e367170863448a278cf9cb"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "7afcc2e60de1166d0b8077c54099899f4a4c2c8fcbad833d030276c11b712f5c"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "d0573769c04a24a0bcb6b4668ce8ac1c5e2b11a43aa00df7d0df2808d783aa95"},
             {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "6784beebb3c9c3ac8df9f386196d47f987aa60f16140379b88937c6805c20001"},
             {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "7bf816b8486065cf97fefc85bd9a62d5f1dce5627fef6a7551fba3deb71c28cd"}
           ]

@@ -709,6 +709,7 @@ jobs:
               exit 1
             fi
           else
+            operations_status=BLOCKED_EXTERNAL
             printf 'BLOCKED_EXTERNAL\n' > release-artifacts/rc/operations-phase-a-status.txt
           fi
           operations_evidence_args=(--evidence-status "post_launch_operations=${operations_status}")

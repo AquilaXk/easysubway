@@ -3207,6 +3207,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     workflow,
     /if \[\[ "\$\{android_artifact_source\}" == easysubway-android-production-rc-\* \]\]; then[\s\S]*node tools\/ops\/generate-operations-phase-a-summary\.mjs[\s\S]*else[\s\S]*BLOCKED_EXTERNAL/,
   );
+  assert.ok(
+    workflow.includes(
+      "          else\n            operations_status=BLOCKED_EXTERNAL\n            printf 'BLOCKED_EXTERNAL\\n' > release-artifacts/rc/operations-phase-a-status.txt\n          fi\n          operations_evidence_args=",
+    ),
+  );
   assert.match(
     workflow,
     /node tools\/ops\/validate-operations-release-summary\.mjs[\s\S]*--rc-manifest release-artifacts\/rc\/rc-evidence-manifest-preliminary\.json[\s\S]*--require-pass/,
