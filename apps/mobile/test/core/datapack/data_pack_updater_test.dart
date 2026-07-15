@@ -1812,6 +1812,182 @@ void main() {
   });
 
   test(
+    'v2 replay floor는 failed release 뒤 더 높은 rescue sequence로 known-good 내용을 복구한다',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'easysubway-datapack-updater-monotonic-rescue-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final userDatabase = user_db.UserDatabase.memory();
+      addTearDown(userDatabase.close);
+      final catalogDirectory = Directory('${directory.path}/catalog');
+      final knownGoodSqliteBytes = await _catalogSqliteBytesWithMarker(
+        directory,
+        fileName: 'known-good.sqlite',
+        marker: 'known-good',
+      );
+      final failedSqliteBytes = await _catalogSqliteBytesWithMarker(
+        directory,
+        fileName: 'failed.sqlite',
+        marker: 'failed',
+      );
+      final knownGoodCompressedBytes = gzip.encode(knownGoodSqliteBytes);
+      final failedCompressedBytes = gzip.encode(failedSqliteBytes);
+      final corruptBytes = <int>[1, 2, 3, 4];
+      var now = DateTime.utc(2026, 7, 15, 1);
+      late Map<String, Object?> manifestJson;
+      manifestJson = _signedV2PackManifest(
+        sequence: 114,
+        version: '18',
+        compressedBytes: knownGoodCompressedBytes,
+        sqliteBytes: knownGoodSqliteBytes,
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      server.listen((request) {
+        switch (request.uri.path) {
+          case '/datapacks/catalog/current.json':
+            request.response
+              ..statusCode = HttpStatus.ok
+              ..headers.contentType = ContentType.json
+              ..write(jsonEncode(manifestJson))
+              ..close();
+          case '/datapacks/catalog/capital-v18.sqlite.gz':
+            request.response
+              ..statusCode = HttpStatus.ok
+              ..add(knownGoodCompressedBytes)
+              ..close();
+          case '/datapacks/catalog/capital-v19.sqlite.gz':
+            request.response
+              ..statusCode = HttpStatus.ok
+              ..add(failedCompressedBytes)
+              ..close();
+          case '/datapacks/catalog/capital-v20.sqlite.gz':
+            request.response
+              ..statusCode = HttpStatus.ok
+              ..add(corruptBytes)
+              ..close();
+          default:
+            request.response
+              ..statusCode = HttpStatus.notFound
+              ..close();
+        }
+      });
+      final stateRepository = DataPackUpdateStateRepository(
+        userDatabase: userDatabase,
+        now: () => now,
+      );
+      final installer = DataPackInstaller(
+        catalogDirectory: catalogDirectory,
+        userDatabase: userDatabase,
+      );
+      final updater = DataPackUpdater(
+        client: DataPackClient(
+          manifestUri: Uri.parse(
+            'http://${server.address.host}:${server.port}/datapacks/catalog/current.json',
+          ),
+          stateRepository: stateRepository,
+          now: () => now,
+        ),
+        installer: installer,
+        now: () => now,
+      );
+
+      await updater.checkForUpdates();
+      manifestJson = _signedV2PackManifest(
+        sequence: 115,
+        version: '19',
+        compressedBytes: failedCompressedBytes,
+        sqliteBytes: failedSqliteBytes,
+      );
+      now = now.add(const Duration(seconds: 2));
+      await updater.checkForUpdates();
+      expect((await installer.readCurrentPointer())?.version, '19');
+
+      manifestJson = _signedV2PackManifest(
+        sequence: 116,
+        version: '18',
+        compressedBytes: knownGoodCompressedBytes,
+        sqliteBytes: knownGoodSqliteBytes,
+        rollbackProvenance: {
+          'kind': 'MONOTONIC_RESCUE',
+          'currentReleaseSequence': 115,
+          'failedReleaseSequence': 115,
+          'failedManifestSha256': 'b' * 64,
+          'knownGoodReleaseSequence': 114,
+          'knownGoodManifestSha256': 'a' * 64,
+          'releaseRequestId': 'rollback-request-1',
+          'approvedByRole': 'release-manager',
+          'approvedAt': '2026-07-15T00:30:00.000Z',
+          'reasonCode': 'FAILED_RELEASE',
+        },
+      );
+      now = now.add(const Duration(seconds: 2));
+      await updater.checkForUpdates();
+      final rescuedPointer = await installer.readCurrentPointer();
+      expect(rescuedPointer?.version, '18');
+      expect(
+        sha256
+            .convert(await File(rescuedPointer!.path).readAsBytes())
+            .toString(),
+        sha256.convert(knownGoodSqliteBytes).toString(),
+      );
+      expect(
+        (await stateRepository.readAcceptedManifestState(
+          'production',
+        ))?.releaseSequence,
+        116,
+      );
+
+      now = now.add(const Duration(seconds: 2));
+      await updater.checkForUpdates();
+      expect((await installer.readCurrentPointer())?.version, '18');
+      expect(
+        (await stateRepository.readAcceptedManifestState(
+          'production',
+        ))?.releaseSequence,
+        116,
+      );
+
+      manifestJson = _signedV2PackManifest(
+        sequence: 117,
+        version: '20',
+        compressedBytes: corruptBytes,
+        sqliteBytes: const [5, 6, 7, 8],
+      );
+      now = now.add(const Duration(seconds: 2));
+      final rejected = await updater.checkForUpdates();
+      expect(rejected.single.status, DataPackInstallStatus.rejected);
+      expect((await installer.readCurrentPointer())?.version, '18');
+      expect(
+        (await stateRepository.readAcceptedManifestState(
+          'production',
+        ))?.releaseSequence,
+        116,
+      );
+
+      manifestJson = _signedV2PackManifest(
+        sequence: 114,
+        version: '18',
+        compressedBytes: knownGoodCompressedBytes,
+        sqliteBytes: knownGoodSqliteBytes,
+      );
+      now = now.add(const Duration(seconds: 2));
+      await expectLater(
+        updater.checkForUpdates(trigger: UpdateTrigger.userConsent),
+        throwsA(isA<DataPackClientException>()),
+      );
+      expect((await installer.readCurrentPointer())?.version, '18');
+      expect(
+        (await stateRepository.readAcceptedManifestState(
+          'production',
+        ))?.releaseSequence,
+        116,
+      );
+    },
+  );
+
+  test(
     'updater는 rollback manifest version이 숫자로 같으면 zero-padded pack을 활성화한다',
     () async {
       final directory = await Directory.systemTemp.createTemp(
@@ -2693,6 +2869,35 @@ Map<String, Object?> _addV2Signature(
   };
 }
 
+Map<String, Object?> _signedV2PackManifest({
+  required int sequence,
+  required String version,
+  required List<int> compressedBytes,
+  required List<int> sqliteBytes,
+  Map<String, Object?>? rollbackProvenance,
+}) {
+  final pack = _packJson(
+    version: version,
+    url: 'catalog/capital-v$version.sqlite.gz',
+    compressedBytes: compressedBytes,
+    sqliteBytes: sqliteBytes,
+  );
+  final signature = pack['signature']! as Map<String, Object?>;
+  signature['algorithm'] = 'sha256-pack-manifest-v2';
+  return _addV2Signature({
+    'manifestVersion': 2,
+    'channel': 'production',
+    'releaseSequence': sequence,
+    'publishedAt': '2026-07-15T00:00:00.000Z',
+    'expiresAt': '2099-01-01T00:00:00.000Z',
+    'keyId': 'fixture-key',
+    'ttlSeconds': 1,
+    'activePack': {'id': 'capital', 'version': version},
+    'rollbackProvenance': ?rollbackProvenance,
+    'packs': [pack],
+  });
+}
+
 /// data_pack_manifest.dart 의 _canonicalValue 를 테스트에서 복제한다(private 접근 불가).
 Object? _canonicalMapValue(Object? value) {
   if (value == null || value is String || value is num || value is bool) {
@@ -2712,6 +2917,22 @@ Future<List<int>> _validCatalogSqliteBytes(Directory directory) async {
   final file = File('${directory.path}/fixture.sqlite');
   final database = CatalogDatabase.file(file);
   await database.seedBaselineIfEmpty();
+  await database.close();
+  return file.readAsBytes();
+}
+
+Future<List<int>> _catalogSqliteBytesWithMarker(
+  Directory directory, {
+  required String fileName,
+  required String marker,
+}) async {
+  final file = File('${directory.path}/$fileName');
+  final database = CatalogDatabase.file(file);
+  await database.seedBaselineIfEmpty();
+  await database.customStatement(
+    'INSERT OR REPLACE INTO catalog_metadata(key, value) VALUES (?, ?)',
+    ['rescueTestMarker', marker],
+  );
   await database.close();
   return file.readAsBytes();
 }
