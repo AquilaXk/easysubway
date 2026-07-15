@@ -8,6 +8,10 @@ import {
   deriveRawRetentionExpiresAt,
   isValidLegalHold,
 } from "./source-governance-policy.mjs";
+import {
+  parseCredentialFreeObjectUri,
+  requiredObjectKey,
+} from "./source-snapshot-policy.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 const ALLOWED_ARGS = new Set([
@@ -291,26 +295,15 @@ function snapshotBindings(snapshots, expectedSourceAuthority) {
 }
 
 function objectKeyFromRawUri(value) {
-  let uri;
   try {
-    uri = new URL(requiredText(value, "rawObjectUri"));
+    const parsed = parseCredentialFreeObjectUri(value, "rawObjectUri");
+    return {
+      objectKey: parsed.objectKey,
+      sourceAuthority: parsed.sourceAuthority,
+    };
   } catch {
     throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence");
   }
-  if (!["s3:", "oci:"].includes(uri.protocol)
-    || uri.username || uri.password || uri.search || uri.hash || !uri.hostname) {
-    throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence");
-  }
-  let objectKey;
-  try {
-    objectKey = decodeURIComponent(uri.pathname.slice(1));
-  } catch {
-    throw new Error("RAW_RETENTION_OVERDUE: snapshot evidence");
-  }
-  return {
-    objectKey: validatedObjectKey(objectKey),
-    sourceAuthority: `${uri.protocol}//${uri.hostname}`,
-  };
 }
 
 function parseArgs(argv) {
@@ -416,13 +409,11 @@ function policyBindings(policyFiles) {
 }
 
 function validatedObjectKey(value) {
-  const key = requiredText(value, "objectKey");
-  if (key.startsWith("/") || key.split("/").some((segment) => (
-    segment === "" || segment === "." || segment === ".." || !/^[A-Za-z0-9._-]+$/.test(segment)
-  ))) {
+  try {
+    return requiredObjectKey(value, "objectKey");
+  } catch {
     throw new Error("RAW_RETENTION_OVERDUE: object key");
   }
-  return key;
 }
 
 function objectUrl(baseUrl, objectKey) {

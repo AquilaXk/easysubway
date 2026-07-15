@@ -356,6 +356,48 @@ test("ledger object key가 LOCKED snapshot raw URI와 다르면 DELETE 전에 �
   });
 });
 
+test("snapshot raw URI의 dot-segment는 URL 정규화 전에 거부한다", async () => {
+  await withFixture(async ({ baseUrl, requests, workDir }) => {
+    for (const objectKey of ["raw/../victim.json", "raw/%2e%2e/victim.json"]) {
+      const entry = rawEntry("dot-segment", "victim.json");
+      const files = await writeInputs(workDir, [entry]);
+      const snapshots = await writeSnapshotEvidence(workDir, [entry], {
+        "dot-segment": objectKey,
+      });
+
+      await assert.rejects(
+        runPurge({
+          ...files,
+          snapshots,
+          baseUrl,
+          output: path.join(workDir, `dot-segment-${encodeURIComponent(objectKey)}.json`),
+        }),
+        /snapshot evidence/,
+      );
+    }
+    assert.deepEqual(requests, []);
+  });
+});
+
+test("Unicode와 공백을 포함한 승인 object key도 동일 bytes를 검증해 삭제한다", async () => {
+  await withFixture(async ({ baseUrl, objects, requests, workDir }) => {
+    const objectKey = "raw/한글 file.json";
+    const requestPath = "/raw/%ED%95%9C%EA%B8%80%20file.json";
+    const files = await writeInputs(workDir, [rawEntry("unicode", objectKey)]);
+    objects.add(requestPath, `/${objectKey}`);
+
+    const report = await runPurge({
+      ...files,
+      baseUrl,
+      output: path.join(workDir, "unicode-object-key.json"),
+    });
+
+    assert.deepEqual(report.deleted.map((entry) => entry.snapshotId), ["unicode"]);
+    assert.deepEqual(requests, [requestPath]);
+    assert.equal(objects.has(requestPath), false);
+  });
+});
+
 test("DELETE 5xx는 sanitized RAW_RETENTION_OVERDUE evidence를 남기고 실패한다", async () => {
   await withFixture(async ({ baseUrl, objects, requests, workDir, failPaths }) => {
     const files = await writeInputs(workDir, [rawEntry("failed", "raw/failed-secret-name.json")]);

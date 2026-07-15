@@ -8,6 +8,8 @@ import { promisify } from "node:util";
 
 import {
   buildSnapshotDiff,
+  parseCredentialFreeObjectUri,
+  requiredCredentialFreeObjectUri,
   validateLineage,
 } from "./source-snapshot-policy.mjs";
 import {
@@ -27,6 +29,23 @@ const second = snapshot({
   retrievedAt: "2026-07-02T00:00:00Z",
 });
 second.diffSummary = buildSnapshotDiff(first, second);
+
+test("snapshot object URI는 dot-segment를 거부하고 Unicode·공백 key를 보존한다", () => {
+  for (const uri of ["s3://bucket/raw/../victim", "s3://bucket/raw/%2e%2e/victim"]) {
+    assert.throws(
+      () => requiredCredentialFreeObjectUri(uri, "rawObjectUri"),
+      /credential-free object storage URI/,
+    );
+  }
+  assert.deepEqual(
+    parseCredentialFreeObjectUri("s3://bucket/raw/%ED%95%9C%EA%B8%80%20file.json", "rawObjectUri"),
+    {
+      uri: "s3://bucket/raw/%ED%95%9C%EA%B8%80%20file.json",
+      objectKey: "raw/한글 file.json",
+      sourceAuthority: "s3://bucket",
+    },
+  );
+});
 
 test("완전한 snapshot chain은 source head까지 추적한다", () => {
   const result = validateLineage([second, first]);

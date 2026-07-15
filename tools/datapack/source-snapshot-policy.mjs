@@ -3,7 +3,14 @@ import { isDeepStrictEqual } from "node:util";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 export function requiredCredentialFreeObjectUri(value, label) {
+  return parseCredentialFreeObjectUri(value, label).uri;
+}
+
+export function parseCredentialFreeObjectUri(value, label) {
   const uri = requiredText(value, label);
+  const pathStart = uri.indexOf("/", uri.indexOf("://") + 3);
+  const encodedPath = pathStart < 0 ? "" : uri.slice(pathStart);
+  const objectKey = decodedObjectKey(encodedPath, label);
   let parsed;
   try {
     parsed = new URL(uri);
@@ -21,7 +28,42 @@ export function requiredCredentialFreeObjectUri(value, label) {
     || uri.includes("@")) {
     throw new Error(`${label} must be a credential-free object storage URI`);
   }
-  return uri;
+  return {
+    uri,
+    objectKey,
+    sourceAuthority: `${parsed.protocol}//${parsed.hostname}`,
+  };
+}
+
+export function requiredObjectKey(value, label) {
+  const key = requiredText(value, label);
+  const segments = key.split("/");
+  if (key.startsWith("/") || segments.some((segment) => (
+    segment === "" || segment === "." || segment === ".." || /[\u0000-\u001f\u007f]/u.test(segment)
+  ))) {
+    throw new Error(`${label} must be a canonical object key`);
+  }
+  try {
+    segments.forEach(encodeURIComponent);
+  } catch {
+    throw new Error(`${label} must be a canonical object key`);
+  }
+  return key;
+}
+
+function decodedObjectKey(encodedPath, label) {
+  if (!encodedPath.startsWith("/") || encodedPath === "/") {
+    throw new Error(`${label} must be a credential-free object storage URI`);
+  }
+  try {
+    const segments = encodedPath.slice(1).split("/").map((segment) => decodeURIComponent(segment));
+    if (segments.some((segment) => segment === "." || segment === "..")) {
+      throw new Error("dot segment");
+    }
+    return requiredObjectKey(segments.join("/"), label);
+  } catch {
+    throw new Error(`${label} must be a credential-free object storage URI`);
+  }
 }
 
 export function buildSnapshotDiff(previous, next) {
