@@ -13291,6 +13291,56 @@ void main() {
     },
   );
 
+  testWidgets('빈 rideLegs mismatch는 기존 하차 알림과 구독을 보존한다', (tester) async {
+    final notifier = _RecordingGetOffAlarmNotifier();
+    final stateRepository = _MemoryGetOffAlarmStateRepository();
+    final controller = GetOffAlarmController(
+      notifier: notifier,
+      permissionGate: _StubExactAlarmPermissionGate(),
+      notificationPermissionProvider: FakeNotificationPermissionProvider(
+        nextStatus: NotificationPermissionStatus.granted,
+      ),
+      repository: stateRepository,
+      now: () => DateTime.parse('2026-07-06T09:00:00+09:00'),
+    );
+    addTearDown(controller.dispose);
+    final repository =
+        FakeRouteSearchRepository(
+            result: _sampleRouteSearchResult(routeSearchId: 'route-2'),
+          )
+          ..refreshResult = RouteRefreshResult(
+            routeSearchId: 'route-2',
+            status: 'UPDATED_ROUTE',
+            result: _sampleRouteSearchResult(
+              routeSearchId: 'route-2',
+              steps: const [],
+            ),
+            refreshedAt: '2026-07-06T09:01:00+09:00',
+            etaSource: 'PLANNED',
+            etaConfidence: 'MEDIUM',
+            sourceLabel: '계획 시간 기준',
+          );
+    await _pumpGetOffAlarmRouteScreen(
+      tester,
+      repository: repository,
+      controller: controller,
+    );
+    await _enableSampleGetOffAlarm(controller);
+    final subscriptionBefore = await stateRepository.loadActive();
+    notifier.reset();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(repository.refreshRouteSearchIds, ['route-2']);
+    expect(notifier.scheduleCalls, 0);
+    expect(notifier.cancelCalls, 0);
+    expect(await stateRepository.loadActive(), same(subscriptionBefore));
+    expect(controller.state.activeRouteId, 'route-1');
+  });
+
   testWidgets('성공한 foreground refresh에 usable ride가 없으면 활성 하차 알림을 취소한다', (
     tester,
   ) async {
