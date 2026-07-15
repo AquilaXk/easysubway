@@ -81,7 +81,13 @@ test("production snapshot gate는 main-only runner에서 backup·격리 restore�
   assert.match(snapshotGate, /purge_sql_sha256/);
   assert.match(snapshotGate, /production_schema_version/);
   assert.match(snapshotGate, /restore_schema_version/);
+  assert.match(snapshotGate, /shopt -s nullglob/);
+  assert.match(snapshotGate, /POSTGRES_V51_FILES=\([^\n]+V51__\*\.sql/);
+  assert.match(snapshotGate, /H2_V51_FILES=\([^\n]+V51__\*\.sql/);
+  assert.match(snapshotGate, /#POSTGRES_V51_FILES\[@\][^\n]+!= 1/);
+  assert.match(snapshotGate, /POSTGRES_V51_FILES\[0\][^\n]+!=[^\n]+POSTGRES_V51/);
   assert.match(snapshotGate, /cmp -s "\$\{PURGE_SQL_FILE\}"/);
+  assert.doesNotMatch(snapshotGate, /if \[\[ -e "\$\{POSTGRES_V51\}" \|\| -e "\$\{H2_V51\}" \]\]/);
   assert.match(purgeSql, /^DELETE FROM route_search_results AS route/m);
   assert.doesNotMatch(purgeSql, /BEGIN|EXPLAIN|ROLLBACK/);
   assert.match(snapshotGate, /tools\/ops\/postgres-backup\.sh/);

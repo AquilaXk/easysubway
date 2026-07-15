@@ -38,9 +38,18 @@ if [[ ! -f "${PURGE_SQL_FILE}" ]]; then
 	printf 'canonical purge SQL is missing\n' >&2
 	exit 2
 fi
-if [[ -e "${POSTGRES_V51}" || -e "${H2_V51}" ]]; then
+shopt -s nullglob
+POSTGRES_V51_FILES=("${ROOT_DIR}"/backend/src/main/resources/db/migration/postgresql/V51__*.sql)
+H2_V51_FILES=("${ROOT_DIR}"/backend/src/main/resources/db/migration/h2/V51__*.sql)
+shopt -u nullglob
+if (( ${#POSTGRES_V51_FILES[@]} > 0 || ${#H2_V51_FILES[@]} > 0 )); then
+	if (( ${#POSTGRES_V51_FILES[@]} != 1 || ${#H2_V51_FILES[@]} != 1 )) \
+		|| [[ "${POSTGRES_V51_FILES[0]}" != "${POSTGRES_V51}" || "${H2_V51_FILES[0]}" != "${H2_V51}" ]]; then
+		printf 'unexpected V51 migration set\n' >&2
+		exit 1
+	fi
 	for migration in "${POSTGRES_V51}" "${H2_V51}"; do
-		if [[ ! -f "${migration}" ]] || ! cmp -s "${PURGE_SQL_FILE}" "${migration}"; then
+		if ! cmp -s "${PURGE_SQL_FILE}" "${migration}"; then
 			printf 'V51 purge SQL differs from the analyzed canonical SQL\n' >&2
 			exit 1
 		fi
