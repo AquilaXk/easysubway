@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -1120,6 +1120,30 @@ test("ITX promotion은 동일한 immutable artifact bytes가 남은 재시도를
   }
 });
 
+test("ITX promotion은 byte-identical symlink를 immutable artifact로 재사용하지 않는다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-symlink-"));
+  const candidate = sourceCandidate();
+  const candidateBytes = sourceBytes(candidate);
+  const sourceDir = path.join(dir, "tools/datapack/sources");
+  const candidatePath = path.join(dir, "candidate.json");
+  try {
+    await mkdir(sourceDir, { recursive: true });
+    await writeFile(candidatePath, candidateBytes);
+    await symlink(candidatePath, path.join(sourceDir, `${candidate.artifactId}.json`));
+    const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+    await assert.rejects(promoteItxSourceCandidate({
+      candidatePath,
+      ...ownerApproval(candidate),
+      sourceOutputDir: sourceDir,
+      coverageContractPath: contractPath,
+      repositoryRoot: dir,
+      now: new Date("2026-07-15T02:00:00.000Z"),
+    }), /ADMITTED_SOURCE_ARTIFACT_INVALID/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("ITX promotion은 동일 artifact ID에 다른 bytes가 있으면 immutable conflict로 거부한다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-conflict-"));
   const candidate = sourceCandidate();
@@ -1198,6 +1222,13 @@ test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 �
     for (const mutate of [
       (candidate) => { candidate.serviceKey = "should-not-persist"; },
       (candidate) => { candidate.stationRosters[0].stations[0].serviceKey = "should-not-persist"; },
+      (candidate) => {
+        candidate.warnings = [{
+          code: "KORAIL_PLAN_NOT_AVAILABLE",
+          dayCd: "8",
+          trainNumber: { serviceKey: "should-not-persist" },
+        }];
+      },
     ]) {
       const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-closed-schema-"));
       try {

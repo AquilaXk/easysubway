@@ -427,6 +427,10 @@ async function promoteItxSourceCandidateLocked({
     await writeFile(artifactPath, candidateBytes, { flag: "wx", mode: 0o644 });
   } catch (error) {
     if (error?.code !== "EEXIST") throw error;
+    const existingStat = await lstat(artifactPath);
+    if (existingStat.isSymbolicLink() || !existingStat.isFile()) {
+      throw new Error("ADMITTED_SOURCE_ARTIFACT_INVALID");
+    }
     const existingBytes = await readFile(artifactPath);
     if (!existingBytes.equals(candidateBytes)) throw new Error("ADMITTED_SOURCE_ARTIFACT_CONFLICT");
   }
@@ -544,7 +548,8 @@ function hasClosedCandidateShape(candidate) {
     || !Array.isArray(candidate?.transitStopTimes)
     || candidate.transitStopTimes.some((row) => !allowed(row, stopTimeKeys))
     || !Array.isArray(candidate?.warnings)
-    || candidate.warnings.some((warning) => !allowed(warning, ["code", "dayCd", "trainNumber"]))
+    || candidate.warnings.some((warning) => !allowed(warning, ["code", "dayCd", "trainNumber"])
+      || !validSourceWarning(warning))
     || !Array.isArray(candidate?.normalizedSnapshotSets)
     || candidate.normalizedSnapshotSets.some((row) => !allowed(row, ["dayCd", "sets"])
       || !allowed(row.sets, setNames) || !setNames.every((name) => Array.isArray(row.sets[name])))
@@ -557,6 +562,16 @@ function hasClosedCandidateShape(candidate) {
     return false;
   }
   return true;
+}
+
+function validSourceWarning(warning) {
+  if (warning.code !== "KORAIL_PLAN_NOT_AVAILABLE" || !["7", "8", "9"].includes(warning.dayCd)
+    || typeof warning.trainNumber !== "string") return false;
+  try {
+    return normalizeTrainNumber(warning.trainNumber) === warning.trainNumber;
+  } catch {
+    return false;
+  }
 }
 
 function isPlainObject(value) {
