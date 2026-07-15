@@ -38,7 +38,10 @@
         {
           "method": "POST",
           "path": "/api/v2/routes/search",
-          "acceptedStatuses": [401, 404],
+          "acceptedStatusesByIngress": {
+            "true": [401],
+            "false": [404]
+          },
           "request": {
             "originStationId": "closure-probe",
             "destinationStationId": "closure-probe",

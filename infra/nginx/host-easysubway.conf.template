@@ -16,6 +16,17 @@ server {
 server {
     listen 443 ssl default_server;
     listen [::]:443 ssl default_server;
+    server_name _;
+
+    ssl_certificate /etc/letsencrypt/live/easysubway-api.aquilaxk.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/easysubway-api.aquilaxk.site/privkey.pem;
+
+    return 444;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
     server_name easysubway-api.aquilaxk.site;
 
     ssl_certificate /etc/letsencrypt/live/easysubway-api.aquilaxk.site/fullchain.pem;

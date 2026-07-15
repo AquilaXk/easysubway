@@ -62,6 +62,9 @@ async function runSmoke(baseUrl, extraArgs = []) {
   await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
   const reportPath = path.join(dir, "report.json");
+  const ingressArgs = extraArgs.includes("--route-v2-ingress-enabled")
+    ? []
+    : ["--route-v2-ingress-enabled", "true"];
   const args = [
     script,
     "--base-url",
@@ -70,6 +73,7 @@ async function runSmoke(baseUrl, extraArgs = []) {
     baseUrl,
     "--timeout-seconds",
     "4",
+    ...ingressArgs,
     "--report",
     reportPath,
     ...extraArgs,
@@ -124,6 +128,35 @@ test("post-deploy smoke accepts 401 for authenticated V2 search and keeps closed
     assert.equal(code, 0);
     assert.equal(axis(report, "route-api-closure").result, "PASS");
     assert.equal(axis(report, "route-api-closure").attempts, 1);
+  });
+});
+
+test("post-deploy smoke requires enabled ingress to return 401 instead of 404", async () => {
+  const routes = defaultRoutes();
+  routes.routeV2Search = () => ({ status: 404, body: {} });
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl);
+    assert.equal(code, 1);
+    assert.equal(axis(report, "route-api-closure").result, "FAIL");
+    assert.match(axis(report, "route-api-closure").detail, /POST \/api\/v2\/routes\/search returned HTTP 404/);
+  });
+});
+
+test("post-deploy smoke requires disabled ingress to return 404 instead of 401", async () => {
+  const routes = defaultRoutes();
+  routes.routeV2Search = () => ({ status: 404, body: {} });
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl, ["--route-v2-ingress-enabled", "false"]);
+    assert.equal(code, 0);
+    assert.equal(axis(report, "route-api-closure").result, "PASS");
+  });
+
+  routes.routeV2Search = () => ({ status: 401, body: {} });
+  await withServer(routes, async (baseUrl) => {
+    const { code, report } = await runSmoke(baseUrl, ["--route-v2-ingress-enabled", "false"]);
+    assert.equal(code, 1);
+    assert.equal(axis(report, "route-api-closure").result, "FAIL");
+    assert.match(axis(report, "route-api-closure").detail, /POST \/api\/v2\/routes\/search returned HTTP 401/);
   });
 });
 
@@ -231,7 +264,10 @@ test("post-deploy smoke contract file matches the expected schema", async () => 
   const authenticatedV2Search = routeApiClosure.endpoints.find(
     ({ path: endpointPath }) => endpointPath === "/api/v2/routes/search",
   );
-  assert.deepEqual(authenticatedV2Search.acceptedStatuses, [401, 404]);
+  assert.deepEqual(authenticatedV2Search.acceptedStatusesByIngress, {
+    true: [401],
+    false: [404],
+  });
   assert.deepEqual(
     routeApiClosure.endpoints.map(({ method, path: endpointPath }) => `${method} ${endpointPath}`),
     [
@@ -258,4 +294,14 @@ test("post-deploy smoke requires an explicit base url", async () => {
     execFileAsync(process.execPath, [script, "--datapack-base-url", "https://example.com"], { cwd: root }),
     /--base-url is required/,
   );
+});
+
+test("post-deploy smoke requires an explicit Route V2 ingress state", async () => {
+  const error = await execFileAsync(
+    process.execPath,
+    [script, "--base-url", "https://example.invalid"],
+    { cwd: root },
+  ).then(() => null, (reason) => reason);
+  assert.notEqual(error, null);
+  assert.match(error.stderr, /--route-v2-ingress-enabled must be true or false/);
 });

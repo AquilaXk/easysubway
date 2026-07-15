@@ -77,7 +77,7 @@ BODY=$(curl -fsS -H 'CF-Connecting-IP: 198.51.100.10' -H 'True-Client-IP: 198.51
 
 for attempt in 1 2; do
 	curl -fsS -o /dev/null -H 'CF-Connecting-IP: 198.51.100.10' "$BASE/api/v2/routes/session"
-	sleep 0.05
+	sleep 0.5
 done
 STATUS=$(curl -sS -D "$TMP_HEADERS" -o "$TMP_BODY" -w '%{http_code}' -H 'CF-Connecting-IP: 198.51.100.10' "$BASE/api/v2/routes/session")
 [ "$STATUS" = 429 ]
@@ -92,7 +92,7 @@ for client_suffix in 31 32 33 34; do
 		-H "CF-Connecting-IP: 198.51.100.$client_suffix" \
 		-H 'Authorization: Bearer integration-token' \
 		"$BASE/api/v2/routes/search"
-	sleep 0.05
+	sleep 0.5
 done
 STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
 	-H 'CF-Connecting-IP: 198.51.100.35' \
@@ -106,7 +106,7 @@ for attempt in 1 2 3 4; do
 		-H 'CF-Connecting-IP: 198.51.100.40' \
 		-H "Authorization: Bearer rotating-token-$attempt" \
 		"$BASE/api/v2/routes/search"
-	sleep 0.05
+	sleep 0.5
 done
 STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
 	-H 'CF-Connecting-IP: 198.51.100.40' \

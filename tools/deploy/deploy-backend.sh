@@ -224,8 +224,14 @@ route_v2_gateway_port="$(read_env_value "${COMPOSE_ENV}" EASYSUBWAY_ROUTE_V2_GAT
 route_v2_gateway_port="${route_v2_gateway_port:-8081}"
 route_v2_ingress_enabled="$(read_env_value "${COMPOSE_ENV}" EASYSUBWAY_ROUTE_V2_INGRESS_ENABLED | tr '[:upper:]' '[:lower:]')"
 case "${route_v2_ingress_enabled}" in
-	true|on|yes|1) route_v2_host_action="proxy_pass http://127.0.0.1:${route_v2_gateway_port};" ;;
-	""|false|off|no|0) route_v2_host_action="return 404;" ;;
+	true|on|yes|1)
+		route_v2_ingress_enabled_normalized=true
+		route_v2_host_action="proxy_pass http://127.0.0.1:${route_v2_gateway_port};"
+		;;
+	""|false|off|no|0)
+		route_v2_ingress_enabled_normalized=false
+		route_v2_host_action="return 404;"
+		;;
 	*) printf 'invalid Route V2 ingress enabled value\n' >&2; exit 2 ;;
 esac
 report_upload_bucket="$(read_env_value "${BACKEND_ENV}" EASYSUBWAY_REPORT_UPLOAD_BUCKET)"
@@ -586,7 +592,7 @@ fail_backend_deployment() {
 		ln -sfn "$(readlink "${SHARED_DIR}/previous-env")" "${SHARED_DIR}/current-env.next"
 		mv -Tf "${SHARED_DIR}/current-env.next" "${SHARED_DIR}/current-env"
 		ensure_rollback_image "${current_sha}" || true
-		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" up -d --no-deps --no-build "${RUNTIME_SERVICES[@]}" || true
+		compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" up -d --no-deps --no-build --force-recreate "${RUNTIME_SERVICES[@]}" || true
 		start_observability_services "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${current_sha}" "${recreate_alertmanager}" "${recreate_observability_config}" || true
 		write_result "failed" "${detail}_rollback_attempted"
 	else
@@ -606,7 +612,7 @@ fail_backend_deployment() {
 }
 
 write_phase "restarting"
-if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build "${RUNTIME_SERVICES[@]}"; then
+if ! compose "${SHARED_DIR}/current-env/backend.env" "${SHARED_DIR}/current-env/compose.env" "${DEPLOY_SHA}" up -d --no-deps --no-build --force-recreate "${RUNTIME_SERVICES[@]}"; then
 	fail_backend_deployment "backend_start_failed"
 	exit 1
 fi
@@ -756,6 +762,9 @@ if ! install_route_v2_host_ingress; then
 	fail_backend_deployment "route_v2_host_ingress_failed"
 	exit 1
 fi
+
+printf '%s\n' "${route_v2_ingress_enabled_normalized}" > "${SHARED_DIR}/current-route-v2-ingress-enabled"
+chmod 600 "${SHARED_DIR}/current-route-v2-ingress-enabled"
 
 legacy_restore_on_error=0
 trap - ERR INT TERM HUP

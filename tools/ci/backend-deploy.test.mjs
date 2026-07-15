@@ -418,7 +418,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /compose_services_running "\$\{BACKEND_ENV\}" "\$\{COMPOSE_ENV\}" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /same_sha_same_env_services_ready/);
   assert.doesNotMatch(deploy, /same_sha_same_env_ready/);
-  assert.match(deploy, /up -d --no-deps --no-build "\$\{RUNTIME_SERVICES\[@\]\}"/);
+  assert.match(deploy, /up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/);
   assert.match(deploy, /--profile observability up -d --no-build "\$\{OBSERVABILITY_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_CONFIG_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate alertmanager \|\| return 1/);
@@ -460,7 +460,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /start_observability_services "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" "\$\{recreate_alertmanager\}" "\$\{recreate_observability_config\}" \|\| true/);
   assert.match(deploy, /rm -f -s "\$\{RUNTIME_SERVICES\[@\]\}"/);
   assert.match(deploy, /logs --no-color --tail=200 "\$\{RUNTIME_SERVICES\[@\]\}"/);
-  assert.match(deploy, /if ! compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
+  assert.match(deploy, /if ! compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
   assert.match(deploy, /actuator\/health\/readiness/);
   assert.match(deploy, /fail_backend_deployment "readiness_failed"/);
   assert.match(deploy, /diagnostics/);
@@ -487,6 +487,9 @@ test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API
   assert.match(cd, /post-deploy-smoke:/);
   assert.match(cd, /node tools\/ops\/post-deploy-smoke\.mjs/);
   assert.match(cd, /DEPLOY_PUBLIC_API_BASE_URL repo variable is not configured/);
+  assert.match(cd, /route_v2_ingress_enabled: \$\{\{ steps\.ingress-state\.outputs\.enabled \}\}/);
+  assert.match(cd, /state_file="\$\{DEPLOY_ROOT\}\/shared\/current-route-v2-ingress-enabled"/);
+  assert.match(cd, /--route-v2-ingress-enabled "\$\{ROUTE_V2_INGRESS_ENABLED\}"/);
   assert.match(cd, /if: \$\{\{ needs\.deploy\.outputs\.deploy_ready == 'true' \}\}/);
 
   // Smoke failures must propagate into the CD result Slack notification.
@@ -521,6 +524,9 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   assert.match(routeHeaders, /proxy_set_header CF-Connecting-IP \$remote_addr;/);
   assert.doesNotMatch(routeHeaders, /proxy_set_header CF-Connecting-IP \$http_cf_connecting_ip;/);
   assert.match(routeHeaders, /proxy_set_header X-Forwarded-For "";/);
+  assert.match(host, /listen 443 ssl default_server;[\s\S]*server_name _;[\s\S]*return 444;/);
+  assert.match(host, /listen 443 ssl;[\s\S]*server_name easysubway-api\.aquilaxk\.site;/);
+  assert.equal((host.match(/listen 443 ssl default_server;/g) ?? []).length, 1);
   assert.match(deploy, /sudo nginx -t/);
   assert.match(deploy, /sudo systemctl reload nginx/);
   assert.match(deploy, /sudo install -m 0644 "\$\{site_backup\}" "\$\{site_target\}"/);
@@ -535,6 +541,15 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   assert.match(deploy, /failed to restore Route V2 host ingress/);
   assert.doesNotMatch(deploy, /sudo nginx -t[^\n]+&& sudo systemctl reload nginx \|\| true/);
   assert.match(deploy, /fail_backend_deployment "route_v2_host_ingress_failed"/);
+  assert.match(deploy, /current-route-v2-ingress-enabled/);
+  assert.match(
+    deploy,
+    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
+  );
+  assert.match(
+    deploy,
+    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
+  );
   assert.match(deploy, /route_v2_host_action="return 404;"/);
   assert.match(deploy, /route_v2_host_action="proxy_pass http:\/\/127\.0\.0\.1:\$\{route_v2_gateway_port\};"/);
 });
