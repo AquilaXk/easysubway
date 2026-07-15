@@ -59,6 +59,15 @@ jobs:
 
           expected_runtime_image="easysubway-backend:${current_sha}"
           deployed_image_id="$(docker image inspect --format '{{.Id}}' "${expected_runtime_image}")"
+          deployed_image_revision="$(
+            docker image inspect \
+              --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' \
+              "${expected_runtime_image}"
+          )"
+          if [[ "${deployed_image_revision}" != "${current_sha}" ]]; then
+            echo "deployed image revision does not match the committed SHA" >&2
+            exit 1
+          fi
           deployed_repo_digests="$(
             docker image inspect --format '{{join .RepoDigests "\n"}}' "${expected_runtime_image}"
           )"

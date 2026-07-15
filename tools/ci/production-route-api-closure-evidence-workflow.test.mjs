@@ -21,6 +21,8 @@ test("production route API closure evidence는 현재 배포와 origin 403·row 
   assert.match(workflow, /merge-base --is-ancestor "\$\{CLOSURE_BASE_SHA\}" "\$\{current_sha\}"/);
   assert.match(workflow, /\.Config\.Image/);
   assert.match(workflow, /\.RepoDigests/);
+  assert.match(workflow, /org\.opencontainers\.image\.revision/);
+  assert.match(workflow, /image_revision[^\n]+!=[^\n]+current_sha/);
   assert.match(workflow, /--format '\{\{\.Image\}\}'/);
   assert.match(workflow, /easysubway-backend/);
   assert.match(workflow, /easysubway-back-worker/);
