@@ -368,15 +368,22 @@ export async function collectTagoItxCheongchunRoster({
         depPlandTime: serviceDate,
         trainGradeCode: gradeId,
       }, key, fetchImpl, requestBudget, waitImpl);
-      const normalizedItineraries = operation.rows.map((row, index) => ({
-        ...normalizeItinerary(row, index, {
-          serviceDate,
+      const normalizedRows = operation.rows.map((row, index) => ({
+        itinerary: {
+          ...normalizeItinerary(row, index, {
           departureStationName: departureStation.providerStationName,
           arrivalStationName: arrivalStation.providerStationName,
-        }),
-        departureStationId: departureStation.canonicalStationId,
-        arrivalStationId: arrivalStation.canonicalStationId,
+          }),
+          departureStationId: departureStation.canonicalStationId,
+          arrivalStationId: arrivalStation.canonicalStationId,
+        },
+        ...tagoServiceDayPartition(row.depplandtime),
       }));
+      const normalizedItineraries = normalizedRows.flatMap(({ itinerary, calendarDay, serviceDay }, index) => {
+        if (serviceDay === serviceDate) return [itinerary];
+        if (calendarDay === serviceDate) return [];
+        throw new Error(`TAGO OD row[${index}] departure date mismatch`);
+      });
       odOperations.push(operation);
       itineraries.push(...normalizedItineraries);
     } catch (error) {
@@ -621,9 +628,6 @@ function normalizeItinerary(row, index, expected = {}) {
   if (arrivalAt.epoch <= departureAt.epoch) throw new Error(`TAGO OD row[${index}] arrival must follow departure`);
   const departureStationName = requiredString(row.depplacename, `row[${index}].depplacename`);
   const arrivalStationName = requiredString(row.arrplacename, `row[${index}].arrplacename`);
-  if (expected.serviceDate && !belongsToTagoServiceDate(row.depplandtime, expected.serviceDate)) {
-    throw new Error(`TAGO OD row[${index}] departure date mismatch`);
-  }
   if ((expected.departureStationName && normalize(departureStationName) !== normalize(expected.departureStationName))
     || (expected.arrivalStationName && normalize(arrivalStationName) !== normalize(expected.arrivalStationName))) {
     throw new Error(`TAGO OD row[${index}] station mismatch`);
@@ -641,14 +645,13 @@ function normalizeItinerary(row, index, expected = {}) {
   };
 }
 
-function belongsToTagoServiceDate(value, serviceDate) {
+function tagoServiceDayPartition(value) {
   const text = String(value ?? "");
-  if (!/^\d{14}$/.test(text)) return false;
-  if (text.slice(0, 8) === serviceDate) return true;
-  const next = calendarDate(serviceDate);
-  next.setUTCDate(next.getUTCDate() + 1);
-  const nextServiceDate = `${next.getUTCFullYear()}${String(next.getUTCMonth() + 1).padStart(2, "0")}${String(next.getUTCDate()).padStart(2, "0")}`;
-  return text.slice(0, 8) === nextServiceDate && Number(text.slice(8, 10)) <= 2;
+  const calendarDay = text.slice(0, 8);
+  const serviceDayDate = calendarDate(calendarDay);
+  if (Number(text.slice(8, 10)) < 3) serviceDayDate.setUTCDate(serviceDayDate.getUTCDate() - 1);
+  const serviceDay = `${serviceDayDate.getUTCFullYear()}${String(serviceDayDate.getUTCMonth() + 1).padStart(2, "0")}${String(serviceDayDate.getUTCDate()).padStart(2, "0")}`;
+  return { calendarDay, serviceDay };
 }
 
 function providerTimestamp(value, label) {

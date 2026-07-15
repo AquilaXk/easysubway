@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -142,8 +142,8 @@ export async function collectKorailItxCheongchunCompleteness({
         korailPlanSummary: {
           availableCount: 0,
           missingWarningCount: 0,
-          duplicateCount: 0,
-          mismatchCount: 0,
+          duplicateCount: failureReasonCode === "KORAIL_PLAN_DUPLICATE" ? 1 : 0,
+          mismatchCount: failureReasonCode === "KORAIL_PLAN_MISMATCH" ? 1 : 0,
         },
         warnings: [],
         reconstructionSummary: roster?.reconstructionSummary ?? emptyReconstructionSummary(),
@@ -253,6 +253,9 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
     throw new Error("ITX source candidate requires SUPPORTED admission completeness");
   }
   validateSourceFreshness(completeness.sourceTimetableArtifact, completeness.selectedServiceDates, now);
+  for (const { dayCd, timetable } of completeness.serviceDays) {
+    validateMaterializedProjection(timetable, dayCd, "TAGO_OD_STOP_SEQUENCE_INVALID");
+  }
   const stationSequences = completeness.serviceDays.flatMap(({ dayCd, timetable }) => (
     (timetable?.stationSequences ?? []).map((sequence) => ({ dayCd, ...sequence }))
   )).sort((left, right) => naturalCompare(left.dayCd, right.dayCd)
@@ -276,10 +279,7 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
     policyVersion: "itx-snapshot-anomaly-v1",
     validationStatus: "SUPPORTED",
     promotionStatus: completeness.sourceTimetableArtifact.status,
-    canonicalPackIdentity: {
-      path: packPath,
-      sha256: sha256(await readFile(packPath)),
-    },
+    canonicalPackIdentity: await readCanonicalPackIdentity(packPath, repoRoot),
     selectedServiceDates: completeness.selectedServiceDates,
     sourceLineage: completeness.serviceDays.map((day) => ({
       dayCd: day.dayCd,
@@ -327,6 +327,7 @@ export async function promoteItxSourceCandidate({
     throw new Error("ITX source candidate hash is invalid");
   }
   validateSourceFreshness(candidate, candidate.selectedServiceDates, now);
+  await validateCanonicalPackIdentity(candidate.canonicalPackIdentity, repositoryRoot);
   const candidateSets = validateSourceSnapshotSets(candidate);
   const contract = JSON.parse(await readFile(coverageContractPath, "utf8"));
   const previousSource = await loadAdmittedSourceReference(contract, repositoryRoot);
@@ -357,7 +358,13 @@ export async function promoteItxSourceCandidate({
   }
   const artifactRelativePath = `tools/datapack/sources/${candidate.artifactId}.json`;
   const artifactPath = await validateSourceOutputPath(sourceOutputDir, artifactRelativePath, repositoryRoot);
-  await writeFile(artifactPath, candidateBytes, { flag: "wx", mode: 0o644 });
+  try {
+    await writeFile(artifactPath, candidateBytes, { flag: "wx", mode: 0o644 });
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    const existingBytes = await readFile(artifactPath);
+    if (!existingBytes.equals(candidateBytes)) throw new Error("ADMITTED_SOURCE_ARTIFACT_CONFLICT");
+  }
   contract.sourceTimetableArtifact = {
     status: "ADMITTED",
     admissionEligible: true,
@@ -374,7 +381,15 @@ export async function promoteItxSourceCandidate({
       approvedArtifactSha256: approvalRequired ? candidateSha256 : null,
     },
   };
-  await writeFile(coverageContractPath, `${JSON.stringify(contract, null, 2)}\n`);
+  const contractTempPath = `${coverageContractPath}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(contractTempPath, `${JSON.stringify(contract, null, 2)}\n`, { flag: "wx", mode: 0o644 });
+    await rename(contractTempPath, coverageContractPath);
+  } finally {
+    await unlink(contractTempPath).catch((error) => {
+      if (error?.code !== "ENOENT") throw error;
+    });
+  }
   return { candidateSha256, artifactPath, sourceTimetableArtifact: contract.sourceTimetableArtifact };
 }
 
@@ -387,6 +402,75 @@ function validateSourceFreshness(source, selectedServiceDates, now = null) {
     throw new Error("SOURCE_SNAPSHOT_FRESHNESS_INVALID");
   }
   if (now && now.getTime() >= Date.parse(value)) throw new Error("SOURCE_SNAPSHOT_EXPIRED");
+}
+
+async function readCanonicalPackIdentity(packPath, repositoryRoot) {
+  const absolutePath = path.resolve(packPath);
+  const relativePath = path.relative(path.resolve(repositoryRoot), absolutePath).split(path.sep).join("/");
+  if (relativePath.startsWith("../") || relativePath === ".." || path.isAbsolute(relativePath)) {
+    throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
+  }
+  const identity = { path: relativePath, sha256: sha256(await readFile(absolutePath)) };
+  await validateCanonicalPackIdentity(identity, repositoryRoot);
+  return identity;
+}
+
+async function validateCanonicalPackIdentity(identity, repositoryRoot) {
+  const relativePath = identity?.path;
+  if (typeof relativePath !== "string" || relativePath === "" || path.isAbsolute(relativePath)
+    || path.posix.normalize(relativePath) !== relativePath || relativePath.startsWith("../")
+    || !/^[a-f0-9]{64}$/.test(identity?.sha256 ?? "")) {
+    throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
+  }
+  const packPath = path.join(repositoryRoot, ...relativePath.split("/"));
+  try {
+    const [realRoot, realParent] = await Promise.all([realpath(repositoryRoot), realpath(path.dirname(packPath))]);
+    const stat = await lstat(packPath);
+    if (!realParent.startsWith(`${realRoot}${path.sep}`) || stat.isSymbolicLink() || !stat.isFile()
+      || sha256(await readFile(packPath)) !== identity.sha256) {
+      throw new Error("CANONICAL_PACK_IDENTITY_INVALID");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === "CANONICAL_PACK_IDENTITY_INVALID") throw error;
+    throw new Error("CANONICAL_PACK_IDENTITY_INVALID", { cause: error });
+  }
+}
+
+function validateMaterializedProjection(source, dayCd, errorCode) {
+  const invalid = () => { throw new Error(errorCode); };
+  if (!["8", "7", "9"].includes(dayCd) || !Array.isArray(source?.stationSequences)
+    || !Array.isArray(source?.transitTrips) || !Array.isArray(source?.transitStopTimes)) invalid();
+  const serviceId = { "8": "weekday-kric", "7": "saturday-kric", "9": "holiday-kric" }[dayCd];
+  const sequences = source.stationSequences.filter((row) => row?.dayCd === undefined || row.dayCd === dayCd)
+    .sort((left, right) => naturalCompare(normalizeTrainNumber(left.trainNumber), normalizeTrainNumber(right.trainNumber)));
+  const trainNumbers = sequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber));
+  const directions = new Set(sequences.map(({ directionId }) => directionId));
+  if (sequences.length < 2 || new Set(trainNumbers).size !== sequences.length
+    || directions.size !== 2 || !directions.has("up") || !directions.has("down")) invalid();
+  const trips = source.transitTrips.filter(({ id }) => typeof id === "string" && id.endsWith(`-${dayCd}`));
+  if (trips.length !== sequences.length) invalid();
+  const tripIds = new Set(trips.map(({ id }) => id));
+  if (tripIds.size !== trips.length
+    || source.transitTrips.some(({ id }) => typeof id !== "string" || !id.endsWith(`-${dayCd}`))
+    || source.transitStopTimes.some(({ tripId }) => !tripIds.has(tripId))) invalid();
+  for (const sequence of sequences) {
+    const trainNumber = normalizeTrainNumber(sequence.trainNumber);
+    const directionId = sequence.directionId;
+    const expectedTripId = `route-${LINE_ID}-${directionId}-${trainNumber}-${dayCd}`;
+    const trip = trips.find(({ id }) => id === expectedTripId);
+    if (!trip || trip.routeId !== `route-${LINE_ID}-${directionId}` || trip.serviceId !== serviceId
+      || trip.directionId !== directionId || trip.servicePattern !== "EXPRESS"
+      || !Array.isArray(sequence.stops) || sequence.stops.length < 2) invalid();
+    const rows = source.transitStopTimes.filter(({ tripId }) => tripId === expectedTripId)
+      .sort((left, right) => left.stopSequence - right.stopSequence);
+    if (rows.length !== sequence.stops.length) invalid();
+    rows.forEach((row, index) => {
+      const stop = sequence.stops[index];
+      if (row.stopSequence !== index + 1 || row.stationId !== stop.stationId
+        || row.arrivalSeconds !== stop.arrivalSeconds || row.departureSeconds !== stop.departureSeconds) invalid();
+    });
+  }
+  return { sequences, trips, stopTimes: source.transitStopTimes };
 }
 
 function validateSourceSnapshotSets(source) {
@@ -409,9 +493,13 @@ function validateSourceSnapshotSets(source) {
       || new Set(providerStationIds).size !== providerStationIds.length) {
       throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
     }
-    const sequences = source.stationSequences.filter((row) => row?.dayCd === dayCd)
-      .sort((left, right) => naturalCompare(normalizeTrainNumber(left.trainNumber), normalizeTrainNumber(right.trainNumber)));
-    const trips = source.transitTrips.filter(({ id }) => typeof id === "string" && id.endsWith(`-${dayCd}`));
+    const { sequences, trips } = validateMaterializedProjection({
+      stationSequences: source.stationSequences.filter((row) => row?.dayCd === dayCd),
+      transitTrips: source.transitTrips.filter(({ id }) => typeof id === "string" && id.endsWith(`-${dayCd}`)),
+      transitStopTimes: source.transitStopTimes.filter(({ tripId }) => (
+        source.transitTrips.some(({ id }) => id === tripId && id.endsWith(`-${dayCd}`))
+      )),
+    }, dayCd, "SOURCE_SNAPSHOT_SETS_MISMATCH");
     const tripIds = new Set(trips.map(({ id }) => id));
     const stopTimes = source.transitStopTimes.filter(({ tripId }) => tripIds.has(tripId));
     const trainSet = sequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber));
@@ -542,10 +630,19 @@ async function verifyOwnerApproval({ approvalUrl, expectedBody, observedAt, fetc
   });
   if (!response.ok) throw new Error("SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
   const record = await response.json();
+  const approvalAt = offsetIsoEpoch(record.created_at);
+  const candidateObservedAt = offsetIsoEpoch(observedAt);
   if (record.author_association !== "OWNER" || record.body !== expectedBody
-    || Date.parse(record.created_at) <= Date.parse(observedAt)) {
+    || approvalAt === null || candidateObservedAt === null || approvalAt <= candidateObservedAt) {
     throw new Error("SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID");
   }
+}
+
+function offsetIsoEpoch(value) {
+  if (typeof value !== "string"
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
+  const epoch = Date.parse(value);
+  return Number.isFinite(epoch) ? epoch : null;
 }
 
 function snapshotSets(day) {
@@ -619,6 +716,7 @@ export async function collectKorailItxCheongchunPlan({
     transitTrips: trainNumberEvidence.transitTrips,
     transitStopTimes: trainNumberEvidence.transitStopTimes,
   };
+  validateMaterializedProjection(materialized, kricServiceDayCode, "TAGO_OD_STOP_SEQUENCE_INVALID");
   const plans = await fetchAll({
     endpoint: `${API_ORIGIN}/B551457/run/v2/travelerTrainRunPlan2`,
     query: {
