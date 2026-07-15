@@ -2172,6 +2172,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
+  const backendBuild = read("backend/build.gradle");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -3237,6 +3238,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /--output release-artifacts\/rc\/rc-evidence-manifest\.json/);
   assert.match(workflow, /--gate-status productionDatapack=BLOCKED_EXTERNAL/);
   assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
+  assert.match(workflow, /cp "\$\{boot_jar\[0\]\}" release-artifacts\/backend\/backend-boot\.jar/);
+  assert.match(workflow, /--backend-artifact release-artifacts\/downloaded\/backend\/backend-boot\.jar/);
+  assert.match(backendBuild, /preserveFileTimestamps\s*=\s*false/);
+  assert.match(backendBuild, /reproducibleFileOrder\s*=\s*true/);
   assert.match(workflow, /--gate-status backendOperations=BLOCKED_EXTERNAL/);
   assert.doesNotMatch(workflow, /--gate-status postLaunchOperations=SATISFIED/);
   assert.match(workflow, /rc-evidence-manifest-preliminary\.json/);

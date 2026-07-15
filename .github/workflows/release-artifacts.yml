@@ -606,10 +606,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts/backend
+          shopt -s nullglob
+          boot_jar=(backend/build/libs/*.jar)
+          if [[ "${#boot_jar[@]}" -ne 1 ]]; then
+            echo "expected exactly one backend bootJar, found ${#boot_jar[@]}" >&2
+            exit 1
+          fi
+          cp "${boot_jar[0]}" release-artifacts/backend/backend-boot.jar
           docker image inspect easysubway-backend:${{ github.sha }} > release-artifacts/backend/image-inspect.json
+          backend_artifact_sha256="$(sha256sum release-artifacts/backend/backend-boot.jar | awk '{print $1}')"
           {
             echo "commit=${GITHUB_SHA}"
             echo "image=easysubway-backend:${GITHUB_SHA}"
+            echo "backendArtifactSha256=${backend_artifact_sha256}"
             echo "dockerfile=backend/Dockerfile"
             echo "compose=infra/docker-compose.yml"
           } > release-artifacts/backend/release-metadata.txt
@@ -690,7 +699,9 @@ jobs:
             generator_args+=(--android-release-metadata release-artifacts/downloaded/android/release-metadata.txt)
             android_artifact_source="easysubway-android-release-${GITHUB_SHA}"
           fi
-          if [[ -f release-artifacts/downloaded/backend/image-inspect.json ]]; then
+          if [[ -f release-artifacts/downloaded/backend/backend-boot.jar ]]; then
+            generator_args+=(--backend-artifact release-artifacts/downloaded/backend/backend-boot.jar)
+          elif [[ -f release-artifacts/downloaded/backend/image-inspect.json ]]; then
             generator_args+=(--backend-image-inspect release-artifacts/downloaded/backend/image-inspect.json)
           fi
           node tools/release/generate-rc-evidence-manifest.mjs \
