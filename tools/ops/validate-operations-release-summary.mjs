@@ -74,9 +74,13 @@ function assertEvidenceValidity(summary, gate, artifactIdentity, requirePass, no
   if (validity.testedAt !== expectedTestedAt || validity.expiresWhen !== expectedExpiresWhen) {
     throw new Error("evidenceValidity must match the canonical Phase A evidence window");
   }
+  if (requirePass && !Number.isFinite(now)) {
+    throw new Error("--now must be a valid timestamp for --require-pass");
+  }
   if (
     requirePass
-    && (!Number.isFinite(now) || now < Date.parse(validity.testedAt) || now > Date.parse(validity.expiresWhen))
+    && summary.postLaunchObservation?.status === "PENDING_PUBLIC_RELEASE"
+    && (now < Date.parse(validity.testedAt) || now > Date.parse(validity.expiresWhen))
   ) {
     throw new Error("evidenceValidity must be current for --require-pass");
   }
@@ -248,6 +252,13 @@ function assertPostLaunch(summary, gate, artifactIdentity, requirePass, now) {
     }
     if (Date.parse(publicReleaseIdentity.publishedAt) > now) {
       throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must not be in the future");
+    }
+    const phaseAValidity = required(summary.evidenceValidity, "evidenceValidity");
+    if (
+      Date.parse(publicReleaseIdentity.publishedAt) < Date.parse(phaseAValidity.testedAt)
+      || Date.parse(publicReleaseIdentity.publishedAt) > Date.parse(phaseAValidity.expiresWhen)
+    ) {
+      throw new Error("postLaunchObservation.publicReleaseIdentity.publishedAt must be within Phase A evidence validity");
     }
     required(publicReleaseIdentity.versionCode, "postLaunchObservation.publicReleaseIdentity.versionCode");
     required(publicReleaseIdentity.gitSha, "postLaunchObservation.publicReleaseIdentity.gitSha");

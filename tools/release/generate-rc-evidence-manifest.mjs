@@ -251,6 +251,12 @@ function requiredEvidenceEntries(baseTestedAt, rootPath, device, androidVersion,
     const evidencePaths = [`${rootPath}${id}/`];
     if (paths[id]) evidencePaths.push(paths[id]);
     const evidence = statuses[id] === "SATISFIED" ? readJsonIfExists(resolvePath(paths[id])) : null;
+    if (statuses[id] === "SATISFIED" && (
+      evidence?.evidenceValidity?.testedAt === undefined
+      || evidence?.evidenceValidity?.expiresWhen === undefined
+    )) {
+      fail(`SATISFIED evidence entry requires evidenceValidity.testedAt and evidenceValidity.expiresWhen: ${id}`);
+    }
     const evidenceTestedAt = evidence?.evidenceValidity?.testedAt ?? baseTestedAt;
     const evidenceExpiresWhen = evidence?.evidenceValidity?.expiresWhen ?? addDays(baseTestedAt, 14);
     if (statuses[id] === "SATISFIED" && (

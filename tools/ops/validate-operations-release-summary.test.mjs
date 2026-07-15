@@ -7,8 +7,16 @@ import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 
-const execFileAsync = promisify(execFile);
+const rawExecFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+const validatorPath = "tools/ops/validate-operations-release-summary.mjs";
+
+function execFileAsync(file, args, options) {
+  const resolvedArgs = args[0] === validatorPath && !args.includes("--now")
+    ? [...args, "--now", "2026-08-15T00:00:00+09:00"]
+    : args;
+  return rawExecFileAsync(file, resolvedArgs, options);
+}
 const observabilityGate = JSON.parse(
   readFileSync(path.join(root, "apps/mobile/release/operations-observability-gate.json"), "utf8"),
 );
@@ -47,7 +55,7 @@ function validSummary() {
     postLaunchObservation: {
       status: "IN_PROGRESS",
       publicReleaseIdentity: {
-        publishedAt: "2020-01-01T00:00:00+09:00",
+        publishedAt: "2026-07-15T00:00:00+09:00",
         versionCode: artifactIdentity.versionCode,
         gitSha: artifactIdentity.gitSha,
       },
@@ -69,10 +77,10 @@ function validSummary() {
     postLaunchReviews: postLaunchGate.reviewWindows.map((window) => ({
       reviewWindowId: window.id,
       observedAt: {
-        first_2h: "2020-01-01T02:00:00+09:00",
-        first_24h: "2020-01-02T00:00:00+09:00",
-        day_7: "2020-01-08T00:00:00+09:00",
-        day_30: "2020-01-31T00:00:00+09:00",
+        first_2h: "2026-07-15T02:00:00+09:00",
+        first_24h: "2026-07-16T00:00:00+09:00",
+        day_7: "2026-07-22T00:00:00+09:00",
+        day_30: "2026-08-14T00:00:00+09:00",
       }[window.id],
       artifactIdentity: { ...artifactIdentity },
       signalSnapshot: window.requiredSignals,
@@ -154,8 +162,14 @@ test("operations release summary validator accepts complete redacted release evi
 });
 
 test("operations release summary validator rejects expired Phase A evidence", async () => {
+  const summary = validSummary();
+  summary.postLaunchObservation = {
+    status: "PENDING_PUBLIC_RELEASE",
+    publicReleaseIdentity: { publishedAt: null, versionCode: null, gitSha: null },
+  };
+  delete summary.postLaunchReviews;
   await assert.rejects(
-    withSummary(validSummary(), (summaryPath) =>
+    withSummary(summary, (summaryPath) =>
       execFileAsync(process.execPath, [
         "tools/ops/validate-operations-release-summary.mjs",
         "--summary",
@@ -282,7 +296,7 @@ test("operations release summary validator uses --now for public release timesta
 test("operations release summary validator uses --now for review timestamps", async () => {
   const summary = validSummary();
   summary.postLaunchObservation.status = "IN_PROGRESS";
-  summary.postLaunchObservation.publicReleaseIdentity.publishedAt = "2026-07-14T00:00:00+09:00";
+  summary.postLaunchObservation.publicReleaseIdentity.publishedAt = "2026-07-15T00:00:00+09:00";
   summary.postLaunchReviews = summary.postLaunchReviews.slice(0, 1);
   summary.postLaunchReviews[0].observedAt = "2026-07-20T00:00:00+09:00";
 
@@ -458,6 +472,8 @@ test("operations release summary validator accepts Phase A PASS while Phase B wa
       "tools/ops/validate-operations-release-summary.mjs",
       "--summary",
       summaryPath,
+      "--now",
+      "2026-07-16T00:00:00+09:00",
       "--require-pass",
     ], { cwd: root }),
   );
@@ -488,6 +504,8 @@ test("operations release summary validator rejects a stale pending summary after
         summaryPath,
         "--post-launch-gate",
         gatePath,
+        "--now",
+        "2026-07-16T00:00:00+09:00",
         "--require-pass",
       ], { cwd: root });
     }),
@@ -530,6 +548,8 @@ test("operations release summary validator accepts the declared in-progress to p
       summaryPath,
       "--post-launch-gate",
       gatePath,
+      "--now",
+      "2026-08-15T00:00:00+09:00",
       "--require-pass",
     ], { cwd: root });
   });
@@ -698,6 +718,27 @@ test("operations release summary validator rejects a public release timestamp in
       ], { cwd: root }),
     ),
     /publishedAt must not be in the future/,
+  );
+});
+
+test("operations release summary validator rejects a public release before Phase A evidence", async () => {
+  const summary = validSummary();
+  summary.postLaunchObservation.status = "IN_PROGRESS";
+  summary.postLaunchObservation.publicReleaseIdentity.publishedAt = "2026-07-14T23:59:59+09:00";
+  summary.postLaunchReviews = [];
+
+  await assert.rejects(
+    withSummary(summary, (summaryPath) =>
+      execFileAsync(process.execPath, [
+        validatorPath,
+        "--summary",
+        summaryPath,
+        "--now",
+        "2026-07-16T00:00:00+09:00",
+        "--require-pass",
+      ], { cwd: root }),
+    ),
+    /publishedAt must be within Phase A evidence validity/,
   );
 });
 
