@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
+  buildItxSourceCandidate,
   collectKorailItxCheongchunCompleteness,
   collectKorailItxCheongchunPlan,
   collectKorailItxCheongchunTimetable,
@@ -119,6 +120,87 @@ function trainNumberEvidence() {
     ],
     evidenceHash: "a".repeat(64),
   };
+}
+
+function sourceCandidate(overrides = {}) {
+  const dayCodes = ["8", "7", "9"];
+  const stationRosters = dayCodes.map((dayCd) => ({
+    dayCd,
+    stations: [
+      { canonicalStationId: "station-a", providerStationId: "provider-a" },
+      { canonicalStationId: "station-b", providerStationId: "provider-b" },
+    ],
+  }));
+  const stationSequences = dayCodes.map((dayCd) => ({
+    dayCd,
+    trainNumber: "2001",
+    directionId: "up",
+    stops: [
+      { stationId: "station-a", arrivalSeconds: 28_800, departureSeconds: 28_800 },
+      { stationId: "station-b", arrivalSeconds: 32_400, departureSeconds: 32_400 },
+    ],
+  }));
+  const transitTrips = dayCodes.map((dayCd) => ({
+    id: `route-line-54a7b980b7c3-up-2001-${dayCd}`,
+    directionId: "up",
+  }));
+  const transitStopTimes = transitTrips.flatMap(({ id: tripId }) => [
+    { tripId, stopSequence: 1, stationId: "station-a", arrivalSeconds: 28_800, departureSeconds: 28_800 },
+    { tripId, stopSequence: 2, stationId: "station-b", arrivalSeconds: 32_400, departureSeconds: 32_400 },
+  ]);
+  const normalizedSnapshotSets = dayCodes.map((dayCd) => ({
+    dayCd,
+    sets: {
+      stationSet: ["station-a", "station-b"],
+      odSet: [[dayCd, "provider-a", "provider-b"], [dayCd, "provider-b", "provider-a"]],
+      trainSet: ["2001"],
+      stopSequenceSet: [[dayCd, "2001", "up", ["station-a", "station-b"]]],
+      timetableTupleSet: [
+        [dayCd, "2001", "station-a", 28_800, 28_800],
+        [dayCd, "2001", "station-b", 32_400, 32_400],
+      ],
+    },
+  }));
+  const candidate = {
+    schemaVersion: 1,
+    artifactKind: "itx-cheongchun-source-timetable",
+    artifactId: "itx-cheongchun-source-timetable-20260715010000000",
+    serviceId: "ITX_CHEONGCHUN",
+    observedAt: "2026-07-15T01:00:00.000Z",
+    freshUntil: "2026-07-20T00:00:00+09:00",
+    policyVersion: "itx-snapshot-anomaly-v1",
+    validationStatus: "SUPPORTED",
+    promotionStatus: "BOOTSTRAP_REVIEW_REQUIRED",
+    selectedServiceDates: { "8": "20260716", "7": "20260718", "9": "20260719" },
+    stationRosters,
+    stationSequences,
+    transitTrips,
+    transitStopTimes,
+    normalizedSnapshotSets,
+    snapshotDiff: {
+      policyVersion: "itx-snapshot-anomaly-v1",
+      status: "BOOTSTRAP_REVIEW_REQUIRED",
+      previousArtifactSha256: null,
+    },
+    credentialRedacted: true,
+    ...overrides,
+  };
+  candidate.evidenceHash = createHash("sha256").update(JSON.stringify(candidate)).digest("hex");
+  return candidate;
+}
+
+function sourceBytes(candidate) {
+  return `${JSON.stringify(candidate, null, 2)}\n`;
+}
+
+async function writeCoverageContract(repositoryRoot, contents) {
+  const contractPath = path.join(
+    repositoryRoot,
+    "tools/datapack/itx-cheongchun-coverage-contract.json",
+  );
+  await mkdir(path.dirname(contractPath), { recursive: true });
+  await writeFile(contractPath, contents);
+  return contractPath;
 }
 
 test("ITX completeness는 dayCd 8/7/9를 독립 수집해 하나의 admission artifact로 묶는다", async () => {
@@ -530,50 +612,82 @@ test("ITX CLI는 runtime 실패를 MISSING artifact로 저장하고 non-zero를 
   }
 });
 
-test("ITX CLI는 absolute previous ADMITTED artifact를 tracked parser로 전달한다", async () => {
+test("ITX CLI는 --previous-admitted 임의 baseline을 거부한다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "itx-cli-previous-"));
-  const previous = path.join(dir, "previous.json");
   const output = path.join(dir, "current.json");
-  const admitted = {
-    schemaVersion: 2,
-    artifactKind: "korail-itx-cheongchun-completeness-evidence",
-    observedAt: "2026-07-14T00:00:00.000Z",
-    validationMode: "ADMISSION",
-    validationStatus: "SUPPORTED",
-    admissionStatus: "BOOTSTRAP_REVIEW_REQUIRED",
-    admissionEligible: false,
-    selectedServiceDates: { "8": "20260715", "7": "20260718", "9": "20260719" },
-    sourceTimetableArtifact: {
-      status: "BOOTSTRAP_REVIEW_REQUIRED",
-      artifactId: "itx-cheongchun-source-timetable-20260714000000000",
-      freshUntil: "2026-07-20T00:00:00+09:00",
+  try {
+    await assert.rejects(runKorailItxCompletenessCli({
+      argv: [
+        "--day8-date", "20260715", "--day7-date", "20260718", "--day9-date", "20260719",
+        "--canonical-pack", PACK_PATH, "--previous-admitted", path.join(dir, "candidate.json"), "--output", output,
+      ],
+      env: { DATA_GO_KR_SERVICE_KEY: "secret" },
+      now: new Date("2026-07-14T00:00:00.000Z"),
+      collectImpl: async () => assert.fail("must reject before collection"),
+    }), /--previous-admitted is not supported/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("ITX candidate builder의 실제 payload에서 생성한 5-set은 promotion 재검증을 통과한다", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "itx-built-candidate-"));
+  const template = sourceCandidate();
+  const serviceDays = ["8", "7", "9"].map((dayCd) => ({
+    dayCd,
+    roster: {
+      stations: template.stationRosters.find((row) => row.dayCd === dayCd).stations,
+      trainNumbers: ["2001"],
+      evidenceHash: "a".repeat(64),
     },
-    snapshotDiff: { status: "BOOTSTRAP_REVIEW_REQUIRED" },
-    serviceDays: [],
+    timetable: {
+      stationSequences: template.stationSequences
+        .filter((row) => row.dayCd === dayCd)
+        .map(({ dayCd: _, ...sequence }) => sequence),
+      transitTrips: template.transitTrips.filter(({ id }) => id.endsWith(`-${dayCd}`)),
+      transitStopTimes: template.transitStopTimes.filter(({ tripId }) => tripId.endsWith(`-${dayCd}`)),
+      evidenceHash: "b".repeat(64),
+    },
+  }));
+  const completeness = {
+    validationStatus: "SUPPORTED",
+    validationMode: "ADMISSION",
+    observedAt: template.observedAt,
+    selectedServiceDates: template.selectedServiceDates,
+    sourceTimetableArtifact: {
+      artifactId: template.artifactId,
+      status: "BOOTSTRAP_REVIEW_REQUIRED",
+      freshUntil: template.freshUntil,
+    },
+    snapshotDiff: template.snapshotDiff,
+    serviceDays,
   };
   try {
-    await runKorailItxCompletenessCli({
-      argv: [
-        "--day8-date", "20260715", "--day7-date", "20260718", "--day9-date", "20260719",
-        "--canonical-pack", PACK_PATH, "--output", previous,
-      ],
-      env: { DATA_GO_KR_SERVICE_KEY: "secret" },
-      now: new Date("2026-07-14T00:00:00.000Z"),
-      collectImpl: async () => admitted,
+    const candidate = await buildItxSourceCandidate({
+      completeness,
+      packPath: PACK_PATH,
+      now: new Date("2026-07-15T02:00:00.000Z"),
     });
-    const result = await runKorailItxCompletenessCli({
-      argv: [
-        "--day8-date", "20260715", "--day7-date", "20260718", "--day9-date", "20260719",
-        "--canonical-pack", PACK_PATH, "--previous-admitted", previous, "--output", output,
-      ],
-      env: { DATA_GO_KR_SERVICE_KEY: "secret" },
-      now: new Date("2026-07-14T00:00:00.000Z"),
-      collectImpl: async ({ previousAdmittedArtifact }) => {
-        assert.equal(previousAdmittedArtifact.artifactKind, "itx-cheongchun-source-timetable");
-        return admitted;
-      },
+    const candidatePath = path.join(dir, "candidate.json");
+    const bytes = sourceBytes(candidate);
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    await writeFile(candidatePath, bytes);
+    const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+    const promoted = await promoteItxSourceCandidate({
+      candidatePath,
+      approvedSha256: digest,
+      approvalUrl: "https://github.com/AquilaXk/easysubway/issues/2135#issuecomment-123",
+      sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+      coverageContractPath: contractPath,
+      repositoryRoot: dir,
+      now: new Date("2026-07-15T02:00:00.000Z"),
+      fetchImpl: async () => new Response(JSON.stringify({
+        author_association: "OWNER",
+        body: `/approve-itx-bootstrap artifactId=${candidate.artifactId} sha256=${digest} policy=itx-snapshot-anomaly-v1`,
+        created_at: "2026-07-15T01:30:00.000Z",
+      }), { status: 200, headers: { "content-type": "application/json" } }),
     });
-    assert.equal(result.exitCode, 0);
+    assert.equal(promoted.sourceTimetableArtifact.status, "ADMITTED");
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -582,29 +696,21 @@ test("ITX CLI는 absolute previous ADMITTED artifact를 tracked parser로 전달
 test("ITX bootstrap promotion은 exact candidate SHA와 OWNER approval 뒤에만 immutable payload를 만든다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-"));
   const candidatePath = path.join(dir, "candidate.json");
-  const contractPath = path.join(dir, "contract.json");
-  const sourceDir = path.join(dir, "sources");
-  const candidate = {
-    schemaVersion: 1,
-    artifactKind: "itx-cheongchun-source-timetable",
-    artifactId: "itx-cheongchun-source-timetable-20260715010000000",
-    observedAt: "2026-07-15T01:00:00.000Z",
-    freshUntil: "2026-07-20T00:00:00+09:00",
-    promotionStatus: "BOOTSTRAP_REVIEW_REQUIRED",
-  };
-  candidate.evidenceHash = createHash("sha256").update(JSON.stringify(candidate)).digest("hex");
-  const candidateBytes = `${JSON.stringify(candidate, null, 2)}\n`;
+  const sourceDir = path.join(dir, "tools/datapack/sources");
+  const candidate = sourceCandidate();
+  const candidateBytes = sourceBytes(candidate);
   const digest = createHash("sha256").update(candidateBytes).digest("hex");
   const approvalUrl = "https://github.com/AquilaXk/easysubway/issues/2135#issuecomment-123";
   try {
     await writeFile(candidatePath, candidateBytes);
-    await writeFile(contractPath, '{"schemaVersion":2}\n');
+    const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
     await assert.rejects(promoteItxSourceCandidate({
       candidatePath,
       approvedSha256: digest,
       approvalUrl,
       sourceOutputDir: sourceDir,
       coverageContractPath: contractPath,
+      repositoryRoot: dir,
       now: new Date("2026-07-20T00:00:00+09:00"),
     }), /SOURCE_SNAPSHOT_EXPIRED/);
     await assert.rejects(promoteItxSourceCandidate({
@@ -613,6 +719,7 @@ test("ITX bootstrap promotion은 exact candidate SHA와 OWNER approval 뒤에만
       approvalUrl,
       sourceOutputDir: sourceDir,
       coverageContractPath: contractPath,
+      repositoryRoot: dir,
       now: new Date("2026-07-15T02:00:00.000Z"),
     }), /SNAPSHOT_BOOTSTRAP_APPROVAL_INVALID/);
 
@@ -622,6 +729,7 @@ test("ITX bootstrap promotion은 exact candidate SHA와 OWNER approval 뒤에만
       approvalUrl,
       sourceOutputDir: sourceDir,
       coverageContractPath: contractPath,
+      repositoryRoot: dir,
       now: new Date("2026-07-15T02:00:00.000Z"),
       fetchImpl: async () => new Response(JSON.stringify({
         author_association: "OWNER",
@@ -634,9 +742,145 @@ test("ITX bootstrap promotion은 exact candidate SHA와 OWNER approval 뒤에만
     const contract = JSON.parse(await readFile(contractPath, "utf8"));
     assert.equal(contract.sourceTimetableArtifact.status, "ADMITTED");
     assert.equal(contract.sourceTimetableArtifact.promotion.mode, "BOOTSTRAP_OWNER_APPROVED");
+    assert.equal(
+      contract.sourceTimetableArtifact.artifactPath,
+      `tools/datapack/sources/${candidate.artifactId}.json`,
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("ITX promotion은 freshness·payload sets·current ADMITTED authority를 재검증한다", async (context) => {
+  await context.test("invalid offset timestamp", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-freshness-"));
+    try {
+      const candidate = sourceCandidate({ freshUntil: "not-a-date" });
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /SOURCE_SNAPSHOT_FRESHNESS_INVALID/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  await context.test("stored normalized sets tamper", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-sets-"));
+    try {
+      const candidate = sourceCandidate();
+      candidate.normalizedSnapshotSets[0].sets.trainSet = ["9999"];
+      candidate.evidenceHash = createHash("sha256")
+        .update(JSON.stringify({ ...candidate, evidenceHash: undefined }))
+        .digest("hex");
+      const { evidenceHash: _, ...withoutEvidence } = candidate;
+      candidate.evidenceHash = createHash("sha256").update(JSON.stringify(withoutEvidence)).digest("hex");
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      const contractPath = await writeCoverageContract(dir, '{"schemaVersion":2}\n');
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /SOURCE_SNAPSHOT_SETS_MISMATCH/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  await context.test("arbitrary status and stale baseline digest", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-authority-"));
+    try {
+      const sourceDir = path.join(dir, "tools/datapack/sources");
+      await mkdir(sourceDir, { recursive: true });
+      const previous = sourceCandidate({
+        artifactId: "itx-cheongchun-source-timetable-20260714010000000",
+        promotionStatus: "SUPPORTED",
+      });
+      const previousBytes = sourceBytes(previous);
+      const previousSha = createHash("sha256").update(previousBytes).digest("hex");
+      const previousPath = path.join(sourceDir, `${previous.artifactId}.json`);
+      await writeFile(previousPath, previousBytes);
+      const contractPath = await writeCoverageContract(dir, `${JSON.stringify({
+        schemaVersion: 2,
+        sourceTimetableArtifact: {
+          status: "ADMITTED",
+          admissionEligible: true,
+          artifactId: previous.artifactId,
+          artifactPath: `tools/datapack/sources/${previous.artifactId}.json`,
+          sha256: previousSha,
+          schemaVersion: 1,
+          policyVersion: "itx-snapshot-anomaly-v1",
+          freshUntil: previous.freshUntil,
+        },
+      }, null, 2)}\n`);
+
+      for (const candidate of [
+        sourceCandidate({
+          promotionStatus: "BOOTSTRAP_REVIEW_REQUIRED",
+          snapshotDiff: { status: "SUPPORTED", previousArtifactSha256: previousSha },
+        }),
+        sourceCandidate({
+          promotionStatus: "SUPPORTED",
+          snapshotDiff: { status: "SUPPORTED", previousArtifactSha256: "f".repeat(64) },
+        }),
+      ]) {
+        const candidatePath = path.join(dir, `${candidate.promotionStatus}-candidate.json`);
+        await writeFile(candidatePath, sourceBytes(candidate));
+        await assert.rejects(promoteItxSourceCandidate({
+          candidatePath,
+          sourceOutputDir: sourceDir,
+          coverageContractPath: contractPath,
+          repositoryRoot: dir,
+          now: new Date("2026-07-15T02:00:00.000Z"),
+        }), /SNAPSHOT_PROMOTION_AUTHORITY_INVALID/);
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  await context.test("absolute ADMITTED artifact path", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "itx-promotion-path-"));
+    try {
+      const previous = sourceCandidate({ artifactId: "itx-cheongchun-source-timetable-20260714010000000" });
+      const previousPath = path.join(dir, "previous.json");
+      const previousBytes = sourceBytes(previous);
+      await writeFile(previousPath, previousBytes);
+      const contractPath = await writeCoverageContract(dir, `${JSON.stringify({
+        sourceTimetableArtifact: {
+          status: "ADMITTED",
+          admissionEligible: true,
+          artifactId: previous.artifactId,
+          artifactPath: previousPath,
+          sha256: createHash("sha256").update(previousBytes).digest("hex"),
+          schemaVersion: 1,
+          policyVersion: "itx-snapshot-anomaly-v1",
+          freshUntil: previous.freshUntil,
+        },
+      })}\n`);
+      const candidate = sourceCandidate();
+      const candidatePath = path.join(dir, "candidate.json");
+      await writeFile(candidatePath, sourceBytes(candidate));
+      await assert.rejects(promoteItxSourceCandidate({
+        candidatePath,
+        sourceOutputDir: path.join(dir, "tools/datapack/sources"),
+        coverageContractPath: contractPath,
+        repositoryRoot: dir,
+        now: new Date("2026-07-15T02:00:00.000Z"),
+      }), /ADMITTED_SOURCE_REFERENCE_INVALID/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 test("ITX CLI는 invalid input을 artifact 생성 전에 거부한다", async (context) => {
@@ -667,6 +911,41 @@ test("ITX CLI는 invalid input을 artifact 생성 전에 거부한다", async (c
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("ITX CLI promotion은 주입된 repository root를 전달한다", async () => {
+  const repositoryRoot = "/tmp/itx-alternate-checkout";
+  let received;
+  const result = await runKorailItxCompletenessCli({
+    argv: [
+      "--promote-candidate", "/tmp/candidate.json",
+      "--source-output-dir", "/tmp/itx-alternate-checkout/tools/datapack/sources",
+      "--coverage-contract", "/tmp/itx-alternate-checkout/tools/datapack/itx-cheongchun-coverage-contract.json",
+    ],
+    env: {},
+    repositoryRoot,
+    promoteImpl: async (options) => {
+      received = options;
+      return { sourceTimetableArtifact: { status: "ADMITTED" } };
+    },
+  });
+
+  assert.equal(received.repositoryRoot, repositoryRoot);
+  assert.equal(result.promotion.sourceTimetableArtifact.status, "ADMITTED");
+});
+
+test("ITX CLI는 canonical coverage contract 복사본으로 admission authority를 우회하지 못한다", async () => {
+  const repositoryRoot = "/tmp/itx-alternate-checkout";
+  await assert.rejects(runKorailItxCompletenessCli({
+    argv: [
+      "--promote-candidate", "/tmp/candidate.json",
+      "--source-output-dir", "/tmp/itx-alternate-checkout/tools/datapack/sources",
+      "--coverage-contract", "/tmp/copied-itx-contract.json",
+    ],
+    env: {},
+    repositoryRoot,
+    promoteImpl: async () => assert.fail("promotion must not run"),
+  }), /ITX coverage contract path must be canonical/);
 });
 
 test("Korail ITX-청춘 collector는 공식 station rows를 canonical EXPRESS trip으로 만든다", async () => {

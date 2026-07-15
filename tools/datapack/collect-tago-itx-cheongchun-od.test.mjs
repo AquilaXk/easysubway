@@ -413,17 +413,81 @@ test("TAGO retry는 최종 503 body를 정리하고 3회에서 종료한다", as
 
 test("TAGO retry는 최종 transport 실패까지 3회에서 종료한다", async () => {
   let attempts = 0;
+  const delays = [];
   await assert.rejects(collectTagoItxCheongchunRoster({
     serviceKey: "key",
     serviceDate: "20260715",
     kricServiceDayCode: "8",
     canonicalStations: canonicalRosterStations(),
+    waitImpl: async (milliseconds) => { delays.push(milliseconds); },
     fetchImpl: async () => {
       attempts += 1;
       throw new Error("socket unavailable");
     },
   }), /^Error: TAGO transport failure$/);
   assert.equal(attempts, 3);
+  assert.deepEqual(delays, [250, 500]);
+});
+
+test("TAGO grade와 corridor metadata는 후속 provider quota 전에 검증한다", async (context) => {
+  await context.test("invalid corridor", async () => {
+    let calls = 0;
+    await assert.rejects(collectTagoItxCheongchunRoster({
+      serviceKey: "key",
+      serviceDate: "20260715",
+      kricServiceDayCode: "8",
+      canonicalStations: [
+        { canonicalStationId: "station-a", nameKo: "청량리", corridorSequence: 0, lineId: "line-54a7b980b7c3" },
+        ...canonicalRosterStations().slice(1),
+      ],
+      fetchImpl: async () => { calls += 1; return assert.fail("provider must not be called"); },
+    }), /canonicalStations corridor metadata is invalid/);
+    assert.equal(calls, 0);
+  });
+
+  await context.test("missing grade id", async () => {
+    let calls = 0;
+    await assert.rejects(collectTagoItxCheongchunRoster({
+      serviceKey: "key",
+      serviceDate: "20260715",
+      kricServiceDayCode: "8",
+      canonicalStations: canonicalRosterStations(),
+      fetchImpl: async () => {
+        calls += 1;
+        return tagoCatalogResponse([{ vehiclekndnm: "ITX-청춘" }]);
+      },
+    }), /vehiclekndid is required/);
+    assert.equal(calls, 1);
+  });
+});
+
+test("TAGO invalid train number는 OD별 failed evidence로 보존한다", async () => {
+  const fallback = validFetch();
+  const artifact = await collectTagoItxCheongchunRoster({
+    serviceKey: "key",
+    serviceDate: "20260715",
+    kricServiceDayCode: "8",
+    canonicalStations: canonicalRosterStations(),
+    fetchImpl: async (url) => {
+      const response = await fallback(url);
+      const parsed = new URL(url);
+      if (!parsed.pathname.endsWith("GetStrtpntAlocFndTrainInfo")
+        || parsed.searchParams.get("depPlaceId") !== "NAT140873") return response;
+      const payload = await response.json();
+      payload.response.body.items.item[0].trainno = "ITX";
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  assert.equal(artifact.completedOdCount, 1);
+  assert.equal(artifact.failedOdCount, 1);
+  assert.equal(artifact.failedOds[0].reasonCode, "PROVIDER_SCHEMA_FAILURE");
+  assert.equal(
+    artifact.failedOds[0].failureContext,
+    "operation=GetStrtpntAlocFndTrainInfo,reason=field_contract_mismatch",
+  );
 });
 
 test("TAGO ITX roster는 OD 일부 실패를 count한 뒤 admission이 거부할 evidence를 반환한다", async () => {
@@ -757,7 +821,7 @@ test("TAGO roster matrix는 provider station catalog와 canonical 경춘선의 �
     serviceDate: "20260715",
     kricServiceDayCode: "8",
     canonicalStations: [
-      { canonicalStationId: "station-x", nameKo: "회기", corridorSequence: 0, lineId: "line-54a7b980b7c3" },
+      { canonicalStationId: "station-x", nameKo: "회기", corridorSequence: 3, lineId: "line-54a7b980b7c3" },
       ...canonicalRosterStations(),
     ],
     fetchImpl: validFetch(),

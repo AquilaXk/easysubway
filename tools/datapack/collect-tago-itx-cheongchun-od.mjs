@@ -273,11 +273,23 @@ export async function collectTagoItxCheongchunRoster({
   fetchImpl = fetch,
   now = new Date(),
   requestBudget = { limit: TAGO_DAILY_REQUEST_LIMIT, remaining: TAGO_DAILY_REQUEST_LIMIT },
+  waitImpl = wait,
 } = {}) {
   const key = decodedServiceKey(requiredString(serviceKey, "DATA_GO_KR_SERVICE_KEY"));
   if (!["7", "8", "9"].includes(kricServiceDayCode)) throw new Error("kricServiceDayCode must be 7, 8, or 9");
   validateServiceDay(serviceDate, kricServiceDayCode);
   if (!Array.isArray(canonicalStations) || canonicalStations.length < 2) throw new Error("canonicalStations must contain at least 2 stations");
+  const canonicalIds = new Set();
+  for (const station of canonicalStations) {
+    const canonicalStationId = requiredString(station?.canonicalStationId, "canonicalStations.canonicalStationId");
+    requiredString(station?.nameKo, "canonicalStations.nameKo");
+    if (canonicalIds.has(canonicalStationId)
+      || !Number.isInteger(station?.corridorSequence) || station.corridorSequence <= 0
+      || !["line-6e39be0cb6e2", "line-54a7b980b7c3"].includes(station?.lineId)) {
+      throw new Error("canonicalStations corridor metadata is invalid");
+    }
+    canonicalIds.add(canonicalStationId);
+  }
   if (!Number.isInteger(requestBudget?.limit) || requestBudget.limit <= 0
     || requestBudget.limit > TAGO_DAILY_REQUEST_LIMIT
     || !Number.isInteger(requestBudget.remaining) || requestBudget.remaining < 0
@@ -285,17 +297,18 @@ export async function collectTagoItxCheongchunRoster({
     throw new Error("requestBudget must stay within the 10000-request daily limit");
   }
 
-  const trainGrades = await fetchAll("GetVhcleKndList", {}, key, fetchImpl, requestBudget);
+  const trainGrades = await fetchAll("GetVhcleKndList", {}, key, fetchImpl, requestBudget, waitImpl);
   const gradeRows = trainGrades.rows.filter((row) => normalize(row.vehiclekndnm) === "itx청춘");
   if (gradeRows.length !== 1) throw new Error("TAGO ITX-청춘 train grade is missing or ambiguous");
   const grade = gradeRows[0];
-  const cities = await fetchAll("GetCtyCodeList", {}, key, fetchImpl, requestBudget);
+  const gradeId = requiredString(grade.vehiclekndid, "vehiclekndid");
+  const cities = await fetchAll("GetCtyCodeList", {}, key, fetchImpl, requestBudget, waitImpl);
   const stationOperations = [];
   const stationRows = [];
   for (const city of cities.rows) {
     const operation = await fetchAll("GetCtyAcctoTrainSttnList", {
       cityCode: requiredString(city.citycode, "citycode"),
-    }, key, fetchImpl, requestBudget);
+    }, key, fetchImpl, requestBudget, waitImpl);
     stationOperations.push(operation);
     stationRows.push(...operation.rows);
   }
@@ -353,8 +366,8 @@ export async function collectTagoItxCheongchunRoster({
         depPlaceId: depStationId,
         arrPlaceId: arrStationId,
         depPlandTime: serviceDate,
-        trainGradeCode: grade.vehiclekndid,
-      }, key, fetchImpl, requestBudget);
+        trainGradeCode: gradeId,
+      }, key, fetchImpl, requestBudget, waitImpl);
       const normalizedItineraries = operation.rows.map((row, index) => ({
         ...normalizeItinerary(row, index, {
           serviceDate,
@@ -387,7 +400,7 @@ export async function collectTagoItxCheongchunRoster({
       observedAt: now.toISOString(),
       serviceDate,
       kricServiceDayCode,
-      trainGrade: { code: String(grade.vehiclekndid), name: grade.vehiclekndnm, serviceId: "ITX_CHEONGCHUN" },
+      trainGrade: { code: gradeId, name: grade.vehiclekndnm, serviceId: "ITX_CHEONGCHUN" },
       canonicalStationCount: canonicalStations.length,
       rosterStationCount: stations.length,
       excludedCanonicalStations: excludedCanonicalStations.sort((left, right) => naturalCompare(left.nameKo, right.nameKo)),
@@ -493,7 +506,7 @@ export async function collectTagoItxCheongchunOd({
   };
 }
 
-async function fetchAll(operation, query, key, fetchImpl, requestBudget = null) {
+async function fetchAll(operation, query, key, fetchImpl, requestBudget = null, waitImpl = wait) {
   const paginated = PAGINATED_OPERATIONS.has(operation);
   if (!paginated && !NON_PAGINATED_OPERATIONS.has(operation)) {
     throw new Error(`TAGO operation is unsupported: ${safeCode(operation)}`);
@@ -509,7 +522,7 @@ async function fetchAll(operation, query, key, fetchImpl, requestBudget = null) 
     for (const [name, value] of Object.entries({ serviceKey: key, _type: "json", ...pagination, ...query })) {
       url.searchParams.set(name, String(value));
     }
-    const fetched = await fetchWithRetry(url, fetchImpl, requestBudget);
+    const fetched = await fetchWithRetry(url, fetchImpl, requestBudget, waitImpl);
     const response = fetched.response;
     requestCount += fetched.attemptCount;
     if (!response.ok) {
@@ -563,25 +576,29 @@ async function fetchAll(operation, query, key, fetchImpl, requestBudget = null) 
   return { operation, endpoint: `${BASE}/${operation}`, pageCount: rawHashes.length, requestCount, totalCount, rawResponseSha256: sha256(rawHashes.join("|")), rows: all };
 }
 
-async function fetchWithRetry(url, fetchImpl, requestBudget) {
+async function fetchWithRetry(url, fetchImpl, requestBudget, waitImpl) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    let response;
     try {
       if (requestBudget) {
         if (requestBudget.remaining <= 0) throw new Error("TAGO_QUOTA_BUDGET_EXHAUSTED");
         requestBudget.remaining -= 1;
       }
-      const response = await fetchImpl(url, {
+      response = await fetchImpl(url, {
         redirect: "error",
         signal: AbortSignal.timeout(15_000),
         headers: { accept: "application/json" },
       });
-      const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
-      if (!retryable || attempt === 2) return { response, attemptCount: attempt + 1 };
-      if (response.body) await response.body.cancel().catch(() => {});
     } catch (error) {
       if (error instanceof Error && error.message === "TAGO_QUOTA_BUDGET_EXHAUSTED") throw error;
       if (attempt === 2) throw new Error("TAGO transport failure", { cause: error });
+      await waitImpl(250 * 2 ** attempt);
+      continue;
     }
+    const retryable = response.status === 408 || response.status === 429 || response.status >= 500;
+    if (!retryable || attempt === 2) return { response, attemptCount: attempt + 1 };
+    if (response.body) await response.body.cancel().catch(() => {});
+    await waitImpl(250 * 2 ** attempt);
   }
   throw new Error("TAGO transport failure");
 }
@@ -614,7 +631,7 @@ function normalizeItinerary(row, index, expected = {}) {
   const fare = Number(row.adultcharge);
   if (!Number.isInteger(fare) || fare < 0) throw new Error(`TAGO OD row[${index}] adultcharge is invalid`);
   return {
-    trainNumber: requiredString(String(row.trainno), `row[${index}].trainno`),
+    trainNumber: normalizeTrainNumber(row.trainno),
     trainType: "ITX_CHEONGCHUN",
     departureStationName,
     arrivalStationName,
@@ -724,7 +741,7 @@ function tagoOdFailure(error) {
     [/departure date mismatch/, "date_mismatch"],
     [/train grade mismatch/, "train_grade_mismatch"],
     [/arrival must follow departure/, "time_order_mismatch"],
-    [/must be YYYYMMDDHHMISS|is invalid|adultcharge is invalid/, "field_contract_mismatch"],
+    [/must be YYYYMMDDHHMISS|is invalid|adultcharge is invalid|invalid train number/, "field_contract_mismatch"],
   ]) {
     if (pattern.test(message)) {
       return {
@@ -753,6 +770,10 @@ function reconstructionFailureSummary(error, itineraries) {
     missingPairCount: message.startsWith("TAGO_OD_PAIR_COVERAGE_INCOMPLETE") ? 1 : 0,
     duplicateOdCount: message.startsWith("TAGO_OD_DUPLICATE") ? 1 : 0,
   };
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 function normalize(value) { return String(value ?? "").toLocaleLowerCase("ko-KR").replace(/[^\p{L}\p{N}]+/gu, ""); }

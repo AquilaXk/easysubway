@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { cleanupPackDir, openPack } from "../route-map/pack-io.mjs";
+import { cleanupPackDir, openPack, repoRoot } from "../route-map/pack-io.mjs";
 import {
   collectTagoItxCheongchunRoster,
   validateItxServiceDates,
@@ -252,9 +252,7 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
   if (completeness?.validationStatus !== "SUPPORTED" || completeness?.validationMode !== "ADMISSION") {
     throw new Error("ITX source candidate requires SUPPORTED admission completeness");
   }
-  if (now.getTime() >= Date.parse(completeness.sourceTimetableArtifact.freshUntil)) {
-    throw new Error("SOURCE_SNAPSHOT_EXPIRED");
-  }
+  validateSourceFreshness(completeness.sourceTimetableArtifact, completeness.selectedServiceDates, now);
   const stationSequences = completeness.serviceDays.flatMap(({ dayCd, timetable }) => (
     (timetable?.stationSequences ?? []).map((sequence) => ({ dayCd, ...sequence }))
   )).sort((left, right) => naturalCompare(left.dayCd, right.dayCd)
@@ -288,6 +286,10 @@ export async function buildItxSourceCandidate({ completeness, packPath, now = ne
       rosterEvidenceHash: day.roster?.evidenceHash,
       timetableEvidenceHash: day.timetable?.evidenceHash,
     })),
+    stationRosters: completeness.serviceDays.map((day) => ({
+      dayCd: day.dayCd,
+      stations: day.roster?.stations ?? [],
+    })),
     stationSequences,
     transitTrips,
     transitStopTimes,
@@ -309,11 +311,14 @@ export async function promoteItxSourceCandidate({
   now = new Date(),
   fetchImpl = fetch,
   githubToken,
+  repositoryRoot = repoRoot,
 }) {
+  coverageContractPath = validateCoverageContractPath(coverageContractPath, repositoryRoot);
   const candidateBytes = await readFile(candidatePath);
   const candidateSha256 = sha256(candidateBytes);
   const candidate = JSON.parse(candidateBytes);
-  if (candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1) {
+  if (candidate?.artifactKind !== "itx-cheongchun-source-timetable" || candidate.schemaVersion !== 1
+    || !/^itx-cheongchun-source-timetable-\d{17}$/.test(candidate.artifactId ?? "")) {
     throw new Error("ITX source candidate schema is invalid");
   }
   const { evidenceHash, ...candidateWithoutEvidenceHash } = candidate;
@@ -321,13 +326,20 @@ export async function promoteItxSourceCandidate({
     || candidateBytes.toString("utf8") !== `${JSON.stringify(candidate, null, 2)}\n`) {
     throw new Error("ITX source candidate hash is invalid");
   }
-  if (now.getTime() >= Date.parse(candidate.freshUntil)) throw new Error("SOURCE_SNAPSHOT_EXPIRED");
+  validateSourceFreshness(candidate, candidate.selectedServiceDates, now);
+  const candidateSets = validateSourceSnapshotSets(candidate);
   const contract = JSON.parse(await readFile(coverageContractPath, "utf8"));
-  const previous = contract.sourceTimetableArtifact?.status === "ADMITTED"
-    ? contract.sourceTimetableArtifact
-    : null;
-  const bootstrap = previous === null;
-  const changed = candidate.promotionStatus === "CHANGE_REVIEW_REQUIRED";
+  const previousSource = await loadAdmittedSourceReference(contract, repositoryRoot);
+  const previous = previousSource?.sourceTimetableArtifact ?? null;
+  const bootstrap = previousSource === null;
+  const changed = !bootstrap
+    && JSON.stringify(candidateSets) !== JSON.stringify(validateSourceSnapshotSets(previousSource));
+  const expectedStatus = bootstrap ? "BOOTSTRAP_REVIEW_REQUIRED" : changed ? "CHANGE_REVIEW_REQUIRED" : "SUPPORTED";
+  if (candidate.promotionStatus !== expectedStatus
+    || candidate.snapshotDiff?.status !== expectedStatus
+    || candidate.snapshotDiff?.previousArtifactSha256 !== (previous?.sha256 ?? null)) {
+    throw new Error("SNAPSHOT_PROMOTION_AUTHORITY_INVALID");
+  }
   const approvalRequired = bootstrap || changed;
   if (approvalRequired) {
     if (approvedSha256 !== candidateSha256 || !/^[a-f0-9]{64}$/.test(approvedSha256 ?? "")) {
@@ -343,14 +355,14 @@ export async function promoteItxSourceCandidate({
   } else if (approvedSha256 || approvalUrl) {
     throw new Error("unchanged promotion must not include approval arguments");
   }
-  await mkdir(sourceOutputDir, { recursive: true });
-  const artifactPath = path.join(sourceOutputDir, `${candidate.artifactId}.json`);
+  const artifactRelativePath = `tools/datapack/sources/${candidate.artifactId}.json`;
+  const artifactPath = await validateSourceOutputPath(sourceOutputDir, artifactRelativePath, repositoryRoot);
   await writeFile(artifactPath, candidateBytes, { flag: "wx", mode: 0o644 });
   contract.sourceTimetableArtifact = {
     status: "ADMITTED",
     admissionEligible: true,
     artifactId: candidate.artifactId,
-    artifactPath,
+    artifactPath: artifactRelativePath,
     sha256: candidateSha256,
     schemaVersion: 1,
     freshUntil: candidate.freshUntil,
@@ -364,6 +376,159 @@ export async function promoteItxSourceCandidate({
   };
   await writeFile(coverageContractPath, `${JSON.stringify(contract, null, 2)}\n`);
   return { candidateSha256, artifactPath, sourceTimetableArtifact: contract.sourceTimetableArtifact };
+}
+
+function validateSourceFreshness(source, selectedServiceDates, now = null) {
+  const value = source?.freshUntil;
+  if (typeof value !== "string"
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+    || !Number.isFinite(Date.parse(value))
+    || value !== freshUntil(selectedServiceDates)) {
+    throw new Error("SOURCE_SNAPSHOT_FRESHNESS_INVALID");
+  }
+  if (now && now.getTime() >= Date.parse(value)) throw new Error("SOURCE_SNAPSHOT_EXPIRED");
+}
+
+function validateSourceSnapshotSets(source) {
+  const dayCodes = ["8", "7", "9"];
+  if (!Array.isArray(source?.stationRosters) || !Array.isArray(source.stationSequences)
+    || !Array.isArray(source.transitTrips) || !Array.isArray(source.transitStopTimes)
+    || !Array.isArray(source.normalizedSnapshotSets)) {
+    throw new Error("ITX source candidate schema is invalid");
+  }
+  const result = dayCodes.map((dayCd) => {
+    const rosterRows = source.stationRosters.filter((row) => row?.dayCd === dayCd);
+    const storedRows = source.normalizedSnapshotSets.filter((row) => row?.dayCd === dayCd);
+    if (rosterRows.length !== 1 || storedRows.length !== 1) throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+    const stations = rosterRows[0].stations ?? [];
+    const stationSet = stations.map(({ canonicalStationId }) => requiredString(canonicalStationId, "canonicalStationId"))
+      .sort(naturalCompare);
+    const providerStationIds = stations.map(({ providerStationId }) => requiredString(providerStationId, "providerStationId"))
+      .sort(naturalCompare);
+    if (stationSet.length < 2 || new Set(stationSet).size !== stationSet.length
+      || new Set(providerStationIds).size !== providerStationIds.length) {
+      throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+    }
+    const sequences = source.stationSequences.filter((row) => row?.dayCd === dayCd)
+      .sort((left, right) => naturalCompare(normalizeTrainNumber(left.trainNumber), normalizeTrainNumber(right.trainNumber)));
+    const trips = source.transitTrips.filter(({ id }) => typeof id === "string" && id.endsWith(`-${dayCd}`));
+    const tripIds = new Set(trips.map(({ id }) => id));
+    const stopTimes = source.transitStopTimes.filter(({ tripId }) => tripIds.has(tripId));
+    const trainSet = sequences.map(({ trainNumber }) => normalizeTrainNumber(trainNumber));
+    if (trainSet.length === 0 || new Set(trainSet).size !== trainSet.length || trips.length !== sequences.length) {
+      throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+    }
+    const stopSequenceSet = [];
+    const timetableTupleSet = [];
+    for (const sequence of sequences) {
+      const trainNumber = normalizeTrainNumber(sequence.trainNumber);
+      const matchingTrips = trips.filter(({ id }) => id.endsWith(`-${trainNumber}-${dayCd}`));
+      if (matchingTrips.length !== 1 || matchingTrips[0].directionId !== sequence.directionId
+        || !Array.isArray(sequence.stops) || sequence.stops.length < 2) {
+        throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+      }
+      const rows = stopTimes.filter(({ tripId }) => tripId === matchingTrips[0].id)
+        .sort((left, right) => left.stopSequence - right.stopSequence);
+      if (rows.length !== sequence.stops.length) throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+      const stationIds = [];
+      rows.forEach((row, index) => {
+        const stop = sequence.stops[index];
+        if (row.stopSequence !== index + 1 || row.stationId !== stop.stationId
+          || row.arrivalSeconds !== stop.arrivalSeconds || row.departureSeconds !== stop.departureSeconds) {
+          throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+        }
+        stationIds.push(row.stationId);
+        timetableTupleSet.push([dayCd, trainNumber, row.stationId, row.arrivalSeconds, row.departureSeconds]);
+      });
+      stopSequenceSet.push([dayCd, trainNumber, sequence.directionId, stationIds]);
+    }
+    const sets = {
+      stationSet,
+      odSet: providerStationIds.flatMap((departure) => providerStationIds
+        .filter((arrival) => arrival !== departure)
+        .map((arrival) => [dayCd, departure, arrival])),
+      trainSet,
+      stopSequenceSet,
+      timetableTupleSet,
+    };
+    if (JSON.stringify(sets) !== JSON.stringify(storedRows[0].sets)) {
+      throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+    }
+    return { dayCd, sets };
+  });
+  if (source.stationRosters.length !== dayCodes.length
+    || source.normalizedSnapshotSets.length !== dayCodes.length
+    || source.stationSequences.some(({ dayCd }) => !dayCodes.includes(dayCd))
+    || source.transitTrips.some(({ id }) => !dayCodes.some((dayCd) => typeof id === "string" && id.endsWith(`-${dayCd}`)))
+    || source.transitStopTimes.some(({ tripId }) => !source.transitTrips.some(({ id }) => id === tripId))) {
+    throw new Error("SOURCE_SNAPSHOT_SETS_MISMATCH");
+  }
+  return result;
+}
+
+async function validateSourceOutputPath(sourceOutputDir, artifactRelativePath, repositoryRoot) {
+  const expectedDir = path.join(repositoryRoot, "tools/datapack/sources");
+  if (path.resolve(sourceOutputDir) !== path.resolve(expectedDir)) {
+    throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+  }
+  await mkdir(expectedDir, { recursive: true });
+  const [realRoot, realDir] = await Promise.all([realpath(repositoryRoot), realpath(expectedDir)]);
+  if (realDir !== path.join(realRoot, "tools/datapack/sources")) {
+    throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+  }
+  return path.join(repositoryRoot, ...artifactRelativePath.split("/"));
+}
+
+function validateCoverageContractPath(contractPath, repositoryRoot) {
+  const expectedPath = path.join(repositoryRoot, "tools/datapack/itx-cheongchun-coverage-contract.json");
+  if (path.resolve(requiredString(contractPath, "--coverage-contract")) !== path.resolve(expectedPath)) {
+    throw new Error("ITX coverage contract path must be canonical");
+  }
+  return expectedPath;
+}
+
+async function loadAdmittedSourceReference(contract, repositoryRoot) {
+  const reference = contract?.sourceTimetableArtifact;
+  if (reference?.status !== "ADMITTED") return null;
+  const expectedPath = `tools/datapack/sources/${reference.artifactId}.json`;
+  if (reference.admissionEligible !== true || reference.schemaVersion !== 1
+    || reference.policyVersion !== "itx-snapshot-anomaly-v1"
+    || !/^itx-cheongchun-source-timetable-\d{17}$/.test(reference.artifactId ?? "")
+    || !/^[a-f0-9]{64}$/.test(reference.sha256 ?? "")
+    || reference.artifactPath !== expectedPath || path.isAbsolute(reference.artifactPath)
+    || path.posix.normalize(reference.artifactPath) !== reference.artifactPath) {
+    throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+  }
+  const artifactPath = path.join(repositoryRoot, ...reference.artifactPath.split("/"));
+  let stat;
+  try {
+    const [realRoot, realDir] = await Promise.all([
+      realpath(repositoryRoot),
+      realpath(path.dirname(artifactPath)),
+    ]);
+    stat = await lstat(artifactPath);
+    if (realDir !== path.join(realRoot, "tools/datapack/sources")) {
+      throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === "ADMITTED_SOURCE_REFERENCE_INVALID") throw error;
+    throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID", { cause: error });
+  }
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+  const bytes = await readFile(artifactPath);
+  if (sha256(bytes) !== reference.sha256) throw new Error("previous ADMITTED source hash mismatch");
+  const source = JSON.parse(bytes);
+  const { evidenceHash, ...withoutEvidenceHash } = source;
+  if (source.artifactKind !== "itx-cheongchun-source-timetable" || source.schemaVersion !== 1
+    || source.artifactId !== reference.artifactId || source.freshUntil !== reference.freshUntil
+    || evidenceHash !== sha256(JSON.stringify(withoutEvidenceHash))
+    || bytes.toString("utf8") !== `${JSON.stringify(source, null, 2)}\n`) {
+    throw new Error("ADMITTED_SOURCE_REFERENCE_INVALID");
+  }
+  validateSourceFreshness(source, source.selectedServiceDates);
+  validateSourceSnapshotSets(source);
+  source.sourceTimetableArtifact = { sha256: reference.sha256 };
+  return source;
 }
 
 async function verifyOwnerApproval({ approvalUrl, expectedBody, observedAt, fetchImpl, githubToken }) {
@@ -1520,17 +1685,24 @@ export async function runKorailItxCompletenessCli({
   env = process.env,
   now = new Date(),
   collectImpl = collectKorailItxCheongchunCompleteness,
+  promoteImpl = promoteItxSourceCandidate,
+  repositoryRoot = repoRoot,
 } = {}) {
   const args = parseArgs(argv);
   if (args["promote-candidate"]) {
-    const promotion = await promoteItxSourceCandidate({
+    const coverageContractPath = validateCoverageContractPath(
+      args["coverage-contract"],
+      repositoryRoot,
+    );
+    const promotion = await promoteImpl({
       candidatePath: requiredString(args["promote-candidate"], "--promote-candidate"),
       approvedSha256: args["approved-sha256"],
       approvalUrl: args["approval-url"],
       sourceOutputDir: requiredString(args["source-output-dir"], "--source-output-dir"),
-      coverageContractPath: requiredString(args["coverage-contract"], "--coverage-contract"),
+      coverageContractPath,
       now,
       githubToken: env.GITHUB_TOKEN,
+      repositoryRoot,
     });
     return { promotion, exitCode: 0 };
   }
@@ -1539,11 +1711,13 @@ export async function runKorailItxCompletenessCli({
   const packPath = requiredString(args["canonical-pack"], "--canonical-pack");
   const serviceKey = requiredString(env.DATA_GO_KR_SERVICE_KEY, "DATA_GO_KR_SERVICE_KEY");
   const replay = args.replay === true;
-  const previousPath = args["previous-admitted"];
-  if (previousPath && !path.isAbsolute(previousPath)) throw new Error("--previous-admitted must be absolute");
-  const previousAdmittedArtifact = previousPath
-    ? JSON.parse(await readFile(previousPath, "utf8"))
-    : await loadPromotedSourceArtifact("tools/datapack/itx-cheongchun-coverage-contract.json");
+  if (Object.hasOwn(args, "previous-admitted")) throw new Error("--previous-admitted is not supported");
+  const contractPath = validateCoverageContractPath(
+    args["coverage-contract"]
+      ?? path.join(repositoryRoot, "tools/datapack/itx-cheongchun-coverage-contract.json"),
+    repositoryRoot,
+  );
+  const previousAdmittedArtifact = await loadPromotedSourceArtifact(contractPath, repositoryRoot);
   const serviceDates = {
     "8": args["day8-date"],
     "7": args["day7-date"],
@@ -1591,7 +1765,7 @@ export async function runKorailItxCompletenessCli({
   };
 }
 
-async function loadPromotedSourceArtifact(contractPath) {
+async function loadPromotedSourceArtifact(contractPath, repositoryRoot = repoRoot) {
   let contract;
   try {
     contract = JSON.parse(await readFile(contractPath, "utf8"));
@@ -1599,13 +1773,7 @@ async function loadPromotedSourceArtifact(contractPath) {
     if (error?.code === "ENOENT") return null;
     throw error;
   }
-  const reference = contract.sourceTimetableArtifact;
-  if (reference?.status !== "ADMITTED") return null;
-  const bytes = await readFile(reference.artifactPath);
-  if (sha256(bytes) !== reference.sha256) throw new Error("previous ADMITTED source hash mismatch");
-  const source = JSON.parse(bytes);
-  source.sourceTimetableArtifact = { sha256: reference.sha256 };
-  return source;
+  return loadAdmittedSourceReference(contract, repositoryRoot);
 }
 
 async function main() {
