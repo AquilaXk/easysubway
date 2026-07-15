@@ -7,6 +7,7 @@ import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.GoogleCredentials;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -24,6 +26,8 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 
 	private static final String DECODE_URL =
 		"https://playintegrity.googleapis.com/v1/com.easysubway.app:decodeIntegrityToken";
+	private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
+	private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
 	private final RestClient restClient;
 	private final ObjectMapper objectMapper;
@@ -35,17 +39,24 @@ public class GooglePlayIntegrityDecoder implements PlayIntegrityDecoder {
 		ObjectMapper objectMapper,
 		@Value("${easysubway.play-integrity.credentials-base64:}") String credentialsBase64
 	) {
-		this(restClientBuilder, objectMapper, new GoogleAccessTokenProvider(credentialsBase64));
+		this(boundedRestClient(restClientBuilder), objectMapper, new GoogleAccessTokenProvider(credentialsBase64));
 	}
 
 	GooglePlayIntegrityDecoder(
-		RestClient.Builder restClientBuilder,
+		RestClient restClient,
 		ObjectMapper objectMapper,
 		AccessTokenProvider accessTokenProvider
 	) {
-		this.restClient = restClientBuilder.build();
+		this.restClient = restClient;
 		this.objectMapper = objectMapper;
 		this.accessTokenProvider = accessTokenProvider;
+	}
+
+	private static RestClient boundedRestClient(RestClient.Builder sharedBuilder) {
+		var requestFactory = new SimpleClientHttpRequestFactory();
+		requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
+		requestFactory.setReadTimeout(READ_TIMEOUT);
+		return sharedBuilder.clone().requestFactory(requestFactory).build();
 	}
 
 	@Override
