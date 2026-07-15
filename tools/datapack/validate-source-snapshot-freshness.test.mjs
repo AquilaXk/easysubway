@@ -441,18 +441,17 @@ test("production 필수 source가 build snapshot에서 빠지면 governance GO�
   );
 });
 
-test("승인 뒤 변경된 실제 source inventory는 stale build spec으로 fail closed한다", async () => {
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      "tools/datapack/validate-source-snapshot-freshness.mjs",
-      "--build-spec", "tools/datapack/release/candidate-build-spec.json",
-      "--policy", "apps/mobile/release/datapack-freshness-sla.json",
-      "--governance-policy", "tools/datapack/source-governance-policy.json",
-      "--inventory", "tools/datapack/source-inventory.json",
-      "--evaluation-at", evaluationAt,
-    ], { cwd: root }),
-    /source inventory hash/,
-  );
+test("실제 release build spec은 current source inventory에 결합되어 governance를 통과한다", async () => {
+  const { stdout } = await execFileAsync(process.execPath, [
+    "tools/datapack/validate-source-snapshot-freshness.mjs",
+    "--build-spec", "tools/datapack/release/candidate-build-spec.json",
+    "--policy", "apps/mobile/release/datapack-freshness-sla.json",
+    "--governance-policy", "tools/datapack/source-governance-policy.json",
+    "--inventory", "tools/datapack/source-inventory.json",
+    "--evaluation-at", evaluationAt,
+  ], { cwd: root });
+
+  assert.equal(JSON.parse(stdout).governanceDecision, "GO");
 });
 
 test("승인 allowlist 밖의 unbound snapshot은 build spec policy로 backfill할 수 없다", () => {
