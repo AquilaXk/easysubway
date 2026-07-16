@@ -14364,6 +14364,10 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "search_queries",
     "favorite_stations_routes_facilities",
     "route_eta_feedback",
+    "route_v2_itx_integrity",
+    "route_v2_itx_mobility_preferences",
+    "route_v2_itx_request_state",
+    "route_v2_gateway_abuse_rate_limit_state",
     "mobility_profile",
     "facility_report_content",
     "facility_report_photo",
@@ -14411,7 +14415,11 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
         `${id} evidence artifact must exist: ${evidencePath}`,
       );
     }
-    const expectedLastVerifiedAt = id === "precise_location" ? "2026-07-09" : "2026-06-19";
+    const expectedLastVerifiedAt = id.startsWith("route_v2_")
+      ? "2026-07-16"
+      : id === "precise_location"
+        ? "2026-07-09"
+        : "2026-06-19";
     assert.equal(item.lastVerifiedAt, expectedLastVerifiedAt, `${id} verification date must be current`);
     const expectedThirdPartySharing = id === "precise_location";
     assert.equal(
@@ -14442,7 +14450,15 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     assert.equal(typeof item.googlePlayDataSafety.purpose, "string", `${id} must declare Play purpose`);
     assert.equal(typeof item.googlePlayDataSafety.linkedToUser, "boolean", `${id} must declare Play linked-to-user value`);
     if (item.googlePlayDataSafety.collected) {
-      assert.equal(item.googlePlayDataSafety.linkedToUser, true, `${id} collected Play data must be linked to user`);
+      const routeV2ExpectedLinkage = [
+        "route_v2_itx_integrity",
+        "route_v2_gateway_abuse_rate_limit_state",
+      ].includes(id);
+      assert.equal(
+        item.googlePlayDataSafety.linkedToUser,
+        id.startsWith("route_v2_itx_") ? routeV2ExpectedLinkage : true,
+        `${id} Play user linkage must match the release data model`,
+      );
     }
     assert.equal(
       item.googlePlayDataSafety.encryptedInTransit,
@@ -14543,6 +14559,264 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.match(facilityReport, /latitude/);
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
   assert.match(`${main}\n${appDependencies}`, /pushNotificationsEnabled/);
+});
+
+test("Route V2 ITX 개인정보와 Data Safety 공개 기준은 실제 전송·보관 경계를 고정한다", () => {
+  const inventory = readJson("apps/mobile/release/store-privacy-inventory.json");
+  const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
+  const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
+  const mobileRouteSearch = read("apps/mobile/lib/route_search.dart");
+  const sessionService = read("backend/src/main/java/com/easysubway/route/application/service/RouteV2SessionService.java");
+  const purgeScheduler = read("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java");
+  const integrityDecoder = read("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java");
+  const routeAccessStore = read("backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteV2AccessStore.java");
+  const routeController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java");
+  const sessionController = read("backend/src/main/java/com/easysubway/route/adapter/in/web/RouteV2SessionController.java");
+  const productionRouteSupport = read("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java");
+  const routeStateMigration = read("backend/src/main/resources/db/migration/postgresql/V57__route_v2_access_state.sql");
+  const nginxGateway = read("infra/nginx/route-v2-gateway.conf.template");
+  const nginxProxyHeaders = read("infra/nginx/route-v2-proxy-headers.conf.template");
+  const items = new Map(inventory.dataTypes.map((item) => [item.id, item]));
+  const integrity = items.get("route_v2_itx_integrity");
+  const mobility = items.get("route_v2_itx_mobility_preferences");
+  const route = items.get("route_v2_itx_request_state");
+  const gatewayRateLimitState = items.get("route_v2_gateway_abuse_rate_limit_state");
+  const officialPolicyReferences = [
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+    "https://developer.android.com/google/play/integrity/terms",
+  ];
+
+  assert.deepEqual(inventory.googlePlayDataSafetyPolicy.officialReferences, officialPolicyReferences);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.offDeviceEphemeralProcessingMustBeDeclared, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.ephemeralProcessingRequiresMemoryOnlyRealTime, true);
+  assert.equal(inventory.googlePlayDataSafetyPolicy.routeV2StoredDataIsEphemeral, false);
+
+  assert.ok(integrity);
+  assert.equal(integrity.googlePlayDataSafety.collected, true);
+  assert.equal(integrity.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(integrity.googlePlayDataSafety.linkedToUser, true);
+  assert.equal(integrity.googlePlayDataSafety.optional, true);
+  assert.equal(integrity.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(integrity.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(integrity.googleProcessingMayBeLinkedToSignedInAccountOrDevice, true);
+  assert.deepEqual(integrity.googlePlayProcessing.alwaysCollected, [
+    "requestHashOrNonce",
+    "appPackageName",
+    "appVersion",
+    "appCertificate",
+    "appLicensingStatus",
+    "deviceAttestationInformation",
+  ]);
+  assert.equal(integrity.googlePlayProcessing.encryptedInTransit, true);
+  assert.equal(integrity.googlePlayProcessing.sharedOnward, false);
+  assert.equal(integrity.googlePlayProcessing.retention, "fixed-by-google-play-integrity-policy");
+  assert.deepEqual(integrity.mobileToBackendFields, ["integrityToken", "128-bit clientNonce"]);
+  assert.deepEqual(integrity.backendToGoogleFields, ["rawIntegrityToken"]);
+  assert.equal(
+    integrity.googleDecodeEndpoint,
+    "https://playintegrity.googleapis.com/v1/com.easysubway.app:decodeIntegrityToken",
+  );
+  assert.deepEqual(integrity.backendStoredFields, [
+    "tokenSha256",
+    "scope",
+    "issuedAt",
+    "expiresAt",
+    "requestCount",
+    "nonceSha256",
+  ]);
+  assert.equal(integrity.retention.sessionLogicalExpiry, "10 minutes");
+  assert.equal(integrity.retention.sessionPhysicalDeletionWithin, "approximately 15 minutes from issuance");
+  assert.equal(integrity.retention.nonceLogicalExpiry, "2 minutes");
+  assert.equal(integrity.retention.noncePhysicalDeletionWithin, "approximately 7 minutes from receipt");
+  assert.equal(integrity.retention.purgeInterval, "5 minutes");
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/out/integrity/GooglePlayIntegrityDecoder.java"));
+  assert.ok(integrity.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+
+  assert.ok(mobility);
+  assert.deepEqual(mobility.routeRequestFields, ["mobilityType", "mobilityPreset", "constraintMode"]);
+  assert.equal(mobility.googlePlayDataSafety.dataType, "Personal info");
+  assert.equal(mobility.googlePlayDataSafety.collected, true);
+  assert.equal(mobility.googlePlayDataSafety.optional, true);
+  assert.equal(mobility.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(mobility.googlePlayDataSafety.processedEphemerally, false);
+  assert.equal(mobility.persistedRepresentation.mobilityPreset, "itinerary_json[].legs[].appliedPreset");
+  assert.equal(mobility.persistedRepresentation.mobilityTypeAndConstraintMode, "computed-itinerary-only");
+  assert.ok(mobility.evidence.includes("backend/src/main/java/com/easysubway/route/application/service/ProductionRouteV2Support.java"));
+
+  assert.ok(route);
+  assert.equal(route.googlePlayDataSafety.collected, true);
+  assert.equal(route.googlePlayDataSafety.linkedToUser, false);
+  assert.equal(route.googlePlayDataSafety.optional, true);
+  assert.equal(route.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(route.routeRequestFields, [
+    "originStationId",
+    "destinationStationId",
+    "mobilityType",
+    "constraintMode",
+    "mobilityPreset",
+    "departureTime",
+    "useRealtime",
+    "maxTransfers",
+    "alternativeCount",
+  ]);
+  assert.deepEqual(route.backendStoredFields, [
+    "route_state_id",
+    "origin_station_id",
+    "destination_station_id",
+    "transport_scope",
+    "requested_departure_at",
+    "itinerary_json",
+    "timetable_artifact_id",
+    "created_at",
+    "planned_arrival_at",
+    "expires_at",
+  ]);
+  assert.equal(route.backendStoredTransportScope, "SUBWAY_AND_ITX_CHEONGCHUN");
+  assert.equal(route.retention.logicalExpiresAt, "min(createdAt+6h,max(createdAt+30m,plannedArrivalAt+30m))");
+  assert.equal(route.retention.physicalDeletionWithin, "expiresAt+5m");
+  assert.equal(route.retention.purgeInterval, "5 minutes");
+  assert.ok(route.evidence.includes("backend/src/main/java/com/easysubway/route/adapter/in/scheduler/RouteV2StatePurgeScheduler.java"));
+  assert.deepEqual(integrity.backendNeverPersistedOrLogged, [
+    "rawIntegrityToken",
+    "rawClientNonce",
+    "integrityPayloadOrVerdict",
+  ]);
+  assert.deepEqual(route.notSentOrStoredByRouteV2, ["rawSearchText", "coordinates"]);
+  assert.equal(integrity.usedForTracking, false);
+  assert.equal(route.usedForTracking, false);
+  assert.equal(integrity.responseCacheControl, "private, no-store");
+  assert.equal(route.responseCacheControl, "private, no-store");
+
+  assert.ok(gatewayRateLimitState);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.dataType, "Device or other IDs");
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.collected, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.linkedToUser, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.optional, true);
+  assert.equal(gatewayRateLimitState.googlePlayDataSafety.processedEphemerally, false);
+  assert.deepEqual(gatewayRateLimitState.gatewayKeyFields, [
+    "$binary_remote_addr",
+    "$http_authorization",
+  ]);
+  assert.equal(gatewayRateLimitState.retention.fixedTtl, false);
+  assert.equal(gatewayRateLimitState.retention.zoneSizeIsRetention, false);
+  assert.equal(gatewayRateLimitState.retention.evictionBoundary, "LRU under zone memory pressure");
+  assert.equal(gatewayRateLimitState.retention.finalDeletionBoundary, "gateway process or shared-memory zone lifecycle end");
+  assert.equal(
+    gatewayRateLimitState.operationReference,
+    "https://nginx.org/en/docs/http/ngx_http_limit_req_module.html",
+  );
+
+  assert.deepEqual(inventory.routeV2GatewayRateLimit.keys, [
+    {
+      nginxVariable: "$binary_remote_addr",
+      scopes: ["session", "search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+    {
+      nginxVariable: "$http_authorization",
+      scopes: ["search"],
+      processing: "nginx-shared-memory-rate-limit-key",
+      persistedToDatabase: false,
+      includedInAccessLog: false,
+    },
+  ]);
+  assert.equal(inventory.routeV2GatewayRateLimit.rateLimitedLogContainsKeyValues, false);
+  assert.equal(inventory.routeV2GatewayRateLimit.zoneSizeIsRetention, false);
+
+  assert.deepEqual(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.officialPolicyReferences,
+    officialPolicyReferences,
+  );
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.optionalUserTriggered, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.tracking, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.backendLinkedToUserDeviceOrAccountId, false);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.googleIntegrityMayBeLinkedToAccountOrDevice, true);
+  assert.equal(playStoreContent.dataSafetyDeclarations.routeV2Itx.storedFieldsProcessedEphemerally, false);
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "App activity")
+      .inventoryDataIds.includes("route_v2_itx_request_state"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("route_v2_itx_integrity"),
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Device or other IDs")
+      .inventoryDataIds.includes("route_v2_gateway_abuse_rate_limit_state"),
+  );
+  assert.equal(
+    playStoreContent.dataSafetyDeclarations.routeV2Itx.gatewayRateLimitStateProcessedEphemerally,
+    false,
+  );
+  assert.ok(
+    playStoreContent.dataSafetyDeclarations.answerMatrix
+      .find((item) => item.dataType === "Personal info")
+      .inventoryDataIds.includes("route_v2_itx_mobility_preferences"),
+  );
+
+  const toJson = mobileRouteSearch.match(/Map<String, Object\?> toJson\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const toV2Json = mobileRouteSearch.match(/Map<String, Object\?> toV2Json\(\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const routeWireBuilders = `${toJson}\n${toV2Json}`;
+  for (const field of route.routeRequestFields) {
+    assert.match(routeWireBuilders, new RegExp(`'${field}'`), `mobile Route V2 wire must send ${field}`);
+  }
+  assert.doesNotMatch(routeWireBuilders, /canonicalOriginStationId|canonicalDestinationStationId|transportScope|realtimeFlag/);
+  assert.match(sessionService, /SESSION_TTL = Duration\.ofMinutes\(10\)/);
+  assert.match(sessionService, /VERDICT_MAX_AGE = Duration\.ofMinutes\(2\)/);
+  assert.match(purgeScheduler, /state-purge-interval-ms:300000/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_states WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_nonce_replays WHERE expires_at <= \?/);
+  assert.match(routeAccessStore, /DELETE FROM route_v2_sessions WHERE expires_at <= \?/);
+  assert.match(integrityDecoder, /playintegrity\.googleapis\.com\/v1\/com\.easysubway\.app:decodeIntegrityToken/);
+  assert.match(integrityDecoder, /body\(Map\.of\("integrityToken", integrityToken\)\)/);
+  assert.doesNotMatch(`${sessionService}\n${integrityDecoder}`, /log\.(?:info|warn|error|debug|trace)\([^\n]*integrityToken/);
+  assert.match(routeController, /String appliedPreset/);
+  assert.match(routeController, /walkSeconds > 0 \? mobilityPreset : ""/);
+  assert.match(productionRouteSupport, /saveState[\s\S]*json\(computedItinerary\)/);
+  assert.match(routeController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  assert.match(sessionController, /header\(HttpHeaders\.CACHE_CONTROL, "private, no-store"\)/);
+  for (const column of route.backendStoredFields) {
+    assert.match(routeStateMigration, new RegExp(`\\b${column}\\b`), `route state migration must store ${column}`);
+  }
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$binary_remote_addr zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req_zone \$http_authorization zone=route_search_token/);
+  assert.match(nginxGateway, /limit_req zone=route_session_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_ip/);
+  assert.match(nginxGateway, /limit_req zone=route_search_token/);
+  assert.match(nginxGateway, /access_log off;/);
+  assert.match(nginxGateway, /add_header Cache-Control "private, no-store" always/);
+  assert.match(nginxGateway, /log_format route_v2_session_rate_limited[^\n]*"status":429/);
+  assert.match(nginxGateway, /log_format route_v2_search_rate_limited[^\n]*"status":429/);
+  assert.doesNotMatch(nginxGateway, /log_format[^\n]*\$(?:binary_remote_addr|http_authorization)/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Forwarded-For ""/);
+  assert.match(nginxProxyHeaders, /proxy_set_header X-Real-IP ""/);
+
+  assert.match(publicPrivacyPolicy, /SUBWAY 경로 검색은 단말 안에서만 처리하며 서버로 전송하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /ITX-청춘 경로 검색은 사용자가 직접 선택할 때만/);
+  assert.match(publicPrivacyPolicy, /tracking에 사용하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /128-bit clientNonce/);
+  assert.match(publicPrivacyPolicy, /발급한 Route V2 세션 token의 SHA-256/);
+  assert.match(publicPrivacyPolicy, /세션은 발급 후 약 15분 이내/);
+  assert.match(publicPrivacyPolicy, /nonce 해시는 수신 후 약 7분 이내/);
+  assert.match(publicPrivacyPolicy, /expiresAt 뒤 5분 이내/);
+  assert.match(publicPrivacyPolicy, /mobilityType, mobilityPreset, constraintMode/);
+  assert.match(publicPrivacyPolicy, /raw integrityToken을 Google Play Integrity decode API로 전송/);
+  assert.match(publicPrivacyPolicy, /raw 검색어와 좌표/);
+  assert.match(publicPrivacyPolicy, /\$binary_remote_addr/);
+  assert.match(publicPrivacyPolicy, /\$http_authorization/);
+  assert.match(publicPrivacyPolicy, /Nginx shared memory/);
+  assert.match(publicPrivacyPolicy, /요청이 끝난 뒤에도 shared memory에 남을 수 있어 ephemeral 처리로 분류하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /고정 TTL은 없으며/);
+  assert.match(publicPrivacyPolicy, /zone 메모리가 부족할 때 LRU 방식으로 퇴출/);
+  assert.match(publicPrivacyPolicy, /gateway process 또는 shared-memory zone 수명 종료/);
+  assert.match(publicPrivacyPolicy, /DB나 access log에는 저장하지 않습니다/);
+  assert.match(publicPrivacyPolicy, /private, no-store/);
 });
 
 test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
