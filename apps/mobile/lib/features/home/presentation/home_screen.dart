@@ -22,13 +22,13 @@ import '../../get_off_alarm/get_off_alarm_controller.dart';
 import '../../mobility_profile/mobility_preset_labels.dart';
 import '../../mobility_profile/mobility_preset_picker.dart';
 import '../../mobility_profile/mobility_profile_policy.dart';
+import '../../notifications/presentation/new_notification_bar.dart';
 import '../../notifications/presentation/notification_inbox_screen.dart';
 import '../../realtime/realtime_repository.dart';
 import '../../route_draft/application/route_draft_controller.dart';
 import '../../route_draft/domain/route_draft.dart';
 import '../../service_notice/data/notice_repository.dart';
 import '../../service_notice/presentation/notice_controller.dart';
-import '../../service_notice/presentation/service_notice_banner.dart';
 import '../../service_notice/presentation/service_notice_list_screen.dart';
 import '../../settings/presentation/app_settings_screen.dart';
 import '../../stations/presentation/station_search_screen.dart';
@@ -546,11 +546,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           onOpenServiceNotices: noticeController == null
               ? null
               : openServiceNotices,
-          disruptionBanner: noticeController == null
+          disruptionBanner:
+              (noticeController == null && notificationRepository == null)
               ? null
-              : ServiceNoticeBanner(
-                  controller: noticeController,
-                  onOpenList: openServiceNotices,
+              : FutureBuilder<bool>(
+                  future: _hasNotificationItemsFuture,
+                  builder: (context, snapshot) {
+                    return NewNotificationBar(
+                      noticeController: noticeController,
+                      hasNotificationItems: snapshot.data ?? false,
+                      onOpenInbox: openNotificationInbox,
+                    );
+                  },
                 ),
           notificationAction: notificationRepository == null
               ? null
