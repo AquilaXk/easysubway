@@ -4,9 +4,10 @@ import 'package:easysubway_mobile/core/database/user/user_database.dart'
     as user_db;
 import 'package:easysubway_mobile/core/datapack/data_pack_metered_consent_gate.dart';
 import 'package:easysubway_mobile/core/datapack/data_pack_update_state.dart';
-import 'package:easysubway_mobile/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../support/easy_subway_app_fixture.dart';
 
 void main() {
   testWidgets('EasySubwayApp은 Navigator 아래에서 metered consent dialog를 띄운다', (
@@ -20,7 +21,7 @@ void main() {
     );
 
     await tester.pumpWidget(
-      EasySubwayApp(
+      buildEasySubwayTestApp(
         dataPackUpdateStateRepository: repo,
         dataPackUpdate: Future<void>.value(),
       ),

@@ -161,7 +161,8 @@ void main() {
     );
     expectRatchet(actual, {
       // 의도 잔존: 시설 상태 카드 blocked/caution — 상태 의미 틴트 (v4 허용 예외)
-      'lib/main.dart': 2,
+      'lib/features/notifications/presentation/notification_inbox_screen.dart':
+          2,
       'lib/station_search.dart': 1,
       // 의도 잔존: 운행 공지 배너 — 운행 중단 상태 의미 (v4 허용 예외)
       'lib/features/service_notice/presentation/service_notice_banner.dart': 1,
@@ -306,8 +307,10 @@ void main() {
     expectRatchet(actual, {
       // 의도 잔존: 역 상세 정보/도움/시설 카드·액션 버튼 radius (16/12) — 무박스 전환 진행 중
       'lib/station_search.dart': 4,
-      // 의도 잔존: _AppCard(20)·역 정보 컨테이너(16)·입력 필드(12x2) — v4 정리 대상
-      'lib/main.dart': 4,
+      // 의도 잔존: AppCard(20)·공용 control radius(12) — v4 정리 대상
+      'lib/app/app_components.dart': 2,
+      // 의도 잔존: 역 정보 컨테이너(16)·입력 필드(12) — v4 정리 대상
+      'lib/main.dart': 2,
       // 의도 잔존: 노선 선택 헤더 캡슐(13)·역명 배지(24) — 노선도 룩 불변, 완전 원 아님
       'lib/network_map.dart': 2,
       // 의도 잔존: 시설 신고 카드 radius(16) — 무박스 전환 대상
@@ -330,8 +333,8 @@ void main() {
     expectRatchet(actual, {
       // 의도 잔존: 역 상세/검색 결과 카드 6곳 — 무박스(행+구분선) 전환 진행 중
       'lib/station_search.dart': 6,
-      // 의도 잔존: _AppCard 공용 래퍼·정보 카드 2곳 — 무박스 전환 대상
-      'lib/main.dart': 2,
+      // 의도 잔존: AppCard 공용 래퍼·정보 카드 2곳 — 무박스 전환 대상
+      'lib/app/app_components.dart': 2,
     }, rule: '블록(박스) Card');
   });
 

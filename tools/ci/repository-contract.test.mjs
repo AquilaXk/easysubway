@@ -1707,12 +1707,40 @@ test("모바일 async 실패는 빈 목록으로 조용히 숨기지 않는다",
 
 test("모바일 공통 상태 카드는 홈 즐겨찾기 노선도에서 사용된다", () => {
   const accessibleDesign = read("apps/mobile/lib/accessible_design.dart");
-  const main = read("apps/mobile/lib/main.dart");
+  const appComponents = read("apps/mobile/lib/app/app_components.dart");
   const networkMap = read("apps/mobile/lib/network_map.dart");
 
   assert.match(accessibleDesign, /class AccessibleStateCard extends StatelessWidget/);
-  assert.match(main, /class _HomeStateCard extends StatelessWidget[\s\S]*AccessibleStateCard\(/);
-  assert.match(networkMap, /AccessibleStateCard\([\s\S]*networkMapRetryButton/);
+  assert.match(
+    appComponents,
+    /class HomeStateCard extends StatelessWidget \{[\s\S]*?Widget build\(BuildContext context\) \{[\s\S]*?return AppCard\([\s\S]*?child: AccessibleStateCard\(/,
+  );
+  assert.match(
+    networkMap,
+    /child: AccessibleStateCard\([\s\S]*?key: const Key\('networkMapRetryButton'\)/,
+  );
+});
+
+test("모바일 presentation canonical 선언과 기존 public export를 유지한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const appComponents = read("apps/mobile/lib/app/app_components.dart");
+  const notificationInbox = read(
+    "apps/mobile/lib/features/notifications/presentation/notification_inbox_screen.dart",
+  );
+
+  assert.match(notificationInbox, /^class NotificationInboxScreen extends StatefulWidget/m);
+  assert.match(appComponents, /^class FeatureTile extends StatelessWidget/m);
+  assert.match(appComponents, /^class AppSectionTitle extends StatelessWidget/m);
+  assert.match(appComponents, /^class HomeStateCard extends StatelessWidget/m);
+  assert.match(main, /^export 'app\/app_components\.dart' show FeatureTile;$/m);
+  assert.match(
+    main,
+    /^export 'features\/notifications\/presentation\/notification_inbox_screen\.dart'\s+show NotificationInboxScreen;$/m,
+  );
+  assert.doesNotMatch(
+    main,
+    /^class (?:NotificationInboxScreen|FeatureTile|AppSectionTitle|HomeStateCard)\b/m,
+  );
 });
 
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
@@ -2490,6 +2518,17 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(
     refreshBindings.map((binding) => binding.refreshOn).sort(),
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.evidenceValidity.refreshOn.toSorted(),
+  );
+  const supportContactBinding = refreshBindings.find(
+    (binding) => binding.refreshOn === "support-contact-or-help-ui-change",
+  );
+  assert.deepEqual(
+    supportContactBinding.files.map((file) => file.path).toSorted(),
+    [
+      "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/main.dart",
+      "apps/mobile/release/support-incident-response-gate.json",
+    ],
   );
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
@@ -12645,9 +12684,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
   assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
   // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
-  assert.match(main, /_AppSectionTitle\(title: '역'\)/);
-  assert.match(main, /_AppSectionTitle\(title: '시설'\)/);
-  assert.match(main, /_AppSectionTitle\(title: '경로'\)/);
+  assert.match(main, /AppSectionTitle\(title: '역'\)/);
+  assert.match(main, /AppSectionTitle\(title: '시설'\)/);
+  assert.match(main, /AppSectionTitle\(title: '경로'\)/);
   assert.match(main, /FavoriteHomeScreen/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
@@ -12855,7 +12894,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(widgetTest, /시설 신고 화면은 사진과 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.match(widgetTest, /시설 신고 화면은 현재 위치를 보내기 전에 공개 범위를 안내한다/);
   assert.doesNotMatch(main, /빠른 길보다, 갈 수 있는 길을 먼저 안내합니다|고령자, 임산부, 장애인도 편하게 이동할 수 있도록|현장에서 발견한 불편 정보를 신고하고 검수할 수 있게/);
-  assert.match(widgetTest, /EasySubwayApp/);
+  assert.match(widgetTest, /buildEasySubwayTestApp\(/);
+  assert.doesNotMatch(widgetTest, /\bEasySubwayApp\(/);
   assert.match(easySubwayAppDefaultsTest, /기본 앱은 출시 범위에서 원격 개인 데이터 저장소를 만들지 않는다/);
   assert.match(easySubwayAppDefaultsTest, /푸시 알림을 명시적으로 켜도 인증 없는 원격 저장소는 만들지 않는다/);
   assert.match(easySubwayAppDefaultsTest, /enablePushNotifications: true/);
