@@ -12705,7 +12705,7 @@ test("V2 경로 검색은 production planner 경계를 통해 요청 조건을 �
   assert.match(postgresArtifactIdMigration, /ALTER COLUMN timetable_artifact_id TYPE VARCHAR\(200\)/);
   assert.match(h2ArtifactIdMigration, /ALTER COLUMN timetable_artifact_id VARCHAR\(200\)/);
   assert.match(planner, /canUseTimetableRaptor/);
-  assert.match(planner, /loadRouteTimetable\(\)/);
+  assert.match(planner, /loadRouteTimetableSnapshot\(\)/);
   assert.match(planner, /RouteTimetableRaptorPlanner/);
   assert.match(planner, /noTimetableServicePlan/);
   assert.match(planner, /nextServiceTime\(command, snapshot\.timetable\(\)\)/);

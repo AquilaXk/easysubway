@@ -190,3 +190,13 @@ test("CLI는 tracked snapshot/evidence를 생성하고 --check에서 byte identi
     /server timetable snapshot is stale/,
   );
 });
+
+test("CLI --check는 admitted input과 tracked snapshot/evidence의 최신성을 검증한다", async () => {
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-server-timetable-snapshot.mjs",
+    "--check",
+  ], {
+    cwd: root,
+    env: { ...process.env, EASYSUBWAY_TIMETABLE_SNAPSHOT_BUILD_NOW: buildNow.toISOString() },
+  });
+});

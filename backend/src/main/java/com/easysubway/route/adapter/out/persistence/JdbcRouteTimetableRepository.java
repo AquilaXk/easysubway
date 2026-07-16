@@ -71,6 +71,17 @@ public class JdbcRouteTimetableRepository implements LoadRouteTimetablePort {
 		return activeItxArtifact().map(ItxArtifact::snapshotId);
 	}
 
+	@Override
+	public RouteTimetableSnapshot loadRouteTimetableSnapshot() {
+		return activeItxArtifact()
+			.map(artifact -> new RouteTimetableSnapshot(
+				artifact.snapshotSha256() + artifact.freshUntil(),
+				artifact.snapshotId(),
+				loadRouteTimetable()
+			))
+			.orElseGet(() -> new RouteTimetableSnapshot("UNAVAILABLE", null, RouteTimetable.empty()));
+	}
+
 	private Optional<ItxArtifact> activeItxArtifact() {
 		return jdbcTemplate.query(
 			"""

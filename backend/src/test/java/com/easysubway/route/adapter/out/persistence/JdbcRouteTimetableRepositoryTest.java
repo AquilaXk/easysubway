@@ -132,6 +132,20 @@ class JdbcRouteTimetableRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("active snapshot identity와 시간표 row를 하나의 조회 값으로 반환한다")
+	void loadsActiveSnapshotIdentityAndTimetableTogether() {
+		insertTimetableRows();
+		insertItxRows("2999-01-01T00:00:00Z");
+
+		var snapshot = repository.loadRouteTimetableSnapshot();
+
+		assertThat(snapshot.cacheKey()).isEqualTo("a".repeat(64) + "2999-01-01T00:00:00Z");
+		assertThat(snapshot.timetableArtifactId()).isEqualTo("snapshot-test");
+		assertThat(snapshot.timetable().transitTrips()).extracting("id")
+			.contains("trip-seoul-4-0900", "trip-itx");
+	}
+
+	@Test
 	@DisplayName("missing·schema-invalid·lineage mismatch active snapshot은 모두 fail closed한다")
 	void rejectsMissingInvalidSchemaAndLineageMismatch() {
 		insertItxRows("2999-01-01T00:00:00Z");
