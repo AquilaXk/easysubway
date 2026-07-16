@@ -51,9 +51,10 @@ public record DatapackReleaseDelivery(
 	public static DatapackReleaseDelivery pending(String releaseRequestId, long releaseSequence,
 		String manifestSha256, String channel, String candidateId, String payloadSha256,
 		String signatureSha256, LocalDateTime now) {
+		var normalizedManifestSha256 = sha(manifestSha256, "manifestSha256");
 		return new DatapackReleaseDelivery(
-			releaseRequestId + ":" + releaseSequence + ":" + manifestSha256,
-			releaseRequestId, releaseSequence, manifestSha256, channel, candidateId,
+			releaseRequestId + ":" + releaseSequence + ":" + normalizedManifestSha256,
+			releaseRequestId, releaseSequence, normalizedManifestSha256, channel, candidateId,
 			payloadSha256, signatureSha256, State.PENDING, 0, now,
 			now.plus(RECONCILE_AFTER), now.plus(DEAD_LETTER_AFTER), null, null, null, null, now, now);
 	}

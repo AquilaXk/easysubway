@@ -44,6 +44,15 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("manifest SHA 대소문자 차이는 같은 release identity로 정규화한다")
+	void normalizesManifestShaBeforeBuildingIdempotencyKey() {
+		var delivery = pending("A".repeat(64));
+
+		assertThat(delivery.manifestSha256()).isEqualTo(SHA);
+		assertThat(delivery.idempotencyKey()).endsWith(":" + SHA);
+	}
+
+	@Test
 	@DisplayName("같은 request/sequence의 다른 manifest hash는 unique constraint로 거부한다")
 	void rejectsDifferentHashForSameSequence() {
 		repository.upsertSameDelivery(pending(SHA));

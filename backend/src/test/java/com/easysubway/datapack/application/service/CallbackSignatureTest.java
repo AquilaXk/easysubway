@@ -1,6 +1,7 @@
 package com.easysubway.datapack.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -12,6 +13,20 @@ import org.junit.jupiter.api.Test;
 
 @DisplayName("CallbackSignature")
 class CallbackSignatureTest {
+
+	@Test
+	@DisplayName("schema v2 canonical field는 양의 release sequence만 허용한다")
+	void rejectsInvalidPrimitiveIdentityFields() {
+		assertThatThrownBy(() -> fields(0, 42)).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> fields(2, 0)).isInstanceOf(IllegalArgumentException.class);
+	}
+
+	private static CanonicalFields fields(int schemaVersion, long releaseSequence) {
+		return new CanonicalFields(schemaVersion, "datapack-release-callback", "req-001",
+			releaseSequence, "production", "req-001:42:" + "a".repeat(64),
+			"https://github.com/example/actions/runs/1", "a".repeat(64), "b".repeat(64),
+			"c".repeat(64), "d".repeat(64), "PASS", "PASS", "PASS");
+	}
 
     private static CanonicalFields fields(JsonNode f) {
         return new CanonicalFields(f.get("schemaVersion").asInt(), f.get("artifactKind").asText(),

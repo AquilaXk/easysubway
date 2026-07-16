@@ -81,6 +81,41 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	}
 
 	@Test
+	void rejectsSignedManifestWithUnsupportedVersion() throws Exception {
+		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+		byte[] body = signedManifest(keyPair, 42, 1, "");
+		var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/catalog/current.json", exchange -> respond(exchange, body));
+		server.start();
+		try {
+			var adapter = new HttpDatapackReleaseCatalogAdapter(
+				"http://127.0.0.1:" + server.getAddress().getPort(), publicKey(keyPair), "production-v1");
+
+			assertThat(adapter.fetchCurrent("production").signatureValid()).isFalse();
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
+	void rejectsCatalogResponseLargerThanOneMebibyte() throws Exception {
+		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+		byte[] body = signedManifest(keyPair, 42, 2, "x".repeat(1_048_576));
+		var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/catalog/current.json", exchange -> respond(exchange, body));
+		server.start();
+		try {
+			var adapter = new HttpDatapackReleaseCatalogAdapter(
+				"http://127.0.0.1:" + server.getAddress().getPort(), publicKey(keyPair), "production-v1");
+
+			assertThatThrownBy(() -> adapter.fetchCurrent("production"))
+				.isInstanceOf(com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.Unavailable.class);
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
 	void returnsSignedIdentityForServiceMismatchClassification() throws Exception {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
 		var manifest = JSON.createObjectNode();
@@ -180,13 +215,19 @@ class HttpDatapackReleaseCatalogAdapterTest {
 
 	private static byte[] signedManifest(java.security.KeyPair keyPair, long sequence)
 		throws Exception {
+		return signedManifest(keyPair, sequence, 2, "");
+	}
+
+	private static byte[] signedManifest(java.security.KeyPair keyPair, long sequence,
+		int manifestVersion, String padding) throws Exception {
 		var manifest = JSON.createObjectNode();
-		manifest.put("manifestVersion", 2);
+		manifest.put("manifestVersion", manifestVersion);
 		manifest.put("channel", "production");
 		manifest.put("releaseSequence", sequence);
 		manifest.put("keyId", "production-v1");
 		manifest.put("ttlSeconds", 3600);
 		manifest.putArray("packs");
+		if (!padding.isEmpty()) manifest.put("padding", padding);
 		var signer = Signature.getInstance("SHA256withRSA");
 		signer.initSign(keyPair.getPrivate());
 		signer.update(HttpDatapackReleaseCatalogAdapter.canonical(manifest));
@@ -194,6 +235,13 @@ class HttpDatapackReleaseCatalogAdapterTest {
 		signature.put("algorithm", "rsa-sha256-manifest-v2");
 		signature.put("value", Base64.getUrlEncoder().withoutPadding().encodeToString(signer.sign()));
 		return JSON.writeValueAsBytes(manifest);
+	}
+
+	private static String publicKey(java.security.KeyPair keyPair) {
+		return "-----BEGIN PUBLIC KEY-----\n"
+			+ Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII))
+				.encodeToString(keyPair.getPublic().getEncoded())
+			+ "\n-----END PUBLIC KEY-----";
 	}
 
 	private static byte[] signedBinding(java.security.KeyPair keyPair, long sequence,

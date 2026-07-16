@@ -69,9 +69,27 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
+	@DisplayName("binding이 없어도 current가 전진한 delivery는 stale로 종결한다")
+	void supersededReleaseDeadLettersBeforeMissingBindingLookup() {
+		var delivery = delivery();
+		when(catalog.fetchCurrent("production")).thenReturn(
+			new CatalogIdentity(43, "e".repeat(64), "production", "", true, "c".repeat(64)));
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenThrow(new DatapackReleaseCatalogPort.NotFound());
+
+		service.reconcile(delivery, T0.plusMinutes(10));
+
+		verify(repository).mark(delivery.idempotencyKey(), State.DEAD_LETTER, 0, null,
+			"STALE", "CURRENT_RELEASE_ADVANCED", T0.plusMinutes(10));
+		verify(catalog, never()).findByRequest(anyString(), anyString());
+	}
+
+	@Test
 	@DisplayName("catalog signature mismatch는 자동 apply 없이 DEAD_LETTER다")
 	void signatureMismatchDeadLetters() {
 		var delivery = delivery();
+		when(catalog.fetchCurrent("production")).thenReturn(
+			new CatalogIdentity(42, SHA, "production", "", true, "c".repeat(64)));
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(
 				new CatalogIdentity(42, SHA, "production", "request-2057", false, "b".repeat(64))));
@@ -95,6 +113,8 @@ class DatapackReleaseReconciliationServiceTest {
 			var caseCatalog = mock(DatapackReleaseCatalogPort.class);
 			var caseService = new DatapackReleaseReconciliationService(
 				caseRepository, callbackService, caseCatalog);
+			when(caseCatalog.fetchCurrent("production")).thenReturn(
+				new CatalogIdentity(42, SHA, "production", "", true, "c".repeat(64)));
 			when(caseCatalog.findByRequest("production", "request-2057"))
 				.thenReturn(java.util.Optional.of(entry.getValue()));
 			caseService.reconcile(delivery(), T0.plusMinutes(10));
@@ -107,6 +127,8 @@ class DatapackReleaseReconciliationServiceTest {
 	@DisplayName("catalog unavailable은 70분 전 retry, 70분 경계부터 DEAD_LETTER다")
 	void unavailableHonorsDeadlines() {
 		var delivery = delivery();
+		when(catalog.fetchCurrent("production")).thenReturn(
+			new CatalogIdentity(42, SHA, "production", "", true, "c".repeat(64)));
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
 

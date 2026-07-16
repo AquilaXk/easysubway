@@ -115,14 +115,6 @@ public class DatapackReleaseReconciliationService {
 
 	void reconcile(DatapackReleaseDelivery delivery, LocalDateTime now) {
 		try {
-			CatalogIdentity identity = catalog.findByRequest(delivery.channel(), delivery.releaseRequestId())
-				.orElseThrow(DatapackReleaseCatalogPort.NotFound::new);
-			String mismatch = mismatch(delivery, identity);
-			if (mismatch != null) {
-				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
-					null, "CONFLICT", mismatch, now);
-				return;
-			}
 			CatalogIdentity current = catalog.fetchCurrent(delivery.channel());
 			if (!current.signatureValid() || !delivery.channel().equals(current.channel())) {
 				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
@@ -140,6 +132,14 @@ public class DatapackReleaseReconciliationService {
 			if (!current.manifestSha256().equals(delivery.manifestSha256())) {
 				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
 					null, "CONFLICT", "CATALOG_CURRENT_MISMATCH", now);
+				return;
+			}
+			CatalogIdentity identity = catalog.findByRequest(delivery.channel(), delivery.releaseRequestId())
+				.orElseThrow(DatapackReleaseCatalogPort.NotFound::new);
+			String mismatch = mismatch(delivery, identity);
+			if (mismatch != null) {
+				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),
+					null, "CONFLICT", mismatch, now);
 				return;
 			}
 			callbackService.reconcile(delivery, identity);

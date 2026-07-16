@@ -2,6 +2,12 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import {
+  canonicalJson,
+  signingPublicKey,
+  verifyRsaSha256Signature,
+  withoutSignature,
+} from "./lib/manifest-validation.mjs";
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -162,6 +168,13 @@ function validateReleaseRequestBinding(binding, manifest, manifestBytes) {
     || typeof binding.signature?.value !== "string"
     || binding.signature.value.length === 0) {
     throw new Error("release request binding does not match manifest identity");
+  }
+  if (!verifyRsaSha256Signature(
+    signingPublicKey(),
+    canonicalJson(withoutSignature(binding)),
+    binding.signature.value,
+  )) {
+    throw new Error("release request binding signature is invalid");
   }
 }
 

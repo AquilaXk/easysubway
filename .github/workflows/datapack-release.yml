@@ -885,15 +885,53 @@ jobs:
             `sqliteSha256=${bundle.sqliteSha256}`,
             `gzipSha256=${bundle.gzipSha256}`,
             `evidenceBundleSha256=${evidenceBundleSha256}`,
+            `validatorStatus=${bundle.validatorStatus}`,
+            `routeRegressionStatus=${bundle.strictRouteRegressionStatus}`,
+          ].join("\n") + "\n");
+          NODE
+
+      - name: Data Pack Release / Prepare no-change release identity
+        if: ${{ steps.release-mode.outputs.mode == 'production-publish' && steps.remote-publish-env.outputs.enabled == 'true' && steps.release-fixture.outputs.remote_publish_ready == 'true' && steps.release-decision.outputs.outcome == 'NO_CHANGE_VALID' && github.ref == 'refs/heads/main' }}
+        id: no-change-release
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("fs");
+          const { createHash } = require("crypto");
+          const hashBytes = (value) => createHash("sha256").update(value).digest("hex");
+          const currentBytes = fs.readFileSync(process.env.EASYSUBWAY_DATAPACK_CURRENT_MANIFEST);
+          const current = JSON.parse(currentBytes);
+          const bundleBytes = fs.readFileSync(process.env.EASYSUBWAY_RELEASE_EVIDENCE_BUNDLE);
+          const bundle = JSON.parse(bundleBytes);
+          if (!Number.isSafeInteger(current.releaseSequence) || current.releaseSequence < 1) {
+            throw new Error("current releaseSequence must be a positive safe integer");
+          }
+          for (const [name, value] of [
+            ["sqliteSha256", bundle.sqliteSha256],
+            ["gzipSha256", bundle.gzipSha256],
+          ]) {
+            if (!/^[a-f0-9]{64}$/.test(value ?? "")) throw new Error(`${name} must be lowercase sha256`);
+          }
+          if (bundle.validatorStatus !== "PASS" || bundle.strictRouteRegressionStatus !== "PASS") {
+            throw new Error("no-change release evidence must remain PASS");
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, [
+            `releaseSequence=${current.releaseSequence}`,
+            `manifestSha256=${hashBytes(currentBytes)}`,
+            `sqliteSha256=${bundle.sqliteSha256}`,
+            `gzipSha256=${bundle.gzipSha256}`,
+            `evidenceBundleSha256=${hashBytes(bundleBytes)}`,
+            `validatorStatus=${bundle.validatorStatus}`,
+            `routeRegressionStatus=${bundle.strictRouteRegressionStatus}`,
           ].join("\n") + "\n");
           NODE
 
       - name: Data Pack Release / Validate published remote artifact
-        if: ${{ steps.production-publish.outputs.manifestSha256 != '' }}
+        if: ${{ steps.production-publish.outputs.manifestSha256 != '' || steps.no-change-release.outputs.manifestSha256 != '' }}
         id: remote-validation
         continue-on-error: true
         env:
-          EXPECTED_MANIFEST_SHA256: ${{ steps.production-publish.outputs.manifestSha256 }}
+          EXPECTED_MANIFEST_SHA256: ${{ steps.production-publish.outputs.manifestSha256 || steps.no-change-release.outputs.manifestSha256 }}
         run: |
           set -euo pipefail
           validated=false
@@ -922,7 +960,7 @@ jobs:
           [[ "${validated}" == "true" ]]
 
       - name: Data Pack Release / Upload remote validation artifact
-        if: ${{ always() && steps.production-publish.outputs.manifestSha256 != '' }}
+        if: ${{ always() && (steps.production-publish.outputs.manifestSha256 != '' || steps.no-change-release.outputs.manifestSha256 != '') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: easysubway-datapack-remote-validation-${{ github.run_id }}
@@ -954,16 +992,20 @@ jobs:
           node -e "const d=require(process.env.EASYSUBWAY_DATAPACK_FINAL_RELEASE_DECISION); if (d.outcome !== 'PUBLISHED_AND_VERIFIED') process.exit(1);"
 
       - name: Data Pack Release / Publish finalized release request binding
-        if: ${{ !cancelled() && steps.final-release-decision.outputs.outcome == 'PUBLISHED_AND_VERIFIED' }}
+        if: ${{ !cancelled() && steps.remote-validation.outcome == 'success' && (steps.final-release-decision.outputs.outcome == 'PUBLISHED_AND_VERIFIED' || steps.release-decision.outputs.outcome == 'NO_CHANGE_VALID') }}
         id: release-request-binding
         run: |
           set -euo pipefail
+          release_manifest="${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json"
+          if [[ "${{ steps.release-decision.outputs.outcome }}" == "NO_CHANGE_VALID" ]]; then
+            release_manifest="${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}"
+          fi
           node tools/datapack/build-release-request-binding.mjs \
-            --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
+            --manifest "${release_manifest}" \
             --release-request-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}" \
             --output "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}"
           node tools/datapack/create-publish-plan.mjs \
-            --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
+            --manifest "${release_manifest}" \
             --root "${EASYSUBWAY_DATAPACK_STAGE}" \
             --output "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}" \
             --release-request-binding "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}" \
@@ -977,22 +1019,22 @@ jobs:
             --verify-only
 
       - name: Data Pack Release / Send release callback
-        if: ${{ !cancelled() && steps.final-release-decision.outputs.outcome != '' }}
+        if: ${{ !cancelled() && (steps.production-publish.outputs.manifestSha256 != '' || steps.no-change-release.outputs.manifestSha256 != '') }}
         id: callback-delivery
         continue-on-error: true
         env:
           EASYSUBWAY_DATAPACK_CALLBACK_URL: ${{ format('{0}/admin/api/datapack/release-callbacks', vars.DEPLOY_PUBLIC_API_BASE_URL) }}
           RELEASE_REQUEST_ID: ${{ steps.release-mode.outputs.release_request_id }}
-          RELEASE_SEQUENCE: ${{ steps.production-publish.outputs.releaseSequence }}
+          RELEASE_SEQUENCE: ${{ steps.production-publish.outputs.releaseSequence || steps.no-change-release.outputs.releaseSequence }}
           TARGET_CHANNEL: ${{ steps.release-mode.outputs.target_channel }}
           WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          MANIFEST_SHA256: ${{ steps.production-publish.outputs.manifestSha256 }}
-          SQLITE_SHA256: ${{ steps.production-publish.outputs.sqliteSha256 }}
-          GZIP_SHA256: ${{ steps.production-publish.outputs.gzipSha256 }}
-          EVIDENCE_BUNDLE_SHA256: ${{ steps.production-publish.outputs.evidenceBundleSha256 }}
-          VALIDATOR_STATUS: ${{ steps.validate.outputs.status || 'PASS' }}
-          ROUTE_REGRESSION_STATUS: ${{ steps.routecheck.outputs.status || 'PASS' }}
-          PUBLISH_STATUS: ${{ steps.final-release-decision.outputs.outcome != 'PUBLISHED_AND_VERIFIED' && 'FAIL' || steps.release-request-binding.outcome == 'success' && 'PASS' || 'BLOCKED_EXTERNAL' }}
+          MANIFEST_SHA256: ${{ steps.production-publish.outputs.manifestSha256 || steps.no-change-release.outputs.manifestSha256 }}
+          SQLITE_SHA256: ${{ steps.production-publish.outputs.sqliteSha256 || steps.no-change-release.outputs.sqliteSha256 }}
+          GZIP_SHA256: ${{ steps.production-publish.outputs.gzipSha256 || steps.no-change-release.outputs.gzipSha256 }}
+          EVIDENCE_BUNDLE_SHA256: ${{ steps.production-publish.outputs.evidenceBundleSha256 || steps.no-change-release.outputs.evidenceBundleSha256 }}
+          VALIDATOR_STATUS: ${{ steps.production-publish.outputs.validatorStatus || steps.no-change-release.outputs.validatorStatus }}
+          ROUTE_REGRESSION_STATUS: ${{ steps.production-publish.outputs.routeRegressionStatus || steps.no-change-release.outputs.routeRegressionStatus }}
+          PUBLISH_STATUS: ${{ steps.release-decision.outputs.outcome == 'NO_CHANGE_VALID' && (steps.release-request-binding.outcome == 'success' && 'PASS' || 'BLOCKED_EXTERNAL') || steps.final-release-decision.outputs.outcome != 'PUBLISHED_AND_VERIFIED' && 'FAIL' || steps.release-request-binding.outcome == 'success' && 'PASS' || 'BLOCKED_EXTERNAL' }}
         run: |
           set -euo pipefail
           node --env-file="${EASYSUBWAY_ENV_FILE}" tools/datapack/build-release-callback.mjs \
@@ -1000,7 +1042,7 @@ jobs:
           node --env-file="${EASYSUBWAY_ENV_FILE}" tools/datapack/send-release-callback.mjs
 
       - name: Data Pack Release / Upload callback delivery evidence
-        if: ${{ always() && steps.production-publish.outputs.manifestSha256 != '' }}
+        if: ${{ always() && (steps.production-publish.outputs.manifestSha256 != '' || steps.no-change-release.outputs.manifestSha256 != '') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: easysubway-datapack-callback-delivery-${{ github.run_id }}
@@ -1009,7 +1051,7 @@ jobs:
           retention-days: 14
 
       - name: Data Pack Release / Require confirmed callback delivery
-        if: ${{ !cancelled() && steps.production-publish.outputs.manifestSha256 != '' && steps.callback-delivery.outputs.state != 'DELIVERED' }}
+        if: ${{ !cancelled() && (steps.production-publish.outputs.manifestSha256 != '' || steps.no-change-release.outputs.manifestSha256 != '') && steps.callback-delivery.outputs.state != 'DELIVERED' }}
         run: |
           echo "CALLBACK_RECONCILIATION_REQUIRED" >&2
           exit 1

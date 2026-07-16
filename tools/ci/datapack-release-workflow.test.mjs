@@ -63,6 +63,13 @@ test("production-publish는 release request 조회 스텝과 !cancelled() 콜백
 });
 
 test("production callback은 bounded sender 증적을 항상 보존하고 실패를 fail-closed한다", () => {
+  const productionPublishStep = yml.match(
+    /- name: Data Pack Release \/ Publish staged data packs to object storage[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(productionPublishStep, "production publish 스텝을 찾지 못함");
+  assert.match(productionPublishStep, /validatorStatus=\$\{bundle\.validatorStatus\}/);
+  assert.match(productionPublishStep, /routeRegressionStatus=\$\{bundle\.strictRouteRegressionStatus\}/);
+
   const callbackStep = yml.match(
     /- name: Data Pack Release \/ Send release callback[\s\S]*?\n\s+- name:/,
   )?.[0];
@@ -113,6 +120,38 @@ test("production request identity는 manifest 밖의 서명된 immutable binding
   const callbackStep = yml.slice(callback, yml.indexOf("Data Pack Release / Upload callback delivery evidence"));
   assert.match(callbackStep, /steps\.release-request-binding\.outcome == 'success'/);
   assert.match(callbackStep, /'BLOCKED_EXTERNAL'/);
+  assert.match(callbackStep, /steps\.final-release-decision\.outputs\.outcome != 'PUBLISHED_AND_VERIFIED' && 'FAIL'/);
+});
+
+test("NO_CHANGE_VALID 재실행은 current manifest binding과 callback을 복구한다", () => {
+  const noChangeIdentity = yml.match(
+    /- name: Data Pack Release \/ Prepare no-change release identity[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(noChangeIdentity, "no-change release identity 스텝을 찾지 못함");
+  assert.match(noChangeIdentity, /steps\.release-decision\.outputs\.outcome == 'NO_CHANGE_VALID'/);
+  assert.match(noChangeIdentity, /EASYSUBWAY_DATAPACK_CURRENT_MANIFEST/);
+  assert.match(noChangeIdentity, /manifestSha256/);
+  assert.match(noChangeIdentity, /releaseSequence/);
+
+  const remoteValidation = yml.match(
+    /- name: Data Pack Release \/ Validate published remote artifact[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(remoteValidation, "remote validation 스텝을 찾지 못함");
+  assert.match(remoteValidation, /steps\.no-change-release\.outputs\.manifestSha256/);
+
+  const binding = yml.match(
+    /- name: Data Pack Release \/ Publish finalized release request binding[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(binding, "release request binding 스텝을 찾지 못함");
+  assert.match(binding, /steps\.release-decision\.outputs\.outcome == 'NO_CHANGE_VALID'/);
+  assert.match(binding, /EASYSUBWAY_DATAPACK_CURRENT_MANIFEST/);
+
+  const callback = yml.match(
+    /- name: Data Pack Release \/ Send release callback[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(callback, "release callback 스텝을 찾지 못함");
+  assert.match(callback, /steps\.no-change-release\.outputs\.releaseSequence/);
+  assert.match(callback, /steps\.no-change-release\.outputs\.manifestSha256/);
 });
 
 test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {

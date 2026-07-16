@@ -32,6 +32,7 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 		.disable(JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
 		.build();
 	private static final Duration TIMEOUT = Duration.ofSeconds(10);
+	private static final int MAX_CATALOG_BYTES = 1024 * 1024;
 
 	private final HttpClient httpClient;
 	private final String baseUrl;
@@ -105,6 +106,7 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 			String signatureValue = manifest.path("signature").path("value").asText("");
 			boolean signatureValid = "rsa-sha256-manifest-v2".equals(
 				manifest.path("signature").path("algorithm").asText())
+				&& manifest.path("manifestVersion").asInt(-1) == 2
 				&& keyId.equals(manifest.path("keyId").asText())
 				&& verify(manifest, signatureValue);
 			long actualSequence = manifest.path("releaseSequence").asLong(-1);
@@ -124,10 +126,14 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 		try {
 			var request = HttpRequest.newBuilder(URI.create(baseUrl + path))
 				.timeout(TIMEOUT).GET().build();
-			var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-			if (response.statusCode() == 404) throw new NotFound();
-			if (response.statusCode() < 200 || response.statusCode() >= 300) throw new Unavailable();
-			return response.body();
+			var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+			try (var body = response.body()) {
+				if (response.statusCode() == 404) throw new NotFound();
+				if (response.statusCode() < 200 || response.statusCode() >= 300) throw new Unavailable();
+				var bytes = body.readNBytes(MAX_CATALOG_BYTES + 1);
+				if (bytes.length > MAX_CATALOG_BYTES) throw new Unavailable();
+				return bytes;
+			}
 		} catch (InterruptedException interrupted) {
 			Thread.currentThread().interrupt();
 			throw new Unavailable();

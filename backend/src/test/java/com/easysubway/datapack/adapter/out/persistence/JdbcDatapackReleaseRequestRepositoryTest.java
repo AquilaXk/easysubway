@@ -78,4 +78,14 @@ class JdbcDatapackReleaseRequestRepositoryTest {
 			.extracting(DatapackReleaseRequest::approvalId)
 			.doesNotContain(due.getFirst().approvalId());
 	}
+
+	@Test
+	@DisplayName("기존 release request 인덱스는 PostgreSQL write를 막지 않게 concurrently 생성한다")
+	void createsReconciliationIndexConcurrently() throws Exception {
+		var migration = java.nio.file.Files.readString(java.nio.file.Path.of(
+			"src/main/resources/db/migration/postgresql/V60__datapack_release_request_reconciliation_index.sql"));
+
+		assertThat(migration).contains(
+			"CREATE INDEX CONCURRENTLY idx_datapack_release_request_reconciliation_due");
+	}
 }

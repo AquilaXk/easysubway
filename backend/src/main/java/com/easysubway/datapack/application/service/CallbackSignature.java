@@ -90,6 +90,12 @@ public class CallbackSignature {
         String evidenceBundleSha256, String validatorStatus, String routeRegressionStatus,
         String publishStatus) {
 		public CanonicalFields {
+			if (schemaVersion != 2) {
+				throw new IllegalArgumentException("callback schemaVersion must be 2");
+			}
+			if (releaseSequence < 1) {
+				throw new IllegalArgumentException("callback releaseSequence must be positive");
+			}
 			for (String value : new String[] {artifactKind, releaseRequestId, channel, idempotencyKey,
 				workflowRunUrl, manifestSha256, sqliteSha256, gzipSha256, evidenceBundleSha256,
 				validatorStatus, routeRegressionStatus, publishStatus}) {

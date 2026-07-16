@@ -186,6 +186,36 @@ test("FAIL callback은 current manifest가 없어도 backend에 전달한다", a
   assert.equal(callbackRequests, 1);
 });
 
+test("validator FAIL callback은 current manifest가 없어도 backend에 전달한다", async () => {
+  const failedPayload = buildReleaseCallback({
+    ...callbackEnv,
+    PUBLISH_STATUS: "PASS",
+    VALIDATOR_STATUS: "FAIL",
+  });
+  let currentChecks = 0;
+  let callbackRequests = 0;
+  const artifact = await sendReleaseCallback({
+    payload: failedPayload,
+    endpoint: "https://api.example.com/callback",
+    token,
+    currentManifestUrl: "https://datapack.example.com/catalog/current.json",
+    retryDelaysSeconds: [],
+    sleep: async () => {},
+    fetchImpl: async (url) => {
+      if (url.includes("current.json")) {
+        currentChecks += 1;
+        return new Response(null, { status: 404 });
+      }
+      callbackRequests += 1;
+      return new Response(null, { status: 200 });
+    },
+  });
+
+  assert.equal(artifact.state, "DELIVERED");
+  assert.equal(currentChecks, 0);
+  assert.equal(callbackRequests, 1);
+});
+
 test("CLI는 delivery state를 GitHub output에 기록한다", async () => {
   const currentBytes = Buffer.from(JSON.stringify({ channel: payload.channel, releaseSequence: payload.releaseSequence }));
   await withServer((request, response) => {

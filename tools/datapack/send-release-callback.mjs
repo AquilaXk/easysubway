@@ -20,6 +20,47 @@ function validatedEndpoint(value) {
   return url.toString();
 }
 
+async function currentReleaseState(payload, currentManifestUrl, fetchImpl) {
+  const allGatesPassed = [
+    payload.publishStatus,
+    payload.validatorStatus,
+    payload.routeRegressionStatus,
+  ].every((status) => status === "PASS");
+  if (!allGatesPassed || !currentManifestUrl) return "READY";
+  try {
+    const current = await fetchCurrentRelease(currentManifestUrl, fetchImpl);
+    if (current.releaseSequence > payload.releaseSequence) return "STALE_SUPERSEDED";
+    if (current.releaseSequence !== payload.releaseSequence
+      || current.channel !== payload.channel
+      || current.manifestSha256 !== payload.manifestSha256) {
+      throw new Error("current release identity mismatch");
+    }
+    return "READY";
+  } catch {
+    return "CURRENT_UNAVAILABLE";
+  }
+}
+
+async function sendAttempt(endpoint, token, payloadBytes, fetchImpl) {
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: payloadBytes,
+      signal: AbortSignal.timeout(15_000),
+    });
+    return {
+      state: response.ok ? "DELIVERED" : retryable(response.status) ? "RETRY" : "STOP",
+      httpClass: httpClass(response.status),
+    };
+  } catch {
+    return { state: "RETRY", httpClass: "NETWORK" };
+  }
+}
+
 export async function sendReleaseCallback({
   payload,
   endpoint,
@@ -42,67 +83,40 @@ export async function sendReleaseCallback({
   };
 
   for (let index = 0; index <= retryDelaysSeconds.length; index += 1) {
-    if (payload.publishStatus === "PASS" && currentManifestUrl) {
-      try {
-        const current = await fetchCurrentRelease(currentManifestUrl, fetchImpl);
-        if (current.releaseSequence > payload.releaseSequence) {
-          artifact.state = "STALE_SUPERSEDED";
-          artifact.terminalReason = "CURRENT_RELEASE_ADVANCED";
-          return artifact;
-        }
-        if (current.releaseSequence !== payload.releaseSequence
-          || current.channel !== payload.channel
-          || current.manifestSha256 !== payload.manifestSha256) {
-          throw new Error("current release identity mismatch");
-        }
-      } catch {
-        artifact.attempts.push({
-          attempt: index + 1,
-          httpClass: "CURRENT_UNAVAILABLE",
-          ...(index < retryDelaysSeconds.length
-            ? { nextRetrySeconds: retryDelaysSeconds[index] }
-            : {}),
-        });
-        if (index < retryDelaysSeconds.length) {
-          await sleep(retryDelaysSeconds[index]);
-          continue;
-        }
-        break;
-      }
+    const currentState = await currentReleaseState(payload, currentManifestUrl, fetchImpl);
+    if (currentState === "STALE_SUPERSEDED") {
+      artifact.state = currentState;
+      artifact.terminalReason = "CURRENT_RELEASE_ADVANCED";
+      return artifact;
     }
-    let status;
-    try {
-      const response = await fetchImpl(endpoint, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${token}`,
-          "content-type": "application/json",
-        },
-        body: payloadBytes,
-        signal: AbortSignal.timeout(15_000),
-      });
-      status = response.status;
+    if (currentState === "CURRENT_UNAVAILABLE") {
       artifact.attempts.push({
         attempt: index + 1,
-        httpClass: httpClass(status),
-        ...(retryable(status) && index < retryDelaysSeconds.length
-          ? { nextRetrySeconds: retryDelaysSeconds[index] }
-          : {}),
-      });
-      if (response.ok) {
-        artifact.state = "DELIVERED";
-        return artifact;
-      }
-      if (!retryable(status)) break;
-    } catch {
-      artifact.attempts.push({
-        attempt: index + 1,
-        httpClass: "NETWORK",
+        httpClass: currentState,
         ...(index < retryDelaysSeconds.length
           ? { nextRetrySeconds: retryDelaysSeconds[index] }
           : {}),
       });
+      if (index < retryDelaysSeconds.length) {
+        await sleep(retryDelaysSeconds[index]);
+        continue;
+      }
+      break;
     }
+
+    const attempt = await sendAttempt(endpoint, token, payloadBytes, fetchImpl);
+    artifact.attempts.push({
+      attempt: index + 1,
+      httpClass: attempt.httpClass,
+      ...(attempt.state === "RETRY" && index < retryDelaysSeconds.length
+        ? { nextRetrySeconds: retryDelaysSeconds[index] }
+        : {}),
+    });
+    if (attempt.state === "DELIVERED") {
+      artifact.state = attempt.state;
+      return artifact;
+    }
+    if (attempt.state === "STOP") break;
     if (index < retryDelaysSeconds.length) await sleep(retryDelaysSeconds[index]);
   }
 

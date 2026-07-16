@@ -2,7 +2,7 @@ package com.easysubway.datapack.adapter.in.web;
 
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackCandidateRepository;
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackCandidateRepository.CandidateRow;
-import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
+import com.easysubway.datapack.application.port.out.DatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
 import com.easysubway.datapack.application.service.DatapackReleaseRequestService;
@@ -31,13 +31,13 @@ class DatapackReleaseRequestAdminPageController {
 	private final JdbcDatapackCandidateRepository candidateRepository;
 	private final DatapackReleaseRequestRepository releaseRequestRepository;
 	private final DatapackReleaseRequestService releaseRequestService;
-	private final JdbcDatapackReleaseDeliveryRepository deliveryRepository;
+	private final DatapackReleaseDeliveryRepository deliveryRepository;
 
 	DatapackReleaseRequestAdminPageController(
 		JdbcDatapackCandidateRepository candidateRepository,
 		DatapackReleaseRequestRepository releaseRequestRepository,
 		DatapackReleaseRequestService releaseRequestService,
-		JdbcDatapackReleaseDeliveryRepository deliveryRepository
+		DatapackReleaseDeliveryRepository deliveryRepository
 	) {
 		this.candidateRepository = candidateRepository;
 		this.releaseRequestRepository = releaseRequestRepository;

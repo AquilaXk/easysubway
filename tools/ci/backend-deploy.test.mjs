@@ -25,6 +25,13 @@ function fixtureEnv() {
   return read("tools/ci/fixtures/deployment-prod-valid.env");
 }
 
+function dotenvValues(source) {
+  return Object.fromEntries(source.split("\n").filter(Boolean).map((line) => {
+    const separator = line.indexOf("=");
+    return [line.slice(0, separator), line.slice(separator + 1)];
+  }));
+}
+
 afterEach(async () => {
   await Promise.all(
     [...deploymentTempDirs].map((dir) => rm(dir, { recursive: true, force: true })),
@@ -118,13 +125,15 @@ test("callback reconciliation catalog trust 설정은 backend env에 전달한�
   const outputDir = await prepare(source);
   const backendEnv = await readFile(path.join(outputDir, "backend.env"), "utf8");
   const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
+  const sourceValues = dotenvValues(source);
+  const backendValues = dotenvValues(backendEnv);
 
   for (const name of [
     "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
   ]) {
-    assert.match(backendEnv, new RegExp(`^${name}=`, "m"));
+    assert.equal(backendValues[name], sourceValues[name]);
     assert.doesNotMatch(composeEnv, new RegExp(`^${name}=`, "m"));
   }
 });

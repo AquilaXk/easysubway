@@ -29,6 +29,10 @@ test("release request binding은 manifest identity를 변경하지 않고 요청
     "production-v1",
   );
 
+  assert.equal(binding.schemaVersion, 1);
+  assert.equal(binding.artifactKind, "datapack-release-request-binding");
+  assert.equal(binding.keyId, "production-v1");
+  assert.equal(binding.signature.algorithm, "rsa-sha256-release-request-v1");
   assert.equal(binding.releaseRequestId, "request-2057");
   assert.equal(binding.releaseSequence, 42);
   assert.equal(binding.channel, "production");
@@ -63,7 +67,7 @@ test("최종 검증 뒤 binding-only plan이 request identity를 immutable 게�
     }],
   };
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest)}\n`);
-  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const binding = buildReleaseRequestBinding(
     manifestBytes,
     "request-2057",
@@ -75,6 +79,28 @@ test("최종 검증 뒤 binding-only plan이 request identity를 immutable 게�
   const planPath = path.join(root, "publish-plan.json");
   await writeFile(path.join(root, "catalog", "capital-v1.sqlite.gz"), packBytes);
   await writeFile(manifestPath, manifestBytes);
+  await writeFile(bindingPath, `${JSON.stringify({
+    ...binding,
+    signature: {
+      ...binding.signature,
+      value: `${binding.signature.value[0] === "A" ? "B" : "A"}${binding.signature.value.slice(1)}`,
+    },
+  })}\n`);
+
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/create-publish-plan.mjs",
+    "--manifest", manifestPath,
+    "--root", root,
+    "--output", planPath,
+    "--release-request-binding", bindingPath,
+    "--only", "release-request-binding",
+  ], {
+    env: {
+      ...process.env,
+      EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey.export({ type: "spki", format: "pem" }),
+    },
+  }), /signature/i);
+
   await writeFile(bindingPath, `${JSON.stringify(binding)}\n`);
 
   await execFileAsync(process.execPath, [
@@ -84,7 +110,12 @@ test("최종 검증 뒤 binding-only plan이 request identity를 immutable 게�
     "--output", planPath,
     "--release-request-binding", bindingPath,
     "--only", "release-request-binding",
-  ]);
+  ], {
+    env: {
+      ...process.env,
+      EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: publicKey.export({ type: "spki", format: "pem" }),
+    },
+  });
   const plan = JSON.parse(await readFile(planPath, "utf8"));
   const bindingPut = plan.steps.findIndex((step) => step.type === "put-release-request-binding-object");
   assert.equal(plan.schemaVersion, 3);
