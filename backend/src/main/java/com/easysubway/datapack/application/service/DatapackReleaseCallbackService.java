@@ -77,15 +77,14 @@ public class DatapackReleaseCallbackService {
 		}
 		boolean pass = allGatesPass(cmd);
 		var terminalReplay = transactionTemplate.execute(
-			status -> receiveTerminalReplay(cmd, fields, pass));
+			status -> receiveTerminalReplay(cmd, fields));
 		if (terminalReplay != null) return terminalReplay;
 		boolean knownRequest = repository.findByApprovalId(cmd.releaseRequestId()).isPresent();
 		var catalogValidation = pass && knownRequest ? validatePublishedCatalog(cmd) : null;
 		return transactionTemplate.execute(status -> receiveVerified(cmd, fields, catalogValidation));
 	}
 
-	private CallbackResult receiveTerminalReplay(CallbackCommand cmd, CanonicalFields fields,
-		boolean pass) {
+	private CallbackResult receiveTerminalReplay(CallbackCommand cmd, CanonicalFields fields) {
 		var existingSequence = deliveryRepository.findByRequestAndSequence(
 			cmd.releaseRequestId(), cmd.releaseSequence());
 		if (existingSequence.isPresent()
@@ -100,13 +99,10 @@ public class DatapackReleaseCallbackService {
 		}
 		var request = repository.findByApprovalId(cmd.releaseRequestId()).orElse(null);
 		if (request == null) return null;
-		var terminal = pass ? DatapackReleaseRequestStatus.PUBLISHED
-			: DatapackReleaseRequestStatus.FAILED;
 		var deliveryTerminal = existingSequence.isPresent()
 			&& (existingSequence.get().state() == State.DELIVERED
 				|| existingSequence.get().state() == State.DEAD_LETTER);
-		if (request.status() != terminal && !deliveryTerminal
-			&& cmd.channel().equals(request.targetChannel())) return null;
+		if (!deliveryTerminal && cmd.channel().equals(request.targetChannel())) return null;
 		return receiveVerified(cmd, fields, null);
 	}
 

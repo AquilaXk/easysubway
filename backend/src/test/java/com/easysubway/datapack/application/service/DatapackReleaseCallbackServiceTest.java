@@ -198,7 +198,8 @@ class DatapackReleaseCallbackServiceTest {
 	@Test
 	@DisplayName("완료된 callback 재전송은 catalog 장애와 무관하게 멱등 처리한다")
 	void terminalReplayDoesNotFetchCatalog() {
-		insertRow("PUBLISHED");
+		insertRow("DISPATCHED");
+		service.receive(command("PASS", computeSignature("PASS")));
 		when(releaseCatalog.fetchCurrent(CHANNEL))
 			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
 		when(releaseCatalog.findByRequest(CHANNEL, APPROVAL_ID))
@@ -208,6 +209,19 @@ class DatapackReleaseCallbackServiceTest {
 
 		assertThat(result.status()).isEqualTo("PUBLISHED");
 		assertThat(result.idempotentReplay()).isTrue();
+	}
+
+	@Test
+	@DisplayName("delivery 없는 terminal request는 catalog identity 검증을 생략하지 않는다")
+	void terminalRequestWithoutDeliveryStillValidatesCatalog() {
+		insertRow("PUBLISHED");
+		when(releaseCatalog.fetchCurrent(CHANNEL))
+			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
+
+		assertThatThrownBy(() -> service.receive(command("PASS", computeSignature("PASS"))))
+			.isInstanceOf(DatapackReleaseCatalogPort.Unavailable.class);
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT COUNT(*) FROM datapack_release_deliveries", Integer.class)).isZero();
 	}
 
     @Test
