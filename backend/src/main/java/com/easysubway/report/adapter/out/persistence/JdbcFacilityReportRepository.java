@@ -655,38 +655,68 @@ public class JdbcFacilityReportRepository implements
 	}
 
 	private void deletePendingAnonymizedPhotoObjects() {
-		List<AnonymizedPhotoObjects> pendingObjects = jdbcTemplate.query(
+		AnonymizedPhotoObjects cursor = null;
+		while (true) {
+			List<AnonymizedPhotoObjects> pendingObjects = loadPendingAnonymizedPhotoObjectsAfter(cursor);
+			if (pendingObjects.isEmpty()) {
+				return;
+			}
+			deletePendingPhotoObjects(pendingObjects);
+			cursor = pendingObjects.get(pendingObjects.size() - 1);
+			if (pendingObjects.size() < PHOTO_DELETION_RETRY_BATCH_SIZE) {
+				return;
+			}
+		}
+	}
+
+	private List<AnonymizedPhotoObjects> loadPendingAnonymizedPhotoObjectsAfter(
+		AnonymizedPhotoObjects cursor
+	) {
+		if (cursor == null) {
+			return jdbcTemplate.query(
+				"""
+					SELECT report_id,
+						created_at,
+						photo_object_key,
+						photo_thumbnail_object_key
+					FROM facility_reports
+					WHERE user_id = ?
+						AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
+					ORDER BY created_at ASC, report_id ASC
+					LIMIT ?
+					""",
+				this::mapAnonymizedPhotoObjects,
+				FacilityReport.ANONYMIZED_USER_ID,
+				PHOTO_DELETION_RETRY_BATCH_SIZE
+			);
+		}
+		return jdbcTemplate.query(
 			"""
 				SELECT report_id,
+					created_at,
 					photo_object_key,
 					photo_thumbnail_object_key
 				FROM facility_reports
 				WHERE user_id = ?
 					AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
+					AND (created_at > ? OR (created_at = ? AND report_id > ?))
 				ORDER BY created_at ASC, report_id ASC
 				LIMIT ?
 				""",
-			resultSet -> {
-				ArrayList<AnonymizedPhotoObjects> objects = new ArrayList<>();
-				while (resultSet.next()) {
-					objects.add(new AnonymizedPhotoObjects(
-						resultSet.getString("report_id"),
-						resultSet.getString("photo_object_key"),
-						resultSet.getString("photo_thumbnail_object_key")
-					));
-				}
-				return List.copyOf(objects);
-			},
+			this::mapAnonymizedPhotoObjects,
 			FacilityReport.ANONYMIZED_USER_ID,
+			cursor.createdAt(),
+			cursor.createdAt(),
+			cursor.reportId(),
 			PHOTO_DELETION_RETRY_BATCH_SIZE
 		);
-		deletePendingPhotoObjects(pendingObjects);
 	}
 
 	private List<AnonymizedPhotoObjects> loadPhotoObjectsByUserId(String userId) {
 		return jdbcTemplate.query(
 			"""
 				SELECT report_id,
+					created_at,
 					photo_object_key,
 					photo_thumbnail_object_key
 				FROM facility_reports
@@ -694,12 +724,18 @@ public class JdbcFacilityReportRepository implements
 					AND (photo_object_key IS NOT NULL OR photo_thumbnail_object_key IS NOT NULL)
 				ORDER BY created_at ASC, report_id ASC
 				""",
-			(resultSet, rowNumber) -> new AnonymizedPhotoObjects(
-				resultSet.getString("report_id"),
-				resultSet.getString("photo_object_key"),
-				resultSet.getString("photo_thumbnail_object_key")
-			),
+			this::mapAnonymizedPhotoObjects,
 			userId
+		);
+	}
+
+	private AnonymizedPhotoObjects mapAnonymizedPhotoObjects(ResultSet resultSet, int rowNumber)
+		throws SQLException {
+		return new AnonymizedPhotoObjects(
+			resultSet.getString("report_id"),
+			resultSet.getObject("created_at", LocalDateTime.class),
+			resultSet.getString("photo_object_key"),
+			resultSet.getString("photo_thumbnail_object_key")
 		);
 	}
 
@@ -768,6 +804,7 @@ public class JdbcFacilityReportRepository implements
 
 	private record AnonymizedPhotoObjects(
 		String reportId,
+		LocalDateTime createdAt,
 		String primaryObjectKey,
 		String thumbnailObjectKey
 	) {

@@ -566,6 +566,31 @@ class JdbcFacilityReportRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("사진 삭제 대기열은 한 건이 실패해도 100건 이후의 행까지 한 번씩 처리한다")
+	void purgePersonalDataScansEveryPhotoDeletionBatchDespiteEarlierFailure() {
+		for (int index = 0; index <= 100; index++) {
+			repository.saveReport(submittedReport(
+				"report-%03d".formatted(index),
+				"anonymous-user-%03d".formatted(index),
+				8
+			));
+		}
+		var firstDeletion = new AtomicBoolean(true);
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, objectKey -> {
+			if (firstDeletion.getAndSet(false)) {
+				throw new IllegalStateException("object storage unavailable");
+			}
+		});
+
+		assertThat(repository.purgePersonalDataCreatedBefore(
+			LocalDateTime.of(2026, 6, 17, 9, 0)
+		)).isEqualTo(101);
+
+		assertThat(repository.loadReport("report-000").orElseThrow().photoObjectKey()).isNotNull();
+		assertThat(repository.loadReport("report-100").orElseThrow().photoObjectKey()).isNull();
+	}
+
+	@Test
 	@DisplayName("검색 질의는 신고 내용 키워드를 대소문자 구분 없이 부분일치로 거른다")
 	void searchFiltersByKeywordCaseInsensitively() {
 		repository.saveReport(reportAt("r-1", "Elevator broken", FacilityReportStatus.SUBMITTED,
