@@ -2,7 +2,9 @@ package com.easysubway.datapack.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
+import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
 import com.easysubway.datapack.application.service.DatapackReleaseCallbackService.CallbackCommand;
 import com.easysubway.datapack.application.service.DatapackReleaseCallbackService.CallbackResult;
@@ -19,6 +21,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @DisplayName("DatapackReleaseCallbackService")
@@ -39,6 +42,8 @@ class DatapackReleaseCallbackServiceTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private CallbackSignature callbackSignature;
+    @MockitoBean
+    private DatapackReleaseCatalogPort releaseCatalog;
 
     @BeforeEach
     void setUp() {
@@ -52,6 +57,8 @@ class DatapackReleaseCallbackServiceTest {
             "DELETE FROM datapack_candidates WHERE id = 'cand-1' OR id LIKE 'cand-cbk-%'");
         jdbcTemplate.update(
             "DELETE FROM datapack_release_request WHERE approval_id = ?", APPROVAL_ID);
+		when(releaseCatalog.fetchCurrent(CHANNEL)).thenReturn(new CatalogIdentity(
+			RELEASE_SEQUENCE, SHA, CHANNEL, APPROVAL_ID, true, "b".repeat(64)));
     }
 
     private void insertRow(String status) {
@@ -185,6 +192,23 @@ class DatapackReleaseCallbackServiceTest {
 			.isEqualTo("DEAD_LETTER");
 		assertThat(jdbcTemplate.queryForObject(
 			"SELECT state FROM datapack_release_deliveries", String.class)).isEqualTo("DELIVERED");
+	}
+
+	@Test
+	@DisplayName("더 최신 서명 release가 있으면 늦은 PASS callback을 적용하지 않는다")
+	void stalePassCallbackCannotPublishOrPromote() {
+		insertRow("DISPATCHED");
+		when(releaseCatalog.fetchCurrent(CHANNEL)).thenReturn(new CatalogIdentity(
+			RELEASE_SEQUENCE + 1, "b".repeat(64), CHANNEL, "request-2058", true, "c".repeat(64)));
+
+		assertThat(service.receive(command("PASS", computeSignature("PASS"))).status())
+			.isEqualTo("DEAD_LETTER");
+		assertThat(statusOf()).isEqualTo("DISPATCHED");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT state FROM datapack_release_deliveries", String.class)).isEqualTo("DEAD_LETTER");
+		assertThat(jdbcTemplate.queryForObject(
+			"SELECT sanitized_detail FROM datapack_release_deliveries", String.class))
+			.isEqualTo("CURRENT_RELEASE_ADVANCED");
 	}
 
     @Test

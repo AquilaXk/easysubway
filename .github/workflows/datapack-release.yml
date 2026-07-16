@@ -955,6 +955,7 @@ jobs:
 
       - name: Data Pack Release / Publish finalized release request binding
         if: ${{ !cancelled() && steps.final-release-decision.outputs.outcome == 'PUBLISHED_AND_VERIFIED' }}
+        id: release-request-binding
         run: |
           set -euo pipefail
           node tools/datapack/build-release-request-binding.mjs \
@@ -991,7 +992,7 @@ jobs:
           EVIDENCE_BUNDLE_SHA256: ${{ steps.production-publish.outputs.evidenceBundleSha256 }}
           VALIDATOR_STATUS: ${{ steps.validate.outputs.status || 'PASS' }}
           ROUTE_REGRESSION_STATUS: ${{ steps.routecheck.outputs.status || 'PASS' }}
-          PUBLISH_STATUS: ${{ steps.final-release-decision.outputs.outcome == 'PUBLISHED_AND_VERIFIED' && 'PASS' || 'FAIL' }}
+          PUBLISH_STATUS: ${{ steps.final-release-decision.outputs.outcome == 'PUBLISHED_AND_VERIFIED' && steps.release-request-binding.outcome == 'success' && 'PASS' || 'FAIL' }}
         run: |
           set -euo pipefail
           node --env-file="${EASYSUBWAY_ENV_FILE}" tools/datapack/build-release-callback.mjs \

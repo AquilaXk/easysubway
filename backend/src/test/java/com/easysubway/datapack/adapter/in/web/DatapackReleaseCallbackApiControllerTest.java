@@ -1,11 +1,14 @@
 package com.easysubway.datapack.adapter.in.web;
 
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.easysubway.datapack.application.service.CallbackSignature;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
+import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
+import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -46,12 +50,16 @@ class DatapackReleaseCallbackApiControllerTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private CallbackSignature callbackSignature;
+    @MockitoBean
+    private DatapackReleaseCatalogPort releaseCatalog;
 
     @BeforeEach
     void setUp() {
 		jdbcTemplate.update("DELETE FROM datapack_release_deliveries WHERE release_request_id = ?", APPROVAL_ID);
         jdbcTemplate.update(
             "DELETE FROM datapack_release_request WHERE approval_id = ?", APPROVAL_ID);
+		when(releaseCatalog.fetchCurrent(CHANNEL)).thenReturn(new CatalogIdentity(
+			RELEASE_SEQUENCE, SHA1, CHANNEL, APPROVAL_ID, true, SHA4));
     }
 
     private void insertDispatched(String approvalId) {

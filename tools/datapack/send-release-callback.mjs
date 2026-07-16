@@ -42,7 +42,7 @@ export async function sendReleaseCallback({
   };
 
   for (let index = 0; index <= retryDelaysSeconds.length; index += 1) {
-    if (currentManifestUrl) {
+    if (payload.publishStatus === "PASS" && currentManifestUrl) {
       try {
         const current = await fetchCurrentRelease(currentManifestUrl, fetchImpl);
         if (current.releaseSequence > payload.releaseSequence) {

@@ -1,6 +1,7 @@
 package com.easysubway.datapack.application.service;
 
 import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
+import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
 import com.easysubway.datapack.application.port.out.DatapackReleaseDeliveryRepository;
 import com.easysubway.datapack.application.service.CallbackSignature.CanonicalFields;
@@ -34,18 +35,21 @@ public class DatapackReleaseCallbackService {
     private final DatapackReleaseChannelCommandPort channelCommandPort;
     private final DatapackReleasePromoteDelegate promoteDelegate;
     private final DatapackReleaseDeliveryRepository deliveryRepository;
+    private final DatapackReleaseCatalogPort releaseCatalog;
 
     public DatapackReleaseCallbackService(DatapackReleaseRequestRepository repository,
         CallbackSignature signature, ObjectProvider<Clock> clockProvider,
         DatapackReleaseChannelCommandPort channelCommandPort,
         DatapackReleasePromoteDelegate promoteDelegate,
-        DatapackReleaseDeliveryRepository deliveryRepository) {
+        DatapackReleaseDeliveryRepository deliveryRepository,
+        DatapackReleaseCatalogPort releaseCatalog) {
         this.repository = repository;
         this.signature = signature;
         this.clock = clockProvider.getIfAvailable(Clock::systemUTC);
         this.channelCommandPort = channelCommandPort;
         this.promoteDelegate = promoteDelegate;
         this.deliveryRepository = deliveryRepository;
+        this.releaseCatalog = releaseCatalog;
     }
 
     @Transactional
@@ -100,6 +104,14 @@ public class DatapackReleaseCallbackService {
         boolean pass = "PASS".equals(cmd.publishStatus())
             && "PASS".equals(cmd.validatorStatus())
             && "PASS".equals(cmd.routeRegressionStatus());
+		if (pass) {
+			var currentMismatch = currentReleaseMismatch(cmd);
+			if (currentMismatch != null) {
+				deliveryRepository.mark(delivery.idempotencyKey(), State.DEAD_LETTER,
+					delivery.attempts(), null, currentMismatch.httpClass(), currentMismatch.detail(), now);
+				return new CallbackResult("DEAD_LETTER", false);
+			}
+		}
         var terminal = pass ? DatapackReleaseRequestStatus.PUBLISHED : DatapackReleaseRequestStatus.FAILED;
 
         // 멱등: 이미 terminal 상태 + 동일 결과 → no-op
@@ -132,6 +144,25 @@ public class DatapackReleaseCallbackService {
 	private static String expectedIdempotencyKey(CallbackCommand cmd) {
 		return cmd.releaseRequestId() + ":" + cmd.releaseSequence() + ":" + cmd.manifestSha256();
 	}
+
+	private CurrentReleaseMismatch currentReleaseMismatch(CallbackCommand cmd) {
+		var current = releaseCatalog.fetchCurrent(cmd.channel());
+		if (!current.signatureValid() || !cmd.channel().equals(current.channel())) {
+			return new CurrentReleaseMismatch("CONFLICT", "CATALOG_CURRENT_MISMATCH");
+		}
+		if (current.releaseSequence() > cmd.releaseSequence()) {
+			return new CurrentReleaseMismatch("STALE", "CURRENT_RELEASE_ADVANCED");
+		}
+		if (current.releaseSequence() < cmd.releaseSequence()) {
+			throw new DatapackReleaseCatalogPort.Unavailable();
+		}
+		if (!current.manifestSha256().equals(cmd.manifestSha256())) {
+			return new CurrentReleaseMismatch("CONFLICT", "CATALOG_CURRENT_MISMATCH");
+		}
+		return null;
+	}
+
+	private record CurrentReleaseMismatch(String httpClass, String detail) {}
 
     private void tryPromote(DatapackReleaseRequest r, CallbackCommand cmd) {
 		tryPromote(r, cmd.manifestSha256(), cmd.workflowRunUrl(), cmd.evidenceBundleSha256(),
