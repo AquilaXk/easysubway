@@ -157,7 +157,7 @@ void main() {
 
     Container segmentContainer(WidgetTester tester, String label) {
       return tester.widget<Container>(
-        find.ancestor(of: find.text(label), matching: find.byType(Container)),
+        find.byKey(ValueKey('networkMapNearbyDataSourceToggleSegment-$label')),
       );
     }
 
@@ -173,16 +173,53 @@ void main() {
           segmentContainer(tester, '실시간').decoration! as BoxDecoration;
       final timetableDeco =
           segmentContainer(tester, '시간표').decoration! as BoxDecoration;
+      // 선택 칸만 흰 배경 + brandSignature 2dp pill이다.
       expect(realtimeDeco.color, Colors.white);
       expect(
         (realtimeDeco.border! as Border).top.color,
         EasySubwayAccessibleColors.brandSignature,
       );
-      expect(
-        timetableDeco.color,
-        EasySubwayAccessibleColors.nearbyToggleIdleFill,
-      );
+      expect((realtimeDeco.border! as Border).top.width, 2);
+      // 비선택 칸은 pill을 그리지 않는다(단일 배경 track이 뒤에서 감싼다).
+      expect(timetableDeco.color, Colors.transparent);
       expect(timetableDeco.border, isNull);
+    });
+
+    testWidgets('두 칸이 간격 없이 하나의 단일 배경 track 안에 붙어 있다', (tester) async {
+      await tester.pumpWidget(hostToggle(isRealtime: true));
+
+      // 단일 라운드 배경이 두 칸을 하나로 감싼다(시각 118×32, radius 16).
+      final track = tester.widget<Container>(
+        find.byKey(const Key('networkMapNearbyDataSourceToggleTrack')),
+      );
+      final trackDeco = track.decoration! as BoxDecoration;
+      expect(trackDeco.color, EasySubwayAccessibleColors.nearbyToggleIdleFill);
+      expect(
+        trackDeco.borderRadius,
+        const BorderRadius.all(Radius.circular(16)),
+      );
+      expect(
+        tester.getSize(
+          find.byKey(const Key('networkMapNearbyDataSourceToggleTrack')),
+        ),
+        const Size(118, 32),
+      );
+
+      // 두 칸 사이 간격이 0이다: 왼쪽 칸의 오른쪽 끝과 오른쪽 칸의 왼쪽 끝이 맞닿는다.
+      final realtimeRect = tester.getRect(find.text('실시간'));
+      final timetableRect = tester.getRect(find.text('시간표'));
+      final leftSegment = tester.getRect(
+        find.byKey(
+          const ValueKey('networkMapNearbyDataSourceToggleSegment-실시간'),
+        ),
+      );
+      final rightSegment = tester.getRect(
+        find.byKey(
+          const ValueKey('networkMapNearbyDataSourceToggleSegment-시간표'),
+        ),
+      );
+      expect(realtimeRect.center.dx, lessThan(timetableRect.center.dx));
+      expect(rightSegment.left - leftSegment.right, moreOrLessEquals(0));
     });
 
     testWidgets('선택 세그먼트는 Semantics selected를 노출한다', (tester) async {
@@ -233,14 +270,25 @@ void main() {
           segmentContainer(tester, '실시간').decoration! as BoxDecoration;
       expect(
         realtimeDeco.color,
-        EasySubwayAccessibleColors.nearbyToggleIdleFill,
-        reason: '비활성 선택 세그먼트는 흰 배경을 쓰지 않는다',
+        Colors.transparent,
+        reason: '비활성 선택 세그먼트는 흰 pill을 그리지 않는다',
       );
       expect(
         realtimeDeco.border,
         isNull,
         reason: '비활성은 brandSignature 테두리를 걷어낸다',
       );
+      // 단일 배경 track은 비활성에서도 idleFill을 유지한다.
+      final trackDeco =
+          tester
+                  .widget<Container>(
+                    find.byKey(
+                      const Key('networkMapNearbyDataSourceToggleTrack'),
+                    ),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      expect(trackDeco.color, EasySubwayAccessibleColors.nearbyToggleIdleFill);
 
       final realtimeText = tester.widget<Text>(find.text('실시간'));
       expect(realtimeText.style!.color, EasySubwayAccessibleColors.mutedText);

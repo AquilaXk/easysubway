@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../../accessible_design.dart';
 
-/// 주변역 패널 실시간/시간표 2버튼 세그먼트 토글 (오너 스펙 2026-07-16, #2200).
+/// 주변역 패널 실시간/시간표 세그먼트 토글 (오너 스펙 2026-07-16, #2200/#2207).
 ///
-/// 각 세그먼트 59×48(전체 118×48), 시각 높이 32, radius 16. 비선택은 옅은 회색
-/// 배경, 선택은 흰 배경 + brandSignature 2dp 테두리. 전환 애니메이션은 없다.
-/// 비선택 세그먼트를 누르면 [onToggle]로 데이터 소스를 뒤집고, 선택된 세그먼트
-/// 탭은 no-op이다.
+/// 두 칸(59×48, 전체 118×48 터치 영역)이 하나의 라운드 컨테이너 안에 붙어 있는
+/// 단일 세그먼트 컨트롤이다. 비선택 배경([EasySubwayAccessibleColors.nearbyToggleIdleFill])이
+/// 두 칸을 하나로 감싸고(세로 inset 상하 8 → 시각 118×32, radius 16), 두 칸 사이
+/// 간격은 없다. 선택된 칸만 흰 배경 + brandSignature 2dp 테두리 pill(59×32, radius
+/// 16)로 그 절반 위에 겹쳐 그린다. 전환 애니메이션·splash는 없다. 비선택 칸을
+/// 누르면 [onToggle]로 데이터 소스를 뒤집고, 선택된 칸 탭은 no-op이다.
 class NearbyDataSourceToggle extends StatelessWidget {
   const NearbyDataSourceToggle({
     required this.isRealtime,
@@ -24,23 +26,42 @@ class NearbyDataSourceToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return SizedBox(
       key: const Key('networkMapNearbyDataSourceToggle'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _Segment(
-          label: '실시간',
-          selected: isRealtime,
-          enabled: enabled,
-          onToggle: onToggle,
-        ),
-        _Segment(
-          label: '시간표',
-          selected: !isRealtime,
-          enabled: enabled,
-          onToggle: onToggle,
-        ),
-      ],
+      width: 118,
+      height: 48,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 두 칸을 하나로 감싸는 단일 라운드 배경(118×32). 두 칸 사이 간격 없음.
+          Container(
+            key: const Key('networkMapNearbyDataSourceToggleTrack'),
+            width: 118,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: EasySubwayAccessibleColors.nearbyToggleIdleFill,
+              borderRadius: _radius,
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _Segment(
+                label: '실시간',
+                selected: isRealtime,
+                enabled: enabled,
+                onToggle: onToggle,
+              ),
+              _Segment(
+                label: '시간표',
+                selected: !isRealtime,
+                enabled: enabled,
+                onToggle: onToggle,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -61,25 +82,18 @@ class _Segment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tappable = enabled && !selected;
-    // 비활성 상태는 선택 세그먼트의 흰 배경·brandSignature 테두리를 걷어내고
-    // 글자색을 mutedText로 낮춰, 활성 토글과 시각적으로 구분한다(여전히 비탭).
-    final Color fillColor;
-    final Border? borderSide;
+    // 비활성 상태는 선택 칸의 흰 배경·brandSignature 테두리를 걷어내고 글자색을
+    // mutedText로 낮춰, 활성 토글과 시각적으로 구분한다(여전히 비탭).
+    final bool showPill;
     final Color textColor;
     if (!enabled) {
-      fillColor = EasySubwayAccessibleColors.nearbyToggleIdleFill;
-      borderSide = null;
+      showPill = false;
       textColor = EasySubwayAccessibleColors.mutedText;
     } else if (selected) {
-      fillColor = Colors.white;
-      borderSide = Border.all(
-        color: EasySubwayAccessibleColors.brandSignature,
-        width: 2,
-      );
+      showPill = true;
       textColor = EasySubwayAccessibleColors.brandSignature;
     } else {
-      fillColor = EasySubwayAccessibleColors.nearbyToggleIdleFill;
-      borderSide = null;
+      showPill = false;
       textColor = EasySubwayAccessibleColors.nearbyToggleIdleText;
     }
     return Semantics(
@@ -99,12 +113,19 @@ class _Segment extends StatelessWidget {
           height: 48,
           child: Center(
             child: Container(
+              key: ValueKey('networkMapNearbyDataSourceToggleSegment-$label'),
+              width: 59,
               height: 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: fillColor,
+                color: showPill ? Colors.white : Colors.transparent,
                 borderRadius: NearbyDataSourceToggle._radius,
-                border: borderSide,
+                border: showPill
+                    ? Border.all(
+                        color: EasySubwayAccessibleColors.brandSignature,
+                        width: 2,
+                      )
+                    : null,
               ),
               child: Text(
                 label,
