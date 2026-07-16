@@ -137,6 +137,14 @@ test("A RED v2 matrix cases are bound to the complete root artifact identity", (
       error.path.endsWith(".artifactIdentitySha256") &&
       error.rule === "root-artifact-identity-digest",
   );
+  const unbound = schemaV2Blocked(gate, "FAIL");
+  unbound.matrices = [freshV2Pass().matrices[0]];
+  assert.throws(
+    () => validateAbusePenetrationSummary(unbound, gate),
+    (error) => error.code === "SUMMARY_IDENTITY_INVALID" &&
+      error.path === "$.artifactIdentity" &&
+      error.rule === "matrix-case-root-artifact-identity",
+  );
 });
 test("A RED direct schema rejects every missing required and extra field", () => {
   const requiredByKind = {
@@ -385,7 +393,8 @@ test("B RED v2 procedure target expected and observed status mapping is exact", 
   await rejectSummary(t, freshV2Pass(), (s) => { s.matrices[0].cases[0].targetAlias = `target.${s.matrices[1].matrixId}`; }, "SUMMARY_PROCEDURE_MAPPING_INVALID", { requirePass: true });
   await rejectSummary(t, freshV2Pass(), (s) => { s.matrices[0].cases[0].expectedStatus = 599; }, "SUMMARY_PROCEDURE_MAPPING_INVALID", { requirePass: true });
   await rejectSummary(t, freshV2Pass(), (s) => { s.matrices[0].cases[0].observedStatus = -1; }, "SUMMARY_PROCEDURE_MAPPING_INVALID", { requirePass: true });
-  const failed = schemaV2Blocked(gate, "FAIL"); failed.matrices = [freshV2Pass().matrices[0]];
+  const failed = schemaV2Blocked(gate, "FAIL"); failed.artifactIdentity = structuredClone(schemaV2Identity);
+  failed.matrices = [freshV2Pass().matrices[0]];
   failed.matrices[0].result = "FAIL"; failed.matrices[0].cases[0].observedStatus = -1;
   await runSummary(t, failed);
 });
@@ -417,7 +426,8 @@ test("B RED v2 accepts cross-matrix shared root evidence and unordered arrays", 
   await runSummary(t, summary, { requirePass: true, gateValue: syntheticGate });
 });
 test("B RED v2 FAIL allows observed mismatch and BLOCKED allows omissions", async (t) => {
-  const failed = schemaV2Blocked(gate, "FAIL"); failed.matrices = [freshV2Pass().matrices[0]];
+  const failed = schemaV2Blocked(gate, "FAIL"); failed.artifactIdentity = structuredClone(schemaV2Identity);
+  failed.matrices = [freshV2Pass().matrices[0]];
   failed.matrices[0].result = "FAIL"; failed.matrices[0].cases[0].observedStatus = -1; await runSummary(t, failed);
   await runSummary(t, schemaV2Blocked());
   await assert.rejects(runSummary(t, failed, { requirePass: true }), /SUMMARY_REQUIRE_PASS_FAILED/);

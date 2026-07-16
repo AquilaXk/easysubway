@@ -146,6 +146,9 @@ function validateV2Semantics(summary, gate, catalog) {
   if (summary.evidence !== undefined) validateEvidence(summary.evidence,catalog.matrixEvidenceIds,"$.evidence",pass,gate,summary.artifactIdentity,evidencePaths);
   if (summary.productionLikeEvidence !== undefined) validateEvidence(summary.productionLikeEvidence,catalog.productionLikeEvidenceIds,"$.productionLikeEvidence",pass,gate,summary.artifactIdentity,evidencePaths);
   if (summary.matrices === undefined) return;
+  if (summary.artifactIdentity === undefined && summary.matrices.some((matrix) => matrix.cases.length > 0)) {
+    fail("SUMMARY_IDENTITY_INVALID","$.artifactIdentity","matrix-case-root-artifact-identity");
+  }
   const matrixIds = uniqueIds(summary.matrices,"matrixId",new Set(catalog.matrixIds),"$.matrices");
   const expectedIdentitySha256 = summary.artifactIdentity === undefined ? undefined : artifactIdentitySha256(summary.artifactIdentity);
   const procedureSets = [];
