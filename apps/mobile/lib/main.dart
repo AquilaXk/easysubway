@@ -10,11 +10,11 @@ import 'features/home_widget/home_widget_link_handler.dart';
 import 'features/home_widget/next_train_widget_repository.dart';
 import 'features/home_widget/next_train_widget_runtime.dart'
     as next_train_widget_runtime;
+import 'features/stations/presentation/station_detail_screen.dart';
 import 'facility_report.dart';
 import 'legacy_credential_cleanup.dart';
 import 'mobile_error_reporter.dart';
 import 'onboarding.dart';
-import 'station_search.dart';
 
 const defaultPushNotificationsEnabled = bool.fromEnvironment(
   'EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS',

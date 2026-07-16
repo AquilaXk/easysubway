@@ -2288,6 +2288,39 @@ test("역 위치 채널과 controller는 stations data·application canonical �
   assert.doesNotMatch(locationTest, /station_search\.dart/);
 });
 
+test("역 상세 화면은 stations presentation canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationDetailScreen = read(
+    "apps/mobile/lib/features/stations/presentation/station_detail_screen.dart",
+  );
+
+  assert.match(stationDetailScreen, /^class StationDetailScreen\b/m);
+  assert.doesNotMatch(stationSearch, /^class StationDetailScreen\b/m);
+  assert.doesNotMatch(
+    stationSearch,
+    /^export 'features\/stations\/presentation\/station_detail_screen\.dart';$/m,
+  );
+  for (const [consumerPath, importPattern] of [
+    [
+      "apps/mobile/lib/main.dart",
+      /^import 'features\/stations\/presentation\/station_detail_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
+      /^import '\.\.\/\.\.\/stations\/presentation\/station_detail_screen\.dart';$/m,
+    ],
+    [
+      "apps/mobile/test/widget_test.dart",
+      /^import 'package:easysubway_mobile\/features\/stations\/presentation\/station_detail_screen\.dart';$/m,
+    ],
+  ]) {
+    assert.match(
+      read(consumerPath),
+      importPattern,
+    );
+  }
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -15951,6 +15984,15 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
   );
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationSearchController = read(
+    "apps/mobile/lib/features/stations/application/station_search_controller.dart",
+  );
+  const stationDetailScreen = read(
+    "apps/mobile/lib/features/stations/presentation/station_detail_screen.dart",
+  );
+  const stationExitCard = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
+  );
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
 
   assert.equal(inventory.schemaVersion, 1);
@@ -16177,7 +16219,10 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   }
   assert.doesNotMatch(privacyManifest, /NSPrivacyCollectedDataTypeDeviceID/);
 
-  assert.match(stationSearch, /currentLocation\(\)/);
+  assert.match(
+    `${stationSearchController}\n${stationDetailScreen}\n${stationExitCard}`,
+    /currentLocation\(\)/,
+  );
   assert.match(facilityReport, /photoDataBase64/);
   assert.match(facilityReport, /latitude/);
   const appDependencies = read("apps/mobile/lib/app/app_dependencies.dart");
