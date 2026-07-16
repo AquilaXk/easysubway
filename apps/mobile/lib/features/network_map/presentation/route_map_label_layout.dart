@@ -18,6 +18,14 @@ import 'route_map_transfer_marker.dart';
 // 어떤 라벨도 숨기지 않으며, 물리적으로 불가피한 겹침만 최소화 배치 후
 // unresolvedOverlapCount로 집계해 감사·튜닝 대상으로 남긴다.
 
+/// 다줄 오너 라벨의 한 줄 렌더 단위(design space px, #2068 다줄 라벨 렌더).
+class RouteMapStaticLabelLine {
+  const RouteMapStaticLabelLine({required this.text, required this.rect});
+
+  final String text;
+  final Rect rect; // design space px — 이 줄만의 anchor·크기로 산출.
+}
+
 /// 배치된 역명 라벨 (design space px). [bold]는 환승 또는 종착.
 class RouteMapStaticLabel {
   const RouteMapStaticLabel({
@@ -26,12 +34,13 @@ class RouteMapStaticLabel {
     required this.rect,
     required this.bold,
     required this.fontSizePx,
+    this.lines = const [],
   });
 
   /// `transfer:<stationId>` 또는 `<stationId>:<lineId>`.
   final String id;
   final String text;
-  final Rect rect; // design space px
+  final Rect rect; // design space px — 단일 줄이면 실제 텍스트 rect, 다줄이면 [lines] 합집합.
 
   /// #2068 9차: 렌더 font-size(design px). 오너 매치 라벨은 오너 SVG의 실제
   /// font-size(entry.fontSizePx × designScale) 그대로, 폴백 라벨은 권역
@@ -39,6 +48,14 @@ class RouteMapStaticLabel {
   /// 모드). recordRouteMapPicture가 라벨별로 다른 크기를 그리기 위한 필드.
   final double fontSizePx;
   final bool bold;
+
+  /// #2068 다줄 라벨 렌더: 오너 SVG가 이 라벨을 2줄 이상으로 나눴고 그 줄을
+  /// 이어붙인 텍스트가 [text]와 정확히 같을 때만 채워진다(대괄호 축약 등으로
+  /// 다르면 안전하게 단일 줄로 폴백 — 비어 있으면 painter가 기존처럼 [text]/
+  /// [rect] 하나로 그린다). 비어 있지 않으면 painter가 줄마다 독립적으로 그린다
+  /// (오너가 좁게 접어둔 이름을 앱이 풀네임 1줄로 오판해 이웃과 오탐 겹치는
+  /// 문제를 없앤다).
+  final List<RouteMapStaticLabelLine> lines;
 }
 
 /// 배치된 노선 뱃지 pill (design space px).
@@ -152,6 +169,79 @@ Rect _ownerLabelRect(
     case RouteMapOwnerLabelAnchor.start:
       return Rect.fromLTWH(anchorDesign.dx, top, size.width, size.height);
   }
+}
+
+/// 오너 매치 라벨 1건을 [RouteMapStaticLabel]로 만든다(#2068 다줄 라벨 렌더).
+/// 오너 SVG가 이 라벨을 2줄 이상으로 나눴고([entry.lines]) 그 줄을 이어붙인
+/// 텍스트가 앱 표시 텍스트([text])와 정확히 같으면 줄마다 독립 rect로 그린다
+/// — SVG가 좁게 접어둔 이름(예: 검단사거리="검단"/"사거리")을 앱이 풀네임
+/// 1줄 폭으로 오판해 이웃 라벨과 오탐 겹치는 문제(#2068 조사 3)를 없앤다.
+/// 이어붙인 텍스트가 다르면(괄호 축약 등으로 [text]가 entry.station과 달라진
+/// 드문 경우) 안전하게 단일 줄 폴백 — 기존(다줄 지원 전) 동작과 동일하다.
+/// [rect]는 항상 채워진다: 단일 줄이면 그 텍스트의 rect, 다줄이면 줄별 rect의
+/// 합집합(솔버·감사 로직이 라벨 전체 점유 영역으로 계속 쓴다).
+RouteMapStaticLabel _ownerFixedLabel({
+  required String id,
+  required String text,
+  required RouteMapOwnerLabelEntry entry,
+  required RouteMapDesignSpace design,
+  required bool bold,
+  required double fontSizePx,
+  required Size Function(
+    String text, {
+    required bool bold,
+    required double fontSize,
+  })
+  measureLabel,
+}) {
+  final joinedLines = entry.lines.isEmpty
+      ? null
+      : entry.lines.map((line) => line.text).join();
+  if (entry.lines.length >= 2 && joinedLines == text) {
+    final lines = <RouteMapStaticLabelLine>[];
+    for (final line in entry.lines) {
+      final lineSize = measureLabel(
+        line.text,
+        bold: bold,
+        fontSize: fontSizePx,
+      );
+      lines.add(
+        RouteMapStaticLabelLine(
+          text: line.text,
+          rect: _ownerLabelRect(
+            design.toDesign(line.position),
+            lineSize,
+            entry.anchor,
+            fontSizePx,
+          ),
+        ),
+      );
+    }
+    final unionRect = lines
+        .map((line) => line.rect)
+        .reduce((a, b) => a.expandToInclude(b));
+    return RouteMapStaticLabel(
+      id: id,
+      text: text,
+      rect: unionRect,
+      bold: bold,
+      fontSizePx: fontSizePx,
+      lines: lines,
+    );
+  }
+  final size = measureLabel(text, bold: bold, fontSize: fontSizePx);
+  return RouteMapStaticLabel(
+    id: id,
+    text: text,
+    rect: _ownerLabelRect(
+      design.toDesign(entry.position),
+      size,
+      entry.anchor,
+      fontSizePx,
+    ),
+    bold: bold,
+    fontSizePx: fontSizePx,
+  );
 }
 
 /// 오너 라벨 매칭 위치 게이트(design px, #2068 7차) — 동명이역(신촌·양평 등)이
@@ -462,21 +552,17 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
         // #2068: 오너 SVG font-size(design 환산)를 클램프 없이 그대로 렌더한다
         // — Pretendard 번들로 앱 자폭이 SVG와 동일해 오너 배치가 겹침 없이
         // 성립한다(10차 13px 상한 클램프 제거). 앵커도 스케일 보정 없이 오너
-        // 좌표 그대로 쓴다.
+        // 좌표 그대로 쓴다. 다줄 라벨은 [_ownerFixedLabel]이 줄별로 배치한다.
         final fontSizePx = entry.fontSizePx * design.designScale;
-        final size = measureLabel(text, bold: true, fontSize: fontSizePx);
         ownerFixedLabels.add(
-          RouteMapStaticLabel(
+          _ownerFixedLabel(
             id: 'transfer:${group.stationId}',
             text: text,
-            rect: _ownerLabelRect(
-              design.toDesign(entry.position),
-              size,
-              entry.anchor,
-              fontSizePx,
-            ),
+            entry: entry,
+            design: design,
             bold: true,
             fontSizePx: fontSizePx,
+            measureLabel: measureLabel,
           ),
         );
         continue;
@@ -525,21 +611,17 @@ RouteMapStaticLabelLayout solveRouteMapLabelLayout({
         // #2068: 오너 SVG font-size(design 환산)를 클램프 없이 그대로 렌더한다
         // — Pretendard 번들로 앱 자폭이 SVG와 동일해 오너 배치가 겹침 없이
         // 성립한다(10차 13px 상한 클램프 제거). 앵커도 스케일 보정 없이 오너
-        // 좌표 그대로 쓴다.
+        // 좌표 그대로 쓴다. 다줄 라벨은 [_ownerFixedLabel]이 줄별로 배치한다.
         final fontSizePx = entry.fontSizePx * design.designScale;
-        final size = measureLabel(text, bold: bold, fontSize: fontSizePx);
         ownerFixedLabels.add(
-          RouteMapStaticLabel(
+          _ownerFixedLabel(
             id: '${station.stationId}:${station.lineId}',
             text: text,
-            rect: _ownerLabelRect(
-              design.toDesign(entry.position),
-              size,
-              entry.anchor,
-              fontSizePx,
-            ),
+            entry: entry,
+            design: design,
             bold: bold,
             fontSizePx: fontSizePx,
+            measureLabel: measureLabel,
           ),
         );
         continue;

@@ -75,10 +75,61 @@ void main() {
       expect(result.containsKey('정상역'), isTrue);
     });
 
-    test(
-      '#2068 광주 2차: hasLineTerminalBadge 플래그를 파싱하고 미보유 시 false',
-      () {
-        const sidecar = '''
+    test('필드 누락 항목의 station·anchor는 그대로 skip과 무관 — lines 필드 없으면 빈 리스트', () {
+      final seoul = parseRouteMapOwnerLabelsForRegion(sidecar, 'seoul');
+      expect(seoul['시청']!.lines, isEmpty);
+    });
+
+    test('#2068 다줄 라벨 렌더: lines가 있으면 텍스트·좌표를 순서대로 파싱한다', () {
+      const sidecar = '''
+      {
+        "regions": {
+          "seoul": [
+            {"station": "검단사거리", "role": "ordinary", "x": 541.0, "y": 1253.4,
+             "anchor": "start", "fontSizePx": 26.374,
+             "lines": [
+               {"text": "검단", "x": 541.0, "y": 1253.4},
+               {"text": "사거리", "x": 530.0, "y": 1282.2}
+             ]}
+          ]
+        }
+      }
+      ''';
+      final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'seoul');
+      final entry = result['검단사거리']!;
+      expect(entry.lines.length, 2);
+      expect(entry.lines[0].text, '검단');
+      expect(entry.lines[0].position, const Offset(541.0, 1253.4));
+      expect(entry.lines[1].text, '사거리');
+      expect(entry.lines[1].position, const Offset(530.0, 1282.2));
+    });
+
+    test('#2068 다줄 라벨 렌더: lines 항목 중 필드 누락은 건너뛰고 나머지는 유지한다', () {
+      const sidecar = '''
+      {
+        "regions": {
+          "seoul": [
+            {"station": "테스트역", "role": "ordinary", "x": 1.0, "y": 1.0,
+             "anchor": "start", "fontSizePx": 12.0,
+             "lines": [
+               {"text": "정상줄", "x": 1.0, "y": 1.0},
+               {"text": "", "x": 2.0, "y": 2.0},
+               {"x": 3.0, "y": 3.0},
+               {"text": "정상줄2", "x": 4.0, "y": 4.0}
+             ]}
+          ]
+        }
+      }
+      ''';
+      final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'seoul');
+      final entry = result['테스트역']!;
+      expect(entry.lines.length, 2);
+      expect(entry.lines[0].text, '정상줄');
+      expect(entry.lines[1].text, '정상줄2');
+    });
+
+    test('#2068 광주 2차: hasLineTerminalBadge 플래그를 파싱하고 미보유 시 false', () {
+      const sidecar = '''
       {
         "regions": {
           "gwangju": [
@@ -88,11 +139,10 @@ void main() {
         }
       }
       ''';
-        final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'gwangju');
-        expect(result['평동']!.hasLineTerminalBadge, isTrue);
-        expect(result['도산']!.hasLineTerminalBadge, isFalse);
-      },
-    );
+      final result = parseRouteMapOwnerLabelsForRegion(sidecar, 'gwangju');
+      expect(result['평동']!.hasLineTerminalBadge, isTrue);
+      expect(result['도산']!.hasLineTerminalBadge, isFalse);
+    });
   });
 
   group('routeMapOwnerLabelsByRegionFrom', () {

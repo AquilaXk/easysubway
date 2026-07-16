@@ -53,13 +53,36 @@ import '../../../support/pretendard_test_font.dart';
 // - 예외 1쌍(마곡나루×신방화, 둘 다 단일 줄): 실제 SVG 렌더에서도 **미세하게
 //   겹친다**(ox≈0.04design 단위 — 서브픽셀 수준, 오너 SVG 자체의 근접 배치).
 //   이 1쌍만 "오너 디자인 그대로"다.
-// - 결론: 25쌍 중 24쌍은 **우리 렌더링(단일 줄 강제)의 한계**이지 오너 SVG
-//   겹침이 아니다. 다만 이를 고치려면 sidecar 스키마에 줄바꿈 정보를 추가하고
-//   앱이 오너 매치 라벨을 다줄로 렌더하도록 painter를 확장해야 한다 — 5권역
-//   전체에 영향을 미치는 별도 기능(#2068 범위 밖, 후속 과제로 분리). 클램프
-//   재도입은 오너의 "글자 키워" 요청을 도로 막으므로 **하지 않는다**(명시적
-//   지시). 따라서 이 baseline은 다줄 라벨 렌더링 후속 과제 전까지 현재 상태를
-//   고정하는 회귀 감시값이다(악화 금지, 완화는 후속 과제 완료 후).
+//
+// 조사 4(다줄 라벨 렌더 구현, 2026-07-17): 조사 3의 진단대로 다줄 라벨을
+// 실제로 구현했다 — compile-basemap-vec.mjs의 extractOwnerLabelLineLocalPositions
+// 가 2줄 이상 라벨의 줄 구성(text+좌표)을 labels.json `lines` 필드로 뽑고
+// (daejeon의 class=station-sub 부기 캡션은 표시 라벨이 아니므로 제외),
+// route_map_label_layout.dart의 [_ownerFixedLabel]이 (이어붙인 줄 텍스트가
+// 앱 표시 텍스트와 정확히 같을 때만, 안전 가드) 줄마다 독립 rect로 배치하며
+// structured_route_map_painter.dart가 줄마다 그린다. 결과: pairs
+// **25→3**로 줄었다(실측 검증):
+// - 마곡나루×신방화(둘 다 단일 줄): 조사 3에서 이미 확인한 오너 SVG 자체의
+//   서브픽셀 근접 배치 — "오너 디자인 그대로", 이 게이트가 고칠 대상이 아니다.
+// - 솔밭공원×4.19민주묘지: 솔밭공원은 다줄 렌더되지만 4.19민주묘지는 안전
+//   가드에 걸려 단일 줄로 폴백한다 — entry.station(오너 SVG 원문, 중점 "4·19
+//   민주묘지")과 앱 표시 텍스트("4.19민주묘지", DB 표기는 마침표)가 문자열
+//   불일치라 다줄 렌더를 건너뛴다(매칭 자체는 _normalizeOwnerLabelNameKey의
+//   중점↔마침표 정규화로 성립하지만, 그 정규화는 후보 키 조회에만 적용되고
+//   entry 텍스트 자체를 바꾸지 않는다 — 7차 지시대로 정규화 범위를 넓히지
+//   않는다). 헤드리스 크롬 검증(조사 3)에서 이미 이 쌍은 실제 SVG에서
+//   겹치지 않음을 확인했다 — 안전 가드의 보수적 비용.
+// - 석천사거리×모래내시장(둘 다 다줄): 헤드리스 크롬 getBBox 재검증 결과 실제
+//   SVG는 겹치지 않는다(oy=0, 두 라벨이 수직으로 딱 붙어 있을 뿐). 우리 rect
+//   모델은 줄 높이를 TextPainter 실측(≈font×1.3)으로 근사하는데, 이 근사가
+//   오너의 실제 줄간격(로컬 28.8 단위, font×1.09)보다 살짝 커 인접 줄이
+//   0.5design 단위 정도 겹치는 것으로 오판한다 — 폭 근사와 같은 "과대 방향
+//   안전 근사"의 부작용(있어도 라벨을 자르지 않지만, 겹침 카운트엔 잡힌다).
+// - 클램프 재도입은 오너의 "글자 키워" 요청을 도로 막으므로 하지 않았다(명시적
+//   지시 준수). 남은 3쌍은 1건 오너 디자인 그대로 + 2건 근사 모델의 보수적
+//   비용이라 baseline을 3으로 고정한다(악화 금지) — 0으로 더 낮추려면 (a)
+//   4.19민주묘지류의 · /. 표기차를 흡수하는 별도 정규화, (b) 줄 높이를 더
+//   타이트하게 근사(단, 폭과 달리 과소 방향 위험) 가 필요해 별도 과제로 남긴다.
 //
 // 이름 매칭은 중점(·)↔마침표(.) 정규화만 적용한다(#2068 7차 지시 2 — 다른
 // 정규화는 과매칭 위험이라 하지 않는다, route_map_label_layout.dart의
@@ -74,11 +97,11 @@ Size _measureLabel(
 Size _measureBadge(String text, {required double fontSize}) =>
     measureRouteMapBadge(text, fontSize: fontSize, basemap: true);
 
-// Pretendard 실메트릭 + 오너 크기(클램프 제거) + 추출 결함 2건 교정
-// (text-anchor style 파싱·tspan x/y 우선순위, 아래 조사 2) 후 TextPainter
-// 실측정(악화 금지). 24/25는 앱의 단일 줄 렌더링 한계(조사 3)로 판명 —
-// sidecar 다줄 지원 후속 과제 전까지는 이 값이 현재 상태의 정직한 기록이다.
-const int kCapitalBasemapLabelLabelPairBaseline = 25;
+// Pretendard 실메트릭 + 오너 크기(클램프 제거) + 추출 결함 교정(text-anchor
+// style 파싱·tspan x/y 우선순위·다줄 라벨 렌더, 위 조사 2·4) 후 TextPainter
+// 실측정(악화 금지). 잔여 3쌍의 근거는 조사 4 참고 — 1건 오너 디자인 그대로,
+// 2건 근사 모델(단일 줄 폴백 가드·줄 높이 과대 근사)의 보수적 비용이다.
+const int kCapitalBasemapLabelLabelPairBaseline = 3;
 
 bool _rectOverlaps(Rect a, Rect b) {
   final o = a.intersect(b);

@@ -198,7 +198,6 @@ void main() {
 
     final expectedOwnerRects = networkMapOwnerLabelSourceRects(
       ownerLabels: ownerLabels.values,
-      designScale: fixture.designScale,
     );
 
     // 프로덕션 _MapGeometry.fromStations와 동일 계산(테스트 노출 함수)으로

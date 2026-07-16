@@ -404,6 +404,56 @@ function ownerLabelStationKey(textOpenTag, textBlock) {
   return ownerLabelTextContent(textBlock);
 }
 
+// 여러 줄(2단) 라벨의 줄 구성을 local(pre-transform) 단위로 뽑는다(#2068
+// 다줄 라벨 렌더 — 앱이 오너 매치 라벨을 늘 단일 줄로 측정·렌더해, 오너가 2줄로
+// 좁게 배치한 이름(예: 검단사거리="검단"/"사거리")을 풀네임 1줄 폭으로 오판해
+// 이웃 라벨과 오탐 겹침을 만들었다).
+//
+// "leaf" tspan(직계 텍스트만 담고 다른 태그를 안 감싸는 tspan)만 대상으로 한다
+// — 중첩 wrapper tspan(이수형 sodipodi:role="line")은 자기 텍스트가 없어(다음
+// 문자가 바로 `<tspan`) 자동 제외된다. y는 절대값이 있으면 그 값을, 없고 dy만
+// 있으면(daegu·busan·daejeon 관례) 직전 커서 + dy로 누적한다(seoul·gwangju는
+// 절대 y만 씀, 관측 확인). x도 tspan 자체 값이 있으면 갱신하고 없으면 직전
+// 커서를 이어받는다.
+//
+// class="station-sub"(daejeon 부기 캡션 — 예: "오정" 메인 + "한남대" 부기, 메인과
+// 다른 축소 font-size)는 표시 라벨의 일부가 아니라 장식 주석이라 제외한다 —
+// 포함하면 카탈로그가 모르는 텍스트가 둘째 줄로 렌더되고 per-line 별도 font-size
+// 지원도 필요해진다(범위 밖). daejeon 환승 5역(대동 등)은 이 필터로 "station-main"
+// 한 줄만 남아 lines.length<=1이 되므로 기존 단일 줄 렌더가 그대로 유지된다.
+//
+// 반환이 2줄 미만이면 호출부가 entry에 lines를 붙이지 않는다(스키마 최소화 —
+// 기존 단일 줄 엔트리·매치 키(ownerLabelStationKey는 무관)와 100% 호환).
+function extractOwnerLabelLineLocalPositions(textOpenTag, textBlock) {
+  const leafTspanRe = /<tspan\b([^>]*)>([^<]*)</g;
+  let cursorX = firstAttr(textOpenTag, "x");
+  let cursorY = firstAttr(textOpenTag, "y");
+  const lines = [];
+  for (const match of textBlock.matchAll(leafTspanRe)) {
+    const tspanAttrs = match[1];
+    const rawText = match[2];
+    if (!rawText || !rawText.trim()) continue; // wrapper-only(빈 텍스트) 제외.
+    if ((firstAttr(tspanAttrs, "class") ?? "").includes("station-sub")) {
+      continue; // 부기 캡션 제외.
+    }
+    const tspanX = firstAttr(tspanAttrs, "x");
+    if (tspanX != null) cursorX = tspanX;
+    const tspanY = firstAttr(tspanAttrs, "y");
+    const tspanDy = firstAttr(tspanAttrs, "dy");
+    if (tspanY != null) {
+      cursorY = tspanY;
+    } else if (tspanDy != null && cursorY != null) {
+      cursorY = String(Number(cursorY) + Number(tspanDy));
+    }
+    if (cursorX == null || cursorY == null) continue; // 위치 미상 줄은 제외.
+    const localX = Number(cursorX);
+    const localY = Number(cursorY);
+    if (!Number.isFinite(localX) || !Number.isFinite(localY)) continue;
+    lines.push({ text: rawText.trim(), localX, localY });
+  }
+  return lines;
+}
+
 // [groupOpenTag]는 gwangju처럼 role이 감싸는 <g>에 있을 때만 넘긴다(그 외 null).
 function ownerLabelEntryFrom(
   groupOpenTag,
@@ -476,6 +526,28 @@ function ownerLabelEntryFrom(
   ) {
     return null;
   }
+  // 2줄 이상일 때만 lines에 항목을 채운다(#2068 다줄 라벨 렌더) — entry-level
+  // x/y와 같은 변환 파이프라인(groupTranslate+textTranslate 후
+  // ×mapScale+mapTranslate)을 줄마다 적용해 최종 좌표계(entry.x/y와 동일 단위)
+  // 로 낸다. 단일 줄이면 빈 배열(스키마 항상 존재, 호출부가 length로 분기).
+  const lineLocalPositions = extractOwnerLabelLineLocalPositions(
+    textOpenTag,
+    textBlock,
+  );
+  const lines =
+    lineLocalPositions.length >= 2
+      ? lineLocalPositions.map((line) => ({
+          text: line.text,
+          x: roundCoord(
+            mapTranslate.dx +
+              (groupTranslate.dx + textTranslate.dx + line.localX) * mapScale,
+          ),
+          y: roundCoord(
+            mapTranslate.dy +
+              (groupTranslate.dy + textTranslate.dy + line.localY) * mapScale,
+          ),
+        }))
+      : [];
   return {
     station,
     role,
@@ -483,6 +555,7 @@ function ownerLabelEntryFrom(
     y: roundCoord(mapTranslate.dy + localY * mapScale),
     anchor,
     fontSizePx: roundCoord(fontSizeLocal * mapScale),
+    lines,
   };
 }
 

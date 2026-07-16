@@ -317,6 +317,87 @@ test("extractOwnerLabels: tspan에 x/y가 없으면(daegu 다음 줄 tspan 관�
   assert.equal(entries[0].y, 200);
 });
 
+test("extractOwnerLabels: 절대 y가 다른 2 tspan(2줄 라벨)은 lines에 두 줄을 담는다(#2068 다줄 라벨 렌더 — 검단사거리 사례)", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <g id="main-map-scaled-layer" transform="translate(0 0) scale(1)">
+        <text data-station="검단사거리" data-label-role="ordinary"
+              transform="translate(541 1253.4)" font-size="26.374"
+              ><tspan x="0" y="0">검단</tspan><tspan x="-11" y="28.8">사거리</tspan></text>
+      </g>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.equal(entry.station, "검단사거리"); // 매치 키는 여전히 전체 연결 텍스트.
+  assert.equal(entry.lines.length, 2);
+  assert.equal(entry.lines[0].text, "검단");
+  assert.equal(entry.lines[0].x, 541);
+  assert.equal(entry.lines[0].y, 1253.4);
+  assert.equal(entry.lines[1].text, "사거리");
+  assert.equal(entry.lines[1].x, 530); // 541 + (-11).
+  assert.equal(entry.lines[1].y, 1282.2); // 1253.4 + 28.8.
+});
+
+test("extractOwnerLabels: 절대 y 없이 dy만 있는 다음 줄(daegu/busan/daejeon 관례)도 커서 누적으로 lines에 담는다", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station="오정한남대" data-label-role="ordinary"
+            font-size="26" x="1980" y="900"
+            ><tspan x="1980" dy="0">오정</tspan><tspan x="1980" dy="10.8">한남대</tspan></text>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.equal(entry.lines.length, 2);
+  assert.equal(entry.lines[0].y, 900); // dy=0 → 부모 y 그대로.
+  assert.equal(entry.lines[1].y, 910.8); // 900 + 10.8.
+});
+
+test("extractOwnerLabels: class=station-sub(daejeon 부기 캡션)는 lines에서 제외돼 단일 줄로 남는다 — lines 필드 자체가 없다(#2068 대동 사례)", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-label-role="transfer" font-size="58" x="572" y="740"
+            data-full-official-name="1호선 대동 | 2호선 208 대동(하늘공원)"
+            ><tspan class="station-main" x="572" dy="0">대동</tspan><tspan
+             class="station-sub" x="572" dy="44.11" font-size="37.58px">하늘공원</tspan></text>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.equal(entry.station, "대동"); // canonical 매치 키 불변.
+  assert.deepEqual(entry.lines, []); // station-sub 제외 → 1줄만 남아 lines 미부착.
+});
+
+test("extractOwnerLabels: 단일 줄 라벨은 lines가 빈 배열이다(스키마 최소화)", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <text data-station="시청" data-label-role="transfer"
+            font-size="28.571px" x="100" y="200"
+            ><tspan x="100" y="200">시청</tspan></text>
+    </svg>
+  `);
+  assert.deepEqual(entries[0].lines, []);
+});
+
+test("extractOwnerLabels: <g data-label-role> 감싸인 gwangju형 다줄 라벨도 g의 transform을 lines 각 줄에 더한다(#2068 학동증심사입구 사례)", () => {
+  const entries = extractOwnerLabels(`
+    <svg>
+      <g id="station-label-group-1" data-station-name="학동"
+         data-label-role="ordinary" transform="translate(10,20)">
+        <text font-size="26"><tspan x="1942" y="889">학동</tspan><tspan
+              x="1942" y="944">증심사입구</tspan></text>
+      </g>
+    </svg>
+  `);
+  assert.equal(entries.length, 1);
+  const [entry] = entries;
+  assert.equal(entry.lines.length, 2);
+  assert.equal(entry.lines[0].x, 1952); // 1942 + groupTranslate.dx(10).
+  assert.equal(entry.lines[0].y, 909); // 889 + groupTranslate.dy(20).
+  assert.equal(entry.lines[1].y, 964); // 944 + 20.
+});
+
 test("extractOwnerLabels: 속성형 text-anchor가 style형보다 우선한다", () => {
   const entries = extractOwnerLabels(`
     <svg>

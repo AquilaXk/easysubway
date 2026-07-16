@@ -16,6 +16,20 @@ import 'dart:ui' show Offset;
 /// SVG `text-anchor` 값. `middle`/`end` 외 전부 `start`로 정규화한다.
 enum RouteMapOwnerLabelAnchor { start, middle, end }
 
+/// 오너 SVG 다줄(2단) 라벨의 한 줄(#2068 다줄 라벨 렌더) — compile-basemap-vec.mjs
+/// extractOwnerLabelLineLocalPositions가 뽑은 실측 줄 텍스트·앵커 좌표.
+/// [position]은 부모 [RouteMapOwnerLabelEntry.position]과 같은 viewBox(source)
+/// 좌표계·같은 text-anchor 의미(줄마다 독립 적용 — SVG 텍스트 청크 규칙, tspan이
+/// 자기 x를 선언하면 그 지점이 그 줄의 앵커)를 공유한다.
+class RouteMapOwnerLabelLine {
+  const RouteMapOwnerLabelLine({required this.text, required this.position});
+
+  final String text;
+
+  /// viewBox(source) 좌표.
+  final Offset position;
+}
+
 /// 오너가 SVG에서 손배치한 역명 라벨 1건.
 class RouteMapOwnerLabelEntry {
   const RouteMapOwnerLabelEntry({
@@ -25,6 +39,7 @@ class RouteMapOwnerLabelEntry {
     required this.anchor,
     required this.fontSizePx,
     this.hasLineTerminalBadge = false,
+    this.lines = const [],
   });
 
   /// SVG 라벨의 렌더 텍스트 내용(=역명, nameKo와 정확 일치 매칭 키).
@@ -33,7 +48,8 @@ class RouteMapOwnerLabelEntry {
   /// `ordinary`/`transfer`/`terminal` — 중복 역명 해소 우선순위에만 쓴다.
   final String role;
 
-  /// viewBox(source) 좌표.
+  /// viewBox(source) 좌표(첫 줄 앵커 — 단일 줄 라벨과 동일 의미, 매칭·후보
+  /// 거리 게이트는 이 대표점을 계속 쓴다).
   final Offset position;
   final RouteMapOwnerLabelAnchor anchor;
 
@@ -46,6 +62,11 @@ class RouteMapOwnerLabelEntry {
   /// 엔트리에만 표시한다. 앱 솔버가 basemap 노선 뱃지 pill과 중복 그리지
   /// 않도록 route_map_label_layout.dart가 이 플래그로 억제한다.
   final bool hasLineTerminalBadge;
+
+  /// #2068 다줄 라벨 렌더: 오너 SVG가 이 라벨을 2줄 이상으로 줄바꿈했으면 그
+  /// 줄 구성(비어 있으면 단일 줄 — 기존 station 텍스트·position 그대로 렌더).
+  /// 비어 있지 않을 때만 렌더러가 다줄 경로를 탄다.
+  final List<RouteMapOwnerLabelLine> lines;
 }
 
 int _routeMapOwnerLabelRolePriority(String role) => switch (role) {
@@ -60,6 +81,27 @@ RouteMapOwnerLabelAnchor _parseRouteMapOwnerLabelAnchor(Object? value) =>
       'end' => RouteMapOwnerLabelAnchor.end,
       _ => RouteMapOwnerLabelAnchor.start,
     };
+
+/// `lines` sidecar 필드 파싱(#2068 다줄 라벨 렌더) — 형식이 어긋난 항목은
+/// 건너뛴다(단일 줄 폴백과 같은 안전 방향: 결과가 비면 호출부가 단일 줄로 렌더).
+List<RouteMapOwnerLabelLine> _parseRouteMapOwnerLabelLines(Object? raw) {
+  if (raw is! List) return const [];
+  final lines = <RouteMapOwnerLabelLine>[];
+  for (final rawLine in raw) {
+    if (rawLine is! Map) continue;
+    final text = rawLine['text'];
+    final x = rawLine['x'];
+    final y = rawLine['y'];
+    if (text is! String || text.isEmpty || x is! num || y is! num) continue;
+    lines.add(
+      RouteMapOwnerLabelLine(
+        text: text,
+        position: Offset(x.toDouble(), y.toDouble()),
+      ),
+    );
+  }
+  return lines;
+}
 
 /// sidecar 전체 JSON에서 [regionId](예: `seoul`)의 라벨만 station명 키 맵으로
 /// 파싱한다. 형식이 어긋나거나 regionId가 없으면 빈 맵(호출부가 안전 폴백).
@@ -107,6 +149,7 @@ Map<String, RouteMapOwnerLabelEntry> parseRouteMapOwnerLabelsForRegion(
       anchor: _parseRouteMapOwnerLabelAnchor(raw['anchor']),
       fontSizePx: fontSizePx.toDouble(),
       hasLineTerminalBadge: raw['hasLineTerminalBadge'] == true,
+      lines: _parseRouteMapOwnerLabelLines(raw['lines']),
     );
     final existing = result[station];
     if (existing == null ||

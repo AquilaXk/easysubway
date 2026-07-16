@@ -341,8 +341,30 @@ ui.Picture recordRouteMapPicture({
   // 4) 역명 라벨(볼드=환승·종착) — 녹화 시에만 TextPainter 생성·즉시 dispose.
   // #2068 9차: label.fontSizePx로 그린다(오너 매치는 오너 SVG 크기 그대로).
   // basemap 모드(역 심벌 미렌더)는 오너 SVG와 동일한 Pretendard로 그린다(#2068).
+  // #2068 다줄 라벨 렌더: label.lines가 있으면(오너 SVG가 2줄 이상으로 나눈
+  // 라벨) 줄마다 자기 rect에 독립적으로 그린다 — 없으면(대다수) 기존처럼
+  // label.text 하나를 label.rect에 그린다.
   final basemap = !drawStationSymbols;
   for (final label in layout.labels) {
+    if (label.lines.isNotEmpty) {
+      for (final line in label.lines) {
+        final linePainter = TextPainter(
+          text: TextSpan(
+            text: line.text,
+            style: _labelStyleFor(
+              bold: label.bold,
+              fontSizePx: label.fontSizePx,
+              basemap: basemap,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+        )..layout();
+        linePainter.paint(canvas, line.rect.topLeft);
+        linePainter.dispose();
+      }
+      continue;
+    }
     final painter = TextPainter(
       text: TextSpan(
         text: label.text,

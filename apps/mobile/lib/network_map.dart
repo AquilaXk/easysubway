@@ -14,7 +14,6 @@ import 'design_tokens.dart';
 import 'facility_report.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/network_map/domain/map_camera.dart';
-import 'features/network_map/domain/route_map_design_space.dart';
 import 'features/network_map/domain/route_map_major_stations.dart';
 import 'features/network_map/domain/route_map_owner_labels.dart';
 import 'features/network_map/domain/structured_route_map.dart';
@@ -4009,12 +4008,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     }
     final ownerLabelSourceRects = ownerEntries == null || ownerEntries.isEmpty
         ? const <Rect>[]
-        : networkMapOwnerLabelSourceRects(
-            ownerLabels: ownerEntries.values,
-            designScale: routeMapDesignSpaceFor(
-              _currentStructuredMap(),
-            ).designScale,
-          );
+        : networkMapOwnerLabelSourceRects(ownerLabels: ownerEntries.values);
     final geometry = _MapGeometry.fromStations(
       data.stations,
       ownerLabelSourceRects: ownerLabelSourceRects,
@@ -5250,40 +5244,66 @@ Rect? _labelPolygonBoundsFor(NetworkMapStation station) {
   return polygon == null ? null : _boundsForPolygon(polygon);
 }
 
-/// basemap 오너 라벨 1건의 실제 렌더 rect를 source 좌표로 산출한다(#2068).
-/// painter(route_map_label_layout.dart의 오너 라벨 경로)와 같은 규칙을 source
-/// 단위로 옮긴 것:
-/// - 렌더 font-size = min(kRouteMapDesignLabelFontPx design px,
-///   entry.fontSizePx × designScale) 을 painter가 그리므로, source 단위로
-///   되돌리면 min(kRouteMapDesignLabelFontPx / designScale, entry.fontSizePx).
-/// - baseline 근사 top = anchorY − 0.8 × fontSize (painter [_ownerLabelRect]와 동일).
-/// - text-anchor(start/middle/end) 의미대로 anchorX에서 폭을 배치.
-///
-/// 폭은 painter가 TextPainter 실측을 쓰지만, geometry 산정 시점에 전 라벨을
-/// TextPainter로 재는 것은 과하므로 "글자수 × fontSize_source"로 보수적 근사한다
-/// (한글 자폭 ≈ 1em이라 근사 방향은 과대 → bounds가 살짝 넓어질 뿐 라벨을 자르는
-/// 방향이 아니어서 안전). 매칭 텍스트(축약본)가 아니라 원본 nameKo(entry.station)
-/// 글자수를 써 항상 실렌더 텍스트 이상 폭을 잡는 것도 같은 안전 방향이다.
-Rect _ownerLabelSourceRect(RouteMapOwnerLabelEntry entry, double designScale) {
-  final fontSizeSource = math.min(
-    kRouteMapDesignLabelFontPx / designScale,
-    entry.fontSizePx,
-  );
-  final width = entry.station.runes.length * fontSizeSource;
+/// [text]/[position]/[anchor]/[fontSizeSource] 한 줄의 근사 렌더 rect(source
+/// 좌표). [_ownerLabelSourceRect]·다줄 union이 공유하는 단일 줄 계산 —
+/// painter [_ownerLabelRect]와 같은 baseline 규칙(top = anchorY − 0.8×fontSize)
+/// ·anchor 배치를 쓴다. 폭은 TextPainter 실측 대신 "글자수 × fontSize"로
+/// 보수적 근사한다(한글 자폭 ≈ 1em이라 근사 방향은 과대 → bounds가 살짝
+/// 넓어질 뿐 라벨을 자르는 방향이 아니어서 안전).
+Rect _ownerLabelLineSourceRect(
+  String text,
+  Offset position,
+  RouteMapOwnerLabelAnchor anchor,
+  double fontSizeSource,
+) {
+  final width = text.runes.length * fontSizeSource;
   // painter의 TextPainter 높이는 대략 fontSize × 1.3(줄 높이)이라 그만큼 잡는다
   // (수직 여유 — 과대 방향이라 안전).
   final height = fontSizeSource * 1.3;
-  final top = entry.position.dy - 0.8 * fontSizeSource;
+  final top = position.dy - 0.8 * fontSizeSource;
   final double left;
-  switch (entry.anchor) {
+  switch (anchor) {
     case RouteMapOwnerLabelAnchor.middle:
-      left = entry.position.dx - width / 2;
+      left = position.dx - width / 2;
     case RouteMapOwnerLabelAnchor.end:
-      left = entry.position.dx - width;
+      left = position.dx - width;
     case RouteMapOwnerLabelAnchor.start:
-      left = entry.position.dx;
+      left = position.dx;
   }
   return Rect.fromLTWH(left, top, width, height);
+}
+
+/// basemap 오너 라벨 1건의 실제 렌더 rect를 source 좌표로 산출한다(#2068,
+/// 다줄 라벨 렌더 갱신). painter(route_map_label_layout.dart의 [_ownerFixedLabel])
+/// 와 같은 규칙을 source 단위로 옮긴 것 — entry.fontSizePx는 이미 source(viewBox)
+/// 단위 로컬 font-size라 design 변환·클램프 없이 그대로 쓴다(Pretendard 번들로
+/// 앱 자폭이 SVG와 동일해져 10차의 13px 상한 클램프를 제거했다 — 클램프가
+/// 여전히 있다면 이 함수의 bounds가 실제(더 큰) 렌더보다 좁게 잡혀 라벨이
+/// 잘릴 수 있었다).
+///
+/// [entry.lines]가 2줄 이상이면(오너 SVG가 줄바꿈한 라벨) 실제 렌더은 painter가
+/// 카탈로그 표시 텍스트 일치 여부로 다줄/단일 줄을 고르지만, 이 함수는 그
+/// 텍스트에 접근할 수 없다 — 단일 줄 근사(entry.station 전체 폭)와 줄별 근사의
+/// **합집합**을 잡아 항상 안전한 상위집합이 되게 한다(과대 방향, 절대 과소
+/// 방향 아님).
+Rect _ownerLabelSourceRect(RouteMapOwnerLabelEntry entry) {
+  var rect = _ownerLabelLineSourceRect(
+    entry.station,
+    entry.position,
+    entry.anchor,
+    entry.fontSizePx,
+  );
+  for (final line in entry.lines) {
+    rect = rect.expandToInclude(
+      _ownerLabelLineSourceRect(
+        line.text,
+        line.position,
+        entry.anchor,
+        entry.fontSizePx,
+      ),
+    );
+  }
+  return rect;
 }
 
 /// basemap 지역 오너 라벨들의 실제 렌더 rect(source 좌표) 목록. geometry bounds가
@@ -5294,11 +5314,8 @@ Rect _ownerLabelSourceRect(RouteMapOwnerLabelEntry entry, double designScale) {
 @visibleForTesting
 List<Rect> networkMapOwnerLabelSourceRects({
   required Iterable<RouteMapOwnerLabelEntry> ownerLabels,
-  required double designScale,
 }) {
-  return [
-    for (final entry in ownerLabels) _ownerLabelSourceRect(entry, designScale),
-  ];
+  return [for (final entry in ownerLabels) _ownerLabelSourceRect(entry)];
 }
 
 /// 테스트용: 주어진 역·오너 라벨 rect로 산출한 지도 geometry의 전체 source
