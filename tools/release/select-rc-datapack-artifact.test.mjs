@@ -65,6 +65,26 @@ test("NO_CHANGE_VALID는 staged candidate가 아니라 current-production manife
   assert.deepEqual(await readFile(result.artifactPath), packBytes);
 });
 
+test("emergencyOverride가 있으면 activePack보다 override pack을 선택한다", async () => {
+  const { root } = await fixture("PUBLISHED_AND_VERIFIED");
+  const manifestPath = path.join(root, "catalog/current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const overrideBytes = Buffer.from("emergency-override-pack");
+  manifest.emergencyOverride = { id: "capital-rescue", version: "13", reason: "검증된 긴급 복구" };
+  manifest.packs.push({
+    id: "capital-rescue",
+    version: "13",
+    sha256: sha256(overrideBytes),
+    sizeBytes: overrideBytes.length,
+  });
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  await writeFile(path.join(root, "catalog/capital-rescue-v13.sqlite.gz"), overrideBytes);
+
+  const result = await selectRcDataPackArtifact(root, path.join(root, "selected"));
+
+  assert.deepEqual(await readFile(result.artifactPath), overrideBytes);
+});
+
 test("실패·미검증 decision과 manifest에 결속되지 않은 pack은 거부한다", async () => {
   const failed = await fixture("NO_CHANGE_VALID");
   await writeFile(path.join(failed.root, "final-release-decision.json"), JSON.stringify({

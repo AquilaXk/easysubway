@@ -16,7 +16,7 @@ export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
     : path.join(root, "current-production.json");
   const manifestBytes = await readFile(manifestSource);
   const manifest = JSON.parse(manifestBytes.toString("utf8"));
-  const activePack = selectActivePack(manifest);
+  const activePack = selectEffectivePack(manifest);
   const packPaths = (await recursiveFiles(root)).filter((file) => file.endsWith(".sqlite.gz"));
   const matchingPacks = [];
   for (const file of packPaths) {
@@ -59,17 +59,18 @@ function validateFinalDecision(decision) {
   }
 }
 
-function selectActivePack(manifest) {
+function selectEffectivePack(manifest) {
   if (manifest?.manifestVersion !== 2 || manifest.channel !== "production" || !Array.isArray(manifest.packs)) {
     throw new Error("selected data pack manifest must be production manifestVersion 2");
   }
   let candidates;
-  if (manifest.activePack && typeof manifest.activePack === "object") {
+  const selectedIdentity = manifest.emergencyOverride ?? manifest.activePack;
+  if (selectedIdentity && typeof selectedIdentity === "object") {
     candidates = manifest.packs.filter((pack) => (
-      pack.id === manifest.activePack.id && String(pack.version) === String(manifest.activePack.version)
+      pack.id === selectedIdentity.id && String(pack.version) === String(selectedIdentity.version)
     ));
-  } else if (typeof manifest.activePack === "string") {
-    candidates = manifest.packs.filter((pack) => pack.id === manifest.activePack);
+  } else if (typeof selectedIdentity === "string") {
+    candidates = manifest.packs.filter((pack) => pack.id === selectedIdentity);
   } else {
     candidates = manifest.packs;
   }

@@ -415,9 +415,10 @@ function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes
   if (Date.parse(manifest.expiresAt) <= evaluatedAtMillis) {
     fail("production data pack manifest is expired");
   }
-  const activePack = manifest.activePack
+  const selectedPackIdentity = manifest.emergencyOverride ?? manifest.activePack;
+  const activePack = selectedPackIdentity
     ? manifest.packs.find((pack) => (
-        pack.id === manifest.activePack.id && pack.version === manifest.activePack.version
+        pack.id === selectedPackIdentity.id && pack.version === selectedPackIdentity.version
       ))
     : manifest.packs.length === 1 ? manifest.packs[0] : null;
   if (!activePack) {
@@ -1277,6 +1278,7 @@ function validateSatisfiedEvidence(id, sourceIssue, evidencePath, generatedAt, c
       canonicalSummaryPath,
       "--require-pass",
     ]);
+    validateAbuseSummaryIdentity(canonicalSummaryPath, context);
     return;
   }
   if (!Array.isArray(requiredChecks) || requiredChecks.length === 0) {
@@ -1285,6 +1287,28 @@ function validateSatisfiedEvidence(id, sourceIssue, evidencePath, generatedAt, c
   requireResultSchema(evidence.result, id);
   requirePassingChecks(id, evidence.result.checks, requiredChecks);
   normalizeEvidenceReferences(id, evidence.result.evidenceReferences);
+}
+
+function validateAbuseSummaryIdentity(summaryPath, context) {
+  const summaryIdentity = readJsonIfExists(summaryPath)?.artifactIdentity;
+  const identity = context.identity;
+  const baseMatches = summaryIdentity
+    && summaryIdentity.gitSha === identity.gitSha
+    && String(summaryIdentity.versionCode) === String(identity.versionCode)
+    && summaryIdentity.androidApplicationId === context.androidApplicationId
+    && summaryIdentity.dataPackManifestSha256 === identity.dataPackManifestSha256
+    && summaryIdentity.aabSha256 === identity.aabSha256;
+  const backendFields = ["backendImageDigest", "backendArtifactSha256"];
+  const backendMatches = backendFields.some((field) => (
+    typeof identity[field] === "string"
+    && identity[field].length > 0
+    && summaryIdentity?.[field] === identity[field]
+  )) && backendFields.every((field) => (
+    summaryIdentity?.[field] === undefined || summaryIdentity[field] === identity[field]
+  ));
+  if (!baseMatches || !backendMatches) {
+    fail("abuse_penetration_rehearsal canonical summary RC identity mismatch");
+  }
 }
 
 function validatePostLaunchOperationsEvidence(evidencePath, generatedAt, context) {

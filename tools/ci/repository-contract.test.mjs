@@ -5024,6 +5024,25 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   );
   await rejectProductionManifest({ sha256: "f".repeat(64) }, /production data pack manifest sha256 does not match the supplied artifact/);
   await rejectProductionManifest({ sizeBytes: dataPackArtifactBytes + 1 }, /production data pack manifest sizeBytes does not match the supplied artifact/);
+  const emergencyOverrideManifest = signProductionManifest({
+    ...productionManifest,
+    emergencyOverride: { id: "capital-rescue", version: "2", reason: "검증된 긴급 복구" },
+    packs: [
+      { ...productionManifest.packs[0], sha256: "f".repeat(64) },
+      {
+        ...productionManifest.packs[0],
+        id: "capital-rescue",
+        version: "2",
+        url: "https://datapack.example.com/catalog/capital-rescue-v2.sqlite.gz",
+      },
+    ],
+  });
+  await writeFile(dataPackManifestPath, JSON.stringify(emergencyOverrideManifest));
+  await execFileAsync(
+    process.execPath,
+    [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+    generatorOptions,
+  );
   await writeFile(dataPackManifestPath, JSON.stringify(productionManifest));
   const releaseDecisionArgIndex = args.indexOf("--data-pack-release-decision");
   const argsWithoutReleaseDecision = args.filter((_, index) => (
@@ -5123,6 +5142,8 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   }
 
   let postLaunchEvidencePath;
+  let abuseEvidencePath;
+  let abuseSummaryPath;
   for (const entry of contract.requiredEvidenceEntries) {
     const evidencePath = path.join(tempDir, `required-evidence-${entry.id}.json`);
     if (entry.id === "post_launch_operations") postLaunchEvidencePath = evidencePath;
@@ -5138,10 +5159,20 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
       };
     }
     if (entry.id === "abuse_penetration_rehearsal") {
-      const canonicalSummaryPath = path.join(tempDir, "abuse-penetration-summary.json");
-      await writeFile(canonicalSummaryPath, "{}\n");
-      evidence.canonicalSummaryPath = canonicalSummaryPath;
-      evidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(canonicalSummaryPath)).digest("hex");
+      abuseEvidencePath = evidencePath;
+      abuseSummaryPath = path.join(tempDir, "abuse-penetration-summary.json");
+      await writeFile(abuseSummaryPath, `${JSON.stringify({
+        artifactIdentity: {
+          gitSha: evidenceRcIdentity.gitSha,
+          versionCode: Number(evidenceRcIdentity.versionCode),
+          androidApplicationId: "com.easysubway.app",
+          dataPackManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
+          aabSha256: evidenceRcIdentity.aabSha256,
+          backendArtifactSha256: evidenceRcIdentity.backendArtifactSha256,
+        },
+      })}\n`);
+      evidence.canonicalSummaryPath = abuseSummaryPath;
+      evidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(abuseSummaryPath)).digest("hex");
     }
     await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
     args.push("--evidence-status", `${entry.id}=SATISFIED`, "--evidence-path", `${entry.id}=${evidencePath}`);
@@ -5249,6 +5280,18 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   assert.equal(manifest.readiness.blockers.some(({ id }) => id.startsWith("datapack_gate_")), false);
   assert.equal(manifest.readiness.status, "GO");
   assert.equal(manifest.readiness.blockers.length, 0);
+
+  const abuseSummary = JSON.parse(readFileSync(abuseSummaryPath, "utf8"));
+  abuseSummary.artifactIdentity.gitSha = "f".repeat(40);
+  await writeFile(abuseSummaryPath, JSON.stringify(abuseSummary));
+  const abuseEvidence = JSON.parse(readFileSync(abuseEvidencePath, "utf8"));
+  abuseEvidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(abuseSummaryPath)).digest("hex");
+  await writeFile(abuseEvidencePath, JSON.stringify(abuseEvidence));
+  await rejectsCurrent(/abuse_penetration_rehearsal canonical summary RC identity mismatch/);
+  abuseSummary.artifactIdentity.gitSha = evidenceRcIdentity.gitSha;
+  await writeFile(abuseSummaryPath, JSON.stringify(abuseSummary));
+  abuseEvidence.canonicalSummarySha256 = createHash("sha256").update(readFileSync(abuseSummaryPath)).digest("hex");
+  await writeFile(abuseEvidencePath, JSON.stringify(abuseEvidence));
 
   const rollbackEvidence = JSON.parse(readFileSync(gateEvidencePaths.rollback_rescue, "utf8"));
   delete rollbackEvidence.result;
