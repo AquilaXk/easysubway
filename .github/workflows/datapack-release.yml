@@ -36,7 +36,7 @@ on:
 
 concurrency:
   group: datapack-release-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   data-pack-release:

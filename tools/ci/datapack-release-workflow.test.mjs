@@ -89,6 +89,10 @@ test("production callback은 bounded sender 증적을 항상 보존하고 실패
   assert.match(gateStep, /exit\s+1/);
 });
 
+test("게시 workflow의 동시 실행은 기존 publish run을 취소하지 않는다", () => {
+  assert.match(yml, /concurrency:\s*[\s\S]*?cancel-in-progress:\s*false/);
+});
+
 test("production request identity는 manifest 밖의 서명된 immutable binding으로 게시한다", () => {
   assert.match(yml, /build-release-request-binding\.mjs/);
   assert.match(yml, /--release-request-binding/);

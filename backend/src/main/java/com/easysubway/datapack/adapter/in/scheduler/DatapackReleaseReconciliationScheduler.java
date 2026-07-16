@@ -12,7 +12,10 @@ public class DatapackReleaseReconciliationScheduler {
 		this.service = service;
 	}
 
-	@Scheduled(fixedDelayString = "${easysubway.datapack.reconciliation-interval-ms:60000}")
+	@Scheduled(
+		fixedDelayString = "${easysubway.datapack.reconciliation-interval-ms:60000}",
+		scheduler = "datapackReleaseTaskScheduler"
+	)
 	public void run() {
 		service.reconcileDue();
 	}
