@@ -3979,6 +3979,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /android-production-rc/);
   assert.match(workflow, /android-production-rc-release:/);
   assert.match(workflow, /name: Android Production RC Artifact/);
+  const productionRcJob = workflow.slice(
+    workflow.indexOf("  android-production-rc-release:"),
+    workflow.indexOf("  play-internal-upload:"),
+  );
+  assert.match(
+    productionRcJob,
+    /Android Production RC Artifact \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"/,
+  );
   assert.match(workflow, /if: \$\{\{ github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main' && inputs\.android_rc_signing_mode == 'production-upload-key' \}\}/);
   assert.match(workflow, /environment:\s*\n\s*name: android-production-rc/);
   assert.match(workflow, /EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64: \$\{\{ secrets\.EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64 \}\}/);
@@ -4034,6 +4042,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /cp release\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
   assert.match(workflow, /rc-evidence-manifest:/);
   assert.match(workflow, /name: RC Evidence Manifest/);
+  const rcEvidenceManifestJob = workflow.slice(
+    workflow.indexOf("  rc-evidence-manifest:"),
+    workflow.indexOf("  notify-slack-release-result:"),
+  );
+  assert.match(
+    rcEvidenceManifestJob,
+    /RC Evidence Manifest \/ Set up Node[\s\S]*actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: "24"/,
+  );
   assert.match(workflow, /uses: actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
   assert.match(workflow, /name: easysubway-android-release-\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /name: easysubway-android-production-rc-\$\{\{ github\.sha \}\}/);
