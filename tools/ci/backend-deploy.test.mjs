@@ -13,6 +13,8 @@ const ASSET_ORIGIN = "https://ads-assets.fixture.test-only.dev";
 const ASSET_ORIGIN_LINE = `EASYSUBWAY_ADS_ASSET_ORIGIN=${ASSET_ORIGIN}`;
 const EVENT_DAILY_CAP_LINE = "EASYSUBWAY_ADS_EVENT_DAILY_CAP=1000000";
 const BACKEND_BIND_LINE = "EASYSUBWAY_BACKEND_BIND=127.0.0.1";
+const ROUTE_V2_ORIGIN_SECRET_LINE = `EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=${"O".repeat(43)}`;
+const ROUTE_V2_CERTIFICATE_LINE = `EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=${"A".repeat(43)}`;
 const deploymentTempDirs = new Set();
 
 function read(relativePath) {
@@ -209,6 +211,27 @@ test("production backend bind는 loopback만 허용한다", async () => {
   }
 });
 
+test("Route V2 배포 secret과 certificate digest는 config injection을 차단한다", async () => {
+  await assert.rejects(
+    prepare(fixtureEnv().replace(ROUTE_V2_ORIGIN_SECRET_LINE, "EASYSUBWAY_ROUTE_V2_ORIGIN_SECRET=short;include")),
+    /invalid Route V2 origin secret/,
+  );
+  await assert.rejects(
+    prepare(fixtureEnv().replace(ROUTE_V2_CERTIFICATE_LINE, "EASYSUBWAY_ROUTE_V2_PLAY_INTEGRITY_CERTIFICATE_SHA256=not-a-digest")),
+    /invalid Play Integrity certificate SHA-256/,
+  );
+  await assert.rejects(
+    prepare(fixtureEnv().replace("EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE=5", "EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE=6")),
+    /invalid or relaxed Route V2 limit: EASYSUBWAY_ROUTE_V2_SESSION_RATE_PER_MINUTE/,
+  );
+  for (const cidr of ["", "0.0.0.0/0", "172.16.0.0/12;include", "172.16.0.0/16"]) {
+    await assert.rejects(
+      prepare(fixtureEnv().replace("EASYSUBWAY_ROUTE_V2_TRUSTED_PROXY_CIDR=172.16.0.0/12", `EASYSUBWAY_ROUTE_V2_TRUSTED_PROXY_CIDR=${cidr}`)),
+      /Route V2 trusted proxy CIDR/,
+    );
+  }
+});
+
 test("배포 env 준비는 Compose 서버 env와 backend 앱 env를 분리한다", async () => {
   const outputDir = await prepare(fixtureEnv());
   const composeEnv = await readFile(path.join(outputDir, "compose.env"), "utf8");
@@ -383,7 +406,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.doesNotMatch(deploy, /sha256sum "\$\{COMPOSE_ENV\}" "\$\{BACKEND_ENV\}" \| sha256sum/);
   assert.match(deploy, /tools\/ops\/postgres-backup\.sh/);
   assert.match(deploy, /EASYSUBWAY_BACKEND_ENV_FILE="\$\{BACKEND_ENV\}"/);
-  assert.match(deploy, /RUNTIME_SERVICES=\(backend back-worker\)/);
+  assert.match(deploy, /RUNTIME_SERVICES=\(backend back-worker route-v2-gateway\)/);
   assert.match(deploy, /OBSERVABILITY_SERVICES=\(public-edge-probe docker-runtime-probe alertmanager prometheus loki grafana\)/);
   assert.match(deploy, /OBSERVABILITY_CONFIG_SERVICES=\(alertmanager prometheus loki grafana\)/);
   assert.match(deploy, /EASYSUBWAY_ALERTMANAGER_CONFIG_FILE=/);
@@ -395,7 +418,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /compose_services_running "\$\{BACKEND_ENV\}" "\$\{COMPOSE_ENV\}" "\$\{DEPLOY_SHA\}" "\$\{RUNTIME_SERVICES\[@\]\}" "\$\{OBSERVABILITY_SERVICES\[@\]\}"/);
   assert.match(deploy, /same_sha_same_env_services_ready/);
   assert.doesNotMatch(deploy, /same_sha_same_env_ready/);
-  assert.match(deploy, /up -d --no-deps --no-build "\$\{RUNTIME_SERVICES\[@\]\}"/);
+  assert.match(deploy, /up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/);
   assert.match(deploy, /--profile observability up -d --no-build "\$\{OBSERVABILITY_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate "\$\{OBSERVABILITY_CONFIG_SERVICES\[@\]\}" \|\| return 1/);
   assert.match(deploy, /--profile observability up -d --no-build --force-recreate alertmanager \|\| return 1/);
@@ -437,7 +460,7 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, readiness 롤�
   assert.match(deploy, /start_observability_services "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" "\$\{recreate_alertmanager\}" "\$\{recreate_observability_config\}" \|\| true/);
   assert.match(deploy, /rm -f -s "\$\{RUNTIME_SERVICES\[@\]\}"/);
   assert.match(deploy, /logs --no-color --tail=200 "\$\{RUNTIME_SERVICES\[@\]\}"/);
-  assert.match(deploy, /if ! compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
+  assert.match(deploy, /if ! compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"; then/);
   assert.match(deploy, /actuator\/health\/readiness/);
   assert.match(deploy, /fail_backend_deployment "readiness_failed"/);
   assert.match(deploy, /diagnostics/);
@@ -464,10 +487,71 @@ test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API
   assert.match(cd, /post-deploy-smoke:/);
   assert.match(cd, /node tools\/ops\/post-deploy-smoke\.mjs/);
   assert.match(cd, /DEPLOY_PUBLIC_API_BASE_URL repo variable is not configured/);
+  assert.match(cd, /route_v2_ingress_enabled: \$\{\{ steps\.ingress-state\.outputs\.enabled \}\}/);
+  assert.match(cd, /state_file="\$\{DEPLOY_ROOT\}\/shared\/current-route-v2-ingress-enabled"/);
+  assert.match(cd, /--route-v2-ingress-enabled "\$\{ROUTE_V2_INGRESS_ENABLED\}"/);
   assert.match(cd, /if: \$\{\{ needs\.deploy\.outputs\.deploy_ready == 'true' \}\}/);
 
   // Smoke failures must propagate into the CD result Slack notification.
   assert.match(cd, /needs:\n {6}- plan\n {6}- build-image\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
+});
+
+test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 시 Nginx 설정을 복원한다", () => {
+  const deploy = read("tools/deploy/deploy-backend.sh");
+  const host = read("infra/nginx/host-easysubway.conf.template");
+  const routeHeaders = read("infra/nginx/host-route-v2-proxy.conf");
+  const cloudflareCidrs = [
+    ...read("infra/terraform/oci/always-free-a1-flex/locals.tf")
+      .match(/cloudflare_ipv4_ingress_cidrs\s*=\s*toset\(\[([\s\S]*?)\]\)/)[1]
+      .matchAll(/"([0-9.]+\/[0-9]+)"/g),
+  ].map((match) => match[1]);
+
+  const httpServer = host.slice(0, host.indexOf("server {", 1));
+  const httpsServer = host.slice(host.indexOf("server {", 1));
+  assert.match(httpServer, /location \^~ \/\.well-known\/acme-challenge\//);
+  assert.match(httpServer, /location \/ \{\s*return 308 https:\/\/\$host\$request_uri;\s*\}/);
+  assert.doesNotMatch(httpServer, /proxy_pass|__ROUTE_V2_ACTION__/);
+  assert.equal((httpsServer.match(/location = \/api\/v2\/routes\/session/g) ?? []).length, 1);
+  assert.equal((httpsServer.match(/location = \/api\/v2\/routes\/search/g) ?? []).length, 1);
+  assert.equal((httpsServer.match(/__ROUTE_V2_ACTION__/g) ?? []).length, 2);
+  assert.match(httpsServer, /location \/ \{[\s\S]*proxy_pass http:\/\/127\.0\.0\.1:__BACKEND_PORT__;/);
+  assert.deepEqual(
+    [...routeHeaders.matchAll(/set_real_ip_from ([0-9.]+\/[0-9]+);/g)].map((match) => match[1]),
+    cloudflareCidrs,
+  );
+  assert.match(routeHeaders, /real_ip_header CF-Connecting-IP;/);
+  assert.match(routeHeaders, /real_ip_recursive on;/);
+  assert.match(routeHeaders, /proxy_set_header CF-Connecting-IP \$remote_addr;/);
+  assert.doesNotMatch(routeHeaders, /proxy_set_header CF-Connecting-IP \$http_cf_connecting_ip;/);
+  assert.match(routeHeaders, /proxy_set_header X-Forwarded-For "";/);
+  assert.match(host, /listen 443 ssl default_server;[\s\S]*server_name _;[\s\S]*return 444;/);
+  assert.match(host, /listen 443 ssl;[\s\S]*server_name easysubway-api\.aquilaxk\.site;/);
+  assert.equal((host.match(/listen 443 ssl default_server;/g) ?? []).length, 1);
+  assert.match(deploy, /sudo nginx -t/);
+  assert.match(deploy, /sudo systemctl reload nginx/);
+  assert.match(deploy, /sudo install -m 0644 "\$\{site_backup\}" "\$\{site_target\}"/);
+  assert.match(deploy, /sudo install -m 0644 "\$\{route_snippet_backup\}" "\$\{route_snippet_target\}"/);
+  assert.match(deploy, /sudo install -m 0644 "\$\{default_snippet_backup\}" "\$\{default_snippet_target\}"/);
+  assert.match(deploy, /sudo rm -f "\$\{route_snippet_target\}"/);
+  assert.match(deploy, /sudo rm -f "\$\{default_snippet_target\}"/);
+  assert.match(deploy, /if ! sudo cp "\$\{site_target\}" "\$\{site_backup\}"; then/);
+  assert.match(deploy, /if ! sudo install -m 0644 infra\/nginx\/host-route-v2-proxy\.conf/);
+  assert.match(deploy, /install_failed=1/);
+  assert.match(deploy, /restore_failed=1/);
+  assert.match(deploy, /failed to restore Route V2 host ingress/);
+  assert.doesNotMatch(deploy, /sudo nginx -t[^\n]+&& sudo systemctl reload nginx \|\| true/);
+  assert.match(deploy, /fail_backend_deployment "route_v2_host_ingress_failed"/);
+  assert.match(deploy, /current-route-v2-ingress-enabled/);
+  assert.match(
+    deploy,
+    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{DEPLOY_SHA\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
+  );
+  assert.match(
+    deploy,
+    /compose "\$\{SHARED_DIR\}\/current-env\/backend\.env" "\$\{SHARED_DIR\}\/current-env\/compose\.env" "\$\{current_sha\}" up -d --no-deps --no-build --force-recreate "\$\{RUNTIME_SERVICES\[@\]\}"/,
+  );
+  assert.match(deploy, /route_v2_host_action="return 404;"/);
+  assert.match(deploy, /route_v2_host_action="proxy_pass http:\/\/127\.0\.0\.1:\$\{route_v2_gateway_port\};"/);
 });
 
 test("Compose backend 서비스는 bootJar 기반 이미지와 제한된 바인딩을 사용한다", () => {
