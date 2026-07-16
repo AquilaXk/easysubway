@@ -7900,6 +7900,112 @@ void main() {
     expect(find.text('상록수'), findsOneWidget);
   });
 
+  testWidgets('#2200 검색 선택으로 연 주변역 패널 body가 화면 안에 실제 크기로 렌더된다', (tester) async {
+    // 오너 QA 회귀 방지(#2207): 툴바(토글)만 뜨고 하단 body(노선 바)가
+    // 사라지는 증상을 막는다. 존재만이 아니라 히트테스트 가능한 크기와 화면
+    // 안 배치까지 단언한다.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final repository = FakeStationSearchRepository(
+      queryResults: {
+        '상록수': [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+      },
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: false,
+        ),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('stationSearchButton')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('stationSearchInput')), '상록수');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const Key('stationSearchResult-station-sangnoksu')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    final track = find.byKey(const Key('nearbyStationLineBarTrack'));
+    expect(track, findsOneWidget);
+    final trackSize = tester.getSize(track);
+    final trackRect = tester.getRect(track);
+    expect(trackSize.width, greaterThan(0), reason: '노선 바 폭이 0이면 body가 붕괴한 것');
+    expect(
+      trackSize.height,
+      greaterThan(0),
+      reason: '노선 바 높이가 0이면 body가 붕괴한 것',
+    );
+    expect(trackRect.top, greaterThanOrEqualTo(0), reason: '노선 바가 화면 위로 벗어남');
+    expect(
+      trackRect.bottom,
+      lessThanOrEqualTo(844),
+      reason: '노선 바가 화면 아래로 벗어남',
+    );
+  });
+
+  testWidgets('#2200 GPS 주변역 패널 body가 화면 안에 실제 크기로 렌더된다', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final repository = FakeStationSearchRepository(
+      networkMapRegionNames: const ['수도권'],
+      nearbyResults: [
+        _stationResult(
+          id: 'station-sangnoksu',
+          name: '상록수',
+          distanceMeters: 180,
+        ),
+      ],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      realtimeRepository: _RecordingRealtimeRepository(),
+    );
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('networkMapNearbyStationPanel')),
+      findsOneWidget,
+    );
+    final track = find.byKey(const Key('nearbyStationLineBarTrack'));
+    expect(track, findsOneWidget);
+    final trackSize = tester.getSize(track);
+    final trackRect = tester.getRect(track);
+    expect(trackSize.width, greaterThan(0));
+    expect(trackSize.height, greaterThan(0));
+    expect(trackRect.top, greaterThanOrEqualTo(0));
+    expect(trackRect.bottom, lessThanOrEqualTo(844));
+  });
+
   testWidgets('#2109 검색 선택은 지도에서 직접 선택한 역을 교체한다', (tester) async {
     final repository = FakeStationSearchRepository(
       queryResults: {
