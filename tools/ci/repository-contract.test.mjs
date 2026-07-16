@@ -2094,6 +2094,65 @@ test("모바일 홈 화면과 shell 상태는 home presentation canonical 파일
   }
 });
 
+test("역 모델과 저장소 계약은 stations domain canonical 파일이 소유한다", () => {
+  const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const models = read(
+    "apps/mobile/lib/features/stations/domain/station_models.dart",
+  );
+  const repositories = read(
+    "apps/mobile/lib/features/stations/domain/station_repositories.dart",
+  );
+
+  for (const declaration of [
+    "StationTimetable",
+    "CurrentLocation",
+    "FavoriteStation",
+    "StationSearchResult",
+    "StationDetail",
+    "StationExitInfo",
+    "StationFacilityInfo",
+    "SubwayLineOption",
+  ]) {
+    assert.match(models, new RegExp(`^class ${declaration}\\b`, "m"));
+    assert.doesNotMatch(stationSearch, new RegExp(`^class ${declaration}\\b`, "m"));
+  }
+  for (const declaration of [
+    "StationSearchRepository",
+    "SearchHistoryRepository",
+    "StationLineFilterRepository",
+    "StationTimetableRepository",
+    "CurrentLocationProvider",
+    "FavoriteStationRepository",
+  ]) {
+    assert.match(
+      repositories,
+      new RegExp(`^abstract class ${declaration}\\b`, "m"),
+    );
+    assert.doesNotMatch(
+      stationSearch,
+      new RegExp(`^abstract class ${declaration}\\b`, "m"),
+    );
+  }
+  assert.doesNotMatch(models, /package:flutter\/material\.dart/);
+  assert.match(
+    stationSearch,
+    /^export 'features\/stations\/domain\/station_models\.dart';$/m,
+  );
+  assert.match(
+    stationSearch,
+    /^export 'features\/stations\/domain\/station_repositories\.dart';$/m,
+  );
+  for (const dataPath of [
+    "apps/mobile/lib/features/stations/data/station_api_repository.dart",
+    "apps/mobile/lib/features/stations/data/drift_station_repository.dart",
+  ]) {
+    const data = read(dataPath);
+    assert.doesNotMatch(data, /station_search\.dart/);
+    assert.match(data, /domain\/station_models\.dart/);
+    assert.match(data, /domain\/station_repositories\.dart/);
+  }
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -12584,7 +12643,9 @@ test("백엔드 데이터 품질 요약은 관리자 API와 헥사고날 경계�
   const adminController = read("backend/src/main/java/com/easysubway/quality/adapter/in/web/DataQualityAdminPageController.java");
   const adminTemplate = read("backend/src/main/resources/templates/admin/quality/dashboard.html");
   const operatorAssembler = read("backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportAssembler.java");
-  const mobileStationSearch = read("apps/mobile/lib/station_search.dart");
+  const mobileStationSearch = read(
+    "apps/mobile/lib/features/stations/domain/station_models.dart",
+  );
   const mobileRouteRepository = read("apps/mobile/lib/features/routes/data/local_route_repository.dart");
   const security = read("backend/src/main/java/com/easysubway/common/security/SecurityConfig.java");
 
@@ -13172,6 +13233,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
   const routeSearch = read("apps/mobile/lib/route_search.dart");
   const stationSearch = read("apps/mobile/lib/station_search.dart");
+  const stationModels = read(
+    "apps/mobile/lib/features/stations/domain/station_models.dart",
+  );
   const networkMap = read("apps/mobile/lib/network_map.dart");
   const stationLineBadges = read("apps/mobile/lib/features/stations/presentation/station_line_badges.dart");
   const stationLine = read("apps/mobile/lib/features/stations/domain/station_line.dart");
@@ -13344,10 +13408,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(stationLine, /class StationSearchLine/);
   assert.match(routeSearch, /features\/stations\/presentation\/station_line_badges\.dart/);
   assert.match(stationApiRepository, /typedef FavoriteStationAuthProvider = AuthorizationHeaderProvider/);
-  assert.match(stationSearch, /final double\? latitude/);
-  assert.match(stationSearch, /final double\? longitude/);
-  assert.match(stationSearch, /_optionalDouble\(json, 'latitude'\)/);
-  assert.match(stationSearch, /_optionalDouble\(json, 'longitude'\)/);
+  assert.match(stationModels, /final double\? latitude/);
+  assert.match(stationModels, /final double\? longitude/);
+  assert.match(stationModels, /_optionalDouble\(json, 'latitude'\)/);
+  assert.match(stationModels, /_optionalDouble\(json, 'longitude'\)/);
   assert.doesNotMatch(stationSearch, /import 'core\/network\/api_client\.dart';/);
   assert.doesNotMatch(stationSearch, /class StationSearchApiRepository/);
   assert.match(stationApiRepository, /class StationSearchApiRepository[\s\S]*final ApiClient _apiClient;/);

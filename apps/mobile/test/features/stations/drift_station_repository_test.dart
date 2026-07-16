@@ -1,7 +1,8 @@
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/features/stations/data/drift_station_repository.dart';
-import 'package:easysubway_mobile/station_search.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_models.dart';
+import 'package:easysubway_mobile/features/stations/domain/station_repositories.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
