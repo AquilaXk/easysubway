@@ -26,7 +26,6 @@ import org.springframework.stereotype.Component;
 public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalogPort {
 	private static final ObjectMapper JSON = new ObjectMapper();
 	private static final Duration TIMEOUT = Duration.ofSeconds(10);
-	private static final int MAX_RELEASE_LOOKBACK = 100;
 
 	private final HttpClient httpClient;
 	private final String baseUrl;
@@ -60,35 +59,45 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 
 	@Override
 	public Optional<CatalogIdentity> findByRequest(String channel, String releaseRequestId) {
-		var current = fetchCurrent(channel);
-		if (matches(current, channel, releaseRequestId)) return Optional.of(current);
-		long oldest = Math.max(1, current.releaseSequence() - MAX_RELEASE_LOOKBACK);
-		for (long sequence = current.releaseSequence() - 1; sequence >= oldest; sequence--) {
-			try {
-				var identity = fetch(channel, sequence);
-				if (matches(identity, channel, releaseRequestId)) return Optional.of(identity);
-			} catch (NotFound ignored) {
-				// GITHUB_RUN_NUMBER 기반 sequence에는 publish되지 않은 gap이 존재할 수 있다.
-			}
+		try {
+			byte[] bytes = fetchBytes("/catalog/release-requests/"
+				+ sha256(releaseRequestId.getBytes(StandardCharsets.UTF_8)) + ".json");
+			JsonNode binding = JSON.readTree(bytes);
+			String signatureValue = binding.path("signature").path("value").asText("");
+			boolean signatureValid = "rsa-sha256-release-request-v1".equals(
+				binding.path("signature").path("algorithm").asText())
+				&& binding.path("schemaVersion").asInt(-1) == 1
+				&& "datapack-release-request-binding".equals(binding.path("artifactKind").asText())
+				&& keyId.equals(binding.path("keyId").asText())
+				&& verify(binding, signatureValue);
+			long sequence = binding.path("releaseSequence").asLong(-1);
+			String boundChannel = binding.path("channel").asText("");
+			String boundRequestId = binding.path("releaseRequestId").asText("");
+			String boundManifestSha256 = binding.path("manifestSha256").asText("");
+			if (!signatureValid || sequence < 1 || !channel.equals(boundChannel)
+				|| !releaseRequestId.equals(boundRequestId)
+				|| !boundManifestSha256.matches("[a-f0-9]{64}")) throw new Unavailable();
+			var manifest = fetch(channel, sequence);
+			if (!manifest.signatureValid() || manifest.releaseSequence() != sequence
+				|| !channel.equals(manifest.channel())
+				|| !boundManifestSha256.equals(manifest.manifestSha256())) throw new Unavailable();
+			var current = fetchCurrent(channel);
+			if (!current.signatureValid() || !channel.equals(current.channel())
+				|| current.releaseSequence() < sequence) throw new Unavailable();
+			return Optional.of(new CatalogIdentity(
+				sequence, boundManifestSha256, channel, releaseRequestId, true,
+				sha256(signatureValue.getBytes(StandardCharsets.UTF_8))));
+		} catch (NotFound missing) {
+			return Optional.empty();
+		} catch (IOException | RuntimeException exception) {
+			if (exception instanceof Unavailable unavailable) throw unavailable;
+			throw new Unavailable();
 		}
-		return Optional.empty();
-	}
-
-	private static boolean matches(CatalogIdentity identity, String channel, String releaseRequestId) {
-		return identity.signatureValid()
-			&& channel.equals(identity.channel())
-			&& releaseRequestId.equals(identity.releaseRequestId());
 	}
 
 	private CatalogIdentity fetchPath(String path) {
-		if (baseUrl.isBlank() || publicKeyPem.isBlank()) throw new Unavailable();
 		try {
-			var request = HttpRequest.newBuilder(URI.create(baseUrl + path))
-				.timeout(TIMEOUT).GET().build();
-			var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-			if (response.statusCode() == 404) throw new NotFound();
-			if (response.statusCode() < 200 || response.statusCode() >= 300) throw new Unavailable();
-			byte[] bytes = response.body();
+			byte[] bytes = fetchBytes(path);
 			JsonNode manifest = JSON.readTree(bytes);
 			String signatureValue = manifest.path("signature").path("value").asText("");
 			boolean signatureValid = "rsa-sha256-manifest-v2".equals(
@@ -99,10 +108,27 @@ public class HttpDatapackReleaseCatalogAdapter implements DatapackReleaseCatalog
 			String actualChannel = manifest.path("channel").asText("");
 			return new CatalogIdentity(
 				actualSequence, sha256(bytes), actualChannel,
-				manifest.path("releaseRequestId").asText(""), signatureValid,
+				"", signatureValid,
 				sha256(signatureValue.getBytes(StandardCharsets.UTF_8)));
-		} catch (IOException | InterruptedException | RuntimeException exception) {
-			if (exception instanceof InterruptedException) Thread.currentThread().interrupt();
+		} catch (IOException | RuntimeException exception) {
+			if (exception instanceof Unavailable unavailable) throw unavailable;
+			throw new Unavailable();
+		}
+	}
+
+	private byte[] fetchBytes(String path) {
+		if (baseUrl.isBlank() || publicKeyPem.isBlank()) throw new Unavailable();
+		try {
+			var request = HttpRequest.newBuilder(URI.create(baseUrl + path))
+				.timeout(TIMEOUT).GET().build();
+			var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+			if (response.statusCode() == 404) throw new NotFound();
+			if (response.statusCode() < 200 || response.statusCode() >= 300) throw new Unavailable();
+			return response.body();
+		} catch (InterruptedException interrupted) {
+			Thread.currentThread().interrupt();
+			throw new Unavailable();
+		} catch (IOException | RuntimeException exception) {
 			if (exception instanceof Unavailable unavailable) throw unavailable;
 			throw new Unavailable();
 		}

@@ -136,9 +136,6 @@ async function main() {
       ? {
           manifestVersion: 2,
           channel: requiredString(fixture.manifest.channel, "manifest.channel"),
-          ...(args["release-request-id"]
-            ? { releaseRequestId: requiredString(args["release-request-id"], "release-request-id") }
-            : {}),
           releaseSequence: optionalPositiveInteger(fixture.manifest.releaseSequence, "manifest.releaseSequence")
             ?? defaultReleaseSequence(),
           publishedAt: optionalUtcDateString(fixture.manifest.publishedAt, "manifest.publishedAt") ?? buildPublishedAt(),

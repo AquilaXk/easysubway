@@ -84,6 +84,26 @@ async function main() {
       continue;
     }
 
+    if (step.type === "put-release-request-binding-object") {
+      const bytes = await readAndVerifySource(root, step);
+      if (!dryRun && !verifyOnly) {
+        const existing = await client.headObject(step.objectKey);
+        if (existing.exists) {
+          if (existing.sha256 !== step.sha256) {
+            throw new Error(`${step.objectKey} immutable violation: stored sha ${existing.sha256} != ${step.sha256}`);
+          }
+        } else {
+          await client.putObject(step.objectKey, bytes, step);
+        }
+      }
+      continue;
+    }
+
+    if (step.type === "verify-release-request-binding-object") {
+      if (!dryRun) await client.verifyObject(step.objectKey, step);
+      continue;
+    }
+
     throw new Error(`unsupported publish step: ${step.type}`);
   }
 }

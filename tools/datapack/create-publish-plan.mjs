@@ -42,6 +42,34 @@ async function main() {
     ? manifestBytes
     : await readFile(currentManifestPath);
 
+  const releaseRequestBindingSteps = [];
+  if (args.has("release-request-binding")) {
+    const bindingPath = path.resolve(args.get("release-request-binding"));
+    const bindingBytes = await readFile(bindingPath);
+    const binding = JSON.parse(bindingBytes.toString("utf8"));
+    validateReleaseRequestBinding(binding, manifest, manifestBytes);
+    const sourcePath = safeRelativeObjectPath(path.relative(root, bindingPath), "release request binding path");
+    const requestHash = sha256(Buffer.from(binding.releaseRequestId, "utf8"));
+    const objectKey = `catalog/release-requests/${requestHash}.json`;
+    releaseRequestBindingSteps.push(
+      {
+        type: "put-release-request-binding-object",
+        sourcePath,
+        objectKey,
+        sha256: sha256(bindingBytes),
+        sizeBytes: bindingBytes.length,
+        immutable: true,
+      },
+      {
+        type: "verify-release-request-binding-object",
+        objectKey,
+        sha256: sha256(bindingBytes),
+        sizeBytes: bindingBytes.length,
+        immutable: true,
+      },
+    );
+  }
+
   const releaseSequence = manifest.releaseSequence;
   const includeReleaseManifest = Number.isInteger(releaseSequence) && releaseSequence >= 1;
   const releaseSteps = includeReleaseManifest
@@ -67,7 +95,7 @@ async function main() {
     : [];
 
   const plan = {
-    schemaVersion: includeReleaseManifest ? 2 : 1,
+    schemaVersion: releaseRequestBindingSteps.length > 0 ? 3 : includeReleaseManifest ? 2 : 1,
     mode: "object-storage-preflight",
     manifestObjectKey: "catalog/current.json",
     steps: [
@@ -81,6 +109,7 @@ async function main() {
         sizeBytes: packPlan.sizeBytes,
       })),
       ...releaseSteps,
+      ...releaseRequestBindingSteps,
       {
         type: "put-manifest-object",
         sourcePath: "catalog/current.json",
@@ -101,6 +130,23 @@ async function main() {
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(plan, null, 2)}\n`);
+}
+
+function validateReleaseRequestBinding(binding, manifest, manifestBytes) {
+  if (binding?.schemaVersion !== 1
+    || binding.artifactKind !== "datapack-release-request-binding"
+    || typeof binding.releaseRequestId !== "string"
+    || binding.releaseRequestId.length === 0
+    || binding.releaseSequence !== manifest.releaseSequence
+    || binding.channel !== manifest.channel
+    || binding.manifestSha256 !== sha256(manifestBytes)
+    || typeof binding.keyId !== "string"
+    || binding.keyId.length === 0
+    || binding.signature?.algorithm !== "rsa-sha256-release-request-v1"
+    || typeof binding.signature?.value !== "string"
+    || binding.signature.value.length === 0) {
+    throw new Error("release request binding does not match manifest identity");
+  }
 }
 
 function parseArgs(argv) {

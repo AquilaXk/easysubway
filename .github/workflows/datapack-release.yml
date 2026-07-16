@@ -83,6 +83,7 @@ jobs:
             echo "EASYSUBWAY_DATAPACK_FINAL_RELEASE_DECISION=${{ runner.temp }}/easysubway-datapack-stage/final-release-decision.json"
             echo "EASYSUBWAY_DATAPACK_CALLBACK_PAYLOAD=${{ runner.temp }}/easysubway-datapack-stage/release-callback.json"
             echo "EASYSUBWAY_DATAPACK_CALLBACK_DELIVERY=${{ runner.temp }}/easysubway-datapack-stage/release-callback-delivery.json"
+            echo "EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING=${{ runner.temp }}/easysubway-datapack-stage/catalog/release-request-binding.json"
             echo "EASYSUBWAY_DATAPACK_REMOTE_VALIDATION=${{ runner.temp }}/easysubway-datapack-remote-validation"
             echo "EASYSUBWAY_DATAPACK_ROLLBACK_APPROVAL=${{ runner.temp }}/easysubway-rollback-approval.json"
             echo "EASYSUBWAY_DATAPACK_ROLLBACK_EVIDENCE=${{ runner.temp }}/easysubway-datapack-rollback-rescue.json"
@@ -472,7 +473,6 @@ jobs:
           if [[ "${EASYSUBWAY_DATAPACK_RELEASE_MODE}" =~ ^(release-candidate|production-publish)$ ]]; then
             node tools/datapack/build-datapack.mjs \
               --build-spec "${EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH}" \
-              --release-request-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}" \
               --output "${EASYSUBWAY_DATAPACK_OUTPUT}"
           else
             node tools/datapack/build-datapack.mjs \
@@ -770,10 +770,19 @@ jobs:
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' }}
         run: |
           set -euo pipefail
-          node tools/datapack/create-publish-plan.mjs \
-            --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
-            --root "${EASYSUBWAY_DATAPACK_STAGE}" \
+          publish_plan_args=(
+            --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json"
+            --root "${EASYSUBWAY_DATAPACK_STAGE}"
             --output "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
+          )
+          if [[ "${EASYSUBWAY_DATAPACK_RELEASE_MODE}" == "production-publish" ]]; then
+            node tools/datapack/build-release-request-binding.mjs \
+              --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
+              --release-request-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}" \
+              --output "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}"
+            publish_plan_args+=(--release-request-binding "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING}")
+          fi
+          node tools/datapack/create-publish-plan.mjs "${publish_plan_args[@]}"
           test -f "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
 
       - name: Data Pack Release / Validate object storage publish executor dry run

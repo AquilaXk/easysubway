@@ -14,9 +14,10 @@ public interface DatapackReleaseRequestRepository {
 
 	List<DatapackReleaseRequest> findRecent(int limit);
 
-	default List<DatapackReleaseRequest> findDispatchedDue(LocalDateTime cutoff) {
+	default List<DatapackReleaseRequest> findReconciliationDue(LocalDateTime cutoff) {
 		return findRecent(Integer.MAX_VALUE).stream()
-			.filter(request -> request.status() == DatapackReleaseRequestStatus.DISPATCHED)
+			.filter(request -> request.status() == DatapackReleaseRequestStatus.APPROVED
+				|| request.status() == DatapackReleaseRequestStatus.DISPATCHED)
 			.filter(request -> !request.updatedAt().isAfter(cutoff))
 			.toList();
 	}

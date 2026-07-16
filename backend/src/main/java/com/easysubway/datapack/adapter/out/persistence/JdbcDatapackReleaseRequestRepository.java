@@ -78,10 +78,10 @@ public class JdbcDatapackReleaseRequestRepository implements DatapackReleaseRequ
 	}
 
 	@Override
-	public List<DatapackReleaseRequest> findDispatchedDue(LocalDateTime cutoff) {
+	public List<DatapackReleaseRequest> findReconciliationDue(LocalDateTime cutoff) {
 		return jdbcTemplate.query("""
 			SELECT * FROM datapack_release_request
-			WHERE status = 'DISPATCHED' AND updated_at <= ?
+			WHERE status IN ('APPROVED', 'DISPATCHED') AND updated_at <= ?
 			ORDER BY updated_at, approval_id
 			""", ROW_MAPPER, toTs(cutoff));
 	}

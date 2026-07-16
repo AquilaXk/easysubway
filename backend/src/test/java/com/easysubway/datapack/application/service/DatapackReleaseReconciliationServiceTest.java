@@ -1,5 +1,6 @@
 package com.easysubway.datapack.application.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -7,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 
 import com.easysubway.datapack.adapter.out.persistence.JdbcDatapackReleaseDeliveryRepository;
@@ -20,6 +22,7 @@ import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +42,8 @@ class DatapackReleaseReconciliationServiceTest {
 	void matchingCatalogUsesCallbackApply() {
 		var delivery = delivery();
 		var identity = new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64));
-		when(catalog.fetch("production", 42)).thenReturn(identity);
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(identity));
 
 		service.reconcile(delivery, T0.plusMinutes(10));
 
@@ -50,8 +54,9 @@ class DatapackReleaseReconciliationServiceTest {
 	@DisplayName("catalog signature mismatch는 자동 apply 없이 DEAD_LETTER다")
 	void signatureMismatchDeadLetters() {
 		var delivery = delivery();
-		when(catalog.fetch("production", 42))
-			.thenReturn(new CatalogIdentity(42, SHA, "production", "request-2057", false, "b".repeat(64)));
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(
+				new CatalogIdentity(42, SHA, "production", "request-2057", false, "b".repeat(64))));
 
 		service.reconcile(delivery, T0.plusMinutes(10));
 
@@ -72,7 +77,8 @@ class DatapackReleaseReconciliationServiceTest {
 			var caseCatalog = mock(DatapackReleaseCatalogPort.class);
 			var caseService = new DatapackReleaseReconciliationService(
 				caseRepository, callbackService, caseCatalog);
-			when(caseCatalog.fetch("production", 42)).thenReturn(entry.getValue());
+			when(caseCatalog.findByRequest("production", "request-2057"))
+				.thenReturn(java.util.Optional.of(entry.getValue()));
 			caseService.reconcile(delivery(), T0.plusMinutes(10));
 			verify(caseRepository).mark(delivery().idempotencyKey(), State.DEAD_LETTER, 0, null,
 				"CONFLICT", entry.getKey(), T0.plusMinutes(10));
@@ -83,7 +89,8 @@ class DatapackReleaseReconciliationServiceTest {
 	@DisplayName("catalog unavailable은 70분 전 retry, 70분 경계부터 DEAD_LETTER다")
 	void unavailableHonorsDeadlines() {
 		var delivery = delivery();
-		when(catalog.fetch("production", 42)).thenThrow(new DatapackReleaseCatalogPort.Unavailable());
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenThrow(new DatapackReleaseCatalogPort.Unavailable());
 
 		service.reconcile(delivery, T0.plusMinutes(10));
 		verify(repository).mark(delivery.idempotencyKey(), State.RETRY_SCHEDULED, 1,
@@ -95,8 +102,8 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
-	@DisplayName("callback row가 없어도 DISPATCHED request와 current catalog 일치로 delivery를 복원한다")
-	void discoversLostCallbackFromCurrentCatalog() {
+	@DisplayName("callback row가 없어도 DISPATCHED request와 서명된 request binding으로 delivery를 복원한다")
+	void discoversLostCallbackFromRequestBinding() {
 		var requests = mock(DatapackReleaseRequestRepository.class);
 		var channels = mock(DatapackReleaseChannelCommandPort.class);
 		var dispatched = DatapackReleaseRequest.requested(
@@ -104,10 +111,11 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findDispatchedDue(T0)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(dispatched));
 		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
-		when(catalog.fetchCurrent("production"))
-			.thenReturn(new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64)));
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(
+				new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64))));
 		var discovery = new DatapackReleaseReconciliationService(
 			repository, callbackService, catalog, requests, channels);
 
@@ -129,9 +137,10 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findDispatchedDue(T0)).thenReturn(java.util.List.of(dispatched));
-		when(catalog.fetchCurrent("production"))
-			.thenReturn(new CatalogIdentity(42, SHA, "production", "another-request", true, "b".repeat(64)));
+		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(dispatched));
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(
+				new CatalogIdentity(42, SHA, "production", "another-request", true, "b".repeat(64))));
 		var discovery = new DatapackReleaseReconciliationService(
 			repository, callbackService, catalog, requests, channels);
 
@@ -150,7 +159,7 @@ class DatapackReleaseReconciliationServiceTest {
 			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
 			.approve("approver", T0)
 			.markDispatched("https://github.com/run/42", "dispatch-42", T0);
-		when(requests.findDispatchedDue(T0)).thenReturn(java.util.List.of(dispatched));
+		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(dispatched));
 		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
 		when(catalog.findByRequest("production", "request-2057"))
 			.thenReturn(java.util.Optional.of(
@@ -168,6 +177,28 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
+	@DisplayName("수동 실행 가능한 APPROVED request도 유실 callback discovery 대상이다")
+	void discoversApprovedManualRequest() {
+		var requests = mock(DatapackReleaseRequestRepository.class);
+		var channels = mock(DatapackReleaseChannelCommandPort.class);
+		var approved = DatapackReleaseRequest.requested(
+			"request-2057", "candidate-2057", "scope", "production",
+			"b".repeat(64), "c".repeat(64), "d".repeat(64), "requester", T0)
+			.approve("approver", T0);
+		when(requests.findReconciliationDue(T0)).thenReturn(java.util.List.of(approved));
+		when(channels.candidateHasManifest("candidate-2057", SHA)).thenReturn(true);
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(
+				new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64))));
+		var discovery = new DatapackReleaseReconciliationService(
+			repository, callbackService, catalog, requests, channels);
+
+		discovery.discoverMissing(T0.plusMinutes(10));
+
+		verify(repository).upsertSameDelivery(any());
+	}
+
+	@Test
 	@DisplayName("일반 reconciliation 오류도 70분 경계에서 DEAD_LETTER로 마감한다")
 	void generalFailureHonorsDeadLetterDeadline() {
 		var fixedClock = Clock.fixed(
@@ -176,9 +207,10 @@ class DatapackReleaseReconciliationServiceTest {
 			repository, callbackService, catalog, null, null, fixedClock);
 		var delivery = delivery();
 		var identity = new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64));
-		when(repository.claimDue(T0.plusMinutes(70), "datapack-reconciler", 100))
+		when(repository.claimDue(eq(T0.plusMinutes(70)), anyString(), eq(100)))
 			.thenReturn(java.util.List.of(delivery));
-		when(catalog.fetch("production", 42)).thenReturn(identity);
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(identity));
 		doThrow(new IllegalStateException("persistent apply failure"))
 			.when(callbackService).reconcile(delivery, identity);
 
@@ -189,18 +221,33 @@ class DatapackReleaseReconciliationServiceTest {
 	}
 
 	@Test
+	@DisplayName("각 reconciliation 실행은 lease fencing용 고유 claim owner를 사용한다")
+	void usesUniqueClaimOwnerPerRun() {
+		service.reconcileDue();
+		service.reconcileDue();
+
+		var owners = ArgumentCaptor.forClass(String.class);
+		verify(repository, org.mockito.Mockito.times(2)).claimDue(any(), owners.capture(), eq(100));
+		assertThat(owners.getAllValues().get(0)).startsWith("datapack-reconciler-");
+		assertThat(owners.getAllValues().get(1)).startsWith("datapack-reconciler-");
+		assertThat(owners.getAllValues().get(0)).isNotEqualTo(owners.getAllValues().get(1));
+	}
+
+	@Test
 	@DisplayName("한 delivery 예외가 다음 reconciliation을 중단하지 않는다")
 	void isolatesDeliveryFailure() {
 		var first = delivery();
 		var second = DatapackReleaseDelivery.pending(
 			"request-2058", 43, "e".repeat(64), "production", "candidate-2058",
 			"c".repeat(64), "d".repeat(64), T0);
-		when(repository.claimDue(any(), eq("datapack-reconciler"), eq(100)))
+		when(repository.claimDue(any(), anyString(), eq(100)))
 			.thenReturn(java.util.List.of(first, second));
 		var firstIdentity = new CatalogIdentity(42, SHA, "production", "request-2057", true, "b".repeat(64));
 		var secondIdentity = new CatalogIdentity(43, "e".repeat(64), "production", "request-2058", true, "b".repeat(64));
-		when(catalog.fetch("production", 42)).thenReturn(firstIdentity);
-		when(catalog.fetch("production", 43)).thenReturn(secondIdentity);
+		when(catalog.findByRequest("production", "request-2057"))
+			.thenReturn(java.util.Optional.of(firstIdentity));
+		when(catalog.findByRequest("production", "request-2058"))
+			.thenReturn(java.util.Optional.of(secondIdentity));
 		doThrow(new IllegalStateException("first failed")).when(callbackService).reconcile(first, firstIdentity);
 
 		service.reconcileDue();

@@ -74,7 +74,9 @@ test("게시 실행기는 동일 sha의 releases 객체 재게시를 멱등 skip
   try {
     await mkdir(path.join(workspace, "catalog"), { recursive: true });
     const manifestBytes = Buffer.from(JSON.stringify({ ok: 1 }));
+    const bindingBytes = Buffer.from(JSON.stringify({ request: "request-2057" }));
     await writeFile(path.join(workspace, "catalog", "current.json"), manifestBytes);
+    await writeFile(path.join(workspace, "catalog", "release-request-binding.json"), bindingBytes);
     const plan = {
       schemaVersion: 2,
       mode: "object-storage-preflight",
@@ -85,6 +87,12 @@ test("게시 실행기는 동일 sha의 releases 객체 재게시를 멱등 skip
           sizeBytes: manifestBytes.length, packCount: 1, immutable: true },
         { type: "verify-release-manifest-object", objectKey: "catalog/releases/5.json",
           sha256: sha256(manifestBytes), sizeBytes: manifestBytes.length, packCount: 1, immutable: true },
+        { type: "put-release-request-binding-object", sourcePath: "catalog/release-request-binding.json",
+          objectKey: `catalog/release-requests/${"a".repeat(64)}.json`, sha256: sha256(bindingBytes),
+          sizeBytes: bindingBytes.length, immutable: true },
+        { type: "verify-release-request-binding-object",
+          objectKey: `catalog/release-requests/${"a".repeat(64)}.json`, sha256: sha256(bindingBytes),
+          sizeBytes: bindingBytes.length, immutable: true },
         { type: "put-manifest-object", sourcePath: "catalog/current.json",
           objectKey: "catalog/current.json", sha256: sha256(manifestBytes),
           sizeBytes: manifestBytes.length, packCount: 1 },
@@ -98,6 +106,7 @@ test("게시 실행기는 동일 sha의 releases 객체 재게시를 멱등 skip
     // 1회차: 정상 게시.
     await runPublish(planPath, workspace, baseUrl);
     assert.ok(mock.objects.has("catalog/releases/5.json"));
+    assert.ok(mock.objects.has(`catalog/release-requests/${"a".repeat(64)}.json`));
 
     // 2회차: 동일 바이트 재게시 → 멱등 성공(에러 없음).
     await runPublish(planPath, workspace, baseUrl);

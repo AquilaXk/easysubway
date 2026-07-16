@@ -8,8 +8,10 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.Signature;
 import java.util.Base64;
+import java.util.HexFormat;
 import org.junit.jupiter.api.Test;
 
 class HttpDatapackReleaseCatalogAdapterTest {
@@ -108,13 +110,17 @@ class HttpDatapackReleaseCatalogAdapterTest {
 	}
 
 	@Test
-	void findsRequestInImmutableManifestAfterCurrentAdvances() throws Exception {
+	void findsRequestThroughSignedBindingWithoutChangingManifestIdentity() throws Exception {
 		var keyPair = KeyPairGenerator.getInstance("RSA").generateKeyPair();
-		byte[] current = signedManifest(keyPair, 44, "request-next");
-		byte[] previous = signedManifest(keyPair, 42, "request-2057");
+		byte[] manifest = signedManifest(keyPair, 42);
+		byte[] current = signedManifest(keyPair, 44);
+		byte[] binding = signedBinding(keyPair, 42, "request-2057", sha256(manifest));
 		var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/catalog/release-requests/"
+			+ sha256("request-2057".getBytes(StandardCharsets.UTF_8)) + ".json",
+			exchange -> respond(exchange, binding));
+		server.createContext("/catalog/releases/42.json", exchange -> respond(exchange, manifest));
 		server.createContext("/catalog/current.json", exchange -> respond(exchange, current));
-		server.createContext("/catalog/releases/42.json", exchange -> respond(exchange, previous));
 		server.start();
 		try {
 			String publicKey = "-----BEGIN PUBLIC KEY-----\n"
@@ -127,18 +133,18 @@ class HttpDatapackReleaseCatalogAdapterTest {
 			var found = adapter.findByRequest("production", "request-2057");
 
 			assertThat(found).get().extracting(identity -> identity.releaseSequence()).isEqualTo(42L);
+			assertThat(found).get().extracting(identity -> identity.manifestSha256()).isEqualTo(sha256(manifest));
 		} finally {
 			server.stop(0);
 		}
 	}
 
-	private static byte[] signedManifest(java.security.KeyPair keyPair, long sequence, String requestId)
+	private static byte[] signedManifest(java.security.KeyPair keyPair, long sequence)
 		throws Exception {
 		var manifest = JSON.createObjectNode();
 		manifest.put("manifestVersion", 2);
 		manifest.put("channel", "production");
 		manifest.put("releaseSequence", sequence);
-		manifest.put("releaseRequestId", requestId);
 		manifest.put("keyId", "production-v1");
 		manifest.put("ttlSeconds", 3600);
 		manifest.putArray("packs");
@@ -149,6 +155,29 @@ class HttpDatapackReleaseCatalogAdapterTest {
 		signature.put("algorithm", "rsa-sha256-manifest-v2");
 		signature.put("value", Base64.getUrlEncoder().withoutPadding().encodeToString(signer.sign()));
 		return JSON.writeValueAsBytes(manifest);
+	}
+
+	private static byte[] signedBinding(java.security.KeyPair keyPair, long sequence,
+		String requestId, String manifestSha256) throws Exception {
+		var binding = JSON.createObjectNode();
+		binding.put("schemaVersion", 1);
+		binding.put("artifactKind", "datapack-release-request-binding");
+		binding.put("releaseRequestId", requestId);
+		binding.put("releaseSequence", sequence);
+		binding.put("channel", "production");
+		binding.put("manifestSha256", manifestSha256);
+		binding.put("keyId", "production-v1");
+		var signer = Signature.getInstance("SHA256withRSA");
+		signer.initSign(keyPair.getPrivate());
+		signer.update(HttpDatapackReleaseCatalogAdapter.canonical(binding));
+		var signature = binding.putObject("signature");
+		signature.put("algorithm", "rsa-sha256-release-request-v1");
+		signature.put("value", Base64.getUrlEncoder().withoutPadding().encodeToString(signer.sign()));
+		return JSON.writeValueAsBytes(binding);
+	}
+
+	private static String sha256(byte[] value) throws Exception {
+		return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));
 	}
 
 	private static void respond(com.sun.net.httpserver.HttpExchange exchange, byte[] body)

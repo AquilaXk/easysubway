@@ -89,6 +89,17 @@ test("production callback은 bounded sender 증적을 항상 보존하고 실패
   assert.match(gateStep, /exit\s+1/);
 });
 
+test("production request identity는 manifest 밖의 서명된 immutable binding으로 게시한다", () => {
+  assert.match(yml, /build-release-request-binding\.mjs/);
+  assert.match(yml, /--release-request-binding/);
+  assert.match(yml, /EASYSUBWAY_DATAPACK_RELEASE_REQUEST_BINDING/);
+  const buildStep = yml.match(
+    /- name: Data Pack Release \/ Build data packs[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(buildStep, "data pack build 스텝을 찾지 못함");
+  assert.doesNotMatch(buildStep, /--release-request-id/);
+});
+
 test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {
   // release-scope 게이트는 게시 범위(pilot region/operator × capitalPilotTargets domains) 내 gap만 차단한다(#1999).
   assert.match(yml, /--release-scope apps\/mobile\/release\/production-datapack-scope\.json/);

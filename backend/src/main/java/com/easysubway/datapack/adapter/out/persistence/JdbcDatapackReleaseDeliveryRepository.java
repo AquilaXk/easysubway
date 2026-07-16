@@ -45,15 +45,37 @@ public class JdbcDatapackReleaseDeliveryRepository implements DatapackReleaseDel
 	public DatapackReleaseDelivery upsertSameDelivery(DatapackReleaseDelivery delivery) {
 		if (postgresql) {
 			if (insertPostgresql(delivery) == 1) return delivery;
-			return findByIdempotencyKey(delivery.idempotencyKey())
+			var existing = findByIdempotencyKey(delivery.idempotencyKey())
 				.orElseThrow(() -> new DuplicateKeyException(
 					"release request/sequence already belongs to another manifest"));
+			ensureSameDelivery(existing, delivery);
+			return existing;
 		}
 		try {
 			insert(delivery);
 			return delivery;
 		} catch (DuplicateKeyException duplicate) {
-			return findByIdempotencyKey(delivery.idempotencyKey()).orElseThrow(() -> duplicate);
+			var existing = findByIdempotencyKey(delivery.idempotencyKey()).orElseThrow(() -> duplicate);
+			ensureSameDelivery(existing, delivery);
+			return existing;
+		}
+	}
+
+	private static void ensureSameDelivery(
+		DatapackReleaseDelivery existing,
+		DatapackReleaseDelivery incoming
+	) {
+		boolean sameIdentity = existing.releaseRequestId().equals(incoming.releaseRequestId())
+			&& existing.releaseSequence() == incoming.releaseSequence()
+			&& existing.manifestSha256().equals(incoming.manifestSha256())
+			&& existing.channel().equals(incoming.channel())
+			&& existing.candidateId().equals(incoming.candidateId());
+		boolean sameCallbackPayload = existing.payloadSha256() == null
+			|| incoming.payloadSha256() == null
+			|| (existing.payloadSha256().equals(incoming.payloadSha256())
+				&& existing.signatureSha256().equals(incoming.signatureSha256()));
+		if (!sameIdentity || !sameCallbackPayload) {
+			throw new DuplicateKeyException("idempotency key already belongs to another callback payload");
 		}
 	}
 

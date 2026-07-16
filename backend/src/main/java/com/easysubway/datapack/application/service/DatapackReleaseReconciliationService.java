@@ -5,12 +5,12 @@ import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseCatalogPort.CatalogIdentity;
 import com.easysubway.datapack.application.port.out.DatapackReleaseChannelCommandPort;
 import com.easysubway.datapack.application.port.out.DatapackReleaseRequestRepository;
-import com.easysubway.datapack.domain.DatapackReleaseRequestStatus;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery;
 import com.easysubway.datapack.domain.DatapackReleaseDelivery.State;
 import com.easysubway.datapack.domain.DatapackReleaseRequest;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -59,12 +59,13 @@ public class DatapackReleaseReconciliationService {
 
 	public void reconcileDue() {
 		var now = LocalDateTime.now(clock);
+		var claimOwner = "datapack-reconciler-" + UUID.randomUUID();
 		try {
 			discoverMissing(now);
 		} catch (RuntimeException ignored) {
 			// 한 discovery 오류가 이미 저장된 delivery reconciliation을 막지 않는다.
 		}
-		for (var delivery : repository.claimDue(now, "datapack-reconciler", 100)) {
+		for (var delivery : repository.claimDue(now, claimOwner, 100)) {
 			try {
 				reconcile(delivery, now);
 			} catch (RuntimeException failure) {
@@ -85,14 +86,11 @@ public class DatapackReleaseReconciliationService {
 
 	void discoverMissing(LocalDateTime now) {
 		if (requestRepository == null || channelRepository == null) return;
-		requestRepository.findDispatchedDue(now.minusMinutes(10)).stream()
+		requestRepository.findReconciliationDue(now.minusMinutes(10)).stream()
 			.forEach(request -> {
 				try {
-					var identity = catalog.fetchCurrent(request.targetChannel());
-					if (!matchesRequest(request, identity)) {
-						identity = catalog.findByRequest(request.targetChannel(), request.approvalId())
-							.orElse(null);
-					}
+					var identity = catalog.findByRequest(request.targetChannel(), request.approvalId())
+						.orElse(null);
 					if (!matchesRequest(request, identity)
 						|| !channelRepository.candidateHasManifest(
 							request.candidateId(), identity.manifestSha256())) return;
@@ -115,7 +113,8 @@ public class DatapackReleaseReconciliationService {
 
 	void reconcile(DatapackReleaseDelivery delivery, LocalDateTime now) {
 		try {
-			CatalogIdentity identity = catalog.fetch(delivery.channel(), delivery.releaseSequence());
+			CatalogIdentity identity = catalog.findByRequest(delivery.channel(), delivery.releaseRequestId())
+				.orElseThrow(DatapackReleaseCatalogPort.NotFound::new);
 			String mismatch = mismatch(delivery, identity);
 			if (mismatch != null) {
 				markClaimed(delivery, State.DEAD_LETTER, delivery.attempts(),

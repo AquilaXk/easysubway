@@ -53,6 +53,16 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("같은 idempotency key의 다른 callback payload와 signature는 거부한다")
+	void rejectsDifferentCallbackPayloadForSameIdentity() {
+		repository.upsertSameDelivery(pending(SHA, "c".repeat(64), "d".repeat(64)));
+
+		assertThatThrownBy(() -> repository.upsertSameDelivery(
+			pending(SHA, "e".repeat(64), "f".repeat(64))))
+			.isInstanceOf(DataIntegrityViolationException.class);
+	}
+
+	@Test
 	@DisplayName("동시 claim은 delivery 한 건을 한 worker에게만 준다")
 	void claimsDueOnce() throws Exception {
 		repository.upsertSameDelivery(pending(SHA));
@@ -79,8 +89,16 @@ class JdbcDatapackReleaseDeliveryRepositoryTest {
 	}
 
 	private static DatapackReleaseDelivery pending(String manifestSha256) {
+		return pending(manifestSha256, "c".repeat(64), "d".repeat(64));
+	}
+
+	private static DatapackReleaseDelivery pending(
+		String manifestSha256,
+		String payloadSha256,
+		String signatureSha256
+	) {
 		return DatapackReleaseDelivery.pending(
 			"request-2057", 42, manifestSha256, "production", "candidate-2057",
-			"c".repeat(64), "d".repeat(64), T0);
+			payloadSha256, signatureSha256, T0);
 	}
 }
