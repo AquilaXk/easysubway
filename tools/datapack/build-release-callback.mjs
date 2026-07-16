@@ -4,9 +4,11 @@ import crypto from "node:crypto";
 
 const e = process.env;
 const fields = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   artifactKind: "datapack-release-callback",
   releaseRequestId: e.RELEASE_REQUEST_ID,
+  releaseSequence: Number(e.RELEASE_SEQUENCE),
+  channel: e.TARGET_CHANNEL,
   workflowRunUrl: e.WORKFLOW_RUN_URL,
   manifestSha256: e.MANIFEST_SHA256,
   sqliteSha256: e.SQLITE_SHA256,
@@ -16,7 +18,8 @@ const fields = {
   routeRegressionStatus: e.ROUTE_REGRESSION_STATUS,
   publishStatus: e.PUBLISH_STATUS,
 };
-const order = ["schemaVersion","artifactKind","releaseRequestId","workflowRunUrl","manifestSha256",
+fields.idempotencyKey = `${fields.releaseRequestId}:${fields.releaseSequence}:${fields.manifestSha256}`;
+const order = ["schemaVersion","artifactKind","releaseRequestId","releaseSequence","channel","idempotencyKey","workflowRunUrl","manifestSha256",
   "sqliteSha256","gzipSha256","evidenceBundleSha256","validatorStatus","routeRegressionStatus","publishStatus"];
 const message = order.map((k) => String(fields[k])).join("\n");
 const value = crypto.createHmac("sha256", e.EASYSUBWAY_DATAPACK_CALLBACK_HMAC_KEY || "")
