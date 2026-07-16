@@ -152,6 +152,24 @@ export function validatePackIdentity(value, label) {
   }
 }
 
+export function selectEffectiveDataPack(manifest, defaultPackId = "capital") {
+  const selectedIdentity = manifest?.emergencyOverride ?? manifest?.activePack;
+  if (selectedIdentity && typeof selectedIdentity === "object") {
+    const candidates = manifest.packs.filter((pack) => (
+      pack.id === selectedIdentity.id && String(pack.version) === String(selectedIdentity.version)
+    ));
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+  if (typeof selectedIdentity === "string") {
+    const candidates = manifest.packs.filter((pack) => pack.id === selectedIdentity);
+    return candidates.length === 1 ? candidates[0] : null;
+  }
+  const defaults = manifest?.packs?.filter((pack) => pack.id === defaultPackId) ?? [];
+  return defaults.reduce((selected, pack) => (
+    selected === null || BigInt(pack.version) > BigInt(selected.version) ? pack : selected
+  ), null);
+}
+
 export function validatePackUrl(packUrl, label) {
   if (/%[0-9a-f]{2}/i.test(packUrl)) {
     throw new Error(`${label} must be a safe relative path or absolute HTTPS URL`);

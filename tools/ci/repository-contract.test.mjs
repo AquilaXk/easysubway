@@ -5026,6 +5026,36 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   );
   await rejectProductionManifest({ sha256: "f".repeat(64) }, /production data pack manifest sha256 does not match the supplied artifact/);
   await rejectProductionManifest({ sizeBytes: dataPackArtifactBytes + 1 }, /production data pack manifest sizeBytes does not match the supplied artifact/);
+  const { activePack: _activePack, ...productionManifestWithoutActivePack } = productionManifest;
+  const defaultCapitalManifest = signProductionManifest({
+    ...productionManifestWithoutActivePack,
+    packs: [
+      {
+        ...productionManifest.packs[0],
+        version: "1",
+        url: "https://datapack.example.com/catalog/capital-v1.sqlite.gz",
+        sha256: "f".repeat(64),
+      },
+      {
+        ...productionManifest.packs[0],
+        id: "aux",
+        version: "99",
+        url: "https://datapack.example.com/catalog/aux-v99.sqlite.gz",
+        sha256: "e".repeat(64),
+      },
+      {
+        ...productionManifest.packs[0],
+        version: "2",
+        url: "https://datapack.example.com/catalog/capital-v2.sqlite.gz",
+      },
+    ],
+  });
+  await writeFile(dataPackManifestPath, JSON.stringify(defaultCapitalManifest));
+  await execFileAsync(
+    process.execPath,
+    [...args, "--phase", "CANDIDATE", "--output", baselineOutput],
+    generatorOptions,
+  );
   const emergencyOverrideManifest = signProductionManifest({
     ...productionManifest,
     emergencyOverride: { id: "capital-rescue", version: "2", reason: "검증된 긴급 복구" },

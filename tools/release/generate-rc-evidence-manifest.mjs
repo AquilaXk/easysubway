@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
-import { validateManifest } from "../datapack/lib/manifest-validation.mjs";
+import { selectEffectiveDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
 const args = parseArgs(process.argv.slice(2));
 const cwd = process.cwd();
@@ -415,12 +415,7 @@ function validateProductionDataPackBinding(manifest, artifactPath, artifactBytes
   if (Date.parse(manifest.expiresAt) <= evaluatedAtMillis) {
     fail("production data pack manifest is expired");
   }
-  const selectedPackIdentity = manifest.emergencyOverride ?? manifest.activePack;
-  const activePack = selectedPackIdentity
-    ? manifest.packs.find((pack) => (
-        pack.id === selectedPackIdentity.id && pack.version === selectedPackIdentity.version
-      ))
-    : manifest.packs.length === 1 ? manifest.packs[0] : null;
+  const activePack = selectEffectiveDataPack(manifest);
   if (!activePack) {
     fail("production data pack manifest must identify exactly one active pack");
   }

@@ -85,6 +85,23 @@ test("emergencyOverride가 있으면 activePack보다 override pack을 선택한
   assert.deepEqual(await readFile(result.artifactPath), overrideBytes);
 });
 
+test("activePack이 없으면 런타임과 같이 최신 capital pack을 선택한다", async () => {
+  const { root, packBytes } = await fixture("PUBLISHED_AND_VERIFIED");
+  const manifestPath = path.join(root, "catalog/current.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  delete manifest.activePack;
+  manifest.packs = [
+    { id: "capital", version: "11", sha256: "f".repeat(64), sizeBytes: 1 },
+    { id: "aux", version: "99", sha256: "e".repeat(64), sizeBytes: 1 },
+    manifest.packs[0],
+  ];
+  await writeFile(manifestPath, JSON.stringify(manifest));
+
+  const result = await selectRcDataPackArtifact(root, path.join(root, "selected-default"));
+
+  assert.deepEqual(await readFile(result.artifactPath), packBytes);
+});
+
 test("실패·미검증 decision과 manifest에 결속되지 않은 pack은 거부한다", async () => {
   const failed = await fixture("NO_CHANGE_VALID");
   await writeFile(path.join(failed.root, "final-release-decision.json"), JSON.stringify({

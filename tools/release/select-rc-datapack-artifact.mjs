@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { copyFile, mkdir, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { selectEffectiveDataPack } from "../datapack/lib/manifest-validation.mjs";
 
 export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
   const root = path.resolve(artifactRoot);
@@ -16,7 +17,10 @@ export async function selectRcDataPackArtifact(artifactRoot, outputRoot) {
     : path.join(root, "current-production.json");
   const manifestBytes = await readFile(manifestSource);
   const manifest = JSON.parse(manifestBytes.toString("utf8"));
-  const activePack = selectEffectivePack(manifest);
+  validateSelectedManifest(manifest);
+  const activePack = selectEffectiveDataPack(manifest);
+  if (!activePack) throw new Error("selected production manifest must identify exactly one active pack");
+  validateSelectedPack(activePack);
   const packPaths = (await recursiveFiles(root)).filter((file) => file.endsWith(".sqlite.gz"));
   const matchingPacks = [];
   for (const file of packPaths) {
@@ -59,27 +63,16 @@ function validateFinalDecision(decision) {
   }
 }
 
-function selectEffectivePack(manifest) {
+function validateSelectedManifest(manifest) {
   if (manifest?.manifestVersion !== 2 || manifest.channel !== "production" || !Array.isArray(manifest.packs)) {
     throw new Error("selected data pack manifest must be production manifestVersion 2");
   }
-  let candidates;
-  const selectedIdentity = manifest.emergencyOverride ?? manifest.activePack;
-  if (selectedIdentity && typeof selectedIdentity === "object") {
-    candidates = manifest.packs.filter((pack) => (
-      pack.id === selectedIdentity.id && String(pack.version) === String(selectedIdentity.version)
-    ));
-  } else if (typeof selectedIdentity === "string") {
-    candidates = manifest.packs.filter((pack) => pack.id === selectedIdentity);
-  } else {
-    candidates = manifest.packs;
-  }
-  if (candidates.length !== 1) throw new Error("selected production manifest must identify exactly one active pack");
-  const [pack] = candidates;
-  if (!/^[a-f0-9]{64}$/.test(pack.sha256 ?? "") || !Number.isSafeInteger(pack.sizeBytes) || pack.sizeBytes <= 0) {
+}
+
+function validateSelectedPack(pack) {
+  if (!/^[a-f0-9]{64}$/.test(pack?.sha256 ?? "") || !Number.isSafeInteger(pack?.sizeBytes) || pack.sizeBytes <= 0) {
     throw new Error("selected production manifest active pack identity is invalid");
   }
-  return pack;
 }
 
 async function recursiveFiles(directory) {
