@@ -6,7 +6,11 @@
   "issue": 1020,
   "parentIssues": [1014, 1020],
   "linkedEvidenceIssues": [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133],
-  "consumerIssues": [2058, 1393, 1020],
+  "phaseConsumers": {
+    "CANDIDATE": [2058, 1393],
+    "FINAL": [1020]
+  },
+  "requiredFinalFragmentIssues": [2058, 1393],
   "activeBlockerIssues": [],
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "signedReleaseArtifactGate": "apps/mobile/release/signed-release-artifact-gate.json",
@@ -20,6 +24,7 @@
     "aabSha256",
     "aabPayloadSha256",
     "dataPackManifestSha256",
+    "dataPackArtifactSha256",
     "supportContactSetSha256",
     "releaseSequence",
     "routeContractVersion",
@@ -98,6 +103,18 @@
       "sourceIssue": 1914,
       "expiresAfterDays": 14,
       "requiredChecks": ["nonRootVerified", "imageScanPassed", "immutableDigestVerified", "runtimePolicyPassed"]
+    },
+    {
+      "id": "production_equivalent_rehearsal",
+      "sourceIssue": 2058,
+      "expiresAfterDays": 14,
+      "requiredChecks": ["currentBaselineCaptured", "appFirstCompatibilityPassed", "governanceNegativeNoProductionMutation", "restrictedCohortPassed", "monotonicRescueRollbackPassed", "finalTestCohortPassed"]
+    },
+    {
+      "id": "production_artifact_android_integration",
+      "sourceIssue": 1393,
+      "expiresAfterDays": 14,
+      "requiredChecks": ["productionBaselineValidated", "candidateArtifactStrictValidated", "negativeArtifactsRejected", "playTestInstalledRcVerified", "installerRecoveryPassed", "routeAndItxSmokesPassed"]
     }
   ],
   "requiredDatapackGates": [

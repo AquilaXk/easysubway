@@ -94,11 +94,11 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "5dc1aa5aeff004e431b4084aacecab2dbd1501db1bab34b62572995cd2fe3dab"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "24e1d6c670dd385a543d77cf4ae56ea1792822c981b1ba5fd88b9095893ed8f9"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
-            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "f8f0de18d1f46e828bf7e8621e2cecca37323d634638729c7022ec7a91366760"},
-            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "0b31da884721de3cd36c013f763b8d244a3564efc6754a55fbb724b37276def2"},
+            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "2a39af27c079d3db8de25ee5dc1f3c5c1a0dbe10b6739604e42d5bbf9a89c124"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "c9df4cbc21ce42af4c3f688be4ee7092983103419b83e9e3aafb64524ea192a9"},
             {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
           ]
         }
