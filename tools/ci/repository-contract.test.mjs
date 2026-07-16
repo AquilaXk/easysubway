@@ -7139,6 +7139,11 @@ test("Play internal track 업로드는 versionCode 정책·mapping·evidence를 
   // Opt-in workflow job that shares the RC environment approval and default off.
   assert.match(workflow, /play_upload:\n\s*description:[\s\S]*options:\n\s*- none\n\s*- internal/);
   assert.match(workflow, /play-internal-upload:/);
+  assert.match(
+    workflow,
+    /play-internal-upload:\n\s*name:[^\n]+\n\s*runs-on:[^\n]+\n\s*needs:\n\s*- android-production-rc-release\n\s*- rc-evidence-manifest/,
+  );
+  assert.match(workflow, /inputs\.play_upload == 'internal'[\s\S]*needs\.rc-evidence-manifest\.result == 'success'/);
   assert.match(workflow, /inputs\.play_upload == 'internal'/);
   assert.match(workflow, /environment:\n\s*name: android-production-rc/);
   assert.match(workflow, /node tools\/release\/upload-play-internal\.mjs/);

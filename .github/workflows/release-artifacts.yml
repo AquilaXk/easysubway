@@ -483,7 +483,9 @@ jobs:
   play-internal-upload:
     name: Play internal track upload
     runs-on: ubuntu-latest
-    needs: android-production-rc-release
+    needs:
+      - android-production-rc-release
+      - rc-evidence-manifest
     permissions:
       contents: read
     # Google Play allows only one active edit per app; serialize uploads and
@@ -493,7 +495,7 @@ jobs:
       cancel-in-progress: false
     # Shares the android-production-rc environment approval gate. Opt-in only:
     # play_upload=internal keeps the default build-only flow unchanged (#1689).
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.android_rc_signing_mode == 'production-upload-key' && inputs.play_upload == 'internal' && needs.android-production-rc-release.result == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.android_rc_signing_mode == 'production-upload-key' && inputs.play_upload == 'internal' && needs.android-production-rc-release.result == 'success' && needs.rc-evidence-manifest.result == 'success' }}
     environment:
       name: android-production-rc
     steps:
