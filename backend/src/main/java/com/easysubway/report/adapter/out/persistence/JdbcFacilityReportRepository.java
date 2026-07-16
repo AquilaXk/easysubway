@@ -25,6 +25,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -40,6 +42,7 @@ public class JdbcFacilityReportRepository implements
 	AnonymizeUserFacilityReportPort,
 	PurgeFacilityReportPersonalDataPort {
 
+	private static final Logger log = LoggerFactory.getLogger(JdbcFacilityReportRepository.class);
 	private static final String DELETED_DESCRIPTION = "사용자 데이터 삭제로 신고 내용이 삭제되었습니다.";
 
 	private final JdbcTemplate jdbcTemplate;
@@ -649,8 +652,26 @@ public class JdbcFacilityReportRepository implements
 			FacilityReport.ANONYMIZED_USER_ID
 		);
 		for (AnonymizedPhotoObjects objects : pendingObjects) {
-			deletePrimaryPhotoObject(objects.reportId(), objects.primaryObjectKey());
-			deleteThumbnailPhotoObject(objects.reportId(), objects.thumbnailObjectKey());
+			tryDeletePendingPhotoObject(
+				() -> deletePrimaryPhotoObject(objects.reportId(), objects.primaryObjectKey()),
+				"primary"
+			);
+			tryDeletePendingPhotoObject(
+				() -> deleteThumbnailPhotoObject(objects.reportId(), objects.thumbnailObjectKey()),
+				"thumbnail"
+			);
+		}
+	}
+
+	private void tryDeletePendingPhotoObject(Runnable deletion, String kind) {
+		try {
+			deletion.run();
+		} catch (RuntimeException exception) {
+			log.warn(
+				"Failed to delete anonymized facility report {} photo; it remains queued for retry",
+				kind,
+				exception
+			);
 		}
 	}
 

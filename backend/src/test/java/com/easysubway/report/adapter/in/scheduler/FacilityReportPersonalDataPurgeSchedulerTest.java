@@ -50,4 +50,14 @@ class FacilityReportPersonalDataPurgeSchedulerTest {
 			0
 		)).isInstanceOf(IllegalArgumentException.class);
 	}
+
+	@Test
+	@DisplayName("보관 기간은 공개된 최대 365일을 넘을 수 없다")
+	void rejectsRetentionDaysAbovePublishedMaximum() {
+		assertThatThrownBy(() -> new FacilityReportPersonalDataPurgeScheduler(
+			cutoff -> 0,
+			Clock.systemUTC(),
+			366
+		)).isInstanceOf(IllegalArgumentException.class);
+	}
 }

@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -381,18 +382,23 @@ class JdbcFacilityReportRepositoryTest {
 	}
 
 	@Test
-	@DisplayName("사진 객체 삭제 실패 시 익명화와 재시도 키를 먼저 영속화한다")
-	void purgePersonalDataPersistsRetryablePhotoDeletionState() {
+	@DisplayName("사진 객체 하나의 삭제 실패를 격리하고 나머지를 처리한 뒤 재시도한다")
+	void purgePersonalDataIsolatesPhotoDeletionFailureAndRetainsRetryState() {
 		var expiredReport = submittedReport("report-expired", "anonymous-user-1", 8);
+		var followingReport = submittedReport("report-following", "anonymous-user-2", 8);
 		repository.saveReport(expiredReport);
+		repository.saveReport(followingReport);
+		var deletedPhotoObjectKeys = new ArrayList<String>();
+		var firstDeletion = new AtomicBoolean(true);
 		repository = new JdbcFacilityReportRepository(jdbcTemplate, objectKey -> {
-			throw new IllegalStateException("object storage unavailable");
+			if (firstDeletion.getAndSet(false)) {
+				throw new IllegalStateException("object storage unavailable");
+			}
+			deletedPhotoObjectKeys.add(objectKey);
 		});
 		LocalDateTime cutoff = LocalDateTime.of(2026, 6, 17, 9, 0);
 
-		assertThatThrownBy(() -> repository.purgePersonalDataCreatedBefore(cutoff))
-			.isInstanceOf(IllegalStateException.class)
-			.hasMessage("object storage unavailable");
+		assertThat(repository.purgePersonalDataCreatedBefore(cutoff)).isEqualTo(2);
 
 		FacilityReport pendingDeletion = repository.loadReport("report-expired").orElseThrow();
 		assertThat(pendingDeletion.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
@@ -403,12 +409,14 @@ class JdbcFacilityReportRepositoryTest {
 		assertThat(pendingDeletion.photoObjectKey()).isEqualTo(expiredReport.photoObjectKey());
 		assertThat(pendingDeletion.latitude()).isNull();
 		assertThat(pendingDeletion.receiptTokenHash()).isNull();
+		assertThat(repository.loadReport("report-following").orElseThrow().photoObjectKey()).isNull();
+		assertThat(deletedPhotoObjectKeys).containsExactly(followingReport.photoObjectKey());
 
-		var deletedPhotoObjectKeys = new ArrayList<String>();
 		repository = new JdbcFacilityReportRepository(jdbcTemplate, deletedPhotoObjectKeys::add);
 		assertThat(repository.purgePersonalDataCreatedBefore(cutoff)).isZero();
 		assertThat(repository.loadReport("report-expired").orElseThrow().photoObjectKey()).isNull();
-		assertThat(deletedPhotoObjectKeys).containsExactly(expiredReport.photoObjectKey());
+		assertThat(deletedPhotoObjectKeys)
+			.containsExactly(followingReport.photoObjectKey(), expiredReport.photoObjectKey());
 	}
 
 	@Test
