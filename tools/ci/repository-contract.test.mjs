@@ -1890,6 +1890,87 @@ test("모바일 즐겨찾기 화면은 새로고침·삭제·복귀 재조회 �
   );
 });
 
+test("모바일 계정 삭제와 출처 화면은 feature presentation canonical 파일이 소유한다", () => {
+  const main = read("apps/mobile/lib/main.dart");
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+
+  assert.match(account, /^class UserDataDeletionAccessItem extends StatelessWidget/m);
+  assert.match(account, /^enum UserDataDeletionScope\b/m);
+  assert.match(account, /^UserDataDeletionScope userDataDeletionScope\(/m);
+  assert.match(account, /^class _UserDataDeletionCopy\b/m);
+  assert.match(account, /^class UserDataDeletionScreen extends StatefulWidget/m);
+  assert.match(account, /^class _UserDataDeletionScreenState extends State<UserDataDeletionScreen>/m);
+  assert.match(account, /^class UserDataDeletionResultScreen extends StatelessWidget/m);
+  assert.match(attribution, /^class DataSourceAttributionScreen extends StatefulWidget/m);
+  assert.match(
+    attribution,
+    /^class _DataSourceAttributionScreenState\s+extends State<DataSourceAttributionScreen>/m,
+  );
+  assert.match(attribution, /^class _AttributionCard extends StatelessWidget/m);
+  assert.match(attribution, /^class _AttributionRow extends StatelessWidget/m);
+  assert.match(
+    main,
+    /^import 'features\/account\/presentation\/user_data_deletion_screen\.dart';$/m,
+  );
+  assert.match(
+    main,
+    /^import 'features\/attribution\/presentation\/data_source_attribution_screen\.dart';$/m,
+  );
+  assert.match(
+    main,
+    /^export 'features\/account\/presentation\/user_data_deletion_screen\.dart'\s+show\s+UserDataDeletionScope,\s+UserDataDeletionScreen,\s+UserDataDeletionResultScreen;$/m,
+  );
+  assert.match(
+    main,
+    /^export 'features\/attribution\/presentation\/data_source_attribution_screen\.dart'\s+show DataSourceAttributionScreen;$/m,
+  );
+  assert.doesNotMatch(main, /^class _UserDataDeletionAccessItem\b/m);
+  assert.doesNotMatch(main, /^enum UserDataDeletionScope\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionCopy\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionScreen\b/m);
+  assert.doesNotMatch(main, /^class _UserDataDeletionScreenState\b/m);
+  assert.doesNotMatch(main, /^class UserDataDeletionResultScreen\b/m);
+  assert.doesNotMatch(main, /^class DataSourceAttributionScreen\b/m);
+  assert.doesNotMatch(main, /^class _DataSourceAttributionScreenState\b/m);
+  assert.doesNotMatch(main, /^class _AttributionCard\b/m);
+  assert.doesNotMatch(main, /^class _AttributionRow\b/m);
+});
+
+test("모바일 계정 삭제와 출처 화면은 삭제·asset load 순서를 유지한다", () => {
+  const account = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
+  const attribution = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
+  const accountBlock = account.slice(
+    account.indexOf("Future<void> _deleteCurrentUserData()"),
+    account.indexOf("class UserDataDeletionResultScreen"),
+  );
+  const attributionBlock = attribution.slice(
+    attribution.indexOf("Future<({Map<String, Object?> manifest"),
+    attribution.indexOf("@override\n  Widget build"),
+  );
+
+  assert.match(
+    accountBlock,
+    /setState\(\(\) \{[\s\S]*?_isDeleting = true;[\s\S]*?await widget\.repository\.deleteCurrentUserData\(\);[\s\S]*?await widget\.onDeleted\?\.call\(result\);[\s\S]*?if \(!mounted\)[\s\S]*?Navigator\.of\(context\)\.popUntil\(\(route\) => route\.isFirst\);/,
+  );
+  assert.match(
+    accountBlock,
+    /on UserDataDeletionException catch \(error\)[\s\S]*?SnackBar\(content: Text\(error\.message\)\)[\s\S]*?catch \(error, stackTrace\)[\s\S]*?context: '사용자 정보 삭제 처리 중 예외가 발생했습니다\.'[\s\S]*?finally \{[\s\S]*?if \(mounted\)[\s\S]*?_isDeleting = false;/,
+  );
+  assert.match(
+    attributionBlock,
+    /if \(initialManifest != null && initialInventory != null\)[\s\S]*?return \(manifest: initialManifest, inventory: initialInventory\);[\s\S]*?Future\.wait\(\[[\s\S]*?rootBundle\.loadString\(_mapManifestAsset\)[\s\S]*?rootBundle\.loadString\(_sourceInventoryAsset\)/,
+  );
+});
+
 test("프로덕션 모바일 UI 위젯명은 prototype 명칭을 쓰지 않는다", () => {
   const mobileFiles = execFileSync("git", ["ls-files", "apps/mobile/lib/*.dart"], {
     cwd: root,
@@ -2677,6 +2758,8 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     [
       "apps/mobile/lib/app/accessibility_theme.dart",
       "apps/mobile/lib/app/app_components.dart",
+      "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+      "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
       "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
       "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
       "apps/mobile/lib/main.dart",
@@ -6425,7 +6508,9 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   const inventory = readJson("tools/datapack/source-inventory.json");
   const appInventory = readJson("apps/mobile/assets/datapacks/source-inventory.json");
   const pubspec = read("apps/mobile/pubspec.yaml");
-  const mobileMain = read("apps/mobile/lib/main.dart");
+  const attributionScreen = read(
+    "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
+  );
   const targets = readJson("tools/datapack/nationwide-coverage-targets.json");
   const productionScope = readJson("apps/mobile/release/production-datapack-scope.json");
   const sourceCandidates = readJson("tools/datapack/source-candidates.json");
@@ -6433,11 +6518,11 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
 
   assert.deepEqual(appInventory, inventory);
   assert.match(pubspec, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /class DataSourceAttributionScreen/);
-  assert.match(mobileMain, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
-  assert.match(mobileMain, /assets\/datapacks\/source-inventory\.json/);
-  assert.match(mobileMain, /지도 표시용 asset/);
-  assert.match(mobileMain, /경로·시설 안내용 데이터/);
+  assert.match(attributionScreen, /class DataSourceAttributionScreen/);
+  assert.match(attributionScreen, /assets\/datapacks\/metro_map_pack\/manifest\.json/);
+  assert.match(attributionScreen, /assets\/datapacks\/source-inventory\.json/);
+  assert.match(attributionScreen, /지도 표시용 asset/);
+  assert.match(attributionScreen, /경로·시설 안내용 데이터/);
 
   assert.equal(inventory.schemaVersion, 1);
   assert.equal(inventory.region, "nationwide");
@@ -12832,6 +12917,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const authHeaders = read("apps/mobile/lib/auth_headers.dart");
   const secureKeyValueStorage = read("apps/mobile/lib/secure_key_value_storage.dart");
   const userDataDeletion = read("apps/mobile/lib/user_data_deletion.dart");
+  const userDataDeletionScreen = read(
+    "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
+  );
   const userDataDeletionTest = read("apps/mobile/test/user_data_deletion_test.dart");
   const onboarding = read("apps/mobile/lib/onboarding.dart");
   const onboardingTest = read("apps/mobile/test/onboarding_test.dart");
@@ -13216,9 +13304,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /현장 안내, 역무원 안내, 운영기관 공지를 먼저 확인해 주세요/);
   assert.match(main, /실시간 상태나 무조건 안전한 경로를 보장하지 않습니다/);
   // 삭제 확인 화면은 지워지는 것 1줄 + 되돌릴 수 없음 강조 + 예외 1줄로 압축한다(#1571).
-  assert.match(main, /삭제 후에는 되돌릴 수 없어요/);
+  assert.match(userDataDeletionScreen, /삭제 후에는 되돌릴 수 없어요/);
   assert.match(
-    main,
+    userDataDeletionScreen,
     /이 기기의 즐겨찾기·최근 검색·설정과 보낸 제보·사진이 삭제되거나 익명 처리돼요/,
   );
   assert.match(apiClient, /class ApiClient/);
@@ -13260,8 +13348,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(userDataDeletionTest, /기존 인증 갱신 실패 시 새 사용자 삭제로 처리하지 않는다/);
   assert.match(widgetTest, /도움말은 앱 안에서 데이터 삭제를 재확인하고 로컬 상태를 정리한다/);
   assert.match(widgetTest, /데이터 삭제 실패 시 로컬 상태를 유지하고 오류를 안내한다/);
-  assert.match(main, /UserDataDeletionScreen/);
-  assert.match(main, /dataDeletionConfirmButton/);
+  assert.match(userDataDeletionScreen, /UserDataDeletionScreen/);
+  assert.match(userDataDeletionScreen, /dataDeletionConfirmButton/);
   assert.match(widgetTest, /알림 설정 화면은 현재 설정을 불러오고 바꾼 값을 저장한다/);
   assert.match(widgetTest, /bySemanticsLabel/);
   assert.match(widgetTest, /greaterThanOrEqualTo\(60\)/);
