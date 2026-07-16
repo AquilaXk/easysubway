@@ -59,6 +59,10 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
   assert.match(script, /DELETE FROM route_v2_states/);
   assert.doesNotMatch(script, /printf -v session_token/);
   assert.match(script, /EASYSUBWAY_SCHEDULING_ENABLED=false/);
+  assert.doesNotMatch(script, /--env-file "\$\{backend_env\}"/);
+  assert.match(script, /backend_env_json="\$\{work_dir\}\/backend-env\.json"/);
+  assert.match(script, /backend_env_args\+=\(--env "\$\{env_name\}"\)/);
+  assert.match(script, /Buffer\.from\(\[0\]\)/);
   assert.match(script, /--publish 127\.0\.0\.1::8080/);
   assert.match(script, /docker port "\$\{cache_app\}" 8080\/tcp/);
   assert.match(script, /curl[^\n]+"\$\{cache_base_url\}/);
