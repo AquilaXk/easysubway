@@ -1706,11 +1706,11 @@ test("모바일 async 실패는 빈 목록으로 조용히 숨기지 않는다",
 
 test("모바일 공통 상태 카드는 홈 즐겨찾기 노선도에서 사용된다", () => {
   const accessibleDesign = read("apps/mobile/lib/accessible_design.dart");
-  const main = read("apps/mobile/lib/main.dart");
+  const appComponents = read("apps/mobile/lib/app/app_components.dart");
   const networkMap = read("apps/mobile/lib/network_map.dart");
 
   assert.match(accessibleDesign, /class AccessibleStateCard extends StatelessWidget/);
-  assert.match(main, /class _HomeStateCard extends StatelessWidget[\s\S]*AccessibleStateCard\(/);
+  assert.match(appComponents, /class HomeStateCard extends StatelessWidget[\s\S]*AccessibleStateCard\(/);
   assert.match(networkMap, /AccessibleStateCard\([\s\S]*networkMapRetryButton/);
 });
 
@@ -12641,9 +12641,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(main, /RouteSearchScreen\([\s\S]*simpleViewEnabled: simpleViewEnabled/);
   assert.match(main, /AppBar\(title: const Text\('즐겨찾기'\)\)/);
   // 즐겨찾기 홈은 #1569에서 카테고리 카드를 없애고 역/경로/시설 인라인 섹션으로 바꿨다.
-  assert.match(main, /_AppSectionTitle\(title: '역'\)/);
-  assert.match(main, /_AppSectionTitle\(title: '시설'\)/);
-  assert.match(main, /_AppSectionTitle\(title: '경로'\)/);
+  assert.match(main, /AppSectionTitle\(title: '역'\)/);
+  assert.match(main, /AppSectionTitle\(title: '시설'\)/);
+  assert.match(main, /AppSectionTitle\(title: '경로'\)/);
   assert.match(main, /FavoriteHomeScreen/);
   // #1569: 하위 목록 화면 진입 대신 즐겨찾기 항목을 인라인 행으로 바로 나열한다.
   // (하위 목록 위젯 클래스는 각 소스 파일에 유지, main에서 진입만 제거)
