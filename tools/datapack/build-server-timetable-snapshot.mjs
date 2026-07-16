@@ -38,6 +38,7 @@ export function buildServerTimetableSnapshot({
   canonicalPackGzipBytes,
   topologyEvidenceBytes,
   subwayRosterBytes,
+  canonicalGzipBytes,
   buildNow = new Date(),
 }) {
   const rawBaselineSql = normalizeBaselineSql(baselineGzipBytes);
@@ -109,7 +110,18 @@ export function buildServerTimetableSnapshot({
   assertNoIdentityCollisions(baselineSql, itxSeed);
   const sql = `${baselineSql}${itxSeed.sql}`;
   const sqlBytes = Buffer.from(sql);
-  const gzipBytes = gzipSync(sqlBytes, { level: 9, mtime: 0 });
+  const gzipBytes = canonicalGzipBytes ?? gzipSync(sqlBytes, { level: 9, mtime: 0 });
+  if (canonicalGzipBytes != null) {
+    let canonicalSqlBytes;
+    try {
+      canonicalSqlBytes = gunzipSync(canonicalGzipBytes);
+    } catch {
+      throw new Error("canonical gzip transport does not match normalized SQL");
+    }
+    if (!canonicalSqlBytes.equals(sqlBytes)) {
+      throw new Error("canonical gzip transport does not match normalized SQL");
+    }
+  }
   const snapshotSha256 = sha256(sqlBytes);
   const canonicalStationIds = canonicalStationSet(source);
   const canonicalStationSetHash = sha256(Buffer.from(JSON.stringify(canonicalStationIds)));
@@ -311,13 +323,12 @@ function representativeServicePatternEvidence(sql, source) {
   const trips = sql.split("\n")
     .filter((line) => line.startsWith("INSERT INTO transit_trips "))
     .map((line) => {
-      const row = values(line);
+      const row = valuesByColumn(line, "transit_trips");
       return {
-        id: row[0],
-        routeId: row[1],
-        servicePattern: row[3],
-        terminalStationId: row[5],
-        directionId: row[6],
+        id: requiredSqlColumn(row, "id"),
+        routeId: requiredSqlColumn(row, "route_id"),
+        servicePattern: requiredSqlColumn(row, "service_pattern"),
+        directionId: requiredSqlColumn(row, "direction_id"),
       };
     });
   const stopsByTrip = new Map();
@@ -385,7 +396,7 @@ function tripPatternSummary(trip, stopsByTrip) {
     tripId: trip.id,
     routeId: trip.routeId,
     directionId: trip.directionId,
-    terminalStationId: trip.terminalStationId,
+    terminalStationId: stopStationIds.at(-1),
     stopStationIds,
     passThroughStationIds: [],
     stopPatternSha256: sha256(Buffer.from(JSON.stringify(stopStationIds))),
@@ -546,6 +557,23 @@ function values(statement) {
   return result;
 }
 
+function valuesByColumn(statement, table) {
+  const prefix = `INSERT INTO ${table} (`;
+  const marker = ") VALUES (";
+  const end = statement.indexOf(marker);
+  if (!statement.startsWith(prefix) || end < 0) throw new Error("unsupported seed statement shape");
+  const columns = statement.slice(prefix.length, end).split(",").map((column) => column.trim());
+  const row = values(statement);
+  if (columns.length !== row.length) throw new Error("seed statement column/value count mismatch");
+  return Object.fromEntries(columns.map((column, index) => [column, row[index]]));
+}
+
+function requiredSqlColumn(row, column) {
+  const value = row[column];
+  if (value == null || value === "") throw new Error(`seed statement column is missing: ${column}`);
+  return value;
+}
+
 function canonicalStationSet(source) {
   return [...new Set(source.stationRosters.flatMap(({ stations }) => stations)
     .map(({ canonicalStationId, lineId }) => `${canonicalStationId}:${lineId}`))].sort();
@@ -593,6 +621,7 @@ async function main() {
     ?? "tools/datapack/itx-cheongchun-topology-evidence.json");
   const subwayRosterPath = path.resolve(root, args["subway-roster"]
     ?? "tools/datapack/sources/kric-line4-route-roster-20260706.json");
+  const canonicalGzipBytes = args.check ? await readFile(outputPath) : undefined;
   const contractBytes = await readFile(contractPath);
   const contract = parseJson(contractBytes, "coverage contract");
   const result = buildServerTimetableSnapshot({
@@ -606,6 +635,7 @@ async function main() {
     canonicalPackGzipBytes: await readFile(canonicalPackPath),
     topologyEvidenceBytes: await readFile(topologyEvidencePath),
     subwayRosterBytes: await readFile(subwayRosterPath),
+    canonicalGzipBytes,
     buildNow: buildClock(),
   });
   if (args.check) {

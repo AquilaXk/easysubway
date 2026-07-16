@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import { buildServerTimetableSnapshot } from "./build-server-timetable-snapshot.mjs";
 
@@ -154,6 +154,46 @@ test("complete snapshot은 source·completeness identity와 freshness를 fail cl
   );
 });
 
+test("현재 8컬럼 subway trip INSERT에서도 direction과 terminal evidence를 보존한다", async () => {
+  const value = await inputs();
+  const currentSchemaSql = gunzipSync(value.baselineGzipBytes).toString("utf8")
+    .replaceAll(
+      "service_pattern, service_day_start_seconds",
+      "service_pattern, service_class, service_day_start_seconds",
+    )
+    .replace(
+      /^(INSERT INTO transit_trips .*?'(?:LOCAL|EXPRESS)')(?=, )/gm,
+      "$1, 'SUBWAY'",
+    );
+
+  const result = buildServerTimetableSnapshot({
+    ...value,
+    baselineGzipBytes: gzipSync(Buffer.from(currentSchemaSql), { level: 9, mtime: 0 }),
+    buildNow,
+  });
+  const local = result.evidence.servicePatternEvidence.representativeLocal;
+
+  assert.equal(local.directionId, "down");
+  assert.equal(local.terminalStationId, local.stopStationIds.at(-1));
+});
+
+test("canonical gzip transport는 zlib encoder가 달라도 normalized SQL identity에 결합한다", async () => {
+  const value = await inputs();
+  const generated = buildServerTimetableSnapshot({ ...value, buildNow });
+  const canonicalGzipBytes = gzipSync(Buffer.from(generated.sql), { level: 0, mtime: 0 });
+
+  const canonical = buildServerTimetableSnapshot({
+    ...value,
+    buildNow,
+    canonicalGzipBytes,
+  });
+
+  assert.equal(sha256(canonical.gzipBytes), sha256(canonicalGzipBytes));
+  assert.equal(canonical.evidence.snapshotSha256, generated.evidence.snapshotSha256);
+  assert.equal(canonical.evidence.snapshotGzipSha256, sha256(canonicalGzipBytes));
+  assert.equal(canonical.evidence.snapshotGzipByteSize, canonicalGzipBytes.length);
+});
+
 test("CLI는 tracked snapshot/evidence를 생성하고 --check에서 byte identity를 검증한다", async (context) => {
   const directory = await mkdtemp(path.join(tmpdir(), "server-timetable-snapshot-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
@@ -184,10 +224,24 @@ test("CLI는 tracked snapshot/evidence를 생성하고 --check에서 byte identi
     readFile(runtimeEvidencePath),
   ]), before);
 
+  const value = await inputs();
+  const canonicalGzipBytes = gzipSync(gunzipSync(before[0]), { level: 0, mtime: 0 });
+  const canonical = buildServerTimetableSnapshot({
+    ...value,
+    buildNow,
+    canonicalGzipBytes,
+  });
+  await Promise.all([
+    writeFile(outputPath, canonicalGzipBytes),
+    writeFile(evidencePath, canonical.evidenceBytes),
+    writeFile(runtimeEvidencePath, canonical.evidenceBytes),
+  ]);
+  await execFileAsync(process.execPath, [...args, "--check"], { cwd: root, env });
+
   await writeFile(outputPath, Buffer.concat([before[0], Buffer.from("tampered")]));
   await assert.rejects(
     execFileAsync(process.execPath, [...args, "--check"], { cwd: root, env }),
-    /server timetable snapshot is stale/,
+    /canonical gzip transport does not match normalized SQL/,
   );
 });
 

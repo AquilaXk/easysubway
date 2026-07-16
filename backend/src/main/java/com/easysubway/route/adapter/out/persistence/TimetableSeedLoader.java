@@ -172,11 +172,26 @@ public class TimetableSeedLoader implements ApplicationRunner {
 	}
 
 	private void validateLoadedSnapshot(SnapshotEvidence evidence) {
+		if (evidence.tripCount() != evidence.subwayTripCount() + evidence.itxTripCount()
+			|| evidence.stopTimeCount() != evidence.subwayStopTimeCount() + evidence.itxStopTimeCount()) {
+			throw new IllegalStateException("complete snapshot service row counts are inconsistent");
+		}
 		assertCount("service_calendars", evidence.calendarCount());
 		assertCount("transit_routes", evidence.routeCount());
 		assertCount("transit_trips", evidence.tripCount());
 		assertCount("transit_stop_times", evidence.stopTimeCount());
 		assertCount("route_service_artifact_evidence", 1);
+		assertQueryCount(
+			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'SUBWAY'",
+			evidence.subwayTripCount(),
+			"subway trip count"
+		);
+		assertQueryCount(
+			"SELECT COUNT(*) FROM transit_stop_times s JOIN transit_trips t ON t.id = s.trip_id "
+				+ "WHERE t.service_class = 'SUBWAY'",
+			evidence.subwayStopTimeCount(),
+			"subway stop-time count"
+		);
 		assertQueryCount(
 			"SELECT COUNT(*) FROM transit_trips WHERE service_class = 'ITX_CHEONGCHUN'",
 			evidence.itxTripCount(),
@@ -418,6 +433,8 @@ public class TimetableSeedLoader implements ApplicationRunner {
 		int routeCount,
 		int tripCount,
 		int stopTimeCount,
+		int subwayTripCount,
+		int subwayStopTimeCount,
 		int itxTripCount,
 		int itxStopTimeCount
 	) {
@@ -473,6 +490,8 @@ public class TimetableSeedLoader implements ApplicationRunner {
 				positiveInteger(counts, "routes"),
 				positiveInteger(counts, "trips"),
 				positiveInteger(counts, "stopTimes"),
+				positiveInteger(counts, "subwayTrips"),
+				positiveInteger(counts, "subwayStopTimes"),
 				positiveInteger(counts, "itxTrips"),
 				positiveInteger(counts, "itxStopTimes")
 			);

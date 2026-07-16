@@ -15,6 +15,7 @@ import java.util.HexFormat;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,6 +126,22 @@ class TimetableSeedLoaderTest {
 			.hasMessageContaining("transit timetable snapshot activation failed");
 		assertThat(activeSha()).isEqualTo(activeSha);
 		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM timetable_snapshot_history", Integer.class)).isOne();
+		assertSnapshotRows("a");
+	}
+
+	@Test
+	void itxOnlyCandidateCannotReplacePriorCompleteSnapshot() throws Exception {
+		SnapshotResource first = snapshot("a", false);
+		SnapshotResource itxOnly = withoutSubwayRows(snapshot("itx-only", false));
+		TimetableSeedLoader loader = loader(first);
+		loader.activateSeed(first.seed(), first.evidence());
+		String activeSha = activeSha();
+
+		assertThatThrownBy(() -> loader.activateSeed(itxOnly.seed(), itxOnly.evidence()))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("transit timetable snapshot activation failed");
+
+		assertThat(activeSha()).isEqualTo(activeSha);
 		assertSnapshotRows("a");
 	}
 
@@ -327,6 +344,38 @@ class TimetableSeedLoaderTest {
 		evidence.remove("evidenceHash");
 		evidence.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(evidence)));
 		return new SnapshotResource(snapshot.seed(), jsonResource(evidence, "invalid-validation-evidence.json"));
+	}
+
+	private SnapshotResource withoutSubwayRows(SnapshotResource snapshot) throws Exception {
+		byte[] compressed;
+		try (var input = snapshot.seed().getInputStream()) {
+			compressed = input.readAllBytes();
+		}
+		byte[] sqlBytes;
+		try (var input = new GZIPInputStream(new java.io.ByteArrayInputStream(compressed))) {
+			sqlBytes = input.readAllBytes();
+		}
+		String sql = new String(sqlBytes, StandardCharsets.UTF_8).lines()
+			.filter(line -> !line.startsWith("INSERT INTO transit_trips ") || !line.contains("'SUBWAY'"))
+			.filter(line -> !line.startsWith("INSERT INTO transit_stop_times ") || !line.contains("'subway-trip-"))
+			.collect(Collectors.joining("\n", "", "\n"));
+		byte[] itxOnlySqlBytes = sql.getBytes(StandardCharsets.UTF_8);
+		byte[] itxOnlyGzipBytes = gzip(itxOnlySqlBytes);
+		ObjectNode evidence;
+		try (var input = snapshot.evidence().getInputStream()) {
+			evidence = (ObjectNode) objectMapper.readTree(input);
+		}
+		evidence.put("snapshotSha256", sha256(itxOnlySqlBytes));
+		evidence.put("snapshotSqlByteSize", itxOnlySqlBytes.length);
+		evidence.put("snapshotGzipSha256", sha256(itxOnlyGzipBytes));
+		evidence.put("snapshotGzipByteSize", itxOnlyGzipBytes.length);
+		evidence.withObject("/rowCounts").put("trips", 1).put("stopTimes", 3);
+		evidence.remove("evidenceHash");
+		evidence.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(evidence)));
+		return new SnapshotResource(
+			namedResource(itxOnlyGzipBytes, "itx-only.sql.gz"),
+			jsonResource(evidence, "itx-only-evidence.json")
+		);
 	}
 
 	private SnapshotResource withNonMonotonicExpressStop(SnapshotResource snapshot) throws Exception {
