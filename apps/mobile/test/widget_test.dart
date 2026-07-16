@@ -32,6 +32,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscript
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
+import 'package:easysubway_mobile/features/stations/presentation/station_detail_screen.dart';
 import 'package:easysubway_mobile/features/service_notice/data/notice_repository.dart';
 import 'package:easysubway_mobile/features/service_notice/domain/service_notice.dart';
 import 'package:easysubway_mobile/features/route_draft/domain/route_draft.dart';
