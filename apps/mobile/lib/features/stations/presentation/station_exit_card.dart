@@ -8,6 +8,7 @@ import '../../../design_tokens.dart';
 import '../../../mobile_error_reporter.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
+import 'station_detail_info_row.dart';
 
 const _currentLocationDisabledMessage =
     '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
@@ -97,7 +98,7 @@ class _StationExitCardState extends State<StationExitCard> {
                     ),
                     if (exit.lastVerifiedAt.trim().isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      _StationDetailInfoRow(
+                      StationDetailInfoRow(
                         icon: Icons.verified_outlined,
                         text:
                             '최근 확인 ${stationVerifiedRelativeLabel(exit.lastVerifiedAt)}',
@@ -109,14 +110,14 @@ class _StationExitCardState extends State<StationExitCard> {
             ),
             if (mapTarget?.usesStationFallback ?? false) ...[
               const SizedBox(height: 8),
-              const _StationDetailInfoRow(
+              const StationDetailInfoRow(
                 icon: Icons.info_outline,
                 text: '출구 좌표가 없어 역 위치 기준으로 안내합니다.',
               ),
             ],
             if (distanceMeters != null) ...[
               const SizedBox(height: 8),
-              _StationDetailInfoRow(
+              StationDetailInfoRow(
                 icon: Icons.straighten,
                 text: _exitDistanceLabel(
                   distanceMeters,
@@ -128,7 +129,7 @@ class _StationExitCardState extends State<StationExitCard> {
               const SizedBox(height: 8),
               Semantics(
                 liveRegion: true,
-                child: _StationDetailInfoRow(
+                child: StationDetailInfoRow(
                   icon: Icons.info_outline,
                   text: _locationMessage,
                 ),
@@ -475,33 +476,6 @@ int _coordinateDistanceMeters({
 }
 
 double _degreesToRadians(double degrees) => degrees * math.pi / 180;
-
-class _StationDetailInfoRow extends StatelessWidget {
-  const _StationDetailInfoRow({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 22, color: EasySubwayAccessibleColors.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: EasySubwayAccessibleColors.secondaryText,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _StationDetailStatusPill extends StatelessWidget {
   const _StationDetailStatusPill({
