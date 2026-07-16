@@ -356,8 +356,7 @@ node tools/ops/prepare-timetable-rollback-candidate.mjs \
 chmod 755 "${work_dir}" "${candidate_dir}"
 chmod 644 "${candidate_dir}/candidate.sql.gz" "${candidate_dir}/evidence.json"
 
-set +e
-run_backend_clone 120 --name "${candidate_app}" --network "${network}" \
+run_backend_clone 30 -d --name "${candidate_app}" --network "${network}" \
 	--cpus 1 --memory 1g --memory-swap 1g --pids-limit 256 \
 	-e SPRING_PROFILES_ACTIVE=prod \
 	-e EASYSUBWAY_DATASOURCE_URL=jdbc:postgresql://db:5432/easysubway_rehearsal \
@@ -371,15 +370,33 @@ run_backend_clone 120 --name "${candidate_app}" --network "${network}" \
 	-e EASYSUBWAY_TIMETABLE_SEED_RESOURCE=file:/evidence/candidate.sql.gz \
 	-e EASYSUBWAY_TIMETABLE_SEED_EVIDENCE_RESOURCE=file:/evidence/evidence.json \
 	-v "${candidate_dir}:/evidence:ro" \
-	"${backend_image}" > "${work_dir}/candidate.log" 2>&1
-candidate_exit=$?
-set -e
-[[ "${candidate_exit}" != 0 && "${candidate_exit}" != 124 ]] \
-	|| { echo 'injected activation did not fail closed' >&2; exit 1; }
+	"${backend_image}" >/dev/null
+candidate_log="${work_dir}/candidate.log"
+candidate_failure_observed=false
+for _ in $(seq 1 300); do
+	docker logs "${candidate_app}" > "${candidate_log}" 2>&1 || true
+	if grep -Fq 'transit timetable snapshot activation failed' "${candidate_log}" \
+		&& grep -Fq 'issue 2145 injected trip failure' "${candidate_log}"; then
+		candidate_failure_observed=true
+		break
+	fi
+	if [[ "$(docker inspect --format '{{.State.Running}}' "${candidate_app}" 2>/dev/null || true)" != true ]]; then
+		break
+	fi
+	sleep 1
+done
+docker logs "${candidate_app}" > "${candidate_log}" 2>&1 || true
+if grep -Fq 'transit timetable snapshot activation failed' "${candidate_log}" \
+	&& grep -Fq 'issue 2145 injected trip failure' "${candidate_log}"; then
+	candidate_failure_observed=true
+fi
+[[ "${candidate_failure_observed}" == true ]] \
+	|| { echo 'injected activation failure was not observed within timeout' >&2; exit 1; }
 grep -Fq 'transit timetable snapshot activation failed' "${work_dir}/candidate.log" \
 	|| { echo 'candidate did not reach timetable activation' >&2; exit 1; }
 grep -Fq 'issue 2145 injected trip failure' "${work_dir}/candidate.log" \
 	|| { echo 'candidate did not reach the injected SQL failure' >&2; exit 1; }
+docker rm -f "${candidate_app}" >/dev/null
 
 clone_identity_after="$(clone_psql -c "${clone_identity_sql}")"
 [[ "${clone_identity_after}" == "${clone_identity_before}" ]] || { echo 'rollback changed active snapshot identity' >&2; exit 1; }

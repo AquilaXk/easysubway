@@ -84,6 +84,9 @@ test("production timetable evidence는 exact deploy에서 cache와 격리 rollba
   assert.match(script, /pg_dump --format=custom/);
   assert.match(script, /pg_restore --clean --if-exists --no-owner --no-privileges/);
   assert.match(script, /issue_2145_reject_trip/);
+  assert.doesNotMatch(script, /candidate_exit/);
+  assert.match(script, /candidate_failure_observed=false/);
+  assert.match(script, /for _ in \$\(seq 1 300\)/);
   assert.match(script, /prepare-timetable-rollback-candidate\.mjs/);
   assert.match(script, /row_to_json/);
   assert.match(script, /transit_stop_times/);
