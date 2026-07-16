@@ -339,13 +339,61 @@ class JdbcFacilityReportRepositoryTest {
 		assertThatThrownBy(() -> repository.anonymizeFacilityReportsByUserId("anonymous-user-1"))
 			.isInstanceOf(IllegalStateException.class)
 			.hasMessage("object storage unavailable");
-		assertThat(repository.loadReport(targetReport.id())).contains(targetReport);
+		FacilityReport pendingDeletion = repository.loadReport(targetReport.id()).orElseThrow();
+		assertThat(pendingDeletion.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(pendingDeletion.description())
+			.isEqualTo("사용자 데이터 삭제로 신고 내용이 삭제되었습니다.");
+		assertThat(pendingDeletion.photoObjectKey()).isEqualTo(targetReport.photoObjectKey());
+		assertThat(pendingDeletion.latitude()).isNull();
+		assertThat(pendingDeletion.receiptTokenHash()).isNull();
 
 		var deletedPhotoObjectKeys = new ArrayList<String>();
 		repository = new JdbcFacilityReportRepository(jdbcTemplate, deletedPhotoObjectKeys::add);
-		assertThat(repository.anonymizeFacilityReportsByUserId("anonymous-user-1")).isEqualTo(1);
+		assertThat(repository.purgePersonalDataCreatedBefore(
+			LocalDateTime.of(2026, 6, 17, 10, 0)
+		)).isZero();
 		assertThat(deletedPhotoObjectKeys).containsExactly(targetReport.photoObjectKey());
 		assertThat(repository.loadReport(targetReport.id()).orElseThrow().photoObjectKey()).isNull();
+	}
+
+	@Test
+	@DisplayName("사용자 데이터 삭제는 일부 사진 삭제 후 실패해도 완료한 키와 남은 재시도 키를 구분한다")
+	void anonymizeFacilityReportsByUserIdPersistsPartialPhotoDeletionProgress() {
+		var firstReport = submittedReport("report-1", "anonymous-user-1", 8);
+		var secondReport = submittedReport("report-2", "anonymous-user-1", 9);
+		repository.saveReport(firstReport);
+		repository.saveReport(secondReport);
+		String firstObjectKey = "facility-reports/report-1/original.jpg";
+		String secondObjectKey = "facility-reports/report-2/original.jpg";
+		jdbcTemplate.update(
+			"UPDATE facility_reports SET photo_object_key = ? WHERE report_id = ?",
+			firstObjectKey,
+			firstReport.id()
+		);
+		jdbcTemplate.update(
+			"UPDATE facility_reports SET photo_object_key = ? WHERE report_id = ?",
+			secondObjectKey,
+			secondReport.id()
+		);
+		var deletedPhotoObjectKeys = new ArrayList<String>();
+		repository = new JdbcFacilityReportRepository(jdbcTemplate, objectKey -> {
+			if (objectKey.equals(secondObjectKey)) {
+				throw new IllegalStateException("object storage unavailable");
+			}
+			deletedPhotoObjectKeys.add(objectKey);
+		});
+
+		assertThatThrownBy(() -> repository.anonymizeFacilityReportsByUserId("anonymous-user-1"))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessage("object storage unavailable");
+
+		assertThat(deletedPhotoObjectKeys).containsExactly(firstObjectKey);
+		FacilityReport firstAnonymized = repository.loadReport(firstReport.id()).orElseThrow();
+		FacilityReport secondPending = repository.loadReport(secondReport.id()).orElseThrow();
+		assertThat(firstAnonymized.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(firstAnonymized.photoObjectKey()).isNull();
+		assertThat(secondPending.userId()).isEqualTo(FacilityReport.ANONYMIZED_USER_ID);
+		assertThat(secondPending.photoObjectKey()).isEqualTo(secondObjectKey);
 	}
 
 	@Test
