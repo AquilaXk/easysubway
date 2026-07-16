@@ -5323,6 +5323,7 @@ Future<void> _addDistanceMetersColumnIfMissing(CatalogDatabase database) async {
 Future<bool> _respondWithRouteV2Session(HttpRequest request) async {
   if (request.uri.path != '/api/v2/routes/session') return false;
   await utf8.decoder.bind(request).join();
+  final issuedAt = DateTime.now().toUtc();
   request.response
     ..statusCode = HttpStatus.ok
     ..headers.contentType = ContentType.json
@@ -5330,8 +5331,10 @@ Future<bool> _respondWithRouteV2Session(HttpRequest request) async {
       jsonEncode({
         'token': 'T' * 43,
         'scope': 'route:v2:itx',
-        'issuedAt': '2026-07-16T09:00:00Z',
-        'expiresAt': '2026-07-16T09:10:00Z',
+        'issuedAt': issuedAt.toIso8601String(),
+        'expiresAt': issuedAt
+            .add(const Duration(minutes: 10))
+            .toIso8601String(),
       }),
     );
   await request.response.close();

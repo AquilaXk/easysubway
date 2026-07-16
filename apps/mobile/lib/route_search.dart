@@ -848,6 +848,7 @@ class RouteSearchV2Result {
     required this.alternativeCount,
     required this.statuses,
     required this.itineraries,
+    this.nextServiceTime = '',
   });
 
   factory RouteSearchV2Result.fromJson(Map<String, Object?> json) {
@@ -866,6 +867,8 @@ class RouteSearchV2Result {
       maxTransfers: _requiredRouteInt(json, 'maxTransfers'),
       alternativeCount: _requiredRouteInt(json, 'alternativeCount'),
       statuses: _routeStringList(json['statuses'], 'route v2 status'),
+      nextServiceTime:
+          _optionalNullableRouteString(json, 'nextServiceTime') ?? '',
       itineraries: rawItineraries
           .map((item) {
             if (item is! Map<String, Object?>) {
@@ -888,6 +891,7 @@ class RouteSearchV2Result {
   final int alternativeCount;
   final List<String> statuses;
   final List<RouteSearchV2Itinerary> itineraries;
+  final String nextServiceTime;
 }
 
 class RouteSearchV2Itinerary {
@@ -1124,6 +1128,7 @@ class RouteSearchResult {
     this.sourceUpdatedAt = '',
     this.officialOdFareQuote,
     this.supportsRefresh = true,
+    this.nextServiceTime = '',
   }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
@@ -1230,10 +1235,45 @@ class RouteSearchResult {
       commercialEtaEligible:
           _optionalRouteBool(json, 'commercialEtaEligible') ?? false,
       sourceUpdatedAt: _optionalRouteString(json, 'sourceUpdatedAt'),
+      nextServiceTime: _optionalRouteString(json, 'nextServiceTime'),
     );
   }
 
   factory RouteSearchResult.fromV2(RouteSearchV2Result result) {
+    if (result.itineraries.isEmpty) {
+      if (result.statuses.isEmpty) {
+        throw const FormatException(
+          'Route v2 response has neither status nor itinerary',
+        );
+      }
+      return RouteSearchResult(
+        routeSearchId:
+            'route-v2-${result.originStationId}-${result.destinationStationId}-${result.departureTime}',
+        originStationId: result.originStationId,
+        originStationName: result.originStationId,
+        destinationStationId: result.destinationStationId,
+        destinationStationName: result.destinationStationId,
+        mobilityType: result.mobilityType,
+        constraintMode: result.constraintMode,
+        status: 'BLOCKED',
+        lineId: '',
+        lineName: '',
+        score: 0,
+        burdenCost: 0,
+        estimatedDurationSeconds: 0,
+        walkingDistanceMeters: 0,
+        transferCount: 0,
+        evidenceSummary: result.statuses,
+        steps: const [],
+        warnings: const [],
+        blockedReasons: result.statuses,
+        createdAt: result.departureTime,
+        etaSource: result.nextServiceTime.isEmpty ? 'UNSUPPORTED' : 'PLANNED',
+        sourceUpdatedAt: result.departureTime,
+        supportsRefresh: false,
+        nextServiceTime: result.nextServiceTime,
+      );
+    }
     final itinerary = result.itineraries.firstWhere(
       (candidate) => candidate.status == 'FOUND',
       orElse: () => result.itineraries.first,
@@ -1325,6 +1365,7 @@ class RouteSearchResult {
   final String sourceUpdatedAt;
   final OfficialOdFareQuote? officialOdFareQuote;
   final bool supportsRefresh;
+  final String nextServiceTime;
 
   bool get hasOfficialOdFareQuote => officialOdFareQuote != null;
 
@@ -1350,7 +1391,11 @@ class RouteSearchResult {
   }
 
   List<String> get blockedReasonLabels {
-    return blockedReasons.map(_routeBlockedReasonLabel).toList(growable: false);
+    return [
+      ...blockedReasons.map(_routeBlockedReasonLabel),
+      if (nextServiceTime.isNotEmpty)
+        _routeNextServiceTimeLabel(nextServiceTime),
+    ];
   }
 
   String get stairAccessLabel {
@@ -1511,6 +1556,7 @@ class RouteSearchResult {
       sourceUpdatedAt: sourceUpdatedAt,
       officialOdFareQuote: officialOdFareQuote ?? this.officialOdFareQuote,
       supportsRefresh: supportsRefresh,
+      nextServiceTime: nextServiceTime,
     );
   }
 
@@ -2134,6 +2180,7 @@ String _routeDistanceLabel(int distanceMeters) {
 const _routeBlockedNoStepFreeRoute = '계단 없는 경로를 아직 찾지 못했어요.';
 const _routeBlockedFacilityUnavailable = '꼭 필요한 시설을 지금 이용하기 어려워요.';
 const _routeBlockedGeneric = '안내할 수 있는 경로를 아직 찾지 못했어요.';
+const _routeBlockedNoTimetableService = '이 시간에는 운행하는 열차가 없어요.';
 
 String _routeBlockedReasonLabel(String reason) {
   final normalizedReason = reason.trim().replaceAll('못했습니다.', '못했어요.');
@@ -2141,6 +2188,7 @@ String _routeBlockedReasonLabel(String reason) {
     // 하드 블록.
     'STAIR_ONLY_ACCESS' => _routeBlockedNoStepFreeRoute,
     'FACILITY_UNAVAILABLE' => _routeBlockedFacilityUnavailable,
+    'NO_TIMETABLE_SERVICE' => _routeBlockedNoTimetableService,
     // 불확실성 계열은 헤지 사전 한 벌로 위임한다(#1577).
     'STAIR_ONLY_ACCESS_UNKNOWN' => routeHedgeStepFreeUnknown,
     'GENERATED_CONNECTOR_UNVERIFIED' ||
@@ -2162,6 +2210,14 @@ String _routeBlockedReasonLabel(String reason) {
     '경로 연결 정보를 확인할 수 없습니다.' => routeHedgeConnectivityUnknown,
     _ => _routeBlockedGeneric,
   };
+}
+
+String _routeNextServiceTimeLabel(String value) {
+  final trimmed = value.trim();
+  if (trimmed.length < 16) {
+    return '다음 운행 시각을 확인해 주세요.';
+  }
+  return '다음 운행 ${trimmed.substring(0, 10)} ${trimmed.substring(11, 16)}';
 }
 
 String _routeStepReasonLabel(String reason) {
