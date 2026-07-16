@@ -14,6 +14,7 @@ import '../../ads/ad_repository.dart';
 import '../../realtime/realtime_repository.dart';
 import '../../route_draft/application/route_draft_controller.dart';
 import '../../route_draft/domain/route_draft.dart';
+import '../../stations/presentation/station_detail_screen.dart';
 
 class _HomeSavedRouteCard extends StatelessWidget {
   const _HomeSavedRouteCard({
