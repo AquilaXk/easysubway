@@ -1546,6 +1546,30 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     /EASYSUBWAY_TIMETABLE_SEED_ENABLED/,
   );
 
+  for (const truthyAlias of ["on", "yes", "1"]) {
+    await writeFile(envFile, [
+      ...deploymentEnvLines,
+      `EASYSUBWAY_TIMETABLE_SEED_ENABLED=${truthyAlias}`,
+      "EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=true",
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+      /EASYSUBWAY_TIMETABLE_SEED_ENABLED/,
+    );
+
+    await writeFile(envFile, [
+      ...deploymentEnvLines,
+      "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",
+      `EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX=${truthyAlias}`,
+      "",
+    ].join("\n"));
+    await assert.rejects(
+      execFileAsync("tools/ci/validate-deployment-env.sh", [envFile], { cwd: root }),
+      /EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX/,
+    );
+  }
+
   await writeFile(envFile, [
     ...deploymentEnvLines,
     "EASYSUBWAY_TIMETABLE_SEED_ENABLED=true",

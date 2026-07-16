@@ -63,6 +63,18 @@ is_bool_env_value() {
   esac
 }
 
+is_spring_bool_env_value() {
+  local name="$1"
+  case "$(normalized_env_value "${name}")" in
+    true|false)
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
+}
+
 is_admin_basic_auth_enabled() {
   case "$(normalized_env_value EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)" in
     true|on|yes|1)
@@ -175,7 +187,14 @@ is_required_env_satisfied() {
     SLACK_CI_WEBHOOK_URL|SLACK_RELEASE_WEBHOOK_URL|SLACK_SECURITY_WEBHOOK_URL)
       true
       ;;
-    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED|EASYSUBWAY_TIMETABLE_SEED_ENABLED|EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
+    EASYSUBWAY_TIMETABLE_SEED_ENABLED|EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
+      if has_env_name "${name}"; then
+        is_spring_bool_env_value "${name}"
+      else
+        is_satisfied_by_runtime_fallback "${name}"
+      fi
+      ;;
+    EASYSUBWAY_ADMIN_BASIC_AUTH_ENABLED)
       if has_env_name "${name}"; then
         is_bool_env_value "${name}"
       else
@@ -223,8 +242,8 @@ if (( ${#missing_names[@]} > 0 )); then
 fi
 
 timetable_seed_invalid_names=()
-if is_truthy_env_value EASYSUBWAY_TIMETABLE_SEED_ENABLED \
-  && ! is_truthy_env_value EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX; then
+if [[ "$(normalized_env_value EASYSUBWAY_TIMETABLE_SEED_ENABLED)" == "true" ]] \
+  && [[ "$(normalized_env_value EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)" != "true" ]]; then
   timetable_seed_invalid_names+=(EASYSUBWAY_TIMETABLE_SEED_INCLUDES_ITX)
 fi
 
