@@ -93,6 +93,7 @@ configurations.configureEach {
 }
 
 dependencies {
+    implementation("com.google.android.play:integrity:1.6.0")
     implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.work:work-runtime:2.10.2")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")

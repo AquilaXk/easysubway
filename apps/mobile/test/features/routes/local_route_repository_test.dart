@@ -12,6 +12,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_map
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_policy.dart';
 import 'package:easysubway_mobile/route_search.dart';
+import 'package:easysubway_mobile/route_v2_ingress.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -146,6 +147,7 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((request) async {
+        if (await _respondWithRouteV2Session(request)) return;
         requestedPaths.add(request.uri.path);
         final requestBody = await utf8.decoder.bind(request).join();
         requestedBodies.add(jsonDecode(requestBody) as Map<String, Object?>);
@@ -171,14 +173,16 @@ void main() {
             Uri.parse('http://${server.address.host}:${server.port}'),
         enablePushNotifications: false,
         enableRouteV2OnlineFirst: true,
+        playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
       );
 
       final result = await dependencies.routeRepository.searchRoute(
         const RouteSearchRequest(
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
-          mobilityType: 'WHEELCHAIR',
-          mobilityPreset: 'STEP_FREE',
+          mobilityType: 'SENIOR',
+          mobilityPreset: 'STANDARD',
+          transportScope: RouteTransportScope.subwayAndItxCheongchun,
         ),
       );
 
@@ -187,8 +191,11 @@ void main() {
       expect(requestedBodies.single, containsPair('maxTransfers', 3));
       expect(requestedBodies.single, containsPair('alternativeCount', 3));
       // 프리셋은 v2 body에 실리고, mobilityType은 하위호환으로 함께 전송된다.
-      expect(requestedBodies.single, containsPair('mobilityPreset', 'STEP_FREE'));
-      expect(requestedBodies.single, containsPair('mobilityType', 'WHEELCHAIR'));
+      expect(
+        requestedBodies.single,
+        containsPair('mobilityPreset', 'STANDARD'),
+      );
+      expect(requestedBodies.single, containsPair('mobilityType', 'SENIOR'));
       expect(requestedBodies.single['departureTime'], isA<String>());
       expect(result.routeSearchId, 'route-v2');
       expect(result.originStationName, '상록수');
@@ -209,26 +216,15 @@ void main() {
       );
       expect(result.etaSource, 'REALTIME');
       expect(result.isLocalResult, isFalse);
-      expect(result.hasOfficialOdFareQuote, isTrue);
-      expect(result.officialOdFareQuote!.gnrlCardFare, 1550);
-      expect(result.officialOdFareQuote!.gnrlCashFare, 1650);
-      expect(result.officialOdFareQuote!.yungCardFare, 800);
-      expect(result.officialOdFareQuote!.yungCashFare, 900);
-      expect(result.officialOdFareQuote!.childCardFare, 500);
-      expect(result.officialOdFareQuote!.childCashFare, 500);
+      expect(result.hasOfficialOdFareQuote, isFalse);
+      expect(result.officialOdFareQuote, isNull);
 
-      final refresh = await dependencies.routeRepository.refreshRoute(
-        result.routeSearchId,
+      await expectLater(
+        dependencies.routeRepository.refreshRoute(result.routeSearchId),
+        throwsA(isA<RouteSearchException>()),
       );
 
-      expect(requestedPaths, [
-        '/api/v2/routes/search',
-        '/api/v2/routes/route-v2/refresh',
-      ]);
-      expect(refresh.routeSearchId, 'route-v2');
-      expect(refresh.result.hasOfficialOdFareQuote, isTrue);
-      expect(refresh.result.officialOdFareQuote!.gnrlCardFare, 1550);
-      expect(refresh.result.officialOdFareQuote!.gnrlCashFare, 1650);
+      expect(requestedPaths, ['/api/v2/routes/search']);
     },
   );
 
@@ -256,6 +252,7 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((request) async {
+        if (await _respondWithRouteV2Session(request)) return;
         request.response
           ..statusCode = HttpStatus.serviceUnavailable
           ..headers.contentType = ContentType.json
@@ -272,6 +269,7 @@ void main() {
         enablePushNotifications: false,
         enableRouteV2OnlineFirst: true,
         routeSearchOnlineFirstMetrics: metrics,
+        playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
       );
 
       await expectLater(
@@ -280,6 +278,7 @@ void main() {
             originStationId: 'station-sangnoksu',
             destinationStationId: 'station-sadang',
             mobilityType: 'WHEELCHAIR',
+            transportScope: RouteTransportScope.subwayAndItxCheongchun,
           ),
         ),
         throwsA(
@@ -312,6 +311,7 @@ void main() {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(server.close);
       server.listen((request) async {
+        if (await _respondWithRouteV2Session(request)) return;
         request.response
           ..statusCode = HttpStatus.notFound
           ..headers.contentType = ContentType.json
@@ -328,6 +328,7 @@ void main() {
         enablePushNotifications: false,
         enableRouteV2OnlineFirst: true,
         routeSearchOnlineFirstMetrics: metrics,
+        playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
       );
 
       await expectLater(
@@ -336,6 +337,7 @@ void main() {
             originStationId: 'station-sangnoksu',
             destinationStationId: 'station-sadang',
             mobilityType: 'WHEELCHAIR',
+            transportScope: RouteTransportScope.subwayAndItxCheongchun,
           ),
         ),
         throwsA(
@@ -366,6 +368,7 @@ void main() {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
     server.listen((request) async {
+      if (await _respondWithRouteV2Session(request)) return;
       request.response
         ..statusCode = HttpStatus.badRequest
         ..headers.contentType = ContentType.json
@@ -382,6 +385,7 @@ void main() {
       enablePushNotifications: false,
       enableRouteV2OnlineFirst: true,
       routeSearchOnlineFirstMetrics: metrics,
+      playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
     );
 
     await expectLater(
@@ -390,6 +394,7 @@ void main() {
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
           mobilityType: 'WHEELCHAIR',
+          transportScope: RouteTransportScope.subwayAndItxCheongchun,
         ),
       ),
       throwsA(
@@ -418,6 +423,7 @@ void main() {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
     server.listen((request) async {
+      if (await _respondWithRouteV2Session(request)) return;
       request.response
         ..statusCode = HttpStatus.notModified
         ..headers.contentType = ContentType.json
@@ -434,6 +440,7 @@ void main() {
       enablePushNotifications: false,
       enableRouteV2OnlineFirst: true,
       routeSearchOnlineFirstMetrics: metrics,
+      playIntegrityAttestor: const _FakePlayIntegrityAttestor(),
     );
 
     await expectLater(
@@ -442,6 +449,7 @@ void main() {
           originStationId: 'station-sangnoksu',
           destinationStationId: 'station-sadang',
           mobilityType: 'WHEELCHAIR',
+          transportScope: RouteTransportScope.subwayAndItxCheongchun,
         ),
       ),
       throwsA(isA<RouteSearchException>()),
@@ -676,10 +684,7 @@ void main() {
     int walkingMinutes(RouteSearchResult result) => result.steps
         .where((step) => step.stepType != 'ride')
         .fold<int>(0, (sum, step) => sum + step.estimatedMinutes);
-    expect(
-      walkingMinutes(slow),
-      greaterThan(walkingMinutes(standard)),
-    );
+    expect(walkingMinutes(slow), greaterThan(walkingMinutes(standard)));
   });
 
   test('STEP_FREE 프리셋은 STANDARD 대비 승강기 대기 60초만 더한다', () async {
@@ -1278,71 +1283,71 @@ void main() {
     expect(edge.read<int>('reliability_score'), 30);
   });
 
-  test('데이터팩 UNDER_MAINTENANCE edge는 표시 경로에서 가용이 아니라 보수중으로 차단된다 (#1996)', () async {
-    // 백엔드 게이트가 확정한 network_edges.accessibility_status='UNDER_MAINTENANCE'가
-    // 앱 표시 경로까지 도달하면서, available로 렌더되지 않고 '보수중' 사유로
-    // 정직하게 구분 표시되는지 end-to-end로 검증한다.
-    final database = CatalogDatabase.memory();
-    addTearDown(database.close);
-    await database.seedBaselineIfEmpty();
-    await database.customStatement('''
+  test(
+    '데이터팩 UNDER_MAINTENANCE edge는 표시 경로에서 가용이 아니라 보수중으로 차단된다 (#1996)',
+    () async {
+      // 백엔드 게이트가 확정한 network_edges.accessibility_status='UNDER_MAINTENANCE'가
+      // 앱 표시 경로까지 도달하면서, available로 렌더되지 않고 '보수중' 사유로
+      // 정직하게 구분 표시되는지 end-to-end로 검증한다.
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      await database.customStatement('''
       UPDATE network_edges
       SET accessibility_status = 'UNDER_MAINTENANCE'
       WHERE id = 'entry-sangnoksu-seoul-4'
     ''');
-    final repository = LocalRouteRepository(catalogDatabase: database);
+      final repository = LocalRouteRepository(catalogDatabase: database);
 
-    final result = await repository.searchRoute(
-      const RouteSearchRequest(
-        originStationId: 'station-sangnoksu',
-        destinationStationId: 'station-sadang',
-        mobilityType: 'WHEELCHAIR',
-      ),
-    );
+      final result = await repository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
 
-    // 가용으로 렌더되면 안 된다: FOUND가 아니라 차단이어야 한다.
-    expect(result.status, 'BLOCKED');
-    expect(result.steps, isEmpty);
-    // 확인 불가가 아니라 실측 보수중 사유로 구분 표시된다.
-    expect(result.blockedReasons, contains('지금은 보수중이라 이용하기 어려워요.'));
-    // 보수중 문구는 available·확인 불가 문구와 겹치지 않는다.
-    expect(
-      result.blockedReasons,
-      isNot(contains('엘리베이터·통로 상태를 확인하고 있어요.')),
-    );
-  });
+      // 가용으로 렌더되면 안 된다: FOUND가 아니라 차단이어야 한다.
+      expect(result.status, 'BLOCKED');
+      expect(result.steps, isEmpty);
+      // 확인 불가가 아니라 실측 보수중 사유로 구분 표시된다.
+      expect(result.blockedReasons, contains('지금은 보수중이라 이용하기 어려워요.'));
+      // 보수중 문구는 available·확인 불가 문구와 겹치지 않는다.
+      expect(result.blockedReasons, isNot(contains('엘리베이터·통로 상태를 확인하고 있어요.')));
+    },
+  );
 
-  test('데이터팩 NO_OFFICIAL_FEED edge는 표시 경로에서 확인 불가(unknown)로 취급된다 (#1996)', () async {
-    // 상록수형: 공식 상태 피드 부재. available로 매핑되면 안 되고 확인 불가로
-    // 취급되어, 휠체어 strict 프로필에서는 UNKNOWN으로 남는다.
-    final database = CatalogDatabase.memory();
-    addTearDown(database.close);
-    await database.seedBaselineIfEmpty();
-    await database.customStatement('''
+  test(
+    '데이터팩 NO_OFFICIAL_FEED edge는 표시 경로에서 확인 불가(unknown)로 취급된다 (#1996)',
+    () async {
+      // 상록수형: 공식 상태 피드 부재. available로 매핑되면 안 되고 확인 불가로
+      // 취급되어, 휠체어 strict 프로필에서는 UNKNOWN으로 남는다.
+      final database = CatalogDatabase.memory();
+      addTearDown(database.close);
+      await database.seedBaselineIfEmpty();
+      await database.customStatement('''
       UPDATE network_edges
       SET accessibility_status = 'NO_OFFICIAL_FEED'
       WHERE id = 'entry-sangnoksu-seoul-4'
     ''');
-    final repository = LocalRouteRepository(catalogDatabase: database);
+      final repository = LocalRouteRepository(catalogDatabase: database);
 
-    final result = await repository.searchRoute(
-      const RouteSearchRequest(
-        originStationId: 'station-sangnoksu',
-        destinationStationId: 'station-sadang',
-        mobilityType: 'WHEELCHAIR',
-      ),
-    );
+      final result = await repository.searchRoute(
+        const RouteSearchRequest(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'WHEELCHAIR',
+        ),
+      );
 
-    // available로 오인되어 FOUND가 되면 안 된다. 확인 불가는 UNKNOWN 계열이다.
-    expect(result.status, 'UNKNOWN');
-    expect(result.steps, isEmpty);
-    // 확인 불가 문구로 안내하고, 보수중 문구는 쓰지 않는다.
-    expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
-    expect(
-      result.blockedReasons,
-      isNot(contains('지금은 보수중이라 이용하기 어려워요.')),
-    );
-  });
+      // available로 오인되어 FOUND가 되면 안 된다. 확인 불가는 UNKNOWN 계열이다.
+      expect(result.status, 'UNKNOWN');
+      expect(result.steps, isEmpty);
+      // 확인 불가 문구로 안내하고, 보수중 문구는 쓰지 않는다.
+      expect(result.blockedReasons, contains('엘리베이터·통로 상태를 확인하고 있어요.'));
+      expect(result.blockedReasons, isNot(contains('지금은 보수중이라 이용하기 어려워요.')));
+    },
+  );
 
   test('기존 baseline edge provenance를 보강해 strict 경로를 유지한다', () async {
     final database = CatalogDatabase.memory();
@@ -5305,4 +5310,32 @@ Future<void> _addDistanceMetersColumnIfMissing(CatalogDatabase database) async {
       'ALTER TABLE network_edges ADD COLUMN distance_meters INTEGER NOT NULL DEFAULT 0',
     );
   }
+}
+
+Future<bool> _respondWithRouteV2Session(HttpRequest request) async {
+  if (request.uri.path != '/api/v2/routes/session') return false;
+  await utf8.decoder.bind(request).join();
+  final issuedAt = DateTime.now().toUtc();
+  request.response
+    ..statusCode = HttpStatus.ok
+    ..headers.contentType = ContentType.json
+    ..write(
+      jsonEncode({
+        'token': 'T' * 43,
+        'scope': 'route:v2:itx',
+        'issuedAt': issuedAt.toIso8601String(),
+        'expiresAt': issuedAt
+            .add(const Duration(minutes: 10))
+            .toIso8601String(),
+      }),
+    );
+  await request.response.close();
+  return true;
+}
+
+class _FakePlayIntegrityAttestor implements PlayIntegrityAttestor {
+  const _FakePlayIntegrityAttestor();
+
+  @override
+  Future<String> requestToken(String requestHash) async => 'integrity-token';
 }

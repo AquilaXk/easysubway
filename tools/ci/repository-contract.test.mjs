@@ -2024,6 +2024,11 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
     "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:443",
   ], { cwd: root });
+  await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+    "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+    "--dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true",
+    "--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
+  ], { cwd: root });
   const injectionDir = await mkdtemp(path.join(tmpdir(), "release-dart-define-"));
   const injectionMarker = path.join(injectionDir, "executed");
   try {
@@ -2064,6 +2069,19 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
     ], { cwd: root }),
     /EASYSUBWAY_DEMO_HOME_DATA is not allowed in release/,
   );
+  for (const cloudProjectNumber of [undefined, "", "0", "12a"] ) {
+    const args = [
+      "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+      "--dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true",
+    ];
+    if (cloudProjectNumber !== undefined) {
+      args.push(`--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=${cloudProjectNumber}`);
+    }
+    await assert.rejects(
+      execFileAsync("tools/mobile/validate-release-dart-defines.sh", args, { cwd: root }),
+      /EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER/,
+    );
+  }
 });
 
 test("mobile datapack asset audit는 fixture provenance와 최소 row를 검사한다", async () => {
@@ -2139,6 +2157,15 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
 	  assert.match(workflow, /--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false/);
+	  assert.equal(
+	    (workflow.match(/--dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true/g) ?? []).length,
+	    2,
+	  );
+	  assert.equal(
+	    (workflow.match(/--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="\$\{EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER\}"/g) ?? []).length,
+	    2,
+	  );
+	  assert.doesNotMatch(workflow, /vars\.EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER/);
 	  assert.doesNotMatch(workflow, /--dart-define=EASYSUBWAY_DEMO_HOME_DATA=true/);
   assert.match(workflow, /build\/app\/outputs\/bundle\/release\/app-release\.aab/);
   assert.match(workflow, /build\/app\/outputs\/mapping\/release\/mapping\.txt/);

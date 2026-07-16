@@ -163,6 +163,46 @@ void main() {
     expect(dependencies.routeRepository, same(injectedRouteRepository));
   });
 
+  test('Route V2 flag는 로컬 catalog가 없으면 즉시 실패한다', () {
+    expect(
+      () => AppDependencies.resolve(
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () => Uri.parse('https://api.example.com'),
+        enablePushNotifications: false,
+        enableRouteV2OnlineFirst: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Route V2 online-first requires a local catalog database.',
+        ),
+      ),
+    );
+  });
+
+  test('Route V2 flag는 API 주소가 없으면 local로 강등하지 않고 즉시 실패한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    addTearDown(catalogDatabase.close);
+
+    expect(
+      () => AppDependencies.resolve(
+        catalogDatabase: catalogDatabase,
+        reportRepository: const UnavailableFacilityReportRepository(),
+        apiBaseUri: () => null,
+        enablePushNotifications: false,
+        enableRouteV2OnlineFirst: true,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Release API base URL must be configured.',
+        ),
+      ),
+    );
+  });
+
   test('로컬 데이터베이스와 API 주소가 있으면 실시간은 API를 호출한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
