@@ -96,8 +96,8 @@
           "files": [
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "8b831a4108c1c77f718a4b729e7d24f36dc024b83845a4ecfa7d2b99e5ad1971"},
-            {"path": ".github/workflows/release-artifacts.yml", "sha256": "3827fe58f2a9ea6042f35ce5eedf702c15cc12f69f9ef4bc5370a151877cbf38"},
-            {"path": ".github/workflows/datapack-release.yml", "sha256": "1c449f274f0486c7de8dbecf771cc6813045309277a7a8123b56bee7c1567008"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "568299ac1e3eb2728908b89aacca9b0f95113a26e53f4eaf5d0bfd4fbfeec454"},
+            {"path": ".github/workflows/datapack-release.yml", "sha256": "77398afcd58935ff3bf305a8c01ea9d9229a0708c505e43a2b9dab2e7808d74b"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "00106be89d1834db166c0c4cfba04674e2a456e7e57648595b74feb933c31273"},
             {"path": "backend/Dockerfile", "sha256": "7d9608f490113e655aeaf9544f061896d20f391d5c309b50a42f6303e5eb676b"},
