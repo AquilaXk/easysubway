@@ -333,8 +333,10 @@ void main() {
     // 상한은 내리기만 한다.
     final actual = countPerFile(RegExp(r'\bCard\('));
     expectRatchet(actual, {
-      // 의도 잔존: 역 상세 카드 5곳 — 무박스(행+구분선) 전환 진행 중
-      'lib/station_search.dart': 5,
+      // 의도 잔존: 역 상세 카드 4곳 — 무박스(행+구분선) 전환 진행 중
+      'lib/station_search.dart': 4,
+      // 동일 총량 중 출구 카드 1곳은 canonical presentation 경로로 이동했다.
+      'lib/features/stations/presentation/station_exit_card.dart': 1,
       // 동일 총량 중 주변 역 검색 카드 1곳은 canonical presentation 경로로 이동했다.
       'lib/features/stations/presentation/station_search_body.dart': 1,
       // 의도 잔존: AppCard 공용 래퍼·정보 카드 2곳 — 무박스 전환 대상
