@@ -74,7 +74,7 @@ wait_gateway
 
 BODY=$(curl -fsS -D "$TMP_HEADERS" -H 'CF-Connecting-IP: 198.51.100.10' -H 'True-Client-IP: 198.51.100.11' "$BASE/api/v2/routes/session")
 [ "$BODY" = '{"rawIpHeaderCount":0,"originVerified":true}' ]
-rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
+grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
 	echo "session success response must remain private, no-store" >&2
 	exit 1
 }
@@ -86,8 +86,8 @@ done
 STATUS=$(curl -sS -D "$TMP_HEADERS" -o "$TMP_BODY" -w '%{http_code}' -H 'CF-Connecting-IP: 198.51.100.10' "$BASE/api/v2/routes/session")
 [ "$STATUS" = 429 ]
 [ "$(tr -d '\n' < "$TMP_BODY")" = '{"success":false,"code":"ROUTE_RATE_LIMITED","message":"잠시 후 다시 시도"}' ]
-rg -qi '^Retry-After: 60' "$TMP_HEADERS"
-rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS"
+grep -Eqi '^Retry-After: 60' "$TMP_HEADERS"
+grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS"
 
 curl -fsS -o /dev/null -H 'CF-Connecting-IP: 198.51.100.20' "$BASE/api/v2/routes/session"
 
@@ -98,7 +98,7 @@ for client_suffix in 31 32 33 34; do
 		"$BASE/api/v2/routes/search"
 	sleep 0.5
 done
-rg -qi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
+grep -Eqi '^Cache-Control: private, no-store' "$TMP_HEADERS" || {
 	echo "search success response must remain private, no-store" >&2
 	exit 1
 }
@@ -125,9 +125,9 @@ STATUS=$(curl -sS -o "$TMP_BODY" -w '%{http_code}' \
 
 sleep 1
 docker logs "$GATEWAY" > "$TMP_LOG" 2>&1
-[ "$(rg -c '"scope":"session"' "$TMP_LOG")" = 1 ]
-[ "$(rg -c '"scope":"search"' "$TMP_LOG")" = 2 ]
-! rg -q '198\.51\.100\.|integration-token|rotating-token' "$TMP_LOG"
+[ "$(grep -Ec '"scope":"session"' "$TMP_LOG")" = 1 ]
+[ "$(grep -Ec '"scope":"search"' "$TMP_LOG")" = 2 ]
+! grep -Eq '198\.51\.100\.|integration-token|rotating-token' "$TMP_LOG"
 BACKEND_PROBE=$(docker exec "$BACKEND" wget -qO- http://127.0.0.1:8080/probe)
 [ "$BACKEND_PROBE" = '{"requests":13}' ]
 

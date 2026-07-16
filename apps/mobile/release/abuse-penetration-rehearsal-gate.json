@@ -17,25 +17,25 @@
     "procedureIdDerivation": "matrixId + '.' + caseId",
     "targetAliasDerivation": "'target.' + matrixId",
     "ownerAliasDerivation": "'owner.' + matrixId",
-    "relativeEvidencePathPattern": "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+    "relativeEvidencePathPattern": "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$",
     "fieldTypes": {
       "root": { "schemaVersion": "integer", "releaseGate": "string", "issue": "integer", "status": "string", "rawInvocationStored": "boolean", "redactionPolicyId": "string", "artifactIdentity": "object", "evidence": "array", "productionLikeEvidence": "array", "matrices": "array" },
       "artifactIdentity": { "gitSha": "string", "versionCode": "integer", "androidApplicationId": "string", "dataPackManifestSha256": "string", "aabSha256": "string", "generatedApkSha256": "string", "backendImageDigest": "string", "backendArtifactSha256": "string" },
-      "evidence": { "evidenceId": "string", "result": "string", "localEvidencePath": "string" },
+      "evidence": { "evidenceId": "string", "result": "string", "localEvidencePath": "string", "artifactIdentitySha256": "string" },
       "matrix": { "matrixId": "string", "result": "string", "findingCounts": "object", "mediumFindingDisposition": "object", "cases": "array" },
       "findingCounts": { "critical": "integer", "high": "integer", "medium": "integer", "low": "integer" },
       "mediumFindingDisposition": { "ownerAlias": "string", "fixPlanEvidencePath": "string" },
-      "case": { "procedureId": "string", "targetAlias": "string", "expectedStatus": "integer", "observedStatus": "integer", "redactionResult": "string", "localEvidencePath": "string" }
+      "case": { "procedureId": "string", "targetAlias": "string", "expectedStatus": "integer", "observedStatus": "integer", "redactionResult": "string", "localEvidencePath": "string", "artifactIdentitySha256": "string" }
     },
     "requiredFields": {
       "rootForAllStatuses": ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
       "rootAdditionalForPass": ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
       "artifactIdentity": ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
-      "evidence": ["evidenceId", "result", "localEvidencePath"],
+      "evidence": ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
       "matrix": ["matrixId", "result", "findingCounts", "cases"],
       "findingCounts": ["critical", "high", "medium", "low"],
       "mediumFindingDisposition": ["ownerAlias", "fixPlanEvidencePath"],
-      "case": ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"]
+      "case": ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"]
     },
     "fieldPatterns": {
       "artifactIdentity": {
@@ -46,6 +46,12 @@
         "generatedApkSha256": "^[0-9a-f]{64}$",
         "backendArtifactSha256": "^[0-9a-f]{64}$",
         "backendImageDigest": "^sha256:[0-9a-f]{64}$"
+      },
+      "evidence": {
+        "artifactIdentitySha256": "^[0-9a-f]{64}$"
+      },
+      "case": {
+        "artifactIdentitySha256": "^[0-9a-f]{64}$"
       }
     }
   },
@@ -80,6 +86,11 @@
       "play-installed-build-smoke",
       "play-pre-launch-report-crash-anr-policy-summary",
       "network-trace-redaction-summary-from-play-installed-build",
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit",
       "deployed-public-https-backend-report-admin-base-url-evidence",
       "deployed-admin-operator-auth-session-csrf-summary",
       "deployed-signed-url-boundary-summary",
@@ -104,6 +115,39 @@
       ]
     }
   },
+  "routeV2IngressAttackMatrix": {
+    "issue": 1022,
+    "status": "BLOCKED_EXTERNAL",
+    "localRegressionStatus": "PASS",
+    "localAutomatedCases": [
+      {
+        "caseId": "attestation_nonce_request_hash",
+        "evidence": "RouteV2SessionServiceTest"
+      },
+      {
+        "caseId": "session_token_scope_expiry_quota",
+        "evidence": "RouteV2IngressFilterTest and ProductionRouteApiClosureTest"
+      },
+      {
+        "caseId": "gateway_401_origin_403_no_write",
+        "evidence": "ProductionRouteApiClosureTest"
+      },
+      {
+        "caseId": "gateway_ip_token_limiter_retry_after",
+        "evidence": "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh"
+      }
+    ],
+    "requiredSameRcProductionEvidence": [
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit"
+    ],
+    "productionMutationPerformed": false,
+    "explicitProductionApprovalRequired": true,
+    "rawCredentialOrExploitPayloadStored": false
+  },
   "productionLikeEvidencePolicy": {
     "requiredForClosing": [
       "play-installed-or-play-generated-artifact-identity",
@@ -116,7 +160,12 @@
       "deployed-ad-event-edge-rate-limit",
       "deployed-ad-event-origin-bypass-denial",
       "deployed-ad-event-privacy-redaction",
-      "container-hardening-negative-controls"
+      "container-hardening-negative-controls",
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit"
     ],
     "forbiddenClosureEvidence": [
       "static gate JSON",
@@ -256,6 +305,18 @@
       "severity": "release-blocker",
       "targetKo": "provider key, object credential, production password, local/internal endpoint exposure in app artifact, backend image, logs, PR evidence",
       "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"]
+    },
+    {
+      "id": "route_v2_ingress_abuse",
+      "area": "route-v2-ingress",
+      "severity": "release-blocker",
+      "targetKo": "Play Integrity nonce/requestHash, session scope·expiry·quota, gateway origin 증명, IP·token limiter 우회",
+      "requiredEvidence": [
+        "route-v2-attestation-session-test-output",
+        "route-v2-session-scope-expiry-quota-test-output",
+        "route-v2-origin-auth-negative-test-output",
+        "route-v2-gateway-rate-limit-integration-output"
+      ]
     },
     {
       "id": "ad_counter_inflation",
@@ -493,6 +554,61 @@
         "pr_evidence_redaction": [0]
       },
       "forbiddenSummaryValues": ["provider secret", "object storage credential", "production password", "signing private key", "local or internal endpoint"]
+    },
+    "routeV2IngressAbuse": {
+      "scenarioId": "route_v2_ingress_abuse",
+      "requiredEvidence": [
+        "route-v2-attestation-session-test-output",
+        "route-v2-session-scope-expiry-quota-test-output",
+        "route-v2-origin-auth-negative-test-output",
+        "route-v2-gateway-rate-limit-integration-output"
+      ],
+      "requiredCases": [
+        "attestation_valid",
+        "attestation_invalid_nonce_format",
+        "attestation_nonce_replay",
+        "attestation_stale_verdict",
+        "attestation_future_verdict",
+        "attestation_request_hash_mismatch",
+        "attestation_wrong_request_package",
+        "attestation_wrong_app_package",
+        "attestation_certificate_mismatch",
+        "attestation_app_recognition_mismatch",
+        "attestation_licensing_mismatch",
+        "attestation_device_integrity_mismatch",
+        "attestation_provider_unavailable",
+        "session_expired",
+        "session_wrong_scope",
+        "session_quota_exhausted",
+        "gateway_session_missing",
+        "direct_origin_bypass_no_write",
+        "gateway_ip_limiter",
+        "gateway_token_limiter"
+      ],
+      "summaryFields": ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "attestation_valid": [200],
+        "attestation_invalid_nonce_format": [403],
+        "attestation_nonce_replay": [403],
+        "attestation_stale_verdict": [403],
+        "attestation_future_verdict": [403],
+        "attestation_request_hash_mismatch": [403],
+        "attestation_wrong_request_package": [403],
+        "attestation_wrong_app_package": [403],
+        "attestation_certificate_mismatch": [403],
+        "attestation_app_recognition_mismatch": [403],
+        "attestation_licensing_mismatch": [403],
+        "attestation_device_integrity_mismatch": [403],
+        "attestation_provider_unavailable": [503],
+        "session_expired": [401],
+        "session_wrong_scope": [422],
+        "session_quota_exhausted": [429],
+        "gateway_session_missing": [401],
+        "direct_origin_bypass_no_write": [403],
+        "gateway_ip_limiter": [429],
+        "gateway_token_limiter": [429]
+      },
+      "forbiddenSummaryValues": ["raw attestation token", "raw session token", "authorization header", "client IP full address", "origin secret"]
     }
   },
   "manualRehearsalPolicy": {

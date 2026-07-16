@@ -3131,6 +3131,11 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "play-installed-build-smoke",
     "play-pre-launch-report-crash-anr-policy-summary",
     "network-trace-redaction-summary-from-play-installed-build",
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
     "deployed-public-https-backend-report-admin-base-url-evidence",
     "deployed-admin-operator-auth-session-csrf-summary",
     "deployed-signed-url-boundary-summary",
@@ -3148,6 +3153,68 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "raw signed URL",
     ),
   );
+  const routeV2SessionServiceTest = read(
+    "backend/src/test/java/com/easysubway/route/application/service/RouteV2SessionServiceTest.java",
+  );
+  const routeV2IngressFilterTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/RouteV2IngressFilterTest.java",
+  );
+  const productionRouteClosureTest = read(
+    "backend/src/test/java/com/easysubway/route/adapter/in/web/ProductionRouteApiClosureTest.java",
+  );
+  const routeV2GatewayTest = read("tools/ci/route-v2-gateway.test.mjs");
+  const routeV2GatewayProbe = read("tools/test/run-route-v2-gateway-integration.sh");
+  const ciWorkflow = read(".github/workflows/ci.yml");
+  const routeV2AttackMatrix = abusePenetrationRehearsalGate.routeV2IngressAttackMatrix;
+  assert.equal(routeV2AttackMatrix.issue, 1022);
+  assert.equal(routeV2AttackMatrix.status, "BLOCKED_EXTERNAL");
+  assert.equal(routeV2AttackMatrix.localRegressionStatus, "PASS");
+  assert.deepEqual(routeV2AttackMatrix.localAutomatedCases, [
+    {
+      caseId: "attestation_nonce_request_hash",
+      evidence: "RouteV2SessionServiceTest",
+    },
+    {
+      caseId: "session_token_scope_expiry_quota",
+      evidence: "RouteV2IngressFilterTest and ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_401_origin_403_no_write",
+      evidence: "ProductionRouteApiClosureTest",
+    },
+    {
+      caseId: "gateway_ip_token_limiter_retry_after",
+      evidence: "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh",
+    },
+  ]);
+  assert.deepEqual(routeV2AttackMatrix.requiredSameRcProductionEvidence, [
+    "play-installed-attestation-positive-negative-matrix",
+    "deployed-token-lifecycle-and-session-quota-rehearsal",
+    "deployed-gateway-401-origin-403-no-write-summary",
+    "deployed-limiter-boundary-burst-retry-after-summary",
+    "credential-log-metric-ui-analytics-absence-audit",
+  ]);
+  for (const evidenceId of routeV2AttackMatrix.requiredSameRcProductionEvidence) {
+    assert.ok(
+      abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(evidenceId),
+      `${evidenceId} must be enforced by the PASS summary evidence catalog`,
+    );
+  }
+  assert.equal(routeV2AttackMatrix.productionMutationPerformed, false);
+  assert.equal(routeV2AttackMatrix.explicitProductionApprovalRequired, true);
+  assert.equal(routeV2AttackMatrix.rawCredentialOrExploitPayloadStored, false);
+  assert.match(routeV2SessionServiceTest, /2분보다 오래됐거나 미래인 verdict와 다른 requestHash를 거부한다/);
+  assert.match(routeV2SessionServiceTest, /128-bit base64url nonce 형식과 2분 replay를 거부한다/);
+  assert.match(routeV2IngressFilterTest, /50회를 소비한 session은 exact 429와 정수 Retry-After를 반환한다/);
+  assert.match(routeV2IngressFilterTest, /만료 session은 exact 401이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /다른 scope session은 exact 422이고 controller를 호출하지 않는다/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_ORIGIN_FORBIDDEN/);
+  assert.match(routeV2IngressFilterTest, /ROUTE_SESSION_REQUIRED/);
+  assert.match(productionRouteClosureTest, /direct-origin Route V2는 handler와 DB write 전에 exact 403으로 거부한다/);
+  assert.match(productionRouteClosureTest, /session 전체 50회 초과는 integer Retry-After와 exact 429다/);
+  assert.match(routeV2GatewayTest, /IP·token limiter와 exact 429 계약/);
+  assert.match(routeV2GatewayProbe, /Retry-After: 60/);
+  assert.match(ciWorkflow, /tools\/test\/run-route-v2-gateway-integration\.sh/);
   assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
   assert.ok(
     abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
@@ -3182,6 +3249,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "provider_and_release_secret_exposure",
       "receipt_token_replay_and_status_abuse",
       "report_photo_upload_abuse",
+      "route_v2_ingress_abuse",
       "signed_url_lifecycle_abuse",
     ],
   );
@@ -3221,6 +3289,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "providerReleaseSecretExposure",
     "receiptTokenAbuse",
     "reportUploadLifecycle",
+    "routeV2IngressAbuse",
     "signedUploadUrlBoundary",
   ]);
   assert.deepEqual(
@@ -3647,25 +3716,25 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   assert.equal(contract.procedureIdDerivation, "matrixId + '.' + caseId");
   assert.equal(contract.targetAliasDerivation, "'target.' + matrixId");
   assert.equal(contract.ownerAliasDerivation, "'owner.' + matrixId");
-  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$");
+  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$");
   assert.deepEqual(contract.fieldTypes, {
     root: { schemaVersion: "integer", releaseGate: "string", issue: "integer", status: "string", rawInvocationStored: "boolean", redactionPolicyId: "string", artifactIdentity: "object", evidence: "array", productionLikeEvidence: "array", matrices: "array" },
     artifactIdentity: { gitSha: "string", versionCode: "integer", androidApplicationId: "string", dataPackManifestSha256: "string", aabSha256: "string", generatedApkSha256: "string", backendImageDigest: "string", backendArtifactSha256: "string" },
-    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string" },
+    evidence: { evidenceId: "string", result: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
     matrix: { matrixId: "string", result: "string", findingCounts: "object", mediumFindingDisposition: "object", cases: "array" },
     findingCounts: { critical: "integer", high: "integer", medium: "integer", low: "integer" },
     mediumFindingDisposition: { ownerAlias: "string", fixPlanEvidencePath: "string" },
-    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string" },
+    case: { procedureId: "string", targetAlias: "string", expectedStatus: "integer", observedStatus: "integer", redactionResult: "string", localEvidencePath: "string", artifactIdentitySha256: "string" },
   });
   assert.deepEqual(contract.requiredFields, {
     rootForAllStatuses: ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
     rootAdditionalForPass: ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
     artifactIdentity: ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
-    evidence: ["evidenceId", "result", "localEvidencePath"],
+    evidence: ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
     matrix: ["matrixId", "result", "findingCounts", "cases"],
     findingCounts: ["critical", "high", "medium", "low"],
     mediumFindingDisposition: ["ownerAlias", "fixPlanEvidencePath"],
-    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+    case: ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"],
   });
   assert.deepEqual(contract.fieldPatterns.artifactIdentity, {
     gitSha: "^[0-9a-f]{40}$", androidApplicationId: "^com\\.easysubway\\.app$",
@@ -3673,11 +3742,13 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     generatedApkSha256: "^[0-9a-f]{64}$", backendArtifactSha256: "^[0-9a-f]{64}$",
     backendImageDigest: "^sha256:[0-9a-f]{64}$",
   });
+  assert.deepEqual(contract.fieldPatterns.evidence, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
+  assert.deepEqual(contract.fieldPatterns.case, { artifactIdentitySha256: "^[0-9a-f]{64}$" });
   assert.equal(existsSync(path.join(root, "tools/security/abuse-penetration-summary-schema.mjs")), true);
   const { deriveSummaryCatalog } = await import("../security/abuse-penetration-summary-schema.mjs");
   const catalog = deriveSummaryCatalog(abusePenetrationRehearsalGate);
   assert.equal(Object.isFrozen(catalog), true);
-  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "signedUploadUrlBoundary"]);
+  assert.deepEqual(catalog.matrixIds, ["adCounterInflation", "adminOperatorSecurity", "distributedRateLimitAbuse", "objectStorageLifecycle", "providerReleaseSecretExposure", "receiptTokenAbuse", "reportUploadLifecycle", "routeV2IngressAbuse", "signedUploadUrlBoundary"]);
   const expectedProcedures = Object.entries(abusePenetrationRehearsalGate.rehearsalMatrices).flatMap(([matrixId, matrix]) =>
     matrix.requiredCases.map((caseId) => [
       `${matrixId}.${caseId}`,
@@ -3712,6 +3783,37 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     "cloudflare-ipv4-live-oci-set-equality-summary", "postgres-atomic-daily-cap-test-output",
     "identifier-zero-request-capture-summary", "origin-log-ip-ua-absence-summary", "cloudflare-logpush-ip-ua-absence-summary",
   ]);
+  const routeV2 = abusePenetrationRehearsalGate.rehearsalMatrices.routeV2IngressAbuse;
+  assert.deepEqual(routeV2.requiredCases, [
+    "attestation_valid",
+    "attestation_invalid_nonce_format",
+    "attestation_nonce_replay",
+    "attestation_stale_verdict",
+    "attestation_future_verdict",
+    "attestation_request_hash_mismatch",
+    "attestation_wrong_request_package",
+    "attestation_wrong_app_package",
+    "attestation_certificate_mismatch",
+    "attestation_app_recognition_mismatch",
+    "attestation_licensing_mismatch",
+    "attestation_device_integrity_mismatch",
+    "attestation_provider_unavailable",
+    "session_expired",
+    "session_wrong_scope",
+    "session_quota_exhausted",
+    "gateway_session_missing",
+    "direct_origin_bypass_no_write",
+    "gateway_ip_limiter",
+    "gateway_token_limiter",
+  ]);
+  for (const caseId of routeV2.requiredCases) {
+    assert.equal(routeV2.expectedStatusByCase[caseId].length, 1, `${caseId} must require one exact result`);
+  }
+  assert.deepEqual(routeV2.expectedStatusByCase.gateway_token_limiter, [429]);
+  const gatewayScriptClassification = await classifyChangedFiles([
+    "tools/test/run-route-v2-gateway-integration.sh",
+  ]);
+  assert.equal(gatewayScriptClassification.repository, "true");
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
 });
@@ -5438,6 +5540,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   );
   assert.match(routeV2GatewayProbe, /session success response must remain private, no-store/);
   assert.match(routeV2GatewayProbe, /search success response must remain private, no-store/);
+  assert.doesNotMatch(routeV2GatewayProbe, /(^|\n)\s*rg\s/, "gateway probe must use POSIX runner tools available in GitHub Actions");
   assert.match(
     securityConfig,
     /@Profile\("prod \| staging \| release \| prod-like"\)[\s\S]*SecurityFilterChain routeV2IngressSecurityFilterChain/,

@@ -95,6 +95,9 @@ while IFS= read -r file; do
       repository=true
       realtime=true
       ;;
+    tools/test/**)
+      repository=true
+      ;;
     tools/security/**)
       repository=true
       ;;
