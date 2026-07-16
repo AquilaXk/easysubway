@@ -110,6 +110,21 @@ test("A RED v2 PASS evidence is bound to the root artifact identity", () => {
     () => validateAbusePenetrationSummary(crossCollectionDuplicate, gate, true),
     (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.rule === "duplicate-evidence-path",
   );
+  const traversed = schemaV2Pass();
+  traversed.evidence[0].localEvidencePath = `${schemaV2EvidenceRoot}/../older-rc/result.json`;
+  assert.throws(
+    () => validateAbusePenetrationSummary(traversed, gate, true),
+    (error) => error.code === "SUMMARY_V2_SCHEMA_INVALID" ||
+      (error.code === "SUMMARY_IDENTITY_INVALID" && error.rule === "root-git-sha-path"),
+  );
+  const staleCase = schemaV2Pass();
+  staleCase.matrices.find((matrix) => matrix.matrixId === "routeV2IngressAbuse")
+    .cases[0].localEvidencePath =
+      `.codex/evidence/security/abuse-penetration-rehearsal/${"f".repeat(40)}/result.json`;
+  assert.throws(
+    () => validateAbusePenetrationSummary(staleCase, gate, true),
+    (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.rule === "root-git-sha-path",
+  );
 });
 test("A RED direct schema rejects every missing required and extra field", () => {
   const requiredByKind = {

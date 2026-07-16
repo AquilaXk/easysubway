@@ -17,7 +17,7 @@
     "procedureIdDerivation": "matrixId + '.' + caseId",
     "targetAliasDerivation": "'target.' + matrixId",
     "ownerAliasDerivation": "'owner.' + matrixId",
-    "relativeEvidencePathPattern": "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+    "relativeEvidencePathPattern": "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$",
     "fieldTypes": {
       "root": { "schemaVersion": "integer", "releaseGate": "string", "issue": "integer", "status": "string", "rawInvocationStored": "boolean", "redactionPolicyId": "string", "artifactIdentity": "object", "evidence": "array", "productionLikeEvidence": "array", "matrices": "array" },
       "artifactIdentity": { "gitSha": "string", "versionCode": "integer", "androidApplicationId": "string", "dataPackManifestSha256": "string", "aabSha256": "string", "generatedApkSha256": "string", "backendImageDigest": "string", "backendArtifactSha256": "string" },
@@ -562,6 +562,7 @@
       ],
       "requiredCases": [
         "attestation_valid",
+        "attestation_invalid_nonce_format",
         "attestation_nonce_replay",
         "attestation_stale_verdict",
         "attestation_future_verdict",
@@ -584,6 +585,7 @@
       "summaryFields": ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
       "expectedStatusByCase": {
         "attestation_valid": [200],
+        "attestation_invalid_nonce_format": [403],
         "attestation_nonce_replay": [403],
         "attestation_stale_verdict": [403],
         "attestation_future_verdict": [403],

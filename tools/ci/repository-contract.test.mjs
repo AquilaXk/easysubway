@@ -3539,7 +3539,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   assert.equal(contract.procedureIdDerivation, "matrixId + '.' + caseId");
   assert.equal(contract.targetAliasDerivation, "'target.' + matrixId");
   assert.equal(contract.ownerAliasDerivation, "'owner.' + matrixId");
-  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$");
+  assert.equal(contract.relativeEvidencePathPattern, "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$");
   assert.deepEqual(contract.fieldTypes, {
     root: { schemaVersion: "integer", releaseGate: "string", issue: "integer", status: "string", rawInvocationStored: "boolean", redactionPolicyId: "string", artifactIdentity: "object", evidence: "array", productionLikeEvidence: "array", matrices: "array" },
     artifactIdentity: { gitSha: "string", versionCode: "integer", androidApplicationId: "string", dataPackManifestSha256: "string", aabSha256: "string", generatedApkSha256: "string", backendImageDigest: "string", backendArtifactSha256: "string" },
@@ -3608,6 +3608,7 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
   const routeV2 = abusePenetrationRehearsalGate.rehearsalMatrices.routeV2IngressAbuse;
   assert.deepEqual(routeV2.requiredCases, [
     "attestation_valid",
+    "attestation_invalid_nonce_format",
     "attestation_nonce_replay",
     "attestation_stale_verdict",
     "attestation_future_verdict",
@@ -3631,6 +3632,10 @@ test("A RED repository locks summary v2 contract and catalog", async () => {
     assert.equal(routeV2.expectedStatusByCase[caseId].length, 1, `${caseId} must require one exact result`);
   }
   assert.deepEqual(routeV2.expectedStatusByCase.gateway_token_limiter, [429]);
+  const gatewayScriptClassification = await classifyChangedFiles([
+    "tools/test/run-route-v2-gateway-integration.sh",
+  ]);
+  assert.equal(gatewayScriptClassification.repository, "true");
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.findingPolicy.criticalHighAllowed, 0);
 });
