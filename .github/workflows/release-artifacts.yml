@@ -692,6 +692,10 @@ jobs:
             --gate-status backendOperations=BLOCKED_EXTERNAL
             --gate-status androidReleaseQuality=BLOCKED_EXTERNAL
             --gate-status abusePenetrationRehearsal=BLOCKED_EXTERNAL
+            --datapack-gate-status source_governance=BLOCKED_EXTERNAL
+            --datapack-gate-status rollback_rescue=BLOCKED_EXTERNAL
+            --datapack-gate-status freshness_conditional_publish=BLOCKED_EXTERNAL
+            --datapack-gate-status callback_reconciliation=BLOCKED_EXTERNAL
           )
           android_artifact_source="none"
           if [[ -f release-artifacts/downloaded/android-production-rc/app-release.aab ]]; then
